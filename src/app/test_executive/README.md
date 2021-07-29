@@ -11,10 +11,10 @@ Note: this environment setup assumes that one is a member of o(1) labs and has a
 
 ![automated-validation service account "Keys" tab](https://user-images.githubusercontent.com/3465290/112069746-9aaed080-8b29-11eb-83f1-f36876f3ac3d.png)
 
-3) Other than `GCLOUD_API_KEY`, ensure the following other environment variables are also properly set (preferably in in .bashrc or .profile.): 
+3) Other than `GCLOUD_API_KEY`, ensure the following other environment variables are also properly set (preferably in in .bashrc or .profile.):
 - `KUBE_CONFIG_PATH`.  this should usually be `~/.kube/config`
-- any other vars relating to Google cloud access, 
-- any AWS related vars, namely: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-west-2`, 
+- any other vars relating to Google cloud access,
+- any AWS related vars, namely: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-west-2`,
 - vars relating to ocaml compilation
 
 4) Run the following commands in order to log in to Google Cloud, and activate the service account for one's work machine.
@@ -44,20 +44,20 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 2) Build `test_executive.exe` with the `integration_tests` profile
 
 3) Run `test_executive.exe`, passing in the coda image selected in step 1, and the name of the test one intends to run
-  
+
 3.1) It's recommended to run with the `--debug` flag when iterating on the development of tests.  this flag will pause the destruction and cleanup of the generated testnet and associated terraform configuration files, so that those things can be inspected post-hoc
-  
+
 3.2) It's also recommended to pipe log output through logproc with a filter to remove Debug and Spam logs be default (those log levels are very verbose and are intended for debugging test framework internals).  Use `tee test.log` to store the raw output into the file `test.log` so that it can be saved and later inspected.
 
 ```sh
 alias test_executive=./_build/default/src/app/test_executive/test_executive.exe
 alias logproc=./_build/default/src/app/logproc/logproc.exe
 
-CODA_IMAGE=... # pick a suitable (recent) "coda-daemon-puppeteered:XXX-develop-XXX" dockerhub
+MINA_IMAGE=... # pick a suitable (recent) "coda-daemon-puppeteered:XXX-develop-XXX" dockerhub
 TEST=... # name of the test one wants to run
 
 dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
-test_executive cloud $TEST --coda-image=$CODA_IMAGE --debug | tee test.log | logproc -i inline -f '!(.level in ["Debug", "Spam"])'
+test_executive cloud $TEST --mina-image=$MINA_IMAGE --debug | tee test.log | logproc -i inline -f '!(.level in ["Debug", "Spam"])'
 ```
 
 4) OPTIONAL: In the event that the automatic cleanup doesn't work properly, one needs to do it manually.  Firstly, destroy what's on GCP with `kubectl delete namespace <namespace of test>`.  Then, delete the local testnet directory, which is in `./automation/terraform/testnets/`

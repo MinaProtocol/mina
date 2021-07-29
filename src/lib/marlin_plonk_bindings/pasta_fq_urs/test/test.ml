@@ -5,7 +5,7 @@ let () =
   let urs = create 17 in
   let _lgr = lagrange_commitment urs ~domain_size:255 1 in
   let _evals =
-    commit_evaluations urs ~domain_size:12 [|Fq.of_int 15; Fq.of_int 35|]
+    commit_evaluations urs ~domain_size:12 [| Fq.of_int 15; Fq.of_int 35 |]
   in
   Format.printf "batch_accumulator_check=%b@."
     (batch_accumulator_check urs [||] [||]) ;
@@ -23,7 +23,7 @@ let () =
   Sys.remove "./test_urs_17" ;
   let _lgr = lagrange_commitment urs2 ~domain_size:255 1 in
   let _evals =
-    commit_evaluations urs2 ~domain_size:12 [|Fq.of_int 15; Fq.of_int 35|]
+    commit_evaluations urs2 ~domain_size:12 [| Fq.of_int 15; Fq.of_int 35 |]
   in
   Format.printf "batch_accumulator_check=%b@."
     (batch_accumulator_check urs2 [||] [||]) ;

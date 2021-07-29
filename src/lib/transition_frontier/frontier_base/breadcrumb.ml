@@ -10,7 +10,7 @@ module T = struct
 
   type t =
     { validated_transition: External_transition.Validated.t
-    ; staged_ledger: Staged_ledger.t sexp_opaque
+    ; staged_ledger: Staged_ledger.t [@sexp.opaque]
     ; just_emitted_a_proof: bool
     ; transition_receipt_time: Time.t option }
   [@@deriving sexp, fields]

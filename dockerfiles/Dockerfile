@@ -1,7 +1,7 @@
-FROM codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
+FROM codaprotocol/coda:toolchain-77e1b03e2785a003827e9bb61af4f4c51f37fdb0
 
 # same as in Dockerfile-toolchain
-ARG OCAML_VERSION=4.07.1
+ARG OCAML_VERSION=4.11.2
 
 ENV OPAM_DIR             "/home/opam/.opam/$OCAML_VERSION"
 ENV PATH                 "${OPAM_DIR}/bin:$PATH"

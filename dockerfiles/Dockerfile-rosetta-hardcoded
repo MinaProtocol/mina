@@ -13,7 +13,7 @@ ARG OPAM_VERSION=2.0.7
 ARG GO_VERSION=1.13.10
 
 # Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
-ARG RUST_VERSION=1.45.2
+ARG RUST_VERSION=1.52.1
 
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.17.2
@@ -277,7 +277,7 @@ FROM debian@sha256:b527bec3708ee1fe2ffb4625d742a60bb45b06064e7c64a81b16550fe4271
 
 ARG POSTGRES_DATA_DIR=/data/postgresql
 ARG CODA_DAEMON_PORT=10101
-ARG CODA_CONFIG_DIR=/root/.mina-config
+ARG MINA_CONFIG_DIR=/root/.mina-config
 # Sample public key for use in dev profile / demo mode genesis block
 ARG PK=B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g
 
@@ -319,14 +319,14 @@ COPY --from=builder /home/opam/coda/src/app/rosetta/config.json /data/config.jso
 
 
 # Set up coda config dir with demo mode keys and genesis
-COPY --from=builder /home/opam/demo-genesis ${CODA_CONFIG_DIR}/demo-genesis
-COPY --from=builder /home/opam/coda/src/app/rosetta/demo-config.json ${CODA_CONFIG_DIR}/daemon.json
+COPY --from=builder /home/opam/demo-genesis ${MINA_CONFIG_DIR}/demo-genesis
+COPY --from=builder /home/opam/coda/src/app/rosetta/demo-config.json ${MINA_CONFIG_DIR}/daemon.json
 
-RUN mkdir -p --mode=700 ${CODA_CONFIG_DIR}/wallets/store/ \
-  && echo "$PK" >  ${CODA_CONFIG_DIR}/wallets/store/$PK.pub \
+RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
+  && echo "$PK" >  ${MINA_CONFIG_DIR}/wallets/store/$PK.pub \
   && echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"8jGuTAxw3zxtWasVqcD1H6rEojHLS1yJmG3aHHd","pwsalt":"AiUCrMJ6243h3TBmZ2rqt3Voim1Y","pwdiff":[134217728,6],"ciphertext":"DbAy736GqEKWe9NQWT4yaejiZUo9dJ6rsK7cpS43APuEf5AH1Qw6xb1s35z8D2akyLJBrUr6m"}' \
-  > ${CODA_CONFIG_DIR}/wallets/store/${PK} \
-  && chmod go-rwx ${CODA_CONFIG_DIR}/wallets/store/${PK}
+  > ${MINA_CONFIG_DIR}/wallets/store/${PK} \
+  && chmod go-rwx ${MINA_CONFIG_DIR}/wallets/store/${PK}
 
 USER postgres
 

@@ -1,7 +1,7 @@
 open Async_kernel
 open Core_kernel
 
-type 'a final_state = [`Failed | `Success of 'a] Ivar.t
+type 'a final_state = [ `Failed | `Success of 'a ] Ivar.t
 
 (** [Constant.S] is a helper signature for passing constant values
  *  to functors.
@@ -24,7 +24,7 @@ module Registry = struct
     val element_added : element -> unit
 
     val element_removed :
-      [`Consumed | `Unconsumed | `Failure] -> element -> unit
+      [ `Consumed | `Unconsumed | `Failure ] -> element -> unit
   end
 end
 
@@ -111,7 +111,7 @@ module Cache = struct
          name:string
       -> logger:Logger.t
       -> on_add:('elt -> unit)
-      -> on_remove:([`Consumed | `Unconsumed | `Failure] -> 'elt -> unit)
+      -> on_remove:([ `Consumed | `Unconsumed | `Failure ] -> 'elt -> unit)
       -> (module Hashtbl.Key_plain with type t = 'elt)
       -> 'elt t
 
@@ -184,10 +184,11 @@ module Transmuter_cache = struct
         (Registry : Registry.S with type element := Transmuter.Target.t)
         (Name : Constant.S with type t := string) :
       S
-      with module Cached := Cached
-       and module Cache := Cache
-       and type source = Transmuter.Source.t
-       and type target = Transmuter.Target.t
+        with module Cached := Cached
+         and module Cache := Cache
+         and type source = Transmuter.Source.t
+         and type target = Transmuter.Target.t
+    [@@warning "-67"]
   end
 end
 

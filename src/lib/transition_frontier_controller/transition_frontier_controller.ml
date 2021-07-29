@@ -40,11 +40,11 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
        * are no duplicates in the list *)
       Transition_handler.Unprocessed_transition_cache.register_exn
         unprocessed_transition_cache t
-      |> Strict_pipe.Writer.write primary_transition_writer ) ;
+      |> Strict_pipe.Writer.write primary_transition_writer) ;
   let initial_state_hashes =
     List.map collected_transitions ~f:(fun envelope ->
         Network_peer.Envelope.Incoming.data envelope
-        |> Mina_transition.External_transition.Initial_validated.state_hash )
+        |> Mina_transition.External_transition.Initial_validated.state_hash)
   in
   let extensions = Transition_frontier.extensions frontier in
   let already_reported = ref false in
@@ -53,8 +53,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
        (Transition_frontier.Extensions.get_view_pipe extensions New_breadcrumbs)
        ~f:(fun new_breadcrumbs ->
          let new_state_hashes =
-           List.map new_breadcrumbs
-             ~f:Transition_frontier.Breadcrumb.state_hash
+           List.map new_breadcrumbs ~f:Transition_frontier.Breadcrumb.state_hash
          in
          List.iter new_state_hashes ~f:(fun new_state_hash ->
              if
@@ -65,15 +64,15 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
                Mina_metrics.(
                  Gauge.set Catchup.initial_catchup_time
                    Time.(Span.to_min @@ diff (now ()) start_time)) ;
-               already_reported := true ) ) ;
-         Deferred.unit ) ;
+               already_reported := true )) ;
+         Deferred.unit) ;
   trace_recurring "validator" (fun () ->
       Transition_handler.Validator.run
         ~consensus_constants:
           (Precomputed_values.consensus_constants precomputed_values)
         ~logger ~trust_system ~time_controller ~frontier
         ~transition_reader:network_transition_reader ~valid_transition_writer
-        ~unprocessed_transition_cache ) ;
+        ~unprocessed_transition_cache) ;
   Strict_pipe.Reader.iter_without_pushback valid_transition_reader
     ~f:(Strict_pipe.Writer.write primary_transition_writer)
   |> don't_wait_for ;
@@ -84,11 +83,11 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
         ~primary_transition_reader ~producer_transition_reader
         ~clean_up_catchup_scheduler ~catchup_job_writer
         ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-        ~processed_transition_writer ) ;
+        ~processed_transition_writer) ;
   trace_recurring "catchup" (fun () ->
       Ledger_catchup.run ~logger ~precomputed_values ~trust_system ~verifier
         ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
-        ~unprocessed_transition_cache ) ;
+        ~unprocessed_transition_cache) ;
   Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
       let open Strict_pipe.Writer in
       kill valid_transition_writer ;
@@ -98,6 +97,6 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       kill catchup_breadcrumbs_writer ;
       if Ivar.is_full clean_up_catchup_scheduler then
         [%log error] "Ivar.fill bug is here!" ;
-      Ivar.fill clean_up_catchup_scheduler () )
+      Ivar.fill clean_up_catchup_scheduler ())
   |> don't_wait_for ;
   processed_transition_reader

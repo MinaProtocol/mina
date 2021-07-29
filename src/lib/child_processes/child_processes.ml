@@ -8,18 +8,22 @@ module Termination = Termination
 exception Child_died
 
 type t =
-  { process: Process.t
-  ; stdout_pipe: string Strict_pipe.Reader.t
-  ; stderr_pipe: string Strict_pipe.Reader.t
-  ; stdin: Writer.t
-  ; terminated_ivar: Unix.Exit_or_signal.t Or_error.t Ivar.t
-  ; mutable killing: bool
-  ; mutable termination_response:
+  { process : Process.t
+  ; stdout_pipe : string Strict_pipe.Reader.t
+  ; stderr_pipe : string Strict_pipe.Reader.t
+  ; stdin : Writer.t
+  ; terminated_ivar : Unix.Exit_or_signal.t Or_error.t Ivar.t
+  ; mutable killing : bool
+  ; mutable termination_response :
       [ `Always_raise
       | `Raise_on_failure
       | `Handler of
-        killed:bool -> Unix.Exit_or_signal.t Or_error.t -> unit Deferred.t
-      | `Ignore ] }
+           killed:bool
+        -> Process.t
+        -> Unix.Exit_or_signal.t Or_error.t
+        -> unit Deferred.t
+      | `Ignore ]
+  }
 
 let stdout_lines : t -> string Strict_pipe.Reader.t = fun t -> t.stdout_pipe
 
@@ -41,11 +45,7 @@ let keep_trying :
     | [] ->
         return e
     | x :: xs -> (
-        match%bind f x with
-        | Ok r ->
-            return (Ok r)
-        | Error e ->
-            go (Error e) xs )
+        match%bind f x with Ok r -> return (Ok r) | Error e -> go (Error e) xs )
   in
   go (Or_error.error_string "empty input") xs
 
@@ -75,7 +75,7 @@ let get_project_root () =
 let get_mina_binary () =
   let open Async in
   let open Deferred.Or_error.Let_syntax in
-  let%bind os = Process.run ~prog:"uname" ~args:["-s"] () in
+  let%bind os = Process.run ~prog:"uname" ~args:[ "-s" ] () in
   if String.equal os "Darwin\n" then
     let open Ctypes in
     let ns_get_executable_path =
@@ -123,8 +123,7 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
               pid_str ;
             Deferred.unit
         | `Ok -> (
-            [%log debug] "Successfully sent TERM signal to %s (%s)" name
-              pid_str ;
+            [%log debug] "Successfully sent TERM signal to %s (%s)" name pid_str ;
             let%bind () = after (Time.Span.of_sec 0.5) in
             match Signal.send Signal.kill (`Pid pid) with
             | `No_such_process ->
@@ -151,16 +150,17 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
                 name
                 ~metadata:
                   [ ("childPid", `Int (Pid.to_int pid))
-                  ; ("exn", `String (Exn.to_string exn)) ] ;
+                  ; ("exn", `String (Exn.to_string exn))
+                  ] ;
               Deferred.unit ) )
   | `Unknown | `No ->
       [%log debug] "No PID file for %s" name ;
       Deferred.unit
 
 type output_handling =
-  [`Log of Logger.Level.t | `Don't_log]
-  * [`Pipe | `No_pipe]
-  * [`Keep_empty | `Filter_empty]
+  [ `Log of Logger.Level.t | `Don't_log ]
+  * [ `Pipe | `No_pipe ]
+  * [ `Keep_empty | `Filter_empty ]
 
 (* Given a Reader.t coming from a process output, optionally log the lines
    coming from it and return a strict pipe that will get the lines if the
@@ -185,7 +185,7 @@ let reader_to_strict_pipe_with_logging :
               Strict_pipe.Writer.write master_w line
           | `Filter_empty ->
               if not (String.equal line "") then
-                Strict_pipe.Writer.write master_w line )
+                Strict_pipe.Writer.write master_w line)
     >>= fun () ->
     Strict_pipe.Writer.close master_w ;
     Deferred.unit ) ;
@@ -196,32 +196,31 @@ let reader_to_strict_pipe_with_logging :
          | `Log level -> (
              let simple_log_msg =
                lazy
-                 { Logger.Message.timestamp= Time.now ()
+                 { Logger.Message.timestamp = Time.now ()
                  ; level
-                 ; source=
+                 ; source =
                      Some
                        (Logger.Source.create ~module_:__MODULE__
                           ~location:__LOC__)
-                 ; message= "Output from process $child_name: $line"
-                 ; metadata=
+                 ; message = "Output from process $child_name: $line"
+                 ; metadata =
                      String.Map.set ~key:"child_name" ~data:(`String name)
                        (String.Map.set ~key:"line" ~data:(`String line)
                           (Logger.metadata logger))
-                 ; event_id= None }
+                 ; event_id = None
+                 }
              in
-             match
-               Option.try_with (fun () -> Yojson.Safe.from_string line)
-             with
+             match Option.try_with (fun () -> Yojson.Safe.from_string line) with
              | Some json -> (
-               match Logger.Message.of_yojson json with
-               | Ok msg ->
-                   Logger.raw logger msg
-               | Error _err ->
-                   Logger.raw logger (Lazy.force simple_log_msg) )
+                 match Logger.Message.of_yojson json with
+                 | Ok msg ->
+                     Logger.raw logger msg
+                 | Error _err ->
+                     Logger.raw logger (Lazy.force simple_log_msg) )
              | None ->
                  Logger.raw logger (Lazy.force simple_log_msg) )
          | `Don't_log ->
-             () )) ;
+             ())) ;
   (* Ideally we'd close the pipe, but you can't do that with a reader, so we
      iterate over it and drop everything. Since Strict_pipe enforces a single
      reader this is safe. *)
@@ -241,13 +240,15 @@ let start_custom :
     -> args:string list
     -> stdout:output_handling
     -> stderr:output_handling
-    -> termination:[ `Always_raise
-                   | `Raise_on_failure
-                   | `Handler of
-                        killed:bool
-                     -> Unix.Exit_or_signal.t Or_error.t
-                     -> unit Deferred.t
-                   | `Ignore ]
+    -> termination:
+         [ `Always_raise
+         | `Raise_on_failure
+         | `Handler of
+              killed:bool
+           -> Process.t
+           -> Unix.Exit_or_signal.t Or_error.t
+           -> unit Deferred.t
+         | `Ignore ]
     -> t Deferred.Or_error.t =
  fun ~logger ~name ~git_root_relative_path ~conf_dir ~args ~stdout ~stderr
      ~termination ->
@@ -259,7 +260,7 @@ let start_custom :
              Deferred.Or_error.return ()
          | _ ->
              Deferred.Or_error.errorf "Config directory %s does not exist"
-               conf_dir )
+               conf_dir)
   in
   let lock_path = conf_dir ^/ name ^ ".lock" in
   let%bind () =
@@ -269,7 +270,8 @@ let start_custom :
   [%log debug] "Starting custom child process $name with args $args"
     ~metadata:
       [ ("name", `String name)
-      ; ("args", `List (List.map args ~f:(fun a -> `String a))) ] ;
+      ; ("args", `List (List.map args ~f:(fun a -> `String a)))
+      ] ;
   let%bind mina_binary_path = get_mina_binary () in
   let relative_to_root =
     get_project_root ()
@@ -277,21 +279,25 @@ let start_custom :
   in
   let%bind process =
     keep_trying
+      (* TODO: remove CODA...PATH and coda-, eventually *)
       (List.filter_opt
-         [ Unix.getenv @@ "CODA_" ^ String.uppercase name ^ "_PATH"
+         [ Unix.getenv @@ "MINA_" ^ String.uppercase name ^ "_PATH"
+         ; Unix.getenv @@ "CODA_" ^ String.uppercase name ^ "_PATH"
          ; relative_to_root
          ; Some (Filename.dirname mina_binary_path ^/ name)
          ; Some ("mina-" ^ name)
-         ; Some ("coda-" ^ name) ])
+         ; Some ("coda-" ^ name)
+         ])
       ~f:(fun prog -> Process.create ~stdin:"" ~prog ~args ())
   in
   [%log info] "Custom child process $name started with pid $pid"
     ~metadata:
       [ ("name", `String name)
       ; ("args", `List (List.map args ~f:(fun a -> `String a)))
-      ; ("pid", `Int (Process.pid process |> Pid.to_int)) ] ;
+      ; ("pid", `Int (Process.pid process |> Pid.to_int))
+      ] ;
   Termination.wait_for_process_log_errors ~logger process ~module_:__MODULE__
-    ~location:__LOC__ ;
+    ~location:__LOC__ ~here:[%here] ;
   let%bind () =
     Deferred.map ~f:Or_error.return
     @@ Async.Writer.save lock_path
@@ -302,22 +308,23 @@ let start_custom :
     reader_to_strict_pipe_with_logging (Process.stdout process)
       (name ^ "-stdout") stdout
       (Logger.extend logger
-         [("process", `String name); ("handle", `String "stdout")])
+         [ ("process", `String name); ("handle", `String "stdout") ])
   in
   let stderr_pipe =
     reader_to_strict_pipe_with_logging (Process.stderr process)
       (name ^ "-stderr") stderr
       (Logger.extend logger
-         [("process", `String name); ("handle", `String "stderr")])
+         [ ("process", `String name); ("handle", `String "stderr") ])
   in
   let t =
     { process
     ; stdout_pipe
     ; stderr_pipe
-    ; stdin= Process.stdin process
+    ; stdin = Process.stdin process
     ; terminated_ivar
-    ; killing= false
-    ; termination_response= termination }
+    ; killing = false
+    ; termination_response = termination
+    }
   in
   don't_wait_for
     (let open Deferred.Let_syntax in
@@ -341,7 +348,7 @@ let start_custom :
             Error_json.error_to_yojson err
       in
       [%log fatal] "Process died unexpectedly: $exit_or_signal"
-        ~metadata:[("exit_or_signal", exit_or_signal)] ;
+        ~metadata:[ ("exit_or_signal", exit_or_signal) ] ;
       raise Child_died
     in
     match (t.termination_response, termination_status) with
@@ -354,7 +361,7 @@ let start_custom :
     | `Raise_on_failure, Ok (Ok ()) ->
         Deferred.unit
     | `Handler f, _ ->
-        f ~killed:t.killing termination_status) ;
+        f ~killed:t.killing process termination_status) ;
   Deferred.Or_error.return t
 
 let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
@@ -383,10 +390,8 @@ let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
   | Some _ ->
       Deferred.Or_error.error_string "already terminated"
 
-let register_process ?termination_expected (termination : Termination.t)
-    (process : t) kind =
-  Termination.register_process ?termination_expected termination
-    process.process kind
+let register_process (termination : Termination.t) (process : t) kind =
+  Termination.register_process termination process.process kind
 
 let%test_module _ =
   ( module struct
@@ -396,7 +401,7 @@ let%test_module _ =
       Async.Thread_safe.block_on_async_exn (fun () ->
           File_system.with_temp_dir
             (Filename.temp_dir_name ^/ "child-processes")
-            ~f )
+            ~f)
 
     let name = "tester.sh"
 
@@ -409,7 +414,7 @@ let%test_module _ =
           let open Deferred.Let_syntax in
           let%bind process =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
-              ~args:["exit"]
+              ~args:[ "exit" ]
               ~stdout:(`Log Logger.Level.Debug, `Pipe, `Keep_empty)
               ~stderr:(`Log Logger.Level.Error, `No_pipe, `Keep_empty)
               ~termination:`Raise_on_failure
@@ -418,7 +423,7 @@ let%test_module _ =
           let%bind () =
             Strict_pipe.Reader.iter (stdout_lines process) ~f:(fun line ->
                 [%test_eq: string] "hello" line ;
-                Deferred.unit )
+                Deferred.unit)
           in
           (* Pipe will be closed before the ivar is filled, so we need to wait a
              bit. *)
@@ -426,14 +431,14 @@ let%test_module _ =
           [%test_eq: Unix.Exit_or_signal.t Or_error.t option]
             (Some (Ok (Ok ())))
             (termination_status process) ;
-          Deferred.unit )
+          Deferred.unit)
 
     let%test_unit "killing works" =
       async_with_temp_dir (fun conf_dir ->
           let open Deferred.Let_syntax in
           let%bind process =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
-              ~args:["loop"]
+              ~args:[ "loop" ]
               ~stdout:(`Don't_log, `Pipe, `Keep_empty)
               ~stderr:(`Don't_log, `No_pipe, `Keep_empty)
               ~termination:`Always_raise
@@ -470,14 +475,14 @@ let%test_module _ =
           [%test_eq: Unix.Exit_or_signal.t] exit_or_signal
             (Error (`Signal Signal.term)) ;
           assert (Option.is_some @@ termination_status process) ;
-          Deferred.unit )
+          Deferred.unit)
 
     let%test_unit "if you spawn two processes it kills the earlier one" =
       async_with_temp_dir (fun conf_dir ->
           let open Deferred.Let_syntax in
           let mk_process () =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
-              ~args:["loop"]
+              ~args:[ "loop" ]
               ~stdout:(`Don't_log, `No_pipe, `Keep_empty)
               ~stderr:(`Don't_log, `No_pipe, `Keep_empty)
               ~termination:`Ignore
@@ -496,5 +501,5 @@ let%test_module _ =
             (termination_status process2)
             None ;
           let%bind _ = kill process2 in
-          Deferred.unit )
+          Deferred.unit)
   end )

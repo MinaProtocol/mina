@@ -22,13 +22,13 @@ module Account = struct
 
   let create = Mina_base.Account.create
 
-  let balance Mina_base.Account.Poly.{balance; _} = balance
+  let balance Mina_base.Account.Poly.{ balance; _ } = balance
 
-  let update_balance t bal = {t with Mina_base.Account.Poly.balance= bal}
+  let update_balance t bal = { t with Mina_base.Account.Poly.balance = bal }
 
-  let token Mina_base.Account.Poly.{token_id; _} = token_id
+  let token Mina_base.Account.Poly.{ token_id; _ } = token_id
 
-  let token_owner Mina_base.Account.Poly.{token_permissions; _} =
+  let token_owner Mina_base.Account.Poly.{ token_permissions; _ } =
     match token_permissions with
     | Mina_base.Token_permissions.Token_owned _ ->
         true
@@ -81,8 +81,8 @@ struct
       include Bigstring.Stable.V1
 
       (* we're not mutating Bigstrings, which would invalidate hashes
-       OK to use these hash functions
-       *)
+         OK to use these hash functions
+      *)
       let hash = hash_t_frozen
 
       let hash_fold_t = hash_fold_t_frozen
@@ -93,7 +93,9 @@ struct
   end
 
   type t =
-    {uuid: Uuid.Stable.V1.t; table: Bigstring_frozen.t Bigstring_frozen.Table.t}
+    { uuid : Uuid.Stable.V1.t
+    ; table : Bigstring_frozen.t Bigstring_frozen.Table.t
+    }
   [@@deriving sexp]
 
   let to_alist t =
@@ -106,13 +108,14 @@ struct
   let get_uuid t = t.uuid
 
   let create _ =
-    {uuid= Uuid_unix.create (); table= Bigstring_frozen.Table.create ()}
+    { uuid = Uuid_unix.create (); table = Bigstring_frozen.Table.create () }
 
   let create_checkpoint t _ =
-    { uuid= Uuid_unix.create ()
-    ; table=
+    { uuid = Uuid_unix.create ()
+    ; table =
         Bigstring_frozen.Table.of_alist_exn
-        @@ Bigstring_frozen.Table.to_alist t.table }
+        @@ Bigstring_frozen.Table.to_alist t.table
+    }
 
   let close _ = ()
 
@@ -123,7 +126,7 @@ struct
   let set_batch t ?(remove_keys = []) ~key_data_pairs =
     List.iter key_data_pairs ~f:(fun (key, data) -> set t ~key ~data) ;
     List.iter remove_keys ~f:(fun key ->
-        Bigstring_frozen.Table.remove t.table key )
+        Bigstring_frozen.Table.remove t.table key)
 
   let remove t ~key = Bigstring_frozen.Table.remove t.table key
 end
@@ -151,8 +154,7 @@ module Key = struct
   let empty : t = Account.empty.public_key
 
   let gen_keys num_keys =
-    Quickcheck.random_value
-      (Quickcheck.Generator.list_with_length num_keys gen)
+    Quickcheck.random_value (Quickcheck.Generator.list_with_length num_keys gen)
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)

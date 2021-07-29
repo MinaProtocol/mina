@@ -8,7 +8,7 @@ let or_error_list_fold ls ~init ~f =
   let open Or_error.Let_syntax in
   List.fold ls ~init:(return init) ~f:(fun acc_or_error el ->
       let%bind acc = acc_or_error in
-      f acc el )
+      f acc el)
 
 let get_metadata (message : Logger.Message.t) key =
   match String.Map.find message.metadata key with
@@ -19,7 +19,7 @@ let get_metadata (message : Logger.Message.t) key =
 
 let parse id (m : Logger.Message.t) =
   Or_error.try_with (fun () ->
-      Structured_log_events.parse_exn id (Map.to_alist m.metadata) )
+      Structured_log_events.parse_exn id (Map.to_alist m.metadata))
 
 let bad_parse = Or_error.error_string "bad parse"
 
@@ -62,16 +62,19 @@ module Transition_frontier_diff_application = struct
   let structured_event_id =
     Some Transition_frontier.applying_diffs_structured_events_id
 
-  type root_transitioned = {new_root: State_hash.t; garbage: State_hash.t list}
+  type root_transitioned =
+    { new_root : State_hash.t; garbage : State_hash.t list }
   [@@deriving to_yojson]
 
   type t =
-    { new_node: State_hash.t option
-    ; best_tip_changed: State_hash.t option
-    ; root_transitioned: root_transitioned option }
+    { new_node : State_hash.t option
+    ; best_tip_changed : State_hash.t option
+    ; root_transitioned : root_transitioned option
+    }
   [@@deriving lens, to_yojson]
 
-  let empty = {new_node= None; best_tip_changed= None; root_transitioned= None}
+  let empty =
+    { new_node = None; best_tip_changed = None; root_transitioned = None }
 
   let register (lens : (t, 'a option) Lens.t) (result : t) (x : 'a) :
       t Or_error.t =
@@ -89,8 +92,8 @@ module Transition_frontier_diff_application = struct
     let%bind diffs = get_metadata message "diffs" >>= parse (list json) in
     or_error_list_fold diffs ~init:empty ~f:(fun res diff ->
         match Yojson.Safe.Util.keys diff with
-        | [name] -> (
-            let%bind value = find json diff [name] in
+        | [ name ] -> (
+            let%bind value = find json diff [ name ] in
             match name with
             | "New_node" ->
                 let%bind state_hash = parse state_hash value in
@@ -99,16 +102,15 @@ module Transition_frontier_diff_application = struct
                 let%bind state_hash = parse state_hash value in
                 register best_tip_changed res state_hash
             | "Root_transitioned" ->
-                let%bind new_root = find state_hash value ["new_root"] in
-                let%bind garbage = find (list state_hash) value ["garbage"] in
-                let data = {new_root; garbage} in
+                let%bind new_root = find state_hash value [ "new_root" ] in
+                let%bind garbage = find (list state_hash) value [ "garbage" ] in
+                let data = { new_root; garbage } in
                 register root_transitioned res data
             | _ ->
-                Or_error.error_string
-                  "unexpected transition frontier diff name" )
+                Or_error.error_string "unexpected transition frontier diff name"
+            )
         | _ ->
-            Or_error.error_string "unexpected transition frontier diff format"
-    )
+            Or_error.error_string "unexpected transition frontier diff format")
 end
 
 module Block_produced = struct
@@ -118,10 +120,11 @@ module Block_produced = struct
     Some Block_producer.block_produced_structured_events_id
 
   type t =
-    { block_height: int
-    ; epoch: int
-    ; global_slot: int
-    ; snarked_ledger_generated: bool }
+    { block_height : int
+    ; epoch : int
+    ; global_slot : int
+    ; snarked_ledger_generated : bool
+    }
   [@@deriving to_yojson]
 
   (*
@@ -160,7 +163,7 @@ module Block_produced = struct
     let open Or_error.Let_syntax in
     let%bind breadcrumb = get_metadata message "breadcrumb" in
     let%bind snarked_ledger_generated =
-      find bool breadcrumb ["just_emitted_a_proof"]
+      find bool breadcrumb [ "just_emitted_a_proof" ]
     in
     let%bind breadcrumb_consensus_state =
       find json breadcrumb
@@ -168,26 +171,26 @@ module Block_produced = struct
         ; "data"
         ; "protocol_state"
         ; "body"
-        ; "consensus_state" ]
+        ; "consensus_state"
+        ]
     in
     let%bind block_height =
-      find int breadcrumb_consensus_state ["blockchain_length"]
+      find int breadcrumb_consensus_state [ "blockchain_length" ]
     in
     let%bind global_slot =
-      find int breadcrumb_consensus_state ["curr_global_slot"; "slot_number"]
+      find int breadcrumb_consensus_state [ "curr_global_slot"; "slot_number" ]
     in
-    let%map epoch = find int breadcrumb_consensus_state ["epoch_count"] in
-    {block_height; global_slot; epoch; snarked_ledger_generated}
+    let%map epoch = find int breadcrumb_consensus_state [ "epoch_count" ] in
+    { block_height; global_slot; epoch; snarked_ledger_generated }
 end
 
 module Breadcrumb_added = struct
   let name = "Breadcrumb_added"
 
   let structured_event_id =
-    Some
-      Transition_frontier.added_breadcrumb_user_commands_structured_events_id
+    Some Transition_frontier.added_breadcrumb_user_commands_structured_events_id
 
-  type t = {user_commands: User_command.Valid.t With_status.t list}
+  type t = { user_commands : User_command.Valid.t With_status.t list }
   [@@deriving to_yojson]
 
   let parse message =
@@ -197,7 +200,7 @@ module Breadcrumb_added = struct
       get_metadata message "user_commands"
       >>= parse valid_commands_with_statuses
     in
-    {user_commands}
+    { user_commands }
 end
 
 module Gossip = struct
@@ -216,7 +219,7 @@ module Gossip = struct
 
     let structured_event_id = Some id
 
-    type r = {state_hash: State_hash.t} [@@deriving yojson, hash]
+    type r = { state_hash : State_hash.t } [@@deriving yojson, hash]
 
     type t = r With_direction.t [@@deriving yojson]
 
@@ -224,10 +227,10 @@ module Gossip = struct
 
     let parse message : t Or_error.t =
       match%bind parse id message with
-      | Mina_networking.Block_received {state_hash; sender= _} ->
-          Ok ({state_hash}, Direction.Received)
-      | Mina_networking.Gossip_new_state {state_hash} ->
-          Ok ({state_hash}, Sent)
+      | Mina_networking.Block_received { state_hash; sender = _ } ->
+          Ok ({ state_hash }, Direction.Received)
+      | Mina_networking.Gossip_new_state { state_hash } ->
+          Ok ({ state_hash }, Sent)
       | _ ->
           bad_parse
   end
@@ -237,7 +240,7 @@ module Gossip = struct
 
     let structured_event_id = Some id
 
-    type r = {work: Network_pool.Snark_pool.Resource_pool.Diff.compact}
+    type r = { work : Network_pool.Snark_pool.Resource_pool.Diff.compact }
     [@@deriving yojson, hash]
 
     type t = r With_direction.t [@@deriving yojson]
@@ -246,10 +249,10 @@ module Gossip = struct
 
     let parse message =
       match%bind parse id message with
-      | Mina_networking.Snark_work_received {work; sender= _} ->
-          Ok ({work}, Direction.Received)
-      | Mina_networking.Gossip_snark_pool_diff {work} ->
-          Ok ({work}, Direction.Received)
+      | Mina_networking.Snark_work_received { work; sender = _ } ->
+          Ok ({ work }, Direction.Received)
+      | Mina_networking.Gossip_snark_pool_diff { work } ->
+          Ok ({ work }, Direction.Received)
       | _ ->
           bad_parse
   end
@@ -260,7 +263,7 @@ module Gossip = struct
     let structured_event_id = Some id
 
     type r =
-      {txns: Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.t}
+      { txns : Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.t }
     [@@deriving yojson, hash]
 
     type t = r With_direction.t [@@deriving yojson]
@@ -269,10 +272,10 @@ module Gossip = struct
 
     let parse message =
       match%bind parse id message with
-      | Mina_networking.Transactions_received {txns; sender= _} ->
-          Ok ({txns}, Direction.Received)
-      | Mina_networking.Gossip_transaction_pool_diff {txns} ->
-          Ok ({txns}, Sent)
+      | Mina_networking.Transactions_received { txns; sender = _ } ->
+          Ok ({ txns }, Direction.Received)
+      | Mina_networking.Gossip_transaction_pool_diff { txns } ->
+          Ok ({ txns }, Sent)
       | _ ->
           bad_parse
   end
@@ -366,7 +369,8 @@ let all_event_types =
   ; Event_type Breadcrumb_added
   ; Event_type Block_gossip
   ; Event_type Snark_work_gossip
-  ; Event_type Transactions_gossip ]
+  ; Event_type Transactions_gossip
+  ]
 
 let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
     = function
@@ -390,7 +394,7 @@ let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
 let event_to_yojson event =
   let (Event (t, d)) = event in
   let (module Type) = event_type_module t in
-  `Assoc [(to_string t, Type.to_yojson d)]
+  `Assoc [ (to_string t, Type.to_yojson d) ]
 
 let to_structured_event_id event_type =
   let (Event_type t) = event_type in
@@ -403,7 +407,7 @@ let of_structured_event_id =
     all_event_types
     |> List.filter_map ~f:(fun t ->
            let%map event_id = to_structured_event_id t in
-           (Structured_log_events.string_of_id event_id, t) )
+           (Structured_log_events.string_of_id event_id, t))
     |> String.Table.of_alist_exn
   in
   Fn.compose (String.Table.find table) Structured_log_events.string_of_id

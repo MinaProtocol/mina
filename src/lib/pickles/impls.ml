@@ -18,7 +18,7 @@ let forbidden_shifted_values ~modulus:r ~size_in_bits ~f =
     |> take_while ~f:fits_in_n_bits
     |> to_list
   in
-  List.concat_map [neg_two_to_n; B.(neg_two_to_n - one)] ~f:representatives
+  List.concat_map [ neg_two_to_n; B.(neg_two_to_n - one) ] ~f:representatives
   |> List.dedup_and_sort ~compare:B.compare
   |> List.map ~f
 
@@ -40,7 +40,7 @@ module Step = struct
         ~modulus:(Wrap_impl.Bigint.to_bignum_bigint Constant.size) ~f:(fun x ->
           let hi = test_bit x (Field.size_in_bits - 1) in
           let lo = B.shift_right x 1 in
-          (Impl.Bigint.(to_field (of_bignum_bigint lo)), hi) )
+          (Impl.Bigint.(to_field (of_bignum_bigint lo)), hi))
 
     let (typ_unchecked : (t, Constant.t) Typ.t), check =
       let t0 =
@@ -48,10 +48,10 @@ module Step = struct
           (Typ.tuple2 Field.typ Boolean.typ)
           ~there:(fun x ->
             let low, high = Util.split_last (Tock.Field.to_bits x) in
-            (Field.Constant.project low, high) )
+            (Field.Constant.project low, high))
           ~back:(fun (low, high) ->
             let low, _ = Util.split_last (Field.Constant.unpack low) in
-            Tock.Field.of_bits (low @ [high]) )
+            Tock.Field.of_bits (low @ [ high ]))
       in
       let check t =
         let open Internal_Basic in
@@ -67,9 +67,9 @@ module Step = struct
       in
       (t0, check)
 
-    let typ = {typ_unchecked with check}
+    let typ = { typ_unchecked with check }
 
-    let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [b]
+    let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [ b ]
   end
 
   module Digest = Digest.Make (Impl)
@@ -109,7 +109,7 @@ module Wrap = struct
     let forbidden_shifted_values =
       forbidden_shifted_values ~size_in_bits:Constant.size_in_bits
         ~modulus:(Step.Impl.Bigint.to_bignum_bigint Constant.size) ~f:(fun x ->
-          Impl.Bigint.(to_field (of_bignum_bigint x)) )
+          Impl.Bigint.(to_field (of_bignum_bigint x)))
 
     let typ_unchecked, check =
       let t0 =
@@ -127,7 +127,7 @@ module Wrap = struct
       in
       (t0, check)
 
-    let typ = {typ_unchecked with check}
+    let typ = { typ_unchecked with check }
 
     let to_bits x = Field.unpack x ~length:Field.size_in_bits
   end
