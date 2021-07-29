@@ -15,6 +15,7 @@ import signal
 import subprocess
 import sys
 import time
+import xdg
 from socketserver import TCPServer
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -156,15 +157,20 @@ if __name__ == '__main__':
   signal.signal(signal.SIGUSR1, handle_stop_request)
   signal.signal(signal.SIGUSR2, handle_start_request)
 
-  Path('.mina-config').mkdir(exist_ok=True)
+  Path(xdg.xdg_config_home + '/.mina').mkdir(exist_ok=True)
   Path('mina.log').touch()
-  Path('.mina-config/mina-prover.log').touch()
-  Path('.mina-config/mina-verifier.log').touch()
-  Path('.mina-config/mina-best-tip.log').touch()
+
+  mina_prover_path = xdg.xdg_state_home + '/.mina/mina-prover.log'
+  mina_verifier_path = xdg.xdg_state_home + '/.mina/mina-verifier.log'
+  mina_best_tip_path = xdg.xdg_state_home + '/.mina/mina-best-tip.log'
+
+  Path(mina_prover_path).touch()
+  Path(mina_verifier_path).touch()
+  Path(mina_best_tip_path).touch()
 
   # currently does not handle tail process dying
   tail_process = subprocess.Popen(
-      ['tail', '-q', '-f', 'mina.log', '-f', '.mina-config/mina-prover.log', '-f', '.mina-config/mina-verifier.log', '-f' , '.mina-config/mina-best-tip.log']
+      ['tail', '-q', '-f', 'mina.log', '-f', mina_prover_path, '-f', mina_verifier_path, '-f' , mina_best_tip_path]
   )
 
   inactive_loop()

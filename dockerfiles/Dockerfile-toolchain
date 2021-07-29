@@ -70,7 +70,7 @@ RUN sudo apt-get update -y \
 
 # -- python dependencies (largely installed above from apt)
 RUN sudo pip install readchar sexpdata \
-    && sudo pip3 install readchar sexpdata
+    && sudo pip3 install readchar sexpdata xdg
 
 # --- deb-s3 tool (deprecated! replace somehow!)
 RUN sudo gem install deb-s3
