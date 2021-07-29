@@ -392,13 +392,17 @@ let with_lengths hs ~target_length =
 
 (* returns a list of state-hashes with the older ones at the front *)
 let download_state_hashes t ~logger ~trust_system ~network ~frontier
-    ~target_hash ~target_length ~downloader ~blockchain_length_of_target_hash =
+    ~target_hash ~target_length ~downloader ~blockchain_length_of_target_hash
+    ~preferred_peers =
   [%log debug]
     ~metadata:[ ("target_hash", State_hash.to_yojson target_hash) ]
     "Doing a catchup job with target $target_hash" ;
-  let%bind peers =
-    (* TODO: Find some preferred peers, e.g., whoever told us about this target_hash *)
-    Mina_networking.peers network >>| List.permute
+
+  let%bind all_peers = Mina_networking.peers network >>| Peer.Set.of_list in
+
+  let unpreferred_peers = Peer.Set.diff all_peers preferred_peers in
+  let peers =
+    Peer.Set.to_list preferred_peers @ Peer.Set.to_list unpreferred_peers
   in
   let open Deferred.Result.Let_syntax in
   find_map_ok ~how:(`Max_concurrent_jobs 12) peers ~f:(fun peer ->
@@ -1055,9 +1059,18 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                       ~blockchain_length_of_target_hash))
            with
            | None ->
+               let preferred_peers =
+                 List.fold (List.concat_map ~f:Rose_tree.flatten forest)
+                   ~init:Peer.Set.empty ~f:(fun acc c ->
+                     match (Cached.peek c).sender with
+                     | Local ->
+                         acc
+                     | Remote peer ->
+                         Peer.Set.add acc peer)
+               in
                download_state_hashes t ~logger ~trust_system ~network ~frontier
                  ~downloader ~target_length ~target_hash:target_parent_hash
-                 ~blockchain_length_of_target_hash
+                 ~blockchain_length_of_target_hash ~preferred_peers
            | Some res ->
                [%log debug] "Succeeded in using cache." ;
                Deferred.Result.return res
