@@ -1,24 +1,60 @@
 locals {
 
-  block_producer_configs = flatten( [
-    for index, bp in concat(var.whales, var.fishes) :
+
+  whale_count_total = length ( flatten( [
+    for bp in var.whales :
+      [
+        for i in range(bp.duplicates) : ""
+    
+   ] ]) )
+
+  fish_count_total = length ( flatten( [
+    for index, bp in var.fishes :
+      [
+        for i in range(bp.duplicates) : ""
+    
+   ] ]) )
+
+
+
+  whale_block_producer_libp2p_names = [for i in range(local.whale_count_total) : "whale-block-producer-${i + 1}"]
+  fish_block_producer_libp2p_names  = [for i in range(local.fish_count_total) : "fish-block-producer-${i + 1}"]
+
+
+  whale_configs = flatten( [
+    for index, bp in var.whales :
       [
         for i in range(bp.duplicates) : {
-          name      = "${bp.class}-${index}-${i}"
-          unique_node_index= index
-          total_node_index= index +i
-          #TODO: i've changed the naming convention so we won't find "${bp.basename}-${i}" in data.local_file.libp2p_peers as it is
-          full_peer = "/dns4/${bp.basename}-${i}.${var.testnet_name}/tcp/${var.block_producer_starting_host_port + index}/p2p/${trimspace(data.local_file.libp2p_peers["${bp.basename}-${i}"].content)}",
-          port      = var.block_producer_starting_host_port + index + i
+          name      = "${bp.class}-${index+1}-${i+1}"
+          unique_node_index= index+1
+          total_node_index= i+ length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):0 ]  ])) #summation of all duplicates so far
+          full_peer = "/dns4/${bp.class}-${index+1}-${i+1}.${var.testnet_name}/tcp/${var.block_producer_starting_host_port +i+ length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):0 ]  ]))}/p2p/${trimspace(data.local_file.libp2p_peers[element (local.whale_block_producer_libp2p_names,i+ length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):0 ]  ])) )  ].content)}",
+          port      = var.block_producer_starting_host_port+i + length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):"" ]  ]))
           class  = bp.class
 
         }
     
    ] ])
 
-  whale_count = length(var.whales)
-  fish_count = length(var.fishes)
+  fish_configs = flatten( [
+    for index, bp in var.fishes :
+      [
+        for i in range(bp.duplicates) : {
+          name      = "${bp.class}-${index+1}-${i+1}"
+          unique_node_index= index+1
+          total_node_index= i+length ( flatten([for b in slice(var.fishes,0, index) : [ for k in range(b.duplicates):0 ]  ]))
+          full_peer = "/dns4/${bp.class}-${index+1}-${i+1}.${var.testnet_name}/tcp/${var.block_producer_starting_host_port +i+ length ( flatten([for b in slice(var.fishes,0, index) : [ for k in range(b.duplicates):0 ]  ]))}/p2p/${trimspace(data.local_file.libp2p_peers[element (local.fish_block_producer_libp2p_names,i+ length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):0 ]  ])) )  ].content)}",
+          port      = var.block_producer_starting_host_port+i + length ( flatten([for b in slice(var.fishes,0, index) : [ for k in range(b.duplicates):"" ]  ]))
+          class  = bp.class
 
+        }
+    
+   ] ])
+
+  block_producer_configs = concat(local.whale_configs, local.fish_configs)
+
+  whale_count_unique = length(var.whales)
+  fish_count_unique = length(var.fishes)
 
   # block_producer_static_peers = {
   #   for index, name in keys(data.local_file.libp2p_peers) : name => {
@@ -28,13 +64,18 @@ locals {
   #   }
   # }
 
-  seed_static_peers = {
-    for index, name in keys(data.local_file.libp2p_seed_peers) : name => {
+  seed_names                 = [for i in range(var.seed_count) : "seed-${i + 1}"]
+
+  seed_static_peers = [
+    for index, name in keys(data.local_file.libp2p_seed_peers) : {
       full_peer = "/dns4/${name}.${var.testnet_name}/tcp/${var.seed_starting_host_port + index}/p2p/${trimspace(data.local_file.libp2p_seed_peers[name].content)}",
       port      = var.seed_starting_host_port + index
-      name      = name
+      name      = local.seed_names[index]
+      unique_node_index= -1
+      total_node_index= -1
+      class = "seed"
     }
-  }
+  ]
 
   default_archive_node = {
     image                   = var.mina_archive_image
@@ -57,11 +98,7 @@ locals {
     preemptibleAllowed      = "false"
   }
 
-  static_peers = merge(local.block_producer_static_peers, local.seed_static_peers)
-
-  # whale_block_producer_names = [for i in range(var.whale_count) : "whale-block-producer-${i + 1}"]
-  # fish_block_producer_names  = [for i in range(var.fish_count) : "fish-block-producer-${i + 1}"]
-  seed_names                 = [for i in range(var.seed_count) : "seed-${i + 1}"]
+  static_peers = concat(local.block_producer_configs, local.seed_static_peers)
 
   archive_node_configs = var.archive_configs != null ? [for item in var.archive_configs : merge(local.default_archive_node, item)] : [
     for i in range(1, var.archive_node_count + 1) : merge(local.default_archive_node, {

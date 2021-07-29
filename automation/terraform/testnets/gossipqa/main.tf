@@ -35,35 +35,36 @@ provider "google" {
 }
 
 
-# variable "whale_count" {
-#   type = number
+variable "whale_count" {
+  type = number
 
-#   description = "Number of online whales for the network to run"
-#   default     = 2
-# }
+  description = "Number of online whales for the network to run"
+  default     = 2
+}
 
-# variable "fish_count" {
-#   type = number
+variable "fish_count" {
+  type = number
 
-#   description = "Number of online fish for the network to run"
-#   default     = 2
-# }
+  description = "Number of online fish for the network to run"
+  default     = 2
+}
 
 variable "seed_count" {
   default     = 3
 }
 
 locals {
-  testnet_name = "gosisp_qa"
+  testnet_name = "gossipqa"
   mina_image = "codaprotocol/mina-daemon:1.2.0beta1-compatible-devnet-bfb9dc8"
   mina_archive_image = "codaprotocol/mina-archive:1.2.0beta1-compatible-devnet-bfb9dc8"
   seed_region = "us-central1"
   seed_zone = "us-central1-c"
 
   # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
-  make_report_discord_webhook_url = <<EOT
-    ${file("../../../discord_webhook_url.txt")}
-  EOT
+  # make_report_discord_webhook_url = <<EOT
+  #   ${file("../../../discord_webhook_url.txt")}
+  # EOT
+  make_report_discord_webhook_url = ""
 
   # replace with `make_report_accounts = ""` if not in use (will fail if file not present)
   # make_report_accounts = <<EOT
@@ -72,7 +73,7 @@ locals {
   make_report_accounts = ""
 }
 
-module "gossip_qa" {
+module "gossipqa" {
   providers = { google.gke = google.google-us-central1 }
   source    = "../../modules/o1-testnet"
 
@@ -137,8 +138,8 @@ module "gossip_qa" {
   snark_worker_fee      = "0.025"
   snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
   snark_worker_host_port = 10401
-  # whale_count           = var.whale_count
-  # fish_count            = var.fish_count
+  # whale_count_unique           = var.whale_count
+  # fish_count_unique            = var.fish_count
   seed_count            = var.seed_count
 
   # TODO: eventually this will be turned into a loop depending on how many bps we want
@@ -152,15 +153,26 @@ module "gossip_qa" {
       class  = "whale"
     }
   ]
+
+  #   whales= [for i in range(var.whale_count):
+  # i%2 ==0 ?
+  #   {
+  #     duplicates = 2
+  #     class  = "whale"
+  #   }
+  #   :
+  #   {
+  #     duplicates = 1
+  #     class  = "whale"
+  #   }
+  # ]
   
   fishes=[
     {
-      basename = "fish1"
       duplicates = 2
       class  = "fish"
     },
     {
-      basename = "fish2"
       duplicates = 1
       class  = "fish"
     }

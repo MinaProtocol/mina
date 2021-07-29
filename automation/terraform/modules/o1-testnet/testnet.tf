@@ -49,7 +49,7 @@ module "kubernetes_testnet" {
   agent_max_tx          = var.agent_max_tx
   agent_send_every_mins = var.agent_send_every_mins
 
-  additional_peers = [for peer in values(local.static_peers) : peer.full_peer]
+  additional_peers = [for peer in local.static_peers : peer.full_peer]
   runtime_config   = data.local_file.genesis_ledger.content
 
   seed_zone   = var.seed_zone
@@ -65,7 +65,7 @@ module "kubernetes_testnet" {
   snark_worker_host_port  = var.snark_worker_host_port
 
   block_producer_key_pass = var.block_producer_key_pass
-  block_producer_configs = [for index, bp in local.block_producer_configs:
+  block_producer_configs = [for i, bp in local.block_producer_configs:
     {
       name                   = bp.name
       class                  = bp.class
@@ -80,7 +80,7 @@ module "kubernetes_testnet" {
       enable_peer_exchange   = true
       isolated               = false
       enableArchive          = false
-      archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""  
+      archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i%(length(local.archive_node_configs)) )["name"]}:${element(local.archive_node_configs, i%(length(local.archive_node_configs)) )["serverPort"]}" : ""  
     }
   ]
   # block_producer_configs = concat(
@@ -124,10 +124,10 @@ module "kubernetes_testnet" {
 
   seed_configs = [
     for i in range(var.seed_count) : {
-      name               = local.seed_names[i]
+      name               = local.seed_static_peers[i].name
       class              = "seed"
       id                 = i + 1
-      external_port      = local.static_peers[local.seed_names[i]].port
+      external_port      = local.seed_static_peers[i].port
       external_ip        = google_compute_address.seed_static_ip[i].address
       private_key_secret = "online-seeds-account-${i + 1}-key"
       libp2p_secret      = "online-seeds-libp2p-${i + 1}-key"
