@@ -7,6 +7,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~collected_transitions ~frontier ~network_transition_reader
     ~producer_transition_reader ~clear_reader ~precomputed_values =
   let valid_transition_pipe_capacity = 30 in
+  let start_time = Time.now () in
   let valid_transition_reader, valid_transition_writer =
     Strict_pipe.create ~name:"valid transitions"
       (Buffered (`Capacity valid_transition_pipe_capacity, `Overflow Crash))
@@ -40,6 +41,29 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       Transition_handler.Unprocessed_transition_cache.register_exn
         unprocessed_transition_cache t
       |> Strict_pipe.Writer.write primary_transition_writer) ;
+  let initial_state_hashes =
+    List.map collected_transitions ~f:(fun envelope ->
+        Network_peer.Envelope.Incoming.data envelope
+        |> Mina_transition.External_transition.Initial_validated.state_hash)
+    |> Mina_base.State_hash.Set.of_list
+  in
+  let extensions = Transition_frontier.extensions frontier in
+  don't_wait_for
+  @@ Pipe_lib.Broadcast_pipe.Reader.iter_until
+       (Transition_frontier.Extensions.get_view_pipe extensions New_breadcrumbs)
+       ~f:(fun new_breadcrumbs ->
+         let open Mina_base.State_hash in
+         let new_state_hashes =
+           List.map new_breadcrumbs ~f:Transition_frontier.Breadcrumb.state_hash
+           |> Set.of_list
+         in
+         if Set.is_empty @@ Set.inter initial_state_hashes new_state_hashes then
+           Deferred.return false
+         else (
+           Mina_metrics.(
+             Gauge.set Catchup.initial_catchup_time
+               Time.(Span.to_min @@ diff (now ()) start_time)) ;
+           Deferred.return true )) ;
   trace_recurring "validator" (fun () ->
       Transition_handler.Validator.run
         ~consensus_constants:
