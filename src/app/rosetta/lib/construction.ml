@@ -586,6 +586,258 @@ module Parse = struct
   module Mock = Impl (Result)
 end
 
+module Hash = struct
+  module Env = struct
+    module T (M : Monad_fail.S) = struct
+      type t = {lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t}
+    end
+
+    module Real = T (Deferred.Result)
+    module Mock = T (Result)
+
+    let real : Real.t = {lift= Deferred.return}
+
+    let mock : Mock.t = {lift= Fn.id}
+  end
+
+  module Impl (M : Monad_fail.S) = struct
+    let handle ~(env : Env.T(M).t) (req : Construction_hash_request.t) =
+      let open M.Let_syntax in
+      let%bind json =
+        try M.return (Yojson.Safe.from_string req.signed_transaction)
+        with _ -> M.fail (Errors.create (`Json_parse None))
+      in
+      let%bind signed_transaction =
+        Transaction.Signed.Rendered.of_yojson json
+        |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
+        |> Result.bind ~f:Transaction.Signed.of_rendered
+        |> env.lift
+      in
+      let%bind signer =
+        let (`Pk pk) = signed_transaction.command.source in
+        Public_key.Compressed.of_base58_check pk
+        |> Result.map_error ~f:(fun _ ->
+               Errors.create ~context:"compression"
+                 `Public_key_format_not_valid )
+        |> Result.bind ~f:(fun pk ->
+               Result.of_option (Public_key.decompress pk)
+                 ~error:
+                   (Errors.create ~context:"decompression"
+                      `Public_key_format_not_valid) )
+        |> Result.map_error ~f:(fun _ -> Errors.create `Malformed_public_key)
+        |> env.lift
+      in
+      let%bind payload =
+        User_command_info.Partial.to_user_command_payload
+          ~nonce:signed_transaction.nonce signed_transaction.command
+        |> env.lift
+      in
+      (* TODO: Implement signature coding *)
+      let%map signature =
+        Result.of_option
+          (Signature.Raw.decode signed_transaction.signature)
+          ~error:(Errors.create `Signature_missing)
+        |> env.lift
+      in
+      let full_command = {Signed_command.Poly.payload; signature; signer} in
+      let hash =
+        Transaction_hash.hash_command
+          (User_command.Signed_command full_command)
+      |> Transaction_hash.to_base58_check
+      in
+      Transaction_identifier_response.create (Transaction_identifier.create hash)
+  end
+
+  module Real = Impl (Deferred.Result)
+  module Mock = Impl (Result)
+end
+
+module Submit = struct
+  module Env = struct
+    module T (M : Monad_fail.S) = struct
+      type ( 'gql_payment
+           , 'gql_delegation
+           , 'gql_create_token
+           , 'gql_create_token_account
+           , 'gql_mint_tokens )
+           t =
+        { gql_payment:
+               payment:Transaction.Unsigned.Rendered.Payment.t
+            -> signature:string
+            -> unit
+            -> ('gql_payment, Errors.t) M.t
+              (* TODO: Validate network choice with separate query *)
+        ; gql_delegation:
+               delegation:Transaction.Unsigned.Rendered.Delegation.t
+            -> signature:string
+            -> unit
+            -> ('gql_delegation, Errors.t) M.t
+        ; gql_create_token:
+               create_token:Transaction.Unsigned.Rendered.Create_token.t
+            -> signature:string
+            -> unit
+            -> ('gql_create_token, Errors.t) M.t
+        ; gql_create_token_account:
+               create_token_account:Transaction.Unsigned.Rendered
+                                    .Create_token_account
+                                    .t
+            -> signature:string
+            -> unit
+            -> ('gql_create_token_account, Errors.t) M.t
+        ; gql_mint_tokens:
+               mint_tokens:Transaction.Unsigned.Rendered.Mint_tokens.t
+            -> signature:string
+            -> unit
+            -> ('gql_mint_tokens, Errors.t) M.t
+        ; lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
+    end
+
+    module Real = T (Deferred.Result)
+    module Mock = T (Result)
+
+    let real :
+           graphql_uri:Uri.t
+        -> ( 'gql_payment
+           , 'gql_delegation
+           , 'gql_create_token
+           , 'gql_create_token_account
+           , 'gql_mint_tokens )
+           Real.t =
+      let uint64 x = `String (Unsigned.UInt64.to_string x) in
+      let uint32 x = `String (Unsigned.UInt32.to_string x) in
+      let token_id x = `String (Mina_base.Token_id.to_string x) in
+      fun ~graphql_uri ->
+        { gql_payment=
+            (fun ~payment ~signature () ->
+              Graphql.query
+                (Send_payment.make ~from:(`String payment.from)
+                   ~to_:(`String payment.to_) ~token:(uint64 payment.token)
+                   ~amount:(uint64 payment.amount) ~fee:(uint64 payment.fee)
+                   ?validUntil:(Option.map ~f:uint32 payment.valid_until)
+                   ?memo:payment.memo ~nonce:(uint32 payment.nonce) ~signature
+                   ())
+                graphql_uri )
+        ; gql_delegation=
+            (fun ~delegation ~signature () ->
+              Graphql.query
+                (Send_delegation.make ~sender:(`String delegation.delegator)
+                   ~receiver:(`String delegation.new_delegate)
+                   ~fee:
+                     (uint64 delegation.fee)
+                     (*                   ?validUntil:(Option.map ~f:uint32 delegation.valid_until) *)
+                   ?memo:delegation.memo ~nonce:(uint32 delegation.nonce)
+                   ~signature ())
+                graphql_uri )
+        ; gql_create_token=
+            (fun ~create_token ~signature () ->
+              Graphql.query
+                (Send_create_token.make
+                   ~receiver:(`String create_token.receiver)
+                   ~fee:(uint64 create_token.fee) ?memo:create_token.memo
+                   ~nonce:(uint32 create_token.nonce)
+                   ~signature ())
+                graphql_uri )
+        ; gql_create_token_account=
+            (fun ~create_token_account ~signature () ->
+              Graphql.query
+                (Send_create_token_account.make
+                   ~tokenOwner:(`String create_token_account.token_owner)
+                   ~receiver:(`String create_token_account.receiver)
+                   ~token:(token_id create_token_account.token)
+                   ~fee:(uint64 create_token_account.fee)
+                   ?memo:create_token_account.memo
+                   ~nonce:(uint32 create_token_account.nonce)
+                   ~signature ())
+                graphql_uri )
+        ; gql_mint_tokens=
+            (fun ~mint_tokens ~signature () ->
+              Graphql.query
+                (Send_mint_tokens.make
+                   ~sender:(`String mint_tokens.token_owner)
+                   ~receiver:(`String mint_tokens.receiver)
+                   ~token:(token_id mint_tokens.token)
+                   ~amount:(uint64 mint_tokens.amount)
+                   ~fee:(uint64 mint_tokens.fee) ?memo:mint_tokens.memo
+                   ~nonce:(uint32 mint_tokens.nonce) ~signature ())
+                graphql_uri )
+        ; lift= Deferred.return }
+  end
+
+  module Impl (M : Monad_fail.S) = struct
+    let handle
+        ~(env :
+           ( 'gql_payment
+           , 'gql_delegation
+           , 'gql_create_token
+           , 'gql_create_token_account
+           , 'gql_mint_tokens )
+           Env.T(M).t) (req : Construction_submit_request.t) =
+      let open M.Let_syntax in
+      let%bind json =
+        try M.return (Yojson.Safe.from_string req.signed_transaction)
+        with _ -> M.fail (Errors.create (`Json_parse None))
+      in
+      let%bind signed_transaction =
+        Transaction.Signed.Rendered.of_yojson json
+        |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
+        |> env.lift
+      in
+      let open M.Let_syntax in
+      let%map hash =
+        match
+          ( signed_transaction.payment
+          , signed_transaction.stake_delegation
+          , signed_transaction.create_token
+          , signed_transaction.create_token_account
+          , signed_transaction.mint_tokens )
+        with
+        | Some payment, None, None, None, None ->
+            let%map res =
+              env.gql_payment ~payment ~signature:signed_transaction.signature
+                ()
+            in
+            let (`UserCommand payment) = (res#sendPayment)#payment in
+            payment#hash
+        | None, Some delegation, None, None, None ->
+            let%map res =
+              env.gql_delegation ~delegation
+                ~signature:signed_transaction.signature ()
+            in
+            let (`UserCommand delegation) = (res#sendDelegation)#delegation in
+            delegation#hash
+        | None, None, Some create_token, None, None ->
+            let%map res =
+              env.gql_create_token ~create_token
+                ~signature:signed_transaction.signature ()
+            in
+            ((res#createToken)#createNewToken)#hash
+        | None, None, None, Some create_token_account, None ->
+            let%map res =
+              env.gql_create_token_account ~create_token_account
+                ~signature:signed_transaction.signature ()
+            in
+            ((res#createTokenAccount)#createNewTokenAccount)#hash
+        | None, None, None, None, Some mint_tokens ->
+            let%map res =
+              env.gql_mint_tokens ~mint_tokens
+                ~signature:signed_transaction.signature ()
+            in
+            ((res#mintTokens)#mintTokens)#hash
+        | _ ->
+            M.fail
+              (Errors.create
+                 ~context:
+                   "Must have one of payment, stakeDelegation, createToken, \
+                    createTokenAccount, or mintTokens"
+                 (`Json_parse None))
+      in
+      Transaction_identifier_response.create (Transaction_identifier.create hash)
+  end
+
+  module Real = Impl (Deferred.Result)
+  module Mock = Impl (Result)
+end
+
 let router ~get_graphql_uri_or_error ~logger (route : string list) body =
   [%log debug] "Handling /construction/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
@@ -655,5 +907,27 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
         |> Errors.Lift.wrap
       in
       Construction_parse_response.to_yojson res
+  | ["hash"] ->
+      let%bind req =
+        Errors.Lift.parse ~context:"Request"
+        @@ Construction_hash_request.of_yojson body
+        |> Errors.Lift.wrap
+      in
+      let%map res =
+        Hash.Real.handle ~env:Hash.Env.real req |> Errors.Lift.wrap
+      in
+      Transaction_identifier_response.to_yojson res
+  | ["submit"] ->
+      let%bind req =
+        Errors.Lift.parse ~context:"Request"
+        @@ Construction_submit_request.of_yojson body
+        |> Errors.Lift.wrap
+      in
+      let%bind graphql_uri = get_graphql_uri_or_error () in
+      let%map res =
+        Submit.Real.handle ~env:(Submit.Env.real ~graphql_uri) req
+        |> Errors.Lift.wrap
+      in
+      Transaction_identifier_response.to_yojson res
   | _ ->
       Deferred.Result.fail `Page_not_found
