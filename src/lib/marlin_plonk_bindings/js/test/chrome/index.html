@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>hello-wasm example</title>
+  </head>
+  <body>
+    <script>
+    </script>
+    <script type="module">
+      import init, * as plonk_wasm from "./plonk_wasm.js";
+      window.plonk_wasm = plonk_wasm;
+      await init();
+      /* Don't load the script until we're done initialising. */
+      var newScript = document.createElement("script");
+      newScript.src = "./chrome_test.bc.js";
+      document.body.appendChild(newScript);
+    </script>
+  </body>
+</html>
