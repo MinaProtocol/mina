@@ -383,11 +383,16 @@ let active_or_bootstrapping =
    To address this, we restart the libp2p helper when we become offline. *)
 let next_helper_restart = ref None
 
+let offline_shutdown = ref None
+
+exception Offline_shutdown
+
 let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let open Mina_incremental.Status in
   let restart_delay = Time.Span.of_min 5. in
+  let offline_shutdown_delay = Time.Span.of_min 25. in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
@@ -403,8 +408,20 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
                     Some
                       (Async.Clock.Event.run_after restart_delay
                          (fun () ->
+                           [%log info]
+                             "Offline for too long; restarting libp2p_helper" ;
                            Mina_networking.restart_helper net ;
-                           next_helper_restart := None )
+                           next_helper_restart := None ;
+                           match !offline_shutdown with
+                           | None ->
+                               offline_shutdown :=
+                                 Some
+                                   (Async.Clock.Event.run_after
+                                      offline_shutdown_delay
+                                      (fun () -> raise Offline_shutdown)
+                                      ())
+                           | Some _ ->
+                               () )
                          ())
               | Some _ ->
                   () ) ;
@@ -419,6 +436,9 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
               Option.iter !next_helper_restart ~f:(fun e ->
                   Async.Clock.Event.abort_if_possible e () ) ;
               next_helper_restart := None ;
+              Option.iter !offline_shutdown ~f:(fun e ->
+                  Async.Clock.Event.abort_if_possible e () ) ;
+              offline_shutdown := None ;
               match active_status with
               | None ->
                   let logger = Logger.create () in
