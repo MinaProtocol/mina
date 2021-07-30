@@ -92,7 +92,7 @@ module Transaction_applied = struct
         type t =
           { accounts :
               (Account_id.Stable.V1.t * Account.Stable.V2.t option) list
-          ; command : Snapp_command.Stable.V1.t With_status.Stable.V1.t
+          ; command : Snapp_command.Stable.V2.t With_status.Stable.V1.t
           }
         [@@deriving sexp]
 
@@ -113,7 +113,8 @@ module Transaction_applied = struct
                 ~f:(fun (aid, account) ->
                   (aid, Option.map ~f:Account.Stable.V1.to_latest account))
                 accounts
-          ; command
+          ; command =
+              With_status.map ~f:Snapp_command.Stable.V1.to_latest command
           }
       end
     end]
@@ -126,7 +127,7 @@ module Transaction_applied = struct
         type t =
           { accounts :
               (Account_id.Stable.V1.t * Account.Stable.V2.t option) list
-          ; command : Parties.Stable.V1.t With_status.Stable.V1.t
+          ; command : Parties.Stable.V2.t With_status.Stable.V1.t
           }
         [@@deriving sexp]
 

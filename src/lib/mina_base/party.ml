@@ -269,6 +269,16 @@ end
 module Predicate = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        | Full of Snapp_predicate.Account.Stable.V2.t
+        | Nonce of Account.Nonce.Stable.V1.t
+        | Accept
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         | Full of Snapp_predicate.Account.Stable.V1.t
@@ -276,7 +286,13 @@ module Predicate = struct
         | Accept
       [@@deriving sexp, equal, yojson, hash, compare]
 
-      let to_latest = Fn.id
+      let to_latest : t -> V2.t = function
+        | Full pred ->
+            Full (Snapp_predicate.Account.Stable.V1.to_latest pred)
+        | Nonce nonce ->
+            Nonce nonce
+        | Accept ->
+            Accept
     end
   end]
 
@@ -346,11 +362,19 @@ module Predicated = struct
 
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t = (Body.Stable.V1.t, Predicate.Stable.V2.t) Poly.Stable.V1.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t = (Body.Stable.V1.t, Predicate.Stable.V1.t) Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
-      let to_latest = Fn.id
+      let to_latest (t : t) : V2.t =
+        { body = t.body; predicate = Predicate.Stable.V1.to_latest t.predicate }
     end
   end]
 
@@ -504,12 +528,23 @@ end
 
 [%%versioned
 module Stable = struct
+  module V2 = struct
+    type t = Poly(Predicated.Stable.V2)(Control.Stable.V1).t =
+      { data : Predicated.Stable.V2.t; authorization : Control.Stable.V1.t }
+    [@@deriving sexp, equal, yojson, hash, compare]
+
+    let to_latest = Fn.id
+  end
+
   module V1 = struct
     type t = Poly(Predicated.Stable.V1)(Control.Stable.V1).t =
       { data : Predicated.Stable.V1.t; authorization : Control.Stable.V1.t }
     [@@deriving sexp, equal, yojson, hash, compare]
 
-    let to_latest = Fn.id
+    let to_latest (t : t) : V2.t =
+      { data = Predicated.Stable.V1.to_latest t.data
+      ; authorization = t.authorization
+      }
   end
 end]
 

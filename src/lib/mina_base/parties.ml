@@ -2,10 +2,10 @@ open Core
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
       { fee_payer : Party.Signed.Stable.V1.t
-      ; other_parties : Party.Stable.V1.t list
+      ; other_parties : Party.Stable.V2.t list
       ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
       }
     [@@deriving sexp, compare, equal, hash, yojson]
@@ -15,6 +15,21 @@ module Stable = struct
     let version_byte = Base58_check.Version_bytes.snapp_command
 
     let description = "Parties"
+  end
+
+  module V1 = struct
+    type t =
+      { fee_payer : Party.Signed.Stable.V1.t
+      ; other_parties : Party.Stable.V1.t list
+      ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
+      }
+    [@@deriving sexp, compare, equal, hash, yojson]
+
+    let to_latest (t : t) : V2.t =
+      { fee_payer = t.fee_payer
+      ; other_parties = List.map ~f:Party.Stable.V1.to_latest t.other_parties
+      ; protocol_state = t.protocol_state
+      }
   end
 end]
 
@@ -198,6 +213,20 @@ end
 module Verifiable = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        { fee_payer : Party.Signed.Stable.V1.t
+        ; other_parties :
+            ( Party.Stable.V2.t
+            * Pickles.Side_loaded.Verification_key.Stable.V1.t option )
+            With_hashes.Stable.V1.t
+        ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
+        }
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         { fee_payer : Party.Signed.Stable.V1.t
@@ -209,7 +238,15 @@ module Verifiable = struct
         }
       [@@deriving sexp, compare, equal, hash, yojson]
 
-      let to_latest = Fn.id
+      let to_latest (t : t) : V2.t =
+        { fee_payer = t.fee_payer
+        ; other_parties =
+            List.map
+              ~f:(fun ((party, x), y) ->
+                ((Party.Stable.V1.to_latest party, x), y))
+              t.other_parties
+        ; protocol_state = t.protocol_state
+        }
     end
   end]
 end

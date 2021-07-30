@@ -357,6 +357,19 @@ module Account = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type ('balance, 'nonce, 'receipt_chain_hash, 'pk, 'field) t =
+          { balance : 'balance
+          ; nonce : 'nonce
+          ; receipt_chain_hash : 'receipt_chain_hash
+          ; public_key : 'pk
+          ; delegate : 'pk
+          ; state : 'field Snapp_state.V.Stable.V1.t
+          ; rollup_state : 'field
+          }
+        [@@deriving hlist, sexp, equal, yojson, hash, compare]
+      end
+
       module V1 = struct
         type ('balance, 'nonce, 'receipt_chain_hash, 'pk, 'field) t =
           { balance : 'balance
@@ -373,6 +386,19 @@ module Account = struct
 
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        ( Balance.Stable.V1.t Numeric.Stable.V1.t
+        , Account_nonce.Stable.V1.t Numeric.Stable.V1.t
+        , Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
+        , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
+        , F.Stable.V1.t Eq_data.Stable.V1.t )
+        Poly.Stable.V2.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         ( Balance.Stable.V1.t Numeric.Stable.V1.t
@@ -383,7 +409,17 @@ module Account = struct
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
-      let to_latest = Fn.id
+      let to_latest
+          ({ balance; nonce; receipt_chain_hash; public_key; delegate; state } :
+            t) : V2.t =
+        { balance
+        ; nonce
+        ; receipt_chain_hash
+        ; public_key
+        ; delegate
+        ; state
+        ; rollup_state = Ignore
+        }
     end
   end]
 
@@ -395,11 +431,19 @@ module Account = struct
     ; delegate = Ignore
     ; state =
         Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> Or_ignore.Ignore)
+    ; rollup_state = Ignore
     }
 
   let to_input
-      ({ balance; nonce; receipt_chain_hash; public_key; delegate; state } : t)
-      =
+      ({ balance
+       ; nonce
+       ; receipt_chain_hash
+       ; public_key
+       ; delegate
+       ; state
+       ; rollup_state
+       } :
+        t) =
     let open Random_oracle_input in
     List.reduce_exn ~f:append
       [ Numeric.(to_input Tc.balance balance)
@@ -409,6 +453,7 @@ module Account = struct
       ; Eq_data.(to_input_explicit (Tc.public_key ()) delegate)
       ; Vector.reduce_exn ~f:append
           (Vector.map state ~f:Eq_data.(to_input_explicit Tc.field))
+      ; Eq_data.(to_input_explicit Tc.field) rollup_state
       ]
 
   let digest t =
@@ -425,7 +470,14 @@ module Account = struct
       Poly.Stable.Latest.t
 
     let to_input
-        ({ balance; nonce; receipt_chain_hash; public_key; delegate; state } :
+        ({ balance
+         ; nonce
+         ; receipt_chain_hash
+         ; public_key
+         ; delegate
+         ; state
+         ; rollup_state
+         } :
           t) =
       let open Random_oracle_input in
       List.reduce_exn ~f:append
@@ -436,12 +488,20 @@ module Account = struct
         ; Eq_data.(to_input_checked (Tc.public_key ()) delegate)
         ; Vector.reduce_exn ~f:append
             (Vector.map state ~f:Eq_data.(to_input_checked Tc.field))
+        ; Eq_data.(to_input_checked Tc.field) rollup_state
         ]
 
     open Impl
 
     let nonsnapp
-        ({ balance; nonce; receipt_chain_hash; public_key; delegate; state = _ } :
+        ({ balance
+         ; nonce
+         ; receipt_chain_hash
+         ; public_key
+         ; delegate
+         ; state = _
+         ; rollup_state = _
+         } :
           t) (a : Account.Checked.Unhashed.t) =
       [ Numeric.(Checked.check Tc.balance balance a.balance)
       ; Numeric.(Checked.check Tc.nonce nonce a.nonce)
@@ -461,10 +521,17 @@ module Account = struct
          ; public_key = _
          ; delegate = _
          ; state
+         ; rollup_state
          } :
           t) (snapp : Snapp_account.Checked.t) =
-      Vector.(
-        to_list (map2 state snapp.app_state ~f:Eq_data.(check_checked Tc.field)))
+      Boolean.any
+        Vector.(
+          to_list
+            (map snapp.rollup_state
+               ~f:Eq_data.(check_checked Tc.field rollup_state)))
+      :: Vector.(
+           to_list
+             (map2 state snapp.app_state ~f:Eq_data.(check_checked Tc.field)))
 
     let check_snapp t a = Boolean.all (snapp t a)
 
@@ -487,13 +554,23 @@ module Account = struct
       ; Snapp_state.typ
           (Or_ignore.typ_implicit Field.typ ~equal:Field.equal
              ~ignore:Field.zero)
+        (* TODO: Having this as the ignored value means we can't ever use it, right? *)
+      ; Or_ignore.typ_implicit Field.typ ~equal:Field.equal
+          ~ignore:(Lazy.force Snapp_account.Rollup_events.empty_hash)
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
   let check
-      ({ balance; nonce; receipt_chain_hash; public_key; delegate; state } : t)
-      (a : Account.t) =
+      ({ balance
+       ; nonce
+       ; receipt_chain_hash
+       ; public_key
+       ; delegate
+       ; state
+       ; rollup_state
+       } :
+        t) (a : Account.t) =
     let open Or_error.Let_syntax in
     let%bind () =
       Numeric.(check ~label:"balance" Tc.balance balance a.balance)
@@ -519,14 +596,22 @@ module Account = struct
       | None ->
           return ()
       | Some snapp ->
-          List.fold_result ~init:0
-            Vector.(to_list (zip state snapp.app_state))
-            ~f:(fun i (c, v) ->
-              let%map () =
-                Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v)
-              in
-              i + 1)
-          >>| ignore
+          let%bind (_ : int) =
+            List.fold_result ~init:0
+              Vector.(to_list (zip state snapp.app_state))
+              ~f:(fun i (c, v) ->
+                let%map () =
+                  Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v)
+                in
+                i + 1)
+          in
+          if
+            Option.is_some
+            @@ List.find (Vector.to_list snapp.rollup_state) ~f:(fun state ->
+                   Eq_data.(check Tc.field ~label:"" rollup_state state)
+                   |> Or_error.is_ok)
+          then Ok ()
+          else Or_error.errorf "Equality check failed: rollup_state"
     in
     return ()
 end
@@ -1120,6 +1205,17 @@ module Other = struct
 
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        ( Account.Stable.V2.t
+        , Account_state.Stable.V1.t Transition.Stable.V1.t
+        , F.Stable.V1.t Hash.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         ( Account.Stable.V1.t
@@ -1128,7 +1224,11 @@ module Other = struct
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
-      let to_latest = Fn.id
+      let to_latest ({ predicate; account_transition; account_vk } : t) : V2.t =
+        { predicate = Account.Stable.V1.to_latest predicate
+        ; account_transition
+        ; account_vk
+        }
     end
   end]
 
@@ -1195,6 +1295,18 @@ end
 
 [%%versioned
 module Stable = struct
+  module V2 = struct
+    type t =
+      ( Account.Stable.V2.t
+      , Protocol_state.Stable.V1.t
+      , Other.Stable.V2.t
+      , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t )
+      Poly.Stable.V1.t
+    [@@deriving sexp, equal, yojson, hash, compare]
+
+    let to_latest = Fn.id
+  end
+
   module V1 = struct
     type t =
       ( Account.Stable.V1.t
@@ -1204,7 +1316,14 @@ module Stable = struct
       Poly.Stable.V1.t
     [@@deriving sexp, equal, yojson, hash, compare]
 
-    let to_latest = Fn.id
+    let to_latest
+        ({ self_predicate; other; fee_payer; protocol_state_predicate } : t) :
+        V2.t =
+      { self_predicate = Account.Stable.V1.to_latest self_predicate
+      ; other = Other.Stable.V1.to_latest other
+      ; fee_payer
+      ; protocol_state_predicate
+      }
   end
 end]
 
