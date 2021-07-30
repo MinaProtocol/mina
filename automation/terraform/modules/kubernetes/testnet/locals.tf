@@ -158,22 +158,30 @@ locals {
       }
     }]
 
-  snark_worker_vars = {
-    testnetName = var.testnet_name
-    coda        = local.coda_vars
-    healthcheck = local.healthcheck_vars
-    worker = {
-      active      = var.snark_worker_replicas > 0
-      numReplicas = var.snark_worker_replicas
+  snark_vars = [
+    for i, snark in var.snark_coordinators: {
+      testnetName = var.testnet_name
+      coda        = local.coda_vars
+      healthcheck = local.healthcheck_vars
+      # coda = {
+      #   seedPeers = var.seed_peers_url
+      # }
+      worker = {
+        active      = snark.snark_worker_replicas > 0
+        numReplicas = snark.snark_worker_replicas
+        remoteCoordinatorHost="snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}"
+        remoteCoordinatorPort      = snark.snark_coordinators_host_port
+      }
+      coordinator = {
+        fullname= "snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}"
+        active        = snark.snark_worker_replicas > 0
+        deployService = snark.snark_worker_replicas > 0
+        publicKey     = snark.snark_worker_public_key
+        snarkFee      = snark.snark_worker_fee
+        hostPort      = snark.snark_coordinators_host_port
+      }
     }
-    coordinator = {
-      active        = var.snark_worker_replicas > 0
-      deployService = var.snark_worker_replicas > 0
-      publicKey     = var.snark_worker_public_key
-      snarkFee      = var.snark_worker_fee
-      hostPort      = var.snark_worker_host_port
-    }
-  }
+  ]
 
   watchdog_vars = {
     testnetName = var.testnet_name

@@ -169,25 +169,31 @@ variable "seed_starting_host_port" {
 
 # Snark Worker Vars
 
-variable "snark_worker_replicas" {
-  type    = number
-  default = 1
+variable "snark_coordinators" {
+  description = "configurations for not just the snark coordinators but also the snark workers they coordinate"
+  default = null
 }
 
-variable "snark_worker_fee" {
-  type    = string
-  default = "0.025"
-}
 
-variable "snark_worker_public_key" {
-  type    = string
-  default = "4vsRCVadXwWMSGA9q81reJRX3BZ5ZKRtgZU7PtGsNq11w2V9tUNf4urZAGncZLUiP4SfWqur7AZsyhJKD41Ke7rJJ8yDibL41ePBeATLUnwNtMTojPDeiBfvTfgHzbAVFktD65vzxMNCvvAJ"
-}
+# variable "snark_worker_replicas" {
+#   type    = number
+#   default = 1
+# }
 
-variable "snark_worker_host_port" {
-  type    = number
-  default = 10400
-}
+# variable "snark_worker_fee" {
+#   type    = string
+#   default = "0.025"
+# }
+
+# variable "snark_worker_public_key" {
+#   type    = string
+#   default = "4vsRCVadXwWMSGA9q81reJRX3BZ5ZKRtgZU7PtGsNq11w2V9tUNf4urZAGncZLUiP4SfWqur7AZsyhJKD41Ke7rJJ8yDibL41ePBeATLUnwNtMTojPDeiBfvTfgHzbAVFktD65vzxMNCvvAJ"
+# }
+
+# variable "snark_worker_host_port" {
+#   type    = number
+#   default = 10400
+# }
 
 variable "agent_min_fee" {
   type    = string

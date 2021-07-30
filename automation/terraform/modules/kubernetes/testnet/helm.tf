@@ -61,15 +61,15 @@ resource "helm_release" "block_producers" {
 
 resource "helm_release" "snark_workers" {
   provider = helm.testnet_deploy
-  count    = local.snark_worker_vars.coordinator.active ? 1 : 0
+  count    = length(local.snark_vars)
 
-  name       = "${var.testnet_name}-snark-worker"
+  name       = "${var.testnet_name}-snark-set-${count.index + 1}"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/snark-worker" : "snark-worker"
   version    = "1.0.2"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
-    yamlencode(local.snark_worker_vars)
+    yamlencode(local.snark_vars[count.index])
   ]
   wait       = false
   timeout    = 600

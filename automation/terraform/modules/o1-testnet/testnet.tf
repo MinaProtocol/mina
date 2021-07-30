@@ -59,10 +59,7 @@ module "kubernetes_testnet" {
 
   mina_archive_schema = var.mina_archive_schema
 
-  snark_worker_replicas   = var.snark_worker_replicas
-  snark_worker_fee        = var.snark_worker_fee
-  snark_worker_public_key = var.snark_worker_public_key
-  snark_worker_host_port  = var.snark_worker_host_port
+  snark_coordinators = var.snark_coordinators
 
   block_producer_key_pass = var.block_producer_key_pass
   block_producer_configs = [for i, bp in local.block_producer_configs:
@@ -71,9 +68,8 @@ module "kubernetes_testnet" {
       class                  = bp.class
       id                     = bp.total_node_index
       external_port          = bp.port
-      #TODO, i've changed the naming convention so these keys and secrets need to be fixed
-      private_key_secret     = "online-${bp.class}-${bp.unique_node_index}-account-key"
-      libp2p_secret          = "online-${bp.class}-${bp.total_node_index}-account-key"
+      private_key_secret     = "online_${bp.class}_account_${bp.unique_node_index+1}"
+      libp2p_secret          = "online_${bp.class}_libp2p_${bp.total_node_index+1}"
       enable_gossip_flooding = false
       run_with_user_agent    = bp.class =="whale" ? false : true
       run_with_bots          = false
