@@ -64,7 +64,7 @@ sleep 3
   -log-json \
   -log-level debug &
 
-# wait for it to settle
+# wait for GraphQL server to start, block production to begin
 sleep 300
 
 # rosetta
@@ -76,7 +76,7 @@ sleep 300
   -port 3087 &
 
 # wait for it to settle
-sleep 3
+sleep 10
 
 # test agent
 /mina-bin/rosetta/test-agent/agent.exe \

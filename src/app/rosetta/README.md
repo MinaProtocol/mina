@@ -88,23 +88,13 @@ The Construction API is _not_ validated using `rosetta-cli` as this would requir
 `gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4` and `rosetta-cli @ v0.5.12`
 using this [`rosetta.conf`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/rosetta.conf) and the [`bootstrap_balances.json`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/bootstrap_balances.json) next to it.
 
-**Create one of each transaction type and exit**
+**Create one of each transaction type and exit, using test-agent**
 
 ```
-$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta-test --entrypoint ./docker-test-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4
-
-$ docker logs --follow coda-rosetta-test
-
-# Wait for a message that looks like:
-#
-# {"timestamp":"2020-09-08 15:05:30.648082Z","level":"Info","source":{"module":"Lib__Rosetta","location":"File \"src/app/rosetta/lib/rosetta.ml\", line 107, characters 8-19"},"message":"Rosetta process running on http://localhost:$port","metadata":{"pid":50,"port":3087}}
-#
-# wait a few more seconds, and then
-
-$ rosetta-cli --configuration-file rosetta.conf check:data
+$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta-test --entrypoint ./docker-test-start.sh gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4
 ```
 
-**Run a fast sandbox network forever**
+**Run a fast sandbox network forever, test with rosetta-cli**
 
 ```
 $ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta --entrypoint ./docker-demo-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4
@@ -149,10 +139,12 @@ Note: Mina is in the `dev` profile, so snarks are turned off and every runs very
 
 To regenerate the models:
 
+Install openapi-generator, instructions [here](https://openapi-generator.tech/docs/installation/),
+then
 ```
 git clone https://github.com/coinbase/rosetta-specifications.git
 cd rosetta-specifications
-`brew install openapi-generator`
 openapi-generator generate -i api.json -g ocaml
-mv src/models $CODA/src/lib/rosetta_models
+cp -p src/models/* $MINA/src/lib/rosetta_models/
 ```
+In the generated files, the type `deriving` clauses will need to have `eq` added manually.
