@@ -122,6 +122,7 @@ module Json_layout = struct
           ; set_permissions : Auth_required.t [@default None]
           ; set_verification_key : Auth_required.t [@default None]
           ; set_snapp_uri : Auth_required.t [@default None]
+          ; edit_rollup_state : Auth_required.t [@default None]
           }
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
 
@@ -134,6 +135,7 @@ module Json_layout = struct
            ; "set_permissions"
            ; "set_verification_key"
            ; "set_snapp_uri"
+           ; "edit_rollup_state"
           |]
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
@@ -183,10 +185,18 @@ module Json_layout = struct
           { state : Field.t list
           ; verification_key : string option
           ; snapp_version : Snapp_version.t
+          ; rollup_state : Field.t list
+          ; last_rollup_slot : int
           }
         [@@deriving sexp, dhall_type, yojson, bin_io_unversioned]
 
-        let fields = [| "state"; "verification_key"; "snapp_version" |]
+        let fields =
+          [| "state"
+           ; "verification_key"
+           ; "snapp_version"
+           ; "rollup_state"
+           ; "last_rollup_slot"
+          |]
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
       end

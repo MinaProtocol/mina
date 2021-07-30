@@ -19,14 +19,101 @@ module Hash_prefix_states = Hash_prefix_states_nonconsensus.Hash_prefix_states
 
 open Snapp_basic
 
+module Events = struct
+  module Event = struct
+    (* Arbitrary hash input, encoding determined by the snapp's developer. *)
+    type t = Field.t array
+
+    type var = Field.Var.t array
+
+    let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.snapp_event x
+
+    let hash_var (x : Field.Var.t array) =
+      Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_event x
+  end
+
+  type t = Event.t list
+
+  type var = t Data_as_hash.t
+
+  let empty_hash = lazy Random_oracle.(salt "MinaSnappEventsEmpty" |> digest)
+
+  let push_hash acc hash =
+    Random_oracle.hash ~init:Hash_prefix_states.snapp_events [| acc; hash |]
+
+  let push_event acc event = push_hash acc (Event.hash event)
+
+  let hash (x : t) = List.fold ~init:(Lazy.force empty_hash) ~f:push_event x
+
+  let to_input (x : t) = Random_oracle_input.field (hash x)
+
+  let var_to_input (x : var) = Data_as_hash.to_input x
+
+  let typ = Data_as_hash.typ ~hash
+
+  let pop_checked (events : var) : Event.t Data_as_hash.t * var =
+    let open Run in
+    let hd, tl =
+      exists
+        Typ.(Data_as_hash.typ ~hash:Event.hash * typ)
+        ~compute:(fun () ->
+          match As_prover.read typ events with
+          | [] ->
+              failwith "Attempted to pop an empty stack"
+          | event :: events ->
+              (event, events))
+    in
+    Field.Assert.equal
+      (Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_events
+         [| Data_as_hash.hash tl; Data_as_hash.hash hd |])
+      (Data_as_hash.hash events) ;
+    (hd, tl)
+
+  let push_checked (events : var) (e : Event.var) : var =
+    let open Run in
+    let res =
+      exists typ ~compute:(fun () ->
+          let tl = As_prover.read typ events in
+          let hd =
+            As_prover.read (Typ.array ~length:(Array.length e) Field.typ) e
+          in
+          hd :: tl)
+    in
+    Field.Assert.equal
+      (Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_events
+         [| Data_as_hash.hash events; Event.hash_var e |])
+      (Data_as_hash.hash res) ;
+    res
+end
+
+module Rollup_events = struct
+  let empty_hash = lazy Random_oracle.(salt "MinaSnappRollupEmpty" |> digest)
+
+  let push_hash acc hash =
+    Random_oracle.hash ~init:Hash_prefix_states.snapp_rollup_events
+      [| acc; hash |]
+
+  let push_events acc events = push_hash acc (Events.hash events)
+
+  let is_empty_var (e : Events.var) =
+    Snark_params.Tick.Field.(
+      Checked.equal (Data_as_hash.hash e) (Var.constant (Lazy.force empty_hash)))
+
+  let push_events_checked x (e : Events.var) =
+    Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_rollup_events
+      [| x; Data_as_hash.hash e |]
+end
+
 module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ('app_state, 'vk, 'snapp_version) t =
+      type ('app_state, 'vk, 'snapp_version, 'field, 'slot) t =
         { app_state : 'app_state
         ; verification_key : 'vk
         ; snapp_version : 'snapp_version
+        ; rollup_state : 'field Pickles_types.Vector.Vector_5.Stable.V1.t
+        ; last_rollup_slot : 'slot
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
@@ -39,11 +126,13 @@ module Poly = struct
   end]
 end
 
-type ('app_state, 'vk, 'snapp_version) t_ =
-      ('app_state, 'vk, 'snapp_version) Poly.t =
+type ('app_state, 'vk, 'snapp_version, 'field, 'slot) t_ =
+      ('app_state, 'vk, 'snapp_version, 'field, 'slot) Poly.t =
   { app_state : 'app_state
   ; verification_key : 'vk
   ; snapp_version : 'snapp_version
+  ; rollup_state : 'field Pickles_types.Vector.Vector_5.t
+  ; last_rollup_slot : 'slot
   }
 
 [%%versioned
@@ -55,7 +144,9 @@ module Stable = struct
         , F.Stable.V1.t )
         With_hash.Stable.V1.t
         option
-      , Mina_numbers.Snapp_version.Stable.V1.t )
+      , Mina_numbers.Snapp_version.Stable.V1.t
+      , F.Stable.V1.t
+      , Mina_numbers.Global_slot.Stable.V1.t )
       Poly.Stable.V2.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
@@ -76,6 +167,10 @@ module Stable = struct
       { app_state
       ; verification_key
       ; snapp_version = Mina_numbers.Snapp_version.zero
+      ; rollup_state =
+          (let empty = Lazy.force Rollup_events.empty_hash in
+           [ empty; empty; empty; empty; empty ])
+      ; last_rollup_slot = Mina_numbers.Global_slot.zero
       }
   end
 end]
@@ -95,7 +190,9 @@ module Checked = struct
     , ( Pickles.Side_loaded.Verification_key.Checked.t Lazy.t
       , Pickles.Impls.Step.Field.t Lazy.t )
       With_hash.t
-    , Mina_numbers.Snapp_version.Checked.t )
+    , Mina_numbers.Snapp_version.Checked.t
+    , Pickles.Impls.Step.Field.t
+    , Mina_numbers.Global_slot.Checked.t )
     Poly.t
 
   let to_input' (t : _ Poly.t) =
@@ -107,6 +204,10 @@ module Checked = struct
       ~snapp_version:
         (f (fun x ->
              Run.run_checked (Mina_numbers.Snapp_version.Checked.to_input x)))
+      ~rollup_state:(f app_state)
+      ~last_rollup_slot:
+        (f (fun x ->
+             Run.run_checked (Mina_numbers.Global_slot.Checked.to_input x)))
     |> List.reduce_exn ~f:append
 
   let to_input (t : t) =
@@ -144,6 +245,8 @@ let typ : (Checked.t, t) Typ.t =
                (lazy x)
                ~hash_data:(fun _ -> lazy (Checked.digest_vk x)))
     ; Mina_numbers.Snapp_version.typ
+    ; Pickles_types.Vector.typ Field.typ Pickles_types.Nat.N5.n
+    ; Mina_numbers.Global_slot.typ
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
@@ -163,6 +266,8 @@ let to_input (t : t) =
          (Fn.compose field
             (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash)))
     ~snapp_version:(f Mina_numbers.Snapp_version.to_input)
+    ~rollup_state:(f app_state)
+    ~last_rollup_slot:(f Mina_numbers.Global_slot.to_input)
   |> List.reduce_exn ~f:append
 
 let default : _ Poly.t =
@@ -170,6 +275,10 @@ let default : _ Poly.t =
   { app_state = Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> F.zero)
   ; verification_key = None
   ; snapp_version = Mina_numbers.Snapp_version.zero
+  ; rollup_state =
+      (let empty = Lazy.force Rollup_events.empty_hash in
+       [ empty; empty; empty; empty; empty ])
+  ; last_rollup_slot = Mina_numbers.Global_slot.zero
   }
 
 let digest (t : t) =

@@ -1229,6 +1229,7 @@ module Base = struct
              ; events = _ (* This is for the snapp to use, we don't need it. *)
              ; call_data =
                  _ (* This is for the snapp to use, we don't need it. *)
+             ; rollup_events
              }
          ; predicate
          } :
@@ -1326,6 +1327,38 @@ module Base = struct
                 (Set_or_keep.Checked.set_or_keep ~if_:Field.if_ verification_key
                    (Lazy.force a.snapp.verification_key.hash)))
         in
+        let rollup_state, last_rollup_slot =
+          let [ s1'; s2'; s3'; s4'; s5' ] = a.snapp.rollup_state in
+          let last_rollup_slot = a.snapp.last_rollup_slot in
+          let is_this_slot =
+            !(Mina_numbers.Global_slot.Checked.equal txn_global_slot
+                last_rollup_slot)
+          in
+          (* Push events to s1 *)
+          let is_empty = !(Party.Rollup_events.is_empty_var rollup_events) in
+          let s1 =
+            Field.if_ is_empty ~then_:s1'
+              ~else_:(Party.Rollup_events.push_events_checked s1' rollup_events)
+          in
+          (* Shift along if last update wasn't this slot *)
+          let is_full_and_different_slot =
+            Boolean.((not is_empty) && is_this_slot)
+          in
+          let s5 = Field.if_ is_full_and_different_slot ~then_:s5' ~else_:s4' in
+          let s4 = Field.if_ is_full_and_different_slot ~then_:s4' ~else_:s3' in
+          let s3 = Field.if_ is_full_and_different_slot ~then_:s3' ~else_:s2' in
+          let s2 = Field.if_ is_full_and_different_slot ~then_:s2' ~else_:s1' in
+          let new_global_slot =
+            !(Mina_numbers.Global_slot.Checked.if_ is_empty
+                ~then_:last_rollup_slot ~else_:txn_global_slot)
+          in
+          let new_rollup_state =
+            ( ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
+            , new_global_slot )
+          in
+          update_authorized a.permissions.edit_rollup_state ~is_keep:is_empty
+            ~updated:(`Ok new_rollup_state)
+        in
         let snapp_version =
           (* Current snapp version. Upgrade mechanism should live here. *)
           Mina_numbers.Snapp_version.(Checked.constant zero)
@@ -1339,6 +1372,8 @@ module Base = struct
             }
         ; app_state
         ; snapp_version
+        ; rollup_state
+        ; last_rollup_slot
         }
       in
       let snapp_uri =
@@ -1708,6 +1743,9 @@ module Base = struct
                           [ Snapp_state.typ Field.typ
                           ; vk
                           ; Mina_numbers.Snapp_version.typ
+                          ; Pickles_types.Vector.typ Field.typ
+                              Pickles_types.Nat.N5.n
+                          ; Mina_numbers.Global_slot.typ
                           ]
                           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
                           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -3797,6 +3835,7 @@ let%test_module "transaction_snark" =
                       Amount.(
                         Signed.(negate (of_unsigned (of_int full_amount))))
                   ; events = []
+                  ; rollup_events = []
                   ; call_data = Field.zero
                   }
               ; predicate = acct1.account.nonce
@@ -3811,6 +3850,7 @@ let%test_module "transaction_snark" =
                     ; token_id = Token_id.default
                     ; delta = Amount.Signed.(of_unsigned receiver_amount)
                     ; events = []
+                    ; rollup_events = []
                     ; call_data = Field.zero
                     }
                 ; predicate = Accept

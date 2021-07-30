@@ -148,72 +148,8 @@ module Update = struct
       ~value_of_hlist:of_hlist
 end
 
-module Events = struct
-  module Event = struct
-    (* Arbitrary hash input, encoding determined by the snapp's developer. *)
-    type t = Field.t array
-
-    type var = Field.Var.t array
-
-    let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.snapp_event x
-
-    let hash_var (x : Field.Var.t array) =
-      Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_event x
-  end
-
-  type t = Event.t list
-
-  type var = t Data_as_hash.t
-
-  let empty_hash = lazy Random_oracle.(salt "MinaSnappEventsEmpty" |> digest)
-
-  let push_hash acc hash =
-    Random_oracle.hash ~init:Hash_prefix_states.snapp_events [| acc; hash |]
-
-  let push_event acc event = push_hash acc (Event.hash event)
-
-  let hash (x : t) = List.fold ~init:(Lazy.force empty_hash) ~f:push_event x
-
-  let to_input (x : t) = Random_oracle_input.field (hash x)
-
-  let var_to_input (x : var) = Data_as_hash.to_input x
-
-  let typ = Data_as_hash.typ ~hash
-
-  let pop_checked (events : var) : Event.t Data_as_hash.t * var =
-    let open Run in
-    let hd, tl =
-      exists
-        Typ.(Data_as_hash.typ ~hash:Event.hash * typ)
-        ~compute:(fun () ->
-          match As_prover.read typ events with
-          | [] ->
-              failwith "Attempted to pop an empty stack"
-          | event :: events ->
-              (event, events))
-    in
-    Field.Assert.equal
-      (Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_events
-         [| Data_as_hash.hash tl; Data_as_hash.hash hd |])
-      (Data_as_hash.hash events) ;
-    (hd, tl)
-
-  let push_checked (events : var) (e : Event.var) : var =
-    let open Run in
-    let res =
-      exists typ ~compute:(fun () ->
-          let tl = As_prover.read typ events in
-          let hd =
-            As_prover.read (Typ.array ~length:(Array.length e) Field.typ) e
-          in
-          hd :: tl)
-    in
-    Field.Assert.equal
-      (Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_events
-         [| Data_as_hash.hash events; Event.hash_var e |])
-      (Data_as_hash.hash res) ;
-    res
-end
+module Events = Snapp_account.Events
+module Rollup_events = Snapp_account.Rollup_events
 
 module Body = struct
   module Poly = struct
@@ -226,6 +162,7 @@ module Body = struct
           ; token_id : 'token_id
           ; delta : 'signed_amount
           ; events : 'events
+          ; rollup_events : 'events
           ; call_data : 'call_data
           }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
@@ -263,13 +200,16 @@ module Body = struct
       , Field.Var.t )
       Poly.t
 
-    let to_input ({ pk; update; token_id; delta; events; call_data } : t) =
+    let to_input
+        ({ pk; update; token_id; delta; events; rollup_events; call_data } : t)
+        =
       List.reduce_exn ~f:Random_oracle_input.append
         [ Public_key.Compressed.Checked.to_input pk
         ; Update.Checked.to_input update
         ; Impl.run_checked (Token_id.Checked.to_input token_id)
         ; Amount.Signed.Checked.to_input delta
         ; Events.var_to_input events
+        ; Events.var_to_input rollup_events
         ; Random_oracle_input.field call_data
         ]
 
@@ -286,6 +226,7 @@ module Body = struct
       ; Token_id.typ
       ; Amount.Signed.typ
       ; Events.typ
+      ; Events.typ
       ; Field.typ
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
@@ -297,16 +238,19 @@ module Body = struct
     ; token_id = Token_id.default
     ; delta = Amount.Signed.zero
     ; events = []
+    ; rollup_events = []
     ; call_data = Field.zero
     }
 
-  let to_input ({ pk; update; token_id; delta; events; call_data } : t) =
+  let to_input
+      ({ pk; update; token_id; delta; events; rollup_events; call_data } : t) =
     List.reduce_exn ~f:Random_oracle_input.append
       [ Public_key.Compressed.to_input pk
       ; Update.to_input update
       ; Token_id.to_input token_id
       ; Amount.Signed.to_input delta
       ; Events.to_input events
+      ; Events.to_input rollup_events
       ; Random_oracle_input.field call_data
       ]
 

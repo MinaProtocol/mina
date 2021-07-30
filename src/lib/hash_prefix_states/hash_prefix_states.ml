@@ -109,3 +109,5 @@ let snapp_uri = salt snapp_uri
 let snapp_event = salt snapp_event
 
 let snapp_events = salt snapp_events
+
+let snapp_rollup_events = salt snapp_rollup_events

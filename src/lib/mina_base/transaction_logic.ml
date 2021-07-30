@@ -1199,6 +1199,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let apply_body
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(state_view : Snapp_predicate.Protocol_state.View.t) ~check_auth ~is_new
+      ~current_global_slot
       ({ body =
            { pk = _
            ; token_id
@@ -1207,6 +1208,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            ; delta
            ; events = _ (* This is for the snapp to use, we don't need it. *)
            ; call_data = _ (* This is for the snapp to use, we don't need it. *)
+           ; rollup_events
            }
        ; predicate
        } :
@@ -1276,13 +1278,46 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         update a.permissions.set_verification_key verification_key
           init.verification_key ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
             match (u, x) with Keep, _ -> x | Set x, _ -> Some x)
+      and rollup_state, last_rollup_slot =
+        let [ s1; s2; s3; s4; s5 ] = init.rollup_state in
+        let last_rollup_slot = init.last_rollup_slot in
+        let is_this_slot =
+          Mina_numbers.Global_slot.equal current_global_slot last_rollup_slot
+        in
+        (* Shift along if last update wasn't this slot *)
+        let s5 = if is_this_slot then s5 else s4 in
+        let s4 = if is_this_slot then s4 else s3 in
+        let s3 = if is_this_slot then s3 else s2 in
+        let s2 = if is_this_slot then s2 else s1 in
+        (* Push events to s1 *)
+        let is_empty = List.is_empty rollup_events in
+        let s1 =
+          if is_empty then s1
+          else Party.Rollup_events.push_events s1 rollup_events
+        in
+        let new_rollup_state =
+          if is_empty then Set_or_keep.Keep
+          else
+            Set_or_keep.Set
+              ( ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
+              , current_global_slot )
+        in
+        update a.permissions.edit_rollup_state new_rollup_state
+          (init.rollup_state, init.last_rollup_slot)
+          ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
+            match u with Keep -> x | Set x -> x)
       in
       let snapp_version =
         (* Current snapp version. Upgrade mechanism should live here. *)
         Mina_numbers.Snapp_version.zero
       in
       let t : Snapp_account.t =
-        { app_state; verification_key; snapp_version }
+        { app_state
+        ; verification_key
+        ; snapp_version
+        ; rollup_state
+        ; last_rollup_slot
+        }
       in
       if Snapp_account.(equal default t) then None else Some t
     in
@@ -1483,7 +1518,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Check_auth_and_update_account
           { is_start
           ; at_party = _
-          ; global_state = _
+          ; global_state
           ; party = p
           ; account = a
           ; transaction_commitment = ()
@@ -1497,6 +1532,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 (Fn.flip Permissions.Auth_required.check
                    (Control.tag p.authorization))
               ~is_new:(match loc with `Existing _ -> false | `New -> true)
+              ~current_global_slot:global_state.protocol_state.curr_global_slot
               p.data a
           with
           | Error _e ->
@@ -2336,6 +2372,7 @@ module For_tests = struct
                   ; token_id = Token_id.default
                   ; delta = Amount.Signed.(negate (of_unsigned total))
                   ; events = []
+                  ; rollup_events = []
                   ; call_data = Snark_params.Tick.Field.zero
                   }
               ; predicate = sender_nonce
@@ -2351,6 +2388,7 @@ module For_tests = struct
                     ; token_id = Token_id.default
                     ; delta = Amount.Signed.(of_unsigned amount)
                     ; events = []
+                    ; rollup_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     }
                 ; predicate = Accept

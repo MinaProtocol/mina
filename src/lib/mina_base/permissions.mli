@@ -54,6 +54,7 @@ module Poly : sig
         ; set_permissions : 'controller
         ; set_verification_key : 'controller
         ; set_snapp_uri : 'controller
+        ; edit_rollup_state : 'controller
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end

@@ -56,6 +56,7 @@ module Accounts = struct
             ; set_permissions
             ; set_verification_key
             ; set_snapp_uri
+            ; edit_rollup_state
             } ->
             let auth_required a =
               match a with
@@ -80,6 +81,7 @@ module Accounts = struct
             ; set_permissions = auth_required set_permissions
             ; set_verification_key = auth_required set_verification_key
             ; set_snapp_uri = auth_required set_snapp_uri
+            ; edit_rollup_state = auth_required edit_rollup_state
             }
       in
       let token_permissions =
@@ -93,7 +95,13 @@ module Accounts = struct
         match t.snapp with
         | None ->
             Ok None
-        | Some { state; verification_key; snapp_version } ->
+        | Some
+            { state
+            ; verification_key
+            ; snapp_version
+            ; rollup_state
+            ; last_rollup_slot
+            } ->
             let%bind app_state =
               if
                 Pickles_types.Vector.Nat.to_int Snapp_state.Max_state_size.n
@@ -105,7 +113,7 @@ module Accounts = struct
                   t (List.length state)
               else Ok (Snapp_state.V.of_list_exn state)
             in
-            let%map verification_key =
+            let%bind verification_key =
               (* Use a URI-safe alphabet to make life easier for maintaining json
                    We prefer this to base58-check here because users should not
                    be manually entering verification keys.
@@ -129,7 +137,27 @@ module Accounts = struct
                   in
                   Some (With_hash.of_data ~hash_data:Snapp_account.digest_vk vk))
             in
-            Some { Snapp_account.verification_key; app_state; snapp_version }
+            let%map rollup_state =
+              if
+                Pickles_types.Vector.Nat.to_int Pickles_types.Nat.N5.n
+                <> List.length rollup_state
+              then
+                Or_error.errorf
+                  !"Snap account rollup_state has invalid length %{sexp: \
+                    Runtime_config.Accounts.Single.t} length: %d"
+                  t (List.length rollup_state)
+              else Ok (Pickles_types.Vector.Vector_5.of_list_exn rollup_state)
+            in
+            let last_rollup_slot =
+              Mina_numbers.Global_slot.of_int last_rollup_slot
+            in
+            Some
+              { Snapp_account.verification_key
+              ; app_state
+              ; snapp_version
+              ; rollup_state
+              ; last_rollup_slot
+              }
       in
       { account with
         delegate =
@@ -207,6 +235,7 @@ module Accounts = struct
             ; set_permissions
             ; set_verification_key
             ; set_snapp_uri
+            ; edit_rollup_state
             } =
           account.permissions
         in
@@ -219,11 +248,19 @@ module Accounts = struct
           ; set_permissions = auth_required set_permissions
           ; set_verification_key = auth_required set_verification_key
           ; set_snapp_uri = auth_required set_snapp_uri
+          ; edit_rollup_state = auth_required edit_rollup_state
           }
       in
       let snapp =
         Option.map account.snapp
-          ~f:(fun { app_state; verification_key; snapp_version } ->
+          ~f:(fun
+               { app_state
+               ; verification_key
+               ; snapp_version
+               ; rollup_state
+               ; last_rollup_slot
+               }
+             ->
             let state = Snapp_state.V.to_list app_state in
             let verification_key =
               Option.map verification_key ~f:(fun vk ->
@@ -233,9 +270,15 @@ module Accounts = struct
                                 .Latest )
                   |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet)
             in
+            let rollup_state = Pickles_types.Vector.to_list rollup_state in
+            let last_rollup_slot =
+              Mina_numbers.Global_slot.to_int last_rollup_slot
+            in
             { Runtime_config.Accounts.Single.Snapp_account.state
             ; verification_key
             ; snapp_version
+            ; rollup_state
+            ; last_rollup_slot
             })
       in
       { pk =
