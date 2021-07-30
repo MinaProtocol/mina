@@ -68,8 +68,8 @@ module "kubernetes_testnet" {
       class                  = bp.class
       id                     = bp.total_node_index
       external_port          = bp.port
-      private_key_secret     = "online_${bp.class}_account_${bp.unique_node_index+1}"
-      libp2p_secret          = "online_${bp.class}_libp2p_${bp.total_node_index+1}"
+      private_key_secret     = "online-${bp.class}-account-${bp.unique_node_index}-key"
+      libp2p_secret          = "online-${bp.class}-libp2p-${bp.total_node_index}-key"
       enable_gossip_flooding = false
       run_with_user_agent    = bp.class =="whale" ? false : true
       run_with_bots          = false

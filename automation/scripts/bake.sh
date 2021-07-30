@@ -72,8 +72,14 @@ cat Dockerfile | docker build --no-cache \
   --build-arg "TESTNET_NAME=${TESTNET}" \
   --build-arg "CONFIG_FILE=${CONFIG_FILE}" -
 
-docker push "$hub_baked_tag"
 docker tag "$hub_baked_tag" "$gcr_baked_tag"
+
+echo "Pushing to dockerhub"
+docker push "$hub_baked_tag"
+echo "Pushing to GCR"
 docker push "$gcr_baked_tag"
-echo "Built + Pushed Image: ${hub_baked_tag}"
+
+echo "Built + Pushed Image"
+echo "Dockerhub url: ${hub_baked_tag}"
+echo "GCR url: ${gcr_baked_tag}"
 

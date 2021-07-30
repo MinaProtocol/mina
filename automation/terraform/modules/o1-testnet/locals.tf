@@ -27,7 +27,7 @@ locals {
         for i in range(bp.duplicates) : {
           name      = "${bp.class}-${index+1}-${i+1}"
           unique_node_index= index+1
-          total_node_index= i+ length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):0 ]  ])) #summation of all duplicates so far
+          total_node_index= 1+ i+ length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):0 ]  ])) #summation of all duplicates so far
           full_peer = "/dns4/${bp.class}-${index+1}-${i+1}.${var.testnet_name}/tcp/${var.block_producer_starting_host_port +i+ length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):0 ]  ]))}/p2p/${trimspace(data.local_file.libp2p_peers[element (local.whale_block_producer_libp2p_names,i+ length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):0 ]  ])) )  ].content)}",
           port      = var.block_producer_starting_host_port+i + length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):"" ]  ]))
           class  = bp.class
@@ -42,7 +42,7 @@ locals {
         for i in range(bp.duplicates) : {
           name      = "${bp.class}-${index+1}-${i+1}"
           unique_node_index= index+1
-          total_node_index= i+length ( flatten([for b in slice(var.fishes,0, index) : [ for k in range(b.duplicates):0 ]  ]))
+          total_node_index= 1+ i+length ( flatten([for b in slice(var.fishes,0, index) : [ for k in range(b.duplicates):0 ]  ]))
           full_peer = "/dns4/${bp.class}-${index+1}-${i+1}.${var.testnet_name}/tcp/${var.block_producer_starting_host_port +i+ length ( flatten([for b in slice(var.fishes,0, index) : [ for k in range(b.duplicates):0 ]  ]))}/p2p/${trimspace(data.local_file.libp2p_peers[element (local.fish_block_producer_libp2p_names,i+ length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):0 ]  ])) )  ].content)}",
           port      = var.block_producer_starting_host_port+i + length ( flatten([for b in slice(var.fishes,0, index) : [ for k in range(b.duplicates):"" ]  ]))
           class  = bp.class

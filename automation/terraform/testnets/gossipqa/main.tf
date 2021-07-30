@@ -35,19 +35,19 @@ provider "google" {
 }
 
 
-variable "whale_count" {
-  type = number
+# variable "whale_count" {
+#   type = number
 
-  description = "Number of online whales for the network to run"
-  default     = 2
-}
+#   description = "Number of online whales for the network to run"
+#   default     = 2
+# }
 
-variable "fish_count" {
-  type = number
+# variable "fish_count" {
+#   type = number
 
-  description = "Number of online fish for the network to run"
-  default     = 2
-}
+#   description = "Number of online fish for the network to run"
+#   default     = 2
+# }
 
 variable "seed_count" {
   default     = 2
@@ -55,7 +55,7 @@ variable "seed_count" {
 
 locals {
   testnet_name = "gossipqa"
-  mina_image = "codaprotocol/mina-daemon:1.2.0beta1-compatible-devnet-bfb9dc8"
+  mina_image = "gcr.io/o1labs-192920/mina-daemon-baked:1.2.0beta1-compatible-devnet-8ceb4c8-gossipqa-90c5a1f"
   mina_archive_image = "codaprotocol/mina-archive:1.2.0beta1-compatible-devnet-bfb9dc8"
   seed_region = "us-central1"
   seed_zone = "us-central1-c"
@@ -141,13 +141,13 @@ module "gossipqa" {
       snark_worker_fee      = "0.025"
       snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
       snark_coordinators_host_port = 10401
-    },
-    {
-      snark_worker_replicas = 5
-      snark_worker_fee      = "0.025"
-      snark_worker_public_key = "asdfljdsdasdfasdasdfasdasfkljdhsdj"
-      snark_coordinators_host_port = 10402
     }
+    # {
+    #   snark_worker_replicas = 5
+    #   snark_worker_fee      = "0.025"
+    #   snark_worker_public_key = "asdfljdsdasdfasdasdfasdasfkljdhsdj"
+    #   snark_coordinators_host_port = 10402
+    # }
   ]
 
   
@@ -192,7 +192,7 @@ module "gossipqa" {
 
   ]
 
-  upload_blocks_to_gcloud         = true
+  upload_blocks_to_gcloud         = false
   restart_nodes                   = false
   restart_nodes_every_mins        = "60"
   make_reports                    = true
