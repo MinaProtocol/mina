@@ -1,22 +1,22 @@
-{{ range $config := $.Values.snarkSetConfigs}}
+# {{ range $config := $.Values.snarkSetConfigs}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{tpl $config.workerName .}}
+  name: {{$.Values.snarkSetConfigs.workerName }}
   labels:
-    app: {{tpl $config.workerName .}}
+    app: {{$.Values.snarkSetConfigs.workerName}}
 spec:
-  replicas: {{ .Values.worker.numReplicas }}
+  replicas: {{ $.Values.snarkSetConfigs.workerReplicas }}
   selector:
     matchLabels:
-      app: {{tpl $config.workerName .}}
+      app: {{$.Values.snarkSetConfigs.workerName}}
   template:
     metadata:
       labels:
-        app: {{tpl $config.workerName .}}
-        testnet: {{ .Values.testnetName }}
+        app: {{$.Values.snarkSetConfigs.workerName}}
+        testnet: {{ $.Values.testnetName }}
         role: snark-worker
-        version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
+        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '10000'
@@ -30,16 +30,16 @@ spec:
           requests:
             memory: 6.0Gi
             cpu: 4
-        image: {{ .Values.coda.image }}
+        image: {{ $.Values.coda.image }}
         {{ if $.Values.coda.useCustomEntrypoint -}}
         command: [{{ $.Values.coda.customEntrypoint }}]
         {{- else }}
         command: ["bash", "-c"]
         {{- end }}
-        args: [ "sleep 120 && mina internal snark-worker -proof-level full -daemon-address '{{ tpl $config.coordinatorHostName . }}:{{ $config.coordinatorRpcPort }}'" ]
+        args: [ "sleep 120 && mina internal snark-worker -proof-level full -daemon-address '{{ $.Values.snarkSetConfigs.coordinatorHostName }}:{{ $.Values.snarkSetConfigs.coordinatorRpcPort }}'" ]
         env:
           - name: "RAYON_NUM_THREADS"
             value: "4"
         imagePullPolicy: Always
-{{- include "nodeSelector.preemptible" .Values | indent 6 }}
+{{- include "nodeSelector.preemptible" $.Values | indent 6 }}
 {{ end }}
