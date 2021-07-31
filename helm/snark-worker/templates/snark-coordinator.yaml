@@ -1,19 +1,19 @@
-{{- if .Values.coordinator.active }}
+{{ range $config := $.Values.snarkSetConfigs}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{tpl .Values.coordinator.fullname .}}
+  name: {{tpl $config.coordinatorName .}}
   labels:
-    app: {{tpl .Values.coordinator.fullname .}}
+    app: {{tpl $config.coordinatorName .}}
 spec:
   replicas: {{ .Values.numReplicas }}
   selector:
     matchLabels:
-      app: {{tpl .Values.coordinator.fullname .}}
+      app: {{tpl $config.coordinatorName .}}
   template:
     metadata:
       labels:
-        app: {{tpl .Values.coordinator.fullname .}}
+        app: {{tpl $config.coordinatorName .}}
         testnet: {{ .Values.testnetName }}
         role: snark-coordinator
         version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
@@ -78,13 +78,13 @@ spec:
         - name: CONNECT_PRIVATE_IPS
           value: "true"
         - name: CODA_SNARK_KEY
-          value: {{ .Values.coordinator.publicKey | quote }}
+          value: {{ $config.publicKey | quote }}
         - name: CODA_SNARK_FEE
-          value: {{ .Values.coordinator.snarkFee | quote }}
+          value: {{ $config.snarkFee | quote }}
         - name: DAEMON_EXTERNAL_PORT
           value: {{ .Values.coda.ports.p2p | quote }}
         - name: WORK_SELECTION
-          value: {{$.Values.coordinator.workSelectionAlgorithm | quote }}
+          value: {{$config.workSelectionAlgorithm | quote }}
         ports:
         - name: client-port
           protocol: TCP 
@@ -99,7 +99,7 @@ spec:
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.p2p }}
           hostPort: {{ .Values.coda.ports.p2p }}
-{{$name := tpl .Values.coordinator.fullname . }}
+{{$name := tpl $config.coordinatorName . }}
 {{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.snarkCoordinator.allChecks" $data | indent 8 }}
         imagePullPolicy: Always

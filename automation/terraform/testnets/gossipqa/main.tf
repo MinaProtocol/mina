@@ -139,15 +139,15 @@ module "gossipqa" {
     {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
-      snark_coordinators_host_port = 10401
+      snark_worker_public_key = "B62qrqcDbsBpbWq8bCVA7xBa7Wp32CKVwZM6tkbRDxbEECbiy5epJo5"
+      # snark_coordinators_host_port = 10401
+    },
+    {
+      snark_worker_replicas = 5
+      snark_worker_fee      = "0.025"
+      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      # snark_coordinators_host_port = 10402
     }
-    # {
-    #   snark_worker_replicas = 5
-    #   snark_worker_fee      = "0.025"
-    #   snark_worker_public_key = "asdfljdsdasdfasdasdfasdasfkljdhsdj"
-    #   snark_coordinators_host_port = 10402
-    # }
   ]
 
   
@@ -199,5 +199,5 @@ module "gossipqa" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/devnet_seeds.txt"
+  # seed_peers_url                  = "https://storage.googleapis.com/seed-lists/gossipqa_seeds.txt"
 }

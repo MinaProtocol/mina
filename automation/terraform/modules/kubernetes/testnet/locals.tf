@@ -166,20 +166,30 @@ locals {
       # coda = {
       #   seedPeers = var.seed_peers_url
       # }
-      worker = {
-        active      = snark.snark_worker_replicas > 0
-        numReplicas = snark.snark_worker_replicas
-        remoteCoordinatorHost="snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}"
-        remoteCoordinatorPort      = snark.snark_coordinators_host_port
+      snarkSetConfigs={
+        coordinatorName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}"
+        workerName= "snark-worker-${lower(substr(snark.snark_worker_public_key,0,6))}"
+        workerReplicas= snark.snark_worker_replicas
+        coordinatorHostName= "snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}.${var.testnet_name}"
+        # coordinatorHostPort = snark.snark_coordinators_host_port
+        publicKey=snark.snark_worker_public_key
+        snarkFee= snark.snark_worker_fee
+
       }
-      coordinator = {
-        fullname= "snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}"
-        active        = snark.snark_worker_replicas > 0
-        deployService = snark.snark_worker_replicas > 0
-        publicKey     = snark.snark_worker_public_key
-        snarkFee      = snark.snark_worker_fee
-        hostPort      = snark.snark_coordinators_host_port
-      }
+      # worker = {
+      #   active      = snark.snark_worker_replicas > 0
+      #   numReplicas = snark.snark_worker_replicas
+      #   remoteCoordinatorHost="snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}"
+      #   remoteCoordinatorPort      = snark.snark_coordinators_host_port
+      # }
+      # coordinator = {
+      #   fullname= "snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}"
+      #   active        = snark.snark_worker_replicas > 0
+      #   deployService = snark.snark_worker_replicas > 0
+      #   publicKey     = snark.snark_worker_public_key
+      #   snarkFee      = snark.snark_worker_fee
+      #   hostPort      = snark.snark_coordinators_host_port
+      # }
     }
   ]
 
