@@ -40,12 +40,13 @@ pub fn caml_pasta_fp_plonk_proof_create(
             let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
             prev_sgs
                 .into_iter()
+                .map(Into::<GAffine>::into)
                 .enumerate()
                 .map(|(i, sg)| {
                     (
                         prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
                             .iter()
-                            .map(|x| *x)
+                            .map(Into::<Fp>::into)
                             .collect(),
                         PolyComm::<GAffine> {
                             unshifted: vec![sg.into()],
@@ -66,11 +67,12 @@ pub fn caml_pasta_fp_plonk_proof_create(
     // Release the runtime lock so that other threads can run using it while we generate the proof.
     runtime.releasing_runtime(|| {
         let map = GroupMap::<Fq>::setup();
-        DlogProof::create::<
+        let proof = DlogProof::create::<
             DefaultFqSponge<VestaParameters, PlonkSpongeConstants>,
             DefaultFrSponge<Fp, PlonkSpongeConstants>,
         >(&map, auxiliary_input, index, prev)
-        .unwrap()
+        .unwrap();
+        proof.into()
     })
 }
 
@@ -102,7 +104,8 @@ pub fn caml_pasta_fp_plonk_proof_verify(
     index: CamlPastaFpPlonkVerifierIndex,
     proof: CamlProverProof<CamlGVesta, CamlFp>,
 ) -> bool {
-    proof_verify(lgr_comm, &index.into(), proof)
+    let lgr_comm = lgr_comm.into_iter().map(|x| x.into()).collect();
+    proof_verify(lgr_comm, &index.into(), proof.into())
 }
 
 #[ocaml::func]
@@ -115,7 +118,7 @@ pub fn caml_pasta_fp_plonk_proof_batch_verify(
         .into_iter()
         .zip(lgr_comms.into_iter())
         .zip(proofs.into_iter())
-        .map(|((i, l), p)| (i.into(), l.into_iter().map(From::from).collect(), p.into()))
+        .map(|((i, l), p)| (i.into(), l.into_iter().map(Into::into).collect(), p.into()))
         .collect();
     let ts: Vec<_> = ts.iter().map(|(i, l, p)| (i, l, p)).collect();
     let group_map = GroupMap::<Fq>::setup();
@@ -134,7 +137,7 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
         shifted: Some(g()),
         unshifted: vec![g(), g(), g()],
     };
-    DlogProof {
+    let dlogproof = DlogProof {
         prev_challenges: vec![
             (vec![Fp::one(), Fp::one()], comm()),
             (vec![Fp::one(), Fp::one()], comm()),
@@ -169,7 +172,8 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
             };
             [evals(), evals()]
         },
-    }
+    };
+    dlogproof.into()
 }
 
 #[ocaml::func]

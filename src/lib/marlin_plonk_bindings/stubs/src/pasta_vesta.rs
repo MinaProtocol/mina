@@ -64,19 +64,20 @@ pub fn caml_pasta_vesta_rng(i: ocaml::Int) -> CamlGroupProjectiveVesta {
     // We only care about entropy here, so we force a conversion i32 -> u32.
     let i: u64 = (i as u32).into();
     let mut rng: StdRng = rand::SeedableRng::seed_from_u64(i);
-    UniformRand::rand(&mut rng)
+    let proj: Projective = UniformRand::rand(&mut rng);
+    proj.into()
 }
 
 #[ocaml::func]
 pub extern "C" fn caml_pasta_vesta_endo_base() -> CamlFq {
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffine>();
-    endo_q
+    endo_q.into()
 }
 
 #[ocaml::func]
 pub extern "C" fn caml_pasta_vesta_endo_scalar() -> CamlFp {
     let (_endo_q, endo_r) = commitment_dlog::srs::endos::<GAffine>();
-    endo_r
+    endo_r.into()
 }
 
 #[ocaml::func]

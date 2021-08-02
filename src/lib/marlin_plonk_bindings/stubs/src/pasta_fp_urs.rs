@@ -102,7 +102,7 @@ pub fn caml_pasta_fp_urs_commit_evaluations(
                 .unwrap(),
         ),
         Some(x_domain) => {
-            let evals = evals.into_iter().map(From::from).collect();
+            let evals = evals.into_iter().map(Into::into).collect();
             let p = Evaluations::<Fp>::from_vec_and_domain(evals, x_domain).interpolate();
             Ok((*urs).commit_non_hiding(&p, None).into())
         }
@@ -128,8 +128,8 @@ pub fn caml_pasta_fp_urs_batch_accumulator_check(
 ) -> bool {
     crate::urs_utils::batch_dlog_accumulator_check(
         &*urs,
-        &comms.into_iter().map(From::from).collect(),
-        &chals.into_iter().map(From::from).collect(),
+        &comms.into_iter().map(Into::into).collect(),
+        &chals.into_iter().map(Into::into).collect(),
     )
 }
 
