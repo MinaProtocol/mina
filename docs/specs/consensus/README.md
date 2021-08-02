@@ -1,4 +1,5 @@
-# Consensus
+Consensus
+---------
 
 Mina uses [Ouroboros Samasika](https://eprint.iacr.org/2020/352.pdf) for consensus, hereafter referred to as Samasika.  The three fundamental guarantees delivered are
 * High decentralization - Self-bootstrap, uncapped participation and dynamic availability
@@ -10,39 +11,47 @@ Samasika extends the ideas from [Ouroboros Genesis](https://eprint.iacr.org/2018
 This documents specifies required structures, algorithms and protocol details.
 
 **Table of Contents**
-* [1 Constants](#1-constants)
-* [2 Structures](#2-structures)
-  * [2.1 `External_transition`](#21-external_transition)
-  * [2.2 `Protocol_state`](#22-protocol_state)
-  * [2.3 `Consensus_state`](#23-consensus_state)
-  * [2.4 `Epoch_data`](#24-epoch_data)
-  * [2.5 Example block](#25-example-block)
-* [3 Algorithms](#3-algorithms)
-  * [3.1 Common](#31-common)
-    * [3.1.1 `top`](#311-top)
-    * [3.1.2 `cState`](#312-cstate)
-    * [3.1.3 `globalSlot`](#313-globalslot)
-    * [3.1.4 `epochSlot`](#314-epochslot)
-    * [3.1.5 `length`](#315-length)
-    * [3.1.6 `lastVRF`](#316-lastvrf)
-    * [3.1.7 `stateHash`](#317-statehash)
-  * [3.2 Chain selection](#32-chain-selection-rules)
-    * [3.2.1 Short-range fork rule](#321-short-range-fork-rule)
-    * [3.2.2 Long-range fork rule](#322-long-range-fork-rule)
-  * [3.3 Decentralized checkpointing](#33-decentralized-checkpointing)
-    * [3.3.1 `initCheckpoints`](#331-initcheckpoints)
-    * [3.3.2 `updateCheckpoints`](#332-updatecheckpoints)
-    * [3.3.3 `isShortRange`](#333-isshortrange)
-  * [3.4 Window min-density](#34-window-min-density)
-    * [3.4.1 `isWindowStop`](#341-iswindowstop)
-    * [3.4.2 `shiftWindow`](#342-shiftwindow)
-    * [3.4.3 `initSubWindowDensities`](#343-initsubwindowdensities)
-    * [3.4.4 `updateSubWindowDensities`](#344-updatesubwindowdensities)
-    * [3.4.5 `getMinDen`](#345-getminden)
-* [4 Protocol](#4-protocol)
-  * [4.1 Initialize consensus](#41-initialize-consensus)
-  * [4.2 Select chain](#42-select-chain)
-  * [4.3 Produce block](#43-produce-block)
+
+<!-- TOC depthFrom:1 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
+
+- [1. Constants](#1-constants)
+- [2. Structures](#2-structures)
+	- [2.1 `State_hash.Stable.V1`](#21-statehashstablev1)
+	- [2.2 `Epoch_seed.Stable.V1`](#22-epochseedstablev1)
+	- [2.3 `External_transition`](#23-externaltransition)
+	- [2.4 `Protocol_state`](#24-protocolstate)
+		- [2.4.1 `Protocol_state.Body`](#241-protocolstatebody)
+	- [2.5 `Consensus_state`](#25-consensusstate)
+	- [2.6 `Epoch_data`](#26-epochdata)
+	- [2.7 Example block](#27-example-block)
+- [3. Algorithms](#3-algorithms)
+	- [3.1 Common](#31-common)
+		- [3.1.1 `top`](#311-top)
+		- [3.1.2 `cState`](#312-cstate)
+		- [3.1.3 `globalSlot`](#313-globalslot)
+		- [3.1.4 `epochSlot`](#314-epochslot)
+		- [3.1.5 `length`](#315-length)
+		- [3.1.6 `lastVRF`](#316-lastvrf)
+		- [3.1.7 `stateHash`](#317-statehash)
+	- [3.2 Chain selection rules](#32-chain-selection-rules)
+		- [3.2.1 Short-range fork rule](#321-short-range-fork-rule)
+		- [3.2.2 Long-range fork rule](#322-long-range-fork-rule)
+	- [3.3 Decentralized checkpointing](#33-decentralized-checkpointing)
+		- [3.3.1 `initCheckpoints`](#331-initcheckpoints)
+		- [3.3.2 `updateCheckpoints`](#332-updatecheckpoints)
+		- [3.3.3 `isShortRange`](#333-isshortrange)
+	- [3.4 Window min-density](#34-window-min-density)
+		- [3.4.1 `isWindowStop`](#341-iswindowstop)
+		- [3.4.2 `shiftWindow`](#342-shiftwindow)
+		- [3.4.3 `initSubWindowDensities`](#343-initsubwindowdensities)
+		- [3.4.4 `updateSubWindowDensities`](#344-updatesubwindowdensities)
+		- [3.4.5 `getMinDen`](#345-getminden)
+- [4 Protocol](#4-protocol)
+	- [4.1 Initialize consensus](#41-initialize-consensus)
+	- [4.2 Select chain](#42-select-chain)
+	- [4.3 Produce block](#43-produce-block)
+
+<!-- /TOC -->
 
 **Conventions**
 * We use the terms _top_ and _last_ interchangeably to refer to the block with the greatest height on a given chain
@@ -58,7 +67,7 @@ This documents specifies required structures, algorithms and protocol details.
 
 # 1. Constants
 
-These are the parameters Mina uses for Samasika
+These are the `mainnet` parameters Mina uses for Samasika
 
 | Field | Value | Description |
 | - | - | - |
@@ -67,6 +76,7 @@ These are the parameters Mina uses for Samasika
 | `slots_per_epoch`               | `7140`                  | Number of slots per epoch |
 | `slots_duration`                | `180000` (= 3m)         | Slot duration in ms |
 | `epoch_duration`                | `1285200000` (= 14d21h) | Duration of an epoch in ms |
+| `grace_period_end`              | `1440`                  | Number of slots before minimum window density is used in chain selection |
 | `genesis_state_timestamp`       | `1615939200000` (Mar 17, 2021 00:00:00 GMT+0000) | Timestamp of genesis block in unixtime |
 | `acceptable_network_delay`      | `180000` (= 3m)         | Acceptable network delay in ms |
 | `slots_per_sub_window`          | `7`                     | Slots per sub window (see [Section 3.4](#34-window-min-density)) |
@@ -76,7 +86,22 @@ These are the parameters Mina uses for Samasika
 
 The main structures used in Mina consensus are as follows
 
-## 2.1 `External_transition`
+## 2.1 `State_hash.Stable.V1`
+
+| Field                           | Type                               | Description |
+| - | - | - |
+| `b58_version`                   | `u8` (= 0x10)                      | Base58 check version byte |
+| `version`                       | `u8` (= 0x01)                      | Structure version |
+| `field`                         | `Field.t`                          | Field element |
+
+## 2.2 `Epoch_seed.Stable.V1.t`
+
+| Field                           | Type                               | Description |
+| - | - | - |
+| `version`                       | `u8` (= 0x01)                      | Structure version |
+| `field`                         | `Field.t`                          | Field element |
+
+## 2.2 `External_transition`
 
 This is Mina's block structure.  In Mina blocks are synonymous with transitions.  A block received from a peer is referred to as an external transition and a block generated and applied locally is referred to as an internal transition.
 
@@ -90,7 +115,7 @@ This is Mina's block structure.  In Mina blocks are synonymous with transitions.
 | `current_protocol_version`      | `Protocol_version.Stable.V1.t`        | Current protocol version |
 | `proposed_protocol_version_opt` | `Protocol_version.Stable.V1.t option` | Proposed protocol version |
 
-## 2.2 `Protocol_state`
+## 2.3 `Protocol_state`
 
 This structure can be thought of like the block header.  It contains the most essential information of a block.
 
@@ -100,7 +125,7 @@ This structure can be thought of like the block header.  It contains the most es
 | `previous_state_hash` | `State_hash.Stable.V1.t` | Commitment to previous block (hash of previous protocol state hash and body hash)|
 | `body`                | `Protocol_state.Body.Value.Stable.V1` | The body of the protocol state |
 
-### 2.2.1 `Protocol_state.Body`
+### 2.3.1 `Protocol_state.Body`
 
 | Field                 | Type                     | Description |
 | - | - | - |
@@ -110,7 +135,7 @@ This structure can be thought of like the block header.  It contains the most es
 | `consensus_state`     | `Consensus.Data.Consensus_state.Value.Stable.V1.t` | Consensus related state |
 | `constants`           | `Protocol_constants_checked.Value.Stable.V1.t` | Consensus constants |
 
-## 2.3 `Consensus_state`
+## 2.4 `Consensus_state`
 
 This structure encapsulates the succinct state of the consensus protocol.  The stake distribution information is contained by the `staking_epoch_data` field.  Due to its succinct nature, Samasika cannot look back into the past to obtain ledger snapshots for the stake distribution.  Instead, Samasika implements a novel approach where the future stake distribution snapshot is prepared by the current consensus epoch.  Samasika prepares the past for the future!  This future state is stored in the `next_epoch_data` field.
 
@@ -133,7 +158,7 @@ This structure encapsulates the succinct state of the consensus protocol.  The s
 | `coinbase_receiver`                      | `Public_key.Compressed.Stable.V1.t` | Compresed public key of account receiving the block reward |
 | `supercharge_coinbase`                   | `bool` | `true` if `block_stake_winner` has no locked tokens, `false` otherwise |
 
-## 2.4 `Epoch_data`
+## 2.6 `Epoch_data`
 
 | Field              | Type                     | Description |
 | - | - | - |
@@ -144,7 +169,7 @@ This structure encapsulates the succinct state of the consensus protocol.  The s
 | `lock_checkpoint`  | `State_hash.Stable.V1.t` | State hash of _last known block in the first 2/3 of epoch_ (see [Section 3.3](#33-decentralized-checkpointing))|
 | `epoch_length`     | `Length.Stable.V1.t` | |
 
-## 2.5 Example block
+## 2.7 Example block
 
 This is an example of a Mina block in JSON format
 
@@ -387,7 +412,7 @@ slots:  s1s2s3s4s5s6s7s8s9|s1s2s3s4s5s6s7s8s9|s1s2s3...
                      start⤻⎺⎺⎺⎺⎺⎺⎺⎺⎺⎺⎺
 ```
 
-These are located in the `start_checkpoint` and `lock_checkpoint` fields of the [`Epoch_data`](#24-epoch_data) structure, which is part of the [`Consensus_state`](#23-consensus_state) (See [Section 2.4](#24-epoch_data)).
+These are located in the `start_checkpoint` and `lock_checkpoint` fields of the [`Epoch_data`](#26-epoch_data) structure, which is part of the [`Consensus_state`](#25-consensus_state) (See [Section 2.6](#26-epoch_data)).
 
 As time progresses away from the first slot of the current epoch, the lock checkpoint is pushed along with the last known block until we reach the last block in the first `2/3` of the epoch and it is _frozen_. ❄
 
@@ -398,7 +423,7 @@ A fork is considered _short-range_ if either
 
 Since the leader selection distribution for the current epoch is computed by the end of the first `2/3` of the slots in the previous epoch, an adversarial fork after the previous epoch's `lock_checkpoint` cannot skewed the distribution for the remainder of that epoch, nor the current epoch.  Anything before the previous epoch's `lock_checkpoint` _long-range_ fork.
 
-Since Mina is succinct this means that it must stored the checkpoints for the current epoch in addition to the checkpoints for the previous epoch.  This is why the [`Consensus_state`](#23-consensus_state) structure contains two `Epoch_data` fields: `staking_epoch_data` and `next_epoch_data`.  The former contains the checkpoints for the previous epoch and the latter contains that of the current epoch.
+Since Mina is succinct this means that it must stored the checkpoints for the current epoch in addition to the checkpoints for the previous epoch.  This is why the [`Consensus_state`](#25-consensus_state) structure contains two `Epoch_data` fields: `staking_epoch_data` and `next_epoch_data`.  The former contains the checkpoints for the previous epoch and the latter contains that of the current epoch.
 
 ### 3.3.1 `initCheckpoints`
 
@@ -411,7 +436,7 @@ fn initCheckpoints(G) -> ()
     cState(G).staking_epoch_data.start_checkpoint = zero
     cState(G).staking_epoch_data.lock_checkpoint = zero
 
-    state_hash = hash(latest state ϵ cState(G).next_epoch_data.seed's update range) ?
+    state_hash = poseidon_3w_hash(latest state ϵ cState(G).next_epoch_data.seed's update range) ?
     cState(G).next_epoch_data.start_checkpoint = state_hash ?
     cState(G).next_epoch_data.lock_checkpoint =  state_hash ?
 }
@@ -424,7 +449,7 @@ This algorithm updates the checkpoints of the block being created `B` based on i
 ```rust
 fn updateCheckpoints(P, B) -> ()
 {
-    state_hash = hash(latest state ϵ SP.next_epoch_data.seed's update range) ?
+    state_hash = poseidon_3w_hash(latest state ϵ cState(P).next_epoch_data.seed's update range) ?
     if epochSlot(B) == 0 then
         cState(B).next_epoch_data.start_checkpoint = state_hash
 
@@ -483,7 +508,7 @@ sub_window_densities:      d1        d2      ...       dk          dc
 
 The value of `k` is defined by the [`sub_windows_per_window`](#1-constants) constant.
 
-This list of window of densities is stored in each block, in the `sub_window_densities` field of the `Consensus_state` (see [Section 2.3](#23-consensus_state)).  This field is of type `Length.Stable.V1.t list` and because it must be written into blocks as part of the protocol, an implimentation MUST implement serialization for this type.
+This list of window of densities is stored in each block, in the `sub_window_densities` field of the `Consensus_state` (see [Section 2.5](#25-consensus_state)).  This field is of type `Length.Stable.V1.t list` and because it must be written into blocks as part of the protocol, an implimentation MUST implement serialization for this type.
 
 The values stored in `sub_window_densities` have this format.
 
@@ -494,7 +519,7 @@ The values stored in `sub_window_densities` have this format.
 | `k - 1` | Previous window density |
 | `k` | Current window density |
 
-Each block also stores the minimum window density, found in the `min_window_density` field of the `Consensus_state` (see [Section 2.3](#23-consensus_state)).
+Each block also stores the minimum window density, found in the `min_window_density` field of the `Consensus_state` (see [Section 2.5](#25-consensus_state)).
 
 ### 3.4.1 `isWindowStop`
 
@@ -545,7 +570,7 @@ fn initSubWindowDensities(G) -> ()
 {
     cState(G).sub_window_densities = u32[0, slots_per_window, slots_per_window, ..., slots_per_window]
     //                                      \_______________________________________________________/
-    //                                                   sub_windows_per_window - 1 times
+    //                                                   sub_windows_per_window - 1
 
     cState(G).min_window_density = slots_per_window
 }
