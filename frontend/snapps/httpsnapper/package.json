@@ -34,14 +34,18 @@
       "limit": "10 KB"
     }
   ],
-  "devDependencies": {
+  "dependencies": {
     "@babel/preset-env": "^7.14.8",
-    "@size-limit/preset-small-lib": "^5.0.2",
-    "eslint-plugin-prettier": "^3.4.0",
-    "prettier": "^2.3.2",
-    "size-limit": "^5.0.1",
+    "node-fetch": "^2.6.1",
+    "@types/node-fetch": "^2.5.12",
     "tsdx": "^0.14.1",
     "tslib": "^2.3.0",
     "typescript": "^4.3.5"
+  },
+  "devDependencies": {
+    "@size-limit/preset-small-lib": "^5.0.2",
+    "eslint-plugin-prettier": "^3.4.0",
+    "prettier": "^2.3.2",
+    "size-limit": "^5.0.1"
   }
 }

@@ -1,3 +1,5 @@
+import fetch from 'node-fetch';
+
 type PublicKey = string;
 
 type Signature = { field: string; scalar: string };
@@ -18,8 +20,8 @@ type Response = {
 };
 
 /**
- * Mocks a response from "HTTPSnapps Oracle API". A successful response will return
- * a code of 200 and a signed payload from an official HTTPSnapps oracle key.
+ * Currently, WIP. Sends either a GET or POST request to the HTTPSnapps Oracle API which will
+ * returned a signed response from an official oracle key.
  *
  * @param _method
  * @param _url
@@ -28,21 +30,45 @@ type Response = {
  * @returns
  */
 export const verify = async (
-  _method: Method,
-  _url: string,
-  _params: QueryParams,
+  method: Method,
+  url: string,
+  params: QueryParams,
   _postData: string
 ): Promise<Response> => {
+  // Convert QueryParams to query string
+  const qs = Object.keys(params)
+    .map((key) => `${key}=${params[key]}`)
+    .join('&');
+
+  // Temporary URL, Oracle API runs on localhost for now
+  const minaOracle =
+    qs.length === 0
+      ? `http://localhost:3000?url=${url}`
+      : `http://localhost:3000?url=${url}&${qs}`;
+
+  let response;
+  if (method === 'GET') {
+    response = await fetch(minaOracle, { method: 'GET' }).catch((err) => {
+      return {
+        error: err,
+      };
+    });
+  } else if (method === 'POST') {
+    response = await fetch(minaOracle, { method: 'POST' }).catch((err) => {
+      return {
+        error: err,
+      };
+    });
+  }
+
+  if (!response.ok) {
+    const message = `An error has occured: ${response.status}`;
+    return {
+      error: Error(message),
+    };
+  }
+  const resJson = await response.json();
   return {
-    ok: {
-      publicKey: 'B62qp64aNJnFbUEyPMr8sPC7hBzDELjK7XT7yACMcbGYCfMtZWReJvx',
-      signature: {
-        field:
-          '20431175305150367946844734992985266806108713008193415136916739672441430210571',
-        scalar:
-          '3134263265420328630089767456663187715829233682017110700619102488905565329549',
-      },
-      payload: 'hello',
-    },
+    ok: resJson,
   };
 };
