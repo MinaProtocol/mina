@@ -71,7 +71,7 @@ pub fn caml_pasta_fq_urs_lagrange_commitment(
     urs: CamlPastaFqUrs,
     domain_size: ocaml::Int,
     i: ocaml::Int,
-) -> Result<PolyComm<GAffine>, ocaml::Error> {
+) -> Result<CamlPolyComm<CamlGPallas>, ocaml::Error> {
     match EvaluationDomain::<Fq>::new(domain_size as usize) {
         None => Err(
             ocaml::Error::invalid_argument("caml_pasta_fq_urs_lagrange_commitment")
@@ -92,8 +92,8 @@ pub fn caml_pasta_fq_urs_lagrange_commitment(
 pub fn caml_pasta_fq_urs_commit_evaluations(
     urs: CamlPastaFqUrs,
     domain_size: ocaml::Int,
-    evals: Vec<Fq>,
-) -> Result<PolyComm<GAffine>, ocaml::Error> {
+    evals: Vec<CamlFq>,
+) -> Result<CamlPolyComm<CamlGPallas>, ocaml::Error> {
     match EvaluationDomain::<Fq>::new(domain_size as usize) {
         None => Err(
             ocaml::Error::invalid_argument("caml_pasta_fq_urs_commit_evaluations")
@@ -111,9 +111,9 @@ pub fn caml_pasta_fq_urs_commit_evaluations(
 #[ocaml::func]
 pub fn caml_pasta_fq_urs_b_poly_commitment(
     urs: CamlPastaFqUrs,
-    chals: Vec<Fq>,
-) -> Result<PolyComm<GAffine>, ocaml::Error> {
-    let chals: Vec<Fq> = chals.into_iter().map(From::from).collect();
+    chals: Vec<CamlFq>,
+) -> Result<CamlPolyComm<CamlGPallas>, ocaml::Error> {
+    let chals: Vec<Fq> = chals.into_iter().map(Into::into).collect();
     let coeffs = b_poly_coefficients(&chals);
     let p = DensePolynomial::<Fq>::from_coefficients_vec(coeffs);
     Ok((*urs).commit_non_hiding(&p, None).into())
@@ -122,8 +122,8 @@ pub fn caml_pasta_fq_urs_b_poly_commitment(
 #[ocaml::func]
 pub fn caml_pasta_fq_urs_batch_accumulator_check(
     urs: CamlPastaFqUrs,
-    comms: Vec<GAffine>,
-    chals: Vec<Fq>,
+    comms: Vec<CamlGPallas>,
+    chals: Vec<CamlFq>,
 ) -> bool {
     crate::urs_utils::batch_dlog_accumulator_check(
         &*urs,
@@ -133,6 +133,6 @@ pub fn caml_pasta_fq_urs_batch_accumulator_check(
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_urs_h(urs: CamlPastaFqUrs) -> GAffine {
+pub fn caml_pasta_fq_urs_h(urs: CamlPastaFqUrs) -> CamlGPallas {
     (*urs).h.into()
 }

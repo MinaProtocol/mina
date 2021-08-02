@@ -21,17 +21,17 @@ use plonk_protocol_dlog::{
 
 #[derive(ocaml::IntoValue, ocaml::FromValue)]
 pub struct CamlPastaFpPlonkOracles {
-    pub o: RandomOracles<Fp>,
-    pub p_eval: (Fp, Fp),
-    pub opening_prechallenges: Vec<Fp>,
-    pub digest_before_evaluations: Fp,
+    pub o: CamlRandomOracles<CamlFp>,
+    pub p_eval: (CamlFp, CamlFp),
+    pub opening_prechallenges: Vec<CamlFp>,
+    pub digest_before_evaluations: CamlFp,
 }
 
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_oracles_create(
-    lgr_comm: Vec<PolyComm<GAffine>>,
-    index: CamlPastaFpPlonkVerifierIndex,
-    proof: DlogProof<GAffine>,
+    lgr_comm: Vec<CamlPolyComm<CamlGVesta>>, // the bases to commit polynomials
+    index: CamlPastaFpPlonkVerifierIndex,    // parameters
+    proof: CamlProverProof<CamlGVesta, CamlFp>, // the final proof (contains public elements at the beginning)
 ) -> CamlPastaFpPlonkOracles {
     let index: DlogVerifierIndex<'_, GAffine> = index.into();
     let proof: DlogProof<GAffine> = proof.into();
@@ -64,11 +64,13 @@ pub fn caml_pasta_fp_plonk_oracles_create(
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fp_plonk_oracles_dummy() -> RandomOracles<Fp> {
-    RandomOracles::zero().into()
+pub fn caml_pasta_fp_plonk_oracles_dummy() -> CamlRandomOracles<CamlFp> {
+    RandomOracles::<Fp>::zero().into()
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fp_plonk_oracles_deep_copy(x: RandomOracles<Fp>) -> RandomOracles<Fp> {
+pub fn caml_pasta_fp_plonk_oracles_deep_copy(
+    x: CamlRandomOracles<CamlFp>,
+) -> CamlRandomOracles<CamlFp> {
     x
 }

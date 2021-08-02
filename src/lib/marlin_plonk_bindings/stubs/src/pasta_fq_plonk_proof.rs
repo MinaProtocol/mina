@@ -27,9 +27,9 @@ pub fn caml_pasta_fq_plonk_proof_create(
     index: CamlPastaFqPlonkIndexPtr<'static>,
     primary_input: CamlPastaFqVector,
     auxiliary_input: CamlPastaFqVector,
-    prev_challenges: Vec<Fq>,
-    prev_sgs: Vec<GAffine>,
-) -> DlogProof<GAffine> {
+    prev_challenges: Vec<CamlFq>,
+    prev_sgs: Vec<CamlGPallas>,
+) -> CamlProverProof<CamlGPallas, CamlFq> {
     // TODO: Should we be ignoring this?!
     let _primary_input = primary_input;
 
@@ -98,18 +98,18 @@ pub fn proof_verify(
 
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_verify(
-    lgr_comm: Vec<PolyComm<GAffine>>,
+    lgr_comm: Vec<CamlPolyComm<CamlGPallas>>,
     index: CamlPastaFqPlonkVerifierIndex,
-    proof: DlogProof<GAffine>,
+    proof: CamlProverProof<CamlGPallas, CamlFq>,
 ) -> bool {
     proof_verify(lgr_comm, &index.into(), proof)
 }
 
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_batch_verify(
-    lgr_comms: Vec<Vec<PolyComm<GAffine>>>,
+    lgr_comms: Vec<Vec<CamlPolyComm<CamlGPallas>>>,
     indexes: Vec<CamlPastaFqPlonkVerifierIndex>,
-    proofs: Vec<DlogProof<GAffine>>,
+    proofs: Vec<CamlProverProof<CamlGPallas, CamlFq>>,
 ) -> bool {
     let ts: Vec<_> = indexes
         .into_iter()
@@ -128,7 +128,7 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_proof_dummy() -> DlogProof<GAffine> {
+pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq> {
     let g = || GAffine::prime_subgroup_generator();
     let comm = || PolyComm {
         shifted: Some(g()),
@@ -173,6 +173,8 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> DlogProof<GAffine> {
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_proof_deep_copy(x: DlogProof<GAffine>) -> DlogProof<GAffine> {
+pub fn caml_pasta_fq_plonk_proof_deep_copy(
+    x: CamlProverProof<CamlGPallas, CamlFq>,
+) -> CamlProverProof<CamlGPallas, CamlFq> {
     x
 }
