@@ -127,7 +127,7 @@ module Transaction_applied = struct
         type t =
           { accounts :
               (Account_id.Stable.V1.t * Account.Stable.V2.t option) list
-          ; command : Parties.Stable.V2.t With_status.Stable.V1.t
+          ; command : Parties.Stable.V1.t With_status.Stable.V1.t
           }
         [@@deriving sexp]
 

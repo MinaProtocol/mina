@@ -68,7 +68,7 @@ module Valid = struct
     module V2 = struct
       type t =
         ( Signed_command.With_valid_signature.Stable.V1.t
-        , Parties.Valid.Stable.V2.t )
+        , Parties.Valid.Stable.V1.t )
         Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
@@ -92,7 +92,7 @@ end
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t = (Signed_command.Stable.V1.t, Parties.Stable.V2.t) Poly.Stable.V2.t
+    type t = (Signed_command.Stable.V1.t, Parties.Stable.V1.t) Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
@@ -144,7 +144,7 @@ module Verifiable = struct
     module V2 = struct
       type t =
         ( Signed_command.Stable.V1.t
-        , Parties.Verifiable.Stable.V2.t )
+        , Parties.Verifiable.Stable.V1.t )
         Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
