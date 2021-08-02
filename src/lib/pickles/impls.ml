@@ -13,6 +13,8 @@ let test_bit x i = B.(shift_right x i land one = one)
  *)
 let forbidden_shifted_values ~modulus:r ~size_in_bits =
   let two_to_n = B.(pow (of_int 2) (of_int size_in_bits)) in
+  (* this function doesn't make sense if the modulus is smaller *)
+  assert (B.(r < two_to_n)) ;
   let neg_two_to_n = B.(neg two_to_n) in
   let representatives x =
     let open Sequence in
@@ -40,22 +42,26 @@ module Step = struct
       Field.t * Boolean.var
 
     let forbidden_shifted_values =
+      let size_in_bits = Constant.size_in_bits in
+      let other_mod = Wrap_impl.Bigint.to_bignum_bigint Constant.size in
+      let values = forbidden_shifted_values ~size_in_bits ~modulus:other_mod in
       let f x =
         let hi = test_bit x (Field.size_in_bits - 1) in
         let lo = B.shift_right x 1 in
-        (Impl.Bigint.(to_field (of_bignum_bigint lo)), hi)
+        let lo =
+          (* IMPORTANT: in practice we should filter such values
+             see: https://github.com/MinaProtocol/mina/pull/9324/commits/82b14cd7f11fb938ab6d88aac19516bd7ea05e94
+             but the circuit needs to remain the same, which is to use 0 when a value is larger than the modulus here (tested by the unit test below)
+          *)
+          let modulus = Impl.Field.size in
+          if B.compare modulus lo <= 0 then Tick.Field.zero
+          else Impl.Bigint.(to_field (of_bignum_bigint lo))
+        in
+        (lo, hi)
       in
-      let modulus = Wrap_impl.Bigint.to_bignum_bigint Constant.size in
-      let size_in_bits = Constant.size_in_bits in
-      let values = forbidden_shifted_values ~size_in_bits ~modulus in
-      values |> List.filter ~f:(fun x -> B.compare modulus x > 0) |> List.map ~f
+      values |> List.map ~f
 
-    let%test_unit "forbidden shifted values print" =
-      print_endline "debug" ;
-      List.iter forbidden_shifted_values ~f:(fun (a, b) ->
-          printf "%s - %B\n" (Tick.Field.to_string a) b)
-
-    let%test_unit "forbidden shifted values" =
+    let%test_unit "preserve circuit behavior for Step" =
       let expected_list =
         [ ("45560315531506369815346746415080538112", false)
         ; ("45560315531506369815346746415080538113", false)
@@ -136,18 +142,21 @@ module Wrap = struct
     type t = Field.t
 
     let forbidden_shifted_values =
-      let f x = Impl.Bigint.(to_field (of_bignum_bigint x)) in
-      let modulus = Step.Impl.Bigint.to_bignum_bigint Constant.size in
+      let other_mod = Step.Impl.Bigint.to_bignum_bigint Constant.size in
       let size_in_bits = Constant.size_in_bits in
-      let values = forbidden_shifted_values ~size_in_bits ~modulus in
-      values |> List.filter ~f:(fun x -> B.compare modulus x > 0) |> List.map ~f
+      let values = forbidden_shifted_values ~size_in_bits ~modulus:other_mod in
+      let f x =
+        let modulus = Impl.Field.size in
+        (* IMPORTANT: in practice we should filter such values
+           see: https://github.com/MinaProtocol/mina/pull/9324/commits/82b14cd7f11fb938ab6d88aac19516bd7ea05e94
+           but the circuit needs to remain the same, which is to use 0 when a value is larger than the modulus here (tested by the unit test below)
+        *)
+        if B.compare modulus x <= 0 then Wrap_field.zero
+        else Impl.Bigint.(to_field (of_bignum_bigint x))
+      in
+      values |> List.map ~f
 
-    let%test_unit "forbidden shifted values 2 print" =
-      print_endline "debug" ;
-      List.iter forbidden_shifted_values ~f:(fun x ->
-          printf "%s\n" (Wrap_field.to_string x))
-
-    let%test_unit "forbidden shifted values 2" =
+    let%test_unit "preserve circuit behavior for Wrap" =
       let expected_list =
         [ "91120631062839412180561524743370440705"
         ; "91120631062839412180561524743370440706"
@@ -161,6 +170,7 @@ module Wrap = struct
       assert ([%equal: string list] str_list expected_list)
 
     let typ_unchecked, check =
+      (* Tick -> Tock *)
       let t0 =
         Typ.transport Field.typ
           ~there:(Fn.compose Tock.Field.of_bits Tick.Field.to_bits)
