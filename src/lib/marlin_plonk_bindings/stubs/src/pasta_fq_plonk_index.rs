@@ -149,8 +149,7 @@ pub fn caml_pasta_fq_plonk_index_create(
 
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
     let cs =
-        match ConstraintSystem::<Fq>::create(gates, oracle::pasta::fq::params(), public as usize)
-        {
+        match ConstraintSystem::<Fq>::create(gates, oracle::pasta::fq::params(), public as usize) {
             None => Err(ocaml::Error::failwith(
                 "caml_pasta_fq_plonk_index_create: could not create constraint system",
             )
