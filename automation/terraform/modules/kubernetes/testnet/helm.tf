@@ -57,6 +57,25 @@ resource "helm_release" "block_producers" {
   depends_on = [helm_release.seeds]
 }
 
+# Plain nodes
+
+resource "helm_release" "plain_nodes" {
+  provider = helm.testnet_deploy
+  count    = length(local.plain_node_vars)
+  name       = "${var.testnet_name}-plain-node-${count.index + 1}"
+  repository = var.use_local_charts ? "" : local.mina_helm_repo
+  #TODO we need a new chart for the plain nodes
+  chart      = var.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
+  version    = "1.0.0"
+  namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
+  values = [
+    yamlencode(local.plain_node_vars[count.index])
+  ]
+  wait       = false
+  timeout    = 600
+  depends_on = [helm_release.seeds]
+}
+
 # Snark Worker
 
 resource "helm_release" "snark_workers" {

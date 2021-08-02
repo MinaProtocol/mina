@@ -53,6 +53,10 @@ variable "seed_count" {
   default     = 2
 }
 
+variable "plain_node_count" {
+  default     = 2
+}
+
 locals {
   testnet_name = "gossipqa"
   mina_image = "gcr.io/o1labs-192920/mina-daemon-baked:1.2.0beta1-compatible-devnet-8ceb4c8-gossipqa-90c5a1f"
@@ -135,7 +139,8 @@ module "gossipqa" {
   block_producer_starting_host_port = 10501
 
   snark_coordinators=[
-
+# gotta manually change the public keys, get them from whatever genesis ledger we're running this with
+# if we want to do this automatically, we would need to modify generate-keys-and-ledger.sh to create a separate batch of files with pulbic keys of all block producer nodes and read those in
     {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
@@ -148,49 +153,113 @@ module "gossipqa" {
       snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
       snark_coordinators_host_port = 10402
     }
+    # ,
+    # {
+    #   snark_worker_replicas = 5
+    #   snark_worker_fee      = "0.025"
+    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+    #   snark_coordinators_host_port = 10403
+    # },
+    # {
+    #   snark_worker_replicas = 5
+    #   snark_worker_fee      = "0.025"
+    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+    #   snark_coordinators_host_port = 10404
+    # },
+    # {
+    #   snark_worker_replicas = 5
+    #   snark_worker_fee      = "0.025"
+    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+    #   snark_coordinators_host_port = 10405
+    # },
+    # {
+    #   snark_worker_replicas = 5
+    #   snark_worker_fee      = "0.025"
+    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+    #   snark_coordinators_host_port = 10406
+    # }
+    # ,
+    # {
+    #   snark_worker_replicas = 5
+    #   snark_worker_fee      = "0.025"
+    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+    #   snark_coordinators_host_port = 10407
+    # },
+    # {
+    #   snark_worker_replicas = 5
+    #   snark_worker_fee      = "0.025"
+    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+    #   snark_coordinators_host_port = 10408
+    # },
+    # {
+    #   snark_worker_replicas = 5
+    #   snark_worker_fee      = "0.025"
+    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+    #   snark_coordinators_host_port = 10409
+    # },
+    # {
+    #   snark_worker_replicas = 5
+    #   snark_worker_fee      = "0.025"
+    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+    #   snark_coordinators_host_port = 10410
+    # }
   ]
 
-  
-  # whale_count_unique           = var.whale_count
-  # fish_count_unique            = var.fish_count
   seed_count            = var.seed_count
 
-  # TODO: eventually this will be turned into a loop depending on how many bps we want
-  whales= [    
-    {
-      duplicates = 2
-      class  = "whale"
-    },
-    {
-      duplicates = 1
-      class  = "whale"
-    }
-  ]
+  plain_node_count = var.plain_node_count
 
-  #   whales= [for i in range(var.whale_count):
-  # i%2 ==0 ?
+  # whales= [    
   #   {
   #     duplicates = 2
   #     class  = "whale"
-  #   }
-  #   :
+  #   },
   #   {
   #     duplicates = 1
   #     class  = "whale"
   #   }
   # ]
-  
-  fishes=[
-    {
-      duplicates = 2
-      class  = "fish"
-    },
-    {
-      duplicates = 1
-      class  = "fish"
-    }
 
-  ]
+  # fishes= [    
+  #   {
+  #     duplicates = 2
+  #     class  = "fish"
+  #   },
+  #   {
+  #     duplicates = 1
+  #     class  = "fish"
+  #   }
+  # ]
+
+  whales= concat( 
+    [for i in range(var.whale_count)/3:{
+        duplicates = 3
+        class  = "whale"
+      }], 
+    [for i in range(var.whale_count)/3:{
+        duplicates = 2
+        class  = "whale"
+      }], 
+    [for i in range(var.whale_count)/3:{
+        duplicates = 1
+        class  = "whale"
+      }]
+  )
+  
+  fishes=concat( 
+    [for i in range(var.fish_count)/3:{
+        duplicates = 3
+        class  = "fish"
+      }], 
+    [for i in range(var.fish_count)/3:{
+        duplicates = 2
+        class  = "fish"
+      }], 
+    [for i in range(var.fish_count)/3:{
+        duplicates = 1
+        class  = "fish"
+      }]
+  )
 
   upload_blocks_to_gcloud         = false
   restart_nodes                   = false
