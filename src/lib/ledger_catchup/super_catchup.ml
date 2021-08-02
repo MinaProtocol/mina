@@ -397,10 +397,9 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
   [%log debug]
     ~metadata:[ ("target_hash", State_hash.to_yojson target_hash) ]
     "Doing a catchup job with target $target_hash" ;
-
   let%bind all_peers = Mina_networking.peers network >>| Peer.Set.of_list in
-
-  let non_preferred_peers = Peer.Set.diff all_peers preferred_peers in
+  let preferred_peers_alive = Peer.Set.inter all_peers preferred_peers in
+  let non_preferred_peers = Peer.Set.diff all_peers preferred_peers_alive in
   let peers =
     Peer.Set.to_list preferred_peers @ Peer.Set.to_list non_preferred_peers
   in
