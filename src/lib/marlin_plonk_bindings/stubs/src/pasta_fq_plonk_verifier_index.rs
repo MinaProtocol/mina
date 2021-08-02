@@ -26,7 +26,7 @@ use std::{
 
 
 pub type CamlPastaFqPlonkVerifierIndex =
-    CamlPlonkVerifierIndex<Fq, CamlPastaFqUrs, PolyComm<GAffine>>;
+    CamlPlonkVerifierIndex<CamlFq, CamlPastaFqUrs, CamlPolyComm<CamlGPallas>>;
 
 pub fn to_ocaml<'a>(
     urs: &Rc<SRS<GAffine>>,
@@ -109,8 +109,8 @@ pub fn of_ocaml<'a>(
     max_quot_size: ocaml::Int,
     log_size_of_group: ocaml::Int,
     urs: CamlPastaFqUrs,
-    evals: CamlPlonkVerificationEvals<PolyComm<GAffine>>,
-    shifts: CamlPlonkVerificationShifts<Fq>,
+    evals: CamlPlonkVerificationEvals<CamlPolyComm<CamlGPallas>>,
+    shifts: CamlPlonkVerificationShifts<CamlFq>,
 ) -> (DlogVerifierIndex<'a, GAffine>, Rc<SRS<GAffine>>) {
     let urs_copy = Rc::clone(&*urs);
     let urs_copy_outer = Rc::clone(&*urs);

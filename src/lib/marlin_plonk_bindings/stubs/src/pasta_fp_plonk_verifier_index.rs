@@ -28,7 +28,7 @@ use std::{
 
 
 pub type CamlPastaFpPlonkVerifierIndex =
-    CamlPlonkVerifierIndex<Fp, CamlPastaFpUrs, PolyComm<GAffine>>;
+    CamlPlonkVerifierIndex<CamlFp, CamlPastaFpUrs, CamlPolyComm<CamlGVesta>>;
 
 pub fn to_ocaml<'a>(
     urs: &Rc<SRS<GAffine>>,
@@ -111,8 +111,8 @@ pub fn of_ocaml<'a>(
     max_quot_size: ocaml::Int,
     log_size_of_group: ocaml::Int,
     urs: CamlPastaFpUrs,
-    evals: CamlPlonkVerificationEvals<PolyComm<GAffine>>,
-    shifts: CamlPlonkVerificationShifts<Fp>,
+    evals: CamlPlonkVerificationEvals<CamlPolyComm<CamlGVesta>>,
+    shifts: CamlPlonkVerificationShifts<CamlFp>,
 ) -> (DlogVerifierIndex<'a, GAffine>, Rc<SRS<GAffine>>) {
     let urs_copy = Rc::clone(&*urs);
     let urs_copy_outer = Rc::clone(&*urs);
@@ -252,9 +252,13 @@ pub fn caml_pasta_fp_plonk_verifier_index_create(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_verifier_index_shifts(
     log2_size: ocaml::Int,
-) -> CamlPlonkVerificationShifts<Fp> {
-    let (a, b) = ConstraintSystem::sample_shifts(&Domain::new(1 << log2_size).unwrap());
-    CamlPlonkVerificationShifts { r: a, o: b }
+) -> CamlPlonkVerificationShifts<CamlFp> {
+    let domain = Domain::new(1 << log2_size).unwrap();
+    let (a, b): (Fp, Fp) = ConstraintSystem::sample_shifts(&domain);
+    CamlPlonkVerificationShifts {
+        r: a.into(),
+        o: b.into(),
+    }
 }
 
 #[ocaml::func]

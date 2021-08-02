@@ -43,7 +43,7 @@ pub fn caml_pasta_fq_plonk_gate_vector_create() -> CamlPastaFqPlonkGateVector {
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_gate_vector_add(
     mut v: CamlPastaFqPlonkGateVectorPtr,
-    gate: CamlPlonkGate<Vec<Fq>>,
+    gate: CamlPlonkGate<Vec<CamlFq>>,
 ) {
     v.as_mut().0.push(Gate {
         typ: gate.typ.into(),
@@ -56,7 +56,7 @@ pub fn caml_pasta_fq_plonk_gate_vector_add(
 pub fn caml_pasta_fq_plonk_gate_vector_get(
     v: CamlPastaFqPlonkGateVectorPtr,
     i: ocaml::Int,
-) -> CamlPlonkGate<Vec<Fq>> {
+) -> CamlPlonkGate<Vec<CamlFq>> {
     let gate = &(v.as_ref().0)[i as usize];
     let c = gate.c.iter().map(|x| *x).collect();
     CamlPlonkGate {
