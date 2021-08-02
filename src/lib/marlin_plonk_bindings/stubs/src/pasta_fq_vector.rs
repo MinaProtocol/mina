@@ -27,7 +27,7 @@ pub fn caml_pasta_fq_vector_get(
     i: ocaml::Int,
 ) -> Result<CamlFq, ocaml::Error> {
     match v.get(i as usize) {
-        Some(x) => Ok(*x),
+        Some(x) => Ok(x.into()),
         None => Err(ocaml::Error::invalid_argument("caml_pasta_fq_vector_get")
             .err()
             .unwrap()),
