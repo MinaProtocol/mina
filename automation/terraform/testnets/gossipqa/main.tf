@@ -140,13 +140,13 @@ module "gossipqa" {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
       snark_worker_public_key = "B62qrqcDbsBpbWq8bCVA7xBa7Wp32CKVwZM6tkbRDxbEECbiy5epJo5"
-      # snark_coordinators_host_port = 10401
+      snark_coordinators_host_port = 10401
     },
     {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
       snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
-      # snark_coordinators_host_port = 10402
+      snark_coordinators_host_port = 10402
     }
   ]
 

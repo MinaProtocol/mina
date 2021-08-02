@@ -171,9 +171,11 @@ locals {
         workerName= "snark-worker-${lower(substr(snark.snark_worker_public_key,0,6))}"
         workerReplicas= snark.snark_worker_replicas
         coordinatorHostName= "snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}.${var.testnet_name}"
-        # coordinatorHostPort = snark.snark_coordinators_host_port
+        coordinatorRpcPort= 8301
+        coordinatorHostPort = snark.snark_coordinators_host_port
         publicKey=snark.snark_worker_public_key
         snarkFee= snark.snark_worker_fee
+        workSelectionAlgorithm= "seq"
 
       }
       # worker = {
