@@ -1224,6 +1224,7 @@ module Base = struct
                  ; verification_key
                  ; permissions
                  ; snapp_uri
+                 ; token_symbol
                  }
              ; delta
              ; events = _ (* This is for the snapp to use, we don't need it. *)
@@ -1384,6 +1385,14 @@ module Base = struct
               (Set_or_keep.Checked.set_or_keep ~if_:Data_as_hash.if_ snapp_uri
                  a.snapp_uri))
       in
+      let token_symbol =
+        update_authorized a.permissions.set_snapp_uri
+          ~is_keep:(Set_or_keep.Checked.is_keep token_symbol)
+          ~updated:
+            (`Ok
+              (Set_or_keep.Checked.set_or_keep ~if_:Account.Token_symbol.if_
+                 token_symbol a.token_symbol))
+      in
       let delegate =
         let base_delegate =
           (* New accounts should have the delegate equal to the public key of the account. *)
@@ -1424,6 +1433,7 @@ module Base = struct
         ; nonce
         ; public_key = pk
         ; snapp_uri
+        ; token_symbol
         }
       in
       (a, `proof_must_verify proof_must_verify)
@@ -2487,6 +2497,7 @@ module Base = struct
              ; public_key
              ; token_id
              ; token_permissions = account.token_permissions
+             ; token_symbol = account.token_symbol
              ; nonce = next_nonce
              ; receipt_chain_hash
              ; delegate
@@ -2678,6 +2689,7 @@ module Base = struct
              ; token_id
              ; token_permissions =
                  { Token_permissions.token_owner; token_locked }
+             ; token_symbol = account.token_symbol
              ; nonce = account.nonce
              ; receipt_chain_hash = account.receipt_chain_hash
              ; delegate
@@ -2827,6 +2839,7 @@ module Base = struct
              ; public_key = account.public_key
              ; token_id = account.token_id
              ; token_permissions = account.token_permissions
+             ; token_symbol = account.token_symbol
              ; nonce = account.nonce
              ; receipt_chain_hash = account.receipt_chain_hash
              ; delegate
@@ -3829,6 +3842,7 @@ let%test_module "transaction_snark" =
                       ; verification_key = Keep
                       ; permissions = Keep
                       ; snapp_uri = Keep
+                      ; token_symbol = Keep
                       }
                   ; token_id = Token_id.default
                   ; delta =

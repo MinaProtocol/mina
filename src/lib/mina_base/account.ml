@@ -84,6 +84,90 @@ end
 
 module Nonce = Account_nonce
 
+module Token_symbol = struct
+  [%%versioned_binable
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = string [@@deriving sexp, equal, compare, hash, yojson]
+
+        let to_latest = Fn.id
+
+        let max_length = 6
+
+        let check (x : t) = assert (String.length x < max_length)
+
+        let t_of_sexp sexp =
+          let res = t_of_sexp sexp in
+          check res ; res
+
+        let of_yojson json =
+          let res = of_yojson json in
+          Result.iter ~f:check res ; res
+      end
+
+      include T
+
+      include Binable.Of_binable
+                (Core_kernel.String.Stable.V1)
+                (struct
+                  type t = string
+
+                  let to_binable = Fn.id
+
+                  let of_binable x = check x ; x
+                end)
+    end
+  end]
+
+  [%%define_locally
+  Stable.Latest.
+    (sexp_of_t, t_of_sexp, equal, to_yojson, of_yojson, max_length, check)]
+
+  let default = ""
+
+  (* 48 = max_length * 8 *)
+  module Num_bits = Pickles_types.Nat.N48
+
+  let to_bits (x : t) =
+    Pickles_types.Vector.init Num_bits.n ~f:(fun i ->
+        try
+          let c = x.[i / 8] |> Char.to_int in
+          c land (1 lsl (i mod 8)) <> 0
+        with _ -> false)
+
+  let of_bits x : t =
+    let c, j, chars =
+      Pickles_types.Vector.fold x ~init:(0, 0, []) ~f:(fun (c, j, chars) x ->
+          let c = c lor ((if x then 1 else 0) lsl j) in
+          if j = 8 then (0, 0, Char.of_int_exn c :: chars) else (c, j + 1, chars))
+    in
+    assert (c = 0) ;
+    assert (j = 0) ;
+    let chars = List.drop_while ~f:(fun c -> Char.to_int c = 0) chars in
+    String.of_char_list (List.rev chars)
+
+  let to_input (x : t) =
+    Random_oracle_input.bitstrings
+      [| Pickles_types.Vector.to_list (to_bits x) |]
+
+  type var = (Boolean.var, Num_bits.n) Pickles_types.Vector.t
+
+  let var_of_value x =
+    Pickles_types.Vector.map ~f:Boolean.var_of_value (to_bits x)
+
+  let typ : (var, t) Typ.t =
+    Typ.transport ~there:to_bits ~back:of_bits
+    @@ Pickles_types.Vector.typ Boolean.typ Num_bits.n
+
+  let var_to_input (x : var) =
+    Random_oracle_input.bitstrings [| Pickles_types.Vector.to_list x |]
+
+  let if_ (b : Boolean.var) ~(then_ : var) ~(else_ : var) : var =
+    Pickles_types.Vector.map2 then_ else_ ~f:(fun then_ else_ ->
+        Snark_params.Tick.Run.Boolean.if_ b ~then_ ~else_)
+end
+
 module Poly = struct
   [%%versioned
   module Stable = struct
@@ -91,6 +175,7 @@ module Poly = struct
       type ( 'pk
            , 'tid
            , 'token_permissions
+           , 'token_symbol
            , 'amount
            , 'nonce
            , 'receipt_chain_hash
@@ -104,6 +189,7 @@ module Poly = struct
         { public_key : 'pk
         ; token_id : 'tid
         ; token_permissions : 'token_permissions
+        ; token_symbol : 'token_symbol
         ; balance : 'amount
         ; nonce : 'nonce
         ; receipt_chain_hash : 'receipt_chain_hash
@@ -175,6 +261,7 @@ module Binable_arg = struct
         ( Public_key.Compressed.Stable.V1.t
         , Token_id.Stable.V1.t
         , Token_permissions.Stable.V1.t
+        , Token_symbol.Stable.V1.t
         , Balance.Stable.V1.t
         , Nonce.Stable.V1.t
         , Receipt.Chain_hash.Stable.V1.t
@@ -226,6 +313,7 @@ module Binable_arg = struct
         { public_key
         ; token_id
         ; token_permissions
+        ; token_symbol = ""
         ; balance
         ; nonce
         ; receipt_chain_hash
@@ -336,6 +424,7 @@ type value =
   ( Public_key.Compressed.t
   , Token_id.t
   , Token_permissions.t
+  , Token_symbol.t
   , Balance.t
   , Nonce.t
   , Receipt.Chain_hash.t
@@ -360,6 +449,7 @@ let initialize account_id : t =
   { public_key
   ; token_id
   ; token_permissions = Token_permissions.default
+  ; token_symbol = ""
   ; balance = Balance.zero
   ; nonce = Nonce.zero
   ; receipt_chain_hash = Receipt.Chain_hash.empty
@@ -415,7 +505,7 @@ let to_input (t : t) =
     ~public_key:(f Public_key.Compressed.to_input)
     ~token_id:(f Token_id.to_input) ~balance:(bits Balance.to_bits)
     ~token_permissions:(f Token_permissions.to_input)
-    ~nonce:(bits Nonce.Bits.to_bits)
+    ~token_symbol:(f Token_symbol.to_input) ~nonce:(bits Nonce.Bits.to_bits)
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
     ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
     ~voting_for:(f State_hash.to_input) ~timing:(bits Timing.to_bits)
@@ -436,6 +526,7 @@ type var =
   ( Public_key.Compressed.var
   , Token_id.var
   , Token_permissions.var
+  , Token_symbol.var
   , Balance.var
   , Nonce.Checked.t
   , Receipt.Chain_hash.var
@@ -457,6 +548,7 @@ let typ' snapp =
       [ Public_key.Compressed.typ
       ; Token_id.typ
       ; Token_permissions.typ
+      ; Token_symbol.typ
       ; Balance.typ
       ; Nonce.typ
       ; Receipt.Chain_hash.typ
@@ -504,6 +596,7 @@ let var_of_t
     ({ public_key
      ; token_id
      ; token_permissions
+     ; token_symbol
      ; balance
      ; nonce
      ; receipt_chain_hash
@@ -518,6 +611,7 @@ let var_of_t
   { Poly.public_key = Public_key.Compressed.var_of_t public_key
   ; token_id = Token_id.var_of_t token_id
   ; token_permissions = Token_permissions.var_of_t token_permissions
+  ; token_symbol = Token_symbol.var_of_value token_symbol
   ; balance = Balance.var_of_t balance
   ; nonce = Nonce.Checked.constant nonce
   ; receipt_chain_hash = Receipt.Chain_hash.var_of_t receipt_chain_hash
@@ -535,6 +629,7 @@ module Checked = struct
       ( Public_key.Compressed.var
       , Token_id.var
       , Token_permissions.var
+      , Token_symbol.var
       , Balance.var
       , Nonce.Checked.t
       , Receipt.Chain_hash.var
@@ -572,6 +667,7 @@ module Checked = struct
                   monad throughout this calculation.
                *)
                (f (fun x -> Run.run_checked (Token_id.Checked.to_input x)))
+             ~token_symbol:(f Token_symbol.var_to_input)
              ~token_permissions:(f Token_permissions.var_to_input)
              ~balance:(bits Balance.var_to_bits)
              ~nonce:(bits !Nonce.Checked.to_bits)
@@ -659,6 +755,7 @@ let empty =
   { Poly.public_key = Public_key.Compressed.empty
   ; token_id = Token_id.default
   ; token_permissions = Token_permissions.default
+  ; token_symbol = Token_symbol.default
   ; balance = Balance.zero
   ; nonce = Nonce.zero
   ; receipt_chain_hash = Receipt.Chain_hash.empty
@@ -684,6 +781,7 @@ let create account_id balance =
   { Poly.public_key
   ; token_id
   ; token_permissions = Token_permissions.default
+  ; token_symbol = Token_symbol.default
   ; balance
   ; nonce = Nonce.zero
   ; receipt_chain_hash = Receipt.Chain_hash.empty
@@ -713,6 +811,7 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
       { Poly.public_key
       ; token_id
       ; token_permissions = Token_permissions.default
+      ; token_symbol = Token_symbol.default
       ; balance
       ; nonce = Nonce.zero
       ; receipt_chain_hash = Receipt.Chain_hash.empty

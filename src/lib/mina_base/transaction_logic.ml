@@ -1205,7 +1205,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            { pk = _
            ; token_id
            ; update =
-               { app_state; delegate; verification_key; permissions; snapp_uri }
+               { app_state
+               ; delegate
+               ; verification_key
+               ; permissions
+               ; snapp_uri
+               ; token_symbol
+               }
            ; delta
            ; events = _ (* This is for the snapp to use, we don't need it. *)
            ; call_data = _ (* This is for the snapp to use, we don't need it. *)
@@ -1327,6 +1333,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
           match u with Keep -> x | Set x -> x)
     in
+    let%bind token_symbol =
+      update a.permissions.set_snapp_uri token_symbol a.token_symbol
+        ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
+          match u with Keep -> x | Set x -> x)
+    in
     let%bind permissions =
       update a.permissions.set_delegate permissions a.permissions
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
@@ -1340,7 +1351,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           Account.Nonce.succ a.nonce
     in
     Ok
-      { a with balance; snapp; delegate; permissions; timing; nonce; snapp_uri }
+      { a with
+        balance
+      ; snapp
+      ; delegate
+      ; permissions
+      ; timing
+      ; nonce
+      ; snapp_uri
+      ; token_symbol
+      }
 
   let apply_parties_unchecked
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -2216,6 +2236,7 @@ module For_tests = struct
       ( Public_key.Compressed.t
       , Token_id.t
       , Token_permissions.t
+      , Account.Token_symbol.t
       , Balance.t
       , Account_nonce.t
       , unit

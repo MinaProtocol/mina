@@ -1767,6 +1767,7 @@ let%test_module _ =
         ; token_id = Token_id.default
         ; token_permissions =
             Token_permissions.Not_owned { account_disabled = false }
+        ; token_symbol = Account.Token_symbol.default
         ; balance = Currency.Balance.of_int balance
         ; nonce = Account.Nonce.of_int nonce
         ; receipt_chain_hash = Receipt.Chain_hash.empty

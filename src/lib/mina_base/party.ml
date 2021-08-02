@@ -32,12 +32,13 @@ module Update = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('state_element, 'pk, 'vk, 'perms, 'snapp_uri) t =
+        type ('state_element, 'pk, 'vk, 'perms, 'snapp_uri, 'token_symbol) t =
           { app_state : 'state_element Snapp_state.V.Stable.V1.t
           ; delegate : 'pk
           ; verification_key : 'vk
           ; permissions : 'perms
           ; snapp_uri : 'snapp_uri
+          ; token_symbol : 'token_symbol
           }
         [@@deriving compare, equal, sexp, hash, yojson, hlist]
       end
@@ -58,7 +59,8 @@ module Update = struct
           With_hash.Stable.V1.t
           Set_or_keep.Stable.V1.t
         , Permissions.Stable.V1.t Set_or_keep.Stable.V1.t
-        , string Set_or_keep.Stable.V1.t )
+        , string Set_or_keep.Stable.V1.t
+        , Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
 
@@ -74,12 +76,19 @@ module Update = struct
       , Public_key.Compressed.var Set_or_keep.Checked.t
       , Field.t Set_or_keep.Checked.t
       , Permissions.Checked.t Set_or_keep.Checked.t
-      , string Data_as_hash.t Set_or_keep.Checked.t )
+      , string Data_as_hash.t Set_or_keep.Checked.t
+      , Account.Token_symbol.var Set_or_keep.Checked.t )
       Poly.t
 
     let to_input
-        ({ app_state; delegate; verification_key; permissions; snapp_uri } : t)
-        =
+        ({ app_state
+         ; delegate
+         ; verification_key
+         ; permissions
+         ; snapp_uri
+         ; token_symbol
+         } :
+          t) =
       let open Random_oracle_input in
       List.reduce_exn ~f:append
         [ Snapp_state.to_input app_state
@@ -90,6 +99,8 @@ module Update = struct
         ; Set_or_keep.Checked.to_input permissions
             ~f:Permissions.Checked.to_input
         ; Set_or_keep.Checked.to_input snapp_uri ~f:Data_as_hash.to_input
+        ; Set_or_keep.Checked.to_input token_symbol
+            ~f:Account.Token_symbol.var_to_input
         ]
   end
 
@@ -100,12 +111,20 @@ module Update = struct
     ; verification_key = Keep
     ; permissions = Keep
     ; snapp_uri = Keep
+    ; token_symbol = Keep
     }
 
   let dummy = noop
 
   let to_input
-      ({ app_state; delegate; verification_key; permissions; snapp_uri } : t) =
+      ({ app_state
+       ; delegate
+       ; verification_key
+       ; permissions
+       ; snapp_uri
+       ; token_symbol
+       } :
+        t) =
     let open Random_oracle_input in
     List.reduce_exn ~f:append
       [ Snapp_state.to_input app_state
@@ -121,6 +140,8 @@ module Update = struct
       ; Set_or_keep.to_input
           (Set_or_keep.map ~f:Account.hash_snapp_uri snapp_uri)
           ~dummy:Field.zero ~f:field
+      ; Set_or_keep.to_input token_symbol ~dummy:Account.Token_symbol.default
+          ~f:Account.Token_symbol.to_input
       ]
 
   let typ () : (Checked.t, t) Typ.t =
@@ -143,6 +164,8 @@ module Update = struct
         |> Typ.transport
              ~there:(Set_or_keep.map ~f:Option.some)
              ~back:(Set_or_keep.map ~f:(fun x -> Option.value_exn x))
+      ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
+          Account.Token_symbol.typ
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist

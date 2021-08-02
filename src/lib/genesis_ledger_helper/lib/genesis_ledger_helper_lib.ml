@@ -57,6 +57,7 @@ module Accounts = struct
             ; set_verification_key
             ; set_snapp_uri
             ; edit_rollup_state
+            ; set_token_symbol
             } ->
             let auth_required a =
               match a with
@@ -82,6 +83,7 @@ module Accounts = struct
             ; set_verification_key = auth_required set_verification_key
             ; set_snapp_uri = auth_required set_snapp_uri
             ; edit_rollup_state = auth_required edit_rollup_state
+            ; set_token_symbol = auth_required set_token_symbol
             }
       in
       let token_permissions =
@@ -90,6 +92,19 @@ module Accounts = struct
             if token_owned then
               Mina_base.Token_permissions.Token_owned { disable_new_accounts }
             else Not_owned { account_disabled })
+      in
+      let%bind token_symbol =
+        try
+          let token_symbol =
+            Option.value ~default:Mina_base.Account.Token_symbol.default
+              t.token_symbol
+          in
+          Mina_base.Account.Token_symbol.check token_symbol ;
+          return token_symbol
+        with _ ->
+          Or_error.errorf "Token symbol exceeds max length: %d > %d"
+            (String.length (Option.value_exn t.token_symbol))
+            Mina_base.Account.Token_symbol.max_length
       in
       let%map snapp =
         match t.snapp with
@@ -159,22 +174,27 @@ module Accounts = struct
               ; last_rollup_slot
               }
       in
-      { account with
-        delegate =
-          (if Option.is_some delegate then delegate else account.delegate)
-      ; token_id
-      ; token_permissions
-      ; nonce = Account.Nonce.of_uint32 t.nonce
-      ; receipt_chain_hash =
-          Option.value_map t.receipt_chain_hash
-            ~default:account.receipt_chain_hash
-            ~f:Mina_base.Receipt.Chain_hash.of_base58_check_exn
-      ; voting_for =
-          Option.value_map ~default:account.voting_for
-            ~f:Mina_base.State_hash.of_base58_check_exn t.voting_for
-      ; snapp
-      ; permissions
-      }
+      ( { public_key = account.public_key
+        ; balance = account.balance
+        ; timing = account.timing
+        ; token_symbol
+        ; delegate =
+            (if Option.is_some delegate then delegate else account.delegate)
+        ; token_id
+        ; token_permissions
+        ; nonce = Account.Nonce.of_uint32 t.nonce
+        ; receipt_chain_hash =
+            Option.value_map t.receipt_chain_hash
+              ~default:account.receipt_chain_hash
+              ~f:Mina_base.Receipt.Chain_hash.of_base58_check_exn
+        ; voting_for =
+            Option.value_map ~default:account.voting_for
+              ~f:Mina_base.State_hash.of_base58_check_exn t.voting_for
+        ; snapp
+        ; permissions
+        ; snapp_uri = Option.value ~default:"" t.snapp_uri
+        }
+        : Mina_base.Account.t )
 
     let of_account :
            Mina_base.Account.t
@@ -236,6 +256,7 @@ module Accounts = struct
             ; set_verification_key
             ; set_snapp_uri
             ; edit_rollup_state
+            ; set_token_symbol
             } =
           account.permissions
         in
@@ -249,6 +270,7 @@ module Accounts = struct
           ; set_verification_key = auth_required set_verification_key
           ; set_snapp_uri = auth_required set_snapp_uri
           ; edit_rollup_state = auth_required edit_rollup_state
+          ; set_token_symbol = auth_required set_token_symbol
           }
       in
       let snapp =
@@ -302,6 +324,8 @@ module Accounts = struct
           Some (Mina_base.State_hash.to_base58_check account.voting_for)
       ; snapp
       ; permissions
+      ; token_symbol = Some account.token_symbol
+      ; snapp_uri = Some account.snapp_uri
       }
   end
 

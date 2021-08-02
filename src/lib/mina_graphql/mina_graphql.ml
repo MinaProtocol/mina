@@ -779,6 +779,7 @@ module Types = struct
           { Account.Poly.public_key
           ; token_id
           ; token_permissions
+          ; token_symbol
           ; nonce
           ; balance
           ; receipt_chain_hash
@@ -792,6 +793,7 @@ module Types = struct
         let open Option.Let_syntax in
         let%bind public_key = public_key in
         let%bind token_permissions = token_permissions in
+        let%bind token_symbol = token_symbol in
         let%bind nonce = nonce in
         let%bind receipt_chain_hash = receipt_chain_hash in
         let%bind delegate = delegate in
@@ -803,6 +805,7 @@ module Types = struct
         { Account.Poly.public_key
         ; token_id
         ; token_permissions
+        ; token_symbol
         ; nonce
         ; balance
         ; receipt_chain_hash
@@ -818,6 +821,7 @@ module Types = struct
           { Account.Poly.public_key
           ; token_id
           ; token_permissions
+          ; token_symbol
           ; nonce
           ; balance
           ; receipt_chain_hash
@@ -831,6 +835,7 @@ module Types = struct
         { Account.Poly.public_key
         ; token_id
         ; token_permissions = Some token_permissions
+        ; token_symbol = Some token_symbol
         ; nonce = Some nonce
         ; balance =
             { AnnotatedBalance.total = balance
@@ -867,6 +872,7 @@ module Types = struct
               { Poly.public_key = Account_id.public_key account_id
               ; token_id = Account_id.token_id account_id
               ; token_permissions = None
+              ; token_symbol = None
               ; nonce = None
               ; delegate = None
               ; balance =
@@ -892,6 +898,7 @@ module Types = struct
           ( Public_key.Compressed.t
           , Token_id.t
           , Token_permissions.t option
+          , Account.Token_symbol.t option
           , AnnotatedBalance.t
           , Account.Nonce.t option
           , Receipt.Chain_hash.t option
@@ -1178,6 +1185,11 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.snapp_uri)
+             ; field "tokenSymbol" ~typ:string
+                 ~doc:"The token symbol associated with this account"
+                 ~args:Arg.[]
+                 ~resolve:(fun _ { account; _ } ->
+                   account.Account.Poly.token_symbol)
              ]))
 
     let account = Lazy.force account
