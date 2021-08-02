@@ -195,6 +195,15 @@ locals {
     }
   ]
 
+  plain_node_vars = [
+    for i, node in var.plain_node_configs: {
+      testnetName = var.testnet_name
+      coda        = local.coda_vars
+      healthcheck = local.healthcheck_vars
+      name = node.name
+    }
+  ]
+
   watchdog_vars = {
     testnetName = var.testnet_name
     image       = var.watchdog_image

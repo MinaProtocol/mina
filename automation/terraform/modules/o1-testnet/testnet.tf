@@ -135,7 +135,7 @@ module "kubernetes_testnet" {
   plain_node_configs = [
     for i in range(var.plain_node_count) : {
       name               = "plain-node-${i+1}"
-      libp2p_secret      = "online-plain-nodes-libp2p-${i + 1}-key"
+      # libp2p_secret      = "online-plain-nodes-libp2p-${i + 1}-key"
     }
   ]
 
