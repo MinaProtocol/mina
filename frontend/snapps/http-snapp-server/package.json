@@ -1,0 +1,32 @@
+{
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=10"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon node src/index.js",
+    "format": "prettier --write --ignore-unknown **/*"
+  },
+  "type": "module",
+  "prettier": {
+    "printWidth": 80,
+    "semi": true,
+    "singleQuote": true,
+    "trailingComma": "es5"
+  },
+  "name": "http-snapp-server",
+  "author": "O(1) Labs",
+  "devDependencies": {
+    "nodemon": "^2.0.12",
+    "prettier": "^2.3.2"
+  },
+  "dependencies": {
+    "@o1labs/client-sdk": "^1.0.1",
+    "@polka/send-type": "^0.5.2",
+    "node-fetch": "^2.6.1",
+    "polka": "^1.0.0-next.15"
+  }
+}
