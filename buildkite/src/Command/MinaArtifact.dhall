@@ -14,8 +14,9 @@ let Libp2p = ../../Command/Libp2pHelperBuild.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let pipeline = \(debVersion : DebianVersions.DebVersion) ->
 in
+
+let pipeline = \(debVersion : DebianVersions.DebVersion) ->
   Pipeline.build
     Pipeline.Config::{
       spec =
@@ -107,9 +108,7 @@ in
 
       ]
     }
-
 in
-
 {
   buster = pipeline Buster,
   stretch = pipeline Stretch
