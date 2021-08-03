@@ -24,7 +24,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
             S.strictlyStart (S.contains "src"),
             S.strictlyStart (S.contains "automation"),
             S.strictly (S.contains "Makefile"),
-            S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
             S.strictlyStart (S.contains "buildkite/src/Command/MinaArtifact"),
             S.exactly "buildkite/scripts/build-artifact" "sh",
             S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh",
