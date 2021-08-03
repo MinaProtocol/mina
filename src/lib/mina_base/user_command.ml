@@ -191,9 +191,9 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
         { fee_payer
         ; protocol_state
         ; other_parties =
-            Parties.With_hashes.create other_parties
-              ~hash:(fun p -> Party.Predicated.digest p.data)
-              ~data:(fun p : (Party.t * _) -> (p, find_vk p))
+            other_parties
+            |> List.map ~f:(fun party -> (party, find_vk party))
+            |> Parties.Party_or_stack.With_hashes.of_parties_list
         }
 
 let of_verifiable (t : Verifiable.t) : t =

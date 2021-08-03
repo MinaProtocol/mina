@@ -1231,6 +1231,7 @@ module Base = struct
              ; call_data =
                  _ (* This is for the snapp to use, we don't need it. *)
              ; rollup_events
+             ; depth = _ (* This is used to build the 'stack of stacks'. *)
              }
          ; predicate
          } :
@@ -1502,27 +1503,95 @@ module Base = struct
         end
 
         module Parties = struct
+          module Opt = struct
+            open Snapp_basic
+
+            type 'a t = (Bool.t, 'a) Flagged_option.t
+
+            let is_some = Flagged_option.is_some
+
+            let map x ~f = Flagged_option.map ~f x
+
+            let or_default ~if_ x ~default =
+              if_ (is_some x) ~then_:(Flagged_option.data x) ~else_:default
+
+            let or_exn x =
+              Bool.assert_ (is_some x) ;
+              Flagged_option.data x
+          end
+
           type nonrec party = party
 
-          type t = Field.t * Party.t Parties.With_hashes.t V.t
+          type party_or_stack =
+            Field.t
+            * (Party.t * unit, Parties.Digest.t) Parties.Party_or_stack.t V.t
+
+          type t =
+            Field.t
+            * (Party.t * unit, Parties.Digest.t) Parties.Party_or_stack.t list
+              V.t
 
           let if_ b ~then_:(xt, rt) ~else_:(xe, re) =
             (Field.if_ b ~then_:xt ~else_:xe, V.if_ b ~then_:rt ~else_:re)
 
-          let empty = Field.constant Parties.With_hashes.empty
+          let empty = Field.constant Parties.Party_or_stack.With_hashes.empty
 
           let is_empty (x, _) = Field.equal empty x
 
           let empty = (empty, V.create (fun () -> []))
 
-          let pop ((h, r) : t) : party * t =
-            let first_party () = V.get r |> List.hd_exn |> fst in
+          let hash_cons hash h_tl =
+            Random_oracle.Checked.hash ~init:Hash_prefix_states.party_cons
+              [| hash; h_tl |]
+
+          let pop_exn ((h, r) : t) : party_or_stack * t =
+            let hd_r = V.create (fun () -> V.get r |> List.hd_exn) in
+            let tl_r = V.create (fun () -> V.get r |> List.tl_exn) in
+            let party_or_stack, stack =
+              exists
+                Typ.(Field.typ * Field.typ)
+                ~compute:(fun () ->
+                  ( V.get hd_r |> Parties.Party_or_stack.With_hashes.hash
+                  , V.get tl_r |> Parties.Party_or_stack.With_hashes.stack_hash
+                  ))
+            in
+            let h' = hash_cons party_or_stack stack in
+            Field.Assert.equal h h' ;
+            ((party_or_stack, hd_r), (stack, tl_r))
+
+          let as_stack ((h, r) : party_or_stack) : t Opt.t =
+            (* NB: Don't need to check here, since interpreting a stack as a
+               party or party as a stack implies a hash collision.
+            *)
+            let is_some =
+              exists Boolean.typ ~compute:(fun () ->
+                  match V.get r with Party _ -> false | Stack _ -> true)
+            in
+            let data =
+              ( h
+              , V.create (fun () ->
+                    match V.get r with Party _ -> [] | Stack (xs, _) -> xs) )
+            in
+            { Snapp_basic.Flagged_option.is_some; data }
+
+          let pop_party_exn ((h, r) : t) : party * t =
+            let first_party =
+              V.create (fun () ->
+                  match V.get r |> List.hd_exn with
+                  | Party ((party, ()), _) ->
+                      party
+                  | Stack _ ->
+                      failwith "pop_party_exn")
+            in
             let body, tl =
               exists
                 Typ.(Party.Body.typ () * field)
                 ~compute:(fun () ->
-                  let p, _ = V.get r |> List.hd_exn in
-                  let h = V.get r |> List.tl_exn |> Parties.With_hashes.hash in
+                  let p = V.get first_party in
+                  let h =
+                    V.get r |> List.tl_exn
+                    |> Parties.Party_or_stack.With_hashes.stack_hash
+                  in
                   (p.data.body, h))
             in
             let predicate : Party.Predicate.Checked.t =
@@ -1531,7 +1600,7 @@ module Base = struct
                   let nonce, accept =
                     exists (Typ.tuple2 Account.Nonce.typ Boolean.typ)
                       ~compute:(fun () ->
-                        match (first_party ()).data.predicate with
+                        match (V.get first_party).data.predicate with
                         | Nonce n ->
                             (n, false)
                         | Accept ->
@@ -1544,10 +1613,10 @@ module Base = struct
               | `Full ->
                   Full
                     (exists (Party.Predicate.typ ()) ~compute:(fun () ->
-                         (first_party ()).data.predicate))
+                         (V.get first_party).data.predicate))
             in
             let auth =
-              V.(create (fun () -> (get r |> List.hd_exn |> fst).authorization))
+              V.(create (fun () -> (V.get first_party).authorization))
             in
             let party : Party.Predicated.Checked.t = { body; predicate } in
             let party =
@@ -1560,6 +1629,47 @@ module Base = struct
             Field.Assert.equal h actual_h ;
             ( { party; control = auth }
             , (tl, V.(create (fun () -> List.tl_exn (get r)))) )
+
+          let pop_stack ((h, r) : t) : (t * t) Opt.t =
+            let hd_r =
+              V.create (fun () ->
+                  match V.get r |> List.hd with
+                  | Some (Stack (x, _)) ->
+                      x
+                  | _ ->
+                      [])
+            in
+            let tl_r =
+              V.create (fun () ->
+                  V.get r |> List.tl |> Option.value ~default:[])
+            in
+            let party_or_stack, stack =
+              exists
+                Typ.(Field.typ * Field.typ)
+                ~compute:(fun () ->
+                  ( V.get hd_r |> Parties.Party_or_stack.With_hashes.stack_hash
+                  , V.get tl_r |> Parties.Party_or_stack.With_hashes.stack_hash
+                  ))
+            in
+            let h' = hash_cons party_or_stack stack in
+            (* NB: Don't need to check here, since interpreting a stack as a
+               party or party as a stack implies a hash collision.
+            *)
+            let is_some = Field.equal h h' in
+            let data = ((party_or_stack, hd_r), (stack, tl_r)) in
+            { Snapp_basic.Flagged_option.is_some; data }
+
+          let push_stack ((h_hd, r_hd) : t) ~onto:((h_tl, r_tl) : t) : t =
+            let h = hash_cons h_hd h_tl in
+            let r =
+              V.create (fun () ->
+                  let hd_stack = V.get r_hd in
+                  let tl = V.get r_tl in
+                  Parties.Party_or_stack.Stack
+                    (hd_stack, As_prover.read Field.typ h)
+                  :: tl)
+            in
+            (h, r)
         end
 
         module Account = struct
@@ -1894,6 +2004,9 @@ module Base = struct
           { parties =
               ( statement.source.local_state.parties
               , V.create (fun () -> !witness.local_state_init.parties) )
+          ; call_stack =
+              ( statement.source.local_state.call_stack
+              , V.create (fun () -> !witness.local_state_init.call_stack) )
           ; transaction_commitment =
               statement.source.local_state.transaction_commitment
           ; token_id = statement.source.local_state.token_id
@@ -1946,15 +2059,18 @@ module Base = struct
                   | `Skip ->
                       []
                   | `Start p ->
-                      Parties.With_hashes.create_all_parties p.parties)
+                      Party.of_signed p.parties.Parties.fee_payer
+                      :: p.parties.Parties.other_parties
+                      |> List.map ~f:(fun party -> (party, ()))
+                      |> Parties.Party_or_stack.With_hashes.of_parties_list)
               in
               let h =
                 exists Field.typ ~compute:(fun () ->
                     match V.get ps with
                     | [] ->
-                        Parties.With_hashes.empty
-                    | (_, h) :: _ ->
-                        h)
+                        Parties.Party_or_stack.With_hashes.empty
+                    | party_or_stack :: _ ->
+                        Parties.Party_or_stack.hash party_or_stack)
               in
               let start_data =
                 { Parties_logic.Start_data.parties = (h, ps)
@@ -1992,7 +2108,7 @@ module Base = struct
                           `Skip
                       | p :: ps ->
                           let should_pop =
-                            Field.Constant.equal Parties.With_hashes.empty
+                            Field.Constant.equal Parties.Party_or_stack.empty
                               (As_prover.read_var (fst local.parties))
                           in
                           if should_pop then (
@@ -2005,7 +2121,7 @@ module Base = struct
                     As_prover.(
                       fun () ->
                         [%test_eq: Impl.Field.Constant.t]
-                          Parties.With_hashes.empty
+                          Parties.Party_or_stack.empty
                           (read_var (fst local.parties))) ;
                   V.create (fun () ->
                       match As_prover.Ref.get start_parties with
@@ -2023,6 +2139,7 @@ module Base = struct
           Local_state.Checked.assert_equal statement.target.local_state
             { local with
               parties = fst local.parties
+            ; call_stack = fst local.call_stack
             ; ledger = fst local.ledger
             }) ;
       with_label __LOC__ (fun () ->
@@ -3366,7 +3483,9 @@ struct
   let of_parties_segment_exn ~statement ~witness : t Async.Deferred.t =
     Base.Parties_snark.witness := Some witness ;
     let types =
-      List.map witness.local_state_init.parties ~f:(fun (p, _) ->
+      List.map
+        (Parties.Party_or_stack.to_parties_list
+           witness.local_state_init.parties) ~f:(fun (p, _) ->
           Control.tag p.authorization)
       @ List.concat_map witness.start_parties ~f:(fun s ->
             Control.Tag.Signature
@@ -3409,8 +3528,10 @@ struct
                   None
             in
             let open Option.Let_syntax in
-            List.filter_map witness.local_state_init.parties
-              ~f:(fun (p, at_party) ->
+            List.filter_map
+              (Parties.Party_or_stack.to_parties_with_hashes_list
+                 witness.local_state_init.parties)
+              ~f:(fun ((p, ()), at_party) ->
                 let%map pi = party_proof p in
                 ( { Snapp_statement.Poly.transaction =
                       witness.local_state_init.transaction_commitment
@@ -3423,18 +3544,20 @@ struct
                      was involved to change the pickles API to allow it. *)
                   let other_parties, transaction =
                     let ps =
-                      Parties.With_hashes.create s.parties.other_parties
-                        ~hash:(fun p -> Party.Predicated.digest p.data)
-                        ~data:Fn.id
+                      Parties.Party_or_stack.With_hashes.of_parties_list
+                        (List.map ~f:(fun p -> (p, ())) s.parties.other_parties)
                     in
                     ( ps
                     , Parties.Transaction_commitment.create
-                        ~other_parties_hash:(Parties.With_hashes.hash ps)
+                        ~other_parties_hash:
+                          (Parties.Party_or_stack.stack_hash ps)
                         ~protocol_state_predicate_hash:
                           (Snapp_predicate.Protocol_state.digest
                              s.protocol_state_predicate) )
                   in
-                  List.filter_map other_parties ~f:(fun (p, at_party) ->
+                  List.filter_map
+                    (Parties.Party_or_stack.to_parties_with_hashes_list
+                       other_parties) ~f:(fun ((p, ()), at_party) ->
                       let%map pi = party_proof p in
                       ({ Snapp_statement.Poly.transaction; at_party }, pi)))
           in
@@ -3851,6 +3974,7 @@ let%test_module "transaction_snark" =
                   ; events = []
                   ; rollup_events = []
                   ; call_data = Field.zero
+                  ; depth = 0
                   }
               ; predicate = acct1.account.nonce
               }
@@ -3866,6 +3990,7 @@ let%test_module "transaction_snark" =
                     ; events = []
                     ; rollup_events = []
                     ; call_data = Field.zero
+                    ; depth = 0
                     }
                 ; predicate = Accept
                 }
@@ -3912,6 +4037,7 @@ let%test_module "transaction_snark" =
                 ; local_state_init =
                     { Local_state.dummy with
                       parties = []
+                    ; call_stack = []
                     ; ledger =
                         Sparse_ledger.of_root ~depth:ledger_depth
                           ~next_available_token:Token_id.(next default)
@@ -3942,8 +4068,11 @@ let%test_module "transaction_snark" =
                     ; local_state =
                         { w.local_state_init with
                           parties =
-                            Parties.With_hashes.digest
+                            Parties.Party_or_stack.stack_hash
                               w.local_state_init.parties
+                        ; call_stack =
+                            Parties.Party_or_stack.stack_hash
+                              w.local_state_init.call_stack
                         ; ledger =
                             Sparse_ledger.merkle_root w.local_state_init.ledger
                         }
@@ -3955,11 +4084,13 @@ let%test_module "transaction_snark" =
                     ; local_state =
                         { local_state_post with
                           parties =
-                            List.fold (List.rev local_state_post.parties)
-                              ~init:Parties.With_hashes.empty ~f:(fun acc p ->
-                                Parties.With_hashes.cons_hash
-                                  (Party.Predicated.digest p.data)
-                                  acc)
+                            Parties.Party_or_stack.(
+                              With_hashes.stack_hash
+                                (accumulate_hashes' local_state_post.parties))
+                        ; call_stack =
+                            Parties.Party_or_stack.(
+                              With_hashes.stack_hash
+                                (accumulate_hashes' local_state_post.call_stack))
                         ; ledger =
                             Sparse_ledger.merkle_root w.local_state_init.ledger
                             (* TODO: This won't quite work when the transaction fails. *)

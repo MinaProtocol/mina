@@ -10,7 +10,7 @@ module Parties_segment_witness : sig
       type t =
         { global_ledger : Sparse_ledger.Stable.V2.t
         ; local_state_init :
-            ( Party.Stable.V1.t Parties.With_hashes.Stable.V1.t
+            ( unit Parties.Party_or_stack.With_hashes.Stable.V1.t
             , Token_id.Stable.V1.t
             , Amount.Stable.V1.t
             , Sparse_ledger.Stable.V2.t

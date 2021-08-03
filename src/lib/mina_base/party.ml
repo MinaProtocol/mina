@@ -179,7 +179,14 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('pk, 'update, 'token_id, 'signed_amount, 'events, 'call_data) t =
+        type ( 'pk
+             , 'update
+             , 'token_id
+             , 'signed_amount
+             , 'events
+             , 'call_data
+             , 'int )
+             t =
           { pk : 'pk
           ; update : 'update
           ; token_id : 'token_id
@@ -187,6 +194,7 @@ module Body = struct
           ; events : 'events
           ; rollup_events : 'events
           ; call_data : 'call_data
+          ; depth : 'int
           }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
@@ -205,7 +213,8 @@ module Body = struct
         , Token_id.Stable.V1.t
         , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         , Pickles.Backend.Tick.Field.Stable.V1.t array list
-        , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *) )
+        , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
+        , int )
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -220,12 +229,21 @@ module Body = struct
       , Token_id.Checked.t
       , Amount.Signed.var
       , Events.var
-      , Field.Var.t )
+      , Field.Var.t
+      , int As_prover.Ref.t )
       Poly.t
 
     let to_input
-        ({ pk; update; token_id; delta; events; rollup_events; call_data } : t)
-        =
+        ({ pk
+         ; update
+         ; token_id
+         ; delta
+         ; events
+         ; rollup_events
+         ; call_data
+         ; depth = _depth (* ignored *)
+         } :
+          t) =
       List.reduce_exn ~f:Random_oracle_input.append
         [ Public_key.Compressed.Checked.to_input pk
         ; Update.Checked.to_input update
@@ -251,6 +269,7 @@ module Body = struct
       ; Events.typ
       ; Events.typ
       ; Field.typ
+      ; Typ.Internal.ref ()
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -263,10 +282,20 @@ module Body = struct
     ; events = []
     ; rollup_events = []
     ; call_data = Field.zero
+    ; depth = 0
     }
 
   let to_input
-      ({ pk; update; token_id; delta; events; rollup_events; call_data } : t) =
+      ({ pk
+       ; update
+       ; token_id
+       ; delta
+       ; events
+       ; rollup_events
+       ; call_data
+       ; depth = _ (* ignored *)
+       } :
+        t) =
     List.reduce_exn ~f:Random_oracle_input.append
       [ Public_key.Compressed.to_input pk
       ; Update.to_input update

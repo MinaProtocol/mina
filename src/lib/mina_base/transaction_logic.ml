@@ -357,7 +357,7 @@ module type S = sig
     -> ledger
     -> Parties.t
     -> ( Transaction_applied.Parties_applied.t
-       * ( ( Party.t list
+       * ( ( (Party.t, unit) Parties.Party_or_stack.t list
            , Token_id.t
            , Amount.t
            , ledger
@@ -1216,6 +1216,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            ; events = _ (* This is for the snapp to use, we don't need it. *)
            ; call_data = _ (* This is for the snapp to use, we don't need it. *)
            ; rollup_events
+           ; depth = _ (* This is used to build the 'stack of stacks'. *)
            }
        ; predicate
        } :
@@ -1451,9 +1452,28 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       end
 
       module Parties = struct
+        module Opt = struct
+          type 'a t = 'a option
+
+          let is_some = Option.is_some
+
+          let map = Option.map
+
+          let or_default ~if_ x ~default =
+            if_ (is_some x) ~then_:(Option.value ~default x) ~else_:default
+
+          let or_exn x = Option.value_exn x
+        end
+
+        type party_or_stack = (Party.t, unit) Parties.Party_or_stack.t
+
+        type t = party_or_stack list
+
         type party = Party.t [@@deriving yojson]
 
-        type t = party list
+        let of_parties_list : party list -> t =
+          Parties.Party_or_stack.of_parties_list
+            ~party_depth:(fun (p : Party.t) -> p.data.body.depth)
 
         let if_ = Parties.value_if
 
@@ -1461,7 +1481,31 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
         let is_empty = List.is_empty
 
-        let pop (t : t) = match t with [] -> failwith "pop" | p :: t -> (p, t)
+        let pop_exn : t -> party_or_stack * t = function
+          | [] ->
+              failwith "pop_exn"
+          | x :: xs ->
+              (x, xs)
+
+        let as_stack : party_or_stack -> t option = function
+          | Party _ ->
+              None
+          | Stack (x, ()) ->
+              Some x
+
+        let pop_party_exn : t -> party * t = function
+          | Party (x, ()) :: xs ->
+              (x, xs)
+          | _ ->
+              failwith "pop_party_exn"
+
+        let pop_stack : t -> (t * t) option = function
+          | Stack (x, ()) :: xs ->
+              Some (x, xs)
+          | _ ->
+              None
+
+        let push_stack x ~onto : t = Stack (x, ()) :: onto
       end
     end in
     let module M = Parties_logic.Make (Inputs) in
@@ -1601,10 +1645,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         :: c.other_parties
       in
       M.start
-        { parties; will_succeed; protocol_state_predicate = c.protocol_state }
+        { parties = Inputs.Parties.of_parties_list parties
+        ; will_succeed
+        ; protocol_state_predicate = c.protocol_state
+        }
         { perform }
         ( { protocol_state = state_view; ledger; fee_excess = Amount.zero }
         , { parties = []
+          ; call_stack = []
           ; transaction_commitment = ()
           ; token_id = Token_id.invalid
           ; excess = Currency.Amount.zero
@@ -2396,6 +2444,7 @@ module For_tests = struct
                   ; events = []
                   ; rollup_events = []
                   ; call_data = Snark_params.Tick.Field.zero
+                  ; depth = 0
                   }
               ; predicate = sender_nonce
               }
@@ -2412,6 +2461,7 @@ module For_tests = struct
                     ; events = []
                     ; rollup_events = []
                     ; call_data = Snark_params.Tick.Field.zero
+                    ; depth = 0
                     }
                 ; predicate = Accept
                 }

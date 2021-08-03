@@ -1,4 +1,161 @@
 open Core
+module Digest = Zexe_backend.Pasta.Fp
+
+module Party_or_stack = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('party, 'digest) t =
+        | Party of 'party * 'digest
+        | Stack of (('party, 'digest) t list * 'digest)
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let of_parties_list ~party_depth parties =
+    let _depth, stack =
+      List.fold ~init:(-1, []) parties ~f:(fun (depth, stack) party ->
+          let new_depth = party_depth party in
+          if depth + 1 = new_depth || depth = -1 then
+            (depth, [ Party (party, ()) ] :: stack)
+          else
+            let rec go depth stack =
+              match stack with
+              | xs :: stack when depth = new_depth ->
+                  (* We're at the correct depth, insert this party. *)
+                  (depth, (Party (party, ()) :: xs) :: stack)
+              | xs :: ys :: stack ->
+                  (* We're still too deep, finalize the current parties and
+                     push them inside the parent parties.
+                  *)
+                  go (depth - 1) ((Stack (List.rev xs, ()) :: ys) :: stack)
+              | _ ->
+                  (* An invariant is broken. The depth doesn't correspond
+                     with any of the depths remaining in the stack. In
+                     practise, this means that [0 <= new_depth <= depth]
+                     wasn't true.
+                  *)
+                  assert false
+            in
+            go depth stack)
+    in
+    let rec finalize stack =
+      match stack with
+      | [] ->
+          (* Empty stack *)
+          []
+      | [ xs ] ->
+          (* Final stack is promoted to be the actual stack. *)
+          List.rev xs
+      | xs :: ys :: stack ->
+          (* Finalize the current parties and push them inside the parent
+             parties.
+          *)
+          finalize ((Stack (List.rev xs, ()) :: ys) :: stack)
+    in
+    finalize stack
+
+  let to_parties_list (xs : _ t list) =
+    let rec collect acc (xs : _ t list) =
+      match xs with
+      | [] ->
+          acc
+      | Party (party, _) :: xs ->
+          collect (party :: acc) xs
+      | Stack (xs, _) :: xss ->
+          let acc = collect acc xs in
+          collect acc xss
+    in
+    List.rev (collect [] xs)
+
+  let to_parties_with_hashes_list (xs : _ t list) =
+    let rec collect acc (xs : _ t list) =
+      match xs with
+      | [] ->
+          acc
+      | Party (party, hash) :: xs ->
+          collect ((party, hash) :: acc) xs
+      | Stack (xs, _) :: xss ->
+          let acc = collect acc xs in
+          collect acc xss
+    in
+    List.rev (collect [] xs)
+
+  let empty = Outside_hash_image.t
+
+  let hash_cons hash h_tl =
+    Random_oracle.hash ~init:Hash_prefix_states.party_cons [| hash; h_tl |]
+
+  let hash = function Party (_, hash) | Stack (_, hash) -> hash
+
+  let stack_hash = function [] -> empty | x :: _ -> hash x
+
+  let rec map (x : _ t) ~f =
+    match x with
+    | Party (party, h) ->
+        Party (f party, h)
+    | Stack (stack, h) ->
+        Stack (map_stack ~f stack, h)
+
+  and map_stack (xs : _ t list) ~f = List.map ~f:(map ~f) xs
+
+  let rec accumulate_hashes ~hash_party (xs : _ t list) =
+    let go = accumulate_hashes ~hash_party in
+    match xs with
+    | [] ->
+        []
+    | Party (party, _) :: xs ->
+        let tl = go xs in
+        Party (party, hash_cons (hash_party party) (stack_hash tl)) :: tl
+    | Stack (stack, _) :: xs ->
+        let tl = go xs in
+        let hd_stack = go stack in
+        Stack (hd_stack, hash_cons (stack_hash hd_stack) (stack_hash tl)) :: tl
+
+  let accumulate_hashes' xs =
+    let hash_party (p : Party.t) = Party.Predicated.digest p.data in
+    accumulate_hashes ~hash_party xs
+
+  module With_hashes = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type 'data t =
+          (Party.Stable.V1.t * 'data, Digest.Stable.V1.t) Stable.V1.t list
+        [@@deriving sexp, compare, equal, hash, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let empty = empty
+
+    let accumulate_hashes xs : _ t =
+      let hash_party ((p : Party.t), _) = Party.Predicated.digest p.data in
+      accumulate_hashes ~hash_party xs
+
+    let of_parties_list xs : _ t =
+      of_parties_list
+        ~party_depth:(fun ((p : Party.t), _) -> p.data.body.depth)
+        xs
+      |> accumulate_hashes
+
+    let to_parties_list (x : _ t) = to_parties_list x
+
+    let to_parties_with_hashes_list (x : _ t) = to_parties_with_hashes_list x
+
+    let hash = hash
+
+    let stack_hash = stack_hash
+
+    let other_parties_hash' xs = of_parties_list xs |> stack_hash
+
+    let other_parties_hash xs =
+      List.map ~f:(fun x -> (x, ())) xs |> other_parties_hash'
+  end
+end
 
 [%%versioned
 module Stable = struct
@@ -26,10 +183,23 @@ module Valid = struct
   type t = Stable.Latest.t
 end
 
+let check_depths (t : t) =
+  try
+    assert (t.fee_payer.data.body.depth = 0) ;
+    let (_ : int) =
+      List.fold ~init:0 t.other_parties ~f:(fun depth party ->
+          let new_depth = party.data.body.depth in
+          if new_depth >= 0 && new_depth <= depth + 1 then new_depth
+          else assert false)
+    in
+    true
+  with _ -> false
+
 let check (t : t) =
   let p = t.fee_payer in
   Token_id.(equal default) p.data.body.token_id
   && Sgn.(equal Neg) p.data.body.delta.sgn
+  && check_depths t
 
 let parties (t : t) : Party.t list =
   let p = t.fee_payer in
@@ -154,47 +324,6 @@ module Virtual = struct
   end
 end
 
-module Digest = Zexe_backend.Pasta.Fp
-
-module With_hashes = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type 'a t = ('a * Digest.Stable.V1.t) list
-      [@@deriving sexp, compare, equal, hash, yojson]
-    end
-  end]
-
-  let empty = Outside_hash_image.t
-
-  let cons_hash hash h_tl =
-    Random_oracle.hash ~init:Hash_prefix_states.party_cons [| hash; h_tl |]
-
-  let cons ({ hash; data } : ('a, 'h) With_hash.t) (t : 'a t) : 'a t =
-    let h_tl = match t with [] -> empty | (_, h_tl) :: _ -> h_tl in
-    (data, cons_hash hash h_tl) :: t
-
-  let hash (t : _ t) : Random_oracle.Digest.t =
-    match t with [] -> empty | (_, h) :: _ -> h
-
-  let create ps ~hash ~data =
-    List.fold ~init:[] (List.rev ps) ~f:(fun acc p ->
-        cons { hash = hash p; data = data p } acc)
-
-  let create_all_parties t =
-    create ~data:Fn.id
-      ~hash:(fun p -> Party.Predicated.digest p.data)
-      (Party.of_signed t.fee_payer :: t.other_parties)
-
-  let other_parties_hash t =
-    List.fold (List.rev t.other_parties) ~init:empty ~f:(fun acc p ->
-        let hash = Party.Predicated.digest p.data in
-        cons_hash hash acc)
-
-  let digest (t : _ t) : Random_oracle.Digest.t =
-    match t with [] -> empty | (_, h) :: _ -> h
-end
-
 module Verifiable = struct
   [%%versioned
   module Stable = struct
@@ -202,9 +331,8 @@ module Verifiable = struct
       type t =
         { fee_payer : Party.Signed.Stable.V1.t
         ; other_parties :
-            ( Party.Stable.V1.t
-            * Pickles.Side_loaded.Verification_key.Stable.V1.t option )
-            With_hashes.Stable.V1.t
+            Pickles.Side_loaded.Verification_key.Stable.V1.t option
+            Party_or_stack.With_hashes.Stable.V1.t
         ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
         }
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -216,7 +344,8 @@ end
 
 let of_verifiable (t : Verifiable.t) : t =
   { fee_payer = t.fee_payer
-  ; other_parties = List.map t.other_parties ~f:(fun ((x, _), _) -> x)
+  ; other_parties =
+      List.map ~f:fst (Party_or_stack.to_parties_list t.other_parties)
   ; protocol_state = t.protocol_state
   }
 
@@ -260,6 +389,7 @@ end
 
 let commitment (t : t) : Transaction_commitment.t =
   Transaction_commitment.create
-    ~other_parties_hash:(With_hashes.other_parties_hash t)
+    ~other_parties_hash:
+      (Party_or_stack.With_hashes.other_parties_hash t.other_parties)
     ~protocol_state_predicate_hash:
       (Snapp_predicate.Protocol_state.digest t.protocol_state)

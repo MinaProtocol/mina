@@ -16,11 +16,7 @@ let check :
       with_return (fun { return } ->
           let commitment =
             let other_parties_hash =
-              match other_parties with
-              | [] ->
-                  Parties.With_hashes.empty
-              | (_, h) :: _ ->
-                  h
+              Parties.Party_or_stack.With_hashes.stack_hash other_parties
             in
             Parties.Transaction_commitment.create ~other_parties_hash
               ~protocol_state_predicate_hash:
@@ -44,8 +40,13 @@ let check :
                ~fee_payer_hash:
                  (Party.Predicated.digest
                     (Party.Predicated.of_signed fee_payer.data))) ;
+          let parties_with_hashes_list =
+            Parties.Party_or_stack.With_hashes.to_parties_with_hashes_list
+              other_parties
+          in
           let valid_assuming =
-            List.filter_map other_parties ~f:(fun ((p, vk_opt), at_party) ->
+            List.filter_map parties_with_hashes_list
+              ~f:(fun ((p, vk_opt), at_party) ->
                 match p.authorization with
                 | Signature s ->
                     check_signature s p.data.body.pk commitment ;
@@ -67,7 +68,8 @@ let check :
           let v =
             User_command.Poly.Parties
               { Parties.fee_payer
-              ; other_parties = List.map other_parties ~f:(fun ((p, _), _) -> p)
+              ; other_parties =
+                  List.map parties_with_hashes_list ~f:(fun ((p, _), _) -> p)
               ; protocol_state
               }
           in
