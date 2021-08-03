@@ -5,7 +5,7 @@
 FROM build-deps AS toolchain
 
 ARG DOCKER_VERSION=19.03.4
-ARG TERRAFORM_VERSION=0.12.29
+ARG TERRAFORM_VERSION=0.14.11
 
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina
