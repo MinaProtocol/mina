@@ -2,5 +2,7 @@
   "presets": [
     "@babel/preset-env"
   ],
-  "plugins": []
+  "plugins": [
+  ],
+  "ignore": [ "src/bindings/snarky.js" ]
 }
