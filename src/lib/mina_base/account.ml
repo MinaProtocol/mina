@@ -103,7 +103,11 @@ module Token_symbol = struct
 
         let of_yojson json =
           let res = of_yojson json in
-          Result.iter ~f:check res ; res
+          Result.bind res ~f:(fun res ->
+              Result.try_with (fun () -> check res)
+              |> Result.map ~f:(Fn.const res)
+              |> Result.map_error
+                   ~f:(Fn.const "Token_symbol.of_yojson: symbol is too long"))
       end
 
       include T
@@ -140,12 +144,32 @@ module Token_symbol = struct
     let c, j, chars =
       Pickles_types.Vector.fold x ~init:(0, 0, []) ~f:(fun (c, j, chars) x ->
           let c = c lor ((if x then 1 else 0) lsl j) in
-          if j = 8 then (0, 0, Char.of_int_exn c :: chars) else (c, j + 1, chars))
+          if j = 7 then (0, 0, Char.of_int_exn c :: chars) else (c, j + 1, chars))
     in
     assert (c = 0) ;
     assert (j = 0) ;
     let chars = List.drop_while ~f:(fun c -> Char.to_int c = 0) chars in
     String.of_char_list (List.rev chars)
+
+  let%test_unit "to_bits of_bits roundtrip" =
+    Quickcheck.test ~trials:30 ~seed:(`Deterministic "")
+      (Quickcheck.Generator.list_with_length
+         (Pickles_types.Nat.to_int Num_bits.n)
+         Quickcheck.Generator.bool)
+      ~f:(fun x ->
+        let v = Pickles_types.Vector.of_list_and_length_exn x Num_bits.n in
+        Pickles_types.Vector.iter2
+          (to_bits (of_bits v))
+          v
+          ~f:(fun x y -> assert (Bool.equal x y)))
+
+  let%test_unit "of_bits to_bits roundtrip" =
+    Quickcheck.test ~trials:30 ~seed:(`Deterministic "")
+      (let open Quickcheck.Generator.Let_syntax in
+      let%bind len = Int.gen_incl 0 max_length in
+      String.gen_with_length len
+        (Char.gen_uniform_inclusive Char.min_value Char.max_value))
+      ~f:(fun x -> assert (String.equal (of_bits (to_bits x)) x))
 
   let to_input (x : t) =
     Random_oracle_input.bitstrings
