@@ -112,6 +112,6 @@ let pipeline = \(debVersion : DebianVersions.DebVersion) ->
 in
 
 {
-  buster = pipeline Buster
+  buster = pipeline Buster,
   stretch = pipeline Stretch
 }
