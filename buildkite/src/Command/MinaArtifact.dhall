@@ -111,6 +111,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.CompoundType = \(debVersion
 
 in
 {
-  buster = pipeline (DebVersions.DebVersion::{Buster}),
-  stretch = pipeline (DebVersions.DebVersion::{Stretch})
+  buster = pipeline DebVersions.DebVersion.Buster,
+  stretch = pipeline DebVersions.DebVersion.Stretch
 }
