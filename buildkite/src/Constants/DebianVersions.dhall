@@ -1,5 +1,6 @@
 let Prelude = ../../External/Prelude.dhall
 let RunInToolchain = ../../Command/RunInToolchain.dhall
+let ContainerImages = ../Constants/ContainerImages.dhall
 
 let dependsOnGitEnv = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
 
@@ -13,6 +14,9 @@ let lowerName = \(debVersion : DebVersion) ->
 
 let toolchainRunner = \(debVersion : DebVersion) ->
   merge { Buster = RunInToolchain.runInToolchainBuster, Stretch = RunInToolchain.runInToolchainStretch } debVersion
+
+let toolchainImage = \(debVersion : DebVersion) ->
+  merge { Buster = ContainerImages.minaToolchainBuster, Stretch = ContainerImages.minaToolchainStretch } debVersion
 
 let dependsOn = \(debVersion : DebVersion) ->
   merge {
