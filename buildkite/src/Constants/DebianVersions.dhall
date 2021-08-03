@@ -23,3 +23,15 @@ let dependsOn = \(debVersion : DebVersion) ->
     Buster = [ dependsOnGitEnv # { name = "MinaArtifactBuster", key = "build-deb-pkg" }],
     Stretch = [ dependsOnGitEnv # { name = "MinaArtifactStretch", key = "build-deb-pkg" }]
   } debVersion
+
+in 
+
+{
+  DebVersion = DebVersion,
+  capitalName = capitalName,
+  lowerName = lowerName,
+  toolchainRunner = toolchainRunner,
+  toolchainImage = toolchainImage,
+  dependsOn = dependsOn,
+  dependsOnGitEnv = dependsOnGitEnv
+}
