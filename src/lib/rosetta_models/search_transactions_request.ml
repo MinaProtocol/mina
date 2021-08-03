@@ -22,7 +22,7 @@ type t =
   ; (* status is the network-specific operation type. *)
     status : string option [@default None]
   ; (* type is the network-specific operation type. *)
-    _type : string option [@default None]
+    _type : string option [@default None] [@key "type"]
   ; (* address is AccountIdentifier.Address. This is used to get all transactions related to an AccountIdentifier.Address, regardless of SubAccountIdentifier. *)
     address : string option [@default None]
   ; (* success is a synthetic condition populated by parsing network-specific operation statuses (using the mapping provided in `/network/options`). *)

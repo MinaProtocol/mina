@@ -10,7 +10,7 @@ type t =
   { (* sequence is the unique identifier of a BlockEvent within the context of a NetworkIdentifier. *)
     sequence : int64
   ; block_identifier : Block_identifier.t
-  ; _type : Enums.blockeventtype
+  ; _type : Enums.blockeventtype [@key "type"]
   }
 [@@deriving yojson { strict = false }, show, eq]
 
