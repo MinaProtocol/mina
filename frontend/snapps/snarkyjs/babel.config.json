@@ -3,6 +3,9 @@
     "@babel/preset-env"
   ],
   "plugins": [
+    ["@babel/transform-runtime", {
+      "regenerator": true
+    }]
   ],
-  "ignore": [ "src/bindings/snarky_raw.js" ]
+  "ignore": [ "src/bindings/snarky_raw.js", "src/bindings/snarky.js"]
 }
