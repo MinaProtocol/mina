@@ -1,6 +1,6 @@
 {
   // see https://www.typescriptlang.org/tsconfig to better understand tsconfigs
-  "include": ["src", "types"],
+  "include": ["./src", "./types"],
   "compilerOptions": {
     "module": "esnext",
     "lib": ["dom", "esnext"],
@@ -33,5 +33,7 @@
     // `tsdx build` ignores this option, but it is commonly used when type-checking separately with `tsc`
     "noEmit": true,
     "experimentalDecorators": true,
-  }
+    "emitDecoratorMetadata": true,
+  },
+  "exclude": [ "./src/bindings/snarky.js" ]
 }
