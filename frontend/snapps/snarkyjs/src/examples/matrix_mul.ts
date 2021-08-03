@@ -1,4 +1,4 @@
-import { Field, Circuit } from '../bindings/plonk.js';
+import { Field, Circuit as C } from '../bindings/snarky.js';
 
 /* @param x an n*m matrix, encoded as x[i][j] for row i column j.
  * @param y an o*n matrix, both encoded as y[i][j] for row i column j.
@@ -23,17 +23,17 @@ let matrix_mul = function (n: number, m: number, o: number, x: Field[][], y: Fie
     return res;
 }
 
-export function circuit(c: Circuit): Field[][] {
+export function circuit(): Field[][] {
     let n = 3;
     let m = 4;
     let o = 3;
-    let x = c.witness(c.array(c.array<Field>(Field, m), n), function () {
+    let x = C.witness(C.array(C.array<Field>(Field, m), n), () => {
         return [
             [Field.random(), Field.random(), Field.random(), Field.random()],
             [Field.random(), Field.random(), Field.random(), Field.random()],
             [Field.random(), Field.random(), Field.random(), Field.random()]]
     });
-    let y = c.witness(c.array(c.array<Field>(Field, o), m), function () {
+    let y = C.witness(C.array(C.array<Field>(Field, o), m), () => {
         return [
             [Field.random(), Field.random(), Field.random(), Field.random()],
             [Field.random(), Field.random(), Field.random(), Field.random()],

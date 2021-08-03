@@ -1,4 +1,4 @@
-import { Field, Circuit } from './bindings/plonk';
+import { Field, Circuit } from './bindings/snarky';
 import { Snapp } from './mina';
 
 exports.Field = Field;

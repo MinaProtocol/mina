@@ -1,26 +1,28 @@
 // This is for an account where any of a list of public keys can update the state
 
 import { prop, CircuitValue } from './circuit_value';
-import { Field, Bool } from './bindings/plonk';
+import { Field, Bool } from './bindings/snarky';
 
 // TODO. Also, don't make user ever talk about distinction b/w compressed and non-compressed keys
 type PublicKey = void;
 
 class SetOrKeep<_A> extends CircuitValue {}
 
+/*
 export class OrIgnore<A> extends CircuitValue {
   @prop value: A;
   @prop shouldIgnore: Field;
 
   assertEqual(x: A) {
-    (this.shouldIgnore as any).assertEqual(false);
-    (this.shouldIgnore as any).fillValue(() => false);
+    this.shouldIgnore.assertEqual(false);
+    this.shouldIgnore.fillValue(() => false);
+    Circuit.assertEqual(this.value, x);
     (this.value as any).assertEqual(x);
   }
 
   ignore() {
-    (this.shouldIgnore as any).assertEqual(true);
-    (this.shouldIgnore as any).fillValue(() => true);
+    this.shouldIgnore.assertEquals(true);
+    this.shouldIgnore.fillValue(() => true);
   }
 
   constructor(value: A, ignore: Field) {
@@ -29,7 +31,27 @@ export class OrIgnore<A> extends CircuitValue {
     this.shouldIgnore = ignore;
   }
 }
+*/
 
+/*
+function Signed_<T extends Constructor<T>>(T : T) {
+  console.log(T);
+  return class SignedT {
+    magnitude: T;
+    sign: Bool;
+    constructor(sign: Bool, magnitude: T) {
+      this.sign = sign;
+      this.magnitude = magnitude;
+    }
+  } ;
+}
+
+const SignedBool_ = Signed_(Bool);
+type SignedBool = InstanceType<typeof Signed>;
+const x : SignedBool = new SignedBool_(new Bool(true), new Bool(true));
+
+console.log(x);
+*/
 class Signed<A> extends CircuitValue {
   @prop sign: Bool;
   @prop magnitude: A;
