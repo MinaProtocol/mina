@@ -16,8 +16,7 @@ let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 let DebianVersions = ../../Constants/DebianVerions.dhall
 
-let pipeline = \(debVersion : DebianVersions.DebVersion) ->
-  Pipeline.build
+let pipeline = \(debVersion : DebianVersions.DebVersion) -> Pipeline.build
     Pipeline.Config::{
       spec =
         JobSpec::{
