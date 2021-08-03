@@ -70,12 +70,10 @@ COPY --from=builder /home/opam/mina/src/app/rosetta/config.json /data/config.jso
 
 USER postgres
 
-# TODO: derive this value from the installed package version
-ARG POSTGRES_VERSION=11
-
 # TODO: use POSTGRES_DATA_DIR variable more consistently and ensure proper escaping
 # TODO: move this to a more useful and easy to maintain script in the rosetta directory for this purpose
-RUN pg_dropcluster --stop ${POSTGRES_VERSION} main \
+RUN POSTGRES_VERSION=$(postgres -V | cut -d " " -f 3 | cut -c -2) \
+    && pg_dropcluster --stop ${POSTGRES_VERSION} main \
     && pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} main \
     && echo "data_directory = '/data/postgresql'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
     && echo "listen_addresses='*'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
