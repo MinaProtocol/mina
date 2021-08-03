@@ -15,8 +15,7 @@ let generate_keypair =
     let kp = Keypair.create () in
     let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
     printf "Keypair generated\nPublic key: %s\nRaw public key: %s\n"
-      ( kp.public_key |> Public_key.compress
-      |> Public_key.Compressed.to_base58_check )
+      (kp.public_key |> Public_key.to_base58_check)
       (Rosetta_coding.Coding.of_public_key kp.public_key) ;
     exit 0)
 

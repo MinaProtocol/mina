@@ -12,8 +12,7 @@ type t =
 let create_network_keypair ~keypair ~secret_name =
   let open Keypair in
   let public_key_file =
-    Public_key.Compressed.to_base58_check
-      (Public_key.compress keypair.public_key)
+    Public_key.to_base58_check keypair.public_key
     ^ "\n"
   in
   let private_key_file =

@@ -83,6 +83,7 @@ module Compressed : sig
 
   val to_string : t -> string
 
+  (* to_base58_check will first compress a given public key and then encode it in base58  *)
   val to_base58_check : t -> string
 
   val of_base58_check_exn : string -> t

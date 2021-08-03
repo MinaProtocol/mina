@@ -122,9 +122,8 @@ let create_hd_account t ~hd_index :
     (Public_key.Compressed.t, string) Deferred.Result.t =
   let open Deferred.Result.Let_syntax in
   let%bind public_key = Hardware_wallets.compute_public_key ~hd_index in
-  let compressed_pk = Public_key.compress public_key in
   let index_path =
-    t.path ^/ Public_key.Compressed.to_base58_check compressed_pk ^ ".index"
+    t.path ^/ Public_key.to_base58_check public_key ^ ".index"
   in
   let%bind () =
     Hardware_wallets.write_exn ~hd_index ~index_path

@@ -880,8 +880,7 @@ let dump_keypair =
       Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair" privkey_path
     in
     printf "Public key: %s\nPrivate key: %s\n"
-      ( kp.public_key |> Public_key.compress
-      |> Public_key.Compressed.to_base58_check )
+      (kp.public_key |> Public_key.to_base58_check)
       (kp.private_key |> Private_key.to_base58_check))
 
 let handle_export_ledger_response ~json = function
