@@ -26,7 +26,7 @@ let cmdConfig = \(debVersion : DebianVersions.DebVersion) ->
   Command.build
     Command.Config::{
       commands  = commands debVersion,
-      label = "Build Libp2p helper for ${DebianVersions.lowerName debVersion}",
+      label = "Build Libp2p helper for ${DebianVersions.capitalName debVersion}",
       key = "libp2p-helper",
       target = Size.Small
     }
