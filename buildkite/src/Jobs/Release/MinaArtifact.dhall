@@ -2,7 +2,5 @@ let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
 in
 
-{
-  ArtifactPipelines.buster,
-  ArtifactPipelines.stretch
-}
+ArtifactPipelines.buster
+ArtifactPipelines.stretch

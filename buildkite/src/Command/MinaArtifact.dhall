@@ -16,8 +16,7 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 
 in
 
-let pipeline : DebianVersions.DebVersion -> Pipeline.CompoundType = \(debVersion : DebianVersions.DebVersion) ->
-  Pipeline.build
+let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion : DebianVersions.DebVersion) ->
     Pipeline.Config::{
       spec =
         JobSpec::{
@@ -111,6 +110,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.CompoundType = \(debVersion
 
 in
 {
-  buster = pipeline DebianVersions.DebVersion.Buster,
-  stretch = pipeline DebianVersions.DebVersion.Stretch
+  buster  = Pipeline.build (pipeline DebianVersions.DebVersion.Buster),
+  stretch = Pipeline.build (pipeline DebianVersions.DebVersion.Stretch)
 }
