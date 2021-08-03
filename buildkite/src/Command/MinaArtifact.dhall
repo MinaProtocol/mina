@@ -110,6 +110,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
 in
 {
-  buster  = Pipeline.build (pipeline DebianVersions.DebVersion.Buster),
-  stretch = Pipeline.build (pipeline DebianVersions.DebVersion.Stretch)
+  buster  = pipeline DebianVersions.DebVersion.Buster,
+  stretch = pipeline DebianVersions.DebVersion.Stretch
 }

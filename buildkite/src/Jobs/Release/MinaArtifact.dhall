@@ -1,6 +1,7 @@
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
+let Pipeline = ../../Pipeline/Dsl.dhall
 
 in
 
-ArtifactPipelines.buster
-ArtifactPipelines.stretch
+Pipeline.build ArtifactPipelines.buster
+Pipeline.build ArtifactPipelines.stretch
