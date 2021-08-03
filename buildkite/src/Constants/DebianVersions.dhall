@@ -1,6 +1,6 @@
-let Prelude = ../../External/Prelude.dhall
-let RunInToolchain = ../../Command/RunInToolchain.dhall
-let ContainerImages = ../Constants/ContainerImages.dhall
+let Prelude = ../External/Prelude.dhall
+let RunInToolchain = ../Command/RunInToolchain.dhall
+let ContainerImages = ./ContainerImages.dhall
 
 let dependsOnGitEnv = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
 
