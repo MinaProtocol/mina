@@ -18,8 +18,13 @@ module Party_or_stack = struct
     let _depth, stack =
       List.fold ~init:(-1, []) parties ~f:(fun (depth, stack) party ->
           let new_depth = party_depth party in
-          if depth + 1 = new_depth || depth = -1 then
-            (depth, [ Party (party, ()) ] :: stack)
+          let depth, stack =
+            if depth = -1 then
+              (new_depth - 1, List.init new_depth ~f:(Fn.const []))
+            else (depth, stack)
+          in
+          if depth + 1 = new_depth then
+            (new_depth, [ Party (party, ()) ] :: stack)
           else
             let rec go depth stack =
               match stack with
@@ -69,6 +74,65 @@ module Party_or_stack = struct
           collect acc xss
     in
     List.rev (collect [] xs)
+
+  let%test_unit "Party_or_stack.of_parties_list" =
+    let parties_list_1 = [ 0; 0; 0; 0 ] in
+    let parties_list_1_res =
+      [ Party (0, ()); Party (0, ()); Party (0, ()); Party (0, ()) ]
+    in
+    [%test_eq: (int, unit) t list]
+      (of_parties_list ~party_depth:Fn.id parties_list_1)
+      parties_list_1_res ;
+    [%test_eq: int list]
+      (to_parties_list (of_parties_list ~party_depth:Fn.id parties_list_1))
+      parties_list_1 ;
+    let parties_list_2 = [ 0; 0; 1; 1 ] in
+    let parties_list_2_res =
+      [ Party (0, ())
+      ; Party (0, ())
+      ; Stack ([ Party (1, ()); Party (1, ()) ], ())
+      ]
+    in
+    [%test_eq: (int, unit) t list]
+      (of_parties_list ~party_depth:Fn.id parties_list_2)
+      parties_list_2_res ;
+    [%test_eq: int list]
+      (to_parties_list (of_parties_list ~party_depth:Fn.id parties_list_2))
+      parties_list_2 ;
+    let parties_list_3 = [ 0; 0; 1; 0 ] in
+    let parties_list_3_res =
+      [ Party (0, ())
+      ; Party (0, ())
+      ; Stack ([ Party (1, ()) ], ())
+      ; Party (0, ())
+      ]
+    in
+    [%test_eq: (int, unit) t list]
+      (of_parties_list ~party_depth:Fn.id parties_list_3)
+      parties_list_3_res ;
+    [%test_eq: int list]
+      (to_parties_list (of_parties_list ~party_depth:Fn.id parties_list_3))
+      parties_list_3 ;
+    let parties_list_4 = [ 0; 1; 2; 3; 2; 1; 0 ] in
+    let parties_list_4_res =
+      [ Party (0, ())
+      ; Stack
+          ( [ Party (1, ())
+            ; Stack
+                ( [ Party (2, ()); Stack ([ Party (3, ()) ], ()); Party (2, ()) ]
+                , () )
+            ; Party (1, ())
+            ]
+          , () )
+      ; Party (0, ())
+      ]
+    in
+    [%test_eq: (int, unit) t list]
+      (of_parties_list ~party_depth:Fn.id parties_list_4)
+      parties_list_4_res ;
+    [%test_eq: int list]
+      (to_parties_list (of_parties_list ~party_depth:Fn.id parties_list_4))
+      parties_list_4
 
   let to_parties_with_hashes_list (xs : _ t list) =
     let rec collect acc (xs : _ t list) =
