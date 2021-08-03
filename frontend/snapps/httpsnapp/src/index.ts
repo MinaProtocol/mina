@@ -35,7 +35,7 @@ export const verify =
     method: Method,
     url: string,
     params: QueryParams,
-    _postData: string
+    postData?: string
   ): Promise<Response> => {
     // Convert QueryParams to query string
     const qs = new URLSearchParams(params).toString();
@@ -53,6 +53,12 @@ export const verify =
           };
         });
     } else if (method === 'POST') {
+      // TODO: This check is in place as we do not use 'postData' at the moment so we simply return an Error for now.
+      if (postData === null) {
+        return {
+          error: Error('postData is disabled and must be nully for now.'),
+        };
+      }
       response = await axios.post(minaOracle).catch((error: AxiosError) => {
         return {
           error,

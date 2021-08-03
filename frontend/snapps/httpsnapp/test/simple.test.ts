@@ -7,8 +7,7 @@ describe('verify', () => {
       const res = await verify(
         'GET',
         'https://jsonplaceholder.typicode.com/posts/1',
-        {},
-        ''
+        {}
       );
       expect(res.ok.publicKey).toBeDefined();
     });
@@ -16,8 +15,7 @@ describe('verify', () => {
       const res = await verify(
         'GET',
         'https://jsonplaceholder.typicode.com/posts/1',
-        {},
-        ''
+        {}
       );
       expect(res.ok.signature).toBeDefined();
     });
@@ -25,8 +23,7 @@ describe('verify', () => {
       const res = await verify(
         'GET',
         'https://jsonplaceholder.typicode.com/posts/1',
-        {},
-        ''
+        {}
       );
       expect(res.ok.payload).toBeDefined();
     });
@@ -34,8 +31,7 @@ describe('verify', () => {
       const res = await verify(
         'GET',
         'https://jsonplaceholder.typicode.com/posts/0',
-        {},
-        ''
+        {}
       );
       expect(res.error).toBeDefined();
     });
@@ -49,8 +45,7 @@ describe('verify', () => {
           title: 'foo',
           body: 'bar',
           userId: 1,
-        },
-        ''
+        }
       );
       expect(res.ok.publicKey).toBeDefined();
     });
@@ -62,8 +57,7 @@ describe('verify', () => {
           title: 'foo',
           body: 'bar',
           userId: 1,
-        },
-        ''
+        }
       );
       expect(res.ok.signature).toBeDefined();
     });
@@ -75,8 +69,7 @@ describe('verify', () => {
           title: 'foo',
           body: 'bar',
           userId: 1,
-        },
-        ''
+        }
       );
       expect(res.ok.payload).toBeDefined();
     });
@@ -88,8 +81,7 @@ describe('verify', () => {
           title: 'foo',
           body: 'bar',
           userId: 1,
-        },
-        ''
+        }
       );
       expect(res.error).toBeDefined();
     });
