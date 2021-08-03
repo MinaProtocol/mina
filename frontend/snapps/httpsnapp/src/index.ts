@@ -36,10 +36,7 @@ export const verify = async (
   _postData: string
 ): Promise<Response> => {
   // Convert QueryParams to query string
-  const qs = Object.keys(params)
-    .map((key) => `${key}=${params[key]}`)
-    .join('&');
-
+  const qs = new URLSearchParams(params).toString();
   // Temporary URL, Oracle API runs on localhost for now
   const minaOracle =
     qs.length === 0
