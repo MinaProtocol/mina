@@ -8,11 +8,9 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
-let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Summon = ../../Command/Summon/Type.dhall
 let Size = ../../Command/Size.dhall
 let Libp2p = ../../Command/Libp2pHelperBuild.dhall
-let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 let DebianVersions = ../../Constants/DebianVerions.dhall
 
@@ -94,7 +92,7 @@ let pipeline = \(debVersion : DebianVersions.DebVersion) -> Pipeline.build
 
         -- rosetta image
         let rosettaSpec = DockerImage.ReleaseSpec::{
-          deps=dependsOnGitEnv,
+          deps=DebianVersions.dependsOnGitEnv,
           service="mina-rosetta",
           extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO}",
           deb_codename="${DebianVersions.lowerName(debVersion)}",

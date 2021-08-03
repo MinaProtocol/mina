@@ -1,16 +1,5 @@
 let Prelude = ../../External/Prelude.dhall
-let Cmd = ../../Lib/Cmds.dhall
-let S = ../../Lib/SelectFiles.dhall
-let D = S.PathPattern
-let Pipeline = ../../Pipeline/Dsl.dhall
-let JobSpec = ../../Pipeline/JobSpec.dhall
-let Command = ../../Command/Base.dhall
 let RunInToolchain = ../../Command/RunInToolchain.dhall
-let Summon = ../../Command/Summon/Type.dhall
-let Size = ../../Command/Size.dhall
-let Libp2p = ../../Command/Libp2pHelperBuild.dhall
-let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
-let DockerImage = ../../Command/DockerImage.dhall
 
 let dependsOnGitEnv = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
 
