@@ -20,11 +20,11 @@ let toolchainImage = \(debVersion : DebVersion) ->
 
 let dependsOn = \(debVersion : DebVersion) ->
   merge {
-    Buster = [ dependsOnGitEnv # { name = "MinaArtifactBuster", key = "build-deb-pkg" }],
-    Stretch = [ dependsOnGitEnv # { name = "MinaArtifactStretch", key = "build-deb-pkg" }]
+    Buster = [ dependsOnGitEnv, { name = "MinaArtifactBuster", key = "build-deb-pkg" }],
+    Stretch = [ dependsOnGitEnv, { name = "MinaArtifactStretch", key = "build-deb-pkg" }]
   } debVersion
 
-in 
+in
 
 {
   DebVersion = DebVersion,
