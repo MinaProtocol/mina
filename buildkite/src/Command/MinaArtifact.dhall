@@ -14,7 +14,9 @@ let Libp2p = ../../Command/Libp2pHelperBuild.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let pipeline = \(debVersion : DebianVersions.DebVersion) -> Pipeline.build
+let pipeline = \(debVersion : DebianVersions.DebVersion) ->
+in
+  Pipeline.build
     Pipeline.Config::{
       spec =
         JobSpec::{
