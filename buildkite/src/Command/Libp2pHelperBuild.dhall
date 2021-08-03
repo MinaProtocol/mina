@@ -6,7 +6,7 @@ let Size = ./Size.dhall
 
 let Cmd = ../Lib/Cmds.dhall
 
-let DebianVersions = ../../Constants/DebianVerions.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let commands = \(debVersion : DebianVersions.DebVersion) ->
   [
