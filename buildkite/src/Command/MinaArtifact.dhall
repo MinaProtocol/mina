@@ -12,7 +12,7 @@ let Summon = ../../Command/Summon/Type.dhall
 let Size = ../../Command/Size.dhall
 let Libp2p = ../../Command/Libp2pHelperBuild.dhall
 let DockerImage = ../../Command/DockerImage.dhall
-let DebianVersions = ../../Constants/DebianVerions.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let pipeline = \(debVersion : DebianVersions.DebVersion) -> Pipeline.build
     Pipeline.Config::{
