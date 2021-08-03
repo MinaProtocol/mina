@@ -3,5 +3,4 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 in
 
-Pipeline.build ArtifactPipelines.buster,
-Pipeline.build ArtifactPipelines.stretch
+Pipeline.build ArtifactPipelines.buster
