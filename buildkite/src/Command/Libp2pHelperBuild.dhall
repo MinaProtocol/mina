@@ -6,12 +6,14 @@ let Size = ./Size.dhall
 
 let Cmd = ../Lib/Cmds.dhall
 
-let commands : List Cmd.Type =
+let DebianVersions = ../../Constants/DebianVerions.dhall
+
+let commands = \(debVersion : DebianVersions.DebVersion) ->
   [
     Cmd.run "chmod -R 777 src/app/libp2p_helper",
     Cmd.runInDocker
       Cmd.Docker::{
-        image = (../Constants/ContainerImages.dhall).minaToolchainBuster,
+        image = DebianVersions.toolchainRunner(debVersion),
         extraEnv = [ "GO=/usr/lib/go/bin/go" ]
       }
       "make libp2p_helper",
@@ -20,10 +22,10 @@ let commands : List Cmd.Type =
 
 in
 
-let cmdConfig =
+let cmdConfig = \(debVersion : DebianVersions.DebVersion) ->
   Command.build
     Command.Config::{
-      commands  = commands,
+      commands  = commands(debVersion),
       label = "Build Libp2p helper",
       key = "libp2p-helper",
       target = Size.Small

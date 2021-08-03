@@ -14,27 +14,9 @@ let Size = ../../Command/Size.dhall
 let Libp2p = ../../Command/Libp2pHelperBuild.dhall
 let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 let DockerImage = ../../Command/DockerImage.dhall
+let DebianVersions = ../../Constants/DebianVerions.dhall
 
-let dependsOnGitEnv = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
-
-let DebVersion = < Buster | Stretch >
-
-let capitalName = \(debVersion : DebVersion) ->
-  merge { Buster = "Buster", Stretch = "Stretch" } debVersion
- 
-let lowerName = \(debVersion : DebVersion) ->
-  merge { Buster = "buster", Stretch = "stretch" } debVersion
-
-let toolchainRunner = \(debVersion : DebVersion) ->
-  merge { Buster = RunInToolchain.runInToolchainBuster, Stretch = RunInToolchain.runInToolchainStretch } debVersion
-
-let dependsOn = \(debVersion : DebVersion) ->
-  merge {
-    Buster = [ dependsOnGitEnv # { name = "MinaArtifactBuster", key = "build-deb-pkg" }],
-    Stretch = [ dependsOnGitEnv # { name = "MinaArtifactStretch", key = "build-deb-pkg" }]
-  } debVersion
-
-let pipeline = \(debVersion : DebVersion) -> 
+let pipeline = \(debVersion : DebianVersions.DebVersion) ->
   Pipeline.build
     Pipeline.Config::{
       spec =
@@ -51,23 +33,23 @@ let pipeline = \(debVersion : DebVersion) ->
             S.strictlyStart (S.contains "scripts")
           ],
           path = "Release",
-          name = "MinaArtifact${capitalName(debVersion)}"
+          name = "MinaArtifact${DebianVersions.capitalName(debVersion)}"
         },
       steps = [
-        Libp2p.step,
+        Libp2p.step(debVersion),
         Command.build
           Command.Config::{
-            commands = toolchainRunner(debVersion) [
+            commands = DebianVersions.toolchainRunner(debVersion) [
               "DUNE_PROFILE=devnet",
               "AWS_ACCESS_KEY_ID",
               "AWS_SECRET_ACCESS_KEY",
               "MINA_BRANCH=$BUILDKITE_BRANCH",
               "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
-              "MINA_DEB_CODENAME=${lowerName(debVersion)}",
+              "MINA_DEB_CODENAME=${DebianVersions.lowerName(debVersion)}",
               -- add zexe standardization preprocessing step (see: https://github.com/MinaProtocol/mina/pull/5777)
               "PREPROCESSOR=./scripts/zexe-standardize.sh"
             ] "./buildkite/scripts/build-artifact.sh",
-            label = "Build Mina daemon package for Debian ${capitalName(debVersion)}",
+            label = "Build Mina daemon package for Debian ${DebianVersions.capitalName(debVersion)}",
             key = "build-deb-pkg",
             target = Size.XLarge,
             retries = [ Command.Retry::{ exit_status = +2, limit = Some 2 } ] -- libp2p error
@@ -75,11 +57,11 @@ let pipeline = \(debVersion : DebVersion) ->
 
         -- daemon devnet image
         let daemonDevnetSpec = DockerImage.ReleaseSpec::{
-          deps=dependsOn(debVersion),
+          deps=DebianVersions.dependsOn(debVersion),
           service="mina-daemon",
           network="devnet",
-          deb_codename="${lowerName(debVersion)}",
-          step_key="daemon-devnet-${lowerName(debVersion)}-docker-image"
+          deb_codename="${DebianVersions.lowerName(debVersion)}",
+          step_key="daemon-devnet-${DebianVersions.lowerName(debVersion)}-docker-image"
         }
 
         in
@@ -88,11 +70,11 @@ let pipeline = \(debVersion : DebVersion) ->
 
         -- daemon mainnet image
         let daemonMainnetSpec = DockerImage.ReleaseSpec::{
-          deps=dependsOn(debVersion),
+          deps=DebianVersions.dependsOn(debVersion),
           service="mina-daemon",
           network="mainnet",
-          deb_codename="${lowerName(debVersion)}",
-          step_key="daemon-mainnet-${lowerName(debVersion)}-docker-image"
+          deb_codename="${DebianVersions.lowerName(debVersion)}",
+          step_key="daemon-mainnet-${DebianVersions.lowerName(debVersion)}-docker-image"
         }
 
         in
@@ -101,10 +83,10 @@ let pipeline = \(debVersion : DebVersion) ->
 
         -- archive image
         let archiveSpec = DockerImage.ReleaseSpec::{
-          deps=dependsOn(debVersion),
+          deps=DebianVersions.dependsOn(debVersion),
           service="mina-archive",
-          deb_codename="${lowerName(debVersion)}",
-          step_key="archive-${lowerName(debVersion)}-docker-image"
+          deb_codename="${DebianVersions.lowerName(debVersion)}",
+          step_key="archive-${DebianVersions.lowerName(debVersion)}-docker-image"
         }
 
         in
@@ -116,8 +98,8 @@ let pipeline = \(debVersion : DebVersion) ->
           deps=dependsOnGitEnv,
           service="mina-rosetta",
           extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO}",
-          deb_codename="${lowerName(debVersion)}",
-          step_key="rosetta-mainnet-${lowerName(debVersion)}-docker-image"
+          deb_codename="${DebianVersions.lowerName(debVersion)}",
+          step_key="rosetta-mainnet-${DebianVersions.lowerName(debVersion)}-docker-image"
         }
 
         in
@@ -129,5 +111,7 @@ let pipeline = \(debVersion : DebVersion) ->
 
 in
 
-let buster = pipeline Buster
-let stretch = pipeline Stretch
+{
+  buster = pipeline Buster
+  stretch = pipeline Stretch
+}
