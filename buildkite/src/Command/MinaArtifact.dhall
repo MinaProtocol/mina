@@ -16,9 +16,8 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 in
 
-let pipeline : DebianVersion.DebVersion -> Pipeline.CompoundType = \(debVersion : DebianVersions.DebVersion) ->
-  Pipeline.build
-    Pipeline.Config::{
+let pipeline : DebianVersion.DebVersion -> Pipeline.Config = \(debVersion : DebianVersions.DebVersion) ->
+  Pipeline.Config::{
       spec =
         JobSpec::{
           dirtyWhen = [
@@ -108,8 +107,9 @@ let pipeline : DebianVersion.DebVersion -> Pipeline.CompoundType = \(debVersion 
 
       ]
     }
+
 in
 {
-  buster = pipeline Buster,
-  stretch = pipeline Stretch
+  buster = Pipeline.build(pipeline Buster),
+  stretch = Pipeline.build(pipeline Stretch)
 }
