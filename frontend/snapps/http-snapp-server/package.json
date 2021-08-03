@@ -26,6 +26,7 @@
   "dependencies": {
     "@o1labs/client-sdk": "^1.0.1",
     "@polka/send-type": "^0.5.2",
+    "cors": "^2.8.5",
     "node-fetch": "^2.6.1",
     "polka": "^1.0.0-next.15"
   }

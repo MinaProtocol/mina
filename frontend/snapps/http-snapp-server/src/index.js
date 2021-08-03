@@ -2,11 +2,13 @@ import MinaSDK from '@o1labs/client-sdk';
 import polka from 'polka';
 import fetch from 'node-fetch';
 import send from '@polka/send-type';
+import cors from 'cors';
 
 const PORT = process.env | 3000;
 const keys = MinaSDK.genKeys();
 
 polka()
+  .use(cors())
   .get('/', async (req, res) => {
     // Bad encoding of query
     if (!'url' in req.query) {
@@ -15,9 +17,7 @@ polka()
 
     // Parse out URL and format query string
     const { url, ...params } = req.query;
-    const qs = Object.keys(params)
-      .map((key) => `${key}=${params[key]}`)
-      .join('&');
+    const qs = new URLSearchParams(params).toString();
 
     try {
       const fetchUrl = qs.length === 0 ? url : `${url}?${qs}`;
