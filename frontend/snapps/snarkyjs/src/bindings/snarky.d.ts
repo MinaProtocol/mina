@@ -1,15 +1,21 @@
 export type AsField<F> = F | number | string | boolean;
 
+export class Keypair {
+}
+
+export class Proof {
+}
+
 export class Field {
   constructor(x: AsField<Field>);
 
-  neg(this: AsField<Field>): Field;
-  inv(this: AsField<Field>): Field;
+  neg(this: Field): Field;
+  inv(this: Field): Field;
 
-  add(this: AsField<Field>, y: AsField<Field>): Field;
-  sub(this: AsField<Field>, y: AsField<Field>): Field;
-  mul(this: AsField<Field>, y: AsField<Field>): Field;
-  div(this: AsField<Field>, y: AsField<Field>): Field;
+  add(this: Field, y: AsField<Field>): Field;
+  sub(this: Field, y: AsField<Field>): Field;
+  mul(this: Field, y: AsField<Field>): Field;
+  div(this: Field, y: AsField<Field>): Field;
 
   square(this: AsField<Field>): Field;
   sqrt(this: AsField<Field>): Field;
@@ -19,17 +25,15 @@ export class Field {
   sizeInFieldElements(): number;
   toFieldElements(this: AsField<Field>): Field[];
 
-  assertEqual(this: AsField<Field>, y: AsField<Field>): void;
+  assertEquals(this: AsField<Field>, y: AsField<Field>): void;
   assertBoolean(this: AsField<Field>): void;
   isZero(this: AsField<Field>): Bool;
 
-  toBool(this: AsField<Field>): Bool;
-
-  unpack(this: AsField<Field>): Bool[];
+  toBits(this: AsField<Field>): Bool[];
 
   equals(this: AsField<Field>, y: AsField<Field>): Bool;
 
-  value(this: AsField<Field>): Field;
+  // value(this: AsField<Field>): Field;
 
   /* Self members */
   static one: Field;
@@ -57,12 +61,10 @@ export class Field {
   static assertBoolean(x: AsField<Field>): void;
   static isZero(x: AsField<Field>): Bool;
 
-  static toBool(x: AsField<Field>): Bool;
+  static ofBits(x: AsBool<Bool>[]): Field;
+  static toBits(x: AsField<Field>): Bool[];
 
-  static pack(x: AsBool<Bool>[]): Field;
-  static unpack(x: AsField<Field>): Bool[];
-
-  static equals(x: AsField<Field>, y: AsField<Field>): Bool;
+  static equal(x: AsField<Field>, y: AsField<Field>): Bool;
 }
 
 export type AsBool<B> = B | boolean;
@@ -72,18 +74,20 @@ export class Bool {
 
   toField(this: AsBool<Bool>): Field;
 
-  not(this: AsBool<Bool>): Bool;
-  and(this: AsBool<Bool>, y: AsBool<Bool>): Bool;
-  or(this: AsBool<Bool>, y: AsBool<Bool>): Bool;
+  not(this: Bool): Bool;
+  and(this: Bool, y: AsBool<Bool>): Bool;
+  or(this: Bool, y: AsBool<Bool>): Bool;
 
-  assertEqual(this: AsBool<Bool>, y: AsBool<Bool>): void;
+  assertEquals(this: Bool, y: AsBool<Bool>): void;
 
-  equals(this: AsBool<Bool>, y: AsBool<Bool>): Bool;
-  isTrue(this: AsBool<Bool>): Bool;
-  isFalse(this: AsBool<Bool>): Bool;
+  equals(this: Bool, y: AsBool<Bool>): Bool;
+  isTrue(this: Bool): Bool;
+  isFalse(this: Bool): Bool;
 
   sizeInFieldElements(): number;
-  toFieldElements(this: AsBool<Bool>): Field[];
+  toFieldElements(this: Bool): Field[];
+
+  toString(this: Bool): string;
 
   /* static members */
   static toField(x: AsBool<Bool>): Field;
@@ -98,7 +102,7 @@ export class Bool {
 
   static assertEqual(x: AsBool<Bool>, y: AsBool<Bool>): void;
 
-  static equals(x: AsBool<Bool>, y: AsBool<Bool>): Bool;
+  static equal(x: AsBool<Bool>, y: AsBool<Bool>): Bool;
   static isTrue(x: AsBool<Bool>): Bool;
   static isFalse(x: AsBool<Bool>): Bool;
 
@@ -115,25 +119,29 @@ export interface AsFieldElements<T> {
   sizeInFieldElements(): number;
 }
 
-export class Circuit {
-  constructor();
+export interface CircuitMain<W, P> {
+  snarkyWitnessTyp: AsFieldElements<W>,
+  snarkyPublicTyp: AsFieldElements<P>,
+  snarkyMain: (W, P) => void
+}
 
-  addConstraint(
+export class Circuit {
+  static addConstraint(
     this: Circuit,
     kind: 'multiply',
     x: Field,
     y: Field,
     z: Field
   ): void;
-  addConstraint(this: Circuit, kind: 'add', x: Field, y: Field, z: Field): void;
-  addConstraint(
+  static addConstraint(this: Circuit, kind: 'add', x: Field, y: Field, z: Field): void;
+  static addConstraint(
     this: Circuit,
     kind: 'equal',
     x: Field,
     y: Field,
     z: Field
   ): void;
-  addConstraint(
+  static addConstraint(
     this: Circuit,
     kind: 'boolean',
     x: Field,
@@ -141,67 +149,125 @@ export class Circuit {
     z: Field
   ): void;
 
-  newVariable(): Field;
-  newVariable(x: AsField<Field>): Field;
-  newVariable(f: () => AsField<Field>): Field;
+  // newVariable(): Field;
+  // newVariable(x: AsField<Field>): Field;
+  // TODO
+  static newVariable(f: () => AsField<Field>): Field;
 
+  /*
   newPublicVariable(): Field;
   newPublicVariable(x: AsField<Field>): Field;
   newPublicVariable(f: () => AsField<Field>): Field;
 
   setVariable(x: Field, value: AsField<Field>): void;
   setVariable(x: Field, f: () => AsField<Field>): void;
+  */
 
-  witness<T>(
+  static witness<T>(
     ctor: { toFieldElements(x: T): Field[]; ofFieldElements(x: Field[]): T; sizeInFieldElements(): number },
     f: () => T
   ): T;
-  witness<Value, Var>(
-    valCtor: { toFieldElements(x: Value): Field[]; sizeInFieldElements(): number },
-    varCtor: { ofFieldElements(x: Field[]): Var; sizeInFieldElements(): number },
-    f: () => Value
-  ): Var;
 
-  array<T>(
+  static array<T>(
     ctor: AsFieldElements<T>,
     length: number
   ): AsFieldElements<T[]>;
 
-  assertEqual<T>(
+  static assertEqual<T>(
     ctor: { toFieldElements(x: T): Field[] },
     x: T,
     y: T
   ): void;
 
-  assertEqual<T extends { toFieldElements(this: T): Field[] }>(
+  static assertEqual(
     x: T,
     y: T
   ): void;
 
-  equal<T>(
+  static equal<T>(
     ctor: { toFieldElements(x: T): Field[] },
     x: T,
     y: T
   ): Bool;
 
-  equal<T extends { toFieldElements(this: T): Field[] }>(
+  static equal(
     x: T,
     y: T
   ): Bool;
 
-  if<T>(
+  static if<T>(
     b: AsBool<Bool>,
     ctor: AsFieldElements<T>,
     x: T,
     y: T
   ): T;
 
-  if<T extends AsFieldElements<T>>(
+  static if(
     b: AsBool<Bool>,
     x: T,
     y: T
   ): T;
+
+  static generateKeypair<W, P>(
+    main: CircuitMain<W, P>,
+  ): Keypair;
+
+  static prove<W, P>(
+    main: CircuitMain<W, P>,
+    w: W, p: P,
+    kp: Keypair
+  ): Proof;
 }
+
+export class Scalar {
+    toFieldElements(this: Scalar): Field[];
+
+    static toFieldElements(x: Scalar): Field[]
+    static ofFieldElements(fields: Field[]): Scalar;
+    static sizeInFieldElements(): number;
+    static ofBits(bits: Bool[]): Scalar;
+}
+
+export class EndoScalar {
+    static toFieldElements(x: Scalar): Field[]
+    static ofFieldElements(fields: Field[]): Scalar;
+    static sizeInFieldElements(): number;
+}
+
+export class Group {
+    x: Field;
+    y: Field;
+
+    add(this: Group, y: Group): Group;
+    sub(this: Group, y: Group): Group;
+    neg(this: Group): Group;
+    scale(this: Group, y: Scalar): Group;
+    endoScale(this: Group, y: EndoScalar): Group;
+
+    assertEquals(this: Group, y: Group): void;
+    equals(this: Group, y: Group): Bool;
+
+    constructor(args: { x: AsField<Field>, y: AsField<Field> })
+    constructor(x: AsField<Field>, y: AsField<Field>)
+
+    static generator: Group;
+    static add(x: Group, y: Group): Group;
+    static sub(x: Group, y: Group): Group;
+    static neg(x: Group): Group;
+    static scale(x: Group, y: Scalar): Group;
+    static endoScale(x: Group, y: EndoScalar): Group;
+
+    static assertEqual(x: Group, y: Group): void;
+    static equal(x: Group, y: Group): Bool;
+
+    static toFieldElements(x: Group): Field[]
+    static ofFieldElements(fields: Field[]): Group;
+    static sizeInFieldElements(): number;
+}
+
+export const Poseidon : {
+  hash: (xs: Field[]) => Field;
+};
 
 /* TODO: Figure out types for these. */
 export const ofFieldElements: (x: any[], y: any[]) => any[];
