@@ -4,5 +4,5 @@
   ],
   "plugins": [
   ],
-  "ignore": [ "src/bindings/snarky.js" ]
+  "ignore": [ "src/bindings/snarky_raw.js" ]
 }
