@@ -1,4 +1,5 @@
-import { verify } from '../src';
+import * as HttpSnapps from '../src';
+const verify = HttpSnapps.verify('http://localhost:3000');
 
 describe('verify', () => {
   describe('GET', () => {

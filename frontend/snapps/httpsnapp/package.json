@@ -34,10 +34,12 @@
       "limit": "10 KB"
     }
   ],
+  "jest": {
+    "testEnvironment": "node"
+  },
   "dependencies": {
     "@babel/preset-env": "^7.14.8",
-    "node-fetch": "^2.6.1",
-    "@types/node-fetch": "^2.5.12",
+    "axios": "^0.21.1",
     "tsdx": "^0.14.1",
     "tslib": "^2.3.0",
     "typescript": "^4.3.5"
