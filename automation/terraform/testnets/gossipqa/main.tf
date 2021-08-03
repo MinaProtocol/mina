@@ -209,57 +209,57 @@ module "gossipqa" {
 
   plain_node_count = var.plain_node_count
 
-  # whales= [    
-  #   {
-  #     duplicates = 2
-  #     class  = "whale"
-  #   },
-  #   {
-  #     duplicates = 1
-  #     class  = "whale"
-  #   }
-  # ]
+  whales= [    
+    {
+      duplicates = 2
+      class  = "whale"
+    },
+    {
+      duplicates = 1
+      class  = "whale"
+    }
+  ]
 
-  # fishes= [    
-  #   {
-  #     duplicates = 2
-  #     class  = "fish"
-  #   },
-  #   {
-  #     duplicates = 1
-  #     class  = "fish"
-  #   }
-  # ]
+  fishes= [    
+    {
+      duplicates = 2
+      class  = "fish"
+    },
+    {
+      duplicates = 1
+      class  = "fish"
+    }
+  ]
 
-  whales= concat( 
-    [for i in range(var.whale_count)/3:{
-        duplicates = 3
-        class  = "whale"
-      }], 
-    [for i in range(var.whale_count)/3:{
-        duplicates = 2
-        class  = "whale"
-      }], 
-    [for i in range(var.whale_count)/3:{
-        duplicates = 1
-        class  = "whale"
-      }]
-  )
+  # whales= concat( 
+  #   [for i in range(var.whale_count)/3:{
+  #       duplicates = 3
+  #       class  = "whale"
+  #     }], 
+  #   [for i in range(var.whale_count)/3:{
+  #       duplicates = 2
+  #       class  = "whale"
+  #     }], 
+  #   [for i in range(var.whale_count)/3:{
+  #       duplicates = 1
+  #       class  = "whale"
+  #     }]
+  # )
   
-  fishes=concat( 
-    [for i in range(var.fish_count)/3:{
-        duplicates = 3
-        class  = "fish"
-      }], 
-    [for i in range(var.fish_count)/3:{
-        duplicates = 2
-        class  = "fish"
-      }], 
-    [for i in range(var.fish_count)/3:{
-        duplicates = 1
-        class  = "fish"
-      }]
-  )
+  # fishes=concat( 
+  #   [for i in range(var.fish_count)/3:{
+  #       duplicates = 3
+  #       class  = "fish"
+  #     }], 
+  #   [for i in range(var.fish_count)/3:{
+  #       duplicates = 2
+  #       class  = "fish"
+  #     }], 
+  #   [for i in range(var.fish_count)/3:{
+  #       duplicates = 1
+  #       class  = "fish"
+  #     }]
+  # )
 
   upload_blocks_to_gcloud         = false
   restart_nodes                   = false

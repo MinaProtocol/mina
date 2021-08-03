@@ -138,6 +138,11 @@ variable "seed_count" {
   default = 1
 }
 
+variable "plain_node_count" {
+  type    = number
+  default = 1
+}
+
 variable "log_level" {
   type    = string
   default = "Trace"

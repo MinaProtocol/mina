@@ -210,6 +210,11 @@ variable "seed_configs" {
   default = []
 }
 
+
+variable "plain_node_configs" {
+  default = null
+}
+
 # Snark Worker Vars
 
 variable "snark_coordinators" {

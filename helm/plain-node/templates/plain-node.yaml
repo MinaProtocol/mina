@@ -15,7 +15,7 @@ spec:
         app: {{ $.Values.name }}
         testnet: {{ $.Values.testnetName }}
         role: seed
-        class: "plain node"
+        class: "plain-node"
         version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
         syncStatus: INIT
       annotations:
@@ -54,9 +54,6 @@ spec:
           {{- if $.Values.coda.maxConnections }}
           "--max-connections", {{ $.Values.coda.maxConnections | quote }},
           {{- end -}}
-          {{- if $.Values.coda.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
-          {{- end }}
           {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}
@@ -85,7 +82,7 @@ spec:
         - name: GCLOUD_BLOCK_UPLOAD_BUCKET
           value: "mina_network_block_data"
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ default $.Values.coda.ports.p2p $config.externalPort | quote }}
+          value: {{ $.Values.coda.ports.p2p | quote }}
         ports:
         - name: client-port
           protocol: TCP
@@ -98,23 +95,15 @@ spec:
           containerPort: {{ $.Values.coda.ports.metrics }}
         - name: external-port
           protocol: TCP
-          containerPort: {{ default $.Values.coda.ports.p2p $config.externalPort }}
-          hostPort: {{ default $.Values.coda.ports.external $config.externalPort }}
-{{$data := dict "name" $config.name "healthcheck" $.Values.healthcheck }}
+          containerPort: {{ $.Values.coda.ports.p2p }}
+          hostPort: {{ $.Values.coda.ports.external }}
+{{$data := dict "name" $.Values.name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.seed.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
-        {{- if $config.libp2pSecret }}
-        - name: actual-libp2p
-          mountPath: /root/libp2p-keys
-        {{- end }}
         {{- if $.Values.coda.uploadBlocksToGCloud }}
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
-        {{- end }}
-        {{- if $.Values.coda.runtimeConfig }}
-        - name: daemon-config
-          mountPath: "/config/"
         {{- end }}
       volumes:
       {{- if $.Values.coda.uploadBlocksToGCloud }}
@@ -147,4 +136,4 @@ spec:
     targetPort: {{ $.Values.coda.ports.graphql }}
 {{- end }}
 ---
-{{ end }}
+

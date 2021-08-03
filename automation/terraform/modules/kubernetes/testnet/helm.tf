@@ -65,7 +65,7 @@ resource "helm_release" "plain_nodes" {
   name       = "${var.testnet_name}-plain-node-${count.index + 1}"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   #TODO we need a new chart for the plain nodes
-  chart      = var.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
+  chart      = var.use_local_charts ? "../../../../helm/plain-node" : "plain-node"
   version    = "1.0.0"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
