@@ -16,7 +16,7 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 
 in
 
-let pipeline : DebianVersion.DebVersion -> Pipeline.Config = \(debVersion : DebianVersions.DebVersion) ->
+let pipeline : DebianVersions.DebVersion -> Pipeline.Config = \(debVersion : DebianVersions.DebVersion) ->
   Pipeline.Config::{
       spec =
         JobSpec::{
