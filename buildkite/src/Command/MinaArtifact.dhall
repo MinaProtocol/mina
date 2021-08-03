@@ -1,18 +1,18 @@
-let Prelude = ../../External/Prelude.dhall
+let Prelude = ../External/Prelude.dhall
 
-let Cmd = ../../Lib/Cmds.dhall
-let S = ../../Lib/SelectFiles.dhall
+let Cmd = ../Lib/Cmds.dhall
+let S = ../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
-let Pipeline = ../../Pipeline/Dsl.dhall
-let JobSpec = ../../Pipeline/JobSpec.dhall
+let Pipeline = ../Pipeline/Dsl.dhall
+let JobSpec = ../Pipeline/JobSpec.dhall
 
-let Command = ../../Command/Base.dhall
-let Summon = ../../Command/Summon/Type.dhall
-let Size = ../../Command/Size.dhall
-let Libp2p = ../../Command/Libp2pHelperBuild.dhall
-let DockerImage = ../../Command/DockerImage.dhall
-let DebianVersions = ../../Constants/DebianVersions.dhall
+let Command = ./Base.dhall
+let Summon = ./Summon/Type.dhall
+let Size = ./Size.dhall
+let Libp2p = ./Libp2pHelperBuild.dhall
+let DockerImage = ./DockerImage.dhall
+let DebianVersions = ../Constants/DebianVersions.dhall
 
 in
 
