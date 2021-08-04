@@ -57,7 +57,7 @@ export class Main {
   }
 }
 
-class Circ {
+class Circ extends Circuit {
   @circuitMain
   static main(@public_ x: Field) {
     let acc = x;
@@ -65,10 +65,18 @@ class Circ {
       acc = acc.mul(acc);
     }
   }
+
+  // TODO: This gets method
+  static generateKeypair(): Keypair {
+  }
+  static prove(wit: any[], pub: any[]): Proof {
+  }
 };
 
 export function main() {
+  console.log('random', Field.random());
   const kp = C.generateKeypair(Circ as any);
+  console.log('random', Field.random());
   const proof = C.prove(Circ as any, [], [ new Field(2) ], kp);
   console.log(proof, kp);
 }
