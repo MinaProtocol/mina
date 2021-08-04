@@ -7,6 +7,7 @@
   (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
   (libraries
     zexe_backend_common
+    zexe_backend_platform_specific
     hex
     pickles_types
     marlin_plonk_bindings
