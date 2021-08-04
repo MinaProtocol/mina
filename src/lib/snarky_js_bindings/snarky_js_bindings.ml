@@ -1,12 +1,37 @@
-module Backend = Zexe_backend_js.Pasta.Vesta_based_plonk
+module Backend = Zexe_backend.Pasta.Vesta_based_plonk
+module Other_backend = Zexe_backend.Pasta.Pallas_based_plonk
 
 let () = Backend.Keypair.set_urs_info []
 
-module Impl =
-  Snarky_backendless.Snark.Run.Make
-    (Zexe_backend_js.Pasta.Pallas_based_plonk)
-    (Unit)
+module Impl = Pickles_base.Impls.Step
+module Other_impl = Pickles_base.Impls.Wrap
+module Challenge = Limb_vector.Challenge.Make (Impl)
+module Sc =
+  Pickles_base.Scalar_challenge.Make
+    (Impl)
+    (Pickles_base.Step_main_inputs.Inner_curve)
+    (Challenge)
+    (Pickles_base.Endo.Step_inner_curve)
 open Js_of_ocaml
+
+let raise_errorf fmt =
+  Core_kernel.ksprintf
+    (fun s -> Js.raise_js_error (new%js Js.error_constr (Js.string s)))
+    fmt
+
+class type field_class =
+  object
+    method value : Impl.Field.t Js.prop
+
+    method toBits : bool_class Js.t Js.js_array Js.t Js.meth
+  end
+
+and bool_class =
+  object
+    method value : Impl.Boolean.var Js.prop
+
+    method toField : field_class Js.t Js.meth
+  end
 
 module As_field = struct
   (* number | string | boolean | field_class | cvar *)
@@ -16,18 +41,28 @@ module As_field = struct
 
   let of_field (x : Field.t) : t = Obj.magic x
 
+  let of_field_obj (x : field_class Js.t) : t = Obj.magic x
+
   let value (value : t) : Field.t =
     match Js.to_string (Js.typeof (Obj.magic value)) with
     | "number" ->
         let value = Js.float_of_number (Obj.magic value) in
         if Float.is_integer value then Field.of_int (Float.to_int value)
-        else failwith "Cannot convert a float to a field element"
+        else raise_errorf "Cannot convert a float to a field element"
     | "boolean" ->
         let value = Js.to_bool (Obj.magic value) in
         if value then Field.one else Field.zero
-    | "string" ->
-        Field.constant
-          (Field.Constant.of_string (Js.to_string (Obj.magic value)))
+    | "string" -> (
+        let value : Js.js_string Js.t = Obj.magic value in
+        let s = Js.to_string value in
+        try
+          Field.constant
+            ( if
+              Char.equal s.[0] '0'
+              && Char.equal (Char.lowercase_ascii s.[1]) 'x'
+            then Zexe_backend.Pasta.Fp.(of_bigint (Bigint.of_hex_string s))
+            else Field.Constant.of_string s )
+        with Failure e -> raise_errorf "%s" e )
     | "object" ->
         let is_array = Js.to_bool (Js.Unsafe.global ##. Array##isArray value) in
         if is_array then
@@ -38,11 +73,41 @@ module As_field = struct
           (* Object case *)
           Js.Optdef.get
             (Obj.magic value)##.value
-            (fun () -> failwith "Expected object with property \"value\"")
+            (fun () -> raise_errorf "Expected object with property \"value\"")
     | s ->
-        Core_kernel.failwithf "Type %s cannot be converted to a field element" s
-          ()
+        raise_errorf "Type \"%s\" cannot be converted to a field element" s
+
+  let field_class : < .. > Js.t =
+    let f =
+      (* We could construct this using Js.wrap_meth_callback, but that returns a
+         function that behaves weirdly (from the point-of-view of JS) when partially applied. *)
+      Js.Unsafe.eval_string
+        {js|
+        (function(asFieldValue) {
+          return function(x) {
+            this.value = asFieldValue(x);
+            return this;
+          }
+        })
+      |js}
+    in
+    Js.Unsafe.(fun_call f [| inject (Js.wrap_callback value) |])
+
+  let field_constr : (t -> field_class Js.t) Js.constr = Obj.magic field_class
+
+  let to_field_obj (x : t) : field_class Js.t =
+    match Js.to_string (Js.typeof (Obj.magic value)) with
+    | "object" ->
+        let is_array = Js.to_bool (Js.Unsafe.global ##. Array##isArray value) in
+        if is_array then (* Cvar case *)
+          new%js field_constr x else Obj.magic x
+    | _ ->
+        new%js field_constr x
 end
+
+let field_class = As_field.field_class
+
+let field_constr = As_field.field_constr
 
 open Core_kernel
 
@@ -53,6 +118,8 @@ module As_bool = struct
   open Impl
 
   let of_boolean (x : Boolean.var) : t = Obj.magic x
+
+  let of_bool_obj (x : bool_class Js.t) : t = Obj.magic x
 
   let value (value : t) : Boolean.var =
     match Js.to_string (Js.typeof (Obj.magic value)) with
@@ -69,36 +136,24 @@ module As_bool = struct
           (* Object case *)
           Js.Optdef.get
             (Obj.magic value)##.value
-            (fun () -> failwith "Expected object with property \"value\"")
+            (fun () -> raise_errorf "Expected object with property \"value\"")
     | s ->
-        Core_kernel.failwithf "Type %s cannot be converted to a field element" s
-          ()
+        raise_errorf "Type \"%s\" cannot be converted to a boolean" s
 end
 
-class type field_class =
-  object
-    method value : Impl.Field.t Js.prop
-  end
-
-class type bool_class =
-  object
-    method value : Impl.Boolean.var Js.prop
-
-    method toField : field_class Js.t Js.meth
-  end
-
-let field_class : < .. > Js.t =
-  Js.wrap_meth_callback (fun (this : field_class Js.t) (value : As_field.t) ->
-      this##.value := As_field.value value ;
-      this)
-  |> Obj.magic
-
-let bool_class =
-  Js.wrap_meth_callback (fun (this : bool_class Js.t) (value : As_bool.t) ->
-      this##.value := As_bool.value value)
-
-let field_constr : (As_field.t -> field_class Js.t) Js.constr =
-  Obj.magic field_class
+let bool_class : < .. > Js.t =
+  let f =
+    Js.Unsafe.eval_string
+      {js|
+      (function(asBoolValue) {
+        return function(x) {
+          this.value = asBoolValue(x);
+          return this;
+        }
+      })
+    |js}
+  in
+  Js.Unsafe.(fun_call f [| inject (Js.wrap_callback As_bool.value) |])
 
 let bool_constr : (As_bool.t -> bool_class Js.t) Js.constr =
   Obj.magic bool_class
@@ -118,21 +173,28 @@ let handle_constants f f_constant (x : Field.t) =
 let handle_constants2 f f_constant (x : Field.t) (y : Field.t) =
   match (x, y) with Constant x, Constant y -> f_constant x y | _ -> f x y
 
+let array_get_exn xs i =
+  Js.Optdef.get (Js.array_get xs i) (fun () -> assert false)
+
+let array_check_length xs n =
+  if xs##.length <> n then failwithf "Expected array of length %d" n ()
+
+let method_ class_ name (f : _ Js.t -> _) =
+  let prototype = Js.Unsafe.get class_ (Js.string "prototype") in
+  Js.Unsafe.set prototype (Js.string name) (Js.wrap_meth_callback f)
+
 let () =
-  let add_method name (f : field_class Js.t -> _) =
-    let prototype = Js.Unsafe.get field_class (Js.string "prototype") in
-    Js.Unsafe.set prototype (Js.string name) (Js.wrap_meth_callback f)
-  in
+  let method_ name (f : field_class Js.t -> _) = method_ field_class name f in
   let to_string (x : Field.t) =
     (match x with Constant x -> x | x -> As_prover.read_var x)
     |> Field.Constant.to_string |> Js.string
   in
   let mk x : field_class Js.t = new%js field_constr (As_field.of_field x) in
   let add_op1 name (f : Field.t -> Field.t) =
-    add_method name (fun this : field_class Js.t -> mk (f this##.value))
+    method_ name (fun this : field_class Js.t -> mk (f this##.value))
   in
   let add_op2 name (f : Field.t -> Field.t -> Field.t) =
-    add_method name (fun this (y : As_field.t) : field_class Js.t ->
+    method_ name (fun this (y : As_field.t) : field_class Js.t ->
         mk (f this##.value (As_field.value y)))
   in
   let sub =
@@ -155,34 +217,58 @@ let () =
   add_op1 "inv" Field.inv ;
   add_op1 "square" Field.square ;
   add_op1 "sqrt" sqrt ;
-  add_method "toString" (fun this : Js.js_string Js.t -> to_string this##.value) ;
-  add_method "sizeInFieldElements" (fun _this : int -> 1) ;
-  add_method "toFieldElements" (fun this : field_class Js.t Js.js_array Js.t ->
+  method_ "toString" (fun this : Js.js_string Js.t -> to_string this##.value) ;
+  method_ "sizeInFieldElements" (fun _this : int -> 1) ;
+  method_ "toFieldElements" (fun this : field_class Js.t Js.js_array Js.t ->
       singleton_array this) ;
-  add_method "assertEqual" (fun this (y : As_field.t) : unit ->
+  ((* TODO: Make this work with arbitrary bit length *)
+   let bit_length = Field.size_in_bits - 2 in
+   let cmp_method (name, f) =
+     method_ name (fun this (y : As_field.t) : unit ->
+         f ~bit_length this##.value (As_field.value y))
+   in
+   let bool_cmp_method (name, f) =
+     method_ name (fun this (y : As_field.t) : bool_class Js.t ->
+         new%js bool_constr
+           (As_bool.of_boolean
+              (f (Field.compare ~bit_length this##.value (As_field.value y)))))
+   in
+   (List.iter ~f:bool_cmp_method)
+     [ ("lt", fun { less; _ } -> less)
+     ; ("lte", fun { less_or_equal; _ } -> less_or_equal)
+     ; ("gt", fun { less_or_equal; _ } -> Boolean.not less_or_equal)
+     ; ("gte", fun { less; _ } -> Boolean.not less)
+     ] ;
+   let open Field.Assert in
+   List.iter ~f:cmp_method
+     [ ("assertLt", lt)
+     ; ("assertLte", lte)
+     ; ("assertGt", gt)
+     ; ("assertGte", gte)
+     ]) ;
+  method_ "assertEquals" (fun this (y : As_field.t) : unit ->
       Field.Assert.equal this##.value (As_field.value y)) ;
-  add_method "assertBoolean" (fun this : unit ->
+  method_ "assertBoolean" (fun this : unit ->
       assert_ (Constraint.boolean this##.value)) ;
-  add_method "isZero" (fun this : bool_class Js.t ->
+  method_ "isZero" (fun this : bool_class Js.t ->
       new%js bool_constr
         (As_bool.of_boolean (Field.equal this##.value Field.zero))) ;
-  (* TODO: toBool *)
-  add_method "unpack" (fun this : bool_class Js.t Js.js_array Js.t ->
+  method_ "toBits" (fun this : bool_class Js.t Js.js_array Js.t ->
       let arr = new%js Js.array_empty in
       List.iter
-        (Field.unpack ~length:Field.size_in_bits this##.value)
+        (Field.choose_preimage_var ~length:Field.size_in_bits this##.value)
         ~f:(fun x ->
           arr##push (new%js bool_constr (As_bool.of_boolean x)) |> ignore) ;
       arr) ;
-  add_method "equals" (fun this (y : As_field.t) : bool_class Js.t ->
+  method_ "equals" (fun this (y : As_field.t) : bool_class Js.t ->
       new%js bool_constr
         (As_bool.of_boolean (Field.equal this##.value (As_field.value y)))) ;
-  let add_static_op1 name (f : Field.t -> Field.t) =
+  let static_op1 name (f : Field.t -> Field.t) =
     Js.Unsafe.set field_class (Js.string name)
       (Js.wrap_callback (fun (x : As_field.t) : field_class Js.t ->
            mk (f (As_field.value x))))
   in
-  let add_static_op2 name (f : Field.t -> Field.t -> Field.t) =
+  let static_op2 name (f : Field.t -> Field.t -> Field.t) =
     Js.Unsafe.set field_class (Js.string name)
       (Js.wrap_callback
          (fun (x : As_field.t) (y : As_field.t) : field_class Js.t ->
@@ -193,14 +279,14 @@ let () =
   field_class##.random :=
     Js.wrap_callback (fun () : field_class Js.t ->
         mk (Field.constant (Field.Constant.random ()))) ;
-  add_static_op2 "add" Field.add ;
-  add_static_op2 "sub" sub ;
-  add_static_op2 "mul" Field.mul ;
-  add_static_op2 "div" div ;
-  add_static_op1 "neg" Field.negate ;
-  add_static_op1 "inv" Field.inv ;
-  add_static_op1 "square" Field.square ;
-  add_static_op1 "sqrt" sqrt ;
+  static_op2 "add" Field.add ;
+  static_op2 "sub" sub ;
+  static_op2 "mul" Field.mul ;
+  static_op2 "div" div ;
+  static_op1 "neg" Field.negate ;
+  static_op1 "inv" Field.inv ;
+  static_op1 "square" Field.square ;
+  static_op1 "sqrt" sqrt ;
   field_class##.toString :=
     Js.wrap_callback (fun (x : As_field.t) : Js.js_string Js.t ->
         to_string (As_field.value x)) ;
@@ -208,14 +294,11 @@ let () =
   field_class##.toFieldElements
   := Js.wrap_callback
        (fun (x : As_field.t) : field_class Js.t Js.js_array Js.t ->
-         (* TODO: Don't allocate a new object if it's already a field_class object, rather than calling mk. *)
-         singleton_array (mk (As_field.value x))) ;
+         singleton_array (As_field.to_field_obj x)) ;
   field_class##.ofFieldElements
   := Js.wrap_callback
        (fun (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t ->
-         if xs##.length = 1 then
-           Js.Optdef.get (Js.array_get xs 0) (fun () -> assert false)
-         else failwith "Expected array of length 1") ;
+         array_check_length xs 1 ; array_get_exn xs 0) ;
   field_class##.assertEqual :=
     Js.wrap_callback (fun (x : As_field.t) (y : As_field.t) : unit ->
         Field.Assert.equal (As_field.value x) (As_field.value y)) ;
@@ -226,7 +309,7 @@ let () =
     Js.wrap_callback (fun (x : As_field.t) : bool_class Js.t ->
         new%js bool_constr
           (As_bool.of_boolean (Field.equal (As_field.value x) Field.zero))) ;
-  field_class##.pack :=
+  field_class##.ofBits :=
     Js.wrap_callback
       (fun (bs : As_bool.t Js.js_array Js.t) : field_class Js.t ->
         mk
@@ -235,15 +318,10 @@ let () =
                   Js.Optdef.case (Js.array_get bs i)
                     (fun () -> assert false)
                     As_bool.value)))) ;
-  field_class##.unpack :=
+  field_class##.toBits :=
     Js.wrap_callback (fun (x : As_field.t) : bool_class Js.t Js.js_array Js.t ->
-        let arr = new%js Js.array_empty in
-        List.iter
-          (Field.unpack ~length:Field.size_in_bits (As_field.value x))
-          ~f:(fun b ->
-            arr##push (new%js bool_constr (As_bool.of_boolean b)) |> ignore) ;
-        arr) ;
-  field_class##.equals :=
+        (As_field.to_field_obj x)##toBits) ;
+  field_class##.equal :=
     Js.wrap_callback (fun (x : As_field.t) (y : As_field.t) : bool_class Js.t ->
         new%js bool_constr
           (As_bool.of_boolean
@@ -262,45 +340,50 @@ let () =
         Boolean.var_of_value (Field.Constant.equal x y))
   in
   let mk x : bool_class Js.t = new%js bool_constr (As_bool.of_boolean x) in
-  let add_method name (f : bool_class Js.t -> _) =
-    let prototype = Js.Unsafe.get bool_class (Js.string "prototype") in
-    Js.Unsafe.set prototype (Js.string name) (Js.wrap_meth_callback f)
-  in
+  let method_ name (f : bool_class Js.t -> _) = method_ bool_class name f in
   let add_op1 name (f : Boolean.var -> Boolean.var) =
-    add_method name (fun this : bool_class Js.t -> mk (f this##.value))
+    method_ name (fun this : bool_class Js.t -> mk (f this##.value))
   in
   let add_op2 name (f : Boolean.var -> Boolean.var -> Boolean.var) =
-    add_method name (fun this (y : As_bool.t) : bool_class Js.t ->
+    method_ name (fun this (y : As_bool.t) : bool_class Js.t ->
         mk (f this##.value (As_bool.value y)))
   in
-  add_method "toField" (fun this : field_class Js.t ->
+  method_ "toField" (fun this : field_class Js.t ->
       new%js field_constr (As_field.of_field (this##.value :> Field.t))) ;
   add_op1 "not" Boolean.not ;
   add_op2 "and" Boolean.( &&& ) ;
   add_op2 "or" Boolean.( ||| ) ;
-  add_method "assertEqual" (fun this (y : As_bool.t) : unit ->
+  method_ "assertEquals" (fun this (y : As_bool.t) : unit ->
       Boolean.Assert.( = ) this##.value (As_bool.value y)) ;
   add_op2 "equals" equal ;
   add_op1 "isTrue" Fn.id ;
   add_op1 "isFalse" Boolean.not ;
-  add_method "sizeInFieldElements" (fun _this : int -> 1) ;
-  add_method "toFieldElements" (fun this : field_class Js.t Js.js_array Js.t ->
+  method_ "sizeInFieldElements" (fun _this : int -> 1) ;
+  method_ "toString" (fun this ->
+      let x =
+        match (this##.value :> Field.t) with
+        | Constant x ->
+            x
+        | x ->
+            As_prover.read_var x
+      in
+      if Field.Constant.(equal one) x then "true" else "false") ;
+  method_ "toFieldElements" (fun this : field_class Js.t Js.js_array Js.t ->
       let arr = new%js Js.array_empty in
       arr##push this##toField |> ignore ;
       arr) ;
-  let add_static_method name f =
+  let static_method name f =
     Js.Unsafe.set bool_class (Js.string name) (Js.wrap_callback f)
   in
-  let add_static_op1 name (f : Boolean.var -> Boolean.var) =
-    add_static_method name (fun (x : As_bool.t) : bool_class Js.t ->
+  let static_op1 name (f : Boolean.var -> Boolean.var) =
+    static_method name (fun (x : As_bool.t) : bool_class Js.t ->
         mk (f (As_bool.value x)))
   in
-  let add_static_op2 name (f : Boolean.var -> Boolean.var -> Boolean.var) =
-    add_static_method name
-      (fun (x : As_bool.t) (y : As_bool.t) : bool_class Js.t ->
+  let static_op2 name (f : Boolean.var -> Boolean.var -> Boolean.var) =
+    static_method name (fun (x : As_bool.t) (y : As_bool.t) : bool_class Js.t ->
         mk (f (As_bool.value x) (As_bool.value y)))
   in
-  add_static_method "toField" (fun (x : As_bool.t) ->
+  static_method "toField" (fun (x : As_bool.t) ->
       new%js field_constr (As_field.of_field (As_bool.value x :> Field.t))) ;
   Js.Unsafe.set bool_class (Js.string "Unsafe")
     (object%js
@@ -308,15 +391,15 @@ let () =
          new%js bool_constr
            (As_bool.of_boolean (Boolean.Unsafe.of_cvar (As_field.value x)))
     end) ;
-  add_static_op1 "not" Boolean.not ;
-  add_static_op2 "and" Boolean.( &&& ) ;
-  add_static_op2 "or" Boolean.( ||| ) ;
-  add_static_method "assertEqual" (fun (x : As_bool.t) (y : As_bool.t) : unit ->
+  static_op1 "not" Boolean.not ;
+  static_op2 "and" Boolean.( &&& ) ;
+  static_op2 "or" Boolean.( ||| ) ;
+  static_method "assertEqual" (fun (x : As_bool.t) (y : As_bool.t) : unit ->
       Boolean.Assert.( = ) (As_bool.value x) (As_bool.value y)) ;
-  add_static_op2 "equals" equal ;
-  add_static_op1 "isTrue" Fn.id ;
-  add_static_op1 "isFalse" Boolean.not ;
-  add_static_method "count"
+  static_op2 "equal" equal ;
+  static_op1 "isTrue" Fn.id ;
+  static_op1 "isFalse" Boolean.not ;
+  static_method "count"
     (fun (bs : As_bool.t Js.js_array Js.t) : field_class Js.t ->
       new%js field_constr
         (As_field.of_field
@@ -326,19 +409,625 @@ let () =
                        (fun () -> assert false)
                        As_bool.value
                      :> Field.t )))))) ;
-  add_static_method "sizeInFieldElements" (fun () : int -> 1) ;
-  add_static_method "toFieldElements"
+  static_method "sizeInFieldElements" (fun () : int -> 1) ;
+  static_method "toFieldElements"
     (fun (x : As_bool.t) : field_class Js.t Js.js_array Js.t ->
       singleton_array
         (new%js field_constr (As_field.of_field (As_bool.value x :> Field.t)))) ;
-  add_static_method "ofFieldElements"
+  static_method "ofFieldElements"
     (fun (xs : field_class Js.t Js.js_array Js.t) : bool_class Js.t ->
       if xs##.length = 1 then
         Js.Optdef.case (Js.array_get xs 0)
           (fun () -> assert false)
           (fun x -> mk (Boolean.Unsafe.of_cvar x##.value))
-      else failwith "Expected array of length 1")
+      else failwith "Expected array of length 1") ;
+  static_method "check" (fun (x : bool_class Js.t) : unit ->
+      assert_ (Constraint.boolean (x##.value :> Field.t)))
 
-let () = Js.export "Field" field_class
+type coords = < x : As_field.t Js.prop ; y : As_field.t Js.prop > Js.t
 
-let () = Js.export "Bool" bool_class
+let group_class : < .. > Js.t =
+  let f =
+    Js.Unsafe.eval_string
+      {js|
+      (function(toFieldObj) {
+        return function() {
+          var err = 'Group constructor expects either 2 arguments (x, y) or a single argument object { x, y }';
+          if (arguments.length == 1) {
+            var t = arguments[0];
+            if (t.x === undefined || t.y === undefined) {
+              throw (Error(err));
+            } else {
+              this.x = toFieldObj(t.x);
+              this.y = toFieldObj(t.y);
+            }
+          } else if (arguments.length == 2) {
+            this.x = toFieldObj(arguments[0]);
+            this.y = toFieldObj(arguments[1]);
+          } else {
+            throw (Error(err));
+          }
+          return this;
+        }
+      })
+      |js}
+  in
+  Js.Unsafe.fun_call f
+    [| Js.Unsafe.inject (Js.wrap_callback As_field.to_field_obj) |]
+
+class type scalar_class =
+  object
+    method value : Boolean.var array Js.prop
+  end
+
+class type endo_scalar_class =
+  object
+    method value : Boolean.var list Js.prop
+  end
+
+module As_group = struct
+  (* { x: as_field, y : as_field } | group_class *)
+  type t
+
+  class type group_class =
+    object
+      method x : field_class Js.t Js.prop
+
+      method y : field_class Js.t Js.prop
+
+      method add : group_class Js.t -> group_class Js.t Js.meth
+
+      method add_ : t -> group_class Js.t Js.meth
+
+      method sub_ : t -> group_class Js.t Js.meth
+
+      method neg : group_class Js.t Js.meth
+
+      method scale : scalar_class Js.t -> group_class Js.t Js.meth
+
+      method endoScale : endo_scalar_class Js.t -> group_class Js.t Js.meth
+
+      method assertEquals : t -> unit Js.meth
+
+      method equals : t -> bool_class Js.t Js.meth
+    end
+
+  let group_constr : (As_field.t -> As_field.t -> group_class Js.t) Js.constr =
+    Obj.magic group_class
+
+  let to_coords (t : t) : coords = Obj.magic t
+
+  let value (t : t) =
+    let t = to_coords t in
+    (As_field.value t##.x, As_field.value t##.y)
+
+  let of_group_obj (t : group_class Js.t) : t = Obj.magic t
+
+  let to_group_obj (t : t) : group_class Js.t =
+    if Js.instanceof (Obj.magic t) group_constr then Obj.magic t
+    else
+      let t = to_coords t in
+      new%js group_constr t##.x t##.y
+end
+
+class type group_class = As_group.group_class
+
+let group_constr = As_group.group_constr
+
+let scalar_class : < .. > Js.t =
+  Js.wrap_meth_callback
+    (fun (this : scalar_class Js.t) (value : Boolean.var array) ->
+      this##.value := value ;
+      this)
+  |> Obj.magic
+
+let scalar_constr : (Boolean.var array -> scalar_class Js.t) Js.constr =
+  Obj.magic scalar_class
+
+let () =
+  let num_bits = Field.size_in_bits in
+  let method_ name (f : scalar_class Js.t -> _) = method_ scalar_class name f in
+  let static_method name f =
+    Js.Unsafe.set scalar_class (Js.string name) (Js.wrap_callback f)
+  in
+
+  (* It is not necessary to boolean constrain the bits of a scalar for the following
+     reasons:
+
+     The only type-safe functions which can be called with a scalar value are
+
+     - if
+     - assertEqual
+     - equal
+     - Group.scale
+
+     The only one of these whose behavior depends on the bit values of the input scalars
+     is Group.scale, and that function boolean constrains the scalar input itself.
+  *)
+  method_ "toFieldElements" (fun x : field_class Js.t Js.js_array Js.t ->
+      Array.map x##.value ~f:(fun b ->
+          new%js field_constr (As_field.of_field (b :> Field.t)))
+      |> Js.array) ;
+  static_method "toFieldElements"
+    (fun (x : scalar_class Js.t) : field_class Js.t Js.js_array Js.t ->
+      (Js.Unsafe.coerce x)##toFieldElements) ;
+  static_method "sizeInFieldElements" (fun () : int -> num_bits) ;
+  static_method "ofFieldElements"
+    (fun (xs : field_class Js.t Js.js_array Js.t) : scalar_class Js.t ->
+      new%js scalar_constr
+        (Array.map (Js.to_array xs) ~f:(fun x ->
+             Boolean.Unsafe.of_cvar x##.value))) ;
+  static_method "ofBits"
+    (fun (bits : bool_class Js.t Js.js_array Js.t) : scalar_class Js.t ->
+      new%js scalar_constr
+        (Array.map (Js.to_array bits) ~f:(fun b ->
+             As_bool.(value (of_bool_obj b)))))
+
+let () =
+  let mk (x, y) : group_class Js.t =
+    new%js group_constr (As_field.of_field x) (As_field.of_field y)
+  in
+  let method_ name (f : group_class Js.t -> _) = method_ group_class name f in
+  let static name x = Js.Unsafe.set group_class (Js.string name) x in
+  let static_method name f = static name (Js.wrap_callback f) in
+  method_ "add"
+    (fun (p1 : group_class Js.t) (p2 : As_group.t) : group_class Js.t ->
+      let p1, p2 =
+        (As_group.value (As_group.of_group_obj p1), As_group.value p2)
+      in
+      let open Pickles_base.Step_main_inputs in
+      match (p1, p2) with
+      | (Constant x1, Constant y1), (Constant x2, Constant y2) ->
+          let x, y = Inner_curve.Constant.( + ) (x1, y1) (x2, y2) in
+          mk Field.(constant x, constant y)
+      | _ ->
+          (* TODO: Make this handle the edge cases *)
+          Ops.add_fast p1 p2 |> mk) ;
+  method_ "neg" (fun (p1 : group_class Js.t) : group_class Js.t ->
+      Pickles_base.Step_main_inputs.Inner_curve.negate
+        (As_group.value (As_group.of_group_obj p1))
+      |> mk) ;
+  method_ "sub"
+    (fun (p1 : group_class Js.t) (p2 : As_group.t) : group_class Js.t ->
+      p1##add (As_group.to_group_obj p2)##neg) ;
+  method_ "scale"
+    (fun (p1 : group_class Js.t) (s : scalar_class Js.t) : group_class Js.t ->
+      Pickles_base.Step_main_inputs.Ops.scale_fast
+        (As_group.value (As_group.of_group_obj p1))
+        (`Plus_two_to_len s##.value)
+      |> mk) ;
+  method_ "endoScale"
+    (fun (p1 : group_class Js.t) (s : endo_scalar_class Js.t) : group_class Js.t
+    ->
+      Sc.endo
+        (As_group.value (As_group.of_group_obj p1))
+        (Scalar_challenge s##.value)
+      |> mk) ;
+  method_ "assertEquals"
+    (fun (p1 : group_class Js.t) (p2 : As_group.t) : unit ->
+      let x1, y1 = As_group.value (As_group.of_group_obj p1) in
+      let x2, y2 = As_group.value p2 in
+      Field.Assert.equal x1 x2 ; Field.Assert.equal y1 y2) ;
+  method_ "equals"
+    (fun (p1 : group_class Js.t) (p2 : As_group.t) : bool_class Js.t ->
+      let x1, y1 = As_group.value (As_group.of_group_obj p1) in
+      let x2, y2 = As_group.value p2 in
+      new%js bool_constr
+        (As_bool.of_boolean
+           (Boolean.all [ Field.equal x1 x2; Field.equal y1 y2 ]))) ;
+  static "generator"
+    (mk Pickles_base.Step_main_inputs.Inner_curve.one : group_class Js.t) ;
+  static_method "add"
+    (fun (p1 : As_group.t) (p2 : As_group.t) : group_class Js.t ->
+      (As_group.to_group_obj p1)##add_ p2) ;
+  static_method "sub"
+    (fun (p1 : As_group.t) (p2 : As_group.t) : group_class Js.t ->
+      (As_group.to_group_obj p1)##sub_ p2) ;
+  static_method "sub"
+    (fun (p1 : As_group.t) (p2 : As_group.t) : group_class Js.t ->
+      (As_group.to_group_obj p1)##sub_ p2) ;
+  static_method "neg" (fun (p1 : As_group.t) : group_class Js.t ->
+      (As_group.to_group_obj p1)##neg) ;
+  static_method "scale"
+    (fun (p1 : As_group.t) (s : scalar_class Js.t) : group_class Js.t ->
+      (As_group.to_group_obj p1)##scale s) ;
+  static_method "assertEqual" (fun (p1 : As_group.t) (p2 : As_group.t) : unit ->
+      (As_group.to_group_obj p1)##assertEquals p2) ;
+  static_method "equal"
+    (fun (p1 : As_group.t) (p2 : As_group.t) : bool_class Js.t ->
+      (As_group.to_group_obj p1)##equals p2) ;
+  static_method "toFieldElements"
+    (fun (p1 : group_class Js.t) : field_class Js.t Js.js_array Js.t ->
+      let arr = singleton_array p1##.x in
+      arr##push p1##.y |> ignore ;
+      arr) ;
+  static_method "ofFieldElements"
+    (fun (xs : field_class Js.t Js.js_array Js.t) ->
+      array_check_length xs 2 ;
+      new%js group_constr
+        (As_field.of_field_obj (array_get_exn xs 0))
+        (As_field.of_field_obj (array_get_exn xs 1))) ;
+  static_method "sizeInFieldElements" (fun () : int -> 2) ;
+  static_method "check" (fun (p : group_class Js.t) : unit ->
+      let open Pickles_base.Step_main_inputs in
+      Inner_curve.assert_on_curve
+        Field.((p##.x##.value :> t), (p##.y##.value :> t)))
+
+let poseidon =
+  object%js
+    method hash (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t =
+      let open Pickles_base.Step_main_inputs in
+      let s = Sponge.create sponge_params in
+      for i = 0 to xs##.length - 1 do
+        Sponge.absorb s (`Field (array_get_exn xs i)##.value)
+      done ;
+      new%js field_constr (As_field.of_field (Sponge.squeeze_field s))
+  end
+
+class type ['a] as_field_elements =
+  object
+    method toFieldElements : 'a -> field_class Js.t Js.js_array Js.t Js.meth
+
+    method ofFieldElements : field_class Js.t Js.js_array Js.t -> 'a Js.meth
+
+    method sizeInFieldElements : int Js.meth
+  end
+
+module Circuit = struct
+  let check_lengths s t1 t2 =
+    if t1##.length <> t2##.length then
+      raise_errorf "%s: Got mismatched lengths, %d != %d" s t1##.length
+        t2##.length
+    else ()
+
+  let wrap name ~pre_args ~post_args ~explicit ~implicit =
+    let total_implicit = pre_args + post_args in
+    let total_explicit = 1 + total_implicit in
+    let wrapped =
+      let err =
+        if pre_args > 0 then
+          sprintf
+            "%s: Must be called with %d arguments, or, if passing constructor \
+             explicitly, with %d arguments, followed by the constructor, \
+             followed by %d arguments"
+            name total_implicit pre_args post_args
+        else
+          sprintf
+            "%s: Must be called with %d arguments, or, if passing constructor \
+             explicitly, with the constructor as the first argument, followed \
+             by %d arguments"
+            name total_implicit post_args
+      in
+      ksprintf Js.Unsafe.eval_string
+        {js|
+        (function(explicit, implicit) {
+          return function() {
+            var err = '%s';
+            if (arguments.length === %d) {
+              return explicit.apply(this, arguments);
+            } else if (arguments.length === %d) {
+              return implicit.apply(this, arguments);
+            } else {
+              throw (Error(err));
+            }
+          }
+        } )
+      |js}
+        err total_explicit total_implicit
+    in
+    Js.Unsafe.(
+      fun_call wrapped
+        [| inject (Js.wrap_callback explicit)
+         ; inject (Js.wrap_callback implicit)
+        |])
+
+  let array_iter t1 ~f =
+    for i = 0 to t1##.length - 1 do
+      f (array_get_exn t1 i)
+    done
+
+  let array_iter2 t1 t2 ~f =
+    for i = 0 to t1##.length - 1 do
+      f (array_get_exn t1 i) (array_get_exn t2 i)
+    done
+
+  let array_map t1 ~f =
+    let res = new%js Js.array_empty in
+    array_iter t1 ~f:(fun x1 -> res##push (f x1) |> ignore) ;
+    res
+
+  let array_map2 t1 t2 ~f =
+    let res = new%js Js.array_empty in
+    array_iter2 t1 t2 ~f:(fun x1 x2 -> res##push (f x1 x2) |> ignore) ;
+    res
+
+  let if_array b t1 t2 =
+    check_lengths "if" t1 t2 ;
+    array_map2 t1 t2 ~f:(fun x1 x2 ->
+        new%js field_constr
+          (As_field.of_field (Field.if_ b ~then_:x1##.value ~else_:x2##.value)))
+
+  let js_equal (type b) (x : b) (y : b) : bool =
+    let f = Js.Unsafe.eval_string "(function(x, y) { return x === y; })" in
+    Js.to_bool Js.Unsafe.(fun_call f [| inject x; inject y |])
+
+  let keys (type a) (a : a) : Js.js_string Js.t Js.js_array Js.t =
+    Js.Unsafe.global ##. Object##keys a
+
+  let check_type name t =
+    let t = Js.to_string t in
+    let ok =
+      match t with
+      | "object" ->
+          true
+      | "function" ->
+          false
+      | "number" ->
+          false
+      | "boolean" ->
+          false
+      | "string" ->
+          false
+      | _ ->
+          false
+    in
+    if ok then ()
+    else raise_errorf "Type \"%s\" cannot be used with function \"%s\"" t name
+
+  let rec to_field_elts_magic :
+      type a. a Js.t -> field_class Js.t Js.js_array Js.t =
+    fun (type a) (t1 : a Js.t) : field_class Js.t Js.js_array Js.t ->
+     let t1_is_array = Js.Unsafe.global ##. Array##isArray t1 in
+     check_type "toFieldElements" (Js.typeof t1) ;
+     match t1_is_array with
+     | true ->
+         let arr = array_map (Obj.magic t1) ~f:to_field_elts_magic in
+         (Obj.magic arr)##flat
+     | false -> (
+         let ctor1 : _ Js.Optdef.t = (Obj.magic t1)##.constructor in
+         let has_methods ctor =
+           let has s = Js.to_bool (ctor##hasOwnProperty (Js.string s)) in
+           has "toFieldElements" && has "ofFieldElements"
+         in
+         match Js.Optdef.(to_option ctor1) with
+         | Some ctor1 when has_methods ctor1 ->
+             ctor1##toFieldElements t1
+         | Some _ ->
+             let arr =
+               array_map
+                 (keys t1)##sort_asStrings
+                 ~f:(fun k -> to_field_elts_magic (Js.Unsafe.get t1 k))
+             in
+             (Obj.magic arr)##flat
+         | None ->
+             raise_errorf
+               "toFieldElements: Argument did not have a constructor." )
+
+  let assert_equal =
+    let f t1 t2 =
+      (* TODO: Have better error handling here that throws at proving time
+         for the specific position where they differ. *)
+      check_lengths "assertEqual" t1 t2 ;
+      for i = 0 to t1##.length - 1 do
+        Field.Assert.equal
+          (array_get_exn t1 i)##.value
+          (array_get_exn t2 i)##.value
+      done
+    in
+    let implicit
+        (t1 :
+          < toFieldElements : field_class Js.t Js.js_array Js.t Js.meth > Js.t
+          as
+          'a) (t2 : 'a) : unit =
+      f (to_field_elts_magic t1) (to_field_elts_magic t2)
+    in
+    let explicit
+        (ctor :
+          < toFieldElements : 'a -> field_class Js.t Js.js_array Js.t Js.meth >
+          Js.t) (t1 : 'a) (t2 : 'a) : unit =
+      f (ctor##toFieldElements t1) (ctor##toFieldElements t2)
+    in
+    wrap "assertEqual" ~pre_args:0 ~post_args:2 ~explicit ~implicit
+
+  let equal =
+    let f t1 t2 =
+      check_lengths "equal" t1 t2 ;
+      (* TODO: Have better error handling here that throws at proving time
+         for the specific position where they differ. *)
+      new%js bool_constr
+        ( Boolean.Array.all
+            (Array.init t1##.length ~f:(fun i ->
+                 Field.equal
+                   (array_get_exn t1 i)##.value
+                   (array_get_exn t2 i)##.value))
+        |> As_bool.of_boolean )
+    in
+    let _implicit
+        (t1 :
+          < toFieldElements : field_class Js.t Js.js_array Js.t Js.meth > Js.t
+          as
+          'a) (t2 : 'a) : bool_class Js.t =
+      f t1##toFieldElements t2##toFieldElements
+    in
+    let implicit t1 t2 = f (to_field_elts_magic t1) (to_field_elts_magic t2) in
+    let explicit
+        (ctor :
+          < toFieldElements : 'a -> field_class Js.t Js.js_array Js.t Js.meth >
+          Js.t) (t1 : 'a) (t2 : 'a) : bool_class Js.t =
+      f (ctor##toFieldElements t1) (ctor##toFieldElements t2)
+    in
+    wrap "equal" ~pre_args:0 ~post_args:2 ~explicit ~implicit
+
+  let if_explicit (type a) (b : As_bool.t) (ctor : a as_field_elements Js.t)
+      (x1 : a) (x2 : a) =
+    let b = As_bool.value b in
+    match (b :> Field.t) with
+    | Constant b ->
+        if Field.Constant.(equal one b) then x1 else x2
+    | _ ->
+        let t1 = ctor##toFieldElements x1 in
+        let t2 = ctor##toFieldElements x2 in
+        let arr = if_array b t1 t2 in
+        ctor##ofFieldElements arr
+
+  let rec if_magic : type a. As_bool.t -> a Js.t -> a Js.t -> a Js.t =
+    fun (type a) (b : As_bool.t) (t1 : a Js.t) (t2 : a Js.t) : a Js.t ->
+     check_type "if" (Js.typeof t1) ;
+     check_type "if" (Js.typeof t2) ;
+     let t1_is_array = Js.Unsafe.global ##. Array##isArray t1 in
+     let t2_is_array = Js.Unsafe.global ##. Array##isArray t2 in
+     match (t1_is_array, t2_is_array) with
+     | false, true | true, false ->
+         raise_errorf "if: Mismatched argument types"
+     | true, true ->
+         array_map2 (Obj.magic t1) (Obj.magic t2) ~f:(fun x1 x2 ->
+             if_magic b x1 x2)
+         |> Obj.magic
+     | false, false -> (
+         let ctor1 : _ Js.Optdef.t = (Obj.magic t1)##.constructor in
+         let ctor2 : _ Js.Optdef.t = (Obj.magic t2)##.constructor in
+         let has_methods ctor =
+           let has s = Js.to_bool (ctor##hasOwnProperty (Js.string s)) in
+           has "toFieldElements" && has "ofFieldElements"
+         in
+         if not (js_equal ctor1 ctor2) then
+           raise_errorf "if: Mismatched argument types" ;
+         match Js.Optdef.(to_option ctor1, to_option ctor2) with
+         | Some ctor1, Some _ when has_methods ctor1 ->
+             if_explicit b ctor1 t1 t2
+         | Some ctor1, Some _ ->
+             (* Try to match them as generic objects *)
+             let ks1 = (keys t1)##sort_asStrings in
+             let ks2 = (keys t2)##sort_asStrings in
+             check_lengths
+               (sprintf "if (%s vs %s)"
+                  (Js.to_string (ks1##join (Js.string ", ")))
+                  (Js.to_string (ks2##join (Js.string ", "))))
+               ks1 ks2 ;
+             array_iter2 ks1 ks2 ~f:(fun k1 k2 ->
+                 if not (js_equal k1 k2) then
+                   raise_errorf "if: Arguments had mismatched types") ;
+             let result = new%js ctor1 in
+             array_iter ks1 ~f:(fun k ->
+                 Js.Unsafe.set result k
+                   (if_magic b (Js.Unsafe.get t1 k) (Js.Unsafe.get t2 k))) ;
+             Obj.magic result
+         | Some _, None | None, Some _ ->
+             assert false
+         | None, None ->
+             raise_errorf "if: Arguments did not have a constructor." )
+
+  let if_ =
+    wrap "if" ~pre_args:1 ~post_args:2 ~explicit:if_explicit ~implicit:if_magic
+
+  let typ_ (type a) (typ : a as_field_elements Js.t) : (a, a) Typ.t =
+    let to_array conv a =
+      Js.to_array (typ##toFieldElements a)
+      |> Array.map ~f:(fun x -> conv x##.value)
+    in
+    let of_array conv xs =
+      typ##ofFieldElements
+        (Js.array
+           (Array.map xs ~f:(fun x ->
+                new%js field_constr (As_field.of_field (conv x)))))
+    in
+    Typ.transport
+      (Typ.array ~length:typ##sizeInFieldElements Field.typ)
+      ~there:(to_array (fun x -> Option.value_exn (Field.to_constant x)))
+      ~back:(of_array Field.constant)
+    |> Typ.transport_var ~there:(to_array Fn.id) ~back:(of_array Fn.id)
+
+  let witness (type a) (typ : a as_field_elements Js.t)
+      (f : (unit -> a) Js.callback) : a =
+    let a =
+      exists (typ_ typ) ~compute:(fun () : a -> Js.Unsafe.fun_call f [||])
+    in
+    if Js.Optdef.test (Js.Unsafe.coerce typ)##.check then
+      (Js.Unsafe.coerce typ)##check a ;
+    a
+
+  module Circuit_main = struct
+    type ('w, 'p) t =
+      < snarkyMain : ('w -> 'p -> unit) Js.callback Js.prop
+      ; snarkyWitnessTyp : 'w as_field_elements Js.t Js.prop
+      ; snarkyPublicTyp : 'p as_field_elements Js.t Js.prop >
+      Js.t
+  end
+
+  let main_and_input (type w p) (c : (w, p) Circuit_main.t) =
+    let main ?(w : w option) (public : p) () =
+      let w : w =
+        witness c##.snarkyWitnessTyp
+          (Js.wrap_callback (fun () -> Option.value_exn w))
+      in
+      Js.Unsafe.(fun_call c##.snarkyMain [| inject w; inject public |])
+    in
+    (main, Data_spec.[ typ_ c##.snarkyPublicTyp ])
+
+  let generate_keypair (type w p) (c : (w, p) Circuit_main.t) : Keypair.t =
+    let main, spec = main_and_input c in
+    generate_keypair ~exposing:spec (fun x -> main x)
+
+  let prove (type w p) (c : (w, p) Circuit_main.t) (priv : w) (pub : p) kp :
+      Backend.Proof.t =
+    let main, spec = main_and_input c in
+    let pk = Keypair.pk kp in
+    generate_witness_conv
+      ~f:(fun { Proof_inputs.auxiliary_inputs; public_inputs } ->
+        Backend.Proof.create pk ~auxiliary:auxiliary_inputs
+          ~primary:public_inputs)
+      spec (main ~w:priv) () pub
+
+  let circuit =
+    object%js
+      method witness (type a) (typ : a as_field_elements Js.t)
+          (f : (unit -> a) Js.callback) : a =
+        witness typ f
+
+      method array (type a) (typ : a as_field_elements Js.t) (length : int)
+          : a Js.js_array Js.t as_field_elements Js.t =
+        let elt_len = typ##sizeInFieldElements in
+        let len = length * elt_len in
+        object%js
+          method sizeInFieldElements = len
+
+          method toFieldElements (xs : a Js.js_array Js.t) =
+            let res = new%js Js.array_empty in
+            for i = 0 to xs##.length - 1 do
+              let x = typ##toFieldElements (array_get_exn xs i) in
+              for j = 0 to x##.length - 1 do
+                res##push (array_get_exn x j) |> ignore
+              done
+            done ;
+            res
+
+          method ofFieldElements (xs : field_class Js.t Js.js_array Js.t) =
+            let res = new%js Js.array_empty in
+            for i = 0 to length - 1 do
+              let a = new%js Js.array_empty in
+              let offset = i * elt_len in
+              for j = 0 to elt_len - 1 do
+                a##push (array_get_exn xs (offset + j)) |> ignore
+              done ;
+              res##push (typ##ofFieldElements a) |> ignore
+            done ;
+            res
+        end
+    end
+    |> Js.Unsafe.coerce
+
+  let () =
+    circuit##.generateKeypair := Js.wrap_callback generate_keypair ;
+    circuit##.prove := Js.wrap_callback prove ;
+    circuit##.assertEqual := assert_equal ;
+    circuit##.equal := equal ;
+    Js.Unsafe.set circuit (Js.string "if") if_
+end
+
+let () =
+  Js.export "Field" field_class ;
+  Js.export "Scalar" scalar_class ;
+  Js.export "Bool" bool_class ;
+  Js.export "Group" group_class ;
+  Js.export "Poseidon" poseidon ;
+  Js.export "Circuit" Circuit.circuit

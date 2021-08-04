@@ -2,7 +2,7 @@
  (name snarky_js_bindings)
  (modes js)
  (js_of_ocaml (flags +toplevel.js +dynlink.js))
- (libraries zexe_backend.js marlin_plonk_bindings js_of_ocaml bindings_js node_backend integers_stubs_js)
+ (libraries snarky_curve pickles.base zexe_backend.js marlin_plonk_bindings js_of_ocaml bindings_js node_backend integers_stubs_js)
  (link_deps 
  ../marlin_plonk_bindings/js/node_js/plonk_wasm.js 
  ../marlin_plonk_bindings/js/node_js/plonk_wasm.wasm)
