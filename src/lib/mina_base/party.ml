@@ -139,7 +139,8 @@ module Update = struct
           ~f:Permissions.to_input
       ; Set_or_keep.to_input
           (Set_or_keep.map ~f:Account.hash_snapp_uri snapp_uri)
-          ~dummy:Field.zero ~f:field
+          ~dummy:(Account.hash_snapp_uri_opt None)
+          ~f:field
       ; Set_or_keep.to_input token_symbol ~dummy:Account.Token_symbol.default
           ~f:Account.Token_symbol.to_input
       ]

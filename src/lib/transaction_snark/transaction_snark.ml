@@ -2066,11 +2066,7 @@ module Base = struct
               in
               let h =
                 exists Field.typ ~compute:(fun () ->
-                    match V.get ps with
-                    | [] ->
-                        Parties.Party_or_stack.With_hashes.empty
-                    | party_or_stack :: _ ->
-                        Parties.Party_or_stack.hash party_or_stack)
+                    Parties.Party_or_stack.With_hashes.stack_hash (V.get ps))
               in
               let start_data =
                 { Parties_logic.Start_data.parties = (h, ps)

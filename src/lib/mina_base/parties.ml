@@ -152,9 +152,17 @@ module Party_or_stack = struct
   let hash_cons hash h_tl =
     Random_oracle.hash ~init:Hash_prefix_states.party_cons [| hash; h_tl |]
 
-  let hash = function Party (_, hash) | Stack (_, hash) -> hash
+  let hash ~hash_party = function
+    | Party (party, _) ->
+        hash_party party
+    | Stack (_, hash) ->
+        hash
 
-  let stack_hash = function [] -> empty | x :: _ -> hash x
+  let stack_hash = function
+    | [] ->
+        empty
+    | (Party (_, hash) | Stack (_, hash)) :: _ ->
+        hash
 
   let rec map (x : _ t) ~f =
     match x with
@@ -196,8 +204,9 @@ module Party_or_stack = struct
 
     let empty = empty
 
+    let hash_party ((p : Party.t), _) = Party.Predicated.digest p.data
+
     let accumulate_hashes xs : _ t =
-      let hash_party ((p : Party.t), _) = Party.Predicated.digest p.data in
       accumulate_hashes ~hash_party xs
 
     let of_parties_list xs : _ t =
@@ -210,7 +219,7 @@ module Party_or_stack = struct
 
     let to_parties_with_hashes_list (x : _ t) = to_parties_with_hashes_list x
 
-    let hash = hash
+    let hash x = hash ~hash_party x
 
     let stack_hash = stack_hash
 

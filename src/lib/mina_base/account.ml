@@ -491,6 +491,12 @@ let hash_snapp_account_opt = function
   | Some (a : Snapp_account.t) ->
       Snapp_account.digest a
 
+(* This preimage cannot be attained by any string, due to the trailing [true]
+   added below.
+*)
+let snapp_uri_non_preimage =
+  lazy (Random_oracle_input.field_elements [| Field.zero; Field.zero |])
+
 let hash_snapp_uri_opt (snapp_uri_opt : string option) =
   let input =
     match snapp_uri_opt with
@@ -509,10 +515,7 @@ let hash_snapp_uri_opt (snapp_uri_opt : string option) =
             done) ;
         Random_oracle_input.bitstring (Array.to_list bits)
     | None ->
-        (* This preimage cannot be attained by any string, due to the trailing
-           [true] added above.
-        *)
-        Random_oracle_input.field_elements [| Field.zero; Field.zero |]
+        Lazy.force snapp_uri_non_preimage
   in
   Random_oracle.pack_input input
   |> Random_oracle.hash ~init:Hash_prefix_states.snapp_uri
