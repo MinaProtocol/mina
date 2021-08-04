@@ -1,15 +1,15 @@
-import { Field, Circuit as C } from '../bindings/snarky.js';
+import * as Snarky from '../bindings/snarky.js';
 
 /* @param x an n*m matrix, encoded as x[i][j] for row i column j.
  * @param y an o*n matrix, both encoded as y[i][j] for row i column j.
  * Returns an o*m matrix.
 */
-let matrix_mul = function (n: number, m: number, o: number, x: Field[][], y: Field[][]): Field[][] {
-    var res: Field[][] = [];
+let matrix_mul = function (n: number, m: number, o: number, x: Snarky.Field[][], y: Snarky.Field[][]): Snarky.Field[][] {
+    var res: Snarky.Field[][] = [];
     /* Initialize output matrix */
     for (var i = 0; i < o; i++) {
         for (var j = 0; j < m; j++) {
-            res[i][j] = Field.zero;
+            res[i][j] = Snarky.Field.zero;
         }
     }
     /* Compute the output matrix. */
@@ -23,21 +23,21 @@ let matrix_mul = function (n: number, m: number, o: number, x: Field[][], y: Fie
     return res;
 }
 
-export function circuit(): Field[][] {
+export function circuit(): Snarky.Field[][] {
     let n = 3;
     let m = 4;
     let o = 3;
-    let x = C.witness(C.array(C.array<Field>(Field, m), n), () => {
+    let x = Snarky.Circuit.witness(Snarky.Circuit.array(Snarky.Circuit.array<Snarky.Field>(Snarky.Field, m), n), () => {
         return [
-            [Field.random(), Field.random(), Field.random(), Field.random()],
-            [Field.random(), Field.random(), Field.random(), Field.random()],
-            [Field.random(), Field.random(), Field.random(), Field.random()]]
+            [Snarky.Field.random(), Snarky.Field.random(), Snarky.Field.random(), Snarky.Field.random()],
+            [Snarky.Field.random(), Snarky.Field.random(), Snarky.Field.random(), Snarky.Field.random()],
+            [Snarky.Field.random(), Snarky.Field.random(), Snarky.Field.random(), Snarky.Field.random()]]
     });
-    let y = C.witness(C.array(C.array<Field>(Field, o), m), () => {
+    let y = Snarky.Circuit.witness(Snarky.Circuit.array(Snarky.Circuit.array<Snarky.Field>(Snarky.Field, o), m), () => {
         return [
-            [Field.random(), Field.random(), Field.random(), Field.random()],
-            [Field.random(), Field.random(), Field.random(), Field.random()],
-            [Field.random(), Field.random(), Field.random(), Field.random()]]
+            [Snarky.Field.random(), Snarky.Field.random(), Snarky.Field.random(), Snarky.Field.random()],
+            [Snarky.Field.random(), Snarky.Field.random(), Snarky.Field.random(), Snarky.Field.random()],
+            [Snarky.Field.random(), Snarky.Field.random(), Snarky.Field.random(), Snarky.Field.random()]]
     });
     return matrix_mul(n, m, o, x, y);
 }

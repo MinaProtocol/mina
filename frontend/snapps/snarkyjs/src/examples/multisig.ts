@@ -1,3 +1,4 @@
+/*
 import { Circuit, Field, AsField, toFieldElements, ofFieldElements, sizeInFieldElements, Bool } from './plonk';
 import { poseidon } from './poseidon';
 import { Group, Scalar } from './group';
@@ -67,14 +68,16 @@ class CanReceiveIfYouSudokoSolution extends Snapp {
   }
 }
 
+*/
+
 // TODO: have a JS api for creating inductive proof systems
 
+/*
 class TheApplication {
   @method applyBatchOfUpdates() {
   }
 }
 
-/*
 
 - user generates some data (which may or may not involve creating a proof)
 - sends to server
@@ -85,6 +88,7 @@ class TheApplication {
 users ->HTTP-> application operator -batch proof-> construct snapp transaction and broadcast to chain
 */
 
+/*
 let privateMultisigAccount : PrivateMultisig = ...;
 let sudokuGuardedReceiver : CanReceiveIfYouSudokoSolution = ..;
 
@@ -143,3 +147,5 @@ class PrivateMultisig extends Snapp {
     this.keys = new MerkleCollection(() => keys);
   }
 }
+
+*/

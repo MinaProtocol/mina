@@ -3,6 +3,7 @@
   "include": ["./src", "./types"],
   "compilerOptions": {
     "module": "esnext",
+    "outDir": "dist",
     "lib": ["dom", "esnext"],
     "importHelpers": true,
     // output .d.ts declaration files for consumers
@@ -34,6 +35,7 @@
     "noEmit": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
+    "allowSyntheticDefaultImports": true
   },
-  "exclude": [ "./src/bindings/snarky.js" ]
+  "exclude": ["./src/bindings/snarky.js"]
 }

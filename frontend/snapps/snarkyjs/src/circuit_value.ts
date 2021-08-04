@@ -58,18 +58,17 @@ export function prop(this: any, target: any, key: string) {
   }
 
   if (fieldType === undefined) {
-  } else if (
-    fieldType.toFieldElements &&
-    fieldType.ofFieldElements
-  ) {
+  } else if (fieldType.toFieldElements && fieldType.ofFieldElements) {
     target._fields.push([key, fieldType]);
     target._sizeInFieldElements += fieldType.sizeInFieldElements();
   } else {
-    console.log(`warning: property ${key} missing field element conversion methods`);
+    console.log(
+      `warning: property ${key} missing field element conversion methods`
+    );
   }
 }
 
-export function public_(target: any, _key : string | symbol, index: number) {
+export function public_(target: any, _key: string | symbol, index: number) {
   // const fieldType = Reflect.getMetadata('design:paramtypes', target, key);
 
   if (target._public === undefined) {
@@ -79,51 +78,59 @@ export function public_(target: any, _key : string | symbol, index: number) {
 }
 
 type AsFieldElements<A> = {
-  sizeInFieldElements: () => number,
-  toFieldElements: (x : A) => Array<any>,
-  ofFieldElements: (x : Array<any>) => A
+  sizeInFieldElements: () => number;
+  toFieldElements: (x: A) => Array<any>;
+  ofFieldElements: (x: Array<any>) => A;
 };
 
-function typOfArray(typs: Array<AsFieldElements<any>>) : AsFieldElements<any> {
+function typOfArray(typs: Array<AsFieldElements<any>>): AsFieldElements<any> {
   return {
     sizeInFieldElements: () => {
-      return typs.reduce((acc, typ) => acc + typ.sizeInFieldElements(), 0)
+      return typs.reduce((acc, typ) => acc + typ.sizeInFieldElements(), 0);
     },
 
-    toFieldElements: (t : Array<any>) => {
+    toFieldElements: (t: Array<any>) => {
       let res = [];
       for (let i = 0; i < t.length; ++i) {
-        res.push(... typs[i].toFieldElements(t[i]))
+        res.push(...typs[i].toFieldElements(t[i]));
       }
       return res;
     },
 
     ofFieldElements: (xs: Array<any>) => {
       let offset = 0;
-      let res : Array<any> = [];
+      let res: Array<any> = [];
       typs.forEach((typ) => {
         const n = typ.sizeInFieldElements();
         res.push(typ.ofFieldElements(xs.slice(offset, offset + n)));
         offset += n;
       });
       return res;
-    }
+    },
   };
 }
 
-export function circuitMain(target: any, propertyName: string, _descriptor?: PropertyDescriptor): any {
-  const paramTypes = Reflect.getMetadata('design:paramtypes', target, propertyName)
+export function circuitMain(
+  target: any,
+  propertyName: string,
+  _descriptor?: PropertyDescriptor
+): any {
+  const paramTypes = Reflect.getMetadata(
+    'design:paramtypes',
+    target,
+    propertyName
+  );
   const numArgs = paramTypes.length;
 
-  const publicIndexSet : Set<number> = new Set(target._public);
-  const witnessIndexSet : Set<number> = new Set();
+  const publicIndexSet: Set<number> = new Set(target._public);
+  const witnessIndexSet: Set<number> = new Set();
   for (let i = 0; i < numArgs; ++i) {
-    if (! publicIndexSet.has(i)) {
-      witnessIndexSet.add(i)
+    if (!publicIndexSet.has(i)) {
+      witnessIndexSet.add(i);
     }
   }
 
-  target.snarkyMain = (w : Array<any>, pub: Array<any>) => {
+  target.snarkyMain = (w: Array<any>, pub: Array<any>) => {
     let args = [];
     for (let i = 0; i < numArgs; ++i) {
       args.push((publicIndexSet.has(i) ? pub : w).shift());
@@ -131,6 +138,10 @@ export function circuitMain(target: any, propertyName: string, _descriptor?: Pro
 
     return target[propertyName].apply(target, args);
   };
-  target.snarkyWitnessTyp = typOfArray(Array.from(witnessIndexSet).map(i => paramTypes[i]));
-  target.snarkyPublicTyp = typOfArray(Array.from(publicIndexSet).map(i => paramTypes[i]));
+  target.snarkyWitnessTyp = typOfArray(
+    Array.from(witnessIndexSet).map((i) => paramTypes[i])
+  );
+  target.snarkyPublicTyp = typOfArray(
+    Array.from(publicIndexSet).map((i) => paramTypes[i])
+  );
 }

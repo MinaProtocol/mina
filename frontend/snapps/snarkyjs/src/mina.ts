@@ -1,7 +1,7 @@
 // This is for an account where any of a list of public keys can update the state
 
 import { prop, CircuitValue } from './circuit_value';
-import { Field, Bool } from './bindings/snarky';
+import * as Snarky from './bindings/snarky';
 
 // TODO. Also, don't make user ever talk about distinction b/w compressed and non-compressed keys
 type PublicKey = void;
@@ -53,10 +53,10 @@ const x : SignedBool = new SignedBool_(new Bool(true), new Bool(true));
 console.log(x);
 */
 class Signed<A> extends CircuitValue {
-  @prop sign: Bool;
+  @prop sign: Snarky.Bool;
   @prop magnitude: A;
 
-  constructor(sign: Bool, magnitude: A) {
+  constructor(sign: Snarky.Bool, magnitude: A) {
     super();
     this.sign = sign;
     this.magnitude = magnitude;
@@ -88,7 +88,7 @@ class Predicate extends CircuitValue {}
 
 class Party extends CircuitValue {
   @prop publicKey: PublicKey;
-  @prop state: Array<SetOrKeep<Field>>;
+  @prop state: Array<SetOrKeep<Snarky.Field>>;
   @prop delegate: SetOrKeep<PublicKey>;
   @prop verificationKey: SetOrKeep<VerificationKey>;
   @prop permissions: SetOrKeep<Permissions>;
@@ -98,7 +98,7 @@ class Party extends CircuitValue {
 
   constructor(
     publicKey: PublicKey,
-    state: Array<SetOrKeep<Field>>,
+    state: Array<SetOrKeep<Snarky.Field>>,
     delegate: SetOrKeep<PublicKey>,
     verificationKey: SetOrKeep<VerificationKey>,
     permissions: SetOrKeep<Permissions>,
@@ -127,7 +127,7 @@ class Parties {
 class Transaction {
   parties: Parties = undefined as any;
 
-  commitment(): Field {
+  commitment(): Snarky.Field {
     throw 'unimplemented';
   }
 
@@ -171,16 +171,16 @@ export type Permissions = {
 };
 
 export class StateSlot extends CircuitValue {
-  @prop isSet: Field;
-  @prop value: Field;
+  @prop isSet: Snarky.Field;
+  @prop value: Snarky.Field;
 
-  set(this: this, x: Field) {
+  set(this: this, x: Snarky.Field) {
     (this.isSet as any).fillValue(true);
     (this.value as any).fillValue(() => (x as any)._value());
     (this.value as any).assertEqual(x);
   }
 
-  constructor(isSet: Field, value: Field) {
+  constructor(isSet: Snarky.Field, value: Snarky.Field) {
     super();
     this.isSet = isSet;
     this.value = value;

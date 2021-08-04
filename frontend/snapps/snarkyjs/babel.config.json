@@ -1,11 +1,16 @@
 {
-  "presets": [
-    "@babel/preset-env"
-  ],
-  "plugins": [
-    ["@babel/transform-runtime", {
-      "regenerator": true
-    }]
-  ],
-  "ignore": [ "src/bindings/snarky_raw.js", "src/bindings/snarky.js"]
+  "presets": [["@babel/preset-env", { "modules": "auto" }]],
+  // "plugins": [
+  //   [
+  //     "@babel/transform-runtime",
+  //     {
+  //       "regenerator": true
+  //     }
+  //   ]
+  // ],
+  "ignore": [
+    "src/bindings/snarky_raw.js",
+    "src/bindings/snarky.js",
+    "src/bindings/workerHelpers.no-modules.js"
+  ]
 }
