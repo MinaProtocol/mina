@@ -67,7 +67,8 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
     (let lengths =
        Commitment_lengths.of_domains_vector step_domains
          ~max_degree:Common.Max_degree.step
-       |> Dlog_plonk_types.Evals.map ~f:(Vector.reduce_exn ~f:Core.Int.max)
+       |> Dlog_plonk_types.Evals.map
+            ~f:(Vector.reduce_exn ~f:Core_kernel.Int.max)
      in
      let t =
        Typ.tuple2

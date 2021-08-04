@@ -28,10 +28,7 @@ struct
     p3
 
   let scale_fast t (`Plus_two_to_len scalar) =
-    let ((xt, yt) as t) =
-      with_label __LOC__ (fun () ->
-          Tuple_lib.Double.map ~f:(Util.seal (module Impl)) t)
-    in
+    let ((xt, yt) as t) = seal t in
     let module S = Zexe_backend_common.Scale_round in
     let rec go rows p i =
       if i < 0 then Array.of_list_rev rows
@@ -119,6 +116,6 @@ struct
               G.Constant.scale g x)
             (random_point, xs)
         with e ->
-          Core.eprintf !"Input %{sexp: bool list}\n%!" xs ;
+          Core_kernel.eprintf !"Input %{sexp: bool list}\n%!" xs ;
           raise e)
 end

@@ -53,33 +53,59 @@ struct
   module Field = Field
 
   let block_cipher (params : _ Sponge.Params.t) init =
-    Impl.with_label __LOC__ (fun () ->
-        let init =
-          Array.map2_exn
-            ~f:(fun c x -> Util.seal (module Impl) (c + x))
-            init params.round_constants.(0)
-        in
-        let t =
-          exists
-            (Typ.array
-               ~length:Int.(rounds_full + 1)
-               (Typ.array ~length:3 Field.typ))
-            ~compute:
-              As_prover.(fun () -> round_table (Array.map init ~f:read_var))
-        in
-        t.(0) <- init ;
-        (let open Zexe_backend_common.Plonk_constraint_system.Plonk_constraint in
-        with_label __LOC__ (fun () ->
-            Impl.assert_
-              [ { basic = T (Poseidon { state = t })
-                ; annotation = Some "plonk-poseidon"
-                }
-              ])) ;
-        t.(Int.(Array.length t - 1)))
+    let init_c =
+      with_return (fun { return } ->
+          Some
+            (Array.map2_exn init params.round_constants.(0) ~f:(fun x y ->
+                 match (Field.to_constant x, Field.to_constant y) with
+                 | Some x, Some y ->
+                     Field.Constant.(x + y)
+                 | _ ->
+                     return None)))
+    in
+    match init_c with
+    | Some init_c ->
+        Array.map (round_table init_c).(rounds_full) ~f:Field.constant
+    | None ->
+        Impl.with_label __LOC__ (fun () ->
+            let init =
+              Array.map2_exn
+                ~f:(fun c x -> Util.seal (module Impl) (c + x))
+                init params.round_constants.(0)
+            in
+            let t =
+              exists
+                (Typ.array
+                   ~length:Int.(rounds_full + 1)
+                   (Typ.array ~length:3 Field.typ))
+                ~compute:
+                  As_prover.(fun () -> round_table (Array.map init ~f:read_var))
+            in
+            t.(0) <- init ;
+            (let open Zexe_backend_common.Plonk_constraint_system
+                      .Plonk_constraint in
+            with_label __LOC__ (fun () ->
+                Impl.assert_
+                  [ { basic = T (Poseidon { state = t })
+                    ; annotation = Some "plonk-poseidon"
+                    }
+                  ])) ;
+            t.(Int.(Array.length t - 1)))
 
   (* TODO: experiment with sealing version of this *)
-  let add_assign ~state i x =
-    state.(i) <- Util.seal (module Impl) (state.(i) + x)
+  let add_assign ~(state : Field.t array) i (x : Field.t) =
+    let s' =
+      match (state.(i), x) with
+      | Constant s, Constant x ->
+          Field.(constant Constant.(s + x))
+      | Constant s, x when Field.Constant.(equal zero) s ->
+          x
+      | s, Constant x when Field.Constant.(equal zero) x ->
+          s
+      | _ ->
+          Util.seal (module Impl) (state.(i) + x)
+    in
+    state.(i) <- s'
 
   let copy = Array.copy
 end

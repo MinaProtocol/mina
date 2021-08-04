@@ -2,6 +2,26 @@ open Core_kernel
 open Pickles_types
 module Sponge_lib = Sponge
 
+module type Field_intf = sig
+  type t
+
+  val size_in_bits : int
+
+  val one : t
+
+  val of_int : int -> t
+
+  val ( * ) : t -> t -> t
+
+  val ( / ) : t -> t -> t
+
+  val ( + ) : t -> t -> t
+
+  val ( - ) : t -> t -> t
+
+  val negate : t -> t
+end
+
 module Snarkable = struct
   module type S1 = sig
     type _ t
@@ -154,7 +174,7 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
       val negate : t -> t
 
       module Scalar : sig
-        include Plonk_checks.Field_intf
+        include Field_intf
 
         include Sexpable.S with type t := t
 
@@ -201,7 +221,7 @@ module Sponge (Impl : Snarky_backendless.Snark_intf.Run) = struct
   open Impl
 
   module type S =
-    Sponge.Intf.Sponge
+    Sponge_lib.Intf.Sponge
       with module Field := Field
        and module State := Sponge.State
        and type input := Field.t
@@ -233,7 +253,7 @@ module type Inputs_base = sig
 
     val of_bigint : Impl.Bigint.t -> t
 
-    val size : Import.B.t
+    val size : Bigint.t
 
     val size_in_bits : int
 
@@ -295,6 +315,7 @@ module type Statement = sig
 end
 
 module type Statement_var =
-  Statement with type field := Backend.Tick.Field.t Snarky_backendless.Cvar.t
+  Statement with type field := Zexe_backend.Pasta.Fp.t Snarky_backendless.Cvar.t
 
-module type Statement_value = Statement with type field := Backend.Tick.Field.t
+module type Statement_value =
+  Statement with type field := Zexe_backend.Pasta.Fp.t

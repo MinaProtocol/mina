@@ -1,6 +1,6 @@
 open Core_kernel
-open Import
 module SC = Pickles_types.Scalar_challenge
+module Challenge = Limb_vector.Challenge
 
 (* Implementation of the algorithm described on page 29 of the Halo paper
    https://eprint.iacr.org/2019/1021.pdf
@@ -132,8 +132,7 @@ let to_field_checked (type f)
   F.(scale !a endo + !b)
 
 let to_field_constant (type f) ~endo
-    (module F : Plonk_checks.Field_intf with type t = f) (SC.Scalar_challenge c)
-    =
+    (module F : Intf.Field_intf with type t = f) (SC.Scalar_challenge c) =
   let bits = Array.of_list (Challenge.Constant.to_bits c) in
   let a = ref (F.of_int 2) in
   let b = ref (F.of_int 2) in
@@ -173,7 +172,7 @@ let test (type f)
               (Scalar_challenge (Challenge.Constant.of_bits s)))
           xs
       with e ->
-        Core.eprintf !"Input %{sexp: bool list}\n%!" xs ;
+        Core_kernel.eprintf !"Input %{sexp: bool list}\n%!" xs ;
         raise e)
 
 module Make
@@ -307,7 +306,7 @@ struct
               G.Constant.scale g x)
             (random_point, xs)
         with e ->
-          Core.eprintf !"Input %{sexp: bool list}\n%!" xs ;
+          Core_kernel.eprintf !"Input %{sexp: bool list}\n%!" xs ;
           raise e)
 
   let endo_inv ((gx, gy) as g) chal =

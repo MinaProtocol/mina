@@ -90,17 +90,17 @@ struct
       as_prover
         As_prover.(
           fun () ->
-            Core.printf "in-snark: %s %!" lab ;
+            printf "in-snark: %s %!" lab ;
             Field.Constant.print (read_var x) ;
-            Core.printf ", %!" ;
+            printf ", %!" ;
             Field.Constant.print (read_var y) ;
-            Core.printf "\n%!")
+            printf "\n%!")
 
   let print_w lab gs =
     if debug then
       Array.iteri gs ~f:(fun i (fin, g) ->
           as_prover
-            As_prover.(fun () -> Core.printf "fin=%b %!" (read Boolean.typ fin)) ;
+            As_prover.(fun () -> printf "fin=%b %!" (read Boolean.typ fin)) ;
           ksprintf print_g "%s[%d]" lab i g)
 
   let print_chal lab x =
@@ -108,10 +108,10 @@ struct
       as_prover
         As_prover.(
           fun () ->
-            Core.printf "in-snark %s:%!" lab ;
+            printf "in-snark %s:%!" lab ;
             Field.Constant.print
               (Field.Constant.project (List.map ~f:(read Boolean.typ) x)) ;
-            Core.printf "\n%!")
+            printf "\n%!")
 
   let print_bool lab x =
     if debug then

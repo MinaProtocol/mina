@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_compare ppx_deriving_yojson h_list.ppx))
  (libraries
-   digestif
+   digestif.ocaml
    mina_version
    zexe_backend
    random_oracle_input
@@ -17,7 +17,6 @@
    pickles.precomputed
    pickles.one_hot_vector
    pickles.pseudo
-   snarky_log
    sponge
    group_map
    snarky_group_map
