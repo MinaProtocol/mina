@@ -1337,7 +1337,7 @@ module Base = struct
                 last_rollup_slot)
           in
           (* Push events to s1 *)
-          let is_empty = !(Party.Rollup_events.is_empty_var rollup_events) in
+          let is_empty = !(Party.Events.is_empty_var rollup_events) in
           let s1 =
             Field.if_ is_empty ~then_:s1'
               ~else_:(Party.Rollup_events.push_events_checked s1' rollup_events)

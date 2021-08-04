@@ -51,6 +51,10 @@ module Events = struct
 
   let typ = Data_as_hash.typ ~hash
 
+  let is_empty_var (e : var) =
+    Snark_params.Tick.Field.(
+      Checked.equal (Data_as_hash.hash e) (Var.constant (Lazy.force empty_hash)))
+
   let pop_checked (events : var) : Event.t Data_as_hash.t * var =
     let open Run in
     let hd, tl =
@@ -94,10 +98,6 @@ module Rollup_events = struct
       [| acc; hash |]
 
   let push_events acc events = push_hash acc (Events.hash events)
-
-  let is_empty_var (e : Events.var) =
-    Snark_params.Tick.Field.(
-      Checked.equal (Data_as_hash.hash e) (Var.constant (Lazy.force empty_hash)))
 
   let push_events_checked x (e : Events.var) =
     Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_rollup_events
