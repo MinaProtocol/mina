@@ -1,0 +1,28 @@
+#build with: 
+# cat /home/helenl1/work/mina/dockerfiles/Dockerfile-rosetta | docker build -t gcr.io/o1labs-192920/mina-rosetta-builder:latest --target builder --build-arg deb_codename=stretch --build-arg MINA_BRANCH=<this branch> -
+# docker build -t txn_burst_util -f Dockerfile_txn_burst .
+
+#run with:
+# docker run --entrypoint ./_build/default/src/app/batch_generate_keys/batch_generate_keys.exe txn_burst_util gen-there-and-back-txns --num-accts 1 --num-txn-per-acct 10 --origin-sender-pk B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV
+
+FROM gcr.io/o1labs-192920/mina-rosetta-builder
+
+COPY ./batch_generate_keys.ml /
+
+ENV DUNE_PROFILE devnet
+
+RUN eval $(opam config env) \
+  && git pull \
+  && git checkout feature/generate-txns-create-many-accounts-2 \
+  && dune build --profile=${DUNE_PROFILE} \
+    src/app/generate_keypair/generate_keypair.exe \
+    src/app/cli/src/mina.exe \
+    src/app/archive/archive.exe \
+    src/app/rosetta/rosetta.exe \
+    src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+    src/app/generate_keypair/generate_keypair.exe \
+    src/app/rosetta/ocaml-signer/signer.exe \
+  && rm -rf _build \
+  && dune build src/app/batch_generate_keys/batch_generate_keys.exe
+
+ENTRYPOINT ["./_build/default/src/app/batch_generate_keys/batch_generate_keys.exe"]
