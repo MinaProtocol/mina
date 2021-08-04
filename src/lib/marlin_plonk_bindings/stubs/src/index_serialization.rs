@@ -234,8 +234,8 @@ where
     let srs = PlonkSRSValue::Ref(unsafe { &(*srs) });
     let vk = PlonkVerifierIndex {
         domain,
-        w: zk_w(domain),
-        zkpm: zk_polynomial(domain),
+        w: zk_w(domain).ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Cannot evaluate zk_w"))?,
+        zkpm: zk_polynomial(domain).ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Cannot evaluate zk_polynomial"))?,
         max_poly_size,
         max_quot_size,
         srs,
@@ -419,7 +419,7 @@ where
     let o = G::ScalarField::read(&mut r)?;
     let endo = G::ScalarField::read(&mut r)?;
 
-    let zkpm = zk_polynomial(domain.d1);
+    let zkpm = zk_polynomial(domain.d1).ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Cannot evaluate zk_polynomial"))?;
     let zkpl = zkpm.evaluate_over_domain_by_ref(domain.d8);
     Ok(PlonkConstraintSystem {
         zkpm,
