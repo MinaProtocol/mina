@@ -595,11 +595,93 @@ let eq_poly_comm ~field_equal (x : _ Types.Poly_comm.t)
   Array.for_all2 (eq_affine ~field_equal) x.unshifted y.unshifted
   && Option.equal (eq_affine ~field_equal) x.shifted y.shifted
 
+module Backend = Zexe_backend.Pasta.Pallas_based_plonk
+
+let () = Backend.Keypair.set_urs_info []
+
+module Impl =
+  Snarky_backendless.Snark.Run.Make
+    (Zexe_backend.Pasta.Pallas_based_plonk)
+    (Unit)
+
+let _ =
+  Js.export "snarky_test"
+    (object%js (_self)
+       method run =
+         let log x = (Js.Unsafe.js_expr "console.log" : _ -> unit) x in
+         let time label f =
+           let start = new%js Js_of_ocaml.Js.date_now in
+           let x = f () in
+           let stop = new%js Js_of_ocaml.Js.date_now in
+           log
+             (Core_kernel.ksprintf Js.string "%s: %f seconds" label
+                ((stop##getTime -. start##getTime) /. 1000.)) ;
+           x
+         in
+         let open Impl in
+         let main x () =
+           let rec go i acc =
+             if i = 0 then acc else go (i - 1) (Field.mul acc acc)
+           in
+           let _ = go 1000 x in
+           ()
+         in
+         let input = Data_spec.[ Typ.field ] in
+         let _kp =
+           time "generate_keypair" (fun () ->
+               generate_keypair ~exposing:input main)
+         in
+         let kp =
+           time "generate_keypair2" (fun () ->
+               generate_keypair ~exposing:input main)
+         in
+         let pk = Keypair.pk kp in
+         let x = Backend.Field.of_int 2 in
+         let pi =
+           time "generate witness conv" (fun () ->
+               Impl.generate_witness_conv input main
+                 ~f:(fun { Proof_inputs.auxiliary_inputs; public_inputs } ->
+                   time "create proof" (fun () ->
+                       Backend.Proof.create pk ~auxiliary:auxiliary_inputs
+                         ~primary:public_inputs))
+                 () x)
+         in
+         let vk = Keypair.vk kp in
+         let vec = Backend.Field.Vector.create () in
+         Backend.Field.Vector.emplace_back vec x ;
+         assert (time "verify proof" (fun () -> Backend.Proof.verify pi vk vec))
+    end)
+
 let _ =
   let open Pasta_fp_urs in
   Js.export "pasta_fp_urs_test"
     (object%js (_self)
        method run =
+         (let time label f =
+            let start = new%js Js_of_ocaml.Js.date_now in
+            let x = f () in
+            let stop = new%js Js_of_ocaml.Js.date_now in
+            let log x = (Js.Unsafe.js_expr "console.log" : _ -> unit) x in
+            log
+              (Core_kernel.ksprintf Js.string "%s: %f seconds" label
+                 ((stop##getTime -. start##getTime) /. 1000.)) ;
+            x
+          in
+          let n = 131072 in
+          let log_n = Core_kernel.Int.ceil_log2 n in
+          let urs = time "create" (fun () -> create n) in
+          let inputs =
+            time "inputs" (fun () -> Array.init n (fun i -> Pasta_fp.of_int i))
+          in
+          let _ =
+            time "commit" (fun () ->
+                commit_evaluations urs ~domain_size:n inputs)
+          in
+          let _ =
+            let xs = Array.init log_n (fun _ -> Pasta_fp.random ()) in
+            time "b_poly" (fun () -> b_poly_commitment urs xs)
+          in
+          ()) ;
          let eq_affine x y = eq_affine ~field_equal:Pasta_fq.equal x y in
          let eq = eq_poly_comm ~field_equal:Pasta_fq.equal in
          let first = create 10 in
