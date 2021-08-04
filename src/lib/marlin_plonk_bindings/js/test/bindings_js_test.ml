@@ -1239,3 +1239,5 @@ let _ =
            (fun x -> assert (eq (deep_copy x) x))
            [ vindex0_0; vindex2_0; dummy0 ]
     end)
+
+let linkme = ()
