@@ -57,7 +57,7 @@ export class Main {
   }
 }
 
-class Circ {
+class Circ extends Snarky.Circuit {
   @circuitMain
   static main(@public_ x: Snarky.Field) {
     let acc = x;
@@ -65,10 +65,18 @@ class Circ {
       acc = acc.mul(acc);
     }
   }
+
+  // TODO: This gets method
+  // static generateKeypair(): Keypair {
+  // }
+  // static prove(wit: any[], pub: any[]): Proof {
+  // }
 };
 
 export function main() {
+  console.log('random', Snarky.Field.random());
   const kp = Snarky.Circuit.generateKeypair(Circ as any);
+  console.log('random', Snarky.Field.random());
   const proof = Snarky.Circuit.prove(Circ as any, [], [ new Snarky.Field(2) ], kp);
   console.log(proof, kp);
 }

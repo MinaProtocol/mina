@@ -1,5 +1,3 @@
-export type AsField<F> = F | number | string | boolean;
-
 export class Keypair {
 }
 
@@ -7,109 +5,112 @@ export class Proof {
 }
 
 export class Field {
-  constructor(x: AsField<Field>);
+  constructor(x: Field | number | string | boolean);
 
-  neg(this: Field): Field;
-  inv(this: Field): Field;
+  neg(): Field;
+  inv(): Field;
 
-  add(this: Field, y: AsField<Field>): Field;
-  sub(this: Field, y: AsField<Field>): Field;
-  mul(this: Field, y: AsField<Field>): Field;
-  div(this: Field, y: AsField<Field>): Field;
+  add(y: Field | number | string | boolean): Field;
+  sub(y: Field | number | string | boolean): Field;
+  mul(y: Field | number | string | boolean): Field;
+  div(y: Field | number | string | boolean): Field;
 
-  square(this: AsField<Field>): Field;
-  sqrt(this: AsField<Field>): Field;
+  square(): Field;
+  sqrt(): Field;
 
-  toString(this: AsField<Field>): string;
+  toString(): string;
 
   sizeInFieldElements(): number;
-  toFieldElements(this: AsField<Field>): Field[];
+  toFieldElements(): Field[];
 
-  assertEquals(this: AsField<Field>, y: AsField<Field>): void;
-  assertBoolean(this: AsField<Field>): void;
-  isZero(this: AsField<Field>): Bool;
+  assertLt(y: Field | number | string | boolean);
+  assertLte(y: Field | number | string | boolean);
+  assertGt(y: Field | number | string | boolean);
+  assertGte(y: Field | number | string | boolean);
 
-  toBits(this: AsField<Field>): Bool[];
+  assertEquals(y: Field | number | string | boolean): void;
+  assertBoolean(): void;
+  isZero(): Bool;
 
-  equals(this: AsField<Field>, y: AsField<Field>): Bool;
+  toBits(): Bool[];
 
-  // value(this: AsField<Field>): Field;
+  equals(y: Field | number | string | boolean): Bool;
+
+  // value(this: Field | number | string | boolean): Field;
 
   /* Self members */
   static one: Field;
   static zero: Field;
   static random(): Field;
 
-  static neg(x: AsField<Field>): Field;
-  static inv(x: AsField<Field>): Field;
+  static neg(x: Field | number | string | boolean): Field;
+  static inv(x: Field | number | string | boolean): Field;
 
-  static add(x: AsField<Field>, y: AsField<Field>): Field;
-  static sub(x: AsField<Field>, y: AsField<Field>): Field;
-  static mul(x: AsField<Field>, y: AsField<Field>): Field;
-  static div(x: AsField<Field>, y: AsField<Field>): Field;
+  static add(x: Field | number | string | boolean, y: Field | number | string | boolean): Field;
+  static sub(x: Field | number | string | boolean, y: Field | number | string | boolean): Field;
+  static mul(x: Field | number | string | boolean, y: Field | number | string | boolean): Field;
+  static div(x: Field | number | string | boolean, y: Field | number | string | boolean): Field;
 
-  static square(x: AsField<Field>): Field;
-  static sqrt(x: AsField<Field>): Field;
+  static square(x: Field | number | string | boolean): Field;
+  static sqrt(x: Field | number | string | boolean): Field;
 
-  static toString(x: AsField<Field>): string;
+  static toString(x: Field | number | string | boolean): string;
 
   static sizeInFieldElements(): number;
-  static toFieldElements(x: AsField<Field>): Field[];
+  static toFieldElements(x: Field | number | string | boolean): Field[];
   static ofFieldElements(fields: Field[]): Field;
 
-  static assertEqual(x: AsField<Field>, y: AsField<Field>): Field;
-  static assertBoolean(x: AsField<Field>): void;
-  static isZero(x: AsField<Field>): Bool;
+  static assertEqual(x: Field | number | string | boolean, y: Field | number | string | boolean): Field;
+  static assertBoolean(x: Field | number | string | boolean): void;
+  static isZero(x: Field | number | string | boolean): Bool;
 
-  static ofBits(x: AsBool<Bool>[]): Field;
-  static toBits(x: AsField<Field>): Bool[];
+  static ofBits(x: Bool | boolean[]): Field;
+  static toBits(x: Field | number | string | boolean): Bool[];
 
-  static equal(x: AsField<Field>, y: AsField<Field>): Bool;
+  static equal(x: Field | number | string | boolean, y: Field | number | string | boolean): Bool;
 }
 
-export type AsBool<B> = B | boolean;
-
 export class Bool {
-  constructor(x: AsBool<Bool>);
+  constructor(x: Bool | boolean);
 
-  toField(this: AsBool<Bool>): Field;
+  toField(): Field;
 
-  not(this: Bool): Bool;
-  and(this: Bool, y: AsBool<Bool>): Bool;
-  or(this: Bool, y: AsBool<Bool>): Bool;
+  not(): Bool;
+  and(y: Bool | boolean): Bool;
+  or(y: Bool | boolean): Bool;
 
-  assertEquals(this: Bool, y: AsBool<Bool>): void;
+  assertEquals(y: Bool | boolean): void;
 
-  equals(this: Bool, y: AsBool<Bool>): Bool;
-  isTrue(this: Bool): Bool;
-  isFalse(this: Bool): Bool;
+  equals(y: Bool | boolean): Bool;
+  isTrue(): Bool;
+  isFalse(): Bool;
 
   sizeInFieldElements(): number;
-  toFieldElements(this: Bool): Field[];
+  toFieldElements(): Field[];
 
-  toString(this: Bool): string;
+  toString(): string;
 
   /* static members */
-  static toField(x: AsBool<Bool>): Field;
+  static toField(x: Bool | boolean): Field;
 
   static Unsafe: {
-    ofField(x: AsField<Field>): Bool;
+    ofField(x: Field | number | string | boolean): Bool;
   };
 
-  static not(x: AsBool<Bool>): Bool;
-  static and(x: AsBool<Bool>, y: AsBool<Bool>): Bool;
-  static or(x: AsBool<Bool>, y: AsBool<Bool>): Bool;
+  static not(x: Bool | boolean): Bool;
+  static and(x: Bool | boolean, y: Bool | boolean): Bool;
+  static or(x: Bool | boolean, y: Bool | boolean): Bool;
 
-  static assertEqual(x: AsBool<Bool>, y: AsBool<Bool>): void;
+  static assertEqual(x: Bool | boolean, y: Bool | boolean): void;
 
-  static equal(x: AsBool<Bool>, y: AsBool<Bool>): Bool;
-  static isTrue(x: AsBool<Bool>): Bool;
-  static isFalse(x: AsBool<Bool>): Bool;
+  static equal(x: Bool | boolean, y: Bool | boolean): Bool;
+  static isTrue(x: Bool | boolean): Bool;
+  static isFalse(x: Bool | boolean): Bool;
 
-  static count(x: AsBool<Bool>[]): Field;
+  static count(x: Bool | boolean[]): Field;
 
   static sizeInFieldElements(): number;
-  static toFieldElements(x: AsBool<Bool>): Field[];
+  static toFieldElements(x: Bool | boolean): Field[];
   static ofFieldElements(fields: Field[]): Bool;
 }
 
@@ -150,17 +151,17 @@ export class Circuit {
   ): void;
 
   // newVariable(): Field;
-  // newVariable(x: AsField<Field>): Field;
+  // newVariable(x: Field | number | string | boolean): Field;
   // TODO
-  static newVariable(f: () => AsField<Field>): Field;
+  static newVariable(f: () => Field | number | string | boolean): Field;
 
   /*
   newPublicVariable(): Field;
-  newPublicVariable(x: AsField<Field>): Field;
-  newPublicVariable(f: () => AsField<Field>): Field;
+  newPublicVariable(x: Field | number | string | boolean): Field;
+  newPublicVariable(f: () => Field | number | string | boolean): Field;
 
-  setVariable(x: Field, value: AsField<Field>): void;
-  setVariable(x: Field, f: () => AsField<Field>): void;
+  setVariable(x: Field, value: Field | number | string | boolean): void;
+  setVariable(x: Field, f: () => Field | number | string | boolean): void;
   */
 
   static witness<T>(
@@ -196,14 +197,14 @@ export class Circuit {
   ): Bool;
 
   static if<T>(
-    b: AsBool<Bool>,
+    b: Bool | boolean,
     ctor: AsFieldElements<T>,
     x: T,
     y: T
   ): T;
 
   static if(
-    b: AsBool<Bool>,
+    b: Bool | boolean,
     x: T,
     y: T
   ): T;
@@ -238,17 +239,17 @@ export class Group {
     x: Field;
     y: Field;
 
-    add(this: Group, y: Group): Group;
-    sub(this: Group, y: Group): Group;
-    neg(this: Group): Group;
-    scale(this: Group, y: Scalar): Group;
-    endoScale(this: Group, y: EndoScalar): Group;
+    add(y: Group): Group;
+    sub(y: Group): Group;
+    neg(): Group;
+    scale(y: Scalar): Group;
+    endoScale(y: EndoScalar): Group;
 
-    assertEquals(this: Group, y: Group): void;
-    equals(this: Group, y: Group): Bool;
+    assertEquals(y: Group): void;
+    equals(y: Group): Bool;
 
-    constructor(args: { x: AsField<Field>, y: AsField<Field> })
-    constructor(x: AsField<Field>, y: AsField<Field>)
+    constructor(args: { x: Field | number | string | boolean, y: Field | number | string | boolean })
+    constructor(x: Field | number | string | boolean, y: Field | number | string | boolean)
 
     static generator: Group;
     static add(x: Group, y: Group): Group;
