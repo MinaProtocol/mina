@@ -123,8 +123,8 @@ pub fn of_ocaml<'a>(
     let domain = Domain::<Fp>::new(1 << log_size_of_group).unwrap();
     let index = DlogVerifierIndex::<GAffine> {
         domain,
-        w: zk_w(domain),
-        zkpm: zk_polynomial(domain),
+        w: zk_w(domain).unwrap(),
+        zkpm: zk_polynomial(domain).unwrap(),
         max_poly_size: max_poly_size as usize,
         max_quot_size: max_quot_size as usize,
         srs,

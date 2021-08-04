@@ -43,9 +43,9 @@ pub fn caml_pasta_fp_plonk_oracles_create(
             .map(|x| x)
             .collect(),
         &proof.public.iter().map(|s| -*s).collect(),
-    );
+    ).unwrap();
     let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =
-        proof.oracles::<DefaultFqSponge<VestaParameters, PlonkSpongeConstants>, DefaultFrSponge<Fp, PlonkSpongeConstants>>(&index, &p_comm);
+        proof.oracles::<DefaultFqSponge<VestaParameters, PlonkSpongeConstants>, DefaultFrSponge<Fp, PlonkSpongeConstants>>(&index, &p_comm).unwrap();
 
     sponge.absorb_fr(&[shift_scalar(combined_inner_product)]);
 
