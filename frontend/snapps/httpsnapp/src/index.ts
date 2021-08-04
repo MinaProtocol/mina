@@ -45,13 +45,11 @@ export const verify =
 
     let response;
     if (method === 'GET') {
-      response = await axios
-        .get(minaOracle, { params })
-        .catch((error: AxiosError) => {
-          return {
-            error,
-          };
-        });
+      response = await axios.get(minaOracle).catch((error: AxiosError) => {
+        return {
+          error,
+        };
+      });
     } else if (method === 'POST') {
       // TODO: This check is in place as we do not use 'postData' at the moment so we simply return an Error for now.
       if (postData === null) {
@@ -59,11 +57,13 @@ export const verify =
           error: Error('postData is disabled and must be nully for now.'),
         };
       }
-      response = await axios.post(minaOracle).catch((error: AxiosError) => {
-        return {
-          error,
-        };
-      });
+      response = await axios
+        .post(minaOracle, { params })
+        .catch((error: AxiosError) => {
+          return {
+            error,
+          };
+        });
     }
     if (!response.status) {
       const message = JSON.stringify(response);
