@@ -142,7 +142,7 @@ impl Drop for WasmPastaFqPlonkIndex {
 #[wasm_bindgen]
 pub fn caml_pasta_fq_plonk_index_create(
     gates: &WasmPastaFqPlonkGateVector,
-    public: i32,
+    public_: i32,
     urs: &WasmPastaFqUrs,
 ) -> Result<WasmPastaFqPlonkIndex, JsValue> {
     let n = match Domain::<Fq>::compute_size_of_domain(gates.0.len()) {
@@ -173,7 +173,7 @@ pub fn caml_pasta_fq_plonk_index_create(
 
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
     let cs =
-        match ConstraintSystem::<Fq>::create(gates, oracle::pasta::fq::params(), public as usize)
+        match ConstraintSystem::<Fq>::create(gates, oracle::pasta::fq::params(), public_ as usize)
         {
             None => Err(JsValue::from_str(
                 "caml_pasta_fq_plonk_index_create: could not create constraint system",
