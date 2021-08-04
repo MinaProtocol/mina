@@ -23,6 +23,11 @@ export class Field {
   sizeInFieldElements(): number;
   toFieldElements(): Field[];
 
+  lt(y: Field | number | string | boolean): Bool;
+  lte(y: Field | number | string | boolean): Bool;
+  gt(y: Field | number | string | boolean): Bool;
+  gte(y: Field | number | string | boolean): Bool;
+
   assertLt(y: Field | number | string | boolean);
   assertLte(y: Field | number | string | boolean);
   assertGt(y: Field | number | string | boolean);
