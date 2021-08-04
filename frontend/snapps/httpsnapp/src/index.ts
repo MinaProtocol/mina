@@ -20,13 +20,13 @@ type Response = {
 };
 
 /**
- * Currently, WIP. Sends either a GET or POST request to the HTTPSnapps Oracle API which will
+ * Sends either a GET or POST request to the HTTPSnapps Oracle API which will
  * returned a signed response from an official oracle key.
  *
- * @param _method
- * @param _url
- * @param _params
- * @param _postData
+ * @param method    Either `GET` or `POST`
+ * @param url       Destination URL to issue the `GET` or `POST` request to
+ * @param params    Request Parameters
+ * @param postData  Post Data
  * @returns
  */
 export const verify =
@@ -37,9 +37,7 @@ export const verify =
     params: QueryParams,
     postData?: string
   ): Promise<Response> => {
-    // Convert QueryParams to query string
     const qs = new URLSearchParams(params).toString();
-    // Temporary URL, Oracle API runs on localhost for now
     const minaOracle =
       qs.length === 0 ? `${oracle}?url=${url}` : `${oracle}?url=${url}&${qs}`;
 
