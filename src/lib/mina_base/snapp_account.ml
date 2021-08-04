@@ -108,12 +108,13 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ('app_state, 'vk, 'snapp_version, 'field, 'slot) t =
+      type ('app_state, 'vk, 'snapp_version, 'field, 'slot, 'bool) t =
         { app_state : 'app_state
         ; verification_key : 'vk
         ; snapp_version : 'snapp_version
         ; rollup_state : 'field Pickles_types.Vector.Vector_5.Stable.V1.t
         ; last_rollup_slot : 'slot
+        ; proved_state : 'bool
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
@@ -126,13 +127,14 @@ module Poly = struct
   end]
 end
 
-type ('app_state, 'vk, 'snapp_version, 'field, 'slot) t_ =
-      ('app_state, 'vk, 'snapp_version, 'field, 'slot) Poly.t =
+type ('app_state, 'vk, 'snapp_version, 'field, 'slot, 'bool) t_ =
+      ('app_state, 'vk, 'snapp_version, 'field, 'slot, 'bool) Poly.t =
   { app_state : 'app_state
   ; verification_key : 'vk
   ; snapp_version : 'snapp_version
   ; rollup_state : 'field Pickles_types.Vector.Vector_5.t
   ; last_rollup_slot : 'slot
+  ; proved_state : 'bool
   }
 
 [%%versioned
@@ -146,7 +148,8 @@ module Stable = struct
         option
       , Mina_numbers.Snapp_version.Stable.V1.t
       , F.Stable.V1.t
-      , Mina_numbers.Global_slot.Stable.V1.t )
+      , Mina_numbers.Global_slot.Stable.V1.t
+      , bool )
       Poly.Stable.V2.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
@@ -171,6 +174,7 @@ module Stable = struct
           (let empty = Lazy.force Rollup_events.empty_hash in
            [ empty; empty; empty; empty; empty ])
       ; last_rollup_slot = Mina_numbers.Global_slot.zero
+      ; proved_state = false
       }
   end
 end]
@@ -192,7 +196,8 @@ module Checked = struct
       With_hash.t
     , Mina_numbers.Snapp_version.Checked.t
     , Pickles.Impls.Step.Field.t
-    , Mina_numbers.Global_slot.Checked.t )
+    , Mina_numbers.Global_slot.Checked.t
+    , Boolean.var )
     Poly.t
 
   let to_input' (t : _ Poly.t) =
@@ -208,6 +213,7 @@ module Checked = struct
       ~last_rollup_slot:
         (f (fun x ->
              Run.run_checked (Mina_numbers.Global_slot.Checked.to_input x)))
+      ~proved_state:(f (fun b -> bitstring [ b ]))
     |> List.reduce_exn ~f:append
 
   let to_input (t : t) =
@@ -247,6 +253,7 @@ let typ : (Checked.t, t) Typ.t =
     ; Mina_numbers.Snapp_version.typ
     ; Pickles_types.Vector.typ Field.typ Pickles_types.Nat.N5.n
     ; Mina_numbers.Global_slot.typ
+    ; Boolean.typ
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
@@ -268,6 +275,7 @@ let to_input (t : t) =
     ~snapp_version:(f Mina_numbers.Snapp_version.to_input)
     ~rollup_state:(f app_state)
     ~last_rollup_slot:(f Mina_numbers.Global_slot.to_input)
+    ~proved_state:(f (fun b -> bitstring [ b ]))
   |> List.reduce_exn ~f:append
 
 let default : _ Poly.t =
@@ -279,6 +287,7 @@ let default : _ Poly.t =
       (let empty = Lazy.force Rollup_events.empty_hash in
        [ empty; empty; empty; empty; empty ])
   ; last_rollup_slot = Mina_numbers.Global_slot.zero
+  ; proved_state = false
   }
 
 let digest (t : t) =

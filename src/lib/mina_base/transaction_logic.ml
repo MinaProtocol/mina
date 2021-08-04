@@ -1199,8 +1199,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let apply_body
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~(state_view : Snapp_predicate.Protocol_state.View.t) ~check_auth ~is_new
-      ~current_global_slot
+      ~(state_view : Snapp_predicate.Protocol_state.View.t) ~check_auth
+      ~has_proof ~is_new ~current_global_slot
       ({ body =
            { pk = _
            ; token_id
@@ -1278,6 +1278,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       else return a.delegate
     in
     let%bind snapp =
+      let proved_state =
+        let is_keep = Vector.for_all ~f:Set_or_keep.is_keep app_state in
+        if is_keep then init.proved_state
+        else if not has_proof then false
+        else if Vector.for_all ~f:Set_or_keep.is_set app_state then true
+        else init.proved_state
+      in
       let%map app_state =
         update a.permissions.edit_state app_state init.app_state
           ~is_keep:(Vector.for_all ~f:Set_or_keep.is_keep)
@@ -1325,6 +1332,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ; snapp_version
         ; rollup_state
         ; last_rollup_slot
+        ; proved_state
         }
       in
       if Snapp_account.(equal default t) then None else Some t
@@ -1596,6 +1604,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               ~check_auth:
                 (Fn.flip Permissions.Auth_required.check
                    (Control.tag p.authorization))
+              ~has_proof:(Control.Tag.equal (Control.tag p.authorization) Proof)
               ~is_new:(match loc with `Existing _ -> false | `New -> true)
               ~current_global_slot:global_state.protocol_state.curr_global_slot
               p.data a

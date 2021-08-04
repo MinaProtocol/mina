@@ -116,6 +116,7 @@ module Accounts = struct
             ; snapp_version
             ; rollup_state
             ; last_rollup_slot
+            ; proved_state
             } ->
             let%bind app_state =
               if
@@ -172,6 +173,7 @@ module Accounts = struct
               ; snapp_version
               ; rollup_state
               ; last_rollup_slot
+              ; proved_state
               }
       in
       ( { public_key = account.public_key
@@ -281,6 +283,7 @@ module Accounts = struct
                ; snapp_version
                ; rollup_state
                ; last_rollup_slot
+               ; proved_state
                }
              ->
             let state = Snapp_state.V.to_list app_state in
@@ -301,6 +304,7 @@ module Accounts = struct
             ; snapp_version
             ; rollup_state
             ; last_rollup_slot
+            ; proved_state
             })
       in
       { pk =

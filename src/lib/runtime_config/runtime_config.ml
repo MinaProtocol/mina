@@ -189,6 +189,7 @@ module Json_layout = struct
           ; snapp_version : Snapp_version.t
           ; rollup_state : Field.t list
           ; last_rollup_slot : int
+          ; proved_state : bool
           }
         [@@deriving sexp, dhall_type, yojson, bin_io_unversioned]
 
@@ -198,6 +199,7 @@ module Json_layout = struct
            ; "snapp_version"
            ; "rollup_state"
            ; "last_rollup_slot"
+           ; "proved_state"
           |]
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json

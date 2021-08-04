@@ -1306,13 +1306,28 @@ module Base = struct
       in
       let open Snapp_basic in
       let snapp : Snapp_account.Checked.t =
+        let keeping_app_state =
+          Boolean.all
+            (List.map (Vector.to_list app_state) ~f:Set_or_keep.Checked.is_keep)
+        in
+        let changing_app_state =
+          Boolean.all
+            (List.map (Vector.to_list app_state) ~f:Set_or_keep.Checked.is_set)
+        in
+        let proved_state =
+          Boolean.if_ keeping_app_state ~then_:a.snapp.proved_state
+            ~else_:
+              ( if Option.is_none tag then (* No proof *)
+                Boolean.false_
+              else
+                (* Has a proof, set proved_state if entire state was set *)
+                Boolean.if_ changing_app_state ~then_:Boolean.true_
+                  ~else_:a.snapp.proved_state )
+        in
         let app_state =
           with_label __LOC__ (fun () ->
               update_authorized a.permissions.edit_state
-                ~is_keep:
-                  (Boolean.all
-                     (List.map (Vector.to_list app_state)
-                        ~f:Set_or_keep.Checked.is_keep))
+                ~is_keep:keeping_app_state
                 ~updated:
                   (`Ok
                     (Vector.map2 app_state a.snapp.app_state
@@ -1376,6 +1391,7 @@ module Base = struct
         ; snapp_version
         ; rollup_state
         ; last_rollup_slot
+        ; proved_state
         }
       in
       let snapp_uri =
@@ -1866,6 +1882,7 @@ module Base = struct
                           ; Pickles_types.Vector.typ Field.typ
                               Pickles_types.Nat.N5.n
                           ; Mina_numbers.Global_slot.typ
+                          ; Boolean.typ
                           ]
                           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
                           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist

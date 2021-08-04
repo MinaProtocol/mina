@@ -223,6 +223,17 @@ module Eq_data = struct
         ; to_input_checked = field
         }
 
+    let boolean =
+      let open Random_oracle_input in
+      Boolean.
+        { typ
+        ; equal = Bool.equal
+        ; equal_checked = run equal
+        ; default = false
+        ; to_input = (fun b -> bitstring [ b ])
+        ; to_input_checked = (fun b -> bitstring [ b ])
+        }
+
     let receipt_chain_hash =
       Receipt.Chain_hash.
         { field with
@@ -358,7 +369,7 @@ module Account = struct
     [%%versioned
     module Stable = struct
       module V2 = struct
-        type ('balance, 'nonce, 'receipt_chain_hash, 'pk, 'field) t =
+        type ('balance, 'nonce, 'receipt_chain_hash, 'pk, 'field, 'bool) t =
           { balance : 'balance
           ; nonce : 'nonce
           ; receipt_chain_hash : 'receipt_chain_hash
@@ -366,6 +377,7 @@ module Account = struct
           ; delegate : 'pk
           ; state : 'field Snapp_state.V.Stable.V1.t
           ; rollup_state : 'field
+          ; proved_state : 'bool
           }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
@@ -392,7 +404,8 @@ module Account = struct
         , Account_nonce.Stable.V1.t Numeric.Stable.V1.t
         , Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
         , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
-        , F.Stable.V1.t Eq_data.Stable.V1.t )
+        , F.Stable.V1.t Eq_data.Stable.V1.t
+        , bool Eq_data.Stable.V1.t )
         Poly.Stable.V2.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -419,6 +432,7 @@ module Account = struct
         ; delegate
         ; state
         ; rollup_state = Ignore
+        ; proved_state = Ignore
         }
     end
   end]
@@ -432,6 +446,7 @@ module Account = struct
     ; state =
         Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> Or_ignore.Ignore)
     ; rollup_state = Ignore
+    ; proved_state = Ignore
     }
 
   let to_input
@@ -442,6 +457,7 @@ module Account = struct
        ; delegate
        ; state
        ; rollup_state
+       ; proved_state
        } :
         t) =
     let open Random_oracle_input in
@@ -454,6 +470,7 @@ module Account = struct
       ; Vector.reduce_exn ~f:append
           (Vector.map state ~f:Eq_data.(to_input_explicit Tc.field))
       ; Eq_data.(to_input_explicit Tc.field) rollup_state
+      ; Eq_data.(to_input_explicit Tc.boolean) proved_state
       ]
 
   let digest t =
@@ -466,7 +483,8 @@ module Account = struct
       , Account_nonce.Checked.t Numeric.Checked.t
       , Receipt.Chain_hash.var Hash.Checked.t
       , Public_key.Compressed.var Eq_data.Checked.t
-      , Field.Var.t Eq_data.Checked.t )
+      , Field.Var.t Eq_data.Checked.t
+      , Boolean.var Eq_data.Checked.t )
       Poly.Stable.Latest.t
 
     let to_input
@@ -477,6 +495,7 @@ module Account = struct
          ; delegate
          ; state
          ; rollup_state
+         ; proved_state
          } :
           t) =
       let open Random_oracle_input in
@@ -489,6 +508,7 @@ module Account = struct
         ; Vector.reduce_exn ~f:append
             (Vector.map state ~f:Eq_data.(to_input_checked Tc.field))
         ; Eq_data.(to_input_checked Tc.field) rollup_state
+        ; Eq_data.(to_input_checked Tc.boolean) proved_state
         ]
 
     open Impl
@@ -501,6 +521,7 @@ module Account = struct
          ; delegate
          ; state = _
          ; rollup_state = _
+         ; proved_state = _
          } :
           t) (a : Account.Checked.Unhashed.t) =
       [ Numeric.(Checked.check Tc.balance balance a.balance)
@@ -522,6 +543,7 @@ module Account = struct
          ; delegate = _
          ; state
          ; rollup_state
+         ; proved_state
          } :
           t) (snapp : Snapp_account.Checked.t) =
       Boolean.any
@@ -529,6 +551,7 @@ module Account = struct
           to_list
             (map snapp.rollup_state
                ~f:Eq_data.(check_checked Tc.field rollup_state)))
+      :: Eq_data.(check_checked Tc.boolean proved_state snapp.proved_state)
       :: Vector.(
            to_list
              (map2 state snapp.app_state ~f:Eq_data.(check_checked Tc.field)))
@@ -557,6 +580,7 @@ module Account = struct
         (* TODO: Having this as the ignored value means we can't ever use it, right? *)
       ; Or_ignore.typ_implicit Field.typ ~equal:Field.equal
           ~ignore:(Lazy.force Snapp_account.Rollup_events.empty_hash)
+      ; Or_ignore.typ_explicit Boolean.typ ~ignore:false
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -569,6 +593,7 @@ module Account = struct
        ; delegate
        ; state
        ; rollup_state
+       ; proved_state
        } :
         t) (a : Account.t) =
     let open Or_error.Let_syntax in
@@ -604,6 +629,11 @@ module Account = struct
                   Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v)
                 in
                 i + 1)
+          in
+          let%bind () =
+            Eq_data.(
+              check ~label:"proved_state" Tc.boolean proved_state
+                snapp.proved_state)
           in
           if
             Option.is_some
