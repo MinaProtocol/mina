@@ -574,10 +574,7 @@ module Account = struct
       ; receipt_chain_hash
       ; public_key ()
       ; public_key ()
-      ; Snapp_state.typ
-          (Or_ignore.typ_implicit Field.typ ~equal:Field.equal
-             ~ignore:Field.zero)
-        (* TODO: Having this as the ignored value means we can't ever use it, right? *)
+      ; Snapp_state.typ (Or_ignore.typ_explicit Field.typ ~ignore:Field.zero)
       ; Or_ignore.typ_implicit Field.typ ~equal:Field.equal
           ~ignore:(Lazy.force Snapp_account.Rollup_events.empty_hash)
       ; Or_ignore.typ_explicit Boolean.typ ~ignore:false
