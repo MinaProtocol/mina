@@ -32,17 +32,12 @@ module type Inputs_intf = sig
   module Urs : sig
     type t
 
-    (* TODO
-       val read : ?offset:int -> string -> t option
+    val read : ?offset:int -> string -> t option
 
-       val write : ?append:bool -> t -> string -> unit *)
+    val write : ?append:bool -> t -> string -> unit
 
     val create : int -> t
   end
-
-  module Store : Key_cache.S with module M := Core_kernel.Or_error
-
-  val store : (string, Urs.t) Store.Disk_storable.t
 
   module Scalar_field : sig
     include Stable_v1
@@ -102,6 +97,7 @@ module Make (Inputs : Inputs_intf) = struct
     let degree = 1 lsl Pickles_types.Nat.to_int Rounds.n in
     let set_urs_info specs = Set_once.set_exn urs_info Lexing.dummy_pos specs in
     let load () =
+      let (module T) = Zexe_backend_platform_specific.get () in
       match !urs with
       | Some urs ->
           urs
@@ -114,13 +110,14 @@ module Make (Inputs : Inputs_intf) = struct
                 t
           in
           let u =
-            match Store.read specs store name with
+            let store = Urs.(T.store ~read ~write) in
+            match T.Store.read specs store name with
             | Ok (u, _) ->
                 u
             | Error _e ->
                 let urs = Urs.create degree in
                 let (_ : (unit, Error.t) Result.t) =
-                  Store.write
+                  T.Store.write
                     (List.filter specs ~f:(function
                       | On_disk _ ->
                           true

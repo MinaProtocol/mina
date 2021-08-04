@@ -64,9 +64,11 @@ module Make
 
   let of_hex_string s =
     assert (Char.equal s.[0] '0' && Char.equal s.[1] 'x') ;
-    String.drop_prefix s 2 |> Hex.Safe.of_hex
-    |> Option.value_exn ~here:[%here]
-    |> Bytes.of_string |> of_bytes
+    let bs =
+      String.drop_prefix s 2 |> Hex.Safe.of_hex
+      |> Option.value_exn ~here:[%here]
+    in
+    bs |> Bytes.of_string |> of_bytes
 
   let%test_unit "hex test" =
     let bytes =
