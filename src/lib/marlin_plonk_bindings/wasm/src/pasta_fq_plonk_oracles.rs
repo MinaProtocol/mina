@@ -25,6 +25,8 @@ use crate::pasta_pallas_poly_comm::WasmPastaPallasPolyComm;
 use crate::pasta_fq_plonk_verifier_index::WasmPastaFqPlonkVerifierIndex;
 use crate::pasta_fq_plonk_proof::WasmPastaFqProverProof;
 
+use std::convert::TryInto;
+
 #[derive(Copy, Clone, Debug)]
 pub struct WasmPastaFqRandomOracles
 {
@@ -121,8 +123,10 @@ pub fn caml_pasta_fq_plonk_oracles_create(
     lgr_comm: WasmVector<WasmPastaPallasPolyComm>,
     index: WasmPastaFqPlonkVerifierIndex,
     proof: WasmPastaFqProverProof,
-) -> WasmPastaFqPlonkOracles {
-    let index: DlogVerifierIndex<'_, GAffine> = index.into();
+) -> Result<WasmPastaFqPlonkOracles, JsValue> {
+    let index: DlogVerifierIndex<'_, GAffine> = TryInto::try_into(index).map_err(|()| {
+      JsValue::from_str("caml_pasta_fq_plonk_oracles_create: Could not convert index")
+    })?;
     let proof: DlogProof<GAffine> = proof.into();
     let lgr_comm: Vec<PolyComm<GAffine>> = lgr_comm.into_iter().map(From::from).collect();
 
@@ -133,13 +137,13 @@ pub fn caml_pasta_fq_plonk_oracles_create(
             .map(|x| x)
             .collect(),
         &proof.public.iter().map(|s| -*s).collect(),
-    );
+    ).ok_or_else(|| JsValue::from_str("caml_pasta_fq_plonk_oracles_create: Could not compute p_comm"))?;
     let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =
-        proof.oracles::<DefaultFqSponge<PallasParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(&index, &p_comm);
+        proof.oracles::<DefaultFqSponge<PallasParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(&index, &p_comm).ok_or_else(|| JsValue::from_str("caml_pasta_fq_plonk_oracles_create: Could not compute oracle values"))?;
 
     sponge.absorb_fr(&[shift_scalar(combined_inner_product)]);
 
-    WasmPastaFqPlonkOracles {
+    Ok(WasmPastaFqPlonkOracles {
         o: WasmPastaFqRandomOracles {
             beta: o.beta.into(),
             gamma: o.gamma.into(),
@@ -161,7 +165,7 @@ pub fn caml_pasta_fq_plonk_oracles_create(
             .map(|x| x.0.into())
             .collect(),
         digest_before_evaluations: digest_before_evaluations.into(),
-    }
+    })
 }
 
 #[wasm_bindgen]

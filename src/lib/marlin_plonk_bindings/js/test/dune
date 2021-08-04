@@ -1,6 +1,6 @@
 (library
  (name bindings_js_test)
  (js_of_ocaml (flags +toplevel.js +dynlink.js))
- (libraries marlin_plonk_bindings js_of_ocaml bindings_js)
+ (libraries marlin_plonk_bindings js_of_ocaml bindings_js hex)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version js_of_ocaml-ppx)))

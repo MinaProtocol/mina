@@ -17,7 +17,7 @@ extern "C" {
 }
 
 macro_rules! console_log {
-    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
+    ($($t:tt)*) => (crate::log(&format_args!($($t)*).to_string()))
 }
 
 #[wasm_bindgen]

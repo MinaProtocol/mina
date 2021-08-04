@@ -33,8 +33,9 @@
       }
       function discover_tests() {
         var discovered_tests = document.getElementById("discovered_tests");
+        var child;
         while (child = discovered_tests.firstChild) {
-          discovered_tests.removeChild(firstChild);
+          discovered_tests.removeChild(child);
         };
         for (var i in window) {
           if(i.indexOf("_test") != -1 && typeof window[i] === "object" && typeof window[i].run === "function") {

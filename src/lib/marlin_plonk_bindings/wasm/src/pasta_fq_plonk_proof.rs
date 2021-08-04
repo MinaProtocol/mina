@@ -30,6 +30,7 @@ use crate::wasm_flat_vector::WasmFlatVector;
 use crate::wasm_vector::WasmVector;
 use crate::pasta_pallas::WasmPallasGAffine;
 use crate::pasta_pallas_poly_comm::WasmPastaPallasPolyComm;
+use std::convert::TryInto;
 
 #[wasm_bindgen]
 #[derive(Clone)]
@@ -671,6 +672,8 @@ pub fn caml_pasta_fq_plonk_proof_create(
                 oracle::rndoracle::ProofError::EvaluationGroup => "caml_pasta_fq_plonk_proof_create: EvaluationGroup",
                 oracle::rndoracle::ProofError::OracleCommit => "caml_pasta_fq_plonk_proof_create: OracleCommit",
                 oracle::rndoracle::ProofError::RuntimeEnv => "caml_pasta_fq_plonk_proof_create: RuntimeEnv",
+                oracle::rndoracle::ProofError::BadMultiScalarMul => "caml_pasta_fq_plonk_proof_create: BadMultiScalarMul",
+                oracle::rndoracle::ProofError::BadSrsLength => "caml_pasta_fp_plonk_proof_create: BadSrsLength",
             };
         JsValue::from_str(str)
     })
@@ -683,6 +686,10 @@ pub fn proof_verify(
     proof: WasmPastaFqProverProof,
 ) -> bool {
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
+    let index = match index.try_into() {
+        Ok(index) => index,
+        Err(_) => return false
+    };
 
     DlogProof::verify::<
         DefaultFqSponge<PallasParameters, PlonkSpongeConstants>,
@@ -690,7 +697,7 @@ pub fn proof_verify(
     >(
         &group_map,
         &[(
-            &index.into(),
+            &index,
             &lgr_comm.into_iter().map(From::from).collect(),
             &proof.into(),
         )]
@@ -729,21 +736,22 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
     lgr_comms: WasmVecVecPallasPolyComm,
     indexes: WasmVector<WasmPastaFqPlonkVerifierIndex>,
     proofs: WasmVector<WasmPastaFqProverProof>,
-) -> bool {
-    let ts: Vec<_> = indexes
+) -> Result<bool, JsValue> {
+    let ts: Option<Vec<_>> = indexes
         .into_iter()
         .zip(lgr_comms.0.into_iter())
         .zip(proofs.into_iter())
-        .map(|((i, l), p)| (i.into(), l.into_iter().map(From::from).collect(), p.into()))
+        .map(|((i, l), p)| Some((i.try_into().ok()?, l.into_iter().map(From::from).collect(), p.into())))
         .collect();
+    let ts = ts.ok_or_else(|| JsValue::from_str("caml_pasta_fq_plonk_proof_batch_verify"))?;
     let ts: Vec<_> = ts.iter().map(|(i, l, p)| (i, l, p)).collect();
     let group_map = GroupMap::<Fp>::setup();
 
-    DlogProof::<GAffine>::verify::<
+    Ok(DlogProof::<GAffine>::verify::<
         DefaultFqSponge<PallasParameters, PlonkSpongeConstants>,
         DefaultFrSponge<Fq, PlonkSpongeConstants>,
     >(&group_map, &ts)
-    .is_ok()
+    .is_ok())
 }
 
 #[wasm_bindgen]

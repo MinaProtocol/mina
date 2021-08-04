@@ -20,6 +20,7 @@ use plonk_protocol_dlog::index::{VerifierIndex as DlogVerifierIndex};
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
+    convert::{TryFrom, TryInto},
 };
 
 use std::rc::Rc;
@@ -424,7 +425,7 @@ pub fn of_wasm<'a>(
     urs: &WasmPastaFpUrs,
     evals: &WasmPastaFpPlonkVerificationEvals,
     shifts: &WasmPastaFpPlonkVerificationShifts,
-) -> (DlogVerifierIndex<'a, GAffine>, Rc<SRS<GAffine>>) {
+) -> Option<(DlogVerifierIndex<'a, GAffine>, Rc<SRS<GAffine>>)> {
     let urs_copy = Rc::clone(&*urs);
     let urs_copy_outer = Rc::clone(&*urs);
     let srs = {
@@ -436,8 +437,8 @@ pub fn of_wasm<'a>(
     let domain = Domain::<Fp>::new(1 << log_size_of_group).unwrap();
     let index = DlogVerifierIndex::<GAffine> {
         domain,
-        w: zk_w(domain),
-        zkpm: zk_polynomial(domain),
+        w: zk_w(domain)?,
+        zkpm: zk_polynomial(domain)?,
         max_poly_size: max_poly_size as usize,
         max_quot_size: max_quot_size as usize,
         srs,
@@ -461,20 +462,20 @@ pub fn of_wasm<'a>(
         fq_sponge_params: oracle::pasta::fq::params(),
         endo: endo_q,
     };
-    (index, urs_copy_outer)
+    Some((index, urs_copy_outer))
 }
 
-impl From<WasmPastaFpPlonkVerifierIndex> for DlogVerifierIndex<'_, GAffine> {
-    fn from(index: WasmPastaFpPlonkVerifierIndex) -> Self {
-        of_wasm(
+impl TryFrom<WasmPastaFpPlonkVerifierIndex> for DlogVerifierIndex<'_, GAffine> {
+    type Error = ();
+    fn try_from(index: WasmPastaFpPlonkVerifierIndex) -> Result<Self, Self::Error> {
+        Ok(of_wasm(
             index.max_poly_size,
             index.max_quot_size,
             index.domain.log_size_of_group,
             &index.urs,
             &index.evals,
             &index.shifts,
-        )
-        .0
+        ).ok_or_else(|| ())?.0)
     }
 }
 
@@ -542,7 +543,9 @@ pub fn caml_pasta_fp_plonk_verifier_index_write(
     index: &WasmPastaFpPlonkVerifierIndex,
     path: String,
 ) -> Result<(), JsValue> {
-    write_raw(append, &index.clone().into(), path).map_err(|err| {
+    let index = TryInto::try_into(index.clone()).map_err(|()| {
+    JsValue::from_str("caml_pasta_fp_plonk_verifier_index_write: could not generate index") })?;
+    write_raw(append, &index, path).map_err(|err| {
     JsValue::from_str(format!("caml_pasta_fp_plonk_verifier_index_write: {}", err).as_str()) })
 }
 

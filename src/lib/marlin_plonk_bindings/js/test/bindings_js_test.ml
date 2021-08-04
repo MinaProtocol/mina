@@ -1158,4 +1158,387 @@ let _ =
            [ vindex0_0; vindex2_0; dummy0 ]
     end)
 
+let eq_proof_evaluations ~field_equal
+    { Types.Plonk_proof.Evaluations.l = l1
+    ; r = r1
+    ; o = o1
+    ; z = z1
+    ; t = t1
+    ; f = f1
+    ; sigma1 = sigma1_1
+    ; sigma2 = sigma2_1
+    }
+    { Types.Plonk_proof.Evaluations.l = l2
+    ; r = r2
+    ; o = o2
+    ; z = z2
+    ; t = t2
+    ; f = f2
+    ; sigma1 = sigma1_2
+    ; sigma2 = sigma2_2
+    } =
+  let field_equal = Array.for_all2 field_equal in
+  field_equal l1 l2 && field_equal r1 r2 && field_equal o1 o2
+  && field_equal z1 z2 && field_equal t1 t2 && field_equal f1 f2
+  && field_equal sigma1_1 sigma1_2
+  && field_equal sigma2_1 sigma2_2
+
+let eq_opening_proof ~field_equal ~other_field_equal
+    { Types.Plonk_proof.Opening_proof.lr = lr1
+    ; delta = delta1
+    ; z1 = z1_1
+    ; z2 = z2_1
+    ; sg = sg_1
+    }
+    { Types.Plonk_proof.Opening_proof.lr = lr2
+    ; delta = delta2
+    ; z1 = z1_2
+    ; z2 = z2_2
+    ; sg = sg_2
+    } =
+  let eq_affine = eq_affine ~field_equal:other_field_equal in
+  Array.for_all2
+    (fun x y -> eq_affine (fst x) (fst y) && eq_affine (snd x) (snd y))
+    lr1 lr2
+  && eq_affine delta1 delta2 && field_equal z1_1 z1_2 && field_equal z2_1 z2_2
+  && eq_affine sg_1 sg_2
+
+let eq_messages ~other_field_equal
+    { Types.Plonk_proof.Messages.l_comm = l1
+    ; r_comm = r1
+    ; o_comm = o1
+    ; z_comm = z1
+    ; t_comm = t1
+    }
+    { Types.Plonk_proof.Messages.l_comm = l2
+    ; r_comm = r2
+    ; o_comm = o2
+    ; z_comm = z2
+    ; t_comm = t2
+    } =
+  let eq_poly_comm = eq_poly_comm ~field_equal:other_field_equal in
+  eq_poly_comm l1 l2 && eq_poly_comm r1 r2 && eq_poly_comm o1 o2
+  && eq_poly_comm z1 z2 && eq_poly_comm t1 t2
+
+let eq_proof ~field_equal ~other_field_equal
+    { Types.Plonk_proof.messages = msg1
+    ; proof = pf1
+    ; evals = evals1
+    ; public = public1
+    ; prev_challenges = prev_challenges1
+    }
+    { Types.Plonk_proof.messages = msg2
+    ; proof = pf2
+    ; evals = evals2
+    ; public = public2
+    ; prev_challenges = prev_challenges2
+    } =
+  eq_messages ~other_field_equal msg1 msg2
+  && eq_opening_proof ~field_equal ~other_field_equal pf1 pf2
+  && eq_proof_evaluations ~field_equal (fst evals1) (fst evals2)
+  && eq_proof_evaluations ~field_equal (snd evals1) (snd evals2)
+  && Array.for_all2 field_equal public1 public2
+  && Array.for_all2
+       (fun (x1, y1) (x2, y2) ->
+         Array.for_all2 field_equal x1 x2
+         && eq_poly_comm ~field_equal:other_field_equal y1 y2)
+       prev_challenges1 prev_challenges2
+
+let vesta_lagranges =
+  Array.map
+    (Array.map (fun unshifted ->
+         { Types.Poly_comm.unshifted =
+             Array.map (fun c -> Types.Or_infinity.Finite c) unshifted
+         ; shifted = None
+         }))
+    Pasta_precomputed.Lagrange_precomputations.vesta
+
+let _ =
+  let open Pasta_fp_proof in
+  Js.export "pasta_fp_proof_test"
+    (object%js (_self)
+       method run =
+         let dummy1 = dummy () in
+         let dummy2 = dummy () in
+         let eq =
+           eq_proof ~field_equal:Pasta_fp.equal
+             ~other_field_equal:Pasta_fq.equal
+         in
+         assert (eq dummy1 dummy2) ;
+         let gate_vector =
+           let open Pasta_fp_index.Gate_vector in
+           let vec = create () in
+           let fields = Array.map Pasta_fp.of_int in
+           let zero = mk_wires Zero 0 (0, L) (0, R) (0, O) (fields [||]) in
+           let generic =
+             mk_wires Generic 1 (1, L) (1, R) (1, O)
+               (fields [| 1; 1; 1; 1; -4 |])
+           in
+           let add1 = mk_wires Add1 2 (2, L) (2, R) (2, O) (fields [||]) in
+           let add2 = mk_wires Add2 3 (3, L) (3, R) (3, O) (fields [||]) in
+           let poseidon =
+             mk_wires Poseidon 4 (4, L) (4, R) (4, O) (fields [| 0; 0; 0 |])
+           in
+           let vbmul1 = mk_wires Vbmul1 5 (5, L) (5, R) (5, O) (fields [||]) in
+           let vbmul2 = mk_wires Vbmul2 6 (6, L) (6, R) (6, O) (fields [||]) in
+           let vbmul3 = mk_wires Vbmul3 7 (7, L) (7, R) (7, O) (fields [||]) in
+           let endomul1 =
+             mk_wires Endomul1 8 (8, L) (8, R) (8, O) (fields [||])
+           in
+           let endomul2 =
+             mk_wires Endomul2 9 (9, L) (9, R) (9, O) (fields [||])
+           in
+           let endomul3 =
+             mk_wires Endomul3 10 (10, L) (10, R) (10, O) (fields [||])
+           in
+           let endomul4 =
+             mk_wires Endomul4 11 (11, L) (11, R) (11, O) (fields [||])
+           in
+           let all =
+             [ zero
+             ; generic
+             ; add1
+             ; add2
+             ; poseidon
+             ; vbmul1
+             ; vbmul2
+             ; vbmul3
+             ; endomul1
+             ; endomul2
+             ; endomul3
+             ; endomul4
+             ]
+           in
+           List.iter (add vec) all ;
+           vec
+         in
+         let urs = Pasta_fp_urs.create 16 in
+         let index1 = Pasta_fp_index.create gate_vector 1 urs in
+         let verifier_index1 = Pasta_fp_verifier_index.create index1 in
+
+         let proof = dummy1 in
+
+         let lagrange :
+             int -> Marlin_plonk_bindings.Pasta_fp_urs.Poly_comm.t array =
+          fun domain_log2 ->
+           vesta_lagranges.(Pasta_precomputed.Lagrange_precomputations
+                            .index_of_domain_log2 domain_log2)
+         in
+         let with_lagrange f (vk : Pasta_fp_verifier_index.t) =
+           f (lagrange vk.domain.log_size_of_group) vk
+         in
+         let with_lagranges f vks =
+           let lgrs =
+             Array.map
+               (fun (vk : Pasta_fp_verifier_index.t) ->
+                 lagrange vk.domain.log_size_of_group)
+               vks
+           in
+           f lgrs vks
+         in
+
+         assert (not (with_lagrange verify verifier_index1 dummy1)) ;
+         assert (
+           let res = with_lagrange verify verifier_index1 proof in
+           res || not res ) ;
+         assert (
+           not (with_lagranges batch_verify [| verifier_index1 |] [| dummy1 |])
+         ) ;
+         assert (
+           not
+             (with_lagranges batch_verify
+                [| verifier_index1; verifier_index1 |]
+                [| dummy1; dummy2 |]) )
+    end)
+
+let pallas_lagranges =
+  Array.map
+    (Array.map (fun unshifted ->
+         { Types.Poly_comm.unshifted =
+             Array.map (fun c -> Types.Or_infinity.Finite c) unshifted
+         ; shifted = None
+         }))
+    Pasta_precomputed.Lagrange_precomputations.pallas
+
+let _ =
+  let open Pasta_fq_proof in
+  Js.export "pasta_fq_proof_test"
+    (object%js (_self)
+       method run =
+         let dummy1 = dummy () in
+         let dummy2 = dummy () in
+         let eq =
+           eq_proof ~field_equal:Pasta_fq.equal
+             ~other_field_equal:Pasta_fp.equal
+         in
+         assert (eq dummy1 dummy2) ;
+         let gate_vector =
+           let open Pasta_fq_index.Gate_vector in
+           let vec = create () in
+           let fields = Array.map Pasta_fq.of_int in
+           let zero = mk_wires Zero 0 (0, L) (0, R) (0, O) (fields [||]) in
+           let generic =
+             mk_wires Generic 1 (1, L) (1, R) (1, O)
+               (fields [| 1; 1; 1; 1; -4 |])
+           in
+           let add1 = mk_wires Add1 2 (2, L) (2, R) (2, O) (fields [||]) in
+           let add2 = mk_wires Add2 3 (3, L) (3, R) (3, O) (fields [||]) in
+           let poseidon =
+             mk_wires Poseidon 4 (4, L) (4, R) (4, O) (fields [| 0; 0; 0 |])
+           in
+           let vbmul1 = mk_wires Vbmul1 5 (5, L) (5, R) (5, O) (fields [||]) in
+           let vbmul2 = mk_wires Vbmul2 6 (6, L) (6, R) (6, O) (fields [||]) in
+           let vbmul3 = mk_wires Vbmul3 7 (7, L) (7, R) (7, O) (fields [||]) in
+           let endomul1 =
+             mk_wires Endomul1 8 (8, L) (8, R) (8, O) (fields [||])
+           in
+           let endomul2 =
+             mk_wires Endomul2 9 (9, L) (9, R) (9, O) (fields [||])
+           in
+           let endomul3 =
+             mk_wires Endomul3 10 (10, L) (10, R) (10, O) (fields [||])
+           in
+           let endomul4 =
+             mk_wires Endomul4 11 (11, L) (11, R) (11, O) (fields [||])
+           in
+           let all =
+             [ zero
+             ; generic
+             ; add1
+             ; add2
+             ; poseidon
+             ; vbmul1
+             ; vbmul2
+             ; vbmul3
+             ; endomul1
+             ; endomul2
+             ; endomul3
+             ; endomul4
+             ]
+           in
+           List.iter (add vec) all ;
+           vec
+         in
+         let urs = Pasta_fq_urs.create 16 in
+         let index1 = Pasta_fq_index.create gate_vector 1 urs in
+         let verifier_index1 = Pasta_fq_verifier_index.create index1 in
+
+         let proof = dummy1 in
+
+         let lagrange :
+             int -> Marlin_plonk_bindings.Pasta_fq_urs.Poly_comm.t array =
+          fun domain_log2 ->
+           pallas_lagranges.(Pasta_precomputed.Lagrange_precomputations
+                             .index_of_domain_log2 domain_log2)
+         in
+         let with_lagrange f (vk : Pasta_fq_verifier_index.t) =
+           f (lagrange vk.domain.log_size_of_group) vk
+         in
+         let with_lagranges f vks =
+           let lgrs =
+             Array.map
+               (fun (vk : Pasta_fq_verifier_index.t) ->
+                 lagrange vk.domain.log_size_of_group)
+               vks
+           in
+           f lgrs vks
+         in
+
+         assert (not (with_lagrange verify verifier_index1 dummy1)) ;
+         assert (
+           let res = with_lagrange verify verifier_index1 proof in
+           res || not res ) ;
+         assert (
+           not (with_lagranges batch_verify [| verifier_index1 |] [| dummy1 |])
+         ) ;
+         assert (
+           not
+             (with_lagranges batch_verify
+                [| verifier_index1; verifier_index1 |]
+                [| dummy1; dummy2 |]) )
+    end)
+
+let random_oracles_to_array
+    { Types.Oracles.Random_oracles.beta
+    ; gamma
+    ; alpha_chal
+    ; alpha
+    ; zeta
+    ; v
+    ; u
+    ; zeta_chal
+    ; v_chal
+    ; u_chal
+    } =
+  let chal = function Types.Scalar_challenge.Scalar_challenge x -> x in
+  [| beta
+   ; gamma
+   ; chal alpha_chal
+   ; alpha
+   ; zeta
+   ; v
+   ; u
+   ; chal zeta_chal
+   ; chal v_chal
+   ; chal u_chal
+  |]
+
+let eq_random_oracles ~field_eq (x : _ Types.Oracles.t) (y : _ Types.Oracles.t)
+    =
+  List.for_all2 (Array.for_all2 field_eq)
+    [ random_oracles_to_array x.o
+    ; [| fst x.p_eval; snd x.p_eval |]
+    ; x.opening_prechallenges
+    ; [| x.digest_before_evaluations |]
+    ]
+    [ random_oracles_to_array y.o
+    ; [| fst y.p_eval; snd y.p_eval |]
+    ; y.opening_prechallenges
+    ; [| y.digest_before_evaluations |]
+    ]
+
+let _ =
+  let open Pasta_fp_oracles in
+  Js.export "pasta_fp_oracles_test"
+    (object%js (_self)
+       method run =
+         let dummy1 = dummy () in
+         let dummy2 = dummy () in
+         let eq = eq_random_oracles ~field_eq:Pasta_fp.equal in
+         assert (eq dummy1 dummy2) ;
+         let dummy3 = deep_copy dummy1 in
+         assert (eq dummy1 dummy3) ;
+         let created =
+           create
+             vesta_lagranges.(Pasta_precomputed.Lagrange_precomputations
+                              .index_of_domain_log2 16)
+             (Pasta_fp_verifier_index.dummy ())
+             (Pasta_fp_proof.dummy ())
+         in
+         let copied = deep_copy created in
+         assert (eq created copied)
+    end)
+
+let _ =
+  let open Pasta_fq_oracles in
+  Js.export "pasta_fq_oracles_test"
+    (object%js (_self)
+       method run =
+         let dummy1 = dummy () in
+         let dummy2 = dummy () in
+         let eq = eq_random_oracles ~field_eq:Pasta_fq.equal in
+         assert (eq dummy1 dummy2) ;
+         let dummy3 = deep_copy dummy1 in
+         assert (eq dummy1 dummy3) ;
+         let created =
+           create
+             pallas_lagranges.(Pasta_precomputed.Lagrange_precomputations
+                              .index_of_domain_log2 16)
+             (Pasta_fq_verifier_index.dummy ())
+             (Pasta_fq_proof.dummy ())
+         in
+         let copied = deep_copy created in
+         assert (eq created copied)
+    end)
+
 let linkme = ()
