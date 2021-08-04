@@ -1,7 +1,6 @@
-open Zexe_backend
 open Core_kernel
 
-module Inputs_common = struct
+module T = struct
   module Store = Key_cache_js.Trivial
 
   let run_in_thread f =
@@ -23,22 +22,4 @@ module Inputs_common = struct
       (fun _ urs path -> Or_error.try_with (fun () -> write urs path))
 end
 
-module Pasta = struct
-  open Pasta
-
-  module Vesta_based_plonk = Vesta_based_plonk.Make (struct
-    include Inputs_common
-
-    let store =
-      store ~read:Marlin_plonk_bindings.Pasta_fp_urs.read
-        ~write:Marlin_plonk_bindings.Pasta_fp_urs.write
-  end)
-
-  module Pallas_based_plonk = Pallas_based_plonk.Make (struct
-    include Inputs_common
-
-    let store =
-      store ~read:Marlin_plonk_bindings.Pasta_fq_urs.read
-        ~write:Marlin_plonk_bindings.Pasta_fq_urs.write
-  end)
-end
+let () = Zexe_backend_platform_specific.set (module T)

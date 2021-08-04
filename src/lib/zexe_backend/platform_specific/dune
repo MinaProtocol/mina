@@ -1,0 +1,4 @@
+(library
+  (name zexe_backend_platform_specific)
+  (public_name zexe_backend.platform_specific)
+  (libraries marlin_plonk_bindings async_kernel key_cache) )
