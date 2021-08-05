@@ -4,6 +4,8 @@ export class Keypair {
 export class Proof {
 }
 
+export type AsField = Field | number | string | boolean;
+
 export class Field {
   constructor(x: Field | number | string | boolean);
 
@@ -22,6 +24,11 @@ export class Field {
 
   sizeInFieldElements(): number;
   toFieldElements(): Field[];
+
+  lt(y: Field | number | string | boolean): Bool;
+  lte(y: Field | number | string | boolean): Bool;
+  gt(y: Field | number | string | boolean): Bool;
+  gte(y: Field | number | string | boolean): Bool;
 
   assertLt(y: Field | number | string | boolean);
   assertLte(y: Field | number | string | boolean);
@@ -209,13 +216,10 @@ export class Circuit {
     y: T
   ): T;
 
-  static generateKeypair<W, P>(
-    main: CircuitMain<W, P>,
-  ): Keypair;
+  static generateKeypair(): Keypair;
 
-  static prove<W, P>(
-    main: CircuitMain<W, P>,
-    w: W, p: P,
+  static prove(
+    w: any[], p: any[],
     kp: Keypair
   ): Proof;
 }

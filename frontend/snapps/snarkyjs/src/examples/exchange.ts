@@ -19,7 +19,7 @@ class Bytes extends CircuitValue {
     this.value = value;
   }
 
-  static ofString(s : string): Bytes {
+  static ofString(_ : string): Bytes {
     return new Bytes([]);
   }
 
@@ -91,7 +91,7 @@ class Trade {
   }
 }
 
-function getElt<A>(xs: Array<A>, i_ : Field | number | string) : A {
+function getElt<A>(xs: Array<A>, i_ : AsField) : A {
   let i = new Field(i_);
   let [ x, found ] = xs.reduce(([acc, found], x, j) => {
     let eltHere = i.equals(j);
@@ -101,7 +101,7 @@ function getElt<A>(xs: Array<A>, i_ : Field | number | string) : A {
   return x;
 }
 
-export class Main {
+export class Main extends C {
   @circuitMain
   // percentGain is an integer in basis points
   static main(witness: Witness, @public_ percentChange : Field) {

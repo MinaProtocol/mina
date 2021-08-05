@@ -43,7 +43,7 @@ console.log(Object.keys(Witness));
 // the signature verifies against Brave's public key and [newAcc] is
 // a re-randomization of [prevAcc]
 
-export class Main {
+export class Main extends Snarky.Circuit {
   @circuitMain
   static main(w: Witness, @public_ newAcc: Snarky.Group) {
     let H = new Snarky.Group({ x: -1, y: 2 });
@@ -65,18 +65,14 @@ class Circ extends Snarky.Circuit {
       acc = acc.mul(acc);
     }
   }
-
-  // TODO: This gets method
-  // static generateKeypair(): Keypair {
-  // }
-  // static prove(wit: any[], pub: any[]): Proof {
-  // }
-};
+}
 
 export function main() {
+  const before = new Date();
+  const kp = Circ.generateKeypair();
+  const after = new Date();
+  console.log('keypairgen', after.getTime() - before.getTime());
   console.log('random', Snarky.Field.random());
-  const kp = Snarky.Circuit.generateKeypair(Circ as any);
-  console.log('random', Snarky.Field.random());
-  const proof = Snarky.Circuit.prove(Circ as any, [], [ new Snarky.Field(2) ], kp);
+  const proof = Circ.prove([], [ new Snarky.Field(2) ], kp);
   console.log(proof, kp);
-}
+};
