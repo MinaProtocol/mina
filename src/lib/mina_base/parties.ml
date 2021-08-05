@@ -190,6 +190,9 @@ module Party_or_stack = struct
     let hash_party (p : Party.t) = Party.Predicated.digest p.data in
     accumulate_hashes ~hash_party xs
 
+  let accumulate_hashes_predicated xs =
+    accumulate_hashes ~hash_party:Party.Predicated.digest xs
+
   module With_hashes = struct
     [%%versioned
     module Stable = struct
@@ -206,8 +209,7 @@ module Party_or_stack = struct
 
     let hash_party ((p : Party.t), _) = Party.Predicated.digest p.data
 
-    let accumulate_hashes xs : _ t =
-      accumulate_hashes ~hash_party xs
+    let accumulate_hashes xs : _ t = accumulate_hashes ~hash_party xs
 
     let of_parties_list xs : _ t =
       of_parties_list

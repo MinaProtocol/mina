@@ -4307,7 +4307,7 @@ let%test_module "transaction_snark" =
             if List.length witness <> m then
               failwith @@ "witness length must be exactly " ^ Int.to_string m
             else
-              Base.dummy_constraints ()
+              dummy_constraints ()
               >>= fun () ->
               printf "reached line %s\n%!" __LOC__
               |> fun () ->
@@ -4552,6 +4552,10 @@ let%test_module "transaction_snark" =
                             ; update = update_empty_permissions
                             ; token_id = Token_id.default
                             ; delta = Amount.Signed.(negate (of_unsigned total))
+                            ; events = []
+                            ; rollup_events = []
+                            ; call_data = Field.zero
+                            ; depth = 0
                             }
                         ; predicate = sender_nonce
                         }
@@ -4565,14 +4569,24 @@ let%test_module "transaction_snark" =
                         ; update = update_empty_permissions
                         ; token_id = Token_id.default
                         ; delta = Amount.Signed.(of_unsigned amount)
+                        ; events = []
+                        ; rollup_events = []
+                        ; call_data = Field.zero
+                        ; depth = 0
                         }
                     ; predicate = Accept
                     }
                   in
                   let protocol_state = Snapp_predicate.Protocol_state.accept in
+                  let ps =
+                    Parties.Party_or_stack.of_parties_list
+                      ~party_depth:(fun (p : Party.Predicated.t) ->
+                        p.body.depth)
+                      [ snapp_party_data ]
+                    |> Parties.Party_or_stack.accumulate_hashes_predicated
+                  in
                   let other_parties_hash =
-                    Party.Predicated.digest snapp_party_data
-                    |> Parties.With_hashes.(Fn.flip cons_hash empty)
+                    Parties.Party_or_stack.stack_hash ps
                   in
                   let protocol_state_predicate_hash =
                     (*FIXME: is this ok? *)
@@ -4583,10 +4597,7 @@ let%test_module "transaction_snark" =
                     Parties.Transaction_commitment.create ~other_parties_hash
                       ~protocol_state_predicate_hash
                   in
-                  let at_party =
-                    Party.Predicated.digest snapp_party_data
-                    |> Parties.With_hashes.(Fn.flip cons_hash empty)
-                  in
+                  let at_party = Parties.Party_or_stack.stack_hash ps in
                   let tx_statement : Snapp_statement.t =
                     { transaction; at_party }
                   in
@@ -4602,13 +4613,14 @@ let%test_module "transaction_snark" =
                   in
                   printf "reached line %s\n%!" __LOC__
                   |> fun () ->
+                  let other_parties =
+                    [ { Party.data = snapp_party_data
+                      ; authorization = Proof pi
+                      }
+                    ]
+                  in
                   let parties : Parties.t =
-                    { fee_payer
-                    ; other_parties =
-                        [ { data = snapp_party_data; authorization = Proof pi }
-                        ]
-                    ; protocol_state
-                    }
+                    { fee_payer; other_parties; protocol_state }
                   in
                   printf "reached line %s\n%!" __LOC__
                   |> fun () ->
@@ -4617,17 +4629,21 @@ let%test_module "transaction_snark" =
                         Sparse_ledger.of_ledger_subset_exn ledger
                           (Parties.accounts_accessed parties)
                     ; local_state_init =
-                        { Local_state.dummy with
-                          parties = []
+                        { parties = []
+                        ; call_stack = []
                         ; ledger =
                             Sparse_ledger.of_root ~depth:ledger_depth
                               ~next_available_token:Token_id.(next default)
                               Local_state.dummy.ledger
+                        ; transaction_commitment = transaction
+                        ; token_id = Token_id.default
+                        ; excess = total
+                        ; success = true
+                        ; will_succeed = true
                         }
                     ; start_parties =
                         [ { will_succeed = true
-                          ; protocol_state_predicate =
-                              Snapp_predicate.Protocol_state.accept
+                          ; protocol_state_predicate = protocol_state
                           ; parties
                           }
                         ]
@@ -4654,8 +4670,11 @@ let%test_module "transaction_snark" =
                         ; local_state =
                             { w.local_state_init with
                               parties =
-                                Parties.With_hashes.digest
+                                Parties.Party_or_stack.With_hashes.stack_hash
                                   w.local_state_init.parties
+                            ; call_stack =
+                                Parties.Party_or_stack.With_hashes.stack_hash
+                                  w.local_state_init.call_stack
                             ; ledger =
                                 Sparse_ledger.merkle_root
                                   w.local_state_init.ledger
@@ -4669,12 +4688,15 @@ let%test_module "transaction_snark" =
                         ; local_state =
                             { local_state_post with
                               parties =
-                                List.fold (List.rev local_state_post.parties)
-                                  ~init:Parties.With_hashes.empty
-                                  ~f:(fun acc p ->
-                                    Parties.With_hashes.cons_hash
-                                      (Party.Predicated.digest p.data)
-                                      acc)
+                                Parties.Party_or_stack.(
+                                  stack_hash
+                                    (accumulate_hashes'
+                                       local_state_post.parties))
+                            ; call_stack =
+                                Parties.Party_or_stack.(
+                                  stack_hash
+                                    (accumulate_hashes'
+                                       local_state_post.call_stack))
                             ; ledger =
                                 (* TODO: This won't quite work when the transaction fails. *)
                                 Ledger.merkle_root local_state_post.ledger
@@ -4920,6 +4942,10 @@ let%test_module "transaction_snark" =
                             ; update = update_empty_permissions
                             ; token_id = Token_id.default
                             ; delta = Amount.Signed.(negate (of_unsigned total))
+                            ; events = []
+                            ; rollup_events = []
+                            ; call_data = Field.zero
+                            ; depth = 0
                             }
                         ; predicate = sender_nonce
                         }
@@ -4933,14 +4959,24 @@ let%test_module "transaction_snark" =
                         ; update = update_empty_permissions
                         ; token_id = Token_id.default
                         ; delta = Amount.Signed.(of_unsigned amount)
+                        ; events = []
+                        ; rollup_events = []
+                        ; call_data = Field.zero
+                        ; depth = 0
                         }
                     ; predicate = Accept
                     }
                   in
                   let protocol_state = Snapp_predicate.Protocol_state.accept in
+                  let ps =
+                    Parties.Party_or_stack.of_parties_list
+                      ~party_depth:(fun (p : Party.Predicated.t) ->
+                        p.body.depth)
+                      [ snapp_party_data ]
+                    |> Parties.Party_or_stack.accumulate_hashes_predicated
+                  in
                   let other_parties_hash =
-                    Party.Predicated.digest snapp_party_data
-                    |> Parties.With_hashes.(Fn.flip cons_hash empty)
+                    Parties.Party_or_stack.stack_hash ps
                   in
                   let protocol_state_predicate_hash =
                     (*FIXME: is this ok? *)
@@ -4951,10 +4987,7 @@ let%test_module "transaction_snark" =
                     Parties.Transaction_commitment.create ~other_parties_hash
                       ~protocol_state_predicate_hash
                   in
-                  let at_party =
-                    Party.Predicated.digest snapp_party_data
-                    |> Parties.With_hashes.(Fn.flip cons_hash empty)
-                  in
+                  let at_party = Parties.Party_or_stack.stack_hash ps in
                   let tx_statement : Snapp_statement.t =
                     { transaction; at_party }
                   in
@@ -5006,12 +5039,17 @@ let%test_module "transaction_snark" =
                         Sparse_ledger.of_ledger_subset_exn ledger
                           (Parties.accounts_accessed parties)
                     ; local_state_init =
-                        { Local_state.dummy with
-                          parties = []
+                        { parties = []
+                        ; call_stack = []
                         ; ledger =
                             Sparse_ledger.of_root ~depth:ledger_depth
                               ~next_available_token:Token_id.(next default)
                               Local_state.dummy.ledger
+                        ; transaction_commitment = transaction
+                        ; token_id = Token_id.default
+                        ; excess = total
+                        ; success = true
+                        ; will_succeed = true
                         }
                     ; start_parties =
                         [ { will_succeed = true
@@ -5043,8 +5081,11 @@ let%test_module "transaction_snark" =
                         ; local_state =
                             { w.local_state_init with
                               parties =
-                                Parties.With_hashes.digest
+                                Parties.Party_or_stack.With_hashes.stack_hash
                                   w.local_state_init.parties
+                            ; call_stack =
+                                Parties.Party_or_stack.With_hashes.stack_hash
+                                  w.local_state_init.call_stack
                             ; ledger =
                                 Sparse_ledger.merkle_root
                                   w.local_state_init.ledger
@@ -5058,12 +5099,15 @@ let%test_module "transaction_snark" =
                         ; local_state =
                             { local_state_post with
                               parties =
-                                List.fold (List.rev local_state_post.parties)
-                                  ~init:Parties.With_hashes.empty
-                                  ~f:(fun acc p ->
-                                    Parties.With_hashes.cons_hash
-                                      (Party.Predicated.digest p.data)
-                                      acc)
+                                Parties.Party_or_stack.(
+                                  stack_hash
+                                    (accumulate_hashes'
+                                       local_state_post.parties))
+                            ; call_stack =
+                                Parties.Party_or_stack.(
+                                  stack_hash
+                                    (accumulate_hashes'
+                                       local_state_post.call_stack))
                             ; ledger =
                                 (* TODO: This won't quite work when the transaction fails. *)
                                 Ledger.merkle_root local_state_post.ledger
