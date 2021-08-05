@@ -151,8 +151,8 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
             `Failed
         | Ok (Some block) ->
             `Succeeded block )
-      ~retry_count:20 ~initial_delay:(Span.of_ms 250.0)
-      ~each_delay:(Span.of_ms 500.0)
+      ~retry_count:20 ~initial_delay:(Span.of_sec 1.0)
+      ~each_delay:(Span.of_sec 1.0)
       ~failure_reason:"Took too long for a block to be created"
   in
   [%log debug]
@@ -276,6 +276,8 @@ let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
           ; _type= "fee_payer_dec"
           ; target= `Check None } ]
 
+(* token creation disabled in daemon for now *)
+(*
 let direct_graphql_create_token_through_block ~logger ~rosetta_uri ~graphql_uri
     ~network_response =
   let open Deferred.Result.Let_syntax in
@@ -322,6 +324,7 @@ let direct_graphql_create_token_account_through_block ~logger ~rosetta_uri
           ; status= "Pending"
           ; _type= "fee_payer_dec"
           ; target= `Check None } ]
+*)
 
 let construction_api_transaction_through_mempool ~logger ~rosetta_uri
     ~graphql_uri ~network_response ~operation_expectations ~operations =
@@ -470,6 +473,8 @@ let construction_api_delegation_through_mempool =
           ; _type= "fee_payer_dec"
           ; target= `Check None } ]
 
+(* token creation disabled in daemon for now *)
+(*
 let construction_api_create_token_through_mempool =
   construction_api_transaction_through_mempool
     ~operations:(fun account_id ->
@@ -502,6 +507,7 @@ let construction_api_create_token_account_through_mempool =
           ; status= "Pending"
           ; _type= "fee_payer_dec"
           ; target= `Check None } ]
+*)
 
 let get_consensus_constants ~logger :
     Consensus.Constants.t Or_error.t Deferred.t =
@@ -716,8 +722,10 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
       ~graphql_uri ~network_response
   in
   [%log info] "Created construction delegation and waited" ;
+  (* token creation is disabled in daemon for now *)
+  (*
+   [%log info] "Starting create token check" ;
   (* Stop staking *)
-  [%log info] "Starting create token check" ;
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   let%bind () =
     direct_graphql_create_token_through_block ~logger ~rosetta_uri ~graphql_uri
@@ -748,8 +756,8 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
   let%bind _ =
     historical_balance_check ~logger ~rosetta_uri ~network_response
   in
+  *)
   [%log info] "Finished historical balance check" ;
-  (* Stop staking *)
   (* Success *)
   return ()
 
