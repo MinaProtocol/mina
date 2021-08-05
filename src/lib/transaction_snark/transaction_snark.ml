@@ -2984,13 +2984,13 @@ module Verification = struct
   module type S = sig
     val tag : tag
 
-    val verify : (t * Sok_message.t) list -> bool Async.Deferred.t
+    val verify : (t * Sok_message.t) list -> bool
 
     val id : Pickles.Verification_key.Id.t Lazy.t
 
     val verification_key : Pickles.Verification_key.t Lazy.t
 
-    val verify_against_digest : t -> bool Async.Deferred.t
+    val verify_against_digest : t -> bool
 
     val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
   end
@@ -3314,18 +3314,15 @@ let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
         pending_coinbase_stack_state handler
 
 let verify (ts : (t * _) list) ~key =
-  if
-    List.for_all ts ~f:(fun ({statement; _}, message) ->
-        Sok_message.Digest.equal
-          (Sok_message.digest message)
-          statement.sok_digest )
-  then
-    Pickles.verify
-      (module Nat.N2)
-      (module Statement.With_sok)
-      key
-      (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
-  else Async.return false
+  List.for_all ts ~f:(fun ({statement; _}, message) ->
+      Sok_message.Digest.equal
+        (Sok_message.digest message)
+        statement.sok_digest )
+  && Pickles.verify
+       (module Nat.N2)
+       (module Statement.With_sok)
+       key
+       (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
 
 let constraint_system_digests ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
@@ -3364,14 +3361,11 @@ struct
     Proof.verify [(statement, proof)]
 
   let verify ts =
-    if
-      List.for_all ts ~f:(fun (p, m) ->
-          Sok_message.Digest.equal (Sok_message.digest m)
-            p.statement.sok_digest )
-    then
-      Proof.verify
-        (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
-    else Async.return false
+    List.for_all ts ~f:(fun (p, m) ->
+        Sok_message.Digest.equal (Sok_message.digest m) p.statement.sok_digest
+    )
+    && Proof.verify
+         (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
 
   let of_transaction_union sok_digest source target ~init_stack
       ~pending_coinbase_stack_state ~next_available_token_before
@@ -4309,9 +4303,7 @@ let%test_module "transaction_snark" =
                     merge ~sok_digest proof12 proof23 )
                 |> Or_error.ok_exn
               in
-              Async.Thread_safe.block_on_async (fun () ->
-                  Proof.verify [(proof13.statement, proof13.proof)] )
-              |> Result.ok_exn ) )
+              Proof.verify [(proof13.statement, proof13.proof)] ) )
 
     let%test "base_and_merge: transactions in one block (t1,t2 in b1), \
               carryforward the state from a previous transaction t0 in b1" =

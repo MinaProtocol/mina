@@ -16,8 +16,7 @@ let dirs_trustlist =
   ; "tablecloth"
   ; "zexe"
   ; "marlin"
-  ; "snarky"
-  ; "_opam" ]
+  ; "snarky" ]
 
 let rec fold_over_files ~path ~process_path ~init ~f =
   let%bind all = Sys.ls_dir path in

@@ -76,4 +76,3 @@ automation/services/watchdog/check_libp2p/check_libp2p
 *.backup
 
 *.terraform.lock.hcl
-_opam

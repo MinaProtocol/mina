@@ -11,7 +11,7 @@ type ledger_proof = Ledger_proof.Prod.t
 module Worker_state = struct
   module type S = sig
     val verify_blockchain_snarks :
-      (Protocol_state.Value.t * Proof.t) list -> bool Deferred.t
+      (Protocol_state.Value.t * Proof.t) list -> bool
 
     val verify_commands :
          Mina_base.User_command.Verifiable.t list
@@ -23,10 +23,9 @@ module Worker_state = struct
            * Pickles.Side_loaded.Proof.t )
            list ]
          list
-         Deferred.t
 
     val verify_transaction_snarks :
-      (Transaction_snark.t * Sok_message.t) list -> bool Deferred.t
+      (Transaction_snark.t * Sok_message.t) list -> bool
   end
 
   (* bin_io required by rpc_parallel *)
@@ -60,8 +59,8 @@ module Worker_state = struct
                let proof_level = proof_level
              end)
 
-             let verify_commands (cs : User_command.Verifiable.t list) :
-                 _ list Deferred.t =
+             let verify_commands (cs : User_command.Verifiable.t list) : _ list
+                 =
                let cs = List.map cs ~f:Common.check in
                let to_verify =
                  List.concat_map cs ~f:(function
@@ -72,7 +71,7 @@ module Worker_state = struct
                    | `Valid_assuming (_, xs) ->
                        xs )
                in
-               let%map all_verified =
+               let all_verified =
                  Pickles.Side_loaded.verify
                    ~value_to_field_elements:Snapp_statement.to_field_elements
                    to_verify
@@ -111,11 +110,10 @@ module Worker_state = struct
                        `Invalid
                    | `Valid_assuming (c, _) ->
                        `Valid c )
-               |> Deferred.return
 
-             let verify_blockchain_snarks _ = Deferred.return true
+             let verify_blockchain_snarks _ = true
 
-             let verify_transaction_snarks _ = Deferred.return true
+             let verify_transaction_snarks _ = true
            end
            : S )
 
@@ -160,18 +158,19 @@ module Worker = struct
       let verify_blockchains (w : Worker_state.t) (chains : Blockchain.t list)
           =
         let (module M) = Worker_state.get w in
-        M.verify_blockchain_snarks
-          (List.map chains ~f:(fun snark ->
-               ( Blockchain_snark.Blockchain.state snark
-               , Blockchain_snark.Blockchain.proof snark ) ))
+        Deferred.return
+          (M.verify_blockchain_snarks
+             (List.map chains ~f:(fun snark ->
+                  ( Blockchain_snark.Blockchain.state snark
+                  , Blockchain_snark.Blockchain.proof snark ) )))
 
       let verify_transaction_snarks (w : Worker_state.t) ts =
         let (module M) = Worker_state.get w in
-        M.verify_transaction_snarks ts
+        Deferred.return (M.verify_transaction_snarks ts)
 
       let verify_commands (w : Worker_state.t) ts =
         let (module M) = Worker_state.get w in
-        M.verify_commands ts
+        Deferred.return (M.verify_commands ts)
 
       let functions =
         let f (i, o, f) =
