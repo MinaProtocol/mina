@@ -1915,18 +1915,15 @@ module Base = struct
             } ->
             ( match (auth_type, snapp_statement) with
             | Proof, Some (i, s) ->
-                printf "reached line %s\n%!" __LOC__
-                |> fun () ->
                 Pickles.Side_loaded.in_circuit (side_loaded i)
                   (Lazy.force account.data.snapp.verification_key.data) ;
                 Snapp_statement.Checked.Assert.equal
                   { transaction = transaction_commitment; at_party }
                   s
             | (Signature | None_given), None ->
-                printf "reached line %s\n%!" __LOC__ |> fun () -> ()
+                ()
             | Proof, None | (Signature | None_given), Some _ ->
-                printf "reached line %s\n%!" __LOC__ |> fun () -> assert false
-            ) ;
+                assert false ) ;
             let transaction_commitment =
               let with_party () =
                 Parties.Transaction_commitment.Checked.with_fee_payer
@@ -1982,19 +1979,8 @@ module Base = struct
             let success =
               match auth_type with
               | None_given | Signature ->
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
-                  ( if Control.Tag.equal auth_type None_given then
-                    printf "auth_type = NONE_GIVEN\n%!"
-                  else
-                    printf "auth_type = Signature\n%!"
-                    |> fun () ->
-                    Boolean.Assert.is_true checks_succeeded |> fun () -> () )
-                  |> fun () ->
                   Boolean.((not proof_must_verify) && checks_succeeded)
               | Proof ->
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   (* We always assert that the proof verifies. *)
                   checks_succeeded
             in
@@ -2011,8 +1997,6 @@ module Base = struct
 
     let main ?(witness : Witness.t option) (spec : Spec.t) ~constraint_constants
         snapp_statements (statement : Statement.With_sok.Checked.t) =
-      printf "reached line %s\n%!" __LOC__
-      |> fun () ->
       let open Impl in
       run_checked (dummy_constraints ()) ;
       let ( ! ) x = Option.value_exn x in
@@ -2020,8 +2004,6 @@ module Base = struct
         exists (Mina_state.Protocol_state.Body.typ ~constraint_constants)
           ~compute:(fun () -> !witness.state_body)
       in
-      printf "reached line %s\n%!" __LOC__
-      |> fun () ->
       let module V = Prover_value in
       let `Needs_some_work_for_snapps_on_mainnet = Mina_base.Util.todo_snapps in
       (* TODO: Must check the state_body against the pending coinbase stack somehow. *)
@@ -2055,16 +2037,10 @@ module Base = struct
         in
         (g, l)
       in
-      printf "reached line %s\n%!" __LOC__
-      |> fun () ->
       let start_parties =
         As_prover.Ref.create (fun () -> !witness.start_parties)
       in
-      printf "reached line %s\n%!" __LOC__
-      |> fun () ->
       let (global, local), snapp_statements =
-        printf "statements length %d\n%!" @@ List.length snapp_statements
-        |> fun () ->
         List.fold_left spec ~init:(init, snapp_statements)
           ~f:(fun (((_, local) as acc), statements) party_spec ->
             let snapp_statement, statements =
@@ -2072,17 +2048,12 @@ module Base = struct
               | Signature | None_given ->
                   (None, statements)
               | Proof -> (
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   match statements with
                   | [] ->
-                      printf "reached line %s\n%!" __LOC__
-                      |> fun () -> assert false
+                      assert false
                   | s :: ss ->
                       (Some s, ss) )
             in
-            printf "reached line %s\n%!" __LOC__
-            |> fun () ->
             let module S = Single (struct
               let constraint_constants = constraint_constants
 
@@ -2090,11 +2061,7 @@ module Base = struct
 
               let snapp_statement = snapp_statement
             end) in
-            printf "reached line %s\n%!" __LOC__
-            |> fun () ->
             let finish v =
-              printf "reached line %s\n%!" __LOC__
-              |> fun () ->
               let open Parties_logic.Start_data in
               let will_succeed =
                 exists Boolean.typ ~compute:(fun () ->
@@ -2104,8 +2071,6 @@ module Base = struct
                     | `Start p ->
                         p.will_succeed)
               in
-              printf "reached line %s\n%!" __LOC__
-              |> fun () ->
               let ps =
                 V.map v ~f:(function
                   | `Skip ->
@@ -2116,14 +2081,10 @@ module Base = struct
                       |> List.map ~f:(fun party -> (party, ()))
                       |> Parties.Party_or_stack.With_hashes.of_parties_list)
               in
-              printf "reached line %s\n%!" __LOC__
-              |> fun () ->
               let h =
                 exists Field.typ ~compute:(fun () ->
                     Parties.Party_or_stack.With_hashes.stack_hash (V.get ps))
               in
-              printf "reached line %s\n%!" __LOC__
-              |> fun () ->
               let start_data =
                 { Parties_logic.Start_data.parties = (h, ps)
                 ; will_succeed
@@ -2137,8 +2098,6 @@ module Base = struct
                             p.protocol_state_predicate)
                 }
               in
-              printf "reached line %s\n%!" __LOC__
-              |> fun () ->
               S.apply
                 ~is_start:
                   ( match party_spec.is_start with
@@ -2151,16 +2110,11 @@ module Base = struct
                 S.{ perform }
                 acc
             in
-            printf "reached line %s\n%!" __LOC__
-            |> fun () ->
             let acc' =
               match party_spec.is_start with
               | `No ->
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () -> S.apply ~is_start:`No S.{ perform } acc
+                  S.apply ~is_start:`No S.{ perform } acc
               | `Compute_in_circuit ->
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   V.create (fun () ->
                       match As_prover.Ref.get start_parties with
                       | [] ->
@@ -2176,33 +2130,23 @@ module Base = struct
                           else `Skip)
                   |> finish
               | `Yes ->
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   as_prover
                     As_prover.(
                       fun () ->
                         [%test_eq: Impl.Field.Constant.t]
                           Parties.Party_or_stack.empty
                           (read_var (fst local.parties))) ;
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   V.create (fun () ->
                       match As_prover.Ref.get start_parties with
                       | [] ->
-                          printf "reached line %s\n%!" __LOC__
-                          |> fun () -> assert false
+                          assert false
                       | p :: ps ->
-                          printf "reached line %s\n%!" __LOC__
-                          |> fun () ->
                           As_prover.Ref.set start_parties ps ;
                           `Start p)
-                  |> fun v ->
-                  printf "reached line %s\n%!" __LOC__ |> fun () -> v |> finish
+                  |> finish
             in
-            printf "reached line %s\n%!" __LOC__ |> fun () -> (acc', statements))
+            (acc', statements))
       in
-      printf "reached line %s\n%!" __LOC__
-      |> fun () ->
       assert (List.is_empty snapp_statements) ;
       with_label __LOC__ (fun () ->
           Local_state.Checked.assert_equal statement.target.local_state
@@ -4287,8 +4231,6 @@ let%test_module "transaction_snark" =
 
           (* verify witness signatures against public keys *)
           let%snarkydef verify_sigs pubkeys commitment witness =
-            printf "reached line %s\n%!" __LOC__
-            |> fun () ->
             let%bind pubkeys =
               exists
                 (Typ.list ~length:(List.length pubkeys) Inner_curve.typ)
@@ -4302,17 +4244,11 @@ let%test_module "transaction_snark" =
             Checked.List.map witness ~f:verify_sig >>= Boolean.Assert.all
 
           let check_witness m pubkeys commitment witness =
-            printf "reached line %s\n%!" __LOC__
-            |> fun () ->
             if List.length witness <> m then
               failwith @@ "witness length must be exactly " ^ Int.to_string m
             else
               dummy_constraints ()
               >>= fun () ->
-              printf "reached line %s\n%!" __LOC__
-              |> fun () ->
-              printf "reached line %s\n%!" __LOC__
-              |> fun () ->
               distinct_public_keys witness
               >>= fun () -> verify_sigs pubkeys commitment witness
 
@@ -4458,16 +4394,12 @@ let%test_module "transaction_snark" =
                           ; main_value = (fun [ _; _ ] _ -> [ true; true ])
                           ; main =
                               (fun [ _; _ ] _ ->
-                                printf "reached line %s\n%!" __LOC__
-                                |> fun () ->
                                 local_dummy_constraints ()
                                 |> fun () ->
                                 (* Unsatisfiable. *)
                                 Run.exists Field.typ ~compute:(fun () ->
                                     Run.Field.Constant.zero)
                                 |> fun s ->
-                                printf "reached line %s\n%!" __LOC__
-                                |> fun () ->
                                 Run.Field.(Assert.equal s (s + one))
                                 |> fun () :
                                        ( Snapp_statement.Checked.t
@@ -4480,13 +4412,9 @@ let%test_module "transaction_snark" =
                           }
                         ])
                   in
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   let vk =
                     Pickles.Side_loaded.Verification_key.of_compiled tag
                   in
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   let { Transaction_logic.For_tests.Transaction_spec.fee
                       ; sender = sender, sender_nonce
                       ; receiver = trivial_account_pk
@@ -4494,13 +4422,9 @@ let%test_module "transaction_snark" =
                       } =
                     spec
                   in
-                  printf "AMOUNT = %d" @@ Amount.to_int amount
-                  |> fun () ->
                   let vk =
                     With_hash.of_data ~hash_data:Snapp_account.digest_vk vk
                   in
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   (let _is_new, _loc =
                      let id =
                        Public_key.compress sender.public_key
@@ -4530,8 +4454,6 @@ let%test_module "transaction_snark" =
                              verification_key = Some vk
                            }
                      }) ;
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   let total = Option.value_exn (Amount.add fee amount) in
                   let update_empty_permissions =
                     let permissions =
@@ -4605,14 +4527,10 @@ let%test_module "transaction_snark" =
                       (Snarky_backendless.Request.With { request; respond }) =
                     match request with _ -> respond Unhandled
                   in
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   let pi : Pickles.Side_loaded.Proof.t =
                     (fun () -> trivial_prover ~handler [] tx_statement)
                     |> Async.Thread_safe.block_on_async_exn
                   in
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   let other_parties =
                     [ { Party.data = snapp_party_data
                       ; authorization = Proof pi
@@ -4622,8 +4540,6 @@ let%test_module "transaction_snark" =
                   let parties : Parties.t =
                     { fee_payer; other_parties; protocol_state }
                   in
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   let w : Parties_segment.Witness.t =
                     { global_ledger =
                         Sparse_ledger.of_ledger_subset_exn ledger
@@ -4650,8 +4566,6 @@ let%test_module "transaction_snark" =
                     ; state_body
                     }
                   in
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   let _, (local_state_post, excess) =
                     Ledger.apply_parties_unchecked ledger ~constraint_constants
                       ~state_view:
@@ -4659,8 +4573,6 @@ let%test_module "transaction_snark" =
                       parties
                     |> Or_error.ok_exn
                   in
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   let statement : Statement.With_sok.t =
                     { source =
                         { ledger = Sparse_ledger.merkle_root w.global_ledger
@@ -4715,8 +4627,6 @@ let%test_module "transaction_snark" =
                     ; sok_digest = Sok_message.Digest.default
                     }
                   in
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   let open Impl in
                   run_and_check
                     (fun () ->
@@ -4724,8 +4634,6 @@ let%test_module "transaction_snark" =
                         exists Statement.With_sok.typ ~compute:(fun () ->
                             statement)
                       in
-                      printf "reached line %s\n%!" __LOC__
-                      |> fun () ->
                       Base.Parties_snark.main ~constraint_constants
                         [ { predicate_type = `Nonce_or_accept
                           ; auth_type = Signature
@@ -4809,8 +4717,6 @@ let%test_module "transaction_snark" =
                           ]
                           |> Fn.flip List.drop not_signing
                         in
-                        printf "reached line %s\n%!" __LOC__
-                        |> fun () ->
                         M_of_n_predicate.check_witness 2 [ pk0; pk1; pk2 ]
                           msg_var witness
                       in
@@ -4869,8 +4775,6 @@ let%test_module "transaction_snark" =
                                   in
                                   ()
                                 in
-                                printf "reached line %s\n%!" __LOC__
-                                |> fun () ->
                                 dummy_constraints ()
                                 |> fun () ->
                                 (* Unsatisfiable. *)
@@ -5016,14 +4920,10 @@ let%test_module "transaction_snark" =
                     | _ ->
                         respond Unhandled
                   in
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   let pi : Pickles.Side_loaded.Proof.t =
                     (fun () -> multisig_prover ~handler [] tx_statement)
                     |> Async.Thread_safe.block_on_async_exn
                   in
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   let parties : Parties.t =
                     { fee_payer
                     ; other_parties =
@@ -5032,8 +4932,6 @@ let%test_module "transaction_snark" =
                     ; protocol_state
                     }
                   in
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   let w : Parties_segment.Witness.t =
                     { global_ledger =
                         Sparse_ledger.of_ledger_subset_exn ledger
@@ -5061,8 +4959,6 @@ let%test_module "transaction_snark" =
                     ; state_body
                     }
                   in
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   let _, (local_state_post, excess) =
                     Ledger.apply_parties_unchecked ledger ~constraint_constants
                       ~state_view:
@@ -5070,8 +4966,6 @@ let%test_module "transaction_snark" =
                       parties
                     |> Or_error.ok_exn
                   in
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   let statement : Statement.With_sok.t =
                     { source =
                         { ledger = Sparse_ledger.merkle_root w.global_ledger
@@ -5126,8 +5020,6 @@ let%test_module "transaction_snark" =
                     ; sok_digest = Sok_message.Digest.default
                     }
                   in
-                  printf "reached line %s\n%!" __LOC__
-                  |> fun () ->
                   let open Impl in
                   run_and_check
                     (fun () ->
@@ -5135,8 +5027,6 @@ let%test_module "transaction_snark" =
                         exists Statement.With_sok.typ ~compute:(fun () ->
                             statement)
                       in
-                      printf "reached line %s\n%!" __LOC__
-                      |> fun () ->
                       Base.Parties_snark.main ~constraint_constants
                         [ { predicate_type = `Nonce_or_accept
                           ; auth_type = Signature
