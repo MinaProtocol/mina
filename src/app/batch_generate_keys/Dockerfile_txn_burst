@@ -5,6 +5,10 @@
 #run with:
 # docker run --entrypoint ./_build/default/src/app/batch_generate_keys/batch_generate_keys.exe txn_burst_util gen-there-and-back-txns --num-accts 1 --num-txn-per-acct 10 --origin-sender-pk B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV
 
+#or run with:
+# docker run -v <demo key local path>:/home/opam/key/demo_key --entrypoint ./_build/default/src/app/batch_generate_keys/batch_generate_keys.exe txn_burst_util gen-there-and-back-txns --num-accts 1 --num-txn-per-acct 10 --origin-sender-sk-path "/home/opam/key/demo_key"
+
+
 FROM gcr.io/o1labs-192920/mina-rosetta-builder
 
 COPY ./batch_generate_keys.ml /
@@ -24,5 +28,8 @@ RUN eval $(opam config env) \
     src/app/rosetta/ocaml-signer/signer.exe \
   && rm -rf _build \
   && dune build src/app/batch_generate_keys/batch_generate_keys.exe
+
+RUN mkdir /home/opam/key && chmod 700 /home/opam/key
+ENV MINA_PRIVKEY_PASS ""
 
 ENTRYPOINT ["./_build/default/src/app/batch_generate_keys/batch_generate_keys.exe"]
