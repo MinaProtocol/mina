@@ -30,6 +30,7 @@ Pipeline.build
     spec =
       JobSpec::{
         dirtyWhen = [
+            S.strictly (S.contains "Makefile"),
             S.strictlyStart (S.contains "src"),
             S.strictlyStart (S.contains "scripts/archive"),
             S.strictlyStart (S.contains "automation"),

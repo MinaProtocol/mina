@@ -16,7 +16,7 @@ locals {
   }
 
   default_archive_node = {
-    image                   = var.coda_archive_image
+    image                   = var.mina_archive_image
     serverPort              = "3086"
     externalPort            = "11010"
     enableLocalDaemon       = true
