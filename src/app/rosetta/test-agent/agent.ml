@@ -58,8 +58,8 @@ let get_last_block_index ~rosetta_uri ~network_response ~logger =
           `Failed
       | Ok index ->
           `Succeeded index )
-    ~retry_count:10 ~initial_delay:(Span.of_ms 0.0)
-    ~each_delay:(Span.of_ms 250.0)
+    ~retry_count:20 ~initial_delay:(Span.of_sec 1.0)
+    ~each_delay:(Span.of_sec 1.0)
     ~failure_reason:"Took too long for the last block to be fetched"
 
 let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
