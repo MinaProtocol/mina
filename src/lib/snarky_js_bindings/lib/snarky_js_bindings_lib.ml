@@ -87,7 +87,7 @@ module As_field = struct
           return function(x) {
             this.value = asFieldValue(x);
             return this;
-          }
+          };
         })
       |js}
     in
@@ -978,47 +978,44 @@ module Circuit = struct
           ~primary:public_inputs)
       spec (main ~w:priv) () pub
 
-  let circuit =
-    object%js
-      method witness (type a) (typ : a as_field_elements Js.t)
-          (f : (unit -> a) Js.callback) : a =
-        witness typ f
-
-      method array (type a) (typ : a as_field_elements Js.t) (length : int)
-          : a Js.js_array Js.t as_field_elements Js.t =
-        let elt_len = typ##sizeInFieldElements in
-        let len = length * elt_len in
-        object%js
-          method sizeInFieldElements = len
-
-          method toFieldElements (xs : a Js.js_array Js.t) =
-            let res = new%js Js.array_empty in
-            for i = 0 to xs##.length - 1 do
-              let x = typ##toFieldElements (array_get_exn xs i) in
-              for j = 0 to x##.length - 1 do
-                res##push (array_get_exn x j) |> ignore
-              done
-            done ;
-            res
-
-          method ofFieldElements (xs : field_class Js.t Js.js_array Js.t) =
-            let res = new%js Js.array_empty in
-            for i = 0 to length - 1 do
-              let a = new%js Js.array_empty in
-              let offset = i * elt_len in
-              for j = 0 to elt_len - 1 do
-                a##push (array_get_exn xs (offset + j)) |> ignore
-              done ;
-              res##push (typ##ofFieldElements a) |> ignore
-            done ;
-            res
-        end
-    end
-    |> Js.Unsafe.coerce
+  let circuit = Js.Unsafe.eval_string {js|(function() { return this })|js}
 
   let () =
-    circuit##.generateKeypair := Js.wrap_callback generate_keypair ;
-    circuit##.prove := Js.wrap_callback prove ;
+    let array (type a) (typ : a as_field_elements Js.t) (length : int) :
+        a Js.js_array Js.t as_field_elements Js.t =
+      let elt_len = typ##sizeInFieldElements in
+      let len = length * elt_len in
+      object%js
+        method sizeInFieldElements = len
+
+        method toFieldElements (xs : a Js.js_array Js.t) =
+          let res = new%js Js.array_empty in
+          for i = 0 to xs##.length - 1 do
+            let x = typ##toFieldElements (array_get_exn xs i) in
+            for j = 0 to x##.length - 1 do
+              res##push (array_get_exn x j) |> ignore
+            done
+          done ;
+          res
+
+        method ofFieldElements (xs : field_class Js.t Js.js_array Js.t) =
+          let res = new%js Js.array_empty in
+          for i = 0 to length - 1 do
+            let a = new%js Js.array_empty in
+            let offset = i * elt_len in
+            for j = 0 to elt_len - 1 do
+              a##push (array_get_exn xs (offset + j)) |> ignore
+            done ;
+            res##push (typ##ofFieldElements a) |> ignore
+          done ;
+          res
+      end
+    in
+    circuit##.witness := Js.wrap_callback witness ;
+    circuit##.array := Js.wrap_callback array ;
+    circuit##.generateKeypair :=
+      Js.wrap_meth_callback (fun this -> generate_keypair this) ;
+    circuit##.prove := Js.wrap_meth_callback (fun this w p -> prove this w p) ;
     circuit##.assertEqual := assert_equal ;
     circuit##.equal := equal ;
     Js.Unsafe.set circuit (Js.string "if") if_
@@ -1031,3 +1028,5 @@ let () =
   Js.export "Group" group_class ;
   Js.export "Poseidon" poseidon ;
   Js.export "Circuit" Circuit.circuit
+
+let link_me = ()
