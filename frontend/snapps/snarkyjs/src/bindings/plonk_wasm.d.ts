@@ -343,6 +343,22 @@ export function caml_pasta_fp_plonk_oracles_dummy(): WasmPastaFpPlonkOracles;
 */
 export function caml_pasta_fp_plonk_oracles_deep_copy(x: WasmPastaFpPlonkOracles): WasmPastaFpPlonkOracles;
 /**
+* @param {Uint32Array} lgr_comm
+* @param {WasmPastaFqPlonkVerifierIndex} index
+* @param {WasmPastaFqProverProof} proof
+* @returns {WasmPastaFqPlonkOracles}
+*/
+export function caml_pasta_fq_plonk_oracles_create(lgr_comm: Uint32Array, index: WasmPastaFqPlonkVerifierIndex, proof: WasmPastaFqProverProof): WasmPastaFqPlonkOracles;
+/**
+* @returns {WasmPastaFqPlonkOracles}
+*/
+export function caml_pasta_fq_plonk_oracles_dummy(): WasmPastaFqPlonkOracles;
+/**
+* @param {WasmPastaFqPlonkOracles} x
+* @returns {WasmPastaFqPlonkOracles}
+*/
+export function caml_pasta_fq_plonk_oracles_deep_copy(x: WasmPastaFqPlonkOracles): WasmPastaFqPlonkOracles;
+/**
 * @param {number | undefined} offset
 * @param {WasmPastaFqUrs} urs
 * @param {string} path
@@ -522,22 +538,6 @@ export function caml_pasta_vesta_affine_deep_copy(x: WasmVestaGAffine): WasmVest
 * @returns {WasmVestaGAffine}
 */
 export function caml_pasta_vesta_affine_one(): WasmVestaGAffine;
-/**
-* @param {Uint32Array} lgr_comm
-* @param {WasmPastaFqPlonkVerifierIndex} index
-* @param {WasmPastaFqProverProof} proof
-* @returns {WasmPastaFqPlonkOracles}
-*/
-export function caml_pasta_fq_plonk_oracles_create(lgr_comm: Uint32Array, index: WasmPastaFqPlonkVerifierIndex, proof: WasmPastaFqProverProof): WasmPastaFqPlonkOracles;
-/**
-* @returns {WasmPastaFqPlonkOracles}
-*/
-export function caml_pasta_fq_plonk_oracles_dummy(): WasmPastaFqPlonkOracles;
-/**
-* @param {WasmPastaFqPlonkOracles} x
-* @returns {WasmPastaFqPlonkOracles}
-*/
-export function caml_pasta_fq_plonk_oracles_deep_copy(x: WasmPastaFqPlonkOracles): WasmPastaFqPlonkOracles;
 /**
 * @param {number | undefined} offset
 * @param {WasmPastaFpUrs} urs

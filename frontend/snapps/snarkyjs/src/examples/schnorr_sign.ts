@@ -43,7 +43,7 @@ console.log(Object.keys(Witness));
 // the signature verifies against Brave's public key and [newAcc] is
 // a re-randomization of [prevAcc]
 
-export class Main {
+export class Main extends C {
   @circuitMain
   static main(w: Witness, @public_ newAcc: Group) {
     let H = new Group({ x: -1, y: 2 });
@@ -57,7 +57,7 @@ export class Main {
   }
 }
 
-class Circ extends Circuit {
+class Circ extends C {
   @circuitMain
   static main(@public_ x: Field) {
     let acc = x;
@@ -65,18 +65,11 @@ class Circ extends Circuit {
       acc = acc.mul(acc);
     }
   }
-
-  // TODO: This gets method
-  static generateKeypair(): Keypair {
-  }
-  static prove(wit: any[], pub: any[]): Proof {
-  }
 };
 
 export function main() {
+  const kp = Circ.generateKeypair();
   console.log('random', Field.random());
-  const kp = C.generateKeypair(Circ as any);
-  console.log('random', Field.random());
-  const proof = C.prove(Circ as any, [], [ new Field(2) ], kp);
+  const proof = Circ.prove([], [ new Field(2) ], kp);
   console.log(proof, kp);
 }
