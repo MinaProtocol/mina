@@ -12,8 +12,8 @@
   },
   "scripts": {
     "start": "tsdx watch",
-    "build": "tsdx build",
-    "test": "tsdx test",
+    "build": "tsdx build && cp ./src/bindings/plonk_wasm_bg.wasm ./dist/plonk_wasm_bg.wasm",
+    "test": "node --experimental-wasm-modules --experimental-modules --experimental-wasm-threads node_modules/.bin/tsdx test",
     "format": "prettier --write --ignore-unknown **/*",
     "lint": "tsdx lint",
     "prepare": "tsdx build",
@@ -35,6 +35,9 @@
   "name": "snarkyjs",
   "author": "O(1) Labs",
   "module": "dist/snarkyjs.esm.js",
+  "resolutions": {
+    "rollup": "2.38"
+  },
   "size-limit": [
     {
       "path": "dist/snarkyjs.cjs.production.min.js",
@@ -48,6 +51,8 @@
   "devDependencies": {
     "@babel/plugin-transform-runtime": "^7.14.5",
     "@babel/preset-env": "^7.14.8",
+    "@rollup/plugin-babel": "^5.3.0",
+    "@rollup/plugin-commonjs": "^20.0.0",
     "@size-limit/preset-small-lib": "^5.0.1",
     "husky": "^7.0.1",
     "prettier": "^2.3.2",
@@ -59,8 +64,7 @@
   },
   "jest": {
     "transformIgnorePatterns": [
-      "src/bindings/snarky.js",
-      "src/bindings/workerHelpers.no-modules.js"
+      "src/bindings"
     ]
   },
   "dependencies": {
