@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { Field } from './bindings/snarky';
+import { Field, JSONValue } from './bindings/snarky';
 
 type Constructor<T> = { new (...args: any[]): T };
 
@@ -38,7 +38,45 @@ export abstract class CircuitValue {
       props.push(propVal);
       offset += propSize;
     }
-    // TODO: this is wrong
+    return new this(...props);
+  }
+
+  static toJSON<T>(this: Constructor<T>, v: T) : JSONValue {
+    const res : { [key: string]: JSONValue } = {};
+    if ((this as any).prototype._fields !== undefined) {
+      const fields: [string, any][] = (this as any).prototype._fields;
+      fields.forEach(([key, propType]) => {
+        res[key] = propType.toJSON((v as any)[key]);
+      });
+    }
+    return res;
+  }
+
+  static fromJSON<T>(this: Constructor<T>, value: JSONValue) : T | null {
+    const props: any[] = [];
+    const fields: [string, any][] = (this as any).prototype._fields;
+
+    switch (typeof value) {
+      case 'object':
+        if (value === null || Array.isArray(value)) {
+          return null;
+        }
+        break;
+      default:
+          return null;
+    }
+
+    if (fields !== undefined) {
+      for (let i = 0; i < fields.length; ++i) {
+        const [ key, propType ] = fields[i];
+        if (value[key] === undefined) {
+          return null;
+        } else {
+          props.push(propType.fromJSON(value[key]));
+        }
+      }
+    }
+
     return new this(...props);
   }
 }
