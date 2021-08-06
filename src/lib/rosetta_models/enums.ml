@@ -1,6 +1,6 @@
-type curvetype = (* pallas *) string [@@deriving yojson, show]
+type curvetype = (* pallas *) string [@@deriving yojson, show, eq]
 
-type signaturetype = (* schnorr_poseidon *) string [@@deriving yojson, show]
+type signaturetype = (* schnorr_poseidon *) string [@@deriving yojson, show, eq]
 
 type coinaction = Coin_action [@@deriving yojson, show, eq]
 
