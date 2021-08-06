@@ -1,3 +1,5 @@
+export type JSONValue = number | string | boolean | null | Array<JSON> | { [key: string]: JSONValue };
+
 export class Keypair {
 }
 
@@ -30,10 +32,10 @@ export class Field {
   gt(y: Field | number | string | boolean): Bool;
   gte(y: Field | number | string | boolean): Bool;
 
-  assertLt(y: Field | number | string | boolean);
-  assertLte(y: Field | number | string | boolean);
-  assertGt(y: Field | number | string | boolean);
-  assertGte(y: Field | number | string | boolean);
+  assertLt(y: Field | number | string | boolean): void;
+  assertLte(y: Field | number | string | boolean): void;
+  assertGt(y: Field | number | string | boolean): void;
+  assertGte(y: Field | number | string | boolean): void;
 
   assertEquals(y: Field | number | string | boolean): void;
   assertBoolean(): void;
@@ -75,6 +77,9 @@ export class Field {
   static toBits(x: Field | number | string | boolean): Bool[];
 
   static equal(x: Field | number | string | boolean, y: Field | number | string | boolean): Bool;
+
+  static toJSON(x: Field): JSONValue;
+  static fromJSON(x: JSONValue): Field | null;
 }
 
 export class Bool {
@@ -96,6 +101,9 @@ export class Bool {
   toFieldElements(): Field[];
 
   toString(): string;
+
+  /* Can only be called on non-witness values */
+  toBoolean(): boolean;
 
   /* static members */
   static toField(x: Bool | boolean): Field;
@@ -119,6 +127,9 @@ export class Bool {
   static sizeInFieldElements(): number;
   static toFieldElements(x: Bool | boolean): Field[];
   static ofFieldElements(fields: Field[]): Bool;
+
+  static toJSON(x: Bool): JSONValue;
+  static fromJSON(x: JSONValue): Bool | null;
 }
 
 export interface AsFieldElements<T> {
@@ -157,19 +168,7 @@ export class Circuit {
     z: Field
   ): void;
 
-  // newVariable(): Field;
-  // newVariable(x: Field | number | string | boolean): Field;
-  // TODO
   static newVariable(f: () => Field | number | string | boolean): Field;
-
-  /*
-  newPublicVariable(): Field;
-  newPublicVariable(x: Field | number | string | boolean): Field;
-  newPublicVariable(f: () => Field | number | string | boolean): Field;
-
-  setVariable(x: Field, value: Field | number | string | boolean): void;
-  setVariable(x: Field, f: () => Field | number | string | boolean): void;
-  */
 
   static witness<T>(
     ctor: { toFieldElements(x: T): Field[]; ofFieldElements(x: Field[]): T; sizeInFieldElements(): number },
@@ -227,10 +226,21 @@ export class Circuit {
 export class Scalar {
     toFieldElements(this: Scalar): Field[];
 
+    /* Can only be called on non-witness values */
+    neg(): Scalar;
+    add(y: Scalar): Scalar;
+    sub(y: Scalar): Scalar;
+    mul(y: Scalar): Scalar;
+    div(y: Scalar): Scalar;
+
     static toFieldElements(x: Scalar): Field[]
     static ofFieldElements(fields: Field[]): Scalar;
     static sizeInFieldElements(): number;
     static ofBits(bits: Bool[]): Scalar;
+    static random(): Scalar;
+
+    static toJSON(x: Scalar): JSONValue;
+    static fromJSON(x: JSONValue): Scalar | null;
 }
 
 export class EndoScalar {
@@ -268,6 +278,9 @@ export class Group {
     static toFieldElements(x: Group): Field[]
     static ofFieldElements(fields: Field[]): Group;
     static sizeInFieldElements(): number;
+
+    static toJSON(x: Group): JSONValue;
+    static fromJSON(x: JSONValue): Group | null;
 }
 
 export const Poseidon : {
