@@ -34,10 +34,28 @@ The node status collection system would make the following `post` request to the
   , "libp2p_input_bandwidth": "<input bandwidth for libp2p helper system>"
   , "libp2p_output_bandwidth": "<output bandwith for libp2p helper system>"
   , "libp2p_cpu_usage": "<cpu usage for libp2p helper system>"
-  , "libp2p_msg_counts": { "New_state": "<integer, e.g. 10>"
-                         , "Transaction_pool_diff": "<integer, e.g. 11>"
-                         , "Snark_pool_diff": "<integer, e.g. 9>"
-                         }
+  , "pubsub_msg_received": { "new_state": { "count": "<integer, e.g. 10>"
+                                          , "bandwidth": "<integer, bandwidth in bytes>" }
+                           , "transaction_pool_diff": { "count": "<integer, e.g. 11>"
+                                                      , "bandwidth": "<integer, bandwidth in bytes>" }
+                           , "snark_pool_diff": { "count": "<integer, e.g. 9>"
+                                                , "bandwidth": "<integer, bandwidth in bytes>" }
+                           }
+  , "pubsub_msg_broadcasted": { "new_state": { "count": "<integer, e.g. 3>"
+                                             , "bandwidth": "<integer, bandwidth in bytes>" }
+                              , "transaction_pool_diff": { "count": "<integer, e.g. 6>"
+                                                         , "bandwidth": "<integer, bandwidth in bytes>" }
+                              , "snark_pool_diff": { "count": "<integer, e.g. 1>"
+                                                   , "bandwidth": "<integer, bandwidth in bytes>" }
+                              }
+  , "rpc_msg_received": { "get_transition_chain_proof": { "count": "<integer>"
+                                                        , "bandwidth": "<integer, bandwidth in bytes>" }
+                        , ...
+                        }
+  , "rpc_msg_sent": { "get_transition_chain_proof": { "count": "<integer>"
+                                                    , "bandwidth": "integer, bandwidth in bytes>" }
+                    , ...
+                    }
   , "block_height_at_best_tip": "<integer, e.g. 43>"
   , "max_observed_block_height": "<integer, e.g. 44>"
   , "max_observed_unvalidated_block_height": "<integer, e.g. 44>"
