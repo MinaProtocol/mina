@@ -862,11 +862,11 @@ let%test_module "Ledger_catchup tests" =
 
     let run_catchup ~network ~frontier =
       let catchup_job_reader, catchup_job_writer =
-        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+        Strict_pipe.create ~logging_enabled:true ~name:(__MODULE__ ^ __LOC__)
           (Buffered (`Capacity 10, `Overflow Crash))
       in
       let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+        Strict_pipe.create ~logging_enabled:true ~name:(__MODULE__ ^ __LOC__)
           (Buffered (`Capacity 10, `Overflow Crash))
       in
       let unprocessed_transition_cache =

@@ -744,7 +744,7 @@ let initialization_finish_signal t = t.initialization_finish_signal
 *)
 let root_diff t =
   let root_diff_reader, root_diff_writer =
-    Strict_pipe.create ~name:"root diff"
+    Strict_pipe.create ~logging_enabled:true ~name:"root diff"
       (Buffered (`Capacity 30, `Overflow Crash))
   in
   trace_recurring_task "root diff pipe reader" (fun () ->
@@ -1262,7 +1262,10 @@ let create ?wallets (config : Config.t) =
                          consensus_constants.slot_duration_ms) )
             in
             log_rate_limiter_occasionally rl ~label:"new_block" ;
-            let r, w = Strict_pipe.create Synchronous in
+            let r, w =
+              Strict_pipe.create ~logging_enabled:true
+                ~name:"external_transitions" Synchronous
+            in
             ( Strict_pipe.Reader.filter_map r ~f:(fun ((e, _, cb) as x) ->
                   let sender = Envelope.Incoming.sender e in
                   match
@@ -1281,7 +1284,8 @@ let create ?wallets (config : Config.t) =
             , w )
           in
           let producer_transition_reader, producer_transition_writer =
-            Strict_pipe.create Synchronous
+            Strict_pipe.create ~logging_enabled:true
+              ~name:"producer_transition" Synchronous
           in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create None

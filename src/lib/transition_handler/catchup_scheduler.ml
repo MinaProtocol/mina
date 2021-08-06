@@ -319,11 +319,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
            ~verifier ~max_length ~frontier_size:1 ~branch_size:2 ())
         ~f:(fun (frontier, branch) ->
           let catchup_job_reader, catchup_job_writer =
-            Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+            Strict_pipe.create ~logging_enabled:true
+              ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
           in
           let _catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-            Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+            Strict_pipe.create ~logging_enabled:true
+              ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
           in
           let disjoint_breadcrumb = List.last_exn branch in
@@ -375,11 +377,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             |> Cached.transform ~f:(Fn.const breadcrumb)
           in
           let catchup_job_reader, catchup_job_writer =
-            Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+            Strict_pipe.create ~logging_enabled:true
+              ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
           in
           let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-            Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+            Strict_pipe.create ~logging_enabled:true
+              ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
           in
           let[@warning "-8"] [breadcrumb_1; breadcrumb_2] =
@@ -450,11 +454,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
            ~verifier ~max_length ~frontier_size:1 ~branch_size:5 ())
         ~f:(fun (frontier, branch) ->
           let catchup_job_reader, catchup_job_writer =
-            Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+            Strict_pipe.create ~logging_enabled:true
+              ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
           in
           let _catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-            Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+            Strict_pipe.create ~logging_enabled:true
+              ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
           in
           let scheduler =

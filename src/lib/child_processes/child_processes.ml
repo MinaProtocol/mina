@@ -174,7 +174,7 @@ let reader_to_strict_pipe_with_logging :
     -> string Strict_pipe.Reader.t =
  fun reader name (log, pipe, filter_empty) logger ->
   let master_r, master_w =
-    Strict_pipe.create ~name
+    Strict_pipe.create ~logging_enabled:true ~name
       (Strict_pipe.Buffered (`Capacity 100, `Overflow Crash))
   in
   let lines_js_pipe = Reader.lines reader in

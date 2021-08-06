@@ -30,10 +30,11 @@ let value_or_empty = Option.value ~default:"<unnamed>"
 
 module Reader0 = struct
   type 't t =
-    { reader: 't Pipe.Reader.t
+    { reader: ('t * Time.t) Pipe.Reader.t
     ; mutable has_reader: bool
     ; mutable downstreams: downstreams
-    ; name: string option }
+    ; name: string option
+    ; logging_enabled: bool }
 
   and downstreams =
     | [] : downstreams
@@ -47,17 +48,22 @@ module Reader0 = struct
 
   (* TODO: See #1281 *)
   let to_linear_pipe {reader= pipe; has_reader; _} =
-    {Linear_pipe.Reader.pipe; has_reader}
+    {Linear_pipe.Reader.pipe= Pipe.map pipe ~f:(fun (x, _) -> x); has_reader}
 
-  let of_linear_pipe ?name {Linear_pipe.Reader.pipe= reader; has_reader} =
-    {reader; has_reader; downstreams= []; name}
+  let of_linear_pipe ?(logging_enabled = false) ?name
+      {Linear_pipe.Reader.pipe= reader; has_reader} =
+    { reader= Pipe.map reader ~f:(fun x -> (x, Time.now ()))
+    ; has_reader
+    ; downstreams= []
+    ; name
+    ; logging_enabled }
 
   let assert_not_read reader =
     if reader.has_reader then
       raise (Multiple_reads_attempted (value_or_empty reader.name))
 
-  let wrap_reader ?name reader =
-    {reader; has_reader= false; downstreams= []; name}
+  let wrap_reader ?(logging_enabled = false) ?name reader =
+    {reader; has_reader= false; downstreams= []; name; logging_enabled}
 
   let enforce_single_reader reader deferred =
     assert_not_read reader ;
@@ -66,14 +72,36 @@ module Reader0 = struct
     reader.has_reader <- false ;
     result
 
-  let read t = enforce_single_reader t (Pipe.read t.reader)
+  let map_read_result ~f = function `Eof -> `Eof | `Ok x -> `Ok (f x)
 
-  let read' t = enforce_single_reader t (Pipe.read' t.reader)
+  let log_pipe_read_latency ~operation t (data, time) =
+    ( if t.logging_enabled then
+      let logger = Logger.create () in
+      [%log trace] "Pipe read latency ($pipe_name, $operation): $latency\n"
+        ~metadata:
+          [ ("pipe_name", `String (Option.value t.name ~default:"_"))
+          ; ("operation", `String operation)
+          ; ( "latency"
+            , `Float (Time.diff (Time.now ()) time |> Time.Span.to_ms) ) ] ) ;
+    data
 
-  let fold reader ~init ~f =
+  let read_and_log_time ~operation t =
+    Pipe.read t.reader
+    >>| map_read_result ~f:(log_pipe_read_latency ~operation t)
+
+  let read_and_log_time' ~operation t =
+    Pipe.read' t.reader
+    >>| map_read_result ~f:(Queue.map ~f:(log_pipe_read_latency ~operation t))
+
+  let read t = enforce_single_reader t (read_and_log_time ~operation:"read" t)
+
+  let read' t =
+    enforce_single_reader t (read_and_log_time' ~operation:"read'" t)
+
+  let fold' reader ~operation ~init ~f =
     enforce_single_reader reader
       (let rec go b =
-         match%bind Pipe.read reader.reader with
+         match%bind read_and_log_time ~operation reader with
          | `Eof ->
              return b
          | `Ok a ->
@@ -83,10 +111,12 @@ module Reader0 = struct
        in
        go init)
 
+  let fold = fold' ~operation:"fold"
+
   let fold_until reader ~init ~f =
     enforce_single_reader reader
       (let rec go b =
-         match%bind Pipe.read reader.reader with
+         match%bind read_and_log_time ~operation:"fold_until" reader with
          | `Eof ->
              return (`Eof b)
          | `Ok a -> (
@@ -100,20 +130,33 @@ module Reader0 = struct
        go init)
 
   let fold_without_pushback ?consumer reader ~init ~f =
-    Pipe.fold_without_pushback ?consumer reader.reader ~init ~f
+    Pipe.fold_without_pushback ?consumer reader.reader ~init ~f:(fun acc x ->
+        f acc
+          (log_pipe_read_latency ~operation:"fold_without_pushback" reader x)
+    )
 
-  let iter reader ~f = fold reader ~init:() ~f:(fun () -> f)
+  let iter reader ~f = fold' reader ~operation:"iter" ~init:() ~f:(fun () -> f)
 
   let iter_without_pushback ?consumer ?continue_on_error reader ~f =
-    Pipe.iter_without_pushback reader.reader ?consumer ?continue_on_error ~f
+    Pipe.iter_without_pushback reader.reader ?consumer ?continue_on_error
+      ~f:(fun x ->
+        f (log_pipe_read_latency ~operation:"iter_without_pushback" reader x)
+    )
 
-  let iter' reader ~f = Pipe.iter' reader.reader ~f
+  let iter' reader ~f =
+    Pipe.iter' reader.reader ~f:(fun queue ->
+        f
+          (Queue.map queue ~f:(log_pipe_read_latency ~operation:"iter'" reader))
+    )
 
   let map reader ~f =
     assert_not_read reader ;
     reader.has_reader <- true ;
     let strict_reader =
-      wrap_reader ?name:reader.name (Pipe.map reader.reader ~f)
+      wrap_reader ?name:reader.name
+        (Pipe.map reader.reader ~f:(fun x ->
+             (f (log_pipe_read_latency ~operation:"map" reader x), Time.now ())
+         ))
     in
     reader.downstreams <- [strict_reader] ;
     strict_reader
@@ -122,7 +165,10 @@ module Reader0 = struct
     assert_not_read reader ;
     reader.has_reader <- true ;
     let strict_reader =
-      wrap_reader ?name:reader.name (Pipe.filter_map reader.reader ~f)
+      wrap_reader ?name:reader.name
+        (Pipe.filter_map reader.reader ~f:(fun x ->
+             f (log_pipe_read_latency ~operation:"filter_map" reader x)
+             |> Option.map ~f:(fun x' -> (x', Time.now ())) ))
     in
     reader.downstreams <- [strict_reader] ;
     strict_reader
@@ -155,7 +201,7 @@ module Reader0 = struct
               failwith "impossible"
           | `Eof ->
               Deferred.unit
-          | `Ok value ->
+          | `Ok (value, _) ->
               Deferred.bind (f value) ~f:(fun () -> read_deferred readers) )
         | None -> (
           match List.filter readers ~f:(fun r -> not @@ is_closed r) with
@@ -220,12 +266,15 @@ module Writer = struct
   type ('t, 'type_, 'write_return) t =
     { type_: ('t, 'type_, 'write_return) type_
     ; strict_reader: 't Reader0.t
-    ; writer: 't Pipe.Writer.t
+    ; writer: ('t * Time.t) Pipe.Writer.t
     ; warn_on_drop: bool
     ; name: string option }
 
   (* TODO: See #1281 *)
-  let to_linear_pipe {writer= pipe; _} = pipe
+  let to_linear_pipe {writer= pipe; _} =
+    let r, w = Pipe.create () in
+    don't_wait_for (Pipe.transfer r pipe ~f:(fun x -> (x, Time.now ()))) ;
+    w
 
   let handle_buffered_write : type type_ return.
          ('t, type_, return) t
@@ -237,7 +286,7 @@ module Writer = struct
    fun t data ~capacity ~on_overflow ~normal_return ->
     if Pipe.length t.strict_reader.reader > capacity then on_overflow ()
     else (
-      Pipe.write_without_pushback t.writer data ;
+      Pipe.write_without_pushback t.writer (data, Time.now ()) ;
       normal_return )
 
   let write : type type_ return. ('t, type_, return) t -> 't -> return =
@@ -252,7 +301,7 @@ module Writer = struct
             ) ] ) ;
     match writer.type_ with
     | Synchronous ->
-        Pipe.write writer.writer data
+        Pipe.write writer.writer (data, Time.now ())
     | Buffered (`Capacity capacity, `Overflow Crash) ->
         handle_buffered_write writer data ~capacity
           ~on_overflow:(fun () -> raise (Overflow (value_or_empty writer.name)))
@@ -267,7 +316,7 @@ module Writer = struct
                 ~metadata:[("pipe_name", `String my_name)]
                 "Dropping message on pipe $pipe_name" ;
             ignore (Pipe.read_now writer.strict_reader.reader) ;
-            Pipe.write_without_pushback writer.writer data )
+            Pipe.write_without_pushback writer.writer (data, Time.now ()) )
           ~normal_return:()
     | Buffered (`Capacity capacity, `Overflow (Call f)) ->
         handle_buffered_write writer data ~capacity
@@ -286,10 +335,10 @@ module Writer = struct
   let is_closed {writer; _} = Pipe.is_closed writer
 end
 
-let create ?name ?(warn_on_drop = true) type_ =
+let create ?(logging_enabled = false) ?name ?(warn_on_drop = true) type_ =
   let reader, writer = Pipe.create () in
   let strict_reader =
-    Reader0.{reader; has_reader= false; downstreams= []; name}
+    Reader0.{reader; has_reader= false; downstreams= []; name; logging_enabled}
   in
   let strict_writer =
     Writer.{type_; strict_reader; warn_on_drop; writer; name}
@@ -298,14 +347,19 @@ let create ?name ?(warn_on_drop = true) type_ =
 
 let transfer reader Writer.{strict_reader; writer; _} ~f =
   Reader0.(reader.downstreams <- [strict_reader]) ;
-  Reader0.enforce_single_reader reader (Pipe.transfer reader.reader writer ~f)
+  Reader0.enforce_single_reader reader
+    (Pipe.transfer reader.reader writer ~f:(fun x ->
+         ( f (Reader0.log_pipe_read_latency ~operation:"transfer" reader x)
+         , Time.now () ) ))
 
 let rec transfer_while_writer_alive reader writer ~f =
   if Pipe.is_closed writer.Writer.writer then Deferred.unit
   else
-    match%bind Pipe.read reader.Reader0.reader with
+    match%bind Reader0.read reader with
     | `Ok x ->
-        let%bind () = Pipe.write_if_open writer.Writer.writer (f x) in
+        let%bind () =
+          Pipe.write_if_open writer.Writer.writer (f x, Time.now ())
+        in
         transfer_while_writer_alive reader writer ~f
     | `Eof ->
         Pipe.close_read writer.Writer.strict_reader.reader ;

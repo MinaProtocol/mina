@@ -121,7 +121,8 @@ end)
       (Resource_pool.Diff.verified Envelope.Incoming.t * Broadcast_callback.t)
       Strict_pipe.Reader.t =
     let r, w =
-      Strict_pipe.create ~name:"verified network pool diffs"
+      Strict_pipe.create ~logging_enabled:true
+        ~name:"verified network pool diffs"
         (Buffered
            ( `Capacity 1024
            , `Overflow
