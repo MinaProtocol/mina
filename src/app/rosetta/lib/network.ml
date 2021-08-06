@@ -443,7 +443,7 @@ module Options = struct
           ~network_identifier:network.network_identifier
       in
       { Network_options_response.version=
-          Version.create "1.4.7" (Option.value ~default:"unknown" res#version)
+          Version.create "1.4.9" (Option.value ~default:"unknown" res#version)
       ; allow=
           { Allow.operation_statuses= Lazy.force Operation_statuses.all
           ; operation_types= Lazy.force Operation_types.all
@@ -479,7 +479,7 @@ module Options = struct
           ~actual:(Mock.handle ~env dummy_network_request)
           ~expected:
             ( Result.return
-            @@ { Network_options_response.version= Version.create "1.4.7" "v1.0"
+            @@ { Network_options_response.version= Version.create "1.4.9" "v1.0"
                ; allow=
                    { Allow.operation_statuses= Lazy.force Operation_statuses.all
                    ; operation_types= Lazy.force Operation_types.all
