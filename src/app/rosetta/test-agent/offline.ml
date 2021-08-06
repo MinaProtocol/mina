@@ -121,6 +121,6 @@ module Hash = struct
             |> to_yojson)
         ~path:"construction/hash"
     in
-    Lift.res r ~logger ~of_yojson:Construction_hash_response.of_yojson
+    Lift.res r ~logger ~of_yojson:Transaction_identifier_response.of_yojson
     |> Lift.successfully
 end
