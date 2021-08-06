@@ -58,8 +58,8 @@ let get_last_block_index ~rosetta_uri ~network_response ~logger =
           `Failed
       | Ok index ->
           `Succeeded index )
-    ~retry_count:10 ~initial_delay:(Span.of_ms 0.0)
-    ~each_delay:(Span.of_ms 250.0)
+    ~retry_count:20 ~initial_delay:(Span.of_sec 1.0)
+    ~each_delay:(Span.of_sec 1.0)
     ~failure_reason:"Took too long for the last block to be fetched"
 
 let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
@@ -152,7 +152,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
         | Ok (Some block) ->
             `Succeeded block )
       ~retry_count:20 ~initial_delay:(Span.of_sec 1.0)
-      ~each_delay:(Span.of_sec 1.0)
+      ~each_delay:(Span.of_sec 2.0)
       ~failure_reason:"Took too long for a block to be created"
   in
   [%log debug]
@@ -417,11 +417,11 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
       ~signed_transaction:combine_res.signed_transaction
   in
   assert (
-    String.equal hash_res.Construction_hash_response.transaction_hash
-      submit_res.transaction_identifier.hash ) ;
+    Transaction_identifier.equal hash_res.Transaction_identifier_response.transaction_identifier
+      submit_res.transaction_identifier ) ;
   [%log debug] "Construction_submit is finalized" ;
   verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
-    ~txn_hash:hash_res.transaction_hash ~network_response
+    ~txn_hash:hash_res.transaction_identifier.hash ~network_response
     ~operation_expectations
 
 let construction_api_payment_through_mempool =
