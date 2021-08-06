@@ -2,13 +2,13 @@
 
 [summary]: #summary
 
-This RFC proposes a system that collects various stats related to node health to better understand the health of the network participants. This report system would collect stats from the node and send those stats to a url (by default those info would be send to o1labs google cloud backend). And if those stats were sent to the o1labs backend, then those would be persisted and be used for debugging and monitoring purpose.
+This RFC proposes a system that collects various stats related to node health to better understand the health of the network participants. This node status collection system would collect stats from the node and send those stats to a url (by default those info would be send to o1labs google cloud backend). And if those stats were sent to the o1labs backend, then those would be persisted and be used for debugging and monitoring purpose.
 
 ## Motivation
 
 [motivation]: #motivation
 
-In current version of the network, we saw some performance and scaling issues around the network layer. By collecting more stats from the network, we hope to improve the latency and connectivity.
+In current version of the network, we saw some performance and scaling issues. By collecting more stats from the network, we hope to improve the speed of the mina protocol by analysize those stats.
 
 ## Protocol between the node status collection service and o1labs backend
 
@@ -31,12 +31,12 @@ The node status collection system would make the following `post` request to the
   { "peer_id": "<base64 encodeing of the libp2p peer id>"
   , "ip_address": "<ip address of the submitter>"
   , "timestamp": "<current time using RFC-3339 representation>"
-  , "libp2p_input_bandwidth": "<input bandwidth for libp2p>"
-  , "libp2p_output_bandwidth": "<output bandwith for libp2p>"
-  , "libp2p_cpu_usage": "<cpu usage for libp2p>"
-  , "libp2p_msg_counts": { "addPeer": "<integer, e.g. 10>"
-                         , "sendStreamMsg": "<integer, e.g. 11>"
-                         , ...
+  , "libp2p_input_bandwidth": "<input bandwidth for libp2p helper system>"
+  , "libp2p_output_bandwidth": "<output bandwith for libp2p helper system>"
+  , "libp2p_cpu_usage": "<cpu usage for libp2p helper system>"
+  , "libp2p_msg_counts": { "New_state": "<integer, e.g. 10>"
+                         , "Transaction_pool_diff": "<integer, e.g. 11>"
+                         , "Snark_pool_diff": "<integer, e.g. 9>"
                          }
   , "block_height_at_best_tip": "<integer, e.g. 43>"
   , "max_observed_block_height": "<integer, e.g. 44>"
@@ -84,4 +84,4 @@ Cloud storage for o1labs backend has the following structure:
 
 `<ip_address>` is the ip address of the submitter
 `<peer_id>` is the base64 encoding of the libp2p peer id of the submitter
-The file contains the content of the request if the request is valid
+The json file contains the content of the request if the request is valid
