@@ -431,7 +431,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
       let message_reader, message_writer =
-        Strict_pipe.create ~name:"libp2p_messages" Synchronous
+        Strict_pipe.create ~logging_enabled:true ~name:"libp2p_messages"
+          Synchronous
       in
       let net2_ref = ref (Deferred.never ()) in
       let subscription_ref = ref (Deferred.never ()) in

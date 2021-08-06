@@ -8,26 +8,26 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~producer_transition_reader ~clear_reader ~precomputed_values =
   let valid_transition_pipe_capacity = 30 in
   let valid_transition_reader, valid_transition_writer =
-    Strict_pipe.create ~name:"valid transitions"
+    Strict_pipe.create ~logging_enabled:true ~name:"valid transitions"
       (Buffered (`Capacity valid_transition_pipe_capacity, `Overflow Crash))
   in
   let primary_transition_pipe_capacity =
     valid_transition_pipe_capacity + List.length collected_transitions
   in
   let primary_transition_reader, primary_transition_writer =
-    Strict_pipe.create ~name:"primary transitions"
+    Strict_pipe.create ~logging_enabled:true ~name:"primary transitions"
       (Buffered (`Capacity primary_transition_pipe_capacity, `Overflow Crash))
   in
   let processed_transition_reader, processed_transition_writer =
-    Strict_pipe.create ~name:"processed transitions"
+    Strict_pipe.create ~logging_enabled:true ~name:"processed transitions"
       (Buffered (`Capacity 30, `Overflow Crash))
   in
   let catchup_job_reader, catchup_job_writer =
-    Strict_pipe.create ~name:"catchup jobs"
+    Strict_pipe.create ~logging_enabled:true ~name:"catchup jobs"
       (Buffered (`Capacity 30, `Overflow Crash))
   in
   let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-    Strict_pipe.create ~name:"catchup breadcrumbs"
+    Strict_pipe.create ~logging_enabled:true ~name:"catchup breadcrumbs"
       (Buffered (`Capacity 30, `Overflow Crash))
   in
   let unprocessed_transition_cache =
