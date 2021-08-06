@@ -14,7 +14,7 @@ In current version of the network, we saw some performance and scaling issues. B
 
 [protocol]: #protocol
 
-1. Node submits a payload to the backend using `POST /submit`
+1. Node submits a payload to the backend using `POST /submit` every 5 slots
 2. Server saves the request
 3. Server replies with `200` with `{"status": "OK"}` if the payload is valid
 
