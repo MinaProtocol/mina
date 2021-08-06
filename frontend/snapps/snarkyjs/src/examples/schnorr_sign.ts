@@ -1,6 +1,8 @@
 import { Poseidon, Circuit as C, Group, Field, Bool, Scalar } from '../bindings/snarky';
 import { public_, circuitMain, prop, CircuitValue } from '../circuit_value';
 
+type PrivateKey = Scalar;
+
 class Signature extends CircuitValue {
   @prop r: Field;
   @prop s: Scalar;
@@ -11,8 +13,18 @@ class Signature extends CircuitValue {
     this.s = s;
   }
 
+  static create(d: PrivateKey, msg: Field[]) : Signature {
+    const publicKey = Group.generator.scale(d);
+    const kPrime = Scalar.random();
+    let { x: r, y: ry } = Group.generator.scale(kPrime);
+    const k = ry.toBits()[0].toBoolean() ? kPrime.neg() : kPrime;
+    const e = Scalar.ofBits(Poseidon.hash(msg.concat([publicKey.x, publicKey.y, r])).toBits());
+    const s = e.mul(d).add(k);
+    return new Signature(r, s)
+  }
+
   verify(this: this, pubKey: Group, msg: Field[]): Bool {
-    let e = Scalar.ofBits(Poseidon.hash(msg).toBits());
+    let e = Scalar.ofBits(Poseidon.hash(msg.concat([pubKey.x, pubKey.y, this.r])).toBits());
     let r = pubKey.scale(e).neg().add(Group.generator).scale(this.s);
     return Bool.and(
       r.x.equals(this.r),
@@ -33,8 +45,6 @@ class Witness extends CircuitValue {
     this.r = r;
   }
 };
-
-console.log(Object.keys(Witness));
 
 // Public input:
 //  [newAcc: curve_point]
@@ -67,8 +77,20 @@ class Circ extends C {
   }
 };
 
+function testSigning() {
+  const msg = [ Field.random() ];
+  const privKey = Scalar.random();
+  const pubKey = Group.generator.scale(privKey);
+  const s = Signature.create(privKey, msg);
+  console.log('signing worked', s.verify(pubKey, msg));
+}
+
 export function main() {
+  const before = new Date();
   const kp = Circ.generateKeypair();
+  const after = new Date();
+  testSigning();
+  console.log('keypairgen', after.getTime() - before.getTime());
   console.log('random', Field.random());
   const proof = Circ.prove([], [ new Field(2) ], kp);
   console.log(proof, kp);
