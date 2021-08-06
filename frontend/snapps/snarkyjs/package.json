@@ -12,7 +12,7 @@
   },
   "scripts": {
     "start": "tsdx watch",
-    "build": "tsdx build && cp ./src/bindings/plonk_wasm_bg.wasm ./dist/plonk_wasm_bg.wasm",
+    "build": "./node_modules/.bin/rollup -c",
     "test": "node --experimental-wasm-modules --experimental-modules --experimental-wasm-threads node_modules/.bin/tsdx test",
     "format": "prettier --write --ignore-unknown **/*",
     "lint": "tsdx lint",
@@ -53,6 +53,7 @@
     "@babel/preset-env": "^7.14.8",
     "@rollup/plugin-babel": "^5.3.0",
     "@rollup/plugin-commonjs": "^20.0.0",
+    "@rollup/plugin-typescript": "^8.2.5",
     "@size-limit/preset-small-lib": "^5.0.1",
     "husky": "^7.0.1",
     "prettier": "^2.3.2",
@@ -65,7 +66,8 @@
   "jest": {
     "transformIgnorePatterns": [
       "src/bindings"
-    ]
+    ],
+    "testEnvironment": "node"
   },
   "dependencies": {
     "@babel/runtime": "^7.14.8",

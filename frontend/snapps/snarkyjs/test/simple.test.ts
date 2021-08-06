@@ -1,5 +1,5 @@
-import * as Src from '../src';
-import * as SchnorrSign from '../src/examples/schnorr_sign';
+import { five } from '../src';
+import { main } from '../src/examples/schnorr_sign';
 
 const timeout = (ms: number) => {
   return new Promise((resolve, _) => {
@@ -11,10 +11,9 @@ const timeout = (ms: number) => {
 };
 
 describe('five', () => {
-  console.log(SchnorrSign.Main);
   it('is five', async () => {
     await timeout(1000);
-    SchnorrSign.main();
-    expect(Src.five).toEqual(5);
+    main();
+    expect(five).toEqual(5);
   });
 });

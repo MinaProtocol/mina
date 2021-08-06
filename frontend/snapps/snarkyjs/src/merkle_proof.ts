@@ -1,14 +1,14 @@
-import * as Snarky from './bindings/snarky';
+import { Bool, Field } from './bindings/snarky';
 
 const MerkleProofFactory = (depth: number) => {
   return class MerkleProof {
-    path: Array<[Snarky.Bool, Snarky.Field]>;
+    path: Array<[Bool, Field]>;
 
-    verify(rootHash: Snarky.Field, eltHash: Snarky.Field) {
+    verify(rootHash: Field, eltHash: Field) {
       // TODO
     }
 
-    constructor(path: Array<[Snarky.Bool, Snarky.Field]>) {
+    constructor(path: Array<[Bool, Field]>) {
       this.path = path;
     }
 
@@ -16,18 +16,18 @@ const MerkleProofFactory = (depth: number) => {
       return depth;
     }
 
-    static toFieldElements(t: MerkleProof): Snarky.Field[] {
+    static toFieldElements(t: MerkleProof): Field[] {
       return t.path.flatMap(([a, h]) => [a.toField(), h]);
     }
 
-    static ofFieldElements(xs: Snarky.Field[]): MerkleProof {
-      let res: Array<[Snarky.Bool, Snarky.Field]> = [];
+    static ofFieldElements(xs: Field[]): MerkleProof {
+      let res: Array<[Bool, Field]> = [];
       if (xs.length !== 2 * depth) {
         throw new Error('Wrong path length');
       }
 
       for (let i = 0; i < depth; ++i) {
-        res.push([Snarky.Bool.Unsafe.ofField(xs[2 * i]), xs[2 * i + 1]]);
+        res.push([Bool.Unsafe.ofField(xs[2 * i]), xs[2 * i + 1]]);
       }
       return new MerkleProof(res);
     }
