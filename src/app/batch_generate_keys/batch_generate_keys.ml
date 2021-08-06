@@ -114,7 +114,8 @@ mutation ($sender: PublicKey!,
 }
 |}]
 
-let make_graphql_signed_transaction ~sender_priv_key ~receiver ~amount ~fee =
+let make_graphql_signed_transaction ~sender_priv_key ~receiver ~amount ~fee
+    ~graphql_target_node =
   let sender_pub_key =
     Public_key.of_private_key_exn sender_priv_key |> Public_key.compress
   in
@@ -155,13 +156,16 @@ let make_graphql_signed_transaction ~sender_priv_key ~receiver ~amount ~fee =
       ]
   in
   Format.sprintf
-    "curl 'http://127.0.0.1:3085/graphql' -X POST -H 'content-type: \
-     application/json' --data '%s'@."
+    "curl 'http://%s/graphql' -X POST -H 'content-type: application/json' \
+     --data '%s'@."
+    graphql_target_node
     (Yojson.Basic.to_string graphql_query_json)
 
 let there_and_back_again ~num_accts ~num_txn_per_acct ~txns_per_block ~slot_time
     ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
-    ~origin_sender_public_key_option ~origin_sender_secret_key_path_option () =
+    ~origin_sender_public_key_option ~origin_sender_secret_key_path_option
+    ~(origin_sender_secret_key_pw_option : string option)
+    ~graphql_target_node_option () =
   let rate_limit =
     if rate_limit then
       let slot_limit =
@@ -201,6 +205,13 @@ let there_and_back_again ~num_accts ~num_txn_per_acct ~txns_per_block ~slot_time
           batch_count := 0 )
         else incr batch_count)
   in
+  let graphql_target_node =
+    match graphql_target_node_option with
+    | Some s ->
+        s
+    | None ->
+        "127.0.0.1:3085"
+  in
 
   (* get the origin_pk and the origin_sk if possible *)
   let open Deferred.Let_syntax in
@@ -210,8 +221,15 @@ let there_and_back_again ~num_accts ~num_txn_per_acct ~txns_per_block ~slot_time
       Deferred.return (false, None)
     else if Option.is_some origin_sender_secret_key_path_option then
       let%bind keypair =
-        Secrets.Keypair.read_exn'
-          (Option.value_exn origin_sender_secret_key_path_option)
+        match origin_sender_secret_key_pw_option with
+        | Some s ->
+            Secrets.Keypair.read_exn
+              ~privkey_path:
+                (Option.value_exn origin_sender_secret_key_path_option)
+              ~password:(s |> Bytes.of_string |> Deferred.return |> Lazy.return)
+        | None ->
+            Secrets.Keypair.read_exn'
+              (Option.value_exn origin_sender_secret_key_path_option)
       in
       let origin_sk = keypair.private_key in
       Deferred.return (true, Some origin_sk)
@@ -250,7 +268,7 @@ let there_and_back_again ~num_accts ~num_txn_per_acct ~txns_per_block ~slot_time
         let transaction_command =
           make_graphql_signed_transaction ~sender_priv_key:origin_sk
             ~receiver:Public_key.(Compressed.to_base58_check (compress acct_pk))
-            ~amount:initial_send_amount ~fee:fee_amount
+            ~amount:initial_send_amount ~fee:fee_amount ~graphql_target_node
         in
         Format.print_string transaction_command ;
         limit) ;
@@ -262,6 +280,7 @@ let there_and_back_again ~num_accts ~num_txn_per_acct ~txns_per_block ~slot_time
            let transaction_command =
              make_graphql_signed_transaction ~sender_priv_key:sk
                ~receiver:origin_pk ~amount:base_send_amount ~fee:fee_amount
+               ~graphql_target_node
            in
            Format.print_string transaction_command ;
            limit ;
@@ -327,13 +346,27 @@ let output_there_and_back_cmds =
          ~doc:"PUBLIC_KEY Public key to send the transactions from"
          (optional string)
      and origin_sender_secret_key_path_option =
-       flag "--origin-sender-sk-path" ~aliases:[ "origin-sender-sk" ]
+       flag "--origin-sender-sk-path"
+         ~aliases:[ "origin-sender-sk-path" ]
          ~doc:"PRIVATE_KEY Path to Private key to send the transactions from"
+         (optional string)
+     and origin_sender_secret_key_pw_option =
+       flag "--origin-sender-sk-pw" ~aliases:[ "origin-sender-sk-pw" ]
+         ~doc:
+           "PRIVATE_KEY Password to Private key to send the transactions from, \
+            if this is not present then we use the env var MINA_PRIVKEY_PASS"
+         (optional string)
+     and graphql_target_node_option =
+       flag "--graphql-target-node" ~aliases:[ "graphql-target-node" ]
+         ~doc:
+           "URL The graphql node to send graphl commands to.  must be in \
+            format `<ip>:<port>`.  default is `127.0.0.1:3085`"
          (optional string)
      in
      there_and_back_again ~num_accts ~num_txn_per_acct ~txns_per_block
        ~slot_time ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
-       ~origin_sender_public_key_option ~origin_sender_secret_key_path_option)
+       ~origin_sender_public_key_option ~origin_sender_secret_key_path_option
+       ~origin_sender_secret_key_pw_option ~graphql_target_node_option)
 
 let () =
   Command.run

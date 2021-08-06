@@ -29,7 +29,9 @@ RUN eval $(opam config env) \
   && rm -rf _build \
   && dune build src/app/batch_generate_keys/batch_generate_keys.exe
 
-RUN mkdir /home/opam/key && chmod 700 /home/opam/key
+USER root
+
+RUN mkdir /keys && chmod 700 /keys
 ENV MINA_PRIVKEY_PASS ""
 
 ENTRYPOINT ["./_build/default/src/app/batch_generate_keys/batch_generate_keys.exe"]
