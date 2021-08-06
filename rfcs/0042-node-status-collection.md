@@ -48,14 +48,14 @@ The node status collection system would make the following `post` request to the
                               , "snark_pool_diff": { "count": "<integer, e.g. 1>"
                                                    , "bandwidth": "<integer, bandwidth in bytes>" }
                               }
-  , "rpc_msg_received": { "get_transition_chain_proof": { "count": "<integer>"
-                                                        , "bandwidth": "<integer, bandwidth in bytes>" }
-                        , ...
-                        }
-  , "rpc_msg_sent": { "get_transition_chain_proof": { "count": "<integer>"
-                                                    , "bandwidth": "integer, bandwidth in bytes>" }
+  , "rpc_received": { "get_transition_chain_proof": { "count": "<integer>"
+                                                    , "bandwidth": "<integer, bandwidth in bytes>" }
                     , ...
                     }
+  , "rpc_sent": { "get_transition_chain_proof": { "count": "<integer>"
+                                                , "bandwidth": "integer, bandwidth in bytes>" }
+                , ...
+                }
   , "block_height_at_best_tip": "<integer, e.g. 43>"
   , "max_observed_block_height": "<integer, e.g. 44>"
   , "max_observed_unvalidated_block_height": "<integer, e.g. 44>"
@@ -79,10 +79,6 @@ The node status collection system would make the following `post` request to the
                        , ...
                        ]
   , "peer_count": "<integer, number of peers in libp2p layer, e.g. 152>"
-  , "rpc_requests_count": { "Get_transition_chain_proof": "<integer, number of this rpc request handled in last hour>"
-                          , "Get_transition_chain": "<integer, number of this rpc request handled in last hour>"
-                          , ...
-                          }
   }
 }
 ```
