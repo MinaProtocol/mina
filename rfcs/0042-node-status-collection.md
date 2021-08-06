@@ -88,10 +88,10 @@ If the `post` request is made against o1labs' backend service, then there would 
 * `500 Internal Server Error` with {"error": "description of the error"} for any server error
 * `200` with {"status": "OK"}
 
-## Cli option to enable/disable the node status collection service
+## daemon.json config to enable/disable the node status collection service
 
-[cli-option]: #cli-option
-This service would be enabled by default. It can be turned off by passing the `--report-status false` flag to `mina daemon`. And it can be turned on again by passing `--report-status true` flag to `mina daemon`. Your choice of on and off would be stored in `daemon.json` file, so that it would be default behavior next time you start mina daemon.
+[daemon.json]: #daemon
+This service would be enabled by default. It can be turned off by setting the `statusReport` field in `daemon.json` file to be false (by default it is set to be true).
 
 ## Cloud storage
 
