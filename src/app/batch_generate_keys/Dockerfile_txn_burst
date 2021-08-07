@@ -34,4 +34,15 @@ USER root
 RUN mkdir /keys && chmod 700 /keys
 ENV MINA_PRIVKEY_PASS ""
 
+RUN mkdir /usr/share/man/man7 /usr/share/man/man1
+RUN apt-get -y update && apt-get -y install man
+
+RUN apt-get update && apt-get install -y apt-transport-https ca-certificates postgresql-client-9.6 postgresql-9.6 postgresql-contrib-9.6
+
+RUN apt upgrade && apt dist-upgrade
+
+RUN echo "deb [trusted=yes] http://packages.o1test.net release main" | sudo tee /etc/apt/sources.list.d/mina.list \
+  && apt-get update \
+  && apt-get install -y curl unzip mina-testnet-postake-medium-curves=1.0.5-68200c7
+
 ENTRYPOINT ["./_build/default/src/app/batch_generate_keys/batch_generate_keys.exe"]

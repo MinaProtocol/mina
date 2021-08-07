@@ -17,13 +17,29 @@ spec:
             - /bin/bash
             - -c
             - '
+
+mina daemon --generate-genesis-proof true --peer-list-url https://storage.googleapis.com/seed-lists/devnet_seeds.txt --background;
+sleep 480;echo "done sleeping";
+while true; do
+  STATUS=$(mina client status | grep "Sync status");
+  echo "$STATUS" | grep "Synced";
+  RESULT=$?;
+  if [ $RESULT -eq 0 ]; then
+    echo "daemon is synced";
+    break;
+  else
+    echo "waiting for daemon to sync";
+    sleep 60;
+  fi;
+done;
+
 mkdir /tmpkeys;
 chmod 700 /tmpkeys;
 cp /keys/key /tmpkeys;
 chmod 600 /tmpkeys/key;
 export MINA_PRIVKEY_PASS="naughty blue worm";
 echo $MINA_PRIVKEY_PASS;
-./_build/default/src/app/batch_generate_keys/batch_generate_keys.exe gen-there-and-back-txns --num-accts 1 --num-txn-per-acct 10 --origin-sender-sk-path /tmpkeys/key > txn_burst.sh;
+./_build/default/src/app/batch_generate_keys/batch_generate_keys.exe gen-there-and-back-txns --num-accts 1 --num-txn-per-acct 10 --origin-sender-sk-path /tmpkeys/key --origin-sender-sk-pw "naughty blue worm" > txn_burst.sh;
 chmod 777 txn_burst.sh;
 
 echo "ran batch gen keys";
@@ -38,7 +54,7 @@ while true; do echo looping; sleep 10; done;
               value: ""
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: gcr.io/o1labs-192920/mina-txn-burst-app@sha256:b16036ec87cb69e983df53e1473743247520f1ad46fd5891df71ca436f385cc9
+            image: gcr.io/o1labs-192920/mina-txn-burst-app@sha256:3a03c63a4c10d8b3897c88ca0e0cc88c6d58b24c0da36a58a13d2bfc2c266582
             imagePullPolicy: IfNotPresent
             name: devnet-txn-burst-cronjob
             resources: {}
