@@ -25,8 +25,8 @@ Pipeline.build
     , steps =
       [ Command.build
           Command.Config::
-            { commands = [ Cmd.run "cd frontend/snapps/snarkyjs && yarn install && yarn build" ]
-            , label = "Build (and not yet test) typescript snarkyjs"
+            { commands = [ Cmd.run "cd frontend/snapps/snarkyjs && yarn install && yarn build && yarn test" ]
+            , label = "Build and test typescript snarkyjs"
             , key = "snarky-js-typescript"
             , target = Size.Small
             , docker = Some (Docker::{ image=ContainerImages.nodeToolchain })
