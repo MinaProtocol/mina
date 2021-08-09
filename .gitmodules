@@ -29,3 +29,6 @@
 	path = src/external/ppx_deriving_yojson
 	url = https://github.com/MinaProtocol/ppx_deriving_yojson.git
 	branch = master
+[submodule "src/external/pushprox"]
+	path = src/external/pushprox
+	url = https://github.com/prometheus-community/pushprox.git
