@@ -29,7 +29,7 @@ The node status collection system would make the following `post` request to the
 ```
 { "data":
   { "peer_id": "<base64 encodeing of the libp2p peer id>"
-  , "ip_address": "<ip address of the submitter>"
+  , "ip_address": "<hash of ip address of the submitter>"
   , "mina_version": "<mina version>"
   , "git_hash": "<git hash of the mina node>"
   , "timestamp": "<current time using RFC-3339 representation>"
@@ -101,8 +101,8 @@ This service would be disabled by default. It can be turned on by setting the `s
 
 Cloud storage for o1labs backend has the following structure:
 
-`<ip_address>/<peer_id>/<created_at>.json`
+`<hash_of_ip_address>/<peer_id>/<created_at>.json`
 
-`<ip_address>` is the ip address of the submitter
+`<hash_of_ip_address>` is the hash of the ip address of the submitter
 `<peer_id>` is the base64 encoding of the libp2p peer id of the submitter
 The json file contains the content of the request if the request is valid
