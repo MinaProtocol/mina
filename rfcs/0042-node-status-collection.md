@@ -30,6 +30,8 @@ The node status collection system would make the following `post` request to the
 { "data":
   { "peer_id": "<base64 encodeing of the libp2p peer id>"
   , "ip_address": "<ip address of the submitter>"
+  , "mina_version": "<mina version>"
+  , "git_hash": "<git hash of the mina node>"
   , "timestamp": "<current time using RFC-3339 representation>"
   , "libp2p_input_bandwidth": "<input bandwidth for libp2p helper system>"
   , "libp2p_output_bandwidth": "<output bandwith for libp2p helper system>"
@@ -91,7 +93,7 @@ If the `post` request is made against o1labs' backend service, then there would 
 ## daemon.json config to enable/disable the node status collection service
 
 [daemon.json]: #daemon
-This service would be enabled by default. It can be turned off by setting the `statusReport` field in `daemon.json` file to be false (by default it is set to be true).
+This service would be disabled by default. It can be turned on by setting the `statusReport` field in `daemon.json` file to be true (by default it is set to be false).
 
 ## Cloud storage
 
