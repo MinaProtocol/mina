@@ -166,7 +166,7 @@ This structure encapsulates the succinct state of the consensus protocol.  The s
 | `ledger`           | `Epoch_ledger.Value.Stable.V1.t` | |
 | `seed`             | `Epoch_seed.Stable.V1.t` | |
 | `start_checkpoint` | `State_hash.Stable.V1.t` | State hash of _first block_ of epoch (see [Section 3.3](#33-decentralized-checkpointing))|
-| `lock_checkpoint`  | `State_hash.Stable.V1.t` | State hash of _last known block in the first 2/3 of epoch_ (see [Section 3.3](#33-decentralized-checkpointing))|
+| `lock_checkpoint`  | `State_hash.Stable.V1.t` | State hash of _last known block in the first 2/3 of epoch_ (see [Section 3.3](#33-decentralized-checkpointing)) excluding the current state |
 | `epoch_length`     | `Length.Stable.V1.t` | |
 
 ## 2.7 Example block
@@ -400,17 +400,30 @@ The above pseudocode is only to provide intuition about how the chain selection 
 ; lock_checkpoint: 'lock_checkpoint
 -->
 
-Samasika uses decentralized checkpointing to determine whether a fork is short- or long-range.  The idea is that each chain maintains two checkpoints in every epoch, which are used to estimate how long ago a fork has occured.
+Samasika uses decentralized checkpointing to determine whether a fork is short- or long-range.  Each epoch is split into three parts with an equal number of slots.  The first 2/3 are called the *seed update range* because this is when the VRF is seeded.
 
-* **Start checkpoint** - First block of the epoch
-* **Lock checkpoint** - Last known block in the first `2/3` of an epoch
+For example, consider an example epoch `i` of 15 slots, `s1 ... s15`.
+```
 
+epoch i: s1 s2 s3 s4 s5 | s6 s7 s8 s9 s10 | s11 s12 s13 s14 s15
+         \______________________________/
+              2/3 (seed update range)
+```
+As seen above, the slots can be split into 3 parts delimited by `|`.  The first `2/3` of the slots (`s1 ... s10`) are in the seed update range. The epoch seeds of blocks in this rage are used to seed the VRF.
+
+The idea of decentralized checkpointing is that each chain maintains two checkpoints in every epoch, which are used to estimate how long ago a fork has occured.
+
+* **Start checkpoint** - State hash of the first block of the epoch
+* **Lock checkpoint** - State hash of the last known block in the seed update range of an epoch (not including the current block)
+
+For example, consider epoch `e1 ... e3` below.
 ```
 epochs:         e1                e2                 e3
                                       ⤺lock
 slots:  s1s2s3s4s5s6s7s8s9|s1s2s3s4s5s6s7s8s9|s1s2s3...
                      start⤻⎺⎺⎺⎺⎺⎺⎺⎺⎺⎺⎺
 ```
+Here the current slot is `s7`, the start checkpoint is `s1` and the lock checkpoint is `s6`.
 
 These are located in the `start_checkpoint` and `lock_checkpoint` fields of the [`Epoch_data`](#26-epoch_data) structure, which is part of the [`Consensus_state`](#25-consensus_state) (See [Section 2.6](#26-epoch_data)).
 
@@ -432,9 +445,10 @@ This algorithm initializes the checkpoints for genesis block `G`
 ```rust
 fn initCheckpoints(G) -> ()
 {
-    cState(G).seed = zero
+    cState(G).staking_epoch_data.seed = zero
     cState(G).staking_epoch_data.start_checkpoint = zero
     cState(G).staking_epoch_data.lock_checkpoint = zero
+    cState(G).staking_epoch_data.length = 1
 
     state_hash = poseidon_3w_hash(latest state ϵ cState(G).next_epoch_data.seed's update range) ?
     cState(G).next_epoch_data.start_checkpoint = state_hash ?
