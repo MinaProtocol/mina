@@ -24,13 +24,28 @@ class type field_class =
     method value : Impl.Field.t Js.prop
 
     method toBits : bool_class Js.t Js.js_array Js.t Js.meth
+
+    method toBits_length :
+      int Js.Optdef.t -> bool_class Js.t Js.js_array Js.t Js.meth
+
+    method toString : Js.js_string Js.t Js.meth
+
+    method toJSON : < .. > Js.t Js.meth
+
+    method toFieldElements : field_class Js.t Js.js_array Js.t Js.meth
   end
 
 and bool_class =
   object
     method value : Impl.Boolean.var Js.prop
 
+    method toBoolean : bool Js.t Js.meth
+
     method toField : field_class Js.t Js.meth
+
+    method toJSON : < .. > Js.t Js.meth
+
+    method toFieldElements : field_class Js.t Js.js_array Js.t Js.meth
   end
 
 module As_field = struct
@@ -47,7 +62,10 @@ module As_field = struct
     match Js.to_string (Js.typeof (Obj.magic value)) with
     | "number" ->
         let value = Js.float_of_number (Obj.magic value) in
-        if Float.is_integer value then Field.of_int (Float.to_int value)
+        if Float.is_integer value then
+          let value = Float.to_int value in
+          if value >= 0 then Field.of_int value
+          else Field.negate (Field.of_int (-value))
         else raise_errorf "Cannot convert a float to a field element"
     | "boolean" ->
         let value = Js.to_bool (Obj.magic value) in
@@ -111,6 +129,13 @@ let field_constr = As_field.field_constr
 
 open Core_kernel
 
+let bool_constant (b : Impl.Boolean.var) =
+  match (b :> Impl.Field.t) with
+  | Constant b ->
+      Some Impl.Field.Constant.(equal one b)
+  | _ ->
+      None
+
 module As_bool = struct
   (* boolean | bool_class | Boolean.var *)
   type t
@@ -120,6 +145,8 @@ module As_bool = struct
   let of_boolean (x : Boolean.var) : t = Obj.magic x
 
   let of_bool_obj (x : bool_class Js.t) : t = Obj.magic x
+
+  let of_js_bool (b : bool Js.t) : t = Obj.magic b
 
   let value (value : t) : Boolean.var =
     match Js.to_string (Js.typeof (Obj.magic value)) with
@@ -186,7 +213,12 @@ let method_ class_ name (f : _ Js.t -> _) =
 let () =
   let method_ name (f : field_class Js.t -> _) = method_ field_class name f in
   let to_string (x : Field.t) =
-    (match x with Constant x -> x | x -> As_prover.read_var x)
+    ( match x with
+    | Constant x ->
+        x
+    | x ->
+        (* TODO: Put good error message here. *)
+        As_prover.read_var x )
     |> Field.Constant.to_string |> Js.string
   in
   let mk x : field_class Js.t = new%js field_constr (As_field.of_field x) in
@@ -253,13 +285,26 @@ let () =
   method_ "isZero" (fun this : bool_class Js.t ->
       new%js bool_constr
         (As_bool.of_boolean (Field.equal this##.value Field.zero))) ;
-  method_ "toBits" (fun this : bool_class Js.t Js.js_array Js.t ->
-      let arr = new%js Js.array_empty in
-      List.iter
-        (Field.choose_preimage_var ~length:Field.size_in_bits this##.value)
-        ~f:(fun x ->
-          arr##push (new%js bool_constr (As_bool.of_boolean x)) |> ignore) ;
-      arr) ;
+  method_ "toBits"
+    (fun this (length : int Js.Optdef.t) : bool_class Js.t Js.js_array Js.t ->
+      let length = Js.Optdef.get length (fun () -> Field.size_in_bits) in
+      let k f bits =
+        let arr = new%js Js.array_empty in
+        List.iter bits ~f:(fun x ->
+            arr##push (new%js bool_constr (As_bool.of_boolean (f x))) |> ignore) ;
+        arr
+      in
+      handle_constants
+        (fun v -> k Fn.id (Field.choose_preimage_var ~length v))
+        (fun x ->
+          let bits = Field.Constant.unpack x in
+          let bits, high_bits = List.split_n bits length in
+          if List.exists high_bits ~f:Fn.id then
+            raise_errorf "Value %s did not fit in %d bits"
+              (Field.Constant.to_string x)
+              length ;
+          k Boolean.var_of_value bits)
+        this##.value) ;
   method_ "equals" (fun this (y : As_field.t) : bool_class Js.t ->
       new%js bool_constr
         (As_bool.of_boolean (Field.equal this##.value (As_field.value y)))) ;
@@ -294,7 +339,7 @@ let () =
   field_class##.toFieldElements
   := Js.wrap_callback
        (fun (x : As_field.t) : field_class Js.t Js.js_array Js.t ->
-         singleton_array (As_field.to_field_obj x)) ;
+         (As_field.to_field_obj x)##toFieldElements) ;
   field_class##.ofFieldElements
   := Js.wrap_callback
        (fun (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t ->
@@ -319,13 +364,52 @@ let () =
                     (fun () -> assert false)
                     As_bool.value)))) ;
   field_class##.toBits :=
-    Js.wrap_callback (fun (x : As_field.t) : bool_class Js.t Js.js_array Js.t ->
-        (As_field.to_field_obj x)##toBits) ;
+    Js.wrap_callback
+      (fun
+        (x : As_field.t)
+        (length : int Js.Optdef.t)
+        :
+        bool_class Js.t Js.js_array Js.t
+      -> (As_field.to_field_obj x)##toBits_length length) ;
   field_class##.equal :=
     Js.wrap_callback (fun (x : As_field.t) (y : As_field.t) : bool_class Js.t ->
         new%js bool_constr
           (As_bool.of_boolean
-             (Field.equal (As_field.value x) (As_field.value y))))
+             (Field.equal (As_field.value x) (As_field.value y)))) ;
+  let static_method name f =
+    Js.Unsafe.set field_class (Js.string name) (Js.wrap_callback f)
+  in
+  method_ "toJSON" (fun (this : field_class Js.t) : < .. > Js.t ->
+      this##toString) ;
+  static_method "toJSON" (fun (this : field_class Js.t) : < .. > Js.t ->
+      this##toJSON) ;
+  static_method "fromJSON"
+    (fun (value : Js.Unsafe.any) : field_class Js.t Js.Opt.t ->
+      let return x =
+        Js.Opt.return (new%js field_constr (As_field.of_field x))
+      in
+      match Js.to_string (Js.typeof (Js.Unsafe.coerce value)) with
+      | "number" ->
+          let value = Js.float_of_number (Obj.magic value) in
+          if Caml.Float.is_integer value then
+            return (Field.of_int (Float.to_int value))
+          else Js.Opt.empty
+      | "boolean" ->
+          let value = Js.to_bool (Obj.magic value) in
+          return (if value then Field.one else Field.zero)
+      | "string" -> (
+          let value : Js.js_string Js.t = Obj.magic value in
+          let s = Js.to_string value in
+          try
+            return
+              (Field.constant
+                 ( if
+                   Char.equal s.[0] '0' && Char.equal (Char.lowercase s.[1]) 'x'
+                 then Zexe_backend.Pasta.Fp.(of_bigint (Bigint.of_hex_string s))
+                 else Field.Constant.of_string s ))
+          with Failure _ -> Js.Opt.empty )
+      | _ ->
+          Js.Opt.empty)
 
 let () =
   let handle_constants2 f f_constant (x : Boolean.var) (y : Boolean.var) =
@@ -358,6 +442,13 @@ let () =
   add_op2 "equals" equal ;
   add_op1 "isTrue" Fn.id ;
   add_op1 "isFalse" Boolean.not ;
+  method_ "toBoolean" (fun this : bool Js.t ->
+      match (this##.value :> Field.t) with
+      | Constant x ->
+          Js.bool Field.Constant.(equal one x)
+      | _ ->
+          raise_errorf
+            "Bool.toBoolean can only be called on non-witness values.") ;
   method_ "sizeInFieldElements" (fun _this : int -> 1) ;
   method_ "toString" (fun this ->
       let x =
@@ -422,7 +513,19 @@ let () =
           (fun x -> mk (Boolean.Unsafe.of_cvar x##.value))
       else failwith "Expected array of length 1") ;
   static_method "check" (fun (x : bool_class Js.t) : unit ->
-      assert_ (Constraint.boolean (x##.value :> Field.t)))
+      assert_ (Constraint.boolean (x##.value :> Field.t))) ;
+  method_ "toJSON" (fun (this : bool_class Js.t) : < .. > Js.t ->
+      Js.Unsafe.coerce this##toBoolean) ;
+  static_method "toJSON" (fun (this : bool_class Js.t) : < .. > Js.t ->
+      this##toJSON) ;
+  static_method "fromJSON"
+    (fun (value : Js.Unsafe.any) : bool_class Js.t Js.Opt.t ->
+      match Js.to_string (Js.typeof (Js.Unsafe.coerce value)) with
+      | "boolean" ->
+          Js.Opt.return
+            (new%js bool_constr (As_bool.of_js_bool (Js.Unsafe.coerce value)))
+      | _ ->
+          Js.Opt.empty)
 
 type coords = < x : As_field.t Js.prop ; y : As_field.t Js.prop > Js.t
 
@@ -458,6 +561,10 @@ let group_class : < .. > Js.t =
 class type scalar_class =
   object
     method value : Boolean.var array Js.prop
+
+    method constantValue : Other_impl.Field.Constant.t Js.Optdef.t Js.prop
+
+    method toJSON : < .. > Js.t Js.meth
   end
 
 class type endo_scalar_class =
@@ -490,6 +597,10 @@ module As_group = struct
       method assertEquals : t -> unit Js.meth
 
       method equals : t -> bool_class Js.t Js.meth
+
+      method toJSON : < .. > Js.t Js.meth
+
+      method toFieldElements : field_class Js.t Js.js_array Js.t Js.meth
     end
 
   let group_constr : (As_field.t -> As_field.t -> group_class Js.t) Js.constr =
@@ -514,14 +625,54 @@ class type group_class = As_group.group_class
 
 let group_constr = As_group.group_constr
 
+let scalar_shift =
+  Pickles_types.Shifted_value.Shift.create (module Other_backend.Field)
+
+let to_constant_scalar (bs : Boolean.var array) :
+    Other_backend.Field.t Js.Optdef.t =
+  with_return (fun { return } ->
+      let bs =
+        Array.map bs ~f:(fun b ->
+            match (b :> Field.t) with
+            | Constant b ->
+                Impl.Field.Constant.(equal one b)
+            | _ ->
+                return Js.Optdef.empty)
+      in
+      Js.Optdef.return
+        (Pickles_types.Shifted_value.to_field
+           (module Other_backend.Field)
+           ~shift:scalar_shift
+           (Shifted_value (Other_backend.Field.of_bits (Array.to_list bs)))))
+
 let scalar_class : < .. > Js.t =
-  Js.wrap_meth_callback
-    (fun (this : scalar_class Js.t) (value : Boolean.var array) ->
-      this##.value := value ;
-      this)
-  |> Obj.magic
+  let f =
+    Js.Unsafe.eval_string
+      {js|
+      (function(toConstantFieldElt) {
+        return function(bits, constantValue) {
+          this.value = bits;
+          if (constantValue !== undefined) {
+            this.constantValue = constantValue;
+            return this;
+          }
+          let c = toConstantFieldElt(bits);
+          if (c !== undefined) {
+            this.constantValue = c;
+          }
+          return this;
+        };
+      })
+    |js}
+  in
+  Js.Unsafe.(fun_call f [| inject (Js.wrap_callback to_constant_scalar) |])
 
 let scalar_constr : (Boolean.var array -> scalar_class Js.t) Js.constr =
+  Obj.magic scalar_class
+
+let scalar_constr_const :
+    (Boolean.var array -> Other_backend.Field.t -> scalar_class Js.t) Js.constr
+    =
   Obj.magic scalar_class
 
 let () =
@@ -529,6 +680,32 @@ let () =
   let method_ name (f : scalar_class Js.t -> _) = method_ scalar_class name f in
   let static_method name f =
     Js.Unsafe.set scalar_class (Js.string name) (Js.wrap_callback f)
+  in
+  let ( ! ) name x =
+    Js.Optdef.get x (fun () ->
+        raise_errorf "Scalar.%s can only be called on non-witness values." name)
+  in
+  let bits x =
+    let (Shifted_value x) =
+      Pickles_types.Shifted_value.of_field ~shift:scalar_shift
+        (module Other_backend.Field)
+        x
+    in
+    Array.of_list_map (Other_backend.Field.to_bits x) ~f:Boolean.var_of_value
+  in
+  let constant_op1 name (f : Other_backend.Field.t -> Other_backend.Field.t) =
+    method_ name (fun x : scalar_class Js.t ->
+        let z = f (!name x##.constantValue) in
+        new%js scalar_constr_const (bits z) z)
+  in
+  let constant_op2 name
+      (f :
+        Other_backend.Field.t -> Other_backend.Field.t -> Other_backend.Field.t)
+      =
+    let ( ! ) = !name in
+    method_ name (fun x (y : scalar_class Js.t) : scalar_class Js.t ->
+        let z = f !(x##.constantValue) !(y##.constantValue) in
+        new%js scalar_constr_const (bits z) z)
   in
 
   (* It is not necessary to boolean constrain the bits of a scalar for the following
@@ -544,6 +721,11 @@ let () =
      The only one of these whose behavior depends on the bit values of the input scalars
      is Group.scale, and that function boolean constrains the scalar input itself.
   *)
+  constant_op1 "neg" Other_backend.Field.negate ;
+  constant_op2 "add" Other_backend.Field.add ;
+  constant_op2 "mul" Other_backend.Field.mul ;
+  constant_op2 "sub" Other_backend.Field.sub ;
+  constant_op2 "div" Other_backend.Field.div ;
   method_ "toFieldElements" (fun x : field_class Js.t Js.js_array Js.t ->
       Array.map x##.value ~f:(fun b ->
           new%js field_constr (As_field.of_field (b :> Field.t)))
@@ -557,11 +739,49 @@ let () =
       new%js scalar_constr
         (Array.map (Js.to_array xs) ~f:(fun x ->
              Boolean.Unsafe.of_cvar x##.value))) ;
+  static_method "random" (fun () : scalar_class Js.t ->
+      let x = Other_backend.Field.random () in
+      new%js scalar_constr_const (bits x) x) ;
   static_method "ofBits"
     (fun (bits : bool_class Js.t Js.js_array Js.t) : scalar_class Js.t ->
       new%js scalar_constr
         (Array.map (Js.to_array bits) ~f:(fun b ->
-             As_bool.(value (of_bool_obj b)))))
+             As_bool.(value (of_bool_obj b))))) ;
+  method_ "toJSON" (fun (s : scalar_class Js.t) : < .. > Js.t ->
+      let s =
+        Js.Optdef.case s##.constantValue
+          (fun () ->
+            Js.Optdef.get
+              (to_constant_scalar s##.value)
+              (fun () -> raise_errorf "Cannot convert in-circuit value to JSON"))
+          Fn.id
+      in
+      Js.string (Other_impl.Field.Constant.to_string s)) ;
+  static_method "toJSON" (fun (s : scalar_class Js.t) : < .. > Js.t ->
+      s##toJSON) ;
+  static_method "fromJSON"
+    (fun (value : Js.Unsafe.any) : scalar_class Js.t Js.Opt.t ->
+      let return x = Js.Opt.return (new%js scalar_constr_const (bits x) x) in
+      match Js.to_string (Js.typeof (Js.Unsafe.coerce value)) with
+      | "number" ->
+          let value = Js.float_of_number (Obj.magic value) in
+          if Caml.Float.is_integer value then
+            return (Other_backend.Field.of_int (Float.to_int value))
+          else Js.Opt.empty
+      | "boolean" ->
+          let value = Js.to_bool (Obj.magic value) in
+          return Other_backend.(if value then Field.one else Field.zero)
+      | "string" -> (
+          let value : Js.js_string Js.t = Obj.magic value in
+          let s = Js.to_string value in
+          try
+            return
+              ( if Char.equal s.[0] '0' && Char.equal (Char.lowercase s.[1]) 'x'
+              then Zexe_backend.Pasta.Fq.(of_bigint (Bigint.of_hex_string s))
+              else Other_impl.Field.Constant.of_string s )
+          with Failure _ -> Js.Opt.empty )
+      | _ ->
+          Js.Opt.empty)
 
 let () =
   let mk (x, y) : group_class Js.t =
@@ -570,6 +790,7 @@ let () =
   let method_ name (f : group_class Js.t -> _) = method_ group_class name f in
   let static name x = Js.Unsafe.set group_class (Js.string name) x in
   let static_method name f = static name (Js.wrap_callback f) in
+  let constant (x, y) = mk Field.(constant x, constant y) in
   method_ "add"
     (fun (p1 : group_class Js.t) (p2 : As_group.t) : group_class Js.t ->
       let p1, p2 =
@@ -578,8 +799,7 @@ let () =
       let open Pickles_base.Step_main_inputs in
       match (p1, p2) with
       | (Constant x1, Constant y1), (Constant x2, Constant y2) ->
-          let x, y = Inner_curve.Constant.( + ) (x1, y1) (x2, y2) in
-          mk Field.(constant x, constant y)
+          constant (Inner_curve.Constant.( + ) (x1, y1) (x2, y2))
       | _ ->
           (* TODO: Make this handle the edge cases *)
           Ops.add_fast p1 p2 |> mk) ;
@@ -592,10 +812,18 @@ let () =
       p1##add (As_group.to_group_obj p2)##neg) ;
   method_ "scale"
     (fun (p1 : group_class Js.t) (s : scalar_class Js.t) : group_class Js.t ->
-      Pickles_base.Step_main_inputs.Ops.scale_fast
-        (As_group.value (As_group.of_group_obj p1))
-        (`Plus_two_to_len s##.value)
-      |> mk) ;
+      let open Pickles_base.Step_main_inputs in
+      match
+        ( As_group.(value (of_group_obj p1))
+        , Js.Optdef.to_option s##.constantValue )
+      with
+      | (Constant x, Constant y), Some s ->
+          Inner_curve.Constant.scale (x, y) s |> constant
+      | _ ->
+          Ops.scale_fast
+            (As_group.value (As_group.of_group_obj p1))
+            (`Plus_two_to_len s##.value)
+          |> mk) ;
   method_ "endoScale"
     (fun (p1 : group_class Js.t) (s : endo_scalar_class Js.t) : group_class Js.t
     ->
@@ -636,11 +864,13 @@ let () =
   static_method "equal"
     (fun (p1 : As_group.t) (p2 : As_group.t) : bool_class Js.t ->
       (As_group.to_group_obj p1)##equals p2) ;
-  static_method "toFieldElements"
+  method_ "toFieldElements"
     (fun (p1 : group_class Js.t) : field_class Js.t Js.js_array Js.t ->
       let arr = singleton_array p1##.x in
       arr##push p1##.y |> ignore ;
       arr) ;
+  static_method "toFieldElements" (fun (p1 : group_class Js.t) ->
+      p1##toFieldElements) ;
   static_method "ofFieldElements"
     (fun (xs : field_class Js.t Js.js_array Js.t) ->
       array_check_length xs 2 ;
@@ -651,7 +881,26 @@ let () =
   static_method "check" (fun (p : group_class Js.t) : unit ->
       let open Pickles_base.Step_main_inputs in
       Inner_curve.assert_on_curve
-        Field.((p##.x##.value :> t), (p##.y##.value :> t)))
+        Field.((p##.x##.value :> t), (p##.y##.value :> t))) ;
+  method_ "toJSON" (fun (p : group_class Js.t) : < .. > Js.t ->
+      object%js
+        val x = (Obj.magic field_class)##toJSON p##.x
+
+        val y = (Obj.magic field_class)##toJSON p##.y
+      end) ;
+  static_method "toJSON" (fun (p : group_class Js.t) : < .. > Js.t -> p##toJSON) ;
+  static_method "fromJSON"
+    (fun (value : Js.Unsafe.any) : group_class Js.t Js.Opt.t ->
+      let get field_name =
+        Js.Optdef.case
+          (Js.Unsafe.get value (Js.string field_name))
+          (fun () -> Js.Opt.empty)
+          (fun x -> field_class##fromJSON x)
+      in
+      Js.Opt.bind (get "x") (fun x ->
+          Js.Opt.map (get "y") (fun y ->
+              new%js group_constr
+                (As_field.of_field_obj x) (As_field.of_field_obj y))))
 
 let poseidon =
   object%js
@@ -1018,6 +1267,7 @@ module Circuit = struct
     circuit##.prove := Js.wrap_meth_callback (fun this w p -> prove this w p) ;
     circuit##.assertEqual := assert_equal ;
     circuit##.equal := equal ;
+    circuit##.toFieldElements := Js.wrap_callback to_field_elts_magic ;
     Js.Unsafe.set circuit (Js.string "if") if_
 end
 
