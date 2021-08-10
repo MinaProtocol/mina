@@ -34,6 +34,7 @@
     "webpack-cli": "^4.7.2"
   },
   "dependencies": {
-    "env": "^0.0.2"
+    "env": "^0.0.2",
+    "reflect-metadata": "^0.1.13"
   }
 }
