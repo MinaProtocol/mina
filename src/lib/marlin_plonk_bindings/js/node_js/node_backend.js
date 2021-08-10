@@ -1,10 +1,5 @@
-// Provides: rayon_js_stubs_path
-// var rayon_js_stubs_path = "./../../../../../external/wasm-bindgen-rayon/src/workerHelpers.no-modules.js";
-var rayon_js_stubs_path = "./workerHelpers.no-modules.js";
-
 // Provides: rayon_js_stubs
-// Requires: rayon_js_stubs_path
-var rayon_js_stubs = require(rayon_js_stubs_path);
+var rayon_js_stubs = require("./workerHelpers.no-modules.js");
 
 // Provides: plonk_wasm
 // Requires: rayon_js_stubs, rayon_js_stubs_path
