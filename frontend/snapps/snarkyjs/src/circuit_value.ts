@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { Field, JSONValue } from './bindings/snarky';
+import { Circuit, Field, Bool, JSONValue } from './bindings/snarky';
 
 type Constructor<T> = { new (...args: any[]): T };
 
@@ -23,6 +23,18 @@ export abstract class CircuitValue {
       subElts.forEach((x) => res.push(x));
     }
     return res;
+  }
+
+  toFieldElements(): Field[] {
+    return (this.constructor as any).toFieldElements(this);
+  }
+
+  equals(this: this, x: typeof this): Bool {
+    return Circuit.equal(this, x);
+  }
+
+  assertEquals(this: this, x: typeof this): void {
+    Circuit.assertEqual(this, x);
   }
 
   static ofFieldElements<T>(this: Constructor<T>, xs: Field[]): T {
