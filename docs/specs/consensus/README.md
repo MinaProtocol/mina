@@ -81,6 +81,7 @@ These are the `mainnet` parameters Mina uses for Samasika
 | `acceptable_network_delay`      | `180000` (= 3m)         | Acceptable network delay in ms |
 | `slots_per_sub_window`          | `7`                     | Slots per sub window (see [Section 3.4](#34-window-min-density)) |
 | `sub_windows_per_window`        | `11`                    | Sub windows per window (see [Section 3.4](#34-window-min-density)) |
+| `slots_per_window`              | `slots_per_sub_window*sub_windows_per_window` (= 77) | Slots per window |
 
 # 2. Structures
 
@@ -656,6 +657,29 @@ Things a peer MUST do to initialize consensus includes
 * Load the genesis block
 * Get head of the current chain
 * Decide if peer should bootstrap or sync
+
+### 4.1.1 Load genesis block
+
+### 4.1.1.1 `Consensus_state`
+
+| Field                                    | Value         |
+| - | - |
+| `version`                                | `0x01`        |
+| `blockchain_length`                      | `1`           |
+| `epoch_count`                            | `0`           |
+| `min_window_density`                     | `77 = slots_per_window` |
+| `sub_window_densities`                   | `u32[77, 11]` (See [initSubWindowDensities](#343-initSubWindowDensities)) |
+| `last_vrf_output`                        | `0x0000000000000000000000000000000000000000000000000000000000000000`
+| `total_currency`                         | `805385692.840039233`
+| `curr_global_slot`                       | `0` |
+| `global_slot_since_genesis`              | `0` |
+| `staking_epoch_data`                     | See [Section 4.1.1.2](#4112-staking_epoch_data) |
+| `next_epoch_data`                        | See [Section 4.1.1.3](#4112-next_epoch_data) |
+| `has_ancestor_in_same_checkpoint_window` | `false` | |
+| `block_stake_winner`                     | `Public_key.Compressed.Stable.V1.t(B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)` |
+| `block_creator`                          | `Public_key.Compressed.Stable.V1.t(B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)` |
+| `coinbase_receiver`                      | `Public_key.Compressed.Stable.V1.t(B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)` |
+| `supercharge_coinbase`                   | `false` |
 
 ## 4.2 Select chain
 
