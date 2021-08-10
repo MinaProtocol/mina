@@ -1,5 +1,0 @@
-{
-  "presets": ["@babel/preset-env"],
-  "sourceMaps": false,
-  "exclude": "node_modules/**"
-}

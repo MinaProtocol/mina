@@ -11,66 +11,29 @@
     "node": ">=10"
   },
   "scripts": {
-    "start": "tsdx watch",
-    "build": "./node_modules/.bin/rollup -c",
-    "test": "node --experimental-wasm-modules --experimental-modules --experimental-wasm-threads node_modules/.bin/tsdx test",
-    "format": "prettier --write --ignore-unknown **/*",
-    "lint": "tsdx lint",
-    "prepare": "tsdx build",
-    "size": "size-limit",
-    "analyze": "size-limit --why"
-  },
-  "peerDependencies": {},
-  "husky": {
-    "hooks": {
-      "pre-commit": "tsdx lint"
-    }
-  },
-  "prettier": {
-    "printWidth": 80,
-    "semi": true,
-    "singleQuote": true,
-    "trailingComma": "es5"
+    "type-check": "tsc --noEmit",
+    "build": "./node_modules/.bin/webpack && cp ./src/bindings/plonk_wasm_bg.wasm ./dist",
+    "test": "node --experimental-wasm-modules --experimental-modules --experimental-wasm-threads ./node_modules/.bin/jest",
+    "format": "prettier --write --ignore-unknown **/*"
   },
   "name": "snarkyjs",
   "author": "O(1) Labs",
   "module": "dist/snarkyjs.esm.js",
-  "resolutions": {
-    "rollup": "2.38"
-  },
-  "size-limit": [
-    {
-      "path": "dist/snarkyjs.cjs.production.min.js",
-      "limit": "10 KB"
-    },
-    {
-      "path": "dist/snarkyjs.esm.js",
-      "limit": "10 KB"
-    }
-  ],
   "devDependencies": {
-    "@babel/plugin-transform-runtime": "^7.14.5",
-    "@babel/preset-env": "^7.14.8",
-    "@rollup/plugin-babel": "^5.3.0",
-    "@rollup/plugin-commonjs": "^20.0.0",
-    "@rollup/plugin-typescript": "^8.2.5",
-    "@size-limit/preset-small-lib": "^5.0.1",
-    "husky": "^7.0.1",
+    "@babel/core": "^7.15.0",
+    "@babel/preset-env": "^7.15.0",
+    "@types/jest": "^27.0.0",
+    "babel-loader": "^8.2.2",
+    "jest": "^27.0.6",
     "prettier": "^2.3.2",
-    "reflect-metadata": "^0.1.13",
-    "size-limit": "^5.0.1",
-    "tsdx": "^0.14.1",
+    "ts-jest": "^27.0.4",
+    "ts-loader": "^9.2.5",
     "tslib": "^2.3.0",
-    "typescript": "^4.3.5"
-  },
-  "jest": {
-    "transformIgnorePatterns": [
-      "src/bindings"
-    ],
-    "testEnvironment": "node"
+    "typescript": "^4.3.5",
+    "webpack": "^5.49.0",
+    "webpack-cli": "^4.7.2"
   },
   "dependencies": {
-    "@babel/runtime": "^7.14.8",
     "env": "^0.0.2"
   }
 }
