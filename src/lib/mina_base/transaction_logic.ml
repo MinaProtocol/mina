@@ -1211,6 +1211,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                ; permissions
                ; snapp_uri
                ; token_symbol
+               ; timing
                }
            ; delta
            ; events = _ (* This is for the snapp to use, we don't need it. *)
@@ -1249,14 +1250,37 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
              | Neg ->
                  a.permissions.send ))
     in
+    let%bind timing =
+      match timing with
+      | Keep ->
+          Ok a.timing
+      | Set timing_info when is_new ->
+          if Global_slot.(timing_info.vesting_period > zero) then
+            Ok
+              (Timed
+                 { initial_minimum_balance = timing_info.initial_minimum_balance
+                 ; cliff_time = timing_info.cliff_time
+                 ; cliff_amount = timing_info.cliff_amount
+                 ; vesting_period = timing_info.vesting_period
+                 ; vesting_increment = timing_info.vesting_increment
+                 })
+          else
+            (* This should be a reject, not a failure, otherwise the snark
+               circuit becomes unsatisfiable.
+            *)
+            Error (failure Update_not_permitted)
+      | Set _ ->
+          Error (failure Update_not_permitted)
+    in
     (* Check timing. *)
     let%bind timing =
       match delta.sgn with
       | Pos ->
-          Ok a.timing
+          Ok timing
       | Neg ->
           validate_timing ~txn_amount:delta.magnitude
-            ~txn_global_slot:state_view.global_slot_since_genesis ~account:a
+            ~txn_global_slot:state_view.global_slot_since_genesis
+            ~account:{ a with timing }
           |> Result.map_error ~f:timing_error_to_user_command_status
     in
     let init =

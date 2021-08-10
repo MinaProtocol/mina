@@ -1225,6 +1225,7 @@ module Base = struct
                  ; permissions
                  ; snapp_uri
                  ; token_symbol
+                 ; timing
                  }
              ; delta
              ; events = _ (* This is for the snapp to use, we don't need it. *)
@@ -1262,6 +1263,25 @@ module Base = struct
       Boolean.Assert.any
         [ is_new; !(Public_key.Compressed.Checked.equal pk a.public_key) ] ;
       let is_receiver = Sgn.Checked.is_pos delta.sgn in
+      let timing =
+        let open Snapp_basic in
+        let new_timing =
+          let timing_info = Set_or_keep.Checked.data timing in
+          ( { is_timed = Set_or_keep.Checked.is_set timing
+            ; initial_minimum_balance = timing_info.initial_minimum_balance
+            ; cliff_time = timing_info.cliff_time
+            ; cliff_amount = timing_info.cliff_amount
+            ; vesting_period = timing_info.vesting_period
+            ; vesting_increment = timing_info.vesting_increment
+            }
+            : Account_timing.var )
+        in
+        add_check ?label:None
+          Boolean.(is_new || Set_or_keep.Checked.is_keep timing) ;
+        !(Account.Timing.if_
+            (Set_or_keep.Checked.is_set timing)
+            ~then_:new_timing ~else_:a.timing)
+      in
       let `Min_balance _, timing =
         !([%with_label "Check snapp timing"]
             (let open Tick in
@@ -1273,8 +1293,9 @@ module Base = struct
               [%with_label "Check snapp timed balance"]
                 (Boolean.Assert.any [ ok; is_receiver ])
             in
-            check_timing ~balance_check ~timed_balance_check ~account:a
-              ~txn_amount:delta.magnitude ~txn_global_slot))
+            check_timing ~balance_check ~timed_balance_check
+              ~account:{ a with timing } ~txn_amount:delta.magnitude
+              ~txn_global_slot))
       in
       let timing =
         !(Account.Timing.if_ is_receiver ~then_:a.timing ~else_:timing)
@@ -3979,6 +4000,7 @@ let%test_module "transaction_snark" =
                       ; permissions = Keep
                       ; snapp_uri = Keep
                       ; token_symbol = Keep
+                      ; timing = Keep
                       }
                   ; token_id = Token_id.default
                   ; delta =
