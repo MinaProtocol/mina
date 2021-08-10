@@ -31,7 +31,7 @@ export class Main extends Circuit {
     let prevAcc: Group = Circuit.witness(Group, () => w.acc);
     let pubKey = Group.generator; // TODO: some literal group element
     let signature = Circuit.witness<Signature>(Signature, () => w.signature);
-    signature.verify(pubKey, [prevAcc.x, prevAcc.y, signature.r]).assertEquals(true);
+    //signature.verify(pubKey, [prevAcc.x, prevAcc.y, signature.r]).assertEquals(true);
     prevAcc.add(mask).assertEquals(newAcc);
   }
 }
@@ -47,11 +47,11 @@ class Circ extends Circuit {
 }
 
 function testSigning() {
-  const msg = [ Field.random() ];
+  const _msg = [ Field.random() ];
   const privKey = Scalar.random();
-  const pubKey = Group.generator.scale(privKey);
-  const s = Signature.create(privKey, msg);
-  console.log('signing worked', s.verify(pubKey, msg).toBoolean());
+  const _pubKey = Group.generator.scale(privKey);
+  //const s = Signature.create(privKey, msg);
+  //console.log('signing worked', s.verify(pubKey, msg).toBoolean());
 }
 
 export function main() {

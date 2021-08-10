@@ -46,9 +46,9 @@ export class HTTPSAttestation extends CircuitValue {
     this.signature = sig;
   }
 
-  verify(request: Bytes) {
-    const O1PUB: Group = Group.generator;
-    this.signature.verify(O1PUB, request.toFieldElements().concat(this.response.toFieldElements()))
+  verify(_request: Bytes) {
+    //const O1PUB: Group = Group.generator;
+    //this.signature.verify(O1PUB, request.toFieldElements().concat(this.response.toFieldElements()))
   }
 }
 
