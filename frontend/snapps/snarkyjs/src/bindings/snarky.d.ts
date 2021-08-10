@@ -23,6 +23,7 @@ export class Field {
   sqrt(): Field;
 
   toString(): string;
+  toJSON(): JSONValue;
 
   sizeInFieldElements(): number;
   toFieldElements(): Field[];
@@ -41,7 +42,16 @@ export class Field {
   assertBoolean(): void;
   isZero(): Bool;
 
+  /**
+   * Little endian binary representation of the field element.
+   */
   toBits(): Bool[];
+
+  /**
+   * Little endian binary representation of the field element.
+   * Fails if the field element cannot fit in `length` bits.
+   */
+  toBits(length: number): Bool[];
 
   equals(y: Field | number | string | boolean): Bool;
 
@@ -73,7 +83,7 @@ export class Field {
   static assertBoolean(x: Field | number | string | boolean): void;
   static isZero(x: Field | number | string | boolean): Bool;
 
-  static ofBits(x: Bool | boolean[]): Field;
+  static ofBits(x: (Bool | boolean)[]): Field;
   static toBits(x: Field | number | string | boolean): Bool[];
 
   static equal(x: Field | number | string | boolean, y: Field | number | string | boolean): Bool;
@@ -101,6 +111,7 @@ export class Bool {
   toFieldElements(): Field[];
 
   toString(): string;
+  toJSON(): JSONValue;
 
   /* Can only be called on non-witness values */
   toBoolean(): boolean;
@@ -186,7 +197,7 @@ export class Circuit {
     y: T
   ): void;
 
-  static assertEqual(
+  static assertEqual<T>(
     x: T,
     y: T
   ): void;
@@ -209,7 +220,7 @@ export class Circuit {
     y: T
   ): T;
 
-  static if(
+  static if<T>(
     b: Bool | boolean,
     x: T,
     y: T
@@ -221,17 +232,44 @@ export class Circuit {
     w: any[], p: any[],
     kp: Keypair
   ): Proof;
+
+  static toFieldElements<A>(A): Field[];
 }
 
 export class Scalar {
     toFieldElements(this: Scalar): Field[];
 
-    /* Can only be called on non-witness values */
+    /**
+     * Negate a scalar field element.
+     * Can only be called outside of circuit execution
+     * */
     neg(): Scalar;
+
+    /**
+     * Add scalar field elements.
+     * Can only be called outside of circuit execution
+     * */
     add(y: Scalar): Scalar;
+
+    /**
+     * Subtract scalar field elements.
+     * Can only be called outside of circuit execution
+     * */
     sub(y: Scalar): Scalar;
+
+    /**
+     * Multiply scalar field elements.
+     * Can only be called outside of circuit execution
+     * */
     mul(y: Scalar): Scalar;
+
+    /**
+     * Divide scalar field elements.
+     * Can only be called outside of circuit execution
+     * */
     div(y: Scalar): Scalar;
+
+    toJSON(): JSONValue;
 
     static toFieldElements(x: Scalar): Field[]
     static ofFieldElements(fields: Field[]): Scalar;
@@ -261,6 +299,8 @@ export class Group {
 
     assertEquals(y: Group): void;
     equals(y: Group): Bool;
+
+    toJSON(): JSONValue;
 
     constructor(args: { x: Field | number | string | boolean, y: Field | number | string | boolean })
     constructor(x: Field | number | string | boolean, y: Field | number | string | boolean)
