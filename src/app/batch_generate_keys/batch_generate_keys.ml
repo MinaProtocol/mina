@@ -139,9 +139,9 @@ let make_graphql_signed_transaction ~sender_priv_key ~receiver ~amount ~fee
             }
       }
   in
-  Format.printf "echo 'DEBUG: field = %s, scalar = %s'"
-    (Snark_params.Tick.Field.to_string field)
-    (Snark_params.Tick.Inner_curve.Scalar.to_string scalar) ;
+  (* Format.printf "echo 'DEBUG: field = %s, scalar = %s'"
+     (Snark_params.Tick.Field.to_string field)
+     (Snark_params.Tick.Inner_curve.Scalar.to_string scalar) ; *)
   let graphql_query =
     Send_payment.make
       ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)

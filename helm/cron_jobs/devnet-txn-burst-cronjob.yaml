@@ -54,7 +54,7 @@ while true; do echo looping; sleep 10; done;
               value: ""
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: gcr.io/o1labs-192920/mina-txn-burst-app@sha256:3e9a5ac971685ca42e71c2b4e98cf06e51715e0b3c04ba1bd1512a2b4e6c0df6
+            image: gcr.io/o1labs-192920/mina-txn-burst-app@sha256:eb13975611d6d0e08e7affb88901f14bb558b0c1772897357809f90bc080eefc
             imagePullPolicy: IfNotPresent
             name: devnet-txn-burst-cronjob
             resources: {}

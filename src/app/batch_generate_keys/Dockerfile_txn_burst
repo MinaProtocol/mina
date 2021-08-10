@@ -15,9 +15,12 @@ COPY ./batch_generate_keys.ml /
 
 ENV DUNE_PROFILE devnet
 
+USER root
+
 RUN eval $(opam config env) \
   && git pull \
   && git checkout feature/generate-txns-create-many-accounts-2 \
+  && mv /batch_generate_keys.ml src/app/batch_generate_keys \
   && dune build --profile=${DUNE_PROFILE} \
     src/app/generate_keypair/generate_keypair.exe \
     src/app/cli/src/mina.exe \
@@ -29,7 +32,6 @@ RUN eval $(opam config env) \
   && rm -rf _build \
   && dune build --profile=${DUNE_PROFILE} src/app/batch_generate_keys/batch_generate_keys.exe
 
-USER root
 
 RUN mkdir /keys && chmod 700 /keys
 ENV MINA_PRIVKEY_PASS ""
