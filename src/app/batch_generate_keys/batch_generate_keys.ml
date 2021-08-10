@@ -148,6 +148,7 @@ let make_graphql_signed_transaction ~sender_priv_key ~receiver ~amount ~fee
       ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
       ~amount:(Graphql_lib.Encoders.amount amount)
       ~fee:(Graphql_lib.Encoders.fee fee)
+      ~nonce:(Graphql_lib.Encoders.nonce Mina_numbers.Account_nonce.zero)
       ~field:(Snark_params.Tick.Field.to_string field)
       ~scalar:(Snark_params.Tick.Inner_curve.Scalar.to_string scalar)
       ()
