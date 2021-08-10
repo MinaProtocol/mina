@@ -223,6 +223,18 @@ module Eq_data = struct
         ; to_input_checked = field
         }
 
+    let rollup_state =
+      let open Random_oracle_input in
+      lazy
+        Field.
+          { typ
+          ; equal
+          ; equal_checked = run Checked.equal
+          ; default = Lazy.force Snapp_account.Rollup_events.empty_hash
+          ; to_input = field
+          ; to_input_checked = field
+          }
+
     let boolean =
       let open Random_oracle_input in
       Boolean.
@@ -469,7 +481,8 @@ module Account = struct
       ; Eq_data.(to_input_explicit (Tc.public_key ()) delegate)
       ; Vector.reduce_exn ~f:append
           (Vector.map state ~f:Eq_data.(to_input_explicit Tc.field))
-      ; Eq_data.(to_input_explicit Tc.field) rollup_state
+      ; Eq_data.(to_input ~explicit:false (Lazy.force Tc.rollup_state))
+          rollup_state
       ; Eq_data.(to_input_explicit Tc.boolean) proved_state
       ]
 
@@ -507,7 +520,7 @@ module Account = struct
         ; Eq_data.(to_input_checked (Tc.public_key ()) delegate)
         ; Vector.reduce_exn ~f:append
             (Vector.map state ~f:Eq_data.(to_input_checked Tc.field))
-        ; Eq_data.(to_input_checked Tc.field) rollup_state
+        ; Eq_data.(to_input_checked (Lazy.force Tc.rollup_state)) rollup_state
         ; Eq_data.(to_input_checked Tc.boolean) proved_state
         ]
 
@@ -550,7 +563,9 @@ module Account = struct
         Vector.(
           to_list
             (map snapp.rollup_state
-               ~f:Eq_data.(check_checked Tc.field rollup_state)))
+               ~f:
+                 Eq_data.(
+                   check_checked (Lazy.force Tc.rollup_state) rollup_state)))
       :: Eq_data.(check_checked Tc.boolean proved_state snapp.proved_state)
       :: Vector.(
            to_list
@@ -635,7 +650,10 @@ module Account = struct
           if
             Option.is_some
             @@ List.find (Vector.to_list snapp.rollup_state) ~f:(fun state ->
-                   Eq_data.(check Tc.field ~label:"" rollup_state state)
+                   Eq_data.(
+                     check
+                       (Lazy.force Tc.rollup_state)
+                       ~label:"" rollup_state state)
                    |> Or_error.is_ok)
           then Ok ()
           else Or_error.errorf "Equality check failed: rollup_state"

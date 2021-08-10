@@ -4425,44 +4425,41 @@ let%test_module "transaction_snark" =
                   let vk =
                     With_hash.of_data ~hash_data:Snapp_account.digest_vk vk
                   in
-                  (let _is_new, _loc =
-                     let id =
-                       Public_key.compress sender.public_key
-                       |> fun pk -> Account_id.create pk Token_id.default
-                     in
-                     Ledger.get_or_create_account ledger id
-                       (Account.create id Balance.(of_int 888_888))
-                     |> Or_error.ok_exn
-                   in
-                   let _is_new, loc =
-                     let id =
-                       Account_id.create trivial_account_pk Token_id.default
-                     in
-                     Ledger.get_or_create_account ledger id
-                       (Account.create id Balance.(of_int 234234234234))
-                     |> Or_error.ok_exn
-                   in
-                   let a = Ledger.get ledger loc |> Option.value_exn in
-                   Ledger.set ledger loc
-                     { a with
-                       permissions = Permissions.empty
-                     ; snapp =
-                         Some
-                           { (Option.value ~default:Snapp_account.default
-                                a.snapp)
-                             with
-                             verification_key = Some vk
-                           }
-                     }) ;
+                  let _is_new, _loc =
+                    let id =
+                      Public_key.compress sender.public_key
+                      |> fun pk -> Account_id.create pk Token_id.default
+                    in
+                    Ledger.get_or_create_account ledger id
+                      (Account.create id Balance.(of_int 888_888))
+                    |> Or_error.ok_exn
+                  in
+                  let _is_new, _loc =
+                    let id =
+                      Account_id.create trivial_account_pk Token_id.default
+                    in
+                    let account : Account.t =
+                      { (Account.create id Balance.(of_int 0)) with
+                        permissions =
+                          { Permissions.user_default with
+                            set_permissions = Proof
+                          }
+                      ; snapp =
+                          Some
+                            { Snapp_account.default with
+                              verification_key = Some vk
+                            }
+                      }
+                    in
+                    Ledger.get_or_create_account ledger id account
+                    |> Or_error.ok_exn
+                  in
                   let total = Option.value_exn (Amount.add fee amount) in
                   let update_empty_permissions =
                     let permissions =
-                      Permissions.empty
-                      (*{
-                        Permissions.user_default with
-                          send=Permissions.Auth_required.Both
-
-                        }*)
+                      { Permissions.user_default with
+                        send = Permissions.Auth_required.Proof
+                      }
                       |> Snapp_basic.Set_or_keep.Set
                     in
                     { Party.Update.dummy with permissions }
@@ -4486,7 +4483,7 @@ let%test_module "transaction_snark" =
                     }
                   in
                   let snapp_party_data : Party.Predicated.t =
-                    { Party.Predicated.Poly.body =
+                    { body =
                         { pk = trivial_account_pk
                         ; update = update_empty_permissions
                         ; token_id = Token_id.default
@@ -4496,7 +4493,7 @@ let%test_module "transaction_snark" =
                         ; call_data = Field.zero
                         ; depth = 0
                         }
-                    ; predicate = Accept
+                    ; predicate = Full Snapp_predicate.Account.accept
                     }
                   in
                   let protocol_state = Snapp_predicate.Protocol_state.accept in
@@ -4537,6 +4534,18 @@ let%test_module "transaction_snark" =
                       }
                     ]
                   in
+                  let fee_payer =
+                    let txn_comm =
+                      Parties.Transaction_commitment.with_fee_payer transaction
+                        ~fee_payer_hash:
+                          Party.Predicated.(digest (of_signed fee_payer.data))
+                    in
+                    { fee_payer with
+                      authorization =
+                        Signature_lib.Schnorr.sign sender.private_key
+                          (Random_oracle.Input.field txn_comm)
+                    }
+                  in
                   let parties : Parties.t =
                     { fee_payer; other_parties; protocol_state }
                   in
@@ -4553,7 +4562,7 @@ let%test_module "transaction_snark" =
                               Local_state.dummy.ledger
                         ; transaction_commitment = transaction
                         ; token_id = Token_id.default
-                        ; excess = total
+                        ; excess = Amount.zero
                         ; success = true
                         ; will_succeed = true
                         }
@@ -4609,11 +4618,9 @@ let%test_module "transaction_snark" =
                                   stack_hash
                                     (accumulate_hashes'
                                        local_state_post.call_stack))
-                            ; ledger =
-                                (* TODO: This won't quite work when the transaction fails. *)
-                                Ledger.merkle_root local_state_post.ledger
+                            ; ledger = Local_state.dummy.ledger
                             ; transaction_commitment =
-                                w.local_state_init.transaction_commitment
+                                Parties.Transaction_commitment.empty
                             }
                         }
                     ; supply_increase = Amount.zero
@@ -4634,6 +4641,10 @@ let%test_module "transaction_snark" =
                         exists Statement.With_sok.typ ~compute:(fun () ->
                             statement)
                       in
+                      let tx_statement =
+                        exists Snapp_statement.typ ~compute:(fun () ->
+                            tx_statement)
+                      in
                       Base.Parties_snark.main ~constraint_constants
                         [ { predicate_type = `Nonce_or_accept
                           ; auth_type = Signature
@@ -4644,7 +4655,7 @@ let%test_module "transaction_snark" =
                           ; is_start = `No
                           }
                         ]
-                        [] s ~witness:w ;
+                        [ (0, tx_statement) ] s ~witness:w ;
                       fun () -> ())
                     ())
               |> Or_error.ok_exn
@@ -4806,18 +4817,30 @@ let%test_module "transaction_snark" =
                   let vk =
                     With_hash.of_data ~hash_data:Snapp_account.digest_vk vk
                   in
-                  (let _is_new, loc =
+                  let total = Option.value_exn (Amount.add fee amount) in
+                  (let _is_new, _loc =
+                     let pk = Public_key.compress sender.public_key in
+                     let id = Account_id.create pk Token_id.default in
+                     Ledger.get_or_create_account ledger id
+                       (Account.create id
+                          Balance.(Option.value_exn (add_amount zero total)))
+                     |> Or_error.ok_exn
+                   in
+                   let _is_new, loc =
                      let id =
                        Account_id.create multisig_account_pk Token_id.default
                      in
                      Ledger.get_or_create_account ledger id
-                       (Account.create id Balance.(of_int 234234234234))
+                       (Account.create id Balance.(of_int 0))
                      |> Or_error.ok_exn
                    in
                    let a = Ledger.get ledger loc |> Option.value_exn in
                    Ledger.set ledger loc
                      { a with
-                       permissions = Permissions.empty
+                       permissions =
+                         { Permissions.user_default with
+                           set_permissions = Proof
+                         }
                      ; snapp =
                          Some
                            { (Option.value ~default:Snapp_account.default
@@ -4826,24 +4849,17 @@ let%test_module "transaction_snark" =
                              verification_key = Some vk
                            }
                      }) ;
-                  let total = Option.value_exn (Amount.add fee amount) in
                   let update_empty_permissions =
                     let permissions =
-                      Permissions.empty
-                      (*{
-                        Permissions.user_default with
-                          send=Permissions.Auth_required.Both
-
-                        }*)
-                      |> Snapp_basic.Set_or_keep.Set
+                      Snapp_basic.Set_or_keep.Set Permissions.empty
                     in
-                    { Party.Update.dummy with permissions }
+                    { Party.Update.noop with permissions }
                   in
                   let fee_payer =
                     { Party.Signed.data =
                         { body =
                             { pk = sender.public_key |> Public_key.compress
-                            ; update = update_empty_permissions
+                            ; update = Party.Update.noop
                             ; token_id = Token_id.default
                             ; delta = Amount.Signed.(negate (of_unsigned total))
                             ; events = []
@@ -4868,7 +4884,7 @@ let%test_module "transaction_snark" =
                         ; call_data = Field.zero
                         ; depth = 0
                         }
-                    ; predicate = Accept
+                    ; predicate = Full Snapp_predicate.Account.accept
                     }
                   in
                   let protocol_state = Snapp_predicate.Protocol_state.accept in
@@ -4924,6 +4940,18 @@ let%test_module "transaction_snark" =
                     (fun () -> multisig_prover ~handler [] tx_statement)
                     |> Async.Thread_safe.block_on_async_exn
                   in
+                  let fee_payer =
+                    let txn_comm =
+                      Parties.Transaction_commitment.with_fee_payer transaction
+                        ~fee_payer_hash:
+                          Party.Predicated.(digest (of_signed fee_payer.data))
+                    in
+                    { fee_payer with
+                      authorization =
+                        Signature_lib.Schnorr.sign sender.private_key
+                          (Random_oracle.Input.field txn_comm)
+                    }
+                  in
                   let parties : Parties.t =
                     { fee_payer
                     ; other_parties =
@@ -4945,7 +4973,7 @@ let%test_module "transaction_snark" =
                               Local_state.dummy.ledger
                         ; transaction_commitment = transaction
                         ; token_id = Token_id.default
-                        ; excess = total
+                        ; excess = Amount.zero
                         ; success = true
                         ; will_succeed = true
                         }
@@ -5002,11 +5030,9 @@ let%test_module "transaction_snark" =
                                   stack_hash
                                     (accumulate_hashes'
                                        local_state_post.call_stack))
-                            ; ledger =
-                                (* TODO: This won't quite work when the transaction fails. *)
-                                Ledger.merkle_root local_state_post.ledger
+                            ; ledger = Local_state.dummy.ledger
                             ; transaction_commitment =
-                                w.local_state_init.transaction_commitment
+                                Parties.Transaction_commitment.empty
                             }
                         }
                     ; supply_increase = Amount.zero
@@ -5027,6 +5053,10 @@ let%test_module "transaction_snark" =
                         exists Statement.With_sok.typ ~compute:(fun () ->
                             statement)
                       in
+                      let tx_statement =
+                        exists Snapp_statement.typ ~compute:(fun () ->
+                            tx_statement)
+                      in
                       Base.Parties_snark.main ~constraint_constants
                         [ { predicate_type = `Nonce_or_accept
                           ; auth_type = Signature
@@ -5037,7 +5067,7 @@ let%test_module "transaction_snark" =
                           ; is_start = `No
                           }
                         ]
-                        [] s ~witness:w ;
+                        [ (0, tx_statement) ] s ~witness:w ;
                       fun () -> ())
                     ())
               |> Or_error.ok_exn
