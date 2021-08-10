@@ -27,7 +27,7 @@ RUN eval $(opam config env) \
     src/app/generate_keypair/generate_keypair.exe \
     src/app/rosetta/ocaml-signer/signer.exe \
   && rm -rf _build \
-  && dune build src/app/batch_generate_keys/batch_generate_keys.exe
+  && dune build --profile=${DUNE_PROFILE} src/app/batch_generate_keys/batch_generate_keys.exe
 
 USER root
 
