@@ -68,11 +68,6 @@ enum ValidationResult {
   ignore @2;
 }
 
-struct ValidationMessage {
-  validationSeqNumber @0 :UInt64;
-  result @1 :ValidationResult;
-}
-
 struct StreamMessage {
   id @0 :StreamId;
   data @1 :Data;
@@ -258,7 +253,8 @@ struct Libp2pHelperInterface {
   # corresponds to the the push message sent to the daemon in the
   # GossipReceived message
   struct Validation {
-    validation @0 :ValidationMessage;
+    validationSeqNumber @0 :UInt64;
+    result @1 :ValidationResult;
   }
 
   struct RpcRequest {
@@ -327,7 +323,7 @@ struct Libp2pHelperInterface {
     # }
   }
 
-  struct IncomingMessage {
+  struct Message {
     union {
       rpcRequest @0 :Libp2pHelperInterface.RpcRequest;
       pushMessage @1 :Libp2pHelperInterface.PushMessage;
@@ -382,7 +378,7 @@ struct DaemonInterface {
     }
   }
 
-  struct IncomingMessage {
+  struct Message {
     union {
       libp2pHelperResponse @0 :Libp2pHelperInterface.RpcResponse;
       pushMessage @1 :DaemonInterface.PushMessage;
