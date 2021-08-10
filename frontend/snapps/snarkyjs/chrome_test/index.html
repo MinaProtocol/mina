@@ -63,16 +63,15 @@
       window.plonk_wasm = plonk_wasm;
       await init();
       plonk_wasm.initThreadPool(navigator.hardwareConcurrency);
-      import * as snarky from "./snarky_js_chrome.bc.js";
-      window.snarky = snarky;
+      // import * as snarky from "./snarky_js_chrome.bc.js";
+      // window.snarky = snarky;
       /* Don't load the script until we're done initialising. */
-      /*
       var newScript = document.createElement("script");
       newScript.src = "./snarky_js_chrome.bc.js";
       document.body.appendChild(newScript);
       var all_button = document.getElementById("run_all_tests");
       all_button.addEventListener("click", run_all_tests);
-      all_button.disabled = false */
+      all_button.disabled = false
     </script>
   </body>
 </html>
