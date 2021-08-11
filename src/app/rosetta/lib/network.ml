@@ -82,8 +82,8 @@ let devnet_chain_id =
   "8af43cf261ea10c761ec540f92aafb76aec56d8d74f77c836f3ab1de5ce4eac5"
 
 let network_tag_of_graphql res =
-  if String.equal (res#daemonStatus)#chainId mainnet_chain_id then "mainnet"
-  else if String.equal (res#daemonStatus)#chainId devnet_chain_id then "dev"
+  if String.equal res#daemonStatus#chainId mainnet_chain_id then "mainnet"
+  else if String.equal res#daemonStatus#chainId devnet_chain_id then "dev"
   else "debug"
 
 module Validate_choice = struct
@@ -126,9 +126,10 @@ module Validate_choice = struct
           ~actual:
             (Mock.validate
                ~network_identifier:
-                 { Network_identifier.blockchain= "coda"
-                 ; network= "debug"
-                 ; sub_network_identifier= None }
+                 { Network_identifier.blockchain = "coda"
+                 ; network = "debug"
+                 ; sub_network_identifier = None
+                 }
                ~gql_response:(build ~chainId:"0"))
           ~expected:(Result.return ())
 
@@ -138,9 +139,10 @@ module Validate_choice = struct
           ~actual:
             (Mock.validate
                ~network_identifier:
-                 { Network_identifier.blockchain= "coda"
-                 ; network= "testnet"
-                 ; sub_network_identifier= None }
+                 { Network_identifier.blockchain = "coda"
+                 ; network = "testnet"
+                 ; sub_network_identifier = None
+                 }
                ~gql_response:(build ~chainId:"0"))
           ~expected:
             (Result.fail
@@ -167,10 +169,13 @@ module List_ = struct
       let%map res = env () in
       (* HACK: If initialPeers + peers are both empty, assume we're on debug ; otherwise testnet or devnet *)
       let network = network_tag_of_graphql res in
-      { Network_list_response.network_identifiers=
-          [ { Network_identifier.blockchain= "coda"
+      { Network_list_response.network_identifiers =
+          [ { Network_identifier.blockchain = "coda"
             ; network
-            ; sub_network_identifier= None } ] }
+            ; sub_network_identifier = None
+            }
+          ]
+      }
   end
 
   module Real = Impl (Deferred.Result)
@@ -187,24 +192,29 @@ module List_ = struct
           ~actual:(Mock.handle ~env:debug_env)
           ~expected:
             (Result.return
-               { Network_list_response.network_identifiers=
-                   [ { Network_identifier.blockchain= "coda"
-                     ; network= "debug"
-                     ; sub_network_identifier= None } ] })
+               { Network_list_response.network_identifiers =
+                   [ { Network_identifier.blockchain = "coda"
+                     ; network = "debug"
+                     ; sub_network_identifier = None
+                     }
+                   ]
+               })
 
       let devnet_env : 'gql Env.Mock.t =
-       fun () ->
-        Result.return @@ Validate_choice.build ~chainId:devnet_chain_id
+       fun () -> Result.return @@ Validate_choice.build ~chainId:devnet_chain_id
 
       let%test_unit "devnet net" =
         Test.assert_ ~f:Network_list_response.to_yojson
           ~actual:(Mock.handle ~env:devnet_env)
           ~expected:
             (Result.return
-               { Network_list_response.network_identifiers=
-                   [ { Network_identifier.blockchain= "coda"
-                     ; network= "dev"
-                     ; sub_network_identifier= None } ] })
+               { Network_list_response.network_identifiers =
+                   [ { Network_identifier.blockchain = "coda"
+                     ; network = "dev"
+                     ; sub_network_identifier = None
+                     }
+                   ]
+               })
 
       let mainnet_env : 'gql Env.Mock.t =
        fun () ->
@@ -215,10 +225,13 @@ module List_ = struct
           ~actual:(Mock.handle ~env:mainnet_env)
           ~expected:
             (Result.return
-               { Network_list_response.network_identifiers=
-                   [ { Network_identifier.blockchain= "coda"
-                     ; network= "mainnet"
-                     ; sub_network_identifier= None } ] })
+               { Network_list_response.network_identifiers =
+                   [ { Network_identifier.blockchain = "coda"
+                     ; network = "mainnet"
+                     ; sub_network_identifier = None
+                     }
+                   ]
+               })
     end )
 end
 
@@ -229,25 +242,26 @@ module Status = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
-        { gql: unit -> ('gql, Errors.t) M.t
-        ; db_oldest_block: unit -> (int64 * string, Errors.t) M.t
-        ; validate_network_choice: 'gql Validate_choice.Impl(M).t }
+        { gql : unit -> ('gql, Errors.t) M.t
+        ; db_oldest_block : unit -> (int64 * string, Errors.t) M.t
+        ; validate_network_choice : 'gql Validate_choice.Impl(M).t
+        }
     end
 
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
     let real :
-        db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t
-        =
+        db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t =
      fun ~db ~graphql_uri ->
       let (module Db : Caqti_async.CONNECTION) = db in
-      { gql= (fun () -> Graphql.query (Get_status.make ()) graphql_uri)
-      ; db_oldest_block=
+      { gql = (fun () -> Graphql.query (Get_status.make ()) graphql_uri)
+      ; db_oldest_block =
           (fun () ->
             Errors.Lift.sql ~context:"Oldest block query"
-            @@ Db.find oldest_block_query () )
-      ; validate_network_choice= Validate_choice.Real.validate }
+            @@ Db.find oldest_block_query ())
+      ; validate_network_choice = Validate_choice.Real.validate
+      }
   end
 
   module Impl (M : Monad_fail.S) = struct
@@ -265,34 +279,33 @@ module Status = struct
         | Some chain ->
             M.return (Array.last chain)
       in
-      let genesis_block_state_hash = (res#genesisBlock)#stateHash in
+      let genesis_block_state_hash = res#genesisBlock#stateHash in
       let%map oldest_block = env.db_oldest_block () in
-      { Network_status_response.current_block_identifier=
+      { Network_status_response.current_block_identifier =
           Block_identifier.create
-            ((latest_block#protocolState)#consensusState)#blockHeight
+            latest_block#protocolState#consensusState#blockHeight
             latest_block#stateHash
-      ; current_block_timestamp=
-          ((latest_block#protocolState)#blockchainState)#utcDate
-      ; genesis_block_identifier=
+      ; current_block_timestamp =
+          latest_block#protocolState#blockchainState#utcDate
+      ; genesis_block_identifier =
           Block_identifier.create genesis_block_height genesis_block_state_hash
-      ; oldest_block_identifier=
-          ( if String.equal (snd oldest_block) genesis_block_state_hash then
-            None
+      ; oldest_block_identifier =
+          ( if String.equal (snd oldest_block) genesis_block_state_hash then None
           else
-            Some
-              (Block_identifier.create (fst oldest_block) (snd oldest_block))
+            Some (Block_identifier.create (fst oldest_block) (snd oldest_block))
           )
-      ; peers=
-          (let peer_objs = (res#daemonStatus)#peers |> Array.to_list in
+      ; peers =
+          (let peer_objs = res#daemonStatus#peers |> Array.to_list in
            List.map peer_objs ~f:(fun po -> po#peerId |> Peer.create))
-      ; sync_status=
+      ; sync_status =
           Some
-            { Sync_status.current_index=
-                Some ((latest_block#protocolState)#consensusState)#blockHeight
-            ; target_index= None
-            ; stage= Some (sync_status_to_string res#syncStatus)
+            { Sync_status.current_index =
+                Some latest_block#protocolState#consensusState#blockHeight
+            ; target_index = None
+            ; stage = Some (sync_status_to_string res#syncStatus)
             ; synced = None
-            } }
+            }
+      }
   end
 
   module Real = Impl (Deferred.Result)
@@ -327,7 +340,8 @@ module Status = struct
                              method blockHeight = Int64.of_int_exn 4
                            end
                        end
-                   end |]
+                   end
+                |]
 
           method daemonStatus =
             object
@@ -336,17 +350,19 @@ module Status = struct
               method peers =
                 [| object
                      method peerId = "dev.o1test.net"
-                   end |]
+                   end
+                |]
             end
 
           method syncStatus = `SYNCED
         end
 
       let no_chain_info_env : 'gql Env.Mock.t =
-        { gql= (fun () -> Result.return @@ build ~best_chain_missing:true)
-        ; validate_network_choice= Validate_choice.Mock.succeed
-        ; db_oldest_block=
-            (fun () -> Result.return (Int64.of_int_exn 1, "GENESIS_HASH")) }
+        { gql = (fun () -> Result.return @@ build ~best_chain_missing:true)
+        ; validate_network_choice = Validate_choice.Mock.succeed
+        ; db_oldest_block =
+            (fun () -> Result.return (Int64.of_int_exn 1, "GENESIS_HASH"))
+        }
 
       let%test_unit "chain info missing" =
         Test.assert_ ~f:Network_status_response.to_yojson
@@ -354,10 +370,11 @@ module Status = struct
           ~expected:(Result.fail (Errors.create `Chain_info_missing))
 
       let oldest_block_is_genesis_env : 'gql Env.Mock.t =
-        { gql= (fun () -> Result.return @@ build ~best_chain_missing:false)
-        ; validate_network_choice= Validate_choice.Mock.succeed
-        ; db_oldest_block=
-            (fun () -> Result.return (Int64.of_int_exn 1, "GENESIS_HASH")) }
+        { gql = (fun () -> Result.return @@ build ~best_chain_missing:false)
+        ; validate_network_choice = Validate_choice.Mock.succeed
+        ; db_oldest_block =
+            (fun () -> Result.return (Int64.of_int_exn 1, "GENESIS_HASH"))
+        }
 
       let%test_unit "oldest block is genesis" =
         Test.assert_ ~f:Network_status_response.to_yojson
@@ -365,28 +382,33 @@ module Status = struct
             (Mock.handle ~env:oldest_block_is_genesis_env dummy_network_request)
           ~expected:
             ( Result.return
-            @@ { Network_status_response.current_block_identifier=
-                   { Block_identifier.index= Int64.of_int_exn 4
-                   ; hash= "STATE_HASH_TIP" }
-               ; current_block_timestamp= Int64.of_int_exn 1_594_854_566
-               ; genesis_block_identifier=
-                   { Block_identifier.index= Int64.of_int_exn 1
-                   ; hash= "GENESIS_HASH" }
-               ; peers= [{Peer.peer_id= "dev.o1test.net"; metadata= None}]
-               ; oldest_block_identifier= None
-               ; sync_status=
+            @@ { Network_status_response.current_block_identifier =
+                   { Block_identifier.index = Int64.of_int_exn 4
+                   ; hash = "STATE_HASH_TIP"
+                   }
+               ; current_block_timestamp = Int64.of_int_exn 1_594_854_566
+               ; genesis_block_identifier =
+                   { Block_identifier.index = Int64.of_int_exn 1
+                   ; hash = "GENESIS_HASH"
+                   }
+               ; peers =
+                   [ { Peer.peer_id = "dev.o1test.net"; metadata = None } ]
+               ; oldest_block_identifier = None
+               ; sync_status =
                    Some
-                     { Sync_status.current_index= Some (Int64.of_int_exn 4)
-                     ; target_index= None
-                     ; stage= Some "Synced"
+                     { Sync_status.current_index = Some (Int64.of_int_exn 4)
+                     ; target_index = None
+                     ; stage = Some "Synced"
                      ; synced = Some true
-                     } } )
+                     }
+               } )
 
       let oldest_block_is_different_env : 'gql Env.Mock.t =
-        { gql= (fun () -> Result.return @@ build ~best_chain_missing:false)
-        ; validate_network_choice= Validate_choice.Mock.succeed
-        ; db_oldest_block=
-            (fun () -> Result.return (Int64.of_int_exn 3, "SOME_HASH")) }
+        { gql = (fun () -> Result.return @@ build ~best_chain_missing:false)
+        ; validate_network_choice = Validate_choice.Mock.succeed
+        ; db_oldest_block =
+            (fun () -> Result.return (Int64.of_int_exn 3, "SOME_HASH"))
+        }
 
       let%test_unit "oldest block is different" =
         Test.assert_ ~f:Network_status_response.to_yojson
@@ -395,25 +417,30 @@ module Status = struct
                dummy_network_request)
           ~expected:
             ( Result.return
-            @@ { Network_status_response.current_block_identifier=
-                   { Block_identifier.index= Int64.of_int_exn 4
-                   ; hash= "STATE_HASH_TIP" }
-               ; current_block_timestamp= Int64.of_int_exn 1_594_854_566
-               ; genesis_block_identifier=
-                   { Block_identifier.index= Int64.of_int_exn 1
-                   ; hash= "GENESIS_HASH" }
-               ; peers= [{Peer.peer_id= "dev.o1test.net"; metadata= None}]
-               ; oldest_block_identifier=
+            @@ { Network_status_response.current_block_identifier =
+                   { Block_identifier.index = Int64.of_int_exn 4
+                   ; hash = "STATE_HASH_TIP"
+                   }
+               ; current_block_timestamp = Int64.of_int_exn 1_594_854_566
+               ; genesis_block_identifier =
+                   { Block_identifier.index = Int64.of_int_exn 1
+                   ; hash = "GENESIS_HASH"
+                   }
+               ; peers =
+                   [ { Peer.peer_id = "dev.o1test.net"; metadata = None } ]
+               ; oldest_block_identifier =
                    Some
-                     { Block_identifier.index= Int64.of_int_exn 3
-                     ; hash= "SOME_HASH" }
-               ; sync_status=
+                     { Block_identifier.index = Int64.of_int_exn 3
+                     ; hash = "SOME_HASH"
+                     }
+               ; sync_status =
                    Some
-                     { Sync_status.current_index= Some (Int64.of_int_exn 4)
-                     ; target_index= None
-                     ; stage= Some "Synced"
+                     { Sync_status.current_index = Some (Int64.of_int_exn 4)
+                     ; target_index = None
+                     ; stage = Some "Synced"
                      ; synced = Some true
-                     } } )
+                     }
+               } )
     end )
 end
 
@@ -421,8 +448,9 @@ module Options = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
-        { gql: unit -> ('gql, Errors.t) M.t
-        ; validate_network_choice: 'gql Validate_choice.Impl(M).t }
+        { gql : unit -> ('gql, Errors.t) M.t
+        ; validate_network_choice : 'gql Validate_choice.Impl(M).t
+        }
     end
 
     module Real = T (Deferred.Result)
@@ -430,8 +458,9 @@ module Options = struct
 
     let real : graphql_uri:Uri.t -> 'gql Real.t =
      fun ~graphql_uri ->
-      { gql= (fun () -> Graphql.query (Get_version.make ()) graphql_uri)
-      ; validate_network_choice= Validate_choice.Real.validate }
+      { gql = (fun () -> Graphql.query (Get_version.make ()) graphql_uri)
+      ; validate_network_choice = Validate_choice.Real.validate
+      }
   end
 
   module Impl (M : Monad_fail.S) = struct
@@ -442,21 +471,23 @@ module Options = struct
         env.validate_network_choice ~gql_response:res
           ~network_identifier:network.network_identifier
       in
-      { Network_options_response.version=
+      { Network_options_response.version =
           Version.create "1.4.9" (Option.value ~default:"unknown" res#version)
-      ; allow=
-          { Allow.operation_statuses= Lazy.force Operation_statuses.all
-          ; operation_types= Lazy.force Operation_types.all
-          ; errors= Lazy.force Errors.all_errors
-          ; historical_balance_lookup=
+      ; allow =
+          { Allow.operation_statuses = Lazy.force Operation_statuses.all
+          ; operation_types = Lazy.force Operation_types.all
+          ; errors = Lazy.force Errors.all_errors
+          ; historical_balance_lookup =
               true
               (* TODO: #6872 We should expose info for the timestamp_start_index via GraphQL then consume it here *)
-          ; timestamp_start_index=
+          ; timestamp_start_index =
               None
               (* If we implement the /call endpoint we'll need to list its supported methods here *)
-          ; call_methods= []
-          ; balance_exemptions= []
-          ; mempool_coins= false } }
+          ; call_methods = []
+          ; balance_exemptions = []
+          ; mempool_coins = false
+          }
+      }
   end
 
   module Real = Impl (Deferred.Result)
@@ -466,48 +497,52 @@ module Options = struct
       module Mock = Impl (Result)
 
       let env : 'gql Env.Mock.t =
-        { gql=
+        { gql =
             (fun () ->
               Result.return
               @@ object
                    method version = Some "v1.0"
-                 end )
-        ; validate_network_choice= Validate_choice.Mock.succeed }
+                 end)
+        ; validate_network_choice = Validate_choice.Mock.succeed
+        }
 
       let%test_unit "options succeeds" =
         Test.assert_ ~f:Network_options_response.to_yojson
           ~actual:(Mock.handle ~env dummy_network_request)
           ~expected:
             ( Result.return
-            @@ { Network_options_response.version= Version.create "1.4.9" "v1.0"
-               ; allow=
-                   { Allow.operation_statuses= Lazy.force Operation_statuses.all
-                   ; operation_types= Lazy.force Operation_types.all
-                   ; errors= Lazy.force Errors.all_errors
-                   ; historical_balance_lookup= true
-                   ; timestamp_start_index= None
-                   ; call_methods= []
-                   ; balance_exemptions= []
-                   ; mempool_coins= false } } )
+            @@ { Network_options_response.version =
+                   Version.create "1.4.9" "v1.0"
+               ; allow =
+                   { Allow.operation_statuses =
+                       Lazy.force Operation_statuses.all
+                   ; operation_types = Lazy.force Operation_types.all
+                   ; errors = Lazy.force Errors.all_errors
+                   ; historical_balance_lookup = true
+                   ; timestamp_start_index = None
+                   ; call_methods = []
+                   ; balance_exemptions = []
+                   ; mempool_coins = false
+                   }
+               } )
     end )
 end
 
 let router ~graphql_uri ~logger ~with_db (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /network/ $route"
-    ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
+    ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
   match route with
-  | ["list"] ->
+  | [ "list" ] ->
       let%bind _meta =
         Errors.Lift.parse ~context:"Request" @@ Metadata_request.of_yojson body
         |> Errors.Lift.wrap
       in
       let%map res =
-        List_.Real.handle ~env:(List_.Env.real ~graphql_uri)
-        |> Errors.Lift.wrap
+        List_.Real.handle ~env:(List_.Env.real ~graphql_uri) |> Errors.Lift.wrap
       in
       Network_list_response.to_yojson res
-  | ["status"] ->
+  | [ "status" ] ->
       with_db (fun ~db ->
           let%bind network =
             Errors.Lift.parse ~context:"Request"
@@ -518,8 +553,8 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
             Status.Real.handle ~env:(Status.Env.real ~graphql_uri ~db) network
             |> Errors.Lift.wrap
           in
-          Network_status_response.to_yojson res )
-  | ["options"] ->
+          Network_status_response.to_yojson res)
+  | [ "options" ] ->
       let%bind network =
         Errors.Lift.parse ~context:"Request" @@ Network_request.of_yojson body
         |> Errors.Lift.wrap

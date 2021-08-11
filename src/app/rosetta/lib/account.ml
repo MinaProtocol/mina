@@ -35,7 +35,7 @@ module Get_balance =
 |}]
 
 module Balance_info = struct
-  type t = {liquid_balance: int64; total_balance: int64}
+  type t = { liquid_balance : int64; total_balance : int64 }
 end
 
 module Sql = struct
@@ -142,21 +142,20 @@ LIMIT 1
             , block_info.state_hash )
     in
     let requested_block_identifier =
-      { Block_identifier.index= requested_block_height
-      ; hash= requested_block_hash }
+      { Block_identifier.index = requested_block_height
+      ; hash = requested_block_hash
+      }
     in
     let%bind last_relevant_command_info_opt =
       Balance_from_last_relevant_command.run
         (module Conn)
         requested_block_height address
       |> Errors.Lift.sql
-           ~context:
-             "Finding balance at last relevant internal or user command."
+           ~context:"Finding balance at last relevant internal or user command."
     in
     let open Unsigned in
     let end_slot =
-      UInt32.of_int
-        (Int.of_int64_exn requested_block_global_slot_since_genesis)
+      UInt32.of_int (Int.of_int64_exn requested_block_global_slot_since_genesis)
     in
     let compute_incremental_balance
         (timing_info : Archive_lib.Processor.Timing_info.t) ~start_slot =
@@ -186,8 +185,8 @@ LIMIT 1
       | None, None ->
           (* We've never heard of this account, at least as of the block_identifier provided *)
           (* This means they requested a block from before account creation;
-         * this is ambiguous in the spec but Coinbase confirmed we can return 0.
-         * https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
+             * this is ambiguous in the spec but Coinbase confirmed we can return 0.
+             * https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
           Deferred.Result.return 0L
       | Some (_, last_relevant_command_balance), None ->
           (* This account has no special vesting, so just use its last known balance *)
@@ -212,8 +211,8 @@ LIMIT 1
             , last_relevant_command_balance )
         , Some timing_info ) ->
           (* This block was in the genesis ledger and has been involved in at least one user or internal command. We need
-         * to compute the change in its balance between the most recent command and the start block (if it has vesting
-         * it may have changed). *)
+             * to compute the change in its balance between the most recent command and the start block (if it has vesting
+             * it may have changed). *)
           let incremental_balance_between_slots =
             compute_incremental_balance timing_info
               ~start_slot:
@@ -235,13 +234,13 @@ LIMIT 1
           Deferred.Result.return 0L
       | Some (_, last_relevant_command_balance), _ ->
           (* This account was involved in a command and we don't care about its vesting, so just use the last known
-         * balance from the command *)
+             * balance from the command *)
           Deferred.Result.return last_relevant_command_balance
       | None, Some timing_info ->
           (* This account hasn't seen any transactions but was in the genesis ledger, so use its genesis balance  *)
           Deferred.Result.return timing_info.initial_balance
     in
-    let balance_info : Balance_info.t = {liquid_balance; total_balance} in
+    let balance_info : Balance_info.t = { liquid_balance; total_balance } in
     Deferred.Result.return (requested_block_identifier, balance_info)
 end
 
@@ -250,13 +249,14 @@ module Balance = struct
     (* All side-effects go in the env so we can mock them out later *)
     module T (M : Monad_fail.S) = struct
       type 'gql t =
-        { gql:
+        { gql :
             ?token_id:string -> address:string -> unit -> ('gql, Errors.t) M.t
-        ; db_block_identifier_and_balance_info:
+        ; db_block_identifier_and_balance_info :
                block_query:Block_query.t
             -> address:string
             -> (Block_identifier.t * Balance_info.t, Errors.t) M.t
-        ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t }
+        ; validate_network_choice : 'gql Network.Validate_choice.Impl(M).t
+        }
     end
 
     (* The real environment does things asynchronously *)
@@ -266,28 +266,28 @@ module Balance = struct
     module Mock = T (Result)
 
     let real :
-        db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t
-        =
+        db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t =
      fun ~db ~graphql_uri ->
-      { gql=
+      { gql =
           (fun ?token_id ~address () ->
             Graphql.query
               (Get_balance.make ~public_key:(`String address)
                  ~token_id:
                    (match token_id with Some s -> `String s | None -> `Null)
                  ())
-              graphql_uri )
-      ; db_block_identifier_and_balance_info=
+              graphql_uri)
+      ; db_block_identifier_and_balance_info =
           (fun ~block_query ~address ->
             let (module Conn : Caqti_async.CONNECTION) = db in
-            Sql.run (module Conn) block_query address )
-      ; validate_network_choice= Network.Validate_choice.Real.validate }
+            Sql.run (module Conn) block_query address)
+      ; validate_network_choice = Network.Validate_choice.Real.validate
+      }
 
     let dummy_block_identifier =
       Block_identifier.create (Int64.of_int_exn 4) "STATE_HASH_BLOCK"
 
     let mock : 'gql Mock.t =
-      { gql=
+      { gql =
           (fun ?token_id:_ ~address:_ () ->
             (* TODO: Add variants to cover every branch *)
             Result.return
@@ -301,7 +301,8 @@ module Balance = struct
                    Some
                      [| object
                           method stateHash = "STATE_HASH_TIP"
-                        end |]
+                        end
+                     |]
 
                  method account =
                    Some
@@ -312,23 +313,23 @@ module Balance = struct
 
                             method stateHash = Some "STATE_HASH_TIP"
 
-                            method liquid =
-                              Some (Unsigned.UInt64.of_int 66_000)
+                            method liquid = Some (Unsigned.UInt64.of_int 66_000)
 
                             method total = Unsigned.UInt64.of_int 66_000
                           end
 
                         method nonce = Some "2"
                      end)
-               end )
-      ; db_block_identifier_and_balance_info=
+               end)
+      ; db_block_identifier_and_balance_info =
           (fun ~block_query ~address ->
             ignore ((block_query, address) : Block_query.t * string) ;
             let balance_info : Balance_info.t =
-              {liquid_balance= 0L; total_balance= 0L}
+              { liquid_balance = 0L; total_balance = 0L }
             in
-            Result.return @@ (dummy_block_identifier, balance_info) )
-      ; validate_network_choice= Network.Validate_choice.Mock.succeed }
+            Result.return @@ (dummy_block_identifier, balance_info))
+      ; validate_network_choice = Network.Validate_choice.Mock.succeed
+      }
   end
 
   module Impl (M : Monad_fail.S) = struct
@@ -369,70 +370,73 @@ module Balance = struct
               Amount_of.token token_id )
             liquid_balance
         in
-        let locked_balance =
-          Unsigned.UInt64.sub total_balance liquid_balance
-        in
+        let locked_balance = Unsigned.UInt64.sub total_balance liquid_balance in
         let metadata =
           `Assoc
             [ ( "locked_balance"
               , `Intlit (Unsigned.UInt64.to_string locked_balance) )
             ; ( "total_balance"
-              , `Intlit (Unsigned.UInt64.to_string total_balance) ) ]
+              , `Intlit (Unsigned.UInt64.to_string total_balance) )
+            ]
         in
-        {amount with metadata= Some metadata}
+        { amount with metadata = Some metadata }
       in
       let metadata =
         Option.map
-          ~f:(fun nonce -> `Assoc [("nonce", `Intlit nonce)])
+          ~f:(fun nonce -> `Assoc [ ("nonce", `Intlit nonce) ])
           account#nonce
       in
       match req.block_identifier with
       | None ->
           let%bind state_hash =
-            match (account#balance)#stateHash with
+            match account#balance#stateHash with
             | None ->
                 M.fail
                   (Errors.create
                      ~context:
-                       "Failed accessing state hash from GraphQL \
-                        communication with the Coda Daemon."
+                       "Failed accessing state hash from GraphQL communication \
+                        with the Coda Daemon."
                      `Chain_info_missing)
             | Some state_hash ->
                 M.return state_hash
           in
           let%map liquid_balance =
-            match (account#balance)#liquid with
+            match account#balance#liquid with
             | None ->
                 M.fail
                   (Errors.create
                      ~context:
-                       "Unable to access liquid balance since your Mina \
-                        daemon isn't fully bootstrapped."
+                       "Unable to access liquid balance since your Mina daemon \
+                        isn't fully bootstrapped."
                      `Chain_info_missing)
             | Some liquid_balance ->
                 M.return liquid_balance
           in
-          let total_balance = (account#balance)#total in
-          { Account_balance_response.block_identifier=
-              { Block_identifier.index=
-                  Unsigned.UInt32.to_int64 (account#balance)#blockHeight
-              ; hash= state_hash }
-          ; balances= [make_balance_amount ~liquid_balance ~total_balance]
-          ; metadata }
+          let total_balance = account#balance#total in
+          { Account_balance_response.block_identifier =
+              { Block_identifier.index =
+                  Unsigned.UInt32.to_int64 account#balance#blockHeight
+              ; hash = state_hash
+              }
+          ; balances = [ make_balance_amount ~liquid_balance ~total_balance ]
+          ; metadata
+          }
       | Some partial_identifier ->
           (* TODO: Once multiple token_ids are possible we may need to add handling for that here *)
           let%bind block_query =
             Query.of_partial_identifier partial_identifier
           in
-          let%map block_identifier, {liquid_balance; total_balance} =
+          let%map block_identifier, { liquid_balance; total_balance } =
             env.db_block_identifier_and_balance_info ~block_query ~address
           in
           { Account_balance_response.block_identifier
-          ; balances=
+          ; balances =
               [ make_balance_amount
                   ~liquid_balance:(Unsigned.UInt64.of_int64 liquid_balance)
-                  ~total_balance:(Unsigned.UInt64.of_int64 total_balance) ]
-          ; metadata }
+                  ~total_balance:(Unsigned.UInt64.of_int64 total_balance)
+              ]
+          ; metadata
+          }
   end
 
   module Real = Impl (Deferred.Result)
@@ -450,28 +454,36 @@ module Balance = struct
                   (Account_identifier.create "x")))
           ~actual:
             (Result.return
-               { Account_balance_response.block_identifier=
-                   { Block_identifier.index= Int64.of_int 3
-                   ; Block_identifier.hash= "STATE_HASH_TIP" }
-               ; balances=
-                   [ { Amount.value= "66000"
-                     ; currency=
-                         {Currency.symbol= "CODA"; decimals= 9l; metadata= None}
-                     ; metadata=
+               { Account_balance_response.block_identifier =
+                   { Block_identifier.index = Int64.of_int 3
+                   ; Block_identifier.hash = "STATE_HASH_TIP"
+                   }
+               ; balances =
+                   [ { Amount.value = "66000"
+                     ; currency =
+                         { Currency.symbol = "CODA"
+                         ; decimals = 9l
+                         ; metadata = None
+                         }
+                     ; metadata =
                          Some
                            (`Assoc
                              [ ("locked_balance", `Intlit "0")
-                             ; ("total_balance", `Intlit "66000") ]) } ]
-               ; metadata= Some (`Assoc [("nonce", `Intlit "2")]) })
+                             ; ("total_balance", `Intlit "66000")
+                             ])
+                     }
+                   ]
+               ; metadata = Some (`Assoc [ ("nonce", `Intlit "2") ])
+               })
     end )
 end
 
 let router ~graphql_uri ~logger ~with_db (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /account/ $route"
-    ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
+    ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
   match route with
-  | ["balance"] ->
+  | [ "balance" ] ->
       with_db (fun ~db ->
           let%bind req =
             Errors.Lift.parse ~context:"Request"
@@ -482,6 +494,6 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
             Balance.Real.handle ~env:(Balance.Env.real ~db ~graphql_uri) req
             |> Errors.Lift.wrap
           in
-          Account_balance_response.to_yojson res )
+          Account_balance_response.to_yojson res)
   | _ ->
       Deferred.Result.fail `Page_not_found

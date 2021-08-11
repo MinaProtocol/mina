@@ -9,11 +9,10 @@ open Lib
 let sign_command =
   let open Command.Let_syntax in
   let%map_open unsigned_transaction =
-    flag "--unsigned-transaction" ~aliases:["unsigned-transaction"]
-      ~doc:"Unsigned transaction string returned from Rosetta"
-      (required string)
+    flag "--unsigned-transaction" ~aliases:[ "unsigned-transaction" ]
+      ~doc:"Unsigned transaction string returned from Rosetta" (required string)
   and private_key =
-    flag "--private-key" ~aliases:["private-key"] ~doc:"Private key hex bytes"
+    flag "--private-key" ~aliases:[ "private-key" ] ~doc:"Private key hex bytes"
       (required string)
   in
   let open Deferred.Let_syntax in
@@ -31,10 +30,10 @@ let sign_command =
 let verify_command =
   let open Command.Let_syntax in
   let%map_open signed_transaction =
-    flag "--signed-transaction" ~aliases:["signed-transaction"]
+    flag "--signed-transaction" ~aliases:[ "signed-transaction" ]
       ~doc:"Signed transaction string returned from Rosetta" (required string)
   and public_key =
-    flag "--public-key" ~aliases:["public-key"] ~doc:"Public key hex bytes"
+    flag "--public-key" ~aliases:[ "public-key" ] ~doc:"Public key hex bytes"
       (required string)
   in
   let open Deferred.Let_syntax in
@@ -55,7 +54,7 @@ let verify_command =
 let derive_command =
   let open Command.Let_syntax in
   let%map_open private_key =
-    flag "--private-key" ~aliases:["private-key"] ~doc:"Private key hex bytes"
+    flag "--private-key" ~aliases:[ "private-key" ] ~doc:"Private key hex bytes"
       (required string)
   in
   let open Deferred.Let_syntax in
@@ -84,4 +83,5 @@ let commands =
     , Command.async ~summary:"Import a private key, returns a public-key"
         derive_command )
   ; ( "generate-private-key"
-    , Command.async ~summary:"Generate a new private key" generate_command ) ]
+    , Command.async ~summary:"Generate a new private key" generate_command )
+  ]

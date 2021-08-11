@@ -31,7 +31,7 @@ module Get_coinbase_and_genesis =
 let account_id = User_command_info.account_id
 
 module Block_query = struct
-  type t = ([`Height of int64], [`Hash of string]) These.t option
+  type t = ([ `Height of int64 ], [ `Hash of string ]) These.t option
 
   module T (M : Monad_fail.S) = struct
     let of_partial_identifier (identifier : Partial_block_identifier.t) =
@@ -64,16 +64,17 @@ module Op = User_command_info.Op
 
 module Internal_command_info = struct
   module Kind = struct
-    type t = [`Coinbase | `Fee_transfer | `Fee_transfer_via_coinbase]
+    type t = [ `Coinbase | `Fee_transfer | `Fee_transfer_via_coinbase ]
     [@@deriving equal, to_yojson]
   end
 
   type t =
-    { kind: Kind.t
-    ; receiver: [`Pk of string]
-    ; fee: Unsigned_extended.UInt64.t
-    ; token: Unsigned_extended.UInt64.t
-    ; hash: string }
+    { kind : Kind.t
+    ; receiver : [ `Pk of string ]
+    ; fee : Unsigned_extended.UInt64.t
+    ; token : Unsigned_extended.UInt64.t
+    ; hash : string
+    }
   [@@deriving to_yojson]
 
   module T (M : Monad_fail.S) = struct
@@ -89,16 +90,17 @@ module Internal_command_info = struct
         match t.kind with
         | `Coinbase ->
             (* The coinbase transaction is really incrementing by the coinbase
-           * amount  *)
-            [{Op.label= `Coinbase_inc; related_to= None}]
+               * amount *)
+            [ { Op.label = `Coinbase_inc; related_to = None } ]
         | `Fee_transfer ->
-            [{Op.label= `Fee_receiver_inc; related_to= None}]
+            [ { Op.label = `Fee_receiver_inc; related_to = None } ]
         | `Fee_transfer_via_coinbase ->
-            [ {Op.label= `Fee_receiver_inc; related_to= None}
-            ; {Op.label= `Fee_payer_dec; related_to= Some `Fee_receiver_inc} ]
+            [ { Op.label = `Fee_receiver_inc; related_to = None }
+            ; { Op.label = `Fee_payer_dec; related_to = Some `Fee_receiver_inc }
+            ]
       in
       Op_build.build
-        ~a_eq:[%equal: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]]
+        ~a_eq:[%equal: [ `Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc ]]
         ~plan ~f:(fun ~related_operations ~operation_identifier op ->
           (* All internal commands succeed if they're in blocks *)
           let status = Some (Operation_statuses.name `Success) in
@@ -108,22 +110,24 @@ module Internal_command_info = struct
                 { Operation.operation_identifier
                 ; related_operations
                 ; status
-                ; account=
+                ; account =
                     Some (account_id t.receiver Amount_of.Token_id.default)
-                ; _type= Operation_types.name `Coinbase_inc
-                ; amount= Some (Amount_of.token t.token t.fee)
-                ; coin_change= None
-                ; metadata= None }
+                ; _type = Operation_types.name `Coinbase_inc
+                ; amount = Some (Amount_of.token t.token t.fee)
+                ; coin_change = None
+                ; metadata = None
+                }
           | `Fee_receiver_inc ->
               M.return
                 { Operation.operation_identifier
                 ; related_operations
                 ; status
-                ; account= Some (account_id t.receiver t.token)
-                ; _type= Operation_types.name `Fee_receiver_inc
-                ; amount= Some (Amount_of.token t.token t.fee)
-                ; coin_change= None
-                ; metadata= None }
+                ; account = Some (account_id t.receiver t.token)
+                ; _type = Operation_types.name `Fee_receiver_inc
+                ; amount = Some (Amount_of.token t.token t.fee)
+                ; coin_change = None
+                ; metadata = None
+                }
           | `Fee_payer_dec ->
               let open M.Let_syntax in
               let%map coinbase_receiver =
@@ -142,53 +146,59 @@ module Internal_command_info = struct
               { Operation.operation_identifier
               ; related_operations
               ; status
-              ; account=
-                  Some
-                    (account_id coinbase_receiver Amount_of.Token_id.default)
-              ; _type= Operation_types.name `Fee_payer_dec
-              ; amount= Some Amount_of.(negated (coda t.fee))
-              ; coin_change= None
-              ; metadata= None } )
+              ; account =
+                  Some (account_id coinbase_receiver Amount_of.Token_id.default)
+              ; _type = Operation_types.name `Fee_payer_dec
+              ; amount = Some Amount_of.(negated (coda t.fee))
+              ; coin_change = None
+              ; metadata = None
+              })
   end
 
   let dummies =
-    [ { kind= `Coinbase
-      ; receiver= `Pk "Eve"
-      ; fee= Unsigned.UInt64.of_int 20_000_000_000
-      ; token= Unsigned.UInt64.of_int 1
-      ; hash= "COINBASE_1" }
-    ; { kind= `Fee_transfer
-      ; receiver= `Pk "Alice"
-      ; fee= Unsigned.UInt64.of_int 30_000_000_000
-      ; token= Unsigned.UInt64.of_int 1
-      ; hash= "FEE_TRANSFER" } ]
+    [ { kind = `Coinbase
+      ; receiver = `Pk "Eve"
+      ; fee = Unsigned.UInt64.of_int 20_000_000_000
+      ; token = Unsigned.UInt64.of_int 1
+      ; hash = "COINBASE_1"
+      }
+    ; { kind = `Fee_transfer
+      ; receiver = `Pk "Alice"
+      ; fee = Unsigned.UInt64.of_int 30_000_000_000
+      ; token = Unsigned.UInt64.of_int 1
+      ; hash = "FEE_TRANSFER"
+      }
+    ]
 end
 
 module Block_info = struct
   type t =
-    { block_identifier: Block_identifier.t
-    ; parent_block_identifier: Block_identifier.t
-    ; creator: [`Pk of string]
-    ; winner: [`Pk of string]
-    ; timestamp: int64
-    ; internal_info: Internal_command_info.t list
-    ; user_commands: User_command_info.t list }
+    { block_identifier : Block_identifier.t
+    ; parent_block_identifier : Block_identifier.t
+    ; creator : [ `Pk of string ]
+    ; winner : [ `Pk of string ]
+    ; timestamp : int64
+    ; internal_info : Internal_command_info.t list
+    ; user_commands : User_command_info.t list
+    }
 
-  let creator_metadata {creator= `Pk pk; _} = `Assoc [("creator", `String pk)]
+  let creator_metadata { creator = `Pk pk; _ } =
+    `Assoc [ ("creator", `String pk) ]
 
-  let block_winner_metadata {winner= `Pk pk; _} =
-    `Assoc [("winner", `String pk)]
+  let block_winner_metadata { winner = `Pk pk; _ } =
+    `Assoc [ ("winner", `String pk) ]
 
   let dummy =
-    { block_identifier=
+    { block_identifier =
         Block_identifier.create (Int64.of_int_exn 4) "STATE_HASH_BLOCK"
-    ; creator= `Pk "Alice"
-    ; winner= `Pk "Babu"
-    ; parent_block_identifier=
+    ; creator = `Pk "Alice"
+    ; winner = `Pk "Babu"
+    ; parent_block_identifier =
         Block_identifier.create (Int64.of_int_exn 3) "STATE_HASH_PARENT"
-    ; timestamp= Int64.of_int_exn 1594937771
-    ; internal_info= Internal_command_info.dummies
-    ; user_commands= User_command_info.dummies }
+    ; timestamp = Int64.of_int_exn 1594937771
+    ; internal_info = Internal_command_info.dummies
+    ; user_commands = User_command_info.dummies
+    }
 end
 
 module Sql = struct
@@ -289,14 +299,15 @@ WITH RECURSIVE chain AS (
     module Extras = struct
       (* TODO: A few of these actually aren't used; should we leave in for future or remove? *)
       type t =
-        { fee_payer: string
-        ; source: string
-        ; receiver: string
-        ; status: string option
-        ; failure_reason: string option
-        ; fee_payer_account_creation_fee_paid: int64 option
-        ; receiver_account_creation_fee_paid: int64 option
-        ; created_token: int64 option }
+        { fee_payer : string
+        ; source : string
+        ; receiver : string
+        ; status : string option
+        ; failure_reason : string option
+        ; fee_payer_account_creation_fee_paid : int64 option
+        ; receiver_account_creation_fee_paid : int64 option
+        ; created_token : int64 option
+        }
       [@@deriving hlist]
 
       let fee_payer t = `Pk t.fee_payer
@@ -328,7 +339,8 @@ WITH RECURSIVE chain AS (
             ; option string
             ; option int64
             ; option int64
-            ; option int64 ]
+            ; option int64
+            ]
         in
         let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
         let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
@@ -395,7 +407,7 @@ WITH RECURSIVE chain AS (
               let open Let_syntax in
               let%bind xs = acc in
               let%map y = f x in
-              y :: xs )
+              y :: xs)
       end
     end in
     let open M.Let_syntax in
@@ -454,10 +466,11 @@ WITH RECURSIVE chain AS (
                      `Invariant_violation)
           in
           { Internal_command_info.kind
-          ; receiver= Internal_commands.Extras.receiver extras
-          ; fee= Unsigned.UInt64.of_int64 ic.fee
-          ; token= Unsigned.UInt64.of_int64 ic.token
-          ; hash= ic.hash } )
+          ; receiver = Internal_commands.Extras.receiver extras
+          ; fee = Unsigned.UInt64.of_int64 ic.fee
+          ; token = Unsigned.UInt64.of_int64 ic.token
+          ; hash = ic.hash
+          })
     in
     let%map user_commands =
       M.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
@@ -488,60 +501,65 @@ WITH RECURSIVE chain AS (
           let%map failure_status =
             match User_commands.Extras.failure_reason extras with
             | None -> (
-              match
-                ( User_commands.Extras.fee_payer_account_creation_fee_paid
-                    extras
-                , User_commands.Extras.receiver_account_creation_fee_paid
-                    extras )
-              with
-              | None, None ->
-                  M.return
-                  @@ `Applied
-                       User_command_info.Account_creation_fees_paid.By_no_one
-              | Some fee_payer, None ->
-                  M.return
-                  @@ `Applied
-                       (User_command_info.Account_creation_fees_paid
-                        .By_fee_payer
-                          (Unsigned.UInt64.of_int64 fee_payer))
-              | None, Some receiver ->
-                  M.return
-                  @@ `Applied
-                       (User_command_info.Account_creation_fees_paid
-                        .By_receiver
-                          (Unsigned.UInt64.of_int64 receiver))
-              | Some _, Some _ ->
-                  M.fail
-                    (Errors.create
-                       ~context:
-                         "The archive database is storing creation fees paid \
-                          by two different pks. This is impossible."
-                       `Invariant_violation) )
+                match
+                  ( User_commands.Extras.fee_payer_account_creation_fee_paid
+                      extras
+                  , User_commands.Extras.receiver_account_creation_fee_paid
+                      extras )
+                with
+                | None, None ->
+                    M.return
+                    @@ `Applied
+                         User_command_info.Account_creation_fees_paid.By_no_one
+                | Some fee_payer, None ->
+                    M.return
+                    @@ `Applied
+                         (User_command_info.Account_creation_fees_paid
+                          .By_fee_payer
+                            (Unsigned.UInt64.of_int64 fee_payer))
+                | None, Some receiver ->
+                    M.return
+                    @@ `Applied
+                         (User_command_info.Account_creation_fees_paid
+                          .By_receiver
+                            (Unsigned.UInt64.of_int64 receiver))
+                | Some _, Some _ ->
+                    M.fail
+                      (Errors.create
+                         ~context:
+                           "The archive database is storing creation fees paid \
+                            by two different pks. This is impossible."
+                         `Invariant_violation) )
             | Some status ->
                 M.return @@ `Failed status
           in
           { User_command_info.kind
-          ; fee_payer= User_commands.Extras.fee_payer extras
-          ; source= User_commands.Extras.source extras
-          ; receiver= User_commands.Extras.receiver extras
-          ; fee_token= Unsigned.UInt64.of_int64 uc.fee_token
-          ; token= Unsigned.UInt64.of_int64 uc.token
-          ; nonce= Unsigned.UInt32.of_int uc.nonce
-          ; amount= Option.map ~f:Unsigned.UInt64.of_int64 uc.amount
-          ; fee= Unsigned.UInt64.of_int64 uc.fee
-          ; hash= uc.hash
-          ; failure_status= Some failure_status } )
+          ; fee_payer = User_commands.Extras.fee_payer extras
+          ; source = User_commands.Extras.source extras
+          ; receiver = User_commands.Extras.receiver extras
+          ; fee_token = Unsigned.UInt64.of_int64 uc.fee_token
+          ; token = Unsigned.UInt64.of_int64 uc.token
+          ; nonce = Unsigned.UInt32.of_int uc.nonce
+          ; amount = Option.map ~f:Unsigned.UInt64.of_int64 uc.amount
+          ; fee = Unsigned.UInt64.of_int64 uc.fee
+          ; hash = uc.hash
+          ; failure_status = Some failure_status
+          })
     in
-    { Block_info.block_identifier=
-        {Block_identifier.index= raw_block.height; hash= raw_block.state_hash}
-    ; creator= Block.Extras.creator block_extras
-    ; winner= Block.Extras.winner block_extras
-    ; parent_block_identifier=
-        { Block_identifier.index= raw_parent_block.height
-        ; hash= raw_parent_block.state_hash }
-    ; timestamp= raw_block.timestamp
-    ; internal_info= internal_commands
-    ; user_commands }
+    { Block_info.block_identifier =
+        { Block_identifier.index = raw_block.height
+        ; hash = raw_block.state_hash
+        }
+    ; creator = Block.Extras.creator block_extras
+    ; winner = Block.Extras.winner block_extras
+    ; parent_block_identifier =
+        { Block_identifier.index = raw_parent_block.height
+        ; hash = raw_parent_block.state_hash
+        }
+    ; timestamp = raw_block.timestamp
+    ; internal_info = internal_commands
+    ; user_commands
+    }
 end
 
 module Specific = struct
@@ -549,10 +567,11 @@ module Specific = struct
     (* All side-effects go in the env so we can mock them out later *)
     module T (M : Monad_fail.S) = struct
       type 'gql t =
-        { gql: unit -> ('gql, Errors.t) M.t
-        ; logger: Logger.t
-        ; db_block: Block_query.t -> (Block_info.t, Errors.t) M.t
-        ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t }
+        { gql : unit -> ('gql, Errors.t) M.t
+        ; logger : Logger.t
+        ; db_block : Block_query.t -> (Block_info.t, Errors.t) M.t
+        ; validate_network_choice : 'gql Network.Validate_choice.Impl(M).t
+        }
     end
 
     (* The real environment does things asynchronously *)
@@ -567,19 +586,20 @@ module Specific = struct
         -> graphql_uri:Uri.t
         -> 'gql Real.t =
      fun ~logger ~db ~graphql_uri ->
-      { gql=
+      { gql =
           (fun () ->
-            Graphql.query (Get_coinbase_and_genesis.make ()) graphql_uri )
+            Graphql.query (Get_coinbase_and_genesis.make ()) graphql_uri)
       ; logger
-      ; db_block=
+      ; db_block =
           (fun query ->
             let (module Conn : Caqti_async.CONNECTION) = db in
-            Sql.run (module Conn) query )
-      ; validate_network_choice= Network.Validate_choice.Real.validate }
+            Sql.run (module Conn) query)
+      ; validate_network_choice = Network.Validate_choice.Real.validate
+      }
 
     let mock : logger:Logger.t -> 'gql Mock.t =
      fun ~logger ->
-      { gql=
+      { gql =
           (fun () ->
             Result.return
             @@ object
@@ -587,11 +607,12 @@ module Specific = struct
                    object
                      method stateHash = "STATE_HASH_GENESIS"
                    end
-               end )
+               end)
           (* TODO: Add variants to cover every branch *)
       ; logger
-      ; db_block= (fun _query -> Result.return @@ Block_info.dummy)
-      ; validate_network_choice= Network.Validate_choice.Mock.succeed }
+      ; db_block = (fun _query -> Result.return @@ Block_info.dummy)
+      ; validate_network_choice = Network.Validate_choice.Mock.succeed
+      }
   end
 
   module Impl (M : Monad_fail.S) = struct
@@ -615,27 +636,28 @@ module Specific = struct
       let%bind block_info =
         if Query.is_genesis ~hash:genesisBlock#stateHash query then
           let genesis_block_identifier =
-            { Block_identifier.index= Network.genesis_block_height
-            ; hash= genesisBlock#stateHash }
+            { Block_identifier.index = Network.genesis_block_height
+            ; hash = genesisBlock#stateHash
+            }
           in
           M.return
-            { Block_info.block_identifier=
+            { Block_info.block_identifier =
                 genesis_block_identifier
                 (* parent_block_identifier for genesis block should be the same as block identifier as described https://www.rosetta-api.org/docs/common_mistakes.html#correct-example *)
-            ; parent_block_identifier= genesis_block_identifier
-            ; creator= `Pk (genesisBlock#creatorAccount)#publicKey
-            ; winner= `Pk (genesisBlock#winnerAccount)#publicKey
-            ; timestamp=
-                Int64.of_string
-                  ((genesisBlock#protocolState)#blockchainState)#date
-            ; internal_info= []
-            ; user_commands= [] }
+            ; parent_block_identifier = genesis_block_identifier
+            ; creator = `Pk genesisBlock#creatorAccount#publicKey
+            ; winner = `Pk genesisBlock#winnerAccount#publicKey
+            ; timestamp =
+                Int64.of_string genesisBlock#protocolState#blockchainState#date
+            ; internal_info = []
+            ; user_commands = []
+            }
         else env.db_block query
       in
       let coinbase_receiver =
         List.find block_info.internal_info ~f:(fun info ->
             Internal_command_info.Kind.equal info.Internal_command_info.kind
-              `Coinbase )
+              `Coinbase)
         |> Option.map ~f:(fun cmd -> cmd.Internal_command_info.receiver)
       in
       let%map internal_transactions =
@@ -646,32 +668,36 @@ module Specific = struct
               Internal_command_info_ops.to_operations ~coinbase_receiver info
             in
             [%log debug]
-              ~metadata:[("info", Internal_command_info.to_yojson info)]
+              ~metadata:[ ("info", Internal_command_info.to_yojson info) ]
               "Block internal received $info" ;
-            { Transaction.transaction_identifier=
-                {Transaction_identifier.hash= info.hash}
+            { Transaction.transaction_identifier =
+                { Transaction_identifier.hash = info.hash }
             ; operations
-            ; metadata= None }
-            :: acc )
+            ; metadata = None
+            }
+            :: acc)
         |> M.map ~f:List.rev
       in
-      { Block_response.block=
+      { Block_response.block =
           Some
-            { Block.block_identifier= block_info.block_identifier
-            ; parent_block_identifier= block_info.parent_block_identifier
-            ; timestamp= block_info.timestamp
-            ; transactions=
+            { Block.block_identifier = block_info.block_identifier
+            ; parent_block_identifier = block_info.parent_block_identifier
+            ; timestamp = block_info.timestamp
+            ; transactions =
                 internal_transactions
                 @ List.map block_info.user_commands ~f:(fun info ->
                       [%log debug]
-                        ~metadata:[("info", User_command_info.to_yojson info)]
+                        ~metadata:[ ("info", User_command_info.to_yojson info) ]
                         "Block user received $info" ;
-                      { Transaction.transaction_identifier=
-                          {Transaction_identifier.hash= info.hash}
-                      ; operations= User_command_info.to_operations' info
-                      ; metadata= None } )
-            ; metadata= Some (Block_info.creator_metadata block_info) }
-      ; other_transactions= [] }
+                      { Transaction.transaction_identifier =
+                          { Transaction_identifier.hash = info.hash }
+                      ; operations = User_command_info.to_operations' info
+                      ; metadata = None
+                      })
+            ; metadata = Some (Block_info.creator_metadata block_info)
+            }
+      ; other_transactions = []
+      }
   end
 
   module Real = Impl (Deferred.Result)
@@ -698,13 +724,12 @@ end
 let router ~graphql_uri ~logger ~with_db (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /block/ $route"
-    ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
+    ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
   match route with
-  | [] | [""] ->
+  | [] | [ "" ] ->
       with_db (fun ~db ->
           let%bind req =
-            Errors.Lift.parse ~context:"Request"
-            @@ Block_request.of_yojson body
+            Errors.Lift.parse ~context:"Request" @@ Block_request.of_yojson body
             |> Errors.Lift.wrap
           in
           let%map res =
@@ -713,7 +738,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
               req
             |> Errors.Lift.wrap
           in
-          Block_response.to_yojson res )
+          Block_response.to_yojson res)
   (* Note: We do not need to implement /block/transaction endpoint because we
    * don't return any "other_transactions" *)
   | _ ->

@@ -32,16 +32,16 @@ let query query_obj uri =
   let open Deferred.Result.Let_syntax in
   let headers =
     Cohttp.Header.of_list
-      [("Content-Type", "application/json"); ("Accept", "application/json")]
+      [ ("Content-Type", "application/json"); ("Accept", "application/json") ]
   in
   let%bind response, body =
     Deferred.Or_error.try_with ~here:[%here] ~extract_exn:true (fun () ->
         Cohttp_async.Client.post ~headers
           ~body:(Cohttp_async.Body.of_string body_string)
-          uri )
+          uri)
     |> Deferred.Result.map_error ~f:(fun e ->
            Errors.create ~context:"Internal POST to Coda Daemon failed"
-             (`Graphql_coda_query (Error.to_string_hum e)) )
+             (`Graphql_coda_query (Error.to_string_hum e)))
   in
   let%bind body_str =
     Cohttp_async.Body.to_string body |> Deferred.map ~f:Result.return
@@ -76,7 +76,7 @@ let query query_obj uri =
                ~context:"JSON parse error in response from Coda Daemon"
                (`Graphql_coda_query
                  (Printf.sprintf "Error parsing graphql response: %s"
-                    (Exn.to_string e))) ) )
+                    (Exn.to_string e)))) )
   |> Deferred.return
 
 module Decoders = struct

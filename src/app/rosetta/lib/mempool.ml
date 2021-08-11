@@ -52,8 +52,9 @@ module All = struct
     (* All side-effects go in the env so we can mock them out later *)
     module T (M : Monad_fail.S) = struct
       type 'gql t =
-        { gql: unit -> ('gql, Errors.t) M.t
-        ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t }
+        { gql : unit -> ('gql, Errors.t) M.t
+        ; validate_network_choice : 'gql Network.Validate_choice.Impl(M).t
+        }
     end
 
     (* The real environment does things asynchronously *)
@@ -64,12 +65,13 @@ module All = struct
 
     let real : graphql_uri:Uri.t -> 'gql Real.t =
      fun ~graphql_uri ->
-      { gql=
+      { gql =
           (fun () -> Graphql.query (Get_all_transactions.make ()) graphql_uri)
-      ; validate_network_choice= Network.Validate_choice.Real.validate }
+      ; validate_network_choice = Network.Validate_choice.Real.validate
+      }
 
     let mock : 'gql Mock.t =
-      { gql=
+      { gql =
           (fun () ->
             Result.return
             @@ object
@@ -81,9 +83,11 @@ module All = struct
                     ; `UserCommand
                         (object
                            method hash = "TXN_2"
-                        end) |]
-               end )
-      ; validate_network_choice= Network.Validate_choice.Mock.succeed }
+                        end)
+                   |]
+               end)
+      ; validate_network_choice = Network.Validate_choice.Mock.succeed
+      }
   end
 
   module Impl (M : Monad_fail.S) = struct
@@ -98,10 +102,11 @@ module All = struct
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~gql_response:res
       in
-      { Mempool_response.transaction_identifiers=
+      { Mempool_response.transaction_identifiers =
           res#pooledUserCommands |> Array.to_list
           |> List.map ~f:(fun (`UserCommand obj) ->
-                 {Transaction_identifier.hash= obj#hash} ) }
+                 { Transaction_identifier.hash = obj#hash })
+      }
   end
 
   module Real = Impl (Deferred.Result)
@@ -115,9 +120,11 @@ module All = struct
           ~expected:(Mock.handle ~env:Env.mock Network.dummy_network_request)
           ~actual:
             (Result.return
-               { Mempool_response.transaction_identifiers=
-                   [ {Transaction_identifier.hash= "TXN_1"}
-                   ; {Transaction_identifier.hash= "TXN_2"} ] })
+               { Mempool_response.transaction_identifiers =
+                   [ { Transaction_identifier.hash = "TXN_1" }
+                   ; { Transaction_identifier.hash = "TXN_2" }
+                   ]
+               })
     end )
 end
 
@@ -125,8 +132,9 @@ module Transaction = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
-        { gql: hash:string -> ('gql, Errors.t) M.t
-        ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t }
+        { gql : hash:string -> ('gql, Errors.t) M.t
+        ; validate_network_choice : 'gql Network.Validate_choice.Impl(M).t
+        }
     end
 
     module Real = T (Deferred.Result)
@@ -134,12 +142,13 @@ module Transaction = struct
 
     let real : graphql_uri:Uri.t -> 'gql Real.t =
      fun ~graphql_uri ->
-      { gql=
+      { gql =
           (fun ~hash ->
             Graphql.query
-              (Get_transactions_by_hash.make ~hashes:[|hash|] ())
-              graphql_uri )
-      ; validate_network_choice= Network.Validate_choice.Real.validate }
+              (Get_transactions_by_hash.make ~hashes:[| hash |] ())
+              graphql_uri)
+      ; validate_network_choice = Network.Validate_choice.Real.validate
+      }
 
     let obj_of_user_command_info (user_command_info : User_command_info.t) =
       object
@@ -192,17 +201,18 @@ module Transaction = struct
       end
 
     let mock : 'gql Mock.t =
-      { gql=
+      { gql =
           (fun ~hash:_ ->
             Result.return
             @@ object
                  method pooledUserCommands =
                    User_command_info.dummies
                    |> List.map ~f:(fun info ->
-                          `UserCommand (obj_of_user_command_info info) )
+                          `UserCommand (obj_of_user_command_info info))
                    |> List.to_array
-               end )
-      ; validate_network_choice= Network.Validate_choice.Mock.succeed }
+               end)
+      ; validate_network_choice = Network.Validate_choice.Mock.succeed
+      }
   end
 
   module Impl (M : Monad_fail.S) = struct
@@ -250,14 +260,15 @@ module Transaction = struct
       { User_command_info.kind
       ; fee_payer
       ; source
-      ; token= obj#token
-      ; fee= obj#fee
+      ; token = obj#token
+      ; fee = obj#fee
       ; receiver
-      ; fee_token= obj#feeToken
-      ; nonce= Unsigned.UInt32.of_int obj#nonce
-      ; amount= Some obj#amount
-      ; failure_status= None
-      ; hash= obj#hash }
+      ; fee_token = obj#feeToken
+      ; nonce = Unsigned.UInt32.of_int obj#nonce
+      ; amount = Some obj#amount
+      ; failure_status = None
+      ; hash = obj#hash
+      }
 
     let handle :
            env:'gql Env.T(M).t
@@ -280,12 +291,14 @@ module Transaction = struct
           M.return cmd
       in
       let%map user_command_info = user_command_info_of_obj user_command_obj in
-      { Mempool_transaction_response.transaction=
-          { Transaction.transaction_identifier=
-              {Transaction_identifier.hash= req.transaction_identifier.hash}
-          ; operations= user_command_info |> User_command_info.to_operations'
-          ; metadata= None }
-      ; metadata= None }
+      { Mempool_transaction_response.transaction =
+          { Transaction.transaction_identifier =
+              { Transaction_identifier.hash = req.transaction_identifier.hash }
+          ; operations = user_command_info |> User_command_info.to_operations'
+          ; metadata = None
+          }
+      ; metadata = None
+      }
   end
 
   module Real = Impl (Deferred.Result)
@@ -295,7 +308,7 @@ module Transaction = struct
       module Mock = Impl (Result)
 
       (* This test intentionally fails as there has not been time to implement
-     * it properly yet *)
+         * it properly yet *)
       (*
       let%test_unit "all dummies" =
         Test.assert_ ~f:Mempool_transaction_response.to_yojson
@@ -312,19 +325,18 @@ end
 let router ~graphql_uri ~logger (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /mempool/ $route"
-    ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
+    ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
   match route with
-  | [] | [""] ->
+  | [] | [ "" ] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request" @@ Network_request.of_yojson body
         |> Errors.Lift.wrap
       in
       let%map res =
-        All.Real.handle ~env:(All.Env.real ~graphql_uri) req
-        |> Errors.Lift.wrap
+        All.Real.handle ~env:(All.Env.real ~graphql_uri) req |> Errors.Lift.wrap
       in
       Mempool_response.to_yojson res
-  | ["transaction"] ->
+  | [ "transaction" ] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
         @@ Mempool_transaction_request.of_yojson body

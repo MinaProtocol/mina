@@ -126,62 +126,63 @@ mutation ($sender: PublicKey!,
 |}]
 
 module Options = struct
-  type t = {sender: Public_key.Compressed.t; token_id: Unsigned.UInt64.t}
+  type t = { sender : Public_key.Compressed.t; token_id : Unsigned.UInt64.t }
 
   module Raw = struct
-    type t = {sender: string; token_id: string} [@@deriving yojson]
+    type t = { sender : string; token_id : string } [@@deriving yojson]
   end
 
   let to_json t =
-    { Raw.sender= Public_key.Compressed.to_base58_check t.sender
-    ; token_id= Unsigned.UInt64.to_string t.token_id }
+    { Raw.sender = Public_key.Compressed.to_base58_check t.sender
+    ; token_id = Unsigned.UInt64.to_string t.token_id
+    }
     |> Raw.to_yojson
 
   let of_json r =
     Raw.of_yojson r
     |> Result.map_error ~f:(fun e ->
-           Errors.create ~context:"Options of_json" (`Json_parse (Some e)) )
+           Errors.create ~context:"Options of_json" (`Json_parse (Some e)))
     |> Result.bind ~f:(fun (r : Raw.t) ->
            let open Result.Let_syntax in
            let%map sender =
              Public_key.Compressed.of_base58_check r.sender
              |> Result.map_error ~f:(fun e ->
                     Errors.create ~context:"Options of_json bad public key"
-                      (`Json_parse (Some (Core_kernel.Error.to_string_hum e)))
-                )
+                      (`Json_parse (Some (Core_kernel.Error.to_string_hum e))))
            in
-           {sender; token_id= Unsigned.UInt64.of_string r.token_id} )
+           { sender; token_id = Unsigned.UInt64.of_string r.token_id })
 end
 
 (* TODO: unify handling of json between this and Options (above) and everything else in rosetta *)
 module Metadata_data = struct
   type t =
-    { sender: string
-    ; nonce: Unsigned_extended.UInt32.t
-    ; token_id: Unsigned_extended.UInt64.t }
+    { sender : string
+    ; nonce : Unsigned_extended.UInt32.t
+    ; token_id : Unsigned_extended.UInt64.t
+    }
   [@@deriving yojson]
 
   let create ~nonce ~sender ~token_id =
-    {sender= Public_key.Compressed.to_base58_check sender; nonce; token_id}
+    { sender = Public_key.Compressed.to_base58_check sender; nonce; token_id }
 
   let of_json r =
     of_yojson r
     |> Result.map_error ~f:(fun e ->
-           Errors.create ~context:"Options of_json" (`Json_parse (Some e)) )
+           Errors.create ~context:"Options of_json" (`Json_parse (Some e)))
 end
 
 module Derive = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
-      type t = {lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t}
+      type t = { lift : 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
     end
 
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
-    let real : Real.t = {lift= Deferred.return}
+    let real : Real.t = { lift = Deferred.return }
 
-    let mock : Mock.t = {lift= Fn.id}
+    let mock : Mock.t = { lift = Fn.id }
   end
 
   module Impl (M : Monad_fail.S) = struct
@@ -200,13 +201,14 @@ module Derive = struct
              pk_or_error
       in
       let%map token_id = Token_id_decode.decode req.metadata in
-      { Construction_derive_response.address= None
-      ; account_identifier=
+      { Construction_derive_response.address = None
+      ; account_identifier =
           Some
             (User_command_info.account_id
                (`Pk Public_key.(compress pk |> Compressed.to_base58_check))
                (Option.value ~default:Amount_of.Token_id.default token_id))
-      ; metadata= None }
+      ; metadata = None
+      }
   end
 
   module Real = Impl (Deferred.Result)
@@ -217,13 +219,14 @@ module Metadata = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
-        { gql:
+        { gql :
                ?token_id:Unsigned.UInt64.t
             -> address:Public_key.Compressed.t
             -> unit
             -> ('gql, Errors.t) M.t
-        ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t
-        ; lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
+        ; validate_network_choice : 'gql Network.Validate_choice.Impl(M).t
+        ; lift : 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t
+        }
     end
 
     module Real = T (Deferred.Result)
@@ -231,27 +234,28 @@ module Metadata = struct
 
     let real : graphql_uri:Uri.t -> 'gql Real.t =
      fun ~graphql_uri ->
-      { gql=
+      { gql =
           (fun ?token_id:_ ~address () ->
             Graphql.query
               (Get_nonce.make
                  ~public_key:
                    (`String (Public_key.Compressed.to_base58_check address))
                    (* for now, nonce is based on the fee payer's account using the default token,
-                    per @mrmr1993
-                 *)
+                      per @mrmr1993
+                   *)
                  ~token_id:(`String Mina_base.Token_id.(default |> to_string))
                  (* WAS:
-                   ( match token_id with
-                   | Some x ->
-                       `String (Unsigned.UInt64.to_string x)
-                   | None ->
-                       `Null )
+                    ( match token_id with
+                    | Some x ->
+                        `String (Unsigned.UInt64.to_string x)
+                    | None ->
+                        `Null )
                  *)
                  ())
-              graphql_uri )
-      ; validate_network_choice= Network.Validate_choice.Real.validate
-      ; lift= Deferred.return }
+              graphql_uri)
+      ; validate_network_choice = Network.Validate_choice.Real.validate
+      ; lift = Deferred.return
+      }
   end
 
   module Impl (M : Monad_fail.S) = struct
@@ -300,13 +304,16 @@ module Metadata = struct
             , Amount.to_yojson
                 (Amount_of.coda
                    (MinaCurrency.Fee.to_uint64
-                      Mina_compile_config.minimum_user_command_fee)) ) ]
+                      Mina_compile_config.minimum_user_command_fee)) )
+          ]
       in
-      { Construction_metadata_response.metadata=
+      { Construction_metadata_response.metadata =
           Metadata_data.create ~sender:options.Options.sender
             ~token_id:options.Options.token_id ~nonce
           |> Metadata_data.to_yojson
-      ; suggested_fee= [{suggested_fee with metadata= Some amount_metadata}] }
+      ; suggested_fee =
+          [ { suggested_fee with metadata = Some amount_metadata } ]
+      }
   end
 
   module Real = Impl (Deferred.Result)
@@ -316,21 +323,21 @@ end
 module Preprocess = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
-      type t = {lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t}
+      type t = { lift : 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
     end
 
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
-    let real : Real.t = {lift= Deferred.return}
+    let real : Real.t = { lift = Deferred.return }
 
-    let mock : Mock.t = {lift= Fn.id}
+    let mock : Mock.t = { lift = Fn.id }
   end
 
   module Impl (M : Monad_fail.S) = struct
     let lift_reason_validation_to_errors ~(env : Env.T(M).t) t =
       Result.map_error t ~f:(fun reasons ->
-          Errors.create (`Operations_not_valid reasons) )
+          Errors.create (`Operations_not_valid reasons))
       |> env.lift
 
     let handle ~(env : Env.T(M).t) (req : Construction_preprocess_request.t) =
@@ -343,16 +350,17 @@ module Preprocess = struct
         let (`Pk pk) = partial_user_command.User_command_info.Partial.source in
         Public_key.Compressed.of_base58_check pk
         |> Result.map_error ~f:(fun _ ->
-               Errors.create `Public_key_format_not_valid )
+               Errors.create `Public_key_format_not_valid)
         |> env.lift
       in
-      { Construction_preprocess_response.options=
+      { Construction_preprocess_response.options =
           Some
             (Options.to_json
-               { Options.sender= pk
-               ; token_id= partial_user_command.User_command_info.Partial.token
+               { Options.sender = pk
+               ; token_id = partial_user_command.User_command_info.Partial.token
                })
-      ; required_public_keys= [] }
+      ; required_public_keys = []
+      }
   end
 
   module Real = Impl (Deferred.Result)
@@ -362,21 +370,21 @@ end
 module Payloads = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
-      type t = {lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t}
+      type t = { lift : 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
     end
 
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
-    let real : Real.t = {lift= Deferred.return}
+    let real : Real.t = { lift = Deferred.return }
 
-    let mock : Mock.t = {lift= Fn.id}
+    let mock : Mock.t = { lift = Fn.id }
   end
 
   module Impl (M : Monad_fail.S) = struct
     let lift_reason_validation_to_errors ~(env : Env.T(M).t) t =
       Result.map_error t ~f:(fun reasons ->
-          Errors.create (`Operations_not_valid reasons) )
+          Errors.create (`Operations_not_valid reasons))
       |> env.lift
 
     let handle ~(env : Env.T(M).t) (req : Construction_payloads_request.t) =
@@ -399,13 +407,12 @@ module Payloads = struct
         let (`Pk pk) = partial_user_command.User_command_info.Partial.source in
         Public_key.Compressed.of_base58_check pk
         |> Result.map_error ~f:(fun _ ->
-               Errors.create ~context:"compression"
-                 `Public_key_format_not_valid )
+               Errors.create ~context:"compression" `Public_key_format_not_valid)
         |> Result.bind ~f:(fun pk ->
                Result.of_option (Public_key.decompress pk)
                  ~error:
                    (Errors.create ~context:"decompression"
-                      `Public_key_format_not_valid) )
+                      `Public_key_format_not_valid))
         |> Result.map ~f:Rosetta_coding.Coding.of_public_key
         |> env.lift
       in
@@ -417,24 +424,28 @@ module Payloads = struct
       let random_oracle_input = Signed_command.to_input user_command_payload in
       let%map unsigned_transaction_string =
         { Transaction.Unsigned.random_oracle_input
-        ; command= partial_user_command
-        ; nonce= metadata.nonce }
+        ; command = partial_user_command
+        ; nonce = metadata.nonce
+        }
         |> Transaction.Unsigned.render
         |> Result.map ~f:Transaction.Unsigned.Rendered.to_yojson
         |> Result.map ~f:Yojson.Safe.to_string
         |> env.lift
       in
-      { Construction_payloads_response.unsigned_transaction=
+      { Construction_payloads_response.unsigned_transaction =
           unsigned_transaction_string
-      ; payloads=
-          [ { Signing_payload.address= None
-            ; account_identifier=
+      ; payloads =
+          [ { Signing_payload.address = None
+            ; account_identifier =
                 Some
                   (User_command_info.account_id
                      partial_user_command.User_command_info.Partial.source
                      partial_user_command.User_command_info.Partial.token)
-            ; hex_bytes= pk
-            ; signature_type= Some "schnorr_poseidon" } ] }
+            ; hex_bytes = pk
+            ; signature_type = Some "schnorr_poseidon"
+            }
+          ]
+      }
   end
 
   module Real = Impl (Deferred.Result)
@@ -444,15 +455,15 @@ end
 module Combine = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
-      type t = {lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t}
+      type t = { lift : 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
     end
 
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
-    let real : Real.t = {lift= Deferred.return}
+    let real : Real.t = { lift = Deferred.return }
 
-    let mock : Mock.t = {lift= Fn.id}
+    let mock : Mock.t = { lift = Fn.id }
   end
 
   module Impl (M : Monad_fail.S) = struct
@@ -478,8 +489,9 @@ module Combine = struct
       in
       let signed_transaction_full =
         { Transaction.Signed.signature
-        ; nonce= unsigned_transaction.nonce
-        ; command= unsigned_transaction.command }
+        ; nonce = unsigned_transaction.nonce
+        ; command = unsigned_transaction.command
+        }
       in
       let%map rendered =
         Transaction.Signed.render signed_transaction_full |> env.lift
@@ -487,7 +499,7 @@ module Combine = struct
       let signed_transaction =
         Transaction.Signed.Rendered.to_yojson rendered |> Yojson.Safe.to_string
       in
-      {Construction_combine_response.signed_transaction}
+      { Construction_combine_response.signed_transaction }
   end
 
   module Real = Impl (Deferred.Result)
@@ -498,12 +510,13 @@ module Parse = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
-        { send_validation_request:
+        { send_validation_request :
                payment:Transaction.Unsigned.Rendered.Payment.t
             -> signature:string
             -> unit
             -> ('gql, Errors.t) M.t
-        ; lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
+        ; lift : 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t
+        }
     end
 
     module Real = T (Deferred.Result)
@@ -513,7 +526,7 @@ module Parse = struct
       let uint64 x = `String (Unsigned.UInt64.to_string x) in
       let uint32 x = `String (Unsigned.UInt32.to_string x) in
       fun ~graphql_uri ->
-        { send_validation_request=
+        { send_validation_request =
             (fun ~payment ~signature () ->
               Graphql.query
                 (Validate_payment.make ~from:(`String payment.from)
@@ -522,8 +535,9 @@ module Parse = struct
                    ?validUntil:(Option.map ~f:uint32 payment.valid_until)
                    ?memo:payment.memo ~nonce:(uint32 payment.nonce) ~signature
                    ())
-                graphql_uri )
-        ; lift= Deferred.return }
+                graphql_uri)
+        ; lift = Deferred.return
+        }
   end
 
   module Impl (M : Monad_fail.S) = struct
@@ -540,7 +554,7 @@ module Parse = struct
             let%bind signed_rendered_transaction =
               Transaction.Signed.Rendered.of_yojson json
               |> Result.map_error ~f:(fun e ->
-                     Errors.create (`Json_parse (Some e)) )
+                     Errors.create (`Json_parse (Some e)))
               |> env.lift
             in
             let%bind signed_transaction =
@@ -563,12 +577,13 @@ module Parse = struct
             ( User_command_info.to_operations ~failure_status:None
                 signed_transaction.command
             , [ User_command_info.account_id signed_transaction.command.source
-                  signed_transaction.command.token ] )
+                  signed_transaction.command.token
+              ] )
         | false ->
             let%map unsigned_transaction =
               Transaction.Unsigned.Rendered.of_yojson json
               |> Result.map_error ~f:(fun e ->
-                     Errors.create (`Json_parse (Some e)) )
+                     Errors.create (`Json_parse (Some e)))
               |> Result.bind ~f:Transaction.Unsigned.of_rendered
               |> env.lift
             in
@@ -577,9 +592,10 @@ module Parse = struct
             , [] )
       in
       { Construction_parse_response.operations
-      ; signers= []
+      ; signers = []
       ; account_identifier_signers
-      ; metadata= None }
+      ; metadata = None
+      }
   end
 
   module Real = Impl (Deferred.Result)
@@ -589,15 +605,15 @@ end
 module Hash = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
-      type t = {lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t}
+      type t = { lift : 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
     end
 
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
-    let real : Real.t = {lift= Deferred.return}
+    let real : Real.t = { lift = Deferred.return }
 
-    let mock : Mock.t = {lift= Fn.id}
+    let mock : Mock.t = { lift = Fn.id }
   end
 
   module Impl (M : Monad_fail.S) = struct
@@ -617,13 +633,12 @@ module Hash = struct
         let (`Pk pk) = signed_transaction.command.source in
         Public_key.Compressed.of_base58_check pk
         |> Result.map_error ~f:(fun _ ->
-               Errors.create ~context:"compression"
-                 `Public_key_format_not_valid )
+               Errors.create ~context:"compression" `Public_key_format_not_valid)
         |> Result.bind ~f:(fun pk ->
                Result.of_option (Public_key.decompress pk)
                  ~error:
                    (Errors.create ~context:"decompression"
-                      `Public_key_format_not_valid) )
+                      `Public_key_format_not_valid))
         |> Result.map_error ~f:(fun _ -> Errors.create `Malformed_public_key)
         |> env.lift
       in
@@ -639,13 +654,13 @@ module Hash = struct
           ~error:(Errors.create `Signature_missing)
         |> env.lift
       in
-      let full_command = {Signed_command.Poly.payload; signature; signer} in
+      let full_command = { Signed_command.Poly.payload; signature; signer } in
       let hash =
-        Transaction_hash.hash_command
-          (User_command.Signed_command full_command)
-      |> Transaction_hash.to_base58_check
+        Transaction_hash.hash_command (User_command.Signed_command full_command)
+        |> Transaction_hash.to_base58_check
       in
-      Transaction_identifier_response.create (Transaction_identifier.create hash)
+      Transaction_identifier_response.create
+        (Transaction_identifier.create hash)
   end
 
   module Real = Impl (Deferred.Result)
@@ -661,35 +676,35 @@ module Submit = struct
            , 'gql_create_token_account
            , 'gql_mint_tokens )
            t =
-        { gql_payment:
+        { gql_payment :
                payment:Transaction.Unsigned.Rendered.Payment.t
             -> signature:string
             -> unit
             -> ('gql_payment, Errors.t) M.t
               (* TODO: Validate network choice with separate query *)
-        ; gql_delegation:
+        ; gql_delegation :
                delegation:Transaction.Unsigned.Rendered.Delegation.t
             -> signature:string
             -> unit
             -> ('gql_delegation, Errors.t) M.t
-        ; gql_create_token:
+        ; gql_create_token :
                create_token:Transaction.Unsigned.Rendered.Create_token.t
             -> signature:string
             -> unit
             -> ('gql_create_token, Errors.t) M.t
-        ; gql_create_token_account:
-               create_token_account:Transaction.Unsigned.Rendered
-                                    .Create_token_account
-                                    .t
+        ; gql_create_token_account :
+               create_token_account:
+                 Transaction.Unsigned.Rendered.Create_token_account.t
             -> signature:string
             -> unit
             -> ('gql_create_token_account, Errors.t) M.t
-        ; gql_mint_tokens:
+        ; gql_mint_tokens :
                mint_tokens:Transaction.Unsigned.Rendered.Mint_tokens.t
             -> signature:string
             -> unit
             -> ('gql_mint_tokens, Errors.t) M.t
-        ; lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
+        ; lift : 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t
+        }
     end
 
     module Real = T (Deferred.Result)
@@ -707,7 +722,7 @@ module Submit = struct
       let uint32 x = `String (Unsigned.UInt32.to_string x) in
       let token_id x = `String (Mina_base.Token_id.to_string x) in
       fun ~graphql_uri ->
-        { gql_payment=
+        { gql_payment =
             (fun ~payment ~signature () ->
               Graphql.query
                 (Send_payment.make ~from:(`String payment.from)
@@ -716,8 +731,8 @@ module Submit = struct
                    ?validUntil:(Option.map ~f:uint32 payment.valid_until)
                    ?memo:payment.memo ~nonce:(uint32 payment.nonce) ~signature
                    ())
-                graphql_uri )
-        ; gql_delegation=
+                graphql_uri)
+        ; gql_delegation =
             (fun ~delegation ~signature () ->
               Graphql.query
                 (Send_delegation.make ~sender:(`String delegation.delegator)
@@ -727,8 +742,8 @@ module Submit = struct
                      (*                   ?validUntil:(Option.map ~f:uint32 delegation.valid_until) *)
                    ?memo:delegation.memo ~nonce:(uint32 delegation.nonce)
                    ~signature ())
-                graphql_uri )
-        ; gql_create_token=
+                graphql_uri)
+        ; gql_create_token =
             (fun ~create_token ~signature () ->
               Graphql.query
                 (Send_create_token.make
@@ -736,8 +751,8 @@ module Submit = struct
                    ~fee:(uint64 create_token.fee) ?memo:create_token.memo
                    ~nonce:(uint32 create_token.nonce)
                    ~signature ())
-                graphql_uri )
-        ; gql_create_token_account=
+                graphql_uri)
+        ; gql_create_token_account =
             (fun ~create_token_account ~signature () ->
               Graphql.query
                 (Send_create_token_account.make
@@ -748,19 +763,19 @@ module Submit = struct
                    ?memo:create_token_account.memo
                    ~nonce:(uint32 create_token_account.nonce)
                    ~signature ())
-                graphql_uri )
-        ; gql_mint_tokens=
+                graphql_uri)
+        ; gql_mint_tokens =
             (fun ~mint_tokens ~signature () ->
               Graphql.query
-                (Send_mint_tokens.make
-                   ~sender:(`String mint_tokens.token_owner)
+                (Send_mint_tokens.make ~sender:(`String mint_tokens.token_owner)
                    ~receiver:(`String mint_tokens.receiver)
                    ~token:(token_id mint_tokens.token)
                    ~amount:(uint64 mint_tokens.amount)
                    ~fee:(uint64 mint_tokens.fee) ?memo:mint_tokens.memo
                    ~nonce:(uint32 mint_tokens.nonce) ~signature ())
-                graphql_uri )
-        ; lift= Deferred.return }
+                graphql_uri)
+        ; lift = Deferred.return
+        }
   end
 
   module Impl (M : Monad_fail.S) = struct
@@ -796,33 +811,33 @@ module Submit = struct
               env.gql_payment ~payment ~signature:signed_transaction.signature
                 ()
             in
-            let (`UserCommand payment) = (res#sendPayment)#payment in
+            let (`UserCommand payment) = res#sendPayment#payment in
             payment#hash
         | None, Some delegation, None, None, None ->
             let%map res =
               env.gql_delegation ~delegation
                 ~signature:signed_transaction.signature ()
             in
-            let (`UserCommand delegation) = (res#sendDelegation)#delegation in
+            let (`UserCommand delegation) = res#sendDelegation#delegation in
             delegation#hash
         | None, None, Some create_token, None, None ->
             let%map res =
               env.gql_create_token ~create_token
                 ~signature:signed_transaction.signature ()
             in
-            ((res#createToken)#createNewToken)#hash
+            res#createToken#createNewToken#hash
         | None, None, None, Some create_token_account, None ->
             let%map res =
               env.gql_create_token_account ~create_token_account
                 ~signature:signed_transaction.signature ()
             in
-            ((res#createTokenAccount)#createNewTokenAccount)#hash
+            res#createTokenAccount#createNewTokenAccount#hash
         | None, None, None, None, Some mint_tokens ->
             let%map res =
               env.gql_mint_tokens ~mint_tokens
                 ~signature:signed_transaction.signature ()
             in
-            ((res#mintTokens)#mintTokens)#hash
+            res#mintTokens#mintTokens#hash
         | _ ->
             M.fail
               (Errors.create
@@ -831,7 +846,8 @@ module Submit = struct
                     createTokenAccount, or mintTokens"
                  (`Json_parse None))
       in
-      Transaction_identifier_response.create (Transaction_identifier.create hash)
+      Transaction_identifier_response.create
+        (Transaction_identifier.create hash)
   end
 
   module Real = Impl (Deferred.Result)
@@ -840,10 +856,10 @@ end
 
 let router ~get_graphql_uri_or_error ~logger (route : string list) body =
   [%log debug] "Handling /construction/ $route"
-    ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
+    ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
   let open Deferred.Result.Let_syntax in
   match route with
-  | ["derive"] ->
+  | [ "derive" ] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
         @@ Construction_derive_request.of_yojson body
@@ -853,7 +869,7 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
         Derive.Real.handle ~env:Derive.Env.real req |> Errors.Lift.wrap
       in
       Construction_derive_response.to_yojson res
-  | ["preprocess"] ->
+  | [ "preprocess" ] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
         @@ Construction_preprocess_request.of_yojson body
@@ -863,7 +879,7 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
         Preprocess.Real.handle ~env:Preprocess.Env.real req |> Errors.Lift.wrap
       in
       Construction_preprocess_response.to_yojson res
-  | ["metadata"] ->
+  | [ "metadata" ] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
         @@ Construction_metadata_request.of_yojson body
@@ -875,7 +891,7 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
         |> Errors.Lift.wrap
       in
       Construction_metadata_response.to_yojson res
-  | ["payloads"] ->
+  | [ "payloads" ] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
         @@ Construction_payloads_request.of_yojson body
@@ -885,7 +901,7 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
         Payloads.Real.handle ~env:Payloads.Env.real req |> Errors.Lift.wrap
       in
       Construction_payloads_response.to_yojson res
-  | ["combine"] ->
+  | [ "combine" ] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
         @@ Construction_combine_request.of_yojson body
@@ -895,7 +911,7 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
         Combine.Real.handle ~env:Combine.Env.real req |> Errors.Lift.wrap
       in
       Construction_combine_response.to_yojson res
-  | ["parse"] ->
+  | [ "parse" ] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
         @@ Construction_parse_request.of_yojson body
@@ -907,7 +923,7 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
         |> Errors.Lift.wrap
       in
       Construction_parse_response.to_yojson res
-  | ["hash"] ->
+  | [ "hash" ] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
         @@ Construction_hash_request.of_yojson body
@@ -917,7 +933,7 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
         Hash.Real.handle ~env:Hash.Env.real req |> Errors.Lift.wrap
       in
       Transaction_identifier_response.to_yojson res
-  | ["submit"] ->
+  | [ "submit" ] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
         @@ Construction_submit_request.of_yojson body

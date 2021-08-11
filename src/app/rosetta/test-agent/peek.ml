@@ -14,7 +14,7 @@ module Lift = struct
     Result.bind res ~f:(fun r ->
         of_yojson r
         |> Result.map_error ~f:(fun str ->
-               Errors.erase @@ Errors.create (`Json_parse (Some str)) ) )
+               Errors.erase @@ Errors.create (`Json_parse (Some str))))
 
   let successfully r =
     match r with
@@ -35,25 +35,25 @@ module Lift = struct
     let%bind str = Cohttp_async.Body.to_string body in
     match Cohttp_async.Response.status response with
     | `OK -> (
-      match Yojson.Safe.from_string str with
-      | body ->
-          Deferred.Result.return (Ok body)
-      | exception Yojson.Json_error err ->
-          Deferred.Result.fail
-            (Errors.create ~context:"Parsing rosetta body"
-               (`Json_parse (Some err))) )
+        match Yojson.Safe.from_string str with
+        | body ->
+            Deferred.Result.return (Ok body)
+        | exception Yojson.Json_error err ->
+            Deferred.Result.fail
+              (Errors.create ~context:"Parsing rosetta body"
+                 (`Json_parse (Some err))) )
     | _ -> (
-      match Yojson.Safe.from_string str with
-      | body -> (
-        match Rosetta_models.Error.of_yojson body |> json with
-        | Ok err ->
-            Deferred.Result.return (Error err)
-        | Error e ->
-            Deferred.Result.fail e )
-      | exception Yojson.Json_error err ->
-          Deferred.Result.fail
-            (Errors.create ~context:"Parsing Rosetta error"
-               (`Json_parse (Some err))) )
+        match Yojson.Safe.from_string str with
+        | body -> (
+            match Rosetta_models.Error.of_yojson body |> json with
+            | Ok err ->
+                Deferred.Result.return (Error err)
+            | Error e ->
+                Deferred.Result.fail e )
+        | exception Yojson.Json_error err ->
+            Deferred.Result.fail
+              (Errors.create ~context:"Parsing Rosetta error"
+                 (`Json_parse (Some err))) )
 end
 
 let net_id network_response =
@@ -104,8 +104,9 @@ module Mempool = struct
       post ~rosetta_uri ~logger
         ~body:
           Mempool_transaction_request.(
-            { network_identifier= net_id network_response
-            ; transaction_identifier= {Transaction_identifier.hash} }
+            { network_identifier = net_id network_response
+            ; transaction_identifier = { Transaction_identifier.hash }
+            }
             |> to_yojson)
         ~path:"mempool/transaction"
     in
@@ -133,7 +134,7 @@ module Block = struct
 
   let block_at_index ~index ~rosetta_uri ~network_response ~logger =
     request_block
-      ~block_identifier:{index= Some index; hash= None}
+      ~block_identifier:{ index = Some index; hash = None }
       ~rosetta_uri ~network_response ~logger
 end
 
@@ -145,9 +146,10 @@ module Construction = struct
       post ~rosetta_uri ~logger
         ~body:
           Construction_metadata_request.(
-            { network_identifier= net_id network_response
+            { network_identifier = net_id network_response
             ; options
-            ; public_keys= [] }
+            ; public_keys = []
+            }
             |> to_yojson)
         ~path:"construction/metadata"
     in
@@ -160,7 +162,7 @@ module Construction = struct
       post ~rosetta_uri ~logger
         ~body:
           Construction_submit_request.(
-            {network_identifier= net_id network_response; signed_transaction}
+            { network_identifier = net_id network_response; signed_transaction }
             |> to_yojson)
         ~path:"construction/submit"
     in
@@ -174,10 +176,11 @@ module Account_balance = struct
   let request_balance ~account_identifier ~block_identifier ~rosetta_uri
       ~network_response ~logger =
     let request : Account_balance_request.t =
-      { network_identifier= net_id network_response
+      { network_identifier = net_id network_response
       ; account_identifier
       ; block_identifier
-      ; currencies= [] }
+      ; currencies = []
+      }
     in
     let%map res =
       post ~rosetta_uri ~logger
@@ -186,14 +189,14 @@ module Account_balance = struct
     in
     Lift.res ~logger res ~of_yojson:Account_balance_response.of_yojson
 
-  let current_balance ~account_identifier ~rosetta_uri ~network_response
-      ~logger =
+  let current_balance ~account_identifier ~rosetta_uri ~network_response ~logger
+      =
     request_balance ~account_identifier ~block_identifier:None ~rosetta_uri
       ~network_response ~logger
 
   let balance_at_index ~account_identifier ~(index : int64) ~rosetta_uri
       ~network_response ~logger =
     request_balance ~account_identifier
-      ~block_identifier:(Some {index= Some index; hash= None})
+      ~block_identifier:(Some { index = Some index; hash = None })
       ~rosetta_uri ~network_response ~logger
 end

@@ -9,10 +9,10 @@ module User_command = Mina_base.User_command
 module Signed_command = Mina_base.Signed_command
 
 module Keys = struct
-  type t = {keypair: Keypair.t; public_key_hex_bytes: string}
+  type t = { keypair : Keypair.t; public_key_hex_bytes : string }
 
   let of_keypair keypair =
-    {keypair; public_key_hex_bytes= Coding.of_public_key keypair.public_key}
+    { keypair; public_key_hex_bytes = Coding.of_public_key keypair.public_key }
 
   let to_private_key_bytes t = Coding.of_scalar t.keypair.private_key
 

@@ -23,7 +23,7 @@ module Staking = struct
   let disable ~graphql_uri =
     let open Deferred.Result.Let_syntax in
     let%map res = Graphql.query (Disable.make ()) graphql_uri in
-    (res#setStaking)#lastStaking
+    res#setStaking#lastStaking
 
   module Enable =
   [%graphql
@@ -40,7 +40,7 @@ module Staking = struct
     let%map res =
       Graphql.query (Enable.make ~publicKey:(`String pk) ()) graphql_uri
     in
-    (res#setStaking)#lastStaking
+    res#setStaking#lastStaking
 end
 
 module Account = struct
@@ -61,7 +61,7 @@ module Account = struct
         (Unlock.make ~password:"" ~public_key:(`String pk) ())
         graphql_uri
     in
-    (res#unlockAccount)#publicKey
+    res#unlockAccount#publicKey
 end
 
 module SendTransaction = struct
@@ -84,7 +84,7 @@ module SendTransaction = struct
         (Payment.make ~fee ~amount ?token ~to_ ~from:(`String pk) ())
         graphql_uri
     in
-    let (`UserCommand x) = (res#sendPayment)#payment in
+    let (`UserCommand x) = res#sendPayment#payment in
     x#hash
 
   (* Note: These operations below are intentionally constructed from a templated
@@ -126,7 +126,7 @@ module SendTransaction = struct
         (Delegation.make ~fee ~to_ ~from:(`String pk) ())
         graphql_uri
     in
-    let (`UserCommand cmd) = (res#sendDelegation)#delegation in
+    let (`UserCommand cmd) = res#sendDelegation#delegation in
     cmd#hash
 
   let delegation_operations ~from ~fee ~to_ =
@@ -163,7 +163,7 @@ module SendTransaction = struct
         (Create_token.make ~fee ~sender:(`String pk) ~receiver:(`String pk) ())
         graphql_uri
     in
-    let cmd = (res#createToken)#createNewToken in
+    let cmd = res#createToken#createNewToken in
     cmd#hash
 
   let create_token_operations ~fee ~sender =
@@ -203,7 +203,7 @@ module SendTransaction = struct
            ~receiver:(`String receiver) ~tokenOwner:(`String pk) ~token ~fee ())
         graphql_uri
     in
-    let cmd = (res#createTokenAccount)#createNewTokenAccount in
+    let cmd = res#createTokenAccount#createNewTokenAccount in
     cmd#hash
 
   let create_token_account_operations ~fee ~sender =

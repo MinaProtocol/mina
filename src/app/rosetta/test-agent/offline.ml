@@ -15,11 +15,13 @@ module Derive = struct
       post ~rosetta_uri ~logger
         ~body:
           Construction_derive_request.(
-            { network_identifier= net_id network_response
-            ; public_key=
-                { Public_key.hex_bytes= public_key_hex_bytes
-                ; curve_type= "pallas" }
-            ; metadata= Some Amount_of.Token_id.(encode default) }
+            { network_identifier = net_id network_response
+            ; public_key =
+                { Public_key.hex_bytes = public_key_hex_bytes
+                ; curve_type = "pallas"
+                }
+            ; metadata = Some Amount_of.Token_id.(encode default)
+            }
             |> to_yojson)
         ~path:"construction/derive"
     in
@@ -33,11 +35,12 @@ module Preprocess = struct
       post ~rosetta_uri ~logger
         ~body:
           Construction_preprocess_request.(
-            { network_identifier= net_id network_response
-            ; max_fee= [Amount_of.coda max_fee]
+            { network_identifier = net_id network_response
+            ; max_fee = [ Amount_of.coda max_fee ]
             ; operations
-            ; suggested_fee_multiplier= None
-            ; metadata= None }
+            ; suggested_fee_multiplier = None
+            ; metadata = None
+            }
             |> to_yojson)
         ~path:"construction/preprocess"
     in
@@ -51,10 +54,11 @@ module Payloads = struct
       post ~rosetta_uri ~logger
         ~body:
           Construction_payloads_request.(
-            { network_identifier= net_id network_response
+            { network_identifier = net_id network_response
             ; operations
-            ; metadata= Some metadata
-            ; public_keys= [] }
+            ; metadata = Some metadata
+            ; public_keys = []
+            }
             |> to_yojson)
         ~path:"construction/payloads"
     in
@@ -75,7 +79,10 @@ module Parse = struct
       post ~rosetta_uri ~logger
         ~body:
           Construction_parse_request.(
-            {network_identifier= net_id network_response; transaction; signed}
+            { network_identifier = net_id network_response
+            ; transaction
+            ; signed
+            }
             |> to_yojson)
         ~path:"construction/parse"
     in
@@ -90,20 +97,25 @@ module Combine = struct
       post ~rosetta_uri ~logger
         ~body:
           Construction_combine_request.(
-            { network_identifier= net_id network_response
+            { network_identifier = net_id network_response
             ; unsigned_transaction
-            ; signatures=
+            ; signatures =
                 [ (* TODO: How important is it to fill in all these details properly? *)
-                  { Signature.signing_payload=
-                      { Signing_payload.account_identifier= Some account_id
-                      ; address= None
-                      ; hex_bytes= "TODO"
-                      ; signature_type= None }
-                  ; public_key=
-                      { Public_key.hex_bytes= public_key_hex_bytes
-                      ; curve_type= "pallas" }
-                  ; signature_type= "schnorr_poseidon"
-                  ; hex_bytes= signature } ] }
+                  { Signature.signing_payload =
+                      { Signing_payload.account_identifier = Some account_id
+                      ; address = None
+                      ; hex_bytes = "TODO"
+                      ; signature_type = None
+                      }
+                  ; public_key =
+                      { Public_key.hex_bytes = public_key_hex_bytes
+                      ; curve_type = "pallas"
+                      }
+                  ; signature_type = "schnorr_poseidon"
+                  ; hex_bytes = signature
+                  }
+                ]
+            }
             |> to_yojson)
         ~path:"construction/combine"
     in
@@ -117,7 +129,7 @@ module Hash = struct
       post ~rosetta_uri ~logger
         ~body:
           Construction_hash_request.(
-            {network_identifier= net_id network_response; signed_transaction}
+            { network_identifier = net_id network_response; signed_transaction }
             |> to_yojson)
         ~path:"construction/hash"
     in
