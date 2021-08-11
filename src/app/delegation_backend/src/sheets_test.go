@@ -16,14 +16,6 @@ func randRow(r *rand.Rand) ([](interface{}), *Pk) {
 		v = hex.EncodeToString(randBytes(r.Intn(100)+1, r))
 	case 1: // Random string starting with https://
 		v = "https://" + randString(r)
-	case 5: // Integer
-		v = r.Int()
-	case 6: // Empty cell
-		v = ""
-	case 7: // Empty row
-		return [](interface{}){}, nil
-	case 9: // Float
-		v = r.Float64()
 	case 2: // Correct base58check-encoded pk
 		var bs []byte
 		bs, v = randB58(PK_PREFIX[:], PK_LENGTH, BASE58CHECK_VERSION_PK, r)
@@ -37,11 +29,19 @@ func randRow(r *rand.Rand) ([](interface{}), *Pk) {
 		_, v = randB58(PK_PREFIX[:], PK_LENGTH, ver, r)
 	case 4: // Incorrect base58check-encoded (one of the symbols altered, so check won't succeed)
 		v = randB58WithWrongCheck(PK_PREFIX[:], PK_LENGTH, BASE58CHECK_VERSION_PK, r)
+	case 5: // Integer
+		v = r.Int()
+	case 6: // Empty cell
+		v = ""
+	case 7: // Empty row
+		return [](interface{}){}, nil
 	case 8: // Correct base58check-encoded, wrong length
 		l := randOther(PK_LENGTH, func() interface{} {
 			return r.Intn(1000) + 1
 		}, r).(int)
 		_, v = randB58(PK_PREFIX[:], l, BASE58CHECK_VERSION_PK, r)
+	case 9: // Float
+		v = r.Float64()
 	}
 	return [](interface{}){v}, pk
 }

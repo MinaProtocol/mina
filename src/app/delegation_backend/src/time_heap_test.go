@@ -24,6 +24,12 @@ func (t *timeMock) Now() time.Time {
 	return t.time
 }
 
+func (t *timeMock) Set1971() {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	t.time = time.Date(1971, 8, 11, 14, 37, 12, 0, time.UTC)
+}
+
 func (t *timeMock) Advance(dur time.Duration) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()

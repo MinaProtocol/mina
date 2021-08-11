@@ -245,9 +245,7 @@ func Test40x(t *testing.T) {
 		t.FailNow()
 	}
 	//5. Created_at in the future
-	// in 50 years this test will likely fail unless we update test files :D
-	minusDur := -h * 24 * 365 * 50
-	tm.Advance(minusDur)
+	tm.Set1971()
 	if rep := sh.testRequest(body); rep.Code != 400 {
 		t.Logf("Failed to test created_at in future: %v", rep)
 		t.FailNow()

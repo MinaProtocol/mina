@@ -11,7 +11,7 @@ COPY result/headers src
 RUN cd src && go get -d -v ./...
 
 COPY result/libmina_signer.so result/libmina_signer.so
-ENV LD_LIBRARY_PATH=result
+ENV LD_LIBRARY_PATH="result:$LD_LIBRARY_PATH"
 
 # Install the package
 RUN cd src && go install -v ./...
