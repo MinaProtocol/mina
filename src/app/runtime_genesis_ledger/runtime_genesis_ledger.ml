@@ -29,8 +29,8 @@ let () =
     (Command.async
        ~summary:
          "Generate the genesis ledger and genesis proof for a given \
-          configuration file, or for the compile-time configuration if none \
-          is provided"
+          configuration file, or for the compile-time configuration if none is \
+          provided"
        Command.(
          let open Let_syntax in
          let open Command.Param in
