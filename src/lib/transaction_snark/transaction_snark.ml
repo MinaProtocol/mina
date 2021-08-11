@@ -1214,7 +1214,8 @@ module Base = struct
 
     let apply_body
         ~(constraint_constants : Genesis_constants.Constraint_constants.t) ?tag
-        ~txn_global_slot ~add_check ~check_auth
+        ~txn_global_slot ~(add_check : ?label:string -> Boolean.var -> unit)
+        ~check_auth
         ({ body =
              { pk
              ; token_id = _
@@ -1246,11 +1247,10 @@ module Base = struct
         r := lazy Boolean.((not is_keep) &&& x) :: !r ;
         match updated with
         | `Ok res ->
-            add_check ?label:(Some __LOC__)
-              Boolean.(speculative_success ||| is_keep) ;
+            add_check ~label:__LOC__ Boolean.(speculative_success ||| is_keep) ;
             res
         | `Flagged (res, failed) ->
-            add_check ?label:(Some __LOC__)
+            add_check ~label:__LOC__
               Boolean.((not failed) &&& speculative_success ||| is_keep) ;
             res
       in
@@ -1276,29 +1276,11 @@ module Base = struct
             }
             : Account_timing.var )
         in
-        add_check ?label:None
+        add_check ~label:__LOC__
           Boolean.(is_new || Set_or_keep.Checked.is_keep timing) ;
         !(Account.Timing.if_
             (Set_or_keep.Checked.is_set timing)
             ~then_:new_timing ~else_:a.timing)
-      in
-      let `Min_balance _, timing =
-        !([%with_label "Check snapp timing"]
-            (let open Tick in
-            let balance_check ok =
-              [%with_label "Check snapp balance"]
-                (Boolean.Assert.any [ ok; is_receiver ])
-            in
-            let timed_balance_check ok =
-              [%with_label "Check snapp timed balance"]
-                (Boolean.Assert.any [ ok; is_receiver ])
-            in
-            check_timing ~balance_check ~timed_balance_check
-              ~account:{ a with timing } ~txn_amount:delta.magnitude
-              ~txn_global_slot))
-      in
-      let timing =
-        !(Account.Timing.if_ is_receiver ~then_:a.timing ~else_:timing)
       in
       (* Check send/receive permissions *)
       let balance =
@@ -1324,6 +1306,31 @@ module Base = struct
                  in
                  let failed = Boolean.(failed1 ||| (is_new &&& failed2)) in
                  `Flagged (res, failed)))
+      in
+      let `Min_balance _, timing =
+        !([%with_label "Check snapp timing"]
+            (let open Tick in
+            let balance_check ok =
+              add_check ~label:__LOC__ !(Boolean.any [ ok; is_receiver ]) ;
+              return ()
+            in
+            let timed_balance_check ok =
+              add_check ~label:__LOC__ !(Boolean.any [ ok; is_receiver ]) ;
+              return ()
+            in
+            (* NB: We perform the check here with the final balance and a zero
+               amount. This allows this to serve dual purposes:
+               * if the balance has decreased, this checks that it isn't below
+                 the minimum;
+               * if the account is new and this party has set its timing info,
+                 this checks that the timing is valid.
+               The balance and txn_amount are used only to find the resulting
+               balance, so using the result directly is equivalent.
+            *)
+            check_timing ~balance_check ~timed_balance_check
+              ~account:{ a with timing; balance }
+              ~txn_amount:Amount.(var_of_t zero)
+              ~txn_global_slot))
       in
       let open Snapp_basic in
       let snapp : Snapp_account.Checked.t =
