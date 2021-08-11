@@ -1,2 +1,2001 @@
-/*! For license information please see snarkyjs_chrome.js.LICENSE.txt */
-(()=>{var t={151:()=>{},660:()=>{var t;!function(t){!function(e){var n="object"==typeof global?global:"object"==typeof self?self:"object"==typeof this?this:Function("return this;")(),r=i(t);function i(t,e){return function(n,r){"function"!=typeof t[n]&&Object.defineProperty(t,n,{configurable:!0,writable:!0,value:r}),e&&e(n,r)}}void 0===n.Reflect?n.Reflect=t:r=i(n.Reflect,r),function(t){var e=Object.prototype.hasOwnProperty,n="function"==typeof Symbol,r=n&&void 0!==Symbol.toPrimitive?Symbol.toPrimitive:"@@toPrimitive",i=n&&void 0!==Symbol.iterator?Symbol.iterator:"@@iterator",o="function"==typeof Object.create,s={__proto__:[]}instanceof Array,u=!o&&!s,a={create:o?function(){return B(Object.create(null))}:s?function(){return B({__proto__:null})}:function(){return B({})},has:u?function(t,n){return e.call(t,n)}:function(t,e){return e in t},get:u?function(t,n){return e.call(t,n)?t[n]:void 0}:function(t,e){return t[e]}},c=Object.getPrototypeOf(Function),l="object"==typeof process&&process.env&&"true"===process.env.REFLECT_METADATA_USE_MAP_POLYFILL,f=l||"function"!=typeof Map||"function"!=typeof Map.prototype.entries?function(){var t={},e=[],n=function(){function t(t,e,n){this._index=0,this._keys=t,this._values=e,this._selector=n}return t.prototype["@@iterator"]=function(){return this},t.prototype[i]=function(){return this},t.prototype.next=function(){var t=this._index;if(t>=0&&t<this._keys.length){var n=this._selector(this._keys[t],this._values[t]);return t+1>=this._keys.length?(this._index=-1,this._keys=e,this._values=e):this._index++,{value:n,done:!1}}return{value:void 0,done:!0}},t.prototype.throw=function(t){throw this._index>=0&&(this._index=-1,this._keys=e,this._values=e),t},t.prototype.return=function(t){return this._index>=0&&(this._index=-1,this._keys=e,this._values=e),{value:t,done:!0}},t}();return function(){function e(){this._keys=[],this._values=[],this._cacheKey=t,this._cacheIndex=-2}return Object.defineProperty(e.prototype,"size",{get:function(){return this._keys.length},enumerable:!0,configurable:!0}),e.prototype.has=function(t){return this._find(t,!1)>=0},e.prototype.get=function(t){var e=this._find(t,!1);return e>=0?this._values[e]:void 0},e.prototype.set=function(t,e){var n=this._find(t,!0);return this._values[n]=e,this},e.prototype.delete=function(e){var n=this._find(e,!1);if(n>=0){for(var r=this._keys.length,i=n+1;i<r;i++)this._keys[i-1]=this._keys[i],this._values[i-1]=this._values[i];return this._keys.length--,this._values.length--,e===this._cacheKey&&(this._cacheKey=t,this._cacheIndex=-2),!0}return!1},e.prototype.clear=function(){this._keys.length=0,this._values.length=0,this._cacheKey=t,this._cacheIndex=-2},e.prototype.keys=function(){return new n(this._keys,this._values,r)},e.prototype.values=function(){return new n(this._keys,this._values,o)},e.prototype.entries=function(){return new n(this._keys,this._values,s)},e.prototype["@@iterator"]=function(){return this.entries()},e.prototype[i]=function(){return this.entries()},e.prototype._find=function(t,e){return this._cacheKey!==t&&(this._cacheIndex=this._keys.indexOf(this._cacheKey=t)),this._cacheIndex<0&&e&&(this._cacheIndex=this._keys.length,this._keys.push(t),this._values.push(void 0)),this._cacheIndex},e}();function r(t,e){return t}function o(t,e){return e}function s(t,e){return[t,e]}}():Map,p=l||"function"!=typeof Set||"function"!=typeof Set.prototype.entries?function(){function t(){this._map=new f}return Object.defineProperty(t.prototype,"size",{get:function(){return this._map.size},enumerable:!0,configurable:!0}),t.prototype.has=function(t){return this._map.has(t)},t.prototype.add=function(t){return this._map.set(t,t),this},t.prototype.delete=function(t){return this._map.delete(t)},t.prototype.clear=function(){this._map.clear()},t.prototype.keys=function(){return this._map.keys()},t.prototype.values=function(){return this._map.values()},t.prototype.entries=function(){return this._map.entries()},t.prototype["@@iterator"]=function(){return this.keys()},t.prototype[i]=function(){return this.keys()},t}():Set,y=new(l||"function"!=typeof WeakMap?function(){var t=a.create(),n=r();return function(){function t(){this._key=r()}return t.prototype.has=function(t){var e=i(t,!1);return void 0!==e&&a.has(e,this._key)},t.prototype.get=function(t){var e=i(t,!1);return void 0!==e?a.get(e,this._key):void 0},t.prototype.set=function(t,e){return i(t,!0)[this._key]=e,this},t.prototype.delete=function(t){var e=i(t,!1);return void 0!==e&&delete e[this._key]},t.prototype.clear=function(){this._key=r()},t}();function r(){var e;do{e="@@WeakMap@@"+s()}while(a.has(t,e));return t[e]=!0,e}function i(t,r){if(!e.call(t,n)){if(!r)return;Object.defineProperty(t,n,{value:a.create()})}return t[n]}function o(t,e){for(var n=0;n<e;++n)t[n]=255*Math.random()|0;return t}function s(){var t,e=(t=16,"function"==typeof Uint8Array?"undefined"!=typeof crypto?crypto.getRandomValues(new Uint8Array(t)):"undefined"!=typeof msCrypto?msCrypto.getRandomValues(new Uint8Array(t)):o(new Uint8Array(t),t):o(new Array(t),t));e[6]=79&e[6]|64,e[8]=191&e[8]|128;for(var n="",r=0;r<16;++r){var i=e[r];4!==r&&6!==r&&8!==r||(n+="-"),i<16&&(n+="0"),n+=i.toString(16).toLowerCase()}return n}}():WeakMap);function h(t,e,n){var r=y.get(t);if(x(r)){if(!n)return;r=new f,y.set(t,r)}var i=r.get(e);if(x(i)){if(!n)return;i=new f,r.set(e,i)}return i}function d(t,e,n){if(v(t,e,n))return!0;var r=M(e);return!k(r)&&d(t,r,n)}function v(t,e,n){var r=h(e,n,!1);return!x(r)&&!!r.has(t)}function _(t,e,n){if(v(t,e,n))return w(t,e,n);var r=M(e);return k(r)?void 0:_(t,r,n)}function w(t,e,n){var r=h(e,n,!1);if(!x(r))return r.get(t)}function g(t,e,n,r){h(n,r,!0).set(t,e)}function m(t,e){var n=b(t,e),r=M(t);if(null===r)return n;var i=m(r,e);if(i.length<=0)return n;if(n.length<=0)return i;for(var o=new p,s=[],u=0,a=n;u<a.length;u++){var c=a[u];o.has(c)||(o.add(c),s.push(c))}for(var l=0,f=i;l<f.length;l++)c=f[l],o.has(c)||(o.add(c),s.push(c));return s}function b(t,e){var n=[],r=h(t,e,!1);if(x(r))return n;for(var o=function(t){var e=A(t,i);if(!j(e))throw new TypeError;var n=e.call(t);if(!F(n))throw new TypeError;return n}(r.keys()),s=0;;){var u=P(o);if(!u)return n.length=s,n;var a=u.value;try{n[s]=a}catch(t){try{q(o)}finally{throw t}}s++}}function E(t){if(null===t)return 1;switch(typeof t){case"undefined":return 0;case"boolean":return 2;case"string":return 3;case"symbol":return 4;case"number":return 5;case"object":return null===t?1:6;default:return 6}}function x(t){return void 0===t}function k(t){return null===t}function F(t){return"object"==typeof t?null!==t:"function"==typeof t}function O(t,e){switch(E(t)){case 0:case 1:case 2:case 3:case 4:case 5:return t}var n=3===e?"string":5===e?"number":"default",i=A(t,r);if(void 0!==i){var o=i.call(t,n);if(F(o))throw new TypeError;return o}return function(t,e){if("string"===e){var n=t.toString;if(j(n)&&!F(i=n.call(t)))return i;if(j(r=t.valueOf)&&!F(i=r.call(t)))return i}else{var r;if(j(r=t.valueOf)&&!F(i=r.call(t)))return i;var i,o=t.toString;if(j(o)&&!F(i=o.call(t)))return i}throw new TypeError}(t,"default"===n?"number":n)}function I(t){var e=O(t,3);return"symbol"==typeof e?e:function(t){return""+t}(e)}function T(t){return Array.isArray?Array.isArray(t):t instanceof Object?t instanceof Array:"[object Array]"===Object.prototype.toString.call(t)}function j(t){return"function"==typeof t}function S(t){return"function"==typeof t}function A(t,e){var n=t[e];if(null!=n){if(!j(n))throw new TypeError;return n}}function P(t){var e=t.next();return!e.done&&e}function q(t){var e=t.return;e&&e.call(t)}function M(t){var e=Object.getPrototypeOf(t);if("function"!=typeof t||t===c)return e;if(e!==c)return e;var n=t.prototype,r=n&&Object.getPrototypeOf(n);if(null==r||r===Object.prototype)return e;var i=r.constructor;return"function"!=typeof i||i===t?e:i}function B(t){return t.__=void 0,delete t.__,t}t("decorate",(function(t,e,n,r){if(x(n)){if(!T(t))throw new TypeError;if(!S(e))throw new TypeError;return function(t,e){for(var n=t.length-1;n>=0;--n){var r=(0,t[n])(e);if(!x(r)&&!k(r)){if(!S(r))throw new TypeError;e=r}}return e}(t,e)}if(!T(t))throw new TypeError;if(!F(e))throw new TypeError;if(!F(r)&&!x(r)&&!k(r))throw new TypeError;return k(r)&&(r=void 0),function(t,e,n,r){for(var i=t.length-1;i>=0;--i){var o=(0,t[i])(e,n,r);if(!x(o)&&!k(o)){if(!F(o))throw new TypeError;r=o}}return r}(t,e,n=I(n),r)})),t("metadata",(function(t,e){return function(n,r){if(!F(n))throw new TypeError;if(!x(r)&&!function(t){switch(E(t)){case 3:case 4:return!0;default:return!1}}(r))throw new TypeError;g(t,e,n,r)}})),t("defineMetadata",(function(t,e,n,r){if(!F(n))throw new TypeError;return x(r)||(r=I(r)),g(t,e,n,r)})),t("hasMetadata",(function(t,e,n){if(!F(e))throw new TypeError;return x(n)||(n=I(n)),d(t,e,n)})),t("hasOwnMetadata",(function(t,e,n){if(!F(e))throw new TypeError;return x(n)||(n=I(n)),v(t,e,n)})),t("getMetadata",(function(t,e,n){if(!F(e))throw new TypeError;return x(n)||(n=I(n)),_(t,e,n)})),t("getOwnMetadata",(function(t,e,n){if(!F(e))throw new TypeError;return x(n)||(n=I(n)),w(t,e,n)})),t("getMetadataKeys",(function(t,e){if(!F(t))throw new TypeError;return x(e)||(e=I(e)),m(t,e)})),t("getOwnMetadataKeys",(function(t,e){if(!F(t))throw new TypeError;return x(e)||(e=I(e)),b(t,e)})),t("deleteMetadata",(function(t,e,n){if(!F(e))throw new TypeError;x(n)||(n=I(n));var r=h(e,n,!1);if(x(r))return!1;if(!r.delete(t))return!1;if(r.size>0)return!0;var i=y.get(e);return i.delete(n),i.size>0||y.delete(e),!0}))}(r)}()}(t||(t={}))}},e={};function n(r){var i=e[r];if(void 0!==i)return i.exports;var o=e[r]={exports:{}};return t[r](o,o.exports,n),o.exports}(()=>{"use strict";function t(t,e,n,r){var i,o=arguments.length,s=o<3?e:null===r?r=Object.getOwnPropertyDescriptor(e,n):r;if("object"==typeof Reflect&&"function"==typeof Reflect.decorate)s=Reflect.decorate(t,e,n,r);else for(var u=t.length-1;u>=0;u--)(i=t[u])&&(s=(o<3?i(s):o>3?i(e,n,s):i(e,n))||s);return o>3&&s&&Object.defineProperty(e,n,s),s}function e(t,e){return function(n,r){e(n,r,t)}}function r(t,e){if("object"==typeof Reflect&&"function"==typeof Reflect.metadata)return Reflect.metadata(t,e)}Object.create,Object.create;var i=n(151),o=(n(660),window.__snarky.Field),s=window.__snarky.Bool,u=window.__snarky.Circuit,a=window.__snarky.Poseidon,c=window.__snarky.Group,l=window.__snarky.Scalar;class f{static sizeInFieldElements(){return this.prototype._sizeInFieldElements||0}static toFieldElements(t){const e=[],n=this.prototype._fields;if(null==n)return e;for(let r=0;r<n.length;++r){const[i,o]=n[r];o.toFieldElements(t[i]).forEach((t=>e.push(t)))}return e}toFieldElements(){return this.constructor.toFieldElements(this)}equals(t){return u.equal(this,t)}assertEquals(t){u.assertEqual(this,t)}static ofFieldElements(t){const e=this.prototype._fields;let n=0;const r=[];for(let i=0;i<e.length;++i){const o=e[i][1],s=o.sizeInFieldElements(),u=o.ofFieldElements(t.slice(n,n+s));r.push(u),n+=s}return new this(...r)}static toJSON(t){const e={};return void 0!==this.prototype._fields&&this.prototype._fields.forEach((([n,r])=>{e[n]=r.toJSON(t[n])})),e}static fromJSON(t){const e=[],n=this.prototype._fields;switch(typeof t){case"object":if(null===t||Array.isArray(t))return null;break;default:return null}if(void 0!==n)for(let r=0;r<n.length;++r){const[i,o]=n[r];if(void 0===t[i])return null;e.push(o.fromJSON(t[i]))}return new this(...e)}}function p(t,e){const n=Reflect.getMetadata("design:type",t,e);void 0!==t._fields&&null!==t._fields||(t._fields=[]),void 0!==t._sizeInFieldElements&&null!==t._sizeInFieldElements||(t._sizeInFieldElements=0),void 0===n||(n.toFieldElements&&n.ofFieldElements?(t._fields.push([e,n]),t._sizeInFieldElements+=n.sizeInFieldElements()):console.log(`warning: property ${e} missing field element conversion methods`))}function y(t,e,n){void 0===t._public&&(t._public=[]),t._public.push(n)}function h(t){return{sizeInFieldElements:()=>t.reduce(((t,e)=>t+e.sizeInFieldElements()),0),toFieldElements:e=>{let n=[];for(let r=0;r<e.length;++r)n.push(...t[r].toFieldElements(e[r]));return n},ofFieldElements:e=>{let n=0,r=[];return t.forEach((t=>{const i=t.sizeInFieldElements();r.push(t.ofFieldElements(e.slice(n,n+i))),n+=i})),r}}}function d(t,e,n){const r=Reflect.getMetadata("design:paramtypes",t,e),i=r.length,o=new Set(t._public),s=new Set;for(let t=0;t<i;++t)o.has(t)||s.add(t);t.snarkyMain=(n,r)=>{let s=[];for(let t=0;t<i;++t)s.push((o.has(t)?r:n).shift());return t[e].apply(t,s)},t.snarkyWitnessTyp=h(Array.from(s).map((t=>r[t]))),t.snarkyPublicTyp=h(Array.from(o).map((t=>r[t])))}class v extends f{s;constructor(t){super(),this.s=t}static random(){return new v(l.random())}static ofBits(t){return new v(l.ofBits(t))}toPublicKey(){return new _(c.generator.scale(this.s))}}t([p,r("design:type",l)],v.prototype,"s",void 0);class _ extends f{g;constructor(t){super(),this.g=t}static fromPrivateKey(t){return t.toPublicKey()}}t([p,r("design:type",c)],_.prototype,"g",void 0);class w extends f{r;s;constructor(t,e){super(),this.r=t,this.s=e}static create(t,e){const{g:n}=_.fromPrivateKey(t),r=t.s,i=l.random();let{x:o,y:s}=c.generator.scale(i);const u=s.toBits()[0].toBoolean()?i.neg():i,f=l.ofBits(a.hash(e.concat([n.x,n.y,o])).toBits()).mul(r).add(u);return new w(o,f)}verify(t,e){const n=t.g;let r=l.ofBits(a.hash(e.concat([n.x,n.y,this.r])).toBits()),i=n.scale(r).neg().add(c.generator.scale(this.s));return s.and(i.x.equals(this.r),i.y.toBits()[0].equals(!1))}}t([p,r("design:type",o)],w.prototype,"r",void 0),t([p,r("design:type",l)],w.prototype,"s",void 0);class g extends f{signature;acc;r;constructor(t,e,n){super(),this.signature=t,this.acc=e,this.r=n}}t([p,r("design:type",w)],g.prototype,"signature",void 0),t([p,r("design:type",i.Group)],g.prototype,"acc",void 0),t([p,r("design:type",i.Scalar)],g.prototype,"r",void 0);class m extends i.Circuit{static main(t,e){let n=new i.Group({x:-1,y:2}),r=i.Circuit.witness(i.Scalar,(()=>t.r)),o=n.scale(r),s=i.Circuit.witness(i.Group,(()=>t.acc));i.Group.generator,i.Circuit.witness(w,(()=>t.signature)),s.add(o).assertEquals(e)}}t([d,e(1,y),r("design:type",Function),r("design:paramtypes",[g,i.Group]),r("design:returntype",void 0)],m,"main",null);class b extends i.Circuit{static main(t){let e=t;for(let t=0;t<1e3;++t)e=e.mul(e)}}t([d,e(0,y),r("design:type",Function),r("design:paramtypes",[i.Field]),r("design:returntype",void 0)],b,"main",null);class E extends f{value;toFieldElements(){return[]}constructor(t){super(),this.value=t}static ofString(t){return new E([])}static readAll(t,e){let n,r=[];for(;n=t.read(e),null!==n;){let[t,i]=n;e=t,r.push(i)}return r}}class x extends f{response;signature;constructor(t,e){super(),this.response=t,this.signature=e}verify(t){}}t([p,r("design:type",E)],x.prototype,"response",void 0),t([p,r("design:type",w)],x.prototype,"signature",void 0);class k extends f{buyIndex;sellIndex;attestation;constructor(t,e,n){super(),this.buyIndex=t,this.sellIndex=e,this.attestation=n}}t([p,r("design:type",o)],k.prototype,"buyIndex",void 0),t([p,r("design:type",o)],k.prototype,"sellIndex",void 0),t([p,r("design:type",x)],k.prototype,"attestation",void 0);class F{timestamp;isBuy;price;quantity;static read(t){if(0===t.value.length)return null;let e=t.value[0],n=new F(e.isBuy,e.price,e.quantity,e.timestamp);return[new E(t.value.slice(1)),n]}constructor(t,e,n,r){this.isBuy=t,this.price=e,this.quantity=n,this.timestamp=r}}class O extends u{static main(t,e){t.attestation.verify(E.ofString("api.coinbase.com/trades"));const n=E.readAll(F,t.attestation.response);let r=I(n,t.buyIndex),i=I(n,t.sellIndex);r.isBuy.assertEquals(!0),i.isBuy.assertEquals(!1),r.timestamp.assertLt(i.timestamp),i.quantity.assertLt(r.quantity);let s=i.quantity.mul(r.price),u=i.quantity.mul(i.price);const a=new o(1e4);u.mul(a.add(e)).assertGte(s.mul(a))}}function I(t,e){let n=new o(e),[r,i]=t.reduce((([t,e],r,i)=>{let o=n.equals(i);return[u.if(o,r,t),e.or(o)]}),[t[0],new s(!1)]);return i.assertEquals(!0),r}t([d,e(1,y),r("design:type",Function),r("design:paramtypes",[k,o]),r("design:returntype",void 0)],O,"main",null),function(){const t=new Date,e=O.generateKeypair(),n=new Date;console.log("keypairgen",n.getTime()-t.getTime());const r=O.prove([{buyIndex:new o(0),sellIndex:new o(1),attestation:new x(new E([{timestamp:new o(150),price:new o(100),quantity:new o(5),isBuy:new s(!0)},{timestamp:new o(250),price:new o(500),quantity:new o(4),isBuy:new s(!1)}]),new w(new o(1),l.random()))}],[new o(25)],e);console.log(r,e)}()})()})();
+/******/ (() => { // webpackBootstrap
+/******/ 	var __webpack_modules__ = ({
+
+/***/ "./src/bindings/snarky2.js":
+/*!*********************************!*\
+  !*** ./src/bindings/snarky2.js ***!
+  \*********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Field": () => (/* binding */ Field),
+/* harmony export */   "Bool": () => (/* binding */ Bool),
+/* harmony export */   "Circuit": () => (/* binding */ Circuit),
+/* harmony export */   "Poseidon": () => (/* binding */ Poseidon),
+/* harmony export */   "Group": () => (/* binding */ Group),
+/* harmony export */   "Scalar": () => (/* binding */ Scalar)
+/* harmony export */ });
+// if (window.__snarky) {
+var Field = window.__snarky.Field;
+var Bool = window.__snarky.Bool;
+var Circuit = window.__snarky.Circuit;
+console.log(Circuit);
+var Poseidon = window.__snarky.Poseidon;
+var Group = window.__snarky.Group;
+var Scalar = window.__snarky.Scalar;
+/*} else {
+  import { Field as F, Bool as B, Circuit as C, Poseidon as P, Group as G, Scalar as S } from './snarky';
+  export class Field = F;
+  export class Bool = B;
+  export class Circuit = C;
+  export class Poseidon = P;
+  export class Group = G;
+  export class Scalar = S;
+}
+*/
+
+/***/ }),
+
+/***/ "./node_modules/reflect-metadata/Reflect.js":
+/*!**************************************************!*\
+  !*** ./node_modules/reflect-metadata/Reflect.js ***!
+  \**************************************************/
+/***/ (() => {
+
+/*! *****************************************************************************
+Copyright (C) Microsoft. All rights reserved.
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at http://www.apache.org/licenses/LICENSE-2.0
+
+THIS CODE IS PROVIDED ON AN *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
+WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
+MERCHANTABLITY OR NON-INFRINGEMENT.
+
+See the Apache Version 2.0 License for specific language governing permissions
+and limitations under the License.
+***************************************************************************** */
+var Reflect;
+(function (Reflect) {
+    // Metadata Proposal
+    // https://rbuckton.github.io/reflect-metadata/
+    (function (factory) {
+        var root = typeof global === "object" ? global :
+            typeof self === "object" ? self :
+                typeof this === "object" ? this :
+                    Function("return this;")();
+        var exporter = makeExporter(Reflect);
+        if (typeof root.Reflect === "undefined") {
+            root.Reflect = Reflect;
+        }
+        else {
+            exporter = makeExporter(root.Reflect, exporter);
+        }
+        factory(exporter);
+        function makeExporter(target, previous) {
+            return function (key, value) {
+                if (typeof target[key] !== "function") {
+                    Object.defineProperty(target, key, { configurable: true, writable: true, value: value });
+                }
+                if (previous)
+                    previous(key, value);
+            };
+        }
+    })(function (exporter) {
+        var hasOwn = Object.prototype.hasOwnProperty;
+        // feature test for Symbol support
+        var supportsSymbol = typeof Symbol === "function";
+        var toPrimitiveSymbol = supportsSymbol && typeof Symbol.toPrimitive !== "undefined" ? Symbol.toPrimitive : "@@toPrimitive";
+        var iteratorSymbol = supportsSymbol && typeof Symbol.iterator !== "undefined" ? Symbol.iterator : "@@iterator";
+        var supportsCreate = typeof Object.create === "function"; // feature test for Object.create support
+        var supportsProto = { __proto__: [] } instanceof Array; // feature test for __proto__ support
+        var downLevel = !supportsCreate && !supportsProto;
+        var HashMap = {
+            // create an object in dictionary mode (a.k.a. "slow" mode in v8)
+            create: supportsCreate
+                ? function () { return MakeDictionary(Object.create(null)); }
+                : supportsProto
+                    ? function () { return MakeDictionary({ __proto__: null }); }
+                    : function () { return MakeDictionary({}); },
+            has: downLevel
+                ? function (map, key) { return hasOwn.call(map, key); }
+                : function (map, key) { return key in map; },
+            get: downLevel
+                ? function (map, key) { return hasOwn.call(map, key) ? map[key] : undefined; }
+                : function (map, key) { return map[key]; },
+        };
+        // Load global or shim versions of Map, Set, and WeakMap
+        var functionPrototype = Object.getPrototypeOf(Function);
+        var usePolyfill = typeof process === "object" && process.env && process.env["REFLECT_METADATA_USE_MAP_POLYFILL"] === "true";
+        var _Map = !usePolyfill && typeof Map === "function" && typeof Map.prototype.entries === "function" ? Map : CreateMapPolyfill();
+        var _Set = !usePolyfill && typeof Set === "function" && typeof Set.prototype.entries === "function" ? Set : CreateSetPolyfill();
+        var _WeakMap = !usePolyfill && typeof WeakMap === "function" ? WeakMap : CreateWeakMapPolyfill();
+        // [[Metadata]] internal slot
+        // https://rbuckton.github.io/reflect-metadata/#ordinary-object-internal-methods-and-internal-slots
+        var Metadata = new _WeakMap();
+        /**
+         * Applies a set of decorators to a property of a target object.
+         * @param decorators An array of decorators.
+         * @param target The target object.
+         * @param propertyKey (Optional) The property key to decorate.
+         * @param attributes (Optional) The property descriptor for the target key.
+         * @remarks Decorators are applied in reverse order.
+         * @example
+         *
+         *     class Example {
+         *         // property declarations are not part of ES6, though they are valid in TypeScript:
+         *         // static staticProperty;
+         *         // property;
+         *
+         *         constructor(p) { }
+         *         static staticMethod(p) { }
+         *         method(p) { }
+         *     }
+         *
+         *     // constructor
+         *     Example = Reflect.decorate(decoratorsArray, Example);
+         *
+         *     // property (on constructor)
+         *     Reflect.decorate(decoratorsArray, Example, "staticProperty");
+         *
+         *     // property (on prototype)
+         *     Reflect.decorate(decoratorsArray, Example.prototype, "property");
+         *
+         *     // method (on constructor)
+         *     Object.defineProperty(Example, "staticMethod",
+         *         Reflect.decorate(decoratorsArray, Example, "staticMethod",
+         *             Object.getOwnPropertyDescriptor(Example, "staticMethod")));
+         *
+         *     // method (on prototype)
+         *     Object.defineProperty(Example.prototype, "method",
+         *         Reflect.decorate(decoratorsArray, Example.prototype, "method",
+         *             Object.getOwnPropertyDescriptor(Example.prototype, "method")));
+         *
+         */
+        function decorate(decorators, target, propertyKey, attributes) {
+            if (!IsUndefined(propertyKey)) {
+                if (!IsArray(decorators))
+                    throw new TypeError();
+                if (!IsObject(target))
+                    throw new TypeError();
+                if (!IsObject(attributes) && !IsUndefined(attributes) && !IsNull(attributes))
+                    throw new TypeError();
+                if (IsNull(attributes))
+                    attributes = undefined;
+                propertyKey = ToPropertyKey(propertyKey);
+                return DecorateProperty(decorators, target, propertyKey, attributes);
+            }
+            else {
+                if (!IsArray(decorators))
+                    throw new TypeError();
+                if (!IsConstructor(target))
+                    throw new TypeError();
+                return DecorateConstructor(decorators, target);
+            }
+        }
+        exporter("decorate", decorate);
+        // 4.1.2 Reflect.metadata(metadataKey, metadataValue)
+        // https://rbuckton.github.io/reflect-metadata/#reflect.metadata
+        /**
+         * A default metadata decorator factory that can be used on a class, class member, or parameter.
+         * @param metadataKey The key for the metadata entry.
+         * @param metadataValue The value for the metadata entry.
+         * @returns A decorator function.
+         * @remarks
+         * If `metadataKey` is already defined for the target and target key, the
+         * metadataValue for that key will be overwritten.
+         * @example
+         *
+         *     // constructor
+         *     @Reflect.metadata(key, value)
+         *     class Example {
+         *     }
+         *
+         *     // property (on constructor, TypeScript only)
+         *     class Example {
+         *         @Reflect.metadata(key, value)
+         *         static staticProperty;
+         *     }
+         *
+         *     // property (on prototype, TypeScript only)
+         *     class Example {
+         *         @Reflect.metadata(key, value)
+         *         property;
+         *     }
+         *
+         *     // method (on constructor)
+         *     class Example {
+         *         @Reflect.metadata(key, value)
+         *         static staticMethod() { }
+         *     }
+         *
+         *     // method (on prototype)
+         *     class Example {
+         *         @Reflect.metadata(key, value)
+         *         method() { }
+         *     }
+         *
+         */
+        function metadata(metadataKey, metadataValue) {
+            function decorator(target, propertyKey) {
+                if (!IsObject(target))
+                    throw new TypeError();
+                if (!IsUndefined(propertyKey) && !IsPropertyKey(propertyKey))
+                    throw new TypeError();
+                OrdinaryDefineOwnMetadata(metadataKey, metadataValue, target, propertyKey);
+            }
+            return decorator;
+        }
+        exporter("metadata", metadata);
+        /**
+         * Define a unique metadata entry on the target.
+         * @param metadataKey A key used to store and retrieve metadata.
+         * @param metadataValue A value that contains attached metadata.
+         * @param target The target object on which to define metadata.
+         * @param propertyKey (Optional) The property key for the target.
+         * @example
+         *
+         *     class Example {
+         *         // property declarations are not part of ES6, though they are valid in TypeScript:
+         *         // static staticProperty;
+         *         // property;
+         *
+         *         constructor(p) { }
+         *         static staticMethod(p) { }
+         *         method(p) { }
+         *     }
+         *
+         *     // constructor
+         *     Reflect.defineMetadata("custom:annotation", options, Example);
+         *
+         *     // property (on constructor)
+         *     Reflect.defineMetadata("custom:annotation", options, Example, "staticProperty");
+         *
+         *     // property (on prototype)
+         *     Reflect.defineMetadata("custom:annotation", options, Example.prototype, "property");
+         *
+         *     // method (on constructor)
+         *     Reflect.defineMetadata("custom:annotation", options, Example, "staticMethod");
+         *
+         *     // method (on prototype)
+         *     Reflect.defineMetadata("custom:annotation", options, Example.prototype, "method");
+         *
+         *     // decorator factory as metadata-producing annotation.
+         *     function MyAnnotation(options): Decorator {
+         *         return (target, key?) => Reflect.defineMetadata("custom:annotation", options, target, key);
+         *     }
+         *
+         */
+        function defineMetadata(metadataKey, metadataValue, target, propertyKey) {
+            if (!IsObject(target))
+                throw new TypeError();
+            if (!IsUndefined(propertyKey))
+                propertyKey = ToPropertyKey(propertyKey);
+            return OrdinaryDefineOwnMetadata(metadataKey, metadataValue, target, propertyKey);
+        }
+        exporter("defineMetadata", defineMetadata);
+        /**
+         * Gets a value indicating whether the target object or its prototype chain has the provided metadata key defined.
+         * @param metadataKey A key used to store and retrieve metadata.
+         * @param target The target object on which the metadata is defined.
+         * @param propertyKey (Optional) The property key for the target.
+         * @returns `true` if the metadata key was defined on the target object or its prototype chain; otherwise, `false`.
+         * @example
+         *
+         *     class Example {
+         *         // property declarations are not part of ES6, though they are valid in TypeScript:
+         *         // static staticProperty;
+         *         // property;
+         *
+         *         constructor(p) { }
+         *         static staticMethod(p) { }
+         *         method(p) { }
+         *     }
+         *
+         *     // constructor
+         *     result = Reflect.hasMetadata("custom:annotation", Example);
+         *
+         *     // property (on constructor)
+         *     result = Reflect.hasMetadata("custom:annotation", Example, "staticProperty");
+         *
+         *     // property (on prototype)
+         *     result = Reflect.hasMetadata("custom:annotation", Example.prototype, "property");
+         *
+         *     // method (on constructor)
+         *     result = Reflect.hasMetadata("custom:annotation", Example, "staticMethod");
+         *
+         *     // method (on prototype)
+         *     result = Reflect.hasMetadata("custom:annotation", Example.prototype, "method");
+         *
+         */
+        function hasMetadata(metadataKey, target, propertyKey) {
+            if (!IsObject(target))
+                throw new TypeError();
+            if (!IsUndefined(propertyKey))
+                propertyKey = ToPropertyKey(propertyKey);
+            return OrdinaryHasMetadata(metadataKey, target, propertyKey);
+        }
+        exporter("hasMetadata", hasMetadata);
+        /**
+         * Gets a value indicating whether the target object has the provided metadata key defined.
+         * @param metadataKey A key used to store and retrieve metadata.
+         * @param target The target object on which the metadata is defined.
+         * @param propertyKey (Optional) The property key for the target.
+         * @returns `true` if the metadata key was defined on the target object; otherwise, `false`.
+         * @example
+         *
+         *     class Example {
+         *         // property declarations are not part of ES6, though they are valid in TypeScript:
+         *         // static staticProperty;
+         *         // property;
+         *
+         *         constructor(p) { }
+         *         static staticMethod(p) { }
+         *         method(p) { }
+         *     }
+         *
+         *     // constructor
+         *     result = Reflect.hasOwnMetadata("custom:annotation", Example);
+         *
+         *     // property (on constructor)
+         *     result = Reflect.hasOwnMetadata("custom:annotation", Example, "staticProperty");
+         *
+         *     // property (on prototype)
+         *     result = Reflect.hasOwnMetadata("custom:annotation", Example.prototype, "property");
+         *
+         *     // method (on constructor)
+         *     result = Reflect.hasOwnMetadata("custom:annotation", Example, "staticMethod");
+         *
+         *     // method (on prototype)
+         *     result = Reflect.hasOwnMetadata("custom:annotation", Example.prototype, "method");
+         *
+         */
+        function hasOwnMetadata(metadataKey, target, propertyKey) {
+            if (!IsObject(target))
+                throw new TypeError();
+            if (!IsUndefined(propertyKey))
+                propertyKey = ToPropertyKey(propertyKey);
+            return OrdinaryHasOwnMetadata(metadataKey, target, propertyKey);
+        }
+        exporter("hasOwnMetadata", hasOwnMetadata);
+        /**
+         * Gets the metadata value for the provided metadata key on the target object or its prototype chain.
+         * @param metadataKey A key used to store and retrieve metadata.
+         * @param target The target object on which the metadata is defined.
+         * @param propertyKey (Optional) The property key for the target.
+         * @returns The metadata value for the metadata key if found; otherwise, `undefined`.
+         * @example
+         *
+         *     class Example {
+         *         // property declarations are not part of ES6, though they are valid in TypeScript:
+         *         // static staticProperty;
+         *         // property;
+         *
+         *         constructor(p) { }
+         *         static staticMethod(p) { }
+         *         method(p) { }
+         *     }
+         *
+         *     // constructor
+         *     result = Reflect.getMetadata("custom:annotation", Example);
+         *
+         *     // property (on constructor)
+         *     result = Reflect.getMetadata("custom:annotation", Example, "staticProperty");
+         *
+         *     // property (on prototype)
+         *     result = Reflect.getMetadata("custom:annotation", Example.prototype, "property");
+         *
+         *     // method (on constructor)
+         *     result = Reflect.getMetadata("custom:annotation", Example, "staticMethod");
+         *
+         *     // method (on prototype)
+         *     result = Reflect.getMetadata("custom:annotation", Example.prototype, "method");
+         *
+         */
+        function getMetadata(metadataKey, target, propertyKey) {
+            if (!IsObject(target))
+                throw new TypeError();
+            if (!IsUndefined(propertyKey))
+                propertyKey = ToPropertyKey(propertyKey);
+            return OrdinaryGetMetadata(metadataKey, target, propertyKey);
+        }
+        exporter("getMetadata", getMetadata);
+        /**
+         * Gets the metadata value for the provided metadata key on the target object.
+         * @param metadataKey A key used to store and retrieve metadata.
+         * @param target The target object on which the metadata is defined.
+         * @param propertyKey (Optional) The property key for the target.
+         * @returns The metadata value for the metadata key if found; otherwise, `undefined`.
+         * @example
+         *
+         *     class Example {
+         *         // property declarations are not part of ES6, though they are valid in TypeScript:
+         *         // static staticProperty;
+         *         // property;
+         *
+         *         constructor(p) { }
+         *         static staticMethod(p) { }
+         *         method(p) { }
+         *     }
+         *
+         *     // constructor
+         *     result = Reflect.getOwnMetadata("custom:annotation", Example);
+         *
+         *     // property (on constructor)
+         *     result = Reflect.getOwnMetadata("custom:annotation", Example, "staticProperty");
+         *
+         *     // property (on prototype)
+         *     result = Reflect.getOwnMetadata("custom:annotation", Example.prototype, "property");
+         *
+         *     // method (on constructor)
+         *     result = Reflect.getOwnMetadata("custom:annotation", Example, "staticMethod");
+         *
+         *     // method (on prototype)
+         *     result = Reflect.getOwnMetadata("custom:annotation", Example.prototype, "method");
+         *
+         */
+        function getOwnMetadata(metadataKey, target, propertyKey) {
+            if (!IsObject(target))
+                throw new TypeError();
+            if (!IsUndefined(propertyKey))
+                propertyKey = ToPropertyKey(propertyKey);
+            return OrdinaryGetOwnMetadata(metadataKey, target, propertyKey);
+        }
+        exporter("getOwnMetadata", getOwnMetadata);
+        /**
+         * Gets the metadata keys defined on the target object or its prototype chain.
+         * @param target The target object on which the metadata is defined.
+         * @param propertyKey (Optional) The property key for the target.
+         * @returns An array of unique metadata keys.
+         * @example
+         *
+         *     class Example {
+         *         // property declarations are not part of ES6, though they are valid in TypeScript:
+         *         // static staticProperty;
+         *         // property;
+         *
+         *         constructor(p) { }
+         *         static staticMethod(p) { }
+         *         method(p) { }
+         *     }
+         *
+         *     // constructor
+         *     result = Reflect.getMetadataKeys(Example);
+         *
+         *     // property (on constructor)
+         *     result = Reflect.getMetadataKeys(Example, "staticProperty");
+         *
+         *     // property (on prototype)
+         *     result = Reflect.getMetadataKeys(Example.prototype, "property");
+         *
+         *     // method (on constructor)
+         *     result = Reflect.getMetadataKeys(Example, "staticMethod");
+         *
+         *     // method (on prototype)
+         *     result = Reflect.getMetadataKeys(Example.prototype, "method");
+         *
+         */
+        function getMetadataKeys(target, propertyKey) {
+            if (!IsObject(target))
+                throw new TypeError();
+            if (!IsUndefined(propertyKey))
+                propertyKey = ToPropertyKey(propertyKey);
+            return OrdinaryMetadataKeys(target, propertyKey);
+        }
+        exporter("getMetadataKeys", getMetadataKeys);
+        /**
+         * Gets the unique metadata keys defined on the target object.
+         * @param target The target object on which the metadata is defined.
+         * @param propertyKey (Optional) The property key for the target.
+         * @returns An array of unique metadata keys.
+         * @example
+         *
+         *     class Example {
+         *         // property declarations are not part of ES6, though they are valid in TypeScript:
+         *         // static staticProperty;
+         *         // property;
+         *
+         *         constructor(p) { }
+         *         static staticMethod(p) { }
+         *         method(p) { }
+         *     }
+         *
+         *     // constructor
+         *     result = Reflect.getOwnMetadataKeys(Example);
+         *
+         *     // property (on constructor)
+         *     result = Reflect.getOwnMetadataKeys(Example, "staticProperty");
+         *
+         *     // property (on prototype)
+         *     result = Reflect.getOwnMetadataKeys(Example.prototype, "property");
+         *
+         *     // method (on constructor)
+         *     result = Reflect.getOwnMetadataKeys(Example, "staticMethod");
+         *
+         *     // method (on prototype)
+         *     result = Reflect.getOwnMetadataKeys(Example.prototype, "method");
+         *
+         */
+        function getOwnMetadataKeys(target, propertyKey) {
+            if (!IsObject(target))
+                throw new TypeError();
+            if (!IsUndefined(propertyKey))
+                propertyKey = ToPropertyKey(propertyKey);
+            return OrdinaryOwnMetadataKeys(target, propertyKey);
+        }
+        exporter("getOwnMetadataKeys", getOwnMetadataKeys);
+        /**
+         * Deletes the metadata entry from the target object with the provided key.
+         * @param metadataKey A key used to store and retrieve metadata.
+         * @param target The target object on which the metadata is defined.
+         * @param propertyKey (Optional) The property key for the target.
+         * @returns `true` if the metadata entry was found and deleted; otherwise, false.
+         * @example
+         *
+         *     class Example {
+         *         // property declarations are not part of ES6, though they are valid in TypeScript:
+         *         // static staticProperty;
+         *         // property;
+         *
+         *         constructor(p) { }
+         *         static staticMethod(p) { }
+         *         method(p) { }
+         *     }
+         *
+         *     // constructor
+         *     result = Reflect.deleteMetadata("custom:annotation", Example);
+         *
+         *     // property (on constructor)
+         *     result = Reflect.deleteMetadata("custom:annotation", Example, "staticProperty");
+         *
+         *     // property (on prototype)
+         *     result = Reflect.deleteMetadata("custom:annotation", Example.prototype, "property");
+         *
+         *     // method (on constructor)
+         *     result = Reflect.deleteMetadata("custom:annotation", Example, "staticMethod");
+         *
+         *     // method (on prototype)
+         *     result = Reflect.deleteMetadata("custom:annotation", Example.prototype, "method");
+         *
+         */
+        function deleteMetadata(metadataKey, target, propertyKey) {
+            if (!IsObject(target))
+                throw new TypeError();
+            if (!IsUndefined(propertyKey))
+                propertyKey = ToPropertyKey(propertyKey);
+            var metadataMap = GetOrCreateMetadataMap(target, propertyKey, /*Create*/ false);
+            if (IsUndefined(metadataMap))
+                return false;
+            if (!metadataMap.delete(metadataKey))
+                return false;
+            if (metadataMap.size > 0)
+                return true;
+            var targetMetadata = Metadata.get(target);
+            targetMetadata.delete(propertyKey);
+            if (targetMetadata.size > 0)
+                return true;
+            Metadata.delete(target);
+            return true;
+        }
+        exporter("deleteMetadata", deleteMetadata);
+        function DecorateConstructor(decorators, target) {
+            for (var i = decorators.length - 1; i >= 0; --i) {
+                var decorator = decorators[i];
+                var decorated = decorator(target);
+                if (!IsUndefined(decorated) && !IsNull(decorated)) {
+                    if (!IsConstructor(decorated))
+                        throw new TypeError();
+                    target = decorated;
+                }
+            }
+            return target;
+        }
+        function DecorateProperty(decorators, target, propertyKey, descriptor) {
+            for (var i = decorators.length - 1; i >= 0; --i) {
+                var decorator = decorators[i];
+                var decorated = decorator(target, propertyKey, descriptor);
+                if (!IsUndefined(decorated) && !IsNull(decorated)) {
+                    if (!IsObject(decorated))
+                        throw new TypeError();
+                    descriptor = decorated;
+                }
+            }
+            return descriptor;
+        }
+        function GetOrCreateMetadataMap(O, P, Create) {
+            var targetMetadata = Metadata.get(O);
+            if (IsUndefined(targetMetadata)) {
+                if (!Create)
+                    return undefined;
+                targetMetadata = new _Map();
+                Metadata.set(O, targetMetadata);
+            }
+            var metadataMap = targetMetadata.get(P);
+            if (IsUndefined(metadataMap)) {
+                if (!Create)
+                    return undefined;
+                metadataMap = new _Map();
+                targetMetadata.set(P, metadataMap);
+            }
+            return metadataMap;
+        }
+        // 3.1.1.1 OrdinaryHasMetadata(MetadataKey, O, P)
+        // https://rbuckton.github.io/reflect-metadata/#ordinaryhasmetadata
+        function OrdinaryHasMetadata(MetadataKey, O, P) {
+            var hasOwn = OrdinaryHasOwnMetadata(MetadataKey, O, P);
+            if (hasOwn)
+                return true;
+            var parent = OrdinaryGetPrototypeOf(O);
+            if (!IsNull(parent))
+                return OrdinaryHasMetadata(MetadataKey, parent, P);
+            return false;
+        }
+        // 3.1.2.1 OrdinaryHasOwnMetadata(MetadataKey, O, P)
+        // https://rbuckton.github.io/reflect-metadata/#ordinaryhasownmetadata
+        function OrdinaryHasOwnMetadata(MetadataKey, O, P) {
+            var metadataMap = GetOrCreateMetadataMap(O, P, /*Create*/ false);
+            if (IsUndefined(metadataMap))
+                return false;
+            return ToBoolean(metadataMap.has(MetadataKey));
+        }
+        // 3.1.3.1 OrdinaryGetMetadata(MetadataKey, O, P)
+        // https://rbuckton.github.io/reflect-metadata/#ordinarygetmetadata
+        function OrdinaryGetMetadata(MetadataKey, O, P) {
+            var hasOwn = OrdinaryHasOwnMetadata(MetadataKey, O, P);
+            if (hasOwn)
+                return OrdinaryGetOwnMetadata(MetadataKey, O, P);
+            var parent = OrdinaryGetPrototypeOf(O);
+            if (!IsNull(parent))
+                return OrdinaryGetMetadata(MetadataKey, parent, P);
+            return undefined;
+        }
+        // 3.1.4.1 OrdinaryGetOwnMetadata(MetadataKey, O, P)
+        // https://rbuckton.github.io/reflect-metadata/#ordinarygetownmetadata
+        function OrdinaryGetOwnMetadata(MetadataKey, O, P) {
+            var metadataMap = GetOrCreateMetadataMap(O, P, /*Create*/ false);
+            if (IsUndefined(metadataMap))
+                return undefined;
+            return metadataMap.get(MetadataKey);
+        }
+        // 3.1.5.1 OrdinaryDefineOwnMetadata(MetadataKey, MetadataValue, O, P)
+        // https://rbuckton.github.io/reflect-metadata/#ordinarydefineownmetadata
+        function OrdinaryDefineOwnMetadata(MetadataKey, MetadataValue, O, P) {
+            var metadataMap = GetOrCreateMetadataMap(O, P, /*Create*/ true);
+            metadataMap.set(MetadataKey, MetadataValue);
+        }
+        // 3.1.6.1 OrdinaryMetadataKeys(O, P)
+        // https://rbuckton.github.io/reflect-metadata/#ordinarymetadatakeys
+        function OrdinaryMetadataKeys(O, P) {
+            var ownKeys = OrdinaryOwnMetadataKeys(O, P);
+            var parent = OrdinaryGetPrototypeOf(O);
+            if (parent === null)
+                return ownKeys;
+            var parentKeys = OrdinaryMetadataKeys(parent, P);
+            if (parentKeys.length <= 0)
+                return ownKeys;
+            if (ownKeys.length <= 0)
+                return parentKeys;
+            var set = new _Set();
+            var keys = [];
+            for (var _i = 0, ownKeys_1 = ownKeys; _i < ownKeys_1.length; _i++) {
+                var key = ownKeys_1[_i];
+                var hasKey = set.has(key);
+                if (!hasKey) {
+                    set.add(key);
+                    keys.push(key);
+                }
+            }
+            for (var _a = 0, parentKeys_1 = parentKeys; _a < parentKeys_1.length; _a++) {
+                var key = parentKeys_1[_a];
+                var hasKey = set.has(key);
+                if (!hasKey) {
+                    set.add(key);
+                    keys.push(key);
+                }
+            }
+            return keys;
+        }
+        // 3.1.7.1 OrdinaryOwnMetadataKeys(O, P)
+        // https://rbuckton.github.io/reflect-metadata/#ordinaryownmetadatakeys
+        function OrdinaryOwnMetadataKeys(O, P) {
+            var keys = [];
+            var metadataMap = GetOrCreateMetadataMap(O, P, /*Create*/ false);
+            if (IsUndefined(metadataMap))
+                return keys;
+            var keysObj = metadataMap.keys();
+            var iterator = GetIterator(keysObj);
+            var k = 0;
+            while (true) {
+                var next = IteratorStep(iterator);
+                if (!next) {
+                    keys.length = k;
+                    return keys;
+                }
+                var nextValue = IteratorValue(next);
+                try {
+                    keys[k] = nextValue;
+                }
+                catch (e) {
+                    try {
+                        IteratorClose(iterator);
+                    }
+                    finally {
+                        throw e;
+                    }
+                }
+                k++;
+            }
+        }
+        // 6 ECMAScript Data Typ0es and Values
+        // https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values
+        function Type(x) {
+            if (x === null)
+                return 1 /* Null */;
+            switch (typeof x) {
+                case "undefined": return 0 /* Undefined */;
+                case "boolean": return 2 /* Boolean */;
+                case "string": return 3 /* String */;
+                case "symbol": return 4 /* Symbol */;
+                case "number": return 5 /* Number */;
+                case "object": return x === null ? 1 /* Null */ : 6 /* Object */;
+                default: return 6 /* Object */;
+            }
+        }
+        // 6.1.1 The Undefined Type
+        // https://tc39.github.io/ecma262/#sec-ecmascript-language-types-undefined-type
+        function IsUndefined(x) {
+            return x === undefined;
+        }
+        // 6.1.2 The Null Type
+        // https://tc39.github.io/ecma262/#sec-ecmascript-language-types-null-type
+        function IsNull(x) {
+            return x === null;
+        }
+        // 6.1.5 The Symbol Type
+        // https://tc39.github.io/ecma262/#sec-ecmascript-language-types-symbol-type
+        function IsSymbol(x) {
+            return typeof x === "symbol";
+        }
+        // 6.1.7 The Object Type
+        // https://tc39.github.io/ecma262/#sec-object-type
+        function IsObject(x) {
+            return typeof x === "object" ? x !== null : typeof x === "function";
+        }
+        // 7.1 Type Conversion
+        // https://tc39.github.io/ecma262/#sec-type-conversion
+        // 7.1.1 ToPrimitive(input [, PreferredType])
+        // https://tc39.github.io/ecma262/#sec-toprimitive
+        function ToPrimitive(input, PreferredType) {
+            switch (Type(input)) {
+                case 0 /* Undefined */: return input;
+                case 1 /* Null */: return input;
+                case 2 /* Boolean */: return input;
+                case 3 /* String */: return input;
+                case 4 /* Symbol */: return input;
+                case 5 /* Number */: return input;
+            }
+            var hint = PreferredType === 3 /* String */ ? "string" : PreferredType === 5 /* Number */ ? "number" : "default";
+            var exoticToPrim = GetMethod(input, toPrimitiveSymbol);
+            if (exoticToPrim !== undefined) {
+                var result = exoticToPrim.call(input, hint);
+                if (IsObject(result))
+                    throw new TypeError();
+                return result;
+            }
+            return OrdinaryToPrimitive(input, hint === "default" ? "number" : hint);
+        }
+        // 7.1.1.1 OrdinaryToPrimitive(O, hint)
+        // https://tc39.github.io/ecma262/#sec-ordinarytoprimitive
+        function OrdinaryToPrimitive(O, hint) {
+            if (hint === "string") {
+                var toString_1 = O.toString;
+                if (IsCallable(toString_1)) {
+                    var result = toString_1.call(O);
+                    if (!IsObject(result))
+                        return result;
+                }
+                var valueOf = O.valueOf;
+                if (IsCallable(valueOf)) {
+                    var result = valueOf.call(O);
+                    if (!IsObject(result))
+                        return result;
+                }
+            }
+            else {
+                var valueOf = O.valueOf;
+                if (IsCallable(valueOf)) {
+                    var result = valueOf.call(O);
+                    if (!IsObject(result))
+                        return result;
+                }
+                var toString_2 = O.toString;
+                if (IsCallable(toString_2)) {
+                    var result = toString_2.call(O);
+                    if (!IsObject(result))
+                        return result;
+                }
+            }
+            throw new TypeError();
+        }
+        // 7.1.2 ToBoolean(argument)
+        // https://tc39.github.io/ecma262/2016/#sec-toboolean
+        function ToBoolean(argument) {
+            return !!argument;
+        }
+        // 7.1.12 ToString(argument)
+        // https://tc39.github.io/ecma262/#sec-tostring
+        function ToString(argument) {
+            return "" + argument;
+        }
+        // 7.1.14 ToPropertyKey(argument)
+        // https://tc39.github.io/ecma262/#sec-topropertykey
+        function ToPropertyKey(argument) {
+            var key = ToPrimitive(argument, 3 /* String */);
+            if (IsSymbol(key))
+                return key;
+            return ToString(key);
+        }
+        // 7.2 Testing and Comparison Operations
+        // https://tc39.github.io/ecma262/#sec-testing-and-comparison-operations
+        // 7.2.2 IsArray(argument)
+        // https://tc39.github.io/ecma262/#sec-isarray
+        function IsArray(argument) {
+            return Array.isArray
+                ? Array.isArray(argument)
+                : argument instanceof Object
+                    ? argument instanceof Array
+                    : Object.prototype.toString.call(argument) === "[object Array]";
+        }
+        // 7.2.3 IsCallable(argument)
+        // https://tc39.github.io/ecma262/#sec-iscallable
+        function IsCallable(argument) {
+            // NOTE: This is an approximation as we cannot check for [[Call]] internal method.
+            return typeof argument === "function";
+        }
+        // 7.2.4 IsConstructor(argument)
+        // https://tc39.github.io/ecma262/#sec-isconstructor
+        function IsConstructor(argument) {
+            // NOTE: This is an approximation as we cannot check for [[Construct]] internal method.
+            return typeof argument === "function";
+        }
+        // 7.2.7 IsPropertyKey(argument)
+        // https://tc39.github.io/ecma262/#sec-ispropertykey
+        function IsPropertyKey(argument) {
+            switch (Type(argument)) {
+                case 3 /* String */: return true;
+                case 4 /* Symbol */: return true;
+                default: return false;
+            }
+        }
+        // 7.3 Operations on Objects
+        // https://tc39.github.io/ecma262/#sec-operations-on-objects
+        // 7.3.9 GetMethod(V, P)
+        // https://tc39.github.io/ecma262/#sec-getmethod
+        function GetMethod(V, P) {
+            var func = V[P];
+            if (func === undefined || func === null)
+                return undefined;
+            if (!IsCallable(func))
+                throw new TypeError();
+            return func;
+        }
+        // 7.4 Operations on Iterator Objects
+        // https://tc39.github.io/ecma262/#sec-operations-on-iterator-objects
+        function GetIterator(obj) {
+            var method = GetMethod(obj, iteratorSymbol);
+            if (!IsCallable(method))
+                throw new TypeError(); // from Call
+            var iterator = method.call(obj);
+            if (!IsObject(iterator))
+                throw new TypeError();
+            return iterator;
+        }
+        // 7.4.4 IteratorValue(iterResult)
+        // https://tc39.github.io/ecma262/2016/#sec-iteratorvalue
+        function IteratorValue(iterResult) {
+            return iterResult.value;
+        }
+        // 7.4.5 IteratorStep(iterator)
+        // https://tc39.github.io/ecma262/#sec-iteratorstep
+        function IteratorStep(iterator) {
+            var result = iterator.next();
+            return result.done ? false : result;
+        }
+        // 7.4.6 IteratorClose(iterator, completion)
+        // https://tc39.github.io/ecma262/#sec-iteratorclose
+        function IteratorClose(iterator) {
+            var f = iterator["return"];
+            if (f)
+                f.call(iterator);
+        }
+        // 9.1 Ordinary Object Internal Methods and Internal Slots
+        // https://tc39.github.io/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots
+        // 9.1.1.1 OrdinaryGetPrototypeOf(O)
+        // https://tc39.github.io/ecma262/#sec-ordinarygetprototypeof
+        function OrdinaryGetPrototypeOf(O) {
+            var proto = Object.getPrototypeOf(O);
+            if (typeof O !== "function" || O === functionPrototype)
+                return proto;
+            // TypeScript doesn't set __proto__ in ES5, as it's non-standard.
+            // Try to determine the superclass constructor. Compatible implementations
+            // must either set __proto__ on a subclass constructor to the superclass constructor,
+            // or ensure each class has a valid `constructor` property on its prototype that
+            // points back to the constructor.
+            // If this is not the same as Function.[[Prototype]], then this is definately inherited.
+            // This is the case when in ES6 or when using __proto__ in a compatible browser.
+            if (proto !== functionPrototype)
+                return proto;
+            // If the super prototype is Object.prototype, null, or undefined, then we cannot determine the heritage.
+            var prototype = O.prototype;
+            var prototypeProto = prototype && Object.getPrototypeOf(prototype);
+            if (prototypeProto == null || prototypeProto === Object.prototype)
+                return proto;
+            // If the constructor was not a function, then we cannot determine the heritage.
+            var constructor = prototypeProto.constructor;
+            if (typeof constructor !== "function")
+                return proto;
+            // If we have some kind of self-reference, then we cannot determine the heritage.
+            if (constructor === O)
+                return proto;
+            // we have a pretty good guess at the heritage.
+            return constructor;
+        }
+        // naive Map shim
+        function CreateMapPolyfill() {
+            var cacheSentinel = {};
+            var arraySentinel = [];
+            var MapIterator = /** @class */ (function () {
+                function MapIterator(keys, values, selector) {
+                    this._index = 0;
+                    this._keys = keys;
+                    this._values = values;
+                    this._selector = selector;
+                }
+                MapIterator.prototype["@@iterator"] = function () { return this; };
+                MapIterator.prototype[iteratorSymbol] = function () { return this; };
+                MapIterator.prototype.next = function () {
+                    var index = this._index;
+                    if (index >= 0 && index < this._keys.length) {
+                        var result = this._selector(this._keys[index], this._values[index]);
+                        if (index + 1 >= this._keys.length) {
+                            this._index = -1;
+                            this._keys = arraySentinel;
+                            this._values = arraySentinel;
+                        }
+                        else {
+                            this._index++;
+                        }
+                        return { value: result, done: false };
+                    }
+                    return { value: undefined, done: true };
+                };
+                MapIterator.prototype.throw = function (error) {
+                    if (this._index >= 0) {
+                        this._index = -1;
+                        this._keys = arraySentinel;
+                        this._values = arraySentinel;
+                    }
+                    throw error;
+                };
+                MapIterator.prototype.return = function (value) {
+                    if (this._index >= 0) {
+                        this._index = -1;
+                        this._keys = arraySentinel;
+                        this._values = arraySentinel;
+                    }
+                    return { value: value, done: true };
+                };
+                return MapIterator;
+            }());
+            return /** @class */ (function () {
+                function Map() {
+                    this._keys = [];
+                    this._values = [];
+                    this._cacheKey = cacheSentinel;
+                    this._cacheIndex = -2;
+                }
+                Object.defineProperty(Map.prototype, "size", {
+                    get: function () { return this._keys.length; },
+                    enumerable: true,
+                    configurable: true
+                });
+                Map.prototype.has = function (key) { return this._find(key, /*insert*/ false) >= 0; };
+                Map.prototype.get = function (key) {
+                    var index = this._find(key, /*insert*/ false);
+                    return index >= 0 ? this._values[index] : undefined;
+                };
+                Map.prototype.set = function (key, value) {
+                    var index = this._find(key, /*insert*/ true);
+                    this._values[index] = value;
+                    return this;
+                };
+                Map.prototype.delete = function (key) {
+                    var index = this._find(key, /*insert*/ false);
+                    if (index >= 0) {
+                        var size = this._keys.length;
+                        for (var i = index + 1; i < size; i++) {
+                            this._keys[i - 1] = this._keys[i];
+                            this._values[i - 1] = this._values[i];
+                        }
+                        this._keys.length--;
+                        this._values.length--;
+                        if (key === this._cacheKey) {
+                            this._cacheKey = cacheSentinel;
+                            this._cacheIndex = -2;
+                        }
+                        return true;
+                    }
+                    return false;
+                };
+                Map.prototype.clear = function () {
+                    this._keys.length = 0;
+                    this._values.length = 0;
+                    this._cacheKey = cacheSentinel;
+                    this._cacheIndex = -2;
+                };
+                Map.prototype.keys = function () { return new MapIterator(this._keys, this._values, getKey); };
+                Map.prototype.values = function () { return new MapIterator(this._keys, this._values, getValue); };
+                Map.prototype.entries = function () { return new MapIterator(this._keys, this._values, getEntry); };
+                Map.prototype["@@iterator"] = function () { return this.entries(); };
+                Map.prototype[iteratorSymbol] = function () { return this.entries(); };
+                Map.prototype._find = function (key, insert) {
+                    if (this._cacheKey !== key) {
+                        this._cacheIndex = this._keys.indexOf(this._cacheKey = key);
+                    }
+                    if (this._cacheIndex < 0 && insert) {
+                        this._cacheIndex = this._keys.length;
+                        this._keys.push(key);
+                        this._values.push(undefined);
+                    }
+                    return this._cacheIndex;
+                };
+                return Map;
+            }());
+            function getKey(key, _) {
+                return key;
+            }
+            function getValue(_, value) {
+                return value;
+            }
+            function getEntry(key, value) {
+                return [key, value];
+            }
+        }
+        // naive Set shim
+        function CreateSetPolyfill() {
+            return /** @class */ (function () {
+                function Set() {
+                    this._map = new _Map();
+                }
+                Object.defineProperty(Set.prototype, "size", {
+                    get: function () { return this._map.size; },
+                    enumerable: true,
+                    configurable: true
+                });
+                Set.prototype.has = function (value) { return this._map.has(value); };
+                Set.prototype.add = function (value) { return this._map.set(value, value), this; };
+                Set.prototype.delete = function (value) { return this._map.delete(value); };
+                Set.prototype.clear = function () { this._map.clear(); };
+                Set.prototype.keys = function () { return this._map.keys(); };
+                Set.prototype.values = function () { return this._map.values(); };
+                Set.prototype.entries = function () { return this._map.entries(); };
+                Set.prototype["@@iterator"] = function () { return this.keys(); };
+                Set.prototype[iteratorSymbol] = function () { return this.keys(); };
+                return Set;
+            }());
+        }
+        // naive WeakMap shim
+        function CreateWeakMapPolyfill() {
+            var UUID_SIZE = 16;
+            var keys = HashMap.create();
+            var rootKey = CreateUniqueKey();
+            return /** @class */ (function () {
+                function WeakMap() {
+                    this._key = CreateUniqueKey();
+                }
+                WeakMap.prototype.has = function (target) {
+                    var table = GetOrCreateWeakMapTable(target, /*create*/ false);
+                    return table !== undefined ? HashMap.has(table, this._key) : false;
+                };
+                WeakMap.prototype.get = function (target) {
+                    var table = GetOrCreateWeakMapTable(target, /*create*/ false);
+                    return table !== undefined ? HashMap.get(table, this._key) : undefined;
+                };
+                WeakMap.prototype.set = function (target, value) {
+                    var table = GetOrCreateWeakMapTable(target, /*create*/ true);
+                    table[this._key] = value;
+                    return this;
+                };
+                WeakMap.prototype.delete = function (target) {
+                    var table = GetOrCreateWeakMapTable(target, /*create*/ false);
+                    return table !== undefined ? delete table[this._key] : false;
+                };
+                WeakMap.prototype.clear = function () {
+                    // NOTE: not a real clear, just makes the previous data unreachable
+                    this._key = CreateUniqueKey();
+                };
+                return WeakMap;
+            }());
+            function CreateUniqueKey() {
+                var key;
+                do
+                    key = "@@WeakMap@@" + CreateUUID();
+                while (HashMap.has(keys, key));
+                keys[key] = true;
+                return key;
+            }
+            function GetOrCreateWeakMapTable(target, create) {
+                if (!hasOwn.call(target, rootKey)) {
+                    if (!create)
+                        return undefined;
+                    Object.defineProperty(target, rootKey, { value: HashMap.create() });
+                }
+                return target[rootKey];
+            }
+            function FillRandomBytes(buffer, size) {
+                for (var i = 0; i < size; ++i)
+                    buffer[i] = Math.random() * 0xff | 0;
+                return buffer;
+            }
+            function GenRandomBytes(size) {
+                if (typeof Uint8Array === "function") {
+                    if (typeof crypto !== "undefined")
+                        return crypto.getRandomValues(new Uint8Array(size));
+                    if (typeof msCrypto !== "undefined")
+                        return msCrypto.getRandomValues(new Uint8Array(size));
+                    return FillRandomBytes(new Uint8Array(size), size);
+                }
+                return FillRandomBytes(new Array(size), size);
+            }
+            function CreateUUID() {
+                var data = GenRandomBytes(UUID_SIZE);
+                // mark as random - RFC 4122 § 4.4
+                data[6] = data[6] & 0x4f | 0x40;
+                data[8] = data[8] & 0xbf | 0x80;
+                var result = "";
+                for (var offset = 0; offset < UUID_SIZE; ++offset) {
+                    var byte = data[offset];
+                    if (offset === 4 || offset === 6 || offset === 8)
+                        result += "-";
+                    if (byte < 16)
+                        result += "0";
+                    result += byte.toString(16).toLowerCase();
+                }
+                return result;
+            }
+        }
+        // uses a heuristic used by v8 and chakra to force an object into dictionary mode.
+        function MakeDictionary(obj) {
+            obj.__ = undefined;
+            delete obj.__;
+            return obj;
+        }
+    });
+})(Reflect || (Reflect = {}));
+
+
+/***/ }),
+
+/***/ "./src/circuit_value.ts":
+/*!******************************!*\
+  !*** ./src/circuit_value.ts ***!
+  \******************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "CircuitValue": () => (/* binding */ CircuitValue),
+/* harmony export */   "prop": () => (/* binding */ prop),
+/* harmony export */   "public_": () => (/* binding */ public_),
+/* harmony export */   "circuitMain": () => (/* binding */ circuitMain)
+/* harmony export */ });
+/* harmony import */ var reflect_metadata__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! reflect-metadata */ "./node_modules/reflect-metadata/Reflect.js");
+/* harmony import */ var reflect_metadata__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(reflect_metadata__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _bindings_snarky2__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./bindings/snarky2 */ "./src/bindings/snarky2.js");
+
+
+class CircuitValue {
+    static sizeInFieldElements() {
+        return this.prototype._sizeInFieldElements || 0;
+    }
+    static toFieldElements(v) {
+        const res = [];
+        const fields = this.prototype._fields;
+        if (fields === undefined || fields === null) {
+            return res;
+        }
+        for (let i = 0; i < fields.length; ++i) {
+            const [key, propType] = fields[i];
+            const subElts = propType.toFieldElements(v[key]);
+            subElts.forEach((x) => res.push(x));
+        }
+        return res;
+    }
+    toFieldElements() {
+        return this.constructor.toFieldElements(this);
+    }
+    equals(x) {
+        return _bindings_snarky2__WEBPACK_IMPORTED_MODULE_1__.Circuit.equal(this, x);
+    }
+    assertEquals(x) {
+        _bindings_snarky2__WEBPACK_IMPORTED_MODULE_1__.Circuit.assertEqual(this, x);
+    }
+    static ofFieldElements(xs) {
+        const fields = this.prototype._fields;
+        let offset = 0;
+        const props = [];
+        for (let i = 0; i < fields.length; ++i) {
+            const propType = fields[i][1];
+            const propSize = propType.sizeInFieldElements();
+            const propVal = propType.ofFieldElements(xs.slice(offset, offset + propSize));
+            props.push(propVal);
+            offset += propSize;
+        }
+        return new this(...props);
+    }
+    static toJSON(v) {
+        const res = {};
+        if (this.prototype._fields !== undefined) {
+            const fields = this.prototype._fields;
+            fields.forEach(([key, propType]) => {
+                res[key] = propType.toJSON(v[key]);
+            });
+        }
+        return res;
+    }
+    static fromJSON(value) {
+        const props = [];
+        const fields = this.prototype._fields;
+        switch (typeof value) {
+            case 'object':
+                if (value === null || Array.isArray(value)) {
+                    return null;
+                }
+                break;
+            default:
+                return null;
+        }
+        if (fields !== undefined) {
+            for (let i = 0; i < fields.length; ++i) {
+                const [key, propType] = fields[i];
+                if (value[key] === undefined) {
+                    return null;
+                }
+                else {
+                    props.push(propType.fromJSON(value[key]));
+                }
+            }
+        }
+        return new this(...props);
+    }
+}
+function prop(target, key) {
+    const fieldType = Reflect.getMetadata('design:type', target, key);
+    if (target._fields === undefined || target._fields === null) {
+        target._fields = [];
+    }
+    if (target._sizeInFieldElements === undefined ||
+        target._sizeInFieldElements === null) {
+        target._sizeInFieldElements = 0;
+    }
+    if (fieldType === undefined) {
+    }
+    else if (fieldType.toFieldElements && fieldType.ofFieldElements) {
+        target._fields.push([key, fieldType]);
+        target._sizeInFieldElements += fieldType.sizeInFieldElements();
+    }
+    else {
+        console.log(`warning: property ${key} missing field element conversion methods`);
+    }
+}
+function public_(target, _key, index) {
+    // const fieldType = Reflect.getMetadata('design:paramtypes', target, key);
+    if (target._public === undefined) {
+        target._public = [];
+    }
+    target._public.push(index);
+}
+function typOfArray(typs) {
+    return {
+        sizeInFieldElements: () => {
+            return typs.reduce((acc, typ) => acc + typ.sizeInFieldElements(), 0);
+        },
+        toFieldElements: (t) => {
+            let res = [];
+            for (let i = 0; i < t.length; ++i) {
+                res.push(...typs[i].toFieldElements(t[i]));
+            }
+            return res;
+        },
+        ofFieldElements: (xs) => {
+            let offset = 0;
+            let res = [];
+            typs.forEach((typ) => {
+                const n = typ.sizeInFieldElements();
+                res.push(typ.ofFieldElements(xs.slice(offset, offset + n)));
+                offset += n;
+            });
+            return res;
+        },
+    };
+}
+function circuitMain(target, propertyName, _descriptor) {
+    const paramTypes = Reflect.getMetadata('design:paramtypes', target, propertyName);
+    const numArgs = paramTypes.length;
+    const publicIndexSet = new Set(target._public);
+    const witnessIndexSet = new Set();
+    for (let i = 0; i < numArgs; ++i) {
+        if (!publicIndexSet.has(i)) {
+            witnessIndexSet.add(i);
+        }
+    }
+    target.snarkyMain = (w, pub) => {
+        let args = [];
+        for (let i = 0; i < numArgs; ++i) {
+            args.push((publicIndexSet.has(i) ? pub : w).shift());
+        }
+        return target[propertyName].apply(target, args);
+    };
+    target.snarkyWitnessTyp = typOfArray(Array.from(witnessIndexSet).map((i) => paramTypes[i]));
+    target.snarkyPublicTyp = typOfArray(Array.from(publicIndexSet).map((i) => paramTypes[i]));
+}
+
+
+/***/ }),
+
+/***/ "./src/examples/exchange.ts":
+/*!**********************************!*\
+  !*** ./src/examples/exchange.ts ***!
+  \**********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Main": () => (/* binding */ Main),
+/* harmony export */   "main": () => (/* binding */ main)
+/* harmony export */ });
+/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! tslib */ "./node_modules/tslib/tslib.es6.js");
+/* harmony import */ var _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../bindings/snarky2 */ "./src/bindings/snarky2.js");
+/* harmony import */ var _circuit_value__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../circuit_value */ "./src/circuit_value.ts");
+/* harmony import */ var _exchange_lib__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./exchange_lib */ "./src/examples/exchange_lib.ts");
+/* harmony import */ var _signature__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../signature */ "./src/signature.ts");
+
+// import { MerkleCollection, MerkleProof } from '../mina.js';
+
+
+
+
+// Proof of bought low sold high for bragging rights
+// 
+// Prove I did a trade that did "X%" increase
+class Witness extends _circuit_value__WEBPACK_IMPORTED_MODULE_1__.CircuitValue {
+    buyIndex;
+    sellIndex;
+    attestation;
+    constructor(buy, sell, a) {
+        super();
+        this.buyIndex = buy;
+        this.sellIndex = sell;
+        this.attestation = a;
+    }
+}
+(0,tslib__WEBPACK_IMPORTED_MODULE_4__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__metadata)("design:type", _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field)
+], Witness.prototype, "buyIndex", void 0);
+(0,tslib__WEBPACK_IMPORTED_MODULE_4__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__metadata)("design:type", _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field)
+], Witness.prototype, "sellIndex", void 0);
+(0,tslib__WEBPACK_IMPORTED_MODULE_4__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__metadata)("design:type", _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.HTTPSAttestation)
+], Witness.prototype, "attestation", void 0);
+class Trade {
+    timestamp;
+    isBuy;
+    price;
+    quantity;
+    static read(bs) {
+        if (bs.value.length === 0) {
+            return null;
+        }
+        let t = bs.value[0];
+        let trade = new Trade(t.isBuy, t.price, t.quantity, t.timestamp);
+        return [new _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.Bytes(bs.value.slice(1)), trade];
+    }
+    constructor(isBuy, price, quantity, time) {
+        this.isBuy = isBuy;
+        this.price = price;
+        this.quantity = quantity;
+        this.timestamp = time;
+    }
+}
+console.log("circuitis", _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Circuit);
+class Main extends _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Circuit {
+    // percentGain is an integer in basis points
+    static main(witness, percentChange) {
+        witness.attestation.verify(_exchange_lib__WEBPACK_IMPORTED_MODULE_2__.Bytes.ofString('api.coinbase.com/trades'));
+        const trades = _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.Bytes.readAll(Trade, witness.attestation.response);
+        let buy = getElt(trades, witness.buyIndex);
+        let sell = getElt(trades, witness.sellIndex);
+        buy.isBuy.assertEquals(true);
+        sell.isBuy.assertEquals(false);
+        buy.timestamp.assertLt(sell.timestamp);
+        sell.quantity.assertLt(buy.quantity);
+        let buyTotal = sell.quantity.mul(buy.price);
+        let sellTotal = sell.quantity.mul(sell.price);
+        const FULL_BASIS = new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(10000);
+        // sellTotal * (10000 + percentChange) > buyTotal * 10000;
+        sellTotal.mul(FULL_BASIS.add(percentChange)).assertGte(buyTotal.mul(FULL_BASIS));
+    }
+}
+(0,tslib__WEBPACK_IMPORTED_MODULE_4__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.circuitMain,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__param)(1, _circuit_value__WEBPACK_IMPORTED_MODULE_1__.public_),
+    (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__metadata)("design:type", Function),
+    (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__metadata)("design:paramtypes", [Witness, _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field]),
+    (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__metadata)("design:returntype", void 0)
+], Main, "main", null);
+console.log("after-circuitis", Main);
+function getElt(xs, i_) {
+    let i = new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(i_);
+    let [x, found] = xs.reduce(([acc, found], x, j) => {
+        let eltHere = i.equals(j);
+        return [_bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Circuit.if(eltHere, x, acc), found.or(eltHere)];
+    }, [xs[0], new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(false)]);
+    found.assertEquals(true);
+    return x;
+}
+function main() {
+    const before = new Date();
+    const kp = Main.generateKeypair();
+    const after = new Date();
+    console.log('keypairgen', after.getTime() - before.getTime());
+    const proof = Main.prove([
+        { buyIndex: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(0), sellIndex: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(1), attestation: new _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.HTTPSAttestation(new _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.Bytes([
+                { timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(150), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(100), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(true) },
+                { timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(250), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(500), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(4), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(false) }
+            ]), new _signature__WEBPACK_IMPORTED_MODULE_3__.Signature(new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(1), _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Scalar.random())) }
+    ], [new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(25)], kp);
+    console.log(proof, kp);
+}
+;
+
+
+/***/ }),
+
+/***/ "./src/examples/exchange_lib.ts":
+/*!**************************************!*\
+  !*** ./src/examples/exchange_lib.ts ***!
+  \**************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Bytes": () => (/* binding */ Bytes),
+/* harmony export */   "HTTPSAttestation": () => (/* binding */ HTTPSAttestation)
+/* harmony export */ });
+/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! tslib */ "./node_modules/tslib/tslib.es6.js");
+/* harmony import */ var _circuit_value__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../circuit_value */ "./src/circuit_value.ts");
+/* harmony import */ var _signature__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../signature */ "./src/signature.ts");
+
+
+
+class Bytes extends _circuit_value__WEBPACK_IMPORTED_MODULE_0__.CircuitValue {
+    value;
+    toFieldElements() { return []; }
+    constructor(value) {
+        super();
+        this.value = value;
+    }
+    static ofString(_) {
+        return new Bytes([]);
+    }
+    static readAll(ctor, bs) {
+        let xs = [];
+        let res;
+        while (true) {
+            res = ctor.read(bs);
+            if (res === null) {
+                break;
+            }
+            else {
+                let [bsPrime, x] = res;
+                bs = bsPrime;
+                xs.push(x);
+            }
+        }
+        return xs;
+    }
+}
+class HTTPSAttestation extends _circuit_value__WEBPACK_IMPORTED_MODULE_0__.CircuitValue {
+    response;
+    signature;
+    constructor(resp, sig) {
+        super();
+        this.response = resp;
+        this.signature = sig;
+    }
+    verify(_request) {
+        //const O1PUB: Group = Group.generator;
+        //this.signature.verify(O1PUB, request.toFieldElements().concat(this.response.toFieldElements()))
+    }
+}
+(0,tslib__WEBPACK_IMPORTED_MODULE_2__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_0__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_2__.__metadata)("design:type", Bytes)
+], HTTPSAttestation.prototype, "response", void 0);
+(0,tslib__WEBPACK_IMPORTED_MODULE_2__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_0__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_2__.__metadata)("design:type", _signature__WEBPACK_IMPORTED_MODULE_1__.Signature)
+], HTTPSAttestation.prototype, "signature", void 0);
+
+
+/***/ }),
+
+/***/ "./src/signature.ts":
+/*!**************************!*\
+  !*** ./src/signature.ts ***!
+  \**************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "PrivateKey": () => (/* binding */ PrivateKey),
+/* harmony export */   "PublicKey": () => (/* binding */ PublicKey),
+/* harmony export */   "Signature": () => (/* binding */ Signature)
+/* harmony export */ });
+/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! tslib */ "./node_modules/tslib/tslib.es6.js");
+/* harmony import */ var _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./bindings/snarky2 */ "./src/bindings/snarky2.js");
+/* harmony import */ var _circuit_value__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./circuit_value */ "./src/circuit_value.ts");
+
+
+
+class PrivateKey extends _circuit_value__WEBPACK_IMPORTED_MODULE_1__.CircuitValue {
+    s;
+    constructor(s) {
+        super();
+        this.s = s;
+    }
+    static random() {
+        return new PrivateKey(_bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Scalar.random());
+    }
+    static ofBits(bs) {
+        return new PrivateKey(_bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Scalar.ofBits(bs));
+    }
+    toPublicKey() {
+        return new PublicKey(_bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Group.generator.scale(this.s));
+    }
+}
+(0,tslib__WEBPACK_IMPORTED_MODULE_2__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_2__.__metadata)("design:type", _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Scalar)
+], PrivateKey.prototype, "s", void 0);
+class PublicKey extends _circuit_value__WEBPACK_IMPORTED_MODULE_1__.CircuitValue {
+    g;
+    constructor(g) {
+        super();
+        this.g = g;
+    }
+    static fromPrivateKey(p) {
+        return p.toPublicKey();
+    }
+}
+(0,tslib__WEBPACK_IMPORTED_MODULE_2__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_2__.__metadata)("design:type", _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Group)
+], PublicKey.prototype, "g", void 0);
+class Signature extends _circuit_value__WEBPACK_IMPORTED_MODULE_1__.CircuitValue {
+    r;
+    s;
+    constructor(r, s) {
+        super();
+        this.r = r;
+        this.s = s;
+    }
+    static create(privKey, msg) {
+        const { g: publicKey } = PublicKey.fromPrivateKey(privKey);
+        const d = privKey.s;
+        const kPrime = _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Scalar.random();
+        let { x: r, y: ry } = _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Group.generator.scale(kPrime);
+        const k = ry.toBits()[0].toBoolean() ? kPrime.neg() : kPrime;
+        const e = _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Scalar.ofBits(_bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Poseidon.hash(msg.concat([publicKey.x, publicKey.y, r])).toBits());
+        const s = e.mul(d).add(k);
+        return new Signature(r, s);
+    }
+    verify(publicKey, msg) {
+        const pubKey = publicKey.g;
+        let e = _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Scalar.ofBits(_bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Poseidon.hash(msg.concat([pubKey.x, pubKey.y, this.r])).toBits());
+        let r = pubKey.scale(e).neg().add(_bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Group.generator.scale(this.s));
+        return _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool.and(r.x.equals(this.r), r.y.toBits()[0].equals(false));
+    }
+}
+(0,tslib__WEBPACK_IMPORTED_MODULE_2__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_2__.__metadata)("design:type", _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field)
+], Signature.prototype, "r", void 0);
+(0,tslib__WEBPACK_IMPORTED_MODULE_2__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_2__.__metadata)("design:type", _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Scalar)
+], Signature.prototype, "s", void 0);
+;
+
+
+/***/ }),
+
+/***/ "./node_modules/tslib/tslib.es6.js":
+/*!*****************************************!*\
+  !*** ./node_modules/tslib/tslib.es6.js ***!
+  \*****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "__extends": () => (/* binding */ __extends),
+/* harmony export */   "__assign": () => (/* binding */ __assign),
+/* harmony export */   "__rest": () => (/* binding */ __rest),
+/* harmony export */   "__decorate": () => (/* binding */ __decorate),
+/* harmony export */   "__param": () => (/* binding */ __param),
+/* harmony export */   "__metadata": () => (/* binding */ __metadata),
+/* harmony export */   "__awaiter": () => (/* binding */ __awaiter),
+/* harmony export */   "__generator": () => (/* binding */ __generator),
+/* harmony export */   "__createBinding": () => (/* binding */ __createBinding),
+/* harmony export */   "__exportStar": () => (/* binding */ __exportStar),
+/* harmony export */   "__values": () => (/* binding */ __values),
+/* harmony export */   "__read": () => (/* binding */ __read),
+/* harmony export */   "__spread": () => (/* binding */ __spread),
+/* harmony export */   "__spreadArrays": () => (/* binding */ __spreadArrays),
+/* harmony export */   "__spreadArray": () => (/* binding */ __spreadArray),
+/* harmony export */   "__await": () => (/* binding */ __await),
+/* harmony export */   "__asyncGenerator": () => (/* binding */ __asyncGenerator),
+/* harmony export */   "__asyncDelegator": () => (/* binding */ __asyncDelegator),
+/* harmony export */   "__asyncValues": () => (/* binding */ __asyncValues),
+/* harmony export */   "__makeTemplateObject": () => (/* binding */ __makeTemplateObject),
+/* harmony export */   "__importStar": () => (/* binding */ __importStar),
+/* harmony export */   "__importDefault": () => (/* binding */ __importDefault),
+/* harmony export */   "__classPrivateFieldGet": () => (/* binding */ __classPrivateFieldGet),
+/* harmony export */   "__classPrivateFieldSet": () => (/* binding */ __classPrivateFieldSet)
+/* harmony export */ });
+/*! *****************************************************************************
+Copyright (c) Microsoft Corporation.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+***************************************************************************** */
+/* global Reflect, Promise */
+
+var extendStatics = function(d, b) {
+    extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+    return extendStatics(d, b);
+};
+
+function __extends(d, b) {
+    if (typeof b !== "function" && b !== null)
+        throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+}
+
+var __assign = function() {
+    __assign = Object.assign || function __assign(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
+        }
+        return t;
+    }
+    return __assign.apply(this, arguments);
+}
+
+function __rest(s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+}
+
+function __decorate(decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+}
+
+function __param(paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+}
+
+function __metadata(metadataKey, metadataValue) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(metadataKey, metadataValue);
+}
+
+function __awaiter(thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+}
+
+function __generator(thisArg, body) {
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    function verb(n) { return function (v) { return step([n, v]); }; }
+    function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [op[0] & 2, t.value];
+            switch (op[0]) {
+                case 0: case 1: t = op; break;
+                case 4: _.label++; return { value: op[1], done: false };
+                case 5: _.label++; y = op[1]; op = [0]; continue;
+                case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                default:
+                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                    if (t[2]) _.ops.pop();
+                    _.trys.pop(); continue;
+            }
+            op = body.call(thisArg, _);
+        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
+    }
+}
+
+var __createBinding = Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+});
+
+function __exportStar(m, o) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(o, p)) __createBinding(o, m, p);
+}
+
+function __values(o) {
+    var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
+    if (m) return m.call(o);
+    if (o && typeof o.length === "number") return {
+        next: function () {
+            if (o && i >= o.length) o = void 0;
+            return { value: o && o[i++], done: !o };
+        }
+    };
+    throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
+}
+
+function __read(o, n) {
+    var m = typeof Symbol === "function" && o[Symbol.iterator];
+    if (!m) return o;
+    var i = m.call(o), r, ar = [], e;
+    try {
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
+    }
+    catch (error) { e = { error: error }; }
+    finally {
+        try {
+            if (r && !r.done && (m = i["return"])) m.call(i);
+        }
+        finally { if (e) throw e.error; }
+    }
+    return ar;
+}
+
+/** @deprecated */
+function __spread() {
+    for (var ar = [], i = 0; i < arguments.length; i++)
+        ar = ar.concat(__read(arguments[i]));
+    return ar;
+}
+
+/** @deprecated */
+function __spreadArrays() {
+    for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
+    for (var r = Array(s), k = 0, i = 0; i < il; i++)
+        for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++)
+            r[k] = a[j];
+    return r;
+}
+
+function __spreadArray(to, from, pack) {
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+        if (ar || !(i in from)) {
+            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+            ar[i] = from[i];
+        }
+    }
+    return to.concat(ar || from);
+}
+
+function __await(v) {
+    return this instanceof __await ? (this.v = v, this) : new __await(v);
+}
+
+function __asyncGenerator(thisArg, _arguments, generator) {
+    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
+    var g = generator.apply(thisArg, _arguments || []), i, q = [];
+    return i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i;
+    function verb(n) { if (g[n]) i[n] = function (v) { return new Promise(function (a, b) { q.push([n, v, a, b]) > 1 || resume(n, v); }); }; }
+    function resume(n, v) { try { step(g[n](v)); } catch (e) { settle(q[0][3], e); } }
+    function step(r) { r.value instanceof __await ? Promise.resolve(r.value.v).then(fulfill, reject) : settle(q[0][2], r); }
+    function fulfill(value) { resume("next", value); }
+    function reject(value) { resume("throw", value); }
+    function settle(f, v) { if (f(v), q.shift(), q.length) resume(q[0][0], q[0][1]); }
+}
+
+function __asyncDelegator(o) {
+    var i, p;
+    return i = {}, verb("next"), verb("throw", function (e) { throw e; }), verb("return"), i[Symbol.iterator] = function () { return this; }, i;
+    function verb(n, f) { i[n] = o[n] ? function (v) { return (p = !p) ? { value: __await(o[n](v)), done: n === "return" } : f ? f(v) : v; } : f; }
+}
+
+function __asyncValues(o) {
+    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
+    var m = o[Symbol.asyncIterator], i;
+    return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
+    function verb(n) { i[n] = o[n] && function (v) { return new Promise(function (resolve, reject) { v = o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
+    function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
+}
+
+function __makeTemplateObject(cooked, raw) {
+    if (Object.defineProperty) { Object.defineProperty(cooked, "raw", { value: raw }); } else { cooked.raw = raw; }
+    return cooked;
+};
+
+var __setModuleDefault = Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+};
+
+function __importStar(mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+}
+
+function __importDefault(mod) {
+    return (mod && mod.__esModule) ? mod : { default: mod };
+}
+
+function __classPrivateFieldGet(receiver, state, kind, f) {
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
+    return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
+}
+
+function __classPrivateFieldSet(receiver, state, value, kind, f) {
+    if (kind === "m") throw new TypeError("Private method is not writable");
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
+    return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
+}
+
+
+/***/ })
+
+/******/ 	});
+/************************************************************************/
+/******/ 	// The module cache
+/******/ 	var __webpack_module_cache__ = {};
+/******/ 	
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/ 		// Check if module is in cache
+/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 		if (cachedModule !== undefined) {
+/******/ 			return cachedModule.exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = __webpack_module_cache__[moduleId] = {
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
+/******/ 			exports: {}
+/******/ 		};
+/******/ 	
+/******/ 		// Execute the module function
+/******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
+/******/ 	
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/ 	
+/************************************************************************/
+/******/ 	/* webpack/runtime/compat get default export */
+/******/ 	(() => {
+/******/ 		// getDefaultExport function for compatibility with non-harmony modules
+/******/ 		__webpack_require__.n = (module) => {
+/******/ 			var getter = module && module.__esModule ?
+/******/ 				() => (module['default']) :
+/******/ 				() => (module);
+/******/ 			__webpack_require__.d(getter, { a: getter });
+/******/ 			return getter;
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__webpack_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
+/******/ 	(() => {
+/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__webpack_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/************************************************************************/
+var __webpack_exports__ = {};
+// This entry need to be wrapped in an IIFE because it need to be in strict mode.
+(() => {
+"use strict";
+/*!**********************!*\
+  !*** ./src/index.ts ***!
+  \**********************/
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "exchange": () => (/* binding */ exchange),
+/* harmony export */   "five": () => (/* binding */ five)
+/* harmony export */ });
+/* harmony import */ var _examples_exchange__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./examples/exchange */ "./src/examples/exchange.ts");
+
+const exchange = _examples_exchange__WEBPACK_IMPORTED_MODULE_0__.main;
+exchange();
+// for testing tests
+const five = 5;
+
+})();
+
+/******/ })()
+;

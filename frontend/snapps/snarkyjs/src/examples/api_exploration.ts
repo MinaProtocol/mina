@@ -1,4 +1,4 @@
-import { Poseidon, Field, Bool, Group, Circuit, Scalar } from '../bindings/snarky';
+import { Poseidon, Field, Bool, Group, Circuit, Scalar } from '../bindings/snarky2';
 import { PrivateKey, PublicKey, Signature } from '../signature';
 
 /* This file demonstrates the classes and functions available in snarky.js */

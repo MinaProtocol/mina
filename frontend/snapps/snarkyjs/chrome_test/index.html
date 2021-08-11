@@ -20,10 +20,11 @@
       var newScript = document.createElement("script");
       newScript.src = "./snarky_js_chrome.bc.js";
       document.body.appendChild(newScript);
-
-      var newScript = document.createElement("script");
-      newScript.src = "./snarkyjs_chrome.js";
-      document.body.appendChild(newScript);
+      newScript.addEventListener('load', () => {
+        var newScript = document.createElement("script");
+        newScript.src = "./snarkyjs_chrome.js";
+        document.body.appendChild(newScript);
+      });
     </script>
   </body>
 </html>

@@ -44,6 +44,8 @@ class Trade {
   }
 }
 
+console.log("circuitis", C);
+
 export class Main extends C {
   @circuitMain
   // percentGain is an integer in basis points
@@ -68,6 +70,7 @@ export class Main extends C {
       buyTotal.mul(FULL_BASIS));
   }
 }
+console.log("after-circuitis", Main);
 
 function getElt<A>(xs: Array<A>, i_ : AsField) : A {
   let i = new Field(i_);
@@ -84,6 +87,7 @@ export function main() {
   const kp = Main.generateKeypair();
   const after = new Date();
   console.log('keypairgen', after.getTime() - before.getTime());
+
   const proof = Main.prove([
     { buyIndex: new Field(0), sellIndex: new Field(1), attestation: new HTTPSAttestation(new Bytes([
       { timestamp: new Field(150), price: new Field(100), quantity: new Field(5), isBuy: new Bool(true) },
