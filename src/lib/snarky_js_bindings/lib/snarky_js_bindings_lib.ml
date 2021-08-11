@@ -206,7 +206,7 @@ let array_get_exn xs i =
 let array_check_length xs n =
   if xs##.length <> n then failwithf "Expected array of length %d" n ()
 
-let method_ class_ name (f : _ Js.t -> _) =
+let method_ class_ (name : string) (f : _ Js.t -> _) =
   let prototype = Js.Unsafe.get class_ (Js.string "prototype") in
   Js.Unsafe.set prototype (Js.string name) (Js.wrap_meth_callback f)
 
@@ -922,6 +922,63 @@ class type ['a] as_field_elements =
     method sizeInFieldElements : int Js.meth
   end
 
+let array_iter t1 ~f =
+  for i = 0 to t1##.length - 1 do
+    f (array_get_exn t1 i)
+  done
+
+let array_iter2 t1 t2 ~f =
+  for i = 0 to t1##.length - 1 do
+    f (array_get_exn t1 i) (array_get_exn t2 i)
+  done
+
+let array_map t1 ~f =
+  let res = new%js Js.array_empty in
+  array_iter t1 ~f:(fun x1 -> res##push (f x1) |> ignore) ;
+  res
+
+let array_map2 t1 t2 ~f =
+  let res = new%js Js.array_empty in
+  array_iter2 t1 t2 ~f:(fun x1 x2 -> res##push (f x1 x2) |> ignore) ;
+  res
+
+class type verification_key_class =
+  object
+    method value : Verification_key.t Js.prop
+
+    method verify :
+      Js.Unsafe.any Js.js_array Js.t -> proof_class Js.t -> bool Js.t Js.meth
+  end
+
+and proof_class =
+  object
+    method value : Backend.Proof.t Js.prop
+  end
+
+class type keypair_class =
+  object
+    method value : Keypair.t Js.prop
+  end
+
+let keypair_class : < .. > Js.t =
+  Js.Unsafe.eval_string {js|(function(v) { this.value = v; return this })|js}
+
+let keypair_constr : (Keypair.t -> keypair_class Js.t) Js.constr =
+  Obj.magic keypair_class
+
+let verification_key_class : < .. > Js.t =
+  Js.Unsafe.eval_string {js|(function(v) { this.value = v; return this })|js}
+
+let verification_key_constr :
+    (Verification_key.t -> verification_key_class Js.t) Js.constr =
+  Obj.magic verification_key_class
+
+let proof_class : < .. > Js.t =
+  Js.Unsafe.eval_string {js|(function(v) { this.value = v; return this })|js}
+
+let proof_constr : (Backend.Proof.t -> proof_class Js.t) Js.constr =
+  Obj.magic proof_class
+
 module Circuit = struct
   let check_lengths s t1 t2 =
     if t1##.length <> t2##.length then
@@ -969,26 +1026,6 @@ module Circuit = struct
         [| inject (Js.wrap_callback explicit)
          ; inject (Js.wrap_callback implicit)
         |])
-
-  let array_iter t1 ~f =
-    for i = 0 to t1##.length - 1 do
-      f (array_get_exn t1 i)
-    done
-
-  let array_iter2 t1 t2 ~f =
-    for i = 0 to t1##.length - 1 do
-      f (array_get_exn t1 i) (array_get_exn t2 i)
-    done
-
-  let array_map t1 ~f =
-    let res = new%js Js.array_empty in
-    array_iter t1 ~f:(fun x1 -> res##push (f x1) |> ignore) ;
-    res
-
-  let array_map2 t1 t2 ~f =
-    let res = new%js Js.array_empty in
-    array_iter2 t1 t2 ~f:(fun x1 x2 -> res##push (f x1 x2) |> ignore) ;
-    res
 
   let if_array b t1 t2 =
     check_lengths "if" t1 t2 ;
@@ -1218,14 +1255,17 @@ module Circuit = struct
     generate_keypair ~exposing:spec (fun x -> main x)
 
   let prove (type w p) (c : (w, p) Circuit_main.t) (priv : w) (pub : p) kp :
-      Backend.Proof.t =
+      proof_class Js.t =
     let main, spec = main_and_input c in
     let pk = Keypair.pk kp in
-    generate_witness_conv
-      ~f:(fun { Proof_inputs.auxiliary_inputs; public_inputs } ->
-        Backend.Proof.create pk ~auxiliary:auxiliary_inputs
-          ~primary:public_inputs)
-      spec (main ~w:priv) () pub
+    let p =
+      generate_witness_conv
+        ~f:(fun { Proof_inputs.auxiliary_inputs; public_inputs } ->
+          Backend.Proof.create pk ~auxiliary:auxiliary_inputs
+            ~primary:public_inputs)
+        spec (main ~w:priv) () pub
+    in
+    new%js proof_constr p
 
   let circuit = Js.Unsafe.eval_string {js|(function() { return this })|js}
 
@@ -1265,6 +1305,11 @@ module Circuit = struct
     circuit##.generateKeypair :=
       Js.wrap_meth_callback (fun this -> generate_keypair this) ;
     circuit##.prove := Js.wrap_meth_callback (fun this w p -> prove this w p) ;
+    (circuit##.verify :=
+       fun (pub : Js.Unsafe.any Js.js_array Js.t)
+           (vk : verification_key_class Js.t) (pi : proof_class Js.t) :
+           bool Js.t ->
+         vk##verify pub pi) ;
     circuit##.assertEqual := assert_equal ;
     circuit##.equal := equal ;
     circuit##.toFieldElements := Js.wrap_callback to_field_elts_magic ;
@@ -1272,6 +1317,47 @@ module Circuit = struct
 end
 
 let () =
+  let method_ name (f : keypair_class Js.t -> _) =
+    method_ keypair_class name f
+  in
+  method_ "verificationKey"
+    (fun (this : keypair_class Js.t) : verification_key_class Js.t ->
+      new%js verification_key_constr (Keypair.vk this##.value))
+
+let () =
+  let method_ name (f : verification_key_class Js.t -> _) =
+    method_ verification_key_class name f
+  in
+  method_ "verify"
+    (fun
+      (this : verification_key_class Js.t)
+      (pub : Js.Unsafe.any Js.js_array Js.t)
+      (pi : proof_class Js.t)
+      :
+      bool Js.t
+    ->
+      let open Backend.Field.Vector in
+      let v = create () in
+      array_iter (Circuit.to_field_elts_magic pub) ~f:(fun x ->
+          match x##.value with
+          | Constant x ->
+              emplace_back v x
+          | _ ->
+              raise_errorf "verify: Expected non-circuit values for input") ;
+      Backend.Proof.verify pi##.value this##.value v |> Js.bool)
+
+let () =
+  let method_ name (f : proof_class Js.t -> _) = method_ proof_class name f in
+  method_ "verify"
+    (fun
+      (this : proof_class Js.t)
+      (vk : verification_key_class Js.t)
+      (pub : Js.Unsafe.any Js.js_array Js.t)
+      :
+      bool Js.t
+    -> vk##verify pub this)
+
+let export () =
   Js.export "Field" field_class ;
   Js.export "Scalar" scalar_class ;
   Js.export "Bool" bool_class ;
@@ -1279,4 +1365,17 @@ let () =
   Js.export "Poseidon" poseidon ;
   Js.export "Circuit" Circuit.circuit
 
-let link_me = ()
+let export_global () =
+  let snarky_obj =
+    Js.Unsafe.(
+      let i = inject in
+      obj
+        [| ("Field", i field_class)
+         ; ("Scalar", i scalar_class)
+         ; ("Bool", i bool_class)
+         ; ("Group", i group_class)
+         ; ("Poseidon", i poseidon)
+         ; ("Circuit", i Circuit.circuit)
+        |])
+  in
+  Js.Unsafe.(set global (Js.string "__snarky") snarky_obj)
