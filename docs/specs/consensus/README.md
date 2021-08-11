@@ -681,6 +681,90 @@ Things a peer MUST do to initialize consensus includes
 | `coinbase_receiver`                      | `Public_key.Compressed.Stable.V1.t(B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)` |
 | `supercharge_coinbase`                   | `false` |
 
+### 4.1.1.2 Genesis block JSON
+
+```json
+{
+  "data": {
+    "block": {
+      "blockHeight": 1,
+      "canonical": true,
+      "creator": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
+      "creatorAccount": {
+        "publicKey": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"
+      },
+      "dateTime": "2021-03-17T00:00:00Z",
+      "protocolState": {
+        "blockchainState": {
+          "date": "1615939200000",
+          "snarkedLedgerHash": "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
+          "stagedLedgerHash": "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
+          "utcDate": "1615939200000"
+        },
+        "consensusState": {
+          "blockHeight": 1,
+          "blockchainLength": 1,
+          "epoch": 0,
+          "epochCount": 0,
+          "hasAncestorInSameCheckpointWindow": true,
+          "lastVrfOutput": "EiRs4sfLJRsfCoy92Bb2mR7zYLDXDAnSqnE2uXbhodfmGykDy8UdS",
+          "minWindowDensity": 77,
+          "nextEpochData": {
+            "epochLength": 2,
+            "ledger": {
+              "hash": "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
+              "totalCurrency": 805385692840039300
+            },
+            "lockCheckpoint": "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d",
+            "seed": "2vaRh7FQ5wSzmpFReF9gcRKjv48CcJvHs25aqb3SSZiPgHQBy5Dt",
+            "startCheckpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x"
+          },
+          "slot": 0,
+          "slotSinceGenesis": 0,
+          "stakingEpochData": {
+            "epochLength": 1,
+            "ledger": {
+              "hash": "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
+              "totalCurrency": 805385692840039300
+            },
+            "lockCheckpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+            "seed": "2va9BGv9JrLTtrzZttiEMDYw1Zj6a6EHzXjmP9evHDTG3oEquURA",
+            "startCheckpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x"
+          },
+          "totalCurrency": 805385692840039300
+        },
+        "previousStateHash": "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d"
+      },
+      "receivedTime": "2021-03-17T00:00:00Z",
+      "snarkFees": "0",
+      "snarkJobs": [],
+      "stateHash": "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ",
+      "stateHashField": "9884505309989150310604636992054488263310056292998048242928359357807664465744",
+      "transactions": {
+        "coinbase": "720000000000",
+        "coinbaseReceiverAccount": {
+          "publicKey": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"
+        },
+        "feeTransfer": [],
+        "userCommands": []
+      },
+      "txFees": "0",
+      "winnerAccount": {
+        "balance": {
+          "blockHeight": 0,
+          "liquid": 0,
+          "locked": "0",
+          "stateHash": "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ",
+          "total": "0",
+          "unknown": "0"
+        },
+        "publicKey": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"
+      }
+    }
+  }
+}
+```
+
 ## 4.2 Select chain
 
 The _select chain_ event occurs every time a peer's chains are updated.  A chain is said to be _updated_ anytime a valid block is added or removed from its head.  All compatible peers MUST select chains as described here.
