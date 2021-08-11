@@ -1,0 +1,1 @@
+../bindings/snarky.d.ts
