@@ -480,6 +480,47 @@ include Binable_arg
 
 [%%versioned_binable
 module Stable = struct
+  module V2 = struct
+    type t = Binable_arg.Stable.V2.t =
+      | Proved_empty of
+          ( Party.Authorized.Proved.Stable.V2.t
+          , Party.Authorized.Empty.Stable.V1.t option )
+          Inner.Stable.V1.t
+      | Proved_signed of
+          ( Party.Authorized.Proved.Stable.V2.t
+          , Party.Authorized.Signed.Stable.V1.t )
+          Inner.Stable.V1.t
+      | Proved_proved of
+          ( Party.Authorized.Proved.Stable.V2.t
+          , Party.Authorized.Proved.Stable.V2.t )
+          Inner.Stable.V1.t
+      | Signed_signed of
+          ( Party.Authorized.Signed.Stable.V1.t
+          , Party.Authorized.Signed.Stable.V1.t )
+          Inner.Stable.V1.t
+      | Signed_empty of
+          ( Party.Authorized.Signed.Stable.V1.t
+          , Party.Authorized.Empty.Stable.V1.t option )
+          Inner.Stable.V1.t
+    [@@deriving sexp, equal, yojson, hash, compare]
+
+    include Binable.Of_binable
+              (Binable_arg.Stable.V2)
+              (struct
+                type nonrec t = t
+
+                let to_binable _ = failwith "Snapps disabled"
+
+                let of_binable _ = failwith "Snapps disabled"
+              end)
+
+    let to_latest = Fn.id
+
+    let description = "Snapp command"
+
+    let version_byte = Base58_check.Version_bytes.snapp_command
+  end
+
   module V1 = struct
     type t = Binable_arg.Stable.V1.t =
       | Proved_empty of
@@ -514,7 +555,7 @@ module Stable = struct
                 let of_binable _ = failwith "Snapps disabled"
               end)
 
-    let to_latest = Fn.id
+    let to_latest = Binable_arg.Stable.V1.to_latest
 
     let description = "Snapp command"
 
