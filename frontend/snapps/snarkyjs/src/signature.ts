@@ -1,4 +1,4 @@
-import { Poseidon, Group, Field, Bool, Scalar } from './bindings/snarky';
+import { Poseidon, Group, Field, Bool, Scalar } from './bindings/snarky2';
 import { prop, CircuitValue } from './circuit_value';
 
 export class PrivateKey extends CircuitValue {

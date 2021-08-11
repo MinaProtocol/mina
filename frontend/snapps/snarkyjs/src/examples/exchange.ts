@@ -1,7 +1,8 @@
 // import { MerkleCollection, MerkleProof } from '../mina.js';
-import { Circuit as C, Field, Bool, AsField } from '../bindings/snarky';
+import { Circuit as C, Field, Bool, AsField, Scalar } from '../bindings/snarky2';
 import { public_, circuitMain, prop, CircuitValue } from '../circuit_value';
 import { HTTPSAttestation, Bytes } from './exchange_lib';
+import { Signature } from '../signature';
 
 // Proof of bought low sold high for bragging rights
 // 
@@ -77,3 +78,17 @@ function getElt<A>(xs: Array<A>, i_ : AsField) : A {
   found.assertEquals(true);
   return x;
 }
+
+export function main() {
+  const before = new Date();
+  const kp = Main.generateKeypair();
+  const after = new Date();
+  console.log('keypairgen', after.getTime() - before.getTime());
+  const proof = Main.prove([
+    { buyIndex: new Field(0), sellIndex: new Field(1), attestation: new HTTPSAttestation(new Bytes([
+      { timestamp: new Field(150), price: new Field(100), quantity: new Field(5), isBuy: new Bool(true) },
+      { timestamp: new Field(250), price: new Field(500), quantity: new Field(4), isBuy: new Bool(false) }
+    ]), new Signature(new Field(1), Scalar.random()))  }
+  ], [ new Field(25) ], kp);
+  console.log(proof, kp);
+};

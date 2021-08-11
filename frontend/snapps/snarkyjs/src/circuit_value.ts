@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { Circuit, Field, Bool, JSONValue } from './bindings/snarky';
+import { Circuit, Field, Bool, JSONValue } from './bindings/snarky2';
 
 type Constructor<T> = { new (...args: any[]): T };
 
