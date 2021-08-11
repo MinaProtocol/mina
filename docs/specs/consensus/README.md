@@ -52,7 +52,7 @@ This documents specifies required structures, algorithms and protocol details.
 	- [4.2 Select chain](#42-select-chain)
 	- [4.3 Produce block](#43-produce-block)
 
-<!-- /TOC -->OC depthFrom:1 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
+<!-- /TOC --> depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
 
 - [1. Constants](#1-constants)
 - [2. Structures](#2-structures)
@@ -747,13 +747,24 @@ The following JSON specifies most of the genesis block (work in progress).
           "utcDate": "1615939200000"
         },
         "consensusState": {
-          "blockHeight": 1,
           "blockchainLength": 1,
-          "epoch": 0,
           "epochCount": 0,
-          "hasAncestorInSameCheckpointWindow": true,
-          "lastVrfOutput": "EiRs4sfLJRsfCoy92Bb2mR7zYLDXDAnSqnE2uXbhodfmGykDy8UdS",
           "minWindowDensity": 77,
+		  "sub_window_densities": TODO: Missing
+		  "lastVrfOutput": "EiRs4sfLJRsfCoy92Bb2mR7zYLDXDAnSqnE2uXbhodfmGykDy8UdS", (TODO: Doesn't match)
+		  "totalCurrency": 805385692840039300, (TODO: Doesn't match 805385692840039233)
+		  "currGlobalSlot": 0,
+		  "slotSinceGenesis": 0,
+		  "stakingEpochData": {
+			"epochLength": 1,
+			"ledger": {
+			  "hash": "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
+			  "totalCurrency": 805385692840039300
+			},
+			"lockCheckpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+			"seed": "2va9BGv9JrLTtrzZttiEMDYw1Zj6a6EHzXjmP9evHDTG3oEquURA",
+			"startCheckpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x"
+		  },
           "nextEpochData": {
             "epochLength": 2,
             "ledger": {
@@ -763,20 +774,12 @@ The following JSON specifies most of the genesis block (work in progress).
             "lockCheckpoint": "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d",
             "seed": "2vaRh7FQ5wSzmpFReF9gcRKjv48CcJvHs25aqb3SSZiPgHQBy5Dt",
             "startCheckpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x"
-          },
-          "slot": 0,
-          "slotSinceGenesis": 0,
-          "stakingEpochData": {
-            "epochLength": 1,
-            "ledger": {
-              "hash": "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
-              "totalCurrency": 805385692840039300
-            },
-            "lockCheckpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
-            "seed": "2va9BGv9JrLTtrzZttiEMDYw1Zj6a6EHzXjmP9evHDTG3oEquURA",
-            "startCheckpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x"
-          },
-          "totalCurrency": 805385692840039300
+          }
+		  "hasAncestorInSameCheckpointWindow": true,
+		  "block_stake_winner": TODO: Missing,
+		  "block_creator": TODO: Missing,
+		  "coinbase_receiver": TODO: Missing,
+		  "supercharge_coinbase": TODO: Missing,
         },
         "previousStateHash": "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d"
       },
