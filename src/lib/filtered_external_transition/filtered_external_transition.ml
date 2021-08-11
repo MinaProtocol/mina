@@ -17,6 +17,24 @@ end
 module Transactions = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        { commands :
+            ( User_command.Stable.V2.t
+            , Transaction_hash.Stable.V1.t )
+            With_hash.Stable.V1.t
+            With_status.Stable.V1.t
+            list
+        ; fee_transfers :
+            (Fee_transfer.Single.Stable.V1.t * Fee_transfer_type.Stable.V1.t)
+            list
+        ; coinbase : Currency.Amount.Stable.V1.t
+        ; coinbase_receiver : Public_key.Compressed.Stable.V1.t option
+        }
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         { commands :
@@ -32,7 +50,17 @@ module Transactions = struct
         ; coinbase_receiver : Public_key.Compressed.Stable.V1.t option
         }
 
-      let to_latest = Fn.id
+      let to_latest (t : t) : V2.t =
+        { commands =
+            List.map t.commands
+              ~f:
+                (With_status.Stable.V1.to_latest
+                   (With_hash.Stable.V1.to_latest
+                      User_command.Stable.V1.to_latest Fn.id))
+        ; fee_transfers = t.fee_transfers
+        ; coinbase = t.coinbase
+        ; coinbase_receiver = t.coinbase_receiver
+        }
     end
   end]
 end
@@ -54,6 +82,19 @@ end
 
 [%%versioned
 module Stable = struct
+  module V2 = struct
+    type t =
+      { creator : Public_key.Compressed.Stable.V1.t
+      ; winner : Public_key.Compressed.Stable.V1.t
+      ; protocol_state : Protocol_state.Stable.V1.t
+      ; transactions : Transactions.Stable.V2.t
+      ; snark_jobs : Transaction_snark_work.Info.Stable.V1.t list
+      ; proof : Proof.Stable.V1.t
+      }
+
+    let to_latest = Fn.id
+  end
+
   module V1 = struct
     type t =
       { creator : Public_key.Compressed.Stable.V1.t
@@ -64,7 +105,14 @@ module Stable = struct
       ; proof : Proof.Stable.V1.t
       }
 
-    let to_latest = Fn.id
+    let to_latest (t : t) : V2.t =
+      { creator = t.creator
+      ; winner = t.winner
+      ; protocol_state = t.protocol_state
+      ; transactions = Transactions.Stable.V1.to_latest t.transactions
+      ; snark_jobs = t.snark_jobs
+      ; proof = t.proof
+      }
   end
 end]
 
@@ -149,7 +197,7 @@ let of_transition external_transition tracked_participants
           }
         , next_available_token )
       ~f:(fun (acc_transactions, next_available_token) -> function
-        | { data = Command (Snapp_command _); _ } -> failwith "Not implemented"
+        | { data = Command (Parties _); _ } -> failwith "Not implemented"
         | { data = Command command; status } -> (
             let command = (command :> User_command.t) in
             let should_include_transaction command participants =

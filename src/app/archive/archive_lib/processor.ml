@@ -431,35 +431,13 @@ module User_command = struct
     match t with
     | Signed_command c ->
         c
-    | Snapp_command c ->
-        let module S = Mina_base.Snapp_command in
-        let ({source; receiver; amount} : S.transfer) = S.as_transfer c in
-        let fee_payer = S.fee_payer c in
-        { signature= Signature.dummy
-        ; signer= Snark_params.Tick.Field.(zero, zero)
-        ; payload=
-            { common=
-                { fee= S.fee_exn c
-                ; fee_token= Account_id.token_id fee_payer
-                ; fee_payer_pk= Account_id.public_key fee_payer
-                ; nonce=
-                    Option.value (S.nonce c)
-                      ~default:Mina_numbers.Account_nonce.zero
-                ; valid_until= Mina_numbers.Global_slot.max_value
-                ; memo= Signed_command_memo.create_from_string_exn "snapp" }
-            ; body=
-                Payment
-                  { source_pk= source
-                  ; receiver_pk= receiver
-                  ; token_id= S.token_id c
-                  ; amount } } }
+    | Parties _ -> failwith "TODO"
 
   let via (t : User_command.t) : [`Snapp_command | `Ident] =
     match t with
     | Signed_command _ ->
         `Ident
-    | Snapp_command _ ->
-        `Snapp_command
+    | Parties _ -> failwith "TODO"
 
   let add_if_doesn't_exist conn (t : User_command.t) =
     Signed_command.add_if_doesn't_exist conn ~via:(via t) (as_signed_command t)
