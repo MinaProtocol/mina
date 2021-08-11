@@ -14,7 +14,7 @@ let SnarkyNodeConfig = {
   // output bundles (location)
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'snarkyjs_node.js',
+    filename: 'snarkyjs_chrome.js',
   },
 
   //file resolutions
