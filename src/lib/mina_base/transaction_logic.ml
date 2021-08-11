@@ -1275,7 +1275,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       if Snapp_account.(equal default t) then None else Some t
     in
     let%bind permissions =
-      update a.permissions.set_delegate permissions a.permissions
+      update a.permissions.set_permissions permissions a.permissions
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
     let nonce : Account.Nonce.t =
