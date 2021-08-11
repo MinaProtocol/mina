@@ -7,7 +7,7 @@
 
 open Core_kernel
 
-let available_libraries = ["vrf_lib_tests"; "mina_base"]
+let available_libraries = [ "vrf_lib_tests"; "mina_base" ]
 
 let run_benchmarks_in_lib libname =
   Core.printf "Running inline tests in library \"%s\"\n%!" libname ;
@@ -22,7 +22,7 @@ let () =
       let bad_libnames = ref [] in
       List.iter chosen_libraries ~f:(fun lib ->
           if not (List.mem available_libraries lib ~equal:String.equal) then
-            bad_libnames := lib :: !bad_libnames ) ;
+            bad_libnames := lib :: !bad_libnames) ;
       if not (List.is_empty !bad_libnames) then (
         eprintf "These libraries not available for benchmarking: %s\n%!"
           (String.concat (List.rev !bad_libnames) ~sep:",") ;
