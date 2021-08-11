@@ -1,9 +1,15 @@
 export type JSONValue = number | string | boolean | null | Array<JSON> | { [key: string]: JSONValue };
 
+export class VerificationKey {
+  verify(publicInput: any[], proof: Proof): boolean;
+}
+
 export class Keypair {
+  verificationKey(): VerificationKey;
 }
 
 export class Proof {
+  verify(verificationKey: VerificationKey, publicInput: any[]): boolean;
 }
 
 export type AsField = Field | number | string | boolean;
@@ -229,9 +235,15 @@ export class Circuit {
   static generateKeypair(): Keypair;
 
   static prove(
-    w: any[], p: any[],
+    privateInput: any[], publicInput: any[],
     kp: Keypair
   ): Proof;
+
+  static verify(
+    publicInput: any[],
+    vk: VerificationKey,
+    pi: Proof
+  ): boolean;
 
   static toFieldElements<A>(A): Field[];
 }
