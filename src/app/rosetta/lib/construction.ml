@@ -643,8 +643,9 @@ module Hash = struct
       let hash =
         Transaction_hash.hash_command
           (User_command.Signed_command full_command)
+      |> Transaction_hash.to_base58_check
       in
-      Construction_hash_response.create (Transaction_hash.to_base58_check hash)
+      Transaction_identifier_response.create (Transaction_identifier.create hash)
   end
 
   module Real = Impl (Deferred.Result)
@@ -830,9 +831,7 @@ module Submit = struct
                     createTokenAccount, or mintTokens"
                  (`Json_parse None))
       in
-      { Construction_submit_response.transaction_identifier=
-          Transaction_identifier.create hash
-      ; metadata= None }
+      Transaction_identifier_response.create (Transaction_identifier.create hash)
   end
 
   module Real = Impl (Deferred.Result)
@@ -917,7 +916,7 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
       let%map res =
         Hash.Real.handle ~env:Hash.Env.real req |> Errors.Lift.wrap
       in
-      Construction_hash_response.to_yojson res
+      Transaction_identifier_response.to_yojson res
   | ["submit"] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
@@ -929,6 +928,6 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
         Submit.Real.handle ~env:(Submit.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap
       in
-      Construction_submit_response.to_yojson res
+      Transaction_identifier_response.to_yojson res
   | _ ->
       Deferred.Result.fail `Page_not_found

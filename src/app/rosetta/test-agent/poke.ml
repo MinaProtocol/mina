@@ -6,6 +6,7 @@ open Lib
 open Async
 
 (* TODO: Parameterize this against prod/test networks *)
+(* this is the same as PK in Rosetta dockerfile *)
 let pk = "B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV"
 
 module Staking = struct

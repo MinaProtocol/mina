@@ -145,14 +145,18 @@ Note: Mina is in the `dev` profile, so snarks are turned off and every runs very
 - `./start.sh CURL` skips the integration test suite and just produces blocks
 - `./start.sh FOREVER` runs the integration test suite and produces blocks forever afterwards
 
-## Model Regen
+## Model Regeneration
 
 To regenerate the models:
 
+Install openapi-generator, instructions [here](https://openapi-generator.tech/docs/installation/),
+then
 ```
 git clone https://github.com/coinbase/rosetta-specifications.git
 cd rosetta-specifications
-`brew install openapi-generator`
 openapi-generator generate -i api.json -g ocaml
-mv src/models $CODA/src/lib/rosetta_models
+cp -p src/models/* $MINA/src/lib/rosetta_models/
 ```
+In the generated files, the type `deriving` clauses will need to have `eq` added manually.
+Any record types with a field named `_type` will need annotate that field with `[@key "type"]`.
+In `lib/network.ml`, update the two instances of the version number.
