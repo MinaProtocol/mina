@@ -6,16 +6,16 @@ module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 
 let genesis_root_identifier ~genesis_state_hash =
   let open Root_identifier.Stable.Latest in
-  {state_hash= genesis_state_hash}
+  { state_hash = genesis_state_hash }
 
 let with_file ?size filename access_level ~f =
   let open Unix in
   let shared, mode =
     match access_level with
     | `Read ->
-        (false, [O_RDONLY])
+        (false, [ O_RDONLY ])
     | `Write ->
-        (true, [O_RDWR; O_TRUNC; O_CREAT])
+        (true, [ O_RDWR; O_TRUNC; O_CREAT ])
   in
   let fd = Unix.openfile filename ~mode in
   let buf_size =
@@ -39,16 +39,17 @@ end
 
 (* TODO: create a reusable singleton factory abstraction *)
 module rec Instance_type : sig
-  type t = {snarked_ledger: Ledger.Db.t; factory: Factory_type.t}
+  type t = { snarked_ledger : Ledger.Db.t; factory : Factory_type.t }
 end =
   Instance_type
 
 and Factory_type : sig
   type t =
-    { directory: string
-    ; logger: Logger.t
-    ; mutable instance: Instance_type.t option
-    ; ledger_depth: int }
+    { directory : string
+    ; logger : Logger.t
+    ; mutable instance : Instance_type.t option
+    ; ledger_depth : int
+    }
 end =
   Factory_type
 
@@ -64,19 +65,19 @@ module Instance = struct
         ~directory_name:(Locations.snarked_ledger factory.directory)
         ()
     in
-    {snarked_ledger; factory}
+    { snarked_ledger; factory }
 
   let destroy t =
     Ledger.Db.close t.snarked_ledger ;
     t.factory.instance <- None
 
   (* TODO: encapsulate functionality of snarked ledger *)
-  let snarked_ledger {snarked_ledger; _} = snarked_ledger
+  let snarked_ledger { snarked_ledger; _ } = snarked_ledger
 
   let set_root_identifier t new_root_identifier =
     [%log' trace t.factory.logger]
       ~metadata:
-        [("root_identifier", Root_identifier.to_yojson new_root_identifier)]
+        [ ("root_identifier", Root_identifier.to_yojson new_root_identifier) ]
       "Setting persistent root identifier" ;
     let size = Root_identifier.Stable.Latest.bin_size_t new_root_identifier in
     with_file (Locations.root_identifier t.factory.directory) `Write ~size
@@ -84,12 +85,12 @@ module Instance = struct
         ignore
           ( Root_identifier.Stable.Latest.bin_write_t buf ~pos:0
               new_root_identifier
-            : int ) )
+            : int ))
 
   (* defaults to genesis *)
   let load_root_identifier t =
     let file = Locations.root_identifier t.factory.directory in
-    match Unix.access file [`Exists; `Read] with
+    match Unix.access file [ `Exists; `Read ] with
     | Error _ ->
         None
     | Ok () ->
@@ -99,17 +100,18 @@ module Instance = struct
             in
             [%log' trace t.factory.logger]
               ~metadata:
-                [("root_identifier", Root_identifier.to_yojson root_identifier)]
+                [ ("root_identifier", Root_identifier.to_yojson root_identifier)
+                ]
               "Loaded persistent root identifier" ;
-            Some root_identifier )
+            Some root_identifier)
 
-  let set_root_state_hash t state_hash = set_root_identifier t {state_hash}
+  let set_root_state_hash t state_hash = set_root_identifier t { state_hash }
 end
 
 type t = Factory_type.t
 
 let create ~logger ~directory ~ledger_depth =
-  {directory; logger; instance= None; ledger_depth}
+  { directory; logger; instance = None; ledger_depth }
 
 let create_instance_exn t =
   assert (Option.is_none t.instance) ;
@@ -137,4 +139,4 @@ let reset_to_genesis_exn t ~precomputed_values =
       Instance.set_root_identifier instance
         (genesis_root_identifier
            ~genesis_state_hash:
-             (Precomputed_values.genesis_state_hash precomputed_values)) )
+             (Precomputed_values.genesis_state_hash precomputed_values)))

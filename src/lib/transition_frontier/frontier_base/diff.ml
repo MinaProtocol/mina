@@ -14,21 +14,20 @@ end
 
 module Node_list = struct
   type full_node =
-    { transition: External_transition.Validated.t
-    ; scan_state: Staged_ledger.Scan_state.t }
+    { transition : External_transition.Validated.t
+    ; scan_state : Staged_ledger.Scan_state.t
+    }
 
   type lite_node = State_hash.t
 
   (* Full representation unfortunately cannot be breadcrumbs since they
    * will no longer be linked after mutation *)
-  type _ t =
-    | Full : full_node list -> full t
-    | Lite : lite_node list -> lite t
+  type _ t = Full : full_node list -> full t | Lite : lite_node list -> lite t
 
   type 'repr node_list = 'repr t
 
   let to_lite =
-    let f {transition; _} =
+    let f { transition; _ } =
       External_transition.Validated.state_hash transition
     in
     List.map ~f
@@ -38,6 +37,7 @@ module Node_list = struct
       [%%versioned
       module Stable = struct
         [@@@no_toplevel_latest_type]
+
         module V1 = struct
           type t = State_hash.Stable.V1.t list
 
@@ -68,7 +68,7 @@ module Node_list = struct
 end
 
 module Root_transition = struct
-  type 'repr t = {new_root: Root_data.Limited.t; garbage: 'repr Node_list.t}
+  type 'repr t = { new_root : Root_data.Limited.t; garbage : 'repr Node_list.t }
 
   type 'repr root_transition = 'repr t
 
@@ -76,10 +76,12 @@ module Root_transition = struct
     [%%versioned
     module Stable = struct
       [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t =
-          { new_root: Root_data.Limited.Stable.V1.t
-          ; garbage: Node_list.Lite.Stable.V1.t }
+          { new_root : Root_data.Limited.Stable.V1.t
+          ; garbage : Node_list.Lite.Stable.V1.t
+          }
 
         let to_latest = Fn.id
       end
@@ -91,6 +93,7 @@ module Root_transition = struct
       [%%versioned
       module Stable = struct
         [@@@no_toplevel_latest_type]
+
         module V1 = struct
           type t = Lite_binable.Stable.V1.t
 
@@ -107,11 +110,11 @@ module Root_transition = struct
         module T_nonbinable = struct
           type nonrec t = t
 
-          let to_binable ({new_root; garbage} : t) : Binable_arg.Stable.V1.t =
-            {new_root; garbage}
+          let to_binable ({ new_root; garbage } : t) : Binable_arg.Stable.V1.t =
+            { new_root; garbage }
 
-          let of_binable ({new_root; garbage} : Binable_arg.Stable.V1.t) : t =
-            {new_root; garbage}
+          let of_binable ({ new_root; garbage } : Binable_arg.Stable.V1.t) : t =
+            { new_root; garbage }
         end
 
         include Binable.Of_binable (Binable_arg.Stable.V1) (T_nonbinable)
@@ -145,7 +148,7 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
     | New_node (Lite transition) ->
         State_hash.to_yojson
           (External_transition.Validated.state_hash transition)
-    | Root_transitioned {new_root; garbage} ->
+    | Root_transitioned { new_root; garbage } ->
         let garbage_hashes =
           match garbage with
           | Node_list.Full nodes ->
@@ -160,15 +163,15 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
     | Best_tip_changed breadcrumb ->
         State_hash.to_yojson breadcrumb
   in
-  `Assoc [(name key, json_key)]
+  `Assoc [ (name key, json_key) ]
 
 let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
   match diff with
   | New_node (Full breadcrumb) ->
       New_node (Lite (Breadcrumb.validated_transition breadcrumb))
-  | Root_transitioned {new_root; garbage= Full garbage_nodes} ->
+  | Root_transitioned { new_root; garbage = Full garbage_nodes } ->
       Root_transitioned
-        {new_root; garbage= Lite (Node_list.to_lite garbage_nodes)}
+        { new_root; garbage = Lite (Node_list.to_lite garbage_nodes) }
   | Best_tip_changed b ->
       Best_tip_changed b
 
@@ -176,6 +179,7 @@ module Lite_binable = struct
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         | New_node of External_transition.Validated.Stable.V1.t
@@ -195,6 +199,7 @@ module Lite = struct
       [%%versioned
       module Stable = struct
         [@@@no_toplevel_latest_type]
+
         module V1 = struct
           type t = Lite_binable.Stable.V1.t
 
@@ -206,8 +211,10 @@ module Lite = struct
     [%%versioned_binable
     module Stable = struct
       [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = E : (lite, 'mutant) diff -> t
+
         module T_nonbinable = struct
           type nonrec t = t
 
