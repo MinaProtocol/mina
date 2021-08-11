@@ -17,11 +17,11 @@ This documents specifies required structures, algorithms and protocol details.
 - [1. Constants](#1-constants)
 - [2. Structures](#2-structures)
 	- [2.1 `State_hash.Stable.V1`](#21-statehashstablev1)
-	- [2.2 `Epoch_seed.Stable.V1`](#22-epochseedstablev1)
-	- [2.3 `External_transition`](#23-externaltransition)
-	- [2.4 `Protocol_state`](#24-protocolstate)
-		- [2.4.1 `Protocol_state.Body`](#241-protocolstatebody)
-	- [2.5 `Consensus_state`](#25-consensusstate)
+	- [2.2 `Epoch_seed.Stable.V1.t`](#22-epochseedstablev1t)
+	- [2.2 `External_transition`](#22-externaltransition)
+	- [2.3 `Protocol_state`](#23-protocolstate)
+		- [2.3.1 `Protocol_state.Body`](#231-protocolstatebody)
+	- [2.4 `Consensus_state`](#24-consensusstate)
 	- [2.6 `Epoch_data`](#26-epochdata)
 	- [2.7 Example block](#27-example-block)
 - [3. Algorithms](#3-algorithms)
@@ -48,6 +48,49 @@ This documents specifies required structures, algorithms and protocol details.
 		- [3.4.5 `getMinDen`](#345-getminden)
 - [4 Protocol](#4-protocol)
 	- [4.1 Initialize consensus](#41-initialize-consensus)
+		- [4.1.1 Genesis block](#411-genesis-block)
+	- [4.2 Select chain](#42-select-chain)
+	- [4.3 Produce block](#43-produce-block)
+
+<!-- /TOC -->OC depthFrom:1 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
+
+- [1. Constants](#1-constants)
+- [2. Structures](#2-structures)
+	- [2.1 `State_hash.Stable.V1`](#21-statehashstablev1)
+	- [2.2 `Epoch_seed.Stable.V1.t`](#22-epochseedstablev1t)
+	- [2.2 `External_transition`](#22-externaltransition)
+	- [2.3 `Protocol_state`](#23-protocolstate)
+		- [2.3.1 `Protocol_state.Body`](#231-protocolstatebody)
+	- [2.4 `Consensus_state`](#24-consensusstate)
+	- [2.6 `Epoch_data`](#26-epochdata)
+	- [2.7 Example block](#27-example-block)
+- [3. Algorithms](#3-algorithms)
+	- [3.1 Common](#31-common)
+		- [3.1.1 `top`](#311-top)
+		- [3.1.2 `cState`](#312-cstate)
+		- [3.1.3 `globalSlot`](#313-globalslot)
+		- [3.1.4 `epochSlot`](#314-epochslot)
+		- [3.1.5 `length`](#315-length)
+		- [3.1.6 `lastVRF`](#316-lastvrf)
+		- [3.1.7 `stateHash`](#317-statehash)
+	- [3.2 Chain selection rules](#32-chain-selection-rules)
+		- [3.2.1 Short-range fork rule](#321-short-range-fork-rule)
+		- [3.2.2 Long-range fork rule](#322-long-range-fork-rule)
+	- [3.3 Decentralized checkpointing](#33-decentralized-checkpointing)
+		- [3.3.1 `initCheckpoints`](#331-initcheckpoints)
+		- [3.3.2 `updateCheckpoints`](#332-updatecheckpoints)
+		- [3.3.3 `isShortRange`](#333-isshortrange)
+	- [3.4 Window min-density](#34-window-min-density)
+		- [3.4.1 `isWindowStop`](#341-iswindowstop)
+		- [3.4.2 `shiftWindow`](#342-shiftwindow)
+		- [3.4.3 `initSubWindowDensities`](#343-initsubwindowdensities)
+		- [3.4.4 `updateSubWindowDensities`](#344-updatesubwindowdensities)
+		- [3.4.5 `getMinDen`](#345-getminden)
+- [4 Protocol](#4-protocol)
+	- [4.1 Initialize consensus](#41-initialize-consensus)
+		- [4.1.1 Load genesis block](#411-load-genesis-block)
+		- [4.1.1.1 `Consensus_state`](#4111-consensusstate)
+		- [4.1.1.2 Genesis block JSON](#4112-genesis-block-json)
 	- [4.2 Select chain](#42-select-chain)
 	- [4.3 Produce block](#43-produce-block)
 
@@ -658,9 +701,9 @@ Things a peer MUST do to initialize consensus includes
 * Get head of the current chain
 * Decide if peer should bootstrap or sync
 
-### 4.1.1 Load genesis block
+### 4.1.1 Genesis block
 
-### 4.1.1.1 `Consensus_state`
+**`Consensus_state`**
 
 | Field                                    | Value         |
 | - | - |
@@ -681,7 +724,9 @@ Things a peer MUST do to initialize consensus includes
 | `coinbase_receiver`                      | `Public_key.Compressed.Stable.V1.t(B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)` |
 | `supercharge_coinbase`                   | `false` |
 
-### 4.1.1.2 Genesis block JSON
+**JSON**
+
+The following JSON specifies most of the genesis block (work in progress).
 
 ```json
 {
