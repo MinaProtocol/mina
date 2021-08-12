@@ -57,7 +57,7 @@ Pipeline.build
       DockerImage.generateStep toolchainStretchSpec,
 
       -- mina-rosetta-ubuntu Ubuntu Rosetta image
-      let toolchainStretchSpec = DockerImage.ReleaseSpec::{
+      let rosettaUbuntuSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-rosetta-ubuntu",
         deb_codename="buster",
