@@ -1200,7 +1200,8 @@ __webpack_require__.r(__webpack_exports__);
 
 class CircuitValue {
     static sizeInFieldElements() {
-        return this.prototype._sizeInFieldElements || 0;
+        const fields = this.prototype._fields;
+        return fields.reduce((acc, [_, typ]) => acc + typ.sizeInFieldElements(), 0);
     }
     static toFieldElements(v) {
         const res = [];
@@ -1278,15 +1279,10 @@ function prop(target, key) {
     if (target._fields === undefined || target._fields === null) {
         target._fields = [];
     }
-    if (target._sizeInFieldElements === undefined ||
-        target._sizeInFieldElements === null) {
-        target._sizeInFieldElements = 0;
-    }
     if (fieldType === undefined) {
     }
     else if (fieldType.toFieldElements && fieldType.ofFieldElements) {
         target._fields.push([key, fieldType]);
-        target._sizeInFieldElements += fieldType.sizeInFieldElements();
     }
     else {
         console.log(`warning: property ${key} missing field element conversion methods`);
@@ -1396,32 +1392,11 @@ class Witness extends _circuit_value__WEBPACK_IMPORTED_MODULE_1__.CircuitValue {
     _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
     (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__metadata)("design:type", _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.HTTPSAttestation)
 ], Witness.prototype, "attestation", void 0);
-class Trade {
-    timestamp;
-    isBuy;
-    price;
-    quantity;
-    static read(bs) {
-        if (bs.value.length === 0) {
-            return null;
-        }
-        let t = bs.value[0];
-        let trade = new Trade(t.isBuy, t.price, t.quantity, t.timestamp);
-        return [new _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.Bytes(bs.value.slice(1)), trade];
-    }
-    constructor(isBuy, price, quantity, time) {
-        this.isBuy = isBuy;
-        this.price = price;
-        this.quantity = quantity;
-        this.timestamp = time;
-    }
-}
-console.log("circuitis", _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Circuit);
 class Main extends _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Circuit {
     // percentGain is an integer in basis points
     static main(witness, percentChange) {
-        witness.attestation.verify(_exchange_lib__WEBPACK_IMPORTED_MODULE_2__.Bytes.ofString('api.coinbase.com/trades'));
-        const trades = _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.Bytes.readAll(Trade, witness.attestation.response);
+        witness.attestation.verify(_exchange_lib__WEBPACK_IMPORTED_MODULE_2__.WebSnappRequest.ofString('api.coinbase.com/trades'));
+        const trades = _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.Trade.readAll(witness.attestation.response);
         let buy = getElt(trades, witness.buyIndex);
         let sell = getElt(trades, witness.sellIndex);
         buy.isBuy.assertEquals(true);
@@ -1442,9 +1417,7 @@ class Main extends _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Circuit {
     (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__metadata)("design:paramtypes", [Witness, _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field]),
     (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__metadata)("design:returntype", void 0)
 ], Main, "main", null);
-console.log("after-circuitis", Main);
-function getElt(xs, i_) {
-    let i = new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(i_);
+function getElt(xs, i) {
     let [x, found] = xs.reduce(([acc, found], x, j) => {
         let eltHere = i.equals(j);
         return [_bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Circuit.if(eltHere, x, acc), found.or(eltHere)];
@@ -1452,18 +1425,26 @@ function getElt(xs, i_) {
     found.assertEquals(true);
     return x;
 }
+function trade({ timestamp, price, quantity, isBuy }) {
+    return new _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.Trade(isBuy, price, quantity, timestamp);
+}
 function main() {
-    const before = new Date();
+    let before = new Date();
     const kp = Main.generateKeypair();
-    const after = new Date();
-    console.log('keypairgen', after.getTime() - before.getTime());
+    let after = new Date();
+    console.log('generated keypair: ', after.getTime() - before.getTime());
+    const publicInput = [new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(25)];
+    before = new Date();
     const proof = Main.prove([
         { buyIndex: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(0), sellIndex: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(1), attestation: new _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.HTTPSAttestation(new _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.Bytes([
-                { timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(150), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(100), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(true) },
-                { timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(250), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(500), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(4), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(false) }
+                trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(150), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(100), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(true) }),
+                trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(250), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(500), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(4), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(false) })
             ]), new _signature__WEBPACK_IMPORTED_MODULE_3__.Signature(new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(1), _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Scalar.random())) }
-    ], [new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(25)], kp);
-    console.log(proof, kp);
+    ], publicInput, kp);
+    after = new Date();
+    console.log('generated proof: ', after.getTime() - before.getTime());
+    const vk = kp.verificationKey();
+    console.log(proof, kp, 'verified?', proof.verify(vk, publicInput));
 }
 ;
 
@@ -1479,43 +1460,73 @@ function main() {
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Trade": () => (/* binding */ Trade),
 /* harmony export */   "Bytes": () => (/* binding */ Bytes),
+/* harmony export */   "WebSnappRequest": () => (/* binding */ WebSnappRequest),
 /* harmony export */   "HTTPSAttestation": () => (/* binding */ HTTPSAttestation)
 /* harmony export */ });
-/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! tslib */ "./node_modules/tslib/tslib.es6.js");
-/* harmony import */ var _circuit_value__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../circuit_value */ "./src/circuit_value.ts");
-/* harmony import */ var _signature__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../signature */ "./src/signature.ts");
+/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! tslib */ "./node_modules/tslib/tslib.es6.js");
+/* harmony import */ var _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../bindings/snarky2 */ "./src/bindings/snarky2.js");
+/* harmony import */ var _circuit_value__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../circuit_value */ "./src/circuit_value.ts");
+/* harmony import */ var _signature__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../signature */ "./src/signature.ts");
+
+// import { MerkleCollection, MerkleProof } from '../mina.js';
 
 
 
-class Bytes extends _circuit_value__WEBPACK_IMPORTED_MODULE_0__.CircuitValue {
-    value;
-    toFieldElements() { return []; }
-    constructor(value) {
+// type TradeObject = { timestamp: Field, price: Field, quantity: Field, isBuy: Bool };
+class Trade extends _circuit_value__WEBPACK_IMPORTED_MODULE_1__.CircuitValue {
+    isBuy;
+    price;
+    quantity;
+    timestamp;
+    constructor(isBuy, price, quantity, timestamp) {
         super();
-        this.value = value;
+        this.isBuy = isBuy;
+        this.price = price;
+        this.quantity = quantity;
+        this.timestamp = timestamp;
     }
-    static ofString(_) {
-        return new Bytes([]);
-    }
-    static readAll(ctor, bs) {
-        let xs = [];
-        let res;
-        while (true) {
-            res = ctor.read(bs);
-            if (res === null) {
-                break;
-            }
-            else {
-                let [bsPrime, x] = res;
-                bs = bsPrime;
-                xs.push(x);
-            }
-        }
-        return xs;
+    static readAll(bytes) {
+        return bytes.value;
     }
 }
-class HTTPSAttestation extends _circuit_value__WEBPACK_IMPORTED_MODULE_0__.CircuitValue {
+(0,tslib__WEBPACK_IMPORTED_MODULE_3__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_3__.__metadata)("design:type", _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool)
+], Trade.prototype, "isBuy", void 0);
+(0,tslib__WEBPACK_IMPORTED_MODULE_3__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_3__.__metadata)("design:type", _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field)
+], Trade.prototype, "price", void 0);
+(0,tslib__WEBPACK_IMPORTED_MODULE_3__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_3__.__metadata)("design:type", _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field)
+], Trade.prototype, "quantity", void 0);
+(0,tslib__WEBPACK_IMPORTED_MODULE_3__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_3__.__metadata)("design:type", _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field)
+], Trade.prototype, "timestamp", void 0);
+console.log('trade size', Trade.sizeInFieldElements());
+const numTrades = 2;
+class Bytes extends _circuit_value__WEBPACK_IMPORTED_MODULE_1__.CircuitValue {
+    value;
+    constructor(value) {
+        super();
+        console.assert(value.length === numTrades);
+        this.value = value;
+    }
+}
+Bytes.prototype._fields = [['value', _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Circuit.array(Trade, numTrades)]];
+class WebSnappRequest extends _circuit_value__WEBPACK_IMPORTED_MODULE_1__.CircuitValue {
+    constructor() {
+        super();
+    }
+    static ofString(_) {
+        return new WebSnappRequest();
+    }
+}
+class HTTPSAttestation extends _circuit_value__WEBPACK_IMPORTED_MODULE_1__.CircuitValue {
     response;
     signature;
     constructor(resp, sig) {
@@ -1528,13 +1539,13 @@ class HTTPSAttestation extends _circuit_value__WEBPACK_IMPORTED_MODULE_0__.Circu
         //this.signature.verify(O1PUB, request.toFieldElements().concat(this.response.toFieldElements()))
     }
 }
-(0,tslib__WEBPACK_IMPORTED_MODULE_2__.__decorate)([
-    _circuit_value__WEBPACK_IMPORTED_MODULE_0__.prop,
-    (0,tslib__WEBPACK_IMPORTED_MODULE_2__.__metadata)("design:type", Bytes)
+(0,tslib__WEBPACK_IMPORTED_MODULE_3__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_3__.__metadata)("design:type", Bytes)
 ], HTTPSAttestation.prototype, "response", void 0);
-(0,tslib__WEBPACK_IMPORTED_MODULE_2__.__decorate)([
-    _circuit_value__WEBPACK_IMPORTED_MODULE_0__.prop,
-    (0,tslib__WEBPACK_IMPORTED_MODULE_2__.__metadata)("design:type", _signature__WEBPACK_IMPORTED_MODULE_1__.Signature)
+(0,tslib__WEBPACK_IMPORTED_MODULE_3__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_3__.__metadata)("design:type", _signature__WEBPACK_IMPORTED_MODULE_2__.Signature)
 ], HTTPSAttestation.prototype, "signature", void 0);
 
 
