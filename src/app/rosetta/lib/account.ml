@@ -36,6 +36,7 @@ module Get_balance =
 
 module Balance_info = struct
   type t = {liquid_balance: int64; total_balance: int64}
+           [@@deriving yojson]
 end
 
 module Sql = struct
@@ -44,7 +45,7 @@ module Sql = struct
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         Caqti_type.(tup2 int64 int64)
-        {|
+        {sql|
 WITH RECURSIVE chain AS (
   (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp
   FROM blocks b
@@ -70,32 +71,57 @@ relevant_internal_block_balances AS (
   WHERE receiver_pk.value = $1
 ),
 
-relevant_user_block_balances AS (
+relevant_user_block_fee_payer_balances AS (
   SELECT
     block_user_command.block_id,
     block_user_command.sequence_no,
-    CASE WHEN fee_payer_pk.value = $1 THEN fee_payer_balance.balance
-         WHEN source_pk.value = $1 THEN source_balance.balance
-         ELSE receiver_balance.balance
-    END
+    fee_payer_balance.balance
   FROM blocks_user_commands block_user_command
 
   INNER JOIN balances fee_payer_balance ON fee_payer_balance.id = block_user_command.fee_payer_balance
-  INNER JOIN balances source_balance ON source_balance.id = block_user_command.source_balance
-  INNER JOIN balances receiver_balance ON receiver_balance.id = block_user_command.receiver_balance
 
   INNER JOIN public_keys fee_payer_pk ON fee_payer_pk.id = fee_payer_balance.public_key_id
+  WHERE fee_payer_pk.value = $1
+),
+
+relevant_user_block_source_balances AS (
+  SELECT
+    block_user_command.block_id,
+    block_user_command.sequence_no,
+    source_balance.balance
+  FROM blocks_user_commands block_user_command
+
+  INNER JOIN balances source_balance ON source_balance.id = block_user_command.source_balance
+
   INNER JOIN public_keys source_pk ON source_pk.id = source_balance.public_key_id
+  WHERE source_pk.value = $1
+),
+
+relevant_user_block_receiver_balances AS (
+  SELECT
+    block_user_command.block_id,
+    block_user_command.sequence_no,
+    receiver_balance.balance
+  FROM blocks_user_commands block_user_command
+
+  INNER JOIN balances receiver_balance ON receiver_balance.id = block_user_command.receiver_balance
+
   INNER JOIN public_keys receiver_pk ON receiver_pk.id = receiver_balance.public_key_id
-  WHERE
-    (fee_payer_pk.value = $1 OR source_pk.value = $1 OR receiver_pk.value = $1) AND
-    block_user_command.status = 'applied'
+  WHERE receiver_pk.value = $1
+),
+
+relevant_user_block_balances AS (
+  (SELECT block_id, sequence_no, balance FROM relevant_user_block_fee_payer_balances)
+  UNION
+  (SELECT block_id, sequence_no, balance FROM relevant_user_block_source_balances)
+  UNION
+  (SELECT block_id, sequence_no, balance FROM relevant_user_block_receiver_balances)
 ),
 
 relevant_block_balances AS (
-  (SELECT block_id, sequence_no, balance from relevant_internal_block_balances)
+  (SELECT block_id, sequence_no, balance FROM relevant_internal_block_balances)
   UNION
-  (SELECT block_id, sequence_no, balance from relevant_user_block_balances)
+  (SELECT block_id, sequence_no, balance FROM relevant_user_block_balances)
 )
 
 SELECT
@@ -107,7 +133,7 @@ JOIN relevant_block_balances rbb ON chain.id = rbb.block_id
 WHERE chain.height <= $2
 ORDER BY (chain.height, sequence_no) DESC
 LIMIT 1
-      |}
+      |sql}
 
     let run (module Conn : Caqti_async.CONNECTION) requested_block_height
         address =
@@ -184,13 +210,13 @@ LIMIT 1
     let%bind liquid_balance =
       match (last_relevant_command_info_opt, timing_info_opt) with
       | None, None ->
-          (* We've never heard of this account, at least as of the block_identifier provided *)
-          (* This means they requested a block from before account creation;
+        (* We've never heard of this account, at least as of the block_identifier provided *)
+        (* This means they requested a block from before account creation;
          * this is ambiguous in the spec but Coinbase confirmed we can return 0.
          * https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
-          Deferred.Result.return 0L
+        Deferred.Result.return 0L
       | Some (_, last_relevant_command_balance), None ->
-          (* This account has no special vesting, so just use its last known balance *)
+        (* This account has no special vesting, so just use its last known balance *)
           Deferred.Result.return last_relevant_command_balance
       | None, Some timing_info ->
           (* This account hasn't seen any transactions but was in the genesis ledger, so compute its balance at the start block *)
@@ -482,6 +508,6 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
             Balance.Real.handle ~env:(Balance.Env.real ~db ~graphql_uri) req
             |> Errors.Lift.wrap
           in
-          Account_balance_response.to_yojson res )
+          Account_balance_response.to_yojson res)
   | _ ->
       Deferred.Result.fail `Page_not_found
