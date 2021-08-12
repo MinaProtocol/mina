@@ -22,6 +22,14 @@ struct PeerInfo {
   peerId @2 :PeerId;
 }
 
+struct SequenceNumber {
+  seqno @0 :UInt64;
+}
+
+struct ValidationId {
+  id @0 :UInt64;
+}
+
 struct StreamId {
   id @0 :UInt64;
 }
@@ -84,7 +92,7 @@ struct PushMessageHeader {
 
 struct RpcMessageHeader {
   timeSent @0 :UnixNano;
-  seqNumber @1 :UInt64;
+  sequenceNumber @1 :SequenceNumber;
 }
 
 # all messages in the libp2p_helper interface are Rpc calls, except for validations
@@ -107,7 +115,7 @@ struct Libp2pHelperInterface {
 
   struct Listen {
     struct Request {
-      iface @0 :Text;
+      iface @0 :Multiaddr;
     }
 
     struct Response {
@@ -212,8 +220,8 @@ struct Libp2pHelperInterface {
   }
 
   struct OpenStream {
-    struct Request {
-      peer @0 :Text;
+   struct Request {
+      peer @0 :PeerId;
       protocolId @1 :Text;
     }
 
@@ -269,7 +277,7 @@ struct Libp2pHelperInterface {
   # corresponds to the the push message sent to the daemon in the
   # GossipReceived message
   struct Validation {
-    validationSeqNumber @0 :UInt64;
+    validationId @0 :ValidationId;
     result @1 :ValidationResult;
   }
 
@@ -364,7 +372,7 @@ struct DaemonInterface {
     seenAt @1 :UnixNano;
     expiration @2 :UnixNano;
     subscriptionId @3 :SubscriptionId;
-    validationSeqNumber @4 :UInt64;
+    validationId @4 :ValidationId;
     data @5 :Data;
   }
 

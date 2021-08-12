@@ -11,10 +11,9 @@ type ports =
 let net_configs n =
   File_system.with_temp_dir "coda-processes-generate-keys" ~f:(fun tmpd ->
       let%bind net =
-        Mina_net2.create ~pids:(Child_processes.Termination.create_pid_table ())
+        Mina_net2.create
+          ~pids:(Child_processes.Termination.create_pid_table ())
           ~logger:(Logger.create ()) ~conf_dir:tmpd ~all_peers_seen_metric:false
-          ~on_unexpected_termination:(fun () ->
-            raise Child_processes.Child_died)
       in
       let net = Or_error.ok_exn net in
       let ips =
@@ -23,7 +22,7 @@ let net_configs n =
       in
       let%bind addrs_and_ports_list =
         Deferred.List.mapi ips ~f:(fun i ip ->
-            let%map key = Mina_net2.Keypair.random net in
+            let%map key = Mina_net2.generate_random_keypair net in
             let base = 23000 + (i * 2) in
             let libp2p_port = base in
             let client_port = base + 1 in
