@@ -31,31 +31,31 @@ struct SubscriptionId {
 }
 
 struct Libp2pKeypair {
-  privateKey @0 :Text;
-  publicKey @1 :Text;
+  privateKey @0 :Data;
+  publicKey @1 :Data;
   peerId @2 :PeerId;
 }
 
 struct GatingConfig {
   bannedIps @0 :List(Text);
-  bannedPeerIds @1 :List(Text);
+  bannedPeerIds @1 :List(PeerId);
   trustedIps @2 :List(Text);
-  trustedPeerIds @3 :List(Text);
+  trustedPeerIds @3 :List(PeerId);
   isolate @4 :Bool;
 }
 
 struct Libp2pConfig {
   statedir @0 :Text;
-  privateKey @1 :Text;
+  privateKey @1 :Data;
   networkId @2 :Text;
-  listenOn @3 :List(Text);
-  metricsPort @4 :Int16;
-  externalMultiaddr @5 :Text;
+  listenOn @3 :List(Multiaddr);
+  metricsPort @4 :UInt16;
+  externalMultiaddr @5 :Multiaddr;
   unsafeNoTrustIp @6 :Bool;
   flood @7 :Bool;
   peerExchange @8 :Bool;
-  directPeers @9 :List(Text);
-  seedPeers @10 :List(Text);
+  directPeers @9 :List(Multiaddr);
+  seedPeers @10 :List(Multiaddr);
   gatingConfig @11 :GatingConfig;
   maxConnections @12 :UInt32;
   validationQueueSize @13 :UInt32;
@@ -69,16 +69,21 @@ enum ValidationResult {
 }
 
 struct StreamMessage {
-  id @0 :StreamId;
+  streamId @0 :StreamId;
   data @1 :Data;
 }
 
+# Unix timestamp in nanoseconds
+struct UnixNano {
+  nanoSec @0 :Int64;
+}
+
 struct PushMessageHeader {
-  timeSent @0 :UInt64;
+  timeSent @0 :UnixNano;
 }
 
 struct RpcMessageHeader {
-  timeSent @0 :UInt64;
+  timeSent @0 :UnixNano;
   seqNumber @1 :UInt64;
 }
 
@@ -124,6 +129,16 @@ struct Libp2pHelperInterface {
     struct Response {}
   }
 
+  struct FindPeer {
+    struct Request {
+      peerId @0 :PeerId;
+    }
+
+    struct Response {
+      result @0 :PeerInfo;
+    }
+  }
+
   struct AddPeer {
     struct Request {
       multiaddr @0 :Multiaddr;
@@ -131,7 +146,8 @@ struct Libp2pHelperInterface {
     }
 
     struct Response {
-      result @0 :AddrInfo;
+      # TODO uncomment after implementing it in Go
+      # result @0 :AddrInfo;
     }
   }
 
@@ -163,7 +179,7 @@ struct Libp2pHelperInterface {
   struct Subscribe {
     struct Request {
       topic @0 :Text;
-      subscriptionId @1 :UInt64;
+      subscriptionId @1 :SubscriptionId;
     }
 
     struct Response {}
@@ -171,7 +187,7 @@ struct Libp2pHelperInterface {
 
   # do we use this anymore?
   struct Unsubscribe {
-   struct Request {
+    struct Request {
       subscriptionId @0 :SubscriptionId;
     }
 
@@ -179,7 +195,7 @@ struct Libp2pHelperInterface {
   }
 
   struct AddStreamHandler {
-   struct Request {
+    struct Request {
       protocol @0 :Text;
     }
 
@@ -188,7 +204,7 @@ struct Libp2pHelperInterface {
 
   # do we use this anymore?
   struct RemoveStreamHandler {
-   struct Request {
+    struct Request {
       protocol @0 :Text;
     }
 
@@ -196,19 +212,19 @@ struct Libp2pHelperInterface {
   }
 
   struct OpenStream {
-   struct Request {
+    struct Request {
       peer @0 :Text;
       protocolId @1 :Text;
     }
 
     struct Response {
-      id @0 :StreamId;
+      streamId @0 :StreamId;
       peer @1 :PeerInfo;
     }
   }
 
   struct CloseStream {
-   struct Request {
+    struct Request {
       streamId @0 :StreamId;
     }
 
@@ -216,7 +232,7 @@ struct Libp2pHelperInterface {
   }
 
   struct ResetStream {
-   struct Request {
+    struct Request {
       streamId @0 :StreamId;
     }
 
@@ -224,7 +240,7 @@ struct Libp2pHelperInterface {
   }
 
   struct SendStream {
-   struct Request {
+    struct Request {
       msg @0 :StreamMessage;
     }
 
@@ -232,7 +248,7 @@ struct Libp2pHelperInterface {
   }
 
   struct SetNodeStatus {
-   struct Request {
+    struct Request {
       status @0 :Data;
     }
 
@@ -240,7 +256,7 @@ struct Libp2pHelperInterface {
   }
 
   struct GetPeerNodeStatus {
-   struct Request {
+    struct Request {
       peer @0 :Multiaddr;
     }
 
@@ -280,6 +296,7 @@ struct Libp2pHelperInterface {
       sendStream @17 :Libp2pHelperInterface.SendStream.Request;
       setNodeStatus @18 :Libp2pHelperInterface.SetNodeStatus.Request;
       getPeerNodeStatus @19 :Libp2pHelperInterface.GetPeerNodeStatus.Request;
+      findPeer @20 :Libp2pHelperInterface.FindPeer.Request;
     }
   }
 
@@ -304,6 +321,7 @@ struct Libp2pHelperInterface {
       sendStream @16 :Libp2pHelperInterface.SendStream.Response;
       setNodeStatus @17 :Libp2pHelperInterface.SetNodeStatus.Response;
       getPeerNodeStatus @18 :Libp2pHelperInterface.GetPeerNodeStatus.Response;
+      findPeer @19 :Libp2pHelperInterface.FindPeer.Response;
     }
   }
 
@@ -337,23 +355,27 @@ struct DaemonInterface {
     peerId @0 :PeerId;
   }
 
+  struct PeerDisconnected {
+    peerId @0 :PeerId;
+  }
+
   struct GossipReceived {
     sender @0 :PeerInfo;
-    seenAt @1 :UInt64;
-    expiration @2 :UInt64;
-    subscriptionId @3 :UInt64;
+    seenAt @1 :UnixNano;
+    expiration @2 :UnixNano;
+    subscriptionId @3 :SubscriptionId;
     validationSeqNumber @4 :UInt64;
     data @5 :Data;
   }
 
   struct IncomingStream {
-    id @0 :UInt64;
+    streamId @0 :StreamId;
     peer @1 :PeerInfo;
     protocol @2 :Text;
   }
 
   struct StreamLost {
-    id @0 :UInt64;
+    streamId @0 :StreamId;
     reason @1 :Text;
   }
 
@@ -369,18 +391,19 @@ struct DaemonInterface {
     header @0 :PushMessageHeader;
 
     union {
-      peerConnected @1 :DaemonInterface.PeerConnected;
-      gossipReceived @2 :DaemonInterface.GossipReceived;
-      incomingStream @3 :DaemonInterface.IncomingStream;
-      streamLost @4 :DaemonInterface.StreamLost;
-      streamComplete @5 :DaemonInterface.StreamComplete;
-      streamMessageReceived @6 :DaemonInterface.StreamMessageReceived;
+      peerConnected         @1 :DaemonInterface.PeerConnected;
+      peerDisconnected      @2 :DaemonInterface.PeerDisconnected;
+      gossipReceived        @3 :DaemonInterface.GossipReceived;
+      incomingStream        @4 :DaemonInterface.IncomingStream;
+      streamLost            @5 :DaemonInterface.StreamLost;
+      streamComplete        @6 :DaemonInterface.StreamComplete;
+      streamMessageReceived @7 :DaemonInterface.StreamMessageReceived;
     }
   }
 
   struct Message {
     union {
-      libp2pHelperResponse @0 :Libp2pHelperInterface.RpcResponse;
+      rpcResponse @0 :Libp2pHelperInterface.RpcResponse;
       pushMessage @1 :DaemonInterface.PushMessage;
     }
   }
