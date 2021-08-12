@@ -2,7 +2,6 @@
   export const Field = window.__snarky.Field;
   export const Bool = window.__snarky.Bool;
   export const Circuit = window.__snarky.Circuit;
-console.log(Circuit);
   export const Poseidon = window.__snarky.Poseidon;
   export const Group = window.__snarky.Group;
   export const Scalar = window.__snarky.Scalar;
