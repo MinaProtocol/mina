@@ -93,10 +93,14 @@ let output_cmds =
              (Public_key.Compressed.to_base58_check pk)
              sender_key))
 
-let there_and_back_again ~num_accts ~num_txn_per_acct ~txns_per_block ~slot_time
-    ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
+let pk_to_str pk =
+  pk |> Public_key.compress |> Public_key.Compressed.to_base58_check
+
+let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
+    ~rate_limit ~rate_limit_level ~rate_limit_interval
     ~origin_sender_secret_key_path
     ~(origin_sender_secret_key_pw_option : string option)
+    ~returner_secret_key_path ~(returner_secret_key_pw_option : string option)
     ~graphql_target_node_option () =
   let rate_limit =
     if rate_limit then
@@ -111,10 +115,16 @@ let there_and_back_again ~num_accts ~num_txn_per_acct ~txns_per_block ~slot_time
   in
   let batch_count = ref 0 in
   let base_send_amount = Currency.Amount.of_formatted_string "0" in
-  let fee_amount = Mina_base.Signed_command.minimum_fee in
-  let acct_creation_fee = Currency.Amount.of_formatted_string "1" in
+  let fee_amount =
+    Currency.Amount.to_fee
+      (Option.value_exn
+         (Currency.Amount.scale
+            (Currency.Amount.of_fee Mina_base.Signed_command.minimum_fee)
+            10))
+  in
+  (* let acct_creation_fee = Currency.Amount.of_formatted_string "1" in *)
   let initial_send_amount =
-    (* min_fee*num_txn_per_accts + base_send_amount*num_txn_per_accts + acct_creation_fee *)
+    (* min_fee*num_txn_per_accts + base_send_amount*num_txn_per_accts + acct_creation_fee*num_accounts *)
     let total_send_value =
       Option.value_exn (Currency.Amount.scale base_send_amount num_txn_per_acct)
     in
@@ -124,12 +134,14 @@ let there_and_back_again ~num_accts ~num_txn_per_acct ~txns_per_block ~slot_time
            (Currency.Amount.of_fee fee_amount)
            num_txn_per_acct)
     in
-    Option.value_exn
-      (Currency.Amount.add total_fees
-         (Option.value_exn
-            (Currency.Amount.add total_send_value acct_creation_fee)))
+    (* let total_acct_creation_fee =
+         Option.value_exn
+         (Currency.Amount.scale
+            ( acct_creation_fee)
+            num_accts)
+       in *)
+    Option.value_exn (Currency.Amount.add total_send_value total_fees)
   in
-  let generated_secrets = gen_secret_keys num_accts in
   (* define the limit function *)
   let limit =
     Option.iter rate_limit ~f:(fun rate_limit ->
@@ -142,62 +154,73 @@ let there_and_back_again ~num_accts ~num_txn_per_acct ~txns_per_block ~slot_time
     match graphql_target_node_option with Some s -> s | None -> "127.0.0.1"
   in
 
-  (* get the origin keypair from file *)
   let open Deferred.Let_syntax in
-  Format.printf "txn burst tool: grabbing keypair from path= %s@."
-    origin_sender_secret_key_path ;
-  let%bind (origin_sk : Marlin_plonk_bindings_pasta_fq.t) =
+  let get_keypair path pw_option =
+    Format.printf "txn burst tool: grabbing keypair from path= %s@." path ;
     let%bind keypair =
-      match origin_sender_secret_key_pw_option with
+      match pw_option with
       | Some s ->
-          Secrets.Keypair.read_exn ~privkey_path:origin_sender_secret_key_path
+          Secrets.Keypair.read_exn ~privkey_path:path
             ~password:(s |> Bytes.of_string |> Deferred.return |> Lazy.return)
       | None ->
-          Secrets.Keypair.read_exn' origin_sender_secret_key_path
+          Secrets.Keypair.read_exn' path
     in
-    Deferred.return keypair.private_key
+    let pk_str =
+      keypair.public_key |> Public_key.compress
+      |> Public_key.Compressed.to_base58_check
+    in
+    Format.printf "txn burst tool: successfully got keypair.  pk= %s@." pk_str ;
+    return keypair
   in
-  let origin_pk =
-    origin_sk |> Public_key.of_private_key_exn |> Public_key.compress
-  in
-  let origin_pk_str = origin_pk |> Public_key.Compressed.to_base58_check in
-  Format.printf "txn burst tool: successfully got keypair.  origin_pk= %s@."
-    origin_pk_str ;
 
-  (* graphql command to get the nonce *)
-  Format.printf
-    "txn burst tool: using graphql to get the nonce of the origin= %s, using \
-     graphql target node= %s@."
-    origin_pk_str graphql_target_node ;
-  let%bind origin_nonce =
-    let%bind querry_result =
-      get_account_data ~graphql_target_node ~public_key:origin_pk
-    in
-    match querry_result with
-    | Ok n ->
-        return (UInt32.of_int n)
-    | Error _ ->
-        Format.printf "txn burst tool: could not get nonce of origin sender@." ;
-        exit 1
+  (* get the origin keypair from file *)
+  let%bind origin_keypair =
+    get_keypair origin_sender_secret_key_path origin_sender_secret_key_pw_option
   in
-  Format.printf "txn burst tool: nonce obtained, nonce= %d@."
-    (UInt32.to_int origin_nonce) ;
+  (* get the returner keypair from file *)
+  let%bind returner_keypair =
+    get_keypair returner_secret_key_path returner_secret_key_pw_option
+  in
+
+  (* graphql command to get the nonces of origin and returner*)
+  let get_nonce pk =
+    Format.printf
+      "txn burst tool: using graphql to get the nonce of the account= %s, \
+       using graphql target node= %s@."
+      (pk_to_str pk) graphql_target_node ;
+    let%bind nonce =
+      let%bind querry_result =
+        get_account_data ~graphql_target_node ~public_key:pk
+      in
+      match querry_result with
+      | Ok n ->
+          return (UInt32.of_int n)
+      | Error _ ->
+          Format.printf "txn burst tool: could not get nonce of pk= %s@."
+            (pk_to_str pk) ;
+          exit 1
+    in
+    Format.printf "txn burst tool: nonce obtained, nonce= %d@."
+      (UInt32.to_int nonce) ;
+    return nonce
+  in
 
   (* there... *)
+  let%bind origin_nonce = get_nonce origin_keypair.public_key in
   let%bind _ =
-    Deferred.List.iter generated_secrets ~f:(fun sk ->
-        let acct_pk = Public_key.of_private_key_exn sk |> Public_key.compress in
-        let acct_pk_str = acct_pk |> Public_key.Compressed.to_base58_check in
+    (* in a previous version of the code there could be multiple returners, thus the iter.  keeping this structure in case we decide to change back later *)
+    Deferred.List.iter [ returner_keypair ] ~f:(fun kp ->
         Format.printf
           "txn burst tool: sending txn from origin= %s to receiver= %s with \
            amount=%s and fee=%s@."
-          origin_pk_str acct_pk_str
+          (pk_to_str origin_keypair.public_key)
+          (pk_to_str kp.public_key)
           (Currency.Amount.to_string initial_send_amount)
           (Currency.Fee.to_string fee_amount) ;
         let%bind res =
-          send_signed_transaction ~sender_priv_key:origin_sk ~nonce:origin_nonce
-            ~receiver_pub_key:acct_pk ~amount:initial_send_amount
-            ~fee:fee_amount ~graphql_target_node
+          send_signed_transaction ~sender_priv_key:origin_keypair.private_key
+            ~nonce:origin_nonce ~receiver_pub_key:kp.public_key
+            ~amount:initial_send_amount ~fee:fee_amount ~graphql_target_node
         in
         let%bind _ =
           match res with
@@ -212,24 +235,24 @@ let there_and_back_again ~num_accts ~num_txn_per_acct ~txns_per_block ~slot_time
   in
 
   (* and back again... *)
+  let%bind returner_nonce = get_nonce returner_keypair.public_key in
   let%bind _ =
-    Deferred.List.iter generated_secrets ~f:(fun sk ->
+    Deferred.List.iter [ returner_keypair ] ~f:(fun kp ->
         let rec do_command n : unit Deferred.t =
-          let acct_pk_str =
-            Public_key.of_private_key_exn sk
-            |> Public_key.compress |> Public_key.Compressed.to_base58_check
+          (* returner_nonce + ( num_txn_per_acct - n ) *)
+          let nce =
+            UInt32.add returner_nonce (UInt32.of_int (num_txn_per_acct - n))
           in
-          let nce = UInt32.of_int (num_txn_per_acct - n) in
           Format.printf
-            "txn burst tool: sending txn from acct= %s to origin with \
-             amount=%s and fee=%s@."
-            acct_pk_str
+            "txn burst tool: sending txn from acct= %s (nonce=%d) to origin \
+             with amount=%s and fee=%s@."
+            (pk_to_str kp.public_key) (UInt32.to_int nce)
             (Currency.Amount.to_string base_send_amount)
             (Currency.Fee.to_string fee_amount) ;
           let%bind res =
-            send_signed_transaction ~sender_priv_key:sk ~nonce:nce
-              ~receiver_pub_key:origin_pk ~amount:base_send_amount
-              ~fee:fee_amount ~graphql_target_node
+            send_signed_transaction ~sender_priv_key:kp.private_key ~nonce:nce
+              ~receiver_pub_key:origin_keypair.public_key
+              ~amount:base_send_amount ~fee:fee_amount ~graphql_target_node
           in
           let%bind _ =
             match res with
@@ -257,10 +280,7 @@ let output_there_and_back_cmds =
        then transfer them back again. The 'back again' commands are expressed \
        as GraphQL commands, so that we can pass a signature, rather than \
        having to load the secret key for each account"
-    (let%map_open num_accts =
-       flag "--num-accts" ~aliases:[ "num-accts" ]
-         ~doc:"NUM Number of keys to generate" (required int)
-     and num_txn_per_acct =
+    (let%map_open num_txn_per_acct =
        flag "--num-txn-per-acct" ~aliases:[ "num-txn-per-acct" ]
          ~doc:"NUM Number of transactions to run for each generated key"
          (required int)
@@ -313,6 +333,19 @@ let output_there_and_back_cmds =
            "PRIVATE_KEY Password to Private key to send the transactions from, \
             if this is not present then we use the env var MINA_PRIVKEY_PASS"
          (optional string)
+     and returner_secret_key_path =
+       flag "--returner-sk-path" ~aliases:[ "returner-sk-path" ]
+         ~doc:
+           "PRIVATE_KEY Path to Private key of account that returns the \
+            transactions"
+         (required string)
+     and returner_secret_key_pw_option =
+       flag "--returner-sk-pw" ~aliases:[ "returner-sk-pw" ]
+         ~doc:
+           "PRIVATE_KEY Password to Private key account that returns the \
+            transactions, if this is not present then we use the env var \
+            MINA_PRIVKEY_PASS"
+         (optional string)
      and graphql_target_node_option =
        flag "--graphql-target-node" ~aliases:[ "graphql-target-node" ]
          ~doc:
@@ -320,9 +353,10 @@ let output_there_and_back_cmds =
             format `<ip>:<port>`.  default is `127.0.0.1:3085`"
          (optional string)
      in
-     there_and_back_again ~num_accts ~num_txn_per_acct ~txns_per_block
-       ~slot_time ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
+     there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time
+       ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
        ~origin_sender_secret_key_path ~origin_sender_secret_key_pw_option
+       ~returner_secret_key_path ~returner_secret_key_pw_option
        ~graphql_target_node_option)
 
 let () =

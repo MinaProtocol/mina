@@ -77,10 +77,9 @@ query ($public_key: PublicKey) {
 
 let get_account_data ~public_key ~graphql_target_node =
   let open Deferred.Or_error.Let_syntax in
+  let pk = public_key |> Public_key.compress in
   let get_acct_data_obj =
-    Get_account_data.make
-      ~public_key:(Graphql_lib.Encoders.public_key public_key)
-      ()
+    Get_account_data.make ~public_key:(Graphql_lib.Encoders.public_key pk) ()
   in
   let%bind balance_obj =
     exec_graphql_request ~graphql_target_node get_acct_data_obj
@@ -88,7 +87,7 @@ let get_account_data ~public_key ~graphql_target_node =
   match balance_obj#account with
   | None ->
       Deferred.Or_error.errorf "Account with %s not found"
-        (Public_key.Compressed.to_string public_key)
+        (Public_key.Compressed.to_string pk)
   | Some acc -> (
       match acc#nonce with
       | Some s ->
@@ -96,7 +95,7 @@ let get_account_data ~public_key ~graphql_target_node =
       | None ->
           Deferred.Or_error.errorf
             "Account with %s somehow doesnt have a noince"
-            (Public_key.Compressed.to_string public_key) )
+            (Public_key.Compressed.to_string pk) )
 
 let send_signed_transaction ~sender_priv_key ~nonce ~receiver_pub_key ~amount
     ~fee ~graphql_target_node =
@@ -104,6 +103,8 @@ let send_signed_transaction ~sender_priv_key ~nonce ~receiver_pub_key ~amount
   let sender_pub_key =
     Public_key.of_private_key_exn sender_priv_key |> Public_key.compress
   in
+  let receiver_pk = receiver_pub_key |> Public_key.compress in
+
   let field, scalar =
     Mina_base.Signed_command.sign_payload sender_priv_key
       { common =
@@ -117,7 +118,7 @@ let send_signed_transaction ~sender_priv_key ~nonce ~receiver_pub_key ~amount
       ; body =
           Payment
             { source_pk = sender_pub_key
-            ; receiver_pk = receiver_pub_key
+            ; receiver_pk
             ; token_id = Mina_base.Token_id.default
             ; amount
             }
@@ -128,7 +129,7 @@ let send_signed_transaction ~sender_priv_key ~nonce ~receiver_pub_key ~amount
      (Snark_params.Tick.Inner_curve.Scalar.to_string scalar) ; *)
   let graphql_query =
     Send_payment.make
-      ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
+      ~receiver:(Graphql_lib.Encoders.public_key receiver_pk)
       ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
       ~amount:(Graphql_lib.Encoders.amount amount)
       ~fee:(Graphql_lib.Encoders.fee fee)
