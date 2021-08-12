@@ -56,7 +56,7 @@ RUN apt-get update \
     capnproto
 
 # Create opam user (for later) and give sudo to make opam happy
-RUN adduser --uid 65534 --disabled-password --gecos '' opam \
+RUN adduser --uid 65533 --disabled-password --gecos '' opam \
   && passwd -l opam \
   && chown -R opam:opam /home/opam \
   && echo 'opam ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/opam \
