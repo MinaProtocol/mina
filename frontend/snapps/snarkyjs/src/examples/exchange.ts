@@ -1,7 +1,7 @@
 // import { MerkleCollection, MerkleProof } from '../mina.js';
 import { Circuit as C, Field, Bool, AsField, Scalar } from '../bindings/snarky2';
 import { public_, circuitMain, prop, CircuitValue } from '../circuit_value';
-import { HTTPSAttestation, Bytes } from './exchange_lib';
+import { Trade, HTTPSAttestation, Bytes, WebSnappRequest } from './exchange_lib';
 import { Signature } from '../signature';
 
 // Proof of bought low sold high for bragging rights
@@ -21,37 +21,12 @@ class Witness extends CircuitValue {
   }
 }
 
-class Trade {
-  timestamp: Field
-  isBuy: Bool
-  price: Field
-  quantity: Field
-
-  static read(bs: Bytes): [Bytes, Trade] | null {
-    if (bs.value.length === 0) {
-      return null;
-    }
-    let t = bs.value[0];
-    let trade = new Trade(t.isBuy, t.price, t.quantity, t.timestamp);
-    return [ new Bytes(bs.value.slice(1)), trade ];
-  }
-
-  constructor(isBuy: Bool, price: Field, quantity: Field, time: Field) {
-    this.isBuy = isBuy;
-    this.price = price;
-    this.quantity = quantity;
-    this.timestamp = time;
-  }
-}
-
-console.log("circuitis", C);
-
 export class Main extends C {
   @circuitMain
   // percentGain is an integer in basis points
   static main(witness: Witness, @public_ percentChange : Field) {
-    witness.attestation.verify(Bytes.ofString('api.coinbase.com/trades'));
-    const trades = Bytes.readAll(Trade, witness.attestation.response);
+    witness.attestation.verify(WebSnappRequest.ofString('api.coinbase.com/trades'));
+    const trades = Trade.readAll(witness.attestation.response);
 
     let buy = getElt(trades, witness.buyIndex);
     let sell = getElt(trades, witness.sellIndex);
@@ -70,10 +45,8 @@ export class Main extends C {
       buyTotal.mul(FULL_BASIS));
   }
 }
-console.log("after-circuitis", Main);
 
-function getElt<A>(xs: Array<A>, i_ : AsField) : A {
-  let i = new Field(i_);
+function getElt<A>(xs: Array<A>, i : Field) : A {
   let [ x, found ] = xs.reduce(([acc, found], x, j) => {
     let eltHere = i.equals(j);
     return [ C.if(eltHere, x, acc), found.or(eltHere) ];
@@ -82,17 +55,28 @@ function getElt<A>(xs: Array<A>, i_ : AsField) : A {
   return x;
 }
 
-export function main() {
-  const before = new Date();
-  const kp = Main.generateKeypair();
-  const after = new Date();
-  console.log('keypairgen', after.getTime() - before.getTime());
+type TradeObject = { timestamp: Field, price: Field, quantity: Field, isBuy: Bool };
+function trade({ timestamp, price, quantity, isBuy } : TradeObject) : Trade {
+  return new Trade(isBuy, price, quantity, timestamp);
+}
 
+export function main() {
+  let before = new Date();
+  const kp = Main.generateKeypair();
+  let after = new Date();
+  console.log('generated keypair: ', after.getTime() - before.getTime());
+
+  const publicInput = [ new Field(25) ];
+  before = new Date();
   const proof = Main.prove([
     { buyIndex: new Field(0), sellIndex: new Field(1), attestation: new HTTPSAttestation(new Bytes([
-      { timestamp: new Field(150), price: new Field(100), quantity: new Field(5), isBuy: new Bool(true) },
-      { timestamp: new Field(250), price: new Field(500), quantity: new Field(4), isBuy: new Bool(false) }
+      trade({ timestamp: new Field(150), price: new Field(100), quantity: new Field(5), isBuy: new Bool(true) }),
+      trade({ timestamp: new Field(250), price: new Field(500), quantity: new Field(4), isBuy: new Bool(false) })
     ]), new Signature(new Field(1), Scalar.random()))  }
-  ], [ new Field(25) ], kp);
-  console.log(proof, kp);
+  ], publicInput, kp);
+  after = new Date();
+
+  console.log('generated proof: ', after.getTime() - before.getTime());
+  const vk = kp.verificationKey();
+  console.log(proof, kp, 'verified?', proof.verify(vk, publicInput));
 };

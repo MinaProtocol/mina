@@ -1,38 +1,52 @@
 // import { MerkleCollection, MerkleProof } from '../mina.js';
-import { Scalar, Group, Bool, Field } from '../bindings/snarky2';
+import { Circuit, Scalar, Group, Bool, Field } from '../bindings/snarky2';
 import { prop, CircuitValue } from '../circuit_value';
 import { Signature } from '../signature';
 
-type TradeObject = { timestamp: Field, price: Field, quantity: Field, isBuy: Bool };
+// type TradeObject = { timestamp: Field, price: Field, quantity: Field, isBuy: Bool };
+
+export class Trade extends CircuitValue {
+  @prop isBuy: Bool
+  @prop price: Field
+  @prop quantity: Field
+  @prop timestamp: Field
+
+  constructor(isBuy: Bool, price: Field, quantity: Field, timestamp: Field) {
+    super();
+    this.isBuy = isBuy;
+    this.price = price;
+    this.quantity = quantity;
+    this.timestamp = timestamp;
+  }
+
+  static readAll(bytes: Bytes) : Array<Trade> {
+    return bytes.value;
+  }
+}
+
+console.log('trade size', Trade.sizeInFieldElements());
+
+const numTrades = 2;
 
 export class Bytes extends CircuitValue {
-  value: Array<TradeObject>
+  value: Array<Trade>
 
-  toFieldElements(this:Bytes): Field[] { return [] }
-
-  constructor(value: Array<TradeObject>) {
+  constructor(value: Array<Trade>) {
     super();
+    console.assert(value.length === numTrades);
     this.value = value;
   }
+}
 
-  static ofString(_ : string): Bytes {
-    return new Bytes([]);
+(Bytes.prototype as any)._fields = [ ['value', Circuit.array(Trade, numTrades) ] ];
+
+export class WebSnappRequest extends CircuitValue {
+  constructor() {
+    super()
   }
 
-  static readAll<A>(ctor: { read: (bs:Bytes) => null | [Bytes, A] }, bs: Bytes): Array<A> {
-    let xs = [];
-    let res;
-    while (true) {
-      res = ctor.read(bs);
-      if (res === null) {
-        break;
-      } else {
-        let [ bsPrime, x ] = res;
-        bs = bsPrime;
-        xs.push(x);
-      }
-    }
-    return xs;
+  static ofString(_ : string): WebSnappRequest {
+    return new WebSnappRequest();
   }
 }
 
@@ -46,7 +60,7 @@ export class HTTPSAttestation extends CircuitValue {
     this.signature = sig;
   }
 
-  verify(_request: Bytes) {
+  verify(_request: WebSnappRequest) {
     //const O1PUB: Group = Group.generator;
     //this.signature.verify(O1PUB, request.toFieldElements().concat(this.response.toFieldElements()))
   }
