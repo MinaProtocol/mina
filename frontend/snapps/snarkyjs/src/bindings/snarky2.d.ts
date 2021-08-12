@@ -1,9 +1,15 @@
 export type JSONValue = number | string | boolean | null | Array<JSON> | { [key: string]: JSONValue };
 
+export class VerificationKey {
+  verify(publicInput: any[], proof: Proof): boolean;
+}
+
 export class Keypair {
+  verificationKey(): VerificationKey;
 }
 
 export class Proof {
+  verify(verificationKey: VerificationKey, publicInput: any[]): boolean;
 }
 
 export type AsField = Field | number | string | boolean;
