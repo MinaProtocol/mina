@@ -21,7 +21,6 @@ __webpack_require__.r(__webpack_exports__);
 var Field = window.__snarky.Field;
 var Bool = window.__snarky.Bool;
 var Circuit = window.__snarky.Circuit;
-console.log(Circuit);
 var Poseidon = window.__snarky.Poseidon;
 var Group = window.__snarky.Group;
 var Scalar = window.__snarky.Scalar;
