@@ -7,7 +7,8 @@ export type Tuple<A, _N extends number> = Array<A>;
 
 export abstract class CircuitValue {
   static sizeInFieldElements(): number {
-    return (this as any).prototype._sizeInFieldElements || 0;
+    const fields : [string, any][] = (this as any).prototype._fields;
+    return fields.reduce((acc, [_, typ]) => acc + typ.sizeInFieldElements(), 0);
   }
 
   static toFieldElements<T>(this: Constructor<T>, v: T): Field[] {
@@ -100,17 +101,9 @@ export function prop(this: any, target: any, key: string) {
     target._fields = [];
   }
 
-  if (
-    target._sizeInFieldElements === undefined ||
-    target._sizeInFieldElements === null
-  ) {
-    target._sizeInFieldElements = 0;
-  }
-
   if (fieldType === undefined) {
   } else if (fieldType.toFieldElements && fieldType.ofFieldElements) {
     target._fields.push([key, fieldType]);
-    target._sizeInFieldElements += fieldType.sizeInFieldElements();
   } else {
     console.log(
       `warning: property ${key} missing field element conversion methods`
