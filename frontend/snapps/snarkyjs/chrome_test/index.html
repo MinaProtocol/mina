@@ -13,17 +13,18 @@
       import init, * as plonk_wasm from "./plonk_wasm.js";
       window.plonk_wasm = plonk_wasm;
       await init();
-      plonk_wasm.initThreadPool(navigator.hardwareConcurrency);
-      // import * as snarky from "./snarky_js_chrome.bc.js";
-      // window.snarky = snarky;
-      /* Don't load the script until we're done initialising. */
-      var newScript = document.createElement("script");
-      newScript.src = "./snarky_js_chrome.bc.js";
-      document.body.appendChild(newScript);
-      newScript.addEventListener('load', () => {
+      plonk_wasm.initThreadPool(navigator.hardwareConcurrency).then(function() {
+        // import * as snarky from "./snarky_js_chrome.bc.js";
+        // window.snarky = snarky;
+        /* Don't load the script until we're done initialising. */
         var newScript = document.createElement("script");
-        newScript.src = "./snarkyjs_chrome.js";
+        newScript.src = "./snarky_js_chrome.bc.js";
         document.body.appendChild(newScript);
+        newScript.addEventListener('load', () => {
+          var newScript = document.createElement("script");
+          newScript.src = "./snarkyjs_chrome.js";
+          document.body.appendChild(newScript);
+        });
       });
     </script>
   </body>
