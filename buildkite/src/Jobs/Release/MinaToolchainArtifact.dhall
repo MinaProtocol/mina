@@ -22,7 +22,9 @@ Pipeline.build
     spec =
       JobSpec::{
         dirtyWhen = [
-          S.strictlyStart (S.contains "dockerfiles/Dockerfile-toolchain"),
+          S.strictlyStart (S.contains "dockerfiles/stages/1-"),
+          S.strictlyStart (S.contains "dockerfiles/stages/2-"),
+          S.strictlyStart (S.contains "dockerfiles/stages/3-"),
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact")
         ],
         path = "Release",
@@ -52,7 +54,20 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep toolchainStretchSpec
+      DockerImage.generateStep toolchainStretchSpec,
+
+      -- mina-rosetta-ubuntu Ubuntu Rosetta image
+      let toolchainStretchSpec = DockerImage.ReleaseSpec::{
+        deps=dependsOn,
+        service="mina-rosetta-ubuntu",
+        deb_codename="buster",
+        extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO}",
+        step_key="mina-rosetta-ubuntu-docker-image",
+      }
+
+      in
+
+      DockerImage.generateStep rosettaUbuntuSpec
 
     ]
   }

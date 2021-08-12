@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-toolchain' 'bot' 'leaderboard')
+VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-rosetta-ubuntu' 'mina-toolchain' 'bot' 'leaderboard')
 
 function usage() {
   if [ -n "$1" ]; then
@@ -69,6 +69,9 @@ mina-toolchain)
   ;;
 mina-rosetta)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-production"
+  ;;
+mina-rosetta-ubuntu)
+  DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu"
   ;;
 leaderboard)
   DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
