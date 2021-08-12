@@ -2,7 +2,7 @@
 # The "production" Stage
 # - sets up the final container with built binaries and a running postgresql archive node setup
 #################################################################################################
-FROM ubuntu:20.04 AS production
+FROM ubuntu:18.04 AS production
 
 ARG POSTGRES_DATA_DIR=/data/postgresql
 ARG MINA_DAEMON_PORT=10101
@@ -22,20 +22,15 @@ RUN apt-get -y update \
     dnsutils \
     dumb-init \
     gettext \
-    libffi6 \
     libgmp10 \
     libgomp1 \
     libssl1.1 \
     postgresql \
     postgresql-contrib \
-    man \
-    tzdata
-
-# Assumes "debian buster" / ubuntu 20.04 depedencies
-RUN sudo apt-get update -y \
-     && sudo apt-get install -y \
-         libjemalloc2 \
-         libprocps8
+    tzdata \
+    libjemalloc1 \
+    libprocps6 \
+    libffi6
 
 # Make all directories for configuration and empty s3 cache dirs
 RUN mkdir -p /tmp/s3_cache_dir \
