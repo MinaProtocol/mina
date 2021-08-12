@@ -513,6 +513,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 
 		app.writeMsg(validateUpcall{
 			Sender:     sender,
+			SeenAt:     time.Now().UnixNano(),
 			Expiration: deadline.UnixNano(),
 			Data:       codaEncode(msg.Data),
 			Seqno:      seqno,
@@ -529,6 +530,8 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			// coda process gets around to it.
 			app.P2p.Logger.Error("validation timed out :(")
 
+			validationTimeoutMetric.Inc()
+
 			app.ValidatorMutex.Lock()
 
 			now := time.Now()
@@ -543,6 +546,11 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			app.P2p.Logger.Info("unvalidated :(")
 			return pubsub.ValidationReject
 		case res := <-ch:
+
+			validationTime := time.Since(deadline)
+
+			validationTimeMetric.Set(float64(validationTime.Nanoseconds()))
+
 			switch res {
 			case rejectResult:
 				app.P2p.Logger.Info("why u fail to validate :(")
@@ -610,6 +618,7 @@ func (u *unsubscribeMsg) run(app *app) (interface{}, error) {
 
 type validateUpcall struct {
 	Sender     *codaPeerInfo `json:"sender"`
+	SeenAt     int64         `json:"seen_at"`
 	Expiration int64         `json:"expiration"`
 	Data       string        `json:"data"`
 	Seqno      int           `json:"seqno"`
@@ -1558,9 +1567,21 @@ var connectionCountMetric = prometheus.NewGauge(prometheus.GaugeOpts{
 	Help: "Number of active connections, according to the CodaConnectionManager.",
 })
 
+var validationTimeoutMetric = prometheus.NewCounter(prometheus.CounterOpts{
+	Name: "Mina_libp2p_validation_timeout_counter",
+	Help: "Number of message validation timeouts",
+})
+
+var validationTimeMetric = prometheus.NewGauge(prometheus.GaugeOpts{
+	Name: "Mina_libp2p_message_validation_time in ns",
+	Help: "Message validation time",
+})
+
 func init() {
 	// === Register metrics collectors here ===
 	prometheus.MustRegister(connectionCountMetric)
+	prometheus.MustRegister(validationTimeoutMetric)
+	prometheus.MustRegister(validationTimeMetric)
 	http.Handle("/metrics", promhttp.Handler())
 }
 

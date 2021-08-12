@@ -9,13 +9,20 @@ module Timeout = Timeout_lib.Core_time_ns
 module Validation_callback = struct
   type validation_result = [ `Accept | `Reject | `Ignore ] [@@deriving equal]
 
-  type t = { expiration : Time_ns.t option; signal : validation_result Ivar.t }
+  type t =
+    { expiration : Time_ns.t option
+    ; signal : validation_result Ivar.t
+    ; mutable message_type : [ `Unknown | `Block | `Snark_work | `Transaction ]
+    }
 
   let create expiration =
-    { expiration = Some expiration; signal = Ivar.create () }
+    { expiration = Some expiration
+    ; signal = Ivar.create ()
+    ; message_type = `Unknown
+    }
 
   let create_without_expiration () =
-    { expiration = None; signal = Ivar.create () }
+    { expiration = None; signal = Ivar.create (); message_type = `Unknown }
 
   let is_expired cb =
     match cb.expiration with
@@ -23,6 +30,43 @@ module Validation_callback = struct
         false
     | Some expires_at ->
         Time_ns.(now () >= expires_at)
+
+  let record_timeout_metrics cb =
+    match cb.message_type with
+    | `Unknown ->
+        Mina_metrics.(Counter.inc_one Network.validations_timed_out)
+    | `Block ->
+        Mina_metrics.(Counter.inc_one Network.block_validations_timed_out)
+    | `Snark_work ->
+        Mina_metrics.(Counter.inc_one Network.snark_work_validations_timed_out)
+    | `Transaction ->
+        Mina_metrics.(Counter.inc_one Network.transaction_validations_timed_out)
+
+  let record_validation_metrics message_type (result : validation_result)
+      validation_time =
+    match (message_type, result) with
+    | `Unknown, _ ->
+        (*should not be unknown if the result was computed*)
+        ()
+    | `Block, `Ignore ->
+        Mina_metrics.(Counter.inc_one Network.blocks_ignored)
+    | `Block, `Reject ->
+        Mina_metrics.(Counter.inc_one Network.blocks_rejected)
+    | `Block, `Accept ->
+        Mina_metrics.(Network.Block_validation_time.update validation_time)
+    | `Snark_work, `Ignore ->
+        Mina_metrics.(Counter.inc_one Network.snark_work_ignored)
+    | `Snark_work, `Reject ->
+        Mina_metrics.(Counter.inc_one Network.snark_work_rejected)
+    | `Snark_work, `Accept ->
+        Mina_metrics.(Network.Snark_work_validation_time.update validation_time)
+    | `Transaction, `Ignore ->
+        Mina_metrics.(Counter.inc_one Network.transactions_ignored)
+    | `Transaction, `Reject ->
+        Mina_metrics.(Counter.inc_one Network.transactions_rejected)
+    | `Transaction, `Accept ->
+        Mina_metrics.(
+          Network.Transaction_validation_time.update validation_time)
 
   let await_timeout cb =
     if is_expired cb then Deferred.return ()
@@ -36,7 +80,7 @@ module Validation_callback = struct
             @@ Time_ns.diff expires_at (Time_ns.now ()) )
 
   let await cb =
-    if is_expired cb then Deferred.return None
+    if is_expired cb then (record_timeout_metrics cb ; Deferred.return None)
     else
       match cb.expiration with
       | None ->
@@ -48,9 +92,14 @@ module Validation_callback = struct
               (Ivar.read cb.signal)
           with
           | `Ok result ->
+              let validation_time =
+                Time_ns.diff expires_at (Time_ns.now ())
+                |> Time_ns.Span.to_ms |> Time.Span.of_ms
+              in
+              record_validation_metrics cb.message_type result validation_time ;
               Some result
           | `Timeout ->
-              None )
+              record_timeout_metrics cb ; None )
 
   let await_exn cb =
     match%map await cb with None -> failwith "timeout" | Some result -> result
@@ -66,6 +115,8 @@ module Validation_callback = struct
       if Ivar.is_full cb.signal then
         [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
       Ivar.fill cb.signal result )
+
+  let set_message_type t x = t.message_type <- x
 end
 
 (** simple types for yojson to derive, later mapped into a Peer.t *)
@@ -838,6 +889,7 @@ module Helper = struct
       type t =
         { sender : peer_info option
         ; data : Data.t
+        ; seen_at : int64
         ; expiration : int64
         ; seqno : int
         ; upcall : string
@@ -985,6 +1037,13 @@ module Helper = struct
         let%bind m = Validate.of_yojson v |> or_error in
         let idx = m.subscription_idx in
         let seqno = m.seqno in
+        let ipc_delay =
+          ( Time_ns.Span.to_int_ms @@ Time_ns.to_span_since_epoch
+          @@ Time_ns.now () )
+          - Int64.to_int_exn m.seen_at
+        in
+        Mina_metrics.(
+          Gauge.set Network.libp2p_daemon_IPC_delay (float_of_int ipc_delay)) ;
         match Hashtbl.find t.subscriptions idx with
         | Some sub ->
             (let open Deferred.Let_syntax in
@@ -1010,6 +1069,8 @@ module Helper = struct
                       ()
                   | `Call f ->
                       f (wrap m.sender raw_data) e ) ;
+                  Mina_metrics.(
+                    Counter.inc_one Network.gossip_messages_failed_to_decode) ;
                   [%log' error t.logger]
                     "failed to decode message published on subscription $topic \
                      ($idx): $error"
@@ -1026,19 +1087,17 @@ module Helper = struct
                   "validation callback timed out before we could respond" ;
                 Deferred.unit
             | Some action -> (
+                let is_valid =
+                  match action with
+                  | `Accept ->
+                      "accept"
+                  | `Reject ->
+                      "reject"
+                  | `Ignore ->
+                      "ignore"
+                in
                 match%map
-                  do_rpc t
-                    (module Rpcs.Validation_complete)
-                    { seqno
-                    ; is_valid =
-                        ( match action with
-                        | `Accept ->
-                            "accept"
-                        | `Reject ->
-                            "reject"
-                        | `Ignore ->
-                            "ignore" )
-                    }
+                  do_rpc t (module Rpcs.Validation_complete) { seqno; is_valid }
                 with
                 | Ok "validationComplete success" ->
                     ()
