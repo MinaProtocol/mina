@@ -1,6 +1,6 @@
 # kubectl apply -f helm/cron_jobs/devnet-txn-burst-cronjob.yaml
 # the above command, with this accompanying file, needs only be run once.  it does not get run in CI.  this file is provided here for future reference
-# make sure you're in devnet2
+# make sure you're in the devnet2 namespace
 apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
@@ -17,9 +17,10 @@ spec:
             - /bin/bash
             - -c
             - '
-
+echo "booting mina daemon";
 mina daemon --generate-genesis-proof true --peer-list-url https://storage.googleapis.com/seed-lists/devnet_seeds.txt --background;
-sleep 480;echo "done sleeping";
+sleep 480;
+echo "done sleeping";
 while true; do
   STATUS=$(mina client status | grep "Sync status");
   echo "$STATUS" | grep "Synced";
@@ -33,20 +34,20 @@ while true; do
   fi;
 done;
 
+
 mkdir /tmpkeys;
 chmod 700 /tmpkeys;
-cp /keys/key /tmpkeys;
-chmod 600 /tmpkeys/key;
-export MINA_PRIVKEY_PASS="naughty blue worm";
-echo $MINA_PRIVKEY_PASS;
-./_build/default/src/app/batch_generate_keys/batch_generate_keys.exe gen-there-and-back-txns --num-accts 1 --num-txn-per-acct 10 --origin-sender-sk-path /tmpkeys/key --origin-sender-sk-pw "naughty blue worm" > txn_burst.sh;
-chmod 777 txn_burst.sh;
 
-echo "ran batch gen keys";
-cat txn_burst.sh;
-./txn_burst.sh;
+cp /keys/whale-key/online-whale-account-1-key /tmpkeys;
+chmod 600 /tmpkeys/online-whale-account-1-key;
+cp /keys/fish-key/online-fish-account-1-key /tmpkeys;
+chmod 600 /tmpkeys/online-fish-account-1-key;
 
-while true; do echo looping; sleep 10; done;
+./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe gen-there-and-back-txns --num-txn-per-acct 100 --rate-limit-level 1 --rate-limit-interval 5000 --origin-sender-sk-path "/tmpkeys/online-whale-account-1-key" --origin-sender-sk-pw "naughty blue worm" --returner-sk-path "/tmpkeys/online-fish-account-1-key" --returner-sk-pw "naughty blue worm";
+
+echo "ran batch txns";
+
+while true; do echo looping; sleep 120; done;
             '
             
             env:
@@ -54,15 +55,17 @@ while true; do echo looping; sleep 10; done;
               value: ""
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: gcr.io/o1labs-192920/mina-txn-burst-app@sha256:7d0b2f426eea52d2ff3e76b5bb86da345451953a6a6834b16f8c063389615d71
+            image: gcr.io/o1labs-192920/mina-txn-burst-app@sha256:405f6c545eab62a5ce55bf66c123f81b3c8dd0ff4bccac6a4500103ec8a03e6c
             imagePullPolicy: IfNotPresent
             name: devnet-txn-burst-cronjob
             resources: {}
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
             volumeMounts:
-            - mountPath: /keys/
-              name: private-keys
+            - mountPath: /keys/whale-key/
+              name: whale-key
+            - mountPath: /keys/fish-key/
+              name: fish-key
           dnsPolicy: ClusterFirst
           restartPolicy: Never
           schedulerName: default-scheduler
@@ -70,23 +73,42 @@ while true; do echo looping; sleep 10; done;
           terminationGracePeriodSeconds: 30
           volumes: [
             {
-              "name": "private-keys",
+              "name": "whale-key",
               "secret": {
                 "defaultMode": 0600,
                 "items": [
                   {
                     "key": "key",
-                    "path": "key"
+                    "path": "online-whale-account-1-key"
                   },
                   {
                     "key": "pub",
-                    "path": "key.pub"
+                    "path": "online-whale-account-1-key.pub"
                   }
                 ],
                 "secretName": "online-whale-account-1-key"
               }
+            },
+            {
+              "name": "fish-key",
+              "secret": {
+                "defaultMode": 0600,
+                "items": [
+                  {
+                    "key": "key",
+                    "path": "online-fish-account-1-key"
+                  },
+                  {
+                    "key": "pub",
+                    "path": "online-fish-account-1-key.pub"
+                  }
+                ],
+                "secretName": "online-fish-account-1-key"
+              }
             }
+
           ]
-  schedule: 0 0 * * *
+  schedule: 0 13 * * * 
+  # every day at 1pm GMT, which is 6am PST
   successfulJobsHistoryLimit: 3
   suspend: false

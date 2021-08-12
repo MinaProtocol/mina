@@ -114,6 +114,21 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     else None
   in
   let batch_count = ref 0 in
+  (* define the rate limiting function function *)
+  let limit =
+    Option.iter rate_limit ~f:(fun rate_limit ->
+        if !batch_count >= rate_limit then (
+          let delayamount = Float.of_int rate_limit_interval /. 1000. in
+          Format.printf
+            "txn burst tool: rate limiting, pausing for %f seconds... @."
+            delayamount ;
+          Thread.delay delayamount ;
+          (* Format.printf "sleep %f@." Float.(of_int rate_limit_interval /. 1000.) ; *)
+          batch_count := 0 )
+        else incr batch_count)
+  in
+
+  (* contants regarding send amount and fees *)
   let base_send_amount = Currency.Amount.of_formatted_string "0" in
   let fee_amount =
     Currency.Amount.to_fee
@@ -142,18 +157,12 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
        in *)
     Option.value_exn (Currency.Amount.add total_send_value total_fees)
   in
-  (* define the limit function *)
-  let limit =
-    Option.iter rate_limit ~f:(fun rate_limit ->
-        if !batch_count >= rate_limit then (
-          Format.printf "sleep %f@." Float.(of_int rate_limit_interval /. 1000.) ;
-          batch_count := 0 )
-        else incr batch_count)
-  in
+
   let graphql_target_node =
     match graphql_target_node_option with Some s -> s | None -> "127.0.0.1"
   in
 
+  (* helper function for getting a keypair from a local path *)
   let open Deferred.Let_syntax in
   let get_keypair path pw_option =
     Format.printf "txn burst tool: grabbing keypair from path= %s@." path ;
@@ -173,16 +182,15 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     return keypair
   in
 
-  (* get the origin keypair from file *)
+  (* get the keypairs from files *)
   let%bind origin_keypair =
     get_keypair origin_sender_secret_key_path origin_sender_secret_key_pw_option
   in
-  (* get the returner keypair from file *)
   let%bind returner_keypair =
     get_keypair returner_secret_key_path returner_secret_key_pw_option
   in
 
-  (* graphql command to get the nonces of origin and returner*)
+  (* helper function that uses graphql command to get the nonce of a node*)
   let get_nonce pk =
     Format.printf
       "txn burst tool: using graphql to get the nonce of the account= %s, \
@@ -205,67 +213,54 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     return nonce
   in
 
+  (* helper function that sends a transaction*)
+  let do_txn ~(sender_kp : Keypair.t) ~(receiver_kp : Keypair.t) ~nonce =
+    Format.printf
+      "txn burst tool: sending txn from sender= %s (nonce=%d) to receiver= %s \
+       with amount=%s and fee=%s@."
+      (pk_to_str sender_kp.public_key)
+      (UInt32.to_int nonce)
+      (pk_to_str receiver_kp.public_key)
+      (Currency.Amount.to_string initial_send_amount)
+      (Currency.Fee.to_string fee_amount) ;
+    let%bind res =
+      send_signed_transaction ~sender_priv_key:sender_kp.private_key ~nonce
+        ~receiver_pub_key:receiver_kp.public_key ~amount:initial_send_amount
+        ~fee:fee_amount ~graphql_target_node
+    in
+    let%bind _ =
+      match res with
+      | Ok _ ->
+          return (Format.printf "txn burst tool: txn sent successfully!@.")
+      | Error e ->
+          return
+            (Format.printf "txn burst tool: txn failed with error %s@."
+               (Error.to_string_hum e))
+    in
+    return limit
+  in
+
   (* there... *)
-  let%bind origin_nonce = get_nonce origin_keypair.public_key in
   let%bind _ =
     (* in a previous version of the code there could be multiple returners, thus the iter.  keeping this structure in case we decide to change back later *)
     Deferred.List.iter [ returner_keypair ] ~f:(fun kp ->
-        Format.printf
-          "txn burst tool: sending txn from origin= %s to receiver= %s with \
-           amount=%s and fee=%s@."
-          (pk_to_str origin_keypair.public_key)
-          (pk_to_str kp.public_key)
-          (Currency.Amount.to_string initial_send_amount)
-          (Currency.Fee.to_string fee_amount) ;
-        let%bind res =
-          send_signed_transaction ~sender_priv_key:origin_keypair.private_key
-            ~nonce:origin_nonce ~receiver_pub_key:kp.public_key
-            ~amount:initial_send_amount ~fee:fee_amount ~graphql_target_node
-        in
-        let%bind _ =
-          match res with
-          | Ok id ->
-              return (Format.printf "txn burst tool: sent txn, txn id=%s@." id)
-          | Error e ->
-              return
-                (Format.printf "txn burst tool: txn failed with error %s@."
-                   (Error.to_string_hum e))
-        in
-        return limit)
+        let%bind origin_nonce = get_nonce origin_keypair.public_key in
+        (* we could also get the origin nonce outside the iter and then just increment by 1 every iter *)
+        do_txn ~sender_kp:origin_keypair ~receiver_kp:kp ~nonce:origin_nonce)
   in
 
   (* and back again... *)
-  let%bind returner_nonce = get_nonce returner_keypair.public_key in
   let%bind _ =
     Deferred.List.iter [ returner_keypair ] ~f:(fun kp ->
+        let%bind returner_nonce = get_nonce kp.public_key in
         let rec do_command n : unit Deferred.t =
-          (* returner_nonce + ( num_txn_per_acct - n ) *)
+          (* nce = returner_nonce + ( num_txn_per_acct - n ) *)
           let nce =
             UInt32.add returner_nonce (UInt32.of_int (num_txn_per_acct - n))
           in
-          Format.printf
-            "txn burst tool: sending txn from acct= %s (nonce=%d) to origin \
-             with amount=%s and fee=%s@."
-            (pk_to_str kp.public_key) (UInt32.to_int nce)
-            (Currency.Amount.to_string base_send_amount)
-            (Currency.Fee.to_string fee_amount) ;
-          let%bind res =
-            send_signed_transaction ~sender_priv_key:kp.private_key ~nonce:nce
-              ~receiver_pub_key:origin_keypair.public_key
-              ~amount:base_send_amount ~fee:fee_amount ~graphql_target_node
-          in
           let%bind _ =
-            match res with
-            | Ok id ->
-                return
-                  (Format.printf
-                     "txn burst tool: txn sent successfully, txn id=%s@." id)
-            | Error e ->
-                return
-                  (Format.printf "txn burst tool: txn failed with error--\n%s@."
-                     (Error.to_string_hum e))
+            do_txn ~sender_kp:kp ~receiver_kp:origin_keypair ~nonce:nce
           in
-          let%bind _ = return limit in
           if n > 1 then do_command (n - 1) else return ()
         in
         do_command num_txn_per_acct)
