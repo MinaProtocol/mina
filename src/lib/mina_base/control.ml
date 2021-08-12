@@ -7,6 +7,16 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
+  module V2 = struct
+    type t =
+      | Proof of Pickles.Side_loaded.Proof.Stable.V1.t
+      | Signature of Signature.Stable.V1.t
+      | None_given
+    [@@deriving sexp, equal, yojson, hash, compare]
+
+    let to_latest = Fn.id
+  end
+
   module V1 = struct
     type t =
       | Proof of Pickles.Side_loaded.Proof.Stable.V1.t
@@ -18,7 +28,16 @@ module Stable = struct
       | None_given
     [@@deriving sexp, equal, yojson, hash, compare]
 
-    let to_latest = Fn.id
+    let to_latest : t -> V2.t = function
+      | Proof proof ->
+          Proof proof
+      | Signature signature ->
+          Signature signature
+      | None_given ->
+          None_given
+      | Both _ ->
+          failwith
+            "Control.Stable.V1.to_latest: Both variant is no longer supported"
   end
 end]
 
@@ -26,6 +45,13 @@ end]
 
 [%%versioned
 module Stable = struct
+  module V2 = struct
+    type t = Proof of unit | Signature of Signature.Stable.V1.t | None_given
+    [@@deriving sexp, equal, yojson, hash, compare]
+
+    let to_latest = Fn.id
+  end
+
   module V1 = struct
     type t =
       | Proof of unit
@@ -34,22 +60,29 @@ module Stable = struct
       | None_given
     [@@deriving sexp, equal, yojson, hash, compare]
 
-    let to_latest = Fn.id
+    let to_latest : t -> V2.t = function
+      | Proof proof ->
+          Proof proof
+      | Signature signature ->
+          Signature signature
+      | None_given ->
+          None_given
+      | Both _ ->
+          failwith
+            "Control.Stable.V1.to_latest: Both variant is no longer supported"
   end
 end]
 
 [%%endif]
 
 module Tag = struct
-  type t = Proof | Signature | Both | None_given
+  type t = Proof | Signature | None_given [@@deriving equal, compare, sexp]
 end
 
 let tag : t -> Tag.t = function
   | Proof _ ->
       Proof
   | Signature _ ->
-      Both
-  | Both _ ->
-      Both
+      Signature
   | None_given ->
       None_given

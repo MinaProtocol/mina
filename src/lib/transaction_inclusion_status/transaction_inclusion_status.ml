@@ -45,8 +45,8 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
             List.exists (Transition_frontier.Breadcrumb.commands breadcrumb)
               ~f:(fun { data = cmd'; _ } ->
                 match cmd' with
-                | Snapp_command _ ->
-                    false
+                | Parties _ ->
+                    failwith "TODO"
                 | Signed_command cmd' ->
                     Signed_command.equal cmd (Signed_command.forget_check cmd'))
           in
