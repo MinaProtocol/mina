@@ -1,7 +1,9 @@
 {
-  "version": "0.1.3",
+  "name": "@o1labs/snarkyjs-node",
+  "description": "Node bindings for SnarkyJS",
+  "version": "0.1.1",
   "license": "Apache-2.0",
-  "main": "dist/snarkyjs_chrome.js",
+  "main": "dist/snarkyjs_node.js",
   "typings": "dist/index.d.ts",
   "files": [
     "dist",
@@ -16,7 +18,6 @@
     "test": "node --experimental-wasm-modules --experimental-modules --experimental-wasm-threads ./node_modules/.bin/jest",
     "format": "prettier --write --ignore-unknown **/*"
   },
-  "name": "snarkyjs-chrome",
   "author": "O(1) Labs",
   "devDependencies": {
     "@babel/core": "^7.15.0",

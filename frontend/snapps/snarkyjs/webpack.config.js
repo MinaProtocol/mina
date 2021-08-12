@@ -6,7 +6,7 @@ let SnarkyNodeConfig = {
   devtool: false,
 
   // bundling mode
-  mode: 'development',
+  mode: 'production',
 
   // entry files
   entry: './src/index.ts',
@@ -14,7 +14,7 @@ let SnarkyNodeConfig = {
   // output bundles (location)
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'snarkyjs_chrome.js',
+    filename: 'snarkyjs_node.js',
   },
 
   //file resolutions
