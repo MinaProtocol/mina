@@ -1,4 +1,4 @@
-[%%import "../../config.mlh"]
+(* TODO: [%%import "../../config.mlh"] *)
 
 open Core
 open Async
@@ -22,7 +22,7 @@ module Config = struct
     { timeout : Time.Span.t
     ; initial_peers : Mina_net2.Multiaddr.t list
     ; addrs_and_ports : Node_addrs_and_ports.t
-    ; metrics_port : string option
+    ; metrics_port : int option
     ; conf_dir : string
     ; chain_id : string
     ; logger : Logger.t
@@ -57,7 +57,7 @@ let rpc_transport_proto = "coda/rpcs/0.0.1"
 let download_seed_peer_list uri =
   let%bind _resp, body = Cohttp_async.Client.get uri in
   let%map contents = Cohttp_async.Body.to_string body in
-  Mina_net2.Multiaddr.of_file_contents ~contents
+  Mina_net2.Multiaddr.of_file_contents contents
 
 module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
@@ -67,15 +67,14 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
     type t =
       { config : Config.t
       ; mutable added_seeds : Peer.Hash_set.t
-      ; net2 : Mina_net2.net Deferred.t ref
+      ; net2 : Mina_net2.t Deferred.t ref
       ; first_peer_ivar : unit Ivar.t
       ; high_connectivity_ivar : unit Ivar.t
       ; ban_reader : Intf.ban_notification Linear_pipe.Reader.t
       ; message_reader :
           (Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t)
           Strict_pipe.Reader.t
-      ; subscription :
-          Message.msg Mina_net2.Pubsub.Subscription.t Deferred.t ref
+      ; subscription : Message.msg Mina_net2.Pubsub.subscription Deferred.t ref
       ; restart_helper : unit -> unit
       }
 
@@ -119,7 +118,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
           real_r when read_w is closed, precisely what we don't want.
       *)
       let read_r, read_w = Pipe.create () in
-      let underlying_r, underlying_w = Mina_net2.Stream.pipes stream in
+      let underlying_r, underlying_w = Mina_net2.Libp2p_stream.pipes stream in
       don't_wait_for
         (Pipe.iter underlying_r ~f:(fun msg ->
              Pipe.write_without_pushback_if_open read_w msg ;
@@ -139,6 +138,13 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
        BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
         high_connectivity_ivar ~added_seeds ~pids ~on_unexpected_termination =
+      let handle_mina_net2_exception exn =
+        match exn with
+        | Mina_net2.Libp2p_helper_died_unexpectedly ->
+            on_unexpected_termination ()
+        | _ ->
+            raise exn
+      in
       let%bind seeds_from_url =
         match config.seed_peer_list_url with
         | None ->
@@ -153,12 +159,12 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       let conf_dir = config.conf_dir ^/ "mina_net2" in
       let%bind () = Unix.mkdir ~p:() conf_dir in
       match%bind
-        Monitor.try_with ~here:[%here] ~rest:`Raise (fun () ->
+        Monitor.try_with ~here:[%here] ~rest:(`Call handle_mina_net2_exception)
+          (fun () ->
             trace "mina_net2" (fun () ->
                 Mina_net2.create
                   ~all_peers_seen_metric:config.all_peers_seen_metric
-                  ~logger:config.logger ~conf_dir ~pids
-                  ~on_unexpected_termination))
+                  ~logger:config.logger ~conf_dir ~pids))
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
@@ -168,7 +174,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
             | Some kp ->
                 return kp
             | None ->
-                Keypair.random net2
+                Mina_net2.generate_random_keypair net2
           in
           let my_peer_id = Keypair.to_peer_id me |> Peer.Id.to_string in
           Logger.append_to_global_metadata
@@ -213,8 +219,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                    ])
             in
             let%bind () =
-              configure net2 ~me ~logger:config.logger
-                ~metrics_port:config.metrics_port
+              configure net2 ~me ~metrics_port:config.metrics_port
                 ~maddrs:
                   [ Multiaddr.of_string
                       (sprintf "/ip4/0.0.0.0/tcp/%d"
@@ -276,11 +281,10 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 ~implementations:(Versioned_rpc.Menu.add implementation_list)
                 ~on_unknown_rpc:(`Call handle_unknown_rpc)
             in
-            (* We could keep this around to close just this listener if we wanted. We don't. *)
-            let%bind _rpc_handler =
-              Mina_net2.handle_protocol net2 ~on_handler_error:`Raise
+            let%bind () =
+              Mina_net2.open_protocol net2 ~on_handler_error:`Raise
                 ~protocol:rpc_transport_proto (fun stream ->
-                  let peer = Mina_net2.Stream.remote_peer stream in
+                  let peer = Mina_net2.Libp2p_stream.remote_peer stream in
                   let transport = prepare_stream_transport stream in
                   let open Deferred.Let_syntax in
                   match%bind
@@ -295,7 +299,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                       let%bind () =
                         Async_rpc_kernel.Rpc.Transport.close transport
                       in
-                      don't_wait_for (Mina_net2.Stream.reset stream >>| ignore) ;
+                      don't_wait_for
+                        (Mina_net2.reset_stream net2 stream >>| ignore) ;
                       Trust_system.(
                         record config.trust_system config.logger peer
                           Actions.
@@ -315,7 +320,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                           ~reason:(Info.of_string "connection completed")
                           rpc_connection
                       in
-                      match%map Mina_net2.Stream.reset stream with
+                      match%map Mina_net2.reset_stream net2 stream with
                       | Error e ->
                           [%log' warn config.logger]
                             "failed to reset stream (this means it was \
@@ -338,7 +343,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                    Instead of refactoring it to have validation up-front and decoupled,
                    we pass along a validation callback with the message. This ends up
                    ignoring the actual subscription message pipe, so drain it separately. *)
-                ~should_forward_message:(fun envelope validation_callback ->
+                ~handle_and_validate_incoming_message:
+                  (fun envelope validation_callback ->
                   (* Messages from ourselves are valid. Don't try and reingest them. *)
                   match Envelope.Incoming.sender envelope with
                   | Local ->
@@ -375,11 +381,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                       |> don't_wait_for ;
                       ()))
             in
-            (* #4097 fix: drain the published message pipe, which we don't care about. *)
-            don't_wait_for
-              (Strict_pipe.Reader.iter
-                 (Mina_net2.Pubsub.Subscription.message_pipe subscription)
-                 ~f:(fun _envelope -> Deferred.unit)) ;
             let%map _ =
               (* XXX: this ALWAYS needs to be AFTER handle_protocol/subscribe
                  or it is possible to miss connections! *)
@@ -390,22 +391,22 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                       |> Unix.Inet_addr.to_string )
                       (Option.value_exn config.addrs_and_ports.peer).libp2p_port))
             in
-            let add_many xs ~seed =
+            let add_many xs ~is_seed =
               Deferred.map
                 (Deferred.List.iter ~how:`Parallel xs ~f:(fun x ->
                      let open Deferred.Let_syntax in
-                     Mina_net2.add_peer ~seed net2 x >>| ignore))
+                     Mina_net2.add_peer ~is_seed net2 x >>| ignore))
                 ~f:(fun () -> Ok ())
             in
             don't_wait_for
               (Deferred.map
-                 (let%bind () = add_many seed_peers ~seed:true
+                 (let%bind () = add_many seed_peers ~is_seed:true
                   and () =
                     let seeds =
                       String.Hash_set.of_list
                         (List.map ~f:Multiaddr.to_string seed_peers)
                     in
-                    add_many ~seed:false
+                    add_many ~is_seed:false
                       (List.filter !peers_snapshot ~f:(fun p ->
                            not (Hash_set.mem seeds (Multiaddr.to_string p))))
                   in
@@ -470,8 +471,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                     in
                     upon (after restart_after) (fun () ->
                         don't_wait_for
-                          (let%bind () = Mina_net2.shutdown n in
-                           on_unexpected_termination ()))
+                          (let%map () = Mina_net2.shutdown n in
+                           restart_libp2p ()))
                 | None ->
                     () ) ;
                 n) ;
@@ -482,26 +483,20 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
               let logger = config.logger in
               [%log trace] ~metadata:[] "Successfully restarted libp2p" ;
               don't_wait_for (Strict_pipe.transfer m message_writer ~f:Fn.id))
-        and on_unexpected_termination () =
-          on_libp2p_create
-            (create_libp2p config rpc_handlers first_peer_ivar
-               high_connectivity_ivar ~added_seeds ~pids
-               ~on_unexpected_termination) ;
-          Deferred.unit
-        in
-        let res =
-          create_libp2p config rpc_handlers first_peer_ivar
-            high_connectivity_ivar ~added_seeds ~pids ~on_unexpected_termination
-        in
-        on_libp2p_create res ;
+        and start_libp2p () =
+          let libp2p =
+            create_libp2p config rpc_handlers first_peer_ivar
+              high_connectivity_ivar ~added_seeds ~pids
+              ~on_unexpected_termination:restart_libp2p
+          in
+          on_libp2p_create libp2p ; Deferred.ignore_m libp2p
+        and restart_libp2p () = don't_wait_for (start_libp2p ()) in
         don't_wait_for
           (Strict_pipe.Reader.iter restarts_r ~f:(fun () ->
                let%bind n = !net2_ref in
                let%bind () = Mina_net2.shutdown n in
-               let%bind () = on_unexpected_termination () in
-               !net2_ref >>| ignore)) ;
-        let%map _ = res in
-        ()
+               restart_libp2p () ; !net2_ref >>| ignore)) ;
+        start_libp2p ()
       in
       let ban_configuration =
         ref { Mina_net2.banned_peers = []; trusted_peers = []; isolate = false }
@@ -576,11 +571,11 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let initial_peers t = t.config.initial_peers
 
-    let add_peer t p ~seed =
+    let add_peer t p ~is_seed =
       let open Mina_net2 in
-      if seed then Hash_set.add t.added_seeds p ;
+      if is_seed then Hash_set.add t.added_seeds p ;
       !(t.net2)
-      >>= Fn.flip (add_peer ~seed)
+      >>= Fn.flip (add_peer ~is_seed)
             (Multiaddr.of_string (Peer.to_multiaddr_string p))
 
     (* OPTIMIZATION: use fast n choose k implementation - see python or old flow code *)
@@ -732,10 +727,10 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         rpc_input =
       let%bind net2 = !(t.net2) in
       match%bind
-        Mina_net2.open_stream net2 ~protocol:rpc_transport_proto peer_id
+        Mina_net2.open_stream net2 ~protocol:rpc_transport_proto ~peer:peer_id
       with
       | Ok stream ->
-          let peer = Mina_net2.Stream.remote_peer stream in
+          let peer = Mina_net2.Libp2p_stream.remote_peer stream in
           let transport = prepare_stream_transport stream in
           try_call_rpc ?heartbeat_timeout ?timeout t peer transport rpc
             rpc_input
@@ -748,10 +743,10 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         (peer_id : Peer.Id.t) (rpc : (q, r) rpc) (qs : q list) =
       let%bind net2 = !(t.net2) in
       match%bind
-        Mina_net2.open_stream net2 ~protocol:rpc_transport_proto peer_id
+        Mina_net2.open_stream net2 ~protocol:rpc_transport_proto ~peer:peer_id
       with
       | Ok stream ->
-          let peer = Mina_net2.Stream.remote_peer stream in
+          let peer = Mina_net2.Libp2p_stream.remote_peer stream in
           let transport = prepare_stream_transport stream in
           let (module Impl) = implementation_of_rpc rpc in
           try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
@@ -774,8 +769,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let broadcast t msg =
       don't_wait_for
-        (let%bind subscription = !(t.subscription) in
-         Mina_net2.Pubsub.Subscription.publish subscription msg)
+        (let%bind net2 = !(t.net2) in
+         let%bind subscription = !(t.subscription) in
+         Mina_net2.Pubsub.publish net2 subscription msg)
 
     let on_first_connect t ~f = Deferred.map (Ivar.read t.first_peer_ivar) ~f
 
@@ -786,13 +782,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let ban_notification_reader t = t.ban_reader
 
-    let ip_for_peer t peer_id =
-      let%bind net2 = !(t.net2) in
-      Mina_net2.lookup_peerid net2 peer_id
-      >>| function Ok p -> Some p | Error _ -> None
-
     let connection_gating t =
-      let%bind net2 = !(t.net2) in
+      let%map net2 = !(t.net2) in
       Mina_net2.connection_gating_config net2
 
     let set_connection_gating t config =

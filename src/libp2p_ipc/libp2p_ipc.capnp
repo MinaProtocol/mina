@@ -22,6 +22,14 @@ struct PeerInfo {
   peerId @2 :PeerId;
 }
 
+struct SequenceNumber {
+  seqno @0 :UInt64;
+}
+
+struct ValidationId {
+  id @0 :UInt64;
+}
+
 struct StreamId {
   id @0 :UInt64;
 }
@@ -48,14 +56,14 @@ struct Libp2pConfig {
   statedir @0 :Text;
   privateKey @1 :Text;
   networkId @2 :Text;
-  listenOn @3 :List(Text);
+  listenOn @3 :List(Multiaddr);
   metricsPort @4 :Int16;
-  externalMultiaddr @5 :Text;
+  externalMultiaddr @5 :Multiaddr;
   unsafeNoTrustIp @6 :Bool;
   flood @7 :Bool;
   peerExchange @8 :Bool;
-  directPeers @9 :List(Text);
-  seedPeers @10 :List(Text);
+  directPeers @9 :List(Multiaddr);
+  seedPeers @10 :List(Multiaddr);
   gatingConfig @11 :GatingConfig;
   maxConnections @12 :UInt32;
   validationQueueSize @13 :UInt32;
@@ -79,7 +87,7 @@ struct PushMessageHeader {
 
 struct RpcMessageHeader {
   timeSent @0 :UInt64;
-  seqNumber @1 :UInt64;
+  sequenceNumber @1 :SequenceNumber;
 }
 
 # all messages in the libp2p_helper interface are Rpc calls, except for validations
@@ -102,7 +110,7 @@ struct Libp2pHelperInterface {
 
   struct Listen {
     struct Request {
-      iface @0 :Text;
+      iface @0 :Multiaddr;
     }
 
     struct Response {
@@ -163,7 +171,7 @@ struct Libp2pHelperInterface {
   struct Subscribe {
     struct Request {
       topic @0 :Text;
-      subscriptionId @1 :UInt64;
+      subscriptionId @1 :SubscriptionId;
     }
 
     struct Response {}
@@ -197,7 +205,7 @@ struct Libp2pHelperInterface {
 
   struct OpenStream {
    struct Request {
-      peer @0 :Text;
+      peer @0 :PeerId;
       protocolId @1 :Text;
     }
 
@@ -253,7 +261,7 @@ struct Libp2pHelperInterface {
   # corresponds to the the push message sent to the daemon in the
   # GossipReceived message
   struct Validation {
-    validationSeqNumber @0 :UInt64;
+    validationId @0 :ValidationId;
     result @1 :ValidationResult;
   }
 
@@ -337,23 +345,27 @@ struct DaemonInterface {
     peerId @0 :PeerId;
   }
 
+  struct PeerDisconnected {
+    peerId @0 :PeerId;
+  }
+
   struct GossipReceived {
     sender @0 :PeerInfo;
     seenAt @1 :UInt64;
     expiration @2 :UInt64;
-    subscriptionId @3 :UInt64;
-    validationSeqNumber @4 :UInt64;
+    subscriptionId @3 :SubscriptionId;
+    validationId @4 :ValidationId;
     data @5 :Data;
   }
 
   struct IncomingStream {
-    id @0 :UInt64;
+    id @0 :StreamId;
     peer @1 :PeerInfo;
     protocol @2 :Text;
   }
 
   struct StreamLost {
-    id @0 :UInt64;
+    id @0 :StreamId;
     reason @1 :Text;
   }
 
@@ -370,11 +382,12 @@ struct DaemonInterface {
 
     union {
       peerConnected @1 :DaemonInterface.PeerConnected;
-      gossipReceived @2 :DaemonInterface.GossipReceived;
-      incomingStream @3 :DaemonInterface.IncomingStream;
-      streamLost @4 :DaemonInterface.StreamLost;
-      streamComplete @5 :DaemonInterface.StreamComplete;
-      streamMessageReceived @6 :DaemonInterface.StreamMessageReceived;
+      peerDisconnected @2 :DaemonInterface.PeerDisconnected;
+      gossipReceived @3 :DaemonInterface.GossipReceived;
+      incomingStream @4 :DaemonInterface.IncomingStream;
+      streamLost @5 :DaemonInterface.StreamLost;
+      streamComplete @6 :DaemonInterface.StreamComplete;
+      streamMessageReceived @7 :DaemonInterface.StreamMessageReceived;
     }
   }
 

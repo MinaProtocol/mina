@@ -955,7 +955,7 @@ let setup_daemon logger =
                   Reader.file_contents file)
             with
             | Ok contents ->
-                return (Mina_net2.Multiaddr.of_file_contents ~contents)
+                return (Mina_net2.Multiaddr.of_file_contents contents)
             | Error _ ->
                 Mina_user_error.raisef ~where:"reading libp2p peer address file"
                   "The file %s could not be read.\n\n\
@@ -1022,7 +1022,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           ; seed_peer_list_url = Option.map seed_peer_list_url ~f:Uri.of_string
           ; initial_peers
           ; addrs_and_ports
-          ; metrics_port = Option.map libp2p_metrics_port ~f:Int.to_string
+          ; metrics_port = libp2p_metrics_port
           ; trust_system
           ; flooding = Option.value ~default:false enable_flooding
           ; direct_peers

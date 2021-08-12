@@ -1,0 +1,5 @@
+(library
+ (name mina_net2_tests)
+ (libraries mina_net2)
+ (preprocess (pps ppx_jane ppx_coda))
+ (inline_tests))
