@@ -5,10 +5,10 @@
   // export const Group = window.__snarky.Group;
   // export const Scalar = window.__snarky.Scalar;
 
-  import { Field as F, Bool as B, Circuit as C, Poseidon as P, Group as G, Scalar as S } from './snarky';
-  export const Field = F;
-  export const Bool = B;
-  export const Circuit = C;
-  export const Poseidon = P;
-  export const Group = G;
-  export const Scalar = S;
+  // import { Field as F, Bool as B, Circuit as C, Poseidon as P, Group as G, Scalar as S } from './snarky';
+  // export class F;
+  // export class Bool = B;
+  // export class Circuit = C;
+  // export class Poseidon = P;
+  // export class Group = G;
+  // export class Scalar = S;
