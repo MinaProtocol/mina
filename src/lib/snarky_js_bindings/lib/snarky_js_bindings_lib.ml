@@ -201,10 +201,11 @@ let handle_constants2 f f_constant (x : Field.t) (y : Field.t) =
   match (x, y) with Constant x, Constant y -> f_constant x y | _ -> f x y
 
 let array_get_exn xs i =
-  Js.Optdef.get (Js.array_get xs i) (fun () -> assert false)
+  Js.Optdef.get (Js.array_get xs i) (fun () ->
+      raise_errorf "array_get_exn: index=%d, length=%d" i xs##.length)
 
 let array_check_length xs n =
-  if xs##.length <> n then failwithf "Expected array of length %d" n ()
+  if xs##.length <> n then raise_errorf "Expected array of length %d" n ()
 
 let method_ class_ (name : string) (f : _ Js.t -> _) =
   let prototype = Js.Unsafe.get class_ (Js.string "prototype") in
@@ -511,7 +512,7 @@ let () =
         Js.Optdef.case (Js.array_get xs 0)
           (fun () -> assert false)
           (fun x -> mk (Boolean.Unsafe.of_cvar x##.value))
-      else failwith "Expected array of length 1") ;
+      else raise_errorf "Expected array of length 1") ;
   static_method "check" (fun (x : bool_class Js.t) : unit ->
       assert_ (Constraint.boolean (x##.value :> Field.t))) ;
   method_ "toJSON" (fun (this : bool_class Js.t) : < .. > Js.t ->
@@ -1250,9 +1251,10 @@ module Circuit = struct
     in
     (main, Data_spec.[ typ_ c##.snarkyPublicTyp ])
 
-  let generate_keypair (type w p) (c : (w, p) Circuit_main.t) : Keypair.t =
+  let generate_keypair (type w p) (c : (w, p) Circuit_main.t) :
+      keypair_class Js.t =
     let main, spec = main_and_input c in
-    generate_keypair ~exposing:spec (fun x -> main x)
+    new%js keypair_constr (generate_keypair ~exposing:spec (fun x -> main x))
 
   let prove (type w p) (c : (w, p) Circuit_main.t) (priv : w) (pub : p) kp :
       proof_class Js.t =
@@ -1303,8 +1305,13 @@ module Circuit = struct
     circuit##.witness := Js.wrap_callback witness ;
     circuit##.array := Js.wrap_callback array ;
     circuit##.generateKeypair :=
-      Js.wrap_meth_callback (fun this -> generate_keypair this) ;
-    circuit##.prove := Js.wrap_meth_callback (fun this w p -> prove this w p) ;
+      Js.wrap_meth_callback
+        (fun (this : _ Circuit_main.t) : keypair_class Js.t ->
+          generate_keypair this) ;
+    circuit##.prove :=
+      Js.wrap_meth_callback
+        (fun (this : _ Circuit_main.t) w p (kp : keypair_class Js.t) ->
+          prove this w p kp##.value) ;
     (circuit##.verify :=
        fun (pub : Js.Unsafe.any Js.js_array Js.t)
            (vk : verification_key_class Js.t) (pi : proof_class Js.t) :
