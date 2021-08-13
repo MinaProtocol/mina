@@ -1,12 +1,12 @@
 const path = require('path');
 
 let SnarkyNodeConfig = {
-  target: 'node',
+  target: 'web',
 
   devtool: false,
 
   // bundling mode
-  mode: 'development',
+  mode: 'production',
 
   // entry files
   entry: './src/index.ts',
@@ -15,6 +15,9 @@ let SnarkyNodeConfig = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'snarkyjs_chrome.js',
+    libraryTarget: 'umd',
+    umdNamedDefine: true,
+    clean: true,
   },
 
   //file resolutions

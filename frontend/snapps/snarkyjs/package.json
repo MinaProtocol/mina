@@ -12,9 +12,10 @@
   },
   "scripts": {
     "type-check": "tsc --noEmit",
-    "build": "./node_modules/.bin/webpack && cp ./src/bindings/plonk_wasm_bg.wasm ./dist",
+    "build": "./node_modules/.bin/webpack && cp ./src/bindings/plonk_wasm_bg.wasm ./dist && cp chrome_test/snarky_js_chrome.bc.js ./dist",
     "test": "node --experimental-wasm-modules --experimental-modules --experimental-wasm-threads ./node_modules/.bin/jest",
-    "format": "prettier --write --ignore-unknown **/*"
+    "format": "prettier --write --ignore-unknown **/*",
+    "serve": "./build-and-run-server.sh"
   },
   "name": "snarkyjs-chrome",
   "author": "O(1) Labs",

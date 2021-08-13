@@ -1,31 +1,33 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="utf-8">
+    <meta charset="utf-8" />
     <title>hello-wasm example</title>
   </head>
   <body>
-    <button id="run_all_tests" disabled=true>Run all tests</button>
+    <button id="run_all_tests" disabled="true">Run all tests</button>
     <button id="discover_tests">Discover tests</button>
     <div id="discovered_tests"></div>
-    <textarea id="output" style="width:100%" rows="35"></textarea>
+    <textarea id="output" style="width: 100%" rows="35"></textarea>
     <script type="module">
-      import init, * as plonk_wasm from "./plonk_wasm.js";
+      import init, * as plonk_wasm from './plonk_wasm.js';
       window.plonk_wasm = plonk_wasm;
       await init();
-      plonk_wasm.initThreadPool(navigator.hardwareConcurrency).then(function() {
-        // import * as snarky from "./snarky_js_chrome.bc.js";
-        // window.snarky = snarky;
-        /* Don't load the script until we're done initialising. */
-        var newScript = document.createElement("script");
-        newScript.src = "./snarky_js_chrome.bc.js";
-        document.body.appendChild(newScript);
-        newScript.addEventListener('load', () => {
-          var newScript = document.createElement("script");
-          newScript.src = "./snarkyjs_chrome.js";
+      plonk_wasm
+        .initThreadPool(navigator.hardwareConcurrency)
+        .then(function () {
+          // import * as snarky from "./snarky_js_chrome.bc.js";
+          // window.snarky = snarky;
+          /* Don't load the script until we're done initialising. */
+          var newScript = document.createElement('script');
+          newScript.src = './snarky_js_chrome.bc.js';
           document.body.appendChild(newScript);
+          newScript.addEventListener('load', () => {
+            var newScript = document.createElement('script');
+            newScript.src = './snarkyjs_chrome.js';
+            document.body.appendChild(newScript);
+          });
         });
-      });
     </script>
   </body>
 </html>

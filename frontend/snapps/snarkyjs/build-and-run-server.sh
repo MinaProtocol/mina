@@ -2,9 +2,11 @@
 
 yarn build
 
-cp dist/snarkyjs_chrome.js chrome_test/snarkyjs_chrome.js
+cp chrome_test/server.py ./dist
 
-pushd chrome_test/
+cp chrome_test/index.html ./dist
+
+pushd dist
 
 python3 server.py
 
