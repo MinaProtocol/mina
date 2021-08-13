@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# add account creation fee to blocks_internal_commands for coinbases, where the balance is the coinbase amount minus 1 Mina
+# add account creation fee to blocks_internal_commands for internal commands, where the balance is the command amount minus 1 Mina
 
 ARCHIVE=archive
 TMPFILE=$(mktemp -t coinbase-acct-fee.XXXXX)
@@ -18,7 +18,7 @@ INNER JOIN internal_commands as ic
 ON bic.internal_command_id = ic.id
 INNER JOIN balances
 ON bic.receiver_balance = balances.id
-WHERE ic.type='coinbase' AND ((ic.fee = 1440000000000 AND balances.balance = 1439000000000) OR (ic.fee = 720000000000 AND balances.balance = 719000000000))
+WHERE balances.balance = ic.fee - 1000000000
 EOF
 
 while read -r block_id internal_command_id sequence_no secondary_sequence_no; do
