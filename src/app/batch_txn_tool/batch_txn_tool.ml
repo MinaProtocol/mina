@@ -241,7 +241,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   in
 
   (* there... *)
-  let%bind _ =
+  let%bind () =
     (* in a previous version of the code there could be multiple returners, thus the iter.  keeping this structure in case we decide to change back later *)
     Deferred.List.iter [ returner_keypair ] ~f:(fun kp ->
         let%bind origin_nonce = get_nonce origin_keypair.public_key in
@@ -250,7 +250,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   in
 
   (* and back again... *)
-  let%bind _ =
+  let%bind () =
     Deferred.List.iter [ returner_keypair ] ~f:(fun kp ->
         let%bind returner_nonce = get_nonce kp.public_key in
         let rec do_command n : unit Deferred.t =
@@ -358,7 +358,7 @@ let () =
   Command.run
     (Command.group
        ~summary:"Generate public keys for sending batches of transactions"
-       [ (* ("gen-keys", output_keys)
-            ; ("gen-txns", output_cmds) *)
-         ("gen-there-and-back-txns", output_there_and_back_cmds)
+       [ ("gen-keys", output_keys)
+       ; ("gen-txns", output_cmds)
+       ; ("gen-there-and-back-txns", output_there_and_back_cmds)
        ])

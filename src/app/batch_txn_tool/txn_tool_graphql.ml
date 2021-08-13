@@ -14,6 +14,7 @@ let ingress_uri ~graphql_target_node =
   Uri.make ~scheme:"http" ~host ~path ~port:3085 ()
 
 (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
+(* copied from src/lib/integration_test_cloud_engine/kubernetes_network.ml and tweaked *)
 let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
     ?(initial_delay_sec = 30.0) ~graphql_target_node query_obj =
   let open Deferred.Let_syntax in
@@ -93,8 +94,7 @@ let get_account_data ~public_key ~graphql_target_node =
       | Some s ->
           return (int_of_string s)
       | None ->
-          Deferred.Or_error.errorf
-            "Account with %s somehow doesnt have a noince"
+          Deferred.Or_error.errorf "Account with %s somehow doesnt have a nonce"
             (Public_key.Compressed.to_string pk) )
 
 let send_signed_transaction ~sender_priv_key ~nonce ~receiver_pub_key ~amount
@@ -124,9 +124,6 @@ let send_signed_transaction ~sender_priv_key ~nonce ~receiver_pub_key ~amount
             }
       }
   in
-  (* Format.printf "echo 'DEBUG: field = %s, scalar = %s'"
-     (Snark_params.Tick.Field.to_string field)
-     (Snark_params.Tick.Inner_curve.Scalar.to_string scalar) ; *)
   let graphql_query =
     Send_payment.make
       ~receiver:(Graphql_lib.Encoders.public_key receiver_pk)
@@ -138,17 +135,6 @@ let send_signed_transaction ~sender_priv_key ~nonce ~receiver_pub_key ~amount
       ~scalar:(Snark_params.Tick.Inner_curve.Scalar.to_string scalar)
       ()
   in
-  (* let graphql_query_json =
-       `Assoc
-         [ ("query", `String graphql_query#query)
-         ; ("variables", graphql_query#variables)
-         ]
-     in
-     Format.sprintf
-       "curl 'http://%s/graphql' -X POST -H 'content-type: application/json' \
-        --data '%s'@."
-       graphql_target_node
-       (Yojson.Basic.to_string graphql_query_json) *)
   let%map res = exec_graphql_request ~graphql_target_node graphql_query in
   let (`UserCommand id_obj) = res#sendPayment#payment in
   id_obj#id
