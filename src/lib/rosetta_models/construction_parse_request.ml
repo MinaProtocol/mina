@@ -13,7 +13,7 @@ type t =
   ; (* This must be either the unsigned transaction blob returned by `/construction/payloads` or the signed transaction blob returned by `/construction/combine`. *)
     transaction : string
   }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** ConstructionParseRequest is the input to the `/construction/parse` endpoint. It allows the caller to parse either an unsigned or signed transaction. *)
 let create (network_identifier : Network_identifier.t) (signed : bool)

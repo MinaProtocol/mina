@@ -1523,7 +1523,7 @@ module Types = struct
                       Some
                         (UserCommand.mk_user_command
                            { status; data = { t.data with data = c } })
-                  | Snapp_command _ ->
+                  | Parties _ ->
                       (* TODO: This should be supported in some graph QL query *)
                       None))
         ; field "feeTransfer"
@@ -3081,15 +3081,23 @@ module Mutations = struct
               | None ->
                   `Snd pk)
         in
+        let unlocked_pks = List.map unlocked ~f:(fun (_kp, pk) -> pk) in
         [%log' info (Mina_lib.top_level_logger coda)]
           ~metadata:
             [ ( "old"
               , [%to_yojson: Public_key.Compressed.t list]
                   (Public_key.Compressed.Set.to_list old_block_production_keys)
               )
-            ; ("new", [%to_yojson: Public_key.Compressed.t list] pks)
+            ; ("new", [%to_yojson: Public_key.Compressed.t list] unlocked_pks)
             ]
-          !"Block production key replacement; old: $old, new: $new" ;
+          "Block production key replacement; old: $old, new: $new" ;
+        if not (List.is_empty locked) then
+          [%log' warn (Mina_lib.top_level_logger coda)]
+            "Some public keys are locked and unavailable as block production \
+             keys"
+            ~metadata:
+              [ ("locked_pks", [%to_yojson: Public_key.Compressed.t list] locked)
+              ] ;
         ignore
         @@ Mina_lib.replace_block_production_keypairs coda
              (Keypair.And_compressed_pk.Set.of_list unlocked) ;
@@ -3386,7 +3394,7 @@ module Queries = struct
                    Some
                      (Types.UserCommand.mk_user_command
                         { status = Unknown; data = { x with data } })
-               | Snapp_command _ ->
+               | Parties _ ->
                    None))
 
   let sync_status =

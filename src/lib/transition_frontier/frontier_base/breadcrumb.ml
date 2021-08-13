@@ -225,7 +225,7 @@ let all_user_commands breadcrumbs =
       breadcrumb |> commands
       |> List.filter_map ~f:(fun {data; _} ->
              match data with
-             | Snapp_command _ ->
+             | Parties _ ->
                  None
              | Signed_command c ->
                  Some (Signed_command.forget_check c) )
