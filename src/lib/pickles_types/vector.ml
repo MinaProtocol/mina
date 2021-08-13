@@ -448,7 +448,7 @@ module Vector_2 = struct
         ; bin_io_derived= false
         ; bin_prot_rule=
             Ppx_version_runtime.Bin_prot_rule.(
-              Type_abstraction (["a"], Custom)) }
+              Type_abstraction (["a"], Custom [Type_var "a"])) }
 
       include Make.Binable (Nat.N2)
 
@@ -487,7 +487,7 @@ module Vector_4 = struct
         ; bin_io_derived= false
         ; bin_prot_rule=
             Ppx_version_runtime.Bin_prot_rule.(
-              Type_abstraction (["a"], Custom)) }
+              Type_abstraction (["a"], Custom [Type_var "a"])) }
 
       include Make.Binable (Nat.N4)
 
@@ -526,7 +526,7 @@ module Vector_8 = struct
         ; bin_io_derived= false
         ; bin_prot_rule=
             Ppx_version_runtime.Bin_prot_rule.(
-              Type_abstraction (["a"], Custom)) }
+              Type_abstraction (["a"], Custom [Type_var "a"])) }
 
       include Make.Binable (Nat.N8)
 
@@ -565,7 +565,7 @@ module Vector_17 = struct
         ; bin_io_derived= false
         ; bin_prot_rule=
             Ppx_version_runtime.Bin_prot_rule.(
-              Type_abstraction (["a"], Custom)) }
+              Type_abstraction (["a"], Custom [Type_var "a"])) }
 
       include Make.Binable (Nat.N17)
 
@@ -604,7 +604,7 @@ module Vector_18 = struct
         ; bin_io_derived= false
         ; bin_prot_rule=
             Ppx_version_runtime.Bin_prot_rule.(
-              Type_abstraction (["a"], Custom)) }
+              Type_abstraction (["a"], Custom [Type_var "a"])) }
 
       include Make.Binable (Nat.N18)
 

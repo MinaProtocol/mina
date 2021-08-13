@@ -279,6 +279,17 @@ module Branching_2 = struct
         [@@deriving compare, sexp, yojson, hash, equal]
 
         let to_latest = Fn.id
+
+        (*        let _ =
+          let layout =
+            { bin_layout_t with
+              bin_prot_rule=
+                Ppx_version_runtime.Bin_prot_rule.compress_references
+                  bin_layout_t.bin_prot_rule }
+          in
+          Format.eprintf "Branching_2.Repr layout: %s@."
+            ( Ppx_version_runtime.Bin_prot_layout.to_yojson layout
+            |> Yojson.Safe.pretty_to_string ) *)
       end
     end]
 

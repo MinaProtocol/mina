@@ -117,7 +117,7 @@ module Make
     ; module_path= "Zexe_backend.Zexe_backend_common.Bigint"
     ; version_opt= None
     ; bin_io_derived= false
-    ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Custom }
+    ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Custom [] }
 
   let of_numeral s ~base = of_numeral s (String.length s) base
 end

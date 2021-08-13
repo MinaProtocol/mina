@@ -89,7 +89,7 @@ struct
     ; type_decl= "T.t"
     ; module_path= "Snark_params.Make_inner_curve_scalar"
     ; bin_io_derived= false
-    ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Custom }
+    ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Custom [] }
 
   let of_bits = Other_impl.Field.project
 
@@ -198,7 +198,7 @@ module Tick = struct
       ; type_decl= "Tick0.Field.t"
       ; module_path= "Snark_params.Tick"
       ; bin_io_derived= false
-      ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Custom }
+      ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Custom [] }
 
     let size_in_triples = Int.((size_in_bits + 2) / 3)
   end

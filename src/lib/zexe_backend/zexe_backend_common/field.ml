@@ -172,7 +172,7 @@ module Make (F : Input_intf) :
         ; type_decl= "Field.t"
         ; module_path= "Zexe_backend.Zexe_backend_common.Stable.Field"
         ; bin_io_derived= false
-        ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Custom }
+        ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Custom [] }
 
       include Sexpable.Of_sexpable
                 (Bigint)

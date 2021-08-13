@@ -113,7 +113,7 @@ struct
               "t = BaseField.Stable.Latest.t * BaseField.Stable.Latest.t"
           ; module_path= "Zexe_backend.Zexe_backend_common.Curve.Affine"
           ; bin_io_derived= false
-          ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Custom }
+          ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Custom [] }
 
         include Binable.Of_binable
                   (T)
