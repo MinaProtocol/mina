@@ -1,4 +1,4 @@
-import { Bool, Field } from './bindings/snarky2';
+import { Bool, Field } from './bindings/snarky';
 
 const MerkleProofFactory = (depth: number) => {
   return class MerkleProof {

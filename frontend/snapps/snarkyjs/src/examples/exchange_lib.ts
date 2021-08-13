@@ -1,5 +1,5 @@
 // import { MerkleCollection, MerkleProof } from '../mina.js';
-import { Circuit, Scalar, Group, Bool, Field } from '../bindings/snarky2';
+import { Circuit, Scalar, Group, Bool, Field } from '../bindings/snarky';
 import { prop, CircuitValue } from '../circuit_value';
 import { Signature } from '../signature';
 

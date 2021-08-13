@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { Circuit, Field, Bool, JSONValue } from './bindings/snarky2';
+import { Circuit, Field, Bool, JSONValue } from './bindings/snarky';
 
 type Constructor<T> = { new (...args: any[]): T };
 
@@ -7,7 +7,7 @@ export type Tuple<A, _N extends number> = Array<A>;
 
 export abstract class CircuitValue {
   static sizeInFieldElements(): number {
-    const fields : [string, any][] = (this as any).prototype._fields;
+    const fields: [string, any][] = (this as any).prototype._fields;
     return fields.reduce((acc, [_, typ]) => acc + typ.sizeInFieldElements(), 0);
   }
 
@@ -54,8 +54,8 @@ export abstract class CircuitValue {
     return new this(...props);
   }
 
-  static toJSON<T>(this: Constructor<T>, v: T) : JSONValue {
-    const res : { [key: string]: JSONValue } = {};
+  static toJSON<T>(this: Constructor<T>, v: T): JSONValue {
+    const res: { [key: string]: JSONValue } = {};
     if ((this as any).prototype._fields !== undefined) {
       const fields: [string, any][] = (this as any).prototype._fields;
       fields.forEach(([key, propType]) => {
@@ -65,7 +65,7 @@ export abstract class CircuitValue {
     return res;
   }
 
-  static fromJSON<T>(this: Constructor<T>, value: JSONValue) : T | null {
+  static fromJSON<T>(this: Constructor<T>, value: JSONValue): T | null {
     const props: any[] = [];
     const fields: [string, any][] = (this as any).prototype._fields;
 
@@ -76,12 +76,12 @@ export abstract class CircuitValue {
         }
         break;
       default:
-          return null;
+        return null;
     }
 
     if (fields !== undefined) {
       for (let i = 0; i < fields.length; ++i) {
-        const [ key, propType ] = fields[i];
+        const [key, propType] = fields[i];
         if (value[key] === undefined) {
           return null;
         } else {

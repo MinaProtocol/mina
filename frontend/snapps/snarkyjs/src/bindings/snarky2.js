@@ -4,6 +4,15 @@
   // export const Poseidon = window.__snarky.Poseidon;
   // export const Group = window.__snarky.Group;
   // export const Scalar = window.__snarky.Scalar;
+  
+  export {
+    Field,
+    Bool,
+    Circuit,
+    Poseidon,
+    Group,
+    Scalar,
+  } from './bindings/snarky'
 
   // import { Field as F, Bool as B, Circuit as C, Poseidon as P, Group as G, Scalar as S } from './snarky';
   // export class F;

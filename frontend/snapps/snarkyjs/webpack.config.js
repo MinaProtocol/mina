@@ -6,7 +6,7 @@ let SnarkyNodeConfig = {
   devtool: false,
 
   // bundling mode
-  mode: 'production',
+  mode: 'development',
 
   // entry files
   entry: './src/index.ts',
@@ -15,6 +15,10 @@ let SnarkyNodeConfig = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'snarkyjs_node.js',
+    library: 'SnarkyJS',
+    libraryTarget: 'umd',
+    umdNamedDefine: true,
+    clean: true,
   },
 
   //file resolutions
