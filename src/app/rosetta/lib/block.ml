@@ -66,11 +66,18 @@ module Internal_command_info = struct
   module Kind = struct
     type t = [`Coinbase | `Fee_transfer | `Fee_transfer_via_coinbase]
     [@@deriving equal, to_yojson]
+
+    let to_string (t : t) =
+      match t with
+      | `Coinbase -> "coinbase"
+      | `Fee_transfer -> "fee_transfer"
+      | `Fee_transfer_via_coinbase -> "fee_transfer_via_coinbase"
   end
 
   type t =
     { kind: Kind.t
     ; receiver: [`Pk of string]
+    ; receiver_account_creation_fee_paid: Unsigned_extended.UInt64.t option
     ; fee: Unsigned_extended.UInt64.t
     ; token: Unsigned_extended.UInt64.t
     ; hash: string }
@@ -86,7 +93,7 @@ module Internal_command_info = struct
        * produce more balance changing operations in the mempool or a block.
        * *)
       let plan : 'a Op.t list =
-        match t.kind with
+        (match t.kind with
         | `Coinbase ->
             (* The coinbase transaction is really incrementing by the coinbase
            * amount  *)
@@ -95,10 +102,16 @@ module Internal_command_info = struct
             [{Op.label= `Fee_receiver_inc; related_to= None}]
         | `Fee_transfer_via_coinbase ->
             [ {Op.label= `Fee_receiver_inc; related_to= None}
-            ; {Op.label= `Fee_payer_dec; related_to= Some `Fee_receiver_inc} ]
+            ; {Op.label= `Fee_payer_dec; related_to= Some `Fee_receiver_inc} ])
+        @
+        match t.receiver_account_creation_fee_paid with
+        | None -> []
+        | Some fee ->
+          [{Op.label= `Account_creation_fee_via_fee_receiver fee
+           ; related_to= None}]
       in
       Op_build.build
-        ~a_eq:[%equal: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]]
+        ~a_eq:[%equal: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc | `Account_creation_fee_via_fee_receiver of Unsigned.UInt64.t]]
         ~plan ~f:(fun ~related_operations ~operation_identifier op ->
           (* All internal commands succeed if they're in blocks *)
           let status = Some (Operation_statuses.name `Success) in
@@ -148,17 +161,31 @@ module Internal_command_info = struct
               ; _type= Operation_types.name `Fee_payer_dec
               ; amount= Some Amount_of.(negated (coda t.fee))
               ; coin_change= None
-              ; metadata= None } )
+              ; metadata= None }
+          | `Account_creation_fee_via_fee_receiver account_creation_fee ->
+              M.return
+                { Operation.operation_identifier
+                ; related_operations
+                ; status
+                ; account=
+                    Some (account_id t.receiver Amount_of.Token_id.default)
+                ; _type= Operation_types.name `Account_creation_fee_via_fee_receiver
+                ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
+                ; coin_change= None
+                ; metadata= None }
+          )
   end
 
   let dummies =
     [ { kind= `Coinbase
       ; receiver= `Pk "Eve"
+      ; receiver_account_creation_fee_paid= None
       ; fee= Unsigned.UInt64.of_int 20_000_000_000
       ; token= Unsigned.UInt64.of_int 1
       ; hash= "COINBASE_1" }
     ; { kind= `Fee_transfer
       ; receiver= `Pk "Alice"
+      ; receiver_account_creation_fee_paid= None
       ; fee= Unsigned.UInt64.of_int 30_000_000_000
       ; token= Unsigned.UInt64.of_int 1
       ; hash= "FEE_TRANSFER" } ]
@@ -276,13 +303,14 @@ WITH RECURSIVE chain AS (
 
     let run (module Conn : Caqti_async.CONNECTION) = function
       | Some (`This (`Height h)) ->
-          Conn.find_opt query_height h
+        Conn.find_opt query_height h
       | Some (`That (`Hash h)) ->
-          Conn.find_opt query_hash h
+        Conn.find_opt query_hash h
       | Some (`Those (`Height height, `Hash hash)) ->
-          Conn.find_opt query_both (hash, height)
+        Conn.find_opt query_both (hash, height)
       | None ->
-          Conn.find_opt query_best ()
+        Conn.find_opt query_best ()
+
   end
 
   module User_commands = struct
@@ -364,9 +392,10 @@ WITH RECURSIVE chain AS (
 
   module Internal_commands = struct
     module Extras = struct
-      let receiver x = `Pk x
+      let receiver (_,x) = `Pk x
+      let receiver_account_creation_fee_paid (fee,_) = fee
 
-      let typ = Caqti_type.string
+      let typ = Caqti_type.(tup2 (option int64) string)
     end
 
     let typ =
@@ -375,10 +404,12 @@ WITH RECURSIVE chain AS (
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT DISTINCT ON (i.hash,i.type) i.id, i.type, i.receiver_id, i.fee, i.token, i.hash, pk.value as receiver FROM internal_commands i
-        INNER JOIN blocks_internal_commands ON blocks_internal_commands.internal_command_id = i.id
+        {| SELECT DISTINCT ON (i.hash,i.type) i.id, i.type, i.receiver_id, i.fee, i.token, i.hash,
+            bic.receiver_account_creation_fee_paid, pk.value as receiver
+        FROM internal_commands i
+        INNER JOIN blocks_internal_commands bic ON bic.internal_command_id = i.id
         INNER JOIN public_keys pk ON pk.id = i.receiver_id
-        WHERE blocks_internal_commands.block_id = ?
+        WHERE bic.block_id = ?
       |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
@@ -405,7 +436,7 @@ WITH RECURSIVE chain AS (
         |> Errors.Lift.sql ~context:"Finding block"
       with
       | None ->
-          M.fail (Errors.create `Block_missing)
+        M.fail (Errors.create `Block_missing)
       | Some (block_id, raw_block, block_extras) ->
           M.return (block_id, raw_block, block_extras)
     in
@@ -455,6 +486,7 @@ WITH RECURSIVE chain AS (
           in
           { Internal_command_info.kind
           ; receiver= Internal_commands.Extras.receiver extras
+          ; receiver_account_creation_fee_paid= Option.map (Internal_commands.Extras.receiver_account_creation_fee_paid extras) ~f:Unsigned.UInt64.of_int64
           ; fee= Unsigned.UInt64.of_int64 ic.fee
           ; token= Unsigned.UInt64.of_int64 ic.token
           ; hash= ic.hash } )
@@ -649,7 +681,14 @@ module Specific = struct
               ~metadata:[("info", Internal_command_info.to_yojson info)]
               "Block internal received $info" ;
             { Transaction.transaction_identifier=
-                {Transaction_identifier.hash= info.hash}
+                (* prepend the kind to the transaction hash, because duplicate
+                   hashes are possible in the archive database, with differing
+                   "type" fields, which correspond to the "kind" here
+                *)
+                {Transaction_identifier.hash=
+                   (Internal_command_info.Kind.to_string info.kind)
+                   ^ ":" ^
+                   info.hash}
             ; operations
             ; metadata= None }
             :: acc )
