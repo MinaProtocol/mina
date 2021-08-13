@@ -14,6 +14,7 @@ import (
 
 	"codanet"
 
+	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	net "github.com/libp2p/go-libp2p-core/network"
@@ -25,24 +26,26 @@ import (
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/prometheus/client_golang/prometheus"
+	ipc "libp2p_ipc"
 )
 
-var seqs = make(chan int)
+var seqs = make(chan uint64)
 
 func newApp() *app {
 	return &app{
 		P2p:                      nil,
 		Ctx:                      context.Background(),
-		Subs:                     make(map[int]subscription),
+		Subs:                     make(map[uint64]subscription),
 		Topics:                   make(map[string]*pubsub.Topic),
 		ValidatorMutex:           &sync.Mutex{},
-		Validators:               make(map[int]*validationStatus),
-		Streams:                  make(map[int]net.Stream),
-		OutChan:                  make(chan interface{}, 4096),
+		Validators:               make(map[uint64]*validationStatus),
+		Streams:                  make(map[uint64]net.Stream),
+		OutChan:                  make(chan *capnp.Message, 64),
 		Out:                      bufio.NewWriter(os.Stdout),
 		AddedPeers:               []peer.AddrInfo{},
 		MetricsRefreshTime:       time.Minute,
 		metricsCollectionStarted: false,
+		metricsServer:            nil,
 	}
 }
 
@@ -62,7 +65,7 @@ func parseMultiaddrWithID(ma multiaddr.Multiaddr, id peer.ID) (*codaPeerInfo, er
 		return nil, err
 	}
 
-	return &codaPeerInfo{Libp2pPort: port, Host: ipComponent.Value(), PeerID: peer.Encode(id)}, nil
+	return &codaPeerInfo{Libp2pPort: uint16(port), Host: ipComponent.Value(), PeerID: peer.Encode(id)}, nil
 }
 
 func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
@@ -78,7 +81,7 @@ func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
 	return info, nil
 }
 
-func (app *app) writeMsg(msg interface{}) {
+func (app *app) writeMsg(msg *capnp.Message) {
 	if app.NoUpcalls {
 		return
 	}
@@ -284,34 +287,92 @@ func (app *app) checkLatency() {
 	}
 }
 
-func (ap *findPeerMsg) run(app *app) (interface{}, error) {
-	id, err := peer.Decode(ap.PeerID)
-	if err != nil {
-		return nil, err
+const ValidationUnknown = pubsub.ValidationResult(-3)
+
+func (app *app) handleValidation(m ipc.Libp2pHelperInterface_Validation) {
+	if app.P2p == nil {
+		app.P2p.Logger.Error("handleValidation: P2p not configured")
+		return
 	}
-
-	maybePeer, err := findPeerInfo(app, id)
-
-	if err != nil {
-		return nil, err
+	seqno := m.ValidationSeqNumber()
+	app.ValidatorMutex.Lock()
+	defer app.ValidatorMutex.Unlock()
+	if st, ok := app.Validators[seqno]; ok {
+		res := ValidationUnknown
+		switch m.Result() {
+		case ipc.ValidationResult_accept:
+			res = pubsub.ValidationAccept
+		case ipc.ValidationResult_reject:
+			res = pubsub.ValidationReject
+		case ipc.ValidationResult_ignore:
+			res = pubsub.ValidationIgnore
+		default:
+			app.P2p.Logger.Warningf("handleValidation: unknown validation result %d", m.Result())
+		}
+		st.Completion <- res
+		if st.TimedOutAt != nil {
+			app.P2p.Logger.Errorf("validation for item %d took %d seconds", seqno, time.Now().Add(validationTimeout).Sub(*st.TimedOutAt))
+		}
+		delete(app.Validators, seqno)
 	}
-
-	return *maybePeer, nil
+	app.P2p.Logger.Warningf("handleValidation: validation seqno %d unknown", seqno)
 }
 
-func (m *setNodeStatusMsg) run(app *app) (interface{}, error) {
-	app.P2p.NodeStatus = m.Data
-	return "setNodeStatus success", nil
+func (app *app) handleFindPeer(seqno uint64, m ipc.Libp2pHelperInterface_FindPeer_Request) *capnp.Message {
+	pid, err := m.PeerId()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	peerId, err := pid.Id()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	id, err := peer.Decode(peerId)
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+
+	peerInfo, err := findPeerInfo(app, id)
+
+	if err != nil {
+		return mkRpcRespError(seqno, badp2p(err))
+	}
+
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		r, err := m.NewFindPeer()
+		panicOnErr(err)
+		res, err := r.NewResult()
+		panicOnErr(err)
+		setPeerInfo(res, peerInfo)
+	})
 }
 
-func (m *getPeerNodeStatusMsg) run(app *app) (interface{}, error) {
+func (app *app) handleSetNodeStatus(seqno uint64, m ipc.Libp2pHelperInterface_SetNodeStatus_Request) *capnp.Message {
+	status, err := m.Status()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	app.P2p.NodeStatus = status
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		_, err := m.NewSetNodeStatus()
+		panicOnErr(err)
+	})
+}
+
+func (app *app) handleGetPeerNodeStatus(seqno uint64, m ipc.Libp2pHelperInterface_GetPeerNodeStatus_Request) *capnp.Message {
 	ctx, _ := context.WithTimeout(app.Ctx, codanet.NodeStatusTimeout)
-
-	addrInfo, err := addrInfoOfString(m.PeerMultiaddr)
+	pma, err := m.Peer()
 	if err != nil {
-		return nil, err
+		return mkRpcRespError(seqno, badRPC(err))
 	}
-
+	pmaRepr, err := pma.Representation()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	addrInfo, err := addrInfoOfString(pmaRepr)
+	if err != nil {
+		return mkRpcRespError(seqno, err)
+	}
 	app.P2p.Host.Peerstore().AddAddrs(addrInfo.ID, addrInfo.Addrs, peerstore.ConnectedAddrTTL)
 
 	// Open a "get node status" stream on m.PeerID,
@@ -319,7 +380,7 @@ func (m *getPeerNodeStatusMsg) run(app *app) (interface{}, error) {
 	s, err := app.P2p.Host.NewStream(ctx, addrInfo.ID, codanet.NodeStatusProtocolID)
 	if err != nil {
 		app.P2p.Logger.Error("failed to open stream: ", err)
-		return nil, err
+		return mkRpcRespError(seqno, err)
 	}
 
 	defer func() {
@@ -327,7 +388,7 @@ func (m *getPeerNodeStatusMsg) run(app *app) (interface{}, error) {
 	}()
 
 	errCh := make(chan error)
-	responseCh := make(chan string)
+	responseCh := make(chan []byte)
 
 	go func() {
 		// 1 megabyte
@@ -335,6 +396,8 @@ func (m *getPeerNodeStatusMsg) run(app *app) (interface{}, error) {
 
 		data := make([]byte, size)
 		n, err := s.Read(data)
+		// TODO will the whole status be read or we can "accidentally" read only
+		// part of it?
 		if err != nil && err != io.EOF {
 			app.P2p.Logger.Errorf("failed to decode node status data: err=%s", err)
 			errCh <- err
@@ -346,23 +409,28 @@ func (m *getPeerNodeStatusMsg) run(app *app) (interface{}, error) {
 			return
 		}
 
-		responseCh <- string(data[:n])
+		responseCh <- data[:n]
 	}()
 
 	select {
 	case <-ctx.Done():
 		s.Reset()
-		return nil, errors.New("timed out requesting node status data from peer")
+		err := errors.New("timed out requesting node status data from peer")
+		return mkRpcRespError(seqno, err)
 	case err := <-errCh:
-		return nil, err
+		return mkRpcRespError(seqno, err)
 	case response := <-responseCh:
-		return response, nil
+		return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+			r, err := m.NewGetPeerNodeStatus()
+			panicOnErr(err)
+			r.SetResult(response)
+		})
 	}
 }
 
-func (lp *listPeersMsg) run(app *app) (interface{}, error) {
+func (app *app) handleListPeers(seqno uint64, m ipc.Libp2pHelperInterface_ListPeers_Request) *capnp.Message {
 	if app.P2p == nil {
-		return nil, needsConfigure()
+		return mkRpcRespError(seqno, needsConfigure())
 	}
 
 	connsHere := app.P2p.Host.Network().Conns()
@@ -378,98 +446,151 @@ func (lp *listPeersMsg) run(app *app) (interface{}, error) {
 		peerInfos = append(peerInfos, *maybePeer)
 	}
 
-	return peerInfos, nil
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		r, err := m.NewListPeers()
+		panicOnErr(err)
+		lst, err := r.NewResult(int32(len(peerInfos)))
+		panicOnErr(err)
+		setPeerInfoList(lst, peerInfos)
+	})
 }
 
-func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
+func (app *app) handleSetGatingConfig(seqno uint64, m ipc.Libp2pHelperInterface_SetGatingConfig_Request) *capnp.Message {
 	if app.P2p == nil {
-		return nil, needsConfigure()
+		return mkRpcRespError(seqno, needsConfigure())
 	}
-
-	newState, err := gatingConfigFromJson(gc, app.AddedPeers)
+	gc, err := m.GatingConfig()
 	if err != nil {
-		return nil, badRPC(err)
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	newState, err := readGatingConfig(gc, app.AddedPeers)
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
 	}
 
 	app.P2p.GatingState = newState
 
-	return "ok", nil
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		_, err := m.NewSetGatingConfig()
+		panicOnErr(err)
+	})
 }
 
-func (m *configureMsg) run(app *app) (interface{}, error) {
-	app.UnsafeNoTrustIP = m.UnsafeNoTrustIP
-	privkBytes, err := codaDecode(m.Privk)
+func (app *app) handleConfigure(seqno uint64, msg ipc.Libp2pHelperInterface_Configure_Request) *capnp.Message {
+	m, err := msg.Config()
 	if err != nil {
-		return nil, badRPC(err)
+		return mkRpcRespError(seqno, badRPC(err))
 	}
-	privk, err := crypto.UnmarshalPrivateKey(privkBytes)
+	app.UnsafeNoTrustIP = m.UnsafeNoTrustIp()
+	listenOnMaList, err := m.ListenOn()
 	if err != nil {
-		return nil, badRPC(err)
+		return mkRpcRespError(seqno, badRPC(err))
 	}
-	maddrs := make([]multiaddr.Multiaddr, len(m.ListenOn))
-	for i, v := range m.ListenOn {
+	listenOn := make([]multiaddr.Multiaddr, 0, listenOnMaList.Len())
+	err = multiaddrListForeach(listenOnMaList, func(v string) error {
 		res, err := multiaddr.NewMultiaddr(v)
-		if err != nil {
-			return nil, badRPC(err)
+		if err == nil {
+			listenOn = append(listenOn, res)
 		}
-		maddrs[i] = res
+		return err
+	})
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	seeds := make([]peer.AddrInfo, 0, len(m.SeedPeers))
-	for _, v := range m.SeedPeers {
+	seedPeersMaList, err := m.SeedPeers()
+	seeds := make([]peer.AddrInfo, 0, seedPeersMaList.Len())
+	err = multiaddrListForeach(seedPeersMaList, func(v string) error {
 		addr, err := addrInfoOfString(v)
-		if err != nil {
-			// TODO: this isn't necessarily an RPC error. Perhaps the encoded multiaddr
-			// isn't supported by this version of libp2p.
-			// But more likely, it is an RPC error.
-			return nil, badRPC(err)
+		if err == nil {
+			seeds = append(seeds, *addr)
 		}
-		seeds = append(seeds, *addr)
+		return err
+	})
+	// TODO: this isn't necessarily an RPC error. Perhaps the encoded multiaddr
+	// isn't supported by this version of libp2p.
+	// But more likely, it is an RPC error.
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
 	}
 
 	app.AddedPeers = append(app.AddedPeers, seeds...)
 
-	directPeers := make([]peer.AddrInfo, 0, len(m.DirectPeers))
-	for _, v := range m.DirectPeers {
+	directPeersMaList, err := m.DirectPeers()
+	directPeers := make([]peer.AddrInfo, 0, directPeersMaList.Len())
+	err = multiaddrListForeach(directPeersMaList, func(v string) error {
 		addr, err := addrInfoOfString(v)
-		if err != nil {
-			// TODO: this isn't necessarily an RPC error. Perhaps the encoded multiaddr
-			// isn't supported by this version of libp2p.
-			// But more likely, it is an RPC error.
-			return nil, badRPC(err)
+		if err == nil {
+			directPeers = append(directPeers, *addr)
 		}
-		directPeers = append(directPeers, *addr)
+		return err
+	})
+	// TODO: this isn't necessarily an RPC error. Perhaps the encoded multiaddr
+	// isn't supported by this version of libp2p.
+	// But more likely, it is an RPC error.
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	externalMaddr, err := multiaddr.NewMultiaddr(m.External)
+	externalMa, err := m.ExternalMultiaddr()
 	if err != nil {
-		return nil, badAddr(err)
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	externalMaRepr, err := externalMa.Representation()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	externalMaddr, err := multiaddr.NewMultiaddr(externalMaRepr)
+	if err != nil {
+		return mkRpcRespError(seqno, badAddr(err))
 	}
 
-	gatingConfig, err := gatingConfigFromJson(&(m.GatingConfig), app.AddedPeers)
+	gc, err := m.GatingConfig()
 	if err != nil {
-		return nil, badRPC(err)
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	gatingConfig, err := readGatingConfig(gc, app.AddedPeers)
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, gatingConfig, m.MaxConnections, m.MinaPeerExchange)
+	stateDir, err := m.Statedir()
 	if err != nil {
-		return nil, badHelper(err)
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	netId, err := m.NetworkId()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+
+	privkBytes, err := m.PrivateKey()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	privk, err := crypto.UnmarshalPrivateKey(privkBytes)
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+
+	helper, err := codanet.MakeHelper(app.Ctx, listenOn, externalMaddr, stateDir, privk, netId, seeds, gatingConfig, int(m.MaxConnections()), m.MinaPeerExchange())
+	if err != nil {
+		return mkRpcRespError(seqno, badHelper(err))
 	}
 
 	// SOMEDAY:
 	// - stop putting block content on the mesh.
 	// - bigger than 32MiB block size?
 	opts := []pubsub.Option{pubsub.WithMaxMessageSize(1024 * 1024 * 32),
-		pubsub.WithPeerExchange(m.PeerExchange),
-		pubsub.WithFloodPublish(m.Flood),
+		pubsub.WithPeerExchange(m.PeerExchange()),
+		pubsub.WithFloodPublish(m.Flood()),
 		pubsub.WithDirectPeers(directPeers),
-		pubsub.WithValidateQueueSize(m.ValidationQueueSize),
+		pubsub.WithValidateQueueSize(int(m.ValidationQueueSize())),
 	}
 
 	var ps *pubsub.PubSub
 	ps, err = pubsub.NewGossipSub(app.Ctx, helper.Host, opts...)
 	if err != nil {
-		return nil, badHelper(err)
+		return mkRpcRespError(seqno, badHelper(err))
 	}
 
 	helper.Pubsub = ps
@@ -477,11 +598,12 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 
 	app.P2p.Logger.Infof("here are the seeds: %v", seeds)
 
-	if metricsServer != nil && metricsServer.port != m.MetricsPort {
+	metricsServer := app.metricsServer
+	if metricsServer != nil && metricsServer.port != m.MetricsPort() {
 		metricsServer.Shutdown()
 	}
-	if len(m.MetricsPort) > 0 {
-		metricsServer = startMetricsServer(m.MetricsPort)
+	if m.MetricsPort() > 0 {
+		metricsServer = startMetricsServer(m.MetricsPort())
 		if !app.metricsCollectionStarted {
 			go app.checkBandwidth()
 			go app.checkPeerCount()
@@ -491,85 +613,139 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		}
 	}
 
-	return "configure success", nil
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		_, err := m.NewConfigure()
+		panicOnErr(err)
+	})
 }
 
-func (m *listenMsg) run(app *app) (interface{}, error) {
-	if app.P2p == nil {
-		return nil, needsConfigure()
+func setPeerInfoList(m ipc.PeerInfo_List, peerInfos []codaPeerInfo) {
+	// TODO check that it works
+	for i := 0; i < len(peerInfos); i++ {
+		setPeerInfo(m.At(i), &peerInfos[i])
 	}
-	ma, err := multiaddr.NewMultiaddr(m.Iface)
+}
+
+func setMultiaddrList(m ipc.Multiaddr_List, addrs []multiaddr.Multiaddr) {
+	// TODO check that it works
+	for i := 0; i < len(addrs); i++ {
+		panicOnErr(m.At(i).SetRepresentation(addrs[i].String()))
+	}
+}
+
+func (app *app) handleListen(seqno uint64, m ipc.Libp2pHelperInterface_Listen_Request) *capnp.Message {
+	if app.P2p == nil {
+		return mkRpcRespError(seqno, needsConfigure())
+	}
+	iface, err := m.Iface()
 	if err != nil {
-		return nil, badp2p(err)
+		return mkRpcRespError(seqno, badp2p(err))
+	}
+	ma, err := multiaddr.NewMultiaddr(iface)
+	if err != nil {
+		return mkRpcRespError(seqno, badp2p(err))
 	}
 	if err := app.P2p.Host.Network().Listen(ma); err != nil {
-		return nil, badp2p(err)
+		return mkRpcRespError(seqno, badp2p(err))
 	}
-	return app.P2p.Host.Addrs(), nil
+	addrs := app.P2p.Host.Addrs()
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		r, err := m.NewListen()
+		panicOnErr(err)
+		lst, err := r.NewResult(int32(len(addrs)))
+		panicOnErr(err)
+		setMultiaddrList(lst, addrs)
+	})
 }
 
-func (m *listeningAddrsMsg) run(app *app) (interface{}, error) {
+func (app *app) handleGetListeningAddrs(seqno uint64, m ipc.Libp2pHelperInterface_GetListeningAddrs_Request) *capnp.Message {
 	if app.P2p == nil {
-		return nil, needsConfigure()
+		return mkRpcRespError(seqno, needsConfigure())
 	}
-	return app.P2p.Host.Addrs(), nil
+	addrs := app.P2p.Host.Addrs()
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		r, err := m.NewGetListeningAddrs()
+		panicOnErr(err)
+		lst, err := r.NewResult(int32(len(addrs)))
+		panicOnErr(err)
+		setMultiaddrList(lst, addrs)
+	})
 }
 
-func (t *publishMsg) run(app *app) (interface{}, error) {
+func (app *app) handlePublish(seqno uint64, m ipc.Libp2pHelperInterface_Publish_Request) *capnp.Message {
 	if app.P2p == nil {
-		return nil, needsConfigure()
+		return mkRpcRespError(seqno, needsConfigure())
 	}
 	if app.P2p.Dht == nil {
-		return nil, needsDHT()
-	}
-
-	data, err := codaDecode(t.Data)
-	if err != nil {
-		return nil, badRPC(err)
+		return mkRpcRespError(seqno, needsDHT())
 	}
 
 	var topic *pubsub.Topic
 	var has bool
 
-	if topic, has = app.Topics[t.Topic]; !has {
-		topic, err = app.P2p.Pubsub.Join(t.Topic)
+	topicName, err := m.Topic()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	data, err := m.Data()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+
+	if topic, has = app.Topics[topicName]; !has {
+		topic, err = app.P2p.Pubsub.Join(topicName)
 		if err != nil {
-			return nil, badp2p(err)
+			return mkRpcRespError(seqno, badp2p(err))
 		}
-		app.Topics[t.Topic] = topic
+		app.Topics[topicName] = topic
 	}
 
 	if err := topic.Publish(app.Ctx, data); err != nil {
-		return nil, badp2p(err)
+		return mkRpcRespError(seqno, badp2p(err))
 	}
 
-	return "publish success", nil
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		_, err := m.NewPublish()
+		panicOnErr(err)
+	})
 }
 
-func (s *subscribeMsg) run(app *app) (interface{}, error) {
+func (app *app) handleSubscribe(seqno uint64, m ipc.Libp2pHelperInterface_Subscribe_Request) *capnp.Message {
 	if app.P2p == nil {
-		return nil, needsConfigure()
+		return mkRpcRespError(seqno, needsConfigure())
 	}
 	if app.P2p.Dht == nil {
-		return nil, needsDHT()
+		return mkRpcRespError(seqno, needsDHT())
 	}
 
-	topic, err := app.P2p.Pubsub.Join(s.Topic)
+	topicName, err := m.Topic()
 	if err != nil {
-		return nil, badp2p(err)
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	subId_, err := m.SubscriptionId()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	subId := subId_.Id()
+
+	topic, err := app.P2p.Pubsub.Join(topicName)
+	if err != nil {
+		return mkRpcRespError(seqno, badp2p(err))
 	}
 
-	app.Topics[s.Topic] = topic
+	app.Topics[topicName] = topic
 
-	err = app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
+	err = app.P2p.Pubsub.RegisterTopicValidator(topicName, func(ctx context.Context, id peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
 			app.P2p.Logger.Info("would have validated but it's from us!")
 			return pubsub.ValidationAccept
 		}
 
+		seenAt := time.Now()
+
 		seqno := <-seqs
-		ch := make(chan string)
+		ch := make(chan pubsub.ValidationResult)
 		app.ValidatorMutex.Lock()
 		app.Validators[seqno] = new(validationStatus)
 		app.Validators[seqno].Completion = ch
@@ -594,15 +770,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			delete(app.Validators, seqno)
 			return pubsub.ValidationIgnore
 		}
-
-		app.writeMsg(validateUpcall{
-			Sender:     sender,
-			Expiration: deadline.UnixNano(),
-			Data:       codaEncode(msg.Data),
-			Seqno:      seqno,
-			Upcall:     "validate",
-			Idx:        s.Subscription,
-		})
+		app.writeMsg(mkValidateUpcall(sender, deadline, seenAt, msg.Data, seqno, subId))
 
 		// Wait for the validation response, but be sure to honor any timeout/deadline in ctx
 		select {
@@ -628,35 +796,33 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			return pubsub.ValidationReject
 		case res := <-ch:
 			switch res {
-			case rejectResult:
+			case pubsub.ValidationReject:
 				app.P2p.Logger.Info("why u fail to validate :(")
-				return pubsub.ValidationReject
-			case acceptResult:
+			case pubsub.ValidationAccept:
 				app.P2p.Logger.Info("validated!")
-				return pubsub.ValidationAccept
-			case ignoreResult:
+			case pubsub.ValidationIgnore:
 				app.P2p.Logger.Info("ignoring valid message!")
-				return pubsub.ValidationIgnore
 			default:
-				app.P2p.Logger.Info("ignoring message that falled off the end!")
-				return pubsub.ValidationIgnore
+				app.P2p.Logger.Info("unknown validation result")
+				res = pubsub.ValidationIgnore
 			}
+			return res
 		}
 	}, pubsub.WithValidatorTimeout(validationTimeout))
 
 	if err != nil {
-		return nil, badp2p(err)
+		return mkRpcRespError(seqno, badp2p(err))
 	}
 
 	sub, err := topic.Subscribe()
 	if err != nil {
-		return nil, badp2p(err)
+		return mkRpcRespError(seqno, badp2p(err))
 	}
 
 	ctx, cancel := context.WithCancel(app.Ctx)
-	app.Subs[s.Subscription] = subscription{
+	app.Subs[subId] = subscription{
 		Sub:    sub,
-		Idx:    s.Subscription,
+		Idx:    subId,
 		Ctx:    ctx,
 		Cancel: cancel,
 	}
@@ -672,63 +838,66 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			}
 		}
 	}()
-	return "subscribe success", nil
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		_, err := m.NewSubscribe()
+		panicOnErr(err)
+	})
 }
 
-func (u *unsubscribeMsg) run(app *app) (interface{}, error) {
+func (app *app) handleUnsubscribe(seqno uint64, m ipc.Libp2pHelperInterface_Unsubscribe_Request) *capnp.Message {
 	if app.P2p == nil {
-		return nil, needsConfigure()
+		return mkRpcRespError(seqno, needsConfigure())
 	}
-	if sub, ok := app.Subs[u.Subscription]; ok {
+	subId_, err := m.SubscriptionId()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	subId := subId_.Id()
+	if sub, ok := app.Subs[subId]; ok {
 		sub.Sub.Cancel()
 		sub.Cancel()
-		delete(app.Subs, u.Subscription)
-		return "unsubscribe success", nil
+		delete(app.Subs, subId)
+		return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+			_, err := m.NewUnsubscribe()
+			panicOnErr(err)
+		})
 	}
-	return nil, badRPC(errors.New("subscription not found"))
+	return mkRpcRespError(seqno, badRPC(errors.New("subscription not found")))
 }
 
-func (r *validationCompleteMsg) run(app *app) (interface{}, error) {
-	if app.P2p == nil {
-		return nil, needsConfigure()
-	}
-	app.ValidatorMutex.Lock()
-	defer app.ValidatorMutex.Unlock()
-	if st, ok := app.Validators[r.Seqno]; ok {
-		st.Completion <- r.Valid
-		if st.TimedOutAt != nil {
-			app.P2p.Logger.Errorf("validation for item %d took %d seconds", r.Seqno, time.Now().Add(validationTimeout).Sub(*st.TimedOutAt))
-		}
-		delete(app.Validators, r.Seqno)
-		return "validationComplete success", nil
-	}
-	return nil, badRPC(errors.New("validation seqno unknown"))
-}
-
-func (*generateKeypairMsg) run(app *app) (interface{}, error) {
+func (app *app) handleGenerateKeypair(seqno uint64, m ipc.Libp2pHelperInterface_GenerateKeypair_Request) *capnp.Message {
 	privk, pubk, err := crypto.GenerateEd25519Key(cryptorand.Reader)
 	if err != nil {
-		return nil, badp2p(err)
+		return mkRpcRespError(seqno, badp2p(err))
 	}
 	privkBytes, err := crypto.MarshalPrivateKey(privk)
 	if err != nil {
-		return nil, badRPC(err)
+		return mkRpcRespError(seqno, badRPC(err))
 	}
 
 	pubkBytes, err := crypto.MarshalPublicKey(pubk)
 	if err != nil {
-		return nil, badRPC(err)
+		return mkRpcRespError(seqno, badRPC(err))
 	}
 
 	peerID, err := peer.IDFromPublicKey(pubk)
 	if err != nil {
-		return nil, badp2p(err)
+		return mkRpcRespError(seqno, badp2p(err))
 	}
 
-	return generatedKeypair{Private: codaEncode(privkBytes), Public: codaEncode(pubkBytes), PeerID: peer.Encode(peerID)}, nil
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		resp, err := m.NewGenerateKeypair()
+		panicOnErr(err)
+		res, err := resp.NewResult()
+		panicOnErr(err)
+		panicOnErr(res.SetPrivateKey(privkBytes))
+		panicOnErr(res.SetPublicKey(pubkBytes))
+		pid, err := res.NewPeerId()
+		panicOnErr(pid.SetId(peer.Encode(peerID)))
+	})
 }
 
-func handleStreamReads(app *app, stream net.Stream, idx int) {
+func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 	go func() {
 		defer func() {
 			_ = stream.Close()
@@ -740,19 +909,11 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 			len, err := stream.Read(buf)
 
 			if len != 0 {
-				app.writeMsg(incomingMsgUpcall{
-					Upcall:    "incomingStreamMsg",
-					Data:      codaEncode(buf[:len]),
-					StreamIdx: idx,
-				})
+				app.writeMsg(mkIncomingMsgUpcall(idx, buf[:len]))
 			}
 
 			if err != nil && err != io.EOF {
-				app.writeMsg(streamLostUpcall{
-					Upcall:    "streamLost",
-					StreamIdx: idx,
-					Reason:    fmt.Sprintf("read failure: %s", err.Error()),
-				})
+				app.writeMsg(mkStreamLostUpcall(idx, fmt.Sprintf("read failure: %s", err.Error())))
 				break
 			}
 
@@ -763,39 +924,45 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 				break
 			}
 		}
-		app.writeMsg(streamReadCompleteUpcall{
-			Upcall:    "streamReadComplete",
-			StreamIdx: idx,
-		})
+		app.writeMsg(mkStreamReadCompleteUpcall(idx))
 	}()
 }
 
-func (o *openStreamMsg) run(app *app) (interface{}, error) {
+func (app *app) handleOpenStream(seqno uint64, m ipc.Libp2pHelperInterface_OpenStream_Request) *capnp.Message {
 	if app.P2p == nil {
-		return nil, needsConfigure()
+		return mkRpcRespError(seqno, needsConfigure())
 	}
 
 	streamIdx := <-seqs
 
-	peer, err := peer.Decode(o.Peer)
+	peerStr, err := m.Peer()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	peerDecoded, err := peer.Decode(peerStr)
 	if err != nil {
 		// TODO: this isn't necessarily an RPC error. Perhaps the encoded Peer ID
 		// isn't supported by this version of libp2p.
-		return nil, badRPC(err)
+		return mkRpcRespError(seqno, badRPC(err))
 	}
 
 	ctx, cancel := context.WithTimeout(app.Ctx, 30*time.Second)
 	defer cancel()
 
-	stream, err := app.P2p.Host.NewStream(ctx, peer, protocol.ID(o.ProtocolID))
+	protocolId, err := m.ProtocolId()
 	if err != nil {
-		return nil, badp2p(err)
+		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	maybePeer, err := parseMultiaddrWithID(stream.Conn().RemoteMultiaddr(), stream.Conn().RemotePeer())
+	stream, err := app.P2p.Host.NewStream(ctx, peerDecoded, protocol.ID(protocolId))
+	if err != nil {
+		return mkRpcRespError(seqno, badp2p(err))
+	}
+
+	peer, err := parseMultiaddrWithID(stream.Conn().RemoteMultiaddr(), stream.Conn().RemotePeer())
 	if err != nil {
 		_ = stream.Reset()
-		return nil, badp2p(err)
+		return mkRpcRespError(seqno, badp2p(err))
 	}
 
 	app.StreamsMutex.Lock()
@@ -807,69 +974,111 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 		// Note: It is _very_ important that we call handleStreamReads here -- this is how the "caller" side of the stream starts listening to the responses from the RPCs. Do not remove.
 		handleStreamReads(app, stream, streamIdx)
 	}()
-	return openStreamResult{StreamIdx: streamIdx, Peer: *maybePeer}, nil
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		resp, err := m.NewOpenStream()
+		panicOnErr(err)
+		sid, err := resp.NewStreamId()
+		panicOnErr(err)
+		sid.SetId(streamIdx)
+		pi, err := resp.NewPeer()
+		panicOnErr(err)
+		setPeerInfo(pi, peer)
+	})
 }
 
-func (cs *closeStreamMsg) run(app *app) (interface{}, error) {
+func (app *app) handleCloseStream(seqno uint64, m ipc.Libp2pHelperInterface_CloseStream_Request) *capnp.Message {
 	if app.P2p == nil {
-		return nil, needsConfigure()
+		return mkRpcRespError(seqno, needsConfigure())
 	}
+	sid, err := m.StreamId()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	streamId := sid.Id()
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
-	if stream, ok := app.Streams[cs.StreamIdx]; ok {
-		delete(app.Streams, cs.StreamIdx)
+	if stream, ok := app.Streams[streamId]; ok {
+		delete(app.Streams, streamId)
 		err := stream.Close()
 		if err != nil {
-			return nil, badp2p(err)
+			return mkRpcRespError(seqno, badp2p(err))
 		}
-		return "closeStream success", nil
+		return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+			_, err := m.NewCloseStream()
+			panicOnErr(err)
+		})
 	}
-	return nil, badRPC(errors.New("unknown stream_idx"))
+	return mkRpcRespError(seqno, badRPC(errors.New("unknown stream_idx")))
 }
 
-func (cs *resetStreamMsg) run(app *app) (interface{}, error) {
+func (app *app) handleResetStream(seqno uint64, m ipc.Libp2pHelperInterface_ResetStream_Request) *capnp.Message {
 	if app.P2p == nil {
-		return nil, needsConfigure()
+		return mkRpcRespError(seqno, needsConfigure())
 	}
-	app.StreamsMutex.Lock()
-	defer app.StreamsMutex.Unlock()
-	if stream, ok := app.Streams[cs.StreamIdx]; ok {
-		err := stream.Reset()
-		delete(app.Streams, cs.StreamIdx)
-		if err != nil {
-			return nil, badp2p(err)
-		}
-		return "resetStream success", nil
-	}
-	return nil, badRPC(errors.New("unknown stream_idx"))
-}
-
-func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
-	if app.P2p == nil {
-		return nil, needsConfigure()
-	}
-	data, err := codaDecode(cs.Data)
+	sid, err := m.StreamId()
 	if err != nil {
-		return nil, badRPC(err)
+		return mkRpcRespError(seqno, badRPC(err))
 	}
+	streamId := sid.Id()
+	app.StreamsMutex.Lock()
+	defer app.StreamsMutex.Unlock()
+	if stream, ok := app.Streams[streamId]; ok {
+		err := stream.Reset()
+		delete(app.Streams, streamId)
+		if err != nil {
+			return mkRpcRespError(seqno, badp2p(err))
+		}
+		return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+			_, err := m.NewResetStream()
+			panicOnErr(err)
+		})
+	}
+	return mkRpcRespError(seqno, badRPC(errors.New("unknown stream_idx")))
+}
+
+func (app *app) handleSendStream(seqno uint64, m ipc.Libp2pHelperInterface_SendStream_Request) *capnp.Message {
+	if app.P2p == nil {
+		return mkRpcRespError(seqno, needsConfigure())
+	}
+	msg, err := m.Msg()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	data, err := msg.Data()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	sid, err := msg.StreamId()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	streamId := sid.Id()
 
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
-	if stream, ok := app.Streams[cs.StreamIdx]; ok {
+	if stream, ok := app.Streams[streamId]; ok {
 		n, err := stream.Write(data)
 		if err != nil {
-			return nil, wrapError(badp2p(err), fmt.Sprintf("only wrote %d out of %d bytes", n, len(data)))
+			// TODO check that it's correct to error out, not repeat writing
+			return mkRpcRespError(seqno, wrapError(badp2p(err), fmt.Sprintf("only wrote %d out of %d bytes", n, len(data))))
 		}
-		return "sendStreamMsg success", nil
+		return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+			_, err := m.NewSendStream()
+			panicOnErr(err)
+		})
 	}
-	return nil, badRPC(errors.New("unknown stream_idx"))
+	return mkRpcRespError(seqno, badRPC(errors.New("unknown stream_idx")))
 }
 
-func (as *addStreamHandlerMsg) run(app *app) (interface{}, error) {
+func (app *app) handleAddStreamHandler(seqno uint64, m ipc.Libp2pHelperInterface_AddStreamHandler_Request) *capnp.Message {
 	if app.P2p == nil {
-		return nil, needsConfigure()
+		return mkRpcRespError(seqno, needsConfigure())
 	}
-	app.P2p.Host.SetStreamHandler(protocol.ID(as.Protocol), func(stream net.Stream) {
+	protocolId, err := m.Protocol()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	app.P2p.Host.SetStreamHandler(protocol.ID(protocolId), func(stream net.Stream) {
 		peerinfo, err := parseMultiaddrWithID(stream.Conn().RemoteMultiaddr(), stream.Conn().RemotePeer())
 		if err != nil {
 			app.P2p.Logger.Errorf("failed to parse remote connection information, silently dropping stream: %s", err.Error())
@@ -879,35 +1088,48 @@ func (as *addStreamHandlerMsg) run(app *app) (interface{}, error) {
 		app.StreamsMutex.Lock()
 		defer app.StreamsMutex.Unlock()
 		app.Streams[streamIdx] = stream
-		app.writeMsg(incomingStreamUpcall{
-			Upcall:    "incomingStream",
-			Peer:      *peerinfo,
-			StreamIdx: streamIdx,
-			Protocol:  as.Protocol,
-		})
+		app.writeMsg(mkIncomingStreamUpcall(peerinfo, streamIdx, protocolId))
 		handleStreamReads(app, stream, streamIdx)
 	})
 
-	return "addStreamHandler success", nil
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		_, err := m.NewAddStreamHandler()
+		panicOnErr(err)
+	})
 }
 
-func (rs *removeStreamHandlerMsg) run(app *app) (interface{}, error) {
+func (app *app) handleRemoveStreamHandler(seqno uint64, m ipc.Libp2pHelperInterface_RemoveStreamHandler_Request) *capnp.Message {
 	if app.P2p == nil {
-		return nil, needsConfigure()
+		return mkRpcRespError(seqno, needsConfigure())
 	}
-	app.P2p.Host.RemoveStreamHandler(protocol.ID(rs.Protocol))
-
-	return "removeStreamHandler success", nil
-}
-
-func (ap *addPeerMsg) run(app *app) (interface{}, error) {
-	if app.P2p == nil {
-		return nil, needsConfigure()
-	}
-
-	info, err := addrInfoOfString(ap.Multiaddr)
+	protocolId, err := m.Protocol()
 	if err != nil {
-		return nil, err
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	app.P2p.Host.RemoveStreamHandler(protocol.ID(protocolId))
+
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		_, err := m.NewRemoveStreamHandler()
+		panicOnErr(err)
+	})
+}
+
+func (app *app) handleAddPeer(seqno uint64, m ipc.Libp2pHelperInterface_AddPeer_Request) *capnp.Message {
+	if app.P2p == nil {
+		return mkRpcRespError(seqno, needsConfigure())
+	}
+
+	maddr, err := m.Multiaddr()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	maRepr, err := maddr.Representation()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	info, err := addrInfoOfString(maRepr)
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
 	}
 
 	app.AddedPeers = append(app.AddedPeers, *info)
@@ -917,18 +1139,21 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 		app.Bootstrapper.Close()
 	}
 
-	app.P2p.Logger.Error("addPeer Trying to connect to: ", info)
+	app.P2p.Logger.Info("addPeer Trying to connect to: ", info)
 
-	if ap.Seed {
+	if m.IsSeed() {
 		app.P2p.Seeds = append(app.P2p.Seeds, *info)
 	}
 
 	err = app.P2p.Host.Connect(app.Ctx, *info)
 	if err != nil {
-		return nil, badp2p(err)
+		return mkRpcRespError(seqno, badp2p(err))
 	}
 
-	return "addPeer success", nil
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		_, err := m.NewAddPeer()
+		panicOnErr(err)
+	})
 }
 
 func beginMDNS(app *app, foundPeerCh chan peerDiscovery) error {
@@ -946,9 +1171,9 @@ func beginMDNS(app *app, foundPeerCh chan peerDiscovery) error {
 	return nil
 }
 
-func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
+func (app *app) handleBeginAdvertising(seqno uint64, m ipc.Libp2pHelperInterface_BeginAdvertising_Request) *capnp.Message {
 	if app.P2p == nil {
-		return nil, needsConfigure()
+		return mkRpcRespError(seqno, needsConfigure())
 	}
 
 	for _, info := range app.AddedPeers {
@@ -999,7 +1224,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		err := beginMDNS(app, foundPeerCh)
 		if err != nil {
 			app.P2p.Logger.Error("failed to connect to begin mdns: ", err.Error())
-			return nil, badp2p(err)
+			return mkRpcRespError(seqno, badp2p(err))
 		}
 	}
 
@@ -1007,7 +1232,8 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		app.P2p.Logger.Infof("beginning DHT discovery")
 		routingDiscovery := discovery.NewRoutingDiscovery(app.P2p.Dht)
 		if routingDiscovery == nil {
-			return nil, errors.New("failed to create routing discovery")
+			err := errors.New("failed to create routing discovery")
+			return mkRpcRespError(seqno, err)
 		}
 
 		app.P2p.Discovery = routingDiscovery
@@ -1015,7 +1241,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		err := app.P2p.Dht.Bootstrap(app.Ctx)
 		if err != nil {
 			app.P2p.Logger.Error("failed to dht bootstrap: ", err.Error())
-			return nil, badp2p(err)
+			return mkRpcRespError(seqno, badp2p(err))
 		}
 
 		time.Sleep(time.Millisecond * 100)
@@ -1024,7 +1250,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		_, err = routingDiscovery.Advertise(app.Ctx, app.P2p.Rendezvous)
 		if err != nil {
 			app.P2p.Logger.Error("failed to routing advertise: ", err.Error())
-			return nil, badp2p(err)
+			return mkRpcRespError(seqno, badp2p(err))
 		}
 
 		go func() {
@@ -1047,10 +1273,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 
 		id := c.RemotePeer()
 
-		app.writeMsg(peerConnectionUpcall{
-			ID:     peer.Encode(id),
-			Upcall: "peerConnected",
-		})
+		app.writeMsg(mkPeerDisconnectedUpcall(peer.Encode(id)))
 	}
 
 	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
@@ -1058,13 +1281,13 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 
 		id := c.RemotePeer()
 
-		app.writeMsg(peerConnectionUpcall{
-			ID:     peer.Encode(id),
-			Upcall: "peerDisconnected",
-		})
+		app.writeMsg(mkPeerConnectedUpcall(peer.Encode(id)))
 	}
 
-	return "beginAdvertising success", nil
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		_, err := m.NewBeginAdvertising()
+		panicOnErr(err)
+	})
 }
 
 func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {
@@ -1089,4 +1312,115 @@ func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {
 		return nil, err
 	}
 	return maybePeer, nil
+}
+
+func (app *app) handleIncomingMsg(msg *ipc.Libp2pHelperInterface_Message) {
+	if msg.HasRpcRequest() {
+		req, err := msg.RpcRequest()
+		panicOnErr(err)
+		h, err := req.Header()
+		panicOnErr(err)
+		seqno := h.SeqNumber()
+		var resp *capnp.Message
+		if req.HasConfigure() {
+			r, err := req.Configure()
+			panicOnErr(err)
+			resp = app.handleConfigure(seqno, r)
+		} else if req.HasSetGatingConfig() {
+			r, err := req.SetGatingConfig()
+			panicOnErr(err)
+			resp = app.handleSetGatingConfig(seqno, r)
+		} else if req.HasListen() {
+			r, err := req.Listen()
+			panicOnErr(err)
+			resp = app.handleListen(seqno, r)
+		} else if req.HasGetListeningAddrs() {
+			r, err := req.GetListeningAddrs()
+			panicOnErr(err)
+			resp = app.handleGetListeningAddrs(seqno, r)
+		} else if req.HasBeginAdvertising() {
+			r, err := req.BeginAdvertising()
+			panicOnErr(err)
+			resp = app.handleBeginAdvertising(seqno, r)
+		} else if req.HasAddPeer() {
+			r, err := req.AddPeer()
+			panicOnErr(err)
+			resp = app.handleAddPeer(seqno, r)
+		} else if req.HasListPeers() {
+			r, err := req.ListPeers()
+			panicOnErr(err)
+			resp = app.handleListPeers(seqno, r)
+		} else if req.HasGenerateKeypair() {
+			r, err := req.GenerateKeypair()
+			panicOnErr(err)
+			resp = app.handleGenerateKeypair(seqno, r)
+		} else if req.HasPublish() {
+			r, err := req.Publish()
+			panicOnErr(err)
+			resp = app.handlePublish(seqno, r)
+		} else if req.HasSubscribe() {
+			r, err := req.Subscribe()
+			panicOnErr(err)
+			resp = app.handleSubscribe(seqno, r)
+		} else if req.HasUnsubscribe() {
+			r, err := req.Unsubscribe()
+			panicOnErr(err)
+			resp = app.handleUnsubscribe(seqno, r)
+		} else if req.HasAddStreamHandler() {
+			r, err := req.AddStreamHandler()
+			panicOnErr(err)
+			resp = app.handleAddStreamHandler(seqno, r)
+		} else if req.HasRemoveStreamHandler() {
+			r, err := req.RemoveStreamHandler()
+			panicOnErr(err)
+			resp = app.handleRemoveStreamHandler(seqno, r)
+		} else if req.HasOpenStream() {
+			r, err := req.OpenStream()
+			panicOnErr(err)
+			resp = app.handleOpenStream(seqno, r)
+		} else if req.HasCloseStream() {
+			r, err := req.CloseStream()
+			panicOnErr(err)
+			resp = app.handleCloseStream(seqno, r)
+		} else if req.HasResetStream() {
+			r, err := req.ResetStream()
+			panicOnErr(err)
+			resp = app.handleResetStream(seqno, r)
+		} else if req.HasSendStream() {
+			r, err := req.SendStream()
+			panicOnErr(err)
+			resp = app.handleSendStream(seqno, r)
+		} else if req.HasSetNodeStatus() {
+			r, err := req.SetNodeStatus()
+			panicOnErr(err)
+			resp = app.handleSetNodeStatus(seqno, r)
+		} else if req.HasGetPeerNodeStatus() {
+			r, err := req.GetPeerNodeStatus()
+			panicOnErr(err)
+			resp = app.handleGetPeerNodeStatus(seqno, r)
+		} else {
+			app.P2p.Logger.Error("Received rpc message of an unknown type")
+			return
+		}
+		if resp == nil {
+			app.P2p.Logger.Error("Failed to process rpc message")
+		} else {
+			app.writeMsg(resp)
+		}
+	} else if msg.HasPushMessage() {
+		req, err := msg.PushMessage()
+		panicOnErr(err)
+		h, err := req.Header()
+		panicOnErr(err)
+		_ = h
+		if req.HasValidation() {
+			r, err := req.Validation()
+			panicOnErr(err)
+			app.handleValidation(r)
+		} else {
+			app.P2p.Logger.Error("Received push message of an unknown type")
+		}
+	} else {
+		app.P2p.Logger.Error("Received message of an unknown type")
+	}
 }

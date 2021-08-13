@@ -1,263 +1,22 @@
 package main
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	gonet "net"
+	"time"
 
 	"codanet"
 
+	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
-)
-
-type methodIdx int
-
-const (
-	// when editing this block, see the README for how to update methodidx_jsonenum
-	configure methodIdx = iota
-	listen
-	publish
-	subscribe
-	unsubscribe
-	validationComplete
-	generateKeypair
-	openStream
-	closeStream
-	resetStream
-	sendStreamMsg
-	removeStreamHandler
-	addStreamHandler
-	listeningAddrs
-	addPeer
-	beginAdvertising
-	findPeer
-	listPeers
-	setGatingConfig
-	setNodeStatus
-	getPeerNodeStatus
+	ipc "libp2p_ipc"
 )
 
 type codaPeerInfo struct {
-	Libp2pPort int    `json:"libp2p_port"`
-	Host       string `json:"host"`
-	PeerID     string `json:"peer_id"`
-}
-
-type envelope struct {
-	Method methodIdx   `json:"method"`
-	Seqno  int         `json:"seqno"`
-	Body   interface{} `json:"body"`
-}
-
-type configureMsg struct {
-	Statedir            string             `json:"statedir"`
-	Privk               string             `json:"privk"`
-	NetworkID           string             `json:"network_id"`
-	ListenOn            []string           `json:"ifaces"`
-	MetricsPort         string             `json:"metrics_port"`
-	External            string             `json:"external_maddr"`
-	UnsafeNoTrustIP     bool               `json:"unsafe_no_trust_ip"`
-	Flood               bool               `json:"flood"`
-	PeerExchange        bool               `json:"peer_exchange"`
-	DirectPeers         []string           `json:"direct_peers"`
-	SeedPeers           []string           `json:"seed_peers"`
-	GatingConfig        setGatingConfigMsg `json:"gating_config"`
-	MaxConnections      int                `json:"max_connections"`
-	ValidationQueueSize int                `json:"validation_queue_size"`
-	MinaPeerExchange    bool               `json:"mina_peer_exchange"`
-}
-
-type peerConnectionUpcall struct {
-	ID     string `json:"peer_id"`
-	Upcall string `json:"upcall"`
-}
-
-type listenMsg struct {
-	Iface string `json:"iface"`
-}
-
-type publishMsg struct {
-	Topic string `json:"topic"`
-	Data  string `json:"data"`
-}
-
-type subscribeMsg struct {
-	Topic        string `json:"topic"`
-	Subscription int    `json:"subscription_idx"`
-}
-
-// we use base64 for encoding blobs in our JSON protocol. there are more
-// efficient options but this one is easy to reach to.
-
-func codaEncode(data []byte) string {
-	return base64.StdEncoding.EncodeToString(data)
-}
-
-func codaDecode(data string) ([]byte, error) {
-	return base64.StdEncoding.DecodeString(data)
-}
-
-var (
-	acceptResult = "accept"
-	rejectResult = "reject"
-	ignoreResult = "ignore"
-)
-
-type validateUpcall struct {
-	Sender     *codaPeerInfo `json:"sender"`
-	Expiration int64         `json:"expiration"`
-	Data       string        `json:"data"`
-	Seqno      int           `json:"seqno"`
-	Upcall     string        `json:"upcall"`
-	Idx        int           `json:"subscription_idx"`
-}
-
-type validationCompleteMsg struct {
-	Seqno int    `json:"seqno"`
-	Valid string `json:"is_valid"`
-}
-
-type unsubscribeMsg struct {
-	Subscription int `json:"subscription_idx"`
-}
-
-type generatedKeypair struct {
-	Private string `json:"sk"`
-	Public  string `json:"pk"`
-	PeerID  string `json:"peer_id"`
-}
-
-type streamLostUpcall struct {
-	Upcall    string `json:"upcall"`
-	StreamIdx int    `json:"stream_idx"`
-	Reason    string `json:"reason"`
-}
-
-type streamReadCompleteUpcall struct {
-	Upcall    string `json:"upcall"`
-	StreamIdx int    `json:"stream_idx"`
-}
-
-type incomingMsgUpcall struct {
-	Upcall    string `json:"upcall"`
-	StreamIdx int    `json:"stream_idx"`
-	Data      string `json:"data"`
-}
-
-type openStreamMsg struct {
-	Peer       string `json:"peer"`
-	ProtocolID string `json:"protocol"`
-}
-
-type openStreamResult struct {
-	StreamIdx int          `json:"stream_idx"`
-	Peer      codaPeerInfo `json:"peer"`
-}
-
-type closeStreamMsg struct {
-	StreamIdx int `json:"stream_idx"`
-}
-
-type resetStreamMsg struct {
-	StreamIdx int `json:"stream_idx"`
-}
-
-type sendStreamMsgMsg struct {
-	StreamIdx int    `json:"stream_idx"`
-	Data      string `json:"data"`
-}
-
-type addStreamHandlerMsg struct {
-	Protocol string `json:"protocol"`
-}
-
-type incomingStreamUpcall struct {
-	Upcall    string       `json:"upcall"`
-	Peer      codaPeerInfo `json:"peer"`
-	StreamIdx int          `json:"stream_idx"`
-	Protocol  string       `json:"protocol"`
-}
-
-type removeStreamHandlerMsg struct {
-	Protocol string `json:"protocol"`
-}
-
-type addPeerMsg struct {
-	Multiaddr string `json:"multiaddr"`
-	Seed      bool   `json:"seed"`
-}
-
-type findPeerMsg struct {
-	PeerID string `json:"peer_id"`
-}
-
-type setNodeStatusMsg struct {
-	Data string `json:"data"`
-}
-
-type getPeerNodeStatusMsg struct {
-	PeerMultiaddr string `json:"peer_multiaddr"`
-}
-
-type setGatingConfigMsg struct {
-	BannedIPs      []string `json:"banned_ips"`
-	BannedPeerIDs  []string `json:"banned_peers"`
-	TrustedPeerIDs []string `json:"trusted_peers"`
-	TrustedIPs     []string `json:"trusted_ips"`
-	Isolate        bool     `json:"isolate"`
-}
-
-type errorResult struct {
-	Seqno  int    `json:"seqno"`
-	Errorr string `json:"error"`
-}
-
-type successResult struct {
-	Seqno    int             `json:"seqno"`
-	Success  json.RawMessage `json:"success"`
-	Duration string          `json:"duration"`
-}
-
-type generateKeypairMsg struct {
-}
-
-type listPeersMsg struct {
-}
-
-type listeningAddrsMsg struct {
-}
-
-type beginAdvertisingMsg struct {
-}
-
-var msgHandlers = map[methodIdx]func() action{
-	configure:           func() action { return &configureMsg{} },
-	listen:              func() action { return &listenMsg{} },
-	publish:             func() action { return &publishMsg{} },
-	subscribe:           func() action { return &subscribeMsg{} },
-	unsubscribe:         func() action { return &unsubscribeMsg{} },
-	validationComplete:  func() action { return &validationCompleteMsg{} },
-	generateKeypair:     func() action { return &generateKeypairMsg{} },
-	openStream:          func() action { return &openStreamMsg{} },
-	closeStream:         func() action { return &closeStreamMsg{} },
-	resetStream:         func() action { return &resetStreamMsg{} },
-	sendStreamMsg:       func() action { return &sendStreamMsgMsg{} },
-	removeStreamHandler: func() action { return &removeStreamHandlerMsg{} },
-	addStreamHandler:    func() action { return &addStreamHandlerMsg{} },
-	listeningAddrs:      func() action { return &listeningAddrsMsg{} },
-	addPeer:             func() action { return &addPeerMsg{} },
-	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
-	findPeer:            func() action { return &findPeerMsg{} },
-	listPeers:           func() action { return &listPeersMsg{} },
-	setGatingConfig:     func() action { return &setGatingConfigMsg{} },
-	setNodeStatus:       func() action { return &setNodeStatusMsg{} },
-	getPeerNodeStatus:   func() action { return &getPeerNodeStatusMsg{} },
-}
-
-type action interface {
-	run(app *app) (interface{}, error)
+	Libp2pPort uint16
+	Host       string
+	PeerID     string
 }
 
 func filterIPString(filters *ma.Filters, ip string, action ma.Action) error {
@@ -265,7 +24,7 @@ func filterIPString(filters *ma.Filters, ip string, action ma.Action) error {
 
 	if realIP == nil {
 		// TODO: how to compute mask for IPv6?
-		return badRPC(errors.New("unparsable IP or IPv6"))
+		return errors.New("unparsable IP or IPv6")
 	}
 
 	ipnet := gonet.IPNet{Mask: gonet.IPv4Mask(255, 255, 255, 255), IP: realIP}
@@ -275,7 +34,57 @@ func filterIPString(filters *ma.Filters, ip string, action ma.Action) error {
 	return nil
 }
 
-func gatingConfigFromJson(gc *setGatingConfigMsg, addedPeers []peer.AddrInfo) (*codanet.CodaGatingState, error) {
+func readMultiaddrList(l ipc.Multiaddr_List) ([]string, error) {
+  res := make([]string, 0, l.Len())
+	return res, multiaddrListForeach(l, func(v string) error {
+    res = append(res, v)
+		return nil
+	})
+}
+
+func multiaddrListForeach(l ipc.Multiaddr_List, f func(string) error) error {
+	for i := 0; i < l.Len(); i++ {
+		el, err := l.At(i).Representation()
+		if err != nil {
+			return err
+		}
+		err = f(el)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func capnpPeerIdListForeach(l ipc.PeerId_List, f func(string) error) error {
+	for i := 0; i < l.Len(); i++ {
+		el, err := l.At(i).Id()
+		if err != nil {
+			return err
+		}
+		err = f(el)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func capnpTextListForeach(l capnp.TextList, f func(string) error) error {
+	for i := 0; i < l.Len(); i++ {
+		el, err := l.At(i)
+		if err != nil {
+			return err
+		}
+		err = f(el)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet.CodaGatingState, error) {
 	_, totalIpNet, err := gonet.ParseCIDR("0.0.0.0/0")
 	if err != nil {
 		return nil, err
@@ -283,39 +92,251 @@ func gatingConfigFromJson(gc *setGatingConfigMsg, addedPeers []peer.AddrInfo) (*
 
 	// TODO: perhaps the isolate option should just be passed down to the gating state instead
 	bannedAddrFilters := ma.NewFilters()
-	if gc.Isolate {
+	if gc.Isolate() {
 		bannedAddrFilters.AddFilter(*totalIpNet, ma.ActionDeny)
 	}
-	for _, ip := range gc.BannedIPs {
-		err := filterIPString(bannedAddrFilters, ip, ma.ActionDeny)
-		if err != nil {
-			return nil, err
-		}
+
+	bannedIps, err := gc.BannedIps()
+	if err != nil {
+		return nil, err
+	}
+	err = capnpTextListForeach(bannedIps, func(ip string) error {
+		return filterIPString(bannedAddrFilters, ip, ma.ActionDeny)
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	trustedAddrFilters := ma.NewFilters()
 	trustedAddrFilters.AddFilter(*totalIpNet, ma.ActionDeny)
-	for _, ip := range gc.TrustedIPs {
-		err := filterIPString(trustedAddrFilters, ip, ma.ActionAccept)
-		if err != nil {
-			return nil, err
-		}
+
+	trustedIps, err := gc.TrustedIps()
+	if err != nil {
+		return nil, err
+	}
+	err = capnpTextListForeach(trustedIps, func(ip string) error {
+		return filterIPString(trustedAddrFilters, ip, ma.ActionAccept)
+	})
+	if err != nil {
+		return nil, err
 	}
 
+	bannedPeerIds, err := gc.BannedPeerIds()
+	if err != nil {
+		return nil, err
+	}
 	bannedPeers := peer.NewSet()
-	for _, peerID := range gc.BannedPeerIDs {
+	err = capnpPeerIdListForeach(bannedPeerIds, func(peerID string) error {
 		id := peer.ID(peerID)
 		bannedPeers.Add(id)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
+	trustedPeerIds, err := gc.TrustedPeerIds()
+	if err != nil {
+		return nil, err
+	}
 	trustedPeers := peer.NewSet()
-	for _, peerID := range gc.TrustedPeerIDs {
+	err = capnpPeerIdListForeach(trustedPeerIds, func(peerID string) error {
 		id := peer.ID(peerID)
 		trustedPeers.Add(id)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	for _, peer := range addedPeers {
 		trustedPeers.Add(peer.ID)
 	}
 
 	return codanet.NewCodaGatingState(bannedAddrFilters, trustedAddrFilters, bannedPeers, trustedPeers), nil
+}
+
+func panicOnErr(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func mkMsg(f func(*capnp.Segment)) *capnp.Message {
+	msg, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+	panicOnErr(err)
+	f(seg)
+	return msg
+}
+
+func setNanoTime(ns *ipc.UnixNano, t time.Time) {
+	ns.SetNanoSec(t.UnixNano())
+}
+
+func mkRpcRespError(seqno uint64, rpcRespErr error) *capnp.Message {
+	if rpcRespErr == nil {
+		panic("mkRpcRespError: nil error")
+	}
+	return mkMsg(func(seg *capnp.Segment) {
+		m, err := ipc.NewRootDaemonInterface_Message(seg)
+		panicOnErr(err)
+		resp, err := m.NewRpcResponse()
+		panicOnErr(err)
+		h, err := resp.NewHeader()
+		panicOnErr(err)
+		ns, err := h.NewTimeSent()
+		panicOnErr(err)
+		setNanoTime(&ns, time.Now())
+		h.SetSeqNumber(seqno)
+		panicOnErr(resp.SetError(rpcRespErr.Error()))
+	})
+}
+
+func mkRpcRespSuccess(seqno uint64, f func(*ipc.Libp2pHelperInterface_RpcResponseSuccess)) *capnp.Message {
+	return mkMsg(func(seg *capnp.Segment) {
+		m, err := ipc.NewRootDaemonInterface_Message(seg)
+		panicOnErr(err)
+		resp, err := m.NewRpcResponse()
+		panicOnErr(err)
+		h, err := resp.NewHeader()
+		panicOnErr(err)
+		ns, err := h.NewTimeSent()
+		panicOnErr(err)
+		setNanoTime(&ns, time.Now())
+		h.SetSeqNumber(seqno)
+		succ, err := resp.NewSuccess()
+		panicOnErr(err)
+		f(&succ)
+	})
+}
+
+func mkPushMsg(f func(*ipc.DaemonInterface_PushMessage)) *capnp.Message {
+	return mkMsg(func(seg *capnp.Segment) {
+		m, err := ipc.NewRootDaemonInterface_Message(seg)
+		panicOnErr(err)
+		pm, err := m.NewPushMessage()
+		panicOnErr(err)
+		h, err := pm.NewHeader()
+		panicOnErr(err)
+		ns, err := h.NewTimeSent()
+		panicOnErr(err)
+		setNanoTime(&ns, time.Now())
+		f(&pm)
+	})
+}
+
+func mkPeerConnectedUpcall(peerId string) *capnp.Message {
+	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
+		pc, err := m.NewPeerConnected()
+		panicOnErr(err)
+		pid, err := pc.NewPeerId()
+		panicOnErr(err)
+		pid.SetId(peerId)
+	})
+}
+
+func mkPeerDisconnectedUpcall(peerId string) *capnp.Message {
+	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
+		pc, err := m.NewPeerDisconnected()
+		panicOnErr(err)
+		pid, err := pc.NewPeerId()
+		panicOnErr(err)
+		panicOnErr(pid.SetId(peerId))
+	})
+}
+func readPeerInfo(pi ipc.PeerInfo) (*codaPeerInfo, error) {
+	pid, err := pi.PeerId()
+	if err != nil {
+		return nil, err
+	}
+	peerId, err := pid.Id()
+	if err != nil {
+		return nil, err
+	}
+	host, err := pi.Host()
+	if err != nil {
+		return nil, err
+	}
+	port := pi.Libp2pPort()
+	return &codaPeerInfo{PeerID: peerId, Host: host, Libp2pPort: port}, nil
+}
+func setPeerInfo(pi ipc.PeerInfo, info *codaPeerInfo) {
+	pid, err := pi.NewPeerId()
+	panicOnErr(err)
+	panicOnErr(pid.SetId(info.PeerID))
+	panicOnErr(pi.SetHost(info.Host))
+	pi.SetLibp2pPort(info.Libp2pPort)
+}
+
+func mkIncomingStreamUpcall(peer *codaPeerInfo, streamIdx uint64, protocol string) *capnp.Message {
+	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
+		pc, err := m.NewIncomingStream()
+		panicOnErr(err)
+		sid, err := pc.NewStreamId()
+		panicOnErr(err)
+		sid.SetId(streamIdx)
+		panicOnErr(pc.SetProtocol(protocol))
+		pi, err := pc.NewPeer()
+		panicOnErr(err)
+		setPeerInfo(pi, peer)
+	})
+}
+
+func mkValidateUpcall(sender *codaPeerInfo, expiration time.Time, seenAt time.Time, data []byte, seqno uint64, subIdx uint64) *capnp.Message {
+	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
+		gr, err := m.NewGossipReceived()
+		panicOnErr(err)
+
+		pi, err := gr.NewSender()
+		panicOnErr(err)
+		setPeerInfo(pi, sender)
+
+		sa, err := gr.NewSeenAt()
+		panicOnErr(err)
+		setNanoTime(&sa, seenAt)
+
+		exp, err := gr.NewExpiration()
+		panicOnErr(err)
+		setNanoTime(&exp, expiration)
+
+		subId, err := gr.NewSubscriptionId()
+		panicOnErr(err)
+		subId.SetId(subIdx)
+
+		gr.SetValidationSeqNumber(seqno)
+		panicOnErr(gr.SetData(data))
+	})
+}
+
+func mkStreamLostUpcall(streamIdx uint64, reason string) *capnp.Message {
+	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
+		sl, err := m.NewStreamLost()
+		panicOnErr(err)
+		panicOnErr(sl.SetReason(reason))
+		sid, err := sl.NewStreamId()
+		panicOnErr(err)
+		sid.SetId(streamIdx)
+	})
+}
+
+func mkStreamReadCompleteUpcall(streamIdx uint64) *capnp.Message {
+	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
+		sl, err := m.NewStreamComplete()
+		panicOnErr(err)
+		sid, err := sl.NewStreamId()
+		panicOnErr(err)
+		sid.SetId(streamIdx)
+	})
+}
+
+func mkIncomingMsgUpcall(streamIdx uint64, data []byte) *capnp.Message {
+	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
+		im_, err := m.NewStreamMessageReceived()
+		panicOnErr(err)
+		im, err := im_.NewMsg()
+		panicOnErr(err)
+		sid, err := im.NewStreamId()
+		panicOnErr(err)
+		sid.SetId(streamIdx)
+		panicOnErr(im.SetData(data))
+	})
 }

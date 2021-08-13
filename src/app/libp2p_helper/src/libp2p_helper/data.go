@@ -14,6 +14,7 @@ import (
 
 	"codanet"
 
+	capnp "capnproto.org/go/capnp/v3"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -22,14 +23,14 @@ import (
 type app struct {
 	P2p                      *codanet.Helper
 	Ctx                      context.Context
-	Subs                     map[int]subscription
+	Subs                     map[uint64]subscription
 	Topics                   map[string]*pubsub.Topic
-	Validators               map[int]*validationStatus
+	Validators               map[uint64]*validationStatus
 	ValidatorMutex           *sync.Mutex
-	Streams                  map[int]net.Stream
+	Streams                  map[uint64]net.Stream
 	StreamsMutex             sync.Mutex
 	Out                      *bufio.Writer
-	OutChan                  chan interface{}
+	OutChan                  chan *capnp.Message
 	Bootstrapper             io.Closer
 	AddedPeers               []peer.AddrInfo
 	UnsafeNoTrustIP          bool
@@ -37,25 +38,26 @@ type app struct {
 	metricsCollectionStarted bool
 
 	// development configuration options
-	NoMDNS    bool
-	NoDHT     bool
-	NoUpcalls bool
+	NoMDNS        bool
+	NoDHT         bool
+	NoUpcalls     bool
+	metricsServer *codaMetricsServer
 }
 
 type subscription struct {
 	Sub    *pubsub.Subscription
-	Idx    int
+	Idx    uint64
 	Ctx    context.Context
 	Cancel context.CancelFunc
 }
 
 type validationStatus struct {
-	Completion chan string
+	Completion chan pubsub.ValidationResult
 	TimedOutAt *time.Time
 }
 
 type codaMetricsServer struct {
-	port   string
+	port   uint16
 	server *http.Server
 	done   *sync.WaitGroup
 }
