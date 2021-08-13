@@ -102,31 +102,52 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     ~(origin_sender_secret_key_pw_option : string option)
     ~returner_secret_key_path ~(returner_secret_key_pw_option : string option)
     ~graphql_target_node_option () =
-  let rate_limit =
-    if rate_limit then
-      let slot_limit =
-        Float.(
-          of_int txns_per_block /. of_int slot_time *. fill_rate
-          *. of_int rate_limit_interval)
-      in
-      let limit = min (Float.to_int slot_limit) rate_limit_level in
-      Some limit
-    else None
+  let open Deferred.Let_syntax in
+  (* define the rate limiting function *)
+  let limit_level =
+    let slot_limit =
+      Float.(
+        of_int txns_per_block /. of_int slot_time *. fill_rate
+        *. of_int rate_limit_interval)
+    in
+    min (Float.to_int slot_limit) rate_limit_level
   in
   let batch_count = ref 0 in
-  (* define the rate limiting function function *)
   let limit =
-    Option.iter rate_limit ~f:(fun rate_limit ->
-        if !batch_count >= rate_limit then (
-          let delayamount = Float.of_int rate_limit_interval /. 1000. in
-          Format.printf
-            "txn burst tool: rate limiting, pausing for %f seconds... @."
-            delayamount ;
-          Thread.delay delayamount ;
-          (* Format.printf "sleep %f@." Float.(of_int rate_limit_interval /. 1000.) ; *)
-          batch_count := 0 )
-        else incr batch_count)
+    (* call this function after a transaction happens *)
+    (* TODO, in the current state of things, this function counts to limit_level of transactions, and then slaps a pause after it.  This happens even if the transactions themselves took far longer than the pause.  It thereby makes the rate slower and more conservative than would appear.  In future, perhaps implement with some sort of Timer *)
+    if rate_limit then ( fun () ->
+      incr batch_count ;
+      if !batch_count >= limit_level then
+        let%bind () =
+          Deferred.return
+            (Format.printf
+               "txn burst tool: rate limiting, pausing for %d milliseconds... \
+                @."
+               rate_limit_interval)
+        in
+        let%bind () =
+          Async.after (Time.Span.create ~ms:rate_limit_interval ())
+        in
+        Deferred.return (batch_count := 0)
+      else Deferred.return () )
+    else fun () -> Deferred.return ()
   in
+
+  (* let limit () =
+       Option.iter rate_limit_freq ~f:(fun rate_limit_freq ->
+           if !batch_count >= rate_limit_freq then (
+             let delay_seconds = Float.of_int rate_limit_interval /. 1000. in
+             Format.printf
+               "txn burst tool: rate limiting, pausing for %f seconds... @."
+               delay_seconds ;
+             let%bind () = Async.after (Time.Span.second delay_seconds) ; in
+             (* Thread.delay delayamount ; *)
+             (* Format.printf "sleep %f@." Float.(of_int rate_limit_interval /. 1000.) ; *)
+             batch_count := 0;
+             return () )
+           else incr batch_count)
+     in *)
 
   (* contants regarding send amount and fees *)
   let base_send_amount = Currency.Amount.of_formatted_string "0" in
@@ -163,7 +184,6 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   in
 
   (* helper function for getting a keypair from a local path *)
-  let open Deferred.Let_syntax in
   let get_keypair path pw_option =
     Format.printf "txn burst tool: grabbing keypair from path= %s@." path ;
     let%bind keypair =
@@ -228,7 +248,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
         ~receiver_pub_key:receiver_kp.public_key ~amount:initial_send_amount
         ~fee:fee_amount ~graphql_target_node
     in
-    let%bind _ =
+    let%bind () =
       match res with
       | Ok _ ->
           return (Format.printf "txn burst tool: txn sent successfully!@.")
@@ -237,7 +257,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
             (Format.printf "txn burst tool: txn failed with error %s@."
                (Error.to_string_hum e))
     in
-    return limit
+    limit ()
   in
 
   (* there... *)
@@ -258,7 +278,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
           let nce =
             UInt32.add returner_nonce (UInt32.of_int (num_txn_per_acct - n))
           in
-          let%bind _ =
+          let%bind () =
             do_txn ~sender_kp:kp ~receiver_kp:origin_keypair ~nonce:nce
           in
           if n > 1 then do_command (n - 1) else return ()
