@@ -1,11 +1,11 @@
 {
-  "version": "0.1.0",
+  "name": "@o1labs/snarkyjs-web",
+  "description": "Web bindings for SnarkyJS",
   "license": "Apache-2.0",
   "main": "dist/snarkyjs_chrome.js",
   "typings": "dist/index.d.ts",
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "engines": {
     "node": ">=10"
@@ -17,7 +17,6 @@
     "format": "prettier --write --ignore-unknown **/*",
     "serve": "./build-and-run-server.sh"
   },
-  "name": "snarkyjs-chrome",
   "author": "O(1) Labs",
   "devDependencies": {
     "@babel/core": "^7.15.0",
