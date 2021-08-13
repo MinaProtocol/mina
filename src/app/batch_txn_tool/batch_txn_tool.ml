@@ -134,21 +134,6 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     else fun () -> Deferred.return ()
   in
 
-  (* let limit () =
-       Option.iter rate_limit_freq ~f:(fun rate_limit_freq ->
-           if !batch_count >= rate_limit_freq then (
-             let delay_seconds = Float.of_int rate_limit_interval /. 1000. in
-             Format.printf
-               "txn burst tool: rate limiting, pausing for %f seconds... @."
-               delay_seconds ;
-             let%bind () = Async.after (Time.Span.second delay_seconds) ; in
-             (* Thread.delay delayamount ; *)
-             (* Format.printf "sleep %f@." Float.(of_int rate_limit_interval /. 1000.) ; *)
-             batch_count := 0;
-             return () )
-           else incr batch_count)
-     in *)
-
   (* contants regarding send amount and fees *)
   let base_send_amount = Currency.Amount.of_formatted_string "0" in
   let fee_amount =
