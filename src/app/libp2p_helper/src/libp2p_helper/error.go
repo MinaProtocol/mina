@@ -25,11 +25,11 @@ func wrapError(e error, tag string) error {
 }
 
 func badRPC(e error) error {
-	return wrapError(e, "internal RPC error")
+	return wrapError(e, "internal RPC")
 }
 
 func badp2p(e error) error {
-	return wrapError(e, "libp2p error")
+	return wrapError(e, "libp2p")
 }
 
 func badHelper(e error) error {

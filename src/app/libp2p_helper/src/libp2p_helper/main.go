@@ -1,32 +1,32 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"runtime/debug"
+	"strconv"
 	"sync"
 	"time"
 
 	// importing this automatically registers the pprof api to our metrics server
 	_ "net/http/pprof"
 
+	capnp "capnproto.org/go/capnp/v3"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	ipc "libp2p_ipc"
 )
 
 const validationTimeout = 5 * time.Minute
 
-func startMetricsServer(port string) *codaMetricsServer {
+func startMetricsServer(port uint16) *codaMetricsServer {
 	log := logging.Logger("metrics server")
 	done := &sync.WaitGroup{}
 	done.Add(1)
-	server := &http.Server{Addr: ":" + port}
+	server := &http.Server{Addr: ":" + strconv.Itoa(int(port))}
 
 	// does this need re-registered every time?
 	// http.Handle("/metrics", promhttp.Handler())
@@ -53,10 +53,6 @@ func (ms *codaMetricsServer) Shutdown() {
 
 	ms.done.Wait()
 }
-
-var (
-	metricsServer *codaMetricsServer
-)
 
 const (
 	latencyMeasurementTime = time.Second * 5
@@ -129,25 +125,21 @@ func main() {
 	_ = logging.SetLogLevel("reuseport-transport", "debug")
 
 	go func() {
-		i := 0
+		i := uint64(0)
 		for {
 			seqs <- i
 			i++
 		}
 	}()
 
-	lines := bufio.NewScanner(os.Stdin)
-	// 22MiB buffer size, larger than the 21.33MB minimum for 16MiB to be b64'd
-	// 4 * (2^24/3) / 2^20 = 21.33
-	bufsize := (1024 * 1024) * 1024
-	lines.Buffer(make([]byte, bufsize), bufsize)
+	decoder := capnp.NewDecoder(os.Stdin)
 
 	app := newApp()
 
 	go func() {
 		for {
 			msg := <-app.OutChan
-			bytes, err := json.Marshal(msg)
+			bytes, err := msg.Marshal()
 			if err != nil {
 				panic(err)
 			}
@@ -160,11 +152,6 @@ func main() {
 			if n != len(bytes) {
 				// TODO: handle this correctly.
 				panic("short write :(")
-			}
-
-			err = app.Out.WriteByte(0x0a)
-			if err != nil {
-				panic(err)
 			}
 
 			if err := app.Out.Flush(); err != nil {
@@ -181,44 +168,22 @@ func main() {
 		}
 	}()
 
-	for lines.Scan() {
-		line = lines.Text()
-		helperLog.Debugf("message size is %d", len(line))
-		var raw json.RawMessage
-		env := envelope{
-			Body: &raw,
-		}
-		if err := json.Unmarshal([]byte(line), &env); err != nil {
-			log.Print("when unmarshaling the envelope...")
+	for {
+		rawMsg, err := decoder.Decode()
+		if err != nil {
 			log.Panic(err)
+			// TODO consider handling non-EOF errors differently
+			// TODO consider sending a message via stdout about stdin closed
+			break
 		}
-		msg := msgHandlers[env.Method]()
-		if err := json.Unmarshal(raw, msg); err != nil {
-			log.Print("when unmarshaling the method invocation...")
-			log.Panic(err)
+		msg, err := ipc.ReadRootLibp2pHelperInterface_Message(rawMsg)
+		if err != nil {
+			panic(err)
 		}
 
-		go func() {
-			start := time.Now()
-			ret, err := msg.run(app)
-			if err != nil {
-				app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
-				return
-			}
-
-			res, err := json.Marshal(ret)
-			if err != nil {
-				app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
-				return
-			}
-
-			app.writeMsg(successResult{Seqno: env.Seqno, Success: res, Duration: time.Since(start).String()})
-		}()
+		go app.handleIncomingMsg(&msg)
 	}
-	app.writeMsg(errorResult{Seqno: 0, Errorr: fmt.Sprintf("helper stdin scanning stopped because %v", lines.Err())})
 	// we never want the helper to get here, it should be killed or gracefully
 	// shut down instead of stdin closed.
 	os.Exit(1)
 }
-
-var _ json.Marshaler = (*methodIdx)(nil)
