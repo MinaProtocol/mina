@@ -501,7 +501,7 @@ var caml_pasta_fp_vector_emplace_back = function (v, x) {
 
 // Provides: caml_pasta_fp_vector_get
 var caml_pasta_fp_vector_get = function (v, i) {
-    return v[i+1];
+    return new joo_global_object.Uint8Array(v[i+1]);
 }
 
 // Provides: caml_pasta_fp_vector_to_rust
@@ -538,7 +538,7 @@ var caml_pasta_fq_vector_emplace_back = function (v, x) {
 
 // Provides: caml_pasta_fq_vector_get
 var caml_pasta_fq_vector_get = function (v, i) {
-    return v[i+1];
+    return new joo_global_object.Uint8Array(v[i+1]);
 }
 
 // Provides: caml_pasta_fq_vector_to_rust
