@@ -69,9 +69,11 @@ mina-toolchain)
   ;;
 mina-rosetta)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-production"
+  CACHE="--no-cache"
   ;;
 mina-rosetta-ubuntu)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu"
+  CACHE="--no-cache"
   ;;
 leaderboard)
   DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
@@ -84,9 +86,9 @@ esac
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo $EXTRA | tr -d '"')
 if [ -z "$DOCKER_CONTEXT" ]; then
-  cat $DOCKERFILE_PATH | docker build $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args -t gcr.io/o1labs-192920/$SERVICE:$VERSION -
+  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args -t gcr.io/o1labs-192920/$SERVICE:$VERSION -
 else
-  docker build --no-cache $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args $DOCKER_CONTEXT -t gcr.io/o1labs-192920/$SERVICE:$VERSION -f $DOCKERFILE_PATH
+  docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args $DOCKER_CONTEXT -t gcr.io/o1labs-192920/$SERVICE:$VERSION -f $DOCKERFILE_PATH
 fi
 
 tag-and-push() {
