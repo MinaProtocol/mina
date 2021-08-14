@@ -50,6 +50,7 @@ COPY --from=builder /home/opam/mina/src/app/rosetta/demo-config.json ${MINA_CONF
 COPY --from=builder /home/opam/app/* /mina-bin/
 COPY --from=builder /home/opam/mina/src/app /app
 COPY --from=builder /home/opam/mina/src/app/rosetta/config.json /data/config.json
+COPY --from=builder /home/opam/mina/genesis_ledgers /data
 
 USER postgres
 
