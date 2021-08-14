@@ -44,10 +44,9 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
   > ${MINA_CONFIG_DIR}/wallets/store/${PK} \
   && chmod go-rwx ${MINA_CONFIG_DIR}/wallets/store/${PK}
 
-COPY --from=builder /home/opam/app/* /mina-bin/
-COPY --from=builder /home/opam/mina/src/app /app
+COPY --from=builder /home/opam/app/* /usr/local/bin
+COPY --from=builder /home/opam/mina/src/app/rosetta /rosetta
 COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
-COPY --from=builder /home/opam/mina/src/app/rosetta/demo-config.json /genesis_ledgers/daemon.json.template
 
 USER postgres
 
@@ -68,7 +67,7 @@ RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
 ENV USER pguser
 USER root
 
-WORKDIR /app/rosetta
+WORKDIR /rosetta
 
 EXPOSE 3087
 EXPOSE $MINA_DAEMON_PORT

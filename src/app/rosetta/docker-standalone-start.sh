@@ -10,6 +10,6 @@ LOG_LEVEL=${LOG_LEVEL:=Debug}
 
 # rosetta
 echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
-/mina-bin/rosetta/rosetta.exe \
+mina-rosetta \
   -log-level "${LOG_LEVEL}" \
   -port "${MINA_ROSETTA_PORT}" $@

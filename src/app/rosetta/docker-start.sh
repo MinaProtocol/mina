@@ -7,13 +7,13 @@ POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
 function cleanup
 {
   echo "========================= CLEANING UP ==========================="
-  echo "Killing archive.exe"
-  kill $(ps aux | egrep '/mina-bin/.*archive.exe' | grep -v grep | awk '{ print $2 }') || true
-  echo "Killing mina.exe"
-  kill $(ps aux | egrep '/mina-bin/.*mina.exe'    | grep -v grep | awk '{ print $2 }') || true
-  echo "Killing rosetta.exe"
-  kill $(ps aux | egrep '/mina-bin/rosetta'       | grep -v grep | awk '{ print $2 }') || true
-  echo "Stopping postgres"
+  echo "Killing archive node"
+  kill $(ps aux | egrep '/usr/local/bin/mina-archive' | grep -v grep | awk '{ print $2 }') || true
+  echo "Killing mina daemon"
+  kill $(ps aux | egrep '/usr/local/bin/mina'         | grep -v grep | awk '{ print $2 }') || true
+  echo "Killing rosetta api"
+  kill $(ps aux | egrep '/usr/local/bin/mina-rosetta' | grep -v grep | awk '{ print $2 }') || true
+  echo "Stopping postgres cluster"
   pg_ctlcluster ${POSTGRES_VERSION} main stop
   exit
 }
@@ -38,9 +38,6 @@ export LOG_LEVEL="Debug"
 DEFAULT_FLAGS="--peer-list-url ${PEER_LIST_URL} --external-port ${MINA_DAEMON_PORT} --rest-port ${MINA_GRAPHQL_PORT} -archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} -insecure-rest-server --log-level ${LOG_LEVEL} --log-json"
 export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
 export PK=${MINA_PK:=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p}
-
-
-
 PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
 
 # Postgres
@@ -52,7 +49,7 @@ sleep 3
 
 # Rosetta
 echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
-/mina-bin/rosetta/rosetta.exe \
+mina-rosetta \
   --archive-uri "${PG_CONN}" \
   --graphql-uri http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
   --log-level ${LOG_LEVEL} \
@@ -64,7 +61,7 @@ sleep 3
 
 # Archive
 echo "========================= STARTING ARCHIVE NODE on PORT ${MINA_ARCHIVE_PORT} ==========================="
-/mina-bin/archive/archive.exe run \
+mina-archive run \
   --postgres-uri "${PG_CONN}" \
   --config-file ${MINA_CONFIG_FILE} \
   --log-level ${LOG_LEVEL} \
@@ -78,9 +75,9 @@ sleep 6
 # Use MINA_CONFIG_FILE=/genesis_ledgers/mainnet.json to run on mainnet
 echo "========================= STARTING DAEMON with GRAPQL on PORT ${MINA_GRAPHQL_PORT}==========================="
 echo "MINA Flags: $MINA_FLAGS -config-file ${MINA_CONFIG_FILE}"
-/mina-bin/cli/src/mina.exe daemon \
-    --config-file ${MINA_CONFIG_FILE} \
-    ${MINA_FLAGS} $@ &
+mina daemon \
+  --config-file ${MINA_CONFIG_FILE} \
+  ${MINA_FLAGS} $@ &
 
 # wait for a signal
 sleep infinity
