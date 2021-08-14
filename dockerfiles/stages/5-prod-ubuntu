@@ -44,13 +44,10 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
   > ${MINA_CONFIG_DIR}/wallets/store/${PK} \
   && chmod go-rwx ${MINA_CONFIG_DIR}/wallets/store/${PK}
 
-# Copy the demo daemon.json.template
-COPY --from=builder /home/opam/mina/src/app/rosetta/demo-config.json ${MINA_CONFIG_DIR}/daemon.json.template
-
 COPY --from=builder /home/opam/app/* /mina-bin/
 COPY --from=builder /home/opam/mina/src/app /app
-COPY --from=builder /home/opam/mina/src/app/rosetta/config.json /data/config.json
-COPY --from=builder /home/opam/mina/genesis_ledgers /data
+COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
+COPY --from=builder /home/opam/mina/src/app/rosetta/demo-config.json /genesis_ledgers/daemon.json.template
 
 USER postgres
 

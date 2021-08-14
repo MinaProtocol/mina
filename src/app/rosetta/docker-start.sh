@@ -31,14 +31,14 @@ sleep 3
 export MINA_PRIVKEY_PASS=""
 export MINA_LIBP2P_HELPER_PATH=/mina-bin/libp2p_helper
 
-export MINA_CONFIG_FILE=${MINA_CONFIG_FILE:=/data/genesis_ledgers/devnet.json}
+export MINA_CONFIG_FILE=${MINA_CONFIG_FILE:=/genesis_ledgers/devnet.json}
 export PEER_LIST_URL=${PEER_LIST_URL:=https://storage.googleapis.com/seed-lists/devnet_seeds.txt}
 export MINA_DAEMON_PORT=${MINA_DAEMON_PORT:=10101}
 export MINA_ARCHIVE_PORT=${MINA_ARCHIVE_PORT:=3086}
 export MINA_ROSETTA_PORT=${MINA_ROSETTA_PORT:=3087}
 DEFAULT_FLAGS="-peer-list-url ${PEER_LIST_URL} -archive-address 0.0.0.0:${MINA_ARCHIVE_PORT} -insecure-rest-server -log-level debug -external-port ${MINA_DAEMON_PORT}"
 export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
-PK=${MINA_PK:=ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R8}
+PK=${MINA_PK:=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p}
 
 echo "MINA Flags: $MINA_FLAGS -config-file ${MINA_CONFIG_FILE}"
 
@@ -52,7 +52,7 @@ echo "MINA Flags: $MINA_FLAGS -config-file ${MINA_CONFIG_FILE}"
 sleep 3
 
 # Daemon w/ config file
-# Use MINA_CONFIG_FILE=/data/genesis_ledgers/mainnet.json to run on mainnet
+# Use MINA_CONFIG_FILE=/genesis_ledgers/mainnet.json to run on mainnet
 /mina-bin/cli/src/mina.exe daemon \
     -config-file ${MINA_CONFIG_FILE} \
     ${MINA_FLAGS} $@ &
