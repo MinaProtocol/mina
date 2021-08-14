@@ -328,7 +328,7 @@ end = struct
       in
       let r, w =
         Strict_pipe.create ~name:"useful_peers-available" ~warn_on_drop:false
-          (Buffered (`Capacity 0, `Overflow Drop_head))
+          (Buffered (`Capacity 0, `Overflow (Drop_head ignore)))
       in
       { downloading_peers = Peer.Hash_set.create ()
       ; knowledge_requesting_peers = Peer.Hash_set.create ()
@@ -940,7 +940,7 @@ end = struct
     let%map all_peers = peers () in
     let pipe ~name c =
       Strict_pipe.create ~warn_on_drop:false ~name
-        (Buffered (`Capacity c, `Overflow Drop_head))
+        (Buffered (`Capacity c, `Overflow (Drop_head ignore)))
     in
     let flush_r, flush_w = pipe ~name:"flush" 0 in
     let got_new_peers_r, got_new_peers_w = pipe ~name:"got_new_peers" 0 in
