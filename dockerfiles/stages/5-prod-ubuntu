@@ -44,7 +44,7 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
   > ${MINA_CONFIG_DIR}/wallets/store/${PK} \
   && chmod go-rwx ${MINA_CONFIG_DIR}/wallets/store/${PK}
 
-COPY --from=builder /home/opam/app/* /usr/local/bin
+COPY --from=builder /home/opam/app/* /usr/local/bin/
 COPY --from=builder /home/opam/mina/src/app/rosetta /rosetta
 COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
 
