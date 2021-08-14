@@ -103,7 +103,6 @@ mina daemon \
   --proof-level none \
   --disable-node-status \
   --background \
-  --external-ip 127.0.0.1 \
   --external-port "${MINA_DAEMON_PORT}" \
   --archive-address "127.0.0.1:${MINA_ARCHIVE_PORT}" \
   --rest-port "${MINA_GRAPHQL_PORT}" \
