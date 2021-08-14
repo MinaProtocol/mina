@@ -4,11 +4,23 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
-11/30:
+2021/08/13:
+
+- Updated Rosetta spec to v1.4.9
+- Preliminary testing on the `devnet2` network
+- Fixes:
+  - When internal commands create new accounts, use a new operation `Account_creation_fee_via_fee_receiver`,
+     so that the computed balance matches the live balance
+  - Handle duplicate transaction hashes for internal commands where the command types differ,
+     by prepending the type and `:` to the actual hash
+  - Valid balance queries for blocks containing user commands, where the fee payer, source, or
+     receiver balance id is NULL
+
+2020/11/30:
 
 - Upgrades from Rosetta spec 1.4.4 to 1.4.7
 
-9/14:
+2020/9/14:
 
 - Upgrades from Rosetta spec v1.4.2 to v1.4.4
 - Handles case where there are multiple blocks at the same height
@@ -88,23 +100,15 @@ The Construction API is _not_ validated using `rosetta-cli` as this would requir
 `gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4` and `rosetta-cli @ v0.5.12`
 using this [`rosetta.conf`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/rosetta.conf) and the [`bootstrap_balances.json`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/bootstrap_balances.json) next to it.
 
-**Create one of each transaction type and exit**
+**Create one of each transaction type using the test-agent and exit**
 
 ```
 $ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta-test --entrypoint ./docker-test-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4
 
 $ docker logs --follow coda-rosetta-test
-
-# Wait for a message that looks like:
-#
-# {"timestamp":"2020-09-08 15:05:30.648082Z","level":"Info","source":{"module":"Lib__Rosetta","location":"File \"src/app/rosetta/lib/rosetta.ml\", line 107, characters 8-19"},"message":"Rosetta process running on http://localhost:$port","metadata":{"pid":50,"port":3087}}
-#
-# wait a few more seconds, and then
-
-$ rosetta-cli --configuration-file rosetta.conf check:data
 ```
 
-**Run a fast sandbox network forever**
+**Run a fast sandbox network forever and test with rosetta-cli**
 
 ```
 $ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta --entrypoint ./docker-demo-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4
@@ -124,8 +128,7 @@ $ rosetta-cli --configuration-file rosetta.conf check:data
 
 Sorted by priority (highest priority first)
 
-- Untested on a live network
-- On a live network, you must _bootstrap your archive node_ if you join the network after the genesis block. Instructions will be provided when the network is online.
+- On a live network, you must _sync your archive node_ if you join the network after the genesis block. Instructions will be provided when the network is online.
 - Not fully robust to crashes on adversarial input
 - `rosetta.conf` does not properly specify construction scenarios
 
