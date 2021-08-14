@@ -11,11 +11,13 @@ function cleanup
   kill $(ps aux | egrep '/mina-bin/.*mina.exe'    | grep -v grep | awk '{ print $2 }') || true
   echo "Killing rosetta.exe"
   kill $(ps aux | egrep '/mina-bin/rosetta'       | grep -v grep | awk '{ print $2 }') || true
+  pg_ctlcluster ${POSTGRES_VERSION} main stop
   exit $CODE
 }
 
 trap cleanup TERM
 trap cleanup INT
+trap cleanup EXIT
 
 MINA_DAEMON_PORT=${MINA_DAEMON_PORT:=8301}
 MINA_ROSETTA_PORT=${MINA_ROSETTA_PORT:=3087}
@@ -52,14 +54,16 @@ echo "Running Mina demo..."
 MINA_CONFIG_DIR=${MINA_CONFIG_DIR:-/root/.mina-config}
 MINA_CONFIG_FILE="${MINA_CONFIG_DIR}/daemon.json}"
 
-PK=${PK:-"B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p"}
+export PK=${PK:-"B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p"}
 SNARK_PK=${SNARK_PK:-"B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL"}
 
 CONFIG_TEMPLATE=${CONFIG_TEMPLATE:-/genesis_ledgers/daemon.json.template}
 
+set +u
 if [ -z "$GENESIS_STATE_TIMESTAMP" ]; then
-  GENESIS_STATE_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  export GENESIS_STATE_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 fi
+set -u
 echo "Genesis State Timestamp for this run is: ${GENESIS_STATE_TIMESTAMP}"
 
 echo "Rewriting config file from template ${CONFIG_TEMPLATE} to ${MINA_CONFIG_FILE}"
@@ -68,7 +72,7 @@ envsubst < ${CONFIG_TEMPLATE} > ${MINA_CONFIG_FILE}
 echo "Contents of config file ${MINA_CONFIG_FILE}:"
 cat "${MINA_CONFIG_FILE}"
 
-MINA_TIME_OFFSET=0
+export MINA_TIME_OFFSET=0
 MINA_PRIVKEY_PASS=${MINA_PRIVKEY_PASS:-""}
 
 # MINA_CONFIG_DIR is exposed by the dockerfile and contains demo mode essentials

@@ -38,7 +38,7 @@ export MINA_ARCHIVE_PORT=${MINA_ARCHIVE_PORT:=3086}
 export MINA_ROSETTA_PORT=${MINA_ROSETTA_PORT:=3087}
 DEFAULT_FLAGS="-peer-list-url ${PEER_LIST_URL} -archive-address 0.0.0.0:${MINA_ARCHIVE_PORT} -insecure-rest-server -log-level debug -external-port ${MINA_DAEMON_PORT}"
 export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
-PK=${MINA_PK:=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p}
+export PK=${MINA_PK:=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p}
 
 echo "MINA Flags: $MINA_FLAGS -config-file ${MINA_CONFIG_FILE}"
 
