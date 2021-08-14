@@ -2,9 +2,11 @@
 
 set -eou pipefail
 
+POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
+
 function cleanup
 {
-  CODE=${1:-0}
+  echo "========================= CLEANING UP ==========================="
   echo "Killing archive.exe"
   kill $(ps aux | egrep '/mina-bin/.*archive.exe' | grep -v grep | awk '{ print $2 }') || true
   echo "Killing mina.exe"
@@ -12,13 +14,16 @@ function cleanup
   echo "Killing rosetta.exe"
   kill $(ps aux | egrep '/mina-bin/rosetta'       | grep -v grep | awk '{ print $2 }') || true
   pg_ctlcluster ${POSTGRES_VERSION} main stop
-  exit $CODE
+  exit
 }
 
 trap cleanup TERM
 trap cleanup INT
 trap cleanup EXIT
 
+# Allows configuring the port that each service runs on.
+# This script does not connect to a network, so MINA_DAEMON_PORT can be kept private.
+# To interact with rosetta, use MINA_ROSETTA_PORT.
 MINA_DAEMON_PORT=${MINA_DAEMON_PORT:=8301}
 MINA_ROSETTA_PORT=${MINA_ROSETTA_PORT:=3087}
 MINA_ARCHIVE_PORT=${MINA_ARCHIVE_PORT:=3086}
@@ -26,7 +31,6 @@ MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
 LOG_LEVEL=${LOG_LEVEL:=Debug}
 
 PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
-POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
 
 # Start postgres
 echo "========================= STARTING POSTGRESQL ==========================="
@@ -89,7 +93,7 @@ echo "========================= STARTING DAEMON ==========================="
   --background \
   --external-ip 127.0.0.1 \
   --external-port "${MINA_DAEMON_PORT}" \
-  --archive-address "${MINA_ARCHIVE_PORT}" \
+  --archive-address "127.0.0.1:${MINA_ARCHIVE_PORT}" \
   --rest-port "${MINA_GRAPHQL_PORT}" \
   --insecure-rest-server \
   --log-level "${LOG_LEVEL}" \
@@ -104,10 +108,10 @@ echo "========================= STARTING DAEMON ==========================="
 sleep 4
 
 # rosetta
-echo "========================= STARTING ROSETTA API on PORT 3087 ==========================="
+echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
 /mina-bin/rosetta/rosetta.exe \
   -archive-uri $PG_CONN \
-  -graphql-uri "http://localhost:${MINA_GRAPHQL_PORT}/graphql" \
+  -graphql-uri "http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql" \
   -log-level "${LOG_LEVEL}" \
   -port "${MINA_ROSETTA_PORT}" &
 
