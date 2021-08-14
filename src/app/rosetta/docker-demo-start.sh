@@ -7,12 +7,14 @@ POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
 function cleanup
 {
   echo "========================= CLEANING UP ==========================="
-  echo "Killing archive node"
-  kill $(ps aux | egrep '/usr/local/bin/mina-archive' | grep -v grep | awk '{ print $2 }') || true
+  echo "Stopping mina daemon and waiting 30 seconds"
+  mina client stop-daemon && sleep 30
   echo "Killing mina daemon"
-  kill $(ps aux | egrep '/usr/local/bin/mina'         | grep -v grep | awk '{ print $2 }') || true
+  pkill 'mina' || true
+  echo "Killing archive node"
+  pkill 'mina-archive' || true
   echo "Killing rosetta api"
-  kill $(ps aux | egrep '/usr/local/bin/mina-rosetta' | grep -v grep | awk '{ print $2 }') || true
+  pkill 'mina-rosetta' || true
   echo "Stopping postgres cluster"
   pg_ctlcluster ${POSTGRES_VERSION} main stop
   exit

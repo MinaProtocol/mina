@@ -7,12 +7,14 @@ POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
 function cleanup
 {
   echo "========================= CLEANING UP ==========================="
+  echo "Stopping mina daemon and waiting 30 seconds"
+  mina client stop-daemon && sleep 30
   echo "Killing archive node"
-  kill $(ps aux | egrep '/usr/local/bin/mina-archive' | grep -v grep | awk '{ print $2 }') || true
+  pkill 'mina-archive' || true
   echo "Killing mina daemon"
-  kill $(ps aux | egrep '/usr/local/bin/mina'         | grep -v grep | awk '{ print $2 }') || true
+  pkill 'mina' || true
   echo "Killing rosetta api"
-  kill $(ps aux | egrep '/usr/local/bin/mina-rosetta' | grep -v grep | awk '{ print $2 }') || true
+  pkill 'mina-rosetta' || true
   echo "Stopping postgres cluster"
   pg_ctlcluster ${POSTGRES_VERSION} main stop
   exit
@@ -34,11 +36,12 @@ export MINA_DAEMON_PORT=${MINA_DAEMON_PORT:=10101}
 export MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
 export MINA_ARCHIVE_PORT=${MINA_ARCHIVE_PORT:=3086}
 export MINA_ROSETTA_PORT=${MINA_ROSETTA_PORT:=3087}
-export LOG_LEVEL="Debug"
+export LOG_LEVEL="${LOG_LEVEL:=Debug}"
 DEFAULT_FLAGS="--peer-list-url ${PEER_LIST_URL} --external-port ${MINA_DAEMON_PORT} --rest-port ${MINA_GRAPHQL_PORT} -archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} -insecure-rest-server --log-level ${LOG_LEVEL} --log-json"
 export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
 export PK=${MINA_PK:=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p}
-PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
+# Postgres database connection string. Override PG_CONN to connect to a more permanent external database.
+PG_CONN="${PG_CONN:=postgres://pguser:pguser@127.0.0.1:5432/archiver}"
 
 # Postgres
 echo "========================= STARTING POSTGRESQL ==========================="

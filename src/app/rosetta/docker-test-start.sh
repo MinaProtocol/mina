@@ -10,11 +10,13 @@ function cleanup
   echo "========================= TEST COMPLETE: exited with code $CODE ========================="
   echo "========================= CLEANING UP ==========================="
   echo "Killing archive node"
-  kill $(ps aux | egrep '/usr/local/bin/mina-archive' | grep -v grep | awk '{ print $2 }') || true
+  pkill 'mina-archive' || true
   echo "Killing mina daemon"
-  kill $(ps aux | egrep '/usr/local/bin/mina'         | grep -v grep | awk '{ print $2 }') || true
+  pkill 'mina' || true
   echo "Killing rosetta api"
-  kill $(ps aux | egrep '/usr/local/bin/mina-rosetta' | grep -v grep | awk '{ print $2 }') || true
+  pkill 'mina-rosetta' || true
+  echo "Killing rosetta test agent"
+  pkill 'mina-rosetta-test-agent' || true
   echo "Stopping postgres cluster"
   pg_ctlcluster ${POSTGRES_VERSION} main stop
   exit $CODE
