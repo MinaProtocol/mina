@@ -18,27 +18,43 @@ export class Trade extends CircuitValue {
     this.quantity = quantity;
     this.timestamp = timestamp;
   }
+}
 
-  static readAll(bytes: Bytes) : Array<Trade> {
+// TODO: Make this an array of trades too
+export class TradePair extends CircuitValue {
+  @prop trade1: Trade
+  @prop trade2: Trade
+  @prop trade3: Trade
+  @prop trade4: Trade
+
+  constructor(trade1: Trade, trade2: Trade, trade3: Trade, trade4: Trade) {
+    super();
+    this.trade1 = trade1;
+    this.trade2 = trade2;
+    this.trade3 = trade3;
+    this.trade4 = trade4;
+  }
+
+  static readAll(bytes: Bytes) : Array<TradePair> {
     return bytes.value;
   }
 }
 
 console.log('trade size', Trade.sizeInFieldElements());
 
-const numTrades = 2;
+const numTradePairs = 3;
 
 export class Bytes extends CircuitValue {
-  value: Array<Trade>
+  value: Array<TradePair>
 
-  constructor(value: Array<Trade>) {
+  constructor(value: Array<TradePair>) {
     super();
-    console.assert(value.length === numTrades);
+    console.assert(value.length === numTradePairs);
     this.value = value;
   }
 }
 
-(Bytes.prototype as any)._fields = [ ['value', Circuit.array(Trade, numTrades) ] ];
+(Bytes.prototype as any)._fields = [ ['value', Circuit.array(TradePair, numTradePairs) ] ];
 
 export class WebSnappRequest extends CircuitValue {
   constructor() {

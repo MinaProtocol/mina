@@ -1369,24 +1369,18 @@ __webpack_require__.r(__webpack_exports__);
 // 
 // Prove I did a trade that did "X%" increase
 class Witness extends _circuit_value__WEBPACK_IMPORTED_MODULE_1__.CircuitValue {
-    buyIndex;
-    sellIndex;
+    pairIndex;
     attestation;
-    constructor(buy, sell, a) {
+    constructor(pairIndex, a) {
         super();
-        this.buyIndex = buy;
-        this.sellIndex = sell;
+        this.pairIndex = pairIndex;
         this.attestation = a;
     }
 }
 (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__decorate)([
     _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
     (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__metadata)("design:type", _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field)
-], Witness.prototype, "buyIndex", void 0);
-(0,tslib__WEBPACK_IMPORTED_MODULE_4__.__decorate)([
-    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
-    (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__metadata)("design:type", _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field)
-], Witness.prototype, "sellIndex", void 0);
+], Witness.prototype, "pairIndex", void 0);
 (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__decorate)([
     _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
     (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__metadata)("design:type", _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.HTTPSAttestation)
@@ -1395,15 +1389,19 @@ class Main extends _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Circuit {
     // percentGain is an integer in basis points
     static main(witness, percentChange) {
         witness.attestation.verify(_exchange_lib__WEBPACK_IMPORTED_MODULE_2__.WebSnappRequest.ofString('api.coinbase.com/trades'));
-        const trades = _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.Trade.readAll(witness.attestation.response);
-        let buy = getElt(trades, witness.buyIndex);
-        let sell = getElt(trades, witness.sellIndex);
-        buy.isBuy.assertEquals(true);
-        sell.isBuy.assertEquals(false);
-        buy.timestamp.assertLt(sell.timestamp);
-        sell.quantity.assertLt(buy.quantity);
-        let buyTotal = sell.quantity.mul(buy.price);
-        let sellTotal = sell.quantity.mul(sell.price);
+        const tradePairs = _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.TradePair.readAll(witness.attestation.response);
+        let pair = getElt(tradePairs, witness.pairIndex);
+        let buyTotal = new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(0);
+        let buyQuantities = new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(0);
+        let sellTotal = new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(0);
+        let sellQuantities = new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(0);
+        [buyTotal, buyQuantities, sellTotal, sellQuantities] = accumulateTrade(pair.trade1, [buyTotal, buyQuantities, sellTotal, sellQuantities]);
+        [buyTotal, buyQuantities, sellTotal, sellQuantities] = accumulateTrade(pair.trade2, [buyTotal, buyQuantities, sellTotal, sellQuantities]);
+        [buyTotal, buyQuantities, sellTotal, sellQuantities] = accumulateTrade(pair.trade3, [buyTotal, buyQuantities, sellTotal, sellQuantities]);
+        [buyTotal, buyQuantities, sellTotal, sellQuantities] = accumulateTrade(pair.trade4, [buyTotal, buyQuantities, sellTotal, sellQuantities]);
+        pair.trade1.timestamp.assertLt(pair.trade2.timestamp);
+        pair.trade2.timestamp.assertLt(pair.trade3.timestamp);
+        pair.trade3.timestamp.assertLt(pair.trade4.timestamp);
         const FULL_BASIS = new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(10000);
         // sellTotal * (10000 + percentChange) > buyTotal * 10000;
         sellTotal.mul(FULL_BASIS.add(percentChange)).assertGte(buyTotal.mul(FULL_BASIS));
@@ -1416,6 +1414,14 @@ class Main extends _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Circuit {
     (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__metadata)("design:paramtypes", [Witness, _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field]),
     (0,tslib__WEBPACK_IMPORTED_MODULE_4__.__metadata)("design:returntype", void 0)
 ], Main, "main", null);
+// takes [buyTotal, buyQuantities, sellTotal, sellQuantities] returns new ones
+function accumulateTrade(trade, totals) {
+    let [buyTotal, buyQuantities, sellTotal, sellQuantities] = totals;
+    let spent = trade.quantity.mul(trade.price);
+    [buyTotal, buyQuantities] = _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Circuit.if(trade.isBuy, [buyTotal.add(spent), buyQuantities.add(trade.quantity)], [buyTotal, buyQuantities]);
+    [sellTotal, sellQuantities] = _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Circuit.if(trade.isBuy, [sellTotal, sellQuantities], [sellTotal.add(spent), sellQuantities.add(trade.quantity)]);
+    return [buyTotal, buyQuantities, sellTotal, sellQuantities];
+}
 function getElt(xs, i) {
     let [x, found] = xs.reduce(([acc, found], x, j) => {
         let eltHere = i.equals(j);
@@ -1427,6 +1433,9 @@ function getElt(xs, i) {
 function trade({ timestamp, price, quantity, isBuy }) {
     return new _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.Trade(isBuy, price, quantity, timestamp);
 }
+function tradePair(trades) {
+    return new _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.TradePair(trades[0], trades[1], trades[2], trades[3]);
+}
 function main() {
     let before = new Date();
     const kp = Main.generateKeypair();
@@ -1435,9 +1444,25 @@ function main() {
     const publicInput = [new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(25)];
     before = new Date();
     const proof = Main.prove([
-        { buyIndex: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(0), sellIndex: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(1), attestation: new _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.HTTPSAttestation(new _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.Bytes([
-                trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(150), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(100), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(true) }),
-                trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(250), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(500), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(4), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(false) })
+        { pairIndex: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(1), attestation: new _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.HTTPSAttestation(new _exchange_lib__WEBPACK_IMPORTED_MODULE_2__.Bytes([
+                tradePair([
+                    trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(150), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(100), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(true) }),
+                    trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(150), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(100), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(true) }),
+                    trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(150), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(100), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(true) }),
+                    trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(150), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(100), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(true) })
+                ]),
+                tradePair([
+                    trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(150), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(100), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(true) }),
+                    trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(150), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(100), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(true) }),
+                    trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(100), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(120), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(true) }),
+                    trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(300), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(150), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(false) })
+                ]),
+                tradePair([
+                    trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(150), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(100), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(true) }),
+                    trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(150), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(100), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(true) }),
+                    trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(150), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(100), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(true) }),
+                    trade({ timestamp: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(150), price: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(100), quantity: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(5), isBuy: new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Bool(true) })
+                ])
             ]), new _signature__WEBPACK_IMPORTED_MODULE_3__.Signature(new _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field(1), _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Scalar.random())) }
     ], publicInput, kp);
     after = new Date();
@@ -1460,6 +1485,7 @@ function main() {
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "Trade": () => (/* binding */ Trade),
+/* harmony export */   "TradePair": () => (/* binding */ TradePair),
 /* harmony export */   "Bytes": () => (/* binding */ Bytes),
 /* harmony export */   "WebSnappRequest": () => (/* binding */ WebSnappRequest),
 /* harmony export */   "HTTPSAttestation": () => (/* binding */ HTTPSAttestation)
@@ -1486,9 +1512,6 @@ class Trade extends _circuit_value__WEBPACK_IMPORTED_MODULE_1__.CircuitValue {
         this.quantity = quantity;
         this.timestamp = timestamp;
     }
-    static readAll(bytes) {
-        return bytes.value;
-    }
 }
 (0,tslib__WEBPACK_IMPORTED_MODULE_3__.__decorate)([
     _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
@@ -1506,17 +1529,50 @@ class Trade extends _circuit_value__WEBPACK_IMPORTED_MODULE_1__.CircuitValue {
     _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
     (0,tslib__WEBPACK_IMPORTED_MODULE_3__.__metadata)("design:type", _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Field)
 ], Trade.prototype, "timestamp", void 0);
+// TODO: Make this an array of trades too
+class TradePair extends _circuit_value__WEBPACK_IMPORTED_MODULE_1__.CircuitValue {
+    trade1;
+    trade2;
+    trade3;
+    trade4;
+    constructor(trade1, trade2, trade3, trade4) {
+        super();
+        this.trade1 = trade1;
+        this.trade2 = trade2;
+        this.trade3 = trade3;
+        this.trade4 = trade4;
+    }
+    static readAll(bytes) {
+        return bytes.value;
+    }
+}
+(0,tslib__WEBPACK_IMPORTED_MODULE_3__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_3__.__metadata)("design:type", Trade)
+], TradePair.prototype, "trade1", void 0);
+(0,tslib__WEBPACK_IMPORTED_MODULE_3__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_3__.__metadata)("design:type", Trade)
+], TradePair.prototype, "trade2", void 0);
+(0,tslib__WEBPACK_IMPORTED_MODULE_3__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_3__.__metadata)("design:type", Trade)
+], TradePair.prototype, "trade3", void 0);
+(0,tslib__WEBPACK_IMPORTED_MODULE_3__.__decorate)([
+    _circuit_value__WEBPACK_IMPORTED_MODULE_1__.prop,
+    (0,tslib__WEBPACK_IMPORTED_MODULE_3__.__metadata)("design:type", Trade)
+], TradePair.prototype, "trade4", void 0);
 console.log('trade size', Trade.sizeInFieldElements());
-const numTrades = 2;
+const numTradePairs = 3;
 class Bytes extends _circuit_value__WEBPACK_IMPORTED_MODULE_1__.CircuitValue {
     value;
     constructor(value) {
         super();
-        console.assert(value.length === numTrades);
+        console.assert(value.length === numTradePairs);
         this.value = value;
     }
 }
-Bytes.prototype._fields = [['value', _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Circuit.array(Trade, numTrades)]];
+Bytes.prototype._fields = [['value', _bindings_snarky2__WEBPACK_IMPORTED_MODULE_0__.Circuit.array(TradePair, numTradePairs)]];
 class WebSnappRequest extends _circuit_value__WEBPACK_IMPORTED_MODULE_1__.CircuitValue {
     constructor() {
         super();
