@@ -121,9 +121,11 @@ module Runtime = struct
 
   let current_jemalloc = ref (Jemalloc.get_memory_stats ())
 
-  let update () =
-    current_gc := Gc.stat () ;
-    current_jemalloc := Jemalloc.get_memory_stats ()
+  let update () = ()
+
+  (*TODO: update every 30mins maybe?*)
+  (*current_gc := Gc.stat () ;
+    current_jemalloc := Jemalloc.get_memory_stats ()*)
 
   let simple_metric ~metric_type ~help name fn =
     let name = Printf.sprintf "%s_%s_%s" namespace subsystem name in
