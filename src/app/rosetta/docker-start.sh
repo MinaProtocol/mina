@@ -50,6 +50,18 @@ pg_ctlcluster ${POSTGRES_VERSION} main start
 # wait for it to settle
 sleep 3
 
+# Rosetta
+echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
+/mina-bin/rosetta/rosetta.exe \
+  --archive-uri "${PG_CONN}" \
+  --graphql-uri http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
+  --log-level ${LOG_LEVEL} \
+  --log-json \
+  --port ${MINA_ROSETTA_PORT} &
+
+# wait for it to settle
+sleep 3
+
 # Archive
 echo "========================= STARTING ARCHIVE NODE on PORT ${MINA_ARCHIVE_PORT} ==========================="
 /mina-bin/archive/archive.exe run \
@@ -60,7 +72,7 @@ echo "========================= STARTING ARCHIVE NODE on PORT ${MINA_ARCHIVE_POR
   --server-port ${MINA_ARCHIVE_PORT} &
 
 # wait for it to settle
-sleep 3
+sleep 6
 
 # Daemon
 # Use MINA_CONFIG_FILE=/genesis_ledgers/mainnet.json to run on mainnet
@@ -69,18 +81,6 @@ echo "MINA Flags: $MINA_FLAGS -config-file ${MINA_CONFIG_FILE}"
 /mina-bin/cli/src/mina.exe daemon \
     --config-file ${MINA_CONFIG_FILE} \
     ${MINA_FLAGS} $@ &
-
-# wait for it to settle
-sleep 3
-
-# Rosetta
-echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
-/mina-bin/rosetta/rosetta.exe \
-  --archive-uri "${PG_CONN}" \
-  --graphql-uri http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
-  --log-level ${LOG_LEVEL} \
-  --log-json \
-  --port ${MINA_ROSETTA_PORT} &
 
 # wait for a signal
 sleep infinity

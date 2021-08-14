@@ -32,26 +32,12 @@ LOG_LEVEL=${LOG_LEVEL:=Debug}
 
 PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
 
-# Start postgres
-echo "========================= STARTING POSTGRESQL ==========================="
-pg_ctlcluster ${POSTGRES_VERSION} main start
 
-# wait for it to settle
-sleep 3
-
-# archive
-echo "========================= STARTING ARCHIVE PROCESS ==========================="
-/mina-bin/archive/archive.exe run \
-  -postgres-uri $PG_CONN \
-  -server-port "${MINA_ARCHIVE_PORT}" \
-  -log-level "${LOG_LEVEL}" \
-  -log-json &
-
-# wait for it to settle
-sleep 3
-
-export MINA_PRIVKEY_PASS=""
+# ====== Set up demo environment ========
+export MINA_PRIVKEY_PASS=${MINA_PRIVKEY_PASS:-""}
 export MINA_LIBP2P_HELPER_PATH=/mina-bin/libp2p_helper
+export MINA_TIME_OFFSET=0
+
 
 # Demo keys and config file
 echo "Running Mina demo..."
@@ -76,8 +62,37 @@ envsubst < ${CONFIG_TEMPLATE} > ${MINA_CONFIG_FILE}
 echo "Contents of config file ${MINA_CONFIG_FILE}:"
 cat "${MINA_CONFIG_FILE}"
 
-export MINA_TIME_OFFSET=0
-MINA_PRIVKEY_PASS=${MINA_PRIVKEY_PASS:-""}
+
+
+
+# Start postgres
+echo "========================= STARTING POSTGRESQL ==========================="
+pg_ctlcluster ${POSTGRES_VERSION} main start
+
+# wait for it to settle
+sleep 3
+
+# rosetta
+echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
+/mina-bin/rosetta/rosetta.exe \
+  -archive-uri $PG_CONN \
+  -graphql-uri "http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql" \
+  -log-level "${LOG_LEVEL}" \
+  -port "${MINA_ROSETTA_PORT}" &
+
+# wait for it to settle
+sleep 3
+
+# archive
+echo "========================= STARTING ARCHIVE PROCESS ==========================="
+/mina-bin/archive/archive.exe run \
+  -postgres-uri $PG_CONN \
+  -server-port "${MINA_ARCHIVE_PORT}" \
+  -log-level "${LOG_LEVEL}" \
+  -log-json &
+
+# wait for it to settle
+sleep 6
 
 # MINA_CONFIG_DIR is exposed by the dockerfile and contains demo mode essentials
 echo "========================= STARTING DAEMON ==========================="
@@ -103,16 +118,5 @@ echo "========================= STARTING DAEMON ==========================="
 # Possibly useful flags:
 #   Rosetta documentation specifies that /data/ will be a volume mount for various state.
 #  -working-dir /data/ \
-
-# wait for it to settle
-sleep 4
-
-# rosetta
-echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
-/mina-bin/rosetta/rosetta.exe \
-  -archive-uri $PG_CONN \
-  -graphql-uri "http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql" \
-  -log-level "${LOG_LEVEL}" \
-  -port "${MINA_ROSETTA_PORT}" &
 
 sleep infinity
