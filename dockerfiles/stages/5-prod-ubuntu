@@ -47,6 +47,7 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
 COPY --from=builder /home/opam/app/* /usr/local/bin/
 COPY --from=builder /home/opam/mina/src/app/rosetta /rosetta
 COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
+COPY --from=builder /home/opam/mina/src/app/archive/create_schema.sql /archive/
 
 USER postgres
 
@@ -62,7 +63,7 @@ RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && /etc/init.d/postgresql start \
     && psql --command "CREATE USER pguser WITH SUPERUSER PASSWORD 'pguser';" \
     && createdb -O pguser archiver \
-    && psql postgresql://pguser:pguser@localhost:5432/archiver -f /app/archive/create_schema.sql
+    && psql postgresql://pguser:pguser@localhost:5432/archiver -f /archive/create_schema.sql
 
 ENV USER pguser
 USER root
