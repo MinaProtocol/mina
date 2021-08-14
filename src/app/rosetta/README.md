@@ -8,6 +8,8 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 - Updated Rosetta spec to v1.4.9
 - Preliminary testing on the `devnet2` network
+- Updated dockerfile split into stages
+- New documentation for the start scripts
 - Fixes:
   - When internal commands create new accounts, use a new operation `Account_creation_fee_via_fee_receiver`,
      so that the computed balance matches the live balance
@@ -30,20 +32,24 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 Checkout the "rosetta-stable" branch of the mina repository and then run the following:
 
-`cat dockerfiles/Dockerfile-rosetta | docker build -t mina-rosetta:stable --build-arg "MINA_BRANCH=rosetta-stable" -`
+`cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu | docker build -t mina-rosetta:compatible --build-arg "deb_codename=stretch" --build-arg "MINA_BRANCH=compatible" -`
 
-This creates an image (mina-rosetta:stable) based on the most up-to-date changes that support rosetta. This image
+This creates an image (mina-rosetta:compatible) based on the most up-to-date changes that support rosetta. This image
 can be used as a drop-in replacement for `gcr.io/o1labs-192920/coda-rosetta:debug-v1.1` in any of the below commands for testing.
 
 ## How to Run
 
-As there is not currently a live network, the best way to run Rosetta is to run it against a sandbox node. Rosetta is best run using the official docker images provided here that run the Mina daemon, an archive node, and the rosetta process for you. See [Reproduce agent and rosetta-cli Validation](#reproduce-agent-and-rosetta-cli-validation) below for details.
+The container includes 4 scripts in /rosetta which run a different set of services connected to a particular network
+- `docker-standalone-start.sh` is the most straightforward, it starts only the mina-rosetta API endpoint and any flags passed into the script go to mina-rosetta.
+- `docker-demo-start.sh` launches a mina node with a very simple 1-address genesis ledger as a sandbox for developing and playing around in. This script starts the full suite of tools (a mina node, mina-archive, a postgresql DB, and mina-rosetta), but for a demo network with all operations occuring inside this container and no external network activity.
+- `docker-test-start.sh` launches the same demo network as in demo-start.sh but also launches the mina-rosetta-test-agent to run a suite of tests against the rosetta API.
+- Finally, the default, `docker-start.sh`, which connects the mina node to our [Devnet](https://docs.minaprotocol.com/en/advanced/connecting-devnet) network with an empty archive database. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/compatible/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
 
 ## Design Choices
 
 ### Network names
 
-Networks supported are `dev`, `debug`, and `testnet`. A sandbox network is a `debug` one. The `dev` net is the one with seed peers always located at `dev.o1test.net` (as soon as we turn it on), and otherwise you are connecting to the `testnet`. Currently, the implementation does not distinguish between these networks, but this will change in the future.
+Networks supported are `rosetta-demo`, `devnet`, and `mainnet`. Currently, the rosetta implementation does not distinguish between these networks, but this will change in the future. The default entrypoint script, `docker-start.sh` runs a mina daemon connected to the [Devnet](https://docs.minaprotocol.com/en/advanced/connecting-devnet) network with an empty archive node and the rosetta api. Additionally, there is a built-in entrypoint script for `rosetta-demo` called `docker-demo-start.sh` which runs a sandboxed node with a simple genesis ledger with one keypair, attaches it to an archive-node and postgres database, and launches the rosetta-api so you can make queries against it. No entrypoint script is provided for mainnet at this time but the mina-daemon package for mainnet does include mina-rosetta.
 
 ### Operation Statuses
 
