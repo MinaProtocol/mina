@@ -1213,7 +1213,7 @@ module Block = struct
                           (module Conn)
                           fee_transfer `Normal
                       in
-                      (id, secondary_sequence_no, fee_transfer.receiver_pk)
+                      (id, secondary_sequence_no, fee_transfer.fee, fee_transfer.receiver_pk)
                       :: acc )
                 in
                 let fee_transfer_infos_with_balances =
@@ -1233,7 +1233,7 @@ module Block = struct
                   deferred_result_list_fold fee_transfer_infos_with_balances
                     ~init:()
                     ~f:(fun ()
-                       ( (fee_transfer_id, secondary_sequence_no, receiver_pk)
+                       ( (fee_transfer_id, secondary_sequence_no, fee, receiver_pk)
                        , balance )
                        ->
                       let%bind receiver_id =
@@ -1246,12 +1246,28 @@ module Block = struct
                           (module Conn)
                           ~public_key_id:receiver_id ~balance
                       in
-                      (* TODO: use transaction status for account creation fee *)
+                      (* TODO: add transaction statuses to internal commands
+                         the archive lib should not know the details of
+                         account creation fees; the calculation below is
+                         a temporizing hack
+                      *)
+                      let receiver_account_creation_fee_paid =
+                        let fee_uint64 = Currency.Fee.to_uint64 fee in
+                        let balance_uint64 = Currency.Balance.to_uint64 balance in
+                        let account_creation_fee_uint64 = Currency.Fee.to_uint64
+                            constraint_constants.account_creation_fee
+                        in
+                        if Unsigned.UInt64.equal balance_uint64
+                            (Unsigned.UInt64.sub fee_uint64 account_creation_fee_uint64) then
+                          Some (Unsigned.UInt64.to_int64 account_creation_fee_uint64)
+                        else
+                          None
+                      in
                       Block_and_internal_command.add
                         (module Conn)
                         ~block_id ~internal_command_id:fee_transfer_id
                         ~sequence_no ~secondary_sequence_no
-                        ~receiver_account_creation_fee_paid:None
+                        ~receiver_account_creation_fee_paid
                         ~receiver_balance_id
                       >>| ignore )
                 in
