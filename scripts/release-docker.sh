@@ -86,7 +86,7 @@ extra_build_args=$(echo $EXTRA | tr -d '"')
 if [ -z "$DOCKER_CONTEXT" ]; then
   cat $DOCKERFILE_PATH | docker build $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args -t gcr.io/o1labs-192920/$SERVICE:$VERSION -
 else
-  docker build $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args $DOCKER_CONTEXT -t gcr.io/o1labs-192920/$SERVICE:$VERSION -f $DOCKERFILE_PATH
+  docker build --no-cache $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args $DOCKER_CONTEXT -t gcr.io/o1labs-192920/$SERVICE:$VERSION -f $DOCKERFILE_PATH
 fi
 
 tag-and-push() {
