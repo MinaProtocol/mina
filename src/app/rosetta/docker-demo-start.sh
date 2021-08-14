@@ -36,7 +36,6 @@ PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
 
 # ====== Set up demo environment ========
 export MINA_PRIVKEY_PASS=${MINA_PRIVKEY_PASS:-""}
-export MINA_LIBP2P_HELPER_PATH=/mina-bin/libp2p_helper
 export MINA_TIME_OFFSET=0
 
 
@@ -93,6 +92,7 @@ sleep 6
 echo "========================= STARTING DAEMON ==========================="
 echo "Contents of config file ${MINA_CONFIG_FILE}:"
 cat "${MINA_CONFIG_FILE}"
+export MINA_LIBP2P_HELPER_PATH=/usr/local/bin/libp2p_helper
 mina daemon \
   --block-producer-pubkey "${PK}" \
   --run-snark-worker "${SNARK_PK}" \

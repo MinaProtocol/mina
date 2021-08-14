@@ -24,7 +24,7 @@ trap cleanup EXIT
 
 # Setup and export useful variables/defaults
 export MINA_PRIVKEY_PASS=""
-export MINA_LIBP2P_HELPER_PATH=/mina-bin/libp2p_helper
+export MINA_LIBP2P_HELPER_PATH=/usr/local/bin/libp2p_helper
 export MINA_CONFIG_FILE=${MINA_CONFIG_FILE:=/genesis_ledgers/devnet.json}
 export PEER_LIST_URL=${PEER_LIST_URL:=https://storage.googleapis.com/seed-lists/devnet_seeds.txt}
 # Allows configuring the port that each service runs on.
