@@ -64,7 +64,4 @@ RUN eval $(opam config env) \
 
 # TODO: Make rosetta test-agent work properly again
 #    src/app/rosetta/test-agent/agent.exe \
-
-# TODO: consider making a mina-rosetta package with the minimum mina binaries/configs for rosetta.
-# Right now make deb is overkill
-#RUN eval $(opam config env) && make deb
+#  && mv _build/default/src/app/rosetta/test-agent/agent.exe $HOME/app/mina-rosetta-test-agent \
