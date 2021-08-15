@@ -30,7 +30,7 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## How to build your own docker image
 
-Checkout the "rosetta-stable" branch of the mina repository and then run the following:
+Checkout the "lk86/pipeline-refactor" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (2GB is too small, 8GB seems is enough) and then run the following:
 
 `cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu | docker build -t mina-rosetta:compatible --build-arg "deb_codename=stretch" --build-arg "MINA_BRANCH=compatible" -`
 
@@ -53,7 +53,7 @@ Networks supported are `rosetta-demo`, `devnet`, and `mainnet`. Currently, the r
 
 ### Operation Statuses
 
-Operations are always `Pending` if retrieved from the mempool. `Success` if they are in a block. A transaction status of `Failed` occurs for transactions within a block whenever certain invariants are not met such as not sending enough to cover the account creation fee. Other reaons include misconfiguring new tokens or snapps. See [this section of the code](https://github.com/MinaProtocol/mina/blob/4ae482b656c743fc4ea824419cebe2f2ff77ef96/src/lib/coda_base/user_command_status.ml#L8) for an exhaustive list.
+Operations are always `Pending` if retrieved from the mempool. `Success` if they are in a block and fully applied. A transaction status of `Failed` occurs for transactions within a block whenever certain invariants are not met such as not sending enough to cover the account creation fee. Other reaons include misconfiguring new tokens or snapps. See [this section of the code](https://github.com/MinaProtocol/mina/blob/4ae482b656c743fc4ea824419cebe2f2ff77ef96/src/lib/coda_base/user_command_status.ml#L8) for an exhaustive list.
 
 ### Operations Types
 
@@ -65,7 +65,7 @@ Accounts in Mina are not uniquely identified by an address alone, you must also 
 
 ### Operations for Supported Transactions via Construction
 
-All supported transactions via Construction API are shown as ["living" documentation](https://github.com/MinaProtocol/mina/blob/477bbdcdeeeafbcbaff74b9b1a83feacf104e5c9/src/app/rosetta/test-agent/poke.ml#L89) in our integration testing code.
+The following supported transactions on devnet and mainnet for the Construction API are the `payment` and `delegation` ones within the ["living" documentation](https://github.com/MinaProtocol/mina/blob/477bbdcdeeeafbcbaff74b9b1a83feacf104e5c9/src/app/rosetta/test-agent/poke.ml#L89) in our integration testing code. The other transaction types are disabled on the live networks.
 
 ## Validation
 
