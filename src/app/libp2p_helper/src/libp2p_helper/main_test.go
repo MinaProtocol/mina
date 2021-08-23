@@ -16,10 +16,10 @@ import (
 
 	"codanet"
 
-	"net/http"
-	"strconv"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"net/http"
+	"strconv"
 
 	logging "github.com/ipfs/go-log"
 
@@ -178,7 +178,7 @@ func beginAdvertisingSendAndCheck(t *testing.T, app *app) {
 	require.NoError(t, err)
 	m, err := ipc.NewRootLibp2pHelperInterface_BeginAdvertising_Request(seg)
 	require.NoError(t, err)
-  var rpcSeqno uint64 = 123
+	var rpcSeqno uint64 = 123
 	resMsg := app.handleBeginAdvertising(rpcSeqno, m)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, rpcSeqno)
@@ -262,7 +262,7 @@ func TestMDNSDiscovery(t *testing.T) {
 	appB, appBPort := newTestApp(t, nil, true)
 	appB.NoDHT = true
 
-  t.Logf("Using libp2p ports: %d and %d", appAPort, appBPort)
+	t.Logf("Using libp2p ports: %d and %d", appAPort, appBPort)
 
 	// begin appA and appB's mDNS advertising
 	beginAdvertisingSendAndCheck(t, appB)
@@ -348,7 +348,28 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 	}
 }
 
-func TestConfigurationMsg(t *testing.T) {
+func TestSetNodeStatus(t *testing.T) {
+	testApp, _ := newTestApp(t, nil, true)
+
+	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+	require.NoError(t, err)
+	m, err := ipc.NewRootLibp2pHelperInterface_SetNodeStatus_Request(seg)
+	require.NoError(t, err)
+	testStatus := []byte("test_node_status")
+	require.NoError(t, m.SetStatus(testStatus))
+
+	resMsg := testApp.handleSetNodeStatus(11239, m)
+	require.NoError(t, err)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	require.Equal(t, seqno, uint64(11239))
+	require.True(t, respSuccess.HasSetNodeStatus())
+	_, err = respSuccess.SetNodeStatus()
+	require.NoError(t, err)
+
+	require.Equal(t, testStatus, testApp.P2p.NodeStatus)
+}
+
+func TestConfigure(t *testing.T) {
 	testApp := newApp()
 
 	dir, err := ioutil.TempDir("", "mina_test_*")
@@ -419,7 +440,7 @@ func TestConfigurationMsg(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestListenMsg(t *testing.T) {
+func TestListen(t *testing.T) {
 	addrStr := "/ip4/127.0.0.2/tcp/8000"
 
 	testApp, _ := newTestApp(t, nil, true)
@@ -450,7 +471,7 @@ func TestListenMsg(t *testing.T) {
 	require.True(t, found)
 }
 
-func TestPublishMsg(t *testing.T) {
+func TestPublish(t *testing.T) {
 	var err error
 	testApp, _ := newTestApp(t, nil, true)
 	testApp.P2p.Pubsub, err = pubsub.NewGossipSub(testApp.Ctx, testApp.P2p.Host)
@@ -478,7 +499,7 @@ func TestPublishMsg(t *testing.T) {
 	require.True(t, has)
 }
 
-func testSubscribeMsgImpl(t *testing.T) (*app, string, uint64) {
+func testSubscribeImpl(t *testing.T) (*app, string, uint64) {
 	var err error
 	testApp, _ := newTestApp(t, nil, true)
 	testApp.P2p.Pubsub, err = pubsub.NewGossipSub(testApp.Ctx, testApp.P2p.Host)
@@ -511,13 +532,13 @@ func testSubscribeMsgImpl(t *testing.T) (*app, string, uint64) {
 	return testApp, topic, idx
 }
 
-func TestSubscribeMsg(t *testing.T) {
-	_, _, _ = testSubscribeMsgImpl(t)
+func TestSubscribe(t *testing.T) {
+	_, _, _ = testSubscribeImpl(t)
 }
 
-func TestUnsubscribeMsg(t *testing.T) {
+func TestUnsubscribe(t *testing.T) {
 	var err error
-	testApp, _, idx := testSubscribeMsgImpl(t)
+	testApp, _, idx := testSubscribeImpl(t)
 
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	require.NoError(t, err)
@@ -539,7 +560,7 @@ func TestUnsubscribeMsg(t *testing.T) {
 	require.False(t, has)
 }
 
-func TestValidationCompleteMsg(t *testing.T) {
+func TestValidationPush(t *testing.T) {
 	testApp, _ := newTestApp(t, nil, true)
 
 	ipcValResults := []ipc.ValidationResult{
@@ -578,7 +599,7 @@ func TestValidationCompleteMsg(t *testing.T) {
 	}
 }
 
-func TestGenerateKeypairMsg(t *testing.T) {
+func TestGenerateKeypair(t *testing.T) {
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	require.NoError(t, err)
 	m, err := ipc.NewRootLibp2pHelperInterface_GenerateKeypair_Request(seg)
@@ -611,7 +632,7 @@ func TestGenerateKeypairMsg(t *testing.T) {
 	require.Greater(t, len(peerId), 0)
 }
 
-func mkPeerInfo (t *testing.T, app *app, appPort uint16) codaPeerInfo {
+func mkPeerInfo(t *testing.T, app *app, appPort uint16) codaPeerInfo {
 	expectedHost, err := app.P2p.Host.Addrs()[0].ValueForProtocol(4)
 	require.NoError(t, err)
 	return codaPeerInfo{
@@ -648,7 +669,7 @@ func testOpenStreamImplDo(t *testing.T, appA *app, appB *app, appBPort uint16, r
 	actual, err := readPeerInfo(peerInfo)
 	require.NoError(t, err)
 
-  expected := mkPeerInfo(t, appB, appBPort)
+	expected := mkPeerInfo(t, appB, appBPort)
 
 	require.Equal(t, respStreamId, streamId)
 	require.Equal(t, expected, *actual)
@@ -671,7 +692,7 @@ func TestOpenStream(t *testing.T) {
 	_ = testOpenStreamImpl(t, 9982, 4, string(testProtocol))
 }
 
-func TestCloseStreamMsg(t *testing.T) {
+func TestCloseStream(t *testing.T) {
 	appA := testOpenStreamImpl(t, 9983, 2, string(testProtocol))
 
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
@@ -693,7 +714,7 @@ func TestCloseStreamMsg(t *testing.T) {
 	require.False(t, has)
 }
 
-func TestResetStreamMsg(t *testing.T) {
+func TestResetStream(t *testing.T) {
 	appA := testOpenStreamImpl(t, 9984, 2, string(testProtocol))
 
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
@@ -715,7 +736,7 @@ func TestResetStreamMsg(t *testing.T) {
 	require.False(t, has)
 }
 
-func TestSendStreamMsg(t *testing.T) {
+func TestSendStream(t *testing.T) {
 	appA := testOpenStreamImpl(t, 9985, 2, string(testProtocol))
 
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
@@ -770,13 +791,13 @@ func testAddStreamHandler(t *testing.T, protocol string) (*app, *app, uint16) {
 	return appA, appB, appBPort
 }
 
-func TestAddStreamHandlerMsg(t *testing.T) {
+func TestAddStreamHandler(t *testing.T) {
 	newProtocol := "/mina/99"
 	appA, appB, appBPort := testAddStreamHandler(t, newProtocol)
 	testOpenStreamImplDo(t, appA, appB, appBPort, 9988, 8, newProtocol)
 }
 
-func TestRemoveStreamHandlerMsg(t *testing.T) {
+func TestRemoveStreamHandler(t *testing.T) {
 	newProtocol := "/mina/99"
 
 	appA, appB, _ := testAddStreamHandler(t, newProtocol)
@@ -814,11 +835,11 @@ func TestRemoveStreamHandlerMsg(t *testing.T) {
 }
 
 func ToStringList(vs []ma.Multiaddr) []string {
-  vsm := make([]string, len(vs))
-  for i, v := range vs {
-    vsm[i] = v.String()
-  }
-  return vsm
+	vsm := make([]string, len(vs))
+	for i, v := range vs {
+		vsm[i] = v.String()
+	}
+	return vsm
 }
 
 func TestGetListeningAddrs(t *testing.T) {
@@ -832,10 +853,10 @@ func TestGetListeningAddrs(t *testing.T) {
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasGetListeningAddrs())
-  ls, err := respSuccess.GetListeningAddrs()
+	ls, err := respSuccess.GetListeningAddrs()
 	require.NoError(t, err)
-  addrsL, err := ls.Result()
-  res, err := readMultiaddrList(addrsL)
+	addrsL, err := ls.Result()
+	res, err := readMultiaddrList(addrsL)
 	require.NoError(t, err)
 	require.Equal(t, ToStringList(testApp.P2p.Host.Addrs()), res)
 }
@@ -847,45 +868,45 @@ func testAddPeerImpl(t *testing.T) (*app, uint16, *app) {
 
 	appB, _ := newTestApp(t, appAInfos, true)
 
-  addr := fmt.Sprintf("%s/p2p/%s", appAInfos[0].Addrs[0], appAInfos[0].ID)
+	addr := fmt.Sprintf("%s/p2p/%s", appAInfos[0].Addrs[0], appAInfos[0].ID)
 
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	require.NoError(t, err)
 	m, err := ipc.NewRootLibp2pHelperInterface_AddPeer_Request(seg)
 	require.NoError(t, err)
-  ma, err := m.NewMultiaddr()
+	ma, err := m.NewMultiaddr()
 	require.NoError(t, err)
 	require.NoError(t, ma.SetRepresentation(addr))
-  m.SetIsSeed(false)
+	m.SetIsSeed(false)
 
 	var mRpcSeqno uint64 = 2000
 	resMsg := appB.handleAddPeer(mRpcSeqno, m)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasAddPeer())
-  _, err = respSuccess.AddPeer()
+	_, err = respSuccess.AddPeer()
 	require.NoError(t, err)
 
 	addrs := appB.P2p.Host.Peerstore().Addrs(appA.P2p.Host.ID())
 	require.NotEqual(t, 0, len(addrs))
 
-  return appA, appAPort, appB
+	return appA, appAPort, appB
 }
 
 func TestAddPeer(t *testing.T) {
-  _, _, _ = testAddPeerImpl(t)
+	_, _, _ = testAddPeerImpl(t)
 }
 
-func TestFindPeerMsg(t *testing.T) {
+func TestFindPeer(t *testing.T) {
 	appA, appAPort, appB := testAddPeerImpl(t)
 
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	require.NoError(t, err)
 	m, err := ipc.NewRootLibp2pHelperInterface_FindPeer_Request(seg)
 	require.NoError(t, err)
-  pid, err := m.NewPeerId()
+	pid, err := m.NewPeerId()
 	require.NoError(t, err)
-  peerId := appA.P2p.Host.ID().String()
+	peerId := appA.P2p.Host.ID().String()
 	require.NoError(t, pid.SetId(peerId))
 
 	var mRpcSeqno uint64 = 2001
@@ -893,15 +914,15 @@ func TestFindPeerMsg(t *testing.T) {
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasFindPeer())
-  resp, err := respSuccess.FindPeer()
+	resp, err := respSuccess.FindPeer()
 	require.NoError(t, err)
-  res, err := resp.Result()
+	res, err := resp.Result()
 	require.NoError(t, err)
 
 	actual, err := readPeerInfo(res)
 	require.NoError(t, err)
 
-  expected := mkPeerInfo(t, appA, appAPort)
+	expected := mkPeerInfo(t, appA, appAPort)
 	require.Equal(t, expected, *actual)
 }
 
@@ -918,15 +939,15 @@ func TestListPeers(t *testing.T) {
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasListPeers())
-  resp, err := respSuccess.ListPeers()
+	resp, err := respSuccess.ListPeers()
 	require.NoError(t, err)
-  res, err := resp.Result()
+	res, err := resp.Result()
 	require.NoError(t, err)
 	require.Equal(t, 1, res.Len())
 	actual, err := readPeerInfo(res.At(0))
 	require.NoError(t, err)
 
-  expected := mkPeerInfo(t, appA, appAPort)
+	expected := mkPeerInfo(t, appA, appAPort)
 	require.Equal(t, expected, *actual)
 }
 
@@ -948,13 +969,13 @@ func TestSetGatingConfig(t *testing.T) {
 
 	gc, err := m.NewGatingConfig()
 	require.NoError(t, err)
-  bIps, err := gc.NewBannedIps(1)
+	bIps, err := gc.NewBannedIps(1)
 	require.NoError(t, err)
-  bPids, err := gc.NewBannedPeerIds(1)
+	bPids, err := gc.NewBannedPeerIds(1)
 	require.NoError(t, err)
-  tIps, err := gc.NewTrustedIps(1)
+	tIps, err := gc.NewTrustedIps(1)
 	require.NoError(t, err)
-  tPids, err := gc.NewTrustedPeerIds(1)
+	tPids, err := gc.NewTrustedPeerIds(1)
 	require.NoError(t, err)
 	require.NoError(t, bIps.Set(0, "1.2.3.4"))
 	require.NoError(t, bPids.At(0).SetId(bannedID))
@@ -967,7 +988,7 @@ func TestSetGatingConfig(t *testing.T) {
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasSetGatingConfig())
-  _, err = respSuccess.SetGatingConfig()
+	_, err = respSuccess.SetGatingConfig()
 	require.NoError(t, err)
 
 	ok := testApp.P2p.GatingState.InterceptPeerDial(peer.ID(bannedID))
@@ -986,7 +1007,7 @@ func TestSetGatingConfig(t *testing.T) {
 	require.True(t, ok)
 }
 
-func TestGetPeerMessage(t *testing.T) {
+func TestPeerExchange(t *testing.T) {
 	codanet.NoDHT = true
 	defer func() {
 		codanet.NoDHT = false
@@ -1066,13 +1087,13 @@ func TestGetPeerNodeStatus(t *testing.T) {
 	appC.P2p.Host.Peerstore().AddAddrs(appA.P2p.Host.ID(), appAInfos[0].Addrs, peerstore.ConnectedAddrTTL)
 
 	maStrs := multiaddrs(appA.P2p.Host)
-  addr := maStrs[0].String()
+	addr := maStrs[0].String()
 
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	require.NoError(t, err)
 	m, err := ipc.NewRootLibp2pHelperInterface_GetPeerNodeStatus_Request(seg)
 	require.NoError(t, err)
-  ma, err := m.NewPeer()
+	ma, err := m.NewPeer()
 	require.NoError(t, err)
 	require.NoError(t, ma.SetRepresentation(addr))
 
@@ -1081,9 +1102,9 @@ func TestGetPeerNodeStatus(t *testing.T) {
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasGetPeerNodeStatus())
-  resp, err := respSuccess.GetPeerNodeStatus()
+	resp, err := respSuccess.GetPeerNodeStatus()
 	require.NoError(t, err)
-  status, err := resp.Result()
+	status, err := resp.Result()
 	require.NoError(t, err)
 	require.Equal(t, appA.P2p.NodeStatus, status)
 }
@@ -1105,37 +1126,37 @@ func waitForMessages(t *testing.T, app *app, numExpectedMessages int) [][]byte {
 		awaiting := numExpectedMessages
 		for {
 			rawMsg := <-app.OutChan
-      imsg, err := ipc.ReadRootDaemonInterface_Message(rawMsg)
-      require.NoError(t, err)
-      if !imsg.HasPushMessage() {
-        continue
-      }
-      pmsg, err := imsg.PushMessage()
-      require.NoError(t, err)
-      if pmsg.HasStreamComplete() {
-        smc, err := pmsg.StreamComplete()
-        require.NoError(t, err)
-        sid, err := smc.StreamId()
-        streamId := sid.Id()
-        require.NoError(t, err)
+			imsg, err := ipc.ReadRootDaemonInterface_Message(rawMsg)
+			require.NoError(t, err)
+			if !imsg.HasPushMessage() {
+				continue
+			}
+			pmsg, err := imsg.PushMessage()
+			require.NoError(t, err)
+			if pmsg.HasStreamComplete() {
+				smc, err := pmsg.StreamComplete()
+				require.NoError(t, err)
+				sid, err := smc.StreamId()
+				streamId := sid.Id()
+				require.NoError(t, err)
 				receivedMsgs = append(receivedMsgs, msgStates[streamId])
 				awaiting -= 1
 				if awaiting <= 0 {
 					close(done)
 					return
 				}
-      } else if pmsg.HasStreamMessageReceived() {
-        smr, err := pmsg.StreamMessageReceived()
-        require.NoError(t, err)
-        msg, err := smr.Msg()
-        require.NoError(t, err)
-        sid, err := msg.StreamId()
-        require.NoError(t, err)
-        streamId := sid.Id()
-        data, err := msg.Data()
-        require.NoError(t, err)
+			} else if pmsg.HasStreamMessageReceived() {
+				smr, err := pmsg.StreamMessageReceived()
+				require.NoError(t, err)
+				msg, err := smr.Msg()
+				require.NoError(t, err)
+				sid, err := msg.StreamId()
+				require.NoError(t, err)
+				streamId := sid.Id()
+				data, err := msg.Data()
+				require.NoError(t, err)
 				msgStates[streamId] = append(msgStates[streamId], data...)
-      }
+			}
 		}
 	})()
 

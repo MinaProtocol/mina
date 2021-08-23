@@ -35,9 +35,9 @@ func filterIPString(filters *ma.Filters, ip string, action ma.Action) error {
 }
 
 func readMultiaddrList(l ipc.Multiaddr_List) ([]string, error) {
-  res := make([]string, 0, l.Len())
+	res := make([]string, 0, l.Len())
 	return res, multiaddrListForeach(l, func(v string) error {
-    res = append(res, v)
+		res = append(res, v)
 		return nil
 	})
 }
@@ -281,7 +281,7 @@ func mkIncomingStreamUpcall(peer *codaPeerInfo, streamIdx uint64, protocol strin
 	})
 }
 
-func mkValidateUpcall(sender *codaPeerInfo, expiration time.Time, seenAt time.Time, data []byte, seqno uint64, subIdx uint64) *capnp.Message {
+func mkGossipReceivedUpcall(sender *codaPeerInfo, expiration time.Time, seenAt time.Time, data []byte, seqno uint64, subIdx uint64) *capnp.Message {
 	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
 		gr, err := m.NewGossipReceived()
 		panicOnErr(err)
@@ -318,7 +318,7 @@ func mkStreamLostUpcall(streamIdx uint64, reason string) *capnp.Message {
 	})
 }
 
-func mkStreamReadCompleteUpcall(streamIdx uint64) *capnp.Message {
+func mkStreamCompleteUpcall(streamIdx uint64) *capnp.Message {
 	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
 		sl, err := m.NewStreamComplete()
 		panicOnErr(err)
@@ -328,7 +328,7 @@ func mkStreamReadCompleteUpcall(streamIdx uint64) *capnp.Message {
 	})
 }
 
-func mkIncomingMsgUpcall(streamIdx uint64, data []byte) *capnp.Message {
+func mkStreamMessageReceivedUpcall(streamIdx uint64, data []byte) *capnp.Message {
 	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
 		im_, err := m.NewStreamMessageReceived()
 		panicOnErr(err)
