@@ -124,14 +124,6 @@ func main() {
 	_ = logging.SetLogLevel("bootstrap", "debug")
 	_ = logging.SetLogLevel("reuseport-transport", "debug")
 
-	go func() {
-		i := uint64(0)
-		for {
-			seqs <- i
-			i++
-		}
-	}()
-
 	decoder := capnp.NewDecoder(os.Stdin)
 
 	app := newApp()

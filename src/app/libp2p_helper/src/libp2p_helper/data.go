@@ -42,6 +42,11 @@ type app struct {
 	NoDHT         bool
 	NoUpcalls     bool
 	metricsServer *codaMetricsServer
+
+	// Counter for id generation
+	counter uint64
+	// Mutex for id generation
+	counterMutex sync.Mutex
 }
 
 type subscription struct {
