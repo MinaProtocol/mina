@@ -183,6 +183,8 @@ func (app *app) handleSendStream(seqno uint64, m ipc.Libp2pHelperInterface_SendS
 	}
 	streamId := sid.Id()
 
+	// TODO Consider using a more fine-grained locking strategy,
+	// not using a global mutex to lock on a message sending
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[streamId]; ok {
