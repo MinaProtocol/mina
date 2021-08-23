@@ -30,6 +30,10 @@ export abstract class CircuitValue {
     return (this.constructor as any).toFieldElements(this);
   }
 
+  toJSON(): JSONValue {
+    return (this.constructor as any).toJSON(this);
+  }
+
   equals(this: this, x: typeof this): Bool {
     return Circuit.equal(this, x);
   }
