@@ -42,6 +42,27 @@ module Step = struct
           let lo = B.shift_right x 1 in
           (Impl.Bigint.(to_field (of_bignum_bigint lo)), hi))
 
+    let%test_unit "forbidden shifted values print" =
+      print_endline "debug" ;
+      List.iter forbidden_shifted_values ~f:(fun (a, b) ->
+          printf "%s - %B\n" (Tick.Field.to_string a) b)
+
+    let%test_unit "forbidden shifted values" =
+      let expected_list =
+        [ ("45560315531506369815346746415080538112", false)
+        ; ("45560315531506369815346746415080538113", false)
+        ; ( "14474011154664524427946373126085988481727088556502330059655218120611762012161"
+          , true )
+        ; ( "14474011154664524427946373126085988481727088556502330059655218120611762012161"
+          , true )
+        ]
+      in
+      let str_list =
+        List.map forbidden_shifted_values ~f:(fun (a, b) ->
+            (Tick.Field.to_string a, b))
+      in
+      assert ([%equal: (string * bool) list] str_list expected_list)
+
     let (typ_unchecked : (t, Constant.t) Typ.t), check =
       let t0 =
         Typ.transport
@@ -110,6 +131,24 @@ module Wrap = struct
       forbidden_shifted_values ~size_in_bits:Constant.size_in_bits
         ~modulus:(Step.Impl.Bigint.to_bignum_bigint Constant.size) ~f:(fun x ->
           Impl.Bigint.(to_field (of_bignum_bigint x)))
+
+    let%test_unit "forbidden shifted values 2 print" =
+      print_endline "debug" ;
+      List.iter forbidden_shifted_values ~f:(fun x ->
+          printf "%s\n" (Wrap_field.to_string x))
+
+    let%test_unit "forbidden shifted values 2" =
+      let expected_list =
+        [ "91120631062839412180561524743370440705"
+        ; "91120631062839412180561524743370440706"
+        ; "0"
+        ; "0"
+        ]
+      in
+      let str_list =
+        List.map forbidden_shifted_values ~f:Wrap_field.to_string
+      in
+      assert ([%equal: string list] str_list expected_list)
 
     let typ_unchecked, check =
       let t0 =
