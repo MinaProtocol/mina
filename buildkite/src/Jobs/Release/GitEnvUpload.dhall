@@ -11,13 +11,15 @@ let Size = ../../Command/Size.dhall
 
 let UploadGitEnv = ../../Command/UploadGitEnv.dhall
 
+let ArtifactPipelines = ../../Command/MinaArtifact.dhall
+
 let deployEnv = "export-git-env-vars.sh"
 
 in Pipeline.build
   Pipeline.Config::{
     spec =
       JobSpec::{
-        dirtyWhen = [
+        dirtyWhen = ArtifactPipelines.dirtyWhen # [
           S.strictlyStart (S.contains "buildkite/scripts/export-git-env-vars"),
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/GitEnvUpload")
         ],
