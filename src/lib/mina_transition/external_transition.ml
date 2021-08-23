@@ -914,14 +914,6 @@ module With_validation = struct
   let reject t = lift reject t
 
   let poke_validation_callback t = lift poke_validation_callback t
-
-  let handle_dropped_transition ?pipe_name ~logger t =
-    [%log warn] "Dropping state_hash $state_hash from $pipe transition pipe"
-      ~metadata:
-        [ ("state_hash", State_hash.to_yojson (state_hash t))
-        ; ("pipe", `String (Option.value pipe_name ~default:"an unknown"))
-        ] ;
-    reject t
 end
 
 module Initial_validated = struct
@@ -1075,8 +1067,7 @@ module Validated = struct
     , payments
     , global_slot
     , erase
-    , to_yojson
-    , handle_dropped_transition )]
+    , to_yojson )]
 
   include Comparable.Make (Stable.Latest)
 

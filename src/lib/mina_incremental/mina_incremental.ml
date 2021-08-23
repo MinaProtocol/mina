@@ -19,7 +19,7 @@ struct
       Strict_pipe.(
         create
           ~name:("Mina_incremental__" ^ Name.t)
-          (Buffered (`Capacity 1, `Overflow (Drop_head ignore))))
+          (Buffered (`Capacity 1, `Overflow Drop_head)))
     in
     Observer.on_update_exn observer ~f:(function
       | Initialized value ->

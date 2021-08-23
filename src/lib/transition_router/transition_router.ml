@@ -13,8 +13,8 @@ type Structured_log_events.t += Starting_transition_frontier_controller
 type Structured_log_events.t += Starting_bootstrap_controller
   [@@deriving register_event { msg = "Starting bootstrap controller phase" }]
 
-let create_bufferred_pipe ?name ~f () =
-  Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow (Drop_head f)))
+let create_bufferred_pipe ?name () =
+  Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
 
 let is_transition_for_bootstrap ~logger
     ~(precomputed_values : Precomputed_values.t) frontier new_transition =
@@ -62,14 +62,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
   [%str_log info] Starting_transition_frontier_controller ;
   let ( transition_frontier_controller_reader
       , transition_frontier_controller_writer ) =
-    let name = "transition frontier controller pipe" in
-    create_bufferred_pipe ~name
-      ~f:(fun head ->
-        Mina_transition.External_transition.Initial_validated
-        .handle_dropped_transition
-          (Network_peer.Envelope.Incoming.data head)
-          ~pipe_name:name ~logger)
-      ()
+    create_bufferred_pipe ~name:"transition frontier controller pipe" ()
   in
   transition_reader_ref := transition_frontier_controller_reader ;
   transition_writer_ref := transition_frontier_controller_writer ;
@@ -102,14 +95,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
   [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
-    let name = "bootstrap controller pipe" in
-    create_bufferred_pipe ~name
-      ~f:(fun head ->
-        Mina_transition.External_transition.Initial_validated
-        .handle_dropped_transition
-          (Network_peer.Envelope.Incoming.data head)
-          ~pipe_name:name ~logger)
-      ()
+    create_bufferred_pipe ~name:"bootstrap controller pipe" ()
   in
   transition_reader_ref := bootstrap_controller_reader ;
   transition_writer_ref := bootstrap_controller_writer ;
@@ -469,22 +455,10 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     Strict_pipe.create ~name:"clear" Synchronous
   in
   let verified_transition_reader, verified_transition_writer =
-    let name = "verified transitions" in
-    create_bufferred_pipe ~name
-      ~f:(fun (`Transition head, _) ->
-        Mina_transition.External_transition.Validated.handle_dropped_transition
-          head ~pipe_name:name ~logger)
-      ()
+    create_bufferred_pipe ~name:"verified transitions" ()
   in
   let transition_reader, transition_writer =
-    let name = "transition pipe" in
-    create_bufferred_pipe ~name
-      ~f:(fun head ->
-        Mina_transition.External_transition.Initial_validated
-        .handle_dropped_transition
-          (Network_peer.Envelope.Incoming.data head)
-          ~pipe_name:name ~logger)
-      ()
+    create_bufferred_pipe ~name:"transition pipe" ()
   in
   let transition_reader_ref = ref transition_reader in
   let transition_writer_ref = ref transition_writer in
@@ -500,14 +474,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
   upon (wait_till_genesis ~logger ~time_controller ~precomputed_values)
     (fun () ->
       let valid_transition_reader, valid_transition_writer =
-        let name = "valid transitions" in
-        create_bufferred_pipe ~name
-          ~f:(fun head ->
-            Mina_transition.External_transition.Initial_validated
-            .handle_dropped_transition
-              (Network_peer.Envelope.Incoming.data head)
-              ~pipe_name:name ~logger)
-          ()
+        create_bufferred_pipe ~name:"valid transitions" ()
       in
       Initial_validator.run ~logger ~trust_system ~verifier
         ~transition_reader:network_transition_reader ~valid_transition_writer

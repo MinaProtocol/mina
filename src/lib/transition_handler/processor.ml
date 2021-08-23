@@ -390,13 +390,11 @@ let%test_module "Transition_handler.Processor tests" =
             Thread_safe.block_on_async_exn (fun () ->
                 let valid_transition_reader, valid_transition_writer =
                   Strict_pipe.create
-                    (Buffered
-                       (`Capacity branch_size, `Overflow (Drop_head ignore)))
+                    (Buffered (`Capacity branch_size, `Overflow Drop_head))
                 in
                 let producer_transition_reader, _ =
                   Strict_pipe.create
-                    (Buffered
-                       (`Capacity branch_size, `Overflow (Drop_head ignore)))
+                    (Buffered (`Capacity branch_size, `Overflow Drop_head))
                 in
                 let _, catchup_job_writer =
                   Strict_pipe.create (Buffered (`Capacity 1, `Overflow Crash))
@@ -406,8 +404,7 @@ let%test_module "Transition_handler.Processor tests" =
                 in
                 let processed_transition_reader, processed_transition_writer =
                   Strict_pipe.create
-                    (Buffered
-                       (`Capacity branch_size, `Overflow (Drop_head ignore)))
+                    (Buffered (`Capacity branch_size, `Overflow Drop_head))
                 in
                 let clean_up_catchup_scheduler = Ivar.create () in
                 let cache = Unprocessed_transition_cache.create ~logger in

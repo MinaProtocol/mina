@@ -13,7 +13,7 @@ type call = Overflow_behavior_call
 
 type (_, _, _) overflow_behavior =
   | Crash : ('a, crash, unit) overflow_behavior
-  | Drop_head : ('a -> unit) -> ('a, drop_head, unit) overflow_behavior
+  | Drop_head : ('a, drop_head, unit) overflow_behavior
   | Call : ('a -> 'r) -> ('a, call, 'r option) overflow_behavior
 
 type synchronous = Type_synchronous
@@ -52,8 +52,6 @@ module Reader0 = struct
 
   let of_linear_pipe ?name { Linear_pipe.Reader.pipe = reader; has_reader } =
     { reader; has_reader; downstreams = []; name }
-
-  let pipe_name t = t.name
 
   let assert_not_read reader =
     if reader.has_reader then
@@ -263,7 +261,7 @@ module Writer = struct
         handle_buffered_write writer data ~capacity
           ~on_overflow:(fun () -> raise (Overflow (value_or_empty writer.name)))
           ~normal_return:()
-    | Buffered (`Capacity capacity, `Overflow (Drop_head f)) ->
+    | Buffered (`Capacity capacity, `Overflow Drop_head) ->
         handle_buffered_write writer data ~capacity
           ~on_overflow:(fun () ->
             let logger = Logger.create () in
@@ -272,12 +270,10 @@ module Writer = struct
               [%log warn]
                 ~metadata:[ ("pipe_name", `String my_name) ]
                 "Dropping message on pipe $pipe_name" ;
-            match Pipe.read_now writer.strict_reader.reader with
-            | `Ok head ->
-                f head
-            | _ ->
-                () ;
-                Pipe.write_without_pushback writer.writer data)
+            ignore
+              ( Pipe.read_now writer.strict_reader.reader
+                : [ `Eof | `Nothing_available | `Ok of 'a ] ) ;
+            Pipe.write_without_pushback writer.writer data)
           ~normal_return:()
     | Buffered (`Capacity capacity, `Overflow (Call f)) ->
         handle_buffered_write writer data ~capacity
@@ -294,9 +290,6 @@ module Writer = struct
     Reader0.close_downstreams strict_reader.downstreams
 
   let is_closed { writer; _ } = Pipe.is_closed writer
-
-  let pipe_name : type type_ return. ('t, type_, return) t -> string option =
-   fun writer -> writer.name
 end
 
 let create ?name ?(warn_on_drop = true) type_ =
@@ -354,10 +347,10 @@ let%test_module "Strict_pipe.Reader.Merge" =
     let%test_unit "'iter' would filter out the closed pipes" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let reader1, writer1 =
-            create (Buffered (`Capacity 10, `Overflow (Drop_head ignore)))
+            create (Buffered (`Capacity 10, `Overflow Drop_head))
           in
           let reader2, writer2 =
-            create (Buffered (`Capacity 10, `Overflow (Drop_head ignore)))
+            create (Buffered (`Capacity 10, `Overflow Drop_head))
           in
           Reader.Merge.iter [ reader1; reader2 ] ~f:(fun _ -> Deferred.unit)
           |> don't_wait_for ;
