@@ -1,17 +1,15 @@
 const path = require('path');
 
-const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const NodePolyfillPlugin = require('node-polyfill-webpack-plugin');
+const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 
 module.exports = {
   target: 'web',
 
   devtool: false,
 
-  // bundling mode
   mode: 'none',
 
-  // entry files
   entry: {
     snarkyjs_chrome: {
       import: path.resolve(__dirname, 'src/index.ts'),
@@ -23,7 +21,6 @@ module.exports = {
     },
   },
 
-  // output bundles (location)
   output: {
     path: path.resolve(__dirname, 'dist'),
     publicPath: '',
@@ -35,7 +32,6 @@ module.exports = {
     clean: true,
   },
 
-  //file resolutions
   resolve: {
     extensions: ['.ts', '.js'],
     fallback: {
@@ -44,7 +40,6 @@ module.exports = {
     },
   },
 
-  // loaders
   module: {
     rules: [
       {
@@ -72,6 +67,7 @@ module.exports = {
       },
     ],
   },
+
   plugins: [new CleanWebpackPlugin(), new NodePolyfillPlugin()],
   optimization: {
     splitChunks: {

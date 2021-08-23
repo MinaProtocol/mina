@@ -9,10 +9,8 @@ module.exports = {
 
   devtool: false,
 
-  // bundling mode
   mode: 'production',
 
-  // entry files
   entry: {
     snarkyjs_chrome: {
       import: path.resolve(__dirname, 'src/index.ts'),
@@ -22,17 +20,8 @@ module.exports = {
         umdNamedDefine: true,
       },
     },
-    plonk_init: {
-      import: path.resolve(__dirname, 'chrome_test/plonk_init.js'),
-      library: {
-        name: 'plonk_init',
-        type: 'umd',
-        umdNamedDefine: true,
-      },
-    },
   },
 
-  // output bundles (location)
   output: {
     path: path.resolve(__dirname, 'dist'),
     publicPath: '',
@@ -44,7 +33,6 @@ module.exports = {
     clean: true,
   },
 
-  //file resolutions
   resolve: {
     extensions: ['.ts', '.js'],
     fallback: {
@@ -53,7 +41,6 @@ module.exports = {
     },
   },
 
-  // loaders
   module: {
     rules: [
       {
@@ -76,19 +63,12 @@ module.exports = {
           options: {
             presets: ['@babel/preset-env'],
             plugins: ['@babel/plugin-transform-runtime'],
-            sourceMaps: false,
           },
-        },
-      },
-      {
-        test: /\.wasm$/,
-        type: 'asset/resource',
-        generator: {
-          filename: 'plonk_wasm_bg.wasm',
         },
       },
     ],
   },
+
   plugins: [new CleanWebpackPlugin(), new NodePolyfillPlugin()],
   optimization: {
     minimize: true,
