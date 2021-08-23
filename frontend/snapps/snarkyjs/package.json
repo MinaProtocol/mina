@@ -1,9 +1,10 @@
 {
   "name": "@o1labs/snarkyjs-web",
   "description": "Web bindings for SnarkyJS",
+  "version": "0.1.0",
   "license": "Apache-2.0",
   "main": "dist/snarkyjs_chrome.js",
-  "typings": "dist/index.d.ts",
+  "types": "dist/index.d.ts",
   "files": [
     "dist"
   ],
@@ -12,18 +13,24 @@
   },
   "scripts": {
     "type-check": "tsc --noEmit",
-    "build": "./node_modules/.bin/webpack && cp ./src/bindings/plonk_wasm_bg.wasm ./dist && cp chrome_test/snarky_js_chrome.bc.js ./dist",
+    "build-dev": "./scripts/build-dev.sh",
+    "build-prod": "./scripts/build-prod.sh",
+    "serve": "./scripts/build-and-run-server.sh",
+    "prepublish": "./scripts/prepublish.sh",
     "test": "node --experimental-wasm-modules --experimental-modules --experimental-wasm-threads ./node_modules/.bin/jest",
     "format": "prettier --write --ignore-unknown **/*",
-    "serve": "./build-and-run-server.sh"
+    "clean": "rm -rf dist"
   },
   "author": "O(1) Labs",
   "devDependencies": {
     "@babel/core": "^7.15.0",
+    "@babel/plugin-transform-runtime": "^7.15.0",
     "@babel/preset-env": "^7.15.0",
     "@types/jest": "^27.0.0",
     "babel-loader": "^8.2.2",
+    "clean-webpack-plugin": "^4.0.0-alpha.0",
     "jest": "^27.0.6",
+    "node-polyfill-webpack-plugin": "^1.1.4",
     "prettier": "^2.3.2",
     "ts-jest": "^27.0.4",
     "ts-loader": "^9.2.5",

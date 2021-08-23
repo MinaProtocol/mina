@@ -1,18 +1,26 @@
-// if (window.__snarky) {
-  export const Field = window.__snarky.Field;
-  export const Bool = window.__snarky.Bool;
-  export const Circuit = window.__snarky.Circuit;
-  export const Poseidon = window.__snarky.Poseidon;
-  export const Group = window.__snarky.Group;
-  export const Scalar = window.__snarky.Scalar;
+export let Field;
+export let Bool;
+export let Circuit;
+export let Poseidon;
+export let Group;
+export let Scalar;
 
-/*} else {
-  import { Field as F, Bool as B, Circuit as C, Poseidon as P, Group as G, Scalar as S } from './snarky';
-  export class Field = F;
-  export class Bool = B;
-  export class Circuit = C;
-  export class Poseidon = P;
-  export class Group = G;
-  export class Scalar = S;
+import * as Snarky from "../../chrome_test/snarky_js_chrome.bc"
+
+(async () => {
+if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
+  Field = window.__snarky.Field;
+  Bool = window.__snarky.Bool;
+  Circuit = window.__snarky.Circuit;
+  Poseidon = window.__snarky.Poseidon;
+  Group = window.__snarky.Group;
+  Scalar = window.__snarky.Scalar;
+} else {
+  Field = Snarky.Field
+  Bool = Snarky.Bool;
+  Circuit = Snarky.Circuit;
+  Poseidon = Snarky.Poseidon;
+  Group = Snarky.Group;
+  Scalar = Snarky.Scalar;
 }
-*/
+})()
