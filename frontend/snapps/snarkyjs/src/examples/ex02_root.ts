@@ -1,4 +1,4 @@
-import { Poseidon, Field, Circuit } from '../bindings/snarky';
+import { Poseidon, Field, Circuit } from '../snarky';
 import { circuitMain, public_ } from '../circuit_value';
 
 /* Exercise 2:

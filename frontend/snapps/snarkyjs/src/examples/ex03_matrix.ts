@@ -1,4 +1,4 @@
-import { Field } from '../bindings/snarky';
+import { Field } from '../snarky';
 
 /* Exercise 3:
 

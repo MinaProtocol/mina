@@ -1,4 +1,4 @@
-import { Field, Circuit } from '../bindings/snarky.js';
+import { Field, Circuit } from '../snarky.js';
 
 /* @param x an n*m matrix, encoded as x[i][j] for row i column j.
  * @param y an o*n matrix, both encoded as y[i][j] for row i column j.

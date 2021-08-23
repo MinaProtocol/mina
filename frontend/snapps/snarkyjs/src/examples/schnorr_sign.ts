@@ -1,4 +1,4 @@
-import { Field, Scalar, Group, Circuit } from '../bindings/snarky2'; 
+import { Field, Scalar, Group, Circuit } from '../snarky'; 
 import { public_, circuitMain, prop, CircuitValue } from '../circuit_value';
 import { Signature } from '../signature';
 

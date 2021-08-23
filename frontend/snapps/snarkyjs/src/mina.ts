@@ -1,7 +1,7 @@
 // This is for an account where any of a list of public keys can update the state
 
 import { prop, CircuitValue } from './circuit_value';
-import { Field, Bool } from './bindings/snarky2';
+import { Field, Bool } from './snarky';
 
 // TODO. Also, don't make user ever talk about distinction b/w compressed and non-compressed keys
 type PublicKey = void;
