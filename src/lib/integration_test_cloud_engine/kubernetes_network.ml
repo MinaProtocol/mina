@@ -11,8 +11,7 @@ module Node = struct
     ; cluster : string
     ; namespace : string
     ; pod_id : string
-          (* ; container_ids : string list *)
-          (* name of the container inside the pod.  most have only 1, archive nodes have 2 *)
+          (* name of the containers inside the pod.  most pods have only a mina container, archive nodes have that and an archive container *)
     ; mina_container_id : string
     ; mina_archive_container_id : string option
     ; graphql_enabled : bool
@@ -53,6 +52,10 @@ module Node = struct
     let%bind.Deferred cwd = Unix.getcwd () in
     Util.run_cmd_exn cwd "sh" [ "-c"; kubectl_cmd ]
 
+  let run_in_container_unit node ~container_id ~cmd =
+    let%map (_output : string) = run_in_container node ~container_id ~cmd in
+    ()
+
   (* we dont use this functionality atm but if we need logic that runs commands in all containers a whole pod at a time, here it is *)
   (* let run_in_pod node ~cmd =
      (* run the cmd in every single container in a pod *)
@@ -73,44 +76,38 @@ module Node = struct
      List.fold result_list ~init:(Deferred.return "") ~f:foldh *)
 
   let start ~fresh_state node : unit Malleable_error.t =
-    let open Malleable_error.Let_syntax in
-    let%bind _ =
-      Malleable_error.return
-        (run_in_container node ~container_id:node.mina_container_id
-           ~cmd:"ps aux")
+    let open Deferred.Let_syntax in
+    let%bind () =
+      run_in_container_unit node ~container_id:node.mina_container_id
+        ~cmd:"ps aux"
     in
-    let%bind _ =
+    let%bind () =
       if fresh_state then
-        Malleable_error.return
-          (run_in_container node ~container_id:node.mina_container_id
-             ~cmd:"rm -rf .mina-config/*")
-      else Malleable_error.return (Deferred.return "")
+        run_in_container_unit node ~container_id:node.mina_container_id
+          ~cmd:"rm -rf .mina-config/*"
+      else Deferred.return ()
     in
-    let%bind _ =
-      Malleable_error.return
-        (run_in_container node ~container_id:node.mina_container_id
-           ~cmd:"/start.sh")
+    let%bind () =
+      run_in_container_unit node ~container_id:node.mina_container_id
+        ~cmd:"/start.sh"
     in
     Malleable_error.return ()
 
   let stop node =
-    let open Malleable_error.Let_syntax in
-    let%bind _ =
-      Malleable_error.return
-        (run_in_container node ~container_id:node.mina_container_id
-           ~cmd:"ps aux")
+    let open Deferred.Let_syntax in
+    let%bind () =
+      run_in_container_unit node ~container_id:node.mina_container_id
+        ~cmd:"ps aux"
     in
-    let%bind _ =
-      Malleable_error.return
-        (run_in_container node ~container_id:node.mina_container_id
-           ~cmd:"/stop.sh")
+    let%bind () =
+      run_in_container_unit node ~container_id:node.mina_container_id
+        ~cmd:"/stop.sh"
     in
-    let%bind _ =
-      Malleable_error.return
-        (run_in_container node ~container_id:node.mina_container_id
-           ~cmd:"ps aux")
+    let%bind () =
+      run_in_container_unit node ~container_id:node.mina_container_id
+        ~cmd:"ps aux"
     in
-    return ()
+    Malleable_error.return ()
 
   let get_pod_name t : string Malleable_error.t =
     let open Malleable_error.Let_syntax in
@@ -396,8 +393,8 @@ module Node = struct
     let archive_container_id =
       if Option.is_none t.mina_archive_container_id then
         failwith
-          "Trying to dump logs of archive node but there is no archive \
-           container"
+          "No archive container found.  One can only dump archive data of an \
+           archive node."
       else Option.value ~default:"" t.mina_archive_container_id
     in
     let open Malleable_error.Let_syntax in

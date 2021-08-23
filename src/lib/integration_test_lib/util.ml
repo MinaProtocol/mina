@@ -79,10 +79,6 @@ let run_cmd_exn_timeout ~timeout_seconds dir prog args =
   | Error error ->
       Error.raise error
 
-(* Timeout.await ()
-   ~timeout_duration:(Time.Span.create ~sec:timeout_seconds ())
-   (run_cmd_exn dir prog args) *)
-
 let rec prompt_continue prompt_string =
   print_string prompt_string ;
   let%bind () = Writer.flushed (Lazy.force Writer.stdout) in
