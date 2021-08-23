@@ -77,8 +77,8 @@ val empty :
 (** How many transactions are currently in the pool *)
 val size : t -> int
 
-(** What is the lowest fee transaction in the pool *)
-val min_fee : t -> Currency.Fee.t option
+(* The least fee per weight unit of all transactions in the transaction pool *)
+val min_fee : t -> int option
 
 (** Remove the lowest fee command from the pool, along with any others from the
     same account with higher nonces. *)
