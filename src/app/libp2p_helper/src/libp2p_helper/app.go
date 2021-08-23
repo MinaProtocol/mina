@@ -770,7 +770,7 @@ func (app *app) handleSubscribe(seqno uint64, m ipc.Libp2pHelperInterface_Subscr
 			delete(app.Validators, seqno)
 			return pubsub.ValidationIgnore
 		}
-		app.writeMsg(mkValidateUpcall(sender, deadline, seenAt, msg.Data, seqno, subId))
+		app.writeMsg(mkGossipReceivedUpcall(sender, deadline, seenAt, msg.Data, seqno, subId))
 
 		// Wait for the validation response, but be sure to honor any timeout/deadline in ctx
 		select {
@@ -909,7 +909,7 @@ func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 			len, err := stream.Read(buf)
 
 			if len != 0 {
-				app.writeMsg(mkIncomingMsgUpcall(idx, buf[:len]))
+				app.writeMsg(mkStreamMessageReceivedUpcall(idx, buf[:len]))
 			}
 
 			if err != nil && err != io.EOF {
@@ -924,7 +924,7 @@ func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 				break
 			}
 		}
-		app.writeMsg(mkStreamReadCompleteUpcall(idx))
+		app.writeMsg(mkStreamCompleteUpcall(idx))
 	}()
 }
 
