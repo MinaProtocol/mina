@@ -13,6 +13,17 @@ let Size = ./Size.dhall
 let Libp2p = ./Libp2pHelperBuild.dhall
 let DockerImage = ./DockerImage.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
+let DirtyWhen = [
+  S.strictlyStart (S.contains "src"),
+  S.strictlyStart (S.contains "automation"),
+  S.strictly (S.contains "Makefile"),
+  S.strictlyStart (S.contains "buildkite/src/Command/MinaArtifact"),
+  S.exactly "buildkite/scripts/build-artifact" "sh",
+  S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh",
+  S.strictlyStart (S.contains "dockerfiles"),
+  S.strictlyStart (S.contains "scripts")
+]
+
 
 in
 
@@ -20,16 +31,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
     Pipeline.Config::{
       spec =
         JobSpec::{
-          dirtyWhen = [
-            S.strictlyStart (S.contains "src"),
-            S.strictlyStart (S.contains "automation"),
-            S.strictly (S.contains "Makefile"),
-            S.strictlyStart (S.contains "buildkite/src/Command/MinaArtifact"),
-            S.exactly "buildkite/scripts/build-artifact" "sh",
-            S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh",
-            S.strictlyStart (S.contains "dockerfiles"),
-            S.strictlyStart (S.contains "scripts")
-          ],
+          dirtyWhen = DirtyWhen,
           path = "Release",
           name = "MinaArtifact${DebianVersions.capitalName debVersion}"
         },
@@ -110,5 +112,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 in
 {
   buster  = pipeline DebianVersions.DebVersion.Buster,
-  stretch = pipeline DebianVersions.DebVersion.Stretch
+  stretch = pipeline DebianVersions.DebVersion.Stretch,
+  dirtyWhen = DirtyWhen
 }

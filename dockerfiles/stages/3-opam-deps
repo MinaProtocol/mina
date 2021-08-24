@@ -10,7 +10,7 @@ FROM toolchain AS opam-deps
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina
 # branch to checkout for opam dependencies
-ARG OPAM_BRANCH=lk86/pipeline-refactor
+ARG OPAM_BRANCH=compatible
 
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
