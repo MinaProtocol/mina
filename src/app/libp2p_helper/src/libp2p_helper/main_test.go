@@ -52,42 +52,39 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
-	// create handler that reads 1<<30 bytes
-	done := make(chan struct{})
-	handler := func(stream net.Stream) {
-		r := bufio.NewReader(stream)
-		i := 0
+	msgSize := uint64(1 << 30)
 
-		for {
-			_, err := r.ReadByte()
-			if err == io.EOF {
-				break
-			}
+	withTimeoutAsync(t, func(done chan interface{}) {
+		// create handler that reads `msgSize` bytes
+		handler := func(stream net.Stream) {
+			r := bufio.NewReader(stream)
+			i := uint64(0)
 
-			i++
-			if i == 1<<30 {
-				close(done)
-				return
+			for {
+				_, err := r.ReadByte()
+				if err == io.EOF {
+					break
+				}
+
+				i++
+				if i == msgSize {
+					close(done)
+					return
+				}
 			}
 		}
-	}
 
-	appB.P2p.Host.SetStreamHandler(testProtocol, handler)
+		appB.P2p.Host.SetStreamHandler(testProtocol, handler)
 
-	// send large message from A to B
-	msg := createMessage(1 << 30)
+		// send large message from A to B
+		msg := createMessage(msgSize)
 
-	stream, err := appA.P2p.Host.NewStream(context.Background(), appB.P2p.Host.ID(), testProtocol)
-	require.NoError(t, err)
+		stream, err := appA.P2p.Host.NewStream(context.Background(), appB.P2p.Host.ID(), testProtocol)
+		require.NoError(t, err)
 
-	_, err = stream.Write(msg)
-	require.NoError(t, err)
-
-	select {
-	case <-time.After(testTimeout):
-		t.Fatal("B did not receive a large message from A")
-	case <-done:
-	}
+		_, err = stream.Write(msg)
+		require.NoError(t, err)
+	}, "B did not receive a large message from A")
 }
 
 func createMessage(size uint64) []byte {
@@ -125,26 +122,17 @@ func TestPeerExchange(t *testing.T) {
 	t.Logf("c=%s", appC.P2p.Host.ID())
 	t.Logf("d=%s", appD.P2p.Host.ID())
 
-	done := make(chan struct{})
-
-	go func() {
+	withTimeout(t, func() {
 		for {
 			// check if appC is connected to appB
 			for _, peer := range appD.P2p.Host.Network().Peers() {
 				if peer == appB.P2p.Host.ID() || peer == appC.P2p.Host.ID() {
-					close(done)
 					return
 				}
 			}
 			time.Sleep(time.Millisecond * 100)
 		}
-	}()
-
-	select {
-	case <-time.After(testTimeout):
-		t.Fatal("D did not connect to B or C via A")
-	case <-done:
-	}
+	}, "D did not connect to B or C via A")
 
 	time.Sleep(time.Second)
 	require.Equal(t, maxCount, len(appA.P2p.Host.Network().Peers()))
@@ -159,11 +147,10 @@ func sendStreamMessage(t *testing.T, from *app, to *app, msg []byte) {
 }
 
 func waitForMessages(t *testing.T, app *app, numExpectedMessages int) [][]byte {
-	done := make(chan struct{})
 	msgStates := make(map[uint64][]byte)
 	receivedMsgs := make([][]byte, 0, numExpectedMessages)
 
-	go (func() {
+	withTimeout(t, func() {
 		awaiting := numExpectedMessages
 		for {
 			rawMsg := <-app.OutChan
@@ -183,7 +170,6 @@ func waitForMessages(t *testing.T, app *app, numExpectedMessages int) [][]byte {
 				receivedMsgs = append(receivedMsgs, msgStates[streamId])
 				awaiting -= 1
 				if awaiting <= 0 {
-					close(done)
 					return
 				}
 			} else if pmsg.HasStreamMessageReceived() {
@@ -199,13 +185,7 @@ func waitForMessages(t *testing.T, app *app, numExpectedMessages int) [][]byte {
 				msgStates[streamId] = append(msgStates[streamId], data...)
 			}
 		}
-	})()
-
-	select {
-	case <-time.After(testTimeout):
-		t.Fatal("did not receive all expected messages")
-	case <-done:
-	}
+	}, "did not receive all expected messages")
 
 	return receivedMsgs
 }
@@ -227,10 +207,8 @@ func TestMplex_SendMultipleMessage(t *testing.T) {
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
-	var streamIdx uint64 = 0
 	handler := func(stream net.Stream) {
-		handleStreamReads(appB, stream, streamIdx)
-		streamIdx++
+		handleStreamReads(appB, stream, appB.NextId())
 	}
 
 	appB.P2p.Host.SetStreamHandler(testProtocol, handler)

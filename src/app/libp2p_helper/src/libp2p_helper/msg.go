@@ -209,7 +209,7 @@ func mkRpcRespSuccess(seqno uint64, f func(*ipc.Libp2pHelperInterface_RpcRespons
 	})
 }
 
-func mkPushMsg(f func(*ipc.DaemonInterface_PushMessage)) *capnp.Message {
+func mkPushMsg(f func(ipc.DaemonInterface_PushMessage)) *capnp.Message {
 	return mkMsg(func(seg *capnp.Segment) {
 		m, err := ipc.NewRootDaemonInterface_Message(seg)
 		panicOnErr(err)
@@ -220,12 +220,12 @@ func mkPushMsg(f func(*ipc.DaemonInterface_PushMessage)) *capnp.Message {
 		ns, err := h.NewTimeSent()
 		panicOnErr(err)
 		setNanoTime(&ns, time.Now())
-		f(&pm)
+		f(pm)
 	})
 }
 
 func mkPeerConnectedUpcall(peerId string) *capnp.Message {
-	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
+	return mkPushMsg(func(m ipc.DaemonInterface_PushMessage) {
 		pc, err := m.NewPeerConnected()
 		panicOnErr(err)
 		pid, err := pc.NewPeerId()
@@ -235,7 +235,7 @@ func mkPeerConnectedUpcall(peerId string) *capnp.Message {
 }
 
 func mkPeerDisconnectedUpcall(peerId string) *capnp.Message {
-	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
+	return mkPushMsg(func(m ipc.DaemonInterface_PushMessage) {
 		pc, err := m.NewPeerDisconnected()
 		panicOnErr(err)
 		pid, err := pc.NewPeerId()
@@ -268,7 +268,7 @@ func setPeerInfo(pi ipc.PeerInfo, info *codaPeerInfo) {
 }
 
 func mkIncomingStreamUpcall(peer *codaPeerInfo, streamIdx uint64, protocol string) *capnp.Message {
-	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
+	return mkPushMsg(func(m ipc.DaemonInterface_PushMessage) {
 		pc, err := m.NewIncomingStream()
 		panicOnErr(err)
 		sid, err := pc.NewStreamId()
@@ -282,7 +282,7 @@ func mkIncomingStreamUpcall(peer *codaPeerInfo, streamIdx uint64, protocol strin
 }
 
 func mkGossipReceivedUpcall(sender *codaPeerInfo, expiration time.Time, seenAt time.Time, data []byte, seqno uint64, subIdx uint64) *capnp.Message {
-	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
+	return mkPushMsg(func(m ipc.DaemonInterface_PushMessage) {
 		gr, err := m.NewGossipReceived()
 		panicOnErr(err)
 
@@ -308,7 +308,7 @@ func mkGossipReceivedUpcall(sender *codaPeerInfo, expiration time.Time, seenAt t
 }
 
 func mkStreamLostUpcall(streamIdx uint64, reason string) *capnp.Message {
-	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
+	return mkPushMsg(func(m ipc.DaemonInterface_PushMessage) {
 		sl, err := m.NewStreamLost()
 		panicOnErr(err)
 		panicOnErr(sl.SetReason(reason))
@@ -319,7 +319,7 @@ func mkStreamLostUpcall(streamIdx uint64, reason string) *capnp.Message {
 }
 
 func mkStreamCompleteUpcall(streamIdx uint64) *capnp.Message {
-	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
+	return mkPushMsg(func(m ipc.DaemonInterface_PushMessage) {
 		sl, err := m.NewStreamComplete()
 		panicOnErr(err)
 		sid, err := sl.NewStreamId()
@@ -329,7 +329,7 @@ func mkStreamCompleteUpcall(streamIdx uint64) *capnp.Message {
 }
 
 func mkStreamMessageReceivedUpcall(streamIdx uint64, data []byte) *capnp.Message {
-	return mkPushMsg(func(m *ipc.DaemonInterface_PushMessage) {
+	return mkPushMsg(func(m ipc.DaemonInterface_PushMessage) {
 		im_, err := m.NewStreamMessageReceived()
 		panicOnErr(err)
 		im, err := im_.NewMsg()
