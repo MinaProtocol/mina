@@ -17,6 +17,20 @@ RUN chmod +x /entrypoint.sh
 # COPY --chown=${UID} puppeteer-context/* /
 # RUN chmod +x /mina_daemon_puppeteer.py /find_puppeteer.sh /start.sh /stop.sh
 
+RUN mkdir /usr/share/man/man7 /usr/share/man/man1
+
+#these are necessary to install BEFORE attempting to install psql-11
+RUN apt-get -y update \
+    && apt-get -y upgrade \
+    && apt-get -y install \
+      wget \
+      lsb-release \
+      gnupg
+
+RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
+  && RELEASE=$(lsb_release -cs) \
+  && echo "deb http://apt.postgresql.org/pub/repos/apt/ ${RELEASE}"-pgdg main | tee /etc/apt/sources.list.d/pgdg.list
+
 # Dependencies
 RUN apt-get -y update \
     && apt-get -y upgrade \
