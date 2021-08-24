@@ -64,6 +64,7 @@ relevant_internal_block_balances AS (
   SELECT
     block_internal_command.block_id,
     block_internal_command.sequence_no,
+    block_internal_command.secondary_sequence_no,
     receiver_balance.balance
   FROM blocks_internal_commands block_internal_command
   INNER JOIN balances receiver_balance ON block_internal_command.receiver_balance = receiver_balance.id
@@ -119,9 +120,9 @@ relevant_user_block_balances AS (
 ),
 
 relevant_block_balances AS (
-  (SELECT block_id, sequence_no, balance FROM relevant_internal_block_balances)
+  (SELECT block_id, sequence_no, secondary_sequence_no, balance FROM relevant_internal_block_balances)
   UNION
-  (SELECT block_id, sequence_no, balance FROM relevant_user_block_balances)
+  (SELECT block_id, sequence_no, 0 AS secondary_sequence_no, balance FROM relevant_user_block_balances)
 )
 
 SELECT
@@ -131,7 +132,7 @@ FROM
 chain
 JOIN relevant_block_balances rbb ON chain.id = rbb.block_id
 WHERE chain.height <= $2
-ORDER BY (chain.height, sequence_no) DESC
+ORDER BY (chain.height, sequence_no, secondary_sequence_no) DESC
 LIMIT 1
       |sql}
 
