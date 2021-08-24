@@ -973,7 +973,7 @@ module Helper = struct
           @@ Time_ns.now () )
           - Int64.to_int_exn m.seen_at
         in
-        [%log' info t.logger]
+        [%log' spam t.logger]
           "Processing gossip message with IPC delay of $delay nanoseconds"
           ~metadata:[("delay", `Int ipc_delay)] ;
         match Hashtbl.find t.subscriptions idx with
