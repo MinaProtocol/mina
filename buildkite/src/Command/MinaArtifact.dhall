@@ -113,5 +113,5 @@ in
 {
   buster  = pipeline DebianVersions.DebVersion.Buster,
   stretch = pipeline DebianVersions.DebVersion.Stretch,
-  dirtyWhen = DirtyWhen
+  dirtyWhen = dirtyWhen
 }
