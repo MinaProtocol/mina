@@ -6,18 +6,31 @@ open O1trace
 let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~collected_transitions ~frontier ~network_transition_reader
     ~producer_transition_reader ~clear_reader ~precomputed_values =
-  let valid_transition_pipe_capacity = 30 in
+  let valid_transition_pipe_capacity = 50 in
   let start_time = Time.now () in
+  let f_drop_head name head =
+    Mina_transition.External_transition.Initial_validated
+    .handle_dropped_transition
+      (Cache_lib.Cached.peek head |> Network_peer.Envelope.Incoming.data)
+      ~pipe_name:name ~logger
+  in
   let valid_transition_reader, valid_transition_writer =
-    Strict_pipe.create ~name:"valid transitions"
-      (Buffered (`Capacity valid_transition_pipe_capacity, `Overflow Crash))
+    let name = "valid transitions" in
+    Strict_pipe.create ~name
+      (Buffered
+         ( `Capacity valid_transition_pipe_capacity
+         , `Overflow (Drop_head (f_drop_head name)) ))
   in
   let primary_transition_pipe_capacity =
     valid_transition_pipe_capacity + List.length collected_transitions
   in
+  (* Ok to drop on overflow- catchup will be triggered if required*)
   let primary_transition_reader, primary_transition_writer =
-    Strict_pipe.create ~name:"primary transitions"
-      (Buffered (`Capacity primary_transition_pipe_capacity, `Overflow Crash))
+    let name = "primary transitions" in
+    Strict_pipe.create ~name
+      (Buffered
+         ( `Capacity primary_transition_pipe_capacity
+         , `Overflow (Drop_head (f_drop_head name)) ))
   in
   let processed_transition_reader, processed_transition_writer =
     Strict_pipe.create ~name:"processed transitions"

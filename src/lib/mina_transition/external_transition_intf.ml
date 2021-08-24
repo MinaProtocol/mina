@@ -316,6 +316,9 @@ module type S = sig
       (external_transition, State_hash.t) With_hash.t * Validation.initial_valid
     [@@deriving compare]
 
+    val handle_dropped_transition :
+      ?pipe_name:string -> logger:Logger.t -> t -> unit
+
     include External_transition_common_intf with type t := t
   end
 
@@ -339,6 +342,9 @@ module type S = sig
 
     val create_unsafe :
       external_transition -> [ `I_swear_this_is_safe_see_my_comment of t ]
+
+    val handle_dropped_transition :
+      ?pipe_name:string -> logger:Logger.t -> t -> unit
 
     include External_transition_base_intf with type t := t
 
