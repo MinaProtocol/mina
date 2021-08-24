@@ -30,12 +30,12 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## How to build your own docker image
 
-Checkout the "lk86/pipeline-refactor" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (2GB is too small, 8GB seems is enough) and then run the following:
+Checkout the "compatible" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (2GB is too small, 8GB seems is enough) and then run the following:
 
 `cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu | docker build -t mina-rosetta:compatible --build-arg "deb_codename=stretch" --build-arg "MINA_BRANCH=compatible" -`
 
 This creates an image (mina-rosetta:compatible) based on the most up-to-date changes that support rosetta. This image
-can be used as a drop-in replacement for `gcr.io/o1labs-192920/coda-rosetta:debug-v1.1` in any of the below commands for testing.
+can be used as a drop-in replacement for `gcr.io/o1labs-192920/mina-rosetta:compatible` in any of the below commands for testing.
 
 ## How to Run
 
@@ -103,23 +103,23 @@ The Construction API is _not_ validated using `rosetta-cli` as this would requir
 
 ### Reproduce agent and rosetta-cli validation
 
-`gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4` and `rosetta-cli @ v0.5.12`
+`gcr.io/o1labs-192920/mina-rosetta:compatible` and `rosetta-cli @ v0.5.12`
 using this [`rosetta.conf`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/rosetta.conf) and the [`bootstrap_balances.json`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/bootstrap_balances.json) next to it.
 
 **Create one of each transaction type using the test-agent and exit**
 
 ```
-$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta-test --entrypoint ./docker-test-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4
+$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-test --entrypoint ./docker-test-start.sh -d gcr.io/o1labs-192920/mina-rosetta:compatible
 
-$ docker logs --follow coda-rosetta-test
+$ docker logs --follow mina-rosetta-test
 ```
 
 **Run a fast sandbox network forever and test with rosetta-cli**
 
 ```
-$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta --entrypoint ./docker-demo-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4
+$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-demo --entrypoint ./docker-demo-start.sh -d gcr.io/o1labs-192920/mina-rosetta:compatible
 
-$ docker logs --follow coda-rosetta
+$ docker logs --follow mina-rosetta-demo
 
 # Wait for a message that looks like:
 #

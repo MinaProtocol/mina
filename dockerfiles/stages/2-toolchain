@@ -20,13 +20,6 @@ ENV OPAMREUSEBUILDDIR=false
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-
-# Pass in deb_codename and workaround postgres man pages only on debian stretch
-ARG deb_codename=stretch
-RUN if test "$deb_codename" = "stretch" ; then \
-      sudo mkdir -p /usr/share/man/man7 /usr/share/man/man1 \
-    else ; exit 0 ; fi
-
 # OS package dependencies
 RUN sudo apt-get update -y \
   && sudo apt-get install -y \
@@ -50,7 +43,6 @@ RUN sudo apt-get update -y \
     libssl-dev \
     lsb-release \
     m4 \
-    man \
     pandoc \
     patchelf \
     postgresql \
