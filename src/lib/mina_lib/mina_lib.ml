@@ -1035,16 +1035,12 @@ let perform_compaction t =
 
 let daemon_start_time = Time_ns.now ()
 
-let check_and_stop_daemon t =
-  let interval_mins = (40 * 60) + (Random.int 16 * 30) in
+let check_and_stop_daemon t ~wait =
   let uptime_mins =
     Time_ns.(diff (now ()) daemon_start_time |> Span.to_min |> Int.of_float)
   in
   let max_catchup_time = Time.Span.of_hr 1. in
-  [%log' info t.config.logger]
-    "Interval minutes $mins Uptime minutes:$uptime_mins "
-    ~metadata:[("mins", `Int interval_mins); ("uptime_mins", `Int uptime_mins)] ;
-  if uptime_mins <= interval_mins then
+  if uptime_mins <= wait then
     `Check_in
       (Block_time.Span.to_time_span
          t.config.precomputed_values.consensus_constants.slot_duration_ms)
@@ -1071,6 +1067,11 @@ let check_and_stop_daemon t =
         else `Check_in wait_for
 
 let stop_long_running_daemon t =
+  let wait_mins = (40 * 60) + (Random.int 10 * 60) in
+  [%log' info t.config.logger]
+    "Stopping daemon after $wait mins and when there are no blocks to be \
+     produced"
+    ~metadata:[("wait", `Int wait_mins)] ;
   let stop_daemon () =
     let uptime_mins =
       Time_ns.(diff (now ()) daemon_start_time |> Span.to_min |> Int.of_float)
@@ -1078,19 +1079,19 @@ let stop_long_running_daemon t =
     [%log' info t.config.logger]
       "Deamon has been running for $uptime mins. Stopping now..."
       ~metadata:[("uptime", `Int uptime_mins)] ;
-    Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for
+    Scheduler.yield ()
+    >>= (fun () -> return (Async.shutdown 1))
+    |> don't_wait_for
   in
   let rec go interval =
     upon (after interval) (fun () ->
-        match check_and_stop_daemon t with
+        match check_and_stop_daemon t ~wait:wait_mins with
         | `Now ->
             stop_daemon ()
         | `Check_in tm ->
             go tm )
   in
-  go
-    (Block_time.Span.to_time_span
-       t.config.precomputed_values.consensus_constants.slot_duration_ms)
+  go (Time.Span.of_ms (wait_mins * 60 * 1000 |> Float.of_int))
 
 let start t =
   let set_next_producer_timing timing consensus_state =
