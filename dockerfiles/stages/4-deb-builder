@@ -23,6 +23,9 @@ ENV MINA_COMMIT_SHA1=${MINA_COMMIT}
 
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
+# Set home directory
+ENV HOME /home/opam
+
 # HACK: build without special cpu features to allow more people to run mina
 RUN ./scripts/zexe-standardize.sh
 

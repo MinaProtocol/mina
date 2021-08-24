@@ -20,6 +20,9 @@ ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
 ENV OPAMKEEPBUILDDIR false
 ENV OPAMREUSEBUILDDIR false
 
+# Set home directory
+ENV HOME /home/opam
+
 # git will clone into an empty dir, but this also helps us set the workdir in advance
 RUN git clone \
   -b "${OPAM_BRANCH}" \

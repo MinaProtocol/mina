@@ -20,6 +20,9 @@ ARG MINA_DIR=mina
 
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
+# Set home directory
+ENV HOME /home/opam
+
 # git will clone into an empty dir, but this also helps us set the workdir in advance
 RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
   && git clone \
