@@ -31,6 +31,8 @@ val time_controller : t -> Block_time.Controller.t
 
 val subscription : t -> Coda_subscriptions.t
 
+val daemon_start_time : Time_ns.t
+
 (** Derived from local state (aka they may not reflect the latest public keys to which you've attempted to change *)
 val block_production_pubkeys : t -> Public_key.Compressed.Set.t
 
