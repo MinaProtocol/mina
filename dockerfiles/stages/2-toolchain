@@ -43,7 +43,6 @@ RUN sudo apt-get update -y \
     libssl-dev \
     lsb-release \
     m4 \
-    man \
     pandoc \
     patchelf \
     postgresql \

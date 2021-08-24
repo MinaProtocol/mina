@@ -29,7 +29,6 @@ RUN apt-get -y update \
     libssl1.1 \
     postgresql \
     postgresql-contrib \
-    man \
     tzdata
 
 RUN if test "$deb_codename" = "buster" ; then \
