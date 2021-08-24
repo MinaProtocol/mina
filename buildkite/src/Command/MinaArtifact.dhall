@@ -13,7 +13,7 @@ let Size = ./Size.dhall
 let Libp2p = ./Libp2pHelperBuild.dhall
 let DockerImage = ./DockerImage.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
-let DirtyWhen = [
+let dirtyWhen = [
   S.strictlyStart (S.contains "src"),
   S.strictlyStart (S.contains "automation"),
   S.strictly (S.contains "Makefile"),
@@ -31,7 +31,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
     Pipeline.Config::{
       spec =
         JobSpec::{
-          dirtyWhen = DirtyWhen,
+          dirtyWhen = dirtyWhen,
           path = "Release",
           name = "MinaArtifact${DebianVersions.capitalName debVersion}"
         },
