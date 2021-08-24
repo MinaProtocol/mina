@@ -120,7 +120,7 @@ func (app *app) handleBeginAdvertising(seqno uint64, m ipc.Libp2pHelperInterface
 
 		id := c.RemotePeer()
 
-		app.writeMsg(mkPeerDisconnectedUpcall(peer.Encode(id)))
+		app.writeMsg(mkPeerConnectedUpcall(peer.Encode(id)))
 	}
 
 	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
@@ -128,7 +128,7 @@ func (app *app) handleBeginAdvertising(seqno uint64, m ipc.Libp2pHelperInterface
 
 		id := c.RemotePeer()
 
-		app.writeMsg(mkPeerConnectedUpcall(peer.Encode(id)))
+		app.writeMsg(mkPeerDisconnectedUpcall(peer.Encode(id)))
 	}
 
 	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {

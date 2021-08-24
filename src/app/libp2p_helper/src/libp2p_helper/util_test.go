@@ -14,8 +14,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	net "github.com/libp2p/go-libp2p-core/network"
-	peer "github.com/libp2p/go-libp2p-core/peer"
-	protocol "github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/protocol"
 
 	"github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
@@ -155,12 +155,44 @@ func checkRpcResponseSuccess(t *testing.T, resMsg *capnp.Message) (uint64, ipc.L
 	return seqno, respSuccess
 }
 
-func mkPeerInfo(t *testing.T, app *app, appPort uint16) codaPeerInfo {
-	expectedHost, err := app.P2p.Host.Addrs()[0].ValueForProtocol(4)
+func mkPeerInfo(t *testing.T, host host.Host, port uint16) codaPeerInfo {
+	expectedHost, err := host.Addrs()[0].ValueForProtocol(4)
 	require.NoError(t, err)
 	return codaPeerInfo{
-		Libp2pPort: appPort,
+		Libp2pPort: port,
 		Host:       expectedHost,
-		PeerID:     app.P2p.Host.ID().String(),
+		PeerID:     host.ID().String(),
+	}
+}
+
+func beginAdvertisingSendAndCheck(t *testing.T, app *app) {
+	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+	require.NoError(t, err)
+	m, err := ipc.NewRootLibp2pHelperInterface_BeginAdvertising_Request(seg)
+	require.NoError(t, err)
+	var rpcSeqno uint64 = 123
+	resMsg := app.handleBeginAdvertising(rpcSeqno, m)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	require.Equal(t, seqno, rpcSeqno)
+	require.True(t, respSuccess.HasBeginAdvertising())
+	_, err = respSuccess.BeginAdvertising()
+	require.NoError(t, err)
+}
+
+func withTimeout(t *testing.T, run func(), timeoutMsg string) {
+	withTimeoutAsync(t, func(done chan interface{}) {
+		defer close(done)
+		run()
+	}, timeoutMsg)
+}
+
+func withTimeoutAsync(t *testing.T, registerDone func(done chan interface{}), timeoutMsg string) {
+	done := make(chan interface{})
+	go registerDone(done)
+	select {
+	case <-time.After(testTimeout):
+		close(done)
+		t.Fatal(timeoutMsg)
+	case <-done:
 	}
 }

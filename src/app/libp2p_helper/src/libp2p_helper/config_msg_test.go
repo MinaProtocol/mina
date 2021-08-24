@@ -24,20 +24,6 @@ func maToStringList(vs []ma.Multiaddr) []string {
 	return vsm
 }
 
-func beginAdvertisingSendAndCheck(t *testing.T, app *app) {
-	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
-	require.NoError(t, err)
-	m, err := ipc.NewRootLibp2pHelperInterface_BeginAdvertising_Request(seg)
-	require.NoError(t, err)
-	var rpcSeqno uint64 = 123
-	resMsg := app.handleBeginAdvertising(rpcSeqno, m)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
-	require.Equal(t, seqno, rpcSeqno)
-	require.True(t, respSuccess.HasBeginAdvertising())
-	_, err = respSuccess.BeginAdvertising()
-	require.NoError(t, err)
-}
-
 /*
   Tests for BeginAdvertising message and
   various discovery mechanisms
@@ -86,27 +72,18 @@ func TestDHTDiscovery_ThreeNodes(t *testing.T) {
 	beginAdvertisingSendAndCheck(t, appB)
 	beginAdvertisingSendAndCheck(t, appC)
 
-	done := make(chan struct{})
-
-	go func() {
+	withTimeout(t, func() {
 		for {
 			// check if peerB knows about peerC
 			addrs := appB.P2p.Host.Peerstore().Addrs(appC.P2p.Host.ID())
 			if len(addrs) != 0 {
 				// send a stream message
 				// then exit
-				close(done)
 				return
 			}
 			time.Sleep(time.Millisecond * 100)
 		}
-	}()
-
-	select {
-	case <-time.After(testTimeout):
-		t.Fatal("B did not discover C via DHT")
-	case <-done:
-	}
+	}, "B did not discover C via DHT")
 
 	time.Sleep(time.Second)
 }
@@ -124,25 +101,16 @@ func TestMDNSDiscovery(t *testing.T) {
 	beginAdvertisingSendAndCheck(t, appB)
 	beginAdvertisingSendAndCheck(t, appA)
 
-	done := make(chan struct{})
-
-	go func() {
+	withTimeout(t, func() {
 		for {
 			// check if peerB knows about peerA
 			addrs := appB.P2p.Host.Peerstore().Addrs(appA.P2p.Host.ID())
 			if len(addrs) != 0 {
-				close(done)
 				return
 			}
 			time.Sleep(time.Millisecond * 100)
 		}
-	}()
-
-	select {
-	case <-time.After(testTimeout):
-		t.Fatal("B did not discover A via mDNS")
-	case <-done:
-	}
+	}, "B did not discover A via mDNS")
 
 	time.Sleep(time.Second * 3)
 }

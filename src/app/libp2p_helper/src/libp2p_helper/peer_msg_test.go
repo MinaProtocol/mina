@@ -8,18 +8,13 @@ import (
 	"codanet"
 
 	capnp "capnproto.org/go/capnp/v3"
-	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peerstore"
 	ipc "libp2p_ipc"
 )
 
-func testAddPeerImpl(t *testing.T) (*app, uint16, *app) {
-	appA, appAPort := newTestApp(t, nil, true)
-	appAInfos, err := addrInfos(appA.P2p.Host)
-	require.NoError(t, err)
-
-	appB, _ := newTestApp(t, appAInfos, true)
-
-	addr := fmt.Sprintf("%s/p2p/%s", appAInfos[0].Addrs[0], appAInfos[0].ID)
+func testAddPeerImplDo(t *testing.T, appB *app, info peer.AddrInfo, isSeed bool) {
+	addr := fmt.Sprintf("%s/p2p/%s", info.Addrs[0], info.ID)
 
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	require.NoError(t, err)
@@ -28,7 +23,7 @@ func testAddPeerImpl(t *testing.T) (*app, uint16, *app) {
 	ma, err := m.NewMultiaddr()
 	require.NoError(t, err)
 	require.NoError(t, ma.SetRepresentation(addr))
-	m.SetIsSeed(false)
+	m.SetIsSeed(isSeed)
 
 	var mRpcSeqno uint64 = 2000
 	resMsg := appB.handleAddPeer(mRpcSeqno, m)
@@ -37,6 +32,16 @@ func testAddPeerImpl(t *testing.T) (*app, uint16, *app) {
 	require.True(t, respSuccess.HasAddPeer())
 	_, err = respSuccess.AddPeer()
 	require.NoError(t, err)
+}
+
+func testAddPeerImpl(t *testing.T) (*app, uint16, *app) {
+	appA, appAPort := newTestApp(t, nil, true)
+	appAInfos, err := addrInfos(appA.P2p.Host)
+	require.NoError(t, err)
+
+	appB, _ := newTestApp(t, appAInfos, true)
+
+	testAddPeerImplDo(t, appB, appAInfos[0], false)
 
 	addrs := appB.P2p.Host.Peerstore().Addrs(appA.P2p.Host.ID())
 	require.NotEqual(t, 0, len(addrs))
@@ -73,7 +78,7 @@ func TestFindPeer(t *testing.T) {
 	actual, err := readPeerInfo(res)
 	require.NoError(t, err)
 
-	expected := mkPeerInfo(t, appA, appAPort)
+	expected := mkPeerInfo(t, appA.P2p.Host, appAPort)
 	require.Equal(t, expected, *actual)
 }
 
@@ -142,6 +147,6 @@ func TestListPeers(t *testing.T) {
 	actual, err := readPeerInfo(res.At(0))
 	require.NoError(t, err)
 
-	expected := mkPeerInfo(t, appA, appAPort)
+	expected := mkPeerInfo(t, appA.P2p.Host, appAPort)
 	require.Equal(t, expected, *actual)
 }
