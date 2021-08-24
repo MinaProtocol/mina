@@ -4,6 +4,10 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2021/08/24:
+
+- Update docker image links and outdated coda references
+
 2021/08/13:
 
 - Updated Rosetta spec to v1.4.9
