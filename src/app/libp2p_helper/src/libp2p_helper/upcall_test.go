@@ -120,7 +120,29 @@ func TestUpcalls(t *testing.T) {
 		testStreamOpenSendClose(t, appA, appAPort, appB, appBPort, 11900, newProtocol, aTrap, bTrap)
 		testStreamOpenSendClose(t, appB, appBPort, appA, appAPort, 11910, newProtocol, bTrap, aTrap)
 
+		/* Stream 2 */
+		testStreamOpenSendReset(t, appA, appAPort, appB, appBPort, 11920, newProtocol, aTrap, bTrap)
+		//testStreamOpenSendReset(t, appB, appBPort, appA, appAPort, 11910, newProtocol, bTrap, aTrap)
+
 	}, "test upcalls: some of upcalls didn't happen")
+}
+
+func testStreamOpenSendReset(t *testing.T, appA *app, appAPort uint16, appB *app, appBPort uint16, rpcSeqno uint64, protocol string, aTrap *upcallTrap, bTrap *upcallTrap) {
+	aPI := mkPeerInfo(t, appA.P2p.Host, appAPort)
+
+	// Alice opens stream to Bob
+	streamId := testOpenStreamDo(t, appA, appB.P2p.Host, appBPort, rpcSeqno, protocol)
+	checkIncomingStream(t, <-bTrap.IncomingStream, streamId, aPI, protocol)
+
+	// Bob sends a message to Alice
+	msg := []byte("msg")
+	testSendStreamDo(t, appB, streamId, msg, rpcSeqno+1)
+	checkStreamMessageReceived(t, <-aTrap.StreamMessageReceived, streamId, msg)
+
+	// Alice closes the stream
+	testResetStreamDo(t, appA, streamId, rpcSeqno+2)
+	checkStreamLost(t, <-aTrap.StreamLost, streamId, "read failure: stream reset")
+	checkStreamLost(t, <-bTrap.StreamLost, streamId, "read failure: stream reset")
 }
 
 func testStreamOpenSendClose(t *testing.T, appA *app, appAPort uint16, appB *app, appBPort uint16, rpcSeqno uint64, protocol string, aTrap *upcallTrap, bTrap *upcallTrap) {
