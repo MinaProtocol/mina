@@ -574,7 +574,7 @@ module Fee_transfer = struct
   end
 
   type t =
-    {kind: Kind.t; receiver_id: int; fee: int; token: int64; hash: string}
+    {kind: Kind.t; receiver_id: int; fee: int64; token: int64; hash: string}
 
   let typ =
     let encode t =
@@ -594,7 +594,7 @@ module Fee_transfer = struct
       in
       Ok {kind; receiver_id; fee; token; hash}
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int int64) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
@@ -623,13 +623,13 @@ module Fee_transfer = struct
              |sql})
           { kind
           ; receiver_id
-          ; fee= Fee_transfer.Single.fee t |> Currency.Fee.to_int
+          ; fee= Fee_transfer.Single.fee t |> Currency.Fee.to_uint64 |> Unsigned.UInt64.to_int64
           ; token= Token_id.to_string t.fee_token |> Int64.of_string
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
 end
 
 module Coinbase = struct
-  type t = {receiver_id: int; amount: int; hash: string}
+  type t = {receiver_id: int; amount: int64; hash: string}
 
   let coinbase_typ = "coinbase"
 
@@ -645,7 +645,7 @@ module Coinbase = struct
     let decode ((_, receiver_id, amount, _), hash) =
       Ok {receiver_id; amount; hash}
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int int64) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : Coinbase.t) =
@@ -670,7 +670,7 @@ module Coinbase = struct
                    RETURNING id
              |sql})
           { receiver_id
-          ; amount= Coinbase.amount t |> Currency.Amount.to_int
+          ; amount= Coinbase.amount t |> Currency.Amount.to_uint64 |> Unsigned.UInt64.to_int64
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
 end
 
