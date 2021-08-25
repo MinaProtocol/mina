@@ -10,7 +10,6 @@ FROM gcr.io/o1labs-192920/mina-rosetta-builder
 USER root
 
 #install devnet mina
-RUN mkdir /usr/share/man/man7 /usr/share/man/man1
 RUN apt-get -y update && apt-get -y install man
 RUN apt-get update && apt-get install -y apt-transport-https ca-certificates postgresql-client-9.6 postgresql-9.6 postgresql-contrib-9.6
 
