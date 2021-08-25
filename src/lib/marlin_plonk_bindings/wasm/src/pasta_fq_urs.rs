@@ -119,8 +119,9 @@ pub fn caml_pasta_fq_urs_lagrange_commitment(
             let evals = (0..domain_size)
                 .map(|j| if i == j { Fq::one() } else { Fq::zero() })
                 .collect();
+            let log2_size = (domain_size as u32).trailing_zeros() as usize;
             let p = Evaluations::<Fq>::from_vec_and_domain(evals, x_domain).interpolate();
-            Ok((*urs).commit_non_hiding(&p, None).into())
+            Ok((*urs).trim(log2_size).commit_non_hiding(&p, None).into())
         }
     }
 }
@@ -135,8 +136,9 @@ pub fn caml_pasta_fq_urs_commit_evaluations(
         None => Err(JsValue::from_str("caml_pasta_fq_urs_commit_evaluations")),
         Some(x_domain) => {
             let evals = Into::<Vec<WasmPastaFq>>::into(evals).into_iter().map(|x| x.0).collect();
+            let log2_size = (domain_size as u32).trailing_zeros() as usize;
             let p = Evaluations::<Fq>::from_vec_and_domain(evals, x_domain).interpolate();
-            Ok((*urs).commit_non_hiding(&p, None).into())
+            Ok((*urs).trim(log2_size).commit_non_hiding(&p, None).into())
         }
     }
 }
@@ -149,7 +151,8 @@ pub fn caml_pasta_fq_urs_b_poly_commitment(
     let chals: Vec<Fq> = Into::<Vec<WasmPastaFq>>::into(chals).into_iter().map(|x| x.0).collect();
     let coeffs = b_poly_coefficients(&chals);
     let p = DensePolynomial::<Fq>::from_coefficients_vec(coeffs);
-    Ok((*urs).commit_non_hiding(&p, None).into())
+    let log2_size = chals.len();
+    Ok((*urs).trim(log2_size).commit_non_hiding(&p, None).into())
 }
 
 #[wasm_bindgen]
