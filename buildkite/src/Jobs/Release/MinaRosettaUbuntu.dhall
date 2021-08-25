@@ -36,7 +36,7 @@ Pipeline.build
 
       -- mina-rosetta-ubuntu Ubuntu Rosetta image
       let rosettaUbuntuSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn
+        deps=dependsOn,
         service="mina-rosetta-ubuntu",
         deb_codename="stretch",
         extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO}",
