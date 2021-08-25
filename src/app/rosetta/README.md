@@ -4,6 +4,13 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2021/08/24:
+
+- Update docker image links and outdated coda references
+- Support mainnet configuration with docker-start.sh and move devnet setup to docker-devnet-start.sh
+- Include mainnet mina binaries AND devnet mina binaries (as mina-dev and rosetta-dev)
+- Include the mina-rosetta-test-agent for running our internal test suite
+
 2021/08/13:
 
 - Updated Rosetta spec to v1.4.9
@@ -43,12 +50,13 @@ The container includes 4 scripts in /rosetta which run a different set of servic
 - `docker-standalone-start.sh` is the most straightforward, it starts only the mina-rosetta API endpoint and any flags passed into the script go to mina-rosetta.
 - `docker-demo-start.sh` launches a mina node with a very simple 1-address genesis ledger as a sandbox for developing and playing around in. This script starts the full suite of tools (a mina node, mina-archive, a postgresql DB, and mina-rosetta), but for a demo network with all operations occuring inside this container and no external network activity.
 - `docker-test-start.sh` launches the same demo network as in demo-start.sh but also launches the mina-rosetta-test-agent to run a suite of tests against the rosetta API.
-- Finally, the default, `docker-start.sh`, which connects the mina node to our [Devnet](https://docs.minaprotocol.com/en/advanced/connecting-devnet) network with an empty archive database. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/compatible/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
+- The default, `docker-start.sh`, which connects the mina node to our [Mainnet](https://docs.minaprotocol.com/en/using-mina/connecting) network with an empty archive database. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/compatible/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
+- Finally, the previous default, `docker-devnet-start.sh`, which connects the mina node to our [Devnet](https://docs.minaprotocol.com/en/advanced/connecting-devnet) network with an empty archive database. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/compatible/src/app/rosetta/docker-devnet-start.sh) for more information about what you can configure and how.
 
-For example, to run the `docker.start.sh` and connect to the live devnet (note, you will need tens of minutes to synchronize to the tip):
+For example, to run the `docker-devnet-start.sh` and connect to the live devnet (note, you will need tens of minutes to synchronize to the tip):
 
 ```
-docker run -it --rm --name rosetta --entrypoint=./docker-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 gcr.io/o1labs-192920/mina-rosetta:compatible
+docker run -it --rm --name rosetta --entrypoint=./docker-devnet-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 gcr.io/o1labs-192920/mina-rosetta:compatible
 ```
 
 * Port 10101 is the default P2P port and must be exposed to the open internet
@@ -67,7 +75,7 @@ Any queries that rely on historical data will fail until the archive database is
 
 ### Network names
 
-Networks supported are `rosetta-demo`, `devnet`, and `mainnet`. Currently, the rosetta implementation does not distinguish between these networks, but this will change in the future. The default entrypoint script, `docker-start.sh` runs a mina daemon connected to the [Devnet](https://docs.minaprotocol.com/en/advanced/connecting-devnet) network with an empty archive node and the rosetta api. Additionally, there is a built-in entrypoint script for `rosetta-demo` called `docker-demo-start.sh` which runs a sandboxed node with a simple genesis ledger with one keypair, attaches it to an archive-node and postgres database, and launches the rosetta-api so you can make queries against it. No entrypoint script is provided for mainnet at this time but the mina-daemon package for mainnet does include mina-rosetta.
+Networks supported are `rosetta-demo`, `devnet`, and `mainnet`. Currently, the rosetta implementation does not distinguish between these networks, but this will change in the future. The default entrypoint script, `docker-start.sh` runs a mina daemon connected to the Mina [Mainnet](https://docs.minaprotocol.com/en/using-mina/connecting) network with an empty archive node and the rosetta api. To connect to our [Devnet](https://docs.minaprotocol.com/en/advanced/connecting-devnet) network, the `docker-devnet-start.sh` entrypoint is provided and it functions identically to `docker-start.sh` except for Devnet. Additionally, there is a built-in entrypoint script for `rosetta-demo` called `docker-demo-start.sh` which runs a sandboxed node with a simple genesis ledger with one keypair, attaches it to an archive-node and postgres database, and launches the rosetta-api so you can make queries against it.
 
 ### Operation Statuses
 
@@ -88,7 +96,7 @@ The following supported transactions on devnet and mainnet for the Construction 
 ## Future Work and Known Issues
 
 - On a live network, in order to work with historical data, you must _sync your archive node_ if you join the network after the genesis block. Some Rosetta endpoints depend on this functionality. Instructions to be provided.
-- On devnet, there are still a handful of edge cases preventing full reconcilliation that are being worked through
+- On devnet and mainnet there are still a handful of edge cases preventing full reconcilliation that are being worked through
 - There are several references to "coda" instead of the new name "mina"
 - Not fully robust to crashes on adversarial input
 

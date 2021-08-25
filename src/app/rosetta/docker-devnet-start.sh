@@ -27,8 +27,8 @@ trap cleanup EXIT
 # Setup and export useful variables/defaults
 export MINA_PRIVKEY_PASS=""
 export MINA_LIBP2P_HELPER_PATH=/usr/local/bin/libp2p_helper
-export MINA_CONFIG_FILE=${MINA_CONFIG_FILE:=/genesis_ledgers/mainnet.json}
-export PEER_LIST_URL=${PEER_LIST_URL:=https://storage.googleapis.com/seed-lists/mainnet_seeds.txt}
+export MINA_CONFIG_FILE=${MINA_CONFIG_FILE:=/genesis_ledgers/devnet.json}
+export PEER_LIST_URL=${PEER_LIST_URL:=https://storage.googleapis.com/seed-lists/devnet_seeds.txt}
 # Allows configuring the port that each service runs on.
 # To connect to a network, the MINA_DAEMON_PORT needs to be publicly accessible.
 # To interact with rosetta, use MINA_ROSETTA_PORT
@@ -52,7 +52,7 @@ sleep 3
 
 # Rosetta
 echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
-mina-rosetta \
+mina-rosetta-dev \
   --archive-uri "${PG_CONN}" \
   --graphql-uri http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
   --log-level ${LOG_LEVEL} \
@@ -76,9 +76,9 @@ sleep 6
 
 # Daemon
 # Use MINA_CONFIG_FILE=/genesis_ledgers/mainnet.json to run on mainnet
-echo "========================= STARTING DAEMON connected to MAINNET with GRAPQL on PORT ${MINA_GRAPHQL_PORT}==========================="
+echo "========================= STARTING DAEMON connected to DEVNET with GRAPQL on PORT ${MINA_GRAPHQL_PORT}==========================="
 echo "MINA Flags: $MINA_FLAGS -config-file ${MINA_CONFIG_FILE}"
-mina daemon \
+mina-dev daemon \
   --config-file ${MINA_CONFIG_FILE} \
   ${MINA_FLAGS} $@ &
 
