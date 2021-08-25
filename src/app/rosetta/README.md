@@ -51,6 +51,7 @@ For example, to run the `docker.start.sh` and connect to the live devnet (note, 
 docker run -it --rm --name rosetta --entrypoint=./docker-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 gcr.io/o1labs-192920/mina-rosetta:compatible
 ```
 
+* Port 10101 is the default P2P port and must be exposed to the open internet
 * The GraphQL API runs on port 3085 (accessible via `localhost:3085/graphql`)
 * PostgreSQL runs on port 3086
 * Rosetta runs on port 3087
@@ -86,7 +87,7 @@ The following supported transactions on devnet and mainnet for the Construction 
 
 ## Future Work and Known Issues
 
-- On a live network, you must _sync your archive node_ if you join the network after the genesis block. Instructions to be provided.
+- On a live network, in order to work with historical data, you must _sync your archive node_ if you join the network after the genesis block. Some Rosetta endpoints depend on this functionality. Instructions to be provided.
 - On devnet, there are still a handful of edge cases preventing full reconcilliation that are being worked through
 - There are several references to "coda" instead of the new name "mina"
 - Not fully robust to crashes on adversarial input
