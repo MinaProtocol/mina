@@ -27,7 +27,7 @@ Pipeline.build
           S.strictlyStart (S.contains "dockerfiles/stages/3-"),
           S.strictlyStart (S.contains "dockerfiles/stages/4-"),
           S.strictlyStart (S.contains "dockerfiles/stages/5-"),
-          S.strictlyStart (S.contains "src/app/rosetta"),
+          S.strictlyStart (S.contains "src/app/rosetta")
         ],
         path = "Release",
         name = "MinaRosettaUbuntu"
