@@ -456,7 +456,7 @@ module Failure = struct
     end
 
     (** Canonical representation for user command failures in snarky.
-    
+
         This bundles some useful accumulators with the underlying record to
         enable us to do a cheap checking operation. The type is private to
         ensure that the invariants of this check are always satisfied.
@@ -689,6 +689,18 @@ module Balance_data = struct
       let to_latest = Fn.id
     end
   end]
+
+  let _ =
+    let layout = Stable.Latest.bin_layout_t in
+    let layout_compressed =
+      { layout with
+        bin_prot_rule=
+          Ppx_version_runtime.Bin_prot_rule.compress_references
+            layout.bin_prot_rule }
+    in
+    Format.eprintf "BALANCE DATA LAYOUT: %s@."
+      ( Ppx_version_runtime.Bin_prot_layout.to_yojson layout_compressed
+      |> Yojson.Safe.pretty_to_string )
 
   let empty =
     {fee_payer_balance= None; source_balance= None; receiver_balance= None}
