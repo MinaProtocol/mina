@@ -78,8 +78,7 @@ func TestFindPeer(t *testing.T) {
 	actual, err := readPeerInfo(res)
 	require.NoError(t, err)
 
-	expected := mkPeerInfo(t, appA.P2p.Host, appAPort)
-	require.Equal(t, expected, *actual)
+	checkPeerInfo(t, actual, appA.P2p.Host, appAPort)
 }
 
 func TestGetPeerNodeStatus(t *testing.T) {
@@ -147,6 +146,5 @@ func TestListPeers(t *testing.T) {
 	actual, err := readPeerInfo(res.At(0))
 	require.NoError(t, err)
 
-	expected := mkPeerInfo(t, appA.P2p.Host, appAPort)
-	require.Equal(t, expected, *actual)
+	checkPeerInfo(t, actual, appA.P2p.Host, appAPort)
 }

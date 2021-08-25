@@ -9,15 +9,7 @@ import (
 	ipc "libp2p_ipc"
 )
 
-func TestPublish(t *testing.T) {
-	var err error
-	testApp, _ := newTestApp(t, nil, true)
-	testApp.P2p.Pubsub, err = pubsub.NewGossipSub(testApp.Ctx, testApp.P2p.Host)
-	require.NoError(t, err)
-
-	topic := "testtopic"
-	data := []byte("testdata")
-
+func testPublishDo(t *testing.T, app *app, topic string, data []byte, rpcSeqno uint64) {
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	require.NoError(t, err)
 	m, err := ipc.NewRootLibp2pHelperInterface_Publish_Request(seg)
@@ -25,15 +17,48 @@ func TestPublish(t *testing.T) {
 	require.NoError(t, m.SetTopic(topic))
 	require.NoError(t, m.SetData(data))
 
-	resMsg := testApp.handlePublish(39, m)
+	resMsg := app.handlePublish(rpcSeqno, m)
 	require.NoError(t, err)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
-	require.Equal(t, seqno, uint64(39))
+	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasPublish())
 	_, err = respSuccess.Publish()
 	require.NoError(t, err)
 
-	_, has := testApp.Topics[topic]
+	_, has := app.Topics[topic]
+	require.True(t, has)
+}
+
+func TestPublish(t *testing.T) {
+	var err error
+	testApp, _ := newTestApp(t, nil, true)
+	testApp.P2p.Pubsub, err = pubsub.NewGossipSub(testApp.Ctx, testApp.P2p.Host)
+	require.NoError(t, err)
+
+	testPublishDo(t, testApp, "testtopic", []byte("testdata"), 48)
+}
+
+func testSubscribeDo(t *testing.T, app *app, topic string, subId uint64, rpcSeqno uint64) {
+	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+	require.NoError(t, err)
+	m, err := ipc.NewRootLibp2pHelperInterface_Subscribe_Request(seg)
+	require.NoError(t, err)
+	require.NoError(t, m.SetTopic(topic))
+	sid, err := m.NewSubscriptionId()
+	require.NoError(t, err)
+	sid.SetId(subId)
+
+	resMsg := app.handleSubscribe(rpcSeqno, m)
+	require.NoError(t, err)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	require.Equal(t, seqno, rpcSeqno)
+	require.True(t, respSuccess.HasSubscribe())
+	_, err = respSuccess.Subscribe()
+	require.NoError(t, err)
+
+	_, has := app.Topics[topic]
+	require.True(t, has)
+	_, has = app.Subs[subId]
 	require.True(t, has)
 }
 
@@ -46,27 +71,8 @@ func testSubscribeImpl(t *testing.T) (*app, string, uint64) {
 	topic := "testtopic"
 	idx := uint64(21)
 
-	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
-	require.NoError(t, err)
-	m, err := ipc.NewRootLibp2pHelperInterface_Subscribe_Request(seg)
-	require.NoError(t, err)
-	require.NoError(t, m.SetTopic(topic))
-	sid, err := m.NewSubscriptionId()
-	require.NoError(t, err)
-	sid.SetId(idx)
+	testSubscribeDo(t, testApp, topic, idx, 58)
 
-	resMsg := testApp.handleSubscribe(59, m)
-	require.NoError(t, err)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
-	require.Equal(t, seqno, uint64(59))
-	require.True(t, respSuccess.HasSubscribe())
-	_, err = respSuccess.Subscribe()
-	require.NoError(t, err)
-
-	_, has := testApp.Topics[topic]
-	require.True(t, has)
-	_, has = testApp.Subs[idx]
-	require.True(t, has)
 	return testApp, topic, idx
 }
 
