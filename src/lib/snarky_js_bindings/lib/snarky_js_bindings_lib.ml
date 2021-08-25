@@ -23,11 +23,6 @@ class type field_class =
   object
     method value : Impl.Field.t Js.prop
 
-    method toBits : bool_class Js.t Js.js_array Js.t Js.meth
-
-    method toBits_length :
-      int Js.Optdef.t -> bool_class Js.t Js.js_array Js.t Js.meth
-
     method toString : Js.js_string Js.t Js.meth
 
     method toJSON : < .. > Js.t Js.meth
@@ -211,6 +206,23 @@ let method_ class_ (name : string) (f : _ Js.t -> _) =
   let prototype = Js.Unsafe.get class_ (Js.string "prototype") in
   Js.Unsafe.set prototype (Js.string name) (Js.wrap_meth_callback f)
 
+let optdef_arg_method (type a) class_ (name : string)
+    (f : _ Js.t -> a Js.Optdef.t -> _) =
+  let prototype = Js.Unsafe.get class_ (Js.string "prototype") in
+  let meth =
+    let wrapper =
+      Js.Unsafe.eval_string
+        {js|
+        (function(f) {
+          return function(xOptdef) {
+            return f(this, xOptdef);
+          };
+        })|js}
+    in
+    Js.Unsafe.(fun_call wrapper [| inject (Js.wrap_callback f) |])
+  in
+  Js.Unsafe.set prototype (Js.string name) meth
+
 let () =
   let method_ name (f : field_class Js.t -> _) = method_ field_class name f in
   let to_string (x : Field.t) =
@@ -286,7 +298,7 @@ let () =
   method_ "isZero" (fun this : bool_class Js.t ->
       new%js bool_constr
         (As_bool.of_boolean (Field.equal this##.value Field.zero))) ;
-  method_ "toBits"
+  optdef_arg_method field_class "toBits"
     (fun this (length : int Js.Optdef.t) : bool_class Js.t Js.js_array Js.t ->
       let length = Js.Optdef.get length (fun () -> Field.size_in_bits) in
       let k f bits =
@@ -358,20 +370,33 @@ let () =
   field_class##.ofBits :=
     Js.wrap_callback
       (fun (bs : As_bool.t Js.js_array Js.t) : field_class Js.t ->
-        mk
-          (Field.pack
-             (List.init bs##.length ~f:(fun i ->
-                  Js.Optdef.case (Js.array_get bs i)
-                    (fun () -> assert false)
-                    As_bool.value)))) ;
-  field_class##.toBits :=
-    Js.wrap_callback
-      (fun
-        (x : As_field.t)
-        (length : int Js.Optdef.t)
-        :
-        bool_class Js.t Js.js_array Js.t
-      -> (As_field.to_field_obj x)##toBits_length length) ;
+        try
+          Array.map (Js.to_array bs) ~f:(fun b ->
+              match (As_bool.value b :> Impl.Field.t) with
+              | Constant b ->
+                  Impl.Field.Constant.(equal one b)
+              | _ ->
+                  failwith "non-constant")
+          |> Array.to_list |> Field.Constant.project |> Field.constant |> mk
+        with _ ->
+          mk
+            (Field.pack
+               (List.init bs##.length ~f:(fun i ->
+                    Js.Optdef.case (Js.array_get bs i)
+                      (fun () -> assert false)
+                      As_bool.value)))) ;
+  (field_class##.toBits :=
+     let wrapper =
+       Js.Unsafe.eval_string
+         {js|
+          (function(toField) {
+            return function(x, length) {
+              return toField(x).toBits(length);
+            };
+          })|js}
+     in
+     Js.Unsafe.(
+       fun_call wrapper [| inject (Js.wrap_callback As_field.to_field_obj) |])) ;
   field_class##.equal :=
     Js.wrap_callback (fun (x : As_field.t) (y : As_field.t) : bool_class Js.t ->
         new%js bool_constr
@@ -380,6 +405,12 @@ let () =
   let static_method name f =
     Js.Unsafe.set field_class (Js.string name) (Js.wrap_callback f)
   in
+  static_method "toConstant"
+    (fun (this : field_class Js.t) : field_class Js.t ->
+      let x =
+        match this##.value with Constant x -> x | x -> As_prover.read_var x
+      in
+      mk (Field.constant x)) ;
   method_ "toJSON" (fun (this : field_class Js.t) : < .. > Js.t ->
       this##toString) ;
   static_method "toJSON" (fun (this : field_class Js.t) : < .. > Js.t ->
@@ -447,9 +478,11 @@ let () =
       match (this##.value :> Field.t) with
       | Constant x ->
           Js.bool Field.Constant.(equal one x)
-      | _ ->
-          raise_errorf
-            "Bool.toBoolean can only be called on non-witness values.") ;
+      | _ -> (
+          try Js.bool (As_prover.read Boolean.typ this##.value)
+          with _ ->
+            raise_errorf
+              "Bool.toBoolean can only be called on non-witness values." )) ;
   method_ "sizeInFieldElements" (fun _this : int -> 1) ;
   method_ "toString" (fun this ->
       let x =
@@ -1302,6 +1335,9 @@ module Circuit = struct
           res
       end
     in
+    circuit##.asProver :=
+      Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->
+          as_prover (fun () -> Js.Unsafe.fun_call f [||])) ;
     circuit##.witness := Js.wrap_callback witness ;
     circuit##.array := Js.wrap_callback array ;
     circuit##.generateKeypair :=
