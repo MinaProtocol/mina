@@ -135,7 +135,6 @@ module Internal_command_info = struct
                 ; coin_change= None
                 ; metadata= None }
           | `Fee_receiver_inc ->
-            let `Pk pk = t.receiver in
             M.return
                 { Operation.operation_identifier
                 ; related_operations
