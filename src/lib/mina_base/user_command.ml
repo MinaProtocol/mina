@@ -298,8 +298,8 @@ let filter_by_participant (commands : t list) public_key =
 let weight : Stable.Latest.t -> int = function
   | Signed_command signed_command ->
       Signed_command.payload signed_command |> Signed_command_payload.weight
-  | Snapp_command snapp_command ->
-      Snapp_command.weight snapp_command
+  | Parties parties ->
+      Parties.weight parties
 
 (* Fee per weight unit *)
 let fee_per_wu (user_command : Stable.Latest.t) : int =

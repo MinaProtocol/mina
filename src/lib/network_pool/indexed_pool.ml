@@ -450,13 +450,13 @@ module Update = struct
   type single =
     | Add of
         { command : Transaction_hash.User_command_with_valid_signature.t
-        ; fee : Currency.Fee.t
+        ; fee_per_wu : Int.t
         ; add_to_applicable_by_fee : bool
         }
     | Remove_all_by_fee_and_hash_and_expiration of
         Transaction_hash.User_command_with_valid_signature.t F_seq.t
     | Remove_from_applicable_by_fee of
-        { fee : Currency.Fee.t
+        { fee_per_wu : Int.t
         ; command : Transaction_hash.User_command_with_valid_signature.t
         }
   [@@deriving sexp]
@@ -467,14 +467,14 @@ module Update = struct
 
   let apply acc (u : single) =
     match u with
-    | Add { command = cmd; fee; add_to_applicable_by_fee } ->
+    | Add { command = cmd; fee_per_wu; add_to_applicable_by_fee } ->
         let acc =
           if add_to_applicable_by_fee then
             { acc with
               applicable_by_fee =
                 Map_set.insert
                   (module Transaction_hash.User_command_with_valid_signature)
-                  acc.applicable_by_fee fee cmd
+                  acc.applicable_by_fee fee_per_wu cmd
             }
           else acc
         in
@@ -482,7 +482,7 @@ module Update = struct
           all_by_fee =
             Map_set.insert
               (module Transaction_hash.User_command_with_valid_signature)
-              acc.all_by_fee fee cmd
+              acc.all_by_fee fee_per_wu cmd
         ; all_by_hash =
             Map.set acc.all_by_hash
               ~key:(Transaction_hash.User_command_with_valid_signature.hash cmd)
@@ -495,10 +495,10 @@ module Update = struct
         F_sequence.foldl
           (fun acc cmd -> remove_all_by_fee_and_hash_and_expiration_exn acc cmd)
           acc cmds
-    | Remove_from_applicable_by_fee { fee; command } ->
+    | Remove_from_applicable_by_fee { fee_per_wu; command } ->
         { acc with
           applicable_by_fee =
-            Map_set.remove_exn acc.applicable_by_fee fee command
+            Map_set.remove_exn acc.applicable_by_fee fee_per_wu command
         }
 
   let apply (us : t) t = Writer_result.Tree.fold ~init:t us ~f:apply
@@ -572,7 +572,7 @@ let remove_with_dependents_exn :
     then
       Writer_result.write
         (Update.Remove_from_applicable_by_fee
-           { fee = User_command.fee_exn unchecked; command = cmd })
+           { fee_per_wu = User_command.fee_per_wu unchecked; command = cmd })
     else Writer_result.return ()
   in
   state :=
@@ -928,7 +928,8 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
         let%bind cmd = verified () in
         let%map () =
           M.write
-            (Update.Add { command = cmd; fee; add_to_applicable_by_fee = true })
+            (Update.Add
+               { command = cmd; fee_per_wu; add_to_applicable_by_fee = true })
         in
         by_sender :=
           { !by_sender with data = Some (F_sequence.singleton cmd, consumed) } ;
@@ -967,7 +968,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           let%map () =
             M.write
               (Update.Add
-                 { command = cmd; fee; add_to_applicable_by_fee = false })
+                 { command = cmd; fee_per_wu; add_to_applicable_by_fee = false })
           in
           by_sender := { !by_sender with data = Some new_state } ;
           (cmd, Sequence.empty) )
