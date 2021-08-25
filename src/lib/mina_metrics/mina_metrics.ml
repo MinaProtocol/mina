@@ -753,7 +753,7 @@ end
 module Pipe = struct
   let subsystem = "Pipe"
 
-  module Overflow = struct
+  module Drop_on_overflow = struct
     let subsystem = subsystem ^ "_overflow"
 
     let bootstrap_sync_ledger : Counter.t =

@@ -129,7 +129,8 @@ end)
                (Call
                   (fun (env, cb) ->
                     Mina_metrics.(
-                      Counter.inc_one Pipe.Overflow.verified_network_pool_diffs) ;
+                      Counter.inc_one
+                        Pipe.Drop_on_overflow.verified_network_pool_diffs) ;
                     let diff = Envelope.Incoming.data env in
                     [%log' warn t.logger]
                       "Dropping verified diff $diff due to pipe overflow"
