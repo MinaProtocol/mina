@@ -80,6 +80,8 @@ module Internal_command_info = struct
     ; receiver_account_creation_fee_paid: Unsigned_extended.UInt64.t option
     ; fee: Unsigned_extended.UInt64.t
     ; token: Unsigned_extended.UInt64.t
+    ; sequence_no: int
+    ; secondary_sequence_no: int
     ; hash: string }
   [@@deriving to_yojson]
 
@@ -93,22 +95,27 @@ module Internal_command_info = struct
        * produce more balance changing operations in the mempool or a block.
        * *)
       let plan : 'a Op.t list =
+        let mk_account_creation_fee related =
+          match t.receiver_account_creation_fee_paid with
+          | None -> []
+          | Some fee ->
+            [{Op.label= `Account_creation_fee_via_fee_receiver fee
+             ; related_to= Some related}]
+        in
         (match t.kind with
         | `Coinbase ->
             (* The coinbase transaction is really incrementing by the coinbase
            * amount  *)
-            [{Op.label= `Coinbase_inc; related_to= None}]
+          [{Op.label= `Coinbase_inc; related_to= None}]
+          @ (mk_account_creation_fee `Coinbase_inc)
         | `Fee_transfer ->
-            [{Op.label= `Fee_receiver_inc; related_to= None}]
+          [{Op.label= `Fee_receiver_inc; related_to= None}]
+        @ (mk_account_creation_fee `Fee_receiver_inc)
         | `Fee_transfer_via_coinbase ->
             [ {Op.label= `Fee_receiver_inc; related_to= None}
-            ; {Op.label= `Fee_payer_dec; related_to= Some `Fee_receiver_inc} ])
-        @
-        match t.receiver_account_creation_fee_paid with
-        | None -> []
-        | Some fee ->
-          [{Op.label= `Account_creation_fee_via_fee_receiver fee
-           ; related_to= None}]
+            ; {Op.label= `Fee_payer_dec; related_to= Some `Fee_receiver_inc} ]
+            @ (mk_account_creation_fee `Fee_receiver_inc)
+        )
       in
       Op_build.build
         ~a_eq:[%equal: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc | `Account_creation_fee_via_fee_receiver of Unsigned.UInt64.t]]
@@ -128,7 +135,8 @@ module Internal_command_info = struct
                 ; coin_change= None
                 ; metadata= None }
           | `Fee_receiver_inc ->
-              M.return
+            let `Pk pk = t.receiver in
+            M.return
                 { Operation.operation_identifier
                 ; related_operations
                 ; status
@@ -182,12 +190,16 @@ module Internal_command_info = struct
       ; receiver_account_creation_fee_paid= None
       ; fee= Unsigned.UInt64.of_int 20_000_000_000
       ; token= Unsigned.UInt64.of_int 1
+      ; sequence_no=1
+      ; secondary_sequence_no=0
       ; hash= "COINBASE_1" }
     ; { kind= `Fee_transfer
       ; receiver= `Pk "Alice"
       ; receiver_account_creation_fee_paid= None
       ; fee= Unsigned.UInt64.of_int 30_000_000_000
       ; token= Unsigned.UInt64.of_int 1
+      ; sequence_no=1
+      ; secondary_sequence_no=0
       ; hash= "FEE_TRANSFER" } ]
 end
 
@@ -392,10 +404,12 @@ WITH RECURSIVE chain AS (
 
   module Internal_commands = struct
     module Extras = struct
-      let receiver (_,x) = `Pk x
-      let receiver_account_creation_fee_paid (fee,_) = fee
+      let receiver (_,x,_,_) = `Pk x
+      let receiver_account_creation_fee_paid (fee,_,_,_) = fee
+      let sequence_no (_,_,seq_no,_) = seq_no
+      let secondary_sequence_no (_,_,_,secondary_seq_no) = secondary_seq_no
 
-      let typ = Caqti_type.(tup2 (option int64) string)
+      let typ = Caqti_type.(tup4 (option int64) string int int)
     end
 
     let typ =
@@ -404,8 +418,9 @@ WITH RECURSIVE chain AS (
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT DISTINCT ON (i.hash,i.type) i.id, i.type, i.receiver_id, i.fee, i.token, i.hash,
-            bic.receiver_account_creation_fee_paid, pk.value as receiver
+        {| SELECT DISTINCT ON (i.hash,i.type,bic.sequence_no,bic.secondary_sequence_no) i.id, i.type, i.receiver_id, i.fee, i.token, i.hash,
+            bic.receiver_account_creation_fee_paid, pk.value as receiver,
+            bic.sequence_no, bic.secondary_sequence_no
         FROM internal_commands i
         INNER JOIN blocks_internal_commands bic ON bic.internal_command_id = i.id
         INNER JOIN public_keys pk ON pk.id = i.receiver_id
@@ -489,6 +504,8 @@ WITH RECURSIVE chain AS (
           ; receiver_account_creation_fee_paid= Option.map (Internal_commands.Extras.receiver_account_creation_fee_paid extras) ~f:Unsigned.UInt64.of_int64
           ; fee= Unsigned.UInt64.of_int64 ic.fee
           ; token= Unsigned.UInt64.of_int64 ic.token
+          ; sequence_no=Internal_commands.Extras.sequence_no extras
+          ; secondary_sequence_no=Internal_commands.Extras.secondary_sequence_no extras
           ; hash= ic.hash } )
     in
     let%map user_commands =
@@ -681,12 +698,16 @@ module Specific = struct
               ~metadata:[("info", Internal_command_info.to_yojson info)]
               "Block internal received $info" ;
             { Transaction.transaction_identifier=
-                (* prepend the kind to the transaction hash, because duplicate
-                   hashes are possible in the archive database, with differing
+                (* prepend the sequence number, secondary sequence number and kind to the transaction hash
+                   duplicate hashes are possible in the archive database, with differing
                    "type" fields, which correspond to the "kind" here
                 *)
                 {Transaction_identifier.hash=
                    (Internal_command_info.Kind.to_string info.kind)
+                   ^ ":" ^
+                   (Int.to_string info.sequence_no)
+                   ^ ":" ^
+                   (Int.to_string info.secondary_sequence_no)
                    ^ ":" ^
                    info.hash}
             ; operations
