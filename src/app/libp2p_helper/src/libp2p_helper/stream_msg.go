@@ -99,7 +99,10 @@ func (app *app) handleOpenStream(seqno uint64, m ipc.Libp2pHelperInterface_OpenS
 
 	peer, err := parseMultiaddrWithID(stream.Conn().RemoteMultiaddr(), stream.Conn().RemotePeer())
 	if err != nil {
-		_ = stream.Reset()
+		err = stream.Reset()
+		if err != nil {
+			app.P2p.Logger.Errorf("handleOpenStream: failed to reset stream: %s", err.Error())
+		}
 		return mkRpcRespError(seqno, badp2p(err))
 	}
 

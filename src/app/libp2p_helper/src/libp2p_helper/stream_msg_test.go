@@ -67,10 +67,9 @@ func testOpenStreamDo(t *testing.T, appA *app, appBHost host.Host, appBPort uint
 	actual, err := readPeerInfo(peerInfo)
 	require.NoError(t, err)
 
-	expected := mkPeerInfo(t, appBHost, appBPort)
+	checkPeerInfo(t, actual, appBHost, appBPort)
 
 	require.Equal(t, appA.counter, respStreamId)
-	require.Equal(t, expected, *actual)
 
 	_, has := appA.Streams[respStreamId]
 	require.True(t, has)

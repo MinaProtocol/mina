@@ -301,25 +301,21 @@ func setMultiaddrList(m ipc.Multiaddr_List, addrs []multiaddr.Multiaddr) {
 
 func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 	go func() {
-		defer func() {
-			_ = stream.Close()
-		}()
-
 		buf := make([]byte, 4096)
 		tot := uint64(0)
 		for {
-			len, err := stream.Read(buf)
+			n, err := stream.Read(buf)
 
-			if len != 0 {
-				app.writeMsg(mkStreamMessageReceivedUpcall(idx, buf[:len]))
+			if n != 0 {
+				app.writeMsg(mkStreamMessageReceivedUpcall(idx, buf[:n]))
 			}
 
 			if err != nil && err != io.EOF {
 				app.writeMsg(mkStreamLostUpcall(idx, fmt.Sprintf("read failure: %s", err.Error())))
-				break
+				return
 			}
 
-			tot += uint64(len)
+			tot += uint64(n)
 
 			if err == io.EOF {
 				app.P2p.MsgStats.UpdateMetrics(tot)
@@ -327,6 +323,10 @@ func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 			}
 		}
 		app.writeMsg(mkStreamCompleteUpcall(idx))
+		err := stream.Close()
+		if err != nil {
+			app.P2p.Logger.Warning("Error while closing the stream: ", err.Error())
+		}
 	}()
 }
 

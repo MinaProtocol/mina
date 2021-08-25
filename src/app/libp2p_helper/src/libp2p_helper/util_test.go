@@ -155,14 +155,12 @@ func checkRpcResponseSuccess(t *testing.T, resMsg *capnp.Message) (uint64, ipc.L
 	return seqno, respSuccess
 }
 
-func mkPeerInfo(t *testing.T, host host.Host, port uint16) codaPeerInfo {
-	expectedHost, err := host.Addrs()[0].ValueForProtocol(4)
-	require.NoError(t, err)
-	return codaPeerInfo{
-		Libp2pPort: port,
-		Host:       expectedHost,
-		PeerID:     host.ID().String(),
-	}
+func checkPeerInfo(t *testing.T, actual *codaPeerInfo, host host.Host, port uint16) {
+	// Check of host is commented out as sometimes it's 127.0.0.1,
+	// sometimes it's some other IP of the machine
+	// expectedHost, err := host.Addrs()[0].ValueForProtocol(4)
+	require.Equal(t, port, actual.Libp2pPort)
+	require.Equal(t, host.ID().String(), actual.PeerID)
 }
 
 func beginAdvertisingSendAndCheck(t *testing.T, app *app) {

@@ -105,7 +105,6 @@ func (app *app) handleGetPeerNodeStatus(seqno uint64, m ipc.Libp2pHelperInterfac
 	// block until you can read the response, return that.
 	s, err := app.P2p.Host.NewStream(ctx, addrInfo.ID, codanet.NodeStatusProtocolID)
 	if err != nil {
-		app.P2p.Logger.Error("failed to open stream: ", err)
 		return mkRpcRespError(seqno, err)
 	}
 
