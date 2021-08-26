@@ -26,8 +26,10 @@ trap cleanup EXIT
 
 # Setup and export useful variables/defaults
 export MINA_LIBP2P_HELPER_PATH=/usr/local/bin/libp2p_helper
-export MINA_CONFIG_FILE=${MINA_CONFIG_FILE:=/genesis_ledgers/devnet.json}
-export PEER_LIST_URL=${PEER_LIST_URL:=https://storage.googleapis.com/seed-lists/devnet_seeds.txt}
+export MINA_NETWORK=devnet2
+export MINA_SUFFIX="-dev"
+export MINA_CONFIG_FILE=/genesis_ledgers/${MINA_NETWORK}.json
+export PEER_LIST_URL=https://storage.googleapis.com/seed-lists/${MINA_NETWORK}_seeds.txt
 # Allows configuring the port that each service runs on.
 # To connect to a network, the MINA_DAEMON_PORT needs to be publicly accessible.
 # To interact with rosetta, use MINA_ROSETTA_PORT
@@ -39,25 +41,25 @@ export LOG_LEVEL="${LOG_LEVEL:=Debug}"
 DEFAULT_FLAGS="--peer-list-url ${PEER_LIST_URL} --external-port ${MINA_DAEMON_PORT} --rest-port ${MINA_GRAPHQL_PORT} -archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} -insecure-rest-server --log-level ${LOG_LEVEL} --log-json"
 export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
 # Postgres database connection string. Override PG_CONN to connect to a more permanent external database.
-PG_CONN="${PG_CONN:=postgres://pguser:pguser@127.0.0.1:5432/rosetta-archive}"
+PG_CONN="${PG_CONN:=postgres://pguser:pguser@127.0.0.1:5432/archive}"
 
 # Postgres
 echo "========================= STARTING POSTGRESQL ==========================="
 pg_ctlcluster ${POSTGRES_VERSION} main start
-#createdb -O pguser rosetta-archive
-#dropdb -U pguser archive
+#sudo -u postgres createdb -O pguser archive
+#sudo -u postgres dropdb archive
 
 echo "========================= POPULATING POSTGRESQL ==========================="
 DATE="$(date -Idate)_0000"
-DATE="$(date -Idate)_2121" # Remove this line after the first _0000 dump is created
-curl "https://storage.googleapis.com/mina-archive-dumps/devnet2-archive-dump-${DATE}.sql.tar.gz" -o o1labs-archive-dump.tar.gz
+DATE="$(date -Idate)_1856" # Remove this line after the first _0000 dump is created
+curl "https://storage.googleapis.com/mina-archive-dumps/${MINA_NETWORK}-archive-dump-${DATE}.sql.tar.gz" -o o1labs-archive-dump.tar.gz
 tar -xvf o1labs-archive-dump.tar.gz
 # It would help to know the block height of this dump in addition to the date
-psql -f devnet2-archive-dump-$DATE.sql "${PG_CONN}"
+psql -f "${MINA_NETWORK}-archive-dump-${DATE}.sql" "${PG_CONN}"
 
 # Rosetta
 echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
-mina-rosetta-dev \
+mina-rosetta${MINA_SUFFIX} \
   --archive-uri "${PG_CONN}" \
   --graphql-uri http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
   --log-level ${LOG_LEVEL} \
@@ -80,10 +82,9 @@ mina-archive run \
 sleep 6
 
 # Daemon
-# Use MINA_CONFIG_FILE=/genesis_ledgers/mainnet.json to run on mainnet
-echo "========================= STARTING DAEMON connected to DEVNET with GRAPQL on PORT ${MINA_GRAPHQL_PORT}==========================="
+echo "========================= STARTING DAEMON connected to ${MINA_NETWORK^^} with GRAPQL on PORT ${MINA_GRAPHQL_PORT}==========================="
 echo "MINA Flags: $MINA_FLAGS -config-file ${MINA_CONFIG_FILE}"
-mina-dev daemon \
+mina${MINA_SUFFIX} daemon \
   --config-file ${MINA_CONFIG_FILE} \
   ${MINA_FLAGS} $@ &
 
@@ -100,13 +101,12 @@ until [[ "$PARENT" != "null" ]] ; do
 done
 
 # Continue until no more blocks are missing
-until [[ "$PARENT" == "null-null" ]] ; do
-  echo "Downloading $PARENT block"
-  FILE="mainnet-${PARENT}.json"
+until [[ "$PARENT" == "null" ]] ; do
+  PARENT_FILE="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs '.[-1].metadata | "'${MINA_NETWORK}'-\(.parent_height)-\(.parent_hash).json"')"
+  echo "Downloading $PARENT_FILE block"
   curl -sO https://storage.googleapis.com/mina_network_block_data/$FILE
-  mina-archive-blocks --precomputed --archive-uri $PG_CONN $FILE | jq -rs .[-1].message
-  rm $FILE # Clean up the block file
-  PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs '.[-1].metadata | "\(.parent_height)-\(.parent_hash)"')"
+  mina-archive-blocks --precomputed --archive-uri $PG_CONN $FILE | jq -rs .[-1].message && rm $FILE
+  PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
 done
 
 sleep infinity

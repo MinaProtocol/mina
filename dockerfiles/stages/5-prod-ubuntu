@@ -63,9 +63,10 @@ RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf \
     && /etc/init.d/postgresql start \
     && psql --command "CREATE USER pguser WITH SUPERUSER PASSWORD 'pguser';" \
-    && createdb -O pguser archive \
-    && createdb -O pguser rosetta-archive \
-    && psql postgresql://pguser:pguser@localhost:5432/archive -f /archive/create_schema.sql
+    && createdb -O pguser archive
+
+# Leave database uninitialized so that rosetta scripts can start from scretch
+#    && psql postgresql://pguser:pguser@localhost:5432/archive -f /archive/create_schema.sql
 
 ENV USER pguser
 USER root
