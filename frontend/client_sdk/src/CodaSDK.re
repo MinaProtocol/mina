@@ -98,7 +98,7 @@ external signString: (codaSDK, privateKey, string) => signature = "signString";
  */
 [@genType]
 let signMessage =
-  (message: string, key: keypair) => {
+  (. message: string, key: keypair) => {
     publicKey: key.publicKey,
     signature: signString(codaSDK, key.privateKey, message),
     payload: message,
@@ -116,7 +116,7 @@ external verifyStringSignature: (codaSDK, signature, publicKey, string) => bool 
  */
 [@genType]
 let verifyMessage =
-  (signedMessage: signed(string)) => {
+  (. signedMessage: signed(string)) => {
     verifyStringSignature(
       codaSDK,
       signedMessage.signature,
@@ -214,7 +214,7 @@ external signPayment: (codaSDK, privateKey, payment_js) => signed_js =
  */
 [@genType]
 let signPayment =
-  (payment: payment, key: keypair) => {
+  (. payment: payment, key: keypair) => {
     let memo = value(~default="", payment.memo);
     // Stringify all numeric inputs since they may be passed as
     // number/bigint in TS/JS
@@ -275,7 +275,7 @@ external signStakeDelegation:
  */
 [@genType]
 let signStakeDelegation =
-  (stakeDelegation: stakeDelegation, key: keypair) => {
+  (. stakeDelegation: stakeDelegation, key: keypair) => {
     let memo = value(~default="", stakeDelegation.memo);
     // Stringify all numeric inputs since they may be passed as
     // number/bigint in TS/JS
@@ -418,7 +418,7 @@ external hashPayment:
   * @returns A transaction hash
   */
 [@genType]
-let hashPayment = (signedPayment: signed(payment)) => {
+let hashPayment = (. signedPayment: signed(payment)) => {
   let payload = signedPayment.payload;
   // Stringify all numeric inputs since they may be passed as
   // number/bigint in TS/JS
@@ -465,7 +465,7 @@ external hashStakeDelegation:
   */
 [@genType]
 let hashStakeDelegation =
-    (signedStakeDelegation: signed(stakeDelegation)) => {
+    (. signedStakeDelegation: signed(stakeDelegation)) => {
   let payload = signedStakeDelegation.payload;
   // Stringify all numeric inputs since they may be passed as
   // number/bigint in TS/JS
