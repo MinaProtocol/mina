@@ -391,7 +391,7 @@ module Balance = struct
         let amount =
           ( match token_id with
           | None ->
-              Amount_of.coda
+              Amount_of.mina
           | Some token_id ->
               Amount_of.token token_id )
             liquid_balance
@@ -422,7 +422,7 @@ module Balance = struct
                   (Errors.create
                      ~context:
                        "Failed accessing state hash from GraphQL \
-                        communication with the Coda Daemon."
+                        communication with the Mina Daemon."
                      `Chain_info_missing)
             | Some state_hash ->
                 M.return state_hash
@@ -483,7 +483,7 @@ module Balance = struct
                ; balances=
                    [ { Amount.value= "66000"
                      ; currency=
-                         {Currency.symbol= "CODA"; decimals= 9l; metadata= None}
+                         {Currency.symbol= "MINA"; decimals= 9l; metadata= None}
                      ; metadata=
                          Some
                            (`Assoc

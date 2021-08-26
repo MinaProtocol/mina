@@ -126,7 +126,7 @@ module Validate_choice = struct
           ~actual:
             (Mock.validate
                ~network_identifier:
-                 { Network_identifier.blockchain= "coda"
+                 { Network_identifier.blockchain= "mina"
                  ; network= "debug"
                  ; sub_network_identifier= None }
                ~gql_response:(build ~chainId:"0"))
@@ -138,7 +138,7 @@ module Validate_choice = struct
           ~actual:
             (Mock.validate
                ~network_identifier:
-                 { Network_identifier.blockchain= "coda"
+                 { Network_identifier.blockchain= "mina"
                  ; network= "testnet"
                  ; sub_network_identifier= None }
                ~gql_response:(build ~chainId:"0"))
@@ -168,7 +168,7 @@ module List_ = struct
       (* HACK: If initialPeers + peers are both empty, assume we're on debug ; otherwise testnet or devnet *)
       let network = network_tag_of_graphql res in
       { Network_list_response.network_identifiers=
-          [ { Network_identifier.blockchain= "coda"
+          [ { Network_identifier.blockchain= "mina"
             ; network
             ; sub_network_identifier= None } ] }
   end
@@ -188,7 +188,7 @@ module List_ = struct
           ~expected:
             (Result.return
                { Network_list_response.network_identifiers=
-                   [ { Network_identifier.blockchain= "coda"
+                   [ { Network_identifier.blockchain= "mina"
                      ; network= "debug"
                      ; sub_network_identifier= None } ] })
 
@@ -202,7 +202,7 @@ module List_ = struct
           ~expected:
             (Result.return
                { Network_list_response.network_identifiers=
-                   [ { Network_identifier.blockchain= "coda"
+                   [ { Network_identifier.blockchain= "mina"
                      ; network= "dev"
                      ; sub_network_identifier= None } ] })
 
@@ -216,7 +216,7 @@ module List_ = struct
           ~expected:
             (Result.return
                { Network_list_response.network_identifiers=
-                   [ { Network_identifier.blockchain= "coda"
+                   [ { Network_identifier.blockchain= "mina"
                      ; network= "mainnet"
                      ; sub_network_identifier= None } ] })
     end )

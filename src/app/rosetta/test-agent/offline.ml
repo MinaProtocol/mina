@@ -34,7 +34,7 @@ module Preprocess = struct
         ~body:
           Construction_preprocess_request.(
             { network_identifier= net_id network_response
-            ; max_fee= [Amount_of.coda max_fee]
+            ; max_fee= [Amount_of.mina max_fee]
             ; operations
             ; suggested_fee_multiplier= None
             ; metadata= None }
