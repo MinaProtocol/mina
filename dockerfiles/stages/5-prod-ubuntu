@@ -63,7 +63,7 @@ RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf \
     && /etc/init.d/postgresql start \
     && psql --command "CREATE USER pguser WITH SUPERUSER PASSWORD 'pguser';" \
-    && createdb -O pguser archiver \
+    && createdb -O pguser archive \
     && psql postgresql://pguser:pguser@localhost:5432/archive -f /archive/create_schema.sql
 
 # Generate en_US.UTF-8 to allow use of O(1) Labs DB dumps
