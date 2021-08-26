@@ -66,11 +66,11 @@ RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && createdb -O pguser archive \
     && psql postgresql://pguser:pguser@localhost:5432/archive -f /archive/create_schema.sql
 
-# Generate en_US.UTF-8 to allow use of O(1) Labs DB dumps
-RUN locale-gen en_US.UTF-8
-
 ENV USER pguser
 USER root
+
+# Generate en_US.UTF-8 to allow use of O(1) Labs DB dumps
+RUN locale-gen en_US.UTF-8
 
 WORKDIR /rosetta
 
