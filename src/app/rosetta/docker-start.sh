@@ -51,8 +51,7 @@ pg_ctlcluster ${POSTGRES_VERSION} main start
 
 echo "========================= POPULATING POSTGRESQL ==========================="
 DATE="$(date -Idate)_0000"
-# Use $MINA_NETWORK-archive-dump... for other networks
-curl "https://storage.googleapis.com/mina-archive-dumps/archive-dump-${DATE}.sql.tar.gz" -o o1labs-archive-dump.tar.gz
+curl "https://storage.googleapis.com/mina-archive-dumps/${MINA_NETWORK}-archive-dump-${DATE}.sql.tar.gz" -o o1labs-archive-dump.tar.gz
 tar -xvf o1labs-archive-dump.tar.gz
 # It would help to know the block height of this dump in addition to the date
 psql -f "${MINA_NETWORK}-archive-dump-${DATE}.sql" "${PG_CONN}"
