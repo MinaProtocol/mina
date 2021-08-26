@@ -702,13 +702,11 @@ module Specific = struct
                    "type" fields, which correspond to the "kind" here
                 *)
                 {Transaction_identifier.hash=
-                   (Internal_command_info.Kind.to_string info.kind)
-                   ^ ":" ^
-                   (Int.to_string info.sequence_no)
-                   ^ ":" ^
-                   (Int.to_string info.secondary_sequence_no)
-                   ^ ":" ^
-                   info.hash}
+                   sprintf "%s:%s:%s:%s"
+                     (Internal_command_info.Kind.to_string info.kind)
+                     (Int.to_string info.sequence_no)
+                     (Int.to_string info.secondary_sequence_no)
+                     info.hash}
             ; operations
             ; metadata= None }
             :: acc )

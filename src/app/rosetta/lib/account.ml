@@ -394,7 +394,7 @@ module Balance = struct
               Amount_of.mina
           | Some token_id ->
               Amount_of.token token_id )
-            liquid_balance
+            total_balance
         in
         let locked_balance =
           Unsigned.UInt64.sub total_balance liquid_balance
@@ -403,6 +403,8 @@ module Balance = struct
           `Assoc
             [ ( "locked_balance"
               , `Intlit (Unsigned.UInt64.to_string locked_balance) )
+            ; ( "liquid_balance"
+              , `Intlit (Unsigned.UInt64.to_string liquid_balance) )
             ; ( "total_balance"
               , `Intlit (Unsigned.UInt64.to_string total_balance) ) ]
         in
@@ -500,7 +502,22 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
   match route with
   | ["balance"] ->
       with_db (fun ~db ->
-          let%bind req =
+        let body =
+          (* workaround: rosetta-cli with view:balance does not seem to have a way to submit the
+             currencies list, so supply it here
+          *)
+          match body with
+          | `Assoc items -> (
+            match List.Assoc.find items "currencies" ~equal:String.equal with
+                Some _ -> body
+              | None ->
+                `Assoc (items @ [("currencies",`List [`Assoc [("symbol",`String "MINA");("decimals", `Int 9)]])])
+          )
+          | _ ->
+            (* will fail on JSON parse below *)
+            body
+        in
+        let%bind req =
             Errors.Lift.parse ~context:"Request"
             @@ Account_balance_request.of_yojson body
             |> Errors.Lift.wrap
