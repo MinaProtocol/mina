@@ -25,7 +25,6 @@ trap cleanup INT
 trap cleanup EXIT
 
 # Setup and export useful variables/defaults
-export MINA_PRIVKEY_PASS=""
 export MINA_LIBP2P_HELPER_PATH=/usr/local/bin/libp2p_helper
 export MINA_CONFIG_FILE=${MINA_CONFIG_FILE:=/genesis_ledgers/mainnet.json}
 export PEER_LIST_URL=${PEER_LIST_URL:=https://storage.googleapis.com/seed-lists/mainnet_seeds.txt}
@@ -39,14 +38,13 @@ export MINA_ROSETTA_PORT=${MINA_ROSETTA_PORT:=3087}
 export LOG_LEVEL="${LOG_LEVEL:=Debug}"
 DEFAULT_FLAGS="--peer-list-url ${PEER_LIST_URL} --external-port ${MINA_DAEMON_PORT} --rest-port ${MINA_GRAPHQL_PORT} -archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} -insecure-rest-server --log-level ${LOG_LEVEL} --log-json"
 export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
-export PK=${MINA_PK:=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p}
 # Postgres database connection string. Override PG_CONN to connect to a more permanent external database.
 PG_CONN="${PG_CONN:=postgres://pguser:pguser@127.0.0.1:5432/rosetta-archive}"
 
 # Postgres
 echo "========================= STARTING POSTGRESQL ==========================="
 pg_ctlcluster ${POSTGRES_VERSION} main start
-createdb -O pguser rosetta-archive
+#createdb -O pguser rosetta-archive
 #dropdb -U pguser archive
 
 echo "========================= POPULATING POSTGRESQL ==========================="
