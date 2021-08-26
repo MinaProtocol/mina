@@ -59,8 +59,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name = "gossipqa"
-  mina_image = "gcr.io/o1labs-192920/mina-daemon-baked:1.2.0beta1-compatible-devnet-8ceb4c8-gossipqa-90c5a1f"
-  mina_archive_image = "codaprotocol/mina-archive:1.2.0beta1-compatible-devnet-bfb9dc8"
+  mina_image = "gcr.io/o1labs-192920/mina-daemon-baked:1.2.0beta1-compatible-6230872-stretch-devnet-gossipqa"
+  mina_archive_image = "minaprotocol/mina-archive:1.2.0beta1-compatible-6230872-stretch-devnet"
   seed_region = "us-central1"
   seed_zone = "us-central1-c"
 
