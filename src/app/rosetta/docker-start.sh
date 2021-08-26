@@ -7,8 +7,8 @@ POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
 function cleanup
 {
   echo "========================= CLEANING UP ==========================="
-  echo "Stopping mina daemon and waiting 30 seconds"
-  mina client stop-daemon && sleep 30
+  echo "Stopping mina daemon and waiting 3 seconds"
+  mina client stop-daemon && sleep 3
   echo "Killing archive node"
   pkill 'mina-archive' || true
   echo "Killing mina daemon"
@@ -46,6 +46,14 @@ PG_CONN="${PG_CONN:=postgres://pguser:pguser@127.0.0.1:5432/archive}"
 # Postgres
 echo "========================= STARTING POSTGRESQL ==========================="
 pg_ctlcluster ${POSTGRES_VERSION} main start
+dropdb $PG_CONN archive
+
+echo "========================= POPULATING POSTGRESQL ==========================="
+DATE="$(date -Idate)_0000"
+curl "https://storage.googleapis.com/mina-archive-dumps/archive-dump-${DATE}.sql.tar.gz" -o o1labs-archive-dump.tar.gz
+tar -xvf o1labs-archive-dump.tar.gz
+# It would help to know the block height of this dump in addition to the date
+psql -f archive-dump-$DATE.sql "${PG_CONN}"
 
 # Rosetta
 echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
@@ -82,14 +90,9 @@ mina daemon \
 # wait for it to settle
 sleep 15
 
-echo "========================= POPULATING POSTGRESQL ==========================="
-DATE="$(date -Idate)"
-curl https://storage.googleapis.com/mina-archive-dumps/archive-dump-${DATE}_0000.sql.tar.gz" -o o1labs-archive-dump.tar.gz
-tar -xvf o1labs-archive-dump.tar.gz
-# It would help to know the block height of this dump in addition to the date
-psql -f archive-dump-$DATE.sql "${PG_CONN}"
-
+echo "========================= POPULATING MISSING BLOCKS SINCE $DATE ==========================="
 # Wait until there is a block missing
+PARENT=3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d
 until [[ "$PARENT" != "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d" ]] ; do
   PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
   sleep 5
