@@ -166,7 +166,7 @@ module Internal_command_info = struct
                   Some
                     (account_id coinbase_receiver Amount_of.Token_id.default)
               ; _type= Operation_types.name `Fee_payer_dec
-              ; amount= Some Amount_of.(negated (coda t.fee))
+              ; amount= Some Amount_of.(negated (mina t.fee))
               ; coin_change= None
               ; metadata= None }
           | `Account_creation_fee_via_fee_receiver account_creation_fee ->
@@ -177,7 +177,7 @@ module Internal_command_info = struct
                 ; account=
                     Some (account_id t.receiver Amount_of.Token_id.default)
                 ; _type= Operation_types.name `Account_creation_fee_via_fee_receiver
-                ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
+                ; amount= Some Amount_of.(negated @@ mina account_creation_fee)
                 ; coin_change= None
                 ; metadata= None }
           )

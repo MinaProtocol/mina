@@ -290,7 +290,7 @@ module Metadata = struct
         |> Option.value ~default:Unsigned.UInt32.zero
       in
       let suggested_fee =
-        Amount_of.coda
+        Amount_of.mina
           (MinaCurrency.Fee.to_uint64
              Mina_compile_config.default_transaction_fee)
       in
@@ -298,7 +298,7 @@ module Metadata = struct
         `Assoc
           [ ( "minimum_fee"
             , Amount.to_yojson
-                (Amount_of.coda
+                (Amount_of.mina
                    (MinaCurrency.Fee.to_uint64
                       Mina_compile_config.minimum_user_command_fee)) ) ]
       in
