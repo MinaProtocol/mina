@@ -1,3 +1,4 @@
+open Core_kernel
 open Marlin_plonk_bindings
 
 exception PayloadLength of string
@@ -55,6 +56,8 @@ let%test_module "TLS Notary test" =
         signature: (Field.Constant.t * Field.Constant.t) * Field.Constant.t
       }
 
+      let max_size = 3072
+
       let authentication ?witness (p, pn, q) () =
 
         let module Block = Plonk.Bytes.Block (Impl) in
@@ -67,8 +70,10 @@ let%test_module "TLS Notary test" =
 
         (* CIPHERTEXT *)
         (*let ctl = Array.length (Option.value_exn witness).cipher_text in*)
-        let ctl = Array.length Test.ct in
+        let ctl = max_size in
+        let actual_length = Array.length Test.ct in
         let bloks = (ctl + 15) / 16 in
+        let actual_bloks = (actual_length + 15) / 16 in
 
         let int_array_witness ~length f =
           exists (Typ.array ~length Field.typ)
@@ -76,7 +81,11 @@ let%test_module "TLS Notary test" =
         in
         let ct =
           int_array_witness ~length:ctl
-            (fun w -> w.cipher_text)
+            (fun w ->
+              Array.append w.cipher_text
+                (Array.init
+                  (max_size - Array.length w.cipher_text)
+                  ~f:(fun i -> i mod 0x100)) )
         in
 
         (* AES SERVER ENCRYPTION KEY *)
@@ -105,15 +114,21 @@ let%test_module "TLS Notary test" =
         let ec = Array.init ptdl1 ~f:(fun i ->
         (
           let cnt = Array.copy iv in
-          let i = i + bloks - ptdl1 + 2 in
+          let i = i + actual_bloks - ptdl1 + 2 in
           Array.iteri Int.[|i lsr 24; (i lsr 16) land 255; (i lsr 8) land 255; i land 255;|]
             ~f:(fun j x -> cnt.(j + 12) <- Field.of_int x);
           Block.encryptBlock cnt ks
         )) in
 
         (* decrypt score ciphertext into plaintext and decode *)
-        let score = let offset = ctl-9-(bloks-ptdl1)*16 in Array.mapi (Array.sub ct (ctl-9) 3)
-          ~f:(fun i x -> Bytes.asciiDigit (Bytes.xor ec.((offset+i)/16).((offset+i)%16) x)) in
+        let score =
+          let offset = actual_length-9-(actual_bloks-ptdl1)*16 in
+          Array.mapi
+            (Array.sub ct (actual_length-9) 3)
+            ~f:(fun i x ->
+              Bytes.asciiDigit
+                (Bytes.xor ec.((offset+i)/16).((offset+i)%16) x) )
+        in
 
         (* check the score *)
         Bytes.assertScore Field.(score.(0) * (of_int 100) + score.(1) * (of_int 10) + score.(2));
@@ -131,7 +146,7 @@ let%test_module "TLS Notary test" =
         let at = Array.foldi (Array.append ctp [|len|]) ~init:(Array.init 16 ~f:(fun _ -> Field.zero))
           ~f:(fun i ht bl ->
             let htn = Block.mul (Block.xor ht bl) h in
-            if i <= bloks then htn
+            if i <= actual_bloks then htn
             else ht
           ) in
 
@@ -157,17 +172,23 @@ let%test_module "TLS Notary test" =
 
       module Public_input = Test.Public_input (Impl)
       open Public_input
-      let input () =
+      let typ () =
         let open Typ in
-        Impl.Data_spec.
-        [
-          tuple3
-            (tuple2 Field.typ Field.typ)  (* signature scheme base point P *)
-            (tuple2 Field.typ Field.typ)  (* [n]P where n = field elements size in bits *)
-            (tuple2 Field.typ Field.typ)  (* notary public key *)
-        ]
+        tuple3
+          (tuple2 Field.typ Field.typ)  (* signature scheme base point P *)
+          (tuple2 Field.typ Field.typ)  (* [n]P where n = field elements size in bits *)
+          (tuple2 Field.typ Field.typ)  (* notary public key *)
+
+      let input () = Impl.Data_spec.[typ ()]
+
+      let () =
+        Format.eprintf
+          "Proving with cipher text length %i. Circuit allows a maximum length %i@."
+          (Array.length Test.ct) max_size
 
       let keys = Impl.generate_keypair ~exposing:(input ()) authentication
+
+      let check_before_proving = false
 
       let proof =
         let signature =
@@ -175,6 +196,19 @@ let%test_module "TLS Notary test" =
           let ((x, y), s) = Test.sign in
           Bigint.((to_field (of_decimal_string x), to_field (of_decimal_string y)), to_field (of_decimal_string s))
         in
+        if check_before_proving then
+          Impl.run_and_check (fun () ->
+            let input = exists (typ ()) ~compute:(fun () -> public_input) in
+            authentication
+             ~witness:{
+               cipher_text= Test.ct;
+               encryption_key= Test.key;
+               iv= Test.iv;
+               signature
+             }
+             input () ;
+            fun () -> () ) ()
+            |> ignore ;
         Impl.prove (Impl.Keypair.pk keys) (input ())
           (authentication
              ~witness:{
