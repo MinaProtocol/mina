@@ -30,7 +30,8 @@ RUN apt-get -y update \
     tzdata \
     libjemalloc1 \
     libprocps6 \
-    libffi6
+    libffi6 \
+    jq
 
 # Make all directories for configuration and empty s3 cache dirs
 RUN mkdir -p /tmp/s3_cache_dir \
@@ -63,7 +64,7 @@ RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && /etc/init.d/postgresql start \
     && psql --command "CREATE USER pguser WITH SUPERUSER PASSWORD 'pguser';" \
     && createdb -O pguser archiver \
-    && psql postgresql://pguser:pguser@localhost:5432/archiver -f /archive/create_schema.sql
+    && psql postgresql://pguser:pguser@localhost:5432/archive -f /archive/create_schema.sql
 
 # Generate en_US.UTF-8 to allow use of O(1) Labs DB dumps
 RUN locale-gen en_US.UTF-8

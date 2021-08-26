@@ -41,21 +41,29 @@ DEFAULT_FLAGS="--peer-list-url ${PEER_LIST_URL} --external-port ${MINA_DAEMON_PO
 export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
 export PK=${MINA_PK:=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p}
 # Postgres database connection string. Override PG_CONN to connect to a more permanent external database.
-PG_CONN="${PG_CONN:=postgres://pguser:pguser@127.0.0.1:5432/archiver}"
+PG_CONN="${PG_CONN:=postgres://pguser:pguser@127.0.0.1:5432/archive}"
 
 # Postgres
 echo "========================= STARTING POSTGRESQL ==========================="
 pg_ctlcluster ${POSTGRES_VERSION} main start
 
 # wait for it to settle
-sleep 3
+sleep 15
 
 echo "========================= POPULATING POSTGRESQL ==========================="
 DATE="$(date -Idate)"
 curl https://storage.googleapis.com/mina-archive-dumps/archive-dump-${DATE}_0000.sql.tar.gz" -o o1labs-archive-dump.tar.gz
 tar -xvf o1labs-archive-dump.tar.gz
+# It would help to know the block height of this dump in addition to the date
 psql -f archive-dump-$DATE.sql "${PG_CONN}"
 
+
+# It would help to get this from the blocks auditor output
+HEIGHT=54678
+FILE=mainnet-$HEIGHT-$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash).json
+curl -O https://storage.googleapis.com/mina_network_block_data/$FILE
+mina-archive-blocks --precomputed --archive-uri $PG_CONN $FILE
+rm $FILE
 
 # Rosetta
 echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="

@@ -41,7 +41,7 @@ DEFAULT_FLAGS="--peer-list-url ${PEER_LIST_URL} --external-port ${MINA_DAEMON_PO
 export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
 export PK=${MINA_PK:=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p}
 # Postgres database connection string. Override PG_CONN to connect to a more permanent external database.
-PG_CONN="${PG_CONN:=postgres://pguser:pguser@127.0.0.1:5432/archiver}"
+PG_CONN="${PG_CONN:=postgres://pguser:pguser@127.0.0.1:5432/archive}"
 
 # Postgres
 echo "========================= STARTING POSTGRESQL ==========================="
