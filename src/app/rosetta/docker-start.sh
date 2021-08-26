@@ -57,13 +57,15 @@ tar -xvf o1labs-archive-dump.tar.gz
 # It would help to know the block height of this dump in addition to the date
 psql -f archive-dump-$DATE.sql "${PG_CONN}"
 
-
 # It would help to get this from the blocks auditor output
-HEIGHT=54678
-FILE=mainnet-$HEIGHT-$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash).json
-curl -O https://storage.googleapis.com/mina_network_block_data/$FILE
-mina-archive-blocks --precomputed --archive-uri $PG_CONN $FILE
-rm $FILE
+PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
+until [[ "$PARENT" != "null" ]] ; do
+  HEIGHT="$(curl -s https://api.minaexplorer.com/blocks/$PARENT | jq -rs .block.blockHeight)"
+  FILE="mainnet-${HEIGHT}-${PARENT}.json"
+  curl -O https://storage.googleapis.com/mina_network_block_data/$FILE
+  mina-archive-blocks --precomputed --archive-uri $PG_CONN $FILE
+  rm $FILE
+done
 
 # Rosetta
 echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
