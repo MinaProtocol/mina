@@ -50,6 +50,13 @@ pg_ctlcluster ${POSTGRES_VERSION} main start
 # wait for it to settle
 sleep 3
 
+echo "========================= POPULATING POSTGRESQL ==========================="
+DATE="$(date -Idate)"
+curl https://storage.googleapis.com/mina-archive-dumps/archive-dump-${DATE}_0000.sql.tar.gz" -o o1labs-archive-dump.tar.gz
+tar -xvf o1labs-archive-dump.tar.gz
+psql -f archive-dump-$DATE.sql "${PG_CONN}"
+
+
 # Rosetta
 echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
 mina-rosetta \
