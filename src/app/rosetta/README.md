@@ -53,11 +53,13 @@ The container includes 4 scripts in /rosetta which run a different set of servic
 - The default, `docker-start.sh`, which connects the mina node to our [Mainnet](https://docs.minaprotocol.com/en/using-mina/connecting) network with an empty archive database. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/compatible/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
 - Finally, the previous default, `docker-devnet-start.sh`, which connects the mina node to our [Devnet](https://docs.minaprotocol.com/en/advanced/connecting-devnet) network with an empty archive database. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/compatible/src/app/rosetta/docker-devnet-start.sh) for more information about what you can configure and how.
 
-For example, to run the `docker-devnet-start.sh` and connect to the live devnet (note, you will need tens of minutes to synchronize to the tip):
+For example, to run the `docker-devnet-start.sh` and connect to the live devnet:
 
 ```
 docker run -it --rm --name rosetta --entrypoint=./docker-devnet-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 gcr.io/o1labs-192920/mina-rosetta:compatible
 ```
+
+Note: It will take 20min-1hr for your node to sync
 
 * Port 10101 is the default P2P port and must be exposed to the open internet
 * The GraphQL API runs on port 3085 (accessible via `localhost:3085/graphql`)
