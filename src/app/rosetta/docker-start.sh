@@ -41,12 +41,13 @@ DEFAULT_FLAGS="--peer-list-url ${PEER_LIST_URL} --external-port ${MINA_DAEMON_PO
 export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
 export PK=${MINA_PK:=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p}
 # Postgres database connection string. Override PG_CONN to connect to a more permanent external database.
-PG_CONN="${PG_CONN:=postgres://pguser:pguser@127.0.0.1:5432/archive}"
+PG_CONN="${PG_CONN:=postgres://pguser:pguser@127.0.0.1:5432/rosetta-archive}"
 
 # Postgres
 echo "========================= STARTING POSTGRESQL ==========================="
 pg_ctlcluster ${POSTGRES_VERSION} main start
-dropdb -U pguser archive
+createdb -O pguser rosetta-archive
+#dropdb -U pguser archive
 
 echo "========================= POPULATING POSTGRESQL ==========================="
 DATE="$(date -Idate)_0000"
@@ -92,24 +93,21 @@ sleep 15
 
 echo "========================= POPULATING MISSING BLOCKS SINCE $DATE ==========================="
 # Wait until there is a block missing
-PARENT=3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d
-until [[ "$PARENT" != "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d" ]] ; do
+PARENT=null
+until [[ "$PARENT" != "null" ]] ; do
   PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
-  echo "PARENT BLOCK HASH: $PARENT"
+  echo "FINDING PARENT BLOCK HASH: $(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].message)"
   sleep 5
 done
 
 # Continue until no more blocks are missing
-# 3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d is the parent hash of the genesis block
-until [[ "$PARENT" == "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d" ]] ; do
-  # It would help to get this from the blocks auditor output instead of minaexplorer
-  HEIGHT="$(curl -s https://api.minaexplorer.com/blocks/$PARENT | jq -rs .[0].block.blockHeight)"
-  echo "Downloading $PARENT block at height $HEIGHT"
-  FILE="mainnet-${HEIGHT}-${PARENT}.json"
+until [[ "$PARENT" == "null-null" ]] ; do
+  echo "Downloading $PARENT block"
+  FILE="mainnet-${PARENT}.json"
   curl -sO https://storage.googleapis.com/mina_network_block_data/$FILE
   mina-archive-blocks --precomputed --archive-uri $PG_CONN $FILE | jq -rs .[-1].message
   rm $FILE # Clean up the block file
-  PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
+  PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs '.[-1].metadata | "\(.parent_height)-\(.parent_hash)"')"
 done
 
 sleep infinity
