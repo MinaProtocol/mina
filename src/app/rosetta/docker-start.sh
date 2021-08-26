@@ -46,7 +46,7 @@ PG_CONN="${PG_CONN:=postgres://pguser:pguser@127.0.0.1:5432/archive}"
 # Postgres
 echo "========================= STARTING POSTGRESQL ==========================="
 pg_ctlcluster ${POSTGRES_VERSION} main start
-dropdb $PG_CONN archive
+dropdb -U pguser archive
 
 echo "========================= POPULATING POSTGRESQL ==========================="
 DATE="$(date -Idate)_0000"
