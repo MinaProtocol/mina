@@ -272,12 +272,12 @@ module Writer = struct
               [%log warn]
                 ~metadata:[ ("pipe_name", `String my_name) ]
                 "Dropping message on pipe $pipe_name" ;
-            match Pipe.read_now writer.strict_reader.reader with
+            ( match Pipe.read_now writer.strict_reader.reader with
             | `Ok head ->
                 f head
             | _ ->
-                () ;
-                Pipe.write_without_pushback writer.writer data)
+                () ) ;
+            Pipe.write_without_pushback writer.writer data)
           ~normal_return:()
     | Buffered (`Capacity capacity, `Overflow (Call f)) ->
         handle_buffered_write writer data ~capacity
