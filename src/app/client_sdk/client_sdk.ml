@@ -152,8 +152,8 @@ let _ =
          let signed = Signed_command.Poly.{ payload; signer; signature } in
          if Signed_command.check_signature signed then Js._true else Js._false
 
-      method hashPayment (signed_payment : signed_payment)
-          : Js.js_string Js.t =
+       method hashPayment (signed_payment : signed_payment) : Js.js_string Js.t
+           =
          let payload : Signed_command_payload.t =
            payload_of_payment_js signed_payment##.payment
          in
@@ -162,9 +162,9 @@ let _ =
            |> Public_key.Compressed.of_base58_check_exn
            |> Public_key.decompress_exn
          in
-         Transaction_hash.hash_signed_command { payload; signer; signature = Signature.dummy }
-         |> Transaction_hash.to_base58_check
-         |> Js.string
+         Transaction_hash.hash_signed_command
+           { payload; signer; signature = Signature.dummy }
+         |> Transaction_hash.to_base58_check |> Js.string
 
        (** sign payment transaction payload with private key *)
        method signStakeDelegation (sk_base58_check_js : string_js)
@@ -203,19 +203,21 @@ let _ =
          let signed = Signed_command.Poly.{ payload; signer; signature } in
          if Signed_command.check_signature signed then Js._true else Js._false
 
-      method hashStakeDelegation (signed_stake_delegation : signed_stake_delegation)
-          : Js.js_string Js.t =
+       method hashStakeDelegation
+           (signed_stake_delegation : signed_stake_delegation)
+           : Js.js_string Js.t =
          let payload : Signed_command_payload.t =
-           payload_of_stake_delegation_js signed_stake_delegation##.stakeDelegation
+           payload_of_stake_delegation_js
+             signed_stake_delegation##.stakeDelegation
          in
          let signer =
-           signed_stake_delegation##.sender |> Js.to_string
-           |> Public_key.Compressed.of_base58_check_exn
+           signed_stake_delegation##.sender
+           |> Js.to_string |> Public_key.Compressed.of_base58_check_exn
            |> Public_key.decompress_exn
          in
-         Transaction_hash.hash_signed_command { payload; signer; signature = Signature.dummy }
-         |> Transaction_hash.to_base58_check
-         |> Js.string
+         Transaction_hash.hash_signed_command
+           { payload; signer; signature = Signature.dummy }
+         |> Transaction_hash.to_base58_check |> Js.string
 
        (** sign a transaction in Rosetta rendered format *)
        method signRosettaTransaction (sk_base58_check_js : string_js)

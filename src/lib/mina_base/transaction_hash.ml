@@ -29,7 +29,8 @@ let of_yojson = function
   | _ ->
       Error "Transaction_hash.of_yojson: Expected a string"
 
-let hash_signed_command = Fn.compose digest_string Signed_command.to_base58_check
+let hash_signed_command =
+  Fn.compose digest_string Signed_command.to_base58_check
 
 [%%ifdef consensus_mechanism]
 
