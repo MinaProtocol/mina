@@ -799,6 +799,10 @@ module Transition_frontier = struct
     in
     Gauge.v "best_tip_slot_time_sec" ~help ~namespace ~subsystem
 
+  let best_tip_block_height : Gauge.t =
+    let help = "Height of most recent best tip" in
+    Gauge.v "best_tip_block_height" ~help ~namespace ~subsystem
+
   (* TODO:
   let recently_finalized_snarked_txns : Gauge.t =
     let help = "toal # of snarked txns that have been finalized" in
