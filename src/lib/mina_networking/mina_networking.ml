@@ -78,6 +78,12 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.get_some_initial_peers_rpcs_sent
+
+    let received_counter =
+      Mina_metrics.Network.get_some_initial_peers_rpcs_received
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -134,6 +140,15 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter =
+      Mina_metrics.Network
+      .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent
+
+    let received_counter =
+      Mina_metrics.Network
+      .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -190,6 +205,12 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.answer_sync_ledger_query_rpcs_sent
+
+    let received_counter =
+      Mina_metrics.Network.answer_sync_ledger_query_rpcs_received
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -243,6 +264,12 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.get_transition_chain_rpcs_sent
+
+    let received_counter =
+      Mina_metrics.Network.get_transition_chain_rpcs_received
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -295,6 +322,13 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter =
+      Mina_metrics.Network.get_transition_chain_proof_rpcs_sent
+
+    let received_counter =
+      Mina_metrics.Network.get_transition_chain_proof_rpcs_received
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -348,6 +382,12 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.get_transition_knowledge_rpcs_sent
+
+    let received_counter =
+      Mina_metrics.Network.get_transition_knowledge_rpcs_received
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -406,6 +446,11 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.get_ancestry_rpcs_sent
+
+    let received_counter = Mina_metrics.Network.get_ancestry_rpcs_received
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -467,6 +512,11 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.ban_notify_rpcs_sent
+
+    let received_counter = Mina_metrics.Network.ban_notify_rpcs_received
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -522,6 +572,11 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.get_best_tip_rpcs_sent
+
+    let received_counter = Mina_metrics.Network.get_best_tip_rpcs_received
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -662,6 +717,11 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.get_node_status_rpcs_sent
+
+    let received_counter = Mina_metrics.Network.get_node_status_rpcs_received
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -774,6 +834,7 @@ module Rpcs = struct
         : ( Get_transition_chain_proof.query
           , Get_transition_chain_proof.response )
           rpc
+    | Get_node_status : (Get_node_status.query, Get_node_status.response) rpc
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
@@ -801,6 +862,8 @@ module Rpcs = struct
         (module Get_transition_knowledge)
     | Get_transition_chain_proof ->
         (module Get_transition_chain_proof)
+    | Get_node_status ->
+        (module Get_node_status)
     | Get_ancestry ->
         (module Get_ancestry)
     | Ban_notify ->
@@ -819,27 +882,50 @@ module Rpcs = struct
     match (rpc, impl_rpc) with
     | Get_some_initial_peers, Get_some_initial_peers ->
         Some (do_ f)
+    | Get_some_initial_peers, _ ->
+        None
     | ( Get_staged_ledger_aux_and_pending_coinbases_at_hash
       , Get_staged_ledger_aux_and_pending_coinbases_at_hash ) ->
         Some (do_ f)
+    | Get_staged_ledger_aux_and_pending_coinbases_at_hash, _ ->
+        None
     | Answer_sync_ledger_query, Answer_sync_ledger_query ->
         Some (do_ f)
+    | Answer_sync_ledger_query, _ ->
+        None
     | Get_transition_chain, Get_transition_chain ->
         Some (do_ f)
+    | Get_transition_chain, _ ->
+        None
+    | Get_transition_knowledge, Get_transition_knowledge ->
+        Some (do_ f)
+    | Get_transition_knowledge, _ ->
+        None
     | Get_transition_chain_proof, Get_transition_chain_proof ->
         Some (do_ f)
+    | Get_transition_chain_proof, _ ->
+        None
+    | Get_node_status, Get_node_status ->
+        Some (do_ f)
+    | Get_node_status, _ ->
+        None
     | Get_ancestry, Get_ancestry ->
         Some (do_ f)
+    | Get_ancestry, _ ->
+        None
     | Ban_notify, Ban_notify ->
         Some (do_ f)
+    | Ban_notify, _ ->
+        None
     | Get_best_tip, Get_best_tip ->
         Some (do_ f)
+    | Get_best_tip, _ ->
+        None
     | Consensus_rpc rpc_a, Consensus_rpc rpc_b ->
         Consensus.Hooks.Rpcs.match_handler
           (Rpc_handler {rpc= rpc_b; f; cost; budget})
           rpc_a ~do_
-    (* TODO: Why is there a catch-all here? *)
-    | _ ->
+    | Consensus_rpc _, _ ->
         None
 end
 
