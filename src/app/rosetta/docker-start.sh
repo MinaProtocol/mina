@@ -112,4 +112,4 @@ until [[ "$PARENT" == "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d" ]] 
   PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
 done
 
-tail -f mina.log
+sleep infinity
