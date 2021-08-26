@@ -98,7 +98,7 @@ external signString: (codaSDK, privateKey, string) => signature = "signString";
  */
 [@genType]
 let signMessage =
-  (. message: string, key: keypair) => {
+  (message: string, key: keypair) => {
     publicKey: key.publicKey,
     signature: signString(codaSDK, key.privateKey, message),
     payload: message,
@@ -116,7 +116,7 @@ external verifyStringSignature: (codaSDK, signature, publicKey, string) => bool 
  */
 [@genType]
 let verifyMessage =
-  (. signedMessage: signed(string)) => {
+  (signedMessage: signed(string)) => {
     verifyStringSignature(
       codaSDK,
       signedMessage.signature,
@@ -214,7 +214,7 @@ external signPayment: (codaSDK, privateKey, payment_js) => signed_js =
  */
 [@genType]
 let signPayment =
-  (. payment: payment, key: keypair) => {
+  (payment: payment, key: keypair) => {
     let memo = value(~default="", payment.memo);
     // Stringify all numeric inputs since they may be passed as
     // number/bigint in TS/JS
@@ -275,7 +275,7 @@ external signStakeDelegation:
  */
 [@genType]
 let signStakeDelegation =
-  (. stakeDelegation: stakeDelegation, key: keypair) => {
+  (stakeDelegation: stakeDelegation, key: keypair) => {
     let memo = value(~default="", stakeDelegation.memo);
     // Stringify all numeric inputs since they may be passed as
     // number/bigint in TS/JS
@@ -385,6 +385,97 @@ let verifyStakeDelegationSignature =
     Js.String.make(value(~default=defaultValidUntil, payload.validUntil));
 
   verifyStakeDelegationSignature(
+    codaSDK,
+    {
+      "sender": signedStakeDelegation.publicKey,
+      "signature": signedStakeDelegation.signature,
+      "stakeDelegation": {
+        "common": {
+          "fee": fee,
+          "feePayer": payload.from,
+          "nonce": nonce,
+          "validUntil": validUntil,
+          "memo": memo,
+        },
+        "delegationPayload": {
+          "newDelegate": payload.to_,
+          "delegator": payload.from,
+        },
+      },
+    },
+  );
+};
+
+[@bs.send]
+external hashPayment:
+  (codaSDK, signed_payment_js) => string =
+  "hashPayment";
+
+/**
+  * Compute the hash of a signed payment.
+  *
+  * @param signedPayment - A signed payment transaction
+  * @returns A transaction hash
+  */
+[@genType]
+let hashPayment = (signedPayment: signed(payment)) => {
+  let payload = signedPayment.payload;
+  // Stringify all numeric inputs since they may be passed as
+  // number/bigint in TS/JS
+  let memo = value(~default="", payload.memo);
+  let fee = Js.String.make(payload.fee);
+  let amount = Js.String.make(payload.amount);
+  let nonce = Js.String.make(payload.nonce);
+  let validUntil =
+    Js.String.make(value(~default=defaultValidUntil, payload.validUntil));
+
+  hashPayment(
+    codaSDK,
+    {
+      "sender": signedPayment.publicKey,
+      "signature": signedPayment.signature,
+      "payment": {
+        "common": {
+          "fee": fee,
+          "feePayer": payload.from,
+          "nonce": nonce,
+          "validUntil": validUntil,
+          "memo": memo,
+        },
+        "paymentPayload": {
+          "source": payload.from,
+          "receiver": payload.to_,
+          "amount": amount,
+        },
+      },
+    },
+  );
+};
+
+[@bs.send]
+external hashStakeDelegation:
+  (codaSDK, signed_stake_delegation_js) => string =
+  "hashStakeDelegation";
+
+/**
+  * Compute the hash of a signed stake delegation.
+  *
+  * @param signedStakeDelegation - A signed stake delegation
+  * @returns A transaction hash
+  */
+[@genType]
+let hashStakeDelegation =
+    (signedStakeDelegation: signed(stakeDelegation)) => {
+  let payload = signedStakeDelegation.payload;
+  // Stringify all numeric inputs since they may be passed as
+  // number/bigint in TS/JS
+  let memo = value(~default="", payload.memo);
+  let fee = Js.String.make(payload.fee);
+  let nonce = Js.String.make(payload.nonce);
+  let validUntil =
+    Js.String.make(value(~default=defaultValidUntil, payload.validUntil));
+
+  hashStakeDelegation(
     codaSDK,
     {
       "sender": signedStakeDelegation.publicKey,
