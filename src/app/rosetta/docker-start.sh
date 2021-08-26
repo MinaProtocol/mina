@@ -57,14 +57,23 @@ tar -xvf o1labs-archive-dump.tar.gz
 # It would help to know the block height of this dump in addition to the date
 psql -f archive-dump-$DATE.sql "${PG_CONN}"
 
-# It would help to get this from the blocks auditor output
-PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
-until [[ "$PARENT" != "null" ]] ; do
-  HEIGHT="$(curl -s https://api.minaexplorer.com/blocks/$PARENT | jq -rs .block.blockHeight)"
+# Wait until there is a block missing
+until [[ "$PARENT" != "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d" ]] ; do
+  PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
+  sleep 5
+done
+
+# Continue until no more blocks are missing
+# 3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d is the parent hash of the genesis block
+until [[ "$PARENT" == "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d" ]] ; do
+  # It would help to get this from the blocks auditor output instead of minaexplorer
+  HEIGHT="$(curl -s https://api.minaexplorer.com/blocks/$PARENT | jq -rs .[0].block.blockHeight)"
+  echo "Downloading $PARENT block at height $HEIGHT"
   FILE="mainnet-${HEIGHT}-${PARENT}.json"
-  curl -O https://storage.googleapis.com/mina_network_block_data/$FILE
-  mina-archive-blocks --precomputed --archive-uri $PG_CONN $FILE
-  rm $FILE
+  curl -sO https://storage.googleapis.com/mina_network_block_data/$FILE
+  mina-archive-blocks --precomputed --archive-uri $PG_CONN $FILE | jq -rs .[-1].message
+  rm $FILE # Clean up the block file
+  PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
 done
 
 # Rosetta
