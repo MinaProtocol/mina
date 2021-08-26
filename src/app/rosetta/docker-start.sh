@@ -85,7 +85,7 @@ echo "========================= STARTING DAEMON connected to MAINNET with GRAPQL
 echo "MINA Flags: $MINA_FLAGS -config-file ${MINA_CONFIG_FILE}"
 mina daemon \
   --config-file ${MINA_CONFIG_FILE} \
-  ${MINA_FLAGS} $@ & > mina.log
+  ${MINA_FLAGS} $@ &
 
 # wait for it to settle
 sleep 15
@@ -95,6 +95,7 @@ echo "========================= POPULATING MISSING BLOCKS SINCE $DATE ==========
 PARENT=3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d
 until [[ "$PARENT" != "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d" ]] ; do
   PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
+  echo "PARENT BLOCK HASH: $PARENT"
   sleep 5
 done
 
