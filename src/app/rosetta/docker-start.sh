@@ -49,6 +49,8 @@ pg_ctlcluster ${POSTGRES_VERSION} main start
 #sudo -u postgres createdb -O pguser archive
 #sudo -u postgres dropdb archive
 
+sleep 5
+
 echo "========================= POPULATING POSTGRESQL ==========================="
 DATE="$(date -Idate)_0000"
 curl "https://storage.googleapis.com/mina-archive-dumps/${MINA_NETWORK}-archive-dump-${DATE}.sql.tar.gz" -o o1labs-archive-dump.tar.gz
@@ -66,7 +68,7 @@ mina-rosetta${MINA_SUFFIX} \
   --port ${MINA_ROSETTA_PORT} &
 
 # wait for it to settle
-sleep 3
+sleep 5
 
 # Archive
 echo "========================= STARTING ARCHIVE NODE on PORT ${MINA_ARCHIVE_PORT} ==========================="
@@ -78,7 +80,7 @@ mina-archive run \
   --server-port ${MINA_ARCHIVE_PORT} &
 
 # wait for it to settle
-sleep 6
+sleep 10
 
 # Daemon
 echo "========================= STARTING DAEMON connected to ${MINA_NETWORK^^} with GRAPQL on PORT ${MINA_GRAPHQL_PORT}==========================="
@@ -88,7 +90,7 @@ mina${MINA_SUFFIX} daemon \
   ${MINA_FLAGS} $@ &
 
 # wait for it to settle
-sleep 15
+sleep 30
 
 echo "========================= POPULATING MISSING BLOCKS SINCE $DATE ==========================="
 # Wait until there is a block missing
@@ -96,7 +98,7 @@ PARENT=null
 until [[ "$PARENT" != "null" ]] ; do
   PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
   echo "FINDING PARENT BLOCK HASH: $(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].message)"
-  sleep 5
+  sleep 300 # Wait for the daemon to catchup and start downloading new blocks
 done
 
 # Continue until no more blocks are missing
@@ -104,7 +106,7 @@ until [[ "$PARENT" == "null" ]] ; do
   PARENT_FILE="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs '.[-1].metadata | "'${MINA_NETWORK}'-\(.parent_height)-\(.parent_hash).json"')"
   echo "Downloading $PARENT_FILE block"
   curl -sO https://storage.googleapis.com/mina_network_block_data/$FILE
-  mina-archive-blocks --precomputed --archive-uri $PG_CONN $FILE | jq -rs .[-1].message && rm $FILE
+  mina-archive-blocks --precomputed --archive-uri $PG_CONN $FILE | jq -rs '"[BOOTSTRAP] Populated database with old block: \(.[-1].message)"' && rm $FILE
   PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
 done
 
