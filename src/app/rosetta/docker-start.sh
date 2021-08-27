@@ -29,6 +29,7 @@ export MINA_LIBP2P_HELPER_PATH=/usr/local/bin/libp2p_helper
 export MINA_NETWORK=${MINA_NETWORK:=mainnet}
 export MINA_SUFFIX=${MINA_SUFFIX:=}
 export MINA_CONFIG_FILE=/genesis_ledgers/${MINA_NETWORK}.json
+export MINA_CLIENT_TRUSTLIST=${MINA_CLIENT_TRUSTLIST}
 export PEER_LIST_URL=https://storage.googleapis.com/seed-lists/${MINA_NETWORK}_seeds.txt
 # Allows configuring the port that each service runs on.
 # To connect to a network, the MINA_DAEMON_PORT needs to be publicly accessible.
