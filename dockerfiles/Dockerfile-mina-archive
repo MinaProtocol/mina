@@ -27,10 +27,6 @@ RUN apt-get -y update \
       lsb-release \
       gnupg
 
-RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
-  && RELEASE=$(lsb_release -cs) \
-  && echo "deb http://apt.postgresql.org/pub/repos/apt/ ${RELEASE}"-pgdg main | tee /etc/apt/sources.list.d/pgdg.list
-
 # Dependencies
 RUN apt-get -y update \
     && apt-get -y upgrade \
@@ -46,7 +42,7 @@ RUN apt-get -y update \
         ca-certificates \
         dnsutils \
         tzdata \
-        postgresql-11 \
+        postgresql \
         postgresql-contrib \
         apt-utils \
         procps \

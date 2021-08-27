@@ -39,7 +39,7 @@ spec:
             env:
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: postgres:11-alpine
+            image: postgres:10-alpine
             imagePullPolicy: IfNotPresent
             name: devnet2-dump-archive-cronjob
             resources: {}
