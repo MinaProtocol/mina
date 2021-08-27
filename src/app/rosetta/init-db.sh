@@ -8,9 +8,10 @@ PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${PO
 
 pg_ctlcluster ${POSTGRES_VERSION} main start
 psql "${PG_CONN}" -c "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
-[[ "$?" == "0" ]] && echo "[WARN] Database already initialized!" && exit ${RETURN_CODE}
+RETURN_CODE=$?
+[[ "$RETURN_CODE" == "0" ]] && echo "[WARN] Database already initialized!" && exit ${RETURN_CODE}
 
-mkdir -p ${POSTGRES_DATA_DIR} \
+mkdir -p ${POSTGRES_DATA_DIR}
 chown postgres ${POSTGRES_DATA_DIR}
 
 echo "Initializing postgresql version $POSTGRES_VERSION"
