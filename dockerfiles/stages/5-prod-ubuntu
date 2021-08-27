@@ -48,6 +48,13 @@ COPY --from=builder /home/opam/mina/src/app/rosetta /rosetta
 COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
 COPY --from=builder /home/opam/mina/src/app/archive/create_schema.sql /archive/
 
+USER postgres
+
+RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
+  && echo "data_directory = '/data/postgresql'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
+  && echo "listen_addresses='*'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
+  && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf \
+
 USER root
 
 # Generate en_US.UTF-8 to allow use of O(1) Labs DB dumps

@@ -18,11 +18,7 @@ echo "Initializing postgresql version $POSTGRES_VERSION"
 pg_dropcluster --stop ${POSTGRES_VERSION} main
 pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} main
 
-sudo -u postgres echo "data_directory = '/data/postgresql'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf
-sudo -u postgres echo "listen_addresses='*'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf
-sudo -u postgres echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf
-
-sudo -u postgres /etc/init.d/postgresql start
+/etc/init.d/postgresql start
 
 sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
 sudo -u postgres createdb -O ${POSTGRES_USERNAME} ${POSTGRES_DBNAME}
