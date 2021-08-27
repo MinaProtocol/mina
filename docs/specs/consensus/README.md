@@ -484,6 +484,8 @@ Since Mina is succinct this means that it must stored the checkpoints for the cu
 
 ### 3.3.1 `initCheckpoints`
 
+**WIP**
+
 This algorithm initializes the checkpoints for genesis block `G`
 
 ```rust
@@ -597,6 +599,8 @@ fn isWindowStop(s, v) -> bool
 
 ### 3.4.2 `shiftWindow`
 
+**WIP**
+
 <!--
 This algorithm is responsible for shifting the sliding window.  It inputs the sliding window `W` = [d<sub>1</sub>,...,d<sub>w</sub>] and the current sub window densities `C = [d<sub>w+1</sub>,...,d<sub>w+v</sub>] and then outputs the result `W'` = [d<sub>1+v</sub>,...,d<sub>w+v</sub>], where `v` is the shift parameter.
 
@@ -636,6 +640,8 @@ fn initSubWindowDensities(G) -> ()
 
 ### 3.4.4 `updateSubWindowDensities`
 
+**WIP**
+
 This algorithm updates the sub-window densities of the block being created `B` based on its parent block `P`.  It inputs the blocks `P` and `B` and updates `B`'s sub window densities according to the description in [Section 3.4](#34-window-min-density).
 
 ```rust
@@ -647,6 +653,8 @@ fn updateSubWindowDensities(P, B) -> ()
 ```
 
 ### 3.4.5 `getMinDen`
+
+**WIP**
 
 This function returns the current minimum density of a chain.  It inputs a chain `C` and the `max_slot` observed between `C`  and the alternative chain (See [selectSecureChain](#42-select-chain)).
 
@@ -725,6 +733,8 @@ Things a peer MUST do to initialize consensus includes
 | `supercharge_coinbase`                   | `false` |
 
 **JSON**
+
+**WIP**
 
 The following JSON specifies most of the genesis block (work in progress).
 
