@@ -45,6 +45,7 @@ PG_CONN="${PG_CONN:=postgres://pguser:pguser@127.0.0.1:5432/archive}"
 
 # Postgres
 echo "========================= STARTING POSTGRESQL ==========================="
+./init-db.sh /data/postgresql archive
 pg_ctlcluster ${POSTGRES_VERSION} main start
 #sudo -u postgres createdb -O pguser archive
 #sudo -u postgres dropdb archive
@@ -106,7 +107,8 @@ until [[ "$PARENT" == "null" ]] ; do
   PARENT_FILE="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs '.[-1].metadata | "'${MINA_NETWORK}'-\(.parent_height)-\(.parent_hash).json"')"
   echo "Downloading $PARENT_FILE block"
   curl -sO https://storage.googleapis.com/mina_network_block_data/$FILE
-  mina-archive-blocks --precomputed --archive-uri $PG_CONN $FILE | jq -rs '"[BOOTSTRAP] Populated database with old block: \(.[-1].message)"' && rm $FILE
+  mina-archive-blocks --precomputed --archive-uri $PG_CONN $FILE | jq -rs '"[BOOTSTRAP] Populated database with old block: \(.[-1].message)"'
+  rm $FILE
   PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
 done
 

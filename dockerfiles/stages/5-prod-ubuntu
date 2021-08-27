@@ -31,13 +31,11 @@ RUN apt-get -y update \
     libjemalloc1 \
     libprocps6 \
     libffi6 \
-    jq
+    jq \
+    sudo
 
-# Make all directories for configuration and empty s3 cache dirs
-RUN mkdir -p /tmp/s3_cache_dir \
-    && mkdir -p /tmp/mina_cache_dir \
-    && mkdir -p ${POSTGRES_DATA_DIR} \
-    && chown postgres ${POSTGRES_DATA_DIR}
+# Install rosetta-cli
+RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/master/scripts/install.sh | sh -s
 
 RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
   && echo "$PK" >  ${MINA_CONFIG_DIR}/wallets/store/$PK.pub \
@@ -50,25 +48,6 @@ COPY --from=builder /home/opam/mina/src/app/rosetta /rosetta
 COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
 COPY --from=builder /home/opam/mina/src/app/archive/create_schema.sql /archive/
 
-USER postgres
-
-# TODO: use POSTGRES_DATA_DIR variable more consistently and ensure proper escaping
-# TODO: move this to a more useful and easy to maintain script in the rosetta directory for this purpose
-RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
-    && echo "$POSTGRES_VERSION" "$(psql -V)" \
-    && pg_dropcluster --stop ${POSTGRES_VERSION} main \
-    && pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} main \
-    && echo "data_directory = '/data/postgresql'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
-    && echo "listen_addresses='*'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
-    && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf \
-    && /etc/init.d/postgresql start \
-    && psql --command "CREATE USER pguser WITH SUPERUSER PASSWORD 'pguser';" \
-    && createdb -O pguser archive
-
-# Leave database uninitialized so that rosetta scripts can start from scretch
-#    && psql postgresql://pguser:pguser@localhost:5432/archive -f /archive/create_schema.sql
-
-ENV USER pguser
 USER root
 
 # Generate en_US.UTF-8 to allow use of O(1) Labs DB dumps
