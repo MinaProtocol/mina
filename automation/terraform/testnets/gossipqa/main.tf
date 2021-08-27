@@ -39,14 +39,14 @@ provider "google" {
 #   type = number
 
 #   description = "Number of online whales for the network to run"
-#   default     = 2
+#   default     = 24
 # }
 
 # variable "fish_count" {
 #   type = number
 
 #   description = "Number of online fish for the network to run"
-#   default     = 2
+#   default     = 72
 # }
 
 variable "seed_count" {
@@ -55,6 +55,7 @@ variable "seed_count" {
 
 variable "plain_node_count" {
   default     = 2
+  # default     = 10
 }
 
 locals {

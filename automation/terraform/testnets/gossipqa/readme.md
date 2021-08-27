@@ -14,4 +14,8 @@ Run Instructions
 
 4: The above steps only have to be done once.  When all that is done, run `terraform apply` in `./automation/terraform/testnets/gossipqa`
 
-5: when you're all done, clean up with either `terraform destroy`, or `kubectl delete namespace gossipqa`
+5: When the network is fully deployed, you can deploy the txn burst cronjob.  copy the file `helm/cron_jobs/devnet-txn-burst-cronjob.yaml`, make modifications as needed to your new file, then deploy it with `kubectl apply -f helm/cron_jobs/<your new file>.yaml`.  you may need to modify the cronjob scheduling, the keys which are to be mounted and used, as well as the arguments to `batch_txn_tool.exe`.
+
+
+when you're all done, clean up with either `terraform destroy`, or `kubectl delete namespace gossipqa`
+
