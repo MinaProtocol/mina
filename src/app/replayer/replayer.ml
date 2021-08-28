@@ -779,7 +779,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
         | Ok ids ->
             return ids
         | Error msg ->
-            [%log error] "Error getting user command ids and slots"
+            [%log error] "Error getting user command ids"
               ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
             exit 1
       in
@@ -912,15 +912,6 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
         in
         let log_on_slot_change curr_global_slot =
           if Int64.( > ) curr_global_slot last_global_slot then (
-            if Int64.equal curr_global_slot 12004L then (
-              Format.eprintf "GLOBAL SLOT: %Ld@." last_global_slot ;
-              let accounts = Ledger.to_list ledger in
-              Format.eprintf "LEDGER: %s@."
-                (Yojson.Safe.pretty_to_string
-                   (Runtime_config.Accounts.to_yojson
-                      (List.map accounts ~f:(fun a ->
-                           Genesis_ledger_helper.Accounts.Single.of_account a
-                             None)))) ) ;
             log_ledger_hash_after_last_slot () ;
             log_state_hash_on_next_slot curr_global_slot )
         in
