@@ -17,10 +17,10 @@ spec:
             - /bin/bash
             - -c
             - '
-echo "/dns4/seed-1.gossipqa.o1test.net/tcp/10000/p2p/12D3KooWLpjCfeBWdiVRG3mqRS5ixfPQpF4gRJooFiXMa8wGpt1A
-/dns4/seed-2.gossipqa.o1test.net/tcp/10001/p2p/12D3KooWS5MQzph8pjCQ9uvjhzsEDos5P8rysBFR673Hs4UrnwTc" > /gossipqa_seed_list.txt;
+printf "/dns4/seed-1.gossipqa.o1test.net/tcp/10000/p2p/12D3KooWLpjCfeBWdiVRG3mqRS5ixfPQpF4gRJooFiXMa8wGpt1A\n/dns4/seed-2.gossipqa.o1test.net/tcp/10001/p2p/12D3KooWS5MQzph8pjCQ9uvjhzsEDos5P8rysBFR673Hs4UrnwTc" > /gossipqa_seed_list.txt;
+
 echo "booting mina daemon";
-mina daemon --generate-genesis-proof true --peer-list-file /gossipqa_seed_list.txt --background;
+mina daemon --config-file /config/daemon.json --generate-genesis-proof true --peer-list-file /gossipqa_seed_list.txt --background;
 sleep 480;
 echo "done sleeping";
 while true; do
@@ -67,12 +67,20 @@ echo "ran batch txns";
               name: whale-key
             - mountPath: /keys/fish-key/
               name: fish-key
+            - mountPath: /config
+              name: daemon-config
           dnsPolicy: ClusterFirst
           restartPolicy: Never
           schedulerName: default-scheduler
           securityContext: {}
           terminationGracePeriodSeconds: 30
           volumes: [
+            {
+              "name":"daemon-config",
+              "configMap": {
+                "name": "seed-daemon-config"
+              }
+            },
             {
               "name": "whale-key",
               "secret": {
