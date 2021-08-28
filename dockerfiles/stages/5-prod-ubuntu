@@ -53,14 +53,14 @@ USER postgres
 RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
   && echo "data_directory = '/data/postgresql'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
   && echo "listen_addresses='*'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
-  && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf \
+  && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf
 
 USER root
 
+WORKDIR /rosetta
+
 # Generate en_US.UTF-8 to allow use of O(1) Labs DB dumps
 RUN locale-gen en_US.UTF-8
-
-WORKDIR /rosetta
 
 EXPOSE 3087
 EXPOSE $MINA_DAEMON_PORT
