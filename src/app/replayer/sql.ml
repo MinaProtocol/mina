@@ -84,6 +84,43 @@ module Block = struct
 
   let get_unparented (module Conn : Caqti_async.CONNECTION) () =
     Conn.collect_list unparented_query ()
+
+  let max_slot_query =
+    Caqti_request.find Caqti_type.unit Caqti_type.int
+      {sql| SELECT MAX(global_slot) FROM blocks |sql}
+
+  let get_max_slot (module Conn : Caqti_async.CONNECTION) () =
+    Conn.find max_slot_query ()
+
+  let state_hashes_by_slot_query =
+    Caqti_request.collect Caqti_type.int Caqti_type.string
+      {sql| SELECT state_hash FROM blocks WHERE global_slot = $1 |sql}
+
+  let get_state_hashes_by_slot (module Conn : Caqti_async.CONNECTION) slot =
+    Conn.collect_list state_hashes_by_slot_query slot
+
+  (* find all blocks, working back from block with given state hash *)
+  let chain_query =
+    Caqti_request.collect Caqti_type.string Caqti_type.string
+      {sql| WITH RECURSIVE chain AS (
+
+              SELECT id,parent_id FROM blocks b WHERE b.state_hash = ?
+
+              UNION ALL
+
+              SELECT b.id,b.parent_id FROM blocks b
+
+              INNER JOIN chain
+
+              ON b.id = chain.parent_id AND NOT chain.parent_id IS NULL
+           )
+
+           SELECT 'ok' AS found_chain FROM chain c
+
+      |sql}
+
+  let get_chain (module Conn : Caqti_async.CONNECTION) state_hash =
+    Conn.collect_list chain_query state_hash
 end
 
 module User_command_ids = struct
