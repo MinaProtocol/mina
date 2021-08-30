@@ -40,12 +40,12 @@ done;
 mkdir /tmpkeys;
 chmod 700 /tmpkeys;
 
-cp /keys/whale-key/online-whale-account-1-key /tmpkeys;
+cp /keys/whale-key1/online-whale-account-1-key /tmpkeys;
 chmod 600 /tmpkeys/online-whale-account-1-key;
-cp /keys/fish-key/online-fish-account-1-key /tmpkeys;
-chmod 600 /tmpkeys/online-fish-account-1-key;
+cp /keys/whale-key2/online-whale-account-2-key /tmpkeys;
+chmod 600 /tmpkeys/online-whale-account-2-key;
 
-./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe gen-there-and-back-txns --num-txn-per-acct 100 --rate-limit-level 1 --rate-limit-interval 5000 --origin-sender-sk-path "/tmpkeys/online-whale-account-1-key" --origin-sender-sk-pw "naughty blue worm" --returner-sk-path "/tmpkeys/online-fish-account-1-key" --returner-sk-pw "naughty blue worm";
+./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe gen-there-and-back-txns --num-txn-per-acct 100 --rate-limit-level 1 --rate-limit-interval 5000 --origin-sender-sk-path "/tmpkeys/online-whale-account-1-key" --origin-sender-sk-pw "naughty blue worm" --returner-sk-path "/tmpkeys/online-whale-account-2-key" --returner-sk-pw "naughty blue worm";
 
 echo "ran batch txns";
 
@@ -63,10 +63,10 @@ echo "ran batch txns";
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
             volumeMounts:
-            - mountPath: /keys/whale-key/
-              name: whale-key
-            - mountPath: /keys/fish-key/
-              name: fish-key
+            - mountPath: /keys/whale-key1/
+              name: whale-key1
+            - mountPath: /keys/whale-key2/
+              name: whale-key2
             - mountPath: /config
               name: daemon-config
           dnsPolicy: ClusterFirst
@@ -82,7 +82,7 @@ echo "ran batch txns";
               }
             },
             {
-              "name": "whale-key",
+              "name": "whale-key1",
               "secret": {
                 "defaultMode": 0600,
                 "items": [
@@ -99,20 +99,20 @@ echo "ran batch txns";
               }
             },
             {
-              "name": "fish-key",
+              "name": "whale-key2",
               "secret": {
                 "defaultMode": 0600,
                 "items": [
                   {
                     "key": "key",
-                    "path": "online-fish-account-1-key"
+                    "path": "online-whale-account-2-key"
                   },
                   {
                     "key": "pub",
-                    "path": "online-fish-account-1-key.pub"
+                    "path": "online-whale-account-2-key.pub"
                   }
                 ],
-                "secretName": "online-fish-account-1-key"
+                "secretName": "online-whale-account-2-key"
               }
             }
 
