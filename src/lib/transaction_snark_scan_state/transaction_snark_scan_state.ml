@@ -1,6 +1,8 @@
 open Core_kernel
+open Async_kernel
 open Mina_base
 open Currency
+open O1trace
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -282,12 +284,11 @@ module P = struct
   type t = Ledger_proof_with_sok_message.t
 end
 
-module Make_statement_scanner
-    (M : Monad_with_Or_error_intf) (Verifier : sig
-        type t
+module Make_statement_scanner (Verifier : sig
+  type t
 
-        val verify : verifier:t -> P.t list -> sexp_bool M.Or_error.t
-    end) =
+  val verify : verifier:t -> P.t list -> sexp_bool Deferred.Or_error.t
+end) =
 struct
   module Fold = Parallel_scan.State.Make_foldable (Monad.Ident)
 
@@ -295,9 +296,8 @@ struct
 
   let time label f =
     let logger = Lazy.force logger in
-    let open M.Let_syntax in
     let start = Core.Time.now () in
-    let%map x = f () in
+    let%map x = trace_recurring label f in
     [%log debug]
       ~metadata:
         [("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))]
@@ -351,8 +351,9 @@ struct
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
   let scan_statement ~constraint_constants tree ~verifier :
-      (Transaction_snark.Statement.t, [`Error of Error.t | `Empty]) Result.t
-      M.t =
+      ( Transaction_snark.Statement.t
+      , [`Error of Error.t | `Empty] )
+      Deferred.Result.t =
     let timer = Timer.create () in
     let module Acc = struct
       type t = (Transaction_snark.Statement.t * P.t list) option
@@ -443,9 +444,8 @@ struct
     Timer.log "scan_statement" timer ;
     match res with
     | Ok None ->
-        M.return (Error `Empty)
+        return (Error `Empty)
     | Ok (Some (res, proofs)) -> (
-        let open M.Let_syntax in
         match%map
           ksprintf time "verify:%s" __LOC__ (fun () ->
               Verifier.verify ~verifier proofs )
@@ -457,7 +457,7 @@ struct
         | Error e ->
             Error (`Error e) )
     | Error e ->
-        M.return (Error (`Error e))
+        return (Error (`Error e))
 
   let check_invariants t ~constraint_constants ~verifier ~error_prefix
       ~ledger_hash_end:current_ledger_hash
@@ -467,7 +467,6 @@ struct
     let clarify_error cond err =
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
     in
-    let open M.Let_syntax in
     match%map
       time "scan_statement" (fun () ->
           scan_statement ~constraint_constants ~verifier t )
