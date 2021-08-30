@@ -29,6 +29,7 @@ export MINA_LIBP2P_HELPER_PATH=/usr/local/bin/libp2p_helper
 export MINA_NETWORK=${MINA_NETWORK:=mainnet}
 export MINA_SUFFIX=${MINA_SUFFIX:=}
 export MINA_CONFIG_FILE=/genesis_ledgers/${MINA_NETWORK}.json
+export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=/data/.mina-config}"
 export MINA_CLIENT_TRUSTLIST=${MINA_CLIENT_TRUSTLIST}
 export PEER_LIST_URL=https://storage.googleapis.com/seed-lists/${MINA_NETWORK}_seeds.txt
 # Allows configuring the port that each service runs on.
@@ -39,7 +40,7 @@ export MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
 export MINA_ARCHIVE_PORT=${MINA_ARCHIVE_PORT:=3086}
 export MINA_ROSETTA_PORT=${MINA_ROSETTA_PORT:=3087}
 export LOG_LEVEL="${LOG_LEVEL:=Debug}"
-DEFAULT_FLAGS="--peer-list-url ${PEER_LIST_URL} --external-port ${MINA_DAEMON_PORT} --rest-port ${MINA_GRAPHQL_PORT} -archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} -insecure-rest-server --log-level ${LOG_LEVEL} --log-json"
+DEFAULT_FLAGS="--config-dir ${MINA_CONFIG_DIR} --peer-list-url ${PEER_LIST_URL} --external-port ${MINA_DAEMON_PORT} --rest-port ${MINA_GRAPHQL_PORT} -archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} -insecure-rest-server --log-level ${LOG_LEVEL} --log-json"
 export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
 # Postgres database connection string and related variables
 POSTGRES_USERNAME=${POSTGRES_USERNAME:=pguser}
@@ -85,6 +86,8 @@ mina-archive run \
 sleep 10
 
 # Daemon
+echo "Removing daemon lockfile ${MINA_CONFIG_DIR}/.mina-lock"
+rm -f "${MINA_CONFIG_DIR}/.mina-lock"
 echo "========================= STARTING DAEMON connected to ${MINA_NETWORK^^} with GRAPQL on PORT ${MINA_GRAPHQL_PORT}==========================="
 echo "MINA Flags: $MINA_FLAGS -config-file ${MINA_CONFIG_FILE}"
 mina${MINA_SUFFIX} daemon \
