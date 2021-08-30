@@ -13,6 +13,8 @@ include T
 let create directory =
   let opts = Rocks.Options.create () in
   Rocks.Options.set_create_if_missing opts true ;
+  Rocks.Options.set_prefix_extractor opts
+    (Rocks.Options.SliceTransform.Noop.create_no_gc ()) ;
   {uuid= Uuid_unix.create (); db= Rocks.open_db ~opts directory}
 
 let create_checkpoint t dir =
@@ -25,6 +27,9 @@ let close t = Rocks.close t.db
 
 let get t ~(key : Bigstring.t) : Bigstring.t option =
   Rocks.get ?pos:None ?len:None ?opts:None t.db key
+
+let get_batch t ~(keys : Bigstring.t list) : Bigstring.t option list =
+  Rocks.multi_get t.db keys
 
 let set t ~(key : Bigstring.t) ~(data : Bigstring.t) : unit =
   Rocks.put ?key_pos:None ?key_len:None ?value_pos:None ?value_len:None
