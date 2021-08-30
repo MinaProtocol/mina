@@ -1097,6 +1097,8 @@ let start t =
     ~precomputed_values:t.config.precomputed_values
     ~block_reward_threshold:t.config.block_reward_threshold ;
   perform_compaction t ;
+  Node_status_service.start ~logger:t.config.logger
+    ~node_status_url:t.config.node_status_url ;
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
