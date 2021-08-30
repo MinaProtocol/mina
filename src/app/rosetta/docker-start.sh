@@ -107,9 +107,9 @@ done
 until [[ "$PARENT" == "null" ]] ; do
   PARENT_FILE="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs '.[-1].metadata | "'${MINA_NETWORK}'-\(.parent_height)-\(.parent_hash).json"')"
   echo "Downloading $PARENT_FILE block"
-  curl -sO https://storage.googleapis.com/mina_network_block_data/$FILE
-  mina-archive-blocks --precomputed --archive-uri $PG_CONN $FILE | jq -rs '"[BOOTSTRAP] Populated database with old block: \(.[-1].message)"'
-  rm $FILE
+  curl -sO "https://storage.googleapis.com/mina_network_block_data/$PARENT_FILE"
+  mina-archive-blocks --precomputed --archive-uri "$PG_CONN" "$PARENT_FILE" | jq -rs '"[BOOTSTRAP] Populated database with old block: \(.[-1].message)"'
+  rm "$PARENT_FILE"
   PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
 done
 
