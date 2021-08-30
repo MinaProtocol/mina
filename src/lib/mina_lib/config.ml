@@ -56,5 +56,6 @@ type t =
   ; block_reward_threshold: Currency.Amount.t option [@default None]
   ; uptime_url: Uri.t option [@default None]
   ; uptime_submitter_keypair: Keypair.t option [@default None]
-  ; stop_time: int }
+  ; stop_time: int
+  ; node_status_url: string option [@default None] }
 [@@deriving make]

@@ -401,6 +401,9 @@ let setup_daemon logger =
          program, for the associated private key that is being tracked by \
          this daemon. You cannot provide both `uptime-submitter-key` and \
          `uptime-submitter-pubkey`."
+  and node_status_url =
+    flag "--node-status-url" ~aliases:["node-status-url"] (optional string)
+      ~doc:"URL URL of the node status collection service"
   in
   fun () ->
     let open Deferred.Let_syntax in
@@ -1219,7 +1222,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
              ~archive_process_location ~log_block_creation ~precomputed_values
              ~start_time ?precomputed_blocks_path ~log_precomputed_blocks
              ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-             ~uptime_submitter_keypair ~stop_time ())
+             ~uptime_submitter_keypair ~stop_time ~node_status_url ())
       in
       { Coda_initialization.coda
       ; client_trustlist
