@@ -343,7 +343,12 @@ module type Base_ledger_intf = sig
 
   val location_of_account : t -> Account_id.t -> Location.t option
 
+  val location_of_account_batch :
+    t -> Account_id.t list -> (Account_id.t * Location.t option) list
+
   val get : t -> Location.t -> Account.t option
+
+  val get_batch : t -> Location.t list -> (Location.t * Account.t option) list
 
   val detached_signal : t -> unit Deferred.t
 end
