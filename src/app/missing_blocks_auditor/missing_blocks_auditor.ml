@@ -26,13 +26,17 @@ let main ~archive_uri () =
               ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
             exit 1
       in
-      List.iter missing_blocks ~f:(fun (block_id, state_hash, parent_hash) ->
-          [%log info] "Block has no parent in archive db"
-            ~metadata:
-              [ ("block_id", `Int block_id)
-              ; ("state_hash", `String state_hash)
-              ; ("parent_hash", `String parent_hash)
-              ]) ;
+      List.iter missing_blocks
+        ~f:(fun (block_id, state_hash, height, parent_hash) ->
+          if height > 1 then
+            [%log info] "Block has no parent in archive db"
+              ~metadata:
+                [ ("block_id", `Int block_id)
+                ; ("state_hash", `String state_hash)
+                ; ("height", `Int height)
+                ; ("parent_hash", `String parent_hash)
+                ; ("parent_height", `Int (height - 1))
+                ]) ;
       ()
 
 let () =
