@@ -83,7 +83,7 @@ let devnet_chain_id =
 
 let network_tag_of_graphql res =
   if String.equal (res#daemonStatus)#chainId mainnet_chain_id then "mainnet"
-  else if String.equal (res#daemonStatus)#chainId devnet_chain_id then "dev"
+  else if String.equal (res#daemonStatus)#chainId devnet_chain_id then "devnet"
   else "debug"
 
 module Validate_choice = struct
@@ -203,7 +203,7 @@ module List_ = struct
             (Result.return
                { Network_list_response.network_identifiers=
                    [ { Network_identifier.blockchain= "mina"
-                     ; network= "dev"
+                     ; network= "devnet"
                      ; sub_network_identifier= None } ] })
 
       let mainnet_env : 'gql Env.Mock.t =
