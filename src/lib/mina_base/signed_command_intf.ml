@@ -174,11 +174,10 @@ module type S = sig
   val sign :
     Signature_keypair.t -> Signed_command_payload.t -> With_valid_signature.t
 
-  val check_signature : ?signature_kind:Mina_signature_kind.t -> t -> bool
+  val check_signature : t -> bool
 
   val create_with_signature_checked :
-       ?signature_kind:Mina_signature_kind.t
-    -> Signature.t
+       Signature.t
     -> Public_key.Compressed.t
     -> Signed_command_payload.t
     -> With_valid_signature.t option
