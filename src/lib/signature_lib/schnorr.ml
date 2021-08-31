@@ -336,7 +336,12 @@ module type S = sig
 
   val sign : Private_key.t -> Message.t -> Signature.t
 
-  val verify : Signature.t -> Public_key.t -> Message.t -> bool
+  val verify :
+       ?signature_kind:Mina_signature_kind.t
+    -> Signature.t
+    -> Public_key.t
+    -> Message.t
+    -> bool
 end
 
 module Make
@@ -407,8 +412,19 @@ module Make
     let s = Curve.Scalar.(k + (e * d)) in
     (r, s)
 
-  let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
-    let e = Message.hash ~public_key:pk ~r m in
+  let verify ?signature_kind ((r, s) : Signature.t) (pk : Public_key.t)
+      (m : Message.t) =
+    let hash =
+      let open Mina_signature_kind in
+      match signature_kind with
+      | None ->
+          Message.hash
+      | Some Mainnet ->
+          Message.hash_for_mainnet
+      | Some Testnet ->
+          Message.hash_for_testnet
+    in
+    let e = hash ~public_key:pk ~r m in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
     match Curve.to_affine_exn r_pt with
     | rx, ry ->
