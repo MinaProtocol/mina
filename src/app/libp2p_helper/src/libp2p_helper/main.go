@@ -1573,7 +1573,7 @@ var validationTimeoutMetric = prometheus.NewCounter(prometheus.CounterOpts{
 })
 
 var validationTimeMetric = prometheus.NewGauge(prometheus.GaugeOpts{
-	Name: "Mina_libp2p_message_validation_time in ns",
+	Name: "Mina_libp2p_message_validation_time_ns",
 	Help: "Message validation time",
 })
 
