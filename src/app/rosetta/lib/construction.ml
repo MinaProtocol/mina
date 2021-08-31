@@ -492,7 +492,8 @@ module Parse = struct
     module T (M : Monad_fail.S) = struct
       type t =
         { verify_payment_signature:
-            payment:Transaction.Unsigned.Rendered.Payment.t
+            network_identifier : Rosetta_models.Network_identifier.t
+            ->  payment:Transaction.Unsigned.Rendered.Payment.t
             -> signature:string
             -> unit
             -> (bool, Errors.t) M.t
@@ -504,7 +505,7 @@ module Parse = struct
 
     let real : Real.t =
       { verify_payment_signature=
-          (fun ~payment ~signature () ->
+          (fun ~network_identifier ~payment ~signature () ->
              let open Deferred.Result.Let_syntax in
              let parse_pk ~which s =
                match Public_key.Compressed.of_base58_check s with
@@ -546,7 +547,13 @@ module Parse = struct
                  (* signature ill-formed, so invalid *)
                  false
                | Some signature ->
-                 match Signed_command.create_with_signature_checked signature signer payload with
+                 (* choose signature verification based on network *)
+                 let signature_kind : Mina_signature_kind.t =
+                   if String.equal network_identifier.network "mainnet"
+                   then Mainnet
+                   else Testnet
+                 in
+                 match Signed_command.create_with_signature_checked ~signature_kind signature signer payload with
                  | None ->
                    (* invalid signature *)
                    false
@@ -582,7 +589,7 @@ module Parse = struct
               | Some payment ->
                   (* Only perform signature validation on payments. *)
                   let%bind res =
-                    env.verify_payment_signature ~payment
+                    env.verify_payment_signature ~network_identifier:req.network_identifier ~payment
                       ~signature:signed_transaction.signature ()
                   in
                   if res then M.return ()
