@@ -36,8 +36,8 @@ module "kubernetes_testnet" {
   mina_points_image  = var.mina_points_image
   watchdog_image     = var.watchdog_image
 
-  coda_faucet_amount = var.coda_faucet_amount
-  coda_faucet_fee    = var.coda_faucet_amount
+  mina_faucet_amount = var.mina_faucet_amount
+  mina_faucet_fee    = var.mina_faucet_fee
 
   log_level           = var.log_level
   log_txn_pool_gossip = var.log_txn_pool_gossip

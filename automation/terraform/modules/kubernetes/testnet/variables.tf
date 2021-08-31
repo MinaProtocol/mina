@@ -76,7 +76,8 @@ variable "mina_agent_image" {
   default = "codaprotocol/coda-user-agent:0.1.4"
 }
 
-variable "coda_agent_active" {
+#this var doesn't actually hook up to anything
+variable "mina_agent_active" {
   type    = string
   default = "true"
 }

@@ -121,8 +121,8 @@ module "gossipqa" {
   ]
 
 
-  coda_faucet_amount = "10000000000"
-  coda_faucet_fee    = "100000000"
+  mina_faucet_amount = "10000000000"
+  mina_faucet_fee    = "100000000"
 
   agent_min_fee = "0.05"
   agent_max_fee = "0.1"
