@@ -1,8 +1,9 @@
+import { CircuitValue } from './circuit_value';
 import { Bool, Field, Circuit, Poseidon, AsFieldElements } from './snarky';
 
 let indexId = 0;
 
-class IndexBase {
+export class IndexBase {
   id: IndexId;
   value: Array<Bool>;
 
@@ -12,13 +13,52 @@ class IndexBase {
   }
 }
 
+class MerkleProofBase {
+  path: Array<Field>
+
+  constructor(path: Array<Field>) {
+    this.path = path;
+  }
+
+  verify(root:Field, index: Index, leaf: Field): Bool {
+    return root.equals(impliedRoot(index.value, this.path, leaf));
+  }
+
+  assertVerifies(root:Field, index: Index, leaf: Field): void {
+    checkMerklePath(root, index.value, this.path, leaf);
+  }
+}
+
+export function MerkleProofFactory(depth: number) {
+  return class MerkleProof extends MerkleProofBase {
+    constructor(path: Array<Field>) {
+      super(path);
+    }
+
+    static sizeInFieldElements(): number {
+      return depth;
+    }
+
+    static toFieldElements(x: MerkleProof): Array<Field> {
+      return x.path;
+    }
+
+    static ofFieldElements(xs: Array<Field>): MerkleProof {
+      if (xs.length !== depth) {
+        throw new Error(`MerkleTree: ofFieldElements expected array of length ${depth}, got ${xs.length}`);
+      }
+      return new MerkleProof(xs);
+    }
+  }
+}
+
 export function IndexFactory(depth: number) {
   return class Index extends IndexBase {
     constructor(value: Array<Bool>) {
       super(value);
     }
 
-    static sizeInFieldElements() {
+    static sizeInFieldElements(): number {
       return depth;
     }
 
@@ -47,8 +87,20 @@ export function IndexFactory(depth: number) {
   }
 }
 
-export const I32 = IndexFactory(32);
-export type I32 = InstanceType<typeof I32>;
+type Constructor<T> = { new (...args: any[]): T };
+
+function range(n: number): Array<number> {
+  let res = [];
+  for (let i = 0; i < n; ++i) {
+    res.push(i);
+  }
+  return res;
+}
+
+export const MerkleProof = range(128).map(MerkleProofFactory);
+export const Index = range(128).map(IndexFactory);
+export type MerkleProof = InstanceType<typeof MerkleProof[0]>;
+export type Index = InstanceType<typeof Index[0]>;
 
 // TODO: Put better value
 const emptyHashes: Field[] = [new Field(1234561789)];
@@ -290,7 +342,7 @@ export class Collection<A> {
     }
   }
 
-  set<I extends IndexBase>(i : I, x: A) {
+  set(i : Index, x: A) {
     let cachedPath = this.cachedPaths.get(i.id);
 
     let path : Array<Field>;
@@ -330,7 +382,7 @@ export class Collection<A> {
     this.root = newRoot;
   }
 
-  get<I extends IndexBase>(i : I): A {
+  get(i : Index): A {
     let cached = this.cachedValues.get(i.id);
     if (cached !== undefined) {
       return cached.value;
