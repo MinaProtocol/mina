@@ -98,13 +98,13 @@ variable "watchdog_image" {
 }
 
 # this must be a string to avoid scientific notation truncation
-variable "coda_faucet_amount" {
+variable "mina_faucet_amount" {
   type    = string
   default = "10000000000"
 }
 
 # this must be a string to avoid scientific notation truncation
-variable "coda_faucet_fee" {
+variable "mina_faucet_fee" {
   type    = string
   default = "100000000"
 }

@@ -10,7 +10,7 @@ locals {
 
   peers = var.additional_peers
 
-  coda_vars = {
+  mina_vars = {
     runtimeConfig        = var.runtime_config
     image                = var.mina_image
     useCustomEntrypoint  = var.use_custom_entrypoint
@@ -36,7 +36,7 @@ locals {
   seed_vars = {
     testnetName = var.testnet_name
     coda = {
-      runtimeConfig = local.coda_vars.runtimeConfig
+      runtimeConfig = local.mina_vars.runtimeConfig
       image         = var.mina_image
       useCustomEntrypoint  = var.use_custom_entrypoint
       customEntrypoint     = var.custom_entrypoint
@@ -76,7 +76,7 @@ locals {
   block_producer_vars = {
     testnetName = var.testnet_name
 
-    coda = local.coda_vars
+    coda = local.mina_vars
 
     healthcheck = local.healthcheck_vars
 
@@ -94,8 +94,8 @@ locals {
     bots = {
       image = var.mina_bots_image
       faucet = {
-        amount = var.coda_faucet_amount
-        fee    = var.coda_faucet_fee
+        amount = var.mina_faucet_amount
+        fee    = var.mina_faucet_fee
       }
     }
 
@@ -124,7 +124,7 @@ locals {
         useCustomEntrypoint  = var.use_custom_entrypoint
         customEntrypoint     = var.custom_entrypoint
         seedPeers     = local.peers
-        runtimeConfig = local.coda_vars.runtimeConfig
+        runtimeConfig = local.mina_vars.runtimeConfig
         seedPeersURL  = var.seed_peers_url
       }
       healthcheck = local.healthcheck_vars
@@ -161,7 +161,7 @@ locals {
   snark_vars = [
     for i, snark in var.snark_coordinators: {
       testnetName = var.testnet_name
-      coda        = local.coda_vars
+      coda        = local.mina_vars
       healthcheck = local.healthcheck_vars
       # coda = {
       #   seedPeers = var.seed_peers_url
@@ -198,7 +198,7 @@ locals {
   plain_node_vars = [
     for i, node in var.plain_node_configs: {
       testnetName = var.testnet_name
-      coda        = local.coda_vars
+      coda        = local.mina_vars
       healthcheck = local.healthcheck_vars
       name = node.name
     }
