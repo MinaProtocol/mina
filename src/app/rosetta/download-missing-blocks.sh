@@ -18,16 +18,25 @@ export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=/data/.mina-config}"
 PARENT=null
 until [[ "$PARENT" != "null" ]] ; do
   PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
-  echo "FINDING PARENT BLOCK HASH: $(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].message)"
+  echo "[BOOTSTRAP] $(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].message)"
   sleep 300 # Wait for the daemon to catchup and start downloading new blocks
 done
+
+echo "[BOOTSTRAP] Top 10 blocks before bootstrapping the archiveDB:"
+psql "${PG_CONN}" -c "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
+echo "[BOOTSTRAP] Restoring blocks individually from ${BLOCKS_BUCKET}..."
 
 # Continue until no more blocks are missing
 until [[ "$PARENT" == "null" ]] ; do
   PARENT_FILE="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs '.[-1].metadata | "'${MINA_NETWORK}'-\(.parent_height)-\(.parent_hash).json"')"
   echo "Downloading $PARENT_FILE block"
   curl -sO "${BLOCKS_BUCKET}/${PARENT_FILE}"
-  mina-archive-blocks --precomputed --archive-uri "$PG_CONN" "$PARENT_FILE" | jq -rs '"[BOOTSTRAP] Populated database with old block: \(.[-1].message)"'
+  mina-archive-blocks --precomputed --archive-uri "$PG_CONN" "$PARENT_FILE" | jq -rs '"[BOOTSTRAP] Populated database with block: \(.[-1].message)"'
   rm "$PARENT_FILE"
   PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
 done
+
+echo "[BOOTSTRAP] Top 10 blocks in bootstrapped archiveDB:"
+psql "${PG_CONN}" -c "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
+
+echo "[BOOTSTRAP] This rosetta node is synced with no missing blocks back to genesis!"
