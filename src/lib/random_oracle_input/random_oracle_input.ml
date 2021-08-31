@@ -251,6 +251,63 @@ module Coding = struct
     |> Result.return
 end
 
+(** Coding2 is an alternate binary coding setup where we pass two arrays of
+ *  field elements instead of a single structure to simplify manipulation
+ *  outside of the Mina construction API
+ *
+ * This is described as the second mechanism for coding Random_oracle_input in
+ * RFC0038
+ *
+*)
+module Coding2 = struct
+  module Rendered = struct
+    type t = { prefix : string array; suffix : string array }
+    [@@deriving yojson]
+  end
+
+  let string_of_field = Coding.string_of_field
+
+  let field_of_string = Coding.field_of_string
+
+  (*
+    type 'field t =
+      { prefix = 'field list
+      ; suffix = 'field list
+      }
+
+    let render (t : 'field t) =
+      { Rendered.prefix = List.map ~f:Rosetta_coding.of_field t.prefix
+      ; suffix = List.map ~f:Rosetta_coding.of_field t.suffix
+      }
+      *)
+
+  let serialize ~string_of_field:_ ~to_bool:_ ~of_bool:_ t =
+    let prefix =
+      (* We only support 32byte fields *)
+      let () =
+        match t.field_elements with
+        | [| x; _ |] ->
+            assert (String.length (string_of_field x) = 32)
+        | _ ->
+            ()
+      in
+      Array.map t.field_elements ~f:string_of_field
+    in
+    let suffix =
+      failwith "TODO"
+      (* TODO: Use pack_to_fields, the ~pack argument should be something about fields?
+
+         pack_to_fields
+      *)
+    in
+
+    { Rendered.prefix; suffix }
+
+  let deserialize ~field_of_string:_ ~of_bool:_
+      { Rendered.prefix = _; suffix = _ } =
+    failwith "TODO"
+end
+
 let%test_module "random_oracle input" =
   ( module struct
     let gen_input ?size_in_bits () =
@@ -269,6 +326,32 @@ let%test_module "random_oracle input" =
       , { field_elements = Array.of_list field_elements
         ; bitstrings = Array.of_list bitstrings
         } )
+
+    let%test_unit "coding2 roundtrip" =
+      let size_in_bits = 255 in
+      Quickcheck.test ~trials:300 (gen_input ~size_in_bits ())
+        ~f:(fun (_, input) ->
+          let serialized =
+            Coding2.(
+              serialize ~string_of_field ~to_bool:Fn.id ~of_bool:Fn.id input)
+          in
+          let deserialized =
+            Coding2.(
+              deserialize serialized
+                ~field_of_string:(field_of_string ~size_in_bits)
+                ~of_bool:Fn.id)
+          in
+          let normalized t =
+            { t with
+              bitstrings =
+                ( t.bitstrings |> Array.to_list |> List.concat
+                |> fun xs -> [| xs |] )
+            }
+          in
+          [%test_eq:
+            ((bool list, bool) t, [ `Expected_eof | `Unexpected_eof ]) Result.t]
+            (normalized input |> Result.return)
+            (deserialized |> Result.map ~f:normalized))
 
     let%test_unit "field/string partial isomorphism bitstrings" =
       Quickcheck.test ~trials:300
