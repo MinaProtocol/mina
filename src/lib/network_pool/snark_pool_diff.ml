@@ -141,8 +141,14 @@ module Make
     match diff with
     | Empty ->
         Deferred.return
+<<<<<<< HEAD
           (Error (`Other (Error.of_string "cannot apply empty snark pool diff")))
     | Add_solved_work (work, { Priced_proof.proof; fee }) ->
+=======
+          (Error
+             (`Other (Error.of_string "cannot apply empty snark pool diff")))
+    | Add_solved_work (work, {Priced_proof.proof; fee}) -> (
+>>>>>>> 46e51fb0e... Fix snark pool race condition
         let is_local = match sender with Local -> true | _ -> false in
         let to_or_error = function
           | `Statement_not_referenced ->
@@ -150,14 +156,11 @@ module Make
           | `Added ->
               Ok (diff, ())
         in
-        Deferred.return
-          (let add_to_pool () =
-             Pool.add_snark ~is_local pool ~work ~proof ~fee |> to_or_error
-           in
-           match has_lower_fee pool work ~fee:fee.fee ~sender with
-           | Ok () ->
-               add_to_pool ()
-           | Error e ->
-               if is_local then Error (`Locally_generated (diff, ()))
-               else Error (`Other e))
+        match has_lower_fee pool work ~fee:fee.fee ~sender with
+        | Ok () ->
+            Pool.add_snark ~is_local pool ~work ~proof ~fee >>| to_or_error
+        | Error e ->
+            Deferred.return
+              ( if is_local then Error (`Locally_generated (diff, ()))
+              else Error (`Other e) ) )
 end
