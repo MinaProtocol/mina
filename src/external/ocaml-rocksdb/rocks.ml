@@ -721,6 +721,7 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
         (cast_array_ptr (ptr char) outputs)
         (cast_array_ptr size_t output_lengths)
         (cast_array_ptr (ptr char) errors) ;
+      keep_alive (inputs, input_lengths, keys) ;
       let results = ref [] in
       for i = count - 1 downto 0 do
         let res =
