@@ -272,18 +272,23 @@ struct
 
       let handle_new_best_tip_ledger t ledger =
         let open Mina_base in
+        let open Signature_lib in
         trace_recurring "handle_new_best_tip_ledger" (fun () ->
             Throttle.enqueue t.snark_table_lock (fun () ->
-                let%bind prover_account_ids_by_statement =
+                let%bind prover_account_ids =
                   trace_recurring
                     "generate account ids of provers in snark table" (fun () ->
-                      let prover_account_id
-                          ({fee= {prover; _}; _} : 'a Priced_proof.t) =
-                        Account_id.create prover Token_id.default
-                      in
                       let account_ids =
-                        Statement_table.map t.snark_tables.all
-                          ~f:prover_account_id
+                        t.snark_tables.all |> Statement_table.data
+                        |> List.map
+                             ~f:(fun {Priced_proof.fee= {prover; _}; _} ->
+                               prover )
+                        |> List.dedup_and_sort
+                             ~compare:Public_key.Compressed.compare
+                        |> List.map ~f:(fun prover ->
+                               ( prover
+                               , Account_id.create prover Token_id.default ) )
+                        |> Public_key.Compressed.Map.of_alist_exn
                       in
                       Scheduler.yield () >>| Fn.const account_ids )
                 in
@@ -293,27 +298,29 @@ struct
                     "lookup prover account locations in best tip ledger"
                     (fun () ->
                       let account_locations =
-                        Statement_table.data prover_account_ids_by_statement
+                        prover_account_ids |> Map.data
                         |> Base_ledger.location_of_account_batch ledger
                         |> Account_id.Map.of_alist_exn
                       in
                       Scheduler.yield () >>| Fn.const account_locations )
                 in
-                Statement_table.filteri_inplace t.snark_tables.all
-                  ~f:(fun ~key ~data:{fee= {fee; _}; _} ->
-                    let prover_account_exists =
-                      Statement_table.find_exn prover_account_ids_by_statement
-                        key
-                      |> Map.find_exn prover_account_locations
-                      |> Option.is_some
-                    in
-                    let keep =
-                      fee_is_sufficient t ~fee
-                        ~account_exists:prover_account_exists
-                    in
-                    if not keep then
-                      Hashtbl.remove t.snark_tables.rebroadcastable key ;
-                    keep ) ) )
+                trace_recurring "filter snark table based on best tip ledger"
+                  (fun () ->
+                    Statement_table.filteri_inplace t.snark_tables.all
+                      ~f:(fun ~key ~data:{fee= {fee; prover}; _} ->
+                        let prover_account_exists =
+                          prover
+                          |> Map.find_exn prover_account_ids
+                          |> Map.find_exn prover_account_locations
+                          |> Option.is_some
+                        in
+                        let keep =
+                          fee_is_sufficient t ~fee
+                            ~account_exists:prover_account_exists
+                        in
+                        if not keep then
+                          Hashtbl.remove t.snark_tables.rebroadcastable key ;
+                        keep ) ) ) )
 
       let handle_new_refcount_table t
           ({removed; refcount_table; best_tip_table} :
