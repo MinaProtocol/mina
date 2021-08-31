@@ -51,7 +51,7 @@ MINA_CONFIG_FILE="${MINA_CONFIG_DIR}/daemon.json}"
 export PK=${PK:-"B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p"}
 SNARK_PK=${SNARK_PK:-"B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL"}
 
-CONFIG_TEMPLATE=${CONFIG_TEMPLATE:-./genesis_ledgers/daemon.json.template}
+CONFIG_TEMPLATE=${CONFIG_TEMPLATE:-/genesis_ledgers/daemon.json.template}
 
 set +u
 if [ -z "$GENESIS_STATE_TIMESTAMP" ]; then
