@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{$.Values.snarkSetConfigs.workerName }}
+  name: {{ $.Values.snarkSetConfigs.workerName }}
   labels:
     app: {{$.Values.snarkSetConfigs.workerName}}
 spec:
