@@ -91,4 +91,4 @@ sleep 30
 echo "========================= POPULATING MISSING BLOCKS ==========================="
 ./download-missing-blocks.sh ${MINA_NETWORK} ${POSTGRES_DBNAME} ${POSTGRES_USERNAME}
 
-sleep infinity
+wait < <(jobs -p)

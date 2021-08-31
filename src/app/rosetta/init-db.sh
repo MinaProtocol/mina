@@ -22,8 +22,9 @@ pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} main
 
 /etc/init.d/postgresql start
 
-sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
+sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD ${POSTGRES_USERNAME};"
 sudo -u postgres createdb -O ${POSTGRES_USERNAME} ${POSTGRES_DBNAME}
+sudo -u postgres psql --command "ALTER DATABASE ${POSTGRES_DBNAME} SET DEFAULT_TRANSACTION_ISOLATION TO SERIALIZABLE;"
 
 DATE="$(date -Idate)_0000"
 curl "https://storage.googleapis.com/mina-archive-dumps/${MINA_NETWORK}-archive-dump-${DATE}.sql.tar.gz" -o o1labs-archive-dump.tar.gz
