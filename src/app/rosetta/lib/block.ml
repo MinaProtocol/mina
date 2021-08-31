@@ -616,8 +616,8 @@ module Specific = struct
         -> 'gql Real.t =
      fun ~logger ~db ~graphql_uri ->
       { gql=
-          (fun () ->
-            Graphql.query (Get_coinbase_and_genesis.make ()) graphql_uri )
+          (Memoize.build @@ fun () ->
+             Graphql.query (Get_coinbase_and_genesis.make ()) graphql_uri )
       ; logger
       ; db_block=
           (fun query ->

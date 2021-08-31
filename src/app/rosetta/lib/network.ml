@@ -158,7 +158,9 @@ module List_ = struct
     module Mock = T (Result)
 
     let real : graphql_uri:Uri.t -> 'gql Real.t =
-     fun ~graphql_uri () -> Graphql.query (Get_network.make ()) graphql_uri
+     fun ~graphql_uri ->
+       Memoize.build @@
+       fun () -> Graphql.query (Get_network.make ()) graphql_uri
   end
 
   module Impl (M : Monad_fail.S) = struct
