@@ -16,9 +16,10 @@ export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=/data/.mina-config}"
 
 # Wait until there is a block missing
 PARENT=null
-until [[ "$PARENT" != "null" ]] ; do
+for i in {1..6}; do # Test every 5 minutes for the first 30 minutes
   PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
   echo "[BOOTSTRAP] $(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].message)"
+  [[ "$PARENT" != "null" ]] && echo "[BOOSTRAP] Some blocks are missing, moving to reovery logic..." && break
   sleep 300 # Wait for the daemon to catchup and start downloading new blocks
 done
 
