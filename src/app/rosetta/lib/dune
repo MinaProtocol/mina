@@ -14,7 +14,6 @@
    core_kernel
    logger
    mina_compile_config
-   mina_lib
    ppx_deriving_yojson.runtime
    rosetta_lib
    rosetta_models
@@ -24,7 +23,6 @@
    signature_lib
    secrets
    unsigned_extended
-   user_command_input
  )
  (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))
