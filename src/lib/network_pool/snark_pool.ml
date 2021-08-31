@@ -168,9 +168,10 @@ struct
         | `New_best_tip of Base_ledger.t ]
 
       type t =
-        { snark_tables : Snark_tables.t
-        ; best_tip_ledger : (unit -> Base_ledger.t option[@sexp.opaque])
-        ; mutable ref_table : int Statement_table.t option
+        { snark_tables: Snark_tables.t
+        ; snark_table_lock: unit Throttle.Sequencer.t sexp_opaque
+        ; best_tip_ledger: (unit -> Base_ledger.t option) sexp_opaque
+        ; mutable ref_table: int Statement_table.t option
               (** Tracks the number of blocks that have each work statement in
                   their scan state.
                   Work is included iff it is a member of some block scan state.
@@ -212,10 +213,11 @@ struct
 
       let of_serializable tables ~constraint_constants ~frontier_broadcast_pipe
           ~config ~logger : t =
-        { snark_tables = Snark_tables.of_serializable tables
-        ; best_tip_ledger = get_best_tip_ledger ~frontier_broadcast_pipe
-        ; batcher = Batcher.Snark_pool.create config.verifier
-        ; account_creation_fee =
+        { snark_tables= Snark_tables.of_serializable tables
+        ; snark_table_lock= Throttle.Sequencer.create ()
+        ; best_tip_ledger= get_best_tip_ledger ~frontier_broadcast_pipe
+        ; batcher= Batcher.Snark_pool.create config.verifier
+        ; account_creation_fee=
             constraint_constants
               .Genesis_constants.Constraint_constants.account_creation_fee
         ; ref_table = None
@@ -271,43 +273,47 @@ struct
       let handle_new_best_tip_ledger t ledger =
         let open Mina_base in
         trace_recurring "handle_new_best_tip_ledger" (fun () ->
-            let%bind prover_account_ids_by_statement =
-              trace_recurring "generate account ids of provers in snark table"
-                (fun () ->
-                  let prover_account_id
-                      ({fee= {prover; _}; _} : 'a Priced_proof.t) =
-                    Account_id.create prover Token_id.default
-                  in
-                  let account_ids =
-                    Statement_table.map t.snark_tables.all ~f:prover_account_id
-                  in
-                  Scheduler.yield () >>| Fn.const account_ids )
-            in
-            (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
-            let%map prover_account_locations =
-              trace_recurring
-                "lookup prover account locations in best tip ledger" (fun () ->
-                  let account_locations =
-                    Statement_table.data prover_account_ids_by_statement
-                    |> Base_ledger.location_of_account_batch ledger
-                    |> Account_id.Map.of_alist_exn
-                  in
-                  Scheduler.yield () >>| Fn.const account_locations )
-            in
-            Statement_table.filteri_inplace t.snark_tables.all
-              ~f:(fun ~key ~data:{fee= {fee; _}; _} ->
-                let prover_account_exists =
-                  Statement_table.find_exn prover_account_ids_by_statement key
-                  |> Map.find_exn prover_account_locations
-                  |> Option.is_some
+            Throttle.enqueue t.snark_table_lock (fun () ->
+                let%bind prover_account_ids_by_statement =
+                  trace_recurring
+                    "generate account ids of provers in snark table" (fun () ->
+                      let prover_account_id
+                          ({fee= {prover; _}; _} : 'a Priced_proof.t) =
+                        Account_id.create prover Token_id.default
+                      in
+                      let account_ids =
+                        Statement_table.map t.snark_tables.all
+                          ~f:prover_account_id
+                      in
+                      Scheduler.yield () >>| Fn.const account_ids )
                 in
-                let keep =
-                  fee_is_sufficient t ~fee
-                    ~account_exists:prover_account_exists
+                (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
+                let%map prover_account_locations =
+                  trace_recurring
+                    "lookup prover account locations in best tip ledger"
+                    (fun () ->
+                      let account_locations =
+                        Statement_table.data prover_account_ids_by_statement
+                        |> Base_ledger.location_of_account_batch ledger
+                        |> Account_id.Map.of_alist_exn
+                      in
+                      Scheduler.yield () >>| Fn.const account_locations )
                 in
-                if not keep then
-                  Hashtbl.remove t.snark_tables.rebroadcastable key ;
-                keep ) )
+                Statement_table.filteri_inplace t.snark_tables.all
+                  ~f:(fun ~key ~data:{fee= {fee; _}; _} ->
+                    let prover_account_exists =
+                      Statement_table.find_exn prover_account_ids_by_statement
+                        key
+                      |> Map.find_exn prover_account_locations
+                      |> Option.is_some
+                    in
+                    let keep =
+                      fee_is_sufficient t ~fee
+                        ~account_exists:prover_account_exists
+                    in
+                    if not keep then
+                      Hashtbl.remove t.snark_tables.rebroadcastable key ;
+                    keep ) ) )
 
       let handle_new_refcount_table t
           ({removed; refcount_table; best_tip_table} :
@@ -373,12 +379,12 @@ struct
       let create ~constraint_constants ~consensus_constants:_ ~time_controller:_
           ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
         let t =
-          { snark_tables =
-              { all = Statement_table.create ()
-              ; rebroadcastable = Statement_table.create ()
-              }
-          ; best_tip_ledger = get_best_tip_ledger ~frontier_broadcast_pipe
-          ; batcher = Batcher.Snark_pool.create config.verifier
+          { snark_tables=
+              { all= Statement_table.create ()
+              ; rebroadcastable= Statement_table.create () }
+          ; snark_table_lock= Throttle.Sequencer.create ()
+          ; best_tip_ledger= get_best_tip_ledger ~frontier_broadcast_pipe
+          ; batcher= Batcher.Snark_pool.create config.verifier
           ; logger
           ; config
           ; ref_table = None
@@ -399,40 +405,44 @@ struct
 
       let add_snark ?(is_local = false) t ~work
           ~(proof : Ledger_proof.t One_or_two.t) ~fee =
-        if work_is_referenced t work then (
-          (*Note: fee against existing proofs and the new proofs are checked in
-            Diff.unsafe_apply which calls this function*)
-          Hashtbl.set t.snark_tables.all ~key:work ~data:{ proof; fee } ;
-          if is_local then
-            Hashtbl.set t.snark_tables.rebroadcastable ~key:work
-              ~data:({ proof; fee }, Time.now ())
-          else
-            (* Stop rebroadcasting locally generated snarks if they are
-               overwritten. No-op if there is no rebroadcastable SNARK with that
-               statement. *)
-            Hashtbl.remove t.snark_tables.rebroadcastable work ;
-          (*when snark work is added to the pool*)
-          Mina_metrics.(
-            Gauge.set Snark_work.useful_snark_work_received_time_sec
-              Time.(
-                let x = now () |> to_span_since_epoch |> Span.to_sec in
-                x -. Mina_metrics.time_offset_sec) ;
-            Gauge.set Snark_work.snark_pool_size
-              (Float.of_int @@ Hashtbl.length t.snark_tables.all) ;
-            Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
-              ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
-              |> Float.of_int )) ;
-          `Added )
-        else
-          let origin = if is_local then "locally generated" else "gossiped" in
-          [%log' warn t.logger]
-            "Rejecting %s snark work $stmt, statement not referenced" origin
-            ~metadata:
-              [ ( "stmt"
-                , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
-                    work )
-              ] ;
-          `Statement_not_referenced
+        Throttle.enqueue t.snark_table_lock (fun () ->
+            Deferred.return
+              ( if work_is_referenced t work then (
+                (*Note: fee against existing proofs and the new proofs are checked in
+                Diff.unsafe_apply which calls this function*)
+                Hashtbl.set t.snark_tables.all ~key:work ~data:{proof; fee} ;
+                if is_local then
+                  Hashtbl.set t.snark_tables.rebroadcastable ~key:work
+                    ~data:({proof; fee}, Time.now ())
+                else
+                  (* Stop rebroadcasting locally generated snarks if they are
+                  overwritten. No-op if there is no rebroadcastable SNARK with that
+                  statement. *)
+                  Hashtbl.remove t.snark_tables.rebroadcastable work ;
+                (*when snark work is added to the pool*)
+                Mina_metrics.(
+                  Gauge.set Snark_work.useful_snark_work_received_time_sec
+                    Time.(
+                      let x = now () |> to_span_since_epoch |> Span.to_sec in
+                      x -. Mina_metrics.time_offset_sec) ;
+                  Gauge.set Snark_work.snark_pool_size
+                    (Float.of_int @@ Hashtbl.length t.snark_tables.all) ;
+                  Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
+                    ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
+                    |> Float.of_int )) ;
+                `Added )
+              else
+                let origin =
+                  if is_local then "locally generated" else "gossiped"
+                in
+                [%log' warn t.logger]
+                  "Rejecting %s snark work $stmt, statement not referenced"
+                  origin
+                  ~metadata:
+                    [ ( "stmt"
+                      , One_or_two.to_yojson
+                          Transaction_snark.Statement.to_yojson work ) ] ;
+                `Statement_not_referenced ) )
 
       let verify_and_act t ~work ~sender =
         let statements, priced_proof = work in
