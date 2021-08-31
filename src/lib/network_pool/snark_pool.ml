@@ -281,7 +281,7 @@ struct
                       Scheduler.yield () >>| Fn.const account_ids )
                 in
                 (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
-                let%map prover_account_locations =
+                let%bind prover_account_locations =
                   trace_recurring
                     "lookup prover account locations in best tip ledger"
                     (fun () ->
@@ -292,10 +292,13 @@ struct
                       in
                       Scheduler.yield () >>| Fn.const account_locations )
                 in
+                let yield = Staged.unstage (Scheduler.yield_every ~n:50) in
                 trace_recurring "filter snark table based on best tip ledger"
                   (fun () ->
-                    Statement_table.filteri_inplace t.snark_tables.all
-                      ~f:(fun ~key ~data:{fee= {fee; prover}; _} ->
+                    Statement_table.fold ~init:Deferred.unit t.snark_tables.all
+                      ~f:(fun ~key ~data:{fee= {fee; prover}; _} acc ->
+                        let%bind () = acc in
+                        let%map () = yield () in
                         let prover_account_exists =
                           prover
                           |> Map.find_exn prover_account_ids
@@ -306,16 +309,15 @@ struct
                           fee_is_sufficient t ~fee
                             ~account_exists:prover_account_exists
                         in
-                        if not keep then
-                          Hashtbl.remove t.snark_tables.rebroadcastable key ;
-                        keep ) ) ) )
+                        if not keep then (
+                          Hashtbl.remove t.snark_tables.all key ;
+                          Hashtbl.remove t.snark_tables.rebroadcastable key )
+                    ) ) ) )
 
       let handle_new_refcount_table t
           ({removed; refcount_table; best_tip_table} :
             Extensions.Snark_pool_refcount.view) =
         trace_recurring "handle_new_refcount_table" (fun () ->
-            (* I think this is needed here to make the tracing work properly here? TODO: test to see if this is true *)
-            let%map () = Deferred.return () in
             t.ref_table <- Some refcount_table ;
             t.best_tip_table <- Some best_tip_table ;
             t.removed_counter <- t.removed_counter + removed ;
@@ -329,7 +331,8 @@ struct
                   keep ) ;
               Mina_metrics.(
                 Gauge.set Snark_work.snark_pool_size
-                  (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ) )
+                  (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ) ;
+            Deferred.unit )
 
       let handle_transition_frontier_diff u t =
         match u with
