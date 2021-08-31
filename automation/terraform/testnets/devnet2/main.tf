@@ -146,14 +146,14 @@ module "testnet_east" {
   # fish_count            = var.fish_count
 
   whales= [
-    for i in range(var.whale_count)/3:{
+    for i in range(var.whale_count):{
       duplicates = 1
       class  = "whale"
     }
   ]
   
   fishes= [
-    for i in range(var.fish_count)/3:{
+    for i in range(var.fish_count):{
       duplicates = 1
       class  = "fish"
     }
