@@ -49,17 +49,8 @@ POSTGRES_DATA_DIR=${POSTGRES_DATA_DIR:=/data/postgresql}
 PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${POSTGRES_DBNAME}
 
 # Postgres
-echo "========================= STARTING POSTGRESQL ==========================="
-./init-db.sh ${POSTGRES_DATA_DIR} ${POSTGRES_DBNAME} ${POSTGRES_USERNAME}
-
-sleep 5
-
-echo "========================= POPULATING POSTGRESQL ==========================="
-DATE="$(date -Idate)_0000"
-curl "https://storage.googleapis.com/mina-archive-dumps/${MINA_NETWORK}-archive-dump-${DATE}.sql.tar.gz" -o o1labs-archive-dump.tar.gz
-tar -xvf o1labs-archive-dump.tar.gz
-# It would help to know the block height of this dump in addition to the date
-psql -f "${MINA_NETWORK}-archive-dump-${DATE}.sql" "${PG_CONN}"
+echo "========================= INITIALIZING POSTGRESQL ==========================="
+./init-db.sh ${MINA_NETWORK} ${POSTGRES_DBNAME} ${POSTGRES_USERNAME} ${POSTGRES_DATA_DIR}
 
 # Rosetta
 echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
@@ -97,23 +88,7 @@ mina${MINA_SUFFIX} daemon \
 # wait for it to settle
 sleep 30
 
-echo "========================= POPULATING MISSING BLOCKS SINCE $DATE ==========================="
-# Wait until there is a block missing
-PARENT=null
-until [[ "$PARENT" != "null" ]] ; do
-  PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
-  echo "FINDING PARENT BLOCK HASH: $(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].message)"
-  sleep 300 # Wait for the daemon to catchup and start downloading new blocks
-done
-
-# Continue until no more blocks are missing
-until [[ "$PARENT" == "null" ]] ; do
-  PARENT_FILE="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs '.[-1].metadata | "'${MINA_NETWORK}'-\(.parent_height)-\(.parent_hash).json"')"
-  echo "Downloading $PARENT_FILE block"
-  curl -sO "https://storage.googleapis.com/mina_network_block_data/$PARENT_FILE"
-  mina-archive-blocks --precomputed --archive-uri "$PG_CONN" "$PARENT_FILE" | jq -rs '"[BOOTSTRAP] Populated database with old block: \(.[-1].message)"'
-  rm "$PARENT_FILE"
-  PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
-done
+echo "========================= POPULATING MISSING BLOCKS ==========================="
+./download-missing-blocks.sh ${MINA_NETWORK} ${POSTGRES_DBNAME} ${POSTGRES_USERNAME}
 
 sleep infinity

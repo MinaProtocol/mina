@@ -1,8 +1,9 @@
 #!/bin/bash
 
-POSTGRES_DATA_DIR=$1
+MINA_NETWORK=${1}
 POSTGRES_DBNAME=$2
 POSTGRES_USERNAME=$3
+POSTGRES_DATA_DIR=$4
 POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
 PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${POSTGRES_DBNAME}
 
@@ -23,6 +24,9 @@ pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} main
 sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
 sudo -u postgres createdb -O ${POSTGRES_USERNAME} ${POSTGRES_DBNAME}
 
-# Leave database uninitialized so that rosetta scripts can start from scretch
-# psql postgresql://pguser:pguser@localhost:5432/archive -f /archive/create_schema.sql
-
+DATE="$(date -Idate)_0000"
+curl "https://storage.googleapis.com/mina-archive-dumps/${MINA_NETWORK}-archive-dump-${DATE}.sql.tar.gz" -o o1labs-archive-dump.tar.gz
+tar -xvf o1labs-archive-dump.tar.gz
+# It would help to know the block height of this dump in addition to the date
+psql -f "${MINA_NETWORK}-archive-dump-${DATE}.sql" "${PG_CONN}"
+rm -f o1labs-archive-dump.tar.gz
