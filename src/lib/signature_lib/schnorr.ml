@@ -36,6 +36,21 @@ module type Message_intf = sig
   [%%endif]
 end
 
+(* for explicit mainnet, testnet messages, add marker in signatures so we
+   don't confuse arguments to the Make functor
+*)
+module type Message_for_mainnet_intf = sig
+  include Message_intf
+
+  val for_mainnet : unit
+end
+
+module type Message_for_testnet_intf = sig
+  include Message_intf
+
+  val for_testnet : unit
+end
+
 [%%ifdef consensus_mechanism]
 
 module type S = sig
@@ -61,6 +76,28 @@ module type S = sig
 
   module Message :
     Message_intf
+      with type boolean_var := Boolean.var
+       and type curve_scalar := curve_scalar
+       and type curve_scalar_var := curve_scalar_var
+       and type ('a, 'b) checked := ('a, 'b) Checked.t
+       and type curve := curve
+       and type curve_var := curve_var
+       and type field := Field.t
+       and type field_var := Field.Var.t
+
+  module Message_for_mainnet :
+    Message_for_mainnet_intf
+      with type boolean_var := Boolean.var
+       and type curve_scalar := curve_scalar
+       and type curve_scalar_var := curve_scalar_var
+       and type ('a, 'b) checked := ('a, 'b) Checked.t
+       and type curve := curve
+       and type curve_var := curve_var
+       and type field := Field.t
+       and type field_var := Field.Var.t
+
+  module Message_for_testnet :
+    Message_for_testnet_intf
       with type boolean_var := Boolean.var
        and type curve_scalar := curve_scalar
        and type curve_scalar_var := curve_scalar_var
@@ -110,7 +147,16 @@ module type S = sig
 
   val sign : Private_key.t -> Message.t -> Signature.t
 
+  (* use compile-time network for verification *)
   val verify : Signature.t -> Public_key.t -> Message.t -> bool
+
+  (* for Rosetta, choose the network for verification dynamically *)
+  val verify_for_mainnet :
+    Signature.t -> Public_key.t -> Message_for_mainnet.t -> bool
+
+  (* for Rosetta, choose the network for verification dynamically *)
+  val verify_for_testnet :
+    Signature.t -> Public_key.t -> Message_for_testnet.t -> bool
 end
 
 module Make
@@ -165,7 +211,27 @@ module Make
                   and type curve_var := Curve.var
                   and type field := Impl.Field.t
                   and type field_var := Impl.Field.Var.t
-                  and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t) :
+                  and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t)
+    (Message_for_mainnet : Message_for_mainnet_intf
+                             with type boolean_var := Impl.Boolean.var
+                              and type curve_scalar_var := Curve.Scalar.var
+                              and type curve_scalar := Curve.Scalar.t
+                              and type curve := Curve.t
+                              and type curve_var := Curve.var
+                              and type field := Impl.Field.t
+                              and type field_var := Impl.Field.Var.t
+                              and type ('a, 'b) checked :=
+                                   ('a, 'b) Impl.Checked.t)
+    (Message_for_testnet : Message_for_testnet_intf
+                             with type boolean_var := Impl.Boolean.var
+                              and type curve_scalar_var := Curve.Scalar.var
+                              and type curve_scalar := Curve.Scalar.t
+                              and type curve := Curve.t
+                              and type curve_var := Curve.var
+                              and type field := Impl.Field.t
+                              and type field_var := Impl.Field.Var.t
+                              and type ('a, 'b) checked :=
+                                   ('a, 'b) Impl.Checked.t) :
   S
     with module Impl := Impl
      and type curve := Curve.t
@@ -173,7 +239,9 @@ module Make
      and type curve_scalar := Curve.Scalar.t
      and type curve_scalar_var := Curve.Scalar.var
      and module Shifted := Curve.Checked.Shifted
-     and module Message := Message = struct
+     and module Message := Message
+     and module Message_for_mainnet := Message_for_mainnet
+     and module Message_for_testnet := Message_for_testnet = struct
   open Impl
 
   module Signature = struct
@@ -215,14 +283,28 @@ module Make
     let s = Curve.Scalar.(k + (e * d)) in
     (r, s)
 
-  let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
-    let e = Message.hash ~public_key:pk ~r m in
+  (* common code for verify... functions below *)
+  let verify_from_hash e ((r, s) : Signature.t) (pk : Public_key.t) =
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
     match Curve.to_affine_exn r_pt with
     | rx, ry ->
         is_even ry && Field.equal rx r
     | exception _ ->
         false
+
+  let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
+    let e = Message.hash ~public_key:pk ~r m in
+    verify_from_hash e (r, s) pk
+
+  let verify_for_mainnet ((r, s) : Signature.t) (pk : Public_key.t)
+      (m : Message_for_mainnet.t) =
+    let e = Message_for_mainnet.hash ~public_key:pk ~r m in
+    verify_from_hash e (r, s) pk
+
+  let verify_for_testnet ((r, s) : Signature.t) (pk : Public_key.t)
+      (m : Message_for_testnet.t) =
+    let e = Message_for_testnet.hash ~public_key:pk ~r m in
+    verify_from_hash e (r, s) pk
 
   [%%if call_logger]
 
@@ -403,13 +485,14 @@ open Hash_prefix_states_nonconsensus
 
 [%%endif]
 
-module Message = struct
+module Make_message (Signature_kind : module type of Mina_signature_kind) =
+struct
   open Tick
 
   type t = (Field.t, bool) Random_oracle.Input.t [@@deriving sexp]
 
   let network_id =
-    match Mina_signature_kind.t with
+    match Signature_kind.t with
     | Mainnet ->
         Char.of_int_exn 1
     | Testnet ->
@@ -462,7 +545,31 @@ module Message = struct
   [%%endif]
 end
 
-module S = Make (Tick) (Tick.Inner_curve) (Message)
+module Message = Make_message (Mina_signature_kind)
+
+module Message_for_mainnet = struct
+  include Make_message (struct
+    include Mina_signature_kind
+
+    let t = Mainnet
+  end)
+
+  let for_mainnet = ()
+end
+
+module Message_for_testnet = struct
+  include Make_message (struct
+    include Mina_signature_kind
+
+    let t = Testnet
+  end)
+
+  let for_testnet = ()
+end
+
+module S =
+  Make (Tick) (Tick.Inner_curve) (Message) (Message_for_mainnet)
+    (Message_for_testnet)
 
 [%%ifdef consensus_mechanism]
 
