@@ -88,7 +88,7 @@ resource "helm_release" "snark_workers" {
   version    = "1.0.2"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
-    yamlencode(local.snark_vars[count.index])
+    yamlencode(local.snark_vars)
   ]
   wait       = false
   timeout    = 600
