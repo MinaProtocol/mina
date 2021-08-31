@@ -1,19 +1,19 @@
-# {{ range $config := $.Values.snarkSetConfigs}}
+{{ range $config := $.Values.snarkSetConfigs}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{$.Values.snarkSetConfigs.coordinatorName }}
+  name: {{$config.coordinatorName }}
   labels:
-    app: {{$.Values.snarkSetConfigs.coordinatorName}}
+    app: {{$config.coordinatorName}}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{$.Values.snarkSetConfigs.coordinatorName }}
+      app: {{$config.coordinatorName }}
   template:
     metadata:
       labels:
-        app: {{$.Values.snarkSetConfigs.coordinatorName}}
+        app: {{$config.coordinatorName}}
         testnet: {{ $.Values.testnetName }}
         role: snark-coordinator
         version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
@@ -78,13 +78,13 @@ spec:
         - name: CONNECT_PRIVATE_IPS
           value: "true"
         - name: CODA_SNARK_KEY
-          value: {{ $.Values.snarkSetConfigs.publicKey | quote }}
+          value: {{ $config.publicKey | quote }}
         - name: CODA_SNARK_FEE
-          value: {{ $.Values.snarkSetConfigs.snarkFee | quote }}
+          value: {{ $config.snarkFee | quote }}
         - name: DAEMON_EXTERNAL_PORT
           value: {{ $.Values.coda.ports.p2p | quote }}
         - name: WORK_SELECTION
-          value: {{$.Values.snarkSetConfigs.workSelectionAlgorithm | quote }}
+          value: {{$config.workSelectionAlgorithm | quote }}
         ports:
         - name: client-port
           protocol: TCP 
@@ -99,7 +99,7 @@ spec:
           protocol: TCP 
           containerPort: {{ $.Values.coda.ports.p2p }}
           hostPort: {{ $.Values.coda.ports.p2p }}
-{{$name := $.Values.snarkSetConfigs.coordinatorName }}
+{{$name := $config.coordinatorName }}
 {{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.snarkCoordinator.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
@@ -110,7 +110,7 @@ spec:
       volumes:
       - name: daemon-config
         configMap:
-          name: {{$.Values.snarkSetConfigs.coordinatorName }}-daemon-config
+          name: {{$config.coordinatorName }}-daemon-config
       {{- end }}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
 {{- end }}

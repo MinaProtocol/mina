@@ -29,8 +29,8 @@ coda:
   # remoteCoordinatorPort: 8301
 
 snarkSetConfigs:
-  - coordinatorName: "" #"snark-coordinator-{{ trunc -6 .Values.coordinator.publicKey | lower }}"
-    workerName: "" #"snark-worker-{{ trunc -6 .Values.coordinator.publicKey | lower }}"
+  - coordinatorName: "snark-coordinator" #"snark-coordinator-{{ trunc -6 .Values.coordinator.publicKey | lower }}"
+    workerName: "snark-worker" #"snark-worker-{{ trunc -6 .Values.coordinator.publicKey | lower }}"
     workerReplicas: 1
     coordinatorHostName: "" # "{{ tpl $.Values.coordinator.fullname . }}.{{ $.Values.testnetName }}"
     coordinatorRpcPort: 8301
