@@ -553,7 +553,6 @@ module Parse = struct
                    then Mainnet
                    else Testnet
                  in
-                 Option.
                  match Signed_command.create_with_signature_checked ~signature_kind signature signer payload with
                  | None ->
                    (* invalid signature *)
