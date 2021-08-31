@@ -1,10 +1,10 @@
-{{ range $config := $.Values.snarkSetConfigs}}
+# {{ range $config := $.Values.snarkSetConfigs}}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $config.coordinatorName }}
+  name: {{ $.Values.coordinatorName }}
   labels:
-    app: {{ $config.coordinatorName }}
+    app: {{ $.Values.coordinatorName }}
 spec:
   type: ClusterIP
   # We want all pods to have their addresses published for the sake of the
@@ -12,7 +12,7 @@ spec:
   # have to be able to talk to each other in order to become ready.
   publishNotReadyAddresses: true
   selector:
-    app: {{ $config.coordinatorName }}
+    app: {{ $.Values.coordinatorName }}
   ports:
   - name: tcp-p2p
     port: {{ $.Values.coda.ports.p2p }}
@@ -25,12 +25,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $config.coordinatorName }}-graphql
+  name: {{ $.Values.coordinatorName }}-graphql
 spec:
   type: ClusterIP
   publishNotReadyAddresses: true
   selector:
-    app: {{ $config.coordinatorName }}
+    app: {{ $.Values.coordinatorName }}
   ports:
   - name: http-graphql
     protocol: TCP

@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{$.Values.snarkSetConfigs.coordinatorName }}-daemon-config
+  name: {{$.Values.coordinatorName }}-daemon-config
   labels:
     app: snark-coordinator
     heritage: {{ .Release.Service }}

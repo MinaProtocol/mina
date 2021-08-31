@@ -166,18 +166,15 @@ locals {
       # coda = {
       #   seedPeers = var.seed_peers_url
       # }
-      snarkSetConfigs={
-        coordinatorName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}"
-        workerName= "snark-worker-${lower(substr(snark.snark_worker_public_key,0,6))}"
-        workerReplicas= snark.snark_worker_replicas
-        coordinatorHostName= "snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}.${var.testnet_name}"
-        coordinatorRpcPort= 8301
-        coordinatorHostPort = snark.snark_coordinators_host_port
-        publicKey=snark.snark_worker_public_key
-        snarkFee= snark.snark_worker_fee
-        workSelectionAlgorithm= "seq"
-
-      }
+      coordinatorName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}"
+      workerName = "snark-worker-${lower(substr(snark.snark_worker_public_key,0,6))}"
+      workerReplicas = snark.snark_worker_replicas
+      coordinatorHostName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}.${var.testnet_name}"
+      coordinatorRpcPort = 8301
+      coordinatorHostPort = snark.snark_coordinators_host_port
+      publicKey =snark.snark_worker_public_key
+      snarkFee = snark.snark_worker_fee
+      workSelectionAlgorithm = "seq"
       # worker = {
       #   active      = snark.snark_worker_replicas > 0
       #   numReplicas = snark.snark_worker_replicas

@@ -1,19 +1,19 @@
-{{ range $config := $.Values.snarkSetConfigs}}
+# {{ range $config := $.Values.snarkSetConfigs}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ $config.workerName }}
+  name: {{ $.Values.workerName }}
   labels:
-    app: {{$config.workerName}}
+    app: {{$.Values.workerName}}
 spec:
-  replicas: {{ $config.workerReplicas }}
+  replicas: {{ $.Values.workerReplicas }}
   selector:
     matchLabels:
-      app: {{$config.workerName}}
+      app: {{$.Values.workerName}}
   template:
     metadata:
       labels:
-        app: {{$config.workerName}}
+        app: {{$.Values.workerName}}
         testnet: {{ $.Values.testnetName }}
         role: snark-worker
         version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
@@ -36,7 +36,7 @@ spec:
         {{- else }}
         command: ["bash", "-c"]
         {{- end }}
-        args: [ "sleep 120 && mina internal snark-worker -proof-level full -daemon-address '{{ $config.coordinatorHostName }}:{{ $config.coordinatorRpcPort }}'" ]
+        args: [ "sleep 120 && mina internal snark-worker -proof-level full -daemon-address '{{ $.Values.coordinatorHostName }}:{{ $.Values.coordinatorRpcPort }}'" ]
         env:
           - name: "RAYON_NUM_THREADS"
             value: "4"

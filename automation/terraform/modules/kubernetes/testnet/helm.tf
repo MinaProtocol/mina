@@ -77,7 +77,6 @@ resource "helm_release" "plain_nodes" {
 }
 
 # Snark Worker
-
 resource "helm_release" "snark_workers" {
   provider = helm.testnet_deploy
   count    = length(local.snark_vars)
@@ -88,7 +87,7 @@ resource "helm_release" "snark_workers" {
   version    = "1.0.2"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
-    yamlencode(local.snark_vars)
+    yamlencode(local.snark_vars[count.index])
   ]
   wait       = false
   timeout    = 600
