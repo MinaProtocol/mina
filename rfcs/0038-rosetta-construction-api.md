@@ -309,6 +309,8 @@ SignerInput (JSON):
   prefix: [ "000000000000000000000000000000000000000000000000000000000001E0F3", ... ],
   suffix: [ "000000000000000000000000000000000000000000000000000000000001E0F3", ... ]
 }
+
+A signer would take the prefix and suffix and use it during `derive` (which doesn't necessarily need to be exactly the same as the implementation Mina (it just needs to be "random"). And use `px`, `py`, and `r` in between prefix and suffix for hash.
 ```
 
 Another important property of the unsigned-transaction and signed-transaction representations is that they are reversible. The `unsigned_transaction_string` is then a `JSON` input (stringified) conforming to the following schema:
@@ -322,6 +324,7 @@ Another important property of the unsigned-transaction and signed-transaction re
 // where stakeDelegation and payemnt are currently defined in the client-sdk shown below
 // it is an error to treat stakeDelegation / payment in any way other than a variant, but it is encoded unsafely like this becuase JSON is garbage-fire and can't represent sum types ergonomically
 ```
+
 
 ```reasonml
 // Taken from Client-SDK code
