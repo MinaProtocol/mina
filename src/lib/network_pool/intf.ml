@@ -204,7 +204,7 @@ module type Snark_resource_pool_intf = sig
     -> work:Transaction_snark_work.Statement.t
     -> proof:Ledger_proof.t One_or_two.t
     -> fee:Fee_with_prover.t
-    -> [`Added | `Statement_not_referenced]
+    -> [`Added | `Statement_not_referenced] Deferred.t
 
   val request_proof :
        t
