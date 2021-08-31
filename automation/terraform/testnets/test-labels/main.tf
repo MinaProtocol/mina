@@ -136,7 +136,7 @@ module "testlabels" {
       snark_worker_replicas = 5
       snark_worker_fee      = "1.025"
       snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
-      snark_worker_host_port = 10401
+      snark_coordinators_host_port = 10401
     }
   ]
 
