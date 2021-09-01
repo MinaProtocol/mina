@@ -99,4 +99,4 @@ if ! kill -0 "${MINA_DAEMON_PID}"; then
   exit 1
 fi
 
-wait < <(jobs -p)
+wait -n < <(jobs -p)
