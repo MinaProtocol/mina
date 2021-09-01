@@ -71,7 +71,7 @@ Messages serving to configure libp2p helper.
     * Launches a subroutine to "report discovery peers" (TODO: write in more details)
  * configure
     * Accept configuration, launch p2p manager and metrics server (if configured).
-    * Among other things, start listening to peers on the `ListenOn` list.
+    * Among other things, start listening to peers on the `ListenOn` list. TODO: really!?
  * generateKeypair
     * Generates a new key pair, along with peer id
     * Returns the generated key pair

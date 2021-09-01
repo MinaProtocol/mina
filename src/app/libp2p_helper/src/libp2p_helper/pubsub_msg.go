@@ -41,8 +41,9 @@ func (app *app) handleValidation(m ipc.Libp2pHelperInterface_Validation) {
 			app.P2p.Logger.Errorf("validation for item %d took %d seconds", seqno, time.Now().Add(validationTimeout).Sub(*st.TimedOutAt))
 		}
 		delete(app.Validators, seqno)
+	} else {
+		app.P2p.Logger.Warningf("handleValidation: validation seqno %d unknown", seqno)
 	}
-	app.P2p.Logger.Warningf("handleValidation: validation seqno %d unknown", seqno)
 }
 
 func (app *app) handlePublish(seqno uint64, m ipc.Libp2pHelperInterface_Publish_Request) *capnp.Message {
