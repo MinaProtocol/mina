@@ -80,8 +80,8 @@ val size : t -> int
 (* The least fee per weight unit of all transactions in the transaction pool *)
 val min_fee : t -> int option
 
-(** Remove the lowest fee command from the pool, along with any others from the
-    same account with higher nonces. *)
+(** Remove the command from the pool with the lowest fee per wu,
+    along with any others from the same account with higher nonces. *)
 val remove_lowest_fee :
   t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t * t
 
@@ -89,7 +89,7 @@ val remove_lowest_fee :
 val remove_expired :
   t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t * t
 
-(** Get the highest fee applicable command in the pool *)
+(** Get the applicable command in the pool with the lowest fee per wu *)
 val get_highest_fee :
   t -> Transaction_hash.User_command_with_valid_signature.t option
 

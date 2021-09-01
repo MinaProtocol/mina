@@ -1573,4 +1573,124 @@ let%test_module _ =
                 ()
             | _ ->
                 failwith "should've returned insufficient_funds")
+
+    let%test_unit "applicable_by_fee ordered by fee per wu" =
+      let cmds =
+        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 10
+        |> Sequence.to_list
+      in
+      let insert_cmd pool cmd =
+        add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
+          Account_nonce.zero
+          (Currency.Amount.of_int 500)
+        |> Result.ok |> Option.value_exn
+        |> fun (_, pool, _) -> pool
+      in
+      let pool = List.fold_left cmds ~init:empty ~f:insert_cmd in
+      let compare cmd0 cmd1 : int =
+        Int.compare
+          (User_command.fee_per_wu cmd0)
+          (User_command.fee_per_wu cmd1)
+      in
+      pool.applicable_by_fee |> Map.data
+      |> List.concat_map ~f:Set.to_list
+      |> List.map ~f:Transaction_hash.User_command_with_valid_signature.command
+      |> List.is_sorted ~compare
+      |> fun is_sorted -> assert is_sorted
+
+    let%test_unit "all_by_fee ordered by fee per wu" =
+      let cmds =
+        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 10
+        |> Sequence.to_list
+      in
+      let insert_cmd pool cmd =
+        add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
+          Account_nonce.zero
+          (Currency.Amount.of_int 500)
+        |> Result.ok |> Option.value_exn
+        |> fun (_, pool, _) -> pool
+      in
+      let pool = List.fold_left cmds ~init:empty ~f:insert_cmd in
+      let compare cmd0 cmd1 : int =
+        Int.compare
+          (User_command.fee_per_wu cmd0)
+          (User_command.fee_per_wu cmd1)
+      in
+      pool.all_by_fee |> Map.data
+      |> List.concat_map ~f:Set.to_list
+      |> List.map ~f:Transaction_hash.User_command_with_valid_signature.command
+      |> List.is_sorted ~compare
+      |> fun is_sorted -> assert is_sorted
+
+    let%test_unit "remove_lowest_fee" =
+      let cmds =
+        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 10
+        |> Sequence.to_list
+      in
+      let compare cmd0 cmd1 : int =
+        let open Transaction_hash.User_command_with_valid_signature in
+        Int.compare
+          (User_command.fee_per_wu @@ command cmd0)
+          (User_command.fee_per_wu @@ command cmd1)
+      in
+      let cmds_sorted_by_fee_per_wu = List.sort ~compare cmds in
+      let cmd_lowest_fee, commands_to_keep =
+        ( List.hd_exn cmds_sorted_by_fee_per_wu
+        , List.tl_exn cmds_sorted_by_fee_per_wu )
+      in
+      let insert_cmd pool cmd =
+        add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
+          Account_nonce.zero
+          (Currency.Amount.of_int 500)
+        |> Result.ok |> Option.value_exn
+        |> fun (_, pool, _) -> pool
+      in
+      let cmd_equal =
+        Transaction_hash.User_command_with_valid_signature.equal
+      in
+      let removed, pool =
+        List.fold_left cmds ~init:empty ~f:insert_cmd |> remove_lowest_fee
+      in
+      (* check that the lowest fee per wu command is returned *)
+      assert (Sequence.(equal cmd_equal removed @@ return cmd_lowest_fee))
+      |> fun () ->
+      (* check that the lowest fee per wu command is removed from
+         applicable_by_fee *)
+      pool.applicable_by_fee |> Map.data
+      |> List.concat_map ~f:Set.to_list
+      |> fun applicable_by_fee_cmds ->
+      assert (List.(equal cmd_equal applicable_by_fee_cmds commands_to_keep))
+      |> fun () ->
+      (* check that the lowest fee per wu command is removed from
+         all_by_fee *)
+      pool.applicable_by_fee |> Map.data
+      |> List.concat_map ~f:Set.to_list
+      |> fun all_by_fee_cmds ->
+      assert (List.(equal cmd_equal all_by_fee_cmds commands_to_keep))
+
+    let%test_unit "get_highest_fee" =
+      let cmds =
+        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 10
+        |> Sequence.to_list
+      in
+      let compare cmd0 cmd1 : int =
+        let open Transaction_hash.User_command_with_valid_signature in
+        Int.compare
+          (User_command.fee_per_wu @@ command cmd0)
+          (User_command.fee_per_wu @@ command cmd1)
+      in
+      let max_by_fee_per_wu = List.max_elt ~compare cmds |> Option.value_exn in
+      let insert_cmd pool cmd =
+        add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
+          Account_nonce.zero
+          (Currency.Amount.of_int 500)
+        |> Result.ok |> Option.value_exn
+        |> fun (_, pool, _) -> pool
+      in
+      let pool = List.fold_left cmds ~init:empty ~f:insert_cmd in
+      let cmd_equal =
+        Transaction_hash.User_command_with_valid_signature.equal
+      in
+      get_highest_fee pool |> Option.value_exn
+      |> fun highest_fee -> assert (cmd_equal highest_fee max_by_fee_per_wu)
   end )
