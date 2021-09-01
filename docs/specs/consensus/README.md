@@ -45,7 +45,7 @@ This documents specifies required structures, algorithms and protocol details.
 		- [3.4.2 `shiftWindow`](#342-shiftwindow)
 		- [3.4.3 `initSubWindowDensities`](#343-initsubwindowdensities)
 		- [3.4.4 `updateSubWindowDensities`](#344-updatesubwindowdensities)
-		- [3.4.5 `getMinDen`](#345-getminden)
+		- [3.4.5 `getMinWindowDensity`](#345-getminwindowdensity)
 - [4 Protocol](#4-protocol)
 	- [4.1 Initialize consensus](#41-initialize-consensus)
 		- [4.1.1 Genesis block](#411-genesis-block)
@@ -85,7 +85,7 @@ This documents specifies required structures, algorithms and protocol details.
 		- [3.4.2 `shiftWindow`](#342-shiftwindow)
 		- [3.4.3 `initSubWindowDensities`](#343-initsubwindowdensities)
 		- [3.4.4 `updateSubWindowDensities`](#344-updatesubwindowdensities)
-		- [3.4.5 `getMinDen`](#345-getminden)
+		- [3.4.5 `getMinWindowDensity`](#345-getminwindowdensity)
 - [4 Protocol](#4-protocol)
 	- [4.1 Initialize consensus](#41-initialize-consensus)
 		- [4.1.1 Load genesis block](#411-load-genesis-block)
@@ -652,19 +652,32 @@ fn initSubWindowDensities(G) -> ()
 
 ### 3.4.4 `updateSubWindowDensities`
 
-This algorithm updates the sub-window densities of the block being created `B` based on its parent block `P`.  It inputs the blocks `P` and `B` and updates `B`'s sub window densities according to the description in [Section 3.4](#34-window-min-density).
+This algorithm updates the sub-window densities and minimum window density of the block being created `B` based on its parent block `P`.  It inputs the blocks `P` and `B` and updates `B`'s sub window densities according to the description in [Section 3.4](#34-window-min-density).
 
 ```rust
 fn updateSubWindowDensities(P, B) -> ()
 {
     cState(B).sub_window_densities = cState(P).sub_window_densities
     
-    // Compute how many slots ahead of parent B is and use
-    // it to shift sub_window_densities.
-    let shift = MAX { globalSubWindow(B) - globalSubWindow(P), cState(B).sub_window_densities.len() }
+    // Compute how many slots B is ahead of P is
+    // and use it to shift sub_window_densities
+    let shift = MIN { globalSubWindow(B) - globalSubWindow(P), cState(B).sub_window_densities.len() }
     if shift > 0 {
         // Left-shift the sub-window densities
         cState(B).sub_window_densities = cState(B).sub_window_densities[shift..]⌢[0; shift]
+    }
+    
+    // Update the minimum window density
+    if shift > 0 or globalSlot(B) < grace_period_end {
+        // Minimum window density is parents minimum window density
+        cState(B).min_window_density = cState(P).min_window_density
+    }
+    else {
+        new_min_window_density = 0
+        for density in cState(B).sub_window_densities {
+            new_min_window_density += density
+        }
+        cState(B).min_window_density = MIN { new_min_window_density, cState(P).min_window_density }
     }
     
     // Update the density of B's sub-window to reflect B's existence
@@ -672,14 +685,14 @@ fn updateSubWindowDensities(P, B) -> ()
 }
 ```
 
-### 3.4.5 `getMinDen`
+### 3.4.5 `getMinWindowDensity`
 
 **WIP**
 
 This function returns the current minimum density of a chain.  It inputs a chain `C` and the `max_slot` observed between `C`  and the alternative chain (See [selectSecureChain](#42-select-chain)).
 
 ```rust
-fn getMinDen(C, max_slot) -> density
+fn getMinWindowDensity(C, max_slot) -> density
 {
     if globalSlot(C) == max_slot {
         return cState(C).min_window_density
@@ -868,10 +881,10 @@ fn selectSecureChain(tip, chains) -> Chain
         else {
             // long-range fork, compare minimum window densities
             max_slot = max(globalSlot(tip), globalSlot(candidate))
-            if getMinDen(candidate, max_slot) > getMinDen(tip, max_slot) {
+            if getMinWindowDensity(candidate, max_slot) > getMinWindowDensity(tip, max_slot) {
                 tip = candidate
             }
-            else if getMinDen(candidate, max_slot) == getMinDen(tip, max_slot) {
+            else if getMinWindowDensity(candidate, max_slot) == getMinWindowDensity(tip, max_slot) {
                 // tiebreak
                 tip = selectLongerChain(tip, candidate)
             }
@@ -882,7 +895,7 @@ fn selectSecureChain(tip, chains) -> Chain
 }
 ```
 
-It relies on the [`isShortRange`](#333-isshortrange) and [`getMinDen`](#345-getminden) algorithms (Section 3.3.3 and Section 3.4.5) and the `selectLongerChain` algorithm below.
+It relies on the [`isShortRange`](#333-isshortrange) and [`getMinWindowDensity`](#345-getminwindowdensity) algorithms (Section 3.3.3 and Section 3.4.5) and the `selectLongerChain` algorithm below.
 
 ```rust
 fn selectLongerChain(tip, candidate) -> Chain
