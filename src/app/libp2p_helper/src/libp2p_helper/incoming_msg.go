@@ -5,6 +5,107 @@ import (
 	ipc "libp2p_ipc"
 )
 
+type rpcRequest = ipc.Libp2pHelperInterface_RpcRequest
+type rpcRequestHandler = func(*app, uint64, rpcRequest) *capnp.Message
+
+var rpcRequestHandlers = map[ipc.Libp2pHelperInterface_RpcRequest_Which]rpcRequestHandler{
+	ipc.Libp2pHelperInterface_RpcRequest_Which_configure: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.Configure()
+		panicOnErr(err)
+		return app.handleConfigure(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_setGatingConfig: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.SetGatingConfig()
+		panicOnErr(err)
+		return app.handleSetGatingConfig(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_listen: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.Listen()
+		panicOnErr(err)
+		return app.handleListen(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_getListeningAddrs: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.GetListeningAddrs()
+		panicOnErr(err)
+		return app.handleGetListeningAddrs(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_beginAdvertising: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.BeginAdvertising()
+		panicOnErr(err)
+		return app.handleBeginAdvertising(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_addPeer: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.AddPeer()
+		panicOnErr(err)
+		return app.handleAddPeer(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_listPeers: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.ListPeers()
+		panicOnErr(err)
+		return app.handleListPeers(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_generateKeypair: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.GenerateKeypair()
+		panicOnErr(err)
+		return app.handleGenerateKeypair(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_publish: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.Publish()
+		panicOnErr(err)
+		return app.handlePublish(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_subscribe: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.Subscribe()
+		panicOnErr(err)
+		return app.handleSubscribe(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_unsubscribe: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.Unsubscribe()
+		panicOnErr(err)
+		return app.handleUnsubscribe(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_addStreamHandler: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.AddStreamHandler()
+		panicOnErr(err)
+		return app.handleAddStreamHandler(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_removeStreamHandler: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.RemoveStreamHandler()
+		panicOnErr(err)
+		return app.handleRemoveStreamHandler(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_openStream: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.OpenStream()
+		panicOnErr(err)
+		return app.handleOpenStream(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_closeStream: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.CloseStream()
+		panicOnErr(err)
+		return app.handleCloseStream(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_resetStream: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.ResetStream()
+		panicOnErr(err)
+		return app.handleResetStream(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_sendStream: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.SendStream()
+		panicOnErr(err)
+		return app.handleSendStream(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_setNodeStatus: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.SetNodeStatus()
+		panicOnErr(err)
+		return app.handleSetNodeStatus(seqno, r)
+	},
+	ipc.Libp2pHelperInterface_RpcRequest_Which_getPeerNodeStatus: func(app *app, seqno uint64, req rpcRequest) *capnp.Message {
+		r, err := req.GetPeerNodeStatus()
+		panicOnErr(err)
+		return app.handleGetPeerNodeStatus(seqno, r)
+	},
+}
+
 func (app *app) handleIncomingMsg(msg *ipc.Libp2pHelperInterface_Message) {
 	if msg.HasRpcRequest() {
 		req, err := msg.RpcRequest()
@@ -12,87 +113,12 @@ func (app *app) handleIncomingMsg(msg *ipc.Libp2pHelperInterface_Message) {
 		h, err := req.Header()
 		panicOnErr(err)
 		seqno := h.SeqNumber()
-		var resp *capnp.Message
-		if req.HasConfigure() {
-			r, err := req.Configure()
-			panicOnErr(err)
-			resp = app.handleConfigure(seqno, r)
-		} else if req.HasSetGatingConfig() {
-			r, err := req.SetGatingConfig()
-			panicOnErr(err)
-			resp = app.handleSetGatingConfig(seqno, r)
-		} else if req.HasListen() {
-			r, err := req.Listen()
-			panicOnErr(err)
-			resp = app.handleListen(seqno, r)
-		} else if req.HasGetListeningAddrs() {
-			r, err := req.GetListeningAddrs()
-			panicOnErr(err)
-			resp = app.handleGetListeningAddrs(seqno, r)
-		} else if req.HasBeginAdvertising() {
-			r, err := req.BeginAdvertising()
-			panicOnErr(err)
-			resp = app.handleBeginAdvertising(seqno, r)
-		} else if req.HasAddPeer() {
-			r, err := req.AddPeer()
-			panicOnErr(err)
-			resp = app.handleAddPeer(seqno, r)
-		} else if req.HasListPeers() {
-			r, err := req.ListPeers()
-			panicOnErr(err)
-			resp = app.handleListPeers(seqno, r)
-		} else if req.HasGenerateKeypair() {
-			r, err := req.GenerateKeypair()
-			panicOnErr(err)
-			resp = app.handleGenerateKeypair(seqno, r)
-		} else if req.HasPublish() {
-			r, err := req.Publish()
-			panicOnErr(err)
-			resp = app.handlePublish(seqno, r)
-		} else if req.HasSubscribe() {
-			r, err := req.Subscribe()
-			panicOnErr(err)
-			resp = app.handleSubscribe(seqno, r)
-		} else if req.HasUnsubscribe() {
-			r, err := req.Unsubscribe()
-			panicOnErr(err)
-			resp = app.handleUnsubscribe(seqno, r)
-		} else if req.HasAddStreamHandler() {
-			r, err := req.AddStreamHandler()
-			panicOnErr(err)
-			resp = app.handleAddStreamHandler(seqno, r)
-		} else if req.HasRemoveStreamHandler() {
-			r, err := req.RemoveStreamHandler()
-			panicOnErr(err)
-			resp = app.handleRemoveStreamHandler(seqno, r)
-		} else if req.HasOpenStream() {
-			r, err := req.OpenStream()
-			panicOnErr(err)
-			resp = app.handleOpenStream(seqno, r)
-		} else if req.HasCloseStream() {
-			r, err := req.CloseStream()
-			panicOnErr(err)
-			resp = app.handleCloseStream(seqno, r)
-		} else if req.HasResetStream() {
-			r, err := req.ResetStream()
-			panicOnErr(err)
-			resp = app.handleResetStream(seqno, r)
-		} else if req.HasSendStream() {
-			r, err := req.SendStream()
-			panicOnErr(err)
-			resp = app.handleSendStream(seqno, r)
-		} else if req.HasSetNodeStatus() {
-			r, err := req.SetNodeStatus()
-			panicOnErr(err)
-			resp = app.handleSetNodeStatus(seqno, r)
-		} else if req.HasGetPeerNodeStatus() {
-			r, err := req.GetPeerNodeStatus()
-			panicOnErr(err)
-			resp = app.handleGetPeerNodeStatus(seqno, r)
-		} else {
+		handler, foundHandler := rpcRequestHandlers[req.Which()]
+		if !foundHandler {
 			app.P2p.Logger.Error("Received rpc message of an unknown type")
 			return
 		}
+		resp := handler(app, seqno, req)
 		if resp == nil {
 			app.P2p.Logger.Error("Failed to process rpc message")
 		} else {
