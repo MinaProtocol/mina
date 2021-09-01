@@ -100,8 +100,11 @@ let devnet_chain_id =
   "8af43cf261ea10c761ec540f92aafb76aec56d8d74f77c836f3ab1de5ce4eac5"
 
 let network_tag_of_graphql res =
-  if String.equal (res#daemonStatus)#chainId mainnet_chain_id then "mainnet"
-  else if String.equal (res#daemonStatus)#chainId devnet_chain_id then "devnet"
+  let equal_chain_id id =
+    String.equal (res#daemonStatus)#chainId id
+  in
+  if equal_chain_id mainnet_chain_id then "mainnet"
+  else if equal_chain_id devnet_chain_id then "devnet"
   else "debug"
 
 module Validate_choice = struct
