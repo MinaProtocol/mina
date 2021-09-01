@@ -396,6 +396,17 @@ fn stateHash(C) -> Hash
 }
 ```
 
+### 3.1.8 `globalSubWindow`
+
+This function returns the sub-window number of a block.
+
+```rust
+fn globalSubWindow(B) -> u64
+{
+   return globalSlot(B)/slots_per_sub_window
+}
+```
+
 ## 3.2 Chain selection rules
 
 Samasika uses two consensus rules: one for *short-range forks* and one for *long-range forks*.
@@ -640,14 +651,19 @@ fn initSubWindowDensities(G) -> ()
 
 ### 3.4.4 `updateSubWindowDensities`
 
-**WIP**
-
 This algorithm updates the sub-window densities of the block being created `B` based on its parent block `P`.  It inputs the blocks `P` and `B` and updates `B`'s sub window densities according to the description in [Section 3.4](#34-window-min-density).
 
 ```rust
 fn updateSubWindowDensities(P, B) -> ()
 {
     cState(B).sub_window_densities = cState(P).sub_window_densities
+    
+    if globalSubWindow(B) != globalSubWindow(P) {
+        // Left-shift the sub-window densities
+        cState(B).sub_window_densities = cState(B).sub_window_densities[1..]⌢0
+    }
+    
+    // Update the density of B's sub-window to reflect B's existence
     cState(B).sub_window_densities[-1] += 1
 }
 ```
