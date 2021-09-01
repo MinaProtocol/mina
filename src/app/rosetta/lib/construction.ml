@@ -215,7 +215,7 @@ module Metadata = struct
             -> address:Public_key.Compressed.t
             -> unit
             -> ('gql, Errors.t) M.t
-        ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t
+        ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t
         ; lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
     end
 
@@ -248,7 +248,7 @@ module Metadata = struct
   end
 
   module Impl (M : Monad_fail.S) = struct
-    let handle ~(env : 'gql Env.T(M).t) (req : Construction_metadata_request.t)
+    let handle ~graphql_uri ~(env : 'gql Env.T(M).t) (req : Construction_metadata_request.t)
         =
       let open M.Let_syntax in
       let%bind req_options =
@@ -264,7 +264,7 @@ module Metadata = struct
       in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~gql_response:res
+          ~graphql_uri
       in
       let%map account =
         match res#account with
@@ -908,7 +908,7 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
       in
       let%bind graphql_uri = get_graphql_uri_or_error () in
       let%map res =
-        Metadata.Real.handle ~env:(Metadata.Env.real ~graphql_uri) req
+        Metadata.Real.handle ~graphql_uri ~env:(Metadata.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap
       in
       Construction_metadata_response.to_yojson res
