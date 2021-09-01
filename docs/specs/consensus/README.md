@@ -106,6 +106,7 @@ This documents specifies required structures, algorithms and protocol details.
 * `T[N]` - Array of type `T` containing `N` elements
 * `T[v; N]` - Array of type `T` containing `N` elements of value `v`
 * `x[i]` - Element `i` of array `x`, starting at index `0`
+* `x[-1]` - Last element of array `x`
 * `x[a..b]` - Slice of vector `x` containing elements from indexes `[a, b)`
 
 # 1. Constants
@@ -553,7 +554,7 @@ This section describes how to compute the density windows and minimum density. F
 
 * We say a slot is _`filled`_ if it contains a valid non-orphaned block
 * An `n-window` is a sequential list of slots s<sub>1</sub>,...,s<sub>n</sub> of length `n`
-* The _`density`_ of a window is the number filled slots filled within it
+* The _`density`_ of a window (or sub-window) is the number non-orphan block within it
 
 The _`sliding window`_ is referred to as a `v`-shifting `w`-window and it characterisd by two parameters.
 
@@ -579,16 +580,16 @@ sub_window_densities:      d1        d2      ...       dk          dc
 
 The value of `k` is defined by the [`sub_windows_per_window`](#1-constants) constant.
 
-This list of window of densities is stored in each block, in the `sub_window_densities` field of the `Consensus_state` (see [Section 2.5](#25-consensus_state)).  This field is of type `Length.Stable.V1.t list` and because it must be written into blocks as part of the protocol, an implimentation MUST implement serialization for this type.
+This list of sub-window of densities is stored in each block, in the `sub_window_densities` field of the `Consensus_state` (see [Section 2.5](#25-consensus_state)).  This field is of type `Length.Stable.V1.t list` and because it must be written into blocks as part of the protocol, an implimentation MUST implement serialization for this type.
 
 The values stored in `sub_window_densities` have this format.
 
 | Index | Contents |
 | - | - |
-| `0` | Oldest window density |
+| `0` | Oldest sub-window density |
 | `...` | |
-| `k - 1` | Previous window density |
-| `k` | Current window density |
+| `k - 1` | Previous sub-window density |
+| `k` | Current sub-window density |
 
 Each block also stores the minimum window density, found in the `min_window_density` field of the `Consensus_state` (see [Section 2.5](#25-consensus_state)).
 
@@ -658,9 +659,12 @@ fn updateSubWindowDensities(P, B) -> ()
 {
     cState(B).sub_window_densities = cState(P).sub_window_densities
     
-    if globalSubWindow(B) != globalSubWindow(P) {
+    // Compute how many slots ahead of parent B is and use
+    // it to shift sub_window_densities.
+    let shift = MAX { globalSubWindow(B) - globalSubWindow(P), cState(B).sub_window_densities.len() }
+    if shift > 0 {
         // Left-shift the sub-window densities
-        cState(B).sub_window_densities = cState(B).sub_window_densities[1..]⌢0
+        cState(B).sub_window_densities = cState(B).sub_window_densities[shift..]⌢[0; shift]
     }
     
     // Update the density of B's sub-window to reflect B's existence
