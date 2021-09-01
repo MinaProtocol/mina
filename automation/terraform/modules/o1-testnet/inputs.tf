@@ -176,7 +176,8 @@ variable "seed_starting_host_port" {
 
 variable "snark_coordinators" {
   description = "configurations for not just the snark coordinators but also the snark workers they coordinate"
-  default = null
+  type    = list(any)
+  default = []
 }
 
 

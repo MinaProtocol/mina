@@ -219,7 +219,8 @@ variable "plain_node_configs" {
 # Snark Worker Vars
 
 variable "snark_coordinators" {
-  default = null
+  type    = list(any)
+  default = []
 }
 
 

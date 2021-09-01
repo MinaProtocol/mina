@@ -1,4 +1,3 @@
-# {{ range $config := $.Values.snarkSetConfigs}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -36,6 +35,5 @@ spec:
     protocol: TCP
     port: 80
     targetPort: {{ $.Values.coda.ports.graphql }}
-{{- end }}
 {{- end }}
 
