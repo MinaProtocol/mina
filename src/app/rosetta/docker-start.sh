@@ -84,7 +84,7 @@ echo "MINA Flags: $MINA_FLAGS -config-file ${MINA_CONFIG_FILE}"
 mina${MINA_SUFFIX} daemon \
   --config-file ${MINA_CONFIG_FILE} \
   ${MINA_FLAGS} $@ &
-MINA_DAEMON_PID=$?
+MINA_DAEMON_PID=$!
 
 # wait for it to settle
 sleep 30
@@ -94,7 +94,7 @@ echo "========================= POPULATING MISSING BLOCKS ======================
 ./download-missing-blocks.sh ${MINA_NETWORK} ${POSTGRES_DBNAME} ${POSTGRES_USERNAME}
 
 
-if [[ ! kill -0 $MINA_DAEMON_PID ]]; then
+if ! kill -0 "${MINA_DAEMON_PID}"; then
   echo "[FATAL] Mina daemon failed to start, exiting docker-start.sh"
   exit 1
 fi
