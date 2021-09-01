@@ -287,7 +287,7 @@ end
 module Make_statement_scanner (Verifier : sig
   type t
 
-  val verify : verifier:t -> P.t list -> sexp_bool Deferred.Or_error.t
+  val verify : verifier:t -> P.t list -> bool Deferred.Or_error.t
 end) =
 struct
   module Fold = Parallel_scan.State.Make_foldable (Deferred)

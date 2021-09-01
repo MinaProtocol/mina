@@ -261,58 +261,83 @@ struct
       let handle_new_best_tip_ledger t ledger =
         let open Mina_base in
         let open Signature_lib in
+        let open Interruptible in
+        let open Interruptible.Let_syntax in
         trace_recurring "handle_new_best_tip_ledger" (fun () ->
             Throttle.enqueue t.snark_table_lock (fun () ->
-                let%bind prover_account_ids =
-                  trace_recurring
-                    "generate account ids of provers in snark table" (fun () ->
-                      let account_ids =
-                        t.snark_tables.all |> Statement_table.data
-                        |> List.map
-                             ~f:(fun {Priced_proof.fee= {prover; _}; _} ->
-                               prover )
-                        |> List.dedup_and_sort
-                             ~compare:Public_key.Compressed.compare
-                        |> List.map ~f:(fun prover ->
-                               ( prover
-                               , Account_id.create prover Token_id.default ) )
-                        |> Public_key.Compressed.Map.of_alist_exn
+                Deferred.map ~f:ignore
+                @@ force
+                     (let%bind () =
+                        lift (Deferred.return ())
+                          (Base_ledger.detached_signal ledger)
                       in
-                      Scheduler.yield () >>| Fn.const account_ids )
-                in
-                (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
-                let%bind prover_account_locations =
-                  trace_recurring
-                    "lookup prover account locations in best tip ledger"
-                    (fun () ->
-                      let account_locations =
-                        prover_account_ids |> Map.data
-                        |> Base_ledger.location_of_account_batch ledger
-                        |> Account_id.Map.of_alist_exn
+                      let%bind prover_account_ids =
+                        uninterruptible
+                        @@ trace_recurring
+                             "generate account ids of provers in snark table"
+                             (fun () ->
+                               let account_ids =
+                                 t.snark_tables.all |> Statement_table.data
+                                 |> List.map
+                                      ~f:(fun {Priced_proof.fee= {prover; _}; _}
+                                         -> prover )
+                                 |> List.dedup_and_sort
+                                      ~compare:Public_key.Compressed.compare
+                                 |> List.map ~f:(fun prover ->
+                                        ( prover
+                                        , Account_id.create prover
+                                            Token_id.default ) )
+                                 |> Public_key.Compressed.Map.of_alist_exn
+                               in
+                               Deferred.map (Scheduler.yield ())
+                                 ~f:(Fn.const account_ids) )
                       in
-                      Scheduler.yield () >>| Fn.const account_locations )
-                in
-                let yield = Staged.unstage (Scheduler.yield_every ~n:50) in
-                trace_recurring "filter snark table based on best tip ledger"
-                  (fun () ->
-                    Statement_table.fold ~init:Deferred.unit t.snark_tables.all
-                      ~f:(fun ~key ~data:{fee= {fee; prover}; _} acc ->
-                        let%bind () = acc in
-                        let%map () = yield () in
-                        let prover_account_exists =
-                          prover
-                          |> Map.find_exn prover_account_ids
-                          |> Map.find_exn prover_account_locations
-                          |> Option.is_some
-                        in
-                        let keep =
-                          fee_is_sufficient t ~fee
-                            ~account_exists:prover_account_exists
-                        in
-                        if not keep then (
-                          Hashtbl.remove t.snark_tables.all key ;
-                          Hashtbl.remove t.snark_tables.rebroadcastable key )
-                    ) ) ) )
+                      (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
+                      let%bind prover_account_locations =
+                        uninterruptible
+                        @@ trace_recurring
+                             "lookup prover account locations in best tip \
+                              ledger" (fun () ->
+                               let account_locations =
+                                 prover_account_ids |> Map.data
+                                 |> Base_ledger.location_of_account_batch
+                                      ledger
+                                 |> Account_id.Map.of_alist_exn
+                               in
+                               Deferred.map (Scheduler.yield ())
+                                 ~f:(Fn.const account_locations) )
+                      in
+                      let yield =
+                        Staged.unstage (Scheduler.yield_every ~n:50)
+                      in
+                      uninterruptible
+                      @@ trace_recurring
+                           "filter snark table based on best tip ledger"
+                           (fun () ->
+                             let open Deferred.Let_syntax in
+                             Statement_table.fold ~init:Deferred.unit
+                               t.snark_tables.all
+                               ~f:(fun ~key
+                                  ~data:{fee= {fee; prover}; _}
+                                  acc
+                                  ->
+                                 let%bind () = acc in
+                                 let%map () = yield () in
+                                 let prover_account_exists =
+                                   prover
+                                   |> Map.find_exn prover_account_ids
+                                   |> Map.find_exn prover_account_locations
+                                   |> Option.is_some
+                                 in
+                                 let keep =
+                                   fee_is_sufficient t ~fee
+                                     ~account_exists:prover_account_exists
+                                 in
+                                 if not keep then (
+                                   Hashtbl.remove t.snark_tables.all key ;
+                                   Hashtbl.remove
+                                     t.snark_tables.rebroadcastable key ) ) ))
+            ) )
 
       let handle_new_refcount_table t
           ({removed; refcount_table; best_tip_table} :
@@ -491,12 +516,15 @@ struct
           in
           let work = One_or_two.map proofs ~f:snd in
           let prover_account_exists =
+            let open Mina_base in
             let open Option.Let_syntax in
             Option.is_some
-              (let open Mina_base in
-              let%bind ledger = t.best_tip_ledger () in
-              Account_id.create prover Token_id.default
-              |> Base_ledger.location_of_account ledger)
+              (let%bind ledger = t.best_tip_ledger () in
+               if Deferred.is_determined (Base_ledger.detached_signal ledger)
+               then None
+               else
+                 Account_id.create prover Token_id.default
+                 |> Base_ledger.location_of_account ledger)
           in
           if
             not
