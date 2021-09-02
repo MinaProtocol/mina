@@ -25,7 +25,7 @@ spec:
     spec:
       initContainers:
       containers:
-      - name: coda
+      - name: mina
         resources:
           limits:
           requests:
