@@ -28,7 +28,7 @@ module "kubernetes_testnet" {
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
 
-  use_local_charts   = true
+  use_local_charts   = false
   mina_image         = var.mina_image
   mina_archive_image = var.mina_archive_image
   mina_agent_image   = var.mina_agent_image
@@ -79,44 +79,6 @@ module "kubernetes_testnet" {
       archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i%(length(local.archive_node_configs)) )["name"]}:${element(local.archive_node_configs, i%(length(local.archive_node_configs)) )["serverPort"]}" : ""  
     }
   ]
-  # block_producer_configs = concat(
-  #   [
-  #     for i in range(var.whale_count) : {
-  #       # for j in range (var.whale.duplicates):
-  #       name                   = local.whale_block_producer_names[i]
-  #       class                  = "whale"
-  #       id                     = i + 1
-  #       external_port          = local.static_peers[local.whale_block_producer_names[i]].port
-  #       private_key_secret     = "online-whale-account-${i + 1}-key"
-  #       libp2p_secret          = "online-whale-libp2p-${i + 1}-key"
-  #       enable_gossip_flooding = false
-  #       run_with_user_agent    = false
-  #       run_with_bots          = false
-  #       enable_peer_exchange   = true
-  #       isolated               = false
-  #       enableArchive          = false
-  #       archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
-  #     }
-  #   ],
-  #   [
-  #     for i in range(var.fish_count) : {
-  #       # for j in range (var.fish.duplicates):
-  #       name                   = local.fish_block_producer_names[i]
-  #       class                  = "fish"
-  #       id                     = i + 1
-  #       external_port          = local.static_peers[local.fish_block_producer_names[i]].port
-  #       private_key_secret     = "online-fish-account-${i + 1}-key"
-  #       libp2p_secret          = "online-fish-libp2p-${i + 1}-key"
-  #       enable_gossip_flooding = false
-  #       run_with_user_agent    = true
-  #       run_with_bots          = false
-  #       enable_peer_exchange   = true
-  #       isolated               = false
-  #       enableArchive          = false
-  #       archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
-  #     }
-  #   ]
-  # )
 
   seed_configs = [
     for i in range(var.seed_count) : {
@@ -135,10 +97,8 @@ module "kubernetes_testnet" {
   plain_node_configs = [
     for i in range(var.plain_node_count) : {
       name               = "plain-node-${i+1}"
-      # libp2p_secret      = "online-plain-nodes-libp2p-${i + 1}-key"
     }
   ]
-
 
   upload_blocks_to_gcloud         = var.upload_blocks_to_gcloud
   restart_nodes                   = var.restart_nodes

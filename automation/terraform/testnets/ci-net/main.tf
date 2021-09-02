@@ -115,9 +115,6 @@ module "ci_testnet" {
     }
   ]
 
-  # whale_count = var.whale_count
-  # fish_count  = var.fish_count
-
   whales= [
     for i in range(var.whale_count):{
       duplicates = 1
