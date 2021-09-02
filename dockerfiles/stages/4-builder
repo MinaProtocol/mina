@@ -31,13 +31,13 @@ RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
 
 WORKDIR $HOME/${MINA_DIR}
 
+RUN mkdir ${HOME}/app
+
 # Build libp2p_helper and clear go module caches
 # Could maybe also delete go during this step / build it as part of the deps stage?
-RUN git pull \
-   && cd src/app/libp2p_helper/src \
-   && go mod download \
-   && cd libp2p_helper \
-   && go build -o ${HOME}/app/libp2p_helper \
+RUN make libp2p_helper \
+   && mv src/app/libp2p_helper/result/bin/libp2p_helper ${HOME}/app/libp2p_helper \
+   && cd src/app/libp2p_helper/src/libp2p_helper \
    && go clean --cache --modcache --testcache -r
 
 # HACK: build without special cpu features to allow more people to run mina-rosetta
