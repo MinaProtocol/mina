@@ -261,28 +261,17 @@ end
 *)
 module Coding2 = struct
   module Rendered = struct
-    type t = { prefix : string array; suffix : string array }
+    (* as bytes, you must hex this later *)
+    type 'bytes t = { prefix : string array; suffix : string array }
     [@@deriving yojson]
   end
 
-  let string_of_field = Coding.string_of_field
+  let string_of_field : 'field -> string = Coding.string_of_field
 
-  let field_of_string = Coding.field_of_string
+  let field_of_string : string -> 'field = Coding.field_of_string
 
-  (*
-    type 'field t =
-      { prefix = 'field list
-      ; suffix = 'field list
-      }
-
-    let render (t : 'field t) =
-      { Rendered.prefix = List.map ~f:Rosetta_coding.of_field t.prefix
-      ; suffix = List.map ~f:Rosetta_coding.of_field t.suffix
-      }
-      *)
-
-  let serialize ~string_of_field:_ ~to_bool:_ ~of_bool:_ t =
-    let prefix =
+  let serialize t ~pack =
+    let prefix : string array =
       (* We only support 32byte fields *)
       let () =
         match t.field_elements with
@@ -293,19 +282,30 @@ module Coding2 = struct
       in
       Array.map t.field_elements ~f:string_of_field
     in
-    let suffix =
-      failwith "TODO"
-      (* TODO: Use pack_to_fields, the ~pack argument should be something about fields?
-
-         pack_to_fields
-      *)
+    let suffix : string array =
+      let fields = pack_bits ~max_size:255 ~pack t |> List.rev in
+      List.map fields ~f:string_of_field |> Array.of_list
     in
-
     { Rendered.prefix; suffix }
 
-  let deserialize ~field_of_string:_ ~of_bool:_
-      { Rendered.prefix = _; suffix = _ } =
-    failwith "TODO"
+  let deserialize ~field_of_string ~unpack { Rendered.prefix; suffix } =
+    let sequence : ('a, 'e) result array -> ('a array, 'e) result =
+      Array.fold ~init:(Result.return []) ~f:(fun acc b ->
+          Result.bind acc ~f:(fun xs ->
+              match b with
+              | Ok x ->
+                  Result.return (x :: xs)
+              | Error e ->
+                  Result.fail e))
+      |> Result.map ~f:(Fn.compose Array.of_list List.rev)
+    in
+    let field_elements : 'field array = Array.map prefix ~f:field_of_string in
+    let bitstrings : 'field array =
+      Array.map suffix ~f:field_of_string
+      |> sequence
+      |> Result.map ~f:(Array.map ~f:unpack)
+    in
+    { field_elements; bitstrings }
 end
 
 let%test_module "random_oracle input" =
@@ -331,15 +331,11 @@ let%test_module "random_oracle input" =
       let size_in_bits = 255 in
       Quickcheck.test ~trials:300 (gen_input ~size_in_bits ())
         ~f:(fun (_, input) ->
-          let serialized =
-            Coding2.(
-              serialize ~string_of_field ~to_bool:Fn.id ~of_bool:Fn.id input)
-          in
+          let serialized = Coding2.(serialize input ~pack:Fn.id) in
           let deserialized =
             Coding2.(
-              deserialize serialized
-                ~field_of_string:(field_of_string ~size_in_bits)
-                ~of_bool:Fn.id)
+              deserialize serialized ~unpack:Fn.id
+                ~field_of_string:(field_of_string ~size_in_bits))
           in
           let normalized t =
             { t with
