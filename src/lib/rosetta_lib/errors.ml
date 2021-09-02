@@ -178,7 +178,7 @@ end = struct
     | `Json_parse _ ->
         false
     | `Graphql_mina_query _ ->
-        false
+        true
     | `Network_doesn't_exist _ ->
         false
     | `Chain_info_missing ->
