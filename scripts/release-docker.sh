@@ -82,12 +82,18 @@ leaderboard)
 esac
 
 
+if [ -z "${BUILDKITE_PULL_REQUEST_REPO}" ]; then
+  REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
+else
+  REPO="--build-arg MINA_REPO=${BUILDKITE_PULL_REQUEST_REPO}"
+fi
+
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo $EXTRA | tr -d '"')
-if [ -z "$DOCKER_CONTEXT" ]; then
-  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args -t gcr.io/o1labs-192920/$SERVICE:$VERSION -
+if [ -z "${DOCKER_CONTEXT}" ]; then
+  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $REPO $extra_build_args -t gcr.io/o1labs-192920/$SERVICE:$VERSION -
 else
-  docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args $DOCKER_CONTEXT -t gcr.io/o1labs-192920/$SERVICE:$VERSION -f $DOCKERFILE_PATH
+  docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args $REPO $DOCKER_CONTEXT -t gcr.io/o1labs-192920/$SERVICE:$VERSION -f $DOCKERFILE_PATH
 fi
 
 tag-and-push() {
