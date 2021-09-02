@@ -7,8 +7,8 @@ POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
 function cleanup
 {
   echo "========================= CLEANING UP ==========================="
-  echo "Stopping mina daemon and waiting 30 seconds"
-  mina client stop-daemon && sleep 30
+  echo "Stopping mina daemon and waiting 3 seconds"
+  mina client stop-daemon && sleep 3
   echo "Killing archive node"
   pkill 'mina-archive' || true
   echo "Killing mina daemon"
@@ -25,10 +25,13 @@ trap cleanup INT
 trap cleanup EXIT
 
 # Setup and export useful variables/defaults
-export MINA_PRIVKEY_PASS=""
 export MINA_LIBP2P_HELPER_PATH=/usr/local/bin/libp2p_helper
-export MINA_CONFIG_FILE=${MINA_CONFIG_FILE:=/genesis_ledgers/mainnet.json}
-export PEER_LIST_URL=${PEER_LIST_URL:=https://storage.googleapis.com/seed-lists/mainnet_seeds.txt}
+export MINA_NETWORK=${MINA_NETWORK:=mainnet}
+export MINA_SUFFIX=${MINA_SUFFIX:=}
+export MINA_CONFIG_FILE=/genesis_ledgers/${MINA_NETWORK}.json
+export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=/data/.mina-config}"
+export MINA_CLIENT_TRUSTLIST=${MINA_CLIENT_TRUSTLIST}
+export PEER_LIST_URL=https://storage.googleapis.com/seed-lists/${MINA_NETWORK}_seeds.txt
 # Allows configuring the port that each service runs on.
 # To connect to a network, the MINA_DAEMON_PORT needs to be publicly accessible.
 # To interact with rosetta, use MINA_ROSETTA_PORT
@@ -37,22 +40,21 @@ export MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
 export MINA_ARCHIVE_PORT=${MINA_ARCHIVE_PORT:=3086}
 export MINA_ROSETTA_PORT=${MINA_ROSETTA_PORT:=3087}
 export LOG_LEVEL="${LOG_LEVEL:=Debug}"
-DEFAULT_FLAGS="--peer-list-url ${PEER_LIST_URL} --external-port ${MINA_DAEMON_PORT} --rest-port ${MINA_GRAPHQL_PORT} -archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} -insecure-rest-server --log-level ${LOG_LEVEL} --log-json"
+DEFAULT_FLAGS="--config-dir ${MINA_CONFIG_DIR} --peer-list-url ${PEER_LIST_URL} --external-port ${MINA_DAEMON_PORT} --rest-port ${MINA_GRAPHQL_PORT} -archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} -insecure-rest-server --log-level ${LOG_LEVEL} --log-json"
 export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
-export PK=${MINA_PK:=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p}
-# Postgres database connection string. Override PG_CONN to connect to a more permanent external database.
-PG_CONN="${PG_CONN:=postgres://pguser:pguser@127.0.0.1:5432/archiver}"
+# Postgres database connection string and related variables
+POSTGRES_USERNAME=${POSTGRES_USERNAME:=pguser}
+POSTGRES_DBNAME=${POSTGRES_DBNAME:=archive}
+POSTGRES_DATA_DIR=${POSTGRES_DATA_DIR:=/data/postgresql}
+PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${POSTGRES_DBNAME}
 
 # Postgres
-echo "========================= STARTING POSTGRESQL ==========================="
-pg_ctlcluster ${POSTGRES_VERSION} main start
-
-# wait for it to settle
-sleep 3
+echo "========================= INITIALIZING POSTGRESQL ==========================="
+./init-db.sh ${MINA_NETWORK} ${POSTGRES_DBNAME} ${POSTGRES_USERNAME} ${POSTGRES_DATA_DIR}
 
 # Rosetta
 echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
-mina-rosetta \
+mina-rosetta${MINA_SUFFIX} \
   --archive-uri "${PG_CONN}" \
   --graphql-uri http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
   --log-level ${LOG_LEVEL} \
@@ -60,7 +62,7 @@ mina-rosetta \
   --port ${MINA_ROSETTA_PORT} &
 
 # wait for it to settle
-sleep 3
+sleep 5
 
 # Archive
 echo "========================= STARTING ARCHIVE NODE on PORT ${MINA_ARCHIVE_PORT} ==========================="
@@ -72,15 +74,29 @@ mina-archive run \
   --server-port ${MINA_ARCHIVE_PORT} &
 
 # wait for it to settle
-sleep 6
+sleep 10
 
 # Daemon
-# Use MINA_CONFIG_FILE=/genesis_ledgers/mainnet.json to run on mainnet
-echo "========================= STARTING DAEMON connected to MAINNET with GRAPQL on PORT ${MINA_GRAPHQL_PORT}==========================="
+echo "Removing daemon lockfile ${MINA_CONFIG_DIR}/.mina-lock"
+rm -f "${MINA_CONFIG_DIR}/.mina-lock"
+echo "========================= STARTING DAEMON connected to ${MINA_NETWORK^^} with GRAPQL on PORT ${MINA_GRAPHQL_PORT}==========================="
 echo "MINA Flags: $MINA_FLAGS -config-file ${MINA_CONFIG_FILE}"
-mina daemon \
+mina${MINA_SUFFIX} daemon \
   --config-file ${MINA_CONFIG_FILE} \
   ${MINA_FLAGS} $@ &
+MINA_DAEMON_PID=$!
 
-# wait for a signal
-sleep infinity
+# wait for it to settle
+sleep 30
+
+echo "========================= POPULATING MISSING BLOCKS ==========================="
+# Note: this script takes some time to fail even in the best case (~30 minutes) and we don't start waiting on the other daemons until it completes
+./download-missing-blocks.sh ${MINA_NETWORK} ${POSTGRES_DBNAME} ${POSTGRES_USERNAME}
+
+
+if ! kill -0 "${MINA_DAEMON_PID}"; then
+  echo "[FATAL] Mina daemon failed to start, exiting docker-start.sh"
+  exit 1
+fi
+
+wait -n < <(jobs -p)

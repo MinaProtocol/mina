@@ -29,7 +29,8 @@ RUN apt-get -y update \
     libssl1.1 \
     postgresql \
     postgresql-contrib \
-    tzdata
+    tzdata \
+    jq
 
 RUN if test "$deb_codename" = "buster" ; then \
      sudo apt-get update -y \
@@ -75,11 +76,14 @@ RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf \
     && /etc/init.d/postgresql start \
     && psql --command "CREATE USER pguser WITH SUPERUSER PASSWORD 'pguser';" \
-    && createdb -O pguser archiver \
-    && psql postgresql://pguser:pguser@localhost:5432/archiver -f /archive/create_schema.sql
+    && createdb -O pguser archive \
+    && psql postgresql://pguser:pguser@localhost:5432/archive -f /archive/create_schema.sql
 
 ENV USER pguser
 USER root
+
+# Generate en_US.UTF-8 to allow use of O(1) Labs DB dumps
+RUN locale-gen en_US.UTF-8
 
 WORKDIR /rosetta
 
