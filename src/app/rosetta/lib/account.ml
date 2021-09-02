@@ -19,7 +19,6 @@ module Get_balance =
           liquid @bsDecoder(fn: "Decoders.optional_uint64")
           total @bsDecoder(fn: "Decoders.uint64")
         }
-        nonce
       }
     }
 |}]
@@ -351,21 +350,9 @@ module Balance = struct
       let open M.Let_syntax in
       let address = req.account_identifier.address in
       let%bind token_id = Token_id.decode req.account_identifier.metadata in
-      let%bind res =
-        env.gql
-          ?token_id:(Option.map token_id ~f:Unsigned.UInt64.to_string)
-          ~address ()
-      in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~graphql_uri
-      in
-      let%bind account =
-        match res#account with
-        | None ->
-            M.fail (Errors.create (`Account_not_found address))
-        | Some account ->
-            M.return account
       in
       let make_balance_amount ~liquid_balance ~total_balance =
         let amount =
@@ -390,13 +377,21 @@ module Balance = struct
         in
         {amount with metadata= Some metadata}
       in
-      let metadata =
-        Option.map
-          ~f:(fun nonce -> `Assoc [("nonce", `Intlit nonce)])
-          account#nonce
-      in
+      let metadata = None in
       match req.block_identifier with
       | None ->
+      let%bind res =
+        env.gql
+          ?token_id:(Option.map token_id ~f:Unsigned.UInt64.to_string)
+          ~address ()
+      in
+      let%bind account =
+        match res#account with
+        | None ->
+            M.fail (Errors.create (`Account_not_found address))
+        | Some account ->
+            M.return account
+      in
           let%bind state_hash =
             match (account#balance)#stateHash with
             | None ->
