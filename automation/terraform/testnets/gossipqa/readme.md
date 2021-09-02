@@ -4,7 +4,7 @@ Run Instructions
 
 `gcloud container clusters get-credentials --region us-central1 coda-infra-central1`
 
-1: Firstly figure out how many unique and total fish, whales, plain nodes, snark coordinators, and how many snark workers per coordinator.  All these must be written out in `automation/terraform/testnets/gossipqa/main.tf`.  use the for-loops to make this process less copy-pasty
+1: Firstly figure out how many unique and total fish, whales, plain nodes, snark coordinators, and how many snark workers per coordinator.  All these must be written out in `automation/terraform/testnets/gossipqa/main.tf`.  use the terraform for-loops to make this process less copy-pasty
 
 2: Generate the keys and genesis ledger.  If you want there to be thousands and thousands of extra random keys in the genesis ledger, use the efc (extra fish count) flag.  From the /mina base directory, run:
 
