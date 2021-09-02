@@ -1178,7 +1178,8 @@ let start t =
     ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer) ;
   stop_long_running_daemon t ;
   Node_status_service.start ~logger:t.config.logger
-    ~node_status_url:t.config.node_status_url ;
+    ~node_status_url:t.config.node_status_url
+    ~transition_frontier:t.components.transition_frontier ;
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
