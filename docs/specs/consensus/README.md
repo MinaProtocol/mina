@@ -92,7 +92,6 @@ This documents specifies required structures, algorithms and protocol details.
 		- [4.1.1.1 `Consensus_state`](#4111-consensusstate)
 		- [4.1.1.2 Genesis block JSON](#4112-genesis-block-json)
 	- [4.2 Select chain](#42-select-chain)
-	- [4.3 Produce block](#43-produce-block)
 
 <!-- /TOC -->
 
@@ -719,7 +718,6 @@ fn getMinWindowDensity(C, max_slot) -> density
 This section specifies the consensus protocol in terms of events and how they MUST be implemented by a compatible peer.  The required events are:
 * [`Initialize consensus`](#41-initialize-consensus)
 * [`Select chain`](#42-select-chain)
-* [`Produce block`](#43-produce-block)
 
 Additionally there are certain local data members that all peers MUST maintain in order to participate in consensus.
 
@@ -857,16 +855,49 @@ The following JSON specifies most of the genesis block (work in progress).
 
 ## 4.2 Select chain
 
+**WIP**
+
 The _select chain_ event occurs every time a peer's chains are updated.  A chain is said to be _updated_ anytime a valid block is added or removed from its head.  All compatible peers MUST select chains as described here.
+
+In addition to the high-level idea given in the [Chain Selection Rules Section](#32-chain-selection-rules) described in [Section 3.2](#32-chain-selection-rules), the chain selection algorithm employs two additional concepts
+
+* Virtual chains
+* Tiebreak logic
+
+### Virtual chains
+
+When a peer computes the best chain it does not actually directly compare the current chain against each candidate chain.  Instead, it compares a *virtual chain* for the current chain against a virtual chain for each candidate chain.
+
+Virtual chains are used to solve a minimum window density *inversion problem* that can happen when applying the long-fork chain selection rule, for example, when a peer that has been disconnected for a long time attempts to join the network again.
+
+**Inversion problem**
+
+Observe that by definition the minimum window density is always decreasing.  Therefore, a peer that has disconnected from the network for a long period and wishes to rejoin will have a higher minimum window density for it current best chain when compared to the canonical chain (i.e. the best chain for the network).
+
+Recall that the long-range fork rule dictates that the peer select the chain with the higher minimum density.  However, this will actually be the peer's current chain, rather than the network's canonical chain (since the minimum window density is always decreasing).  Thus, the peer will be stuck and not sync-- the so-called investion problem.
+
+**Solution**
+
+The invesrion problem is overcome by using *virtual chains*.  A virtual chain is created by temporarily mutating an existing chain and adding a virtual top block to it.  The virtual top block's global slot will reflect the current time, which is the time at which the peer is joining the network.
+
+```rust
+TODO: Spec of how to create a virtual top block for a given chain
+```
+
+Once this is done, the peer uses the [`getMinWindowDensity`](#345-getminwindowdensity) algorithm on the virtual chains to select the best chain.
+
+### Tiebreak logic
+
+Additional tiebreak logic is needed when comparing chains of equal length or equal minimum density.  The rule is simple-- if we are applying the long-range rule and two chains have equal minimum window density, then we apply the short-range rule (i.e. select the longer chain).
+
+### Bringing it all together
 
 Assuming an update to either `P.tip` or `P.chains`, the peer `P` must update its `tip` like this
 
 ```rust
 P.tip = selectSecureChain(P.tip, P.chains)
 ```
-The `selectSecureChain` algorithm, presented below, takes as input the peer's current best chain `P.tip` and its set of known valid chains `P.chains` and outputs the most secure chain according to the [Chain Selection Rules Section](#32-chain-selection-rules) described in [Section 3.2](#32-chain-selection-rules).
-
-In addition to the high-level idea given in Section 3.2, the algorithm employs some additional tiebreak logic when comparing chains of equal length or equal minimum density.
+The `selectSecureChain` algorithm, presented below, takes as input the peer's current best chain `P.tip` and its set of known valid chains `P.chains` and outputs the most secure chain.
 
 ```rust
 fn selectSecureChain(tip, chains) -> Chain
@@ -919,5 +950,3 @@ fn selectLongerChain(tip, candidate) -> Chain
     return tip
 }
 ```
-
-## 4.3 Produce block
