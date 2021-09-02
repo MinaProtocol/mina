@@ -43,8 +43,8 @@ This documents specifies required structures, algorithms and protocol details.
 	- [3.4 Window min-density](#34-window-min-density)
 		- [3.4.1 `isWindowStop`](#341-iswindowstop)
 		- [3.4.2 `shiftWindow`](#342-shiftwindow)
-		- [3.4.3 `initSubWindowDensities`](#343-initsubwindowdensities)
-		- [3.4.4 `updateSubWindowDensities`](#344-updatesubwindowdensities)
+		- [3.4.3 `initWindowDensities`](#343-initwindowdensities)
+		- [3.4.4 `updateWindowDensities`](#344-updatewindowdensities)
 		- [3.4.5 `getMinWindowDensity`](#345-getminwindowdensity)
 - [4 Protocol](#4-protocol)
 	- [4.1 Initialize consensus](#41-initialize-consensus)
@@ -83,8 +83,8 @@ This documents specifies required structures, algorithms and protocol details.
 	- [3.4 Window min-density](#34-window-min-density)
 		- [3.4.1 `isWindowStop`](#341-iswindowstop)
 		- [3.4.2 `shiftWindow`](#342-shiftwindow)
-		- [3.4.3 `initSubWindowDensities`](#343-initsubwindowdensities)
-		- [3.4.4 `updateSubWindowDensities`](#344-updatesubwindowdensities)
+		- [3.4.3 `initWindowDensities`](#343-initwindowdensities)
+		- [3.4.4 `updateWindowDensities`](#344-updatewindowdensities)
 		- [3.4.5 `getMinWindowDensity`](#345-getminwindowdensity)
 - [4 Protocol](#4-protocol)
 	- [4.1 Initialize consensus](#41-initialize-consensus)
@@ -633,14 +633,14 @@ fn shiftWindow(D) -> D'
 }
 ```
 
-### 3.4.3 `initSubWindowDensities`
+### 3.4.3 `initWindowDensities`
 
 This algorithm initializes the sub-window densities and minimm window density for genesis block `G`
 
 <!-- cState(G).sub_window_densities = u32[0]⌢u32[slots_per_window; sub_windows_per_window - 1] -->
 
 ```rust
-fn initSubWindowDensities(G) -> ()
+fn initWindowDensities(G) -> ()
 {
     cState(G).sub_window_densities = u32[0, slots_per_window, slots_per_window, ..., slots_per_window]
     //                                      \_______________________________________________________/
@@ -650,17 +650,16 @@ fn initSubWindowDensities(G) -> ()
 }
 ```
 
-### 3.4.4 `updateSubWindowDensities`
+### 3.4.4 `updateWindowDensities`
 
-This algorithm updates the sub-window densities and minimum window density of the block being created `B` based on its parent block `P`.  It inputs the blocks `P` and `B` and updates `B`'s sub window densities according to the description in [Section 3.4](#34-window-min-density).
+This algorithm updates both the the sub-window densities and the minimum window density of the block being created `B` based on its parent block `P`.  It inputs the blocks `P` and `B` and updates `B` according to the description in [Section 3.4](#34-window-min-density).
 
 ```rust
-fn updateSubWindowDensities(P, B) -> ()
+fn updateWindowDensities(P, B) -> ()
 {
     cState(B).sub_window_densities = cState(P).sub_window_densities
     
-    // Compute how many slots B is ahead of P is
-    // and use it to shift sub_window_densities
+    // Compute how many slots B is ahead of P and use it to shift sub_window_densities
     let shift = MIN { globalSubWindow(B) - globalSubWindow(P), cState(B).sub_window_densities.len() }
     if shift > 0 {
         // Left-shift the sub-window densities
@@ -752,7 +751,7 @@ Things a peer MUST do to initialize consensus includes
 | `blockchain_length`                      | `1`           |
 | `epoch_count`                            | `0`           |
 | `min_window_density`                     | `77 = slots_per_window` |
-| `sub_window_densities`                   | `u32[77, 11]` (See [initSubWindowDensities](#343-initSubWindowDensities)) |
+| `sub_window_densities`                   | `u32[77, 11]` (See [initWindowDensities](#343-initwindowdensities)) |
 | `last_vrf_output`                        | `0x0000000000000000000000000000000000000000000000000000000000000000`
 | `total_currency`                         | `805385692.840039233`
 | `curr_global_slot`                       | `0` |
