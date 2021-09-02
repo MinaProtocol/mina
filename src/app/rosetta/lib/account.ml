@@ -493,14 +493,14 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
             body
         in
         let%bind req =
-            Errors.Lift.parse ~context:"Request"
-            @@ Account_balance_request.of_yojson body
-            |> Errors.Lift.wrap
-          in
-          let%map res =
-            Balance.Real.handle ~graphql_uri ~env:(Balance.Env.real ~db ~graphql_uri) req
-            |> Errors.Lift.wrap
-          in
-          Account_balance_response.to_yojson res)
+          Errors.Lift.parse ~context:"Request"
+          @@ Account_balance_request.of_yojson body
+          |> Errors.Lift.wrap
+        in
+        let%map res =
+          Balance.Real.handle ~graphql_uri ~env:(Balance.Env.real ~db ~graphql_uri) req
+          |> Errors.Lift.wrap
+        in
+        Account_balance_response.to_yojson res)
   | _ ->
       Deferred.Result.fail `Page_not_found
