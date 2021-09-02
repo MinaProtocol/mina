@@ -2,10 +2,6 @@
 
 ## libp2p_helper hints
 
-If you are adding new `methodIdx` values, edit `generate_methodidx/main.go`
-(search for `TypesAndValues`) with the names of the new values. Then, run `go
-run generate_methodidx/main.go > libp2p_helper/methodidx_jsonenum.go`.
-
 ## building
 
 ### Makefile
@@ -18,8 +14,6 @@ $ make clean
 ### Bazel
 
 ```
-$ bazel build src/generate_methodidx
-$ bazel run src/generate_methodidx
 $ bazel build src:codanet
 $ bazel build src/libp2p_helper
 ```

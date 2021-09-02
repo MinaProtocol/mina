@@ -23,7 +23,6 @@ node_modules/
 .graphql_ppx_cache
 /scripts/archive/output
 accounts.json
-src/app/libp2p_helper/src/generate_methodidx/generate_methodidx
 src/app/libp2p_helper/src/libp2p_helper/libp2p_helper
 src/app/validation/_build
 src/app/validation/config/local.exs
