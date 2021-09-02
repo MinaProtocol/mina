@@ -374,7 +374,7 @@ add_another_to_prompt ${TESTNET}_offline-fish ${FISH_AMOUNT} ${TESTNET}_online-f
 add_another_to_prompt ${TESTNET}_online-fish ${FISH_AMOUNT} ${TESTNET}_online-fish
 add_another_to_prompt ${TESTNET}_online-o1 ${FISH_AMOUNT} ${TESTNET}_online-o1
 
-if [ -f keys/keysets/${TESTNET}_bots_keyfiles ];
+if [ -s keys/keysets/${TESTNET}_bots_keyfiles ];
 then
   add_another_to_prompt ${TESTNET}_bots_keyfiles 50000 ${TESTNET}_bots_keyfiles
 else
