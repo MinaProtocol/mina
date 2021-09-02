@@ -1,10 +1,16 @@
 open Async
 open Core
+open Pipe_lib
+
+type catchup_job_states =
+  (Transition_frontier.Full_catchup_tree.Node.State.Enum.t * int) list option
+[@@deriving to_yojson]
 
 type node_status_data =
   { block_height_at_best_tip : int
   ; max_observed_block_height : int
   ; max_observed_unvalidated_block_height : int
+  ; catchup_job_states : catchup_job_states
   }
 [@@deriving to_yojson]
 
@@ -38,17 +44,33 @@ let send_node_status_data ~logger ~url node_status_data =
         [%log error] "Failed to send node status data to URL $url"
           ~metadata:(metadata @ extra_metadata)
 
-let start ~logger ~node_status_url =
+let start ~logger ~node_status_url ~transition_frontier =
   let url_string = Option.value ~default:"127.0.0.1" node_status_url in
   [%log info] "Starting node status service using URL $url"
     ~metadata:[ ("URL", `String url_string) ] ;
+
   let _data = Prometheus.CollectorRegistry.(collect default) in
-  let node_status_data =
-    { block_height_at_best_tip = 1
-    ; max_observed_block_height = 2
-    ; max_observed_unvalidated_block_height = 3
-    }
-  in
-  don't_wait_for
-  @@ send_node_status_data ~logger ~url:(Uri.of_string url_string)
-       node_status_data
+  match Broadcast_pipe.Reader.peek transition_frontier with
+  | None ->
+      [%log info] "Transition frontier not available for node status service"
+  | Some tf ->
+      let catchup_job_states =
+        match Transition_frontier.catchup_tree tf with
+        | Full catchup_tree ->
+            Some
+              (Transition_frontier.Full_catchup_tree.to_node_status_report
+                 catchup_tree)
+        | _ ->
+            None
+      in
+
+      let node_status_data =
+        { block_height_at_best_tip = 1
+        ; max_observed_block_height = 2
+        ; max_observed_unvalidated_block_height = 3
+        ; catchup_job_states
+        }
+      in
+      don't_wait_for
+      @@ send_node_status_data ~logger ~url:(Uri.of_string url_string)
+           node_status_data
