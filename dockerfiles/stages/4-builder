@@ -36,9 +36,7 @@ WORKDIR $HOME/${MINA_DIR}
 RUN git pull \
    && cd src/app/libp2p_helper/src \
    && go mod download \
-   && cd generate_methodidx \
-   && go build -o ${HOME}/app/generate_methodidx \
-   && cd ../libp2p_helper \
+   && cd libp2p_helper \
    && go build -o ${HOME}/app/libp2p_helper \
    && go clean --cache --modcache --testcache -r
 

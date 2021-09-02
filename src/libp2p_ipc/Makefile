@@ -1,13 +1,17 @@
 .PHONY: get-go-capnp clean
 
+ifeq ($(GO),)
+GO := go
+endif
+
 GO_CAPNP_VERSION=v3@v3.0.0-alpha.1
-GO_CAPNP_STD=$(shell go env GOPATH)/pkg/mod/capnproto.org/go/capnp/${GO_CAPNP_VERSION}/std
+GO_CAPNP_STD=$(shell $(GO) env GOPATH)/pkg/mod/capnproto.org/go/capnp/${GO_CAPNP_VERSION}/std
 
 get-go-capnp:
-	go get capnproto.org/go/capnp/$(GO_CAPNP_VERSION)
+	$(GO) get capnproto.org/go/capnp/$(GO_CAPNP_VERSION)
 
 build/capnpc-go: get-go-capnp
-	mkdir -p build && go build -o build/capnpc-go capnproto.org/go/capnp/v3/capnpc-go
+	mkdir -p build && $(GO) build -o build/capnpc-go capnproto.org/go/capnp/v3/capnpc-go
 
 libp2p_ipc.capnp.go: libp2p_ipc.capnp build/capnpc-go
 	PATH="build:${PATH}" capnp compile -ogo -I${GO_CAPNP_STD} libp2p_ipc.capnp
