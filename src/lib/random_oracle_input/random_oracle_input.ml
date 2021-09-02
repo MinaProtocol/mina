@@ -262,13 +262,13 @@ end
 module Coding2 = struct
   module Rendered = struct
     (* as bytes, you must hex this later *)
-    type 'bytes t = { prefix : string array; suffix : string array }
+    type t = { prefix : string array; suffix : string array }
     [@@deriving yojson]
   end
 
-  let string_of_field : 'field -> string = Coding.string_of_field
+  let string_of_field : bool list -> string = Coding.string_of_field
 
-  let field_of_string : string -> 'field = Coding.field_of_string
+  let field_of_string = Coding.field_of_string
 
   let serialize t ~pack =
     let prefix : string array =
@@ -288,9 +288,12 @@ module Coding2 = struct
     in
     { Rendered.prefix; suffix }
 
-  let deserialize ~field_of_string ~unpack { Rendered.prefix; suffix } =
+  let deserialize
+      ~(field_of_string : string -> size_in_bits:int -> ('b, 'c) result) ~unpack
+      { Rendered.prefix; suffix } =
     let sequence : ('a, 'e) result array -> ('a array, 'e) result =
-      Array.fold ~init:(Result.return []) ~f:(fun acc b ->
+     fun arr ->
+      Array.fold arr ~init:(Result.return []) ~f:(fun acc b ->
           Result.bind acc ~f:(fun xs ->
               match b with
               | Ok x ->
@@ -299,9 +302,12 @@ module Coding2 = struct
                   Result.fail e))
       |> Result.map ~f:(Fn.compose Array.of_list List.rev)
     in
-    let field_elements : 'field array = Array.map prefix ~f:field_of_string in
-    let bitstrings : 'field array =
-      Array.map suffix ~f:field_of_string
+    let open Result.Let_syntax in
+    let%bind field_elements =
+      Array.map prefix ~f:(field_of_string ~size_in_bits:255) |> sequence
+    in
+    let%map bitstrings =
+      Array.map suffix ~f:(field_of_string ~size_in_bits:255)
       |> sequence
       |> Result.map ~f:(Array.map ~f:unpack)
     in
@@ -333,9 +339,7 @@ let%test_module "random_oracle input" =
         ~f:(fun (_, input) ->
           let serialized = Coding2.(serialize input ~pack:Fn.id) in
           let deserialized =
-            Coding2.(
-              deserialize serialized ~unpack:Fn.id
-                ~field_of_string:(field_of_string ~size_in_bits))
+            Coding2.(deserialize serialized ~unpack:Fn.id ~field_of_string)
           in
           let normalized t =
             { t with
