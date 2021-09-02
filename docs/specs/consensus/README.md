@@ -864,7 +864,7 @@ In addition to the high-level idea given in the [Chain Selection Rules Section](
 * Virtual chains
 * Tiebreak logic
 
-### Virtual chains
+### 4.2.1 Virtual chains
 
 When a peer computes the best chain it does not actually directly compare the current chain against each candidate chain.  Instead, it compares a *virtual chain* for the current chain against a virtual chain for each candidate chain.
 
@@ -886,11 +886,11 @@ TODO: Spec of how to create a virtual top block for a given chain
 
 Once this is done, the peer uses the [`getMinWindowDensity`](#345-getminwindowdensity) algorithm on the virtual chains to select the best chain.
 
-### Tiebreak logic
+### 4.2.2 Tiebreak logic
 
 Additional tiebreak logic is needed when comparing chains of equal length or equal minimum density.  The rule is simple-- if we are applying the long-range rule and two chains have equal minimum window density, then we apply the short-range rule (i.e. select the longer chain).
 
-### Bringing it all together
+### 4.2.3 Bringing it all together
 
 Assuming an update to either `P.tip` or `P.chains`, the peer `P` must update its `tip` like this
 
