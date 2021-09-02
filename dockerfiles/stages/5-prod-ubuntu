@@ -4,7 +4,6 @@
 #################################################################################################
 FROM ubuntu:18.04 AS production
 
-ARG POSTGRES_DATA_DIR=/data/postgresql
 ARG MINA_DAEMON_PORT=10101
 ARG MINA_CONFIG_DIR=/root/.mina-config
 # Sample public key for use in dev profile / demo mode genesis block
@@ -44,16 +43,18 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
   && chmod go-rwx ${MINA_CONFIG_DIR}/wallets/store/${PK}
 
 COPY --from=builder /home/opam/app/* /usr/local/bin/
-COPY --from=builder /home/opam/mina/src/app/rosetta /rosetta
+COPY --from=builder /home/opam/mina/src/app/rosetta/*.sh /rosetta/
+COPY --from=builder /home/opam/mina/src/app/rosetta/*.conf /rosetta/
+COPY --from=builder /home/opam/mina/src/app/rosetta/README.md /rosetta/
 COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
-COPY --from=builder /home/opam/mina/src/app/archive/create_schema.sql /archive/
 
 USER postgres
 
 RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
-  && echo "data_directory = '/data/postgresql'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
-  && echo "listen_addresses='*'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
-  && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf
+    && echo "$POSTGRES_VERSION" "$(psql -V)" \
+    && echo "data_directory = '/data/postgresql'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
+    && echo "listen_addresses='*'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
+    && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf
 
 USER root
 

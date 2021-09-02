@@ -13,7 +13,7 @@ RED='\033[0;31m'
 VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-rosetta-ubuntu' 'mina-toolchain' 'bot' 'leaderboard')
 
 function usage() {
-  if [ -n "$1" ]; then
+  if [[ -n "$1" ]]; then
     echo -e "${RED}☞  $1${CLEAR}\n";
   fi
   echo "Usage: $0 [-s service-to-release] [-v service-version] [-n network]"
@@ -43,16 +43,16 @@ while [[ "$#" -gt 0 ]]; do case $1 in
 esac; shift; done
 
 # Debug prints for visability
-echo 'service="'$SERVICE'" version="'$VERSION'" deb_version="'${DEB_VERSION}'" deb_release="'${DEB_RELEASE}' "deb_codename="'${DEB_CODENAME}'" '
-echo $EXTRA
+echo 'service="'${SERVICE}'" version="'${VERSION}'" deb_version="'${DEB_VERSION}'" deb_release="'${DEB_RELEASE}' "deb_codename="'${DEB_CODENAME}'" '
+echo ${EXTRA}
 
 # Verify Required Parameters are Present
-if [ -z "$SERVICE" ]; then usage "Service is not set!"; fi;
-if [ -z "$VERSION" ]; then usage "Version is not set!"; fi;
-if [ -z "$EXTRA" ]; then EXTRA=""; fi;
-if [ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]; then usage "Invalid service!"; fi
+if [[ -z "$SERVICE" ]]; then usage "Service is not set!"; fi;
+if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
+if [[ -z "$EXTRA" ]]; then EXTRA=""; fi;
+if [[ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
 
-case $SERVICE in
+case "${SERVICE}" in
 mina-archive)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
   DOCKER_CONTEXT="dockerfiles/"
@@ -82,12 +82,18 @@ leaderboard)
 esac
 
 
-# If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
-extra_build_args=$(echo $EXTRA | tr -d '"')
-if [ -z "$DOCKER_CONTEXT" ]; then
-  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args -t gcr.io/o1labs-192920/$SERVICE:$VERSION -
+if [[ -z "${BUILDKITE_PULL_REQUEST_REPO}" ]]; then
+  REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
 else
-  docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args $DOCKER_CONTEXT -t gcr.io/o1labs-192920/$SERVICE:$VERSION -f $DOCKERFILE_PATH
+  REPO="--build-arg MINA_REPO=${BUILDKITE_PULL_REQUEST_REPO}"
+fi
+
+# If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
+extra_build_args=$(echo ${EXTRA} | tr -d '"')
+if [[ -z "${DOCKER_CONTEXT}" ]]; then
+  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $REPO $extra_build_args -t gcr.io/o1labs-192920/$SERVICE:$VERSION -
+else
+  docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args $REPO $DOCKER_CONTEXT -t gcr.io/o1labs-192920/$SERVICE:$VERSION -f $DOCKERFILE_PATH
 fi
 
 tag-and-push() {
@@ -95,7 +101,7 @@ tag-and-push() {
   docker push "$1"
 }
 
-if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then
+if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
   tag-and-push "minaprotocol/$SERVICE:$VERSION"
   docker push "gcr.io/o1labs-192920/$SERVICE:$VERSION"
 fi
