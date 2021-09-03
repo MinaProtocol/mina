@@ -4,6 +4,7 @@
 #################################################################################################
 ARG deb_codename=stretch
 FROM debian:${deb_codename}-slim AS production
+ARG deb_codename=stretch
 
 ARG MINA_DAEMON_PORT=10101
 ARG MINA_CONFIG_DIR=/root/.mina-config
