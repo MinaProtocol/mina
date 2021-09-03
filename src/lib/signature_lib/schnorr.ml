@@ -16,6 +16,10 @@ module type Message_intf = sig
 
   val hash : t -> public_key:curve -> r:field -> curve_scalar
 
+  val hash_for_mainnet : t -> public_key:curve -> r:field -> curve_scalar
+
+  val hash_for_testnet : t -> public_key:curve -> r:field -> curve_scalar
+
   [%%ifdef consensus_mechanism]
 
   type field_var
@@ -110,7 +114,12 @@ module type S = sig
 
   val sign : Private_key.t -> Message.t -> Signature.t
 
-  val verify : Signature.t -> Public_key.t -> Message.t -> bool
+  val verify :
+       ?signature_kind:Mina_signature_kind.t
+    -> Signature.t
+    -> Public_key.t
+    -> Message.t
+    -> bool
 end
 
 module Make
@@ -215,8 +224,19 @@ module Make
     let s = Curve.Scalar.(k + (e * d)) in
     (r, s)
 
-  let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
-    let e = Message.hash ~public_key:pk ~r m in
+  let verify ?signature_kind ((r, s) : Signature.t) (pk : Public_key.t)
+      (m : Message.t) =
+    let hash =
+      let open Mina_signature_kind in
+      match signature_kind with
+      | None ->
+          Message.hash
+      | Some Mainnet ->
+          Message.hash_for_mainnet
+      | Some Testnet ->
+          Message.hash_for_testnet
+    in
+    let e = hash ~public_key:pk ~r m in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
     match Curve.to_affine_exn r_pt with
     | rx, ry ->
@@ -316,7 +336,12 @@ module type S = sig
 
   val sign : Private_key.t -> Message.t -> Signature.t
 
-  val verify : Signature.t -> Public_key.t -> Message.t -> bool
+  val verify :
+       ?signature_kind:Mina_signature_kind.t
+    -> Signature.t
+    -> Public_key.t
+    -> Message.t
+    -> bool
 end
 
 module Make
@@ -387,8 +412,19 @@ module Make
     let s = Curve.Scalar.(k + (e * d)) in
     (r, s)
 
-  let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
-    let e = Message.hash ~public_key:pk ~r m in
+  let verify ?signature_kind ((r, s) : Signature.t) (pk : Public_key.t)
+      (m : Message.t) =
+    let hash =
+      let open Mina_signature_kind in
+      match signature_kind with
+      | None ->
+          Message.hash
+      | Some Mainnet ->
+          Message.hash_for_mainnet
+      | Some Testnet ->
+          Message.hash_for_testnet
+    in
+    let e = hash ~public_key:pk ~r m in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
     match Curve.to_affine_exn r_pt with
     | rx, ry ->
@@ -432,16 +468,24 @@ module Message = struct
     |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
     |> Tock.Field.project
 
-  let hash t ~public_key ~r =
+  let make_hash ~init t ~public_key ~r =
     let input =
       let px, py = Inner_curve.to_affine_exn public_key in
       Random_oracle.Input.append t
         { field_elements = [| px; py; r |]; bitstrings = [||] }
     in
     let open Random_oracle in
-    hash ~init:Hash_prefix_states.signature (pack_input input)
+    hash ~init (pack_input input)
     |> Digest.to_bits ~length:Field.size_in_bits
     |> Inner_curve.Scalar.of_bits
+
+  let hash = make_hash ~init:Hash_prefix_states.signature
+
+  let hash_for_mainnet =
+    make_hash ~init:Hash_prefix_states.signature_for_mainnet
+
+  let hash_for_testnet =
+    make_hash ~init:Hash_prefix_states.signature_for_testnet
 
   [%%ifdef consensus_mechanism]
 
