@@ -369,6 +369,79 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
         ] ;
     if continue_on_error then incr error_count else Core_kernel.exit 1 )
 
+let account_creation_fee_uint64 =
+  Currency.Fee.to_uint64 constraint_constants.account_creation_fee
+
+let account_creation_fee_int64 =
+  Currency.Fee.to_int constraint_constants.account_creation_fee |> Int64.of_int
+
+let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
+    ~balance_id ~pk_id ~fee ~continue_on_error =
+  let%map claimed_balance =
+    balance_of_id_and_pk_id pool ~id:balance_id ~pk_id
+  in
+  let balance_uint64 = Currency.Balance.to_uint64 claimed_balance in
+  let fee_uint64 = Currency.Fee.to_uint64 fee in
+  if Unsigned_extended.UInt64.( >= ) fee_uint64 account_creation_fee_uint64 then
+    let fee_less_account_creation_fee_uint64 =
+      Unsigned.UInt64.sub fee_uint64 account_creation_fee_uint64
+    in
+    if Unsigned.UInt64.equal balance_uint64 fee_less_account_creation_fee_uint64
+    then
+      match receiver_account_creation_fee with
+      | None ->
+          [%log error]
+            "In the archive database, the account balance equals the internal \
+             command fee minus the account creation fee, but the receiver \
+             account creation fee is NULL"
+            ~metadata:
+              [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
+              ; ("fee", Currency.Fee.to_yojson fee)
+              ; ( "constraint_constants.account_creation_fee"
+                , Currency.Fee.to_yojson
+                    constraint_constants.account_creation_fee )
+              ] ;
+          if continue_on_error then incr error_count else Core_kernel.exit 1
+      | Some amount_int64 ->
+          if Int64.equal amount_int64 account_creation_fee_int64 then
+            (* account creation fee in db has the expected value *)
+            ()
+          else (
+            [%log error]
+              "In the archive database, the account balance equals the \
+               internal command fee minus the account creation fee, but the \
+               receiver account creation fee differs from the account creation \
+               fee"
+              ~metadata:
+                [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
+                ; ("fee", Currency.Fee.to_yojson fee)
+                ; ( "constraint_constants.account_creation_fee"
+                  , Currency.Fee.to_yojson
+                      constraint_constants.account_creation_fee )
+                ; ( "receiver_account_creation_fee"
+                  , `Int (Int64.to_int_exn amount_int64) )
+                ] ;
+            if continue_on_error then incr error_count else Core_kernel.exit 1 )
+    else
+      match receiver_account_creation_fee with
+      | None ->
+          ()
+      | Some amount_int64 ->
+          [%log error]
+            "In the archive database, the account balance is different than \
+             the internal command fee minus the account creation fee, but the \
+             receiver account creation fee is not NULL"
+            ~metadata:
+              [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
+              ; ("fee", Currency.Fee.to_yojson fee)
+              ; ( "constraint_constants.account_creation_fee"
+                , Currency.Fee.to_yojson
+                    constraint_constants.account_creation_fee )
+              ; ( "receiver_account_creation_fee"
+                , `Int (Int64.to_int_exn amount_int64) )
+              ] ;
+          if continue_on_error then incr error_count else Core_kernel.exit 1
+
 let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
     ~continue_on_error =
   [%log info]
@@ -391,6 +464,11 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
   let pk_id = cmd.receiver_id in
   let balance_id = cmd.receiver_balance in
   let token_int64 = cmd.token in
+  let receiver_account_creation_fee = cmd.receiver_account_creation_fee_paid in
+  let%bind () =
+    verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
+      ~balance_id ~pk_id ~fee ~continue_on_error
+  in
   let open Mina_base.Ledger in
   match cmd.type_ with
   | "fee_transfer" -> (
