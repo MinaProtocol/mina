@@ -166,7 +166,7 @@ module Internal_command_info = struct
                   Some
                     (account_id coinbase_receiver Amount_of.Token_id.default)
               ; _type= Operation_types.name `Fee_payer_dec
-              ; amount= Some Amount_of.(negated (coda t.fee))
+              ; amount= Some Amount_of.(negated (mina t.fee))
               ; coin_change= None
               ; metadata= None }
           | `Account_creation_fee_via_fee_receiver account_creation_fee ->
@@ -177,7 +177,7 @@ module Internal_command_info = struct
                 ; account=
                     Some (account_id t.receiver Amount_of.Token_id.default)
                 ; _type= Operation_types.name `Account_creation_fee_via_fee_receiver
-                ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
+                ; amount= Some Amount_of.(negated @@ mina account_creation_fee)
                 ; coin_change= None
                 ; metadata= None }
           )
@@ -600,7 +600,7 @@ module Specific = struct
         { gql: unit -> ('gql, Errors.t) M.t
         ; logger: Logger.t
         ; db_block: Block_query.t -> (Block_info.t, Errors.t) M.t
-        ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t }
+        ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
     end
 
     (* The real environment does things asynchronously *)
@@ -616,8 +616,8 @@ module Specific = struct
         -> 'gql Real.t =
      fun ~logger ~db ~graphql_uri ->
       { gql=
-          (fun () ->
-            Graphql.query (Get_coinbase_and_genesis.make ()) graphql_uri )
+          (Memoize.build @@ fun ~graphql_uri () ->
+             Graphql.query (Get_coinbase_and_genesis.make ()) graphql_uri ) ~graphql_uri
       ; logger
       ; db_block=
           (fun query ->
@@ -647,17 +647,18 @@ module Specific = struct
     module Internal_command_info_ops = Internal_command_info.T (M)
 
     let handle :
-           env:'gql Env.T(M).t
+      graphql_uri:Uri.t
+        -> env:'gql Env.T(M).t
         -> Block_request.t
         -> (Block_response.t, Errors.t) M.t =
-     fun ~env req ->
+     fun ~graphql_uri ~env req ->
       let open M.Let_syntax in
       let logger = env.logger in
       let%bind query = Query.of_partial_identifier req.block_identifier in
       let%bind res = env.gql () in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~gql_response:res
+          ~graphql_uri
       in
       let genesisBlock = res#genesisBlock in
       let%bind block_info =
@@ -702,13 +703,11 @@ module Specific = struct
                    "type" fields, which correspond to the "kind" here
                 *)
                 {Transaction_identifier.hash=
-                   (Internal_command_info.Kind.to_string info.kind)
-                   ^ ":" ^
-                   (Int.to_string info.sequence_no)
-                   ^ ":" ^
-                   (Int.to_string info.secondary_sequence_no)
-                   ^ ":" ^
-                   info.hash}
+                   sprintf "%s:%s:%s:%s"
+                     (Internal_command_info.Kind.to_string info.kind)
+                     (Int.to_string info.sequence_no)
+                     (Int.to_string info.secondary_sequence_no)
+                     info.hash}
             ; operations
             ; metadata= None }
             :: acc )
@@ -767,7 +766,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
             |> Errors.Lift.wrap
           in
           let%map res =
-            Specific.Real.handle
+            Specific.Real.handle ~graphql_uri
               ~env:(Specific.Env.real ~logger ~db ~graphql_uri)
               req
             |> Errors.Lift.wrap

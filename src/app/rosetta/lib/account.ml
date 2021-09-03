@@ -12,16 +12,6 @@ module Get_balance =
 [%graphql
 {|
     query get_balance($public_key: PublicKey!, $token_id: TokenId) {
-      genesisBlock {
-        stateHash
-      }
-      bestChain {
-        stateHash
-      }
-      initialPeers
-      daemonStatus {
-        chainId
-      }
       account(publicKey: $public_key, token: $token_id) {
         balance {
           blockHeight @bsDecoder(fn: "Decoders.uint32")
@@ -29,7 +19,6 @@ module Get_balance =
           liquid @bsDecoder(fn: "Decoders.optional_uint64")
           total @bsDecoder(fn: "Decoders.uint64")
         }
-        nonce
       }
     }
 |}]
@@ -283,7 +272,7 @@ module Balance = struct
                block_query:Block_query.t
             -> address:string
             -> (Block_identifier.t * Balance_info.t, Errors.t) M.t
-        ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t }
+        ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
     end
 
     (* The real environment does things asynchronously *)
@@ -319,17 +308,6 @@ module Balance = struct
             (* TODO: Add variants to cover every branch *)
             Result.return
             @@ object
-                 method genesisBlock =
-                   object
-                     method stateHash = "STATE_HASH_GENESIS"
-                   end
-
-                 method bestChain =
-                   Some
-                     [| object
-                          method stateHash = "STATE_HASH_TIP"
-                        end |]
-
                  method account =
                    Some
                      (object
@@ -364,37 +342,26 @@ module Balance = struct
     module Query = Block_query.T (M)
 
     let handle :
-           env:'gql E.t
+            graphql_uri: Uri.t
+        -> env:'gql E.t
         -> Account_balance_request.t
         -> (Account_balance_response.t, Errors.t) M.t =
-     fun ~env req ->
+     fun ~graphql_uri ~env req ->
       let open M.Let_syntax in
       let address = req.account_identifier.address in
       let%bind token_id = Token_id.decode req.account_identifier.metadata in
-      let%bind res =
-        env.gql
-          ?token_id:(Option.map token_id ~f:Unsigned.UInt64.to_string)
-          ~address ()
-      in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~gql_response:res
-      in
-      let%bind account =
-        match res#account with
-        | None ->
-            M.fail (Errors.create (`Account_not_found address))
-        | Some account ->
-            M.return account
+          ~graphql_uri
       in
       let make_balance_amount ~liquid_balance ~total_balance =
         let amount =
           ( match token_id with
           | None ->
-              Amount_of.coda
+              Amount_of.mina
           | Some token_id ->
               Amount_of.token token_id )
-            liquid_balance
+            total_balance
         in
         let locked_balance =
           Unsigned.UInt64.sub total_balance liquid_balance
@@ -403,18 +370,28 @@ module Balance = struct
           `Assoc
             [ ( "locked_balance"
               , `Intlit (Unsigned.UInt64.to_string locked_balance) )
+            ; ( "liquid_balance"
+              , `Intlit (Unsigned.UInt64.to_string liquid_balance) )
             ; ( "total_balance"
               , `Intlit (Unsigned.UInt64.to_string total_balance) ) ]
         in
         {amount with metadata= Some metadata}
       in
-      let metadata =
-        Option.map
-          ~f:(fun nonce -> `Assoc [("nonce", `Intlit nonce)])
-          account#nonce
-      in
+      let metadata = None in
       match req.block_identifier with
       | None ->
+      let%bind res =
+        env.gql
+          ?token_id:(Option.map token_id ~f:Unsigned.UInt64.to_string)
+          ~address ()
+      in
+      let%bind account =
+        match res#account with
+        | None ->
+            M.fail (Errors.create (`Account_not_found address))
+        | Some account ->
+            M.return account
+      in
           let%bind state_hash =
             match (account#balance)#stateHash with
             | None ->
@@ -422,7 +399,7 @@ module Balance = struct
                   (Errors.create
                      ~context:
                        "Failed accessing state hash from GraphQL \
-                        communication with the Coda Daemon."
+                        communication with the Mina Daemon."
                      `Chain_info_missing)
             | Some state_hash ->
                 M.return state_hash
@@ -471,7 +448,7 @@ module Balance = struct
       let%test_unit "account exists lookup" =
         Test.assert_ ~f:Account_balance_response.to_yojson
           ~expected:
-            (Mock.handle ~env:Env.mock
+            (Mock.handle ~graphql_uri:(Uri.of_string "http://minaprotocol.com") ~env:Env.mock
                (Account_balance_request.create
                   (Network_identifier.create "x" "y")
                   (Account_identifier.create "x")))
@@ -483,7 +460,7 @@ module Balance = struct
                ; balances=
                    [ { Amount.value= "66000"
                      ; currency=
-                         {Currency.symbol= "CODA"; decimals= 9l; metadata= None}
+                         {Currency.symbol= "MINA"; decimals= 9l; metadata= None}
                      ; metadata=
                          Some
                            (`Assoc
@@ -500,15 +477,30 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
   match route with
   | ["balance"] ->
       with_db (fun ~db ->
-          let%bind req =
-            Errors.Lift.parse ~context:"Request"
-            @@ Account_balance_request.of_yojson body
-            |> Errors.Lift.wrap
-          in
-          let%map res =
-            Balance.Real.handle ~env:(Balance.Env.real ~db ~graphql_uri) req
-            |> Errors.Lift.wrap
-          in
-          Account_balance_response.to_yojson res)
+        let body =
+          (* workaround: rosetta-cli with view:balance does not seem to have a way to submit the
+             currencies list, so supply it here
+          *)
+          match body with
+          | `Assoc items -> (
+            match List.Assoc.find items "currencies" ~equal:String.equal with
+                Some _ -> body
+              | None ->
+                `Assoc (items @ [("currencies",`List [`Assoc [("symbol",`String "MINA");("decimals", `Int 9)]])])
+          )
+          | _ ->
+            (* will fail on JSON parse below *)
+            body
+        in
+        let%bind req =
+          Errors.Lift.parse ~context:"Request"
+          @@ Account_balance_request.of_yojson body
+          |> Errors.Lift.wrap
+        in
+        let%map res =
+          Balance.Real.handle ~graphql_uri ~env:(Balance.Env.real ~db ~graphql_uri) req
+          |> Errors.Lift.wrap
+        in
+        Account_balance_response.to_yojson res)
   | _ ->
       Deferred.Result.fail `Page_not_found

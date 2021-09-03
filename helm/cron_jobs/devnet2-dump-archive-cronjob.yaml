@@ -1,9 +1,9 @@
-# kubectl apply -f helm/cron_jobs/mainnet-dump-archive-cronjob.yaml
+# kubectl apply -f helm/cron_jobs/devnet2-dump-archive-cronjob.yaml
 # the above command, with this accompanying file, needs only be run once.  it does not get run in CI.  this file is provided here for future reference
 apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
-  name: mainnet-dump-archive-cronjob
+  name: devnet2-dump-archive-cronjob
 spec:
   concurrencyPolicy: Replace
   failedJobsHistoryLimit: 1
@@ -23,9 +23,9 @@ spec:
             echo "installed gsutil";
 
             DATE="$(date +%F_%H%M)";
-            FILENAME=mainnet-archive-dump-"$DATE".sql;
+            FILENAME=devnet2-archive-dump-"$DATE".sql;
 
-            pg_dump --no-owner --create postgres://postgres:foobar@archive-3-postgresql:5432/archive > $FILENAME;
+            pg_dump --no-owner --create postgres://postgres:foobar@archive-1-postgresql:5432/archive > $FILENAME;
 
             tar -czvf $FILENAME.tar.gz $FILENAME;
 
@@ -41,7 +41,7 @@ spec:
               value: /gcloud/keyfile.json
             image: postgres:11-alpine
             imagePullPolicy: IfNotPresent
-            name: mainnet-dump-archive-cronjob
+            name: devnet2-dump-archive-cronjob
             resources: {}
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File

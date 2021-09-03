@@ -39,7 +39,7 @@ Pipeline.build
         deps=dependsOn,
         service="mina-rosetta-ubuntu",
         deb_codename="stretch",
-        extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO}",
+        extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH}  --no-cache",
         step_key="mina-rosetta-ubuntu-docker-image"
       }
 

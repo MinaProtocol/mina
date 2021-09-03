@@ -4,6 +4,19 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2021/09/02:
+
+- Build off of the rosetta-v1 branch so that compatible does not break in parrallel to this document
+- All docker build instructions and docker image references have been updated accordingly
+
+2021/08/31:
+
+- Add init-db.sh and download-missing-blocks.sh to the normal daemon startup procedure to restore historical block data from O(1) Labs backups (See the Database Bootstrap section for more information about the implementation)
+- Include rosetta-cli, mina-missing-blocks-auditor, and other rosetta/archive tooling in every container
+- Include rosetta.conf and rosetta-dev.conf for the two major networks (mainnet and devnet respectively)
+- Default to storing postgresql data and .mina-config in /data/, and the tools now wait to initialize those until runtime instead of during docker build
+- Convert docker-devnet-start.sh into a special case / configuration of docker-start.sh based on the environment variables `MINA_NETWORK=devnet2` and `MINA_SUFFIX=-dev`
+
 2021/08/24:
 
 - Update docker image links and outdated coda references
@@ -37,12 +50,12 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## How to build your own docker image
 
-Checkout the "compatible" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (2GB is too small, 8GB seems is enough) and then run the following:
+Checkout the "rosetta-v1" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (2GB is too small, 8GB seems is enough) and then run the following:
 
-`cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu | docker build -t mina-rosetta:compatible --build-arg "deb_codename=stretch" --build-arg "MINA_BRANCH=compatible" -`
+`cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu | docker build -t mina-rosetta:v1 --build-arg "deb_codename=stretch" --build-arg "MINA_BRANCH=rosetta-v1" -`
 
-This creates an image (mina-rosetta:compatible) based on the most up-to-date changes that support rosetta. This image
-can be used as a drop-in replacement for `gcr.io/o1labs-192920/mina-rosetta:compatible` in any of the below commands for testing.
+This creates an image (mina-rosetta:v1) based on the most up-to-date changes that support rosetta. This image
+can be used as a drop-in replacement for `gcr.io/o1labs-192920/mina-rosetta:v1` in any of the below commands for testing.
 
 ## How to Run
 
@@ -50,13 +63,13 @@ The container includes 4 scripts in /rosetta which run a different set of servic
 - `docker-standalone-start.sh` is the most straightforward, it starts only the mina-rosetta API endpoint and any flags passed into the script go to mina-rosetta.
 - `docker-demo-start.sh` launches a mina node with a very simple 1-address genesis ledger as a sandbox for developing and playing around in. This script starts the full suite of tools (a mina node, mina-archive, a postgresql DB, and mina-rosetta), but for a demo network with all operations occuring inside this container and no external network activity.
 - `docker-test-start.sh` launches the same demo network as in demo-start.sh but also launches the mina-rosetta-test-agent to run a suite of tests against the rosetta API.
-- The default, `docker-start.sh`, which connects the mina node to our [Mainnet](https://docs.minaprotocol.com/en/using-mina/connecting) network with an empty archive database. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/compatible/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
-- Finally, the previous default, `docker-devnet-start.sh`, which connects the mina node to our [Devnet](https://docs.minaprotocol.com/en/advanced/connecting-devnet) network with an empty archive database. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/compatible/src/app/rosetta/docker-devnet-start.sh) for more information about what you can configure and how.
+- The default, `docker-start.sh`, which connects the mina node to our [Mainnet](https://docs.minaprotocol.com/en/using-mina/connecting) network and initializes the archive database from publicly-availible nightly O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. The script also periodically checks for blocks that may be missing between the nightly backup and the tip of the chain and will fill in those gaps by walking back the linked list of blocks in the canonical chain and importing them one at a time. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/rosetta-v1/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
+- Finally, the previous default, `docker-devnet-start.sh`, which connects the mina node to our [Devnet](https://docs.minaprotocol.com/en/advanced/connecting-devnet) network with the archive database initalized in a similar way to docker-start.sh. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. `docker-devnet-start.sh` is now just a special case of `docker-start.sh` so inspect the source there for more detailed configuration.
 
 For example, to run the `docker-devnet-start.sh` and connect to the live devnet:
 
 ```
-docker run -it --rm --name rosetta --entrypoint=./docker-devnet-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 gcr.io/o1labs-192920/mina-rosetta:compatible
+docker run -it --rm --name rosetta --entrypoint=./docker-devnet-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 gcr.io/o1labs-192920/mina-rosetta:v1
 ```
 
 Note: It will take 20min-1hr for your node to sync
@@ -69,11 +82,23 @@ Note: It will take 20min-1hr for your node to sync
 Examples queries via Rosetta:
 
 * `curl --data '{ metadata: {} }' 'localhost:3087/network/list'`
-* `curl --data '{ network_identifier: { blockchain: "coda", network: "dev" }, metadata: {} }' 'localhost:3087/network/status'`
+* `curl --data '{ network_identifier: { blockchain: "mina", network: "dev" }, metadata: {} }' 'localhost:3087/network/status'`
 
 Any queries that rely on historical data will fail until the archive database is populated.
 
 ## Design Choices
+
+### Database Bootstrap Scripts
+
+#### init-db.sh
+
+As Mina does not store or broadcast historical blocks beyond the "transition frontier" (approximately 290 blocks), Rosetta requires logic to fetch historical data from a trusted archive node database. `docker-start.sh` and the `init-db.sh` script that it calls set up a fresh database when the node is first launched (located in /data/postgresql by default) and then restores the latest O(1) Labs nightly backup into that new database. If this data is persisted across reboots/deployments then the `init-db.sh` script will short-circuit and refuse to restore from the database backup.
+
+#### download-missing-blocks.sh
+
+In all cases, `download-missing-blocks.sh` will check the database every 5 minutes for any gaps / missing blocks until the first missing block is encountered. Once this happens, `mina-missing-blocks-auditor` will return the state hash and block height for whichever blocks are missing, and the script will download them one at a time from O(1) Labs json block backups until the missing blocks auditor reaches the genesis block.
+
+If the data in postgresql is really stale (>24 hours), it would likely be better/quicker to delete the /data/ directory and force `init-db.sh` to restore from a complete database backup instead of relying on the individual block restore mechanism to download hundreds of blocks.
 
 ### Network names
 
@@ -142,13 +167,13 @@ The Construction API is _not_ validated using `rosetta-cli` as this would requir
 
 ### Reproduce agent and rosetta-cli validation
 
-`gcr.io/o1labs-192920/mina-rosetta:compatible` and `rosetta-cli @ v0.5.12`
+`gcr.io/o1labs-192920/mina-rosetta:v1` and `rosetta-cli @ v0.5.12`
 using this [`rosetta.conf`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/rosetta.conf) and the [`bootstrap_balances.json`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/bootstrap_balances.json) next to it.
 
 **Create one of each transaction type using the test-agent and exit**
 
 ```
-$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-test --entrypoint ./docker-test-start.sh -d gcr.io/o1labs-192920/mina-rosetta:compatible
+$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-test --entrypoint ./docker-test-start.sh -d gcr.io/o1labs-192920/mina-rosetta:v1
 
 $ docker logs --follow mina-rosetta-test
 ```
@@ -156,7 +181,7 @@ $ docker logs --follow mina-rosetta-test
 **Run a fast sandbox network forever and test with rosetta-cli**
 
 ```
-$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-demo --entrypoint ./docker-demo-start.sh -d gcr.io/o1labs-192920/mina-rosetta:compatible
+$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-demo --entrypoint ./docker-demo-start.sh -d gcr.io/o1labs-192920/mina-rosetta:v1
 
 $ docker logs --follow mina-rosetta-demo
 
