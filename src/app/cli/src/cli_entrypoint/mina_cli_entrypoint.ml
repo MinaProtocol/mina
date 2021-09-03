@@ -143,12 +143,6 @@ let setup_daemon logger =
         "PORT metrics server for scraping via Prometheus (default no \
          metrics-server)"
       (optional int16)
-  and gc_stat_interval =
-    flag "--gc-stat-interval" ~aliases:["gc-stat-interval"] (optional float)
-      ~doc:
-        (sprintf
-           "INTERVAL in mins for collecting GC stats for metrics (Default: %f)"
-           !Mina_metrics.Runtime.gc_stat_interval_mins)
   and libp2p_metrics_port =
     flag "--libp2p-metrics-port" ~aliases:["libp2p-metrics-port"]
       ~doc:
@@ -1218,9 +1212,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                 Uri.with_uri ~scheme:(Some "http") ~host:(Some "127.0.0.1")
                   ~port:(Some port) ~path:(Some "/metrics") Uri.empty )
           in
-          Mina_metrics.Runtime.(
-            gc_stat_interval_mins :=
-              Option.value ~default:!gc_stat_interval_mins gc_stat_interval) ;
           Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore )
       |> Option.value ~default:Deferred.unit
     in
