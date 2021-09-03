@@ -297,9 +297,9 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
 let create ~logger ~(network : Kubernetes_network.t) =
   let open Deferred.Or_error.Let_syntax in
   let log_filter =
-    let coda_container_filter = "resource.labels.container_name=\"coda\"" in
+    let mina_container_filter = "resource.labels.container_name=\"mina\"" in
     let filters =
-      [ network.testnet_log_filter; coda_container_filter ]
+      [ network.testnet_log_filter; mina_container_filter ]
       @ all_event_types_log_filter
     in
     String.concat filters ~sep:"\n"
