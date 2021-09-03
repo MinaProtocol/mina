@@ -671,7 +671,7 @@ fn updateWindowDensities(P, B) -> ()
     }
 
     // Update the minimum window density
-    if shift > 0 or globalSlot(B) < grace_period_end {
+    if shift == 0 or globalSlot(B) < grace_period_end {
         // Minimum window density is parents minimum window density
         cState(B).min_window_density = cState(P).min_window_density
     }
@@ -871,7 +871,7 @@ In addition to the high-level idea given in the [Chain Selection Rules Section](
 
 ### 4.2.1 Virtual chains
 
-When a peer computes the best chain it does not actually directly compare the current chain against each candidate chain.  Instead, it compares a *virtual chain* for the current chain against a virtual chain for each candidate chain.
+When a peer computes the best chain it does not actually directly compare the current chain against each candidate chain.  Instead, it compares the current chain against a *virtual chain* for each candidate chain.
 
 Virtual chains are used to solve a minimum window density *inversion problem* that can happen when applying the long-fork chain selection rule, for example, when a peer that has been disconnected for a long time attempts to join the network again.
 
@@ -879,7 +879,7 @@ Virtual chains are used to solve a minimum window density *inversion problem* th
 
 Observe that by definition the minimum window density is always decreasing.  Therefore, a peer that has disconnected from the network for a long period and wishes to rejoin will have a higher minimum window density for it current best chain when compared to the canonical chain (i.e. the best chain for the network).
 
-Recall that the long-range fork rule dictates that the peer select the chain with the higher minimum density.  However, this will actually be the peer's current chain, rather than the network's canonical chain (since the minimum window density is always decreasing).  Thus, the peer will be stuck and not sync-- the so-called investion problem.
+Recall that the long-range fork rule dictates that the peer select the chain with the higher minimum density.  However, this will actually be the peer's current chain, rather than the network's canonical chain (since the minimum window density is always decreasing).  Thus, the peer will be stuck and synchronization will not succeed-- the so-called inversion problem.
 
 **Solution**
 
@@ -889,7 +889,7 @@ The invesrion problem is overcome by using *virtual chains*.  A virtual chain is
 TODO: Spec of how to create a virtual top block for a given chain
 ```
 
-Once this is done, the peer uses the [`getMinWindowDensity`](#345-getminwindowdensity) algorithm on the virtual chains to select the best chain.
+During chain selection the peer uses the [`getMinWindowDensity`](#345-getminwindowdensity) algorithm to compare its current chain to virtual chains of the candidates.
 
 ### 4.2.2 Tiebreak logic
 
