@@ -213,22 +213,18 @@ module "gossipqa" {
   whales= [    
     {
       duplicates = 2
-      class  = "whale"
     },
     {
       duplicates = 1
-      class  = "whale"
     }
   ]
 
   fishes= [    
     {
       duplicates = 2
-      class  = "fish"
     },
     {
       duplicates = 1
-      class  = "fish"
     }
   ]
 

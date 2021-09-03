@@ -118,14 +118,12 @@ module "ci_testnet" {
   whales= [
     for i in range(var.whale_count):{
       duplicates = 1
-      class  = "whale"
     }
   ]
   
   fishes= [
     for i in range(var.fish_count):{
       duplicates = 1
-      class  = "fish"
     }
   ]
 
