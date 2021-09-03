@@ -11,6 +11,7 @@ type node_status_data =
   ; max_observed_block_height : int
   ; max_observed_unvalidated_block_height : int
   ; catchup_job_states : catchup_job_states
+  ; sync_status : Sync_status.Stable.V1.t
   }
 [@@deriving to_yojson]
 
@@ -44,7 +45,7 @@ let send_node_status_data ~logger ~url node_status_data =
         [%log error] "Failed to send node status data to URL $url"
           ~metadata:(metadata @ extra_metadata)
 
-let start ~logger ~node_status_url ~transition_frontier =
+let start ~logger ~node_status_url ~transition_frontier ~sync_status =
   let url_string = Option.value ~default:"127.0.0.1" node_status_url in
   [%log info] "Starting node status service using URL $url"
     ~metadata:[ ("URL", `String url_string) ] ;
@@ -63,12 +64,16 @@ let start ~logger ~node_status_url ~transition_frontier =
         | _ ->
             None
       in
+      let sync_status =
+        sync_status |> Mina_incremental.Status.Observer.value_exn
+      in
 
       let node_status_data =
         { block_height_at_best_tip = 1
         ; max_observed_block_height = 2
         ; max_observed_unvalidated_block_height = 3
         ; catchup_job_states
+        ; sync_status
         }
       in
       don't_wait_for

@@ -1099,7 +1099,8 @@ let start t =
   perform_compaction t ;
   Node_status_service.start ~logger:t.config.logger
     ~node_status_url:t.config.node_status_url
-    ~transition_frontier:t.components.transition_frontier ;
+    ~transition_frontier:t.components.transition_frontier
+    ~sync_status:t.sync_status ;
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
