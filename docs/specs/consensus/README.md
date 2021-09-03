@@ -656,6 +656,8 @@ fn initWindowDensities(G) -> ()
 
 ### 3.4.4 `updateWindowDensities`
 
+**WIP**
+
 This algorithm updates both the the sub-window densities and the minimum window density of the block being created `B` based on its parent block `P`.  It inputs the blocks `P` and `B` and updates `B` according to the description in [Section 3.4](#34-window-min-density).
 
 ```rust
