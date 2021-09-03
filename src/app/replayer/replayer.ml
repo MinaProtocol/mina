@@ -382,7 +382,8 @@ let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
   in
   let balance_uint64 = Currency.Balance.to_uint64 claimed_balance in
   let fee_uint64 = Currency.Fee.to_uint64 fee in
-  if Unsigned_extended.UInt64.( >= ) fee_uint64 account_creation_fee_uint64 then
+  if Unsigned_extended.UInt64.( >= ) fee_uint64 account_creation_fee_uint64 then (
+    (* account may have been created *)
     let fee_less_account_creation_fee_uint64 =
       Unsigned.UInt64.sub fee_uint64 account_creation_fee_uint64
     in
@@ -419,7 +420,7 @@ let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
                   , Currency.Fee.to_yojson
                       constraint_constants.account_creation_fee )
                 ; ( "receiver_account_creation_fee"
-                  , `Int (Int64.to_int_exn amount_int64) )
+                  , `String (Int64.to_string amount_int64) )
                 ] ;
             if continue_on_error then incr error_count else Core_kernel.exit 1 )
     else
@@ -438,9 +439,29 @@ let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
                 , Currency.Fee.to_yojson
                     constraint_constants.account_creation_fee )
               ; ( "receiver_account_creation_fee"
-                , `Int (Int64.to_int_exn amount_int64) )
+                , `String (Int64.to_string amount_int64) )
               ] ;
-          if continue_on_error then incr error_count else Core_kernel.exit 1
+          if continue_on_error then incr error_count else Core_kernel.exit 1 )
+  else
+    (* fee less than account creation fee *)
+    match receiver_account_creation_fee with
+    | None ->
+        ()
+    | Some amount_int64 ->
+        [%log error]
+          "The internal command fee is less than the account creation fee, so \
+           no account should have been created, but in the archive database, \
+           the receiver account creation fee is not NULL"
+          ~metadata:
+            [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
+            ; ("fee", Currency.Fee.to_yojson fee)
+            ; ( "constraint_constants.account_creation_fee"
+              , Currency.Fee.to_yojson constraint_constants.account_creation_fee
+              )
+            ; ( "receiver_account_creation_fee"
+              , `String (Int64.to_string amount_int64) )
+            ] ;
+        if continue_on_error then incr error_count else Core_kernel.exit 1
 
 let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
     ~continue_on_error =
