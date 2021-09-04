@@ -46,7 +46,7 @@ esac; shift; done
 
 # Debug prints for visability
 # Substring removal to cut the --build-arg arguments on the = so that the output is exactly the input flags https://wiki.bash-hackers.org/syntax/pe#substring_removal
-echo "--service ${SERVICE} --version ${VERSION} --branch ${BRANCH##=} --deb-version ${DEB_VERSION##=} --deb-release ${DEB_RELEASE##=} --deb-codename ${DEB_CODENAME##=}"
+echo "--service ${SERVICE} --version ${VERSION} --branch ${BRANCH##*=} --deb-version ${DEB_VERSION##*=} --deb-release ${DEB_RELEASE##*=} --deb-codename ${DEB_CODENAME##*=}"
 echo ${EXTRA}
 
 # Verify Required Parameters are Present
