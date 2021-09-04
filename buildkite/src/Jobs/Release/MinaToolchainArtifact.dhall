@@ -38,6 +38,7 @@ Pipeline.build
         deps=dependsOn,
         service="mina-toolchain",
         deb_codename="buster",
+        extra_args="--no-cache",
         step_key="mina-toolchain-buster-docker-image"
       }
 
@@ -50,6 +51,7 @@ Pipeline.build
         deps=dependsOn,
         service="mina-toolchain",
         deb_codename="stretch",
+        extra_args="--no-cache",
         step_key="mina-toolchain-stretch-docker-image"
       }
 
