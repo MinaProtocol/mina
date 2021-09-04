@@ -2,8 +2,8 @@
 
 {
   toolchainBase = "codaprotocol/ci-toolchain-base:v3",
-  minaToolchainStretch = "gcr.io/o1labs-192920/mina-toolchain@sha256:beaf3b311c150244f590b34540a84ce54ecd9cca7eb930dc90e4880d1589f284",
-  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:02b5284212156020d3a67f433fa4def6aa25cfe0759fb872ebd56870dc394bc0",
+  minaToolchainStretch = "gcr.io/o1labs-192920/mina-toolchain@sha256:4c3f5ebc09d4db1224b61fb39170ff0f6486d0e00e9a1d9744c06cd9dd7d6570",
+  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:741434ac49836a91e093749dae348ba535d3995b2b4f58a66dbaac20b3068da3",
   elixirToolchain = "elixir:1.10-alpine",
   rustToolchain = "codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3",
   nodeToolchain = "node:14.13.1-stretch-slim",
