@@ -18,6 +18,7 @@ let ReleaseSpec = {
     network: Text,
     service: Text,
     version: Text,
+    branch: Text,
     deb_codename: Text,
     deb_release: Text,
     deb_version: Text,
