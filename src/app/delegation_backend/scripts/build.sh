@@ -22,6 +22,14 @@ else
 fi
 cp "$ref_signer"/*.h "$OUT/headers"
 
+docker_toolchain_build() {
+  tag=delegation-backend-toolchain
+  if [[ "$TAG" != "" ]]; then
+    tag="$tag:$TAG"
+  fi
+  docker build -t "$tag" -f Dockerfile-toolchain .
+}
+
 docker_build() {
   tag=delegation-backend-production
   if [[ "$TAG" != "" ]]; then
@@ -39,6 +47,15 @@ case "$1" in
     docker_build
     docker save delegation-backend-production \
       | gzip > result/delegation_backend.tar.gz
+    ;;
+  docker-toolchain)
+    if [[ "$TAG" == "" ]]; then
+      echo "Specify TAG env variable"
+    else
+      docker_toolchain_build
+      docker tag delegation-backend-toolchain:"$TAG" "$GCR":"$TAG"
+      docker push "$GCR":"$TAG"
+    fi
     ;;
   docker-upload)
     if [[ "$TAG" == "" ]]; then
