@@ -214,8 +214,9 @@ module Unsigned = struct
       |> Hex.Safe.to_hex
     in
     let signer_input =
-      Random_oracle_input.Coding2.serialize ~string_of_field ~to_bool:Fn.id
-        ~of_bool:Fn.id t.random_oracle_input
+      Random_oracle_input.Coding2.serialize ~string_of_field ~pack:Field.project
+        t.random_oracle_input
+      |> Random_oracle_input.Coding2.Rendered.map ~f:Hex.Safe.to_hex
     in
     match%map render_command ~nonce:t.nonce t.command with
     | `Payment payment ->

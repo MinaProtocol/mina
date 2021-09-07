@@ -278,7 +278,7 @@ module Coding2 = struct
     ; suffix = pack_bits ~max_size:254 ~pack t |> Array.of_list_rev
     }
 
-  let serialize t ~pack =
+  let serialize t ~string_of_field ~pack =
     let () =
       if Array.length t.field_elements > 0 then
         assert (String.length (string_of_field t.field_elements.(0)) = 32)
