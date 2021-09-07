@@ -1035,6 +1035,66 @@ let perform_compaction t =
       in
       perform interval_configured
 
+let daemon_start_time = Time_ns.now ()
+
+let check_and_stop_daemon t ~wait =
+  let uptime_mins =
+    Time_ns.(diff (now ()) daemon_start_time |> Span.to_min |> Int.of_float)
+  in
+  let max_catchup_time = Time.Span.of_hr 1. in
+  if uptime_mins <= wait then
+    `Check_in
+      (Block_time.Span.to_time_span
+         t.config.precomputed_values.consensus_constants.slot_duration_ms)
+  else
+    match t.next_producer_timing with
+    | None ->
+        `Now
+    | Some timing ->
+        let tm =
+          match timing.timing with
+          | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again tm ->
+              Block_time.to_time tm
+          | Produce tm | Produce_now tm ->
+              Block_time.to_time tm.time
+        in
+        (*Assuming it takes at most 1hr to bootstrap and catchup*)
+        let next_block =
+          Time.add tm
+            (Block_time.Span.to_time_span
+               t.config.precomputed_values.consensus_constants.slot_duration_ms)
+        in
+        let wait_for = Time.(diff next_block (now ())) in
+        if Time.Span.(wait_for > max_catchup_time) then `Now
+        else `Check_in wait_for
+
+let stop_long_running_daemon t =
+  let wait_mins = (40 * 60) + (Random.int 10 * 60) in
+  [%log' info t.config.logger]
+    "Stopping daemon after $wait mins and when there are no blocks to be \
+     produced"
+    ~metadata:[("wait", `Int wait_mins)] ;
+  let stop_daemon () =
+    let uptime_mins =
+      Time_ns.(diff (now ()) daemon_start_time |> Span.to_min |> Int.of_float)
+    in
+    [%log' info t.config.logger]
+      "Deamon has been running for $uptime mins. Stopping now..."
+      ~metadata:[("uptime", `Int uptime_mins)] ;
+    Scheduler.yield ()
+    >>= (fun () -> return (Async.shutdown 1))
+    |> don't_wait_for
+  in
+  let rec go interval =
+    upon (after interval) (fun () ->
+        match check_and_stop_daemon t ~wait:wait_mins with
+        | `Now ->
+            stop_daemon ()
+        | `Check_in tm ->
+            go tm )
+  in
+  go (Time.Span.of_ms (wait_mins * 60 * 1000 |> Float.of_int))
+
 let start t =
   let set_next_producer_timing timing consensus_state =
     let block_production_status, next_producer_timing =
@@ -1117,6 +1177,7 @@ let start t =
     ~get_next_producer_timing:(fun () -> t.next_producer_timing)
     ~get_snark_work_fee:(fun () -> snark_work_fee t)
     ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer) ;
+  stop_long_running_daemon t ;
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
