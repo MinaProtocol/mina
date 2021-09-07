@@ -56,14 +56,6 @@ locals {
   whale_count_unique = length(var.whales)
   fish_count_unique = length(var.fishes)
 
-  # block_producer_static_peers = {
-  #   for index, name in keys(data.local_file.libp2p_peers) : name => {
-  #     full_peer = "/dns4/${name}.${var.testnet_name}/tcp/${var.block_producer_starting_host_port + index}/p2p/${trimspace(data.local_file.libp2p_peers[name].content)}",
-  #     port      = var.block_producer_starting_host_port + index
-  #     name      = name
-  #   }
-  # }
-
   seed_names                 = [for i in range(var.seed_count) : "seed-${i + 1}"]
 
   seed_static_peers = [
