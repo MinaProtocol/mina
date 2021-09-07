@@ -68,6 +68,24 @@ module Get_network =
   }
 |}]
 
+module Get_network_memoized = struct
+  let query =
+     Memoize.build @@
+     fun ~graphql_uri () -> Graphql.query (Get_network.make ()) graphql_uri
+
+   module Mock = struct
+     let query ~graphql_uri:_ =
+        Result.return
+        @@ object
+          method daemonStatus =
+            object
+              method chainId = "xxxxx"
+            end
+       end
+   end
+end
+
+
 let oldest_block_query =
   Caqti_request.find Caqti_type.unit
     (Caqti_type.tup2 Caqti_type.int64 Caqti_type.string)
@@ -82,8 +100,11 @@ let devnet_chain_id =
   "8af43cf261ea10c761ec540f92aafb76aec56d8d74f77c836f3ab1de5ce4eac5"
 
 let network_tag_of_graphql res =
-  if String.equal (res#daemonStatus)#chainId mainnet_chain_id then "mainnet"
-  else if String.equal (res#daemonStatus)#chainId devnet_chain_id then "dev"
+  let equal_chain_id id =
+    String.equal (res#daemonStatus)#chainId id
+  in
+  if equal_chain_id mainnet_chain_id then "mainnet"
+  else if equal_chain_id devnet_chain_id then "devnet"
   else "debug"
 
 module Validate_choice = struct
@@ -95,57 +116,22 @@ module Validate_choice = struct
         end
     end
 
-  module Impl (M : Monad_fail.S) = struct
-    type 'gql t =
-         network_identifier:Network_identifier.t
-      -> gql_response:'gql
-      -> (unit, Errors.t) M.t
-
-    let validate ~network_identifier ~gql_response =
-      let open M.Let_syntax in
+  module Real = struct
+    let validate ~network_identifier ~graphql_uri =
+      let open Deferred.Result.Let_syntax in
+      let%bind gql_response = Get_network_memoized.query ~graphql_uri () in
       let network_tag = network_tag_of_graphql gql_response in
       let requested_tag = network_identifier.Network_identifier.network in
       if not (String.equal requested_tag network_tag) then
-        M.fail
+        Deferred.Result.fail
           (Errors.create (`Network_doesn't_exist (requested_tag, network_tag)))
-      else return ()
+      else Deferred.Result.return ()
 
-    (* Use succeed in tests that depend on validation; we've already tested
-     * validation here so no need to test again *)
-    let succeed ~network_identifier:_ ~gql_response:_ = Result.return ()
   end
 
-  module Real = Impl (Deferred.Result)
-  module Mock = Impl (Result)
-
-  let%test_module "validate_choice" =
-    ( module struct
-      let%test_unit "success" =
-        Test.assert_
-          ~f:(fun () -> `String "()")
-          ~actual:
-            (Mock.validate
-               ~network_identifier:
-                 { Network_identifier.blockchain= "mina"
-                 ; network= "debug"
-                 ; sub_network_identifier= None }
-               ~gql_response:(build ~chainId:"0"))
-          ~expected:(Result.return ())
-
-      let%test_unit "failure" =
-        Test.assert_
-          ~f:(fun () -> `String "()")
-          ~actual:
-            (Mock.validate
-               ~network_identifier:
-                 { Network_identifier.blockchain= "mina"
-                 ; network= "testnet"
-                 ; sub_network_identifier= None }
-               ~gql_response:(build ~chainId:"0"))
-          ~expected:
-            (Result.fail
-               (Errors.create (`Network_doesn't_exist ("testnet", "debug"))))
-    end )
+  module Mock = struct
+    let succeed ~network_identifier:_ ~graphql_uri:_ = Result.return ()
+  end
 end
 
 module List_ = struct
@@ -158,7 +144,8 @@ module List_ = struct
     module Mock = T (Result)
 
     let real : graphql_uri:Uri.t -> 'gql Real.t =
-     fun ~graphql_uri () -> Graphql.query (Get_network.make ()) graphql_uri
+      fun ~graphql_uri ->
+      Get_network_memoized.query ~graphql_uri
   end
 
   module Impl (M : Monad_fail.S) = struct
@@ -203,7 +190,7 @@ module List_ = struct
             (Result.return
                { Network_list_response.network_identifiers=
                    [ { Network_identifier.blockchain= "mina"
-                     ; network= "dev"
+                     ; network= "devnet"
                      ; sub_network_identifier= None } ] })
 
       let mainnet_env : 'gql Env.Mock.t =
@@ -231,7 +218,7 @@ module Status = struct
       type 'gql t =
         { gql: unit -> ('gql, Errors.t) M.t
         ; db_oldest_block: unit -> (int64 * string, Errors.t) M.t
-        ; validate_network_choice: 'gql Validate_choice.Impl(M).t }
+        ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
     end
 
     module Real = T (Deferred.Result)
@@ -251,11 +238,11 @@ module Status = struct
   end
 
   module Impl (M : Monad_fail.S) = struct
-    let handle ~(env : 'gql Env.T(M).t) (network : Network_request.t) =
+    let handle ~graphql_uri ~(env : 'gql Env.T(M).t) (network : Network_request.t) =
       let open M.Let_syntax in
       let%bind res = env.gql () in
       let%bind () =
-        env.validate_network_choice ~gql_response:res
+        env.validate_network_choice ~graphql_uri
           ~network_identifier:network.network_identifier
       in
       let%bind latest_block =
@@ -350,7 +337,7 @@ module Status = struct
 
       let%test_unit "chain info missing" =
         Test.assert_ ~f:Network_status_response.to_yojson
-          ~actual:(Mock.handle ~env:no_chain_info_env dummy_network_request)
+          ~actual:(Mock.handle ~graphql_uri:(Uri.of_string "https://minaprotocol.com") ~env:no_chain_info_env dummy_network_request)
           ~expected:(Result.fail (Errors.create `Chain_info_missing))
 
       let oldest_block_is_genesis_env : 'gql Env.Mock.t =
@@ -362,7 +349,7 @@ module Status = struct
       let%test_unit "oldest block is genesis" =
         Test.assert_ ~f:Network_status_response.to_yojson
           ~actual:
-            (Mock.handle ~env:oldest_block_is_genesis_env dummy_network_request)
+            (Mock.handle ~graphql_uri:(Uri.of_string "https://minaprotocol.com") ~env:oldest_block_is_genesis_env dummy_network_request)
           ~expected:
             ( Result.return
             @@ { Network_status_response.current_block_identifier=
@@ -391,7 +378,7 @@ module Status = struct
       let%test_unit "oldest block is different" =
         Test.assert_ ~f:Network_status_response.to_yojson
           ~actual:
-            (Mock.handle ~env:oldest_block_is_different_env
+            (Mock.handle ~graphql_uri:(Uri.of_string "https://minaprotocol.com") ~env:oldest_block_is_different_env
                dummy_network_request)
           ~expected:
             ( Result.return
@@ -422,7 +409,7 @@ module Options = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
         { gql: unit -> ('gql, Errors.t) M.t
-        ; validate_network_choice: 'gql Validate_choice.Impl(M).t }
+        ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
     end
 
     module Real = T (Deferred.Result)
@@ -435,11 +422,11 @@ module Options = struct
   end
 
   module Impl (M : Monad_fail.S) = struct
-    let handle ~(env : 'gql Env.T(M).t) (network : Network_request.t) =
+    let handle ~graphql_uri ~(env : 'gql Env.T(M).t) (network : Network_request.t) =
       let open M.Let_syntax in
       let%bind res = env.gql () in
       let%map () =
-        env.validate_network_choice ~gql_response:res
+        env.validate_network_choice ~graphql_uri
           ~network_identifier:network.network_identifier
       in
       { Network_options_response.version=
@@ -476,7 +463,7 @@ module Options = struct
 
       let%test_unit "options succeeds" =
         Test.assert_ ~f:Network_options_response.to_yojson
-          ~actual:(Mock.handle ~env dummy_network_request)
+          ~actual:(Mock.handle ~graphql_uri:(Uri.of_string "https://minaprotocol.com") ~env dummy_network_request)
           ~expected:
             ( Result.return
             @@ { Network_options_response.version= Version.create "1.4.9" "v1.0"
@@ -515,7 +502,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
             |> Errors.Lift.wrap
           in
           let%map res =
-            Status.Real.handle ~env:(Status.Env.real ~graphql_uri ~db) network
+            Status.Real.handle ~graphql_uri ~env:(Status.Env.real ~graphql_uri ~db) network
             |> Errors.Lift.wrap
           in
           Network_status_response.to_yojson res )
@@ -525,7 +512,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
         |> Errors.Lift.wrap
       in
       let%map res =
-        Options.Real.handle ~env:(Options.Env.real ~graphql_uri) network
+        Options.Real.handle ~graphql_uri ~env:(Options.Env.real ~graphql_uri) network
         |> Errors.Lift.wrap
       in
       Network_options_response.to_yojson res

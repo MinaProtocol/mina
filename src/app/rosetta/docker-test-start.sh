@@ -35,7 +35,7 @@ MINA_ROSETTA_PORT=${MINA_ROSETTA_PORT:=3087}
 MINA_ARCHIVE_PORT=${MINA_ARCHIVE_PORT:=3086}
 MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
 LOG_LEVEL=${LOG_LEVEL:=Debug}
-PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
+PG_CONN=postgres://pguser:pguser@localhost:5432/archive
 
 
 # ====== Set up demo environment ========

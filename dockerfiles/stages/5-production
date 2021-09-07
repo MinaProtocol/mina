@@ -4,8 +4,8 @@
 #################################################################################################
 ARG deb_codename=stretch
 FROM debian:${deb_codename}-slim AS production
+ARG deb_codename=stretch
 
-ARG POSTGRES_DATA_DIR=/data/postgresql
 ARG MINA_DAEMON_PORT=10101
 ARG MINA_CONFIG_DIR=/root/.mina-config
 # Sample public key for use in dev profile / demo mode genesis block
@@ -15,8 +15,8 @@ ENV DEBIAN_FRONTEND noninteractive
 
 # Dependencies
 # TODO: make sure this is the minimum runtime deps
-RUN apt-get -y update \
-  && apt -y install \
+RUN apt-get update -y \
+  && apt install -y \
     apt-utils \
     curl \
     ca-certificates \
@@ -29,27 +29,26 @@ RUN apt-get -y update \
     libssl1.1 \
     postgresql \
     postgresql-contrib \
-    tzdata
+    tzdata \
+    jq \
+    sudo
 
-RUN if test "$deb_codename" = "buster" ; then \
-     sudo apt-get update -y \
-     && sudo apt-get install -y \
+RUN test "$deb_codename" = "buster" \
+     && apt-get update -y \
+     && apt-get install -y \
          libjemalloc2 \
-         libprocps8 \
-      else ; exit 0 ; fi
+         libprocps7 \
+     || exit 0
 
-RUN if test "$deb_codename" = "stretch" ; then \
-     sudo apt-get update -y \
-     && sudo apt-get install -y \
+RUN test "$deb_codename" = "stretch" \
+     && apt-get update -y \
+     && apt-get install -y \
          libjemalloc1 \
          libprocps6 \
-      else ; exit 0 ; fi
+     || exit 0
 
-# Make all directories for configuration and empty s3 cache dirs
-RUN mkdir -p /tmp/s3_cache_dir \
-    && mkdir -p /tmp/mina_cache_dir \
-    && mkdir -p ${POSTGRES_DATA_DIR} \
-    && chown postgres ${POSTGRES_DATA_DIR}
+# Install rosetta-cli
+RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/master/scripts/install.sh | sh -s
 
 RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
   && echo "$PK" >  ${MINA_CONFIG_DIR}/wallets/store/$PK.pub \
@@ -59,29 +58,24 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
 
 COPY --from=builder /home/opam/app/* /usr/local/bin/
 COPY --from=builder /home/opam/mina/src/app/rosetta/*.sh /rosetta/
-COPY --from=builder /home/opam/mina/src/app/archive/create_schema.sql /archive/
+COPY --from=builder /home/opam/mina/src/app/rosetta/*.conf /rosetta/
+COPY --from=builder /home/opam/mina/src/app/rosetta/README.md /rosetta/
 COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
 
 USER postgres
 
-# TODO: use POSTGRES_DATA_DIR variable more consistently and ensure proper escaping
-# TODO: move this to a more useful and easy to maintain script in the rosetta directory for this purpose
 RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && echo "$POSTGRES_VERSION" "$(psql -V)" \
-    && pg_dropcluster --stop ${POSTGRES_VERSION} main \
-    && pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} main \
     && echo "data_directory = '/data/postgresql'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
     && echo "listen_addresses='*'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
-    && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf \
-    && /etc/init.d/postgresql start \
-    && psql --command "CREATE USER pguser WITH SUPERUSER PASSWORD 'pguser';" \
-    && createdb -O pguser archiver \
-    && psql postgresql://pguser:pguser@localhost:5432/archiver -f /archive/create_schema.sql
+    && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf
 
-ENV USER pguser
 USER root
 
 WORKDIR /rosetta
+
+# Generate en_US.UTF-8 to allow use of O(1) Labs DB dumps
+RUN locale-gen en_US.UTF-8
 
 EXPOSE 3087
 EXPOSE $MINA_DAEMON_PORT

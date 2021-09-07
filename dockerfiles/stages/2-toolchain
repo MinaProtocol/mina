@@ -60,14 +60,12 @@ RUN sudo apt-get update -y \
     zlib1g-dev
 
 # -- python dependencies (largely installed above from apt)
-RUN if test "$deb_codename" = "buster" ; then \
-      sudo apt-get update -y \
+RUN test "$deb_codename" = "buster" \
       && sudo apt-get install -y \
         python3-sexpdata \
         python-sexpdata \
-    else ; \
-      sudo pip install readchar sexpdata \
-      && sudo pip3 install readchar sexpdata ; fi
+      || sudo pip install readchar sexpdata \
+      && sudo pip3 install readchar sexpdata
 
 # --- deb-s3 tool (deprecated! replace somehow!)
 RUN sudo gem install deb-s3
