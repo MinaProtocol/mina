@@ -82,7 +82,7 @@ Note: It will take 20min-1hr for your node to sync
 Examples queries via Rosetta:
 
 * `curl --data '{ metadata: {} }' 'localhost:3087/network/list'`
-* `curl --data '{ network_identifier: { blockchain: "mina", network: "dev" }, metadata: {} }' 'localhost:3087/network/status'`
+* `curl --data '{ network_identifier: { blockchain: "mina", network: "devnet" }, metadata: {} }' 'localhost:3087/network/status'`
 
 Any queries that rely on historical data will fail until the archive database is populated.
 
