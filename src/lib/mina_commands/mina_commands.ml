@@ -142,7 +142,7 @@ let setup_and_submit_snapp_command t (snapp_parties : Parties.t) =
   | Ok ([ User_command.Parties txn ], []) ->
       [%log' info (Mina_lib.top_level_logger t)]
         ~metadata:[ ("snapp_command", Parties.to_yojson txn) ]
-        "Scheduled Snapp command $command" ;
+        "Scheduled Snapp command $snapp_command" ;
       Ok txn
   | Ok (valid_commands, invalid_commands) ->
       [%log' info (Mina_lib.top_level_logger t)]
