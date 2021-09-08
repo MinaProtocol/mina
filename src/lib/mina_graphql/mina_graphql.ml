@@ -1526,6 +1526,78 @@ module Types = struct
 
   let user_command = UserCommand.user_command_interface
 
+  module SnappCommand = struct
+    module Status = struct
+      type t =
+        | Applied
+        | Included_but_failed of Transaction_status.Failure.t
+        | Unknown
+    end
+
+    module With_status = struct
+      type 'a t = { data : 'a; status : Status.t }
+
+      let map t ~f = { t with data = f t.data }
+    end
+
+    let field_no_status ?doc ?deprecated lab ~typ ~args ~resolve =
+      field ?doc ?deprecated lab ~typ ~args ~resolve:(fun c cmd ->
+          resolve c cmd.With_status.data)
+
+    let snapp_command =
+      obj "SnappCommand" ~fields:(fun _ ->
+          [ field_no_status "id" ~typ:(non_null guid) ~args:[]
+              ~resolve:(fun _ parties ->
+                Parties.to_base58_check parties.With_hash.data)
+          ; field_no_status "hash" ~typ:(non_null string) ~args:[]
+              ~resolve:(fun _ parties ->
+                Transaction_hash.to_base58_check parties.With_hash.hash)
+          ; field_no_status "nonce" ~typ:(non_null int) ~args:[]
+              ~doc:
+                "Sequence number of the Snapp transaction for the fee-payer's \
+                 account" ~resolve:(fun _ parties ->
+                Parties.nonce parties.With_hash.data |> Unsigned.UInt32.to_int)
+          ; field_no_status "feePayer" ~typ:(non_null AccountObj.account)
+              ~args:[]
+              ~doc:"Account that pays the fees for the Snapp transaction"
+              ~resolve:(fun { ctx = coda; _ } cmd ->
+                AccountObj.get_best_ledger_account coda
+                  (Parties.fee_payer cmd.With_hash.data))
+          ; field_no_status "accountsAccessed"
+              ~typ:(non_null (list (non_null AccountObj.account)))
+              ~args:[]
+              ~doc:"List of accounts accessed to complete the Snapp transaction"
+              ~resolve:(fun { ctx = coda; _ } parties ->
+                let account_ids =
+                  Parties.accounts_accessed parties.With_hash.data
+                in
+                List.map account_ids ~f:(fun acct_id ->
+                    AccountObj.get_best_ledger_account coda acct_id))
+          ; field_no_status "feeLowerBound" ~typ:uint64 ~args:[]
+              ~doc:
+                "Lower bound on the fee paid by the fee-payer for the Snapp \
+                 transaction, or null if it can't be alculated"
+              ~resolve:(fun _ parties ->
+                try
+                  Some
+                    ( Parties.fee_lower_bound_exn parties.With_hash.data
+                    |> Currency.Fee.to_uint64 )
+                with _ -> None)
+          ; field_no_status "feeToken" ~typ:(non_null token_id) ~args:[]
+              ~doc:"Token used to pay the fee" ~resolve:(fun _ parties ->
+                Parties.fee_token parties.With_hash.data)
+          ; field "failureReason" ~typ:string ~args:[]
+              ~doc:
+                "The reason for the Snapp transaction failure; null means \
+                 success or the status is unknown" ~resolve:(fun _ cmd ->
+                match cmd.With_status.status with
+                | Applied | Unknown ->
+                    None
+                | Included_but_failed failure ->
+                    Some (Transaction_status.Failure.to_string failure))
+          ])
+  end
+
   let transactions =
     let open Filtered_external_transition.Transactions in
     obj "Transactions" ~doc:"Different types of transactions in a block"
@@ -1556,6 +1628,7 @@ module Types = struct
                       in
                       (* TODO: This should be supported in some graph QL query *)
                       None))
+          (* TODO: add Snapp commands *)
         ; field "feeTransfer"
             ~doc:"List of fee transfers included in this block"
             ~typ:(non_null @@ list @@ non_null fee_transfer)
@@ -1818,6 +1891,15 @@ module Types = struct
               ~resolve:(fun _ -> Fn.id)
           ])
 
+    let send_snapp =
+      obj "SendSnappPayload" ~fields:(fun _ ->
+          [ field "snapp"
+              ~typ:(non_null SnappCommand.snapp_command)
+              ~doc:"Snapp transaction that was sent"
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id)
+          ])
+
     let send_rosetta_transaction =
       obj "SendRosettaTransactionPayload" ~fields:(fun _ ->
           [ field "userCommand"
@@ -1975,6 +2057,29 @@ module Types = struct
             | _ ->
                 Error "Invalid format for token."
           with _ -> Error "Invalid format for token.")
+
+    (* TODO: define a type otherwise identical to Party.Signed.t, but
+       which makes the nonce optional
+    *)
+    let snapp_party_signed_arg : Party.Signed.t option arg_typ =
+      scalar "SnappPartySigned"
+        ~doc:"A party to a Snapp transaction with a signature authorization"
+        ~coerce:(fun party_signed ->
+          let json = to_yojson party_signed in
+          Party.Signed.of_yojson json)
+
+    let snapp_party_arg : Party.t option arg_typ =
+      scalar "SnappParty" ~doc:"A party to a Snapp transaction"
+        ~coerce:(fun party ->
+          let json = to_yojson party in
+          Party.of_yojson json)
+
+    let snapp_protocol_state_arg :
+        Snapp_predicate.Protocol_state.t option arg_typ =
+      scalar "SnappProtocolState" ~doc:"Protocol state for a Snapp transaction"
+        ~coerce:(fun protocol_state ->
+          let json = to_yojson protocol_state in
+          Snapp_predicate.Protocol_state.of_yojson json)
 
     let precomputed_block =
       scalar "PrecomputedBlock" ~doc:"Block encoded in precomputed block format"
@@ -2184,6 +2289,21 @@ module Types = struct
             "If a signature is provided, this transaction is considered signed \
              and will be broadcasted to the network without requiring a \
              private key"
+
+      let snapp_fee_payer =
+        arg "snappFeePayer"
+          ~typ:(non_null snapp_party_signed_arg)
+          ~doc:"The fee payer party to a Snapp transaction"
+
+      let snapp_other_parties =
+        arg "snappOtherParties"
+          ~typ:(non_null (list (non_null snapp_party_arg)))
+          ~doc:"The parties other than the fee payer in a Snapp transaction"
+
+      let snapp_protocol_state =
+        arg "snappProtocolState"
+          ~typ:(non_null snapp_protocol_state_arg)
+          ~doc:"The protocol state in a Snapp transaction"
     end
 
     let send_payment =
@@ -2202,6 +2322,13 @@ module Types = struct
           ; memo
           ; nonce
           ]
+
+    let send_snapp =
+      let open Fields in
+      obj "SendSnappInput"
+        ~coerce:(fun fee_payer other_parties protocol_state ->
+          (fee_payer, other_parties, protocol_state))
+        ~fields:[ snapp_fee_payer; snapp_other_parties; snapp_protocol_state ]
 
     let send_delegation =
       let open Fields in
@@ -2800,6 +2927,28 @@ module Mutations = struct
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
+  let send_snapp_command coda parties =
+    match Mina_commands.setup_and_submit_snapp_command coda parties with
+    | `Active f -> (
+        match%map f with
+        | Ok parties ->
+            let cmd =
+              { Types.SnappCommand.With_status.data = parties
+              ; status = Unknown
+              }
+            in
+            let cmd_with_hash =
+              Types.SnappCommand.With_status.map cmd ~f:(fun cmd ->
+                  { With_hash.data = cmd
+                  ; hash = Transaction_hash.hash_command (Parties cmd)
+                  })
+            in
+            Ok cmd_with_hash
+        | Error e ->
+            Error ("Couldn't send Snapp command: " ^ Error.to_string_hum e) )
+    | `Bootstrapping ->
+        return (Error "Daemon is bootstrapping")
+
   let find_identity ~public_key coda =
     Result.of_option
       (Secrets.Wallets.find_identity (Mina_lib.wallets coda) ~needle:public_key)
@@ -2947,6 +3096,15 @@ module Mutations = struct
             send_signed_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
               ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
             |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command)
+
+  let send_snapp =
+    io_field "sendSnappTransaction" ~doc:"Send a Snapp transaction"
+      ~typ:(non_null Types.Payload.send_snapp)
+      ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.send_snapp) ]
+      ~resolve:
+        (fun { ctx = coda; _ } () (fee_payer, other_parties, protocol_state) ->
+        let parties = { Parties.fee_payer; other_parties; protocol_state } in
+        send_snapp_command coda parties)
 
   let create_token =
     io_field "createToken" ~doc:"Create a new token"
@@ -3311,6 +3469,7 @@ module Mutations = struct
     ; create_token
     ; create_token_account
     ; mint_tokens
+    ; send_snapp
     ; export_logs
     ; set_staking
     ; set_coinbase_receiver

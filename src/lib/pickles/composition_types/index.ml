@@ -4,11 +4,26 @@ open Pickles_types
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = char [@@deriving sexp, sexp, compare, yojson, hash, equal]
+    type t = char [@@deriving sexp, sexp, compare, hash, equal]
+
+    (* encode/decode as integer, which is readable by GraphQL *)
+    let to_yojson c : Yojson.Safe.t = `Int (Char.to_int c)
+
+    let of_yojson =
+      let min_char_int = Char.to_int Char.min_value in
+      let max_char_int = Char.to_int Char.max_value in
+      fun json ->
+        match json with
+        | `Int n when n >= min_char_int && n <= max_char_int ->
+            Result.Ok (Char.of_int_exn n)
+        | _ ->
+            Result.Error "Index.Stable.V1.t"
 
     let to_latest = Fn.id
   end
 end]
+
+[%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 
 let of_int = Char.of_int
 
