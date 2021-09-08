@@ -1,10 +1,10 @@
-# kubectl apply -f helm/cron_jobs/devnet-txn-burst-cronjob.yaml
+# kubectl apply -f helm/cron_jobs/gossipqa-txn-burst-cronjob.yaml
 # the above command, with this accompanying file, needs only be run once.  it does not get run in CI.  this file is provided here for future reference
-# make sure you're in the devnet2 namespace
+# make sure you're in the gossipqa namespace
 apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
-  name: devnet-txn-burst-cronjob
+  name: gossipqa-txn-burst-cronjob
 spec:
   concurrencyPolicy: Replace
   failedJobsHistoryLimit: 1
@@ -17,8 +17,10 @@ spec:
             - /bin/bash
             - -c
             - '
+printf "/dns4/seed-1.gossipqa.o1test.net/tcp/10000/p2p/12D3KooWLpjCfeBWdiVRG3mqRS5ixfPQpF4gRJooFiXMa8wGpt1A\n/dns4/seed-2.gossipqa.o1test.net/tcp/10001/p2p/12D3KooWS5MQzph8pjCQ9uvjhzsEDos5P8rysBFR673Hs4UrnwTc" > /gossipqa_seed_list.txt;
+
 echo "booting mina daemon";
-mina daemon --generate-genesis-proof true --peer-list-url https://storage.googleapis.com/seed-lists/devnet_seeds.txt --background;
+mina daemon --config-file /config/daemon.json --generate-genesis-proof true --peer-list-file /gossipqa_seed_list.txt --background;
 sleep 480;
 echo "done sleeping";
 while true; do
@@ -38,12 +40,12 @@ done;
 mkdir /tmpkeys;
 chmod 700 /tmpkeys;
 
-cp /keys/whale-key/online-whale-account-1-key /tmpkeys;
+cp /keys/whale-key1/online-whale-account-1-key /tmpkeys;
 chmod 600 /tmpkeys/online-whale-account-1-key;
-cp /keys/fish-key/online-fish-account-1-key /tmpkeys;
-chmod 600 /tmpkeys/online-fish-account-1-key;
+cp /keys/whale-key2/online-whale-account-2-key /tmpkeys;
+chmod 600 /tmpkeys/online-whale-account-2-key;
 
-./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe gen-there-and-back-txns --num-txn-per-acct 100 --rate-limit-level 1 --rate-limit-interval 5000 --origin-sender-sk-path "/tmpkeys/online-whale-account-1-key" --origin-sender-sk-pw "naughty blue worm" --returner-sk-path "/tmpkeys/online-fish-account-1-key" --returner-sk-pw "naughty blue worm";
+./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe gen-there-and-back-txns --num-txn-per-acct 100 --rate-limit-level 1 --rate-limit-interval 5000 --origin-sender-sk-path "/tmpkeys/online-whale-account-1-key" --origin-sender-sk-pw "naughty blue worm" --returner-sk-path "/tmpkeys/online-whale-account-2-key" --returner-sk-pw "naughty blue worm";
 
 echo "ran batch txns";
 
@@ -56,15 +58,17 @@ echo "ran batch txns";
               value: /gcloud/keyfile.json
             image: gcr.io/o1labs-192920/mina-txn-burst-app@sha256:8c4a7e0c092dcdbe0f5d8bebefb374181012dfb08e7cd60f99ee88969f1b26e8
             imagePullPolicy: IfNotPresent
-            name: devnet-txn-burst-cronjob
+            name: gossipqa-txn-burst-cronjob
             resources: {}
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
             volumeMounts:
-            - mountPath: /keys/whale-key/
-              name: whale-key
-            - mountPath: /keys/fish-key/
-              name: fish-key
+            - mountPath: /keys/whale-key1/
+              name: whale-key1
+            - mountPath: /keys/whale-key2/
+              name: whale-key2
+            - mountPath: /config
+              name: daemon-config
           dnsPolicy: ClusterFirst
           restartPolicy: Never
           schedulerName: default-scheduler
@@ -72,7 +76,13 @@ echo "ran batch txns";
           terminationGracePeriodSeconds: 30
           volumes: [
             {
-              "name": "whale-key",
+              "name":"daemon-config",
+              "configMap": {
+                "name": "seed-daemon-config"
+              }
+            },
+            {
+              "name": "whale-key1",
               "secret": {
                 "defaultMode": 0600,
                 "items": [
@@ -89,20 +99,20 @@ echo "ran batch txns";
               }
             },
             {
-              "name": "fish-key",
+              "name": "whale-key2",
               "secret": {
                 "defaultMode": 0600,
                 "items": [
                   {
                     "key": "key",
-                    "path": "online-fish-account-1-key"
+                    "path": "online-whale-account-2-key"
                   },
                   {
                     "key": "pub",
-                    "path": "online-fish-account-1-key.pub"
+                    "path": "online-whale-account-2-key.pub"
                   }
                 ],
-                "secretName": "online-fish-account-1-key"
+                "secretName": "online-whale-account-2-key"
               }
             }
 

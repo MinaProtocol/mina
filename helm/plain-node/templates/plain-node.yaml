@@ -1,20 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{$.Values.coordinatorName }}
+  name: {{ $.Values.name }}
   labels:
-    app: {{$.Values.coordinatorName}}
+    app: {{ $.Values.name }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{$.Values.coordinatorName }}
+      app: {{ $.Values.name }}
   template:
     metadata:
       labels:
-        app: {{$.Values.coordinatorName}}
+        app: {{ $.Values.name }}
         testnet: {{ $.Values.testnetName }}
-        role: snark-coordinator
+        role: seed
+        class: "plain-node"
         version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
         syncStatus: INIT
       annotations:
@@ -22,13 +23,14 @@ spec:
         prometheus.io/port: {{ $.Values.coda.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      initContainers:
       containers:
-      - name: coordinator
+      - name: mina
         resources:
           limits:
           requests:
-            memory: 24Gi
-            cpu: 8.0
+            memory: 32.0Gi
+            cpu: 12.0
         image: {{ $.Values.coda.image }}
         {{ if $.Values.coda.useCustomEntrypoint -}}
         command: [{{ $.Values.coda.customEntrypoint }}]
@@ -36,36 +38,36 @@ spec:
         args: [ "daemon",
           "-log-level", "Debug",
           "-log-json",
-          "-config-directory", "/root/.mina-config",
           "-log-snark-work-gossip", "true",
+          "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
-          "-run-snark-coordinator", "$(CODA_SNARK_KEY)",
-          "-snark-worker-fee", "$(CODA_SNARK_FEE)",
-          "-work-selection", "$(WORK_SELECTION)",
           "-enable-peer-exchange", "true",
-          {{- if $.Values.coda.logTxnPoolGossip }}
-          "-log-txn-pool-gossip", "true",
-          {{- end -}}
           {{- if $.Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end }}
+          {{- if $.Values.coda.logPrecomputedBlocks }}
+          "-log-precomputed-blocks", "true",
+          {{- end -}}
+          {{- if $.Values.coda.logTxnPoolGossip }}
+          "-log-txn-pool-gossip", "true",
+          {{- end -}}
+          {{- if $.Values.coda.maxConnections }}
+          "--max-connections", {{ $.Values.coda.maxConnections | quote }},
+          {{- end -}}
           {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}
-          {{- if $.Values.coda.seedPeersURL }}
-          "-peer-list-url", {{ $.Values.coda.seedPeersURL | quote }},
-          {{- end }}
           "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }},
-          {{- if $.Values.coda.enableArchive }}
-          "-archive-address", {{ $.Values.coda.archiveAddress }}
-          {{- end -}}
+          {{- if $.Values.coda.uploadBlocksToGCloud }}
+          "-upload-blocks-to-gcloud", "true",
+          {{- end }}
         ]
         env:
         - name: "RAYON_NUM_THREADS"
-          value: "7"
+          value: "6"
         - name: DAEMON_REST_PORT
           value: {{ $.Values.coda.ports.graphql | quote }}
         - name: DAEMON_CLIENT_PORT
@@ -76,39 +78,74 @@ spec:
           value: "10.0.0.0/8"
         - name: CONNECT_PRIVATE_IPS
           value: "true"
-        - name: CODA_SNARK_KEY
-          value: {{ $.Values.publicKey | quote }}
-        - name: CODA_SNARK_FEE
-          value: {{ $.Values.snarkFee | quote }}
+        - name: GCLOUD_KEYFILE
+          value: "/gcloud/keyfile.json"
+        - name: NETWORK_NAME
+          value: {{ $.Values.testnetName }}
+        - name: GCLOUD_BLOCK_UPLOAD_BUCKET
+          value: "mina_network_block_data"
         - name: DAEMON_EXTERNAL_PORT
           value: {{ $.Values.coda.ports.p2p | quote }}
-        - name: WORK_SELECTION
-          value: {{$.Values.workSelectionAlgorithm | quote }}
         ports:
         - name: client-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ $.Values.coda.ports.client }}
         - name: graphql-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ $.Values.coda.ports.graphql }}
         - name: metrics-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ $.Values.coda.ports.metrics }}
         - name: external-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ $.Values.coda.ports.p2p }}
-          hostPort: {{ $.Values.coda.ports.p2p }}
-{{$name := $.Values.coordinatorName }}
-{{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
-{{- include "healthcheck.snarkCoordinator.allChecks" $data | indent 8 }}
+          hostPort: {{ $.Values.coda.ports.external }}
+{{$data := dict "name" $.Values.name "healthcheck" $.Values.healthcheck }}
+{{- include "healthcheck.seed.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
-      {{- if $.Values.coda.runtimeConfig }}
         volumeMounts:
+        {{- if $.Values.coda.uploadBlocksToGCloud }}
+        - name: gcloud-keyfile
+          mountPath: "/gcloud/"
+        {{- end }}
+        {{- if $.Values.coda.runtimeConfig }}
         - name: daemon-config
           mountPath: "/config/"
+        {{- end }}
       volumes:
+      {{- if $.Values.coda.runtimeConfig }}
       - name: daemon-config
         configMap:
-          name: {{$.Values.coordinatorName }}-daemon-config
+          name: seed-daemon-config
       {{- end }}
+      {{- if $.Values.coda.uploadBlocksToGCloud }}
+      - name: gcloud-keyfile
+        secret:
+          secretName: gcloud-keyfile
+          defaultMode: 256
+          items:
+          - key: keyfile
+            path: keyfile.json
+      {{- end }}
+      - name: actual-libp2p
+        emptyDir: {}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
+---
+{{- if $.Values.coda.exposeGraphql }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Values.name  }}-graphql
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $.Values.name  }}
+  ports:
+  - name: http-graphql
+    protocol: TCP
+    port: 80
+    targetPort: {{ $.Values.coda.ports.graphql }}
+{{- end }}
+---
+
