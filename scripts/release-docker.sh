@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Author's Note: Because the structure of this repo is inconsistent (Dockerfiles and build contexts placed willy-nilly)
 # we have to trustlist and configure image builds individually because each one is going to be slightly different.
@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-rosetta-ubuntu' 'mina-toolchain' 'bot' 'leaderboard')
+VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-rosetta-ubuntu' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -80,6 +80,14 @@ mina-rosetta-ubuntu)
 leaderboard)
   DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
   DOCKER_CONTEXT="frontend/leaderboard"
+  ;;
+delegation-backend)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend"
+  DOCKER_CONTEXT="src/app/delegation_backend"
+  ;;
+delegation-backend-toolchain)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
+  DOCKER_CONTEXT="src/app/delegation_backend"
   ;;
 esac
 

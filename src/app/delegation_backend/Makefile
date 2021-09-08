@@ -16,13 +16,10 @@ tidy:
 test:
 	GO=$(GO) ./scripts/build.sh test
 
-docker-toolchain:
-	./scripts/build.sh $@
-
-docker-upload:
-	./scripts/build.sh $@
-
 docker-run:
+	./scripts/build.sh $@
+
+docker-toolchain:
 	./scripts/build.sh $@
 
 docker:
