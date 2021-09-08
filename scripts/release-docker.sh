@@ -98,20 +98,19 @@ else
   REPO="--build-arg MINA_REPO=${BUILDKITE_PULL_REQUEST_REPO}"
 fi
 
+TAG="gcr.io/o1labs-192920/$SERVICE:$VERSION"
+
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
-  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args -t gcr.io/o1labs-192920/$SERVICE:$VERSION -
+  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args -t "$TAG" -
 else
-  docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t gcr.io/o1labs-192920/$SERVICE:$VERSION -f $DOCKERFILE_PATH
+  docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
-tag-and-push() {
-  docker tag "gcr.io/o1labs-192920/$SERVICE:$VERSION" "$1"
-  docker push "$1"
-}
-
 if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
-  tag-and-push "minaprotocol/$SERVICE:$VERSION"
-  docker push "gcr.io/o1labs-192920/$SERVICE:$VERSION"
+  TARGET="minaprotocol/$SERVICE:$VERSION"
+  docker tag "$TAG" "$TARGET"
+  docker push "$TAG"
+  docker push "$TARGET"
 fi
