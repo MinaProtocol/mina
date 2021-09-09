@@ -1198,6 +1198,7 @@ module Types = struct
   module Command_status = struct
     type t =
       | Applied
+      | Enqueued
       | Included_but_failed of Transaction_status.Failure.t
       | Unknown
   end
@@ -1416,7 +1417,7 @@ module Types = struct
             "null is no failure or status unknown, reason for failure \
              otherwise." ~resolve:(fun _ uc ->
             match uc.With_status.status with
-            | Applied | Unknown ->
+            | Applied | Enqueued | Unknown ->
                 None
             | Included_but_failed failure ->
                 Some (Transaction_status.Failure.to_string failure))
@@ -1585,7 +1586,7 @@ module Types = struct
                 "The reason for the Snapp transaction failure; null means \
                  success or the status is unknown" ~resolve:(fun _ cmd ->
                 match cmd.With_status.status with
-                | Applied | Unknown ->
+                | Applied | Enqueued | Unknown ->
                     None
                 | Included_but_failed failure ->
                     Some (Transaction_status.Failure.to_string failure))
@@ -2933,7 +2934,7 @@ module Mutations = struct
         | Ok user_command ->
             Ok
               { Types.User_command.With_status.data = user_command
-              ; status = Unknown
+              ; status = Enqueued
               }
         | Error e ->
             Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
@@ -2947,7 +2948,7 @@ module Mutations = struct
         | Ok parties ->
             let cmd =
               { Types.Snapp_command.With_status.data = parties
-              ; status = Unknown
+              ; status = Enqueued
               }
             in
             let cmd_with_hash =
@@ -3237,7 +3238,7 @@ module Mutations = struct
           ->
             Ok
               (Types.User_command.mk_user_command
-                 { status = Unknown
+                 { status = Enqueued
                  ; data =
                      { With_hash.data = signed_command
                      ; hash = Transaction_hash.hash_command transaction
