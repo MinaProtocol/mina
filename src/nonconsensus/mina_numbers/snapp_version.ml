@@ -1,1 +1,1 @@
-include Nat.Make32 ()
+../../lib/mina_numbers/snapp_version.ml
