@@ -134,9 +134,8 @@ module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
       match proof_elem with
       | Signed_command c ->
           Receipt.Elt.Signed_command (Signed_command.payload c)
-      | Snapp_command x ->
-          Receipt.Elt.Snapp_command
-            Snapp_command.(Payload.(Digested.digest (digested (to_payload x))))
+      | Parties _ ->
+          failwith "TODO"
     in
     Receipt.Chain_hash.cons p parent_hash
 end)
@@ -315,8 +314,10 @@ let get_status ~flag t =
       | `Offline ->
           `Active `Offline
       | `Synced | `Catchup ->
-          if abs (!max_block_height - blockchain_length) < 5 then
-            `Active `Synced
+          if
+            (Mina_lib.config t).demo_mode
+            || abs (!max_block_height - blockchain_length) < 5
+          then `Active `Synced
           else `Active `Catchup
     in
     let consensus_time_best_tip =
@@ -368,7 +369,9 @@ let get_status ~flag t =
     in
     match Transition_frontier.catchup_tree frontier with
     | Full full ->
-        Some (Hashtbl.to_alist full.states)
+        Some
+          (List.map (Hashtbl.to_alist full.states) ~f:(fun (state, hashes) ->
+               (state, State_hash.Set.length hashes)))
     | _ ->
         None
   in

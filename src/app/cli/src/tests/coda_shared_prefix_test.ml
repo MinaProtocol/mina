@@ -27,7 +27,7 @@ let command =
   let open Command.Let_syntax in
   Command.async ~summary:"Test that workers share prefixes"
     (let%map_open who_produces =
-       flag "--who-produces" ~aliases:["who-produces"]
+       flag "--who-produces" ~aliases:[ "who-produces" ]
          ~doc:"ID node number which will be producing blocks" (required int)
      in
      main who_produces)

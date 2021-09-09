@@ -18,7 +18,7 @@ type t =
   ; (* Often times it is useful to return context specific to the request that caused the error (i.e. a sample of the stack trace or impacted account) in addition to the standard error message. *)
     details : Yojson.Safe.t option [@default None]
   }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** Instead of utilizing HTTP status codes to describe node errors (which often do not have a good analog), rich errors are returned using this object. Both the code and message fields can be individually used to correctly identify an error. Implementations MUST use unique values for both fields. *)
 let create (code : int32) (message : string) (retriable : bool) : t =

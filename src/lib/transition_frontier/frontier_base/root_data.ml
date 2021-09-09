@@ -5,9 +5,9 @@ open Mina_transition
 module Common = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
-        { scan_state: Staged_ledger.Scan_state.Stable.V1.t
+        { scan_state: Staged_ledger.Scan_state.Stable.V2.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
 
       let to_latest = Fn.id
@@ -30,10 +30,10 @@ end
 module Historical = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
-        { transition: External_transition.Validated.Stable.V1.t
-        ; common: Common.Stable.V1.t
+        { transition: External_transition.Validated.Stable.V2.t
+        ; common: Common.Stable.V2.t
         ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
 
       let to_latest = Fn.id
@@ -65,20 +65,20 @@ end
 module Limited = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
-        { transition: External_transition.Validated.Stable.V1.t
+        { transition: External_transition.Validated.Stable.V2.t
         ; protocol_states:
             ( Mina_base.State_hash.Stable.V1.t
             * Mina_state.Protocol_state.Value.Stable.V1.t )
             list
-        ; common: Common.Stable.V1.t }
+        ; common: Common.Stable.V2.t }
 
       let to_yojson {transition; protocol_states= _; common} =
         `Assoc
           [ ("transition", External_transition.Validated.to_yojson transition)
           ; ("protocol_states", `String "<opaque>")
-          ; ("common", Common.Stable.V1.to_yojson common) ]
+          ; ("common", Common.Stable.V2.to_yojson common) ]
 
       let to_latest = Fn.id
     end
@@ -107,8 +107,8 @@ module Minimal = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
-      type t = {hash: State_hash.Stable.V1.t; common: Common.Stable.V1.t}
+    module V2 = struct
+      type t = {hash: State_hash.Stable.V1.t; common: Common.Stable.V2.t}
       [@@driving to_yojson]
 
       let to_latest = Fn.id

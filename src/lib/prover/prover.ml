@@ -58,9 +58,8 @@ module Worker_state = struct
   type init_arg =
     { conf_dir : string
     ; logger : Logger.Stable.Latest.t
-    ; proof_level : Genesis_constants.Proof_level.Stable.Latest.t
-    ; constraint_constants :
-        Genesis_constants.Constraint_constants.Stable.Latest.t
+    ; proof_level : Genesis_constants.Proof_level.t
+    ; constraint_constants : Genesis_constants.Constraint_constants.t
     }
   [@@deriving bin_io_unversioned]
 
@@ -318,6 +317,30 @@ let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
       ] ;
   Child_processes.Termination.register_process pids process
     Child_processes.Termination.Prover ;
+  let exit_or_signal =
+    Child_processes.Termination.wait_safe ~logger process ~module_:__MODULE__
+      ~location:__LOC__ ~here:[%here]
+  in
+  don't_wait_for
+    ( match%bind exit_or_signal with
+    | Ok (Ok ()) ->
+        [%log fatal] "Unexpected prover termination, terminating daemon" ;
+        Async.exit 1
+    | Ok (Error (`Exit_non_zero n)) ->
+        [%log fatal]
+          "Prover terminated with nonzero exit code, terminating daemon"
+          ~metadata:[ ("exit_code", `Int n) ] ;
+        Async.exit 1
+    | Ok (Error (`Signal signal)) ->
+        let signal_str = Signal.to_string signal in
+        [%log fatal] "Prover terminated due to signal, terminating daemon"
+          ~metadata:[ ("signal", `String signal_str) ] ;
+        Async.exit 1
+    | Error err ->
+        let err_str = Error.to_string_hum err in
+        [%log fatal] "Error waiting on prover process, terminating daemon"
+          ~metadata:[ ("error", `String err_str) ] ;
+        Async.exit 1 ) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stdout process |> Reader.pipe)

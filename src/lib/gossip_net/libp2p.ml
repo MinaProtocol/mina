@@ -442,7 +442,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       let subscription_ref = ref (Deferred.never ()) in
       let restarts_r, restarts_w =
         Strict_pipe.create ~name:"libp2p-restarts"
-          (Strict_pipe.Buffered (`Capacity 0, `Overflow Strict_pipe.Drop_head))
+          (Strict_pipe.Buffered
+             (`Capacity 0, `Overflow (Strict_pipe.Drop_head ignore)))
       in
       let added_seeds = Peer.Hash_set.create () in
       let%bind () =

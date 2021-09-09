@@ -171,16 +171,8 @@ module With_hashes = struct
   let hash (t : _ t) : Random_oracle.Digest.t =
     match t with [] -> empty | (_, h) :: _ -> h
 
-  let create { other_parties; fee_payer; protocol_state = _ } : Party.t t =
-    let parties =
-      let p = fee_payer in
-      { Party.authorization = Control.Signature p.authorization
-      ; data =
-          { p.data with predicate = Party.Predicate.Nonce p.data.predicate }
-      }
-      :: other_parties
-    in
-    List.fold (List.rev parties) ~init:[] ~f:(fun acc p ->
+  let create t : Party.t t =
+    List.fold (parties t) ~init:[] ~f:(fun acc p ->
         let hash = Party.Predicated.digest p.data in
         cons { hash; data = p } acc)
 

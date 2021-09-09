@@ -9,9 +9,6 @@ module T = struct
 
   let env = "MINA_PRIVKEY_PASS"
 
-  (* TODO: remove eventually *)
-  let env_deprecated = "CODA_PRIVKEY_PASS"
-
   let which = "Mina keypair"
 
   (** Writes a keypair to [privkey_path] and [privkey_path ^ ".pub"] using [Secret_file] *)
@@ -73,12 +70,10 @@ module T = struct
 
   let read_exn' path =
     let password =
-      let env_value = Sys.getenv env in
-      let env_deprecated_value = Sys.getenv env_deprecated in
-      match (env_value, env_deprecated_value) with
-      | Some v, _ | None, Some v ->
+      match Sys.getenv env with
+      | Some v ->
           lazy (return @@ Bytes.of_string v)
-      | None, None ->
+      | None ->
           let error_help_message =
             sprintf "Set the %s environment variable to the password" env
           in

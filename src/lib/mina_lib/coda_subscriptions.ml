@@ -67,7 +67,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
               |> List.filter_map ~f:(function
                    | User_command.Signed_command c ->
                        Some c
-                   | Snapp_command _ ->
+                   | Parties _ ->
                        None)
               |> Fn.flip Signed_command.filter_by_participant participant
             in
@@ -275,7 +275,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
   let reorganization_subscription = [] in
   let reader, writer =
     Strict_pipe.create ~name:"Reorganization subscription"
-      Strict_pipe.(Buffered (`Capacity 1, `Overflow Drop_head))
+      Strict_pipe.(Buffered (`Capacity 1, `Overflow (Drop_head ignore)))
   in
   let t =
     { subscribed_payment_users
