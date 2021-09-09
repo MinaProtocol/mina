@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Author's Note: Because the structure of this repo is inconsistent (Dockerfiles and build contexts placed willy-nilly)
 # we have to trustlist and configure image builds individually because each one is going to be slightly different.
@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-rosetta-ubuntu' 'mina-toolchain' 'bot' 'leaderboard')
+VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-rosetta-ubuntu' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -81,6 +81,14 @@ leaderboard)
   DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
   DOCKER_CONTEXT="frontend/leaderboard"
   ;;
+delegation-backend)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend"
+  DOCKER_CONTEXT="src/app/delegation_backend"
+  ;;
+delegation-backend-toolchain)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
+  DOCKER_CONTEXT="src/app/delegation_backend"
+  ;;
 esac
 
 
@@ -90,20 +98,19 @@ else
   REPO="--build-arg MINA_REPO=${BUILDKITE_PULL_REQUEST_REPO}"
 fi
 
+TAG="gcr.io/o1labs-192920/$SERVICE:$VERSION"
+
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
-  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args -t gcr.io/o1labs-192920/$SERVICE:$VERSION -
+  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args -t "$TAG" -
 else
-  docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t gcr.io/o1labs-192920/$SERVICE:$VERSION -f $DOCKERFILE_PATH
+  docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
-tag-and-push() {
-  docker tag "gcr.io/o1labs-192920/$SERVICE:$VERSION" "$1"
-  docker push "$1"
-}
-
 if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
-  tag-and-push "minaprotocol/$SERVICE:$VERSION"
-  docker push "gcr.io/o1labs-192920/$SERVICE:$VERSION"
+  TARGET="minaprotocol/$SERVICE:$VERSION"
+  docker tag "$TAG" "$TARGET"
+  docker push "$TAG"
+  docker push "$TARGET"
 fi
