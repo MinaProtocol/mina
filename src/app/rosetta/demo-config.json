@@ -1,0 +1,1 @@
+{"genesis":{"genesis_state_timestamp":"${GENESIS_STATE_TIMESTAMP}"},"ledger":{"name": "rosetta-demo","accounts":[{"pk":"${PK}","balance":"66000","sk":null,"delegate":null}]}}

@@ -1,0 +1,20 @@
+(library
+ (name logproc_lib)
+ (public_name logproc_lib)
+ (modules logproc_lib filter)
+ (libraries interpolator_lib core_kernel yojson angstrom re2)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_jane ppx_deriving.std))
+ (inline_tests))
+
+;; interpolator is made separately available because
+;; filter depends on re2, which binds to C++ code,
+;; making it unusable from js_of_ocaml
+(library
+ (name interpolator_lib)
+ (public_name interpolator_lib)
+ (modules interpolator)
+ (libraries core_kernel yojson angstrom)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_jane ppx_deriving.std))
+ (inline_tests))

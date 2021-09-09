@@ -1,0 +1,7 @@
+(library
+ (name mina_compile_config)
+ (public_name mina_compile_config)
+ (libraries currency)
+ (preprocessor_deps ../../config.mlh)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_base ppx_optcomp)))

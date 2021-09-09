@@ -1,0 +1,15 @@
+(executable
+ (package missing_blocks_auditor)
+ (name missing_blocks_auditor)
+ (public_name missing_blocks_auditor)
+ (libraries
+   async
+   core_kernel
+   caqti
+   caqti-async
+   caqti-driver-postgresql
+   logger
+ )
+ (preprocessor_deps ../../config.mlh)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_coda ppx_version ppx_let)))

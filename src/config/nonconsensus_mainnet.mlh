@@ -1,0 +1,4 @@
+[%%import "/src/config/mainnet.mlh"]
+
+[%%undef consensus_mechanism]
+[%%undef compaction_interval]

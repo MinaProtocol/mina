@@ -1,0 +1,3 @@
+[%%define feature_tokens true]
+[%%define feature_snapps true]
+[%%define mainnet false]

@@ -1,0 +1,30 @@
+<p><span style="font-weight: 300;">Dear Mina community member,</span></p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">Thank you for your participation in the O(1) Labs delegation program. You are receiving a delegation from two addresses belonging to O(1) Labs. This email is related to the delegation from address </span><span style="font-weight: 300;">#FOUNDATION_ADDRESS</span><span style="font-weight: 300;">. You will receive a separate email for each of the delegation(s).</span></p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">Epoch </span><span style="font-weight: 300;">#EPOCH_NO </span><span style="font-weight: 300;">ended recently. As described in the </span><a href="https://medium.com/o1labs/o-1-labs-delegation-policy-786bf96f9fdd"><span style="font-weight: 300;">delegation policy</span></a><span style="font-weight: 300;">, you are allowed to keep up to 5% of the block rewards in MINA as fees and are required to send the rest of the block rewards back to O(1) Labs.</span></p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">According to our system, you are required to send back at least </span><strong>#PAYOUT_AMOUNT </strong><span style="font-weight: 300;"> MINA to this address: </span><span style="font-weight: 300;">#FOUNDATION_ADDRESS for blocks produced in Epoch #EPOCH_NO</span>.</p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">Please ensure that the transaction or payout can be associated with your delegation. You can do this by fulfilling one of the below criteria:&nbsp;</span></p>
+<ul>
+<li style="font-weight: 300;"><span style="font-weight: 300;">send the transaction from the </span><em><span style="font-weight: 300;">hot wallet</span></em><span style="font-weight: 300;"> (</span><span style="font-weight: 300;">#BLOCK_PRODUCER_ADDRESS </span><span style="font-weight: 300;">) that is receiving the delegation.</span></li>
+<li style="font-weight: 300;"><span style="font-weight: 300;">send the transaction from a </span><em><span style="font-weight: 300;">coinbase-receiver account</span></em><span style="font-weight: 300;"> specified in any of the blocks that your account has created.</span></li>
+<li style="font-weight: 300;"><span style="font-weight: 300;">put your </span><em><span style="font-weight: 300;">discord id</span></em><span style="font-weight: 300;"> in the </span><em><span style="font-weight: 300;">memo</span></em><span style="font-weight: 300;">. The discord ID should be the same as the one you used for registering the delegation program.</span></li>
+<li style="font-weight: 300;"><span style="font-weight: 300;">put the </span><em><span style="font-weight: 300;">sha256 of your discord id</span></em><span style="font-weight: 300;"> in the </span><em><span style="font-weight: 300;">memo.</span></em></li>
+<li style="font-weight: 300;"><span style="font-weight: 300;">put the </span><em><span style="font-weight: 300;">sha256 of your hot wallet address</span></em><span style="font-weight: 300;"> in the </span><em><span style="font-weight: 300;">memo.</span></em></li>
+</ul>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">Details related to the calculation of the payout can be found </span><a href="https://docs.minaprotocol.com/en/advanced/foundation-delegation-program"><span style="font-weight: 300;">here</span></a><span style="font-weight: 300;">.</span></p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">Please send the block rewards back </span><strong>before</strong><span style="font-weight: 300;"> slot 3500 of Epoch #CURRENT_EPOCH_NO on </span><strong>#DEADLINE_DATE [TIME IN UTC]</strong><span style="font-weight: 300;">.</span></p>
+<p>&nbsp;</p>
+<p><strong>Failure to do so will result in penalization and undelegation. </strong><span style="font-weight: 300;">Please refer to the </span><a href="https://medium.com/o1labs/o-1-labs-delegation-policy-786bf96f9fdd"><span style="font-weight: 300;">delegation policy</span></a><span style="font-weight: 300;"> for more details.</span></p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">We recommend you use a block explorer to check if your transactions were completed.</span></p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">For any questions related to the delegation program, please ask in the </span><strong>#delegation-program channel</strong><span style="font-weight: 300;"> on </span><a href="http://bit.ly/MinaDiscord"><span style="font-weight: 300;">Discord</span></a><span style="font-weight: 300;">.&nbsp;</span></p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">Thank you for being part of Mina&rsquo;s decentralized network, which is powered by participants.</span></p>
+<p><span style="font-weight: 300;">Best,</span></p>
+<p><span style="font-weight: 300;">O(1) Labs</span></p>

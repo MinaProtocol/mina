@@ -1,0 +1,9 @@
+(library
+ (name error_json)
+ (public_name error_json)
+ (libraries
+  base
+  yojson
+  mina_version)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_deriving_yojson ppx_version)))

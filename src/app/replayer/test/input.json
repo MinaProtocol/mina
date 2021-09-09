@@ -1,0 +1,20 @@
+{
+    "target_epoch_ledgers_state_hash": "3NLijmwJSM1tjjUN5pV7877m5n38rgbbrvj3F1fBxfmiGAsdm8mZ",
+    "genesis_ledger": {
+        "accounts": [
+            {
+                "pk": "B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV",
+                "balance": "66000",
+                "sk": null,
+                "delegate": null
+            },
+            {
+                "pk": "B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL",
+                "balance": "0.000000001",
+                "sk": null,
+                "delegate": null
+            }
+        ],
+        "add_genesis_winner": false
+    }
+}

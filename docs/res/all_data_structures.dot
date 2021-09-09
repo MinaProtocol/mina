@@ -1,0 +1,59 @@
+digraph data_structures {
+  rankdir=LR;
+
+  subgraph cluster_transactions {
+    label="transactions";
+    {Coinbase Fee_transfer} -> Internal_transaction;
+    {Payment Delegation} -> User_transaction;
+    {Internal_transaction User_transaction} -> Transaction;
+  }
+
+  subgraph cluster_merkle_trees {
+    label="merkle trees";
+    Merkle_tree -> {Merkle_mask Merkle_database};
+    Merkle_tree_diff -> Merkle_mask -> Merkle_database;
+  }
+  subgraph cluster_filesystem { label="filesystem"; {Rocksdb_database Stack_database}; }
+  {Rocksdb_database Stack_database} -> Merkle_database;
+
+  subgraph cluster_scan_state {
+    label="scan state";
+    Parallel_scan_state_diff -> Parallel_scan_state;
+    {Parallel_scan_state Transaction_snark_work} -> Transaction_snark_scan_state;
+  }
+
+  subgraph cluster_staged_ledger {
+    label="staged ledger";
+    {Merkle_tree Transaction_snark_scan_state Staged_ledger_diff} -> Staged_ledger
+    {Merkle_tree_diff Parallel_scan_state_diff} -> Staged_ledger_diff;
+  }
+
+  subgraph cluster_snarks { label="snarks"; {Transition_snark Transaction_snark}; }
+  subgraph cluster_proofs { label="proofs"; {Transition_proof Transaction_proof}; }
+  {Merkle_tree Transaction} -> Transaction_snark -> {Transaction_proof Transaction_snark_work};
+  {Snark_transition Merkle_tree Transaction_proof} -> Transition_snark -> Transition_proof;
+
+  subgraph cluster_consensus {
+    label="consensus mechanism";
+    {Consensus_state Consensus_transition_data Consensus_local_state Transition_prover_state};
+  }
+
+  subgraph cluster_state {
+    label="state";
+    {Blockchain_state Consensus_state} -> Protocol_state;
+  }
+
+  subgraph cluster_transitions {
+    label="transitions";
+    {Protocol_state Consensus_transition_data} -> Snark_transition;
+    {Snark_transition Transition_prover_state} -> Internal_transition;
+    {Protocol_state Transition_proof} -> External_transition;
+  }
+  Staged_ledger_diff -> {Internal_transition External_transition}
+
+  subgraph cluster_transition_frontier {
+    label="transition frontier";
+    {External_transition Merkle_mask} -> Transition_frontier_breadcrumb;
+    {Transition_frontier_breadcrumb Staged_ledger Merkle_tree} -> Transition_frontier;
+  }
+}

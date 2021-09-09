@@ -1,0 +1,10 @@
+(library
+ (name snark_work_lib)
+ (public_name snark_work_lib)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core_kernel currency one_or_two signature_lib transaction_snark)
+ (preprocess
+  (pps ppx_jane ppx_deriving_yojson ppx_version))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "Snark work types"))

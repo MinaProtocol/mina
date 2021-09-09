@@ -1,0 +1,12 @@
+(library
+ (name cli_lib)
+ (public_name cli_lib)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core async_unix sodium ppx_deriving_yojson.runtime yojson
+            mina_base secrets work_selector graphql_lib rosetta_coding
+            rosetta_lib)
+ (preprocess
+  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "Library to communicate with Coda as cli as the front-end"))

@@ -1,0 +1,141 @@
+# my global config
+global:
+  scrape_interval:     15s # By default, scrape targets every 15 seconds.
+  evaluation_interval: 15s # By default, scrape targets every 15 seconds.
+  # scrape_timeout is set to the global default (10s).
+
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager).
+  external_labels:
+      monitor: 'coda-monitor'
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+  # - "first.rules"
+  # - "second.rules"
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'prometheus'
+
+    # Override the global default and scrape targets from this job every 5 seconds.
+    scrape_interval: 20s
+
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'coda-us-west-2'
+    scrape_interval: "5s"
+    ec2_sd_configs:
+      - region: us-west-2
+        port: 10000
+    relabel_configs:
+      # Monitor using the public IP address of the node
+      - source_labels: [__meta_ec2_public_ip]
+        target_label: __address__
+        replacement: "${1}:10000"
+      # Only monitor instances with a tag module = coda-node
+      - source_labels: [__meta_ec2_tag_module]
+        regex: coda-node
+        action: keep
+      - source_labels: [__meta_ec2_tag_Name]
+        target_label: instance
+      - source_labels: [__meta_ec2_tag_testnet]
+        target_label: testnet
+      - source_labels: [__meta_ec2_tag_role]
+        target_label: role
+
+  - job_name: 'coda-us-west-1'
+    scrape_interval: "5s"
+    ec2_sd_configs:
+      - region: us-west-1
+        port: 10000
+    relabel_configs:
+      # Monitor using the public IP address of the node
+      - source_labels: [__meta_ec2_public_ip]
+        target_label: __address__
+        replacement: "${1}:10000"
+      # Only monitor instances with a tag module = coda-node
+      - source_labels: [__meta_ec2_tag_module]
+        regex: coda-node
+        action: keep
+      - source_labels: [__meta_ec2_tag_Name]
+        target_label: instance
+      - source_labels: [__meta_ec2_tag_testnet]
+        target_label: testnet
+      - source_labels: [__meta_ec2_tag_role]
+        target_label: role
+
+  - job_name: 'coda-us-east-1'
+    scrape_interval: "5s"
+    ec2_sd_configs:
+      - region: us-east-1
+        port: 10000
+    relabel_configs:
+      # Monitor using the public IP address of the node
+      - source_labels: [__meta_ec2_public_ip]
+        target_label: __address__
+        replacement: "${1}:10000"
+      # Only monitor instances with a tag module = coda-node
+      - source_labels: [__meta_ec2_tag_module]
+        regex: coda-node
+        action: keep
+      - source_labels: [__meta_ec2_tag_Name]
+        target_label: instance
+      - source_labels: [__meta_ec2_tag_testnet]
+        target_label: testnet
+      - source_labels: [__meta_ec2_tag_role]
+        target_label: role
+
+  - job_name: 'coda-us-east-2'
+    scrape_interval: "5s"
+    ec2_sd_configs:
+      - region: us-east-2
+        port: 10000
+    relabel_configs:
+      # Monitor using the public IP address of the node
+      - source_labels: [__meta_ec2_public_ip]
+        target_label: __address__
+        replacement: "${1}:10000"
+      # Only monitor instances with a tag module = coda-node
+      - source_labels: [__meta_ec2_tag_module]
+        regex: coda-node
+        action: keep
+      - source_labels: [__meta_ec2_tag_Name]
+        target_label: instance
+      - source_labels: [__meta_ec2_tag_testnet]
+        target_label: testnet
+      - source_labels: [__meta_ec2_tag_role]
+        target_label: role
+
+{% if CODA_METRICS_URI is defined %}
+  - job_name: "coda"
+    scrape_interval: "10s"
+    static_configs:
+      - targets: ['{{ CODA_METRICS_URI }}']
+{% endif %}
+{% if FAUCET_METRICS_URI is defined %}
+  - job_name: "faucet"
+    scrape_interval: "10s"
+    static_configs:
+      - targets: ['{{ FAUCET_METRICS_URI }}']
+{% endif %}
+{% if ECHO_METRICS_URI is defined %}
+  - job_name: "echo"
+    scrape_interval: "10s"
+    static_configs:
+      - targets: ['{{ ECHO_METRICS_URI }}']
+{% endif %}
+{% if REMOTE_WRITE_URI is defined %}
+# For writing to a remote prometheus instance
+remote_write:
+- url: {{ REMOTE_WRITE_URI }}
+  basic_auth:
+    username: {{ REMOTE_WRITE_USERNAME }}
+    password: {{ REMOTE_WRITE_PASSWORD }}
+{% endif %}

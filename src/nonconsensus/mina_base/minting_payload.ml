@@ -1,0 +1,1 @@
+../../lib/mina_base/minting_payload.ml

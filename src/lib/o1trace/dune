@@ -1,0 +1,8 @@
+(library
+ (name o1trace)
+ (public_name o1trace)
+ (libraries async core webkit_trace_event)
+ (synopsis "Basic event tracing")
+ (preprocessor_deps "../../config.mlh")
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_optcomp)))

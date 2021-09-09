@@ -1,0 +1,14 @@
+(library
+ (name block_producer)
+ (public_name block_producer)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries
+   async async_extra core mina_base mina_intf mina_state
+   mina_transition consensus interruptible o1trace pipe_lib
+   prover transaction_snark_scan_state transition_frontier
+   network_pool unix_timestamp otp_lib transition_chain_prover)
+ (preprocess
+  (pps ppx_coda ppx_version ppx_jane ppx_register_event))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "Coda block producer"))

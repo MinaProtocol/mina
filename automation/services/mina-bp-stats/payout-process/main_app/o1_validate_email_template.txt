@@ -1,0 +1,22 @@
+<p><span style="font-weight: 300;">Dear Mina community member,</span></p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">You are receiving a delegation from two addresses of O(1) Labs. This email is related to the delegation from address </span><span style="font-weight: 300;">#FOUNDATION_ADDRESS</span><span style="font-weight: 300;">. You will receive a separate email for each of the delegation(s).</span></p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">According to our system, you were required to send back at least </span><strong>#PAYOUT_AMOUNT</strong> <span style="font-weight: 300;">MINA to this address: </span><span style="font-weight: 300;">#FOUNDATION_ADDRESS for blocks produced in Epoch #EPOCH_NO</span>.</p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">According to our system, we received payment of </span><strong>#PAYOUT_RECEIVED</strong> <span style="font-weight: 300;">MINA to this address: </span><span style="font-weight: 300;">#FOUNDATION_ADDRESS between slot 3,501 of Epoch #EPOCH_NO and slot 3,500 of Epoch #CURRENT_EPOCH_NO</span>.</p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">If you have not sent back the full amount required, please do so </span><strong>IMMEDIATELY</strong><span style="font-weight: 300;">. Failure to do so will result in penalization and undelegation.</span> <span style="font-weight: 300;">Please refer to the </span><a href="https://medium.com/o1labs/o-1-labs-delegation-policy-786bf96f9fdd"><span style="font-weight: 300;">delegation policy</span></a><span style="font-weight: 300;"> for more details.</span></p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">If you have sent back more than you were required to do so, you may deduct the overpayment from a future payment.</span></p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">Please be reminded of the following clause in the delegation policy:&nbsp;</span></p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">"c) Once every quarter, or more frequently as determined by O(1) Labs, O(1) Labs will review the list of validators to determine whether un-/re-delegation is appropriate with respect to any particular validator, taking into account the following exclusive factors:</span></p>
+<p><span style="font-weight: 300;">...</span></p>
+<p><span style="font-weight: 300;">- whether any validator did not properly remit back the staking rewards; and"</span></p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">If you have any questions related to the delegation program, you can ask them in the </span><strong>#delegation-program channel</strong><span style="font-weight: 300;"> on </span><a href="http://bit.ly/MinaDiscord"><span style="font-weight: 300;">Discord</span></a><span style="font-weight: 300;">.</span></p>
+<p>&nbsp;</p>
+<p><span style="font-weight: 300;">Best regards,</span></p>
+<p><span style="font-weight: 300;">O(1) Labs</span></p>

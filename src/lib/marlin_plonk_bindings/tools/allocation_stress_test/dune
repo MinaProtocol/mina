@@ -1,0 +1,5 @@
+(library
+ (name allocation_stress_test)
+ (libraries core_kernel)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))
