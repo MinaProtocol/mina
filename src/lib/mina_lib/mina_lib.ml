@@ -908,9 +908,9 @@ let add_full_transactions t user_command =
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
-let add_snapp_transactions t (snapp_parties : Parties.t list) =
+let add_snapp_transactions t (snapp_txns : Parties.t list) =
   let result_ivar = Ivar.create () in
-  let cmd_inputs = Snapp_command_inputs snapp_parties in
+  let cmd_inputs = Snapp_command_inputs snapp_txns in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
     (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
   |> Deferred.don't_wait_for ;
@@ -1585,13 +1585,14 @@ let create ?wallets (config : Config.t) =
                         ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
                       result_cb (Error e) ;
                       Deferred.unit )
-              | Snapp_command_inputs parties ->
+              | Snapp_command_inputs snapp_txns ->
                   (* TODO: here, submit a Parties.t, which includes a nonce
                      allow the nonce to be omitted, and infer it, as done
                      for user command inputs
                   *)
                   Strict_pipe.Writer.write local_txns_writer
-                    ( List.map parties ~f:(fun cmd -> User_command.Parties cmd)
+                    ( List.map snapp_txns ~f:(fun cmd ->
+                          User_command.Parties cmd)
                     , result_cb ))
           |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block) =
