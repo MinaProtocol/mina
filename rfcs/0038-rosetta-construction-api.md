@@ -313,7 +313,7 @@ SignerInput (JSON):
 A signer would take the prefix and suffix and use it during `derive` (which doesn't necessarily need to be exactly the same as the implementation Mina (it just needs to be "random"). And use `px`, `py`, and `r` in between prefix and suffix for hash.
 ```
 
-Another important property of the unsigned-transaction and signed-transaction representations is that they are reversible. The `unsigned_transaction_string` is then a `JSON` input (stringified) conforming to the following schema:
+Another important property of the unsigned-transaction and signed-transaction representations is that they are invertible. The `unsigned_transaction_string` is then a `JSON` input (stringified) conforming to the following schema:
 
 ```
 { randomOracleInput : string (* Random_oracle_input.t |> to_bytes |> to_hex *)
