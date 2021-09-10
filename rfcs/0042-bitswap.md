@@ -17,53 +17,21 @@ Implementing Bitswap in our libp2p layer will address this issue by allowing us 
 
 In this design, we will lay out an architecture to support Bitswap in our Mina implementation, along with a strategy for migrating Mina blocks into Bitswap to reduce current gossip pub/sub pressure. We limit the scope of migrating Mina data to Bitswap only to blocks for the context of this RFC, but in the future, we will also investigate moving snark work, transactions, and ledger data into Bitswap. Snark work and transactions will likely be modeled similarly to Mina blocks with respect to Bitswap, but ledger data will require some special thought since it's Bitswap block representation will have overlapping Bitswap blocks across different ledgers.
 
-### Bitswap Architecture
-
-In order to allow the libp2p helper process to serve Bitswap blocks without putting any pressure on the daemon process, a "Bitswap block cache" is introduced to the process architecture. This cache provides enough information for the libp2p process to be able to answer Bitswap requests (informing other peers which blocks in their want-list we have, and serving those blocks to peers upon request).
-
-![](res/bitswap_architecture.conv.tex.png)
-
 ### Bitswap Block Format
 
 Bitswap blocks are chunks of arbitrary binary data which are content addressed by [IPFS CIDs](https://docs.ipfs.io/concepts/content-addressing/#cid-conversion). There is no pre-defined maximum size of each Bitswap block, but IPFS uses 256kb, and the maximum recommended size of a Bitswap block is 1mb. Realistically, we want Bitswap blocks to be as small as possible, so we should start at 256kb for our maximum size, but keep the size of Bitswap blocks as a parameter we can tune so that we can optimize for block size vs block count.
 
-While the Bitswap specification does not care about what data is stored in each block, we do require each block have a commonly-defined format that we can parse from the libp2p helper so that we can piece together a series of blocks into a single larger binary blob. In order to do this, we structure Bitswap blocks as DAGs, where nodes can contain both pointers to successors and binary data. We advertise the "root" block of each DAG as the initial block to download for each resource we store in Bitswap, and the libp2p helper process will automatically explore all the child blocks referenced throughout the DAG. To construct the full binary blob from this DAG, We do a depth first left fold over the DAG and stitch each splice of binary data together in that order. Dependent on our maximum resource binary size, it may be possible that every DAG we would want to advertise over Bitswap would be at most depth = 2, which could reduce complexity from the implementation. However, without having a good maximum resource binary size for that at the moment, we will initially support a more generic solution that technically allows for DAGs of unbounded sizes.
+While the Bitswap specification does not care about what data is stored in each block, we do require each block have a commonly-defined format:
+
+ 1. [2 bytes] count of links n
+ 2. [n * 32 bytes] links (each link is a 256-bit hash)
+ 3. [up to (maxBlockSize - 2 - 32 * n) bytes] data
+
+Hence, data blob is converted to a tree of blocks. We advertise the "root" block of the tree as the initial block to download for each resource we store in Bitswap, and the libp2p helper process will automatically explore all the child blocks referenced throughout the tree. To construct the full binary blob out of this tree, breadth-first search (BFS) algorithm should be utilized to traverse the tree. BFS is a more favourable approach to DFS (another traversal order) as it allows to lazily load the blob by each time following nodes links to which we already have from the root block (counter to the order induced by DFS where one has to go to the deepest level before emitting a chunk of data).
 
 Below is a proposed representation of Bitswap blocks. In this example, we use bin_io to serialize the block format (since it's a simple enough message format that likely won't change regularly, seems not too difficult to implement some Go code to parse this data). However, should we have the networking refactor in place before we implement Bitswap, it would make more sense to use Cap'N Proto.
 
-```ocaml
-type block_cid = <<implementation of relevant version of IPFS CID>>
-[@@deriving bin_io]
-
-type bitswap_block = {refs: block_cid list; data: Bigstring.t}
-[@@deriving bin_io]
-
-(** ALTERNATIVE DEFINITION (requires custom serialization): **)
-type bitswap_block =
-  | Leaf of Bigstring.t
-  | Branch of block_cid list * Bigstring.t
-```
-
-The algorithm for projecting a resource's binary representation into Bitswap blocks roughly goes as follows:
-- compute the size of the binary blob
-- compute how many blocks would be required to store this binary blob, accounting for the overhead of storing a CID reference per block computed
-  - example given
-    - if we have:
-      - a binary blob of `blob_size`
-      - a max Bitswap block size of `max_block_size`
-      - each IPFS cid is of `cid_size`
-      - and the maximum additional overhead of a serialized block (additional numbers to encode length of data portions) of `max_overhead_size`
-    - we could compute this as:
-      - **NB:** _Please double check my math above. History has proven I am not the best mathematician, and I could have gotten something wrong with my above math (would write some tests to confirm it when we go to implement it)._
-      - `let base_block_size = max_block_size - max_overhead_size`
-      - `let leftover_space s = s mod base_block_size`
-      - `let num_blocks s = s / base_block_size + if leftover_space s = 0 then 0 else 1`
-      - `let blob_cids_size = num_blocks blob_size - 1 * cid_size` (we subtract 1 here because we do not store a reference to the root block in a DAG)
-      - `let num_overflow_cids_size = min 0 (blob_cid_size - leftover_space blob_size)`
-      - `num_blocks blob_size + num_blocks num_overflow_cids_size`
-- generate a block tree layout based on how many CIDs we need to store to refer to all the blocks (minus the root block)
-- fill in slices of binary data, starting at the leaves; continue upward, propagating CIDs of child blocks to parents for inclusion in their representation)
-- at the end, you have a set of blocks, with a single block being marked as the "root" block for the set
+For links a 256-bit version of Blake2b hash is to be used. Packing algorithm can be implemented in the way that no padding is used in blocks and there are maximum `n = (blobSize - 32) / (maxBlockSize - 34)` blocks generated with `n - 1` blocks of exactly `maxBlockSize` bytes.
 
 ### Bitswap Block Cache
 
