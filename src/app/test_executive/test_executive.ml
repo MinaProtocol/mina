@@ -41,7 +41,7 @@ let engines : engine list =
 
 let tests : test list =
   [ ("reliability", (module Reliability_test.Make : Intf.Test.Functor_intf))
-  ; ("short-boot", (module Short_bootstrap.Make : Intf.Test.Functor_intf))
+    (* ; ("short-boot", (module Short_bootstrap.Make : Intf.Test.Functor_intf)) *)
   ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
     (*
   ; ( "bp-timed-accts"
