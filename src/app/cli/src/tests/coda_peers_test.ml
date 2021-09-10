@@ -25,9 +25,7 @@ let main () =
         * (Unsigned.UInt32.to_int consensus_constants.delta + 1)
       |> Float.of_int )
   in
-  let work_selection_method =
-    Cli_lib.Arg_type.Work_selection_method.Sequence
-  in
+  let work_selection_method = Cli_lib.Arg_type.Work_selection_method.Sequence in
   Coda_processes.init () ;
   let%bind configs =
     Coda_processes.local_configs n ~program_dir ~block_production_interval
@@ -49,8 +47,7 @@ let main () =
            let%map peers = Coda_process.peers_exn worker in
            [%log debug]
              ~metadata:
-               [ ( "peers"
-                 , `List (List.map ~f:Network_peer.Peer.to_yojson peers) )
+               [ ("peers", `List (List.map ~f:Network_peer.Peer.to_yojson peers))
                ; ( "expected_ports"
                  , `List (List.map ~f:(fun n -> `Int n) expected_peer_ports) )
                ]
@@ -61,9 +58,8 @@ let main () =
                ~of_:
                  (S.of_list
                     ( peers
-                    |> List.map ~f:(fun p -> p.Network_peer.Peer.libp2p_port)
-                    ))
-               (S.of_list expected_peer_ports) ) ))
+                    |> List.map ~f:(fun p -> p.Network_peer.Peer.libp2p_port) ))
+               (S.of_list expected_peer_ports) )))
   in
   Deferred.List.iter workers ~f:(Coda_process.disconnect ~logger)
 

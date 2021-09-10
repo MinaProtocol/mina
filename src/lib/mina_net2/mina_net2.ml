@@ -1626,12 +1626,13 @@ let create ~all_peers_seen_metric ~on_unexpected_termination ~logger ~pids
       ~stderr:(`Don't_log, `Pipe, `Filter_empty)
       ~termination:
         (`Handler
-          (fun ~killed e ->
+          (fun ~killed process e ->
             Hashtbl.iter outstanding_requests ~f:(fun iv ->
                 Ivar.fill_if_empty iv
                   (Or_error.error_string
                      "libp2p_helper process died before answering")) ;
             Hashtbl.clear outstanding_requests ;
+            Child_processes.Termination.remove pids (Process.pid process) ;
             if
               (not killed)
               && not
@@ -1688,11 +1689,10 @@ let create ~all_peers_seen_metric ~on_unexpected_termination ~logger ~pids
         (Error.tag e
            ~tag:
              "Could not start libp2p_helper. If you are a dev, did you forget \
-              to `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
-              CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper.")
+              to `make libp2p_helper` and set MINA_LIBP2P_HELPER_PATH? Try \
+              MINA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper.")
   | Ok subprocess ->
-      Child_processes.register_process ~termination_expected:true pids
-        subprocess Libp2p_helper ;
+      Child_processes.register_process pids subprocess Libp2p_helper ;
       let t : Helper.t =
         { subprocess
         ; conf_dir
@@ -1980,6 +1980,8 @@ let%test_module "coda network tests" =
           handle_protocol b ~on_handler_error:`Raise ~protocol:"echo"
             (fun stream ->
               let r, w = Stream.pipes stream in
+              (* Prime the pipe by writing to it, in lieu of an RPC menu. *)
+              let () = Pipe.write_without_pushback w "1" in
               let%map () = Pipe.transfer r w ~f:Fn.id in
               Pipe.close w ;
               handler_finished := true)
@@ -1989,6 +1991,7 @@ let%test_module "coda network tests" =
           open_stream c ~protocol:"echo" b_peerid >>| Or_error.ok_exn
         in
         let r, w = Stream.pipes stream in
+        let%bind _fake_rpc_menu = Pipe.read r in
         Pipe.write_without_pushback w testmsg ;
         Pipe.close w ;
         (* HACK: let our messages send before we reset.
@@ -1996,10 +1999,11 @@ let%test_module "coda network tests" =
            the stream interface. *)
         let%bind () = after (Time.Span.of_sec 1.) in
         let%bind _ = Stream.reset stream in
-        let%bind msg = Pipe.read_all r in
+        let%bind msg =
+          match%map Pipe.read r with `Ok x -> x | `Eof -> failwith "eof"
+        in
         (* give time for [a] to notice the reset finish. *)
         let%bind () = after (Time.Span.of_sec 1.) in
-        let msg = Queue.to_list msg |> String.concat in
         assert (String.equal msg testmsg) ;
         assert !handler_finished ;
         let%bind () = Protocol_handler.close echo_handler in

@@ -314,8 +314,10 @@ let get_status ~flag t =
       | `Offline ->
           `Active `Offline
       | `Synced | `Catchup ->
-          if abs (!max_block_height - blockchain_length) < 5 then
-            `Active `Synced
+          if
+            (Mina_lib.config t).demo_mode
+            || abs (!max_block_height - blockchain_length) < 5
+          then `Active `Synced
           else `Active `Catchup
     in
     let consensus_time_best_tip =
@@ -367,7 +369,9 @@ let get_status ~flag t =
     in
     match Transition_frontier.catchup_tree frontier with
     | Full full ->
-        Some (Hashtbl.to_alist full.states)
+        Some
+          (List.map (Hashtbl.to_alist full.states) ~f:(fun (state, hashes) ->
+               (state, State_hash.Set.length hashes)))
     | _ ->
         None
   in

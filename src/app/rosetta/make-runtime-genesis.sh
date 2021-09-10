@@ -17,5 +17,5 @@ mkdir -p /tmp/keys \
   && echo "$PK" >  ~/.mina-config/wallets/store/$PK.pub \
   && cp /tmp/keys/demo-block-producer ~/.mina-config/wallets/store/$PK \
   && rm -rf ~/.mina-config/genesis* \
-  && echo '{"ledger":{"accounts":[{"pk":"'$PK'","balance":"66000","sk":null,"delegate":null}, {"pk":"'$SNARK_PK'","balance":"0.000000001","sk":null,"delegate":null}, {"pk":"'$TIMELOCKED_PK'","balance":"10000","sk":null,"delegate":null,"timing":{"initial_minimum_balance":"5000","cliff_time":"20","cliff_amount":"2000","vesting_period":"5","vesting_increment":"10"}}]}}' > /tmp/config.json \
+  && echo '{"ledger":{"accounts":[{"pk":"'$PK'","balance":"66000","sk":null,"delegate":null}, {"pk":"'$SNARK_PK'","balance":"0.000000001","sk":null,"delegate":null}, {"pk":"'$TIMELOCKED_PK'","balance":"10000","sk":null,"delegate":null,"timing":{"initial_minimum_balance":"5000","cliff_time":"20","cliff_amount":"2000","vesting_period":"5","vesting_increment":"10"}}], "add_genesis_winner":true}}' > /tmp/config.json \
   && ../../../_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --config-file /tmp/config.json
