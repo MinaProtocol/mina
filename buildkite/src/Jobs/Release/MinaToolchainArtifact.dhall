@@ -25,7 +25,8 @@ Pipeline.build
           S.strictlyStart (S.contains "dockerfiles/stages/1-"),
           S.strictlyStart (S.contains "dockerfiles/stages/2-"),
           S.strictlyStart (S.contains "dockerfiles/stages/3-"),
-          S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact")
+          S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact"),
+          S.strictly (S.contains "src/opam.export")
         ],
         path = "Release",
         name = "MinaToolchainArtifact"
@@ -37,6 +38,7 @@ Pipeline.build
         deps=dependsOn,
         service="mina-toolchain",
         deb_codename="buster",
+        extra_args="--no-cache",
         step_key="mina-toolchain-buster-docker-image"
       }
 
@@ -49,6 +51,7 @@ Pipeline.build
         deps=dependsOn,
         service="mina-toolchain",
         deb_codename="stretch",
+        extra_args="--no-cache",
         step_key="mina-toolchain-stretch-docker-image"
       }
 

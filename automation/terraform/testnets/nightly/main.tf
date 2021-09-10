@@ -100,11 +100,26 @@ module "ci_testnet" {
   block_producer_key_pass           = "naughty blue worm"
   block_producer_starting_host_port = 10501
 
-  snark_worker_replicas   = 1
-  snark_worker_fee        = "0.025"
-  snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
-  snark_worker_host_port  = 10401
+  snark_coordinators = [
+    {
+      snark_worker_replicas   = 1
+      snark_worker_fee        = "0.025"
+      snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
+      snark_coordinators_host_port  = 10401
+    }
+  ]
+  
+  whales= [
+    for i in range(var.whale_count):{
+      duplicates = 1
+    }
+  ]
+  
+  fishes= [
+    for i in range(var.fish_count):{
+      duplicates = 1
+    }
+  ]
+  plain_node_count = 0
 
-  whale_count = var.whale_count
-  fish_count  = var.fish_count
 }

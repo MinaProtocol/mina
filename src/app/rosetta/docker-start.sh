@@ -30,7 +30,7 @@ export MINA_NETWORK=${MINA_NETWORK:=mainnet}
 export MINA_SUFFIX=${MINA_SUFFIX:=}
 export MINA_CONFIG_FILE=/genesis_ledgers/${MINA_NETWORK}.json
 export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=/data/.mina-config}"
-export MINA_CLIENT_TRUSTLIST=${MINA_CLIENT_TRUSTLIST}
+export MINA_CLIENT_TRUSTLIST=${MINA_CLIENT_TRUSTLIST:=}
 export PEER_LIST_URL=https://storage.googleapis.com/seed-lists/${MINA_NETWORK}_seeds.txt
 # Allows configuring the port that each service runs on.
 # To connect to a network, the MINA_DAEMON_PORT needs to be publicly accessible.

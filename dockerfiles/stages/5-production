@@ -4,6 +4,7 @@
 #################################################################################################
 ARG deb_codename=stretch
 FROM debian:${deb_codename}-slim AS production
+ARG deb_codename=stretch
 
 ARG MINA_DAEMON_PORT=10101
 ARG MINA_CONFIG_DIR=/root/.mina-config
@@ -14,8 +15,8 @@ ENV DEBIAN_FRONTEND noninteractive
 
 # Dependencies
 # TODO: make sure this is the minimum runtime deps
-RUN apt-get -y update \
-  && apt -y install \
+RUN apt-get update -y \
+  && apt install -y \
     apt-utils \
     curl \
     ca-certificates \
@@ -32,19 +33,19 @@ RUN apt-get -y update \
     jq \
     sudo
 
-RUN if test "$deb_codename" = "buster" ; then \
-     sudo apt-get update -y \
-     && sudo apt-get install -y \
+RUN test "$deb_codename" = "buster" \
+     && apt-get update -y \
+     && apt-get install -y \
          libjemalloc2 \
-         libprocps8 \
-      else ; exit 0 ; fi
+         libprocps7 \
+     || exit 0
 
-RUN if test "$deb_codename" = "stretch" ; then \
-     sudo apt-get update -y \
-     && sudo apt-get install -y \
+RUN test "$deb_codename" = "stretch" \
+     && apt-get update -y \
+     && apt-get install -y \
          libjemalloc1 \
          libprocps6 \
-      else ; exit 0 ; fi
+     || exit 0
 
 # Install rosetta-cli
 RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/master/scripts/install.sh | sh -s
