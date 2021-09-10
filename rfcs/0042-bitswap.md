@@ -23,13 +23,11 @@ Bitswap blocks are chunks of arbitrary binary data which are content addressed b
 
 While the Bitswap specification does not care about what data is stored in each block, we do require each block have a commonly-defined format:
 
- 1. [2 bytes] count of links n
- 2. [n * 32 bytes] links (each link is a 256-bit hash)
- 3. [up to (maxBlockSize - 2 - 32 * n) bytes] data
+ 1. `[2 bytes]` count of links n
+ 2. `[n * 32 bytes]` links (each link is a 256-bit hash)
+ 3. `[up to (maxBlockSize - 2 - 32 * n) bytes]` data
 
 Hence, data blob is converted to a tree of blocks. We advertise the "root" block of the tree as the initial block to download for each resource we store in Bitswap, and the libp2p helper process will automatically explore all the child blocks referenced throughout the tree. To construct the full binary blob out of this tree, breadth-first search (BFS) algorithm should be utilized to traverse the tree. BFS is a more favourable approach to DFS (another traversal order) as it allows to lazily load the blob by each time following nodes links to which we already have from the root block (counter to the order induced by DFS where one has to go to the deepest level before emitting a chunk of data).
-
-Below is a proposed representation of Bitswap blocks. In this example, we use bin_io to serialize the block format (since it's a simple enough message format that likely won't change regularly, seems not too difficult to implement some Go code to parse this data). However, should we have the networking refactor in place before we implement Bitswap, it would make more sense to use Cap'N Proto.
 
 For links a 256-bit version of Blake2b hash is to be used. Packing algorithm can be implemented in the way that no padding is used in blocks and there are maximum `n = (blobSize - 32) / (maxBlockSize - 34)` blocks generated with `n - 1` blocks of exactly `maxBlockSize` bytes.
 
