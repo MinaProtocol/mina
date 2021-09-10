@@ -50,7 +50,7 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## How to build your own docker image
 
-Checkout the "rosetta-v1" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (2GB is too small, 8GB seems is enough) and then run the following:
+Checkout the "rosetta-v1" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
 
 `cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu | docker build -t mina-rosetta:v1 --build-arg "deb_codename=stretch" --build-arg "MINA_BRANCH=rosetta-v1" -`
 
