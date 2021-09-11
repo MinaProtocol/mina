@@ -374,10 +374,8 @@ def main():
     participants_offline = []
 
     if has_participants:
-      rows = []
       reader = csv.reader(args.accounts_csv.strip().split('\n'), delimiter=",")
-      for row in reader:
-        rows.append(row)
+      rows = [ row for row in reader ]
 
       discord_to_keys = {}
       key_to_discord = {}
