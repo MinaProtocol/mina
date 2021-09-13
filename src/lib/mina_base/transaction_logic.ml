@@ -1268,7 +1268,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             (* This should be a reject, not a failure, otherwise the snark
                circuit becomes unsatisfiable.
             *)
-            Error (failure Update_not_permitted)
+            failwith "Transaction contains invalid timing information"
       | Set _ ->
           Error (failure Update_not_permitted)
     in
