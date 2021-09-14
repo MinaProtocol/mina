@@ -32,17 +32,113 @@ module Update = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('state_element, 'pk, 'vk, 'perms, 'snapp_uri, 'token_symbol) t =
+        type ( 'state_element
+             , 'pk
+             , 'vk
+             , 'perms
+             , 'snapp_uri
+             , 'token_symbol
+             , 'timing )
+             t =
           { app_state : 'state_element Snapp_state.V.Stable.V1.t
           ; delegate : 'pk
           ; verification_key : 'vk
           ; permissions : 'perms
           ; snapp_uri : 'snapp_uri
           ; token_symbol : 'token_symbol
+          ; timing : 'timing
           }
         [@@deriving compare, equal, sexp, hash, yojson, hlist]
       end
     end]
+  end
+
+  module Timing_info = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          { initial_minimum_balance : Balance.Stable.V1.t
+          ; cliff_time : Global_slot.Stable.V1.t
+          ; cliff_amount : Amount.Stable.V1.t
+          ; vesting_period : Global_slot.Stable.V1.t
+          ; vesting_increment : Amount.Stable.V1.t
+          }
+        [@@deriving compare, equal, sexp, hash, yojson, hlist]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type value = t
+
+    let to_input (t : t) =
+      List.reduce_exn ~f:Random_oracle_input.append
+        [ Balance.to_input t.initial_minimum_balance
+        ; Global_slot.to_input t.cliff_time
+        ; Amount.to_input t.cliff_amount
+        ; Global_slot.to_input t.vesting_period
+        ; Amount.to_input t.vesting_increment
+        ]
+
+    let dummy =
+      let slot_unused = Global_slot.zero in
+      let balance_unused = Balance.zero in
+      let amount_unused = Amount.zero in
+      { initial_minimum_balance = balance_unused
+      ; cliff_time = slot_unused
+      ; cliff_amount = amount_unused
+      ; vesting_period = slot_unused
+      ; vesting_increment = amount_unused
+      }
+
+    module Checked = struct
+      type t =
+        { initial_minimum_balance : Balance.Checked.t
+        ; cliff_time : Global_slot.Checked.t
+        ; cliff_amount : Amount.Checked.t
+        ; vesting_period : Global_slot.Checked.t
+        ; vesting_increment : Amount.Checked.t
+        }
+      [@@deriving hlist]
+
+      let constant (t : value) : t =
+        { initial_minimum_balance = Balance.var_of_t t.initial_minimum_balance
+        ; cliff_time = Global_slot.Checked.constant t.cliff_time
+        ; cliff_amount = Amount.var_of_t t.cliff_amount
+        ; vesting_period = Global_slot.Checked.constant t.vesting_period
+        ; vesting_increment = Amount.var_of_t t.vesting_increment
+        }
+
+      let to_input
+          ({ initial_minimum_balance
+           ; cliff_time
+           ; cliff_amount
+           ; vesting_period
+           ; vesting_increment
+           } :
+            t) =
+        List.reduce_exn ~f:Random_oracle_input.append
+          [ Balance.var_to_input initial_minimum_balance
+          ; Snark_params.Tick.Run.run_checked
+              (Global_slot.Checked.to_input cliff_time)
+          ; Amount.var_to_input cliff_amount
+          ; Snark_params.Tick.Run.run_checked
+              (Global_slot.Checked.to_input vesting_period)
+          ; Amount.var_to_input vesting_increment
+          ]
+    end
+
+    let typ : (Checked.t, t) Typ.t =
+      Typ.of_hlistable
+        [ Balance.typ
+        ; Global_slot.typ
+        ; Amount.typ
+        ; Global_slot.typ
+        ; Amount.typ
+        ]
+        ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
+        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
   end
 
   open Snapp_basic
@@ -60,7 +156,8 @@ module Update = struct
           Set_or_keep.Stable.V1.t
         , Permissions.Stable.V1.t Set_or_keep.Stable.V1.t
         , string Set_or_keep.Stable.V1.t
-        , Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t )
+        , Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
+        , Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
 
@@ -77,7 +174,8 @@ module Update = struct
       , Field.t Set_or_keep.Checked.t
       , Permissions.Checked.t Set_or_keep.Checked.t
       , string Data_as_hash.t Set_or_keep.Checked.t
-      , Account.Token_symbol.var Set_or_keep.Checked.t )
+      , Account.Token_symbol.var Set_or_keep.Checked.t
+      , Timing_info.Checked.t Set_or_keep.Checked.t )
       Poly.t
 
     let to_input
@@ -87,6 +185,7 @@ module Update = struct
          ; permissions
          ; snapp_uri
          ; token_symbol
+         ; timing
          } :
           t) =
       let open Random_oracle_input in
@@ -101,6 +200,7 @@ module Update = struct
         ; Set_or_keep.Checked.to_input snapp_uri ~f:Data_as_hash.to_input
         ; Set_or_keep.Checked.to_input token_symbol
             ~f:Account.Token_symbol.var_to_input
+        ; Set_or_keep.Checked.to_input timing ~f:Timing_info.Checked.to_input
         ]
   end
 
@@ -112,6 +212,7 @@ module Update = struct
     ; permissions = Keep
     ; snapp_uri = Keep
     ; token_symbol = Keep
+    ; timing = Keep
     }
 
   let dummy = noop
@@ -123,6 +224,7 @@ module Update = struct
        ; permissions
        ; snapp_uri
        ; token_symbol
+       ; timing
        } :
         t) =
     let open Random_oracle_input in
@@ -143,6 +245,8 @@ module Update = struct
           ~f:field
       ; Set_or_keep.to_input token_symbol ~dummy:Account.Token_symbol.default
           ~f:Account.Token_symbol.to_input
+      ; Set_or_keep.to_input timing ~dummy:Timing_info.dummy
+          ~f:Timing_info.to_input
       ]
 
   let typ () : (Checked.t, t) Typ.t =
@@ -167,6 +271,7 @@ module Update = struct
              ~back:(Set_or_keep.map ~f:(fun x -> Option.value_exn x))
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
           Account.Token_symbol.typ
+      ; Set_or_keep.typ ~dummy:Timing_info.dummy Timing_info.typ
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
