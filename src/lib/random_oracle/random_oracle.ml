@@ -77,7 +77,33 @@ module Digest = struct
         List.take (unpack x) length
 end
 
-include Sponge.Make_hash (Sponge.Poseidon (Inputs))
+module Ocaml_permutation = Sponge.Poseidon (Inputs)
+
+[%%ifdef consensus_mechanism]
+
+module Permutation : Sponge.Intf.Permutation with module Field = Field = struct
+  module Field = Field
+
+  let add_assign = Ocaml_permutation.add_assign
+
+  let copy = Ocaml_permutation.copy
+
+  let params = Marlin_plonk_bindings_pasta_fp_poseidon.create ()
+
+  let block_cipher _params (s : Field.t array) =
+    let v = Marlin_plonk_bindings_pasta_fp_vector.create () in
+    Array.iter s ~f:(Marlin_plonk_bindings_pasta_fp_vector.emplace_back v) ;
+    Marlin_plonk_bindings_pasta_fp_poseidon.block_cipher params v ;
+    Array.init (Array.length s) ~f:(Marlin_plonk_bindings_pasta_fp_vector.get v)
+end
+
+[%%else]
+
+module Permutation = Ocaml_permutation
+
+[%%endif]
+
+include Sponge.Make_hash (Permutation)
 
 let update ~state = update ~state params
 
@@ -151,5 +177,15 @@ let%test_unit "sponge checked-unchecked" =
     (fun (x, y) -> make_checked (fun () -> Checked.hash [| x; y |]))
     (fun (x, y) -> hash [| x; y |])
     (x, y)
+
+let%test_unit "check rust implementation of block-cipher" =
+  let open Pickles.Impls.Step in
+  let module T = Internal_Basic in
+  Quickcheck.test (Quickcheck.Generator.list_with_length 3 T.Field.gen)
+    ~f:(fun s ->
+      let s = Array.of_list s in
+      [%test_eq: T.Field.t array]
+        (Ocaml_permutation.block_cipher params s)
+        (Permutation.block_cipher params s))
 
 [%%endif]
