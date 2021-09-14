@@ -728,10 +728,11 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
           let error_ptr = Bigarray.Array1.unsafe_get errors i |> ptr_of_raw_address in
           if is_null error_ptr then (
             let output_length = Nativeint.to_int (Bigarray.Array1.unsafe_get output_lengths i) in
-            let output_ptr = Bigarray.Array1.unsafe_get outputs i |> ptr_of_raw_address |> from_voidp char in
-            let output = bigarray_of_ptr array1 output_length Bigarray.char output_ptr in
-            Gc.finalise_last (fun () -> free (to_voidp output_ptr)) output ;
-            Some output )
+            let output_ptr = Bigarray.Array1.unsafe_get outputs i |> ptr_of_raw_address in
+            if output_ptr = null then None else (
+              let output = bigarray_of_ptr array1 output_length Bigarray.char (from_voidp char output_ptr) in
+              Gc.finalise_last (fun () -> free output_ptr) output ;
+              Some output ))
           else (
             free error_ptr ;
             None )
