@@ -1546,11 +1546,13 @@ module Types = struct
 
     let snapp_command =
       obj "SnappCommand" ~fields:(fun _ ->
-          [ field_no_status "id" ~typ:(non_null guid) ~args:[]
-              ~resolve:(fun _ parties ->
+          [ field_no_status "id"
+              ~doc:"A Base58Check string representing the command"
+              ~typ:(non_null guid) ~args:[] ~resolve:(fun _ parties ->
                 Parties.to_base58_check parties.With_hash.data)
-          ; field_no_status "hash" ~typ:(non_null string) ~args:[]
-              ~resolve:(fun _ parties ->
+          ; field_no_status "hash"
+              ~doc:"A cryptographic hash of the Snapp command"
+              ~typ:(non_null string) ~args:[] ~resolve:(fun _ parties ->
                 Transaction_hash.to_base58_check parties.With_hash.hash)
           ; field_no_status "nonce" ~typ:(non_null int) ~args:[]
               ~doc:
@@ -1576,7 +1578,7 @@ module Types = struct
           ; field_no_status "feeLowerBound" ~typ:uint64 ~args:[]
               ~doc:
                 "Lower bound on the fee paid by the fee-payer for the Snapp \
-                 transaction, or null if it can't be alculated"
+                 transaction, or null if it can't be calculated"
               ~resolve:(fun _ parties ->
                 try
                   Some
@@ -3098,7 +3100,7 @@ module Mutations = struct
             |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command)
 
   let send_snapp =
-    io_field "sendSnappTransaction" ~doc:"Send a Snapp transaction"
+    io_field "sendSnapp" ~doc:"Send a Snapp transaction"
       ~typ:(non_null Types.Payload.send_snapp)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.send_snapp) ]
       ~resolve:
