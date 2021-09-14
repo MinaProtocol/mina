@@ -836,6 +836,7 @@ module Helper = struct
 
     module Validate = struct
       type t =
+<<<<<<< HEAD
         { sender : peer_info option
         ; data : Data.t
         ; expiration : int64
@@ -843,6 +844,22 @@ module Helper = struct
         ; upcall : string
         ; subscription_idx : int
         }
+||||||| fc3cfa287
+        { sender: peer_info option
+        ; data: Data.t
+        ; expiration: int64
+        ; seqno: int
+        ; upcall: string
+        ; subscription_idx: int }
+=======
+        { sender: peer_info option
+        ; data: Data.t
+        ; seen_at: int64
+        ; expiration: int64
+        ; seqno: int
+        ; upcall: string
+        ; subscription_idx: int }
+>>>>>>> origin/release/1.2.0
       [@@deriving yojson]
     end
 
@@ -985,6 +1002,14 @@ module Helper = struct
         let%bind m = Validate.of_yojson v |> or_error in
         let idx = m.subscription_idx in
         let seqno = m.seqno in
+        let ipc_delay =
+          ( Time_ns.Span.to_int_ns @@ Time_ns.to_span_since_epoch
+          @@ Time_ns.now () )
+          - Int64.to_int_exn m.seen_at
+        in
+        [%log' spam t.logger]
+          "Processing gossip message with IPC delay of $delay nanoseconds"
+          ~metadata:[("delay", `Int ipc_delay)] ;
         match Hashtbl.find t.subscriptions idx with
         | Some sub ->
             (let open Deferred.Let_syntax in

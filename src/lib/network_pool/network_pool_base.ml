@@ -2,6 +2,7 @@ open Async_kernel
 open Core_kernel
 open Pipe_lib
 open Network_peer
+open O1trace
 
 module Make (Transition_frontier : sig
   type t
@@ -97,6 +98,7 @@ end)
           (Resource_pool.Diff.summary diff') ;
         forward t.write_broadcasts diff' rejected cb )
     in
+<<<<<<< HEAD
     match%bind Resource_pool.Diff.unsafe_apply t.resource_pool diff with
     | Ok res ->
         rebroadcast res
@@ -107,6 +109,30 @@ end)
           "Refusing to rebroadcast. Pool diff apply feedback: $error"
           ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
         Broadcast_callback.error e cb
+||||||| fc3cfa287
+    match%bind Resource_pool.Diff.unsafe_apply t.resource_pool diff with
+    | Ok res ->
+        rebroadcast res
+    | Error (`Locally_generated res) ->
+        rebroadcast res
+    | Error (`Other e) ->
+        [%log' debug t.logger]
+          "Refusing to rebroadcast. Pool diff apply feedback: $error"
+          ~metadata:[("error", Error_json.error_to_yojson e)] ;
+        Broadcast_callback.error e cb
+=======
+    trace_recurring (Resource_pool.label ^ "_apply_and_broadcast") (fun () ->
+        match%bind Resource_pool.Diff.unsafe_apply t.resource_pool diff with
+        | Ok res ->
+            rebroadcast res
+        | Error (`Locally_generated res) ->
+            rebroadcast res
+        | Error (`Other e) ->
+            [%log' debug t.logger]
+              "Refusing to rebroadcast. Pool diff apply feedback: $error"
+              ~metadata:[("error", Error_json.error_to_yojson e)] ;
+            Broadcast_callback.error e cb )
+>>>>>>> origin/release/1.2.0
 
   let log_rate_limiter_occasionally t rl =
     let time = Time_ns.Span.of_min 1. in
@@ -141,6 +167,7 @@ end)
     if log_rate_limiter then log_rate_limiter_occasionally t rl ;
     (*Note: This is done asynchronously to use batch verification*)
     Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun d ->
+<<<<<<< HEAD
         let diff, cb = f d in
         if not (Broadcast_callback.is_expired cb) then (
           let summary =
@@ -169,7 +196,54 @@ end)
             | `Within_capacity -> (
                 match%bind Resource_pool.Diff.verify t.resource_pool diff with
                 | Error err ->
+||||||| fc3cfa287
+        let diff, cb = f d in
+        if not (Broadcast_callback.is_expired cb) then (
+          let summary =
+            `String (Resource_pool.Diff.summary @@ Envelope.Incoming.data diff)
+          in
+          [%log' debug t.logger] "Verifying $diff from $sender"
+            ~metadata:
+              [ ("diff", summary)
+              ; ("sender", Envelope.Sender.to_yojson diff.sender) ] ;
+          don't_wait_for
+            ( match
+                Rate_limiter.add rl diff.sender ~now:(Time.now ())
+                  ~score:(Resource_pool.Diff.score diff.data)
+              with
+            | `Capacity_exceeded ->
+                [%log' debug t.logger]
+                  ~metadata:
+                    [ ("sender", Envelope.Sender.to_yojson diff.sender)
+                    ; ("diff", summary) ]
+                  "exceeded capacity from $sender" ;
+                Broadcast_callback.error
+                  (Error.of_string "exceeded capacity")
+                  cb
+            | `Within_capacity -> (
+                match%bind Resource_pool.Diff.verify t.resource_pool diff with
+                | Error err ->
+=======
+        trace_recurring (Resource_pool.label ^ "_verification") (fun () ->
+            let diff, cb = f d in
+            if not (Broadcast_callback.is_expired cb) then (
+              let summary =
+                `String
+                  (Resource_pool.Diff.summary @@ Envelope.Incoming.data diff)
+              in
+              [%log' debug t.logger] "Verifying $diff from $sender"
+                ~metadata:
+                  [ ("diff", summary)
+                  ; ("sender", Envelope.Sender.to_yojson diff.sender) ] ;
+              don't_wait_for
+                ( match
+                    Rate_limiter.add rl diff.sender ~now:(Time.now ())
+                      ~score:(Resource_pool.Diff.score diff.data)
+                  with
+                | `Capacity_exceeded ->
+>>>>>>> origin/release/1.2.0
                     [%log' debug t.logger]
+<<<<<<< HEAD
                       "Refusing to rebroadcast $diff. Verification error: \
                        $error"
                       ~metadata:
@@ -180,7 +254,20 @@ end)
                     Broadcast_callback.error err cb
                 | Ok verified_diff -> (
                     [%log' debug t.logger] "Verified diff: $verified_diff"
+||||||| fc3cfa287
+                      "Refusing to rebroadcast $diff. Verification error: \
+                       $error"
                       ~metadata:
+                        [ ("diff", summary)
+                        ; ("error", Error_json.error_to_yojson err) ] ;
+                    (*reject incoming messages*)
+                    Broadcast_callback.error err cb
+                | Ok verified_diff -> (
+                    [%log' debug t.logger] "Verified diff: $verified_diff"
+=======
+>>>>>>> origin/release/1.2.0
+                      ~metadata:
+<<<<<<< HEAD
                         [ ( "verified_diff"
                           , Resource_pool.Diff.verified_to_yojson
                             @@ Envelope.Incoming.data verified_diff )
@@ -193,6 +280,55 @@ end)
                         r
                     | None ->
                         Deferred.unit ) ) ) ))
+||||||| fc3cfa287
+                        [ ( "verified_diff"
+                          , Resource_pool.Diff.verified_to_yojson
+                            @@ Envelope.Incoming.data verified_diff )
+                        ; ( "sender"
+                          , Envelope.Sender.to_yojson
+                            @@ Envelope.Incoming.sender verified_diff ) ] ;
+                    match Strict_pipe.Writer.write w (verified_diff, cb) with
+                    | Some r ->
+                        r
+                    | None ->
+                        Deferred.unit ) ) ) ) )
+=======
+                        [ ("sender", Envelope.Sender.to_yojson diff.sender)
+                        ; ("diff", summary) ]
+                      "exceeded capacity from $sender" ;
+                    Broadcast_callback.error
+                      (Error.of_string "exceeded capacity")
+                      cb
+                | `Within_capacity -> (
+                    match%bind
+                      Resource_pool.Diff.verify t.resource_pool diff
+                    with
+                    | Error err ->
+                        [%log' debug t.logger]
+                          "Refusing to rebroadcast $diff. Verification error: \
+                           $error"
+                          ~metadata:
+                            [ ("diff", summary)
+                            ; ("error", Error_json.error_to_yojson err) ] ;
+                        (*reject incoming messages*)
+                        Broadcast_callback.error err cb
+                    | Ok verified_diff -> (
+                        [%log' debug t.logger] "Verified diff: $verified_diff"
+                          ~metadata:
+                            [ ( "verified_diff"
+                              , Resource_pool.Diff.verified_to_yojson
+                                @@ Envelope.Incoming.data verified_diff )
+                            ; ( "sender"
+                              , Envelope.Sender.to_yojson
+                                @@ Envelope.Incoming.sender verified_diff ) ] ;
+                        match
+                          Strict_pipe.Writer.write w (verified_diff, cb)
+                        with
+                        | Some r ->
+                            r
+                        | None ->
+                            Deferred.unit ) ) ) ) ) )
+>>>>>>> origin/release/1.2.0
     |> don't_wait_for ;
     r
 
@@ -228,7 +364,17 @@ end)
         | `Local (verified_diff, cb) ->
             apply_and_broadcast network_pool verified_diff cb
         | `Transition_frontier_extension diff ->
+<<<<<<< HEAD
             Resource_pool.handle_transition_frontier_diff diff resource_pool)
+||||||| fc3cfa287
+            Resource_pool.handle_transition_frontier_diff diff resource_pool )
+=======
+            trace_recurring
+              (Resource_pool.label ^ "_handle_transition_frontier_diff")
+              (fun () ->
+                Resource_pool.handle_transition_frontier_diff diff
+                  resource_pool ) )
+>>>>>>> origin/release/1.2.0
     |> Deferred.don't_wait_for ;
     network_pool
 
@@ -252,6 +398,7 @@ end)
       if Time.(add time rebroadcast_window < now ()) then `Timed_out else `Ok
     in
     let rec go () =
+<<<<<<< HEAD
       let rebroadcastable =
         Resource_pool.get_rebroadcastable t.resource_pool ~has_timed_out
       in
@@ -275,6 +422,54 @@ end)
       in
       let%bind () = Async.after rebroadcast_interval in
       go ()
+||||||| fc3cfa287
+      let rebroadcastable =
+        Resource_pool.get_rebroadcastable t.resource_pool ~has_timed_out
+      in
+      if List.is_empty rebroadcastable then
+        [%log trace] "Nothing to rebroadcast"
+      else
+        [%log debug]
+          "Preparing to rebroadcast locally generated resource pool diffs \
+           $diffs"
+          ~metadata:
+            [ ("count", `Int (List.length rebroadcastable))
+            ; ( "diffs"
+              , `List
+                  (List.map
+                     ~f:(fun d -> `String (Resource_pool.Diff.summary d))
+                     rebroadcastable) ) ] ;
+      let%bind () =
+        Deferred.List.iter rebroadcastable
+          ~f:(Linear_pipe.write t.write_broadcasts)
+      in
+      let%bind () = Async.after rebroadcast_interval in
+      go ()
+=======
+      trace_recurring (Resource_pool.label ^ "_rebroadcast_loop") (fun () ->
+          let rebroadcastable =
+            Resource_pool.get_rebroadcastable t.resource_pool ~has_timed_out
+          in
+          if List.is_empty rebroadcastable then
+            [%log trace] "Nothing to rebroadcast"
+          else
+            [%log debug]
+              "Preparing to rebroadcast locally generated resource pool diffs \
+               $diffs"
+              ~metadata:
+                [ ("count", `Int (List.length rebroadcastable))
+                ; ( "diffs"
+                  , `List
+                      (List.map
+                         ~f:(fun d -> `String (Resource_pool.Diff.summary d))
+                         rebroadcastable) ) ] ;
+          let%bind () =
+            Deferred.List.iter rebroadcastable
+              ~f:(Linear_pipe.write t.write_broadcasts)
+          in
+          let%bind () = Async.after rebroadcast_interval in
+          go () )
+>>>>>>> origin/release/1.2.0
     in
     go ()
 
