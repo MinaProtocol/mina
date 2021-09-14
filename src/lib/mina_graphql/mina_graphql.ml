@@ -1181,7 +1181,7 @@ module Types = struct
              ; field "snappUri" ~typ:string
                  ~doc:
                    "The URI associated with this account, usually pointing to \
-                    the snapp source code"
+                    the Snapp source code"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.snapp_uri)
@@ -2036,15 +2036,15 @@ module Types = struct
           ]
 
     let public_key_arg =
-      scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
-        ~coerce:(fun key ->
-          match key with
+      scalar "PublicKey" ~doc:"Public key in Base58Check format"
+        ~coerce:(fun pk ->
+          match pk with
           | `String s ->
-              Result.try_with (fun () ->
-                  Public_key.of_base58_check_decompress_exn s)
-              |> Result.map_error ~f:(fun e -> Exn.to_string e)
+              Result.map_error
+                (Public_key.Compressed.of_base58_check s)
+                ~f:Error.to_string_hum
           | _ ->
-              Error "Invalid format for public key.")
+              Error "Expected public key as a string in Base58Check format")
 
     let token_id_arg =
       scalar "TokenId"
@@ -2058,28 +2058,863 @@ module Types = struct
                 Error "Invalid format for token."
           with _ -> Error "Invalid format for token.")
 
-    (* TODO: define a type otherwise identical to Party.Signed.t, but
-       which makes the nonce optional
-    *)
-    let snapp_party_signed_arg : Party.Signed.t option arg_typ =
-      scalar "SnappPartySigned"
-        ~doc:"A party to a Snapp transaction with a signature authorization"
-        ~coerce:(fun party_signed ->
-          let json = to_yojson party_signed in
-          Party.Signed.of_yojson json)
+    let sign =
+      enum "Sign"
+        ~values:
+          [ enum_value "PLUS" ~value:Sgn.Pos
+          ; enum_value "MINUS" ~value:Sgn.Neg
+          ]
 
-    let snapp_party_arg : Party.t option arg_typ =
-      scalar "SnappParty" ~doc:"A party to a Snapp transaction"
-        ~coerce:(fun party ->
-          let json = to_yojson party in
-          Party.of_yojson json)
+    let field =
+      scalar "Field" ~coerce:(fun field ->
+          match field with
+          | `String s ->
+              Ok (Snark_params.Tick.Field.of_string s)
+          | _ ->
+              Error "Expected a string representing a field element")
 
-    let snapp_protocol_state_arg :
-        Snapp_predicate.Protocol_state.t option arg_typ =
-      scalar "SnappProtocolState" ~doc:"Protocol state for a Snapp transaction"
-        ~coerce:(fun protocol_state ->
-          let json = to_yojson protocol_state in
-          Snapp_predicate.Protocol_state.of_yojson json)
+    let nonce =
+      scalar "Nonce" ~coerce:(fun nonce ->
+          (* of_string might raise *)
+          try
+            match nonce with
+            | `String s ->
+                (* a nonce is a uint32, GraphQL ints are signed int32, so use string *)
+                Ok (Mina_base.Account.Nonce.of_string s)
+            | _ ->
+                Error "Expected string for nonce"
+          with exn -> Error (Exn.to_string exn))
+
+    let snarked_ledger_hash =
+      scalar "SnarkedLedgerHash" ~coerce:(fun hash ->
+          match hash with
+          | `String s ->
+              Result.map_error
+                (Frozen_ledger_hash.of_base58_check s)
+                ~f:Error.to_string_hum
+          | _ ->
+              Error "Expected snarked ledger hash in Base58Check format")
+
+    let block_time =
+      scalar "BlockTime" ~coerce:(fun block_time ->
+          match block_time with
+          | `String s -> (
+              try
+                (* a block time is a uint64, GraphQL ints are signed int32, so use string *)
+                (* of_string might raise *)
+                Ok (Block_time.of_string_exn s)
+              with exn -> Error (Exn.to_string exn) )
+          | _ ->
+              Error "Expected string for block time")
+
+    let length =
+      scalar "Length" ~coerce:(fun length ->
+          (* of_string might raise *)
+          match length with
+          | `String s -> (
+              try
+                (* a length is a uint32, GraphQL ints are signed int32, so use string *)
+                Ok (Mina_numbers.Length.of_string s)
+              with exn -> Error (Exn.to_string exn) )
+          | _ ->
+              Error "Expected string for length")
+
+    let currency_amount =
+      scalar "CurrencyAmount" ~coerce:(fun amt ->
+          match amt with
+          | `String s -> (
+              try Ok (Currency.Amount.of_string s)
+              with exn -> Error (Exn.to_string exn) )
+          | _ ->
+              Error "Expected string for currency amount")
+
+    module Snapp_inputs = struct
+      (* inputs particular to Snapps *)
+
+      let snapp_delta :
+          ((Amount.t, Sgn.t) Signed_poly.t, string) Result.t option arg_typ =
+        obj "Delta" ~doc:"A signed amount"
+          ~coerce:(fun magnitude sgn ->
+            try Ok Currency.Signed_poly.{ magnitude; sgn }
+            with exn -> Error (Exn.to_string exn))
+          ~fields:
+            [ arg "magnitude" ~doc:"An amount of Mina"
+                ~typ:(non_null currency_amount)
+            ; arg "sgn" ~doc:"The sign of the amount" ~typ:(non_null sign)
+            ]
+
+      (* like Snapp_basic.Set_or_keep.t, but Set is nullary *)
+      type set_or_keep = Set | Keep
+
+      let snapp_set_or_keep =
+        enum "KeepOrSet" ~doc:"Keep or set a value"
+          ~values:[ enum_value "Keep" ~value:Keep; enum_value "Set" ~value:Set ]
+
+      let snapp_make_set_or_keep name value_arg =
+        obj name
+          ~coerce:(fun set_or_keep value_opt ->
+            match (set_or_keep, value_opt) with
+            | Keep, None ->
+                Ok Snapp_basic.Set_or_keep.Keep
+            | Set, Some value ->
+                Ok (Snapp_basic.Set_or_keep.Set value)
+            | Keep, Some _ ->
+                Error "Non-null value given with Keep"
+            | Set, None ->
+                Error "No value given for Set")
+          ~fields:
+            [ arg "set_or_keep" ~doc:"Flag to keep or set"
+                ~typ:(non_null snapp_set_or_keep)
+            ; value_arg
+            ]
+
+      let snapp_make_set_or_keep_for_result name value_arg =
+        obj name
+          ~coerce:(fun set_or_keep value_opt ->
+            match (set_or_keep, value_opt) with
+            | Keep, None ->
+                Ok Snapp_basic.Set_or_keep.Keep
+            | Set, Some value_result -> (
+                match value_result with
+                | Ok value ->
+                    Ok (Snapp_basic.Set_or_keep.Set value)
+                | Error err ->
+                    Error err )
+            | Keep, Some _ ->
+                Error "Non-null value given with Keep"
+            | Set, None ->
+                Error "No value given for Set")
+          ~fields:
+            [ arg "set_or_keep" ~doc:"Flag to keep or set"
+                ~typ:(non_null snapp_set_or_keep)
+            ; value_arg
+            ]
+
+      let snapp_pk_set_or_keep =
+        snapp_make_set_or_keep "PublicKeySetOrKeep"
+          (arg "public_key"
+             ~doc:"A public key in Base58Check format, or null if Keep"
+             ~typ:public_key_arg)
+
+      let snapp_vk_with_hash =
+        obj "VerificationKeyWithHash" ~doc:"Verification key with hash"
+          ~coerce:(fun vk hash ->
+            let open Result.Let_syntax in
+            let%bind data =
+              Pickles.Side_loaded.Verification_key.of_yojson (`String vk)
+            in
+            let%map hash =
+              Pickles.Backend.Tick.Field.of_yojson (`String hash)
+            in
+            { With_hash.data; hash })
+          ~fields:
+            [ arg "verification_key"
+                ~doc:"Verification key in Base58Check format"
+                ~typ:(non_null string)
+            ; arg "hash" ~doc:"Hash of verification key" ~typ:(non_null string)
+            ]
+
+      let snapp_vk_with_hash_set_or_keep =
+        snapp_make_set_or_keep_for_result "VerificationKeyWithHashSetOrKeep"
+          (arg "verification_key_with_hash"
+             ~doc:"A verification key and hash, or null if Keep"
+             ~typ:snapp_vk_with_hash)
+
+      let snapp_token =
+        scalar "AccountToken" ~coerce:(fun tok ->
+            Account.Token_symbol.of_yojson (to_yojson tok))
+
+      let snapp_token_symbol_set_or_keep =
+        snapp_make_set_or_keep "AccountTokenSetOrKeep"
+          (arg "token_symbol" ~doc:"Token symbol" ~typ:snapp_token)
+
+      let snapp_auth_required =
+        let open Permissions.Auth_required in
+        enum "AuthRequired" ~doc:"Kind of authorization required"
+          ~values:
+            [ enum_value "None" ~value:None
+            ; enum_value "Either" ~value:Either
+            ; enum_value "Proof" ~value:Proof
+            ; enum_value "Signature" ~value:Signature
+            ; enum_value "Both" ~value:Both
+            ; enum_value "Impossible" ~value:Impossible
+            ]
+
+      let snapp_permissions =
+        obj "Permissions"
+          ~coerce:
+            (fun stake edit_state send receive set_delegate set_permissions
+                 set_verification_key set_snapp_uri edit_rollup_state
+                 set_token_symbol ->
+            Ok
+              { Permissions.Poly.stake
+              ; edit_state
+              ; send
+              ; receive
+              ; set_delegate
+              ; set_permissions
+              ; set_verification_key
+              ; set_snapp_uri
+              ; edit_rollup_state
+              ; set_token_symbol
+              })
+          ~fields:
+            [ arg "stake" ~typ:(non_null bool)
+            ; arg "edit_state" ~typ:(non_null snapp_auth_required)
+            ; arg "send" ~typ:(non_null snapp_auth_required)
+            ; arg "receive" ~typ:(non_null snapp_auth_required)
+            ; arg "set_delegate" ~typ:(non_null snapp_auth_required)
+            ; arg "set_permissions" ~typ:(non_null snapp_auth_required)
+            ; arg "set_verification_key" ~typ:(non_null snapp_auth_required)
+            ; arg "set_snapp_uri" ~typ:(non_null snapp_auth_required)
+            ; arg "edit_rollup_state" ~typ:(non_null snapp_auth_required)
+            ; arg "set_token_symbol" ~typ:(non_null snapp_auth_required)
+            ]
+
+      let snapp_permissions_set_or_keep =
+        snapp_make_set_or_keep_for_result "PermissionsSetOrKeep"
+          (arg "permissions" ~doc:"Permissions, or null if Keep"
+             ~typ:snapp_permissions)
+
+      let snapp_field_set_or_keep =
+        snapp_make_set_or_keep "FieldSetOrKeep"
+          (arg "field" ~doc:"A field in string format, or null if Keep"
+             ~typ:field)
+
+      let snapp_uri_set_or_keep =
+        snapp_make_set_or_keep "SnappUriSetOrKeep"
+          (arg "uri" ~doc:"A URI string, or null if Keep" ~typ:string)
+
+      let snapp_timing =
+        obj "Timing"
+          ~coerce:
+            (fun initial_minimum_balance cliff_time cliff_amount vesting_period
+                 vesting_increment ->
+            (* the conversion functions here can raise *)
+            try
+              let initial_minimum_balance =
+                Currency.Balance.of_string initial_minimum_balance
+              in
+              let cliff_time = Mina_numbers.Global_slot.of_string cliff_time in
+              let cliff_amount = Currency.Amount.of_string cliff_amount in
+              let vesting_period =
+                Mina_numbers.Global_slot.of_string vesting_period
+              in
+              let vesting_increment =
+                Currency.Amount.of_string vesting_increment
+              in
+              Ok
+                { Party.Update.Timing_info.initial_minimum_balance
+                ; cliff_time
+                ; cliff_amount
+                ; vesting_period
+                ; vesting_increment
+                }
+            with exn -> Error (Exn.to_string exn))
+          ~fields:
+            [ arg "initial_minimum_balance"
+                ~doc:"Initial minimum balance as a string"
+                ~typ:(non_null string)
+            ; arg "cliff_time" ~doc:"Cliff time, a global slot, as a string"
+                ~typ:(non_null string)
+            ; arg "cliff_amount" ~doc:"Cliff amoount, as a string"
+                ~typ:(non_null string)
+            ; arg "vesting_period"
+                ~doc:"Vesting period, a number of slots, as a string"
+                ~typ:(non_null string)
+            ; arg "vesting_increment" ~doc:"Vesting amount, as a string"
+                ~typ:(non_null string)
+            ]
+
+      let snapp_timing_set_or_keep =
+        snapp_make_set_or_keep_for_result "TimingSetOrKeep"
+          (arg "timing" ~doc:"Timing info, or null if Keep" ~typ:snapp_timing)
+
+      let snapp_update : (Party.Update.t, string) Result.t option arg_typ =
+        obj "PartyUpdate" ~doc:"Update component of a Snapp Party"
+          ~coerce:
+            (fun app_state_elt_results delegate_result vk_result perms_result
+                 snapp_uri_result tok_sym_result timing_result ->
+            let open Result.Let_syntax in
+            let%bind app_state_elts = Result.all app_state_elt_results in
+            let%bind app_state =
+              let expected_len = 8 in
+              let len = List.length app_state_elts in
+              if len = expected_len then
+                (* length check prevents raising *)
+                Ok (Snapp_state.V.of_list_exn app_state_elts)
+              else
+                Error
+                  (sprintf "Expected %d field elements in app state, got %d"
+                     expected_len len)
+            in
+            let%bind delegate = delegate_result in
+            let%bind verification_key = vk_result in
+            let%bind permissions = perms_result in
+            let%bind snapp_uri = snapp_uri_result in
+            let%bind token_symbol = tok_sym_result in
+            let%map timing = timing_result in
+            Party.Update.Poly.
+              { app_state
+              ; delegate
+              ; verification_key
+              ; permissions
+              ; snapp_uri
+              ; token_symbol
+              ; timing
+              })
+          ~fields:
+            [ arg "app_state" ~doc:"List of 8 field elements"
+                ~typ:(non_null (list (non_null snapp_field_set_or_keep)))
+            ; arg "delegate" ~typ:(non_null snapp_pk_set_or_keep)
+            ; arg "verification_key"
+                ~typ:(non_null snapp_vk_with_hash_set_or_keep)
+            ; arg "permissions" ~typ:(non_null snapp_permissions_set_or_keep)
+            ; arg "snapp_uri" ~typ:(non_null snapp_uri_set_or_keep)
+            ; arg "token_symbol" ~typ:(non_null snapp_token_symbol_set_or_keep)
+            ; arg "timing" ~typ:(non_null snapp_timing_set_or_keep)
+            ]
+
+      let snapp_party_body : (Party.Body.t, string) Result.t option arg_typ =
+        obj "PartyBody" ~doc:"Body component of a Snapp Party"
+          ~coerce:
+            (fun pk update_result token_id delta events rollup_events call_data
+                 depth ->
+            try
+              let open Result.Let_syntax in
+              let%bind pk =
+                Result.map_error
+                  (Public_key.Compressed.of_base58_check pk)
+                  ~f:Error.to_string_hum
+              in
+              let token_id = Token_id.of_string token_id in
+              let mk_field_arrays evs =
+                List.map evs ~f:(fun fields ->
+                    List.map fields ~f:Snark_params.Tick.Field.of_string
+                    |> Array.of_list)
+              in
+              let%bind update = update_result in
+              let%map delta = delta in
+              let events = mk_field_arrays events in
+              let rollup_events = mk_field_arrays rollup_events in
+              let call_data = Snark_params.Tick.Field.of_string call_data in
+              let depth = Int.of_string depth in
+              Party.Body.Poly.
+                { pk
+                ; update
+                ; token_id
+                ; delta
+                ; events
+                ; rollup_events
+                ; call_data
+                ; depth
+                }
+            with exn -> Error (Exn.to_string exn))
+          ~fields:
+            [ arg "pk" ~doc:"Public key as a Base58Check string"
+                ~typ:(non_null string)
+            ; arg "update" ~doc:"Update part of the body"
+                ~typ:(non_null snapp_update)
+            ; arg "token_id" ~doc:"Token id" ~typ:(non_null string)
+            ; arg "delta" ~doc:"Signed amount" ~typ:(non_null snapp_delta)
+            ; arg "events" ~doc:"A list of list of fields in Base58Check"
+                ~typ:(non_null (list (non_null (list (non_null string)))))
+            ; arg "rollup_events" ~doc:"A list of list of fields in Base58Check"
+                ~typ:(non_null (list (non_null (list (non_null string)))))
+            ; arg "call_data" ~doc:"A field in Base58Check"
+                ~typ:(non_null string)
+            ; arg "depth" ~doc:"An integer in string format"
+                ~typ:(non_null string)
+            ]
+
+      let snapp_party_predicated_signed :
+          (Party.Predicated.Signed.t, string) Result.t option arg_typ =
+        obj "SnappPartyPredicatedSigned"
+          ~doc:"A party to a Snapp transaction with a nonce predicate"
+          ~coerce:(fun body nonce ->
+            let open Result.Let_syntax in
+            let%map body = body in
+            let predicate = nonce in
+            Party.Predicated.Poly.{ body; predicate })
+          ~fields:
+            [ arg "body" ~doc:"signed predicated party"
+                ~typ:(non_null snapp_party_body)
+            ; arg "predicate" ~doc:"signature" ~typ:(non_null nonce)
+            ]
+
+      let snapp_signature =
+        scalar "Signature" ~coerce:(fun signature ->
+            match signature with
+            | `String s ->
+                Result.map_error
+                  (Signature.of_base58_check s)
+                  ~f:Error.to_string_hum
+            | _ ->
+                Error "Expected signature as a string in Base58Check format")
+
+      (* TODO: define a type otherwise identical to Party.Signed.t, but
+         which makes the nonce optional
+      *)
+      let snapp_party_signed =
+        obj "SnappPartySigned"
+          ~doc:"A party to a Snapp transaction with a signature authorization"
+          ~coerce:(fun data authorization ->
+            let open Result.Let_syntax in
+            let%bind data = data in
+            Ok Party.Signed.{ data; authorization })
+          ~fields:
+            [ arg "data" ~doc:"party with a signature and nonce predicate"
+                ~typ:(non_null snapp_party_predicated_signed)
+            ; arg "authorization" ~doc:"signature"
+                ~typ:(non_null snapp_signature)
+            ]
+
+      (* like Party.Predicate.t with nullary constructors *)
+      type party_predicate = Full | Nonce | Accept
+
+      let snapp_predicate_enum =
+        enum "SnappPredicateConstructors"
+          ~doc:"Constructors for Snapp predicates"
+          ~values:
+            [ enum_value "Full" ~value:Full
+            ; enum_value "Nonce" ~value:Nonce
+            ; enum_value "Accept" ~value:Accept
+            ]
+
+      (* like Snapp_basic.Or_ignore.t, with nullary constructors *)
+      type snapp_or_ignore = Check | Ignore
+
+      let snapp_check_or_ignore =
+        enum "OrIgnore"
+          ~values:
+            [ enum_value "Ignore" ~value:Ignore
+            ; enum_value "Check" ~value:Check
+            ]
+
+      let snapp_make_check_or_ignore name value_arg =
+        obj name
+          ~coerce:(fun check_or_ignore value_opt ->
+            match (check_or_ignore, value_opt) with
+            | Ignore, None ->
+                Ok Snapp_basic.Or_ignore.Ignore
+            | Ignore, Some _ ->
+                Error "Got Ignore with a non-null value"
+            | Check, Some value ->
+                Ok (Snapp_basic.Or_ignore.Check value)
+            | Check, None ->
+                Error "Got Check with a null value")
+          ~fields:
+            [ arg "check_or_ignore" ~doc:"Check or ignore"
+                ~typ:(non_null snapp_check_or_ignore)
+            ; value_arg
+            ]
+
+      let snapp_pk_or_ignore =
+        snapp_make_check_or_ignore "Public_keyOrIgnore"
+          (arg "public_key"
+             ~doc:"Public key in Base58Check format, or null if Ignore"
+             ~typ:public_key_arg)
+
+      let snapp_balance =
+        scalar "Balance" ~coerce:(fun s ->
+            try
+              match s with
+              | `String balance ->
+                  Ok (Currency.Balance.of_string balance)
+              | _ ->
+                  Error "Expected balance as a string"
+            with exn -> Error (Exn.to_string exn))
+
+      let snapp_balance_closed_interval =
+        obj "BalanceClosedInterval"
+          ~coerce:(fun lower upper ->
+            Snapp_predicate.Closed_interval.{ lower; upper })
+          ~fields:
+            [ arg "lower" ~typ:(non_null snapp_balance)
+            ; arg "upper" ~typ:(non_null snapp_balance)
+            ]
+
+      let snapp_balance_numeric =
+        obj "BalanceNumeric"
+          ~coerce:(fun check_or_ignore balance_interval_opt ->
+            match (check_or_ignore, balance_interval_opt) with
+            | Ignore, None ->
+                Ok Snapp_basic.Or_ignore.Ignore
+            | Ignore, Some _ ->
+                Error "Got Ignore with a non-null value"
+            | Check, Some balance_interval ->
+                Ok (Snapp_basic.Or_ignore.Check balance_interval)
+            | Check, None ->
+                Error "Got Check with a null value")
+          ~fields:
+            [ arg "check_or_ignore" ~doc:"Check or ignore"
+                ~typ:(non_null snapp_check_or_ignore)
+            ; arg "balance_interval" ~doc:"Balance interval, or null if Ignore"
+                ~typ:snapp_balance_closed_interval
+            ]
+
+      let snapp_make_closed_interval ~name ~typ =
+        obj name
+          ~coerce:(fun lower upper ->
+            Snapp_predicate.Closed_interval.{ lower; upper })
+          ~fields:
+            [ arg "lower" ~typ:(non_null typ); arg "upper" ~typ:(non_null typ) ]
+
+      let snapp_make_numeric ~name ~arg_name ~typ =
+        snapp_make_check_or_ignore name
+          (arg arg_name ~typ:(snapp_make_closed_interval ~name:arg_name ~typ))
+
+      let snapp_nonce_numeric =
+        snapp_make_numeric ~name:"NonceNumeric" ~arg_name:"nonce" ~typ:nonce
+
+      let snapp_receipt_chain_hash =
+        scalar "ReceiptChainHash" ~coerce:(fun s ->
+            try
+              match s with
+              | `String chain_hash ->
+                  Receipt.Chain_hash.of_base58_check chain_hash
+                  |> Result.map_error ~f:Error.to_string_hum
+              | _ ->
+                  Error "Expected balance as a string"
+            with exn -> Error (Exn.to_string exn))
+
+      let snapp_receipt_chain_hash_or_ignore =
+        snapp_make_check_or_ignore "SnappReceiptChainHashOrIgnore"
+          (arg "receipt_chain_hash" ~doc:"receipt chain hash, or null if Ignore"
+             ~typ:snapp_receipt_chain_hash)
+
+      let snapp_field_or_ignore =
+        snapp_make_check_or_ignore "SnappFieldOrIgnore"
+          (arg "field" ~doc:"Field in string format, or null if Ignore"
+             ~typ:field)
+
+      let snapp_state =
+        obj "SnappState" ~doc:"Snapp state, a list of 8 field elements"
+          ~coerce:(fun element_results ->
+            let open Result.Let_syntax in
+            let%bind elements = Result.all element_results in
+            if List.length elements = 8 then
+              (* length check means this won't raise *)
+              Ok (Snapp_state.V.of_list_exn elements)
+            else Error "Expected 8 elements for Snapp state")
+          ~fields:
+            [ arg "elements"
+                ~typ:(non_null (list (non_null snapp_field_or_ignore)))
+            ]
+
+      let snapp_bool_or_ignore =
+        snapp_make_check_or_ignore "BoolOrIgnore"
+          (arg "bool" ~doc:"A boolean, or null if Ignore" ~typ:bool)
+
+      let snapp_predicate_account =
+        obj "SnappPredicateAccount"
+          ~coerce:
+            (fun balance_result nonce_result receipt_chain_hash_result
+                 public_key_result delegate_result state_result
+                 rollup_state_result proved_state_result ->
+            let open Result.Let_syntax in
+            let%bind balance = balance_result in
+            let%bind nonce = nonce_result in
+            let%bind receipt_chain_hash = receipt_chain_hash_result in
+            let%bind public_key = public_key_result in
+            let%bind delegate = delegate_result in
+            let%bind state = state_result in
+            let%bind rollup_state = rollup_state_result in
+            let%bind proved_state = proved_state_result in
+            return
+              ( Snapp_predicate.Account.Poly.
+                  { balance
+                  ; nonce
+                  ; receipt_chain_hash
+                  ; public_key
+                  ; delegate
+                  ; state
+                  ; rollup_state
+                  ; proved_state
+                  }
+                : Snapp_predicate.Account.t ))
+          ~fields:
+            [ arg "balance" ~typ:(non_null snapp_balance_numeric)
+            ; arg "nonce" ~typ:(non_null snapp_nonce_numeric)
+            ; arg "receipt_chain_hash"
+                ~typ:(non_null snapp_receipt_chain_hash_or_ignore)
+            ; arg "public_key" ~typ:(non_null snapp_pk_or_ignore)
+            ; arg "delegate" ~typ:(non_null snapp_pk_or_ignore)
+            ; arg "state" ~typ:(non_null snapp_state)
+            ; arg "rollup_state" ~typ:(non_null snapp_field_or_ignore)
+            ; arg "proved_state" ~typ:(non_null snapp_bool_or_ignore)
+            ]
+
+      let snapp_predicate =
+        obj "SnappPredicate"
+          ~coerce:(fun ctor account_opt nonce_opt ->
+            match (ctor, account_opt, nonce_opt) with
+            | Accept, None, None ->
+                Ok Party.Predicate.Accept
+            | Accept, _, _ ->
+                Error "Non-null account or nonces given for Accept"
+            | Full, Some account_result, None -> (
+                match account_result with
+                | Ok account ->
+                    Ok (Party.Predicate.Full account)
+                | Error err ->
+                    Error err )
+            | Full, _, _ ->
+                Error "Full requires a non-null account value"
+            | Nonce, None, Some nonce ->
+                Ok (Party.Predicate.Nonce nonce)
+            | Nonce, _, _ ->
+                Error "Nonce requires a non-null nonce value")
+          ~fields:
+            [ arg "full_or_nonce_or_accept" ~typ:(non_null snapp_predicate_enum)
+            ; arg "account" ~doc:"An account for Full, null otherwise"
+                ~typ:snapp_predicate_account
+            ; arg "nonce" ~doc:"A nonce for Nonce, null otherwise" ~typ:nonce
+            ]
+
+      let snapp_party_predicated =
+        obj "SnappPartyPredicated"
+          ~coerce:(fun body_result predicate_result ->
+            let open Result.Let_syntax in
+            let%bind body = body_result in
+            let%bind predicate = predicate_result in
+            Ok Party.Predicated.Poly.{ body; predicate })
+          ~fields:
+            [ arg "body" ~doc:"Body of the party predicated"
+                ~typ:(non_null snapp_party_body)
+            ; arg "predicate" ~doc:"Predicate of the party predicated"
+                ~typ:(non_null snapp_predicate)
+            ]
+
+      let snapp_proof =
+        scalar "SnappProof" ~coerce:(fun proof ->
+            match proof with
+            | `String s ->
+                Pickles.Side_loaded.Proof.of_base64 s
+            | _ ->
+                Error "Expected Snapp proof as base64-encoded string")
+
+      (* like Control.t with nullary constructors *)
+      type snapp_proof_or_signature_or_none_given =
+        | Proof
+        | Signature
+        | None_given
+
+      let snapp_control_enum =
+        enum "ProofOrSignature"
+          ~values:
+            [ enum_value "Proof" ~value:Proof
+            ; enum_value "Signature" ~value:Signature
+            ; enum_value "None_given" ~value:None_given
+            ]
+
+      let snapp_control =
+        obj "Control"
+          ~coerce:(fun proof_or_signature proof_opt signature_opt ->
+            match (proof_or_signature, proof_opt, signature_opt) with
+            | Proof, Some proof, None ->
+                Ok (Control.Proof proof)
+            | Proof, _, _ ->
+                Error "Proof requires non-null proof, null other data"
+            | Signature, None, Some signature ->
+                Ok (Control.Signature signature)
+            | Signature, _, _ ->
+                Error "Signature requires non-null signature, null other data"
+            | None_given, None, None ->
+                Ok Control.None_given
+            | None_given, _, _ ->
+                Error "None_given, other data should be null")
+          ~fields:
+            [ arg "proof_or_signature" ~typ:(non_null snapp_control_enum)
+            ; arg "proof" ~typ:snapp_proof
+            ; arg "signature" ~typ:snapp_signature
+            ]
+
+      let snapp_party_arg =
+        obj "SnappParty" ~doc:"A party to a Snapp transaction"
+          ~coerce:(fun predicated_result authorization_result ->
+            let open Result.Let_syntax in
+            let%bind data = predicated_result in
+            let%bind authorization = authorization_result in
+            Ok Party.{ data; authorization })
+          ~fields:
+            [ arg "data" ~doc:"Predicated party"
+                ~typ:(non_null snapp_party_predicated)
+            ; arg "authorization" ~doc:"Authorization for this party"
+                ~typ:(non_null snapp_control)
+            ]
+
+      let snapp_snarked_ledger_hash_or_ignore =
+        snapp_make_check_or_ignore "SnarkedLedgerHashOrIgnore"
+          (arg "snarked_ledger_hash"
+             ~doc:"Snarked ledger hash in Base58Check format, or null if Ignore"
+             ~typ:snarked_ledger_hash)
+
+      let snapp_token_id_closed_interval =
+        snapp_make_closed_interval ~name:"SnappTokenIdClosedInterval"
+          ~typ:token_id_arg
+
+      let snapp_token_id_numeric =
+        snapp_make_numeric ~name:"SnappNumericTokenId" ~arg_name:"token_id"
+          ~typ:token_id_arg
+
+      let snapp_block_time_numeric =
+        snapp_make_numeric ~name:"BlockTimeNumeric" ~arg_name:"block_time"
+          ~typ:block_time
+
+      let snapp_length_numeric =
+        snapp_make_numeric ~name:"LengthNumeric" ~arg_name:"length" ~typ:length
+
+      let snapp_vrf_output =
+        scalar "VrfOutput" ~coerce:(fun vrf_output ->
+            match vrf_output with
+            | `Null ->
+                Ok ()
+            | _ ->
+                Error "VRF output, expected null")
+
+      let snapp_currency_amount_numeric =
+        snapp_make_numeric ~name:"CurrencyAmountNumeric"
+          ~arg_name:"currency_amount" ~typ:currency_amount
+
+      let snapp_global_slot =
+        scalar "GlobalSlot" ~coerce:(fun amt ->
+            match amt with
+            | `String s -> (
+                try Ok (Mina_numbers.Global_slot.of_string s)
+                with exn -> Error (Exn.to_string exn) )
+            | _ ->
+                Error "Expected string for global slot")
+
+      let snapp_global_slot_numeric =
+        snapp_make_numeric ~name:"GlobalSlotNumeric" ~arg_name:"global_slot"
+          ~typ:snapp_global_slot
+
+      let snapp_state_hash =
+        scalar "StateHash" ~coerce:(fun state_hash ->
+            match state_hash with
+            | `String s ->
+                Result.map_error
+                  (State_hash.of_base58_check s)
+                  ~f:Error.to_string_hum
+            | _ ->
+                Error "Expected state hash in Base58Check format")
+
+      let snapp_state_hash_or_ignore =
+        snapp_make_check_or_ignore "SnappStateHashOrIgnore"
+          (arg "state_hash" ~typ:snapp_state_hash)
+
+      let snapp_epoch_seed =
+        scalar "EpochSeed" ~coerce:(fun field ->
+            match field with
+            | `String s ->
+                Ok (Snark_params.Tick.Field.of_string s)
+            | _ ->
+                Error "Expected a string representing a field element")
+
+      let snapp_epoch_seed_or_ignore =
+        snapp_make_check_or_ignore "EpochSeedOrIgnore"
+          (arg "epoch_seed" ~typ:snapp_epoch_seed)
+
+      let snapp_epoch_ledger =
+        obj "EpochLedger"
+          ~coerce:(fun hash_result total_currency_result ->
+            let open Result.Let_syntax in
+            let%bind hash = hash_result in
+            let%bind total_currency = total_currency_result in
+            Ok { Epoch_ledger.Poly.hash; total_currency })
+          ~fields:
+            [ arg "hash" ~typ:(non_null snapp_snarked_ledger_hash_or_ignore)
+            ; arg "total_currency" ~typ:(non_null snapp_currency_amount_numeric)
+            ]
+
+      let snapp_epoch_data =
+        obj "EpochData"
+          ~coerce:
+            (fun ledger_result seed_result start_checkpoint_result
+                 lock_checkpoint_result epoch_length_result ->
+            let open Result.Let_syntax in
+            let%bind ledger = ledger_result in
+            let%bind seed = seed_result in
+            let%bind start_checkpoint = start_checkpoint_result in
+            let%bind lock_checkpoint = lock_checkpoint_result in
+            let%bind epoch_length = epoch_length_result in
+            Ok
+              { Snapp_predicate.Protocol_state.Epoch_data.Poly.ledger
+              ; seed
+              ; start_checkpoint
+              ; lock_checkpoint
+              ; epoch_length
+              })
+          ~fields:
+            [ arg "ledger" ~typ:(non_null snapp_epoch_ledger)
+            ; arg "seed" ~typ:(non_null snapp_epoch_seed_or_ignore)
+            ; arg "start_checkpoint" ~typ:(non_null snapp_state_hash_or_ignore)
+            ; arg "lock_checkpoint" ~typ:(non_null snapp_state_hash_or_ignore)
+            ; arg "epoch_length" ~typ:(non_null snapp_length_numeric)
+            ]
+
+      let snapp_protocol_state_arg :
+          (Snapp_predicate.Protocol_state.t, string) result option arg_typ =
+        obj "SnappProtocolState" ~doc:"Protocol state for a Snapp transaction"
+          ~coerce:
+            (fun snarked_ledger_hash_result snarked_next_available_token_result
+                 timestamp_result blockchain_length_result
+                 min_window_density_result last_vrf_output_opt
+                 total_currency_result curr_global_slot_result
+                 global_slot_since_genesis_result staking_epoch_data_result
+                 next_epoch_data_result ->
+            let open Result.Let_syntax in
+            let%bind snarked_ledger_hash = snarked_ledger_hash_result in
+            let%bind snarked_next_available_token =
+              snarked_next_available_token_result
+            in
+            let%bind timestamp = timestamp_result in
+            let%bind blockchain_length = blockchain_length_result in
+            let%bind min_window_density = min_window_density_result in
+            let last_vrf_output =
+              (* if the value is given, it's null
+                 if it's not given, provide the null
+              *)
+              match last_vrf_output_opt with Some () -> () | None -> ()
+            in
+            let%bind total_currency = total_currency_result in
+            let%bind curr_global_slot = curr_global_slot_result in
+            let%bind global_slot_since_genesis =
+              global_slot_since_genesis_result
+            in
+            let%bind staking_epoch_data = staking_epoch_data_result in
+            let%bind next_epoch_data = next_epoch_data_result in
+            Ok
+              { Snapp_predicate.Protocol_state.Poly.snarked_ledger_hash
+              ; snarked_next_available_token
+              ; timestamp
+              ; blockchain_length
+              ; min_window_density
+              ; last_vrf_output
+              ; total_currency
+              ; curr_global_slot
+              ; global_slot_since_genesis
+              ; staking_epoch_data
+              ; next_epoch_data
+              })
+          ~fields:
+            [ arg "snarked_ledger_hash"
+                ~typ:(non_null snapp_snarked_ledger_hash_or_ignore)
+            ; arg "snarked_next_available_token"
+                ~typ:(non_null snapp_token_id_numeric)
+            ; arg "timestamp" ~typ:(non_null snapp_block_time_numeric)
+            ; arg "blockchain_length" ~typ:(non_null snapp_length_numeric)
+            ; arg "min_window_density" ~typ:(non_null snapp_length_numeric)
+            ; arg "last_vrf_output" ~typ:snapp_vrf_output (* nullable! *)
+            ; arg "total_currency" ~typ:(non_null snapp_currency_amount_numeric)
+            ; arg "curr_global_slot" ~typ:(non_null snapp_global_slot_numeric)
+            ; arg "global_slot_since_genesis"
+                ~typ:(non_null snapp_global_slot_numeric)
+            ; arg "staking_epoch_data" ~typ:(non_null snapp_epoch_data)
+            ; arg "next_epoch_data" ~typ:(non_null snapp_epoch_data)
+            ]
+    end
 
     let precomputed_block =
       scalar "PrecomputedBlock" ~doc:"Block encoded in precomputed block format"
@@ -2292,17 +3127,17 @@ module Types = struct
 
       let snapp_fee_payer =
         arg "snappFeePayer"
-          ~typ:(non_null snapp_party_signed_arg)
+          ~typ:(non_null Snapp_inputs.snapp_party_signed)
           ~doc:"The fee payer party to a Snapp transaction"
 
       let snapp_other_parties =
         arg "snappOtherParties"
-          ~typ:(non_null (list (non_null snapp_party_arg)))
+          ~typ:(non_null (list (non_null Snapp_inputs.snapp_party_arg)))
           ~doc:"The parties other than the fee payer in a Snapp transaction"
 
       let snapp_protocol_state =
         arg "snappProtocolState"
-          ~typ:(non_null snapp_protocol_state_arg)
+          ~typ:(non_null Snapp_inputs.snapp_protocol_state_arg)
           ~doc:"The protocol state in a Snapp transaction"
     end
 
@@ -3102,9 +3937,21 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.send_snapp)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.send_snapp) ]
       ~resolve:
-        (fun { ctx = coda; _ } () (fee_payer, other_parties, protocol_state) ->
-        let parties = { Parties.fee_payer; other_parties; protocol_state } in
-        send_snapp_command coda parties)
+        (fun { ctx = coda; _ } ()
+             (fee_payer_result, other_parties_results, protocol_state_result) ->
+        let parties_result =
+          let open Result.Let_syntax in
+          let other_parties_result = Result.all other_parties_results in
+          let%bind fee_payer = fee_payer_result in
+          let%bind other_parties = other_parties_result in
+          let%map protocol_state = protocol_state_result in
+          { Parties.fee_payer; other_parties; protocol_state }
+        in
+        match parties_result with
+        | Ok parties ->
+            send_snapp_command coda parties
+        | Error err ->
+            return (Error err))
 
   let create_token =
     io_field "createToken" ~doc:"Create a new token"
