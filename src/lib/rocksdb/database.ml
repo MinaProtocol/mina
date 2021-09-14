@@ -2,13 +2,7 @@
 
 open Core
 
-(* Uuid.t deprecates sexp functions; use Uuid.Stable.V1 *)
-
-module T = struct
-  type t = {uuid: Uuid.Stable.V1.t; db: Rocks.t sexp_opaque} [@@deriving sexp]
-end
-
-include T
+type t = {uuid: Uuid.Stable.V1.t; db: Rocks.t sexp_opaque} [@@deriving sexp]
 
 let create directory =
   let opts = Rocks.Options.create () in
@@ -86,6 +80,20 @@ let to_alist t : (Bigstring.t * Bigstring.t) list =
 
 let to_bigstring = Bigstring.of_string
 
+let%test_unit "get_batch" =
+  Async.Thread_safe.block_on_async_exn (fun () ->
+    File_system.with_temp_dir "/tmp/mina-rocksdb-test" ~f:(fun db_dir ->
+      let db = create db_dir in
+      let[@warning "-8"] [key1; key2; key3] = List.map ~f:Bigstring.of_string ["a"; "b"; "c"] in
+      let data = Bigstring.of_string "test" in
+      set db ~key:key1 ~data ;
+      set db ~key:key3 ~data ;
+      let[@warning "-8"] [res1; res2; res3] = get_batch db ~keys:[key1; key2; key3] in
+      assert (res1 = Some data) ;
+      assert (res2 = None) ;
+      assert (res3 = Some data) ;
+      Async.Deferred.unit))
+
 let%test_unit "to_alist (of_alist l) = l" =
   Async.Thread_safe.block_on_async_exn
   @@ fun () ->
@@ -97,7 +105,7 @@ let%test_unit "to_alist (of_alist l) = l" =
       | `Duplicate_key _ ->
           Async.Deferred.unit
       | `Ok _ ->
-          File_system.with_temp_dir "/tmp/coda-test" ~f:(fun db_dir ->
+          File_system.with_temp_dir "/tmp/mina-rocksdb-test" ~f:(fun db_dir ->
               let sorted =
                 List.sort kvs ~compare:[%compare: string * string]
                 |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))
