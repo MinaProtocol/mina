@@ -32,3 +32,6 @@ pub mod pasta_fq_plonk_proof;
 /* Oracles */
 pub mod pasta_fp_plonk_oracles;
 pub mod pasta_fq_plonk_oracles;
+/* Poseidon */
+pub mod pasta_fp_poseidon;
+pub mod pasta_fq_poseidon;
