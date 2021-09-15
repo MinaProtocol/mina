@@ -1458,6 +1458,8 @@ include struct
 
   let peers = lift peers
 
+  let bandwidth_info = lift bandwidth_info
+
   let get_peer_node_status t peer =
     let open Deferred.Or_error.Let_syntax in
     let%bind s = get_peer_node_status t.gossip_net peer in

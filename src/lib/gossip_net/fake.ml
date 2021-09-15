@@ -200,6 +200,10 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let peers { peer_table; _ } = Hashtbl.data peer_table |> Deferred.return
 
+    let bandwidth_info _ =
+      Deferred.Or_error.fail
+        (Error.of_string "fake bandwidth info: Not implemented")
+
     let set_node_status _ _ = Deferred.Or_error.ok_unit
 
     let get_peer_node_status _ _ =

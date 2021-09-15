@@ -434,6 +434,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let peers t = !(t.net2) >>= Mina_net2.peers
 
+    let bandwidth_info t = !(t.net2) >>= Mina_net2.bandwidth_info
+
     let create (config : Config.t) ~pids rpc_handlers =
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in

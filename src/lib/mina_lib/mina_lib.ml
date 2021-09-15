@@ -1098,7 +1098,7 @@ let start t =
     ~block_reward_threshold:t.config.block_reward_threshold ;
   perform_compaction t ;
   Node_status_service.start ~logger:t.config.logger
-    ~node_status_url:t.config.node_status_url
+    ~node_status_url:t.config.node_status_url ~network:t.components.net
     ~transition_frontier:t.components.transition_frontier
     ~sync_status:t.sync_status ;
   Snark_worker.start t

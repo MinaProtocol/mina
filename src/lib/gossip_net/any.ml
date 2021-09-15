@@ -40,6 +40,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
   let peers (Any ((module M), t)) = M.peers t
 
+  let bandwidth_info (Any ((module M), t)) = M.bandwidth_info t
+
   let set_node_status (Any ((module M), t)) = M.set_node_status t
 
   let get_peer_node_status (Any ((module M), t)) = M.get_peer_node_status t

@@ -98,6 +98,7 @@ const (
 	beginAdvertising
 	findPeer
 	listPeers
+	getBandwidthInfo
 	setGatingConfig
 	setNodeStatus
 	getPeerNodeStatus
@@ -109,6 +110,11 @@ type codaPeerInfo struct {
 	Libp2pPort int    `json:"libp2p_port"`
 	Host       string `json:"host"`
 	PeerID     string `json:"peer_id"`
+}
+
+type bandwidthInfo struct {
+	rateIn  float64 `json:"libp2p_input_bandwidth`
+	rateOut float64 `json:"libp2p_output_bandwidth`
 }
 
 type envelope struct {
@@ -1414,6 +1420,9 @@ func (m *getPeerNodeStatusMsg) run(app *app) (interface{}, error) {
 type listPeersMsg struct {
 }
 
+type getBandwidthInfoMsg struct {
+}
+
 func (lp *listPeersMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
@@ -1433,6 +1442,16 @@ func (lp *listPeersMsg) run(app *app) (interface{}, error) {
 	}
 
 	return peerInfos, nil
+}
+
+func (bi *getBandwidthInfoMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
+
+	stats := app.P2p.BandwidthCounter.GetBandwidthTotals()
+
+	return bandwidthInfo{stats.RateIn, stats.RateOut}, nil
 }
 
 func filterIPString(filters *ma.Filters, ip string, action ma.Action) error {
@@ -1537,6 +1556,7 @@ var msgHandlers = map[methodIdx]func() action{
 	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
 	findPeer:            func() action { return &findPeerMsg{} },
 	listPeers:           func() action { return &listPeersMsg{} },
+	getBandwidthInfo:    func() action { return &getBandwidthInfoMsg{} },
 	setGatingConfig:     func() action { return &setGatingConfigMsg{} },
 	setNodeStatus:       func() action { return &setNodeStatusMsg{} },
 	getPeerNodeStatus:   func() action { return &getPeerNodeStatusMsg{} },
