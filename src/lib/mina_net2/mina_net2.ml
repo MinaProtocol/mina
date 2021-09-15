@@ -74,6 +74,10 @@ end
 type peer_info = {libp2p_port: int; host: string; peer_id: string}
 [@@deriving yojson]
 
+type bandwidth_info =
+  {libp2p_input_bandwidth: float; libp2p_output_bandwidth: float}
+[@@deriving yojson]
+
 type connection_gating =
   {banned_peers: Peer.t list; trusted_peers: Peer.t list; isolate: bool}
 [@@deriving yojson]
@@ -525,6 +529,14 @@ module Helper = struct
       type output = peer_info list [@@deriving yojson]
 
       let name = "listPeers"
+    end
+
+    module Bandwidth_info = struct
+      include No_input
+
+      type output = bandwidth_info [@@deriving yojson]
+
+      let name = "getBandwidthInfo"
     end
 
     module Set_node_status = struct
@@ -1397,6 +1409,12 @@ let list_peers net =
         "Encountered $error while asking libp2p_helper for peers"
         ~metadata:[("error", Error_json.error_to_yojson error)] ;
       []
+
+let bandwidth_info net =
+  Deferred.Or_error.map ~f:(function
+      | {libp2p_input_bandwidth; libp2p_output_bandwidth} ->
+      (libp2p_input_bandwidth, libp2p_output_bandwidth) )
+  @@ Helper.do_rpc net (module Helper.Rpcs.Bandwidth_info) ()
 
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id

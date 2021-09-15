@@ -30,6 +30,7 @@ var (
 		"setGatingConfig":     setGatingConfig,
 		"setNodeStatus":       setNodeStatus,
 		"getPeerNodeStatus":   getPeerNodeStatus,
+		"getBandwidthInfo":    getBandwidthInfo,
 	}
 
 	_methodIdxValueToName = map[methodIdx]string{
@@ -54,6 +55,7 @@ var (
 		setGatingConfig:     "setGatingConfig",
 		setNodeStatus:       "setNodeStatus",
 		getPeerNodeStatus:   "getPeerNodeStatus",
+		getBandwidthInfo:    "getBandwidthInfo",
 	}
 )
 
@@ -82,6 +84,7 @@ func init() {
 			interface{}(setGatingConfig).(fmt.Stringer).String():     setGatingConfig,
 			interface{}(setNodeStatus).(fmt.Stringer).String():       setNodeStatus,
 			interface{}(getPeerNodeStatus).(fmt.Stringer).String():   getPeerNodeStatus,
+			interface{}(getBandwidthInfo).(fmt.Stringer).String():    getBandwidthInfo,
 		}
 	}
 }
