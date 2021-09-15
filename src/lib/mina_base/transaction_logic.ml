@@ -758,6 +758,62 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let receiver_location, receiver_account =
             get_with_location ledger receiver |> ok_or_reject
           in
+          let%bind source_location, source_timing, source_account =
+            let ret =
+              if Account_id.equal source receiver then
+                (*just check if the timing needs updating*)
+                let%bind location, account =
+                  match receiver_location with
+                  | `Existing _ ->
+                      return (receiver_location, receiver_account)
+                  | `New ->
+                      Result.fail Transaction_status.Failure.Source_not_present
+                in
+                let source_timing = account.timing in
+                let%map timing =
+                  validate_timing ~txn_amount:amount
+                    ~txn_global_slot:current_global_slot ~account
+                  |> Result.map_error ~f:timing_error_to_user_command_status
+                in
+                (location, source_timing, {account with timing})
+              else
+                let location, account =
+                  get_with_location ledger source |> ok_or_reject
+                in
+                let%bind () =
+                  match location with
+                  | `Existing _ ->
+                      return ()
+                  | `New ->
+                      Result.fail Transaction_status.Failure.Source_not_present
+                in
+                let source_timing = account.timing in
+                let%bind timing =
+                  validate_timing ~txn_amount:amount
+                    ~txn_global_slot:current_global_slot ~account
+                  |> Result.map_error ~f:timing_error_to_user_command_status
+                in
+                let%map balance =
+                  Result.map_error (sub_amount account.balance amount)
+                    ~f:(fun _ ->
+                      Transaction_status.Failure.Source_insufficient_balance )
+                in
+                (location, source_timing, {account with timing; balance})
+            in
+            if Account_id.equal fee_payer source then
+              (* Don't process transactions with insufficient balance from the
+               fee-payer.
+            *)
+              match ret with
+              | Ok x ->
+                  Ok x
+              | Error failure ->
+                  raise
+                    (Reject
+                       (Error.createf "%s"
+                          (Transaction_status.Failure.describe failure)))
+            else ret
+          in
           (* Charge the account creation fee. *)
           let%bind receiver_amount =
             match receiver_location with
@@ -774,53 +830,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   Result.fail
                     Transaction_status.Failure.Cannot_pay_creation_fee_in_token
           in
-          let%bind receiver_account =
+          let%map receiver_account =
             incr_balance receiver_account receiver_amount
-          in
-          let%map source_location, source_timing, source_account =
-            let ret =
-              let%bind location, account =
-                if Account_id.equal source receiver then
-                  match receiver_location with
-                  | `Existing _ ->
-                      return (receiver_location, receiver_account)
-                  | `New ->
-                      Result.fail Transaction_status.Failure.Source_not_present
-                else return (get_with_location ledger source |> ok_or_reject)
-              in
-              let%bind () =
-                match location with
-                | `Existing _ ->
-                    return ()
-                | `New ->
-                    Result.fail Transaction_status.Failure.Source_not_present
-              in
-              let source_timing = account.timing in
-              let%bind timing =
-                validate_timing ~txn_amount:amount
-                  ~txn_global_slot:current_global_slot ~account
-                |> Result.map_error ~f:timing_error_to_user_command_status
-              in
-              let%map balance =
-                Result.map_error (sub_amount account.balance amount)
-                  ~f:(fun _ ->
-                    Transaction_status.Failure.Source_insufficient_balance )
-              in
-              (location, source_timing, {account with timing; balance})
-            in
-            if Account_id.equal fee_payer source then
-              (* Don't process transactions with insufficient balance from the
-                 fee-payer.
-              *)
-              match ret with
-              | Ok x ->
-                  Ok x
-              | Error failure ->
-                  raise
-                    (Reject
-                       (Error.createf "%s"
-                          (Transaction_status.Failure.describe failure)))
-            else ret
           in
           let previous_empty_accounts, auxiliary_data =
             match receiver_location with
@@ -1043,7 +1054,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ( {common= applied_common; body= applied_body}
             : Transaction_applied.Signed_command_applied.t )
     | Error failure ->
-        (* Do not update the ledger. *)
+        (* Do not update the ledger. Except for the fee payer which is already updated *)
         let applied_common =
           { applied_common with
             user_command=
