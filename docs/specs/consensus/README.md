@@ -33,7 +33,9 @@ This documents specifies required structures, algorithms and protocol details.
     - [3.1.5 `length`](#315-length)
     - [3.1.6 `lastVRF`](#316-lastvrf)
     - [3.1.7 `stateHash`](#317-statehash)
-    - [3.1.8 `globalSubWindow`](#318-globalsubwindow)
+    - [3.1.8 `subWindow`](#318-subwindow)
+    - [3.1.9 `sameSubWindow`](#319-samesubwindow)
+    - [3.1.10 `relativeSubWindow`](#3110-relativesubwindow)
   - [3.2 Chain selection rules](#32-chain-selection-rules)
     - [3.2.1 Short-range fork rule](#321-short-range-fork-rule)
     - [3.2.2 Long-range fork rule](#322-long-range-fork-rule)
@@ -42,10 +44,15 @@ This documents specifies required structures, algorithms and protocol details.
     - [3.3.2 `updateCheckpoints`](#332-updatecheckpoints)
     - [3.3.3 `isShortRange`](#333-isshortrange)
   - [3.4 Window min-density](#34-window-min-density)
+    - [Terminology](#terminology)
+    - [Sliding windows](#sliding-windows)
+    - [Sub-windows](#sub-windows)
+    - [Structure](#structure)
+    - [Minimum window density](#minimum-window-density)
     - [3.4.1 `isWindowStop`](#341-iswindowstop)
     - [3.4.2 `shiftWindow`](#342-shiftwindow)
-    - [3.4.3 `initWindowDensities`](#343-initwindowdensities)
-    - [3.4.4 `updateWindowDensities`](#344-updatewindowdensities)
+    - [3.4.3 `initSubWindowDensities`](#343-initsubwindowdensities)
+    - [3.4.4 `updateSubWindowDensities`](#344-updatesubwindowdensities)
     - [3.4.5 `getMinWindowDensity`](#345-getminwindowdensity)
 - [4 Protocol](#4-protocol)
   - [4.1 Initialize consensus](#41-initialize-consensus)
@@ -76,7 +83,9 @@ This documents specifies required structures, algorithms and protocol details.
     - [3.1.5 `length`](#315-length)
     - [3.1.6 `lastVRF`](#316-lastvrf)
     - [3.1.7 `stateHash`](#317-statehash)
-    - [3.1.8 `globalSubWindow`](#318-globalsubwindow)
+    - [3.1.8 `subWindow`](#318-subwindow)
+    - [3.1.9 `sameSubWindow`](#319-samesubwindow)
+    - [3.1.10 `relativeSubWindow`](#3110-relativesubwindow)
   - [3.2 Chain selection rules](#32-chain-selection-rules)
     - [3.2.1 Short-range fork rule](#321-short-range-fork-rule)
     - [3.2.2 Long-range fork rule](#322-long-range-fork-rule)
@@ -85,10 +94,15 @@ This documents specifies required structures, algorithms and protocol details.
     - [3.3.2 `updateCheckpoints`](#332-updatecheckpoints)
     - [3.3.3 `isShortRange`](#333-isshortrange)
   - [3.4 Window min-density](#34-window-min-density)
+    - [Terminology](#terminology)
+    - [Sliding windows](#sliding-windows)
+    - [Sub-windows](#sub-windows)
+    - [Structure](#structure)
+    - [Minimum window density](#minimum-window-density)
     - [3.4.1 `isWindowStop`](#341-iswindowstop)
     - [3.4.2 `shiftWindow`](#342-shiftwindow)
-    - [3.4.3 `initWindowDensities`](#343-initwindowdensities)
-    - [3.4.4 `updateWindowDensities`](#344-updatewindowdensities)
+    - [3.4.3 `initSubWindowDensities`](#343-initsubwindowdensities)
+    - [3.4.4 `updateSubWindowDensities`](#344-updatesubwindowdensities)
     - [3.4.5 `getMinWindowDensity`](#345-getminwindowdensity)
 - [4 Protocol](#4-protocol)
   - [4.1 Initialize consensus](#41-initialize-consensus)
@@ -401,14 +415,36 @@ fn stateHash(C) -> Hash
 }
 ```
 
-### 3.1.8 `globalSubWindow`
+### 3.1.8 `subWindow`
 
 This function returns the sub-window number of a block.
 
 ```rust
-fn globalSubWindow(B) -> u64
+fn subWindow(B) -> u64
 {
    return globalSlot(B)/slots_per_sub_window
+}
+```
+
+### 3.1.9 `sameSubWindow`
+
+This function returns true if two blocks are in the same global sub-window.
+
+```rust
+fn sameSubWindow(A, B) -> bool
+{
+   return subWindow(A) == subWindow(B)
+}
+```
+
+### 3.1.10 `relativeSubWindow`
+
+This function returns the relative sub-window number of a block.
+
+```rust
+fn relativeSubWindow(B) -> u64
+{
+   return subWindow(B) mod sub_windows_per_window
 }
 ```
 
@@ -428,7 +464,7 @@ A fork is short-range if it occured less than `m` blocks ago.  The naı̈ve impl
 
 ### 3.2.2 Long-range fork rule
 
-Recall that when an adversary creates a long-range fork, over time it skews the leader selection distribution leading to a longer adversarial chain.  Initially the dishonest chain will have a lower density, but in time the adversary will work to increase it.  Thus, we can only rely on the density difference in the first few slots following the fork, the so-called *critical window*.  The idea is that in the critical window the honest chain the density is overwhelmingly likely to be higher because this contains the majority of stake.
+Recall that when an adversary creates a long-range fork, over time it skews the leader selection distribution leading to a longer adversarial chain.  Initially the dishonest chain will have a lower density, but in time the adversary will work to increase it.  Thus, we can only rely on the density difference in the first few slots following the fork, the so-called *critical window*.  The idea is that for the honest chain's critical window the density is overwhelmingly likely to be higher because this chain contains the majority of stake.
 
 As a succint blockchain, Mina does not have a chain into which it can look back on the fork point to observe the densities.  Moreover, the slot range of the desired densities cannot be know ahead of time.
 
@@ -438,7 +474,7 @@ Samasika overcomes this problem by storing a succinct summary of a sliding windo
 
 Given chain `C` let `C.min_density` be the minimum density observed in `C` so far.
 
-Let `C1` be the local chain and `C2` be a [valid](../verification/README.md#1.1-isvalidchain) alternative chain; the main idea of the _long-range fork rule_ is
+Let `C1` be the local chain and `C2` be a [valid](../verification/README.md#1.1-isvalidchain) alternative chain; the gist of the _long-range fork rule_ is
 
 ```rust
 if C2.min_density > C1.min_density {
@@ -449,7 +485,7 @@ else {
 }
 ```
 
-The above pseudocode is only to provide intuition about how the chain selection rules work.  The actual chain selection algorithm is specified in [Section 4.2](#42-select-chain) and is designed to handle more complex cases
+The above pseudocode is only to provide intuition about how the chain selection rules work.  A detailed description of the succinct sliding window structure is described in section [Section 3.4](#34-window-min-density) and the actual chain selection algorithm is specified in [Section 4.2](#42-select-chain).
 
 ## 3.3 Decentralized checkpointing
 
@@ -463,12 +499,13 @@ The above pseudocode is only to provide intuition about how the chain selection 
 Samasika uses decentralized checkpointing to determine whether a fork is short- or long-range.  Each epoch is split into three parts with an equal number of slots.  The first 2/3 are called the *seed update range* because this is when the VRF is seeded.
 
 For example, consider an example epoch `i` of 15 slots, `s1 ... s15`.
-```
 
+```text
 epoch i: s1 s2 s3 s4 s5 | s6 s7 s8 s9 s10 | s11 s12 s13 s14 s15
          \______________________________/
               2/3 (seed update range)
 ```
+
 As seen above, the slots can be split into 3 parts delimited by `|`.  The first `2/3` of the slots (`s1 ... s10`) are in the seed update range. The epoch seeds of blocks in this rage are used to seed the VRF.
 
 The idea of decentralized checkpointing is that each chain maintains two checkpoints in every epoch, which are used to estimate how long ago a fork has occured.
@@ -477,12 +514,14 @@ The idea of decentralized checkpointing is that each chain maintains two checkpo
 * **Lock checkpoint** - State hash of the last known block in the seed update range of an epoch (not including the current block)
 
 For example, consider epoch `e1 ... e3` below.
-```
+
+```text
 epochs:         e1                e2                 e3
                                       ⤺lock
 slots:  s1s2s3s4s5s6s7s8s9|s1s2s3s4s5s6s7s8s9|s1s2s3...
                      start⤻⎺⎺⎺⎺⎺⎺⎺⎺⎺⎺⎺
 ```
+
 Here the current slot is `s7`, the start checkpoint is `s1` and the lock checkpoint is `s6`.
 
 These are located in the `start_checkpoint` and `lock_checkpoint` fields of the [`Epoch_data`](#26-epoch_data) structure, which is part of the [`Consensus_state`](#25-consensus_state) (See [Section 2.6](#26-epoch_data)).
@@ -534,6 +573,7 @@ fn updateCheckpoints(P, B) -> ()
     }
 }
 ```
+
 Specifically, if the epoch slot of the new block `B` is the start of a new epoch, then the `start_checkpoint` of the current epoch data (`next_epoch_data`) is updated to the state hash from the previous block `P`.  Next, if the the new block's slot is also within the first `2/3` of the slots in the epoch ([`slots_per_epoch`](#1-constants)), then the `lock_checkpoint` of the current epoch data is also updated to the same value.
 
 ### 3.3.3 `isShortRange`
@@ -554,48 +594,74 @@ fn isShortRange(C1, C2) -> bool
 
 ## 3.4 Window min-density
 
-This section describes how to compute the density windows and minimum density. Firstly we must define some terminology.
+This section describes the succinct sliding window density structure, how to compute it and how to compute minimum density. Firstly we must define some terminology.
+
+### Terminology
 
 * We say a slot is _`filled`_ if it contains a valid non-orphaned block
 * An `n-window` is a sequential list of slots s<sub>1</sub>,...,s<sub>n</sub> of length `n`
-* The _`density`_ of a window (or sub-window) is the number non-orphan block within it
+* A `sub-window` is a contiguous region of a `n-window`
+* The _`density`_ of an n-window (or sub-window) is the number non-orphan block within it
 
-The _`sliding window`_ is referred to as a `v`-shifting `w`-window and it characterisd by two parameters.
+### Sliding windows
+
+The _`sliding window`_ can be thought of different ways.  In the Ouroborus Samasika paper it is referred to as a `v`-shifting `w`-window and it characterisd by two parameters.
 
 | Parameter | Description                                | Value |
 | - | - | - |
 | `v`       | Length by which the window shifts in slots (shift parameter) | [`slots_per_sub_window`](#1-constants) (= 7) |
 | `w`       | Window length in slots                                       | [`slots_per_sub_window`](#1-constants)` * `[`sub_windows_per_window`](#1-constants) (= 7*11 = 77 slots) |
 
-This is a `w`-long window that shifts `v`-slots at a time.  You can think of the `w`-length window as being comprised of `k` sub-windows (`sub_windows_per_window`), each of length `v` slots.  For the parameters given in the table above, the sliding window looks like this:
+This is a `w`-long window that shifts `v`-slots at a time.
 
-```
+### Sub-windows
+
+Another way to imagine the `sliding window` is as a collection of sub-windows.  That is, you can think of the `w`-length window as being comprised of `k` sub-windows, each of length `v` slots.  For the parameters given in the table above, the sliding window looks like this:
+
+```text
    |s1,...,s7|s8,...,s14| ... |s71,...,s77|
 k:      1          2      ...      11
 ```
+
 where `si` is slot `i`.
 
-Samasika tracks the list of densities of the previous `k = 11` sub-windows and the current window density `dc`
+Instead of storing the slots Samasika is only interested in the density of each sub-window, thus, it need only track a list of densities.
 
-```
-                      |s1,...,s7|s8,...,s14| ... |s71,...,s77|s78,...
-sub_window_densities:      d1        d2      ...       dk          dc
+As hinted at in the table above, Mina Samasika tracks the previous `k = 11` sub-windows
+
+```text
+                      |s1,...,s7|s8,...,s14| ... |s71,...,s77|
+sub_window_densities:      d1        d2      ...       dk
 ```
 
 The value of `k` is defined by the [`sub_windows_per_window`](#1-constants) constant.
 
-This list of sub-window of densities is stored in each block, in the `sub_window_densities` field of the `Consensus_state` (see [Section 2.5](#25-consensus_state)).  This field is of type `Length.Stable.V1.t list` and because it must be written into blocks as part of the protocol, an implimentation MUST implement serialization for this type.
+### Structure
 
-The values stored in `sub_window_densities` have this format.
+This sliding window is stored as list of sub-window of densities in each block.  Specifically, it is the `sub_window_densities` field of the `Consensus_state` (see [Section 2.5](#25-consensus_state)).  This field is of type `Length.Stable.V1.t list` and because it must be written into blocks as part of the protocol, an implimentation MUST implement serialization for this type.
+
+Given block `B`, the values stored in `B.sub_window_densities` has this format.
 
 | Index | Contents |
 | - | - |
 | `0` | Oldest sub-window density |
 | `...` | |
-| `k - 1` | Previous sub-window density |
-| `k` | Current sub-window density |
+| `k - 2` | Previous sub-window density |
+| `k - 1` | Current sub-window density (i.e. the sub-window density of `B`'s sub-window) |
+
+### Minimum window density
 
 Each block also stores the minimum window density, found in the `min_window_density` field of the `Consensus_state` (see [Section 2.5](#25-consensus_state)).
+
+In order to define the *minimum window density* of block, we first need to define the *window density*.  Given a block `C` whose sub-window densities has been computed, the window density of `C` is
+
+> window_density(C) = sum(C.sub_window_densities)
+
+The minimum window density for block `C` is defined as the minimum of `C`'s window density and the previous blocks minimum window density (i.e. the minimum window density of `C`'s parent block).
+
+> min_window_density(C) = min(window_density(C), window_density(C.parent))
+
+We will describe how to compute the minimum window density in [Section 3.4.5](#345-getminwindowdensity); however, in order to understand it you will also need to understand the algorithm for updating the window (i.e. updating the sub-window densities), which is the subject of [Section 3.4.4](#344-updatesubwindowdensity).
 
 ### 3.4.1 `isWindowStop`
 
@@ -637,14 +703,14 @@ fn shiftWindow(D) -> D'
 }
 ```
 
-### 3.4.3 `initWindowDensities`
+### 3.4.3 `initSubWindowDensities`
 
-This algorithm initializes the sub-window densities and minimm window density for genesis block `G`
+This algorithm initializes the sub-window densities and minimm window density for genesis block `G`.  This method is used to update the sub-window densities
 
 <!-- cState(G).sub_window_densities = u32[0]⌢u32[slots_per_window; sub_windows_per_window - 1] -->
 
 ```rust
-fn initWindowDensities(G) -> ()
+fn initSubWindowDensities(G) -> ()
 {
     cState(G).sub_window_densities = u32[0, slots_per_window, slots_per_window, ..., slots_per_window]
     //                                      \_______________________________________________________/
@@ -654,11 +720,44 @@ fn initWindowDensities(G) -> ()
 }
 ```
 
-### 3.4.4 `updateWindowDensities`
+### 3.4.4 `updateSubWindowDensities`
 
 **WIP**
 
-This algorithm updates both the the sub-window densities and the minimum window density of the block being created `B` based on its parent block `P`.  It inputs the blocks `P` and `B` and updates `B` according to the description in [Section 3.4](#34-window-min-density).
+This algorithm computes the density window for the current block `B` based on its parent block `P` and returns the minimum window density.  It is used both in block production and during chain selection for reasons described in [Section 4.2.1](#421-virtual-chains).  For details about density windows and minimum window density see [Section 3.4](#34-window-min-density)
+
+```rust
+fn updateSubWindowDensities(P, B) -> ()
+{
+    cState(B).sub_window_densities = cState(P).sub_window_densities
+
+    // Compute how many slots B is ahead of P and use it to shift sub_window_densities
+    let shift = MIN { globalSubWindow(B) - globalSubWindow(P), cState(B).sub_window_densities.len() }
+
+    let curr_density = cState(B).sub_window_densities[current_sub_window mod sub_windows_per_window]
+
+    if shift > 0 {
+        // Left-shift the sub-window densities
+        cState(B).sub_window_densities = cState(B).sub_window_densities[shift..]⌢[0; shift]
+    }
+
+    // Update the minimum window density
+    if shift == 0 or globalSlot(B) < grace_period_end {
+        // Minimum window density is parents minimum window density
+        cState(B).min_window_density = cState(P).min_window_density
+    }
+    else {
+        new_min_window_density = 0
+        for density in cState(B).sub_window_densities {
+            new_min_window_density += density
+        }
+        cState(B).min_window_density = MIN { new_min_window_density, cState(P).min_window_density }
+    }
+
+    // Update the density of B's sub-window to reflect B's existence
+    cState(B).sub_window_densities[-1] += 1
+}
+```
 
 ```rust
 fn updateWindowDensities(P, B) -> ()
@@ -756,7 +855,7 @@ Things a peer MUST do to initialize consensus includes
 | `blockchain_length`                      | `1`           |
 | `epoch_count`                            | `0`           |
 | `min_window_density`                     | `77 = slots_per_window` |
-| `sub_window_densities`                   | `u32[77, 11]` (See [initWindowDensities](#343-initwindowdensities)) |
+| `sub_window_densities`                   | `u32[77, 11]` (See [initSubWindowDensities](#343-initsubwindowdensities)) |
 | `last_vrf_output`                        | `0x0000000000000000000000000000000000000000000000000000000000000000`
 | `total_currency`                         | `805385692.840039233`
 | `curr_global_slot`                       | `0` |
