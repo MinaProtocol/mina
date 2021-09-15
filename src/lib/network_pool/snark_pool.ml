@@ -168,10 +168,10 @@ struct
         | `New_best_tip of Base_ledger.t ]
 
       type t =
-        { snark_tables: Snark_tables.t
-        ; snark_table_lock: unit Throttle.Sequencer.t sexp_opaque
-        ; best_tip_ledger: (unit -> Base_ledger.t option) sexp_opaque
-        ; mutable ref_table: int Statement_table.t option
+        { snark_tables : Snark_tables.t
+        ; snark_table_lock : (unit Throttle.Sequencer.t[@sexp.opaque])
+        ; best_tip_ledger : (unit -> Base_ledger.t option[@sexp.opaque])
+        ; mutable ref_table : int Statement_table.t option
               (** Tracks the number of blocks that have each work statement in
                   their scan state.
                   Work is included iff it is a member of some block scan state.
@@ -213,11 +213,11 @@ struct
 
       let of_serializable tables ~constraint_constants ~frontier_broadcast_pipe
           ~config ~logger : t =
-        { snark_tables= Snark_tables.of_serializable tables
-        ; snark_table_lock= Throttle.Sequencer.create ()
-        ; best_tip_ledger= get_best_tip_ledger ~frontier_broadcast_pipe
-        ; batcher= Batcher.Snark_pool.create config.verifier
-        ; account_creation_fee=
+        { snark_tables = Snark_tables.of_serializable tables
+        ; snark_table_lock = Throttle.Sequencer.create ()
+        ; best_tip_ledger = get_best_tip_ledger ~frontier_broadcast_pipe
+        ; batcher = Batcher.Snark_pool.create config.verifier
+        ; account_creation_fee =
             constraint_constants
               .Genesis_constants.Constraint_constants.account_creation_fee
         ; ref_table = None
@@ -278,7 +278,7 @@ struct
                 let%map _ =
                   let open Interruptible.Deferred_let_syntax in
                   Interruptible.force
-                    (let%bind.Interruptible.Let_syntax () =
+                    (let%bind.Interruptible () =
                        Interruptible.lift (Deferred.return ())
                          (Base_ledger.detached_signal ledger)
                      in
@@ -289,18 +289,19 @@ struct
                            let account_ids =
                              t.snark_tables.all |> Statement_table.data
                              |> List.map
-                                  ~f:(fun {Priced_proof.fee= {prover; _}; _} ->
-                                    prover )
+                                  ~f:(fun
+                                       { Priced_proof.fee = { prover; _ }; _ }
+                                     -> prover)
                              |> List.dedup_and_sort
                                   ~compare:Public_key.Compressed.compare
                              |> List.map ~f:(fun prover ->
                                     ( prover
                                     , Account_id.create prover Token_id.default
-                                    ) )
+                                    ))
                              |> Public_key.Compressed.Map.of_alist_exn
                            in
                            Deferred.map (Scheduler.yield ())
-                             ~f:(Fn.const account_ids) )
+                             ~f:(Fn.const account_ids))
                      in
                      (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
                      let%bind prover_account_locations =
@@ -313,11 +314,9 @@ struct
                              |> Account_id.Map.of_alist_exn
                            in
                            Deferred.map (Scheduler.yield ())
-                             ~f:(Fn.const account_locations) )
+                             ~f:(Fn.const account_locations))
                      in
-                     let yield =
-                       Staged.unstage (Scheduler.yield_every ~n:50)
-                     in
+                     let yield = Staged.unstage (Scheduler.yield_every ~n:50) in
                      let%map () =
                        trace_recurring
                          "filter snark table based on best tip ledger"
@@ -325,7 +324,8 @@ struct
                            let open Deferred.Let_syntax in
                            Statement_table.fold ~init:Deferred.unit
                              t.snark_tables.all
-                             ~f:(fun ~key ~data:{fee= {fee; prover}; _} acc ->
+                             ~f:(fun ~key ~data:{ fee = { fee; prover }; _ } acc
+                                ->
                                let%bind () = acc in
                                let%map () = yield () in
                                let prover_account_exists =
@@ -341,14 +341,14 @@ struct
                                if not keep then (
                                  Hashtbl.remove t.snark_tables.all key ;
                                  Hashtbl.remove t.snark_tables.rebroadcastable
-                                   key ) ) )
+                                   key )))
                      in
                      ())
                 in
-                () ) )
+                ()))
 
       let handle_new_refcount_table t
-          ({removed; refcount_table; best_tip_table} :
+          ({ removed; refcount_table; best_tip_table } :
             Extensions.Snark_pool_refcount.view) =
         trace_recurring "handle_new_refcount_table" (fun () ->
             t.ref_table <- Some refcount_table ;
@@ -361,11 +361,11 @@ struct
                   let keep = work_is_referenced t k in
                   if not keep then
                     Hashtbl.remove t.snark_tables.rebroadcastable k ;
-                  keep ) ;
+                  keep) ;
               Mina_metrics.(
                 Gauge.set Snark_work.snark_pool_size
                   (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ) ;
-            Deferred.unit )
+            Deferred.unit)
 
       let handle_transition_frontier_diff u t =
         match u with
@@ -410,12 +410,13 @@ struct
       let create ~constraint_constants ~consensus_constants:_ ~time_controller:_
           ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
         let t =
-          { snark_tables=
-              { all= Statement_table.create ()
-              ; rebroadcastable= Statement_table.create () }
-          ; snark_table_lock= Throttle.Sequencer.create ()
-          ; best_tip_ledger= get_best_tip_ledger ~frontier_broadcast_pipe
-          ; batcher= Batcher.Snark_pool.create config.verifier
+          { snark_tables =
+              { all = Statement_table.create ()
+              ; rebroadcastable = Statement_table.create ()
+              }
+          ; snark_table_lock = Throttle.Sequencer.create ()
+          ; best_tip_ledger = get_best_tip_ledger ~frontier_broadcast_pipe
+          ; batcher = Batcher.Snark_pool.create config.verifier
           ; logger
           ; config
           ; ref_table = None
@@ -440,15 +441,15 @@ struct
             Deferred.return
               ( if work_is_referenced t work then (
                 (*Note: fee against existing proofs and the new proofs are checked in
-                Diff.unsafe_apply which calls this function*)
-                Hashtbl.set t.snark_tables.all ~key:work ~data:{proof; fee} ;
+                  Diff.unsafe_apply which calls this function*)
+                Hashtbl.set t.snark_tables.all ~key:work ~data:{ proof; fee } ;
                 if is_local then
                   Hashtbl.set t.snark_tables.rebroadcastable ~key:work
-                    ~data:({proof; fee}, Time.now ())
+                    ~data:({ proof; fee }, Time.now ())
                 else
                   (* Stop rebroadcasting locally generated snarks if they are
-                  overwritten. No-op if there is no rebroadcastable SNARK with that
-                  statement. *)
+                     overwritten. No-op if there is no rebroadcastable SNARK with that
+                     statement. *)
                   Hashtbl.remove t.snark_tables.rebroadcastable work ;
                 (*when snark work is added to the pool*)
                 Mina_metrics.(
@@ -472,8 +473,9 @@ struct
                   ~metadata:
                     [ ( "stmt"
                       , One_or_two.to_yojson
-                          Transaction_snark.Statement.to_yojson work ) ] ;
-                `Statement_not_referenced ) )
+                          Transaction_snark.Statement.to_yojson work )
+                    ] ;
+                `Statement_not_referenced ))
 
       let verify_and_act t ~work ~sender =
         let statements, priced_proof = work in
@@ -538,8 +540,7 @@ struct
                  |> Base_ledger.location_of_account ledger)
           in
           if
-            not
-              (fee_is_sufficient t ~fee ~account_exists:prover_account_exists)
+            not (fee_is_sufficient t ~fee ~account_exists:prover_account_exists)
           then (
             [%log' debug t.logger]
               "Prover $prover did not have sufficient balance" ~metadata ;

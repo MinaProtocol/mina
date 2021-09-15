@@ -53,7 +53,7 @@ end) : sig
     -> t
     -> verifier:Verifier.t
     -> ( Transaction_snark.Statement.t
-       , [`Empty | `Error of Error.t] )
+       , [ `Empty | `Error of Error.t ] )
        Deferred.Result.t
 
   val check_invariants :
