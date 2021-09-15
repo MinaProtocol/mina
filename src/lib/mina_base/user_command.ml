@@ -302,7 +302,5 @@ let weight : Stable.Latest.t -> int = function
       Parties.weight parties
 
 (* Fee per weight unit *)
-let fee_per_wu (user_command : Stable.Latest.t) : int =
-  let fee = Currency.Fee.to_int @@ fee_exn user_command in
-  let weight = weight user_command in
-  fee / weight
+let fee_per_wu (user_command : Stable.Latest.t) : Currency.Fee_rate.t =
+  Currency.Fee_rate.make_exn (fee_exn user_command) (weight user_command)

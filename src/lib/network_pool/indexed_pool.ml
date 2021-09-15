@@ -38,7 +38,8 @@ end
 
 type t =
   { applicable_by_fee :
-      Transaction_hash.User_command_with_valid_signature.Set.t Int.Map.t
+      Transaction_hash.User_command_with_valid_signature.Set.t
+      Currency.Fee_rate.Map.t
         (** Transactions valid against the current ledger, indexed by fee per
             weight unit. *)
   ; all_by_sender :
@@ -50,7 +51,8 @@ type t =
             transactions from other accounts -- indexed by sender account.
             Ordered by nonce inside the accounts. *)
   ; all_by_fee :
-      Transaction_hash.User_command_with_valid_signature.Set.t Int.Map.t
+      Transaction_hash.User_command_with_valid_signature.Set.t
+      Currency.Fee_rate.Map.t
         (** All transactions in the pool indexed by fee per weight unit. *)
   ; all_by_hash :
       Transaction_hash.User_command_with_valid_signature.t
@@ -188,7 +190,8 @@ module For_tests = struct
             let unchecked =
               Transaction_hash.User_command_with_valid_signature.command tx
             in
-            [%test_eq: Int.t] key (User_command.fee_per_wu unchecked) ;
+            [%test_eq: Currency.Fee_rate.t] key
+              (User_command.fee_per_wu unchecked) ;
             let tx' =
               Map.find_exn all_by_sender (User_command.fee_payer unchecked)
               |> Tuple2.get1 |> F_sequence.head_exn
@@ -277,7 +280,10 @@ module For_tests = struct
               Transaction_hash.User_command_with_valid_signature.command tx
             in
             let wu = User_command.weight command in
-            let fee = Currency.Fee.of_int (fee_per_wu * wu) in
+            let fee =
+              Currency.Fee_rate.scale_exn fee_per_wu wu
+              |> Currency.Fee_rate.to_uint64_exn |> Currency.Fee.of_uint64
+            in
             check_sender_applicable fee tx ;
             assert_all_by_hash tx)) ;
     Map.iter all_by_hash ~f:(fun tx ->
@@ -290,9 +296,9 @@ module For_tests = struct
 end
 
 let empty ~constraint_constants ~consensus_constants ~time_controller : t =
-  { applicable_by_fee = Int.Map.empty
+  { applicable_by_fee = Currency.Fee_rate.Map.empty
   ; all_by_sender = Account_id.Map.empty
-  ; all_by_fee = Int.Map.empty
+  ; all_by_fee = Currency.Fee_rate.Map.empty
   ; all_by_hash = Transaction_hash.Map.empty
   ; transactions_with_expiration = Global_slot.Map.empty
   ; size = 0
@@ -302,7 +308,7 @@ let empty ~constraint_constants ~consensus_constants ~time_controller : t =
 let size : t -> int = fun t -> t.size
 
 (* The least fee per weight unit of all transactions in the transaction pool *)
-let min_fee : t -> int option =
+let min_fee : t -> Currency.Fee_rate.t option =
  fun { all_by_fee; _ } -> Option.map ~f:Tuple2.get1 @@ Map.min_elt all_by_fee
 
 let member : t -> Transaction_hash.User_command.t -> bool =
@@ -450,13 +456,13 @@ module Update = struct
   type single =
     | Add of
         { command : Transaction_hash.User_command_with_valid_signature.t
-        ; fee_per_wu : Int.t
+        ; fee_per_wu : Currency.Fee_rate.t
         ; add_to_applicable_by_fee : bool
         }
     | Remove_all_by_fee_and_hash_and_expiration of
         Transaction_hash.User_command_with_valid_signature.t F_seq.t
     | Remove_from_applicable_by_fee of
-        { fee_per_wu : Int.t
+        { fee_per_wu : Currency.Fee_rate.t
         ; command : Transaction_hash.User_command_with_valid_signature.t
         }
   [@@deriving sexp]
@@ -1576,19 +1582,19 @@ let%test_module _ =
 
     let%test_unit "applicable_by_fee ordered by fee per wu" =
       let cmds =
-        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 10
+        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 4
         |> Sequence.to_list
       in
       let insert_cmd pool cmd =
         add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
           Account_nonce.zero
-          (Currency.Amount.of_int 500)
+          (Currency.Amount.of_int (500 * 10_000_000))
         |> Result.ok |> Option.value_exn
         |> fun (_, pool, _) -> pool
       in
       let pool = List.fold_left cmds ~init:empty ~f:insert_cmd in
       let compare cmd0 cmd1 : int =
-        Int.compare
+        Currency.Fee_rate.compare
           (User_command.fee_per_wu cmd0)
           (User_command.fee_per_wu cmd1)
       in
@@ -1600,19 +1606,19 @@ let%test_module _ =
 
     let%test_unit "all_by_fee ordered by fee per wu" =
       let cmds =
-        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 10
+        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 4
         |> Sequence.to_list
       in
       let insert_cmd pool cmd =
         add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
           Account_nonce.zero
-          (Currency.Amount.of_int 500)
+          (Currency.Amount.of_int (500 * 10_000_000))
         |> Result.ok |> Option.value_exn
         |> fun (_, pool, _) -> pool
       in
       let pool = List.fold_left cmds ~init:empty ~f:insert_cmd in
       let compare cmd0 cmd1 : int =
-        Int.compare
+        Currency.Fee_rate.compare
           (User_command.fee_per_wu cmd0)
           (User_command.fee_per_wu cmd1)
       in
@@ -1624,12 +1630,12 @@ let%test_module _ =
 
     let%test_unit "remove_lowest_fee" =
       let cmds =
-        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 10
+        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 4
         |> Sequence.to_list
       in
       let compare cmd0 cmd1 : int =
         let open Transaction_hash.User_command_with_valid_signature in
-        Int.compare
+        Currency.Fee_rate.compare
           (User_command.fee_per_wu @@ command cmd0)
           (User_command.fee_per_wu @@ command cmd1)
       in
@@ -1641,7 +1647,7 @@ let%test_module _ =
       let insert_cmd pool cmd =
         add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
           Account_nonce.zero
-          (Currency.Amount.of_int 500)
+          (Currency.Amount.of_int (500 * 10_000_000))
         |> Result.ok |> Option.value_exn
         |> fun (_, pool, _) -> pool
       in
@@ -1670,12 +1676,12 @@ let%test_module _ =
 
     let%test_unit "get_highest_fee" =
       let cmds =
-        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 10
+        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 4
         |> Sequence.to_list
       in
       let compare cmd0 cmd1 : int =
         let open Transaction_hash.User_command_with_valid_signature in
-        Int.compare
+        Currency.Fee_rate.compare
           (User_command.fee_per_wu @@ command cmd0)
           (User_command.fee_per_wu @@ command cmd1)
       in
@@ -1683,7 +1689,7 @@ let%test_module _ =
       let insert_cmd pool cmd =
         add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
           Account_nonce.zero
-          (Currency.Amount.of_int 500)
+          (Currency.Amount.of_int (500 * 10_000_000))
         |> Result.ok |> Option.value_exn
         |> fun (_, pool, _) -> pool
       in

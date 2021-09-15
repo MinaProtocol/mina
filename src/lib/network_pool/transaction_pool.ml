@@ -422,7 +422,7 @@ struct
           true
       | Some min_fee ->
           if Indexed_pool.size pool >= pool_max_size then
-            User_command.fee_per_wu cmd > min_fee
+            Currency.Fee_rate.(User_command.fee_per_wu cmd > min_fee)
           else true
 
     let diff_error_of_indexed_pool_error :
