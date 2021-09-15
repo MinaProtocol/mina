@@ -141,14 +141,8 @@ module Make
     match diff with
     | Empty ->
         Deferred.return
-<<<<<<< HEAD
           (Error (`Other (Error.of_string "cannot apply empty snark pool diff")))
-    | Add_solved_work (work, { Priced_proof.proof; fee }) ->
-=======
-          (Error
-             (`Other (Error.of_string "cannot apply empty snark pool diff")))
-    | Add_solved_work (work, {Priced_proof.proof; fee}) -> (
->>>>>>> 46e51fb0e... Fix snark pool race condition
+    | Add_solved_work (work, { Priced_proof.proof; fee }) -> (
         let is_local = match sender with Local -> true | _ -> false in
         let to_or_error = function
           | `Statement_not_referenced ->

@@ -249,13 +249,11 @@ module T = struct
     let ledger_hash_begin, next_available_token_begin =
       Scan_state.latest_ledger_proof scan_state
       |> Option.value_map ~default:(None, None) ~f:(fun proof ->
-             (Some (get_target proof), Some (next_available_token_begin proof))
-         )
+             (Some (get_target proof), Some (next_available_token_begin proof)))
     in
     Statement_scanner.check_invariants ~constraint_constants scan_state
       ~verifier:() ~error_prefix ~ledger_hash_end:ledger ~ledger_hash_begin
-      ~next_available_token_begin
-      ~next_available_token_end:next_available_token
+      ~next_available_token_begin ~next_available_token_end:next_available_token
 
   let statement_exn ~constraint_constants t =
     let open Deferred.Let_syntax in
@@ -516,8 +514,7 @@ module T = struct
       } )
 
   let apply_transaction_and_get_witness ~constraint_constants ledger
-      pending_coinbase_stack_state s status txn_state_view state_and_body_hash
-      =
+      pending_coinbase_stack_state s status txn_state_view state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let account_ids : Transaction.t -> _ = function
       | Fee_transfer t ->
@@ -541,7 +538,7 @@ module T = struct
     let%bind applied_txn, statement, updated_pending_coinbase_stack_state =
       measure "apply+stmt" (fun () ->
           apply_transaction_and_get_statement ~constraint_constants ledger
-            pending_coinbase_stack_state s txn_state_view )
+            pending_coinbase_stack_state s txn_state_view)
       |> Deferred.return
     in
     let%bind () = yield_result () in
@@ -589,8 +586,7 @@ module T = struct
               ( match
                   List.find (Transaction.public_keys t.With_status.data)
                     ~f:(fun pk ->
-                      Option.is_none (Signature_lib.Public_key.decompress pk)
-                  )
+                      Option.is_none (Signature_lib.Public_key.decompress pk))
                 with
               | None ->
                   ()
@@ -604,7 +600,7 @@ module T = struct
               | Ok (res, updated_pending_coinbase_stack_state) ->
                   (res :: acc, updated_pending_coinbase_stack_state)
               | Error err ->
-                  raise (Exit err) ) )
+                  raise (Exit err)))
       |> Deferred.Result.map_error ~f:(function
            | Exit err ->
                err
@@ -871,7 +867,7 @@ module T = struct
                     !"Insufficient number of transaction snark work (slots \
                       occupying: %d)  required %d, got %d"
                     slots required work_count))
-          else Deferred.Result.return () )
+          else Deferred.Result.return ())
     in
     let%bind () = Deferred.return (check_zero_fee_excess t.scan_state data) in
     let%bind res_opt, scan_state' =

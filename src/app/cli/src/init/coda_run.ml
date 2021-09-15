@@ -523,7 +523,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
       (On_port (Mina_lib.client_port coda))
   in
   trace_task "client RPC server" (fun () ->
-      Deferred.ignore
+      Deferred.ignore_m
         (Tcp.Server.create
            ~on_handler_error:
              (`Call
@@ -532,20 +532,21 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                    "Exception while handling TCP server request: $error"
                    ~metadata:
                      [ ("error", `String (Exn.to_string_mach exn))
-                     ; ("context", `String "rpc_tcp_server") ] ))
+                     ; ("context", `String "rpc_tcp_server")
+                     ]))
            where_to_listen
            (fun address reader writer ->
              let address = Socket.Address.Inet.addr address in
              if
                not
                  (Set.exists !client_trustlist ~f:(fun cidr ->
-                      Unix.Cidr.does_match cidr address ))
+                      Unix.Cidr.does_match cidr address))
              then (
                [%log error]
                  !"Rejecting client connection from $address, it is not \
                    present in the trustlist."
                  ~metadata:
-                   [("$address", `String (Unix.Inet_addr.to_string address))] ;
+                   [ ("$address", `String (Unix.Inet_addr.to_string address)) ] ;
                Deferred.unit )
              else
                Rpc.Connection.server_with_close
@@ -577,8 +578,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                            [ ("error", `String (Exn.to_string_mach exn))
                            ; ("context", `String "rpc_server")
                            ; ( "address"
-                             , `String (Unix.Inet_addr.to_string address) ) ] ;
-                       Deferred.unit )) )) )
+                             , `String (Unix.Inet_addr.to_string address) )
+                           ] ;
+                       Deferred.unit)))))
 
 let coda_crash_message ~log_issue ~action ~error =
   let followup =

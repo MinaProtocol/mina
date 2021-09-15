@@ -187,7 +187,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             | Some account ->
                 `Fst (location, Some account)
             | None ->
-                `Snd location )
+                `Snd location)
       in
       found_accounts @ Base.get_batch (get_parent t) leftover_locations
 
@@ -575,7 +575,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             | Some location ->
                 `Fst (account_id, Some location)
             | None ->
-                `Snd account_id )
+                `Snd account_id)
       in
       found_locations
       @ Base.location_of_account_batch (get_parent t) leftover_account_ids

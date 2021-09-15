@@ -121,10 +121,8 @@ module Make (Inputs : Inputs_intf) :
   let get_raw { kvdb; depth; _ } location =
     Kvdb.get kvdb ~key:(Location.serialize ~ledger_depth:depth location)
 
-  let get_raw_batch {kvdb; depth; _} locations =
-    let keys =
-      List.map locations ~f:(Location.serialize ~ledger_depth:depth)
-    in
+  let get_raw_batch { kvdb; depth; _ } locations =
+    let keys = List.map locations ~f:(Location.serialize ~ledger_depth:depth) in
     Kvdb.get_batch kvdb ~keys
 
   let get_bin mdb location bin_read =
@@ -134,7 +132,7 @@ module Make (Inputs : Inputs_intf) :
     get_raw_batch mdb locations
     |> List.map ~f:(Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0)))
 
-  let delete_raw {kvdb; depth; _} location =
+  let delete_raw { kvdb; depth; _ } location =
     Kvdb.remove kvdb ~key:(Location.serialize ~ledger_depth:depth location)
 
   let get mdb location =

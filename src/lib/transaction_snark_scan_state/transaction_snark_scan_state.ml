@@ -369,7 +369,7 @@ struct
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
   let scan_statement ~constraint_constants tree ~verifier :
       ( Transaction_snark.Statement.t
-      , [`Error of Error.t | `Empty] )
+      , [ `Error of Error.t | `Empty ] )
       Deferred.Result.t =
     let open Deferred.Or_error.Let_syntax in
     let timer = Timer.create () in
@@ -389,7 +389,7 @@ struct
     let with_error ~f message =
       let result = f () in
       Deferred.Result.map_error result ~f:(fun e ->
-          Error.createf !"%s: %{sexp:Error.t}" (write_error message) e )
+          Error.createf !"%s: %{sexp:Error.t}" (write_error message) e)
     in
     let merge_acc ~proofs (acc : Acc.t) s2 : Acc.t Deferred.Or_error.t =
       Timer.time timer (sprintf "merge_acc:%s" __LOC__) (fun () ->
@@ -402,22 +402,22 @@ struct
                     Deferred.return (Transaction_snark.Statement.merge s1 s2)
                   in
                   let%map () = yield_occasionally () in
-                  Some (merged_statement, proofs @ ps) ) )
+                  Some (merged_statement, proofs @ ps)))
     in
     let fold_step_a acc_statement job =
       match job with
       | Parallel_scan.Merge.Job.Part (proof, message) ->
           let statement = Ledger_proof.statement proof in
-          merge_acc ~proofs:[(proof, message)] acc_statement statement
-      | Empty | Full {status= Parallel_scan.Job_status.Done; _} ->
+          merge_acc ~proofs:[ (proof, message) ] acc_statement statement
+      | Empty | Full { status = Parallel_scan.Job_status.Done; _ } ->
           return acc_statement
-      | Full {left= proof_1, message_1; right= proof_2, message_2; _} ->
+      | Full { left = proof_1, message_1; right = proof_2, message_2; _ } ->
           let%bind merged_statement =
             Timer.time timer (sprintf "merge:%s" __LOC__) (fun () ->
                 Deferred.return
                   (Transaction_snark.Statement.merge
                      (Ledger_proof.statement proof_1)
-                     (Ledger_proof.statement proof_2)) )
+                     (Ledger_proof.statement proof_2)))
           in
           merge_acc acc_statement merged_statement
             ~proofs:[ (proof_1, message_1); (proof_2, message_2) ]
@@ -425,16 +425,16 @@ struct
     let fold_step_d acc_statement job =
       match job with
       | Parallel_scan.Base.Job.Empty
-      | Full {status= Parallel_scan.Job_status.Done; _} ->
+      | Full { status = Parallel_scan.Job_status.Done; _ } ->
           return acc_statement
-      | Full {job= transaction; _} ->
+      | Full { job = transaction; _ } ->
           with_error "Bad base statement" ~f:(fun () ->
               let%bind expected_statement =
                 Timer.time timer
                   (sprintf "create_expected_statement:%s" __LOC__) (fun () ->
                     Deferred.return
                       (create_expected_statement ~constraint_constants
-                         transaction) )
+                         transaction))
               in
               let%bind () = yield_always () in
               if
@@ -449,22 +449,22 @@ struct
                        %{sexp:Transaction_snark.Statement.t}"
                      transaction.statement expected_statement))
     in
-    let%bind.Deferred.Let_syntax res =
+    let%bind.Deferred res =
       Fold.fold_chronological_until tree ~init:None
         ~f_merge:(fun acc (_weight, job) ->
           let open Container.Continue_or_stop in
-          match%map.Deferred.Let_syntax fold_step_a acc job with
+          match%map.Deferred fold_step_a acc job with
           | Ok next ->
               Continue next
           | e ->
               Stop e)
         ~f_base:(fun acc (_weight, job) ->
           let open Container.Continue_or_stop in
-          match%map.Deferred.Let_syntax fold_step_d acc job with
+          match%map.Deferred fold_step_d acc job with
           | Ok next ->
               Continue next
           | e ->
-              Stop e )
+              Stop e)
         ~finish:return
     in
     Timer.log "scan_statement" timer ;
@@ -472,7 +472,7 @@ struct
     | Ok None ->
         Deferred.return (Error `Empty)
     | Ok (Some (res, proofs)) -> (
-        match%map.Deferred.Let_syntax
+        match%map.Deferred
           ksprintf time "verify:%s" __LOC__ (fun () ->
               Verifier.verify ~verifier proofs)
         with

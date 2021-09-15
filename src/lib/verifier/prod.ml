@@ -420,10 +420,10 @@ let with_retry ~logger f =
   in
   go 4
 
-let verify_blockchain_snarks {worker; logger} chains =
+let verify_blockchain_snarks { worker; logger } chains =
   trace_recurring "Verifier.verify_blockchain_snarks" (fun () ->
       with_retry ~logger (fun () ->
-          let%bind {connection; _} =
+          let%bind { connection; _ } =
             let ivar = !worker in
             match Ivar.peek ivar with
             | Some worker ->
@@ -441,11 +441,12 @@ let verify_blockchain_snarks {worker; logger} chains =
               @@ `Stop (Error.of_string "verify_blockchain_snarks timeout") )
             ; Worker.Connection.run connection
                 ~f:Worker.functions.verify_blockchains ~arg:chains
-              |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ] ) )
+              |> Deferred.Or_error.map ~f:(fun x -> `Continue x)
+            ]))
 
 module Id = Unique_id.Int ()
 
-let verify_transaction_snarks {worker; logger} ts =
+let verify_transaction_snarks { worker; logger } ts =
   trace_recurring "Verifier.verify_transaction_snarks" (fun () ->
       let id = Id.create () in
       let n = List.length ts in
@@ -458,22 +459,22 @@ let verify_transaction_snarks {worker; logger} ts =
         ~metadata:(metadata ()) ;
       let%map res =
         with_retry ~logger (fun () ->
-            let%bind {connection; _} = Ivar.read !worker in
+            let%bind { connection; _ } = Ivar.read !worker in
             Worker.Connection.run connection
               ~f:Worker.functions.verify_transaction_snarks ~arg:ts
-            |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
+            |> Deferred.Or_error.map ~f:(fun x -> `Continue x))
       in
       [%log trace] "verify $n transaction_snarks (after)!"
         ~metadata:
           ( ( "result"
             , `String (Sexp.to_string ([%sexp_of: bool Or_error.t] res)) )
           :: metadata () ) ;
-      res )
+      res)
 
-let verify_commands {worker; logger} ts =
+let verify_commands { worker; logger } ts =
   trace_recurring "Verifier.verify_commands" (fun () ->
       with_retry ~logger (fun () ->
-          let%bind {connection; _} = Ivar.read !worker in
+          let%bind { connection; _ } = Ivar.read !worker in
           Worker.Connection.run connection ~f:Worker.functions.verify_commands
             ~arg:ts
-          |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) )
+          |> Deferred.Or_error.map ~f:(fun x -> `Continue x)))
