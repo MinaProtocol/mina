@@ -330,8 +330,7 @@ module Rpcs = struct
 
     include Master.T
 
-    let sent_counter =
-      Mina_metrics.Network.get_transition_chain_proof_rpcs_sent
+    let sent_counter = Mina_metrics.Network.get_transition_chain_proof_rpcs_sent
 
     let received_counter =
       Mina_metrics.Network.get_transition_chain_proof_rpcs_received

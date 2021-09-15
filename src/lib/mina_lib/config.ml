@@ -47,7 +47,6 @@ type t =
   ; archive_process_location :
       Core.Host_and_port.t Cli_lib.Flag.Types.with_name option
         [@default None]
-<<<<<<< HEAD
   ; demo_mode : bool [@default false]
   ; log_block_creation : bool [@default false]
   ; precomputed_values : Precomputed_values.t
@@ -56,26 +55,7 @@ type t =
   ; log_precomputed_blocks : bool
   ; upload_blocks_to_gcloud : bool
   ; block_reward_threshold : Currency.Amount.t option [@default None]
+  ; uptime_url : Uri.t option [@default None]
+  ; uptime_submitter_keypair : Keypair.t option [@default None]
   }
-||||||| fc3cfa287
-  ; demo_mode: bool [@default false]
-  ; log_block_creation: bool [@default false]
-  ; precomputed_values: Precomputed_values.t
-  ; start_time: Time.t
-  ; precomputed_blocks_path: string option
-  ; log_precomputed_blocks: bool
-  ; upload_blocks_to_gcloud: bool
-  ; block_reward_threshold: Currency.Amount.t option [@default None] }
-=======
-  ; demo_mode: bool [@default false]
-  ; log_block_creation: bool [@default false]
-  ; precomputed_values: Precomputed_values.t
-  ; start_time: Time.t
-  ; precomputed_blocks_path: string option
-  ; log_precomputed_blocks: bool
-  ; upload_blocks_to_gcloud: bool
-  ; block_reward_threshold: Currency.Amount.t option [@default None]
-  ; uptime_url: Uri.t option [@default None]
-  ; uptime_submitter_keypair: Keypair.t option [@default None] }
->>>>>>> origin/release/1.2.0
 [@@deriving make]

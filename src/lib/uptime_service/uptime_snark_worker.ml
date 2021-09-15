@@ -40,11 +40,12 @@ module Worker = struct
     module F = Rpc_parallel.Function
 
     type 'w functions =
-      { perform_single:
+      { perform_single :
           ( 'w
           , Sok_message.t * Prod.single_spec
           , (Ledger_proof.t * Time.Span.t) Or_error.t )
-          F.t }
+          F.t
+      }
 
     module Worker_state = Worker_state
 
@@ -57,8 +58,8 @@ module Worker = struct
 
     module Functions
         (C : Rpc_parallel.Creator
-             with type worker_state := Worker_state.t
-              and type connection_state := Connection_state.t) =
+               with type worker_state := Worker_state.t
+                and type connection_state := Connection_state.t) =
     struct
       let perform_single (w : Worker_state.t) msg_and_single_spec =
         let (module M) = Worker_state.get w in
@@ -70,20 +71,19 @@ module Worker = struct
             ~f:(fun ~worker_state ~conn_state:_ i -> f worker_state i)
             ~bin_input:i ~bin_output:o ()
         in
-        { perform_single=
+        { perform_single =
             f
-              ( [%bin_type_class:
-                  Sok_message.Stable.Latest.t * Prod.single_spec]
+              ( [%bin_type_class: Sok_message.Stable.Latest.t * Prod.single_spec]
               , [%bin_type_class:
                   (Ledger_proof.Stable.Latest.t * Time.Span.t) Or_error.t]
-              , perform_single ) }
+              , perform_single )
+        }
 
       let init_worker_state logger =
         [%log info] "Uptime SNARK worker started" ;
         Worker_state.create ~logger
 
-      let init_connection_state ~connection:_ ~worker_state:_ () =
-        Deferred.unit
+      let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
     end
   end
 
@@ -91,14 +91,15 @@ module Worker = struct
 end
 
 type t =
-  { connection: Worker.Connection.t
-  ; process: Process.t
-  ; logger: Logger.Stable.Latest.t }
+  { connection : Worker.Connection.t
+  ; process : Process.t
+  ; logger : Logger.Stable.Latest.t
+  }
 
 let create ~logger ~pids : t Deferred.t =
   let on_failure err =
     [%log error] "Uptime service SNARK worker process failed with error $err"
-      ~metadata:[("err", Error_json.error_to_yojson err)] ;
+      ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
     Error.raise err
   in
   [%log info] "Starting a new uptime service SNARK worker process" ;
@@ -114,7 +115,8 @@ let create ~logger ~pids : t Deferred.t =
       ; ( "process_kind"
         , `String
             Child_processes.Termination.(show_process_kind Uptime_snark_worker)
-        ) ] ;
+        )
+      ] ;
   Child_processes.Termination.register_process pids process
     Child_processes.Termination.Uptime_snark_worker ;
   (* the wait loop in the daemon will terminate the daemon if this SNARK worker
@@ -129,15 +131,15 @@ let create ~logger ~pids : t Deferred.t =
        ~f:(fun stdout ->
          return
          @@ [%log debug] "Uptime SNARK worker stdout: $stdout"
-              ~metadata:[("stdout", `String stdout)] ) ;
+              ~metadata:[ ("stdout", `String stdout) ]) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stderr process |> Reader.pipe)
        ~f:(fun stderr ->
          return
          @@ [%log error] "Uptime SNARK worker stderr: $stderr"
-              ~metadata:[("stderr", `String stderr)] ) ;
-  {connection; process; logger}
+              ~metadata:[ ("stderr", `String stderr) ]) ;
+  { connection; process; logger }
 
-let perform_single {connection; _} ((_message, _single_spec) as arg) =
+let perform_single { connection; _ } ((_message, _single_spec) as arg) =
   Worker.Connection.run connection ~f:Worker.functions.perform_single ~arg

@@ -130,7 +130,7 @@ module Runtime = struct
           current_gc := Gc.stat () ;
           current_jemalloc := Jemalloc.get_memory_stats () ;
           gc_allocated_bytes := Gc.allocated_bytes () ;
-          gc_stat () ))
+          gc_stat ()))
 
   let simple_metric ~metric_type ~help name fn =
     let name = Printf.sprintf "%s_%s_%s" namespace subsystem name in
@@ -379,8 +379,7 @@ module Network = struct
 
   let get_some_initial_peers_rpcs_received : Counter.t =
     let help = "# of Get_some_initial_peers rpc requests received" in
-    Counter.v "get_some_initial_peers_rpcs_received" ~help ~namespace
-      ~subsystem
+    Counter.v "get_some_initial_peers_rpcs_received" ~help ~namespace ~subsystem
 
   let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent : Counter.t
       =
@@ -429,8 +428,7 @@ module Network = struct
 
   let get_transition_chain_proof_rpcs_sent : Counter.t =
     let help = "# of Get_transition_chain_proof rpc requests sent" in
-    Counter.v "get_transition_chain_proof_rpcs_sent" ~help ~namespace
-      ~subsystem
+    Counter.v "get_transition_chain_proof_rpcs_sent" ~help ~namespace ~subsystem
 
   let get_transition_chain_proof_rpcs_received : Counter.t =
     let help = "# of Get_transition_chain_proof rpc requests received" in

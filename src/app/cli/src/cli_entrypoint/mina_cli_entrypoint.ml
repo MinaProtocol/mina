@@ -137,7 +137,7 @@ let setup_daemon logger =
          metrics-server)"
       (optional int16)
   and gc_stat_interval =
-    flag "--gc-stat-interval" ~aliases:["gc-stat-interval"] (optional float)
+    flag "--gc-stat-interval" ~aliases:[ "gc-stat-interval" ] (optional float)
       ~doc:
         (sprintf
            "INTERVAL in mins for collecting GC stats for metrics (Default: %f)"
@@ -376,10 +376,10 @@ let setup_daemon logger =
         "true|false whether to track the set of all peers ever seen for the \
          all_peers metric (default: false)"
   and uptime_url_string =
-    flag "--uptime-url" ~aliases:["uptime-url"] (optional string)
+    flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
       ~doc:"URL URL of the uptime service of the Mina delegation program"
   and uptime_submitter_string =
-    flag "--uptime-submitter" ~aliases:["uptime-submitter"] (optional string)
+    flag "--uptime-submitter" ~aliases:[ "uptime-submitter" ] (optional string)
       ~doc:
         "PUBLICKEY Public key of the submitter to the uptime service of the \
          Mina delegation program"
@@ -836,19 +836,6 @@ let setup_daemon logger =
             in
             Some kp
         | _, Some tracked_pubkey ->
-<<<<<<< HEAD
-            let%bind wallets =
-              Secrets.Wallets.load ~logger ~disk_location:(conf_dir ^/ "wallets")
-            in
-            let sk_file = Secrets.Wallets.get_path wallets tracked_pubkey in
-||||||| fc3cfa287
-            let%bind wallets =
-              Secrets.Wallets.load ~logger
-                ~disk_location:(conf_dir ^/ "wallets")
-            in
-            let sk_file = Secrets.Wallets.get_path wallets tracked_pubkey in
-=======
->>>>>>> origin/release/1.2.0
             let%map kp =
               Secrets.Wallets.get_tracked_keypair ~logger
                 ~which:"block producer keypair"
@@ -1102,18 +1089,18 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         Option.map uptime_submitter_string ~f:(fun s ->
             match Public_key.Compressed.of_base58_check s with
             | Ok pk -> (
-              match Public_key.decompress pk with
-              | Some _ ->
-                  pk
-              | None ->
-                  failwithf
-                    "Invalid public key %s for uptime submitter (could not \
-                     decompress)"
-                    s () )
+                match Public_key.decompress pk with
+                | Some _ ->
+                    pk
+                | None ->
+                    failwithf
+                      "Invalid public key %s for uptime submitter (could not \
+                       decompress)"
+                      s () )
             | Error err ->
                 Mina_user_error.raisef
                   "Invalid public key %s for uptime submitter, %s" s
-                  (Error.to_string_hum err) () )
+                  (Error.to_string_hum err) ())
       in
       let%bind uptime_submitter_keypair =
         match uptime_submitter with
@@ -1194,16 +1181,10 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                 Uri.with_uri ~scheme:(Some "http") ~host:(Some "127.0.0.1")
                   ~port:(Some port) ~path:(Some "/metrics") Uri.empty)
           in
-<<<<<<< HEAD
-          Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore)
-||||||| fc3cfa287
-          Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore )
-=======
           Mina_metrics.Runtime.(
             gc_stat_interval_mins :=
               Option.value ~default:!gc_stat_interval_mins gc_stat_interval) ;
-          Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore )
->>>>>>> origin/release/1.2.0
+          Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore)
       |> Option.value ~default:Deferred.unit
     in
     let () = Mina_plugins.init_plugins ~logger coda plugins in

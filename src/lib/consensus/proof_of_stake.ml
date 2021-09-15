@@ -2432,8 +2432,7 @@ module Hooks = struct
 
       let sent_counter = Mina_metrics.Network.get_epoch_ledger_rpcs_sent
 
-      let received_counter =
-        Mina_metrics.Network.get_epoch_ledger_rpcs_received
+      let received_counter = Mina_metrics.Network.get_epoch_ledger_rpcs_received
 
       module M = Versioned_rpc.Both_convert.Plain.Make (Master)
       include M

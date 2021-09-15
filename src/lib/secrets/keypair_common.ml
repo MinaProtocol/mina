@@ -9,7 +9,7 @@ module Make_terminal_stdin (KP : sig
 
   val env : string
 
-  val env_deprecated : string
+  val env_deprecated : string option
 
   val read :
        privkey_path:string
@@ -34,7 +34,7 @@ struct
   let read_exn ?(should_reask = true) ~which path =
     let read_privkey password = read ~privkey_path:path ~password in
     let%bind result =
-      match (Sys.getenv env, Sys.getenv env_deprecated) with
+      match (Sys.getenv env, Option.bind env_deprecated ~f:Sys.getenv) with
       | Some password, _ ->
           (* this function is only called from client commands that can prompt for
              a password, so printing a message, rather than a formatted log, is OK
@@ -49,7 +49,8 @@ struct
           printf
             "Using %s private-key password from deprecated environment \
              variable %s\n"
-            which env_deprecated ;
+            which
+            (Option.value_exn env_deprecated) ;
           printf "Please use environment variable %s instead\n" env ;
           read_privkey (lazy (Deferred.return @@ Bytes.of_string password))
       | None, None ->

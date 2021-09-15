@@ -1,10 +1,8 @@
 (* string_sign.ml -- signatures for strings *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params
 open Signature_lib
@@ -106,18 +104,14 @@ module Message = struct
     let open Random_oracle in
     hash ~init (pack_input input)
     |> Digest.to_bits |> Inner_curve.Scalar.of_bits
-<<<<<<< HEAD:src/app/client_sdk/string_sign.ml
 
   let hash = make_hash ~init:Hash_prefix.signature
 
   let hash_for_mainnet = make_hash ~init:Hash_prefix.signature_for_mainnet
 
   let hash_for_testnet = make_hash ~init:Hash_prefix.signature_for_testnet
-||||||| fc3cfa287:src/app/client_sdk/string_sign.ml
-=======
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   (* TODO: factor out this common code from Signature_lib.Schnorr.Message *)
   type var = (Field.Var.t, Boolean.var) Random_oracle.Input.t
@@ -126,16 +120,15 @@ module Message = struct
     let input =
       let px, py = public_key in
       Random_oracle.Input.append t
-        {field_elements= [|px; py; r|]; bitstrings= [||]}
+        { field_elements = [| px; py; r |]; bitstrings = [||] }
     in
     Tick.make_checked (fun () ->
         let open Random_oracle.Checked in
         hash ~init:Hash_prefix_states.signature (pack_input input)
         |> Digest.to_bits ~length:Field.size_in_bits
-        |> Bitstring_lib.Bitstring.Lsb_first.of_list )
+        |> Bitstring_lib.Bitstring.Lsb_first.of_list)
 
   [%%endif]
->>>>>>> origin/release/1.2.0:src/lib/string_sign/string_sign.ml
 end
 
 module Schnorr = Signature_lib.Schnorr.Make (Tick) (Inner_curve) (Message)

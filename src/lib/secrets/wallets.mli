@@ -46,21 +46,13 @@ val lock : t -> needle:Public_key.Compressed.t -> unit
 val get_path : t -> Public_key.Compressed.t -> string
 
 val delete :
-<<<<<<< HEAD
   t -> Public_key.Compressed.t -> (unit, [ `Not_found ]) Deferred.Result.t
-||||||| fc3cfa287
-  t -> Public_key.Compressed.t -> (unit, [`Not_found]) Deferred.Result.t
-=======
-  t -> Public_key.Compressed.t -> (unit, [`Not_found]) Deferred.Result.t
 
 val get_tracked_keypair :
      logger:Logger.t
   -> which:string
-  -> read_from_env_exn:(   logger:Logger.t
-                        -> which:string
-                        -> string
-                        -> Keypair.t Deferred.t)
+  -> read_from_env_exn:
+       (logger:Logger.t -> which:string -> string -> Keypair.t Deferred.t)
   -> conf_dir:string
   -> Public_key.Compressed.t
   -> Keypair.t Deferred.t
->>>>>>> origin/release/1.2.0

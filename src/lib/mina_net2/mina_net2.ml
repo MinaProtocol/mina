@@ -836,30 +836,14 @@ module Helper = struct
 
     module Validate = struct
       type t =
-<<<<<<< HEAD
         { sender : peer_info option
         ; data : Data.t
+        ; seen_at : int64
         ; expiration : int64
         ; seqno : int
         ; upcall : string
         ; subscription_idx : int
         }
-||||||| fc3cfa287
-        { sender: peer_info option
-        ; data: Data.t
-        ; expiration: int64
-        ; seqno: int
-        ; upcall: string
-        ; subscription_idx: int }
-=======
-        { sender: peer_info option
-        ; data: Data.t
-        ; seen_at: int64
-        ; expiration: int64
-        ; seqno: int
-        ; upcall: string
-        ; subscription_idx: int }
->>>>>>> origin/release/1.2.0
       [@@deriving yojson]
     end
 
@@ -1009,7 +993,7 @@ module Helper = struct
         in
         [%log' spam t.logger]
           "Processing gossip message with IPC delay of $delay nanoseconds"
-          ~metadata:[("delay", `Int ipc_delay)] ;
+          ~metadata:[ ("delay", `Int ipc_delay) ] ;
         match Hashtbl.find t.subscriptions idx with
         | Some sub ->
             (let open Deferred.Let_syntax in

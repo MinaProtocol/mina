@@ -731,17 +731,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         -> r Deferred.Or_error.t =
      fun ?heartbeat_timeout ?timeout t peer transport rpc query ->
       let (module Impl) = implementation_of_rpc rpc in
-<<<<<<< HEAD
-      try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout ~rpc_name:Impl.name
-        t peer transport Impl.dispatch_multi query
-||||||| fc3cfa287
-      try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
-        ~rpc_name:Impl.name t peer transport Impl.dispatch_multi query
-=======
       try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
         ~rpc_counter:Impl.sent_counter ~rpc_name:Impl.name t peer transport
         Impl.dispatch_multi query
->>>>>>> origin/release/1.2.0
 
     let query_peer ?heartbeat_timeout ?timeout t (peer_id : Peer.Id.t) rpc
         rpc_input =

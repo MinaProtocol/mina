@@ -7,6 +7,9 @@ open Signature_lib
 module Make (Env : sig
   val env : string
 
+  (* TODO: remove eventually *)
+  val env_deprecated : string option
+
   val which : string
 end) =
 struct
@@ -19,8 +22,10 @@ struct
 
   let env = env
 
+  let env_deprecated = env_deprecated
+
   (** Writes a keypair to [privkey_path] and [privkey_path ^ ".pub"] using [Secret_file] *)
-  let write_exn {Keypair.private_key; public_key} ~(privkey_path : string)
+  let write_exn { Keypair.private_key; public_key } ~(privkey_path : string)
       ~(password : Secret_file.password) : unit Deferred.t =
     let privkey_bytes =
       Private_key.to_bigstring private_key |> Bigstring.to_bytes
@@ -34,9 +39,9 @@ struct
     with
     | Ok () ->
         (* The hope is that if [Secret_file.write] succeeded then this ought to
-       as well, letting [handle_open] stay inside [Secret_file]. It might not
-       if the environment changes underneath us, and we won't have nice errors
-       in that case. *)
+           as well, letting [handle_open] stay inside [Secret_file]. It might not
+           if the environment changes underneath us, and we won't have nice errors
+           in that case. *)
         let%bind pubkey_f = Writer.open_file (privkey_path ^ ".pub") in
         Writer.write_line pubkey_f pubkey_string ;
         Writer.close pubkey_f
@@ -77,7 +82,19 @@ struct
         Privkey_error.raise ~which priv_key_error
 
   let read_exn' path =
-    read_exn ~privkey_path:path
-      ~password:
-        (lazy (Password.hidden_line_or_env "Secret key password: " ~env))
+    let password =
+      let env_value = Sys.getenv env in
+      let env_deprecated_value = Option.bind env_deprecated ~f:Sys.getenv in
+      match (env_value, env_deprecated_value) with
+      | Some v, _ | None, Some v ->
+          lazy (return @@ Bytes.of_string v)
+      | None, None ->
+          let error_help_message =
+            sprintf "Set the %s environment variable to the password" env
+          in
+          lazy
+            (Password.read_hidden_line ~error_help_message
+               "Secret key password: ")
+    in
+    read_exn ~privkey_path:path ~password
 end
