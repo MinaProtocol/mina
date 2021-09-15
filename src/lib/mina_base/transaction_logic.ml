@@ -753,26 +753,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let receiver_location, receiver_account =
             get_with_location ledger receiver |> ok_or_reject
           in
-          (* Charge the account creation fee. *)
-          let%bind receiver_amount =
-            match receiver_location with
-            | `Existing _ ->
-                return amount
-            | `New ->
-                if Token_id.(equal default) token then
-                  (* Subtract the creation fee from the transaction amount. *)
-                  sub_account_creation_fee ~constraint_constants `Added amount
-                  |> Result.map_error ~f:(fun _ ->
-                         Transaction_status.Failure
-                         .Amount_insufficient_to_create_account )
-                else
-                  Result.fail
-                    Transaction_status.Failure.Cannot_pay_creation_fee_in_token
-          in
-          let%bind receiver_account =
-            incr_balance receiver_account receiver_amount
-          in
-          let%map source_location, source_timing, source_account =
+          let%bind source_location, source_timing, source_account =
             let ret =
               let%bind location, account =
                 if Account_id.equal source receiver then
@@ -805,8 +786,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             in
             if Account_id.equal fee_payer source then
               (* Don't process transactions with insufficient balance from the
-                 fee-payer.
-              *)
+               fee-payer.
+            *)
               match ret with
               | Ok x ->
                   Ok x
@@ -816,6 +797,25 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                        (Error.createf "%s"
                           (Transaction_status.Failure.describe failure)))
             else ret
+          in
+          (* Charge the account creation fee. *)
+          let%bind receiver_amount =
+            match receiver_location with
+            | `Existing _ ->
+                return amount
+            | `New ->
+                if Token_id.(equal default) token then
+                  (* Subtract the creation fee from the transaction amount. *)
+                  sub_account_creation_fee ~constraint_constants `Added amount
+                  |> Result.map_error ~f:(fun _ ->
+                         Transaction_status.Failure
+                         .Amount_insufficient_to_create_account )
+                else
+                  Result.fail
+                    Transaction_status.Failure.Cannot_pay_creation_fee_in_token
+          in
+          let%map receiver_account =
+            incr_balance receiver_account receiver_amount
           in
           let previous_empty_accounts, auxiliary_data =
             match receiver_location with
@@ -1034,7 +1034,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ( {common= applied_common; body= applied_body}
             : Transaction_applied.Signed_command_applied.t )
     | Error failure ->
-        (* Do not update the ledger. *)
+        (* Do not update the ledger. Except for the fee payer which is already updated *)
         let applied_common =
           { applied_common with
             user_command=
