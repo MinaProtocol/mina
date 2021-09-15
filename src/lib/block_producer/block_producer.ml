@@ -416,9 +416,6 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
   | Error (`Invalid_staged_ledger_hash e) ->
       exn_breadcrumb (Error.tag ~tag:"Invalid staged ledger hash" e)
   | Error (`Invalid_staged_ledger_diff (e, staged_ledger_diff)) ->
-      (* Unexpected errors from staged_ledger are captured in
-                     `Fatal_error
-    *)
       let msg : (_, unit, string, unit) format4 =
         "Unable to build breadcrumb from produced transition due to invalid \
          staged ledger diff: $error"
