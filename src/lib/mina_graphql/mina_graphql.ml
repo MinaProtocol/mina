@@ -2147,7 +2147,7 @@ module Types = struct
       type set_or_keep = Set | Keep
 
       let snapp_set_or_keep =
-        enum "KeepOrSet" ~doc:"Keep or set a value"
+        enum "SetOrKeep" ~doc:"Keep or set a value"
           ~values:[ enum_value "Keep" ~value:Keep; enum_value "Set" ~value:Set ]
 
       let snapp_make_set_or_keep name value_arg =
@@ -2163,7 +2163,7 @@ module Types = struct
             | Set, None ->
                 Error "No value given for Set")
           ~fields:
-            [ arg "set_or_keep" ~doc:"Flag to keep or set"
+            [ arg "setOrKeep" ~doc:"Flag to keep or set"
                 ~typ:(non_null snapp_set_or_keep)
             ; value_arg
             ]
@@ -2185,7 +2185,7 @@ module Types = struct
             | Set, None ->
                 Error "No value given for Set")
           ~fields:
-            [ arg "set_or_keep" ~doc:"Flag to keep or set"
+            [ arg "setOrKeep" ~doc:"Flag to keep or set"
                 ~typ:(non_null snapp_set_or_keep)
             ; value_arg
             ]
@@ -2208,7 +2208,7 @@ module Types = struct
             in
             { With_hash.data; hash })
           ~fields:
-            [ arg "verification_key"
+            [ arg "verificationKey"
                 ~doc:"Verification key in Base58Check format"
                 ~typ:(non_null string)
             ; arg "hash" ~doc:"Hash of verification key" ~typ:(non_null string)
@@ -2226,7 +2226,7 @@ module Types = struct
 
       let snapp_token_symbol_set_or_keep =
         snapp_make_set_or_keep "AccountTokenSetOrKeep"
-          (arg "token_symbol" ~doc:"Token symbol" ~typ:snapp_token)
+          (arg "tokenSymbol" ~doc:"Token symbol" ~typ:snapp_token)
 
       let snapp_auth_required =
         let open Permissions.Auth_required in
@@ -2260,15 +2260,15 @@ module Types = struct
               })
           ~fields:
             [ arg "stake" ~typ:(non_null bool)
-            ; arg "edit_state" ~typ:(non_null snapp_auth_required)
+            ; arg "editState" ~typ:(non_null snapp_auth_required)
             ; arg "send" ~typ:(non_null snapp_auth_required)
             ; arg "receive" ~typ:(non_null snapp_auth_required)
-            ; arg "set_delegate" ~typ:(non_null snapp_auth_required)
-            ; arg "set_permissions" ~typ:(non_null snapp_auth_required)
-            ; arg "set_verification_key" ~typ:(non_null snapp_auth_required)
-            ; arg "set_snapp_uri" ~typ:(non_null snapp_auth_required)
-            ; arg "edit_rollup_state" ~typ:(non_null snapp_auth_required)
-            ; arg "set_token_symbol" ~typ:(non_null snapp_auth_required)
+            ; arg "setDelegate" ~typ:(non_null snapp_auth_required)
+            ; arg "setPermissions" ~typ:(non_null snapp_auth_required)
+            ; arg "setVerification_key" ~typ:(non_null snapp_auth_required)
+            ; arg "setSnappUri" ~typ:(non_null snapp_auth_required)
+            ; arg "editRollupState" ~typ:(non_null snapp_auth_required)
+            ; arg "setTokenSymbol" ~typ:(non_null snapp_auth_required)
             ]
 
       let snapp_permissions_set_or_keep =
@@ -2312,17 +2312,17 @@ module Types = struct
                 }
             with exn -> Error (Exn.to_string exn))
           ~fields:
-            [ arg "initial_minimum_balance"
+            [ arg "initialMinimumBalance"
                 ~doc:"Initial minimum balance as a string"
                 ~typ:(non_null string)
-            ; arg "cliff_time" ~doc:"Cliff time, a global slot, as a string"
+            ; arg "cliffTime" ~doc:"Cliff time, a global slot, as a string"
                 ~typ:(non_null string)
-            ; arg "cliff_amount" ~doc:"Cliff amoount, as a string"
+            ; arg "cliffAmount" ~doc:"Cliff amoount, as a string"
                 ~typ:(non_null string)
-            ; arg "vesting_period"
+            ; arg "vestingPeriod"
                 ~doc:"Vesting period, a number of slots, as a string"
                 ~typ:(non_null string)
-            ; arg "vesting_increment" ~doc:"Vesting amount, as a string"
+            ; arg "vestingIncrement" ~doc:"Vesting amount, as a string"
                 ~typ:(non_null string)
             ]
 
@@ -2364,14 +2364,14 @@ module Types = struct
               ; timing
               })
           ~fields:
-            [ arg "app_state" ~doc:"List of 8 field elements"
+            [ arg "appState" ~doc:"List of 8 field elements"
                 ~typ:(non_null (list (non_null snapp_field_set_or_keep)))
             ; arg "delegate" ~typ:(non_null snapp_pk_set_or_keep)
-            ; arg "verification_key"
+            ; arg "verificationKey"
                 ~typ:(non_null snapp_vk_with_hash_set_or_keep)
             ; arg "permissions" ~typ:(non_null snapp_permissions_set_or_keep)
-            ; arg "snapp_uri" ~typ:(non_null snapp_uri_set_or_keep)
-            ; arg "token_symbol" ~typ:(non_null snapp_token_symbol_set_or_keep)
+            ; arg "snappUri" ~typ:(non_null snapp_uri_set_or_keep)
+            ; arg "tokenSymbol" ~typ:(non_null snapp_token_symbol_set_or_keep)
             ; arg "timing" ~typ:(non_null snapp_timing_set_or_keep)
             ]
 
@@ -2415,13 +2415,13 @@ module Types = struct
                 ~typ:(non_null string)
             ; arg "update" ~doc:"Update part of the body"
                 ~typ:(non_null snapp_update)
-            ; arg "token_id" ~doc:"Token id" ~typ:(non_null string)
+            ; arg "tokenId" ~doc:"Token id" ~typ:(non_null string)
             ; arg "delta" ~doc:"Signed amount" ~typ:(non_null snapp_delta)
             ; arg "events" ~doc:"A list of list of fields in Base58Check"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
-            ; arg "rollup_events" ~doc:"A list of list of fields in Base58Check"
+            ; arg "rollupEvents" ~doc:"A list of list of fields in Base58Check"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
-            ; arg "call_data" ~doc:"A field in Base58Check"
+            ; arg "callData" ~doc:"A field in Base58Check"
                 ~typ:(non_null string)
             ; arg "depth" ~doc:"An integer in string format"
                 ~typ:(non_null string)
@@ -2439,7 +2439,7 @@ module Types = struct
           ~fields:
             [ arg "body" ~doc:"signed predicated party"
                 ~typ:(non_null snapp_party_body)
-            ; arg "predicate" ~doc:"signature" ~typ:(non_null nonce)
+            ; arg "predicate" ~doc:"nonce" ~typ:(non_null nonce)
             ]
 
       let snapp_signature =
@@ -2547,9 +2547,9 @@ module Types = struct
             | Check, None ->
                 Error "Got Check with a null value")
           ~fields:
-            [ arg "check_or_ignore" ~doc:"Check or ignore"
+            [ arg "checkOrIgnore" ~doc:"Check or ignore"
                 ~typ:(non_null snapp_check_or_ignore)
-            ; arg "balance_interval" ~doc:"Balance interval, or null if Ignore"
+            ; arg "balanceInterval" ~doc:"Balance interval, or null if Ignore"
                 ~typ:snapp_balance_closed_interval
             ]
 
@@ -2636,13 +2636,13 @@ module Types = struct
           ~fields:
             [ arg "balance" ~typ:(non_null snapp_balance_numeric)
             ; arg "nonce" ~typ:(non_null snapp_nonce_numeric)
-            ; arg "receipt_chain_hash"
+            ; arg "receiptChainHash"
                 ~typ:(non_null snapp_receipt_chain_hash_or_ignore)
-            ; arg "public_key" ~typ:(non_null snapp_pk_or_ignore)
+            ; arg "publicKey" ~typ:(non_null snapp_pk_or_ignore)
             ; arg "delegate" ~typ:(non_null snapp_pk_or_ignore)
             ; arg "state" ~typ:(non_null snapp_state)
-            ; arg "rollup_state" ~typ:(non_null snapp_field_or_ignore)
-            ; arg "proved_state" ~typ:(non_null snapp_bool_or_ignore)
+            ; arg "rollupState" ~typ:(non_null snapp_field_or_ignore)
+            ; arg "provedState" ~typ:(non_null snapp_bool_or_ignore)
             ]
 
       let snapp_predicate =
@@ -2666,7 +2666,7 @@ module Types = struct
             | Nonce, _, _ ->
                 Error "Nonce requires a non-null nonce value")
           ~fields:
-            [ arg "full_or_nonce_or_accept" ~typ:(non_null snapp_predicate_enum)
+            [ arg "fullOrNonceOrAccept" ~typ:(non_null snapp_predicate_enum)
             ; arg "account" ~doc:"An account for Full, null otherwise"
                 ~typ:snapp_predicate_account
             ; arg "nonce" ~doc:"A nonce for Nonce, null otherwise" ~typ:nonce
@@ -2725,7 +2725,7 @@ module Types = struct
             | None_given, _, _ ->
                 Error "None_given, other data should be null")
           ~fields:
-            [ arg "proof_or_signature" ~typ:(non_null snapp_control_enum)
+            [ arg "proofOrSignature" ~typ:(non_null snapp_control_enum)
             ; arg "proof" ~typ:snapp_proof
             ; arg "signature" ~typ:snapp_signature
             ]
@@ -2746,7 +2746,7 @@ module Types = struct
 
       let snapp_snarked_ledger_hash_or_ignore =
         snapp_make_check_or_ignore "SnarkedLedgerHashOrIgnore"
-          (arg "snarked_ledger_hash"
+          (arg "snarkedLedgerHash"
              ~doc:"Snarked ledger hash in Base58Check format, or null if Ignore"
              ~typ:snarked_ledger_hash)
 
@@ -2825,7 +2825,7 @@ module Types = struct
             Ok { Epoch_ledger.Poly.hash; total_currency })
           ~fields:
             [ arg "hash" ~typ:(non_null snapp_snarked_ledger_hash_or_ignore)
-            ; arg "total_currency" ~typ:(non_null snapp_currency_amount_numeric)
+            ; arg "totalCurrency" ~typ:(non_null snapp_currency_amount_numeric)
             ]
 
       let snapp_epoch_data =
@@ -2849,9 +2849,9 @@ module Types = struct
           ~fields:
             [ arg "ledger" ~typ:(non_null snapp_epoch_ledger)
             ; arg "seed" ~typ:(non_null snapp_epoch_seed_or_ignore)
-            ; arg "start_checkpoint" ~typ:(non_null snapp_state_hash_or_ignore)
-            ; arg "lock_checkpoint" ~typ:(non_null snapp_state_hash_or_ignore)
-            ; arg "epoch_length" ~typ:(non_null snapp_length_numeric)
+            ; arg "startCheckpoint" ~typ:(non_null snapp_state_hash_or_ignore)
+            ; arg "lockCheckpoint" ~typ:(non_null snapp_state_hash_or_ignore)
+            ; arg "epochLength" ~typ:(non_null snapp_length_numeric)
             ]
 
       let snapp_protocol_state_arg :
@@ -2899,20 +2899,20 @@ module Types = struct
               ; next_epoch_data
               })
           ~fields:
-            [ arg "snarked_ledger_hash"
+            [ arg "snarkedLedgerHash"
                 ~typ:(non_null snapp_snarked_ledger_hash_or_ignore)
-            ; arg "snarked_next_available_token"
+            ; arg "snarkedNextAvailableToken"
                 ~typ:(non_null snapp_token_id_numeric)
             ; arg "timestamp" ~typ:(non_null snapp_block_time_numeric)
-            ; arg "blockchain_length" ~typ:(non_null snapp_length_numeric)
-            ; arg "min_window_density" ~typ:(non_null snapp_length_numeric)
-            ; arg "last_vrf_output" ~typ:snapp_vrf_output (* nullable! *)
-            ; arg "total_currency" ~typ:(non_null snapp_currency_amount_numeric)
-            ; arg "curr_global_slot" ~typ:(non_null snapp_global_slot_numeric)
-            ; arg "global_slot_since_genesis"
+            ; arg "blockchainLength" ~typ:(non_null snapp_length_numeric)
+            ; arg "minWindowDensity" ~typ:(non_null snapp_length_numeric)
+            ; arg "lastVrfOutput" ~typ:snapp_vrf_output (* nullable! *)
+            ; arg "totalCurrency" ~typ:(non_null snapp_currency_amount_numeric)
+            ; arg "currGlobalSlot" ~typ:(non_null snapp_global_slot_numeric)
+            ; arg "globalSlotSinceGenesis"
                 ~typ:(non_null snapp_global_slot_numeric)
-            ; arg "staking_epoch_data" ~typ:(non_null snapp_epoch_data)
-            ; arg "next_epoch_data" ~typ:(non_null snapp_epoch_data)
+            ; arg "stakingEpochData" ~typ:(non_null snapp_epoch_data)
+            ; arg "nextEpochData" ~typ:(non_null snapp_epoch_data)
             ]
     end
 
