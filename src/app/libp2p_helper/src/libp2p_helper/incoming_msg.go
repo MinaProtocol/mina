@@ -40,6 +40,13 @@ var rpcRequestExtractors = map[ipc.Libp2pHelperInterface_RpcRequest_Which]extrac
 	ipc.Libp2pHelperInterface_RpcRequest_Which_getPeerNodeStatus:   fromGetPeerNodeStatusReq,
 }
 
+var pushMesssageExtractors = map[ipc.Libp2pHelperInterface_PushMessage_Which]extractPushMessage{
+	ipc.Libp2pHelperInterface_PushMessage_Which_addResource:      fromAddResourcePush,
+	ipc.Libp2pHelperInterface_PushMessage_Which_deleteResource:   fromDeleteResourcePush,
+	ipc.Libp2pHelperInterface_PushMessage_Which_downloadResource: fromDownloadResourcePush,
+	ipc.Libp2pHelperInterface_PushMessage_Which_validation:       fromValidationPush,
+}
+
 func (app *app) handleIncomingMsg(msg *ipc.Libp2pHelperInterface_Message) {
 	if msg.HasRpcRequest() {
 		resp, err := func() (*capnp.Message, error) {
@@ -73,22 +80,23 @@ func (app *app) handleIncomingMsg(msg *ipc.Libp2pHelperInterface_Message) {
 		}
 	} else if msg.HasPushMessage() {
 		err := func() error {
-			req, err := msg.PushMessage()
+			push, err := msg.PushMessage()
 			if err != nil {
 				return err
 			}
-			_, err = req.Header()
+			_, err = push.Header()
 			if err != nil {
 				return err
 			}
-			if !req.HasValidation() {
+			extractor, foundHandler := pushMesssageExtractors[push.Which()]
+			if !foundHandler {
 				return errors.New("Received push message of an unknown type")
 			}
-			r, err := req.Validation()
+			push_, err := extractor(push)
 			if err != nil {
 				return err
 			}
-			app.handleValidation(r)
+			push_.handle(app)
 			return nil
 		}()
 		if err != nil {

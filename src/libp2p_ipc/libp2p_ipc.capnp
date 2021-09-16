@@ -11,6 +11,10 @@ struct PeerId {
   id @0 :Text;
 }
 
+struct RootBlockId {
+  blake2bHash @0 :Data;
+}
+
 struct AddrInfo {
   peerId @0 :PeerId;
   addrs @1 :List(Multiaddr);
@@ -68,6 +72,13 @@ struct Libp2pConfig {
   maxConnections @12 :UInt32;
   validationQueueSize @13 :UInt32;
   minaPeerExchange @14 :Bool;
+}
+
+# Resource status updated
+enum ResourceUpdateType {
+  added @0; # resource was added to storage
+  removed @1; # resource was removed from the storage
+  broken @2; # resource was found to be broken
 }
 
 enum ValidationResult {
@@ -281,6 +292,18 @@ struct Libp2pHelperInterface {
     result @1 :ValidationResult;
   }
 
+  struct DeleteResource {
+    ids @0 :List(RootBlockId);
+  }
+
+  struct DownloadResource {
+    ids @0 :List(RootBlockId);
+  }
+
+  struct AddResource {
+    data @0 :Data;
+  }
+
   struct RpcRequest {
     header @0 :RpcMessageHeader;
 
@@ -344,9 +367,12 @@ struct Libp2pHelperInterface {
   struct PushMessage {
     header @0 :PushMessageHeader;
 
-    # union {
-    validation @1 :Libp2pHelperInterface.Validation;
-    # }
+    union {
+      validation @1 :Libp2pHelperInterface.Validation;
+      addResource @2 :Libp2pHelperInterface.AddResource;
+      deleteResource @3 :Libp2pHelperInterface.DeleteResource;
+      downloadResource @4 :Libp2pHelperInterface.DownloadResource;
+    }
   }
 
   struct Message {
@@ -395,6 +421,11 @@ struct DaemonInterface {
     msg @0 :StreamMessage;
   }
 
+  struct ResourceUpdate {
+    type @0 :ResourceUpdateType;
+    ids @1 :List(RootBlockId);
+  }
+
   struct PushMessage {
     header @0 :PushMessageHeader;
 
@@ -406,6 +437,7 @@ struct DaemonInterface {
       streamLost            @5 :DaemonInterface.StreamLost;
       streamComplete        @6 :DaemonInterface.StreamComplete;
       streamMessageReceived @7 :DaemonInterface.StreamMessageReceived;
+      resourceUpdated       @8 :DaemonInterface.ResourceUpdate;
     }
   }
 

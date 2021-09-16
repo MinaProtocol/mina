@@ -64,8 +64,8 @@ func badHash(data []byte) [32]byte {
 }
 
 func testSplitJoin(maxBlockSize int, data []byte) error {
-	blocks, root := SplitData(maxBlockSize, badHash, data)
-	res, err := JoinData(blocks, root)
+	blocks, root := SplitDataToBitswapBlocksWithHashF(maxBlockSize, badHash, data)
+	res, err := JoinBitswapBlocks(blocks, root)
 	if err != nil {
 		return err
 	}

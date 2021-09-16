@@ -138,7 +138,7 @@ func TestValidationPush(t *testing.T) {
 		validationId, err := m.NewValidationId()
 		validationId.SetId(seqno)
 		m.SetResult(ipcValResults[i])
-		testApp.handleValidation(m)
+		ValidationPush(m).handle(testApp)
 		require.NoError(t, err)
 		require.Equal(t, pubsubValResults[i], result)
 		_, has := testApp.Validators[seqno]

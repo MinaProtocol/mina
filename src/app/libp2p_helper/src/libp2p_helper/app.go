@@ -24,6 +24,7 @@ import (
 )
 
 func newApp() *app {
+	outChan := make(chan *capnp.Message, 64)
 	return &app{
 		P2p:                      nil,
 		Ctx:                      context.Background(),
@@ -32,12 +33,13 @@ func newApp() *app {
 		ValidatorMutex:           &sync.Mutex{},
 		Validators:               make(map[uint64]*validationStatus),
 		Streams:                  make(map[uint64]net.Stream),
-		OutChan:                  make(chan *capnp.Message, 64),
+		OutChan:                  outChan,
 		Out:                      bufio.NewWriter(os.Stdout),
 		AddedPeers:               []peer.AddrInfo{},
 		MetricsRefreshTime:       time.Minute,
 		metricsCollectionStarted: false,
 		metricsServer:            nil,
+		bitswapCtx:               NewBitswapCtx(context.Background(), outChan),
 	}
 }
 
