@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -13,6 +14,10 @@ import (
 	"sync"
 	"time"
 
+	lmdbbs "github.com/georgeee/go-bs-lmdb"
+	"github.com/ipfs/go-bitswap"
+	bitnet "github.com/ipfs/go-bitswap/network"
+	"github.com/ipfs/go-cid"
 	dsb "github.com/ipfs/go-ds-badger"
 	logging "github.com/ipfs/go-log"
 	p2p "github.com/libp2p/go-libp2p"
@@ -37,6 +42,7 @@ import (
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns_legacy"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
+	"github.com/multiformats/go-multihash"
 	"golang.org/x/crypto/blake2b"
 
 	libp2pmplex "github.com/libp2p/go-libp2p-mplex"
@@ -73,6 +79,7 @@ var (
 
 	pxProtocolID         = protocol.ID("/mina/peer-exchange")
 	NodeStatusProtocolID = protocol.ID("/mina/node-status")
+	BitSwapExchange      = protocol.ID("/mina/bitswap-exchange")
 
 	privateIpFilter *ma.Filters = nil
 )
@@ -228,6 +235,8 @@ func (cm *CodaConnectionManager) GetInfo() p2pconnmgr.CMInfo {
 // Helper contains all the daemon state
 type Helper struct {
 	Host              host.Host
+	Bitswap           *bitswap.Bitswap
+	BitswapStorage    BitswapStorage
 	Mdns              *mdns.Service
 	Dht               *dual.DHT
 	Ctx               context.Context
@@ -243,6 +252,130 @@ type Helper struct {
 	Seeds             []peer.AddrInfo
 	NodeStatus        []byte
 	pxDiscoveries     chan peer.AddrInfo
+}
+
+type RootBlockStatus int
+
+const (
+	Partial RootBlockStatus = iota
+	Full
+	Deleting
+)
+
+type BitswapStorage interface {
+	GetStatus(key [32]byte) (RootBlockStatus, error)
+	SetStatus(key [32]byte, value RootBlockStatus) error
+	DeleteStatus(key [32]byte) error
+	DeleteBlocks(keys [][32]byte) error
+	ViewBlock(key [32]byte, callback func([]byte) error) error
+}
+
+type BitswapStorageLmdb lmdbbs.Blockstore
+
+func UnmarshalRootBlockStatus(r []byte) (res RootBlockStatus, err error) {
+	err = errors.New("Wrong root block status retrieved")
+	if len(r) != 1 {
+		return
+	}
+	res = RootBlockStatus(r[0])
+	if res == Partial || res == Full || res == Deleting {
+		err = nil
+	}
+	return
+}
+
+func statusKey(key [32]byte) []byte {
+	return append([]byte{BS_STATUS_PREFIX}, key[:]...)
+}
+
+func blockKey(key []byte) []byte {
+	return append([]byte{BS_BLOCK_PREFIX}, key...)
+}
+
+func (bs_ *BitswapStorageLmdb) ViewBlock(key [32]byte, callback func([]byte) error) error {
+	bs := (*lmdbbs.Blockstore)(bs_)
+	return bs.View(BlockHashToCid(key), callback)
+}
+
+func (bs_ *BitswapStorageLmdb) GetStatus(key [32]byte) (res RootBlockStatus, err error) {
+	bs := (*lmdbbs.Blockstore)(bs_)
+	r, err := bs.GetData(statusKey(key))
+	if err != nil {
+		return
+	}
+	res, err = UnmarshalRootBlockStatus(r)
+	return
+}
+
+func (bs_ *BitswapStorageLmdb) DeleteStatus(key [32]byte) error {
+	bs := (*lmdbbs.Blockstore)(bs_)
+	return bs.PutData(statusKey(key), func(prevVal []byte, exists bool) (newVal []byte, newExists bool, err error) {
+		prev, err := UnmarshalRootBlockStatus(prevVal)
+		if err != nil {
+			return
+		}
+		newExists = false
+		if exists && prev != Deleting {
+			err = fmt.Errorf("Wrong status deletion from %d", prev)
+		}
+		return
+	})
+}
+
+func (bs_ *BitswapStorageLmdb) SetStatus(key [32]byte, newStatus RootBlockStatus) error {
+	bs := (*lmdbbs.Blockstore)(bs_)
+	return bs.PutData(statusKey(key), func(prevVal []byte, exists bool) (newVal []byte, newExists bool, err error) {
+		prev, err := UnmarshalRootBlockStatus(prevVal)
+		if err != nil {
+			return
+		}
+		newVal = []byte{byte(newStatus)}
+		newExists = true
+		allowed := false
+		allowed = allowed || (newStatus == Partial && (!exists || prev == Partial))
+		allowed = allowed || (newStatus == Full && (!exists || prev <= Full))
+		allowed = allowed || (newStatus == Deleting && exists)
+		if !allowed {
+			err = fmt.Errorf("Wrong status transition: from %d to %d", prev, newStatus)
+		}
+		return
+	})
+}
+func (bs_ *BitswapStorageLmdb) DeleteBlocks(keys [][32]byte) error {
+	bs := (*lmdbbs.Blockstore)(bs_)
+	cids := make([]cid.Cid, len(keys))
+	for i, key := range keys {
+		cids[i] = BlockHashToCid(key)
+	}
+	return bs.DeleteMany(cids)
+}
+
+const (
+	BS_BLOCK_PREFIX byte = iota
+	BS_STATUS_PREFIX
+)
+
+var blake2b256Code = multihash.Names["blake2b_256"]
+
+func cidToKeyMapper(id cid.Cid) []byte {
+	mh, err := multihash.Decode(id.Hash())
+	if err == nil && mh.Code == blake2b256Code && id.Prefix().Codec == cid.Raw {
+		return blockKey(mh.Digest)
+	}
+	return nil
+}
+
+func BlockHashToCid(h [32]byte) cid.Cid {
+	mh, _ := multihash.EncodeName(h[:], "blake2b_256")
+	return cid.NewCidV1(cid.Raw, mh)
+}
+
+func keyToCidMapper(key []byte) (id cid.Cid) {
+	if len(key) == 33 && key[0] == BS_BLOCK_PREFIX {
+		mh, _ := multihash.Encode(key[1:], blake2b256Code)
+		id = cid.NewCidV1(cid.Raw, mh)
+	}
+	return
 }
 
 type MessageStats struct {
@@ -707,9 +840,26 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		return nil, err
 	}
 
+	// 256MiB, a large enough mmap size to make mmap grow() a rare event
+	opt := lmdbbs.Options{
+		Path:            path.Join(statedir, "libp2p-lmdb-store"),
+		InitialMmapSize: 256 << 20,
+		CidToKeyMapper:  cidToKeyMapper,
+		KeyToCidMapper:  keyToCidMapper,
+	}
+	bstore, err := lmdbbs.Open(&opt)
+	if err != nil {
+		return nil, err
+	}
+
+	bitswapNetwork := bitnet.NewFromIpfsHost(host, kad, bitnet.Prefix(BitSwapExchange))
+	bs := bitswap.New(context.Background(), bitswapNetwork, bstore).(*bitswap.Bitswap)
+
 	// nil fields are initialized by beginAdvertising
 	h := &Helper{
 		Host:              host,
+		Bitswap:           bs,
+		BitswapStorage:    (*BitswapStorageLmdb)(bstore),
 		Ctx:               ctx,
 		Mdns:              nil,
 		Dht:               kad,

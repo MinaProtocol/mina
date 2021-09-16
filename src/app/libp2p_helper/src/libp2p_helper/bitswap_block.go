@@ -3,11 +3,29 @@ package main
 import (
 	"bytes"
 	"errors"
+
+	"golang.org/x/crypto/blake2b"
 )
 
-const LINK_SIZE = 32
+const BITSWAP_BLOCK_LINK_SIZE = blake2b.Size256
 
-type link = [LINK_SIZE]byte
+type BitswapBlockLink = [BITSWAP_BLOCK_LINK_SIZE]byte
+
+const MAX_BLOCK_SIZE = 1 << 18
+
+func SplitDataToBitswapBlocks(data []byte) (map[BitswapBlockLink][]byte, BitswapBlockLink) {
+	return SplitDataToBitswapBlocksWithHashF(MAX_BLOCK_SIZE, func([]byte) BitswapBlockLink {
+		return blake2b.Sum256(data)
+	}, data)
+}
+
+func LinksPerBlock(maxBlockSize int) int {
+	linksPerBlock := (maxBlockSize - 2) / BITSWAP_BLOCK_LINK_SIZE
+	if linksPerBlock > 65535 {
+		linksPerBlock = 65535
+	}
+	return linksPerBlock
+}
 
 // Split data blob to a series of bitswap
 // blocks. Each resulting block follows
@@ -29,15 +47,12 @@ type link = [LINK_SIZE]byte
 //
 // Returns a map of bitswap blocks, indexed by
 // hashes of respective blocks and the root block hash.
-func SplitData(maxBlockSize int, hashF func([]byte) link, data []byte) (map[link][]byte, link) {
-	if maxBlockSize <= 2+LINK_SIZE {
+func SplitDataToBitswapBlocksWithHashF(maxBlockSize int, hashF func([]byte) BitswapBlockLink, data []byte) (map[BitswapBlockLink][]byte, BitswapBlockLink) {
+	if maxBlockSize <= 2+BITSWAP_BLOCK_LINK_SIZE {
 		panic("Max block size too small")
 	}
 	// Maximum number of links that can fit in a single Bitswap block
-	linksPerBlock := (maxBlockSize - 2) / LINK_SIZE
-	if linksPerBlock > 65535 {
-		linksPerBlock = 65535
-	}
+	linksPerBlock := LinksPerBlock(maxBlockSize)
 	// `n` is the total number of bitswap blocks
 	//   formula for `n` is derived as follows
 	//   (for s_i the data part of bitswap block i,
@@ -53,8 +68,8 @@ func SplitData(maxBlockSize int, hashF func([]byte) link, data []byte) (map[link
 	//      6. n >= (len(data) - LINK_SIZE) / (maxBlockSize - LINK_SIZE - 2)
 	n := 1
 	if len(data) > maxBlockSize-2 {
-		n1 := len(data) - LINK_SIZE
-		n2 := maxBlockSize - LINK_SIZE - 2
+		n1 := len(data) - BITSWAP_BLOCK_LINK_SIZE
+		n2 := maxBlockSize - BITSWAP_BLOCK_LINK_SIZE - 2
 		n = n1 / n2
 		if n1%n2 > 0 {
 			n++
@@ -66,13 +81,13 @@ func SplitData(maxBlockSize int, hashF func([]byte) link, data []byte) (map[link
 	//   amount of data fit in first (n - 1) blocks from total
 	//   length of data
 
-	lastBlockDataSz := len(data) - (maxBlockSize-LINK_SIZE-2)*(n-1)
+	lastBlockDataSz := len(data) - (maxBlockSize-BITSWAP_BLOCK_LINK_SIZE-2)*(n-1)
 
-	res := make(map[link][]byte)
-	queue := make([]link, 0, n)
-	addBlock := func(links []link, chunk []byte) {
+	res := make(map[BitswapBlockLink][]byte)
+	queue := make([]BitswapBlockLink, 0, n)
+	addBlock := func(links []BitswapBlockLink, chunk []byte) {
 		l := len(links)
-		sz := l*LINK_SIZE + 2 + len(chunk)
+		sz := l*BITSWAP_BLOCK_LINK_SIZE + 2 + len(chunk)
 		if l > 65535 || sz > maxBlockSize {
 			panic("DataToBlocks: invalid block produced")
 		}
@@ -83,9 +98,9 @@ func SplitData(maxBlockSize int, hashF func([]byte) link, data []byte) (map[link
 			// We iterate links in reverse order as they were
 			// taken out of queue which has the order reversed
 			i := len(links) - i_ - 1
-			copy(block[2+LINK_SIZE*i:], links[i][:])
+			copy(block[2+BITSWAP_BLOCK_LINK_SIZE*i:], links[i][:])
 		}
-		copy(block[2+l*LINK_SIZE:], chunk)
+		copy(block[2+l*BITSWAP_BLOCK_LINK_SIZE:], chunk)
 		blockLink := hashF(block)
 		res[blockLink] = block
 		queue = append(queue, blockLink)
@@ -93,7 +108,7 @@ func SplitData(maxBlockSize int, hashF func([]byte) link, data []byte) (map[link
 
 	// end of data not yet allocated to some block
 	dataEnd := len(data) - lastBlockDataSz
-	addBlock([]link{}, data[dataEnd:])
+	addBlock([]BitswapBlockLink{}, data[dataEnd:])
 
 	if n > 1 {
 		// number of bitswap blocks containing exactly
@@ -110,18 +125,18 @@ func SplitData(maxBlockSize int, hashF func([]byte) link, data []byte) (map[link
 		dataBlockSz := maxBlockSize - 2
 		// Adding data-only blocks
 		for i := 0; i < dataBlocks; i++ {
-			addBlock([]link{}, data[dataEnd-dataBlockSz:dataEnd])
+			addBlock([]BitswapBlockLink{}, data[dataEnd-dataBlockSz:dataEnd])
 			dataEnd = dataEnd - dataBlockSz
 		}
 		if lRem > 0 {
 			// Adding a single block with some links that
 			// contains less than `linksPerBlock` links
-			dsz := maxBlockSize - 2 - lRem*LINK_SIZE
+			dsz := maxBlockSize - 2 - lRem*BITSWAP_BLOCK_LINK_SIZE
 			addBlock(queue[:lRem], data[dataEnd-dsz:dataEnd])
 			queue = queue[lRem:]
 			dataEnd = dataEnd - dsz
 		}
-		dsz := maxBlockSize - 2 - linksPerBlock*LINK_SIZE
+		dsz := maxBlockSize - 2 - linksPerBlock*BITSWAP_BLOCK_LINK_SIZE
 		for i := 0; i < fullLinkBlocks; i++ {
 			addBlock(queue[:linksPerBlock], data[dataEnd-dsz:dataEnd])
 			queue = queue[linksPerBlock:]
@@ -132,15 +147,15 @@ func SplitData(maxBlockSize int, hashF func([]byte) link, data []byte) (map[link
 }
 
 // Parses block
-func ReadBlock(block []byte) ([]link, []byte, error) {
+func ReadBitswapBlock(block []byte) ([]BitswapBlockLink, []byte, error) {
 	if len(block) >= 2 {
 		l := (int(block[0]) << 8) | int(block[1])
-		prefix := LINK_SIZE*l + 2
+		prefix := BITSWAP_BLOCK_LINK_SIZE*l + 2
 		if len(block) >= prefix {
-			links := make([]link, l)
+			links := make([]BitswapBlockLink, l)
 			for i := 0; i < l; i++ {
 				// Copy relies on fixed size of link
-				copy(links[i][:], block[2+i*LINK_SIZE:])
+				copy(links[i][:], block[2+i*BITSWAP_BLOCK_LINK_SIZE:])
 			}
 			return links, block[prefix:], nil
 		}
@@ -148,8 +163,8 @@ func ReadBlock(block []byte) ([]link, []byte, error) {
 	return nil, nil, errors.New("Block is too short")
 }
 
-func JoinData(blocks map[link][]byte, root link) ([]byte, error) {
-	queue := make([]link, 0, len(blocks))
+func JoinBitswapBlocks(blocks map[BitswapBlockLink][]byte, root BitswapBlockLink) ([]byte, error) {
+	queue := make([]BitswapBlockLink, 0, len(blocks))
 	queue = append(queue, root)
 	res := make([][]byte, 0, len(blocks))
 	for {
@@ -157,7 +172,7 @@ func JoinData(blocks map[link][]byte, root link) ([]byte, error) {
 		if !has {
 			return nil, errors.New("Didn't find a block")
 		}
-		links, data, err := ReadBlock(block)
+		links, data, err := ReadBitswapBlock(block)
 		if err != nil {
 			return nil, err
 		}

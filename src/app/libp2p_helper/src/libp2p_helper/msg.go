@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	gonet "net"
 	"time"
 
@@ -20,11 +21,17 @@ type codaPeerInfo struct {
 	PeerID     string
 }
 
+type ipcPushMessage = ipc.Libp2pHelperInterface_PushMessage
+type pushMessage interface {
+	handle(app *app)
+}
+type extractPushMessage = func(ipcPushMessage) (pushMessage, error)
+
 type ipcRpcRequest = ipc.Libp2pHelperInterface_RpcRequest
-type extractRequest = func(ipcRpcRequest) (rpcRequest, error)
 type rpcRequest interface {
 	handle(app *app, seqno uint64) *capnp.Message
 }
+type extractRequest = func(ipcRpcRequest) (rpcRequest, error)
 
 func filterIPString(filters *ma.Filters, ip string, action ma.Action) error {
 	realIP := gonet.ParseIP(ip).To4()
@@ -352,5 +359,21 @@ func mkStreamMessageReceivedUpcall(streamIdx uint64, data []byte) *capnp.Message
 		panicOnErr(err)
 		sid.SetId(streamIdx)
 		panicOnErr(im.SetData(data))
+	})
+}
+
+func mkResourceUpdatedUpcall(type_ ipc.ResourceUpdateType, rootIds []BitswapBlockLink) *capnp.Message {
+	return mkPushMsg(func(m ipc.DaemonInterface_PushMessage) {
+		im, err := m.NewResourceUpdated()
+		panicOnErr(err)
+		if len(rootIds) > math.MaxInt32 {
+			panic("too many root ids in a single upcall")
+		}
+		im.SetType(type_)
+		mIds, err := im.NewIds(int32(len(rootIds)))
+		panicOnErr(err)
+		for i, rootId := range rootIds {
+			panicOnErr(mIds.At(i).SetBlake2bHash(rootId[:]))
+		}
 	})
 }
