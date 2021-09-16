@@ -378,11 +378,21 @@ let setup_daemon logger =
   and uptime_url_string =
     flag "--uptime-url" ~aliases:["uptime-url"] (optional string)
       ~doc:"URL URL of the uptime service of the Mina delegation program"
-  and uptime_submitter_string =
-    flag "--uptime-submitter" ~aliases:["uptime-submitter"] (optional string)
+  and uptime_submitter_key =
+    flag "--uptime-submitter-key" ~aliases:["uptime-submitter-key"]
       ~doc:
-        "PUBLICKEY Public key of the submitter to the uptime service of the \
-         Mina delegation program"
+        "KEYFILE Private key file for the uptime submitter. You cannot \
+         provide both `uptime-submitter-key` and `uptime-submitter-pubkey`."
+      (optional string)
+  and uptime_submitter_pubkey =
+    flag "--uptime-submitter-pubkey"
+      ~aliases:["uptime-submitter-pubkey"]
+      (optional string)
+      ~doc:
+        "PUBLICKEY Public key of the submitter to the Mina delegation \
+         program, for the associated private key that is being tracked by \
+         this daemon. You cannot provide both `uptime-submitter-key` and \
+         `uptime-submitter-pubkey`."
   in
   fun () ->
     let open Deferred.Let_syntax in
@@ -1115,17 +1125,20 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
           proposed_protocol_version
       in
-      ( match (uptime_url_string, uptime_submitter_string) with
-      | Some _, Some _ | None, None ->
+      ( match
+          (uptime_url_string, uptime_submitter_key, uptime_submitter_pubkey)
+        with
+      | Some _, Some _, None | Some _, None, Some _ | None, None, None ->
           ()
       | _ ->
           Mina_user_error.raise
-            "Must provide both --uptime-url and --uptime-submitter" ) ;
+            "Must provide both --uptime-url and exactly one of \
+             --uptime-submitter-key or --uptime-submitter-pubkey" ) ;
       let uptime_url =
         Option.map uptime_url_string ~f:(fun s -> Uri.of_string s)
       in
-      let uptime_submitter =
-        Option.map uptime_submitter_string ~f:(fun s ->
+      let uptime_submitter_opt =
+        Option.map uptime_submitter_pubkey ~f:(fun s ->
             match Public_key.Compressed.of_base58_check s with
             | Ok pk -> (
               match Public_key.decompress pk with
@@ -1142,10 +1155,10 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                   (Error.to_string_hum err) () )
       in
       let%bind uptime_submitter_keypair =
-        match uptime_submitter with
-        | None ->
+        match (uptime_submitter_key, uptime_submitter_opt) with
+        | None, None ->
             return None
-        | Some pk ->
+        | None, Some pk ->
             let%map kp =
               Secrets.Wallets.get_tracked_keypair ~logger
                 ~which:"uptime submitter keypair"
@@ -1154,6 +1167,17 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                 ~conf_dir pk
             in
             Some kp
+        | Some sk_file, None ->
+            let%map kp =
+              Secrets.Uptime_keypair.Terminal_stdin.read_from_env_exn ~logger
+                ~which:"uptime submitter keypair" sk_file
+            in
+            Some kp
+        | _ ->
+            (* unreachable, because of earlier check *)
+            failwith
+              "Cannot provide both uptime submitter public key and uptime \
+               submitter keyfile"
       in
       let start_time = Time.now () in
       let%map coda =
