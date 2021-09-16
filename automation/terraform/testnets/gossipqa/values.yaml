@@ -1,12 +1,14 @@
 # helm install gossipqa-prom prometheus-community/prometheus -f automation/terraform/testnets/gossipqa/values.yaml
 
-## Define serviceAccount names for components. Defaults to component's fully qualified name.
-##
-serviceAccounts:
-  nodeExporter:
-    create: false
-    name:
-    annotations: {}
+nodeExporter:
+  ## If false, node-exporter will not be installed
+  ##
+  enabled: false
+
+alertmanager:
+  ## If false, alertmanager will not be installed
+  ##
+  enabled: false
 
 server:
 
