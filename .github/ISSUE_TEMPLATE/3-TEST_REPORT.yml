@@ -29,7 +29,7 @@ body:
     attributes:
       label: Summary
       description: |
-        Describe what test(s) are failing and how do you think they should behave?
+        List which test(s) are failing, and describe how you expect them to behave.
   - type: textarea
     validations:
       required: true
@@ -51,7 +51,7 @@ body:
   - type: textarea
     attributes:
       label: Platform
-      description: What platform you use. Are there any special flags you are using?
+      description: Which platform do you use? Are there any special flags you are using?
       placeholder: |
         Platform: Ubuntu 21.04
         FLAGS: --XPTO=1

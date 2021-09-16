@@ -10,7 +10,7 @@ body:
         Thanks for taking the time to fill out this bug report.
         Please fill out each section below. This info allows Mina maintainers to diagnose (and fix!) your issue as quickly as possible. Otherwise we might need to close the issue without e.g. clear reproduction steps.
 
-        Bug reports also should not be used for support requests about a specific problem in your site, please use GitHub Discussions for that.
+        Bug reports also should not be used for support requests about a specific problem in your deployments, please use GitHub Discussions for that.
 
         Useful Links:
         - Documentation: https://docs.minaprotocol.com/
@@ -60,7 +60,7 @@ body:
     validations:
       required: true
     attributes:
-      label: Describe how frequently you see this issue.
+      label: How frequently do you see this issue?
       multiple: false
       options:
         - Rarely
