@@ -97,9 +97,12 @@ let () =
 let compression = `Packing
 
 let now () =
-  (* can we make this int time? worried about float truncation *)
-  Time_ns.now () |> Time_ns.to_span_since_epoch |> Time_ns.Span.to_ns
-  |> Stdint.Uint64.of_float
+  let now_int64 =
+    (* can we make this int time? worried about float truncation *)
+    Time_ns.now () |> Time_ns.to_span_since_epoch |> Time_ns.Span.to_ns
+    |> Int64.of_float
+  in
+  build (module Builder.UnixNano) Builder.UnixNano.(op nano_sec_set now_int64)
 
 let unsafe_parse_peer_id peer_id =
   peer_id |> Reader.PeerId.id_get |> Peer.Id.unsafe_of_string
@@ -115,13 +118,17 @@ let stream_id_to_string = Fn.compose Uint64.to_string Reader.StreamId.id_get
 
 let multiaddr_to_string = Reader.Multiaddr.representation_get
 
+let unix_nano_to_time_span unix_nano =
+  unix_nano |> Reader.UnixNano.nano_sec_get |> Float.of_int64
+  |> Time_ns.Span.of_ns |> Time_ns.of_span_since_epoch
+
 let create_multiaddr representation =
   build'
     (module Builder.Multiaddr)
     (op Builder.Multiaddr.representation_set representation)
 
 let create_peer_id peer_id =
-  build (module Builder.PeerId) (op Builder.PeerId.id_set peer_id)
+  build' (module Builder.PeerId) (op Builder.PeerId.id_set peer_id)
 
 let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
     ~external_multiaddr ~network_id ~unsafe_no_trust_ip ~flood ~direct_peers
@@ -161,7 +168,7 @@ let create_rpc_header ~sequence_number =
   build'
     (module Builder.RpcMessageHeader)
     Builder.RpcMessageHeader.(
-      op time_sent_set (now ())
+      reader_op time_sent_set_reader (now ())
       *> reader_op sequence_number_set_reader sequence_number)
 
 let rpc_request_body_set req body =
@@ -232,14 +239,9 @@ let rpc_request_to_outgoing_message request =
       builder_op rpc_request_set_builder request)
 
 let create_push_message_header () =
-  (* can we make this int time? worried about float truncation *)
-  let time =
-    Time_ns.now () |> Time_ns.to_span_since_epoch |> Time_ns.Span.to_ns
-    |> Stdint.Uint64.of_float
-  in
   build'
     (module Builder.PushMessageHeader)
-    Builder.PushMessageHeader.(op time_sent_set time)
+    Builder.PushMessageHeader.(reader_op time_sent_set_reader (now ()))
 
 let push_message_to_outgoing_message request =
   build'

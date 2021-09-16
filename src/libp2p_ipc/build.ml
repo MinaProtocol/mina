@@ -19,7 +19,7 @@ let noop : 'a op = Fn.ignore
    types because the signature `forall a b c. (a -> b -> c)` would unsafely allow us to not fully
    apply functions when constructing the DSL *)
 let op (type a b) (op : a builder_t -> b -> unit) (value : b) : a op =
- fun builder -> ignore (op builder value)
+ fun builder -> op builder value
 
 let list_op (type a b cap)
     (op : a builder_t -> b list -> (cap, b, Builder.array_t) Capnp.Array.t)

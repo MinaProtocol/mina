@@ -380,7 +380,8 @@ module OpenStream = struct
     let open Builder.Libp2pHelperInterface.OpenStream in
     build'
       (module Request)
-      Request.(reader_op peer_set_reader peer_id *> op protocol_id_set protocol)
+      Request.(
+        builder_op peer_set_builder peer_id *> op protocol_id_set protocol)
 end
 
 module CloseStream = struct
@@ -462,7 +463,7 @@ module SendStream = struct
         reader_op Request.msg_set_reader
           (build
              (module StreamMessage)
-             ( reader_op StreamMessage.id_set_reader stream_id
+             ( reader_op StreamMessage.stream_id_set_reader stream_id
              *> op StreamMessage.data_set data )))
 end
 

@@ -155,7 +155,7 @@ module OpenStream : sig
       with type Request.t = Builder.Libp2pHelperInterface.OpenStream.Request.t
        and type Response.t = Reader.Libp2pHelperInterface.OpenStream.Response.t
 
-  val create_request : peer_id:peer_id -> protocol:string -> Request.t
+  val create_request : peer_id:Builder.PeerId.t -> protocol:string -> Request.t
 end
 
 module CloseStream : sig

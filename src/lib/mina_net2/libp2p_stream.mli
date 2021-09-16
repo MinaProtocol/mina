@@ -12,7 +12,7 @@ val open_ :
      logger:Logger.t
   -> helper:Libp2p_helper.t
   -> protocol:string
-  -> peer_id:Libp2p_ipc.peer_id
+  -> peer_id:Libp2p_ipc.Builder.PeerId.t
   -> release_stream:(Libp2p_ipc.stream_id -> unit)
   -> t Deferred.Or_error.t
 

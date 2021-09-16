@@ -167,16 +167,17 @@ let handle_libp2p_helper_termination t ~pids ~killed result =
 let handle_incoming_message t msg ~handle_push_message =
   let open Libp2p_ipc.Reader in
   let open DaemonInterface.Message in
-  let record_message_delay time_sent =
-    let time_received = Time_ns.(now () |> to_span_since_epoch |> Span.to_ns) in
+  let record_message_delay time_sent_ipc =
     let message_delay =
-      time_received -. Float.of_int (Stdint.Uint64.to_int time_sent)
+      Time_ns.diff (Time_ns.now ())
+        (Libp2p_ipc.unix_nano_to_time_span time_sent_ipc)
     in
     Mina_metrics.Network.(
-      Ipc_latency_histogram.observe ipc_latency_ns_summary message_delay)
+      Ipc_latency_histogram.observe ipc_latency_ns_summary
+        (Time_ns.Span.to_ns message_delay))
   in
   match msg with
-  | Libp2pHelperResponse rpc_response ->
+  | RpcResponse rpc_response ->
       let rpc_header =
         Libp2pHelperInterface.RpcResponse.header_get rpc_response
       in

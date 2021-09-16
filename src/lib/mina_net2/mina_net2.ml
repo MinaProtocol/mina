@@ -1,7 +1,6 @@
 open Core
 open Async
 open Async_unix
-open Stdint
 open Network_peer
 module Keypair = Keypair
 module Libp2p_stream = Libp2p_stream
@@ -46,8 +45,16 @@ let gating_config_to_helper_format (config : connection_gating) =
         if Set.mem trusted p then None else Some p)
       config.banned_peers
   in
-  let banned_peers = List.map ~f:(fun p -> p.peer_id) config.banned_peers in
-  let trusted_peers = List.map ~f:(fun p -> p.peer_id) config.trusted_peers in
+  let banned_peers =
+    List.map
+      ~f:(fun p -> Libp2p_ipc.create_peer_id p.peer_id)
+      config.banned_peers
+  in
+  let trusted_peers =
+    List.map
+      ~f:(fun p -> Libp2p_ipc.create_peer_id p.peer_id)
+      config.trusted_peers
+  in
   Libp2p_ipc.create_gating_config ~banned_ips ~banned_peers ~trusted_ips
     ~trusted_peers ~isolate:config.isolate
 
@@ -336,8 +343,7 @@ let handle_push_message t push_message =
       let sender = Libp2p_ipc.unsafe_parse_peer (sender_get m) in
       let validation_id = validation_id_get m in
       let validation_expiration =
-        expiration_get m |> Uint64.to_int64 |> Int63.of_int64_exn
-        |> Time_ns.Span.of_int63_ns |> Time_ns.of_span_since_epoch
+        Libp2p_ipc.unix_nano_to_time_span (expiration_get m)
       in
       match Hashtbl.find t.subscriptions subscription_id with
       | Some (Subscription.E sub) ->
@@ -373,7 +379,7 @@ let handle_push_message t push_message =
   (* A new inbound stream was opened *)
   | IncomingStream m -> (
       let open IncomingStream in
-      let stream_id = id_get m in
+      let stream_id = stream_id_get m in
       let protocol = protocol_get m in
       let peer = Libp2p_ipc.unsafe_parse_peer (peer_get m) in
       Option.iter t.all_peers_seen ~f:(fun all_peers_seen ->
@@ -442,7 +448,7 @@ let handle_push_message t push_message =
       let open StreamMessageReceived in
       let open StreamMessage in
       let msg = msg_get m in
-      let stream_id = id_get msg in
+      let stream_id = stream_id_get msg in
       let data = data_get msg in
       match
         Hashtbl.find t.streams (Libp2p_ipc.stream_id_to_string stream_id)
@@ -455,7 +461,7 @@ let handle_push_message t push_message =
   (* Stream was reset, either by the remote peer or an error on our end. *)
   | StreamLost m ->
       let open StreamLost in
-      let stream_id = id_get m in
+      let stream_id = stream_id_get m in
       let reason = reason_get m in
       [%log' trace t.logger]
         "Encountered error while reading stream $id: $error"

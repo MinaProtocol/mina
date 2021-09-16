@@ -46,9 +46,11 @@ val stream_id_to_string : stream_id -> string
 
 val multiaddr_to_string : Reader.Multiaddr.t -> string
 
+val unix_nano_to_time_span : Reader.UnixNano.t -> Time_ns.t
+
 val create_multiaddr : string -> multiaddr
 
-val create_peer_id : string -> peer_id
+val create_peer_id : string -> Builder.PeerId.t
 
 val create_libp2p_config :
      private_key:string
@@ -70,9 +72,9 @@ val create_libp2p_config :
 
 val create_gating_config :
      banned_ips:string list
-  -> banned_peers:string list
+  -> banned_peers:Builder.PeerId.t list
   -> trusted_ips:string list
-  -> trusted_peers:string list
+  -> trusted_peers:Builder.PeerId.t list
   -> isolate:bool
   -> gating_config
 

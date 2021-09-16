@@ -174,7 +174,7 @@ let open_ ~logger ~helper ~protocol ~peer_id ~release_stream =
       (Libp2p_ipc.Rpcs.OpenStream.create_request ~peer_id ~protocol)
   in
   let open Libp2p_ipc.Reader.Libp2pHelperInterface.OpenStream.Response in
-  let stream_id = id_get response in
+  let stream_id = stream_id_get response in
   let peer = Libp2p_ipc.unsafe_parse_peer (peer_get response) in
   create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
     ~release_stream

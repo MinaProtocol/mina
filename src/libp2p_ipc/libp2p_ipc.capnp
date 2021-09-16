@@ -137,16 +137,6 @@ struct Libp2pHelperInterface {
     struct Response {}
   }
 
-  struct FindPeer {
-    struct Request {
-      peerId @0 :PeerId;
-    }
-
-    struct Response {
-      result @0 :PeerInfo;
-    }
-  }
-
   struct AddPeer {
     struct Request {
       multiaddr @0 :Multiaddr;
@@ -304,7 +294,6 @@ struct Libp2pHelperInterface {
       sendStream @17 :Libp2pHelperInterface.SendStream.Request;
       setNodeStatus @18 :Libp2pHelperInterface.SetNodeStatus.Request;
       getPeerNodeStatus @19 :Libp2pHelperInterface.GetPeerNodeStatus.Request;
-      findPeer @20 :Libp2pHelperInterface.FindPeer.Request;
     }
   }
 
@@ -329,7 +318,6 @@ struct Libp2pHelperInterface {
       sendStream @16 :Libp2pHelperInterface.SendStream.Response;
       setNodeStatus @17 :Libp2pHelperInterface.SetNodeStatus.Response;
       getPeerNodeStatus @18 :Libp2pHelperInterface.GetPeerNodeStatus.Response;
-      findPeer @19 :Libp2pHelperInterface.FindPeer.Response;
     }
   }
 
