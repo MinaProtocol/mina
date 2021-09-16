@@ -1,3 +1,12 @@
+#this file was generated with 
+# helm template grafana --namespace gossipqa-prometheus --release-name grafana > grafana.yaml
+
+#apply this file with
+# kubectl apply -f grafana.yaml
+
+#then the PW to the admin grafana account will be obtained by running
+# kubectl get secret --namespace gossipqa-prometheus grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
 ---
 # Source: grafana/templates/podsecuritypolicy.yaml
 apiVersion: policy/v1beta1
