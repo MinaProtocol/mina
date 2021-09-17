@@ -14,6 +14,9 @@ module Stable : sig
   end
 end]
 
+module L :
+  Transaction_logic.Ledger_intf with type t = t ref and type location = int
+
 val merkle_root : t -> Ledger_hash.t
 
 val depth : t -> int
