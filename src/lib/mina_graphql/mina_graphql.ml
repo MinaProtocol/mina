@@ -2169,8 +2169,8 @@ module Types = struct
       let valid_until =
         arg "validUntil" ~typ:uint32_arg
           ~doc:
-            "The global slot number after which this transaction cannot be \
-             applied"
+            "The global slot since genesis after which this transaction cannot \
+             be applied"
 
       let nonce =
         arg "nonce" ~typ:uint32_arg
