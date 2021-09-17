@@ -7,11 +7,12 @@ import (
 	"testing"
 	"time"
 
+	ipc "libp2p_ipc"
+
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
-	ipc "libp2p_ipc"
 
 	"github.com/stretchr/testify/require"
 )
@@ -177,7 +178,7 @@ func TestConfigure(t *testing.T) {
 	require.NoError(t, err)
 	gc.SetIsolate(false)
 
-	resMsg := testApp.handleConfigure(239, m)
+	resMsg := ConfigureReq(m).handle(testApp, 239)
 	require.NoError(t, err)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, uint64(239))
@@ -193,7 +194,7 @@ func TestGenerateKeypair(t *testing.T) {
 	require.NoError(t, err)
 
 	testApp, _ := newTestApp(t, nil, true)
-	resMsg := testApp.handleGenerateKeypair(7839, m)
+	resMsg := GenerateKeypairReq(m).handle(testApp, 7839)
 	require.NoError(t, err)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, uint64(7839))
@@ -226,7 +227,7 @@ func TestGetListeningAddrs(t *testing.T) {
 	m, err := ipc.NewRootLibp2pHelperInterface_GetListeningAddrs_Request(seg)
 	require.NoError(t, err)
 	var mRpcSeqno uint64 = 1024
-	resMsg := testApp.handleGetListeningAddrs(mRpcSeqno, m)
+	resMsg := GetListeningAddrsReq(m).handle(testApp, mRpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasGetListeningAddrs())
@@ -247,9 +248,11 @@ func TestListen(t *testing.T) {
 	require.NoError(t, err)
 	m, err := ipc.NewRootLibp2pHelperInterface_Listen_Request(seg)
 	require.NoError(t, err)
-	require.NoError(t, m.SetIface(addrStr))
+	iface, err := m.NewIface()
+	require.NoError(t, iface.SetRepresentation(addrStr))
+	require.NoError(t, err)
 
-	resMsg := testApp.handleListen(1239, m)
+	resMsg := ListenReq(m).handle(testApp, 1239)
 	require.NoError(t, err)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, uint64(1239))
@@ -302,7 +305,7 @@ func TestSetGatingConfig(t *testing.T) {
 	gc.SetIsolate(false)
 
 	var mRpcSeqno uint64 = 2003
-	resMsg := testApp.handleSetGatingConfig(mRpcSeqno, m)
+	resMsg := SetGatingConfigReq(m).handle(testApp, mRpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasSetGatingConfig())
@@ -335,7 +338,7 @@ func TestSetNodeStatus(t *testing.T) {
 	testStatus := []byte("test_node_status")
 	require.NoError(t, m.SetStatus(testStatus))
 
-	resMsg := testApp.handleSetNodeStatus(11239, m)
+	resMsg := SetNodeStatusReq(m).handle(testApp, 11239)
 	require.NoError(t, err)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, uint64(11239))

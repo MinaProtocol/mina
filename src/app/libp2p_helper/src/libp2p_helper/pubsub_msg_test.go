@@ -1,12 +1,14 @@
 package main
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	ipc "libp2p_ipc"
 
 	capnp "capnproto.org/go/capnp/v3"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	ipc "libp2p_ipc"
 )
 
 func testPublishDo(t *testing.T, app *app, topic string, data []byte, rpcSeqno uint64) {
@@ -17,7 +19,7 @@ func testPublishDo(t *testing.T, app *app, topic string, data []byte, rpcSeqno u
 	require.NoError(t, m.SetTopic(topic))
 	require.NoError(t, m.SetData(data))
 
-	resMsg := app.handlePublish(rpcSeqno, m)
+	resMsg := PublishReq(m).handle(app, rpcSeqno)
 	require.NoError(t, err)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, rpcSeqno)
@@ -48,7 +50,7 @@ func testSubscribeDo(t *testing.T, app *app, topic string, subId uint64, rpcSeqn
 	require.NoError(t, err)
 	sid.SetId(subId)
 
-	resMsg := app.handleSubscribe(rpcSeqno, m)
+	resMsg := SubscribeReq(m).handle(app, rpcSeqno)
 	require.NoError(t, err)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, rpcSeqno)
@@ -92,7 +94,7 @@ func TestUnsubscribe(t *testing.T) {
 	require.NoError(t, err)
 	sid.SetId(idx)
 
-	resMsg := testApp.handleUnsubscribe(7739, m)
+	resMsg := UnsubscribeReq(m).handle(testApp, 7739)
 	require.NoError(t, err)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, uint64(7739))
@@ -133,7 +135,8 @@ func TestValidationPush(t *testing.T) {
 		require.NoError(t, err)
 		m, err := ipc.NewRootLibp2pHelperInterface_Validation(seg)
 		require.NoError(t, err)
-		m.SetValidationSeqNumber(seqno)
+		validationId, err := m.NewValidationId()
+		validationId.SetId(seqno)
 		m.SetResult(ipcValResults[i])
 		testApp.handleValidation(m)
 		require.NoError(t, err)

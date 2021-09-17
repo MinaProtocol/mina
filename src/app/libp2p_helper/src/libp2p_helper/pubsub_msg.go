@@ -4,11 +4,12 @@ import (
 	"context"
 	"time"
 
+	ipc "libp2p_ipc"
+
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	ipc "libp2p_ipc"
 )
 
 // Helper type to distinguish from integer default value `0`
@@ -21,7 +22,12 @@ func (app *app) handleValidation(m ipc.Libp2pHelperInterface_Validation) {
 		app.P2p.Logger.Error("handleValidation: P2p not configured")
 		return
 	}
-	seqno := m.ValidationSeqNumber()
+	vid, err := m.ValidationId()
+	if err != nil {
+		app.P2p.Logger.Errorf("handleValidation: error %w", err)
+		return
+	}
+	seqno := vid.Id()
 	app.ValidatorMutex.Lock()
 	defer app.ValidatorMutex.Unlock()
 	if st, ok := app.Validators[seqno]; ok {
@@ -46,7 +52,14 @@ func (app *app) handleValidation(m ipc.Libp2pHelperInterface_Validation) {
 	}
 }
 
-func (app *app) handlePublish(seqno uint64, m ipc.Libp2pHelperInterface_Publish_Request) *capnp.Message {
+type PublishReqT = ipc.Libp2pHelperInterface_Publish_Request
+type PublishReq PublishReqT
+
+func fromPublishReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.Publish()
+	return PublishReq(i), err
+}
+func (m PublishReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -57,11 +70,11 @@ func (app *app) handlePublish(seqno uint64, m ipc.Libp2pHelperInterface_Publish_
 	var topic *pubsub.Topic
 	var has bool
 
-	topicName, err := m.Topic()
+	topicName, err := PublishReqT(m).Topic()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
-	data, err := m.Data()
+	data, err := PublishReqT(m).Data()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
@@ -84,7 +97,14 @@ func (app *app) handlePublish(seqno uint64, m ipc.Libp2pHelperInterface_Publish_
 	})
 }
 
-func (app *app) handleSubscribe(seqno uint64, m ipc.Libp2pHelperInterface_Subscribe_Request) *capnp.Message {
+type SubscribeReqT = ipc.Libp2pHelperInterface_Subscribe_Request
+type SubscribeReq SubscribeReqT
+
+func fromSubscribeReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.Subscribe()
+	return SubscribeReq(i), err
+}
+func (m SubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -92,11 +112,11 @@ func (app *app) handleSubscribe(seqno uint64, m ipc.Libp2pHelperInterface_Subscr
 		return mkRpcRespError(seqno, needsDHT())
 	}
 
-	topicName, err := m.Topic()
+	topicName, err := SubscribeReqT(m).Topic()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
-	subId_, err := m.SubscriptionId()
+	subId_, err := SubscribeReqT(m).SubscriptionId()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
@@ -218,11 +238,18 @@ func (app *app) handleSubscribe(seqno uint64, m ipc.Libp2pHelperInterface_Subscr
 	})
 }
 
-func (app *app) handleUnsubscribe(seqno uint64, m ipc.Libp2pHelperInterface_Unsubscribe_Request) *capnp.Message {
+type UnsubscribeReqT = ipc.Libp2pHelperInterface_Unsubscribe_Request
+type UnsubscribeReq UnsubscribeReqT
+
+func fromUnsubscribeReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.Unsubscribe()
+	return UnsubscribeReq(i), err
+}
+func (m UnsubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
-	subId_, err := m.SubscriptionId()
+	subId_, err := UnsubscribeReqT(m).SubscriptionId()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}

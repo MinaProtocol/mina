@@ -5,19 +5,27 @@ import (
 	"fmt"
 	"time"
 
+	ipc "libp2p_ipc"
+
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
-	ipc "libp2p_ipc"
 )
 
-func (app *app) handleAddStreamHandler(seqno uint64, m ipc.Libp2pHelperInterface_AddStreamHandler_Request) *capnp.Message {
+type AddStreamHandlerReqT = ipc.Libp2pHelperInterface_AddStreamHandler_Request
+type AddStreamHandlerReq AddStreamHandlerReqT
+
+func fromAddStreamHandlerReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.AddStreamHandler()
+	return AddStreamHandlerReq(i), err
+}
+func (m AddStreamHandlerReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
-	protocolId, err := m.Protocol()
+	protocolId, err := AddStreamHandlerReqT(m).Protocol()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
@@ -41,11 +49,18 @@ func (app *app) handleAddStreamHandler(seqno uint64, m ipc.Libp2pHelperInterface
 	})
 }
 
-func (app *app) handleCloseStream(seqno uint64, m ipc.Libp2pHelperInterface_CloseStream_Request) *capnp.Message {
+type CloseStreamReqT = ipc.Libp2pHelperInterface_CloseStream_Request
+type CloseStreamReq CloseStreamReqT
+
+func fromCloseStreamReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.CloseStream()
+	return CloseStreamReq(i), err
+}
+func (m CloseStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
-	sid, err := m.StreamId()
+	sid, err := CloseStreamReqT(m).StreamId()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
@@ -66,31 +81,43 @@ func (app *app) handleCloseStream(seqno uint64, m ipc.Libp2pHelperInterface_Clos
 	return mkRpcRespError(seqno, badRPC(errors.New("unknown stream_idx")))
 }
 
-func (app *app) handleOpenStream(seqno uint64, m ipc.Libp2pHelperInterface_OpenStream_Request) *capnp.Message {
+type OpenStreamReqT = ipc.Libp2pHelperInterface_OpenStream_Request
+type OpenStreamReq OpenStreamReqT
+
+func fromOpenStreamReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.OpenStream()
+	return OpenStreamReq(i), err
+}
+func (m OpenStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
 
 	streamIdx := app.NextId()
-
-	peerStr, err := m.Peer()
+	var peerDecoded peer.ID
+	var protocolId string
+	err := func() error {
+		peerId, err := OpenStreamReqT(m).Peer()
+		if err != nil {
+			return err
+		}
+		peerStr, err := peerId.Id()
+		if err != nil {
+			return err
+		}
+		peerDecoded, err = peer.Decode(peerStr)
+		if err != nil {
+			return err
+		}
+		protocolId, err = OpenStreamReqT(m).ProtocolId()
+		return err
+	}()
 	if err != nil {
-		return mkRpcRespError(seqno, badRPC(err))
-	}
-	peerDecoded, err := peer.Decode(peerStr)
-	if err != nil {
-		// TODO: this isn't necessarily an RPC error. Perhaps the encoded Peer ID
-		// isn't supported by this version of libp2p.
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
 	ctx, cancel := context.WithTimeout(app.Ctx, 30*time.Second)
 	defer cancel()
-
-	protocolId, err := m.ProtocolId()
-	if err != nil {
-		return mkRpcRespError(seqno, badRPC(err))
-	}
 
 	stream, err := app.P2p.Host.NewStream(ctx, peerDecoded, protocol.ID(protocolId))
 	if err != nil {
@@ -127,11 +154,18 @@ func (app *app) handleOpenStream(seqno uint64, m ipc.Libp2pHelperInterface_OpenS
 	})
 }
 
-func (app *app) handleRemoveStreamHandler(seqno uint64, m ipc.Libp2pHelperInterface_RemoveStreamHandler_Request) *capnp.Message {
+type RemoveStreamHandlerReqT = ipc.Libp2pHelperInterface_RemoveStreamHandler_Request
+type RemoveStreamHandlerReq RemoveStreamHandlerReqT
+
+func fromRemoveStreamHandlerReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.RemoveStreamHandler()
+	return RemoveStreamHandlerReq(i), err
+}
+func (m RemoveStreamHandlerReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
-	protocolId, err := m.Protocol()
+	protocolId, err := RemoveStreamHandlerReqT(m).Protocol()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
@@ -143,11 +177,18 @@ func (app *app) handleRemoveStreamHandler(seqno uint64, m ipc.Libp2pHelperInterf
 	})
 }
 
-func (app *app) handleResetStream(seqno uint64, m ipc.Libp2pHelperInterface_ResetStream_Request) *capnp.Message {
+type ResetStreamReqT = ipc.Libp2pHelperInterface_ResetStream_Request
+type ResetStreamReq ResetStreamReqT
+
+func fromResetStreamReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.ResetStream()
+	return ResetStreamReq(i), err
+}
+func (m ResetStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
-	sid, err := m.StreamId()
+	sid, err := ResetStreamReqT(m).StreamId()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
@@ -168,11 +209,18 @@ func (app *app) handleResetStream(seqno uint64, m ipc.Libp2pHelperInterface_Rese
 	return mkRpcRespError(seqno, badRPC(errors.New("unknown stream_idx")))
 }
 
-func (app *app) handleSendStream(seqno uint64, m ipc.Libp2pHelperInterface_SendStream_Request) *capnp.Message {
+type SendStreamReqT = ipc.Libp2pHelperInterface_SendStream_Request
+type SendStreamReq SendStreamReqT
+
+func fromSendStreamReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.SendStream()
+	return SendStreamReq(i), err
+}
+func (m SendStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
-	msg, err := m.Msg()
+	msg, err := SendStreamReqT(m).Msg()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}

@@ -2,15 +2,17 @@ package main
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"codanet"
+
+	ipc "libp2p_ipc"
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
-	ipc "libp2p_ipc"
 )
 
 func testAddPeerImplDo(t *testing.T, appB *app, info peer.AddrInfo, isSeed bool) {
@@ -26,7 +28,7 @@ func testAddPeerImplDo(t *testing.T, appB *app, info peer.AddrInfo, isSeed bool)
 	m.SetIsSeed(isSeed)
 
 	var mRpcSeqno uint64 = 2000
-	resMsg := appB.handleAddPeer(mRpcSeqno, m)
+	resMsg := AddPeerReq(m).handle(appB, mRpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasAddPeer())
@@ -51,34 +53,6 @@ func testAddPeerImpl(t *testing.T) (*app, uint16, *app) {
 
 func TestAddPeer(t *testing.T) {
 	_, _, _ = testAddPeerImpl(t)
-}
-
-func TestFindPeer(t *testing.T) {
-	appA, appAPort, appB := testAddPeerImpl(t)
-
-	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
-	require.NoError(t, err)
-	m, err := ipc.NewRootLibp2pHelperInterface_FindPeer_Request(seg)
-	require.NoError(t, err)
-	pid, err := m.NewPeerId()
-	require.NoError(t, err)
-	peerId := appA.P2p.Host.ID().String()
-	require.NoError(t, pid.SetId(peerId))
-
-	var mRpcSeqno uint64 = 2001
-	resMsg := appB.handleFindPeer(mRpcSeqno, m)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
-	require.Equal(t, seqno, mRpcSeqno)
-	require.True(t, respSuccess.HasFindPeer())
-	resp, err := respSuccess.FindPeer()
-	require.NoError(t, err)
-	res, err := resp.Result()
-	require.NoError(t, err)
-
-	actual, err := readPeerInfo(res)
-	require.NoError(t, err)
-
-	checkPeerInfo(t, actual, appA.P2p.Host, appAPort)
 }
 
 func TestGetPeerNodeStatus(t *testing.T) {
@@ -114,7 +88,7 @@ func TestGetPeerNodeStatus(t *testing.T) {
 	require.NoError(t, ma.SetRepresentation(addr))
 
 	var mRpcSeqno uint64 = 18900
-	resMsg := appB.handleGetPeerNodeStatus(mRpcSeqno, m)
+	resMsg := GetPeerNodeStatusReq(m).handle(appB, mRpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasGetPeerNodeStatus())
@@ -134,7 +108,7 @@ func TestListPeers(t *testing.T) {
 	require.NoError(t, err)
 
 	var mRpcSeqno uint64 = 2002
-	resMsg := appB.handleListPeers(mRpcSeqno, m)
+	resMsg := ListPeersReq(m).handle(appB, mRpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasListPeers())

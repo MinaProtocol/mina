@@ -6,6 +6,8 @@ import (
 
 	"codanet"
 
+	ipc "libp2p_ipc"
+
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
@@ -15,10 +17,16 @@ import (
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
-	ipc "libp2p_ipc"
 )
 
-func (app *app) handleBeginAdvertising(seqno uint64, m ipc.Libp2pHelperInterface_BeginAdvertising_Request) *capnp.Message {
+type BeginAdvertisingReqT = ipc.Libp2pHelperInterface_BeginAdvertising_Request
+type BeginAdvertisingReq BeginAdvertisingReqT
+
+func fromBeginAdvertisingReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.BeginAdvertising()
+	return BeginAdvertisingReq(i), err
+}
+func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -137,8 +145,15 @@ func (app *app) handleBeginAdvertising(seqno uint64, m ipc.Libp2pHelperInterface
 	})
 }
 
-func (app *app) handleConfigure(seqno uint64, msg ipc.Libp2pHelperInterface_Configure_Request) *capnp.Message {
-	m, err := msg.Config()
+type ConfigureReqT = ipc.Libp2pHelperInterface_Configure_Request
+type ConfigureReq ConfigureReqT
+
+func fromConfigureReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.Configure()
+	return ConfigureReq(i), err
+}
+func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
+	m, err := ConfigureReqT(msg).Config()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
@@ -280,7 +295,13 @@ func (app *app) handleConfigure(seqno uint64, msg ipc.Libp2pHelperInterface_Conf
 	})
 }
 
-func (app *app) handleGetListeningAddrs(seqno uint64, m ipc.Libp2pHelperInterface_GetListeningAddrs_Request) *capnp.Message {
+type GetListeningAddrsReq ipc.Libp2pHelperInterface_GetListeningAddrs_Request
+
+func fromGetListeningAddrsReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.GetListeningAddrs()
+	return GetListeningAddrsReq(i), err
+}
+func (msg GetListeningAddrsReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
@@ -294,7 +315,14 @@ func (app *app) handleGetListeningAddrs(seqno uint64, m ipc.Libp2pHelperInterfac
 	})
 }
 
-func (app *app) handleGenerateKeypair(seqno uint64, m ipc.Libp2pHelperInterface_GenerateKeypair_Request) *capnp.Message {
+type GenerateKeypairReqT = ipc.Libp2pHelperInterface_GenerateKeypair_Request
+type GenerateKeypairReq GenerateKeypairReqT
+
+func fromGenerateKeypairReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.GenerateKeypair()
+	return GenerateKeypairReq(i), err
+}
+func (msg GenerateKeypairReq) handle(app *app, seqno uint64) *capnp.Message {
 	privk, pubk, err := crypto.GenerateEd25519Key(cryptorand.Reader)
 	if err != nil {
 		return mkRpcRespError(seqno, badp2p(err))
@@ -326,17 +354,30 @@ func (app *app) handleGenerateKeypair(seqno uint64, m ipc.Libp2pHelperInterface_
 	})
 }
 
-func (app *app) handleListen(seqno uint64, m ipc.Libp2pHelperInterface_Listen_Request) *capnp.Message {
+type ListenReqT = ipc.Libp2pHelperInterface_Listen_Request
+type ListenReq ListenReqT
+
+func fromListenReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.Listen()
+	return ListenReq(i), err
+}
+func (m ListenReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
-	iface, err := m.Iface()
+	ma, err := func() (multiaddr.Multiaddr, error) {
+		iface, err := ListenReqT(m).Iface()
+		if err != nil {
+			return nil, err
+		}
+		ifaceRepr, err := iface.Representation()
+		if err != nil {
+			return nil, err
+		}
+		return multiaddr.NewMultiaddr(ifaceRepr)
+	}()
 	if err != nil {
-		return mkRpcRespError(seqno, badp2p(err))
-	}
-	ma, err := multiaddr.NewMultiaddr(iface)
-	if err != nil {
-		return mkRpcRespError(seqno, badp2p(err))
+		return mkRpcRespError(seqno, badRPC(err))
 	}
 	if err := app.P2p.Host.Network().Listen(ma); err != nil {
 		return mkRpcRespError(seqno, badp2p(err))
@@ -351,15 +392,22 @@ func (app *app) handleListen(seqno uint64, m ipc.Libp2pHelperInterface_Listen_Re
 	})
 }
 
-func (app *app) handleSetGatingConfig(seqno uint64, m ipc.Libp2pHelperInterface_SetGatingConfig_Request) *capnp.Message {
+type SetGatingConfigReqT = ipc.Libp2pHelperInterface_SetGatingConfig_Request
+type SetGatingConfigReq SetGatingConfigReqT
+
+func fromSetGatingConfigReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.SetGatingConfig()
+	return SetGatingConfigReq(i), err
+}
+func (m SetGatingConfigReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
-	gc, err := m.GatingConfig()
-	if err != nil {
-		return mkRpcRespError(seqno, badRPC(err))
+	var newState *codanet.CodaGatingState
+	gc, err := SetGatingConfigReqT(m).GatingConfig()
+	if err == nil {
+		newState, err = readGatingConfig(gc, app.AddedPeers)
 	}
-	newState, err := readGatingConfig(gc, app.AddedPeers)
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
@@ -372,8 +420,15 @@ func (app *app) handleSetGatingConfig(seqno uint64, m ipc.Libp2pHelperInterface_
 	})
 }
 
-func (app *app) handleSetNodeStatus(seqno uint64, m ipc.Libp2pHelperInterface_SetNodeStatus_Request) *capnp.Message {
-	status, err := m.Status()
+type SetNodeStatusReqT = ipc.Libp2pHelperInterface_SetNodeStatus_Request
+type SetNodeStatusReq SetNodeStatusReqT
+
+func fromSetNodeStatusReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.SetNodeStatus()
+	return SetNodeStatusReq(i), err
+}
+func (m SetNodeStatusReq) handle(app *app, seqno uint64) *capnp.Message {
+	status, err := SetNodeStatusReqT(m).Status()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}

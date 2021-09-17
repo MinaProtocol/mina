@@ -16,13 +16,14 @@ import (
 	net "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
-	"github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
+
+	ipc "libp2p_ipc"
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/stretchr/testify/require"
-	ipc "libp2p_ipc"
 )
 
 var (
@@ -134,10 +135,11 @@ func checkRpcResponseError(t *testing.T, resMsg *capnp.Message) (uint64, string)
 	require.True(t, resp.HasError())
 	header, err := resp.Header()
 	require.NoError(t, err)
-	seqno := header.SeqNumber()
+	seqno, err := header.SequenceNumber()
+	require.NoError(t, err)
 	respError, err := resp.Error()
 	require.NoError(t, err)
-	return seqno, respError
+	return seqno.Seqno(), respError
 }
 
 func checkRpcResponseSuccess(t *testing.T, resMsg *capnp.Message) (uint64, ipc.Libp2pHelperInterface_RpcResponseSuccess) {
@@ -149,10 +151,11 @@ func checkRpcResponseSuccess(t *testing.T, resMsg *capnp.Message) (uint64, ipc.L
 	require.True(t, resp.HasSuccess())
 	header, err := resp.Header()
 	require.NoError(t, err)
-	seqno := header.SeqNumber()
+	seqno, err := header.SequenceNumber()
+	require.NoError(t, err)
 	respSuccess, err := resp.Success()
 	require.NoError(t, err)
-	return seqno, respSuccess
+	return seqno.Seqno(), respSuccess
 }
 
 func checkPeerInfo(t *testing.T, actual *codaPeerInfo, host host.Host, port uint16) {
@@ -169,7 +172,7 @@ func beginAdvertisingSendAndCheck(t *testing.T, app *app) {
 	m, err := ipc.NewRootLibp2pHelperInterface_BeginAdvertising_Request(seg)
 	require.NoError(t, err)
 	var rpcSeqno uint64 = 123
-	resMsg := app.handleBeginAdvertising(rpcSeqno, m)
+	resMsg := BeginAdvertisingReq(m).handle(app, rpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasBeginAdvertising())

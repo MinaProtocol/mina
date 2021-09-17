@@ -7,19 +7,26 @@ import (
 
 	"codanet"
 
+	ipc "libp2p_ipc"
+
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
-	peer "github.com/libp2p/go-libp2p-core/peer"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
-	ipc "libp2p_ipc"
 )
 
-func (app *app) handleAddPeer(seqno uint64, m ipc.Libp2pHelperInterface_AddPeer_Request) *capnp.Message {
+type AddPeerReqT = ipc.Libp2pHelperInterface_AddPeer_Request
+type AddPeerReq AddPeerReqT
+
+func fromAddPeerReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.AddPeer()
+	return AddPeerReq(i), err
+}
+func (m AddPeerReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
 
-	maddr, err := m.Multiaddr()
+	maddr, err := AddPeerReqT(m).Multiaddr()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
@@ -41,7 +48,7 @@ func (app *app) handleAddPeer(seqno uint64, m ipc.Libp2pHelperInterface_AddPeer_
 
 	app.P2p.Logger.Info("addPeer Trying to connect to: ", info)
 
-	if m.IsSeed() {
+	if AddPeerReqT(m).IsSeed() {
 		app.P2p.Seeds = append(app.P2p.Seeds, *info)
 	}
 
@@ -56,38 +63,16 @@ func (app *app) handleAddPeer(seqno uint64, m ipc.Libp2pHelperInterface_AddPeer_
 	})
 }
 
-func (app *app) handleFindPeer(seqno uint64, m ipc.Libp2pHelperInterface_FindPeer_Request) *capnp.Message {
-	pid, err := m.PeerId()
-	if err != nil {
-		return mkRpcRespError(seqno, badRPC(err))
-	}
-	peerId, err := pid.Id()
-	if err != nil {
-		return mkRpcRespError(seqno, badRPC(err))
-	}
-	id, err := peer.Decode(peerId)
-	if err != nil {
-		return mkRpcRespError(seqno, badRPC(err))
-	}
+type GetPeerNodeStatusReqT = ipc.Libp2pHelperInterface_GetPeerNodeStatus_Request
+type GetPeerNodeStatusReq GetPeerNodeStatusReqT
 
-	peerInfo, err := findPeerInfo(app, id)
-
-	if err != nil {
-		return mkRpcRespError(seqno, badp2p(err))
-	}
-
-	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
-		r, err := m.NewFindPeer()
-		panicOnErr(err)
-		res, err := r.NewResult()
-		panicOnErr(err)
-		setPeerInfo(res, peerInfo)
-	})
+func fromGetPeerNodeStatusReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.GetPeerNodeStatus()
+	return GetPeerNodeStatusReq(i), err
 }
-
-func (app *app) handleGetPeerNodeStatus(seqno uint64, m ipc.Libp2pHelperInterface_GetPeerNodeStatus_Request) *capnp.Message {
+func (m GetPeerNodeStatusReq) handle(app *app, seqno uint64) *capnp.Message {
 	ctx, _ := context.WithTimeout(app.Ctx, codanet.NodeStatusTimeout)
-	pma, err := m.Peer()
+	pma, err := GetPeerNodeStatusReqT(m).Peer()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
@@ -153,7 +138,14 @@ func (app *app) handleGetPeerNodeStatus(seqno uint64, m ipc.Libp2pHelperInterfac
 	}
 }
 
-func (app *app) handleListPeers(seqno uint64, m ipc.Libp2pHelperInterface_ListPeers_Request) *capnp.Message {
+type ListPeersReqT = ipc.Libp2pHelperInterface_ListPeers_Request
+type ListPeersReq ListPeersReqT
+
+func fromListPeersReq(req ipcRpcRequest) (rpcRequest, error) {
+	i, err := req.ListPeers()
+	return ListPeersReq(i), err
+}
+func (msg ListPeersReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}

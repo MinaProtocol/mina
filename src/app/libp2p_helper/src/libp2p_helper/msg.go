@@ -6,17 +6,24 @@ import (
 
 	"codanet"
 
+	ipc "libp2p_ipc"
+
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
-	ipc "libp2p_ipc"
 )
 
 type codaPeerInfo struct {
 	Libp2pPort uint16
 	Host       string
 	PeerID     string
+}
+
+type ipcRpcRequest = ipc.Libp2pHelperInterface_RpcRequest
+type extractRequest = func(ipcRpcRequest) (rpcRequest, error)
+type rpcRequest interface {
+	handle(app *app, seqno uint64) *capnp.Message
 }
 
 func filterIPString(filters *ma.Filters, ip string, action ma.Action) error {
@@ -186,7 +193,9 @@ func mkRpcRespError(seqno uint64, rpcRespErr error) *capnp.Message {
 		ns, err := h.NewTimeSent()
 		panicOnErr(err)
 		setNanoTime(&ns, time.Now())
-		h.SetSeqNumber(seqno)
+		sn, err := h.NewSequenceNumber()
+		sn.SetSeqno(seqno)
+		panicOnErr(err)
 		panicOnErr(resp.SetError(rpcRespErr.Error()))
 	})
 }
@@ -202,7 +211,9 @@ func mkRpcRespSuccess(seqno uint64, f func(*ipc.Libp2pHelperInterface_RpcRespons
 		ns, err := h.NewTimeSent()
 		panicOnErr(err)
 		setNanoTime(&ns, time.Now())
-		h.SetSeqNumber(seqno)
+		sn, err := h.NewSequenceNumber()
+		sn.SetSeqno(seqno)
+		panicOnErr(err)
 		succ, err := resp.NewSuccess()
 		panicOnErr(err)
 		f(&succ)
@@ -302,7 +313,8 @@ func mkGossipReceivedUpcall(sender *codaPeerInfo, expiration time.Time, seenAt t
 		panicOnErr(err)
 		subId.SetId(subIdx)
 
-		gr.SetValidationSeqNumber(seqno)
+		sn, err := gr.NewValidationId()
+		sn.SetId(seqno)
 		panicOnErr(gr.SetData(data))
 	})
 }

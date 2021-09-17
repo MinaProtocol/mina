@@ -11,4 +11,4 @@ test: ../../libp2p_ipc/libp2p_ipc.capnp.go
 	$(WRAPAPP) ../../../scripts/build-go-helper.sh --test libp2p_helper
 
 clean:
-	rm -rf result
+	rm -rf result ../../libp2p_ipc/libp2p_ipc.capnp.go

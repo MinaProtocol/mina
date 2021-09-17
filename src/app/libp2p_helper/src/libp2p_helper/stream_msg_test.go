@@ -1,12 +1,14 @@
 package main
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	ipc "libp2p_ipc"
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/libp2p/go-libp2p-core/host"
-	ipc "libp2p_ipc"
 )
 
 func testAddStreamHandlerDo(t *testing.T, protocol string, app *app, rpcSeqno uint64) {
@@ -16,7 +18,7 @@ func testAddStreamHandlerDo(t *testing.T, protocol string, app *app, rpcSeqno ui
 	require.NoError(t, err)
 	require.NoError(t, m.SetProtocol(protocol))
 
-	resMsg := app.handleAddStreamHandler(rpcSeqno, m)
+	resMsg := AddStreamHandlerReq(m).handle(app, rpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasAddStreamHandler())
@@ -51,9 +53,11 @@ func testOpenStreamDo(t *testing.T, appA *app, appBHost host.Host, appBPort uint
 	require.NoError(t, err)
 
 	require.NoError(t, m.SetProtocolId(protocol))
-	require.NoError(t, m.SetPeer(appBHost.ID().String()))
+	pid, err := m.NewPeer()
+	require.NoError(t, pid.SetId(appBHost.ID().String()))
+	require.NoError(t, err)
 
-	resMsg := appA.handleOpenStream(rpcSeqno, m)
+	resMsg := OpenStreamReq(m).handle(appA, rpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasOpenStream())
@@ -98,7 +102,7 @@ func testCloseStreamDo(t *testing.T, app *app, streamId uint64, rpcSeqno uint64)
 	require.NoError(t, err)
 	sid.SetId(streamId)
 
-	resMsg := app.handleCloseStream(rpcSeqno, m)
+	resMsg := CloseStreamReq(m).handle(app, rpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasCloseStream())
@@ -129,7 +133,7 @@ func TestRemoveStreamHandler(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, rsh.SetProtocol(newProtocol))
 	var rshRpcSeqno uint64 = 1023
-	resMsg := appB.handleRemoveStreamHandler(rshRpcSeqno, rsh)
+	resMsg := RemoveStreamHandlerReq(rsh).handle(appB, rshRpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, rshRpcSeqno)
 	require.True(t, respSuccess.HasRemoveStreamHandler())
@@ -141,10 +145,12 @@ func TestRemoveStreamHandler(t *testing.T) {
 	os, err := ipc.NewRootLibp2pHelperInterface_OpenStream_Request(seg)
 	require.NoError(t, err)
 	require.NoError(t, os.SetProtocolId(newProtocol))
-	require.NoError(t, os.SetPeer(appB.P2p.Host.ID().String()))
+	pid, err := os.NewPeer()
+	require.NoError(t, pid.SetId(appB.P2p.Host.ID().String()))
+	require.NoError(t, err)
 
 	var osRpcSeqno uint64 = 1026
-	osResMsg := appA.handleOpenStream(osRpcSeqno, os)
+	osResMsg := OpenStreamReq(os).handle(appA, osRpcSeqno)
 	osRpcSeqno_, errMsg := checkRpcResponseError(t, osResMsg)
 	require.Equal(t, osRpcSeqno, osRpcSeqno_)
 	require.Equal(t, "libp2p error: protocol not supported", errMsg)
@@ -159,7 +165,7 @@ func testResetStreamDo(t *testing.T, app *app, streamId uint64, rpcSeqno uint64)
 	require.NoError(t, err)
 	sid.SetId(streamId)
 
-	resMsg := app.handleResetStream(rpcSeqno, m)
+	resMsg := ResetStreamReq(m).handle(app, rpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasResetStream())
@@ -187,7 +193,7 @@ func testSendStreamDo(t *testing.T, app *app, streamId uint64, msgBytes []byte, 
 	sid.SetId(streamId)
 	require.NoError(t, msg.SetData(msgBytes))
 
-	resMsg := app.handleSendStream(rpcSeqno, m)
+	resMsg := SendStreamReq(m).handle(app, rpcSeqno)
 	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasSendStream())
