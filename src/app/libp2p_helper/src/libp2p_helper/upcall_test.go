@@ -1,12 +1,14 @@
 package main
 
 import (
+	ipc "libp2p_ipc"
+	"testing"
+
 	capnp "capnproto.org/go/capnp/v3"
+	"github.com/go-errors/errors"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/stretchr/testify/require"
-	ipc "libp2p_ipc"
-	"testing"
 )
 
 type upcallTrap struct {
@@ -33,48 +35,78 @@ func newUpcallTrap(tag string, chanSize int) *upcallTrap {
 	}
 }
 
-func feedUpcallTrap(t *testing.T, out chan *capnp.Message, trap *upcallTrap, done chan interface{}) {
+func launchFeedUpcallTrap(t *testing.T, out chan *capnp.Message, trap *upcallTrap, done chan interface{}) {
+	errChan := make(chan error)
+	go func() {
+		errChan <- feedUpcallTrap(func(format string, args ...interface{}) {
+			t.Logf(format, args...)
+		}, out, trap, done)
+	}()
+	if err := <-errChan; err != nil {
+		t.Errorf("feedUpcallTrap failed with %s", err)
+	}
+}
+
+func feedUpcallTrap(logf func(format string, args ...interface{}), out chan *capnp.Message, trap *upcallTrap, done chan interface{}) error {
 	for {
 		select {
 		case <-done:
-			return
+			return nil
 		case rawMsg := <-out:
 			imsg, err := ipc.ReadRootDaemonInterface_Message(rawMsg)
-			require.NoError(t, err)
+			if err != nil {
+				return err
+			}
 			if !imsg.HasPushMessage() {
-				t.Fatal("Received message is not a push")
+				return errors.New("Received message is not a push")
 			}
 			pmsg, err := imsg.PushMessage()
-			require.NoError(t, err)
+			if err != nil {
+				return err
+			}
 			if pmsg.HasPeerConnected() {
 				m, err := pmsg.PeerConnected()
-				require.NoError(t, err)
+				if err != nil {
+					return err
+				}
 				trap.PeerConnected <- m
 			} else if pmsg.HasPeerDisconnected() {
 				m, err := pmsg.PeerDisconnected()
-				require.NoError(t, err)
+				if err != nil {
+					return err
+				}
 				trap.PeerDisconnected <- m
 			} else if pmsg.HasGossipReceived() {
 				m, err := pmsg.GossipReceived()
-				require.NoError(t, err)
+				if err != nil {
+					return err
+				}
 				trap.GossipReceived <- m
 			} else if pmsg.HasIncomingStream() {
 				m, err := pmsg.IncomingStream()
-				require.NoError(t, err)
+				if err != nil {
+					return err
+				}
 				trap.IncomingStream <- m
 			} else if pmsg.HasStreamLost() {
-				t.Logf("%s: Stream lost", trap.Tag)
+				logf("%s: Stream lost", trap.Tag)
 				m, err := pmsg.StreamLost()
-				require.NoError(t, err)
+				if err != nil {
+					return err
+				}
 				trap.StreamLost <- m
 			} else if pmsg.HasStreamComplete() {
-				t.Logf("%s: Stream complete", trap.Tag)
+				logf("%s: Stream complete", trap.Tag)
 				m, err := pmsg.StreamComplete()
-				require.NoError(t, err)
+				if err != nil {
+					return err
+				}
 				trap.StreamComplete <- m
 			} else if pmsg.HasStreamMessageReceived() {
 				m, err := pmsg.StreamMessageReceived()
-				require.NoError(t, err)
+				if err != nil {
+					return err
+				}
 				trap.StreamMessageReceived <- m
 			}
 		}
@@ -115,9 +147,9 @@ func TestUpcalls(t *testing.T) {
 
 	withTimeoutAsync(t, func(done chan interface{}) {
 		defer close(done)
-		go feedUpcallTrap(t, alice.OutChan, aTrap, done)
-		go feedUpcallTrap(t, bob.OutChan, bTrap, done)
-		go feedUpcallTrap(t, carol.OutChan, cTrap, done)
+		launchFeedUpcallTrap(t, alice.OutChan, aTrap, done)
+		launchFeedUpcallTrap(t, bob.OutChan, bTrap, done)
+		launchFeedUpcallTrap(t, carol.OutChan, cTrap, done)
 
 		// Bob connects to Alice
 		testAddPeerImplDo(t, bob, aliceInfo, true)

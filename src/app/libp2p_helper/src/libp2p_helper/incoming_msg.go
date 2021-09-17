@@ -70,7 +70,6 @@ func (app *app) handleIncomingMsg(msg *ipc.Libp2pHelperInterface_Message) {
 		} else {
 			app.P2p.Logger.Errorf("Failed to process rpc message: %w", err)
 		}
-		return
 	} else if msg.HasPushMessage() {
 		err := func() error {
 			req, err := msg.PushMessage()
@@ -94,6 +93,7 @@ func (app *app) handleIncomingMsg(msg *ipc.Libp2pHelperInterface_Message) {
 		if err != nil {
 			app.P2p.Logger.Errorf("Failed to process push message: %w", err)
 		}
+	} else {
+		app.P2p.Logger.Error("Received message of an unknown type")
 	}
-	app.P2p.Logger.Error("Received message of an unknown type")
 }

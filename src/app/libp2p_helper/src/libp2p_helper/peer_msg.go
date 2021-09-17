@@ -71,7 +71,8 @@ func fromGetPeerNodeStatusReq(req ipcRpcRequest) (rpcRequest, error) {
 	return GetPeerNodeStatusReq(i), err
 }
 func (m GetPeerNodeStatusReq) handle(app *app, seqno uint64) *capnp.Message {
-	ctx, _ := context.WithTimeout(app.Ctx, codanet.NodeStatusTimeout)
+	ctx, cancel := context.WithTimeout(app.Ctx, codanet.NodeStatusTimeout)
+	defer cancel()
 	pma, err := GetPeerNodeStatusReqT(m).Peer()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
