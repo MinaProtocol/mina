@@ -1633,8 +1633,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                    (Control.tag p.authorization))
               ~has_proof:(Control.Tag.equal (Control.tag p.authorization) Proof)
               ~is_new:(match loc with `Existing _ -> false | `New -> true)
-              ~current_global_slot:global_state.protocol_state.curr_global_slot
-              p.data a
+              ~current_global_slot:
+                global_state.protocol_state.global_slot_since_genesis p.data a
           with
           | Error _e ->
               (* TODO: Use this in the failure reason. *)
@@ -2582,7 +2582,6 @@ module For_tests = struct
     ; min_window_density = len
     ; last_vrf_output = ()
     ; total_currency = a
-    ; curr_global_slot = txn_global_slot
     ; global_slot_since_genesis = txn_global_slot
     ; staking_epoch_data = epoch_data
     ; next_epoch_data = epoch_data
