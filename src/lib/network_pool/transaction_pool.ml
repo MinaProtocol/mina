@@ -1961,22 +1961,21 @@ let%test_module _ =
           in
           assert_pool_txs [] ;
           let curr_slot = current_global_slot () in
-          let curr_slot_plus_three =
-            Mina_numbers.Global_slot.(succ (succ (succ curr_slot)))
+          let curr_slot_plus_ten =
+            Mina_numbers.Global_slot.(add curr_slot (of_int 10))
           in
-          let curr_slot_plus_seven =
-            Mina_numbers.Global_slot.(
-              succ (succ (succ (succ curr_slot_plus_three))))
+          let curr_slot_plus_twenty =
+            Mina_numbers.Global_slot.(add curr_slot_plus_ten (of_int 10))
           in
           let few_now, _few_later =
             List.split_n independent_cmds (List.length independent_cmds / 2)
           in
           let expires_later1 =
-            mk_payment ~valid_until:curr_slot_plus_three 0 1_000_000_000 1 9
+            mk_payment ~valid_until:curr_slot_plus_ten 0 1_000_000_000 1 9
               10_000_000_000
           in
           let expires_later2 =
-            mk_payment ~valid_until:curr_slot_plus_seven 0 1_000_000_000 2 9
+            mk_payment ~valid_until:curr_slot_plus_twenty 0 1_000_000_000 2 9
               10_000_000_000
           in
           let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
@@ -2012,7 +2011,7 @@ let%test_module _ =
             mk_payment ~valid_until:curr_slot 9 1_000_000_000 0 5 1_000_000_000
           in
           let unexpired_command =
-            mk_payment ~valid_until:curr_slot_plus_seven 8 1_000_000_000 0 9
+            mk_payment ~valid_until:curr_slot_plus_twenty 8 1_000_000_000 0 9
               1_000_000_000
           in
           let valid_forever = List.nth_exn few_now 0 in
@@ -2048,9 +2047,9 @@ let%test_module _ =
           in
           let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
           assert_pool_txs cmds_wo_check ;
-          (*after 5 block times there should be no expired transactions*)
+          (*after 20 block times there should be no expired transactions*)
           let%bind () =
-            after (Block_time.Span.to_time_span (n_block_times 5L))
+            after (Block_time.Span.to_time_span (n_block_times 20L))
           in
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w

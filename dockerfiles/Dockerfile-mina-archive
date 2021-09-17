@@ -16,9 +16,6 @@ RUN chmod +x /entrypoint.sh
 COPY --chown=${UID} puppeteer-context/* /
 RUN chmod +x /mina_daemon_puppeteer.py /find_puppeteer.sh /start.sh /stop.sh
 
-# Workaround terrible postgresql package requirements with man
-RUN mkdir /usr/share/man/man7 /usr/share/man/man1
-
 # Dependencies
 RUN apt-get -y update \
     && apt-get -y upgrade \
@@ -37,7 +34,6 @@ RUN apt-get -y update \
         postgresql \
         postgresql-contrib \
         apt-utils \
-        man \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir /healthcheck && curl https://raw.githubusercontent.com/MinaProtocol/mina/develop/dockerfiles/scripts/healthcheck-utilities.sh -o /healthcheck/utilities.sh
