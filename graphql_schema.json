@@ -188,7 +188,7 @@
           "description": "Network identifiers for another protocol participant",
           "fields": [
             {
-              "name": "libp2p_port",
+              "name": "libp2pPort",
               "description": null,
               "args": [],
               "type": {
@@ -220,7 +220,7 @@
               "deprecationReason": null
             },
             {
-              "name": "peer_id",
+              "name": "peerId",
               "description": "base58-encoded peer ID",
               "args": [],
               "type": {
@@ -238,7 +238,7 @@
           ],
           "inputFields": [
             {
-              "name": "libp2p_port",
+              "name": "libp2pPort",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -266,7 +266,7 @@
               "defaultValue": null
             },
             {
-              "name": "peer_id",
+              "name": "peerId",
               "description": "base58-encoded peer ID",
               "type": {
                 "kind": "NON_NULL",
@@ -824,7 +824,7 @@
           "description": null,
           "fields": [
             {
-              "name": "state_hash",
+              "name": "stateHash",
               "description": null,
               "args": [],
               "type": {
@@ -836,7 +836,7 @@
               "deprecationReason": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "args": [],
               "type": {
@@ -854,7 +854,7 @@
           ],
           "inputFields": [
             {
-              "name": "state_hash",
+              "name": "stateHash",
               "description": null,
               "type": {
                 "kind": "SCALAR",
@@ -864,7 +864,7 @@
               "defaultValue": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "type": {
                 "kind": "NON_NULL",
@@ -888,7 +888,7 @@
           "description": null,
           "fields": [
             {
-              "name": "epoch_seed",
+              "name": "epochSeed",
               "description": null,
               "args": [],
               "type": {
@@ -900,7 +900,7 @@
               "deprecationReason": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "args": [],
               "type": {
@@ -918,7 +918,7 @@
           ],
           "inputFields": [
             {
-              "name": "epoch_seed",
+              "name": "epochSeed",
               "description": null,
               "type": {
                 "kind": "SCALAR",
@@ -928,7 +928,7 @@
               "defaultValue": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "type": {
                 "kind": "NON_NULL",
@@ -1192,7 +1192,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "global_slot",
+          "name": "globalSlot",
           "description": null,
           "fields": [
             {
@@ -1268,19 +1268,19 @@
           "description": null,
           "fields": [
             {
-              "name": "global_slot",
+              "name": "globalSlot",
               "description": null,
               "args": [],
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "global_slot",
+                "name": "globalSlot",
                 "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "args": [],
               "type": {
@@ -1298,17 +1298,17 @@
           ],
           "inputFields": [
             {
-              "name": "global_slot",
+              "name": "globalSlot",
               "description": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "global_slot",
+                "name": "globalSlot",
                 "ofType": null
               },
               "defaultValue": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "type": {
                 "kind": "NON_NULL",
@@ -1328,7 +1328,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "currency_amount",
+          "name": "currencyAmount",
           "description": null,
           "fields": [
             {
@@ -1404,19 +1404,19 @@
           "description": null,
           "fields": [
             {
-              "name": "currency_amount",
+              "name": "currencyAmount",
               "description": null,
               "args": [],
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "currency_amount",
+                "name": "currencyAmount",
                 "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "args": [],
               "type": {
@@ -1434,17 +1434,17 @@
           ],
           "inputFields": [
             {
-              "name": "currency_amount",
+              "name": "currencyAmount",
               "description": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "currency_amount",
+                "name": "currencyAmount",
                 "ofType": null
               },
               "defaultValue": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "type": {
                 "kind": "NON_NULL",
@@ -1572,7 +1572,7 @@
               "deprecationReason": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "args": [],
               "type": {
@@ -1600,7 +1600,7 @@
               "defaultValue": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "type": {
                 "kind": "NON_NULL",
@@ -1630,7 +1630,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "block_time",
+          "name": "blockTime",
           "description": null,
           "fields": [
             {
@@ -1706,19 +1706,19 @@
           "description": null,
           "fields": [
             {
-              "name": "block_time",
+              "name": "blockTime",
               "description": null,
               "args": [],
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "block_time",
+                "name": "blockTime",
                 "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "args": [],
               "type": {
@@ -1736,17 +1736,17 @@
           ],
           "inputFields": [
             {
-              "name": "block_time",
+              "name": "blockTime",
               "description": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "block_time",
+                "name": "blockTime",
                 "ofType": null
               },
               "defaultValue": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "type": {
                 "kind": "NON_NULL",
@@ -1766,7 +1766,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "token_id",
+          "name": "tokenId",
           "description": null,
           "fields": [
             {
@@ -1842,19 +1842,19 @@
           "description": null,
           "fields": [
             {
-              "name": "token_id",
+              "name": "tokenId",
               "description": null,
               "args": [],
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "token_id",
+                "name": "tokenId",
                 "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "args": [],
               "type": {
@@ -1872,17 +1872,17 @@
           ],
           "inputFields": [
             {
-              "name": "token_id",
+              "name": "tokenId",
               "description": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "token_id",
+                "name": "tokenId",
                 "ofType": null
               },
               "defaultValue": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "type": {
                 "kind": "NON_NULL",
@@ -1928,7 +1928,7 @@
               "deprecationReason": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "args": [],
               "type": {
@@ -1956,7 +1956,7 @@
               "defaultValue": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "type": {
                 "kind": "NON_NULL",
@@ -2339,7 +2339,7 @@
               "deprecationReason": null
             },
             {
-              "name": "None_given",
+              "name": "NoneGiven",
               "description": null,
               "isDeprecated": false,
               "deprecationReason": null
@@ -2451,7 +2451,7 @@
               "deprecationReason": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "args": [],
               "type": {
@@ -2479,7 +2479,7 @@
               "defaultValue": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "type": {
                 "kind": "NON_NULL",
@@ -2515,7 +2515,7 @@
               "deprecationReason": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "args": [],
               "type": {
@@ -2543,7 +2543,7 @@
               "defaultValue": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "type": {
                 "kind": "NON_NULL",
@@ -2621,11 +2621,11 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "Public_keyOrIgnore",
+          "name": "PublicKeyOrIgnore",
           "description": null,
           "fields": [
             {
-              "name": "public_key",
+              "name": "publicKey",
               "description": "Public key in Base58Check format, or null if Ignore",
               "args": [],
               "type": {
@@ -2637,7 +2637,7 @@
               "deprecationReason": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "args": [],
               "type": {
@@ -2655,7 +2655,7 @@
           ],
           "inputFields": [
             {
-              "name": "public_key",
+              "name": "publicKey",
               "description": "Public key in Base58Check format, or null if Ignore",
               "type": {
                 "kind": "SCALAR",
@@ -2665,7 +2665,7 @@
               "defaultValue": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "type": {
                 "kind": "NON_NULL",
@@ -2699,7 +2699,7 @@
           "description": null,
           "fields": [
             {
-              "name": "receipt_chain_hash",
+              "name": "receiptChainHash",
               "description": "receipt chain hash, or null if Ignore",
               "args": [],
               "type": {
@@ -2711,7 +2711,7 @@
               "deprecationReason": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "args": [],
               "type": {
@@ -2729,7 +2729,7 @@
           ],
           "inputFields": [
             {
-              "name": "receipt_chain_hash",
+              "name": "receiptChainHash",
               "description": "receipt chain hash, or null if Ignore",
               "type": {
                 "kind": "SCALAR",
@@ -2739,7 +2739,7 @@
               "defaultValue": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "type": {
                 "kind": "NON_NULL",
@@ -2847,7 +2847,7 @@
               "deprecationReason": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "args": [],
               "type": {
@@ -2875,7 +2875,7 @@
               "defaultValue": null
             },
             {
-              "name": "check_or_ignore",
+              "name": "checkOrIgnore",
               "description": "Check or ignore",
               "type": {
                 "kind": "NON_NULL",
@@ -3124,7 +3124,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "Public_keyOrIgnore",
+                  "name": "PublicKeyOrIgnore",
                   "ofType": null
                 }
               },
@@ -3140,7 +3140,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "Public_keyOrIgnore",
+                  "name": "PublicKeyOrIgnore",
                   "ofType": null
                 }
               },
@@ -3247,7 +3247,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "Public_keyOrIgnore",
+                  "name": "PublicKeyOrIgnore",
                   "ofType": null
                 }
               },
@@ -3261,7 +3261,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "Public_keyOrIgnore",
+                  "name": "PublicKeyOrIgnore",
                   "ofType": null
                 }
               },
@@ -4163,7 +4163,7 @@
               "deprecationReason": null
             },
             {
-              "name": "setVerification_key",
+              "name": "setVerificationKey",
               "description": null,
               "args": [],
               "type": {
@@ -4319,7 +4319,7 @@
               "defaultValue": null
             },
             {
-              "name": "setVerification_key",
+              "name": "setVerificationKey",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -4563,7 +4563,7 @@
           "description": null,
           "fields": [
             {
-              "name": "verification_key_with_hash",
+              "name": "verificationKeyWithHash",
               "description": "A verification key and hash, or null if Keep",
               "args": [],
               "type": {
@@ -4593,7 +4593,7 @@
           ],
           "inputFields": [
             {
-              "name": "verification_key_with_hash",
+              "name": "verificationKeyWithHash",
               "description": "A verification key and hash, or null if Keep",
               "type": {
                 "kind": "INPUT_OBJECT",
@@ -4627,7 +4627,7 @@
           "description": null,
           "fields": [
             {
-              "name": "public_key",
+              "name": "publicKey",
               "description": "A public key in Base58Check format, or null if Keep",
               "args": [],
               "type": {
@@ -4657,7 +4657,7 @@
           ],
           "inputFields": [
             {
-              "name": "public_key",
+              "name": "publicKey",
               "description": "A public key in Base58Check format, or null if Keep",
               "type": {
                 "kind": "SCALAR",
@@ -9287,7 +9287,7 @@
           "description": null,
           "fields": [
             {
-              "name": "ip_addr",
+              "name": "ipAddr",
               "description": "IP address",
               "args": [],
               "type": {
@@ -9303,7 +9303,7 @@
               "deprecationReason": null
             },
             {
-              "name": "peer_id",
+              "name": "peerId",
               "description": "libp2p Peer ID",
               "args": [],
               "type": {
@@ -9335,7 +9335,7 @@
               "deprecationReason": null
             },
             {
-              "name": "banned_status",
+              "name": "bannedStatus",
               "description": "Banned status",
               "args": [],
               "type": {
@@ -12377,7 +12377,7 @@
           "description": null,
           "fields": [
             {
-              "name": "peer_id",
+              "name": "peerId",
               "description": "base58-encoded peer ID",
               "args": [],
               "type": {
@@ -12409,7 +12409,7 @@
               "deprecationReason": null
             },
             {
-              "name": "libp2p_port",
+              "name": "libp2pPort",
               "description": null,
               "args": [],
               "type": {
@@ -12626,7 +12626,7 @@
           "description": null,
           "fields": [
             {
-              "name": "initial_mininum_balance",
+              "name": "initialMininumBalance",
               "description": "The initial minimum balance for a time-locked account",
               "args": [],
               "type": {
@@ -12638,7 +12638,7 @@
               "deprecationReason": null
             },
             {
-              "name": "cliff_time",
+              "name": "cliffTime",
               "description": "The cliff time for a time-locked account",
               "args": [],
               "type": {
@@ -12650,7 +12650,7 @@
               "deprecationReason": null
             },
             {
-              "name": "cliff_amount",
+              "name": "cliffAmount",
               "description": "The cliff amount for a time-locked account",
               "args": [],
               "type": {
@@ -12662,7 +12662,7 @@
               "deprecationReason": null
             },
             {
-              "name": "vesting_period",
+              "name": "vestingPeriod",
               "description": "The vesting period for a time-locked account",
               "args": [],
               "type": {
@@ -12674,7 +12674,7 @@
               "deprecationReason": null
             },
             {
-              "name": "vesting_increment",
+              "name": "vestingIncrement",
               "description": "The vesting increment for a time-locked account",
               "args": [],
               "type": {

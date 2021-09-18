@@ -425,7 +425,7 @@ module Types = struct
 
   let account_timing : (Mina_lib.t, Account_timing.t option) typ =
     obj "AccountTiming" ~fields:(fun _ ->
-        [ field "initial_mininum_balance" ~typ:uint64
+        [ field "initialMininumBalance" ~typ:uint64
             ~doc:"The initial minimum balance for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -434,7 +434,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some (Balance.to_uint64 timing_info.initial_minimum_balance))
-        ; field "cliff_time" ~typ:uint32
+        ; field "cliffTime" ~typ:uint32
             ~doc:"The cliff time for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -443,7 +443,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some timing_info.cliff_time)
-        ; field "cliff_amount" ~typ:uint64
+        ; field "cliffAmount" ~typ:uint64
             ~doc:"The cliff amount for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -452,7 +452,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some (Currency.Amount.to_uint64 timing_info.cliff_amount))
-        ; field "vesting_period" ~typ:uint32
+        ; field "vestingPeriod" ~typ:uint32
             ~doc:"The vesting period for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -461,7 +461,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some timing_info.vesting_period)
-        ; field "vesting_increment" ~typ:uint64
+        ; field "vestingIncrement" ~typ:uint64
             ~doc:"The vesting increment for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -1734,7 +1734,7 @@ module Types = struct
   module Payload = struct
     let peer : ('context, Network_peer.Peer.t option) typ =
       obj "NetworkPeerPayload" ~fields:(fun _ ->
-          [ field "peer_id" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
+          [ field "peerId" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
               ~args:Arg.[]
               ~resolve:(fun _ peer -> peer.Network_peer.Peer.peer_id)
           ; field "host" ~doc:"IP address of the remote host"
@@ -1742,7 +1742,7 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ peer ->
                 Unix.Inet_addr.to_string peer.Network_peer.Peer.host)
-          ; field "libp2p_port" ~typ:(non_null int)
+          ; field "libp2pPort" ~typ:(non_null int)
               ~args:Arg.[]
               ~resolve:(fun _ peer -> peer.Network_peer.Peer.libp2p_port)
           ])
@@ -1832,17 +1832,17 @@ module Types = struct
     let trust_status =
       obj "TrustStatusPayload" ~fields:(fun _ ->
           let open Trust_system.Peer_status in
-          [ field "ip_addr" ~typ:(non_null string) ~doc:"IP address"
+          [ field "ipAddr" ~typ:(non_null string) ~doc:"IP address"
               ~args:Arg.[]
               ~resolve:(fun _ (peer, _) ->
                 Unix.Inet_addr.to_string peer.Network_peer.Peer.host)
-          ; field "peer_id" ~typ:(non_null string) ~doc:"libp2p Peer ID"
+          ; field "peerId" ~typ:(non_null string) ~doc:"libp2p Peer ID"
               ~args:Arg.[]
               ~resolve:(fun _ (peer, __) -> peer.Network_peer.Peer.peer_id)
           ; field "trust" ~typ:(non_null float) ~doc:"Trust score"
               ~args:Arg.[]
               ~resolve:(fun _ (_, { trust; _ }) -> trust)
-          ; field "banned_status" ~typ:string ~doc:"Banned status"
+          ; field "bannedStatus" ~typ:string ~doc:"Banned status"
               ~args:Arg.[]
               ~resolve:(fun _ (_, { banned; _ }) ->
                 string_of_banned_status banned)
@@ -2029,10 +2029,10 @@ module Types = struct
                 { peer_id; host = Unix.Inet_addr.of_string host; libp2p_port }
           with _ -> Error "Invalid format for NetworkPeer.host")
         ~fields:
-          [ arg "peer_id" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
+          [ arg "peerId" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
           ; arg "host" ~doc:"IP address of the remote host"
               ~typ:(non_null string)
-          ; arg "libp2p_port" ~typ:(non_null int)
+          ; arg "libp2pPort" ~typ:(non_null int)
           ]
 
     let public_key_arg =
@@ -2192,7 +2192,7 @@ module Types = struct
 
       let snapp_pk_set_or_keep =
         snapp_make_set_or_keep "PublicKeySetOrKeep"
-          (arg "public_key"
+          (arg "publicKey"
              ~doc:"A public key in Base58Check format, or null if Keep"
              ~typ:public_key_arg)
 
@@ -2216,7 +2216,7 @@ module Types = struct
 
       let snapp_vk_with_hash_set_or_keep =
         snapp_make_set_or_keep_for_result "VerificationKeyWithHashSetOrKeep"
-          (arg "verification_key_with_hash"
+          (arg "verificationKeyWithHash"
              ~doc:"A verification key and hash, or null if Keep"
              ~typ:snapp_vk_with_hash)
 
@@ -2265,7 +2265,7 @@ module Types = struct
             ; arg "receive" ~typ:(non_null snapp_auth_required)
             ; arg "setDelegate" ~typ:(non_null snapp_auth_required)
             ; arg "setPermissions" ~typ:(non_null snapp_auth_required)
-            ; arg "setVerification_key" ~typ:(non_null snapp_auth_required)
+            ; arg "setVerificationKey" ~typ:(non_null snapp_auth_required)
             ; arg "setSnappUri" ~typ:(non_null snapp_auth_required)
             ; arg "editRollupState" ~typ:(non_null snapp_auth_required)
             ; arg "setTokenSymbol" ~typ:(non_null snapp_auth_required)
@@ -2504,14 +2504,14 @@ module Types = struct
             | Check, None ->
                 Error "Got Check with a null value")
           ~fields:
-            [ arg "check_or_ignore" ~doc:"Check or ignore"
+            [ arg "checkOrIgnore" ~doc:"Check or ignore"
                 ~typ:(non_null snapp_check_or_ignore)
             ; value_arg
             ]
 
       let snapp_pk_or_ignore =
-        snapp_make_check_or_ignore "Public_keyOrIgnore"
-          (arg "public_key"
+        snapp_make_check_or_ignore "PublicKeyOrIgnore"
+          (arg "publicKey"
              ~doc:"Public key in Base58Check format, or null if Ignore"
              ~typ:public_key_arg)
 
@@ -2580,7 +2580,7 @@ module Types = struct
 
       let snapp_receipt_chain_hash_or_ignore =
         snapp_make_check_or_ignore "SnappReceiptChainHashOrIgnore"
-          (arg "receipt_chain_hash" ~doc:"receipt chain hash, or null if Ignore"
+          (arg "receiptChainHash" ~doc:"receipt chain hash, or null if Ignore"
              ~typ:snapp_receipt_chain_hash)
 
       let snapp_field_or_ignore =
@@ -2705,7 +2705,7 @@ module Types = struct
           ~values:
             [ enum_value "Proof" ~value:Proof
             ; enum_value "Signature" ~value:Signature
-            ; enum_value "None_given" ~value:None_given
+            ; enum_value "NoneGiven" ~value:None_given
             ]
 
       let snapp_control =
@@ -2755,11 +2755,11 @@ module Types = struct
           ~typ:token_id_arg
 
       let snapp_token_id_numeric =
-        snapp_make_numeric ~name:"SnappNumericTokenId" ~arg_name:"token_id"
+        snapp_make_numeric ~name:"SnappNumericTokenId" ~arg_name:"tokenId"
           ~typ:token_id_arg
 
       let snapp_block_time_numeric =
-        snapp_make_numeric ~name:"BlockTimeNumeric" ~arg_name:"block_time"
+        snapp_make_numeric ~name:"BlockTimeNumeric" ~arg_name:"blockTime"
           ~typ:block_time
 
       let snapp_length_numeric =
@@ -2775,7 +2775,7 @@ module Types = struct
 
       let snapp_currency_amount_numeric =
         snapp_make_numeric ~name:"CurrencyAmountNumeric"
-          ~arg_name:"currency_amount" ~typ:currency_amount
+          ~arg_name:"currencyAmount" ~typ:currency_amount
 
       let snapp_global_slot =
         scalar "GlobalSlot" ~coerce:(fun amt ->
@@ -2787,7 +2787,7 @@ module Types = struct
                 Error "Expected string for global slot")
 
       let snapp_global_slot_numeric =
-        snapp_make_numeric ~name:"GlobalSlotNumeric" ~arg_name:"global_slot"
+        snapp_make_numeric ~name:"GlobalSlotNumeric" ~arg_name:"globalSlot"
           ~typ:snapp_global_slot
 
       let snapp_state_hash =
@@ -2802,7 +2802,7 @@ module Types = struct
 
       let snapp_state_hash_or_ignore =
         snapp_make_check_or_ignore "SnappStateHashOrIgnore"
-          (arg "state_hash" ~typ:snapp_state_hash)
+          (arg "stateHash" ~typ:snapp_state_hash)
 
       let snapp_epoch_seed =
         scalar "EpochSeed" ~coerce:(fun field ->
@@ -2814,7 +2814,7 @@ module Types = struct
 
       let snapp_epoch_seed_or_ignore =
         snapp_make_check_or_ignore "EpochSeedOrIgnore"
-          (arg "epoch_seed" ~typ:snapp_epoch_seed)
+          (arg "epochSeed" ~typ:snapp_epoch_seed)
 
       let snapp_epoch_ledger =
         obj "EpochLedger"
