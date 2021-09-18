@@ -361,6 +361,14 @@ let setup_daemon logger =
          included as long as the required snark work is available and can be \
          paid for)"
       (optional txn_amount)
+  and stop_time =
+    flag "--stop-time" ~aliases:["stop-time"] (optional int)
+      ~doc:
+        (sprintf
+           "UPTIME in hours after which the daemon stops itself (only if \
+            there were no slots won within an hour after the stop time) \
+            (Default: %d)"
+           Cli_lib.Default.stop_time)
   and upload_blocks_to_gcloud =
     flag "--upload-blocks-to-gcloud"
       ~aliases:["upload-blocks-to-gcloud"]
@@ -1043,6 +1051,10 @@ let setup_daemon logger =
         or_from_config YJ.Util.to_int_option "validation-queue-size"
           ~default:Cli_lib.Default.validation_queue_size validation_queue_size
       in
+      let stop_time =
+        or_from_config YJ.Util.to_int_option "stop-time"
+          ~default:Cli_lib.Default.stop_time stop_time
+      in
       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
       let seed_peer_list_url =
         Option.value_map seed_peer_list_url ~f:Option.some
@@ -1183,7 +1195,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
              ~archive_process_location ~log_block_creation ~precomputed_values
              ~start_time ?precomputed_blocks_path ~log_precomputed_blocks
              ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-             ~uptime_submitter_keypair ())
+             ~uptime_submitter_keypair ~stop_time ())
       in
       { Coda_initialization.coda
       ; client_trustlist
