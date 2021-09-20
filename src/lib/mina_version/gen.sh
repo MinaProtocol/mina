@@ -5,7 +5,7 @@ commit_id_short=$(git rev-parse --short=8 --verify HEAD)
 CWD=$PWD
 
 if [ -n "$MINA_BRANCH" ]; then
-  branch="$MINA_BRANCH"
+  branch="$MINA_BRA NCH"
 else
   branch=$(git rev-parse --verify --abbrev-ref HEAD || echo "<none found>")
 fi

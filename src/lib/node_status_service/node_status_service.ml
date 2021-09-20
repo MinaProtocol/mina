@@ -15,6 +15,13 @@ type node_status_data =
   ; libp2p_input_bandwidth : float
   ; libp2p_output_bandwidth : float
   ; libp2p_cpu_usage : float
+  ; commit_hash : string
+  ; branch : string
+  ; peer_id : string
+  ; ip_address : string
+  ; timestamp : string
+  ; uptime_of_node : float
+  ; peer_count : int
   }
 [@@deriving to_yojson]
 
@@ -48,12 +55,12 @@ let send_node_status_data ~logger ~url node_status_data =
         [%log error] "Failed to send node status data to URL $url"
           ~metadata:(metadata @ extra_metadata)
 
-let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network =
+let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
+    ~addrs_and_ports ~start_time =
   let url_string = Option.value ~default:"127.0.0.1" node_status_url in
   [%log info] "Starting node status service using URL $url"
     ~metadata:[ ("URL", `String url_string) ] ;
 
-  let _data = Prometheus.CollectorRegistry.(collect default) in
   don't_wait_for
   @@
   match Broadcast_pipe.Reader.peek transition_frontier with
@@ -78,15 +85,33 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network =
           ( `Input libp2p_input_bandwidth
           , `Output libp2p_output_bandwidth
           , `Cpu_usage libp2p_cpu_usage ) ->
+          let%bind peers = Mina_networking.peers network in
           let node_status_data =
-            { block_height_at_best_tip = 1
-            ; max_observed_block_height = 2
-            ; max_observed_unvalidated_block_height = 3
+            { block_height_at_best_tip =
+                Transition_frontier.best_tip tf
+                |> Transition_frontier.Breadcrumb.blockchain_length
+                |> Unsigned.UInt32.to_int
+            ; max_observed_block_height =
+                !Mina_metrics.Transition_frontier.max_blocklength_observed
+            ; max_observed_unvalidated_block_height =
+                !Mina_metrics.Transition_frontier
+                 .max_unvalidated_blocklength_observed
             ; catchup_job_states
             ; sync_status
             ; libp2p_input_bandwidth
             ; libp2p_output_bandwidth
             ; libp2p_cpu_usage
+            ; commit_hash = Mina_version.commit_id
+            ; branch = Mina_version.branch
+            ; peer_id =
+                (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
+            ; ip_address =
+                Node_addrs_and_ports.external_ip addrs_and_ports
+                |> Core.Unix.Inet_addr.to_string
+            ; timestamp = Rfc3339_time.get_rfc3339_time ()
+            ; uptime_of_node =
+                Time.Span.to_sec @@ Time.diff (Time.now ()) start_time
+            ; peer_count = List.length peers
             }
           in
           send_node_status_data ~logger ~url:(Uri.of_string url_string)
