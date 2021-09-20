@@ -6,6 +6,20 @@ type catchup_job_states =
   (Transition_frontier.Full_catchup_tree.Node.State.Enum.t * int) list option
 [@@deriving to_yojson]
 
+type rpc_count =
+  { get_some_initial_peers: float
+  ; get_staged_ledger_aux_and_pending_coinbases_at_hash: float
+  ; answer_sync_ledger_query: float
+  ; get_transition_chain: float
+  ; get_transition_knowledge: float
+  ; get_transition_chain_proof: float
+  ; get_node_status: float
+  ; get_ancestry: float
+  ; ban_notify: float
+  ; get_best_tip: float
+  ; get_epoch_ledger: float }
+[@@deriving to_yojson]
+
 type node_status_data =
   { block_height_at_best_tip: int
   ; max_observed_block_height: int
@@ -21,7 +35,9 @@ type node_status_data =
   ; ip_address: string
   ; timestamp: string
   ; uptime_of_node: float
-  ; peer_count: int }
+  ; peer_count: int
+  ; rpc_received: rpc_count
+  ; rpc_sent: rpc_count }
 [@@deriving to_yojson]
 
 let send_node_status_data ~logger ~url node_status_data =
@@ -107,7 +123,81 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
             ; timestamp= Rfc3339_time.get_rfc3339_time ()
             ; uptime_of_node=
                 Time.Span.to_sec @@ Time.diff (Time.now ()) start_time
-            ; peer_count= List.length peers }
+            ; peer_count= List.length peers
+            ; rpc_sent=
+                { get_some_initial_peers=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.get_some_initial_peers_rpcs_sent
+                ; get_staged_ledger_aux_and_pending_coinbases_at_hash=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network
+                      .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent
+                ; answer_sync_ledger_query=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.answer_sync_ledger_query_rpcs_sent
+                ; get_transition_chain=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.get_transition_chain_proof_rpcs_sent
+                ; get_transition_knowledge=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.get_transition_knowledge_rpcs_sent
+                ; get_transition_chain_proof=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.get_transition_chain_proof_rpcs_sent
+                ; get_node_status=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.get_node_status_rpcs_sent
+                ; get_ancestry=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.get_ancestry_rpcs_sent
+                ; ban_notify=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.ban_notify_rpcs_sent
+                ; get_best_tip=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.get_best_tip_rpcs_sent
+                ; get_epoch_ledger=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.get_epoch_ledger_rpcs_sent }
+            ; rpc_received=
+                { get_some_initial_peers=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.get_some_initial_peers_rpcs_received
+                ; get_staged_ledger_aux_and_pending_coinbases_at_hash=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network
+                      .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received
+                ; answer_sync_ledger_query=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network
+                      .answer_sync_ledger_query_rpcs_received
+                ; get_transition_chain=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network
+                      .get_transition_chain_proof_rpcs_received
+                ; get_transition_knowledge=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network
+                      .get_transition_knowledge_rpcs_received
+                ; get_transition_chain_proof=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network
+                      .get_transition_chain_proof_rpcs_received
+                ; get_node_status=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.get_node_status_rpcs_received
+                ; get_ancestry=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.get_ancestry_rpcs_received
+                ; ban_notify=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.ban_notify_rpcs_received
+                ; get_best_tip=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.get_best_tip_rpcs_received
+                ; get_epoch_ledger=
+                    Prometheus.Counter.value
+                      Mina_metrics.Network.get_epoch_ledger_rpcs_received } }
           in
           send_node_status_data ~logger ~url:(Uri.of_string url_string)
             node_status_data
