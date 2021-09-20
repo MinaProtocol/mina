@@ -115,6 +115,32 @@ module Go_log = struct
       }
 end
 
+let%test "record_of_yojson 1" =
+  let lines =
+    [ "{\"level\":\"info\",\"ts\":\"2021-09-20T16:36:34.150+0300\",\"logger\":\"helper \
+       top-level JSON handling\",\"msg\":\"libp2p_helper has the following \
+       logging subsystems active: [badger swarm2 p2p-config dht blankhost \
+       connmgr ipns mplex reuseport-transport tcp-tpt basichost autorelay \
+       addrutil dht.pb providers dht/RtRefreshManager mdns routedhost table \
+       routing/record peerstore/ds test-logger peerstore autonat helper \
+       top-level JSON handling relay codanet.Helper eventlog discovery nat \
+       net/identify ping pubsub stream-upgrader diversityFilter]\"}"
+    ; "2021/09/20 17:38:12 capnp: decode: too many segments to decode"
+    ]
+  in
+  List.equal Bool.equal
+    (List.map
+       ~f:(fun line ->
+         try
+           match line |> Yojson.Safe.from_string |> Go_log.record_of_yojson with
+           | Ok _ ->
+               true
+           | Error _ ->
+               false
+         with _ -> false)
+       lines)
+    [ true; false ]
+
 type t =
   { process : Child_processes.t
   ; logger : Logger.t

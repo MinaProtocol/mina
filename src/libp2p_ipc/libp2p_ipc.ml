@@ -94,7 +94,7 @@ let () =
     | _ ->
         None)
 
-let compression = `Packing
+let compression = `None
 
 let now () =
   let now_int64 =

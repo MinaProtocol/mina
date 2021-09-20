@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"runtime/debug"
@@ -13,11 +12,12 @@ import (
 	// importing this automatically registers the pprof api to our metrics server
 	_ "net/http/pprof"
 
+	ipc "libp2p_ipc"
+
 	capnp "capnproto.org/go/capnp/v3"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	ipc "libp2p_ipc"
 )
 
 const validationTimeout = 5 * time.Minute
@@ -163,7 +163,7 @@ func main() {
 	for {
 		rawMsg, err := decoder.Decode()
 		if err != nil {
-			log.Panic(err)
+			helperLog.Errorf("Error decoding message: %w", err)
 			// TODO consider handling non-EOF errors differently
 			// TODO consider sending a message via stdout about stdin closed
 			break

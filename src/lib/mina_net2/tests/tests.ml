@@ -39,8 +39,8 @@ let%test_module "coda network tests" =
       let%bind kp_c = generate_random_keypair c in
       let maddrs = List.map [ "/ip4/127.0.0.1/tcp/0" ] ~f:Multiaddr.of_string in
       let%bind () =
-        configure a ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
-          ~maddrs ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+        configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
+          ~network_id ~peer_exchange:true ~mina_peer_exchange:true
           ~direct_peers:[] ~seed_peers:[] ~on_peer_connected:Fn.ignore
           ~on_peer_disconnected:Fn.ignore ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~max_connections:50
@@ -60,8 +60,8 @@ let%test_module "coda network tests" =
         ~metadata:[ ("peer", `String (Multiaddr.to_string seed_peer)) ]
         "Seed_peer: $peer" ;
       let%bind () =
-        configure b ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
-          ~maddrs ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+        configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
+          ~network_id ~peer_exchange:true ~mina_peer_exchange:true
           ~direct_peers:[] ~seed_peers:[ seed_peer ]
           ~on_peer_connected:Fn.ignore ~on_peer_disconnected:Fn.ignore
           ~flooding:false ~metrics_port:None ~unsafe_no_trust_ip:true
@@ -70,8 +70,8 @@ let%test_module "coda network tests" =
             { trusted_peers = []; banned_peers = []; isolate = false }
         >>| Or_error.ok_exn
       and () =
-        configure c ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_c
-          ~maddrs ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+        configure c ~external_maddr:(List.hd_exn maddrs) ~me:kp_c ~maddrs
+          ~network_id ~peer_exchange:true ~mina_peer_exchange:true
           ~direct_peers:[] ~seed_peers:[ seed_peer ]
           ~on_peer_connected:Fn.ignore ~on_peer_disconnected:Fn.ignore
           ~flooding:false ~metrics_port:None ~unsafe_no_trust_ip:true
@@ -186,7 +186,7 @@ let%test_module "coda network tests" =
           |> Deferred.Or_error.ok_exn
         in
         let%bind stream =
-          open_stream c ~protocol:"echo" b_peerid >>| Or_error.ok_exn
+          open_stream c ~protocol:"echo" ~peer:b_peerid >>| Or_error.ok_exn
         in
         let r, w = Libp2p_stream.pipes stream in
         Pipe.write_without_pushback w testmsg ;
