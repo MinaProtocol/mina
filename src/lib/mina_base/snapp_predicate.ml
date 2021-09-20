@@ -758,18 +758,18 @@ module Protocol_state = struct
           ; timestamp : 'time
           ; blockchain_length : 'length
                 (* TODO: This previously had epoch_count but I removed it as I believe it is redundant
-                   with curr_global_slot.
+                   with global_slot_since_hard_fork.
 
                    epoch_count in [a, b]
 
                    should be equivalent to
 
-                   curr_global_slot in [slots_per_epoch * a, slots_per_epoch * b]
+                   global_slot_since_hard_fork in [slots_per_epoch * a, slots_per_epoch * b]
                 *)
           ; min_window_density : 'length
           ; last_vrf_output : 'vrf_output
           ; total_currency : 'amount
-          ; curr_global_slot : 'global_slot
+          ; global_slot_since_hard_fork : 'global_slot
           ; global_slot_since_genesis : 'global_slot
           ; staking_epoch_data : 'epoch_data
           ; next_epoch_data : 'epoch_data
@@ -806,7 +806,7 @@ module Protocol_state = struct
        ; min_window_density
        ; last_vrf_output
        ; total_currency
-       ; curr_global_slot
+       ; global_slot_since_hard_fork
        ; global_slot_since_genesis
        ; staking_epoch_data
        ; next_epoch_data
@@ -822,7 +822,7 @@ module Protocol_state = struct
       ; length blockchain_length
       ; length min_window_density
       ; Numeric.(to_input Tc.amount total_currency)
-      ; Numeric.(to_input Tc.global_slot curr_global_slot)
+      ; Numeric.(to_input Tc.global_slot global_slot_since_hard_fork)
       ; Numeric.(to_input Tc.global_slot global_slot_since_genesis)
       ; Epoch_data.to_input staking_epoch_data
       ; Epoch_data.to_input next_epoch_data
@@ -899,7 +899,7 @@ module Protocol_state = struct
          ; min_window_density
          ; last_vrf_output
          ; total_currency
-         ; curr_global_slot
+         ; global_slot_since_hard_fork
          ; global_slot_since_genesis
          ; staking_epoch_data
          ; next_epoch_data
@@ -915,7 +915,7 @@ module Protocol_state = struct
         ; length blockchain_length
         ; length min_window_density
         ; Numeric.(Checked.to_input Tc.amount total_currency)
-        ; Numeric.(Checked.to_input Tc.global_slot curr_global_slot)
+        ; Numeric.(Checked.to_input Tc.global_slot global_slot_since_hard_fork)
         ; Numeric.(Checked.to_input Tc.global_slot global_slot_since_genesis)
         ; Epoch_data.Checked.to_input staking_epoch_data
         ; Epoch_data.Checked.to_input next_epoch_data
@@ -935,7 +935,7 @@ module Protocol_state = struct
            ; min_window_density
            ; last_vrf_output
            ; total_currency
-           ; curr_global_slot
+           ; global_slot_since_hard_fork
            ; global_slot_since_genesis
            ; staking_epoch_data
            ; next_epoch_data
@@ -972,7 +972,7 @@ module Protocol_state = struct
               min_window_density s.min_window_density
           ; Numeric.(Checked.check Tc.amount) total_currency s.total_currency
           ; Numeric.(Checked.check Tc.global_slot)
-              curr_global_slot s.curr_global_slot
+              global_slot_since_hard_fork s.global_slot_since_hard_fork
           ; Numeric.(Checked.check Tc.global_slot)
               global_slot_since_genesis s.global_slot_since_genesis
           ]
@@ -1036,7 +1036,7 @@ module Protocol_state = struct
     ; min_window_density = Ignore
     ; last_vrf_output = ()
     ; total_currency = Ignore
-    ; curr_global_slot = Ignore
+    ; global_slot_since_hard_fork = Ignore
     ; global_slot_since_genesis = Ignore
     ; staking_epoch_data = epoch_data
     ; next_epoch_data = epoch_data
@@ -1051,7 +1051,7 @@ module Protocol_state = struct
          ; min_window_density
          ; last_vrf_output
          ; total_currency
-         ; curr_global_slot
+         ; global_slot_since_hard_fork
          ; global_slot_since_genesis
          ; staking_epoch_data
          ; next_epoch_data
@@ -1117,7 +1117,7 @@ module Protocol_state = struct
     in
     let%bind () =
       Numeric.(check ~label:"curr_global_slot" Tc.global_slot)
-        curr_global_slot s.curr_global_slot
+        global_slot_since_hard_fork s.global_slot_since_hard_fork
     in
     let%bind () =
       Numeric.(check ~label:"global_slot_since_genesis" Tc.global_slot)
