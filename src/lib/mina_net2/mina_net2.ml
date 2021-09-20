@@ -463,6 +463,15 @@ let handle_push_message t push_message =
       let open StreamLost in
       let stream_id = stream_id_get m in
       let reason = reason_get m in
+      let stream_id_str = Libp2p_ipc.stream_id_to_string stream_id in
+      ( match Hashtbl.find t.streams stream_id_str with
+      | Some stream ->
+          let (`Stream_should_be_released should_release) =
+            Libp2p_stream.stream_closed ~logger:t.logger ~who_closed:Them stream
+          in
+          if should_release then Hashtbl.remove t.streams stream_id_str
+      | None ->
+          () ) ;
       [%log' trace t.logger]
         "Encountered error while reading stream $id: $error"
         ~metadata:

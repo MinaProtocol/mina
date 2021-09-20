@@ -194,10 +194,10 @@ func (m ResetStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 	}
 	streamId := sid.Id()
 	app.StreamsMutex.Lock()
-	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[streamId]; ok {
-		err := stream.Reset()
 		delete(app.Streams, streamId)
+		app.StreamsMutex.Unlock()
+		err := stream.Reset()
 		if err != nil {
 			return mkRpcRespError(seqno, badp2p(err))
 		}
@@ -206,6 +206,7 @@ func (m ResetStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 			panicOnErr(err)
 		})
 	}
+	app.StreamsMutex.Unlock()
 	return mkRpcRespError(seqno, badRPC(errors.New("unknown stream_idx")))
 }
 
