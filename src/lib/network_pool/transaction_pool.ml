@@ -179,7 +179,8 @@ module Diff_versioned = struct
         [@@deriving sexp, yojson]
 
         let to_latest (t : t) : V2.t =
-          List.map t ~f:(fun (x, y) -> (User_command.Stable.V1.to_latest x, y))
+          List.map t ~f:(fun (cmd, err) ->
+              (User_command.Stable.V1.to_latest cmd, err))
       end
     end]
 
@@ -498,6 +499,14 @@ struct
                   ~cliff_amount ~vesting_period ~vesting_increment
                   ~initial_minimum_balance))
           |> Option.value ~default:Currency.Balance.zero
+
+    let check_command (t : User_command.t) : User_command.Valid.t option =
+      match t with
+      | Parties _ ->
+          failwith "TODO"
+      | Signed_command t ->
+          Option.map (Signed_command.check t) ~f:(fun x ->
+              User_command.Signed_command x)
 
     let handle_transition_frontier_diff
         ( ({ new_commands; removed_commands; reorg_best_tip = _ } :

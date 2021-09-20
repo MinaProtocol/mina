@@ -561,8 +561,8 @@ end
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = Poly(Predicated.Stable.V1)(Control.Stable.V1).t =
-      { data : Predicated.Stable.V1.t; authorization : Control.Stable.V1.t }
+    type t = Poly(Predicated.Stable.V1)(Control.Stable.V2).t =
+      { data : Predicated.Stable.V1.t; authorization : Control.Stable.V2.t }
     [@@deriving sexp, equal, yojson, hash, compare]
 
     let to_latest = Fn.id

@@ -92,7 +92,7 @@ module Transaction_applied = struct
         type t =
           { accounts :
               (Account_id.Stable.V1.t * Account.Stable.V2.t option) list
-          ; command : Snapp_command.Stable.V1.t With_status.Stable.V1.t
+          ; command : Snapp_command.Stable.V2.t With_status.Stable.V1.t
           }
         [@@deriving sexp]
 
@@ -107,13 +107,14 @@ module Transaction_applied = struct
           }
         [@@deriving sexp]
 
-        let to_latest { accounts; command } : V2.t =
+        let to_latest (t : t) : V2.t =
           { accounts =
               List.map
                 ~f:(fun (aid, account) ->
                   (aid, Option.map ~f:Account.Stable.V1.to_latest account))
-                accounts
-          ; command
+                t.accounts
+          ; command =
+              With_status.map ~f:Snapp_command.Stable.V1.to_latest t.command
           }
       end
     end]
@@ -1292,7 +1293,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           match u with Keep -> x | Set x -> x)
     in
     let%bind permissions =
-      update a.permissions.set_delegate permissions a.permissions
+      update a.permissions.set_permissions permissions a.permissions
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
     let nonce : Account.Nonce.t =
