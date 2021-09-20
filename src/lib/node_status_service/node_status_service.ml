@@ -16,7 +16,7 @@ type node_status_data =
   ; libp2p_output_bandwidth: float
   ; libp2p_cpu_usage: float
   ; commit_hash: string
-  ; branch: string
+  ; git_branch: string
   ; peer_id: string
   ; ip_address: string
   ; timestamp: string
@@ -98,7 +98,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
             ; libp2p_output_bandwidth
             ; libp2p_cpu_usage
             ; commit_hash= Mina_version.commit_id
-            ; branch= Mina_version.branch
+            ; git_branch= Mina_version.branch
             ; peer_id=
                 (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
             ; ip_address=
