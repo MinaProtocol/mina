@@ -22,7 +22,7 @@ import (
 	_ "net/http/pprof"
 
 	"codanet"
-
+	"github.com/shirou/gopsutil/v3/process"
 	"github.com/go-errors/errors"
 	logging "github.com/ipfs/go-log/v2"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
@@ -113,8 +113,9 @@ type codaPeerInfo struct {
 }
 
 type bandwidthInfo struct {
-	rateIn  float64 `json:"libp2p_input_bandwidth`
-	rateOut float64 `json:"libp2p_output_bandwidth`
+	rateIn   float64 `json:"libp2p_input_bandwidth`
+	rateOut  float64 `json:"libp2p_output_bandwidth`
+	cpuUsage float64 `json:"libp2p_cpu_usage`
 }
 
 type envelope struct {
@@ -175,6 +176,7 @@ func needsConfigure() error {
 func needsDHT() error {
 	return badRPC(errors.New("helper not yet joined to pubsub"))
 }
+
 
 func parseMultiaddrWithID(ma multiaddr.Multiaddr, id peer.ID) (*codaPeerInfo, error) {
 	ipComponent, tcpMaddr := multiaddr.SplitFirst(ma)
@@ -1453,7 +1455,31 @@ func (bi *getBandwidthInfoMsg) run(app *app) (interface{}, error) {
 
 	stats := app.P2p.BandwidthCounter.GetBandwidthTotals()
 
-	return bandwidthInfo{stats.RateIn, stats.RateOut}, nil
+	processes, err := process.Processes()
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, proc := range processes {
+		name, err := proc.Name()
+
+		if err != nil {
+			return nil, err
+		}
+
+		if name == "coda-libp2p_helper" {
+			usage, err := proc.CPUPercent()
+
+			if err != nil {
+				return nil, err
+			}
+
+			return bandwidthInfo{stats.RateIn, stats.RateOut, usage}, nil			
+		}
+	}
+
+	return nil, errors.New("fail to find coda-libp2p_helper, do we rename it?")
 }
 
 func filterIPString(filters *ma.Filters, ip string, action ma.Action) error {

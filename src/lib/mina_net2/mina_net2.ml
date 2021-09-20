@@ -75,7 +75,9 @@ type peer_info = {libp2p_port: int; host: string; peer_id: string}
 [@@deriving yojson]
 
 type bandwidth_info =
-  {libp2p_input_bandwidth: float; libp2p_output_bandwidth: float}
+  { libp2p_input_bandwidth: float
+  ; libp2p_output_bandwidth: float
+  ; libp2p_cpu_usage: float }
 [@@deriving yojson]
 
 type connection_gating =
@@ -1412,8 +1414,10 @@ let list_peers net =
 
 let bandwidth_info net =
   Deferred.Or_error.map ~f:(function
-      | {libp2p_input_bandwidth; libp2p_output_bandwidth} ->
-      (libp2p_input_bandwidth, libp2p_output_bandwidth) )
+      | {libp2p_input_bandwidth; libp2p_output_bandwidth; libp2p_cpu_usage} ->
+      ( `Input libp2p_input_bandwidth
+      , `Output libp2p_output_bandwidth
+      , `Cpu_usage libp2p_cpu_usage ) )
   @@ Helper.do_rpc net (module Helper.Rpcs.Bandwidth_info) ()
 
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
