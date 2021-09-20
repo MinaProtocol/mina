@@ -14,6 +14,7 @@ type node_status_data =
   ; sync_status : Sync_status.Stable.V1.t
   ; libp2p_input_bandwidth : float
   ; libp2p_output_bandwidth : float
+  ; libp2p_cpu_usage : float
   }
 [@@deriving to_yojson]
 
@@ -73,7 +74,10 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network =
         sync_status |> Mina_incremental.Status.Observer.value_exn
       in
       match%bind Mina_networking.bandwidth_info network with
-      | Ok (libp2p_input_bandwidth, libp2p_output_bandwidth) ->
+      | Ok
+          ( `Input libp2p_input_bandwidth
+          , `Output libp2p_output_bandwidth
+          , `Cpu_usage libp2p_cpu_usage ) ->
           let node_status_data =
             { block_height_at_best_tip = 1
             ; max_observed_block_height = 2
@@ -82,6 +86,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network =
             ; sync_status
             ; libp2p_input_bandwidth
             ; libp2p_output_bandwidth
+            ; libp2p_cpu_usage
             }
           in
           send_node_status_data ~logger ~url:(Uri.of_string url_string)

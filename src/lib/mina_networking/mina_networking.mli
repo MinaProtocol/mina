@@ -189,7 +189,10 @@ val states :
 
 val peers : t -> Network_peer.Peer.t list Deferred.t
 
-val bandwidth_info : t -> (float * float) Deferred.Or_error.t
+val bandwidth_info :
+     t
+  -> ([ `Input of float ] * [ `Output of float ] * [ `Cpu_usage of float ])
+     Deferred.Or_error.t
 
 val get_peer_node_status :
      t
