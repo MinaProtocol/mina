@@ -2,6 +2,7 @@ const path = require('path');
 
 const NodePolyfillPlugin = require('node-polyfill-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
+const CopyPlugin = require('copy-webpack-plugin');
 
 module.exports = {
   target: 'web',
@@ -68,7 +69,38 @@ module.exports = {
     ],
   },
 
-  plugins: [new CleanWebpackPlugin(), new NodePolyfillPlugin()],
+  plugins: [
+    new CleanWebpackPlugin(),
+    new NodePolyfillPlugin(),
+    new CopyPlugin({
+      patterns: [
+        {
+          from: './src/chrome_bindings/index.html',
+          to: '',
+        },
+        {
+          from: './src/chrome_bindings/server.py',
+          to: '',
+        },
+        {
+          from: './src/chrome_bindings/plonk_init.js',
+          to: '',
+        },
+        {
+          from: './src/chrome_bindings/plonk_wasm.js',
+          to: '',
+        },
+        {
+          from: './src/chrome_bindings/plonk_wasm_bg.wasm',
+          to: '',
+        },
+        {
+          from: 'src/chrome_bindings/snippets',
+          to: 'snippets',
+        },
+      ],
+    }),
+  ],
   optimization: {
     splitChunks: {
       cacheGroups: {

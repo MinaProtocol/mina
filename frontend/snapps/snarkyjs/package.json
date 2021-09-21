@@ -13,10 +13,10 @@
   },
   "scripts": {
     "type-check": "tsc --noEmit",
-    "build-dev": "./scripts/build-dev.sh",
+    "build-dev": "webpack --config webpack.dev.js --stats-error-details",
     "build-prod": "./scripts/build-prod.sh",
     "serve": "./scripts/build-and-run-server.sh",
-    "prepublish": "./scripts/prepublish.sh",
+    "prepublish": "webpack --config webpack.prod.js ",
     "test": "node --experimental-wasm-modules --experimental-modules --experimental-wasm-threads ./node_modules/.bin/jest",
     "format": "prettier --write --ignore-unknown **/*",
     "clean": "rm -rf dist"
@@ -40,6 +40,7 @@
     "webpack-cli": "^4.7.2"
   },
   "dependencies": {
+    "copy-webpack-plugin": "^9.0.1",
     "env": "^0.0.2",
     "reflect-metadata": "^0.1.13"
   }
