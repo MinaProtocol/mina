@@ -768,15 +768,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 in
                 let source_timing = account.timing in
                 let%map timing =
-                  let error_check x =
-                    if Account_id.equal source fee_payer then
-                      Ok (ok_or_reject x)
-                    else
-                      Result.map_error ~f:timing_error_to_user_command_status x
-                  in
                   validate_timing ~txn_amount:amount
                     ~txn_global_slot:current_global_slot ~account
-                  |> error_check
+                  |> Result.map_error ~f:timing_error_to_user_command_status
                 in
                 (location, source_timing, {account with timing})
               else
