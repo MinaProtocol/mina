@@ -949,7 +949,7 @@
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
+              "description": "The global slot since genesis after which this transaction cannot be applied",
               "type": {
                 "kind": "SCALAR",
                 "name": "UInt32",
@@ -1086,7 +1086,7 @@
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
+              "description": "The global slot since genesis after which this transaction cannot be applied",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -1196,7 +1196,7 @@
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
+              "description": "The global slot since genesis after which this transaction cannot be applied",
               "type": {
                 "kind": "SCALAR",
                 "name": "UInt32",
@@ -1333,7 +1333,7 @@
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
+              "description": "The global slot since genesis after which this transaction cannot be applied",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -1411,7 +1411,7 @@
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
+              "description": "The global slot since genesis after which this transaction cannot be applied",
               "type": {
                 "kind": "SCALAR",
                 "name": "UInt32",
@@ -1520,7 +1520,7 @@
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
+              "description": "The global slot since genesis after which this transaction cannot be applied",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -1602,7 +1602,7 @@
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
+              "description": "The global slot since genesis after which this transaction cannot be applied",
               "type": {
                 "kind": "SCALAR",
                 "name": "UInt32",
@@ -3860,7 +3860,7 @@
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
+              "description": "The global slot since genesis after which this transaction cannot be applied",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -3970,7 +3970,7 @@
             },
             {
               "name": "validUntil",
-              "description": "The global slot number after which this transaction cannot be applied",
+              "description": "The global slot since genesis after which this transaction cannot be applied",
               "type": {
                 "kind": "SCALAR",
                 "name": "UInt32",
