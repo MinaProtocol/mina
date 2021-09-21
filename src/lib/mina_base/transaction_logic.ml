@@ -336,12 +336,12 @@ let timing_error_to_user_command_status err =
 let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
   let open Account.Poly in
   let open Account.Timing.Poly in
-  let nsf_error () =
+  let nsf_error kind =
     Or_error.errorf
-      !"For timed account, the requested transaction for amount %{sexp: \
+      !"For %s account, the requested transaction for amount %{sexp: \
         Amount.t} at global slot %{sexp: Global_slot.t}, the balance %{sexp: \
         Balance.t} is insufficient"
-      txn_amount txn_global_slot account.balance
+      kind txn_amount txn_global_slot account.balance
     |> Or_error.tag ~tag:nsf_tag
   in
   match account.timing with
@@ -349,7 +349,7 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
     (* no time restrictions *)
     match Balance.(account.balance - txn_amount) with
     | None ->
-        nsf_error ()
+        nsf_error "untimed"
     | _ ->
         Or_error.return (Untimed, `Min_balance Balance.zero) )
   | Timed
@@ -376,7 +376,7 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
                regardless, the transaction would put the account below any calculated minimum balance
                so don't bother with the remaining computations
             *)
-            nsf_error ()
+            nsf_error "timed"
         | Some proposed_new_balance ->
             let curr_min_balance =
               Account.min_balance_at_slot ~global_slot:txn_global_slot
