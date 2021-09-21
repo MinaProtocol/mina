@@ -82,7 +82,7 @@ export class Field {
   static toString(x: Field | number | string | boolean): string;
 
   static sizeInFieldElements(): number;
-  static toFieldElements(x: Field | number | string | boolean): Field[];
+  static toFieldElements(x: Field): Field[];
   static ofFieldElements(fields: Field[]): Field;
 
   static assertEqual(x: Field | number | string | boolean, y: Field | number | string | boolean): Field;
@@ -96,6 +96,8 @@ export class Field {
 
   static toJSON(x: Field): JSONValue;
   static fromJSON(x: JSONValue): Field | null;
+
+  static toConstant(x : Field): Field;
 }
 
 export class Bool {
@@ -191,6 +193,8 @@ export class Circuit {
     ctor: { toFieldElements(x: T): Field[]; ofFieldElements(x: Field[]): T; sizeInFieldElements(): number },
     f: () => T
   ): T;
+
+  static asProver(f: () => void): void;
 
   static array<T>(
     ctor: AsFieldElements<T>,

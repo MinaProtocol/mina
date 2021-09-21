@@ -30,6 +30,10 @@ export abstract class CircuitValue {
     return (this.constructor as any).toFieldElements(this);
   }
 
+  toJSON(): JSONValue {
+    return (this.constructor as any).toJSON(this);
+  }
+
   equals(this: this, x: typeof this): Bool {
     return Circuit.equal(this, x);
   }
@@ -133,6 +137,10 @@ function typOfArray(typs: Array<AsFieldElements<any>>): AsFieldElements<any> {
     },
 
     toFieldElements: (t: Array<any>) => {
+      if (t.length !== typs.length) {
+        throw new Error(`typOfArray: Expected ${typs.length}, got ${t.length}`);
+      }
+
       let res = [];
       for (let i = 0; i < t.length; ++i) {
         res.push(...typs[i].toFieldElements(t[i]));
@@ -181,6 +189,7 @@ export function circuitMain(
 
     return target[propertyName].apply(target, args);
   };
+
   target.snarkyWitnessTyp = typOfArray(
     Array.from(witnessIndexSet).map((i) => paramTypes[i])
   );
