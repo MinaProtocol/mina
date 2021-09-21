@@ -35,16 +35,14 @@ func newUpcallTrap(tag string, chanSize int) *upcallTrap {
 	}
 }
 
-func launchFeedUpcallTrap(t *testing.T, out chan *capnp.Message, trap *upcallTrap, done chan interface{}) {
+func launchFeedUpcallTrap(t *testing.T, out chan *capnp.Message, trap *upcallTrap, done chan interface{}) chan error {
 	errChan := make(chan error)
 	go func() {
 		errChan <- feedUpcallTrap(func(format string, args ...interface{}) {
 			t.Logf(format, args...)
 		}, out, trap, done)
 	}()
-	if err := <-errChan; err != nil {
-		t.Errorf("feedUpcallTrap failed with %s", err)
-	}
+	return errChan
 }
 
 func feedUpcallTrap(logf func(format string, args ...interface{}), out chan *capnp.Message, trap *upcallTrap, done chan interface{}) error {
@@ -145,11 +143,12 @@ func TestUpcalls(t *testing.T) {
 	testAddStreamHandlerDo(t, newProtocol, bob, 10991)
 	testAddStreamHandlerDo(t, newProtocol, carol, 10992)
 
+	errChans := make([]chan error, 0, 3)
 	withTimeoutAsync(t, func(done chan interface{}) {
 		defer close(done)
-		launchFeedUpcallTrap(t, alice.OutChan, aTrap, done)
-		launchFeedUpcallTrap(t, bob.OutChan, bTrap, done)
-		launchFeedUpcallTrap(t, carol.OutChan, cTrap, done)
+		errChans = append(errChans, launchFeedUpcallTrap(t, alice.OutChan, aTrap, done))
+		errChans = append(errChans, launchFeedUpcallTrap(t, bob.OutChan, bTrap, done))
+		errChans = append(errChans, launchFeedUpcallTrap(t, carol.OutChan, cTrap, done))
 
 		// Bob connects to Alice
 		testAddPeerImplDo(t, bob, aliceInfo, true)
@@ -205,6 +204,11 @@ func TestUpcalls(t *testing.T) {
 
 		checkGossipReceived(t, <-aTrap.GossipReceived, msg, subId, peerId(carolInfo))
 	}, "test upcalls: some of upcalls didn't happen")
+	for _, errChan := range errChans {
+		if err := <-errChan; err != nil {
+			t.Errorf("feedUpcallTrap failed with %s", err)
+		}
+	}
 }
 
 func checkGossipReceived(t *testing.T, m ipc.DaemonInterface_GossipReceived, msg []byte, subId uint64, senderPeerId string) {

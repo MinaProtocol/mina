@@ -26,5 +26,9 @@ RESULT_BIN="$PWD/result/bin"
 mkdir -p "$RESULT_BIN" || echo "Can't create $RESULT_BIN"
 
 for f in "$@"; do
-  ( cd "src/$f" && "$GO" "$cmd" -o "$RESULT_BIN/$f" )
+  if [[ "$cmd" == "test" ]]; then
+    ( cd "src/$f" && "$GO" "$cmd" )
+  else
+    ( cd "src/$f" && "$GO" "$cmd" -o "$RESULT_BIN/$f" )
+  fi
 done
