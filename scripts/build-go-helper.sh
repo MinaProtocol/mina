@@ -23,7 +23,7 @@ if [[ $# -lt 1 ]]; then
 fi
 
 RESULT_BIN="$PWD/result/bin"
-mkdir -p "$RESULT_BIN"
+mkdir -p "$RESULT_BIN" || echo "Can't create $RESULT_BIN"
 
 for f in "$@"; do
   ( cd "src/$f" && "$GO" "$cmd" -o "$RESULT_BIN/$f" )
