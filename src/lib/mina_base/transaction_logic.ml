@@ -341,10 +341,22 @@ let timing_error_to_user_command_status err =
 let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
   let open Account.Poly in
   let open Account.Timing.Poly in
+  let nsf_error () =
+    Or_error.errorf
+      !"For timed account, the requested transaction for amount %{sexp: \
+        Amount.t} at global slot %{sexp: Global_slot.t}, the balance %{sexp: \
+        Balance.t} is insufficient"
+      txn_amount txn_global_slot account.balance
+    |> Or_error.tag ~tag:nsf_tag
+  in
   match account.timing with
-  | Untimed ->
-      (* no time restrictions *)
-      Or_error.return (Untimed, `Min_balance Balance.zero)
+  | Untimed -> (
+    (* no time restrictions *)
+    match Balance.(account.balance - txn_amount) with
+    | None ->
+        nsf_error ()
+    | _ ->
+        Or_error.return (Untimed, `Min_balance Balance.zero) )
   | Timed
       { initial_minimum_balance
       ; cliff_time
@@ -354,14 +366,6 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
       let open Or_error.Let_syntax in
       let%map curr_min_balance =
         let account_balance = account.balance in
-        let nsf_error () =
-          Or_error.errorf
-            !"For timed account, the requested transaction for amount %{sexp: \
-              Amount.t} at global slot %{sexp: Global_slot.t}, the balance \
-              %{sexp: Balance.t} is insufficient"
-            txn_amount txn_global_slot account_balance
-          |> Or_error.tag ~tag:nsf_tag
-        in
         let min_balance_error min_balance =
           Or_error.errorf
             !"For timed account, the requested transaction for amount %{sexp: \
@@ -414,10 +418,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Some account ->
           Ok (`Existing location, account)
       | None ->
-          Or_error.errorf
-            !"Account %{sexp: Account_id.t} has a location in the ledger, but \
-              is not present"
-            account_id )
+          Ok (`New, Account.create account_id Balance.zero)
+      )
     | None ->
         Ok (`New, Account.create account_id Balance.zero)
 
@@ -771,9 +773,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 in
                 let source_timing = account.timing in
                 let%map timing =
+                  let error_check x =
+                    if Account_id.equal source fee_payer then
+                      Ok (ok_or_reject x)
+                    else
+                      Result.map_error ~f:timing_error_to_user_command_status x
+                  in
                   validate_timing ~txn_amount:amount
                     ~txn_global_slot:current_global_slot ~account
-                  |> Result.map_error ~f:timing_error_to_user_command_status
+                  |> error_check
                 in
                 (location, source_timing, {account with timing})
               else
