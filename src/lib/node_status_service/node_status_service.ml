@@ -72,12 +72,47 @@ let send_node_status_data ~logger ~url node_status_data =
         [%log error] "Failed to send node status data to URL $url"
           ~metadata:(metadata @ extra_metadata)
 
+let reset_gauges () =
+  Mina_metrics.(
+    Gauge.set (snd Network.get_some_initial_peers_rpcs_sent) 0. ;
+    Gauge.set (snd Network.get_some_initial_peers_rpcs_received) 0. ;
+    Gauge.set
+      (snd
+         Network.get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent)
+      0. ;
+    Gauge.set
+      (snd
+         Network
+         .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received)
+      0. ;
+    Gauge.set (snd Network.answer_sync_ledger_query_rpcs_sent) 0. ;
+    Gauge.set (snd Network.answer_sync_ledger_query_rpcs_received) 0. ;
+    Gauge.set (snd Network.get_transition_chain_rpcs_sent) 0. ;
+    Gauge.set (snd Network.get_transition_chain_rpcs_received) 0. ;
+    Gauge.set (snd Network.get_transition_knowledge_rpcs_sent) 0. ;
+    Gauge.set (snd Network.get_transition_knowledge_rpcs_received) 0. ;
+    Gauge.set (snd Network.get_transition_chain_proof_rpcs_sent) 0. ;
+    Gauge.set (snd Network.get_transition_chain_proof_rpcs_received) 0. ;
+    Gauge.set (snd Network.get_node_status_rpcs_sent) 0. ;
+    Gauge.set (snd Network.get_node_status_rpcs_received) 0. ;
+    Gauge.set (snd Network.get_ancestry_rpcs_sent) 0. ;
+    Gauge.set (snd Network.get_ancestry_rpcs_received) 0. ;
+    Gauge.set (snd Network.ban_notify_rpcs_sent) 0. ;
+    Gauge.set (snd Network.ban_notify_rpcs_received) 0. ;
+    Gauge.set (snd Network.get_best_tip_rpcs_sent) 0. ;
+    Gauge.set (snd Network.get_best_tip_rpcs_received) 0. ;
+    Gauge.set (snd Network.get_epoch_ledger_rpcs_sent) 0. ;
+    Gauge.set (snd Network.get_epoch_ledger_rpcs_received) 0.)
+
 let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
-    ~addrs_and_ports ~start_time =
+    ~addrs_and_ports ~start_time ~slot_duration =
   let url_string = Option.value ~default:"127.0.0.1" node_status_url in
   [%log info] "Starting node status service using URL $url"
     ~metadata:[ ("URL", `String url_string) ] ;
-
+  let five_slots = Time.Span.scale slot_duration 5. in
+  reset_gauges () ;
+  every ~start:(after five_slots) ~continue_on_error:true five_slots
+  @@ fun () ->
   don't_wait_for
   @@
   match Broadcast_pipe.Reader.peek transition_frontier with
@@ -221,6 +256,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
                 }
             }
           in
+          reset_gauges () ;
           send_node_status_data ~logger ~url:(Uri.of_string url_string)
             node_status_data
       | Error e ->
