@@ -30,6 +30,6 @@
 	url = https://github.com/MinaProtocol/ppx_deriving_yojson.git
 	branch = master
 [submodule "src/external/prometheus"]
-    path = src/external/prometheus
-	url = https://github.com/MinaProtocol/prometheus
+	path = src/external/prometheus
+	url = git@github.com:MinaProtocol/prometheus.git
     branch = master
