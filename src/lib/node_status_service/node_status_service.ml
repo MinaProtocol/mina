@@ -131,79 +131,93 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
             ; peer_count = List.length peers
             ; rpc_sent =
                 { get_some_initial_peers =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.get_some_initial_peers_rpcs_sent
+                    Prometheus.Gauge.value
+                    @@ snd Mina_metrics.Network.get_some_initial_peers_rpcs_sent
                 ; get_staged_ledger_aux_and_pending_coinbases_at_hash =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network
-                      .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent
+                    Prometheus.Gauge.value
+                    @@ snd
+                         Mina_metrics.Network
+                         .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent
                 ; answer_sync_ledger_query =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.answer_sync_ledger_query_rpcs_sent
+                    Prometheus.Gauge.value
+                    @@ snd
+                         Mina_metrics.Network.answer_sync_ledger_query_rpcs_sent
                 ; get_transition_chain =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.get_transition_chain_proof_rpcs_sent
+                    Prometheus.Gauge.value
+                    @@ snd
+                         Mina_metrics.Network
+                         .get_transition_chain_proof_rpcs_sent
                 ; get_transition_knowledge =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.get_transition_knowledge_rpcs_sent
+                    Prometheus.Gauge.value
+                    @@ snd
+                         Mina_metrics.Network.get_transition_knowledge_rpcs_sent
                 ; get_transition_chain_proof =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.get_transition_chain_proof_rpcs_sent
+                    Prometheus.Gauge.value
+                    @@ snd
+                         Mina_metrics.Network
+                         .get_transition_chain_proof_rpcs_sent
                 ; get_node_status =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.get_node_status_rpcs_sent
+                    Prometheus.Gauge.value
+                    @@ snd Mina_metrics.Network.get_node_status_rpcs_sent
                 ; get_ancestry =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.get_ancestry_rpcs_sent
+                    Prometheus.Gauge.value
+                    @@ snd Mina_metrics.Network.get_ancestry_rpcs_sent
                 ; ban_notify =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.ban_notify_rpcs_sent
+                    Prometheus.Gauge.value
+                    @@ snd Mina_metrics.Network.ban_notify_rpcs_sent
                 ; get_best_tip =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.get_best_tip_rpcs_sent
+                    Prometheus.Gauge.value
+                    @@ snd Mina_metrics.Network.get_best_tip_rpcs_sent
                 ; get_epoch_ledger =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.get_epoch_ledger_rpcs_sent
+                    Prometheus.Gauge.value
+                    @@ snd Mina_metrics.Network.get_epoch_ledger_rpcs_sent
                 }
             ; rpc_received =
                 { get_some_initial_peers =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.get_some_initial_peers_rpcs_received
+                    Prometheus.Gauge.value
+                    @@ snd
+                         Mina_metrics.Network
+                         .get_some_initial_peers_rpcs_received
                 ; get_staged_ledger_aux_and_pending_coinbases_at_hash =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network
-                      .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received
+                    Prometheus.Gauge.value
+                    @@ snd
+                         Mina_metrics.Network
+                         .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received
                 ; answer_sync_ledger_query =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network
-                      .answer_sync_ledger_query_rpcs_received
+                    Prometheus.Gauge.value
+                    @@ snd
+                         Mina_metrics.Network
+                         .answer_sync_ledger_query_rpcs_received
                 ; get_transition_chain =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network
-                      .get_transition_chain_proof_rpcs_received
+                    Prometheus.Gauge.value
+                    @@ snd
+                         Mina_metrics.Network
+                         .get_transition_chain_proof_rpcs_received
                 ; get_transition_knowledge =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network
-                      .get_transition_knowledge_rpcs_received
+                    Prometheus.Gauge.value
+                    @@ snd
+                         Mina_metrics.Network
+                         .get_transition_knowledge_rpcs_received
                 ; get_transition_chain_proof =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network
-                      .get_transition_chain_proof_rpcs_received
+                    Prometheus.Gauge.value
+                    @@ snd
+                         Mina_metrics.Network
+                         .get_transition_chain_proof_rpcs_received
                 ; get_node_status =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.get_node_status_rpcs_received
+                    Prometheus.Gauge.value
+                    @@ snd Mina_metrics.Network.get_node_status_rpcs_received
                 ; get_ancestry =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.get_ancestry_rpcs_received
+                    Prometheus.Gauge.value
+                    @@ snd Mina_metrics.Network.get_ancestry_rpcs_received
                 ; ban_notify =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.ban_notify_rpcs_received
+                    Prometheus.Gauge.value
+                    @@ snd Mina_metrics.Network.ban_notify_rpcs_received
                 ; get_best_tip =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.get_best_tip_rpcs_received
+                    Prometheus.Gauge.value
+                    @@ snd Mina_metrics.Network.get_best_tip_rpcs_received
                 ; get_epoch_ledger =
-                    Prometheus.Counter.value
-                      Mina_metrics.Network.get_epoch_ledger_rpcs_received
+                    Prometheus.Gauge.value
+                    @@ snd Mina_metrics.Network.get_epoch_ledger_rpcs_received
                 }
             }
           in
