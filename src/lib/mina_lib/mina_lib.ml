@@ -1182,7 +1182,10 @@ let start t =
     ~transition_frontier:t.components.transition_frontier
     ~sync_status:t.sync_status
     ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
-    ~start_time:t.config.start_time ;
+    ~start_time:t.config.start_time
+    ~slot_duration:
+      (Block_time.Span.to_time_span
+         t.config.precomputed_values.consensus_constants.slot_duration_ms) ;
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
