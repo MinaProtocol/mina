@@ -13,7 +13,7 @@ module Get_status =
     genesisBlock {
       stateHash
     }
-    bestChain {
+    bestChain(maxLength: 1) {
       stateHash
       protocolState {
         blockchainState {
@@ -224,6 +224,8 @@ module Status = struct
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
+    let oldest_block_ref = ref None
+
     let real :
         db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t
         =
@@ -232,8 +234,15 @@ module Status = struct
       { gql= (fun () -> Graphql.query (Get_status.make ()) graphql_uri)
       ; db_oldest_block=
           (fun () ->
-            Errors.Lift.sql ~context:"Oldest block query"
-            @@ Db.find oldest_block_query () )
+            match !oldest_block_ref with
+            | Some oldest_block -> Deferred.Result.return oldest_block
+            | None ->
+                let%map result =
+                  Errors.Lift.sql ~context:"Oldest block query"
+                  @@ Db.find oldest_block_query ()
+                in
+                Result.iter result ~f:(fun oldest_block -> oldest_block_ref := Some oldest_block) ;
+                result )
       ; validate_network_choice= Validate_choice.Real.validate }
   end
 
