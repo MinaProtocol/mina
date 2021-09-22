@@ -413,8 +413,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Some account ->
           Ok (`Existing location, account)
       | None ->
-          Ok (`New, Account.create account_id Balance.zero)
-      )
+          Ok (`New, Account.create account_id Balance.zero) )
     | None ->
         Ok (`New, Account.create account_id Balance.zero)
 
