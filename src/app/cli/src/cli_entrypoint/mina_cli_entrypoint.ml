@@ -403,7 +403,7 @@ let setup_daemon logger =
          `uptime-submitter-pubkey`."
   and node_status_url =
     flag "--node-status-url" ~aliases:["node-status-url"] (optional string)
-      ~doc:"URL URL of the node status collection service"
+      ~doc:"URL of the node status collection service"
   in
   fun () ->
     let open Deferred.Let_syntax in
@@ -777,6 +777,11 @@ let setup_daemon logger =
         in
         or_from_config json_to_currency_fee_option "snark-worker-fee"
           ~default:Mina_compile_config.default_snark_worker_fee snark_work_fee
+      in
+      let node_status_url =
+        Some
+          (or_from_config YJ.Util.to_string_option "report-health-url"
+             ~default:"default url" node_status_url)
       in
       (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
       let _max_concurrent_connections =

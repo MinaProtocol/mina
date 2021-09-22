@@ -1167,25 +1167,21 @@ let start t =
     ~block_reward_threshold:t.config.block_reward_threshold
     ~block_produced_bvar:t.components.block_produced_bvar ;
   perform_compaction t ;
-  Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
-    ~snark_worker_opt:t.processes.uptime_snark_worker_opt
-    ~transition_frontier:t.components.transition_frontier
-    ~time_controller:t.config.time_controller
-    ~block_produced_bvar:t.components.block_produced_bvar
-    ~uptime_submitter_keypair:t.config.uptime_submitter_keypair
-    ~get_next_producer_timing:(fun () -> t.next_producer_timing)
-    ~get_snark_work_fee:(fun () -> snark_work_fee t)
-    ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer) ;
-  stop_long_running_daemon t ;
-  Node_status_service.start ~logger:t.config.logger
-    ~node_status_url:t.config.node_status_url ~network:t.components.net
-    ~transition_frontier:t.components.transition_frontier
-    ~sync_status:t.sync_status
-    ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
-    ~start_time:t.config.start_time
-    ~slot_duration:
-      (Block_time.Span.to_time_span
-         t.config.precomputed_values.consensus_constants.slot_duration_ms) ;
+  let () =
+    match t.config.node_status_url with
+    | Some node_status_url ->
+        Node_status_service.start ~logger:t.config.logger ~node_status_url
+          ~network:t.components.net
+          ~transition_frontier:t.components.transition_frontier
+          ~sync_status:t.sync_status
+          ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
+          ~start_time:t.config.start_time
+          ~slot_duration:
+            (Block_time.Span.to_time_span
+               t.config.precomputed_values.consensus_constants.slot_duration_ms)
+    | None ->
+        ()
+  in
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =

@@ -20,6 +20,10 @@ type rpc_count =
   ; get_epoch_ledger: float }
 [@@deriving to_yojson]
 
+type gossip_count =
+  {new_state: float; transaction_pool_diff: float; snark_pool_diff: float}
+[@@deriving to_yojson]
+
 type node_status_data =
   { block_height_at_best_tip: int
   ; max_observed_block_height: int
@@ -37,7 +41,9 @@ type node_status_data =
   ; uptime_of_node: float
   ; peer_count: int
   ; rpc_received: rpc_count
-  ; rpc_sent: rpc_count }
+  ; rpc_sent: rpc_count
+  ; pubsub_msg_received: gossip_count
+  ; pubsub_msg_broadcasted: gossip_count }
 [@@deriving to_yojson]
 
 let send_node_status_data ~logger ~url node_status_data =
@@ -98,13 +104,18 @@ let reset_gauges () =
     Gauge.set (snd Network.get_best_tip_rpcs_sent) 0. ;
     Gauge.set (snd Network.get_best_tip_rpcs_received) 0. ;
     Gauge.set (snd Network.get_epoch_ledger_rpcs_sent) 0. ;
-    Gauge.set (snd Network.get_epoch_ledger_rpcs_received) 0.)
+    Gauge.set (snd Network.get_epoch_ledger_rpcs_received) 0. ;
+    Gauge.set Network.new_state_received 0. ;
+    Gauge.set Network.new_state_broadcasted 0. ;
+    Gauge.set Network.transaction_pool_diff_received 0. ;
+    Gauge.set Network.transaction_pool_diff_broadcasted 0. ;
+    Gauge.set Network.snark_pool_diff_received 0. ;
+    Gauge.set Network.snark_pool_diff_broadcasted 0.)
 
 let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
     ~addrs_and_ports ~start_time ~slot_duration =
-  let url_string = Option.value ~default:"127.0.0.1" node_status_url in
   [%log info] "Starting node status service using URL $url"
-    ~metadata:[("URL", `String url_string)] ;
+    ~metadata:[("URL", `String node_status_url)] ;
   let five_slots = Time.Span.scale slot_duration 5. in
   reset_gauges () ;
   every ~start:(after five_slots) ~continue_on_error:true five_slots
@@ -251,10 +262,31 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
                 ; get_epoch_ledger=
                     Prometheus.Gauge.value
                     @@ snd Mina_metrics.Network.get_epoch_ledger_rpcs_received
-                } }
+                }
+            ; pubsub_msg_received=
+                { new_state=
+                    Prometheus.Gauge.value
+                      Mina_metrics.Network.new_state_received
+                ; transaction_pool_diff=
+                    Prometheus.Gauge.value
+                      Mina_metrics.Network.transaction_pool_diff_received
+                ; snark_pool_diff=
+                    Prometheus.Gauge.value
+                      Mina_metrics.Network.snark_pool_diff_received }
+            ; pubsub_msg_broadcasted=
+                { new_state=
+                    Prometheus.Gauge.value
+                      Mina_metrics.Network.new_state_broadcasted
+                ; transaction_pool_diff=
+                    Prometheus.Gauge.value
+                      Mina_metrics.Network.transaction_pool_diff_broadcasted
+                ; snark_pool_diff=
+                    Prometheus.Gauge.value
+                      Mina_metrics.Network.snark_pool_diff_broadcasted } }
           in
           reset_gauges () ;
-          send_node_status_data ~logger ~url:(Uri.of_string url_string)
+          send_node_status_data ~logger
+            ~url:(Uri.of_string node_status_url)
             node_status_data
       | Error e ->
           [%log info]
