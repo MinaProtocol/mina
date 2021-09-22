@@ -249,19 +249,10 @@ module Status = struct
   module Impl (M : Monad_fail.S) = struct
     let handle ~graphql_uri ~(env : 'gql Env.T(M).t) (network : Network_request.t) =
       let open M.Let_syntax in
-      let time operation_name f =
-        let start_time = Time.now () in
-        let%map x = f () in
-        let end_time = Time.now () in
-        let elapsed_time = Time.diff end_time start_time |> Time.Span.to_ms in
-        Core.Printf.printf "operation %s took %fms\n%!" operation_name elapsed_time ;
-        x
-      in
-      let%bind res = time "gql" env.gql in
+      let%bind res = env.gql () in
       let%bind () =
-        time "validate_network_choice" (fun () ->
-          env.validate_network_choice ~graphql_uri
-            ~network_identifier:network.network_identifier)
+        env.validate_network_choice ~graphql_uri
+          ~network_identifier:network.network_identifier
       in
       let%bind latest_block =
         match res#bestChain with
@@ -271,7 +262,7 @@ module Status = struct
             M.return (Array.last chain)
       in
       let genesis_block_state_hash = (res#genesisBlock)#stateHash in
-      let%map oldest_block = time "oldest_block" env.db_oldest_block in
+      let%map oldest_block = env.db_oldest_block () in
       { Network_status_response.current_block_identifier=
           Block_identifier.create
             ((latest_block#protocolState)#consensusState)#blockHeight
