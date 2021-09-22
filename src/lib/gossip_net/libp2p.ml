@@ -93,7 +93,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       log_rate_limiter_occasionally rl ;
       let handler (peer : Network_peer.Peer.t) ~version q =
         Mina_metrics.(Counter.inc_one Network.rpc_requests_received) ;
-        Mina_metrics.(Counter.inc_one Impl.received_counter) ;
+        Mina_metrics.(Counter.inc_one @@ fst Impl.received_counter) ;
+        Mina_metrics.(Gauge.inc_one @@ snd Impl.received_counter) ;
         let score = cost q in
         match
           Network_pool.Rate_limiter.add rl (Remote peer) ~now:(Time.now ())
@@ -594,7 +595,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
     let try_call_rpc_with_dispatch : type r q.
            ?heartbeat_timeout:Time_ns.Span.t
         -> ?timeout:Time.Span.t
-        -> rpc_counter:Mina_metrics.Counter.t
+        -> rpc_counter:Mina_metrics.Counter.t * Mina_metrics.Gauge.t
         -> rpc_name:string
         -> t
         -> Peer.t
@@ -619,7 +620,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 Versioned_rpc.Connection_with_menu.create conn
                 >>=? fun conn' ->
                 Mina_metrics.(Counter.inc_one Network.rpc_requests_sent) ;
-                Mina_metrics.(Counter.inc_one rpc_counter) ;
+                Mina_metrics.(Counter.inc_one @@ fst rpc_counter) ;
+                Mina_metrics.(Gauge.inc_one @@ snd rpc_counter) ;
                 let d = dispatch conn' query in
                 match timeout with
                 | None ->
