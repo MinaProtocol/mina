@@ -24,6 +24,22 @@ type gossip_count =
   {new_state: float; transaction_pool_diff: float; snark_pool_diff: float}
 [@@deriving to_yojson]
 
+type block =
+  { hash: Mina_base.State_hash.t
+  ; sender: Network_peer.Envelope.Sender.t
+  ; received_at: string
+  ; is_valid: bool
+  ; reason_for_rejection:
+      [ `Invalid_proof
+      | `Invalid_delta_transition_chain_proof
+      | `Too_early
+      | `Too_late
+      | `Invalid_genesis_protocol_state
+      | `Invalid_protocol_version
+      | `Mismatched_protocol_version ]
+      option }
+[@@deriving to_yojson]
+
 type node_status_data =
   { block_height_at_best_tip: int
   ; max_observed_block_height: int
@@ -43,7 +59,8 @@ type node_status_data =
   ; rpc_received: rpc_count
   ; rpc_sent: rpc_count
   ; pubsub_msg_received: gossip_count
-  ; pubsub_msg_broadcasted: gossip_count }
+  ; pubsub_msg_broadcasted: gossip_count
+  ; received_blocks: block list }
 [@@deriving to_yojson]
 
 let send_node_status_data ~logger ~url node_status_data =
@@ -110,7 +127,9 @@ let reset_gauges () =
     Gauge.set Network.transaction_pool_diff_received 0. ;
     Gauge.set Network.transaction_pool_diff_broadcasted 0. ;
     Gauge.set Network.snark_pool_diff_received 0. ;
-    Gauge.set Network.snark_pool_diff_broadcasted 0.)
+    Gauge.set Network.snark_pool_diff_broadcasted 0.) ;
+  Queue.clear Transition_frontier.validated_blocks ;
+  Queue.clear Transition_frontier.rejected_blocks
 
 let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
     ~addrs_and_ports ~start_time ~slot_duration =
@@ -282,7 +301,24 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
                       Mina_metrics.Network.transaction_pool_diff_broadcasted
                 ; snark_pool_diff=
                     Prometheus.Gauge.value
-                      Mina_metrics.Network.snark_pool_diff_broadcasted } }
+                      Mina_metrics.Network.snark_pool_diff_broadcasted }
+            ; received_blocks=
+                List.map (Queue.to_list Transition_frontier.rejected_blocks)
+                  ~f:(fun (hash, sender, received_at, reason_for_rejection) ->
+                    { hash
+                    ; sender
+                    ; received_at=
+                        Time.to_string (Block_time.to_time received_at)
+                    ; is_valid= false
+                    ; reason_for_rejection= Some reason_for_rejection } )
+                @ List.map (Queue.to_list Transition_frontier.validated_blocks)
+                    ~f:(fun (hash, sender, received_at) ->
+                      { hash
+                      ; sender
+                      ; received_at=
+                          Time.to_string (Block_time.to_time received_at)
+                      ; is_valid= true
+                      ; reason_for_rejection= None } ) }
           in
           reset_gauges () ;
           send_node_status_data ~logger
