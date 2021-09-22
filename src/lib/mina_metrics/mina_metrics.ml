@@ -508,6 +508,30 @@ module Network = struct
     ( Counter.v name ~help ~namespace ~subsystem
     , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
+  let new_state_received =
+    let help = "# of blocks received" in
+    Gauge.v "new_state_received" ~help ~namespace ~subsystem
+
+  let new_state_broadcasted =
+    let help = "# of block broadcasted" in
+    Gauge.v "new_state_broadcasted" ~help ~namespace ~subsystem
+
+  let snark_pool_diff_received =
+    let help = "# of snark_pool_diff received" in
+    Gauge.v "snark_pool_diff_received" ~help ~namespace ~subsystem
+
+  let snark_pool_diff_broadcasted =
+    let help = "# of snark_pool_diff broadcasted" in
+    Gauge.v "snark_pool_diff_broadcasted" ~help ~namespace ~subsystem
+
+  let transaction_pool_diff_received =
+    let help = "# of txn_pool_diff received" in
+    Gauge.v "transaction_pool_diff_received" ~help ~namespace ~subsystem
+
+  let transaction_pool_diff_broadcasted =
+    let help = "# of txn_pool_diff broadcasted" in
+    Gauge.v "transaction_pool_diff_broadcasted" ~help ~namespace ~subsystem
+
   module Gauge_map = Metric_map (struct
     type t = Gauge.t
 
