@@ -13,7 +13,7 @@ module Get_status =
     genesisBlock {
       stateHash
     }
-    bestChain {
+    bestChain(maxLength: 1) {
       stateHash
       protocolState {
         blockchainState {
@@ -224,6 +224,8 @@ module Status = struct
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
+    let oldest_block_ref = ref None
+
     let real :
         db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t
         =
@@ -232,18 +234,34 @@ module Status = struct
       { gql= (fun () -> Graphql.query (Get_status.make ()) graphql_uri)
       ; db_oldest_block=
           (fun () ->
-            Errors.Lift.sql ~context:"Oldest block query"
-            @@ Db.find oldest_block_query () )
+            match !oldest_block_ref with
+            | Some oldest_block -> Deferred.Result.return oldest_block
+            | None ->
+                let%map result =
+                  Errors.Lift.sql ~context:"Oldest block query"
+                  @@ Db.find oldest_block_query ()
+                in
+                Result.iter result ~f:(fun oldest_block -> oldest_block_ref := Some oldest_block) ;
+                result )
       ; validate_network_choice= Validate_choice.Real.validate }
   end
 
   module Impl (M : Monad_fail.S) = struct
     let handle ~graphql_uri ~(env : 'gql Env.T(M).t) (network : Network_request.t) =
       let open M.Let_syntax in
-      let%bind res = env.gql () in
+      let time operation_name f =
+        let start_time = Time.now () in
+        let%map x = f () in
+        let end_time = Time.now () in
+        let elapsed_time = Time.diff end_time start_time |> Time.Span.to_ms in
+        Core.Printf.printf "operation %s took %fms\n%!" operation_name elapsed_time ;
+        x
+      in
+      let%bind res = time "gql" env.gql in
       let%bind () =
-        env.validate_network_choice ~graphql_uri
-          ~network_identifier:network.network_identifier
+        time "validate_network_choice" (fun () ->
+          env.validate_network_choice ~graphql_uri
+            ~network_identifier:network.network_identifier)
       in
       let%bind latest_block =
         match res#bestChain with
@@ -253,7 +271,7 @@ module Status = struct
             M.return (Array.last chain)
       in
       let genesis_block_state_hash = (res#genesisBlock)#stateHash in
-      let%map oldest_block = env.db_oldest_block () in
+      let%map oldest_block = time "oldest_block" env.db_oldest_block in
       { Network_status_response.current_block_identifier=
           Block_identifier.create
             ((latest_block#protocolState)#consensusState)#blockHeight
