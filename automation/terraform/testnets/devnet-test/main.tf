@@ -52,18 +52,19 @@ variable "fish_count" {
 variable "seed_count" {
   default     = 3
 }
-#.2.0beta6-feature-matt-tests-devnet-9b5bbaa
+
 locals {
   testnet_name = "devnet-test"
-  mina_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.0.4-8202b60-devnet-0f2032c"
-  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:1.2.0beta6-feature-matt-tests-devnet-9b5bbaa"
-  seed_region = "us-east4"
-  seed_zone = "us-east4-b"
+  mina_image = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta7-fix-devnet-new-devnet-4f86d34"
+  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:1.2.0beta7-fix-devnet-new-devnet-4f86d34"
+  seed_region = "us-central1"
+  seed_zone = "us-central1-b"
 
-  # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
-  make_report_discord_webhook_url = <<EOT
-    ${file("../../../discord_webhook_url.txt")}
-  EOT
+  # replace with `make_report_discord_webhook_url = ""` if not in #use (will fail if file not present)
+  #make_report_discord_webhook_url = <<EOT
+  #  ${file("../../../discord_webhook_url.txt")}
+  #EOT
+  make_report_discord_webhook_url = ""
 
   # replace with `make_report_accounts = ""` if not in use (will fail if file not present)
   # make_report_accounts = <<EOT
@@ -137,7 +138,7 @@ module "devnet-test" {
     {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
+      snark_worker_public_key = "B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t"
       snark_coordinators_host_port = 10401
     }
   ]

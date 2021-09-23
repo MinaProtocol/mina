@@ -21,11 +21,11 @@ if [ -z "$TESTNET" ]; then
   exit 1
 fi
 
-[ "$(pwd)" = "$(dirname "$0")" ] && cd ..
-if [ ! -d .git ]; then
-  echo "INVALID DIRECTORY -- this script must be run from either the ./ or ./scripts/ (relative to the git repository)"
-  exit 1
-fi
+#[ "$(pwd)" = "$(dirname "$0")" ] && cd ..
+#if [ ! -d .git ]; then
+#  echo "INVALID DIRECTORY -- this script must be run from either the ./ or ./scripts/ (relative to the git repository)"
+#  exit 1
+#fi
 
 
 terraform_dir="terraform/testnets/$TESTNET"
@@ -55,8 +55,8 @@ read -p "Terraform destroy? [y/N] " -n 1 -r
 
 # Show the plan
 terraform plan
-read -p "Is the above terraform plan correct? [y/N] " -n 1 -r
-[[ ! $REPLY =~ ^[Yy]$ ]] && echo "incorrect terraform plan, exiting before doing anything destructive" && exit 1
+#read -p "Is the above terraform plan correct? [y/N] " -n 1 -r
+#[[ ! $REPLY =~ ^[Yy]$ ]] && echo "incorrect terraform plan, exiting before doing anything destructive" && exit 1
 
 # Apply and move forward only when plan is approved by the user, from here we auto-approve
 echo "Applying Terraform..."
