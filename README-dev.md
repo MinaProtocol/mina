@@ -27,6 +27,22 @@ The short version:
       you need to [set up SSH keys on your machine](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
 4.  Run `git config --local --add submodule.recurse true`
 
+### Connecting to mainnet
+
+1. Build mina with `DUNE_PROFILE=mainnet make build`
+2. Launch with `_build/default/src/app/cli/src/mina.exe daemon --config-file genesis_ledgers/mainnet.json --generate-genesis-proof true --peer-list-url https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt`
+
+Please be aware that direct access to port 8302 is required for other nodes to be able to connect to your node (for your node to properly participate in the network). If your IPS doesn't allow you such setup, the following trick might be utilized:
+
+1. Configure your machine's firewall to allow incoming traffic on port 8302 (or other port configured with `--external-port` CLI argument)
+2. Setup a remote ssh host by setting `GatewayPorts yes` in your sshd config (on ubuntu: edit `/etc/ssh/sshd_config`)
+3. Restart ssh service on remote host (on ubuntu: `sudo systemctl restart sshd`)
+4. Install `sshuttle` onto your local machine
+5. Run following commands in parallel: `sudo sshuttle -r username@sshserver 0/0` and `ssh -NCR 8302:127.0.0.1:8302 username@sshserver`
+
+That's it! With `sshuttle` you will use remote SSH server as VPN server and all outgoing connections will look like as if they were initiated by the remote host. And `ssh -NCR` allows incoming connections to reach your local Mina node.
+
+
 ### Developer Setup (Docker)
 
 You can build Mina using Docker. This should work in any dev environment.
@@ -39,6 +55,19 @@ When using nix package manager, run `scripts/nixos-setup.sh` script to install a
 This script was tested on channel `20.03` but should work well on newer channels too.
 
 Troubleshooting tip: to remove everything and build from scratch, use `rm -Rf ~/.opam _build`.
+
+
+#### Testing on a remote host
+
+For binaries built with nix there is an easy way to test mina on a remote host.
+
+1. Make sure your host has at least 16GB of RAM and direct external IP address
+2. Setup nix with `scripts/nixos-setup.sh`
+3. Build mina for mainnet with `nix-shell --run 'DUNE_PROFILE=mainnet make build'`
+4. Configure SSH host with `scripts/upload-nix-remote.sh {username}@{sshserver}`
+5. Launch Mina daemon with `ssh o@{sshserver} './launch.sh daemon --config-file genesis_ledgers/mainnet.json --generate-genesis-proof true --peer-list-url https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt'`
+
+Note that scripts will setup user `o` on the remote machine and allow SSH authentication in the same way it's configured for `{username}` (scripts rely on SSH key authentication method being configured).
 
 ### Developer Setup (MacOS)
 
