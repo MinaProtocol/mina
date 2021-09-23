@@ -109,7 +109,7 @@ module Go_log = struct
             (Logger.Source.create
                ~module_:(sprintf "Libp2p_helper.Go.%s" r.module_)
                ~location:"(not tracked)")
-      ; message = r.msg
+      ; message = String.concat [ "libp2p_helper: "; r.msg ]
       ; metadata = r.metadata
       ; event_id = None
       }
@@ -259,7 +259,7 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
                  | Ok record ->
                      record |> Go_log.record_to_message |> Logger.raw logger
                  | Error error ->
-                     [%log error]
+                     [%log' error logger]
                        "failed to parse record over libp2p_helper stderr: \
                         $error"
                        ~metadata:[ ("error", `String error) ] ) ;

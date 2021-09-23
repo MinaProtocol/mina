@@ -152,30 +152,26 @@ func main() {
 		}
 	}()
 
-	var line string
-
 	defer func() {
 		if r := recover(); r != nil {
-			helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", string(debug.Stack()))
+			helperLog.Error("The following panic occurred: ", r, "\nstack:\n", string(debug.Stack()))
 		}
 	}()
 
 	for {
 		rawMsg, err := decoder.Decode()
 		if err != nil {
-			helperLog.Errorf("Error decoding message: %w", err)
-			// TODO consider handling non-EOF errors differently
-			// TODO consider sending a message via stdout about stdin closed
-			break
+			helperLog.Errorf("Error decoding raw message: %w", err)
+			os.Exit(2)
+			return
 		}
 		msg, err := ipc.ReadRootLibp2pHelperInterface_Message(rawMsg)
 		if err != nil {
-			panic(err)
+			helperLog.Errorf("Error decoding capnp message: %w", err)
+			os.Exit(3)
+			return
 		}
 
 		go app.handleIncomingMsg(&msg)
 	}
-	// we never want the helper to get here, it should be killed or gracefully
-	// shut down instead of stdin closed.
-	os.Exit(1)
 }

@@ -152,7 +152,7 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
         | Error e ->
             [%log error] "error sending message on stream $idx: $error"
               ~metadata:
-                [ ("id", `String (Libp2p_ipc.stream_id_to_string stream_id))
+                [ ("idx", `String (Libp2p_ipc.stream_id_to_string stream_id))
                 ; ("error", Error_json.error_to_yojson e)
                 ] ;
             Pipe.close outgoing_w)
