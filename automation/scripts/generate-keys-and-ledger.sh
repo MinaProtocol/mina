@@ -1,23 +1,29 @@
 #! /bin/bash
 
 # Set defaults before parsing args
-TESTNET=new-net
+TESTNET=devnet-test
 COMMUNITY_KEYFILE=""
 RESET=false
 
-WHALE_COUNT_UNIQUE=1
-WHALE_COUNT_TOTAL=1
-FISH_COUNT_UNIQUE=1
-FISH_COUNT_TOTAL=1
-SEED_COUNT=1
-EXTRA_COUNT=1 # Extra community keys to be handed out manually
+WHALE_COUNT_UNIQUE=20
+WHALE_COUNT_TOTAL=20
+FISH_COUNT_UNIQUE=2
+FISH_COUNT_TOTAL=2
+SEED_COUNT=3
+EXTRA_COUNT=200 # Extra community keys to be handed out manually
+EXTRA_COUNT_DELEGATED=$(bc <<< "scale=0; ($EXTRA_COUNT/2)") # Extra community keys to be handed out manually and delegated to whales. Requires a month for re delegation
+EXTRA_COUNT_UNDELEGATED=$(($EXTRA_COUNT-$EXTRA_COUNT_DELEGATED))
+
+DELEGATORS_PER_WHALE=300
 
 MINA_DAEMON_IMAGE="codaprotocol/mina-daemon:1.1.6alpha4-feature-mina-passwd-envvars-devnet-4a86bc8"
 
-WHALE_AMOUNT=2250000
-FISH_AMOUNT=20000
-O1_AMOUNT="${FISH_AMOUNT}"
-COMMUNITY_AMOUNT=66000
+TOTAL_AMOUNT=1000000000
+TOTAL_WHALE_STAKE=0.5
+FAUCET_STAKE=0.1
+COMMUNITY_STAKE=0.4
+
+#COMMUNITY_AMOUNT=66000
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -48,6 +54,9 @@ while [ $# -gt 0 ]; do
     --efc=*)
       EXTRA_COUNT="${1#*=}"
       ;;
+    --dc=*)
+      DELEGATORS_PER_WHALE="${1#*=}"
+      ;;
     --artifact-path=*)
       ARTIFACT_PATH="${1#*=}"
       ;;
@@ -60,10 +69,21 @@ if [[ ! $ARTIFACT_PATH ]]; then
   ARTIFACT_PATH="terraform/testnets/${TESTNET}"
 fi
 
-WHALE_AMOUNT=2250000
-FISH_AMOUNT=20000
-O1_AMOUNT="${FISH_AMOUNT}"
-COMMUNITY_AMOUNT=66000
+TOTAL_DELEGATIONS=$(($WHALE_COUNT_UNIQUE * $DELEGATORS_PER_WHALE))
+
+DELEGATORS_PER_WHALE=$(($DELEGATORS_PER_WHALE - 1)) #whale delegates itself
+
+COMMUNITY_DELEGATORS_PER_WHALE=$(($EXTRA_COUNT_DELEGATED / $WHALE_COUNT_UNIQUE))
+
+#NOTE: The amounts need to be unique otherwise ledger creation doesn't work- We search for accounts based on amount
+WHALE_AMOUNT=$(bc <<< "scale = 0; (($TOTAL_AMOUNT * $TOTAL_WHALE_STAKE)/$TOTAL_DELEGATIONS)")
+FISH_AMOUNT=20000 #not included in the pie above, it is ok as long as negligible stake
+O1_AMOUNT=$(($FISH_AMOUNT} + 1))
+COMMUNITY_AMOUNT=$(bc <<< "scale = 0; (($TOTAL_AMOUNT*$COMMUNITY_STAKE)/$EXTRA_COUNT)")
+
+FAUCET_AMOUNT=$(bc <<< "scale = 0; ((($TOTAL_AMOUNT * $FAUCET_STAKE)/1)+1)")
+
+echo "WHALE amount $WHALE_AMOUNT COMMUNITY AMT $COMMUNITY_AMOUNT FAUCET $FAUCET_AMOUNT" 
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPTPATH}/../"
@@ -118,10 +138,13 @@ function generate_key_files {
 function build_keyset_from_testnet_keys {
   output_dir=$1
   keyset_name=$2
+  count=$3
 
   for file in $output_dir/*_account_*.pub; do
     nickname=$(basename $file .pub)
-    jq -n ".publicKey = \"$(cat $file)\" | .nickname = \"$nickname\""
+    for i in $(seq 1 $count);do
+      jq -n ".publicKey = \"$(cat $file)\" | .nickname = \"$nickname\""
+    done
   done | jq -n ".name = \"${TESTNET}_${keyset_name}\" | .entries |= [inputs]" > keys/keysets/${TESTNET}_${keyset_name}
 }
 
@@ -163,13 +186,13 @@ if [[ -s "keys/testnet-keys/${TESTNET}_online-whale-keyfiles/online_whale_accoun
 echo "using existing whale keys"
 else
   online_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_online-whale-keyfiles"
-  offline_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_offline-whale-keyfiles"
+  #offline_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_offline-whale-keyfiles"
 
   generate_key_files $WHALE_COUNT_UNIQUE $WHALE_COUNT_TOTAL "online_whale" $online_output_dir
-  generate_key_files $WHALE_COUNT_UNIQUE $WHALE_COUNT_TOTAL "offline_whale" $offline_output_dir
+  #generate_key_files $WHALE_COUNT_UNIQUE $WHALE_COUNT_TOTAL "offline_whale" $offline_output_dir
 
-  build_keyset_from_testnet_keys $online_output_dir "online-whales"
-  build_keyset_from_testnet_keys $offline_output_dir "offline-whales"
+  build_keyset_from_testnet_keys $online_output_dir "online-whales" 1
+  #build_keyset_from_testnet_keys $offline_output_dir "offline-whales"
 fi
 
 online_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_online-whale-keyfiles"
@@ -178,20 +201,38 @@ cp ${online_output_dir}/*libp2p*.peerid ${LIBP2PPEERS}
 echo "Online Whale Keyset:"
 cat "keys/keysets/${TESTNET}_online-whales"
 echo "Offline Whale Keyset:"
-cat "keys/keysets/${TESTNET}_offline-whales"
+#cat "keys/keysets/${TESTNET}_offline-whales"
 echo
+
+delegator_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_delegator-keyfiles"
+delegatee_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_delegatee-keyfiles"
+whale_keys_directory="$(pwd)/keys/testnet-keys/${TESTNET}_online-whale-keyfiles"
+z=$(($DELEGATORS_PER_WHALE * $WHALE_COUNT_UNIQUE))
+
+if [[ -s "keys/testnet-keys/${TESTNET}_delegator-keyfiles/delegator_account_1.pub" ]]; then
+echo "using existing delegator keys"
+else
+  generate_key_files $z $z "delegator" $delegator_output_dir
+fi
+
+build_keyset_from_testnet_keys $delegator_output_dir "delegator" 1
+  #keyset replicating whale keys for delegators (coda-network requires a 1-1 mapping)
+build_keyset_from_testnet_keys $whale_keys_directory "delegatee" $DELEGATORS_PER_WHALE
+
+build_keyset_from_testnet_keys $whale_keys_directory "community_delegatee" $COMMUNITY_DELEGATORS_PER_WHALE
+
 
 if [[ -s "keys/testnet-keys/${TESTNET}_online-fish-keyfiles/online_fish_account_1.pub" ]]; then
 echo "using existing fish keys"
 else
   online_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_online-fish-keyfiles"
-  offline_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_offline-fish-keyfiles"
+  #offline_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_offline-fish-keyfiles"
 
   generate_key_files $FISH_COUNT_UNIQUE $FISH_COUNT_TOTAL "online_fish" $online_output_dir
-  generate_key_files $FISH_COUNT_UNIQUE $FISH_COUNT_TOTAL "offline_fish" $offline_output_dir
+  #generate_key_files $FISH_COUNT_UNIQUE $FISH_COUNT_TOTAL "offline_fish" $offline_output_dir
 
-  build_keyset_from_testnet_keys $online_output_dir "online-fish"
-  build_keyset_from_testnet_keys $offline_output_dir "offline-fish"
+  build_keyset_from_testnet_keys $online_output_dir "online-fish" 1
+  #build_keyset_from_testnet_keys $offline_output_dir "offline-fish"
 fi
 
 online_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_online-fish-keyfiles"
@@ -200,7 +241,7 @@ cp ${online_output_dir}/*libp2p*.peerid ${LIBP2PPEERS}
 echo "Online Fish Keyset:"
 cat keys/keysets/${TESTNET}_online-fish
 echo "Offline Fish Keyset:"
-cat keys/keysets/${TESTNET}_offline-fish
+#cat keys/keysets/${TESTNET}_offline-fish
 echo
 
 # TODO make this just check libp2p instead of unnecessarily generating seed public keys
@@ -211,7 +252,7 @@ else
 
   generate_key_files $SEED_COUNT $SEED_COUNT  "online_seeds" $online_output_dir
 
-  build_keyset_from_testnet_keys $online_output_dir "online-seeds"
+  build_keyset_from_testnet_keys $online_output_dir "online-seeds" 1
 
 fi
 
@@ -250,18 +291,32 @@ fi
 
 # ================================================================================
 
-# EXTRA FISH
-if [[ -s "keys/testnet-keys/${TESTNET}_extra-fish-keyfiles/extra_fish_account_1.pub" ]]; then
+# keys for community (delegated)
+if [[ -s "keys/testnet-keys/${TESTNET}_extra-fish-delegated-keyfiles/extra_fish_delegated_account_1.pub" ]]; then
 echo "using existing fish keys"
 else
-  output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_extra-fish-keyfiles"
-  generate_key_files $EXTRA_COUNT $EXTRA_COUNT "extra_fish" $output_dir
+  output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_extra-fish-delegated-keyfiles"
+  generate_key_files $EXTRA_COUNT_DELEGATED $EXTRA_COUNT_DELEGATED "extra_fish_delegated" $output_dir
 
-  build_keyset_from_testnet_keys $output_dir "extra-fish"
+  build_keyset_from_testnet_keys $output_dir "extra-fish-delegated" 1
 fi
 
-echo "Extra Fish Keyset:"
-cat keys/keysets/${TESTNET}_extra-fish
+echo "Extra Fish Delegated Keyset:"
+cat keys/keysets/${TESTNET}_extra-fish-delegated
+echo
+
+# keys for community (undelegated)
+if [[ -s "keys/testnet-keys/${TESTNET}_extra-fish-undelegated-keyfiles/extra_fish_undelegated_account_1.pub" ]]; then
+echo "using existing fish keys"
+else
+  output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_extra-fish-undelegated-keyfiles"
+  generate_key_files $EXTRA_COUNT_UNDELEGATED $EXTRA_COUNT_UNDELEGATED "extra_fish_undelegated" $output_dir
+
+  build_keyset_from_testnet_keys $output_dir "extra-fish-undelegated" 1
+fi
+
+echo "Extra Fish Undelegated Keyset:"
+cat keys/keysets/${TESTNET}_extra-fish-undelegated
 echo
 
 # ================================================================================
@@ -286,14 +341,14 @@ then
   echo "Bots keys already present, not generating new ones"
 else
   output_dir="$(pwd)/keys/testnet-keys/bots_keyfiles/"
-  generate_key_files 2 2 "bots_keyfiles" "${output_dir}"
+  generate_key_files 1 1 "bots_keyfiles" "${output_dir}"
 
-  build_keyset_from_testnet_keys "${output_dir}" "bots_keyfiles"
+  build_keyset_from_testnet_keys "${output_dir}" "bots_keyfiles" 1
 
-  mv ${output_dir}/bots_keyfiles_account_1.pub ${output_dir}/echo_service.pub
-  mv ${output_dir}/bots_keyfiles_account_1 ${output_dir}/echo_service
-  mv ${output_dir}/bots_keyfiles_account_2.pub ${output_dir}/faucet_service.pub
-  mv ${output_dir}/bots_keyfiles_account_2 ${output_dir}/faucet_service
+  #mv ${output_dir}/bots_keyfiles_account_1.pub ${output_dir}/echo_service.pub
+  #mv ${output_dir}/bots_keyfiles_account_1 ${output_dir}/echo_service
+  mv ${output_dir}/bots_keyfiles_account_1.pub ${output_dir}/faucet_service.pub
+  mv ${output_dir}/bots_keyfiles_account_1 ${output_dir}/faucet_service
 fi
 
 # ================================================================================
@@ -365,21 +420,26 @@ function dynamic_keysets {
 
 
 # add initial keyset
-PROMPT_KEYSETS="${TESTNET}_extra-fish
+PROMPT_KEYSETS="${TESTNET}_extra-fish-undelegated
 ${COMMUNITY_AMOUNT}
-${TESTNET}_extra-fish
+ ${TESTNET}_extra-fish-undelegated
 "
-add_another_to_prompt ${TESTNET}_offline-whales ${WHALE_AMOUNT} ${TESTNET}_online-whales
-add_another_to_prompt ${TESTNET}_offline-fish ${FISH_AMOUNT} ${TESTNET}_online-fish
+#whale keys delegating to themselves
+add_another_to_prompt ${TESTNET}_online-whales ${WHALE_AMOUNT} ${TESTNET}_online-whales
+#DELEGATORS_PER_WHALE delegating to whales (delegatee)
+add_another_to_prompt ${TESTNET}_delegator ${WHALE_AMOUNT} ${TESTNET}_delegatee
+#delegate some community keys to our whales
+add_another_to_prompt ${TESTNET}_extra-fish-delegated ${COMMUNITY_AMOUNT} ${TESTNET}_community_delegatee
+
 add_another_to_prompt ${TESTNET}_online-fish ${FISH_AMOUNT} ${TESTNET}_online-fish
 add_another_to_prompt ${TESTNET}_online-o1 ${FISH_AMOUNT} ${TESTNET}_online-o1
 
-if [ -s keys/keysets/${TESTNET}_bots_keyfiles ];
-then
-  add_another_to_prompt ${TESTNET}_bots_keyfiles 50000 ${TESTNET}_bots_keyfiles
-else
-  echo "Bots keyset is missing, building ledger without them"
-fi
+#if [ -s keys/keysets/${TESTNET}_bots_keyfiles ];
+#then
+  add_another_to_prompt ${TESTNET}_bots_keyfiles $FAUCET_AMOUNT ${TESTNET}_bots_keyfiles
+#else
+#  echo "Bots keyset is missing, building ledger without them"
+#fi
 
 # set not another keyset
 PROMPT_KEYSETS="${PROMPT_KEYSETS}n
@@ -397,7 +457,8 @@ GENESIS_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 echo "Rewriting ./keys/genesis/* as ${ARTIFACT_PATH}/genesis_ledger.json in the proper format for daemon consumption..."
 cat ./keys/genesis/* | jq '.[] | select(.balance=="'${WHALE_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000") }' | cat > "${ARTIFACT_PATH}/whales.accounts.json"
 cat ./keys/genesis/* | jq '.[] | select(.balance=="'${FISH_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000") }' | cat > "${ARTIFACT_PATH}/fish.accounts.json"
-cat ./keys/genesis/* | jq '.[] | select(.balance=="'${COMMUNITY_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000"), timing: { initial_minimum_balance: "60000", cliff_time:"150", cliff_amount:"12000", vesting_period:"6", vesting_increment:"150"}}' | cat > "${ARTIFACT_PATH}/community_fast_unlock.accounts.json"
+cat ./keys/genesis/* | jq '.[] | select(.balance=="'${FAUCET_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000") }' | cat > "${ARTIFACT_PATH}/bots.accounts.json"
+cat ./keys/genesis/* | jq '.[] | select(.balance=="'${COMMUNITY_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000"), timing: { initial_minimum_balance: "1000000", cliff_time:"12000", cliff_amount:"500000", vesting_period:"6", vesting_increment:"150"}}' | cat > "${ARTIFACT_PATH}/community_fast_unlock.accounts.json"
 
 echo "Determining total accounts based on partial ledgers..."
 NUM_ACCOUNTS=$(jq -s 'length'  ${ARTIFACT_PATH}/*.json)
