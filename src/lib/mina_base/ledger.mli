@@ -286,3 +286,12 @@ type init_state =
 val apply_initial_ledger_state : t -> init_state -> unit
 
 module Ledger_inner : Transaction_logic.Ledger_intf with type t = t
+
+module Snapp_generators : sig
+  val gen_parties_from :
+       ?succeed:bool
+    -> keypair:Signature_lib.Keypair.t
+    -> ledger:t
+    -> protocol_state:Snapp_predicate.Protocol_state.t
+    -> Parties.t Quickcheck.Generator.t
+end

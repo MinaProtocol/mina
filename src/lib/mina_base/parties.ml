@@ -468,3 +468,59 @@ let commitment (t : t) : Transaction_commitment.t =
       (Party_or_stack.With_hashes.other_parties_hash t.other_parties)
     ~protocol_state_predicate_hash:
       (Snapp_predicate.Protocol_state.digest t.protocol_state)
+
+(* let gen =
+  let open Quickcheck.Let_syntax in
+  let%bind keypair = Signature_lib.Keypair.gen in
+  let pk = Signature_lib.Public_key.compress keypair.public_key in
+  let%bind fee_payer = Party.Signed.gen ~pk () in
+  let%bind num_parties = Int.gen_uniform_incl 0 6 in
+  let%bind other_parties =
+    Quickcheck.Generator.list_with_length num_parties Party.gen
+  in
+  let%map protocol_state = Snapp_predicate.Protocol_state.gen in
+  let parties : t = { fee_payer; other_parties; protocol_state } in
+  (* replace dummy signature in fee payer *)
+  let signature =
+    Signature_lib.Schnorr.sign keypair.private_key
+      (Random_oracle.Input.field
+         ( commitment parties
+         |> Transaction_commitment.with_fee_payer
+              ~fee_payer_hash:
+                (Party.Predicated.digest
+                   (Party.Predicated.of_signed parties.fee_payer.data)) ))
+  in
+  { parties with
+    fee_payer = { parties.fee_payer with authorization = signature }
+  }
+*)
+
+(*
+
+let gen_from ?(succeed = true) ~ledger ~protocol_state =
+  let max_parties = 6 in
+  let open Quickcheck.Let_syntax in
+  let%bind keypair = Signature_lib.Keypair.gen in
+  let pk = Signature_lib.Public_key.compress keypair.public_key in
+  let%bind fee_payer = Party.Signed.gen ~pk () in
+  let%bind num_parties = Int.gen_uniform_incl 0 max_parties in
+  let%bind other_parties =
+    Quickcheck.Generator.list_with_length num_parties
+      (Party.gen_from ~succeed ~ledger)
+  in
+  let parties : t = { fee_payer; other_parties; protocol_state } in
+  (* replace dummy signature in fee payer *)
+  let signature =
+    Signature_lib.Schnorr.sign keypair.private_key
+      (Random_oracle.Input.field
+         ( commitment parties
+         |> Transaction_commitment.with_fee_payer
+              ~fee_payer_hash:
+                (Party.Predicated.digest
+                   (Party.Predicated.of_signed parties.fee_payer.data)) ))
+  in
+  return
+    { parties with
+      fee_payer = { parties.fee_payer with authorization = signature }
+    }
+*)

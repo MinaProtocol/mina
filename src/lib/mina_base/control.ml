@@ -18,6 +18,16 @@ module Stable = struct
   end
 end]
 
+let gen_with_dummies : t Quickcheck.Generator.t =
+  Quickcheck.Generator.of_list
+    (let dummy_proof =
+       let n2 = Pickles_types.Nat.N2.n in
+       let proof = Pickles.Proof.dummy n2 n2 n2 in
+       Proof proof
+     in
+     let dummy_signature = Signature Signature.dummy in
+     [ dummy_proof; dummy_signature; None_given ])
+
 [%%else]
 
 [%%versioned
