@@ -45,9 +45,6 @@ spec:
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-enable-peer-exchange", "true",
-          {{- if $.Values.coda.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
-          {{- end }}
           {{- if $.Values.coda.logPrecomputedBlocks }}
           "-log-precomputed-blocks", "true",
           {{- end -}}

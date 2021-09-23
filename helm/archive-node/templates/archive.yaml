@@ -67,9 +67,6 @@ spec:
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-archive-address", "$(DAEMON_ARCHIVE_PORT)",
-          {{- if .Values.coda.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
-          {{- end -}}
           "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }}
         ]
         env:
@@ -121,9 +118,6 @@ spec:
           "run",
           "-metrics-port", "{{ .Values.archive.ports.metrics }}",
           "-postgres-uri", "{{ tpl .Values.archive.postgresUri . }}",
-          {{- if .Values.coda.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
-          {{- end }}
           "-server-port", "{{ .Values.archive.ports.server }}"
         ]
         env:

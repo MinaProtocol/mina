@@ -1,7 +1,7 @@
 terraform {
   required_version = ">= 0.14.0"
   backend "s3" {
-    key     = "terraform-devnet-test.tfstate"
+    key     = "terraform-devnet.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
@@ -54,11 +54,11 @@ variable "seed_count" {
 }
 
 locals {
-  testnet_name = "devnet-test"
-  mina_image = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta7-fix-devnet-new-devnet-4f86d34"
-  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:1.2.0beta7-fix-devnet-new-devnet-4f86d34"
-  seed_region = "us-central1"
-  seed_zone = "us-central1-b"
+  testnet_name = "devnet"
+  mina_image = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta7-fix-devnet-new-devnet-5f8f7ef"
+  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:1.2.0beta7-fix-devnet-new-devnet-5f8f7ef"
+  seed_region = "us-east4"
+  seed_zone = "us-east4-b"
 
   # replace with `make_report_discord_webhook_url = ""` if not in #use (will fail if file not present)
   #make_report_discord_webhook_url = <<EOT
@@ -73,15 +73,15 @@ locals {
   make_report_accounts = ""
 }
 
-module "devnet-test" {
-  providers = { google.gke = google.google-us-central1 }
+module "devnet" {
+  providers = { google.gke = google.google-us-east4 }
   source    = "../../modules/o1-testnet"
 
   artifact_path = abspath(path.module)
 
-  cluster_name   = "coda-infra-central1"
-  cluster_region = "us-central1"
-  k8s_context    = "gke_o1labs-192920_us-central1_coda-infra-central1"
+  cluster_name   = "coda-infra-east4"
+  cluster_region = "us-east4"
+  k8s_context    = "gke_o1labs-192920_us-east4_coda-infra-east4"
   testnet_name   = local.testnet_name
 
   mina_image         = local.mina_image
@@ -159,13 +159,13 @@ module "devnet-test" {
 
   plain_node_count = 0
 
-  upload_blocks_to_gcloud         = false
+  upload_blocks_to_gcloud         = true
   restart_nodes                   = false
   restart_nodes_every_mins        = "60"
   make_reports                    = true
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/devnet-test_seeds.txt"
+  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/devnet_seeds.txt"
 }
 

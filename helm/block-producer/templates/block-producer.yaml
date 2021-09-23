@@ -59,7 +59,7 @@ spec:
         - name: config-dir
           mountPath: /root/.mina-config
         env:
-          - name: MINA_PRIVKEY_PASS
+          - name: CODA_PRIVKEY_PASS
             value: {{ $.Values.coda.privkeyPass | quote }}
       {{ if $config.libp2pSecret -}}
       - name: libp2p-perms
@@ -114,7 +114,7 @@ spec:
               secretKeyRef:
                 name: {{ $config.privateKeySecret }}
                 key: pub
-          - name: MINA_PRIVKEY_PASS
+          - name: CODA_PRIVKEY_PASS
             value: {{ $.Values.coda.privkeyPass | quote }}
           - name: PYTHONUNBUFFERED
             value: "1"
@@ -169,8 +169,8 @@ spec:
         resources:
           limits:
           requests:
-            memory: 8.0Gi
-            cpu: 8.0
+            memory: 14.0Gi
+            cpu: 12.0
         image: {{ $.Values.coda.image }}
         {{ if $.Values.coda.useCustomEntrypoint -}}
         command: [{{ $.Values.coda.customEntrypoint }}]
@@ -215,9 +215,6 @@ spec:
           {{- if $.Values.coda.uploadBlocksToGCloud }}
           "-upload-blocks-to-gcloud", "true",
           {{- end }}
-          {{- if $.Values.coda.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
-          {{- end -}}
           "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }},
           {{- if $config.enableArchive }}
           "-archive-address", {{ $config.archiveAddress }}
@@ -240,10 +237,10 @@ spec:
           value: {{ $.Values.testnetName }}
         - name: GCLOUD_BLOCK_UPLOAD_BUCKET
           value: "mina_network_block_data"
-        - name: MINA_PRIVKEY_PASS
+        - name: CODA_PRIVKEY_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
         {{- if $config.libp2pSecret }}
-        - name: MINA_LIBP2P_PASS
+        - name: CODA_LIBP2P_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
         {{- end }}
         - name: CODA_CLIENT_TRUSTLIST

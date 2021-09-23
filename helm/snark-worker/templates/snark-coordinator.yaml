@@ -49,9 +49,6 @@ spec:
           {{- if $.Values.coda.logTxnPoolGossip }}
           "-log-txn-pool-gossip", "true",
           {{- end -}}
-          {{- if $.Values.coda.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
-          {{- end }}
           {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}

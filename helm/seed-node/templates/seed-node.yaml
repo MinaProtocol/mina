@@ -71,9 +71,6 @@ spec:
           {{- if $.Values.coda.seedPeersURL }}
           "-peer-list-url", {{ $.Values.coda.seedPeersURL | quote }},
           {{- end -}}
-          {{- if $.Values.coda.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
-          {{- end }}
           {{- if $config.libp2pSecret }}
           "-discovery-keypair", "/root/libp2p-keys/key",
           {{- end -}}
@@ -111,7 +108,7 @@ spec:
         - name: DAEMON_EXTERNAL_PORT
           value: {{ default $.Values.coda.ports.p2p $config.externalPort | quote }}
         {{- if $config.libp2pSecret }}
-        - name: MINA_LIBP2P_PASS
+        - name: CODA_LIBP2P_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
         {{- end }}
         ports:

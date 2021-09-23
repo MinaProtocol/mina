@@ -1,0 +1,10 @@
+{
+  "genesis": {
+    "genesis_state_timestamp": "2021-09-23 15:30:00-07:00"
+  },
+  "ledger": {
+    "name": "devnet-dummy",
+    "num_accounts": 0,
+    "accounts": []
+  }
+}
