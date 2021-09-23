@@ -1,4 +1,5 @@
 use crate::arkworks::CamlBigInteger256;
+use ark_ff::bytes::ToBytes;
 use ark_ff::{FftField, Field, FpParameters, One, PrimeField, SquareRootField, UniformRand, Zero};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use mina_curves::pasta::fp::{Fp, FpParameters as Fp_params};
@@ -300,13 +301,11 @@ pub fn caml_pasta_fp_domain_generator(log2_size: ocaml::Int) -> Result<CamlFp, o
         .ok_or(ocaml::Error::Message("caml_pasta_fp_domain_generator"))
 }
 
-use ark_ff::bytes::ToBytes;
-
 #[ocaml_gen]
 #[ocaml::func]
 pub fn caml_pasta_fp_to_bytes(x: ocaml::Pointer<CamlFp>) -> [u8; std::mem::size_of::<Fp>()] {
     let mut res = [0u8; std::mem::size_of::<Fp>()];
-    x.as_ref().0.write(&mut res[..]);
+    x.as_ref().0.write(&mut res[..]).unwrap();
     res
 }
 
