@@ -25,16 +25,16 @@ ark-ec = { version = "0.3.0", features = ["parallel"] }
 ark-poly = { version = "0.3.0", features = ["parallel"] }
 
 # proof-systems
-commitment_dlog = { git = "https://github.com/o1-labs/proof-systems/", rev = "ba75514a900279e4d67c3331596081f382ded1ce", features = ["ocaml_types"] }
-groupmap = { git = "https://github.com/o1-labs/proof-systems/", rev = "ba75514a900279e4d67c3331596081f382ded1ce" }
-mina-curves = { git = "https://github.com/o1-labs/proof-systems/", rev = "ba75514a900279e4d67c3331596081f382ded1ce" }
-oracle = { git = "https://github.com/o1-labs/proof-systems/", rev = "ba75514a900279e4d67c3331596081f382ded1ce", features = ["ocaml_types"] }
-plonk_circuits = { git = "https://github.com/o1-labs/proof-systems/", rev = "ba75514a900279e4d67c3331596081f382ded1ce", features = ["ocaml_types"] }
-plonk_protocol_dlog = { git = "https://github.com/o1-labs/proof-systems/", rev = "ba75514a900279e4d67c3331596081f382ded1ce", features = ["ocaml_types"] }
+commitment_dlog = { git = "https://github.com/o1-labs/proof-systems/", rev = "b2fac6d801d53ac8439a4d4da43f8320c144cfe5", features = ["ocaml_types"] }
+groupmap = { git = "https://github.com/o1-labs/proof-systems/", rev = "b2fac6d801d53ac8439a4d4da43f8320c144cfe5" }
+mina-curves = { git = "https://github.com/o1-labs/proof-systems/", rev = "b2fac6d801d53ac8439a4d4da43f8320c144cfe5" }
+oracle = { git = "https://github.com/o1-labs/proof-systems/", rev = "b2fac6d801d53ac8439a4d4da43f8320c144cfe5", features = ["ocaml_types"] }
+plonk_circuits = { git = "https://github.com/o1-labs/proof-systems/", rev = "b2fac6d801d53ac8439a4d4da43f8320c144cfe5", features = ["ocaml_types"] }
+plonk_protocol_dlog = { git = "https://github.com/o1-labs/proof-systems/", rev = "b2fac6d801d53ac8439a4d4da43f8320c144cfe5", features = ["ocaml_types"] }
 
 # ocaml-specific
 ocaml = { version = "0.22.1" }
-ocaml-gen = { git = "https://github.com/o1-labs/proof-systems/", rev = "ba75514a900279e4d67c3331596081f382ded1ce" }
+ocaml-gen = { git = "https://github.com/o1-labs/proof-systems/", rev = "b2fac6d801d53ac8439a4d4da43f8320c144cfe5" }
 
 [profile.release]
 debug = true
