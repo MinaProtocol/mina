@@ -204,6 +204,52 @@ module Ledger_inner = struct
     let _base, mask = create_ephemeral_with_base ~depth () in
     mask
 
+  (** Create a new empty ledger.
+
+      Warning: This skips mask registration, for use in transaction logic,
+      where we always have either 0 or 1 masks, and the mask is always either
+      committed or discarded. This function is deliberately not exposed in the
+      public API of this module.
+
+      This should *NOT* be used to create a ledger for other purposes.
+  *)
+  let empty ~depth () =
+    let mask = Mask.create ~depth () in
+    (* We don't register the mask here. This is only used in transaction logic,
+       where we don't want to unregister. Transaction logic is also
+       synchronous, so we don't need to worry that our mask will be reparented.
+    *)
+    Mask.set_parent mask (Any_ledger.cast (module Null) (Null.create ~depth ()))
+
+  (** Create a ledger as a mask on top of the existing ledger.
+
+      Warning: This skips mask registration, for use in transaction logic,
+      where we always have either 0 or 1 masks, and the mask is always either
+      committed or discarded. This function is deliberately not exposed in the
+      public API of this module.
+
+      This should *NOT* be used to create a ledger for other purposes.
+  *)
+  let create_masked (t : t) : t =
+    let mask = Mask.create ~depth:(depth t) () in
+    (* We don't register the mask here. This is only used in transaction logic,
+       where we don't want to unregister. Transaction logic is also
+       synchronous, so we don't need to worry that our mask will be reparented.
+    *)
+    Mask.set_parent mask (Any_ledger.cast (module Mask.Attached) t)
+
+  (** Apply a mask to a ledger.
+
+      Warning: The first argument is ignored, instead calling [commit]
+      directly. This is used to support the different ledger kinds in
+      transaction logic, where some of the 'masks' returned by [create_masked]
+      do not hold a reference to their parent. This function is deliberately
+      not exposed in the public API of this module.
+
+      This should *NOT* be used to apply a mask for other purposes.
+  *)
+  let apply_mask (_t : t) ~(masked : t) = commit masked
+
   let with_ledger ~depth ~f =
     let ledger = create ~depth () in
     try

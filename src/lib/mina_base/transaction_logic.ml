@@ -31,6 +31,12 @@ module type Ledger_intf = sig
   val next_available_token : t -> Token_id.t
 
   val set_next_available_token : t -> Token_id.t -> unit
+
+  val empty : depth:int -> unit -> t
+
+  val create_masked : t -> t
+
+  val apply_mask : t -> masked:t -> unit
 end
 
 module Transaction_applied = struct
@@ -1441,8 +1447,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
         let if_ = Parties.value_if
 
-        (* This is semantically wrong, but the empty ledger is not actually used here, so it's fine. *)
-        let empty = ledger
+        let empty = L.empty
       end
 
       module Transaction_commitment = struct
@@ -1579,7 +1584,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let perform (type r) (eff : (r, Env.t) Parties_logic.Eff.t) : r =
       match eff with
       | Get_global_ledger _ ->
-          ledger
+          L.create_masked ledger
       | Transaction_commitment_on_start _ ->
           ()
       | Finalize_local_state (is_last_party, local_state) ->
@@ -1611,8 +1616,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           l
       | Modify_global_excess (s, f) ->
           { s with fee_excess = f s.fee_excess }
-      | Modify_global_ledger (s, f) ->
-          { s with ledger = f s.ledger }
+      | Modify_global_ledger { global_state; ledger; should_update } ->
+          (* Commit, modifying the underlying ledger. *)
+          if should_update then L.apply_mask global_state.ledger ~masked:ledger ;
+          global_state
       | Party_token_id p ->
           p.data.body.token_id
       | Check_auth_and_update_account
@@ -1647,7 +1654,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         acc ) =
       if List.is_empty l.parties then `Ok acc
       else
-        match M.step { perform } (g, l) with
+        match M.step ~constraint_constants { perform } (g, l) with
         | exception E.Did_not_succeed ->
             let module L = struct
               type t = L.t
@@ -1680,7 +1687,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         }
         :: c.other_parties
       in
-      M.start
+      M.start ~constraint_constants
         { parties = Inputs.Parties.of_parties_list parties
         ; will_succeed
         ; protocol_state_predicate = c.protocol_state

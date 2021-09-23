@@ -45,6 +45,12 @@ val find_index_exn : t -> Account_id.t -> int
 
 val of_root : depth:int -> next_available_token:Token_id.t -> Ledger_hash.t -> t
 
+(** Create a new 'empty' ledger.
+    This ledger has an invalid root hash, and cannot be used except as a
+    placeholder.
+*)
+val empty : depth:int -> unit -> t
+
 val apply_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_global_slot:Mina_numbers.Global_slot.t

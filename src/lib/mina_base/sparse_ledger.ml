@@ -48,6 +48,15 @@ module M =
 
 type account_state = [ `Added | `Existed ] [@@deriving equal]
 
+(** Create a new 'empty' ledger.
+    This ledger has an invalid root hash, and cannot be used except as a
+    placeholder.
+*)
+let empty ~depth () =
+  M.of_hash
+    ~next_available_token:Token_id.(next default)
+    ~depth Outside_hash_image.t
+
 module L = struct
   type t = M.t ref
 
@@ -106,6 +115,30 @@ module L = struct
 
   let set_next_available_token : t -> Token_id.t -> unit =
    fun t token -> t := { !t with next_available_token = token }
+
+  (** Create a new ledger mask 'on top of' the given ledger.
+
+      Warning: For technical reasons, this mask cannot be applied directly to
+      the parent ledger; instead, use
+      [apply_mask parent_ledger ~masked:this_ledger] to update the parent
+      ledger as necessary.
+  *)
+  let create_masked t = ref !t
+
+  (** [apply_mask ledger ~masked] applies any updates in [masked] to the ledger
+      [ledger]. [masked] should be created by calling [create_masked ledger].
+
+      Warning: This function may behave unexpectedly if [ledger] was modified
+      after calling [create_masked], or the given [ledger] was not used to
+      create [masked].
+  *)
+  let apply_mask t ~masked = t := !masked
+
+  (** Create a new 'empty' ledger.
+      This ledger has an invalid root hash, and cannot be used except as a
+      placeholder.
+  *)
+  let empty ~depth () = ref (empty ~depth ())
 end
 
 module T = Transaction_logic.Make (L)

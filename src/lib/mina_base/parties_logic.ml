@@ -151,7 +151,7 @@ end
 module type Ledger_intf = sig
   include Iffable
 
-  val empty : t
+  val empty : depth:int -> unit -> t
 end
 
 module Eff = struct
@@ -208,9 +208,15 @@ module Eff = struct
            , < global_state : 'global_state ; amount : 'amount ; .. > )
            t
     | Modify_global_ledger :
-        'global_state * ('ledger -> 'ledger)
+        { global_state : 'global_state
+        ; ledger : 'ledger
+        ; should_update : 'bool
+        }
         -> ( 'global_state
-           , < global_state : 'global_state ; ledger : 'ledger ; .. > )
+           , < bool : 'bool
+             ; global_state : 'global_state
+             ; ledger : 'ledger
+             ; .. > )
            t
     | Party_token_id :
         'party
@@ -345,6 +351,7 @@ module Make (Inputs : Inputs_intf) = struct
     (party, current_stack, call_stack)
 
   let apply (type global_state)
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start :
          [ `Yes of _ Start_data.t | `No | `Compute of _ Start_data.t ])
       (h :
@@ -566,10 +573,10 @@ module Make (Inputs : Inputs_intf) = struct
     let global_state =
       h.perform
         (Modify_global_ledger
-           ( global_state
-           , fun curr ->
-               Inputs.Ledger.if_ is_last_party ~then_:local_state.ledger
-                 ~else_:curr ))
+           { global_state
+           ; ledger = local_state.ledger
+           ; should_update = is_last_party
+           })
     in
     let local_state =
       (* Make sure to reset the local_state at the end of a transaction.
@@ -588,7 +595,9 @@ module Make (Inputs : Inputs_intf) = struct
           Token_id.if_ is_last_party ~then_:Token_id.default
             ~else_:local_state.token_id
       ; ledger =
-          Inputs.Ledger.if_ is_last_party ~then_:Inputs.Ledger.empty
+          Inputs.Ledger.if_ is_last_party
+            ~then_:
+              (Inputs.Ledger.empty ~depth:constraint_constants.ledger_depth ())
             ~else_:local_state.ledger
       ; success =
           Bool.if_ is_last_party ~then_:Bool.true_ ~else_:local_state.success

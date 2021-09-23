@@ -1538,12 +1538,10 @@ module Base = struct
             ( run_checked (Ledger_hash.if_ b ~then_:xt ~else_:xe)
             , V.if_ b ~then_:rt ~else_:re )
 
-          let empty : t =
-            let t = Ledger_hash.empty_hash in
-            ( Ledger_hash.var_of_t t
-            , V.create (fun () ->
-                  Sparse_ledger.of_root t ~depth:0
-                    ~next_available_token:Token_id.(next default)) )
+          let empty ~depth () : t =
+            let t = Sparse_ledger.empty ~depth () in
+            ( Ledger_hash.var_of_t (Sparse_ledger.merkle_root t)
+            , V.create (fun () -> t) )
         end
 
         module Parties = struct
@@ -1928,8 +1926,12 @@ module Base = struct
                       else ledger) )
         | Modify_global_excess (global, f) ->
             { global with fee_excess = f global.fee_excess }
-        | Modify_global_ledger (global, f) ->
-            { global with ledger = f global.ledger }
+        | Modify_global_ledger { global_state; ledger; should_update } ->
+            { global_state with
+              ledger =
+                Inputs.Ledger.if_ should_update ~then_:ledger
+                  ~else_:global_state.ledger
+            }
         | Party_token_id { party; _ } ->
             party.data.body.token_id
         | Check_auth_and_update_account
@@ -2126,7 +2128,7 @@ module Base = struct
                             p.protocol_state_predicate)
                 }
               in
-              S.apply
+              S.apply ~constraint_constants
                 ~is_start:
                   ( match party_spec.is_start with
                   | `No ->
@@ -2141,7 +2143,7 @@ module Base = struct
             let acc' =
               match party_spec.is_start with
               | `No ->
-                  S.apply ~is_start:`No S.{ perform } acc
+                  S.apply ~constraint_constants ~is_start:`No S.{ perform } acc
               | `Compute_in_circuit ->
                   V.create (fun () ->
                       match As_prover.Ref.get start_parties with
@@ -4080,10 +4082,7 @@ let%test_module "transaction_snark" =
                     { Local_state.dummy with
                       parties = []
                     ; call_stack = []
-                    ; ledger =
-                        Sparse_ledger.of_root ~depth:ledger_depth
-                          ~next_available_token:Token_id.(next default)
-                          Local_state.dummy.ledger
+                    ; ledger = Sparse_ledger.empty ~depth:ledger_depth ()
                     }
                 ; start_parties =
                     [ { will_succeed = true
@@ -4585,10 +4584,7 @@ let%test_module "transaction_snark" =
                     ; local_state_init =
                         { parties = []
                         ; call_stack = []
-                        ; ledger =
-                            Sparse_ledger.of_root ~depth:ledger_depth
-                              ~next_available_token:Token_id.(next default)
-                              Local_state.dummy.ledger
+                        ; ledger = Sparse_ledger.empty ~depth:ledger_depth ()
                         ; transaction_commitment = transaction
                         ; token_id = Token_id.default
                         ; excess = Amount.zero
@@ -4996,10 +4992,7 @@ let%test_module "transaction_snark" =
                     ; local_state_init =
                         { parties = []
                         ; call_stack = []
-                        ; ledger =
-                            Sparse_ledger.of_root ~depth:ledger_depth
-                              ~next_available_token:Token_id.(next default)
-                              Local_state.dummy.ledger
+                        ; ledger = Sparse_ledger.empty ~depth:ledger_depth ()
                         ; transaction_commitment = transaction
                         ; token_id = Token_id.default
                         ; excess = Amount.zero
