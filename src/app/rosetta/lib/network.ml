@@ -97,7 +97,7 @@ let mainnet_chain_id =
 
 (* TODO: Update this when we have a new chainId *)
 let devnet_chain_id =
-  "8af43cf261ea10c761ec540f92aafb76aec56d8d74f77c836f3ab1de5ce4eac5"
+  "b6ee40d336f4cc3f33c1cc04dee7618eb8e556664c2b2d82ad4676b512a82418"
 
 let network_tag_of_graphql res =
   let equal_chain_id id =
