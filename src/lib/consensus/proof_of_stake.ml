@@ -1273,7 +1273,7 @@ module Data = struct
           let sub_window_diff =
             UInt32.(
               to_int
-              @@ min constants.sub_windows_per_window
+              @@ min (succ constants.sub_windows_per_window)
               @@ Global_sub_window.sub next_global_sub_window
                    prev_global_sub_window)
           in
