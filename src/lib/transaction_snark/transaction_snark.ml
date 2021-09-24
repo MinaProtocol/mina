@@ -1562,8 +1562,6 @@ module Base = struct
               Flagged_option.data x
           end
 
-          type nonrec party = party
-
           type party_or_stack =
             Field.t
             * (Party.t * unit, Parties.Digest.t) Parties.Party_or_stack.t V.t
@@ -1714,6 +1712,12 @@ module Base = struct
             (h, r)
         end
 
+        module Party = struct
+          type t = party
+
+          let delta (t : t) = t.party.data.body.delta
+        end
+
         module Account = struct
           type t = (Account.Checked.Unhashed.t, Field.t) With_hash.t
         end
@@ -1725,6 +1729,8 @@ module Base = struct
             type t = Amount.Signed.Checked.t
 
             let is_pos (t : t) = Sgn.Checked.is_pos t.sgn
+
+            let negate = Amount.Signed.Checked.negate
           end
 
           let if_ b ~then_ ~else_ =
@@ -1762,7 +1768,7 @@ module Base = struct
         open Inputs
 
         type t =
-          < party : Parties.party
+          < party : Party.t
           ; account : Account.t
           ; ledger : Ledger.t
           ; amount : Amount.t
@@ -1862,10 +1868,8 @@ module Base = struct
                      (Account.Nonce.Checked.equal nonce account.data.nonce))
             | Full p ->
                 Snapp_predicate.Account.Checked.check p account.data )
-        | Set_account_if (b, (root, ledger), a, incl) ->
-            ( Field.if_ b ~then_:(implied_root a incl)
-                ~else_:(Ledger_hash.var_to_hash_packed root)
-              |> Ledger_hash.var_of_hash_packed
+        | Set_account ((_root, ledger), a, incl) ->
+            ( implied_root a incl |> Ledger_hash.var_of_hash_packed
             , V.map ledger
                 ~f:
                   As_prover.(
@@ -1921,9 +1925,7 @@ module Base = struct
                     fun ledger ->
                       let a : Account.t = read account_typ a.data in
                       let idx = idx ledger (Account.identifier a) in
-                      if read Boolean.typ b then
-                        Sparse_ledger.set_exn ledger idx a
-                      else ledger) )
+                      Sparse_ledger.set_exn ledger idx a) )
         | Modify_global_excess (global, f) ->
             { global with fee_excess = f global.fee_excess }
         | Modify_global_ledger { global_state; ledger; should_update } ->
@@ -2017,12 +2019,6 @@ module Base = struct
             (account_with_hash account', success)
         | Balance account ->
             Balance.Checked.to_amount account.data.balance
-        | Finalize_local_state (is_last_party, local_state) ->
-            Boolean.(
-              Assert.any
-                [ not is_last_party
-                ; equal local_state.will_succeed local_state.success
-                ])
     end
 
     let main ?(witness : Witness.t option) (spec : Spec.t) ~constraint_constants
@@ -2062,7 +2058,6 @@ module Base = struct
               ( statement.source.local_state.ledger
               , V.create (fun () -> !witness.local_state_init.ledger) )
           ; success = statement.source.local_state.success
-          ; will_succeed = statement.source.local_state.will_succeed
           }
         in
         (g, l)
@@ -2093,14 +2088,6 @@ module Base = struct
             end) in
             let finish v =
               let open Parties_logic.Start_data in
-              let will_succeed =
-                exists Boolean.typ ~compute:(fun () ->
-                    match V.get v with
-                    | `Skip ->
-                        true
-                    | `Start p ->
-                        p.will_succeed)
-              in
               let ps =
                 V.map v ~f:(function
                   | `Skip ->
@@ -2117,7 +2104,6 @@ module Base = struct
               in
               let start_data =
                 { Parties_logic.Start_data.parties = (h, ps)
-                ; will_succeed
                 ; protocol_state_predicate =
                     exists Snapp_predicate.Protocol_state.typ
                       ~compute:(fun () ->
@@ -4085,8 +4071,7 @@ let%test_module "transaction_snark" =
                     ; ledger = Sparse_ledger.empty ~depth:ledger_depth ()
                     }
                 ; start_parties =
-                    [ { will_succeed = true
-                      ; protocol_state_predicate =
+                    [ { protocol_state_predicate =
                           Snapp_predicate.Protocol_state.accept
                       ; parties
                       }
@@ -4589,13 +4574,9 @@ let%test_module "transaction_snark" =
                         ; token_id = Token_id.default
                         ; excess = Amount.zero
                         ; success = true
-                        ; will_succeed = true
                         }
                     ; start_parties =
-                        [ { will_succeed = true
-                          ; protocol_state_predicate = protocol_state
-                          ; parties
-                          }
+                        [ { protocol_state_predicate = protocol_state; parties }
                         ]
                     ; state_body
                     }
@@ -4997,11 +4978,9 @@ let%test_module "transaction_snark" =
                         ; token_id = Token_id.default
                         ; excess = Amount.zero
                         ; success = true
-                        ; will_succeed = true
                         }
                     ; start_parties =
-                        [ { will_succeed = true
-                          ; protocol_state_predicate =
+                        [ { protocol_state_predicate =
                               Snapp_predicate.Protocol_state.accept
                           ; parties
                           }

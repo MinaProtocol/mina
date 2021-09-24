@@ -33,6 +33,8 @@ module type Amount_intf = sig
     type t
 
     val is_pos : t -> bool
+
+    val negate : t -> t
   end
 
   val zero : t
@@ -68,7 +70,6 @@ module Local_state = struct
         ; excess : 'excess
         ; ledger : 'ledger
         ; success : 'bool
-        ; will_succeed : 'bool
         }
       [@@deriving compare, equal, hash, sexp, yojson, fields, hlist]
     end
@@ -76,7 +77,7 @@ module Local_state = struct
 
   let typ parties token_id excess ledger bool comm =
     Pickles.Impls.Step.Typ.of_hlistable
-      [ parties; parties; comm; token_id; excess; ledger; bool; bool ]
+      [ parties; parties; comm; token_id; excess; ledger; bool ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
@@ -111,6 +112,14 @@ module Local_state = struct
       , Parties.Transaction_commitment.Checked.t )
       Stable.Latest.t
   end
+end
+
+module type Party_intf = sig
+  type t
+
+  type signed_amount
+
+  val delta : t -> signed_amount
 end
 
 module type Parties_intf = sig
@@ -190,11 +199,10 @@ module Eff = struct
              ; protocol_state_predicate : 'protocol_state_pred
              ; .. > )
            t
-    | Set_account_if :
-        'bool * 'ledger * 'account * 'inclusion_proof
+    | Set_account :
+        'ledger * 'account * 'inclusion_proof
         -> ( 'ledger
-           , < bool : 'bool
-             ; ledger : 'ledger
+           , < ledger : 'ledger
              ; inclusion_proof : 'inclusion_proof
              ; account : 'account
              ; .. > )
@@ -243,9 +251,6 @@ module Eff = struct
     | Balance :
         'account
         -> ('amount, < account : 'account ; amount : 'amount ; .. >) t
-    | Finalize_local_state :
-        'bool * 'local_state
-        -> (unit, < local_state : 'local_state ; bool : 'bool ; .. >) t
     | Transaction_commitment_on_start :
         { start_party : 'party
         ; protocol_state_predicate : 'protocol_state_pred
@@ -276,7 +281,10 @@ module type Inputs_intf = sig
 
   module Token_id : Token_id_intf with type bool := Bool.t
 
-  module Parties : Parties_intf with type bool := Bool.t
+  module Party : Party_intf with type signed_amount := Amount.Signed.t
+
+  module Parties :
+    Parties_intf with type bool := Bool.t and type party := Party.t
 
   module Transaction_commitment : sig
     include Iffable with type bool := Bool.t
@@ -291,11 +299,8 @@ module Start_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('parties, 'protocol_state_pred, 'bool) t =
-        { parties : 'parties
-        ; protocol_state_predicate : 'protocol_state_pred
-        ; will_succeed : 'bool
-        }
+      type ('parties, 'protocol_state_pred) t =
+        { parties : 'parties; protocol_state_predicate : 'protocol_state_pred }
       [@@deriving sexp, yojson]
     end
   end]
@@ -439,21 +444,7 @@ module Make (Inputs : Inputs_intf) = struct
       in
       ((party, remaining, call_stack), to_pop, local_state)
     in
-    let local_state =
-      { local_state with
-        parties = remaining
-      ; call_stack
-      ; will_succeed =
-          ( match is_start with
-          | `Yes start_data ->
-              start_data.will_succeed
-          | `No ->
-              local_state.will_succeed
-          | `Compute start_data ->
-              Bool.if_ is_start' ~then_:start_data.will_succeed
-                ~else_:local_state.will_succeed )
-      }
-    in
+    let local_state = { local_state with parties = remaining; call_stack } in
     let a, inclusion_proof =
       h.perform (Get_account (party, local_state.ledger))
     in
@@ -486,39 +477,31 @@ module Make (Inputs : Inputs_intf) = struct
       }
     in
     let local_delta =
-      (* TODO: This is wasteful as it repeats a computation performed inside
-         the account update. *)
-      Amount.(h.perform (Balance a) - h.perform (Balance a'))
+      (* NOTE: It is *not* correct to use the actual change in balance here.
+         Indeed, if the account creation fee is paid, using that amount would
+         be equivalent to paying it out to the block producer.
+         In the case of a failure that prevents any updates from being applied,
+         every other party in this transaction will also fail, and the excess
+         will never be promoted to the global excess, so this amount is
+         irrelevant.
+      *)
+      Amount.Signed.negate (Party.delta party)
     in
     let party_token = h.perform (Party_token_id party) in
     Bool.(assert_ (not (Token_id.(equal invalid) party_token))) ;
-    let fee_excess_change0, new_local_fee_excess =
+    let new_local_fee_excess =
       let curr_token : Token_id.t = local_state.token_id in
-      let same_token = Token_id.equal curr_token party_token in
       let curr_is_default = Token_id.(equal default) curr_token in
+      let party_is_default = Token_id.(equal default) party_token in
       Bool.(
         assert_
           ( (not is_start')
-          ||| ( curr_is_default &&& same_token
-              &&& Amount.Signed.is_pos local_delta ) )) ;
-      let should_merge = Bool.( &&& ) (Bool.not same_token) curr_is_default in
-      let to_merge_amount =
-        Amount.if_ should_merge ~then_:local_state.excess ~else_:Amount.zero
-      in
-      let new_local =
-        let base =
-          Amount.if_ same_token ~then_:local_state.excess ~else_:Amount.zero
-        in
-        Amount.add_signed base local_delta
-      in
-      (to_merge_amount, new_local)
+          ||| (party_is_default &&& Amount.Signed.is_pos local_delta) )) ;
+      (* FIXME: Allow non-default tokens again. *)
+      Bool.(assert_ (party_is_default &&& curr_is_default)) ;
+      Amount.add_signed local_state.excess local_delta
     in
     let local_state = { local_state with excess = new_local_fee_excess } in
-    let global_state =
-      (* TODO: Maybe overflows should be possible and cause a transaction failure? *)
-      h.perform
-        (Modify_global_excess (global_state, Amount.( + ) fee_excess_change0))
-    in
 
     (* If a's token ID differs from that in the local state, then
        the local state excess gets moved into the execution state's fee excess.
@@ -530,9 +513,7 @@ module Make (Inputs : Inputs_intf) = struct
        The local state excess (plus the local delta) gets moved to the fee excess if it is default token.
     *)
     let new_ledger =
-      let should_apply = Bool.( ||| ) is_start' local_state.will_succeed in
-      h.perform
-        (Set_account_if (should_apply, local_state.ledger, a', inclusion_proof))
+      h.perform (Set_account (local_state.ledger, a', inclusion_proof))
     in
     let is_last_party = Ps.is_empty remaining in
     let local_state =
@@ -544,7 +525,10 @@ module Make (Inputs : Inputs_intf) = struct
             ~else_:local_state.transaction_commitment
       }
     in
-    h.perform (Finalize_local_state (is_last_party, local_state)) ;
+    let update_local_excess = Bool.(is_start' ||| is_last_party) in
+    let update_global_state =
+      Bool.(update_local_excess &&& local_state.success)
+    in
     (*
        In the SNARK, this will be
     Bool.(assert_
@@ -552,21 +536,16 @@ module Make (Inputs : Inputs_intf) = struct
             equal local_state.will_succeed local_state.success)) ;
        *)
     let global_state, local_state =
-      let curr_is_default = Token_id.(equal default) local_state.token_id in
-      let should_perform_second_excess_merge =
-        (* See: https://github.com/MinaProtocol/mina/issues/8921 *)
-        Bool.(curr_is_default &&& is_last_party)
-      in
       ( h.perform
           (Modify_global_excess
              ( global_state
              , fun amt ->
-                 Amount.if_ should_perform_second_excess_merge
+                 Amount.if_ update_global_state
                    ~then_:Amount.(amt + local_state.excess)
                    ~else_:amt ))
       , { local_state with
           excess =
-            Amount.if_ is_last_party ~then_:Amount.zero
+            Amount.if_ update_local_excess ~then_:Amount.zero
               ~else_:local_state.excess
         } )
     in
@@ -575,7 +554,7 @@ module Make (Inputs : Inputs_intf) = struct
         (Modify_global_ledger
            { global_state
            ; ledger = local_state.ledger
-           ; should_update = is_last_party
+           ; should_update = update_global_state
            })
     in
     let local_state =
@@ -588,7 +567,6 @@ module Make (Inputs : Inputs_intf) = struct
          - token_id = Token_id.default
          - ledger = Frozen_ledger_hash.empty_hash
          - success = true
-         - will_succeed = true
       *)
       { local_state with
         token_id =
@@ -601,9 +579,6 @@ module Make (Inputs : Inputs_intf) = struct
             ~else_:local_state.ledger
       ; success =
           Bool.if_ is_last_party ~then_:Bool.true_ ~else_:local_state.success
-      ; will_succeed =
-          Bool.if_ is_last_party ~then_:Bool.true_
-            ~else_:local_state.will_succeed
       }
     in
     (global_state, local_state)
