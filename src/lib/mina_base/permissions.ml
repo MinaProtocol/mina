@@ -73,7 +73,6 @@ module Auth_required = struct
   end]
 
   let gen : t Quickcheck.Generator.t =
-    (* TODO: the generator makes these equally likely; is that OK? *)
     Quickcheck.Generator.of_list
       [ None; Either; Proof; Signature; Both; Impossible ]
 

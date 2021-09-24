@@ -185,7 +185,7 @@ module Update = struct
     end
   end]
 
-  let gen : t Quickcheck.Generator.t =
+  let gen ?(new_party = false) () : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let%bind app_state =
       let%bind fields =
@@ -222,7 +222,10 @@ module Update = struct
       in
       Set_or_keep.gen token_gen
     in
-    let%map timing = Set_or_keep.gen Timing_info.gen in
+    let%map timing =
+      if new_party then Set_or_keep.gen Timing_info.gen
+      else return Set_or_keep.Keep
+    in
     Poly.
       { app_state
       ; delegate
@@ -480,48 +483,6 @@ module Body = struct
       ; Random_oracle_input.field call_data
       ]
 
-  let gen ?pk () : t Quickcheck.Generator.t =
-    let open Quickcheck.Let_syntax in
-    let%bind pk =
-      match pk with Some pk -> return pk | None -> Public_key.Compressed.gen
-    in
-    let%bind update = Update.gen in
-    let%bind token_id = Token_id.gen in
-    let%bind delta =
-      let%bind magnitude = Currency.Amount.gen in
-      let%map sgn = Quickcheck.Generator.of_list [ Sgn.Pos; Neg ] in
-      Currency.Signed_poly.{ magnitude; sgn }
-    in
-    let field_array_list_gen ~max_array_len ~max_list_len =
-      let array_gen =
-        let%bind array_len = Int.gen_uniform_incl 0 max_array_len in
-        let%map fields =
-          Quickcheck.Generator.list_with_length array_len
-            Snark_params.Tick.Field.gen
-        in
-        Array.of_list fields
-      in
-      let%bind list_len = Int.gen_uniform_incl 0 max_list_len in
-      Quickcheck.Generator.list_with_length list_len array_gen
-    in
-    (* TODO: are these lengths reasonable? *)
-    let%bind events = field_array_list_gen ~max_array_len:8 ~max_list_len:12 in
-    let%bind rollup_events =
-      field_array_list_gen ~max_array_len:4 ~max_list_len:6
-    in
-    let%bind call_data = Snark_params.Tick.Field.gen in
-    (* TODO: are these numbers reasonable? *)
-    let%map depth = Int.gen_uniform_incl 0 20 in
-    { Poly.pk
-    ; update
-    ; token_id
-    ; delta
-    ; events
-    ; rollup_events
-    ; call_data
-    ; depth
-    }
-
   let digest (t : t) =
     Random_oracle.(hash ~init:Hash_prefix.snapp_body (pack_input (to_input t)))
 
@@ -694,13 +655,6 @@ module Predicated = struct
       type t = (Body.Checked.t, Account_nonce.Checked.t) Poly.t
     end
 
-    (* takes an optional public key, if we want to sign this data *)
-    let gen ?pk () : t Quickcheck.Generator.t =
-      let open Quickcheck.Let_syntax in
-      let%bind body = Body.gen ?pk () in
-      let%map predicate = Account.Nonce.gen in
-      Poly.{ body; predicate }
-
     let dummy : t = { body = Body.dummy; predicate = Account_nonce.zero }
   end
 
@@ -759,13 +713,6 @@ module Signed = struct
       let to_latest = Fn.id
     end
   end]
-
-  let gen ?pk () =
-    let open Quickcheck.Let_syntax in
-    let%map data = Predicated.Signed.gen ?pk () in
-    (* real signature to be added when this data inserted into a Parties.t *)
-    let authorization = Signature.dummy in
-    { data; authorization }
 
   let account_id (t : t) : Account_id.t =
     Account_id.create t.data.body.pk t.data.body.token_id
