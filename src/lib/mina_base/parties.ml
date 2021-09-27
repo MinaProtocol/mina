@@ -252,6 +252,9 @@ end]
 
 include Codable.Make_base58_check (Stable.Latest)
 
+(* shadow the definitions from Make_base58_check *)
+[%%define_locally Stable.Latest.(of_yojson, to_yojson)]
+
 module Valid = struct
   module Stable = Stable
 
