@@ -8,6 +8,7 @@
  (libraries
    digestif
    mina_version
+   base64
    zexe_backend
    random_oracle_input
    pickles_base
