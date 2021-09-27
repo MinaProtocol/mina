@@ -37,6 +37,8 @@ var wasm_ready = function(wasm) {
 // Provides: startWorkers
 // Requires: worker_threads, _workers
 var startWorkers = function(worker_source, memory, builder) {
+    joo_global_object.wasm_workers = [];
+    joo_global_object.wasm_rayon_poolbuilder = builder;
     return joo_global_object.Promise.all(
         Array.from({ length: builder.numThreads() }, function() {
             // Self-spawn into a new Worker.
@@ -46,6 +48,7 @@ var startWorkers = function(worker_source, memory, builder) {
             var worker = new worker_threads.Worker(worker_source, {
                 workerData: {memory: memory, receiver: builder.receiver()}
             });
+            joo_global_object.wasm_workers.push(worker);
             var target = worker;
             var type = 'wasm_bindgen_worker_ready';
             return new joo_global_object.Promise(function(resolve) {
@@ -59,7 +62,15 @@ var startWorkers = function(worker_source, memory, builder) {
         })
     ).then(function(data) {
         _workers = data;
-        builder.build();
+        try { builder.build(); }
+        catch (_e) {
+            // We 'mute' this error here, since it can only ever throw when
+            // there is something wrong with the rayon subsystem in WASM, and
+            // we deliberately introduce such a problem by destroying builder
+            // when we want to shutdown the process (and thus need to kill the
+            // child threads). The error here won't be useful to developers
+            // using the library.
+        }
     });
 };
 
