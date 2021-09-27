@@ -290,9 +290,6 @@ ARG PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
 
 ENV DEBIAN_FRONTEND noninteractive
 
-# Workaround terrible postgresql package requirements with man
-RUN mkdir /usr/share/man/man7 /usr/share/man/man1
-
 # Dependencies
 # TODO: make sure this is the minimum runtime deps
 RUN apt-get -y update \
@@ -310,7 +307,6 @@ RUN apt-get -y update \
     libssl1.1 \
     postgresql \
     postgresql-contrib \
-    man \
     tzdata
 
 # Make all directories for configuration and empty s3 cache dirs

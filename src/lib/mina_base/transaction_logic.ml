@@ -1268,17 +1268,20 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             (* This should be a reject, not a failure, otherwise the snark
                circuit becomes unsatisfiable.
             *)
-            Error (failure Update_not_permitted)
+            failwith "Transaction contains invalid timing information"
       | Set _ ->
           Error (failure Update_not_permitted)
     in
     (* Check timing. *)
     let%bind timing =
       match delta.sgn with
-      | Pos ->
+      | Pos when not is_new ->
           Ok timing
-      | Neg ->
-          validate_timing ~txn_amount:delta.magnitude
+      | _ ->
+          let txn_amount =
+            match delta.sgn with Pos -> Amount.zero | Neg -> delta.magnitude
+          in
+          validate_timing ~txn_amount
             ~txn_global_slot:state_view.global_slot_since_genesis
             ~account:{ a with timing }
           |> Result.map_error ~f:timing_error_to_user_command_status
