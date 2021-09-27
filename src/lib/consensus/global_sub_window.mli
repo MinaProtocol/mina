@@ -1,4 +1,4 @@
-type t [@@deriving equal]
+type t = Unsigned.uint32 [@@deriving equal]
 
 val succ : t -> t
 

@@ -1467,6 +1467,66 @@ module Data = struct
               return (next_global_slot, sub_window_densities, min_window_density))
 
         let%test_unit "the actual implementation is equivalent to the \
+                       referennce implementation at the edge case" =
+          let open Unsigned.UInt32 in
+          let prev_global_slot =
+            Consensus_time.of_slot_number ~constants
+              (Mina_numbers.Global_slot.of_uint32
+                 Infix.(constants.slots_per_window + constants.grace_period_end))
+          in
+          let prev_sub_window =
+            Global_sub_window.of_global_slot ~constants prev_global_slot
+          in
+          let next_global_slot =
+            Consensus_time.of_slot_number ~constants
+              (Mina_numbers.Global_slot.of_uint32
+                 Infix.(
+                   (constants.slots_per_window * of_int 2)
+                   + constants.grace_period_end))
+          in
+          let next_sub_window =
+            Global_sub_window.of_global_slot ~constants next_global_slot
+          in
+          let prev_sub_window_densities =
+            Length.zero
+            :: List.init
+                 (Length.to_int constants.sub_windows_per_window - 1)
+                 ~f:(Fn.const constants.slots_per_sub_window)
+          in
+          let prev_min_window_density = constants.slots_per_window in
+          let min_window_density1, sub_window_densities1 =
+            update_min_window_density ~incr_window:true ~constants
+              ~prev_global_slot ~next_global_slot ~prev_sub_window_densities
+              ~prev_min_window_density
+          in
+          let min_window_density2, sub_window_densities2 =
+            update_min_window_density_reference_implementation ~constants
+              ~prev_global_slot ~next_global_slot
+              ~prev_sub_window_densities:
+                (actual_to_reference ~prev_global_slot
+                   ~prev_sub_window_densities)
+              ~prev_min_window_density
+          in
+          let open Unsigned.UInt32 in
+          printf "slots_per_sub_window: %d\n"
+            (to_int constants.slots_per_sub_window) ;
+          printf "slots_per_window: %d\n" (to_int prev_min_window_density) ;
+          printf "density: %d %d\n"
+            (Unsigned.UInt32.to_int min_window_density1)
+            (Unsigned.UInt32.to_int min_window_density2) ;
+          printf "density1:" ;
+          List.iter sub_window_densities1 ~f:(fun density ->
+              printf " %d " (to_int density)) ;
+          printf "\n" ;
+          printf "density2:" ;
+          Array.iter sub_window_densities2 ~f:(fun density ->
+              printf " %d " (to_int density)) ;
+          printf "\n" ;
+          printf "sub window: %d %d\n" (to_int prev_sub_window)
+            (to_int next_sub_window) ;
+          assert (Length.(equal min_window_density1 min_window_density2))
+
+        let%test_unit "the actual implementation is equivalent to the \
                        reference implementation" =
           Quickcheck.test ~trials:100 gen
             ~f:(fun
