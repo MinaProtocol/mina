@@ -5605,7 +5605,7 @@
           "fields": [
             {
               "name": "id",
-              "description": null,
+              "description": "A Base58Check string representing the command",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5621,7 +5621,7 @@
             },
             {
               "name": "hash",
-              "description": null,
+              "description": "A cryptographic hash of the Snapp command",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5693,7 +5693,7 @@
             },
             {
               "name": "feeLowerBound",
-              "description": "Lower bound on the fee paid by the fee-payer for the Snapp transaction, or null if it can't be alculated",
+              "description": "Lower bound on the fee paid by the fee-payer for the Snapp transaction, or null if it can't be calculated",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -7716,7 +7716,7 @@
               "deprecationReason": null
             },
             {
-              "name": "sendSnappTransaction",
+              "name": "sendSnapp",
               "description": "Send a Snapp transaction",
               "args": [
                 {
