@@ -1577,23 +1577,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           Parties_logic.Local_state.t
       ; protocol_state_predicate : Snapp_predicate.Protocol_state.t
       ; transaction_commitment : unit >
-  end
 
-  module M = Parties_logic.Make (Inputs)
-
-  let apply_parties_unchecked
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~(state_view : Snapp_predicate.Protocol_state.View.t) (ledger : L.t)
-      (c : Parties.t) : (Transaction_applied.Parties_applied.t * _) Or_error.t =
-    let original_account_states =
-      List.map (Parties.accounts_accessed c) ~f:(fun id ->
-          ( id
-          , Option.Let_syntax.(
-              let%bind loc = L.location_of_account ledger id in
-              let%map a = L.get ledger loc in
-              (loc, a)) ))
-    in
-    let perform (type r) (eff : (r, Env.t) Parties_logic.Eff.t) : r =
+    let perform ~constraint_constants ~state_view ledger (type r)
+        (eff : (r, t) Parties_logic.Eff.t) : r =
       match eff with
       | Get_global_ledger _ ->
           L.create_masked ledger
@@ -1656,6 +1642,24 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               (a, false)
           | Ok a ->
               (a, true) )
+  end
+
+  module M = Parties_logic.Make (Inputs)
+
+  let apply_parties_unchecked
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~(state_view : Snapp_predicate.Protocol_state.View.t) (ledger : L.t)
+      (c : Parties.t) : (Transaction_applied.Parties_applied.t * _) Or_error.t =
+    let original_account_states =
+      List.map (Parties.accounts_accessed c) ~f:(fun id ->
+          ( id
+          , Option.Let_syntax.(
+              let%bind loc = L.location_of_account ledger id in
+              let%map a = L.get ledger loc in
+              (loc, a)) ))
+    in
+    let perform eff =
+      Env.perform ~constraint_constants ~state_view ledger eff
     in
     let rec step_all
         ( ((g : Inputs.Global_state.t), (l : _ Parties_logic.Local_state.t)) as
