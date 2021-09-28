@@ -138,6 +138,13 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
        BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
         high_connectivity_ivar ~added_seeds ~pids ~on_unexpected_termination =
+      let ctr = ref 0 in
+      let record_peer_connection () =
+        [%log' trace config.logger] "Fired peer_connected callback" ;
+        Ivar.fill_if_empty first_peer_ivar () ;
+        if !ctr < 4 then incr ctr
+        else Ivar.fill_if_empty high_connectivity_ivar ()
+      in
       let handle_mina_net2_exception exn =
         match exn with
         | Mina_net2.Libp2p_helper_died_unexpectedly ->
@@ -164,7 +171,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
             trace "mina_net2" (fun () ->
                 Mina_net2.create
                   ~all_peers_seen_metric:config.all_peers_seen_metric
-                  ~logger:config.logger ~conf_dir ~pids))
+                  ~on_peer_connected:(fun _ -> record_peer_connection ())
+                  ~on_peer_disconnected:ignore ~logger:config.logger ~conf_dir
+                  ~pids))
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
@@ -196,16 +205,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                      ~peer_id:my_peer_id) ) ;
           [%log' info config.logger] "libp2p peer ID this session is $peer_id"
             ~metadata:[ ("peer_id", `String my_peer_id) ] ;
-          let ctr = ref 0 in
           let initializing_libp2p_result : _ Deferred.Or_error.t =
             [%log' debug config.logger] "(Re)initializing libp2p result" ;
             let open Deferred.Or_error.Let_syntax in
-            let record_peer_connection () =
-              [%log' trace config.logger] "Fired peer_connected callback" ;
-              Ivar.fill_if_empty first_peer_ivar () ;
-              if !ctr < 4 then incr ctr
-              else Ivar.fill_if_empty high_connectivity_ivar ()
-            in
             let seed_peers =
               List.dedup_and_sort ~compare:Mina_net2.Multiaddr.compare
                 (List.concat
@@ -256,8 +258,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                           config.initial_peers
                     ; isolate = config.isolate
                     }
-                ~on_peer_connected:(fun _ -> record_peer_connection ())
-                ~on_peer_disconnected:ignore
             in
             let implementation_list =
               List.bind rpc_handlers ~f:create_rpc_implementations
@@ -566,7 +566,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       !(t.net2) >>= Fn.flip Mina_net2.set_node_status data
 
     let get_peer_node_status t peer =
-      !(t.net2) >>= Fn.flip Mina_net2.get_peer_node_status peer
+      !(t.net2)
+      >>= Fn.flip Mina_net2.get_peer_node_status
+            (Peer.to_multiaddr_string peer |> Mina_net2.Multiaddr.of_string)
 
     let initial_peers t = t.config.initial_peers
 

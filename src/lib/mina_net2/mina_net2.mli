@@ -120,6 +120,8 @@ val create :
   -> logger:Logger.t
   -> pids:Child_processes.Termination.t
   -> conf_dir:string
+  -> on_peer_connected:(Peer.Id.t -> unit)
+  -> on_peer_disconnected:(Peer.Id.t -> unit)
   -> t Deferred.Or_error.t
 
 (** State for the connection gateway. It will disallow connections from IPs
@@ -148,8 +150,6 @@ val configure :
   -> maddrs:Multiaddr.t list
   -> network_id:string
   -> metrics_port:int option
-  -> on_peer_connected:(Peer.Id.t -> unit)
-  -> on_peer_disconnected:(Peer.Id.t -> unit)
   -> unsafe_no_trust_ip:bool
   -> flooding:bool
   -> direct_peers:Multiaddr.t list
@@ -174,7 +174,7 @@ val peers : t -> Peer.t list Deferred.t
 val set_node_status : t -> string -> unit Deferred.Or_error.t
 
 (** Get node status from given peer. *)
-val get_peer_node_status : t -> Peer.t -> string Deferred.Or_error.t
+val get_peer_node_status : t -> Multiaddr.t -> string Deferred.Or_error.t
 
 val generate_random_keypair : t -> Keypair.t Deferred.t
 
@@ -235,6 +235,15 @@ module Pubsub : sig
     * It is exactly [Pubsub.publish] with the topic this subscription was
     * created for, and fails in the same way. *)
   val publish : t -> 'a subscription -> 'a -> unit Deferred.t
+
+  (** Publish a message to a topic described buy a string.
+    *
+    * Returned deferred is resolved once the publish is enqueued locally.
+    * This function continues to work even if [unsubscribe t] has been called.
+    * This function allows to publish to the topic to which we are
+    * not necessarily subscribed.
+    *)
+  val publish_raw : t -> topic:string -> string -> unit Deferred.t
 end
 
 (** An open stream.
@@ -338,7 +347,6 @@ val listening_addrs : t -> Multiaddr.t list Deferred.Or_error.t
 val add_peer : t -> Multiaddr.t -> is_seed:bool -> unit Deferred.Or_error.t
 
 (** Join the DHT and announce our existence.
-
     Call this after using [add_peer] to add any bootstrap peers. *)
 val begin_advertising : t -> unit Deferred.Or_error.t
 

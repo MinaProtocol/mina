@@ -82,8 +82,7 @@ let handle_and_validate sub ~validation_expiration ~(sender : Peer.t)
           f (wrap_message raw_data) e ) ;
       return (`Decoding_error e)
 
-let publish ~logger ~helper { topic; encode; _ } message =
-  let data = encode message in
+let publish_raw ~logger ~helper ~topic data =
   match%map
     Libp2p_helper.do_rpc helper
       (module Libp2p_ipc.Rpcs.Publish)
@@ -95,3 +94,6 @@ let publish ~logger ~helper { topic; encode; _ } message =
       [%log' error logger] "error while publishing message on $topic: $err"
         ~metadata:
           [ ("topic", `String topic); ("err", Error_json.error_to_yojson e) ]
+
+let publish ~logger ~helper { topic; encode; _ } message =
+  publish_raw ~logger ~helper ~topic (encode message)

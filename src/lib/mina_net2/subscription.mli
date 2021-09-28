@@ -36,3 +36,10 @@ val handle_and_validate :
 
 val publish :
   logger:Logger.t -> helper:Libp2p_helper.t -> 'a t -> 'a -> unit Deferred.t
+
+val publish_raw :
+     logger:Logger.t
+  -> helper:Libp2p_helper.t
+  -> topic:string
+  -> string
+  -> unit Deferred.t

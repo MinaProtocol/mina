@@ -78,8 +78,8 @@ type t =
   ; mutable connection_gating : connection_gating
   ; mutable all_peers_seen : Peer_without_id.Set.t option
   ; mutable banned_ips : Unix.Inet_addr.t list
-  ; mutable peer_connected_callback : (string -> unit) option
-  ; mutable peer_disconnected_callback : (string -> unit) option
+  ; peer_connected_callback : string -> unit
+  ; peer_disconnected_callback : string -> unit
   }
 
 let banned_ips t = t.banned_ips
@@ -137,6 +137,8 @@ module Pubsub = struct
   let unsubscribe t = Subscription.unsubscribe ~helper:t.helper
 
   let publish t = Subscription.publish ~logger:t.logger ~helper:t.helper
+
+  let publish_raw t = Subscription.publish_raw ~logger:t.logger ~helper:t.helper
 end
 
 let set_node_status t data =
@@ -147,9 +149,7 @@ let set_node_status t data =
 
 let get_peer_node_status t peer =
   let open Deferred.Or_error.Let_syntax in
-  let peer_multiaddr =
-    Libp2p_ipc.create_multiaddr (Peer.to_multiaddr_string peer)
-  in
+  let peer_multiaddr = Multiaddr.to_libp2p_ipc peer in
   let%map response =
     Libp2p_helper.do_rpc t.helper
       (module Libp2p_ipc.Rpcs.GetPeerNodeStatus)
@@ -179,15 +179,10 @@ let list_peers t =
 
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
-    ~on_peer_connected ~on_peer_disconnected ~unsafe_no_trust_ip ~flooding
-    ~direct_peers ~peer_exchange ~mina_peer_exchange ~seed_peers
-    ~initial_gating_config ~max_connections ~validation_queue_size =
+    ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange
+    ~mina_peer_exchange ~seed_peers ~initial_gating_config ~max_connections
+    ~validation_queue_size =
   let open Deferred.Or_error.Let_syntax in
-  t.peer_connected_callback <-
-    Some (fun peer_id -> on_peer_connected (Peer.Id.unsafe_of_string peer_id)) ;
-  t.peer_disconnected_callback <-
-    Some
-      (fun peer_id -> on_peer_disconnected (Peer.Id.unsafe_of_string peer_id)) ;
   let libp2p_config =
     Libp2p_ipc.create_libp2p_config ~private_key:(Keypair.secret me)
       ~statedir:t.conf_dir
@@ -330,12 +325,12 @@ let handle_push_message t push_message =
       let peer_id =
         Libp2p_ipc.unsafe_parse_peer_id (PeerConnected.peer_id_get m)
       in
-      Option.iter t.peer_connected_callback ~f:(fun cb -> cb peer_id)
+      t.peer_connected_callback peer_id
   | PeerDisconnected m ->
       let peer_id =
         Libp2p_ipc.unsafe_parse_peer_id (PeerDisconnected.peer_id_get m)
       in
-      Option.iter t.peer_disconnected_callback ~f:(fun cb -> cb peer_id)
+      t.peer_disconnected_callback peer_id
   | GossipReceived m -> (
       let open GossipReceived in
       let data = data_get m in
@@ -438,7 +433,8 @@ let handle_push_message t push_message =
                 these are buffered stream open RPCs that were enqueued before
                 our close went into effect. *)
             (* TODO: we leak the new pipes here*)
-            ()
+            [%log' warn t.logger]
+              "incoming stream for protocol that is being closed after error"
       | None ->
           (* TODO: punish *)
           [%log' error t.logger]
@@ -496,7 +492,8 @@ let handle_push_message t push_message =
   | Undefined n ->
       Libp2p_ipc.undefined_union ~context:"DaemonInterface.PushMessage" n
 
-let create ~all_peers_seen_metric ~logger ~pids ~conf_dir =
+let create ~all_peers_seen_metric ~logger ~pids ~conf_dir ~on_peer_connected
+    ~on_peer_disconnected =
   let open Deferred.Or_error.Let_syntax in
   let push_message_handler =
     ref (fun _msg ->
@@ -520,8 +517,10 @@ let create ~all_peers_seen_metric ~logger ~pids ~conf_dir =
     ; streams = String.Table.create ()
     ; all_peers_seen =
         (if all_peers_seen_metric then Some Peer_without_id.Set.empty else None)
-    ; peer_connected_callback = None
-    ; peer_disconnected_callback = None
+    ; peer_connected_callback =
+        (fun peer_id -> on_peer_connected (Peer.Id.unsafe_of_string peer_id))
+    ; peer_disconnected_callback =
+        (fun peer_id -> on_peer_disconnected (Peer.Id.unsafe_of_string peer_id))
     ; protocol_handlers = Hashtbl.create (module String)
     }
   in

@@ -156,6 +156,20 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
                 ; ("error", Error_json.error_to_yojson e)
                 ] ;
             Pipe.close outgoing_w)
+    (* TODO implement proper stream closing *)
+    (* >>= ( fun () ->
+       match%map Libp2p_helper.do_rpc helper
+           (module Libp2p_ipc.Rpcs.CloseStream)
+           (Libp2p_ipc.Rpcs.CloseStream.create_request ~stream_id) with
+         | Ok _ ->
+             ()
+         | Error e ->
+           [%log error] "error closing stream $idx: $error"
+             ~metadata:
+               [ ("idx", `String (Libp2p_ipc.stream_id_to_string stream_id))
+               ; ("error", Error_json.error_to_yojson e)
+               ] ;
+             ) *)
   in
   upon send_outgoing_messages_task (fun () ->
       let (`Stream_should_be_released should_release) =
