@@ -1474,14 +1474,24 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
         let zero = zero
 
-        let ( - ) (x1 : t) (x2 : t) : Signed.t =
-          Option.value_exn Signed.(of_unsigned x1 + negate (of_unsigned x2))
+        let add_flagged = add_flagged
 
-        let ( + ) (x1 : t) (x2 : t) : t = Option.value_exn (add x1 x2)
-
-        let add_signed (x1 : t) (x2 : Signed.t) : t =
-          let y = Option.value_exn Signed.(of_unsigned x1 + x2) in
-          match y.sgn with Pos -> y.magnitude | Neg -> failwith "add_signed"
+        let add_signed_flagged (x1 : t) (x2 : Signed.t) :
+            t * [ `Overflow of bool ] =
+          let y, `Overflow b = Signed.(add_flagged (of_unsigned x1) x2) in
+          match y.sgn with
+          | Pos ->
+              (y.magnitude, `Overflow b)
+          | Neg ->
+              (* We want to capture the accurate value so that this will match
+                 with the values in the snarked logic.
+              *)
+              let magnitude =
+                Amount.to_uint64 y.magnitude
+                |> Unsigned.UInt64.(mul (sub zero one))
+                |> Amount.of_uint64
+              in
+              (magnitude, `Overflow true)
       end
 
       module Token_id = struct

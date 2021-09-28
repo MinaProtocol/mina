@@ -83,6 +83,8 @@ module type Arithmetic_intf = sig
 
   val add : t -> t -> t option
 
+  val add_flagged : t -> t -> t * [ `Overflow of bool ]
+
   val sub : t -> t -> t option
 
   val ( + ) : t -> t -> t option
@@ -124,6 +126,8 @@ module type Signed_intf = sig
   val to_input : t -> (_, bool) Random_oracle.Input.t
 
   val add : t -> t -> t option
+
+  val add_flagged : t -> t -> t * [ `Overflow of bool ]
 
   val ( + ) : t -> t -> t option
 

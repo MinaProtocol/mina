@@ -1738,16 +1738,10 @@ module Base = struct
 
           let zero = Amount.(var_of_t zero)
 
-          let ( - ) x y =
-            run_checked
-              Amount.Signed.Checked.(of_unsigned x + negate (of_unsigned y))
+          let add_flagged x y = run_checked (Amount.Checked.add_flagged x y)
 
-          let ( + ) x y = run_checked (Amount.Checked.add x y)
-
-          let add_signed (x : t) (y : Signed.t) =
-            let z = run_checked Amount.Signed.Checked.(of_unsigned x + y) in
-            Boolean.Assert.is_true (Sgn.Checked.is_pos z.sgn) ;
-            z.magnitude
+          let add_signed_flagged (x : t) (y : Signed.t) =
+            run_checked (Amount.Checked.add_signed_flagged x y)
         end
 
         module Token_id = struct
@@ -4117,10 +4111,7 @@ let%test_module "transaction_snark" =
                             Parties.Party_or_stack.(
                               With_hashes.stack_hash
                                 (accumulate_hashes' local_state_post.call_stack))
-                        ; ledger =
-                            Sparse_ledger.merkle_root w.local_state_init.ledger
-                            (* TODO: This won't quite work when the transaction fails. *)
-                            (*                             Ledger.merkle_root local_state_post.ledger *)
+                        ; ledger = Ledger.merkle_root local_state_post.ledger
                         ; transaction_commitment =
                             w.local_state_init.transaction_commitment
                         }
@@ -4624,7 +4615,8 @@ let%test_module "transaction_snark" =
                                   stack_hash
                                     (accumulate_hashes'
                                        local_state_post.call_stack))
-                            ; ledger = Local_state.dummy.ledger
+                            ; ledger =
+                                Ledger.merkle_root local_state_post.ledger
                             ; transaction_commitment =
                                 Parties.Transaction_commitment.empty
                             }
@@ -5031,7 +5023,8 @@ let%test_module "transaction_snark" =
                                   stack_hash
                                     (accumulate_hashes'
                                        local_state_post.call_stack))
-                            ; ledger = Local_state.dummy.ledger
+                            ; ledger =
+                                Ledger.merkle_root local_state_post.ledger
                             ; transaction_commitment =
                                 Parties.Transaction_commitment.empty
                             }

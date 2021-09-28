@@ -39,11 +39,9 @@ module type Amount_intf = sig
 
   val zero : t
 
-  val ( - ) : t -> t -> Signed.t
+  val add_flagged : t -> t -> t * [ `Overflow of bool ]
 
-  val ( + ) : t -> t -> t
-
-  val add_signed : t -> Signed.t -> t
+  val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
 end
 
 module type Token_id_intf = sig
@@ -489,7 +487,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let party_token = h.perform (Party_token_id party) in
     Bool.(assert_ (not (Token_id.(equal invalid) party_token))) ;
-    let new_local_fee_excess =
+    let new_local_fee_excess, `Overflow overflowed =
       let curr_token : Token_id.t = local_state.token_id in
       let curr_is_default = Token_id.(equal default) curr_token in
       let party_is_default = Token_id.(equal default) party_token in
@@ -499,9 +497,16 @@ module Make (Inputs : Inputs_intf) = struct
           ||| (party_is_default &&& Amount.Signed.is_pos local_delta) )) ;
       (* FIXME: Allow non-default tokens again. *)
       Bool.(assert_ (party_is_default &&& curr_is_default)) ;
-      Amount.add_signed local_state.excess local_delta
+      Amount.add_signed_flagged local_state.excess local_delta
     in
-    let local_state = { local_state with excess = new_local_fee_excess } in
+    (* The first party must succeed. *)
+    Bool.(assert_ (not (is_start' &&& overflowed))) ;
+    let local_state =
+      { local_state with
+        excess = new_local_fee_excess
+      ; success = Bool.(local_state.success &&& not overflowed)
+      }
+    in
 
     (* If a's token ID differs from that in the local state, then
        the local state excess gets moved into the execution state's fee excess.
@@ -527,34 +532,41 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let update_local_excess = Bool.(is_start' ||| is_last_party) in
     let update_global_state =
-      Bool.(update_local_excess &&& local_state.success)
+      ref Bool.(update_local_excess &&& local_state.success)
     in
-    (*
-       In the SNARK, this will be
-    Bool.(assert_
-            (not is_last_party |||
-            equal local_state.will_succeed local_state.success)) ;
-       *)
+    let global_excess_update_failed = ref Bool.true_ in
     let global_state, local_state =
       ( h.perform
           (Modify_global_excess
              ( global_state
              , fun amt ->
-                 Amount.if_ update_global_state
-                   ~then_:Amount.(amt + local_state.excess)
-                   ~else_:amt ))
+                 let res, `Overflow overflow =
+                   Amount.add_flagged amt local_state.excess
+                 in
+                 (global_excess_update_failed :=
+                    Bool.(!update_global_state &&& overflow)) ;
+                 (update_global_state :=
+                    Bool.(!update_global_state &&& not overflow)) ;
+                 Amount.if_ !update_global_state ~then_:res ~else_:amt ))
       , { local_state with
           excess =
             Amount.if_ update_local_excess ~then_:Amount.zero
               ~else_:local_state.excess
         } )
     in
+    Bool.(assert_ (not (is_start' &&& !global_excess_update_failed))) ;
+    let local_state =
+      { local_state with
+        success =
+          Bool.(local_state.success &&& not !global_excess_update_failed)
+      }
+    in
     let global_state =
       h.perform
         (Modify_global_ledger
            { global_state
            ; ledger = local_state.ledger
-           ; should_update = update_global_state
+           ; should_update = !update_global_state
            })
     in
     let local_state =

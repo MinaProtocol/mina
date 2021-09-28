@@ -174,6 +174,10 @@ end = struct
     let z = Unsigned.add x y in
     if z < x then None else Some z
 
+  let add_flagged x y =
+    let z = Unsigned.add x y in
+    (z, `Overflow (z < x))
+
   let scale u64 i =
     let i = Unsigned.of_int i in
     let max_val = Unsigned.(div max_int i) in
@@ -260,6 +264,22 @@ end = struct
               create ~sgn:x.sgn
                 ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
             else zero )
+
+    let add_flagged (x : t) (y : t) : t * [ `Overflow of bool ] =
+      match (x.sgn, y.sgn) with
+      | Neg, (Neg as sgn) | Pos, (Pos as sgn) ->
+          let magnitude, `Overflow b = add_flagged x.magnitude y.magnitude in
+          (create ~sgn ~magnitude, `Overflow b)
+      | Pos, Neg | Neg, Pos ->
+          let c = compare_magnitude x.magnitude y.magnitude in
+          ( ( if Int.( < ) c 0 then
+              create ~sgn:y.sgn
+                ~magnitude:Unsigned.Infix.(y.magnitude - x.magnitude)
+            else if Int.( > ) c 0 then
+              create ~sgn:x.sgn
+                ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
+            else zero )
+          , `Overflow false )
 
     let negate t =
       if Unsigned.(equal zero t.magnitude) then zero
