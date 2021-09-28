@@ -56,6 +56,18 @@ module Node_initialization = struct
   let parse = Fn.const (Or_error.return ())
 end
 
+module Node_offline = struct
+  let name = "Node_offline"
+
+  let structured_event_id : Structured_log_events.id option = None
+
+  (* TODO figure out what event gets triggered when a node goes offline, or how we can tell*)
+
+  type t = unit [@@deriving to_yojson]
+
+  let parse = Fn.const (Or_error.return ())
+end
+
 module Transition_frontier_diff_application = struct
   let name = "Transition_frontier_diff_application"
 
@@ -284,6 +296,7 @@ end
 type 'a t =
   | Log_error : Log_error.t t
   | Node_initialization : Node_initialization.t t
+  | Node_offline : Node_offline.t t
   | Transition_frontier_diff_application
       : Transition_frontier_diff_application.t t
   | Block_produced : Block_produced.t t
@@ -299,6 +312,8 @@ let existential_to_string = function
       "Log_error"
   | Event_type Node_initialization ->
       "Node_initialization"
+  | Event_type Node_offline ->
+      "Node_offline"
   | Event_type Transition_frontier_diff_application ->
       "Transition_frontier_diff_application"
   | Event_type Block_produced ->
@@ -319,6 +334,8 @@ let existential_of_string_exn = function
       Event_type Log_error
   | "Node_initialization" ->
       Event_type Node_initialization
+  | "Node_offline" ->
+      Event_type Node_offline
   | "Transition_frontier_diff_application" ->
       Event_type Transition_frontier_diff_application
   | "Block_produced" ->
@@ -364,6 +381,7 @@ let type_of_event (Event (t, _)) = Event_type t
 let all_event_types =
   [ Event_type Log_error
   ; Event_type Node_initialization
+  ; Event_type Node_offline
   ; Event_type Transition_frontier_diff_application
   ; Event_type Block_produced
   ; Event_type Breadcrumb_added
@@ -378,6 +396,8 @@ let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
       (module Log_error)
   | Node_initialization ->
       (module Node_initialization)
+  | Node_offline ->
+      (module Node_offline)
   | Transition_frontier_diff_application ->
       (module Transition_frontier_diff_application)
   | Block_produced ->
@@ -434,6 +454,8 @@ let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
   | Log_error, Log_error ->
       h e
   | Node_initialization, Node_initialization ->
+      h e
+  | Node_offline, Node_offline ->
       h e
   | Transition_frontier_diff_application, Transition_frontier_diff_application
     ->
