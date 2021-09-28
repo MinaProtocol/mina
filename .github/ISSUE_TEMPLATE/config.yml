@@ -4,7 +4,7 @@ contact_links:
     url: https://docs.minaprotocol.com/
     about: Check out the Mina documentation for answers to common questions
   - name: 🚀 Mina discussions
-    url: https://github.com/MinaProtocol/issues-experiment/discussions
+    url: https://github.com/MinaProtocol/mina/discussions
     about: Ask questions, request features & discuss RFCs
   - name: Mina Discord
     url: https://discord.com/invite/Vexf4ED
