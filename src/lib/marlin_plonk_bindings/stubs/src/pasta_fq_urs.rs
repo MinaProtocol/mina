@@ -116,7 +116,7 @@ pub fn caml_pasta_fq_urs_b_poly_commitment(
     let chals: Vec<Fq> = chals.into_iter().map(From::from).collect();
     let coeffs = b_poly_coefficients(&chals);
     let p = DensePolynomial::<Fq>::from_coefficients_vec(coeffs);
-    Ok((*urs).commit_non_hiding(&p, None).into())
+    Ok((*urs).trim(chals.len()).commit_non_hiding(&p, None).into())
 }
 
 #[ocaml::func]
