@@ -143,11 +143,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 180.0)) in
          check_peers ~logger all_nodes)
     in
+    let print_chains (chain_list : string list list) =
+      List.iter chain_list ~f:(fun chain ->
+          let s = String.concat ~sep:"\n" chain in
+          [%log info] "\nchain:\n %s" s)
+    in
     section "nodes share common prefix no greater than 2 block back"
       (* the common prefix test relies on at least 4 blocks having been produced.  previous sections altogether have already produced 5, so no further block production is needed.  if previous sections change, then this may need to be re-adjusted*)
       (let%bind chains =
          Malleable_error.List.map all_nodes
            ~f:(Network.Node.must_get_best_chain ~logger)
        in
+       print_chains chains ;
        check_common_prefixes chains ~number_of_blocks:2 ~logger)
 end

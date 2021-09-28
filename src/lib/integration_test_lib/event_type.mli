@@ -23,6 +23,12 @@ module Node_initialization : sig
   include Event_type_intf with type t := t
 end
 
+module Node_offline : sig
+  type t = unit
+
+  include Event_type_intf with type t := t
+end
+
 module Transition_frontier_diff_application : sig
   type root_transitioned =
     { new_root : State_hash.t; garbage : State_hash.t list }
@@ -104,6 +110,7 @@ end
 type 'a t =
   | Log_error : Log_error.t t
   | Node_initialization : Node_initialization.t t
+  | Node_offline : Node_offline.t t
   | Transition_frontier_diff_application
       : Transition_frontier_diff_application.t t
   | Block_produced : Block_produced.t t
