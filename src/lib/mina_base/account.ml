@@ -592,8 +592,15 @@ let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
             |> to_int64 |> UInt64.of_int64)
         in
         let vesting_decrement =
-          UInt64.Infix.(num_periods * Amount.to_uint64 vesting_increment)
-          |> Amount.of_uint64
+          let vesting_increment = Amount.to_uint64 vesting_increment in
+          if
+            try UInt64.(Infix.(max_int / num_periods < vesting_increment))
+            with Division_by_zero -> false
+          then
+            (* The vesting decrement will overflow, use [max_int] instead. *)
+            UInt64.max_int |> Amount.of_uint64
+          else
+            UInt64.Infix.(num_periods * vesting_increment) |> Amount.of_uint64
         in
         match Balance.(min_balance_past_cliff - vesting_decrement) with
         | None ->
