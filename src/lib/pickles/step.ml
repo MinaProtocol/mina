@@ -95,7 +95,12 @@ struct
         , Index.t )
         Dlog_based.Statement.In_circuit.t
     end in
-    let b_poly = Tock.Field.(Dlog_main.b_poly ~add ~mul ~one) in
+    let b_poly =
+      Tock.Field.(
+        Dlog_main.b_poly ~add ~mul ~one
+          ~square_if:(fun b x -> if b then square x else x)
+          ~is_non_zero:(fun x -> not (equal zero x)))
+    in
     let sgs, unfinalized_proofs, statements_with_hashes, x_hats, witnesses =
       let f :
           type var value max local_max_branching m.

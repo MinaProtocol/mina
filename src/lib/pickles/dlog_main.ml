@@ -11,28 +11,71 @@ module Accumulator = Pairing_marlin_types.Accumulator
 open Tuple_lib
 open Import
 
-(* given [chals], compute
-   \prod_i (1 / chals.(i) + chals.(i) * x^{2^i}) *)
-let b_poly ~one ~add ~mul chals =
+(* given [chals] of length [k], compute
+   \prod_i (1 + chals.(i) * x^{2^{k - 1 - i}})
+
+   This has been modified to work with verifying proofs that don't use all
+   the available rounds in the inner product argument.
+
+   To expand a bit, if a circuit has a number of rows which is smaller than
+   SRS_SIZE = 2^n, we can perform an inner product argument with k < n rounds.
+
+   In such cases, the [chals] array will have the actual challenges for the
+   first k entries, and then 0 for the remaining n - k entries.
+
+   So the layout of [chals] is
+
+   c_0 ... c_{k - 1} 0 ... 0
+
+   We compute an array [pow_two_pows] that looks like
+
+   x^{2^0} ... x^{2^0} x^{2^1} ... x^{2^{k - 1}}
+
+   For i > k - 1, we have
+
+   chals.(i) * pow_two_pows.(n - 1 - i)
+   = 0 * x^{2^0}
+   = 0
+
+   and for i <= k - 1, we have
+
+   chals.(i) * pow_two_pows.(n - 1 - i)
+   = chals.(i) * x^{2^{k - 1 - i}}
+
+   so that the actual value we compute,
+
+   prod_{i = 0}^{n - 1} (1 + chals.(i) * pow_two_pows.(n - 1 - i))
+   =
+   ( prod_{i = 0}^{k - 1} (1 + chals.(i) * pow_two_pows.(n - 1 - i)) )
+   ( prod_{i = k}^{n - 1} (1 + chals.(i) * pow_two_pows.(n - 1 - i)) )
+   =
+   ( prod_{i = 0}^{k - 1} (1 + chals.(i) * x^{2^{k - 1 - i}}) )
+   ( prod_{i = k}^{n - 1} 1 )
+   =
+   prod_{i = 0}^{k - 1} (1 + chals.(i) * x^{2^{k - 1 - i}})
+
+   as desired.
+*)
+let b_poly ~square_if ~is_non_zero ~one ~add ~mul chals =
   let ( + ) = add and ( * ) = mul in
   stage (fun pt ->
-      let k = Array.length chals in
+      let n = Array.length chals in
       let pow_two_pows =
-        let res = Array.init k ~f:(fun _ -> pt) in
-        for i = 1 to k - 1 do
+        let res = Array.init n ~f:(fun _ -> pt) in
+        for i = 1 to n - 1 do
           let y = res.(i - 1) in
-          res.(i) <- y * y
+          res.(i) <- square_if (is_non_zero chals.(n - i)) y
         done ;
         res
       in
       let prod f =
         let r = ref (f 0) in
-        for i = 1 to k - 1 do
+        for i = 1 to n - 1 do
           r := f i * !r
         done ;
         !r
       in
-      prod (fun i -> one + (chals.(i) * pow_two_pows.(k - 1 - i))))
+      prod (fun i -> one + (chals.(i) * pow_two_pows.(n - 1 - i))))
 
 module Make
     (Inputs : Inputs
@@ -138,23 +181,60 @@ struct
     let bits, packed = Sponge.squeeze sponge ~length:Challenge.length in
     (Scalar_challenge bits, Scalar_challenge packed)
 
-  let bullet_reduce sponge gammas =
+  (*
+     Compute the bulletproof challenges and the logarithmically large MSM
+
+     sum_i c^{-1} L_i + c R_i
+
+     The `mask` array lets us process a variable number of rounds.
+     If we use k out of the maximum n rounds, it looks like
+
+     [| true; true; ...; true; false; ... false |]
+        0     1          k-1   k          n
+
+     For rounds past k, we set the prechallenge to 0 to indicate it is
+     an omitted round. This is fine since an actual prechallenge comes
+     from the random oracle, and thus will only be 0 with negligible
+     probability.
+  *)
+  let bullet_reduce ~mask sponge gammas =
     let absorb t = absorb sponge t in
+    let state = ref sponge.state in
     let prechallenges =
-      Array.map gammas ~f:(fun gammas_i ->
+      Array.map2_exn mask gammas ~f:(fun b gammas_i ->
           absorb (PC :: PC) gammas_i ;
-          squeeze_scalar sponge)
+          let s = squeeze_scalar sponge in
+          state :=
+            Array.map2_exn !state sponge.state ~f:(fun s1 s2 ->
+                Field.if_ b ~then_:s2 ~else_:s1) ;
+          s)
     in
-    let term_and_challenge (l, r) (pre, pre_packed) =
+    sponge.state <- !state ;
+    let term_and_challenge i
+        ((l, r), (pre, (Scalar_challenge pre_packed : _ SC.SC.t))) =
       let left_term = Scalar_challenge.endo_inv l pre in
       let right_term = Scalar_challenge.endo r pre in
       ( Ops.add_fast left_term right_term
-      , { Bulletproof_challenge.prechallenge = pre_packed } )
+      , { Bulletproof_challenge.prechallenge =
+            (Scalar_challenge Field.((mask.(i) :> t) * pre_packed) : _ SC.SC.t)
+        } )
     in
     let terms, challenges =
-      Array.map2_exn gammas prechallenges ~f:term_and_challenge |> Array.unzip
+      Array.mapi (Array.zip_exn gammas prechallenges) ~f:term_and_challenge
+      |> Array.unzip
     in
-    (Array.reduce_exn terms ~f:Ops.add_fast, challenges)
+    let res =
+      let rec go i acc =
+        if i = Array.length terms then acc
+        else
+          go (i + 1)
+            (Inner_curve.if_ mask.(i)
+               ~then_:(Ops.add_fast acc terms.(i))
+               ~else_:acc)
+      in
+      go 1 terms.(0)
+    in
+    (res, challenges)
 
   let equal_g g1 g2 =
     List.map2_exn ~f:Field.equal
@@ -358,7 +438,7 @@ struct
         ({ lr; delta; z_1; z_2; sg } :
           ( Inner_curve.t
           , Other_field.Packed.t Shifted_value.t )
-          Openings.Bulletproof.t) =
+          Openings.Bulletproof.t) ~rounds_mask =
     let scale_fast p s =
       scale_fast p (Shifted_value.map ~f:Other_field.Packed.to_bits_unsafe s)
     in
@@ -376,7 +456,7 @@ struct
           Split_commitments.combine pcs_batch ~xi without_degree_bound
             with_degree_bound
         in
-        let lr_prod, challenges = bullet_reduce sponge lr in
+        let lr_prod, challenges = bullet_reduce ~mask:rounds_mask sponge lr in
         let p_prime =
           let uc = scale_fast u combined_inner_product in
           combined_polynomial + uc
@@ -511,6 +591,11 @@ struct
             (ones_vector (module Impl) ~first_zero:actual_width Max_branching.n)
             sg_old
             ~f:(fun keep sg -> [| (keep, sg) |]))
+    in
+    let rounds_mask =
+      mask
+        (Vector.map step_domains ~f:(fun d -> Domain.log2_size d.h))
+        which_branch
     in
     with_label __LOC__ (fun () ->
         let receive ty f =
@@ -659,7 +744,7 @@ struct
               ]
               (snd (Max_branching.add Nat.N8.n))
           in
-          check_bulletproof
+          check_bulletproof ~rounds_mask
             ~pcs_batch:
               (Common.dlog_pcs_batch
                  (Max_branching.add Nat.N8.n)
@@ -717,7 +802,12 @@ struct
     Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
         scalar prechallenge)
 
-  let b_poly = Field.(b_poly ~add ~mul ~one)
+  let b_poly =
+    Field.(
+      b_poly
+        ~is_non_zero:(fun x -> Boolean.not Field.(equal zero x))
+        ~square_if:(fun b x -> Field.if_ b ~then_:(Field.square x) ~else_:x)
+        ~add ~mul ~one)
 
   let pack_scalar_challenge (Pickles_types.Scalar_challenge.Scalar_challenge t)
       =

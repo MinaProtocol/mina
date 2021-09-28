@@ -456,7 +456,13 @@ struct
         Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
             scalar prechallenge))
 
-  let b_poly = Field.(Dlog_main.b_poly ~add ~mul ~one)
+  let b_poly =
+    Field.(
+      (* The dlog proofs all have the same size so no
+         need to handle trimming. *)
+      Dlog_main.b_poly ~add ~mul ~one
+        ~square_if:(fun _b x -> Field.square x)
+        ~is_non_zero:(fun _ -> Boolean.false_))
 
   module Pseudo = Pseudo.Make (Impl)
 

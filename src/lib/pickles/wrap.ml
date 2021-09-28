@@ -18,7 +18,11 @@ let vector_of_list (type a t)
   List.iter xs ~f:(V.emplace_back r) ;
   r
 
-let b_poly = Tick.Field.(Dlog_main.b_poly ~add ~mul ~one)
+let b_poly =
+  Tick.Field.(
+    Dlog_main.b_poly ~add ~mul ~one
+      ~square_if:(fun b x -> if b then square x else x)
+      ~is_non_zero:(fun x -> not (equal zero x)))
 
 let combined_inner_product (type actual_branching)
     ~actual_branching:(module AB : Nat.Add.Intf with type n = actual_branching)
