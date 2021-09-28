@@ -1404,160 +1404,162 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; token_symbol
       }
 
+  module Inputs = struct
+    module First_party = Party.Signed
+
+    module Global_state = struct
+      type t =
+        { ledger : L.t
+        ; fee_excess : Amount.t
+        ; protocol_state : Snapp_predicate.Protocol_state.View.t
+        }
+    end
+
+    module Bool = struct
+      type t = bool
+
+      let assert_ b = assert b
+
+      let if_ = Parties.value_if
+
+      let true_ = true
+
+      let false_ = false
+
+      let equal = Bool.equal
+
+      let not = not
+
+      let ( ||| ) = ( || )
+
+      let ( &&& ) = ( && )
+    end
+
+    module Ledger = struct
+      type t = L.t
+
+      let if_ = Parties.value_if
+
+      let empty = L.empty
+    end
+
+    module Transaction_commitment = struct
+      type t = unit
+
+      let empty = ()
+
+      let if_ = Parties.value_if
+    end
+
+    module Account = struct
+      include Account
+    end
+
+    module Amount = struct
+      open Currency.Amount
+
+      type nonrec t = t
+
+      let if_ = Parties.value_if
+
+      module Signed = struct
+        include Signed
+
+        let is_pos (t : t) = Sgn.equal t.sgn Pos
+      end
+
+      let zero = zero
+
+      let add_flagged = add_flagged
+
+      let add_signed_flagged (x1 : t) (x2 : Signed.t) : t * [ `Overflow of bool ]
+          =
+        let y, `Overflow b = Signed.(add_flagged (of_unsigned x1) x2) in
+        match y.sgn with
+        | Pos ->
+            (y.magnitude, `Overflow b)
+        | Neg ->
+            (* We want to capture the accurate value so that this will match
+               with the values in the snarked logic.
+            *)
+            let magnitude =
+              Amount.to_uint64 y.magnitude
+              |> Unsigned.UInt64.(mul (sub zero one))
+              |> Amount.of_uint64
+            in
+            (magnitude, `Overflow true)
+    end
+
+    module Token_id = struct
+      include Token_id
+
+      let if_ = Parties.value_if
+    end
+
+    module Party = Party
+
+    module Parties = struct
+      module Opt = struct
+        type 'a t = 'a option
+
+        let is_some = Option.is_some
+
+        let map = Option.map
+
+        let or_default ~if_ x ~default =
+          if_ (is_some x) ~then_:(Option.value ~default x) ~else_:default
+
+        let or_exn x = Option.value_exn x
+      end
+
+      type party_or_stack = (Party.t, unit) Parties.Party_or_stack.t
+
+      type t = party_or_stack list
+
+      let of_parties_list : Party.t list -> t =
+        Parties.Party_or_stack.of_parties_list
+          ~party_depth:(fun (p : Party.t) -> p.data.body.depth)
+
+      let if_ = Parties.value_if
+
+      let empty = []
+
+      let is_empty = List.is_empty
+
+      let pop_exn : t -> party_or_stack * t = function
+        | [] ->
+            failwith "pop_exn"
+        | x :: xs ->
+            (x, xs)
+
+      let as_stack : party_or_stack -> t option = function
+        | Party _ ->
+            None
+        | Stack (x, ()) ->
+            Some x
+
+      let pop_party_exn : t -> Party.t * t = function
+        | Party (x, ()) :: xs ->
+            (x, xs)
+        | _ ->
+            failwith "pop_party_exn"
+
+      let pop_stack : t -> (t * t) option = function
+        | Stack (x, ()) :: xs ->
+            Some (x, xs)
+        | _ ->
+            None
+
+      let push_stack x ~onto : t = Stack (x, ()) :: onto
+    end
+  end
+
+  module M = Parties_logic.Make (Inputs)
+
   let apply_parties_unchecked
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(state_view : Snapp_predicate.Protocol_state.View.t) (ledger : L.t)
       (c : Parties.t) : (Transaction_applied.Parties_applied.t * _) Or_error.t =
-    let module Inputs = struct
-      module First_party = Party.Signed
-
-      module Global_state = struct
-        type t =
-          { ledger : L.t
-          ; fee_excess : Amount.t
-          ; protocol_state : Snapp_predicate.Protocol_state.View.t
-          }
-      end
-
-      module Bool = struct
-        type t = bool
-
-        let assert_ b = assert b
-
-        let if_ = Parties.value_if
-
-        let true_ = true
-
-        let false_ = false
-
-        let equal = Bool.equal
-
-        let not = not
-
-        let ( ||| ) = ( || )
-
-        let ( &&& ) = ( && )
-      end
-
-      module Ledger = struct
-        type t = L.t
-
-        let if_ = Parties.value_if
-
-        let empty = L.empty
-      end
-
-      module Transaction_commitment = struct
-        type t = unit
-
-        let empty = ()
-
-        let if_ = Parties.value_if
-      end
-
-      module Account = struct
-        include Account
-      end
-
-      module Amount = struct
-        open Currency.Amount
-
-        type nonrec t = t
-
-        let if_ = Parties.value_if
-
-        module Signed = struct
-          include Signed
-
-          let is_pos (t : t) = Sgn.equal t.sgn Pos
-        end
-
-        let zero = zero
-
-        let add_flagged = add_flagged
-
-        let add_signed_flagged (x1 : t) (x2 : Signed.t) :
-            t * [ `Overflow of bool ] =
-          let y, `Overflow b = Signed.(add_flagged (of_unsigned x1) x2) in
-          match y.sgn with
-          | Pos ->
-              (y.magnitude, `Overflow b)
-          | Neg ->
-              (* We want to capture the accurate value so that this will match
-                 with the values in the snarked logic.
-              *)
-              let magnitude =
-                Amount.to_uint64 y.magnitude
-                |> Unsigned.UInt64.(mul (sub zero one))
-                |> Amount.of_uint64
-              in
-              (magnitude, `Overflow true)
-      end
-
-      module Token_id = struct
-        include Token_id
-
-        let if_ = Parties.value_if
-      end
-
-      module Party = Party
-
-      module Parties = struct
-        module Opt = struct
-          type 'a t = 'a option
-
-          let is_some = Option.is_some
-
-          let map = Option.map
-
-          let or_default ~if_ x ~default =
-            if_ (is_some x) ~then_:(Option.value ~default x) ~else_:default
-
-          let or_exn x = Option.value_exn x
-        end
-
-        type party_or_stack = (Party.t, unit) Parties.Party_or_stack.t
-
-        type t = party_or_stack list
-
-        let of_parties_list : Party.t list -> t =
-          Parties.Party_or_stack.of_parties_list
-            ~party_depth:(fun (p : Party.t) -> p.data.body.depth)
-
-        let if_ = Parties.value_if
-
-        let empty = []
-
-        let is_empty = List.is_empty
-
-        let pop_exn : t -> party_or_stack * t = function
-          | [] ->
-              failwith "pop_exn"
-          | x :: xs ->
-              (x, xs)
-
-        let as_stack : party_or_stack -> t option = function
-          | Party _ ->
-              None
-          | Stack (x, ()) ->
-              Some x
-
-        let pop_party_exn : t -> Party.t * t = function
-          | Party (x, ()) :: xs ->
-              (x, xs)
-          | _ ->
-              failwith "pop_party_exn"
-
-        let pop_stack : t -> (t * t) option = function
-          | Stack (x, ()) :: xs ->
-              Some (x, xs)
-          | _ ->
-              None
-
-        let push_stack x ~onto : t = Stack (x, ()) :: onto
-      end
-    end in
-    let module M = Parties_logic.Make (Inputs) in
     let module Env = struct
       open Inputs
 
