@@ -21,7 +21,7 @@ body:
       options:
         - label: "This issue is not a duplicate. Before opening a new issue, please search existing issues: https://github.com/MinaProtocol/mina/issues"
           required: true
-        - label: "This issue is not a question, feature request, RFC, or anything other than a bug report. Please post those things in GitHub Discussions: https://github.com/MinaProtocol/issues-experiment/discussions"
+        - label: "This issue is not a question, feature request, RFC, or anything other than a bug report. Please post those things in GitHub Discussions: https://github.com/MinaProtocol/mina/discussions"
           required: true
   - type: textarea
     validations:
