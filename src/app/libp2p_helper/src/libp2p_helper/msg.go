@@ -134,9 +134,11 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	}
 	bannedPeers := peer.NewSet()
 	err = capnpPeerIdListForeach(bannedPeerIds, func(peerID string) error {
-		id := peer.ID(peerID)
-		bannedPeers.Add(id)
-		return nil
+		id, err := peer.Decode(peerID)
+		if err == nil {
+			bannedPeers.Add(id)
+		}
+		return err
 	})
 	if err != nil {
 		return nil, err

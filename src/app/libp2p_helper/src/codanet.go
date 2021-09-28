@@ -579,7 +579,7 @@ func (h *Helper) handleNodeStatusStreams(s network.Stream) {
 		logger.Error("failed to write to stream", err)
 		return
 	} else if n != len(h.NodeStatus) {
-    // TODO repeat writing, not log error
+		// TODO repeat writing, not log error
 		logger.Error("failed to write all data to stream")
 		return
 	}

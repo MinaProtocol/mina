@@ -31,6 +31,16 @@ func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
 
+	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
+		app.updateConnectionMetrics()
+		app.writeMsg(mkPeerConnectedUpcall(peer.Encode(c.RemotePeer())))
+	}
+
+	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
+		app.updateConnectionMetrics()
+		app.writeMsg(mkPeerDisconnectedUpcall(peer.Encode(c.RemotePeer())))
+	}
+
 	for _, info := range app.AddedPeers {
 		app.P2p.Logger.Debug("Trying to connect to: ", info)
 		err := app.P2p.Host.Connect(app.Ctx, info)
@@ -88,7 +98,7 @@ func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) *capnp.Message {
 		routingDiscovery := discovery.NewRoutingDiscovery(app.P2p.Dht)
 		if routingDiscovery == nil {
 			err := errors.New("failed to create routing discovery")
-			return mkRpcRespError(seqno, err)
+			return mkRpcRespError(seqno, badp2p(err))
 		}
 
 		app.P2p.Discovery = routingDiscovery
@@ -121,22 +131,6 @@ func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) *capnp.Message {
 				}
 			}
 		}()
-	}
-
-	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
-		app.updateConnectionMetrics()
-
-		id := c.RemotePeer()
-
-		app.writeMsg(mkPeerConnectedUpcall(peer.Encode(id)))
-	}
-
-	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
-		app.updateConnectionMetrics()
-
-		id := c.RemotePeer()
-
-		app.writeMsg(mkPeerDisconnectedUpcall(peer.Encode(id)))
 	}
 
 	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
