@@ -1554,36 +1554,37 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     end
   end
 
+  module Env = struct
+    open Inputs
+
+    type t =
+      < party : Party.t
+      ; parties : Parties.t
+      ; account : Account.t
+      ; ledger : Ledger.t
+      ; amount : Amount.t
+      ; bool : Bool.t
+      ; token_id : Token_id.t
+      ; global_state : Global_state.t
+      ; inclusion_proof : [ `Existing of location | `New ]
+      ; local_state :
+          ( Parties.t
+          , Token_id.t
+          , Amount.t
+          , L.t
+          , bool
+          , Transaction_commitment.t )
+          Parties_logic.Local_state.t
+      ; protocol_state_predicate : Snapp_predicate.Protocol_state.t
+      ; transaction_commitment : unit >
+  end
+
   module M = Parties_logic.Make (Inputs)
 
   let apply_parties_unchecked
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(state_view : Snapp_predicate.Protocol_state.View.t) (ledger : L.t)
       (c : Parties.t) : (Transaction_applied.Parties_applied.t * _) Or_error.t =
-    let module Env = struct
-      open Inputs
-
-      type t =
-        < party : Party.t
-        ; parties : Parties.t
-        ; account : Account.t
-        ; ledger : Ledger.t
-        ; amount : Amount.t
-        ; bool : Bool.t
-        ; token_id : Token_id.t
-        ; global_state : Global_state.t
-        ; inclusion_proof : [ `Existing of location | `New ]
-        ; local_state :
-            ( Parties.t
-            , Token_id.t
-            , Amount.t
-            , L.t
-            , bool
-            , Transaction_commitment.t )
-            Parties_logic.Local_state.t
-        ; protocol_state_predicate : Snapp_predicate.Protocol_state.t
-        ; transaction_commitment : unit >
-    end in
     let original_account_states =
       List.map (Parties.accounts_accessed c) ~f:(fun id ->
           ( id
