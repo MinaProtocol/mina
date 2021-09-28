@@ -343,6 +343,14 @@ module type S = sig
     val user_command_status : t -> Transaction_status.t
   end
 
+  module Global_state : sig
+    type t =
+      { ledger : ledger
+      ; fee_excess : Amount.t
+      ; protocol_state : Snapp_predicate.Protocol_state.View.t
+      }
+  end
+
   val apply_user_command :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> txn_global_slot:Global_slot.t
@@ -372,6 +380,39 @@ module type S = sig
            Parties_logic.Local_state.t
          * Amount.t ) )
        Or_error.t
+
+  (** Apply all parties within a parties transaction. This behaves as
+      [apply_parties_unchecked], except that the [~init] and [~f] arguments
+      are provided to allow for the accumulation of the intermediate states.
+
+      Invariant: [f] is always applied at least once, so it is valid to use an
+      [_ option] as the initial state and call [Option.value_exn] on the
+      accumulated result.
+
+      This can be used to collect the intermediate states to make them
+      available for snark work. In particular, since the transaction snark has
+      a cap on the number of parties of each kind that may be included, we can
+      use this to retrieve the (source, target) pairs for each batch of
+      parties to include in the snark work spec / transaction snark witness.
+  *)
+  val apply_parties_unchecked_aux :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> state_view:Snapp_predicate.Protocol_state.View.t
+    -> init:'acc
+    -> f:
+         (   'acc
+          -> Global_state.t
+             * ( (Party.t, unit) Parties.Party_or_stack.t list
+               , Token_id.t
+               , Amount.t
+               , ledger
+               , bool
+               , unit )
+               Parties_logic.Local_state.t
+          -> 'acc)
+    -> ledger
+    -> Parties.t
+    -> (Transaction_applied.Parties_applied.t * 'acc) Or_error.t
 
   val apply_fee_transfer :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -1404,16 +1445,17 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; token_symbol
       }
 
+  module Global_state = struct
+    type t =
+      { ledger : L.t
+      ; fee_excess : Amount.t
+      ; protocol_state : Snapp_predicate.Protocol_state.View.t
+      }
+  end
+
   module Inputs = struct
     module First_party = Party.Signed
-
-    module Global_state = struct
-      type t =
-        { ledger : L.t
-        ; fee_excess : Amount.t
-        ; protocol_state : Snapp_predicate.Protocol_state.View.t
-        }
-    end
+    module Global_state = Global_state
 
     module Bool = struct
       type t = bool
@@ -1646,10 +1688,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   module M = Parties_logic.Make (Inputs)
 
-  let apply_parties_unchecked
+  let apply_parties_unchecked_aux (type user_acc)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~(state_view : Snapp_predicate.Protocol_state.View.t) (ledger : L.t)
-      (c : Parties.t) : (Transaction_applied.Parties_applied.t * _) Or_error.t =
+      ~(state_view : Snapp_predicate.Protocol_state.View.t) ~(init : user_acc)
+      ~(f : user_acc -> _ -> user_acc) (ledger : L.t) (c : Parties.t) :
+      (Transaction_applied.Parties_applied.t * user_acc) Or_error.t =
     let original_account_states =
       List.map (Parties.accounts_accessed c) ~f:(fun id ->
           ( id
@@ -1661,18 +1704,29 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let perform eff =
       Env.perform ~constraint_constants ~state_view ledger eff
     in
-    let rec step_all
-        ( ((g : Inputs.Global_state.t), (l : _ Parties_logic.Local_state.t)) as
-        acc ) =
-      if List.is_empty l.parties then Ok acc
+    let rec step_all user_acc
+        ((g : Inputs.Global_state.t), (l : _ Parties_logic.Local_state.t)) :
+        user_acc Or_error.t =
+      if List.is_empty l.parties then Ok user_acc
       else
         match M.step ~constraint_constants { perform } (g, l) with
         | exception e ->
             Error (Error.of_exn ~backtrace:`Get e)
         | s ->
-            step_all s
+            step_all (f user_acc s) s
     in
-    let init () : Inputs.Global_state.t * _ =
+    let initial_state : Inputs.Global_state.t * _ Parties_logic.Local_state.t =
+      ( { protocol_state = state_view; ledger; fee_excess = Amount.zero }
+      , { parties = []
+        ; call_stack = []
+        ; transaction_commitment = ()
+        ; token_id = Token_id.invalid
+        ; excess = Currency.Amount.zero
+        ; ledger
+        ; success = true
+        } )
+    in
+    let start : Inputs.Global_state.t * _ =
       let parties =
         let p = c.fee_payer in
         { Party.authorization = Control.Signature p.authorization
@@ -1685,25 +1739,17 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         { parties = Inputs.Parties.of_parties_list parties
         ; protocol_state_predicate = c.protocol_state
         }
-        { perform }
-        ( { protocol_state = state_view; ledger; fee_excess = Amount.zero }
-        , { parties = []
-          ; call_stack = []
-          ; transaction_commitment = ()
-          ; token_id = Token_id.invalid
-          ; excess = Currency.Amount.zero
-          ; ledger
-          ; success = true
-          } )
+        { perform } initial_state
     in
     let accounts () =
       List.map original_account_states
         ~f:(Tuple2.map_snd ~f:(Option.map ~f:snd))
     in
-    match step_all (init ()) with
+    let user_acc = f init initial_state in
+    match step_all (f user_acc start) start with
     | Error e ->
         Error e
-    | Ok (global_state, local_state) ->
+    | Ok s ->
         Ok
           ( { accounts = accounts ()
             ; command =
@@ -1721,7 +1767,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                         } )
                 }
             }
-          , (local_state, global_state.fee_excess) )
+          , s )
+
+  let apply_parties_unchecked ~constraint_constants ~state_view ledger c =
+    apply_parties_unchecked_aux ~constraint_constants ~state_view ledger c
+      ~init:None ~f:(fun _acc (global_state, local_state) ->
+        Some (local_state, global_state.fee_excess))
+    |> Result.map ~f:(fun (party_applied, state_res) ->
+           (party_applied, Option.value_exn state_res))
 
   let update_timing_when_no_deduction ~txn_global_slot account =
     validate_timing ~txn_amount:Amount.zero ~txn_global_slot ~account

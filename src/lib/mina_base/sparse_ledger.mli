@@ -28,6 +28,16 @@ module Stable : sig
   end
 end]
 
+type sparse_ledger = t
+
+module Global_state : sig
+  type t =
+    { ledger : sparse_ledger
+    ; fee_excess : Currency.Amount.t
+    ; protocol_state : Snapp_predicate.Protocol_state.View.t
+    }
+end
+
 val merkle_root : t -> Ledger_hash.t
 
 val depth : t -> int
@@ -64,6 +74,27 @@ val apply_transaction_exn :
   -> t
   -> Transaction.t
   -> t
+
+(** Apply all parties within a parties transaction, accumulating the
+    intermediate (global, local) state pairs, in order from first to last
+    party.
+*)
+val apply_parties_unchecked_with_states :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> state_view:Snapp_predicate.Protocol_state.View.t
+  -> t
+  -> Parties.t
+  -> ( Transaction_logic.Transaction_applied.Parties_applied.t
+     * ( Global_state.t
+       * ( (Party.t, unit) Parties.Party_or_stack.t list
+         , Token_id.t
+         , Currency.Amount.t
+         , t
+         , bool
+         , unit )
+         Parties_logic.Local_state.t )
+       list )
+     Or_error.t
 
 val of_any_ledger : Ledger.Any_ledger.M.t -> t
 

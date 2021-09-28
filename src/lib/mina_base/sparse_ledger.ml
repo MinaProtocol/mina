@@ -31,6 +31,8 @@ module Stable = struct
   end
 end]
 
+type sparse_ledger = t
+
 module Hash = struct
   include Ledger_hash
 
@@ -43,6 +45,15 @@ module Account = struct
   let data_hash = Fn.compose Ledger_hash.of_digest Account.digest
 end
 
+module Global_state = struct
+  type t =
+    { ledger : sparse_ledger
+    ; fee_excess : Currency.Amount.t
+    ; protocol_state : Snapp_predicate.Protocol_state.View.t
+    }
+end
+
+module GS = Global_state
 module M =
   Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Token_id) (Account_id) (Account)
 
@@ -155,6 +166,21 @@ M.
   , merkle_root
   , iteri
   , next_available_token )]
+
+let apply_parties_unchecked_with_states ~constraint_constants ~state_view ledger
+    c =
+  let open T in
+  apply_parties_unchecked_aux ~constraint_constants ~state_view (ref ledger) c
+    ~init:[]
+    ~f:(fun acc ({ ledger; fee_excess; protocol_state }, local_state) ->
+      ( { GS.ledger = !ledger; fee_excess; protocol_state }
+      , { local_state with ledger = !(local_state.ledger) } )
+      :: acc)
+  |> Result.map ~f:(fun (party_applied, states) ->
+         (* We perform a [List.rev] here to ensure that the states are in order
+            wrt. the parties that generated the states.
+         *)
+         (party_applied, List.rev states))
 
 let of_root ~depth ~next_available_token (h : Ledger_hash.t) =
   of_hash ~depth ~next_available_token
