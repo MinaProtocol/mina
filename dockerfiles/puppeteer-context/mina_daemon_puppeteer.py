@@ -81,6 +81,7 @@ def start_daemon():
     )
   print("puppeteer script: touching /root/daemon-active" )
   Path('daemon-active').touch()
+  print("puppeteer script: daemon fully started" )
 
 def stop_daemon():
   print("puppeteer script: stop_daemon called" )
@@ -98,6 +99,7 @@ def stop_daemon():
   print("puppeteer script: removing /root/daemon-active" )
   Path('daemon-active').unlink()
   mina_process = None
+  print("puppeteer script: daemon fully stopped" )
 
 # technically, doing the loops like this will eventually result in a stack overflow
 # however, you would need to do a lot of starts and stops to hit this condition
