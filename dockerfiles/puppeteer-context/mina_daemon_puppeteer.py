@@ -82,7 +82,7 @@ def start_daemon():
   print("puppeteer script: touching /root/daemon-active" )
   Path('daemon-active').touch()
   print("puppeteer script: daemon fully started" )
-  print('{"puppeteer_script_event": true, "event_type": "node_initialized"')
+  # print('{"puppeteer_script_event": true, "event_type": "node_initialized"')
 
 def stop_daemon():
   print("puppeteer script: stop_daemon called" )
