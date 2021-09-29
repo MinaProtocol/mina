@@ -467,6 +467,32 @@ module type S = sig
     t -> t -> sok_digest:Sok_message.Digest.t -> t Async.Deferred.Or_error.t
 end
 
+(** [group_by_parties_rev partiess stmtss] identifies before/after pairs of
+    statements, corresponding to parties in [partiess] which minimize the
+    number of snark proofs needed to prove all of the parties.
+
+    This function is intended to take the parties from multiple transactions as
+    its input, which may be converted from a [Parties.t list] using
+    [List.map ~f:Parties.parties]. The [stmtss] argument should be a list of
+    the same length, with 1 more state than the number of parties for each
+    transaction.
+
+    For example, two transactions made up of parties [[p1; p2; p3]] and
+    [[p4; p5]] should have the statements [[[s0; s1; s2; s3]; [s3; s4; s5]]],
+    where each [s_n] is the state after applying [p_n] on top of [s_{n-1}], and
+    where [s0] is the initial state before any of the transactions have been
+    applied.
+
+    Each pair is also identified with one of [`Same], [`New], or [`Two_new],
+    indicating that the next one ([`New]) or next two ([`Two_new]) [Parties.t]s
+    will need to be passed as part of the snark witness while applying that
+    pair.
+*)
+val group_by_parties_rev :
+     Party.t list list
+  -> 'a list list
+  -> ([ `Same | `New | `Two_new ] * 'a * 'a) list
+
 module Make (Inputs : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 

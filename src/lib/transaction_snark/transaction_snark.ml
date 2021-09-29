@@ -3464,6 +3464,163 @@ let constraint_system_digests ~constraint_constants () =
             (main ~constraint_constants)) )
   ]
 
+(** [group_by_parties_rev partiess stmtss] identifies before/after pairs of
+    statements, corresponding to parties in [partiess] which minimize the
+    number of snark proofs needed to prove all of the parties.
+
+    This function is intended to take the parties from multiple transactions as
+    its input, which may be converted from a [Parties.t list] using
+    [List.map ~f:Parties.parties]. The [stmtss] argument should be a list of
+    the same length, with 1 more state than the number of parties for each
+    transaction.
+
+    For example, two transactions made up of parties [[p1; p2; p3]] and
+    [[p4; p5]] should have the statements [[[s0; s1; s2; s3]; [s3; s4; s5]]],
+    where each [s_n] is the state after applying [p_n] on top of [s_{n-1}], and
+    where [s0] is the initial state before any of the transactions have been
+    applied.
+
+    Each pair is also identified with one of [`Same], [`New], or [`Two_new],
+    indicating that the next one ([`New]) or next two ([`Two_new]) [Parties.t]s
+    will need to be passed as part of the snark witness while applying that
+    pair.
+*)
+let group_by_parties_rev partiess stmtss =
+  (* Maintainance note: this function could easily be moved to anywhere else
+     in the codebase that isn't a dependency of [Mina_base.Party], and it might
+     seem convenient to move it.
+     However, care must be taken to avoid the logic here falling out of sync
+     with the logic for the snark. If it is possible to make the desired use
+     work without separating it from this snark logic, it is better to keep it
+     here, to increase the chances that this remains correct and in sync.
+  *)
+  let rec group_by_parties_rev partiess stmtss acc =
+    match (partiess, stmtss) with
+    | ([] | [ [] ]), [ _ ] ->
+        (* We've associated statements with all given parties. *)
+        acc
+    | [ [ { Party.authorization = _; _ } ] ], [ [ before; after ] ] ->
+        (* There are no later parties to pair this one with. Prove it on its
+           own.
+        *)
+        (`Same, before, after) :: acc
+    | [ []; [ { Party.authorization = _; _ } ] ], [ [ _ ]; [ before; after ] ]
+      ->
+        (* This party is part of a new transaction, and there are no later
+           parties to pair it with. Prove it on its own.
+        *)
+        (`New, before, after) :: acc
+    | ( ({ Party.authorization = Proof _; _ } :: parties) :: partiess
+      , (before :: (after :: _ as stmts)) :: stmtss ) ->
+        (* This party contains a proof, don't pair it with other parties. *)
+        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+          ((`Same, before, after) :: acc)
+    | ( [] :: ({ Party.authorization = Proof _; _ } :: parties) :: partiess
+      , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
+        (* This party is part of a new transaction, and contains a proof, don't
+           pair it with other parties.
+        *)
+        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+          ((`New, before, after) :: acc)
+    | ( ({ Party.authorization = _; _ }
+        :: ({ Party.authorization = Proof _; _ } :: _ as parties))
+        :: partiess
+      , (before :: (after :: _ as stmts)) :: stmtss ) ->
+        (* The next party contains a proof, don't pair it with this party. *)
+        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+          ((`Same, before, after) :: acc)
+    | ( ({ Party.authorization = _; _ } :: ([] as parties))
+        :: (({ Party.authorization = Proof _; _ } :: _) :: _ as partiess)
+      , (before :: (after :: _ as stmts)) :: stmtss ) ->
+        (* The next party is in the next transaction and contains a proof,
+           don't pair it with this party.
+        *)
+        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+          ((`Same, before, after) :: acc)
+    | ( (_ :: _ :: parties) :: partiess
+      , (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
+        (* The next two parties do not contain proofs, and are within the same
+           transaction. Pair them.
+        *)
+        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+          ((`Same, before, after) :: acc)
+    | ( [] :: (_ :: _ :: parties) :: partiess
+      , [ _ ] :: (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
+        (* The next two parties do not contain proofs, and are within the same
+           new transaction. Pair them.
+        *)
+        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+          ((`New, before, after) :: acc)
+    | ( [ _ ] :: (_ :: parties) :: partiess
+      , (before :: _after1) :: (_before2 :: (after :: _ as stmts)) :: stmtss )
+      ->
+        (* The next two parties do not contain proofs, and the second is within
+           a new transaction. Pair them.
+        *)
+        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+          ((`New, before, after) :: acc)
+    | ( [] :: [ _ ] :: (_ :: parties) :: partiess
+      , [ _ ]
+        :: [ before; _after1 ] :: (_before2 :: (after :: _ as stmts)) :: stmtss
+      ) ->
+        (* The next two parties do not contain proofs, the first is within a
+           new transaction, and the second is within another new transaction.
+           Pair them.
+        *)
+        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+          ((`Two_new, before, after) :: acc)
+    | [ [ _ ] ], (before :: after :: _) :: _ ->
+        (* This party is the final party given. Prove it on its own. *)
+        (`Same, before, after) :: acc
+    | [] :: [ _ ] :: [] :: _, [ _ ] :: (before :: after :: _) :: _ ->
+        (* This party is the final party given, in a new transaction. Prove it
+           on its own.
+        *)
+        (`New, before, after) :: acc
+    | _, [] ->
+        failwith "group_by_parties_rev: No statements remaining"
+    | ([] | [ [] ]), _ ->
+        failwith "group_by_parties_rev: Unmatched statements remaining"
+    | [] :: _, [] :: _ ->
+        failwith
+          "group_by_parties_rev: No final statement for current transaction"
+    | [] :: _, (_ :: _ :: _) :: _ ->
+        failwith
+          "group_by_parties_rev: Unmatched statements for current transaction"
+    | [] :: [ _ ] :: _, [ _ ] :: (_ :: _ :: _ :: _) :: _ ->
+        failwith
+          "group_by_parties_rev: Unmatched statements for next transaction"
+    | [ []; [ _ ] ], [ _ ] :: [ _; _ ] :: _ :: _ ->
+        failwith
+          "group_by_parties_rev: Unmatched statements after next transaction"
+    | (_ :: _) :: _, ([] | [ _ ]) :: _ | (_ :: _ :: _) :: _, [ _; _ ] :: _ ->
+        failwith
+          "group_by_parties_rev: Too few statements remaining for the current \
+           transaction"
+    | ([] | [ _ ]) :: [] :: _, _ ->
+        failwith "group_by_parties_rev: The next transaction has no parties"
+    | [] :: (_ :: _) :: _, _ :: ([] | [ _ ]) :: _
+    | [] :: (_ :: _ :: _) :: _, _ :: [ _; _ ] :: _ ->
+        failwith
+          "group_by_parties_rev: Too few statements remaining for the next \
+           transaction"
+    | [ _ ] :: (_ :: _) :: _, _ :: ([] | [ _ ]) :: _ ->
+        failwith
+          "group_by_parties_rev: Too few statements remaining for the next \
+           transaction"
+    | [] :: [ _ ] :: (_ :: _) :: _, _ :: _ :: ([] | [ _ ]) :: _ ->
+        failwith
+          "group_by_parties_rev: Too few statements remaining for the \
+           transaction after next"
+    | ([] | [ _ ]) :: (_ :: _) :: _, [ _ ] ->
+        failwith
+          "group_by_parties_rev: No statements given for the next transaction"
+    | [] :: [ _ ] :: (_ :: _) :: _, [ _; (_ :: _ :: _) ] ->
+        failwith
+          "group_by_parties_rev: No statements given for transaction after next"
+  in
+  group_by_parties_rev partiess stmtss []
+
 module Make (Inputs : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
