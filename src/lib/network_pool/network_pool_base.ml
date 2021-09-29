@@ -36,21 +36,21 @@ end)
         | Local f ->
             f (Error err)
         | External cb ->
-            fire_exn cb `Reject)
+            fire_if_not_already_fired cb `Reject)
 
     let drop accepted rejected =
       Fn.compose Deferred.return (function
         | Local f ->
             f (Ok (accepted, rejected))
         | External cb ->
-            fire_exn cb `Ignore)
+            fire_if_not_already_fired cb `Ignore)
 
     let forward broadcast_pipe accepted rejected = function
       | Local f ->
           f (Ok (accepted, rejected)) ;
           Linear_pipe.write broadcast_pipe accepted
       | External cb ->
-          fire_exn cb `Accept ;
+          fire_if_not_already_fired cb `Accept ;
           Deferred.unit
 
     let _replace broadcast_pipe accepted rejected = function
@@ -58,7 +58,7 @@ end)
           f (Ok (accepted, rejected)) ;
           Linear_pipe.write broadcast_pipe accepted
       | External cb ->
-          fire_exn cb `Ignore ;
+          fire_if_not_already_fired cb `Ignore ;
           Linear_pipe.write broadcast_pipe accepted
   end
 

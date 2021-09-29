@@ -55,9 +55,3 @@ let fire_if_not_already_fired cb result =
     if Ivar.is_full cb.signal then
       [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
     Ivar.fill cb.signal result )
-
-let fire_exn cb result =
-  if not (is_expired cb) then (
-    if Ivar.is_full cb.signal then
-      [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-    Ivar.fill cb.signal result )

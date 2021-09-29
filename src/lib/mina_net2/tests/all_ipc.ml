@@ -93,7 +93,7 @@ let%test_module "all-ipc test" =
           raise UnexpectedState
       | Remote p ->
           assert (String.equal p.peer_id expected_sender) ) ;
-      Validation_callback.fire_exn cb vr
+      Validation_callback.fire_if_not_already_fired cb vr
 
     let mk_banning_gating_config peer_id =
       let fake_peer =

@@ -288,16 +288,6 @@ val open_stream :
 *)
 val reset_stream : t -> Libp2p_stream.t -> unit Deferred.Or_error.t
 
-(*
-TODO: protocol_handler
-
-  (** Returns the protocol string being handled. *)
-  val handling_protocol : t -> string
-
-  (** Whether [close t] has been called. *)
-  val is_closed : t -> bool
-*)
-
 (** Handle incoming streams for a protocol.
 
     [on_handler_error] determines what happens if the handler throws an

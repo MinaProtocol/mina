@@ -1,5 +1,3 @@
-(* TODO: [%%import "../../config.mlh"] *)
-
 open Core
 open Async
 open Network_peer
@@ -348,15 +346,15 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                   (* Messages from ourselves are valid. Don't try and reingest them. *)
                   match Envelope.Incoming.sender envelope with
                   | Local ->
-                      Mina_net2.Validation_callback.fire_exn validation_callback
-                        `Accept ;
+                      Mina_net2.Validation_callback.fire_if_not_already_fired
+                        validation_callback `Accept ;
                       Deferred.unit
                   | Remote sender ->
                       if not (Peer.Id.equal sender.peer_id my_peer_id) then
                         Strict_pipe.Writer.write message_writer
                           (envelope, validation_callback)
                       else (
-                        Mina_net2.Validation_callback.fire_exn
+                        Mina_net2.Validation_callback.fire_if_not_already_fired
                           validation_callback `Accept ;
                         Deferred.unit ))
                 ~bin_prot:Message.Latest.T.bin_msg

@@ -34,68 +34,46 @@ module Go_log = struct
   let record_of_yojson (json : Yojson.Safe.t) =
     let open Result.Let_syntax in
     let prefix = "Mina_net2.Go_log.record_of_yojson: " in
+    let string_of_yojson = function
+      | `String s ->
+          Ok s
+      | _ ->
+          Error "Expected a string"
+    in
+    let take_string map key =
+      match Map.find map key with
+      | Some json -> (
+          match string_of_yojson json with
+          | Ok value ->
+              Ok (value, Map.remove map key)
+          | Error err ->
+              Error
+                (Printf.sprintf "%sCould not parse field '%s': %s" prefix key
+                   err) )
+      | None ->
+          Error (Printf.sprintf "%sField '%s' is required" prefix key)
+    in
+    let rewrite_key map bad_key good_key =
+      match Map.find map bad_key with
+      | Some data -> (
+          match Map.remove map bad_key |> Map.add ~key:good_key ~data with
+          | `Ok map' ->
+              Ok map'
+          | `Duplicate ->
+              Error
+                (Printf.sprintf "%sField '%s' should not already exist" prefix
+                   good_key) )
+      | None ->
+          Ok map
+    in
     match json with
     | `Assoc fields ->
-        let set_field field_name prev_value parse json =
-          match prev_value with
-          | Some _ ->
-              Error
-                (prefix ^ "Field '" ^ field_name ^ "' appears multiple times")
-          | None ->
-              parse json
-              |> Result.map_error ~f:(fun err ->
-                     prefix ^ "Could not parse field '" ^ field_name ^ "':"
-                     ^ err)
-              |> Result.map ~f:Option.return
-        in
-        let get_field field_name value =
-          match value with
-          | Some x ->
-              Ok x
-          | None ->
-              Error (prefix ^ "Field '" ^ field_name ^ "' is required")
-        in
-        let string_of_yojson = function
-          | `String s ->
-              Ok s
-          | _ ->
-              Error "Expected a string"
-        in
-        let%bind ts, module_, level, msg, metadata =
-          List.fold_result ~init:(None, None, None, None, String.Map.empty)
-            fields ~f:(fun (ts, module_, level, msg, metadata) (field, json) ->
-              match field with
-              | "ts" ->
-                  let%map ts = set_field "ts" ts string_of_yojson json in
-                  (ts, module_, level, msg, metadata)
-              | "logger" ->
-                  let%map module_ =
-                    set_field "logger" module_ string_of_yojson json
-                  in
-                  (ts, module_, level, msg, metadata)
-              | "level" ->
-                  let%map level =
-                    set_field "level" level string_of_yojson json
-                  in
-                  (ts, module_, level, msg, metadata)
-              | "msg" ->
-                  let%map msg = set_field "msg" msg string_of_yojson json in
-                  (ts, module_, level, msg, metadata)
-              | _ ->
-                  let field =
-                    if String.equal field "error" then "go_error" else field
-                  in
-                  Ok
-                    ( ts
-                    , module_
-                    , level
-                    , msg
-                    , Map.set ~key:field ~data:json metadata ))
-        in
-        let%bind ts = get_field "ts" ts in
-        let%bind module_ = get_field "logger" module_ in
-        let%bind level = get_field "level" level in
-        let%map msg = get_field "msg" msg in
+        let obj = String.Map.of_alist_exn fields in
+        let%bind ts, obj = take_string obj "ts" in
+        let%bind module_, obj = take_string obj "logger" in
+        let%bind level, obj = take_string obj "level" in
+        let%bind msg, obj = take_string obj "msg" in
+        let%map metadata = rewrite_key obj "error" "go_error" in
         { ts; module_; level; msg; metadata }
     | _ ->
         Error (prefix ^ "Expected a JSON object")
@@ -211,10 +189,15 @@ let handle_incoming_message t msg ~handle_push_message =
       record_message_delay (RpcMessageHeader.time_sent_get rpc_header) ;
       ( match Hashtbl.find t.outstanding_requests sequence_number with
       | Some ivar ->
-          if Ivar.is_full ivar then failwith "TODO: log an error, don't crash"
+          if Ivar.is_full ivar then
+            [%log' error t.logger]
+              "Attempted fill outstanding libp2p_helper RPC request more than \
+               once"
           else Ivar.fill ivar (Libp2p_ipc.rpc_response_to_or_error rpc_response)
       | None ->
-          failwith "TODO" ) ;
+          [%log' error t.logger]
+            "Attempted to fill outstanding libp2p_helper RPC request, but not \
+             outstanding request was found" ) ;
       Deferred.unit
   | PushMessage push_msg ->
       let push_header = DaemonInterface.PushMessage.header_get push_msg in
@@ -253,13 +236,21 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
       trace_recurring_task "process libp2p_helper stderr" (fun () ->
           Child_processes.stderr process
           |> Strict_pipe.Reader.iter ~f:(fun line ->
-                 ( match
-                     line |> Yojson.Safe.from_string |> Go_log.record_of_yojson
-                   with
+                 let record_result =
+                   let open Result.Let_syntax in
+                   let%bind json =
+                     try Ok (Yojson.Safe.from_string line)
+                     with Yojson.Json_error error ->
+                       Error
+                         (Printf.sprintf "Failed to parse json line: %s" error)
+                   in
+                   Go_log.record_of_yojson json
+                 in
+                 ( match record_result with
                  | Ok record ->
                      record |> Go_log.record_to_message |> Logger.raw logger
                  | Error error ->
-                     [%log' error logger]
+                     [%log error]
                        "failed to parse record over libp2p_helper stderr: \
                         $error"
                        ~metadata:[ ("error", `String error) ] ) ;
@@ -271,8 +262,13 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
                | Ok msg ->
                    msg |> Libp2p_ipc.Reader.DaemonInterface.Message.get
                    |> handle_incoming_message t ~handle_push_message
-               | Error _err ->
-                   failwith "TODO: handle the error")) ;
+               | Error error ->
+                   [%log error]
+                     "failed to parse IPC message over libp2p_helper stdout: \
+                      $error"
+                     ~metadata:
+                       [ ("error", `String (Error.to_string_hum error)) ] ;
+                   Deferred.unit)) ;
       Or_error.return t
 
 let shutdown t =

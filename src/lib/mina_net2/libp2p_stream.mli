@@ -7,7 +7,7 @@ type t
 
 val id : t -> Libp2p_ipc.stream_id
 
-(** Open a new stream to a remote peer. *)
+(** Open a new stream to a remote peer. [release_stream] is called once the stream will no longer be used (for cleaning up any references to stream related data). *)
 val open_ :
      logger:Logger.t
   -> helper:Libp2p_helper.t
@@ -16,7 +16,7 @@ val open_ :
   -> release_stream:(Libp2p_ipc.stream_id -> unit)
   -> t Deferred.Or_error.t
 
-(** Create a new stream type from an existing stream. *)
+(** Create a new stream type from an existing stream. [release_stream] is called once the stream will no longer be used (for cleaning up any references to stream related data). *)
 val create_from_existing :
      logger:Logger.t
   -> helper:Libp2p_helper.t
