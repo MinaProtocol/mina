@@ -1,5 +1,5 @@
-import { uint32 as $$uint32 } from './TSTypes';
-import { uint64 as $$uint64 } from './TSTypes';
+import type { uint32 as $$uint32 } from './TSTypes';
+import type { uint64 as $$uint64 } from './TSTypes';
 export declare type publicKey = string;
 export declare type privateKey = string;
 export declare type uint64 = $$uint64;
