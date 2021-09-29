@@ -38,9 +38,7 @@ let log_filter_of_event_type =
          \"Fatal\")"
       ]
   | Event_type Node_offline ->
-      let filter =
-        Printf.sprintf "puppeteer script: removing /root/daemon-active"
-      in
+      let filter = Printf.sprintf "jsonPayload.event_type=\"node_offline\"" in
       [ filter ]
   | Event_type t ->
       let event_id =
@@ -257,6 +255,11 @@ type t =
 
 let event_reader { event_reader; _ } = event_reader
 
+module Puppeteer_message = struct
+  type t = { puppeteer_script_event : bool; event_type : string }
+  [@@deriving yojson]
+end
+
 let parse_event_from_log_entry ~network log_entry =
   let open Or_error.Let_syntax in
   let open Json_parsing in
@@ -267,13 +270,30 @@ let parse_event_from_log_entry ~network log_entry =
          ~default:
            (Or_error.errorf "failed to find node by pod app id \"%s\"" app_id)
   in
-  let%bind log =
-    find
-      (parser_from_of_yojson Logger.Message.of_yojson)
-      log_entry [ "jsonPayload" ]
+  let event_id_existence =
+    find string log_entry [ "jsonPayload"; "event_id" ]
   in
-  let%map event = Event_type.parse_event log in
-  (node, event)
+  match event_id_existence with
+  | Ok _ ->
+      let%bind log =
+        find
+          (parser_from_of_yojson Logger.Message.of_yojson)
+          log_entry [ "jsonPayload" ]
+      in
+      let%map event = Event_type.parse_event log in
+      (node, event)
+  | Error _ -> (
+      let%map log =
+        find
+          (parser_from_of_yojson Puppeteer_message.of_yojson)
+          log_entry [ "jsonPayload" ]
+      in
+      match log.event_type with
+      | "node_offline" ->
+          let ev = Event_type.Event (Event_type.Node_offline, ()) in
+          (node, ev)
+      | _ ->
+          failwith "Could not process a puppeteer message from the logs" )
 
 let rec pull_subscription_in_background ~logger ~network ~event_writer
     ~subscription =
