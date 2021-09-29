@@ -37,6 +37,11 @@ let log_filter_of_event_type =
       [ "jsonPayload.level=(\"Warn\" OR \"Error\" OR \"Faulty_peer\" OR \
          \"Fatal\")"
       ]
+  | Event_type Node_offline ->
+      let filter =
+        Printf.sprintf "puppeteer script: removing /root/daemon-active"
+      in
+      [ filter ]
   | Event_type t ->
       let event_id =
         to_structured_event_id (Event_type t)
