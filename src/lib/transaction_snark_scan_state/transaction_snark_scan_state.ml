@@ -282,20 +282,21 @@ let create_expected_statement ~constraint_constants
         pending_coinbase_with_state
   in
   let%bind fee_excess = Transaction.fee_excess transaction in
-  (* TODO: Not sure what the local_state should be in there. *)
+  (*TODO: source local state should `local_state_init` from the witness and target local state should be whatever `apply_parties_unchecked` returns. Do they have to be in the statement in the scan state? transaction snark*)
+  let local_state = Mina_state.Local_state.empty in
   let `Needs_some_work_for_snapps_on_mainnet = Mina_base.Util.todo_snapps in
   let%map supply_increase = Transaction.supply_increase transaction in
   { Transaction_snark.Statement.source =
       { ledger = source
       ; pending_coinbase_stack = statement.source.pending_coinbase_stack
       ; next_available_token = next_available_token_before
-      ; local_state = Mina_state.Local_state.empty
+      ; local_state
       }
   ; target =
       { ledger = target
       ; pending_coinbase_stack = pending_coinbase_after
       ; next_available_token = next_available_token_after
-      ; local_state = Mina_state.Local_state.empty
+      ; local_state
       }
   ; fee_excess
   ; supply_increase
@@ -542,20 +543,17 @@ struct
     | Error e ->
         M.return (Error (`Error e))
 
-  let check_invariants t (type a)
-      ~(pending_coinbase_stack_equal : a -> a -> bool)
-      ~(pending_coinbase_stack_equal' : a -> Pending_coinbase.Stack.t -> bool)
-      ~constraint_constants ~verifier ~error_prefix
+  let check_invariants t ~constraint_constants ~verifier ~error_prefix
       ~(registers_begin :
          ( Frozen_ledger_hash.t
-         , a
+         , Pending_coinbase.Stack.t
          , Token_id.t
          , Mina_state.Local_state.t )
          Mina_state.Registers.t
          option)
       ~(registers_end :
          ( Frozen_ledger_hash.t
-         , a
+         , Pending_coinbase.Stack.t
          , Token_id.t
          , Mina_state.Local_state.t )
          Mina_state.Registers.t) =
@@ -563,7 +561,7 @@ struct
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
     in
     let open M.Let_syntax in
-    let check_registers pc_eq (reg1 : _ Mina_state.Registers.t)
+    let check_registers (reg1 : _ Mina_state.Registers.t)
         (reg2 : _ Mina_state.Registers.t) =
       let open Or_error.Let_syntax in
       let%map () =
@@ -576,12 +574,8 @@ struct
           "did not connect with next available token"
       and () =
         clarify_error
-          (let `Needs_some_work_for_snapps_on_mainnet =
-             Mina_base.Util.todo_snapps
-           in
-           (* TODO: This should be the else branch, but is not because of an error in how certain things
-              are computed. This matches behavior on compatible. *)
-           true || pc_eq reg1.pending_coinbase_stack reg2.pending_coinbase_stack)
+          (Pending_coinbase.Stack.connected ~first:reg1.pending_coinbase_stack
+             ~second:reg2.pending_coinbase_stack)
           "did not connect with pending-coinbase stack"
       and () =
         clarify_error
@@ -600,8 +594,7 @@ struct
     | Error `Empty ->
         Option.value_map ~default:(Ok ()) registers_begin
           ~f:(fun registers_begin ->
-            check_registers pending_coinbase_stack_equal registers_begin
-              registers_end)
+            check_registers registers_begin registers_end)
     | Ok
         { fee_excess = { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
         ; source
@@ -612,11 +605,8 @@ struct
         let open Or_error.Let_syntax in
         let%map () =
           Option.value_map ~default:(Ok ()) registers_begin
-            ~f:(fun registers_begin ->
-              check_registers pending_coinbase_stack_equal' registers_begin
-                source)
-        and () =
-          check_registers pending_coinbase_stack_equal' registers_end target
+            ~f:(fun registers_begin -> check_registers registers_begin source)
+        and () = check_registers registers_end target
         and () =
           clarify_error
             (Fee.Signed.equal Fee.Signed.zero fee_excess_l)
@@ -885,16 +875,9 @@ let fill_work_and_enqueue_transactions t transactions work =
           Option.value_map ~default:curr_source old_proof
             ~f:(fun ((p', _), _) -> (Ledger_proof.statement p').target)
         in
-        let `Needs_some_work_for_snapps_on_mainnet =
-          Mina_base.Util.todo_snapps
-        in
-        (* This is not checking to match the behavior on compatible. We should actually be checking here, but that
-            requires a change in how we compute scan_statement in transaction_snark_scan_statement.ml *)
-        if
-          Mina_state.Registers.Without_pending_coinbase_stack.equal
-            { curr_source with pending_coinbase_stack = () }
-            { prev_target with pending_coinbase_stack = () }
-        then Ok (Some (proof, extract_txns txns_with_witnesses))
+        (*prev_target is connected to curr_source- Order of the arguments is important here*)
+        if Mina_state.Registers.Value.connected prev_target curr_source then
+          Ok (Some (proof, extract_txns txns_with_witnesses))
         else Or_error.error_string "Unexpected ledger proof emitted")
   in
   (result_opt, updated_scan_state)

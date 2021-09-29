@@ -401,15 +401,14 @@ module Statement = struct
                 (Field.name f) x1 x2)
           f
       in
+      let module PC = struct
+        type t = Pending_coinbase.Stack.t [@@deriving sexp_of]
+
+        let equal t1 t2 = Pending_coinbase.Stack.connected ~first:t1 ~second:t2
+      end in
       Registers.Fields.to_list
         ~ledger:(check (module Ledger_hash))
-        ~pending_coinbase_stack:(fun _ ->
-          let `Needs_some_work_for_snapps_on_mainnet =
-            Mina_base.Util.todo_snapps
-          in
-          (* This is not checking to match the behavior on compatible. We should actually be checking here, but that
-             requires a change in how we compute scan_statement in transaction_snark_scan_statement.ml *)
-          Ok ())
+        ~pending_coinbase_stack:(check (module PC))
         ~next_available_token:(check (module Token_id))
         ~local_state:(check (module Local_state))
       |> Or_error.combine_errors_unit
@@ -2023,6 +2022,30 @@ module Base = struct
                 ])
     end
 
+    let check_protocol_state ~pending_coinbase_stack_init
+        ~pending_coinbase_stack_before ~pending_coinbase_stack_after state_body
+        =
+      [%with_label "Compute pending coinbase stack"]
+        (let%bind state_body_hash =
+           Mina_state.Protocol_state.Body.hash_checked state_body
+         in
+         let%bind computed_pending_coinbase_stack_after =
+           Pending_coinbase.Stack.Checked.push_state state_body_hash
+             pending_coinbase_stack_init
+         in
+         [%with_label "Check pending coinbase stack"]
+           (let%bind correct_coinbase_target_stack =
+              Pending_coinbase.Stack.equal_var
+                computed_pending_coinbase_stack_after
+                pending_coinbase_stack_after
+            in
+            let%bind valid_init_state =
+              Pending_coinbase.Stack.equal_var pending_coinbase_stack_init
+                pending_coinbase_stack_before
+            in
+            Boolean.Assert.all
+              [ correct_coinbase_target_stack; valid_init_state ]))
+
     let main ?(witness : Witness.t option) (spec : Spec.t) ~constraint_constants
         snapp_statements (statement : Statement.With_sok.Checked.t) =
       let open Impl in
@@ -2032,9 +2055,17 @@ module Base = struct
         exists (Mina_state.Protocol_state.Body.typ ~constraint_constants)
           ~compute:(fun () -> !witness.state_body)
       in
+      let pending_coinbase_stack_init =
+        exists Pending_coinbase.Stack.typ ~compute:(fun () ->
+            !witness.init_stack)
+      in
       let module V = Prover_value in
-      let `Needs_some_work_for_snapps_on_mainnet = Mina_base.Util.todo_snapps in
-      (* TODO: Must check the state_body against the pending coinbase stack somehow. *)
+      run_checked
+        (check_protocol_state ~pending_coinbase_stack_init
+           ~pending_coinbase_stack_before:
+             statement.source.pending_coinbase_stack
+           ~pending_coinbase_stack_after:statement.target.pending_coinbase_stack
+           state_body) ;
       let init : Global_state.t * _ Parties_logic.Local_state.t =
         let g : Global_state.t =
           { ledger =
@@ -3792,10 +3823,15 @@ let%test_module "transaction_snark" =
 
     let state_body_hash = Mina_state.Protocol_state.Body.hash state_body
 
+    let pending_coinbase_state_update state_body_hash stack =
+      Pending_coinbase.Stack.(push_state state_body_hash stack)
+
+    let init_stack = Pending_coinbase.Stack.empty
+
     let pending_coinbase_stack_target (t : Transaction.Valid.t) state_body_hash
         stack =
       let stack_with_state =
-        Pending_coinbase.Stack.(push_state state_body_hash stack)
+        pending_coinbase_state_update state_body_hash stack
       in
       match t with
       | Coinbase c ->
@@ -4093,6 +4129,7 @@ let%test_module "transaction_snark" =
                       }
                     ]
                 ; state_body
+                ; init_stack
                 }
               in
               let _, (local_state_post, excess) =
@@ -4106,7 +4143,7 @@ let%test_module "transaction_snark" =
                     { ledger = Sparse_ledger.merkle_root w.global_ledger
                     ; next_available_token =
                         Sparse_ledger.next_available_token w.global_ledger
-                    ; pending_coinbase_stack = Pending_coinbase.Stack.empty
+                    ; pending_coinbase_stack = init_stack
                     ; local_state =
                         { w.local_state_init with
                           parties =
@@ -4122,7 +4159,8 @@ let%test_module "transaction_snark" =
                 ; target =
                     { ledger = Ledger.merkle_root ledger
                     ; next_available_token = Ledger.next_available_token ledger
-                    ; pending_coinbase_stack = Pending_coinbase.Stack.empty
+                    ; pending_coinbase_stack =
+                        pending_coinbase_state_update state_body_hash init_stack
                     ; local_state =
                         { local_state_post with
                           parties =
@@ -4602,6 +4640,7 @@ let%test_module "transaction_snark" =
                           }
                         ]
                     ; state_body
+                    ; init_stack
                     }
                   in
                   let _, (local_state_post, excess) =
@@ -4616,7 +4655,7 @@ let%test_module "transaction_snark" =
                         { ledger = Sparse_ledger.merkle_root w.global_ledger
                         ; next_available_token =
                             Sparse_ledger.next_available_token w.global_ledger
-                        ; pending_coinbase_stack = Pending_coinbase.Stack.empty
+                        ; pending_coinbase_stack = init_stack
                         ; local_state =
                             { w.local_state_init with
                               parties =
@@ -4634,7 +4673,9 @@ let%test_module "transaction_snark" =
                         { ledger = Ledger.merkle_root ledger
                         ; next_available_token =
                             Ledger.next_available_token ledger
-                        ; pending_coinbase_stack = Pending_coinbase.Stack.empty
+                        ; pending_coinbase_stack =
+                            pending_coinbase_state_update state_body_hash
+                              init_stack
                         ; local_state =
                             { local_state_post with
                               parties =
@@ -5014,6 +5055,7 @@ let%test_module "transaction_snark" =
                           }
                         ]
                     ; state_body
+                    ; init_stack
                     }
                   in
                   let _, (local_state_post, excess) =
@@ -5028,7 +5070,7 @@ let%test_module "transaction_snark" =
                         { ledger = Sparse_ledger.merkle_root w.global_ledger
                         ; next_available_token =
                             Sparse_ledger.next_available_token w.global_ledger
-                        ; pending_coinbase_stack = Pending_coinbase.Stack.empty
+                        ; pending_coinbase_stack = init_stack
                         ; local_state =
                             { w.local_state_init with
                               parties =
@@ -5046,7 +5088,9 @@ let%test_module "transaction_snark" =
                         { ledger = Ledger.merkle_root ledger
                         ; next_available_token =
                             Ledger.next_available_token ledger
-                        ; pending_coinbase_stack = Pending_coinbase.Stack.empty
+                        ; pending_coinbase_stack =
+                            pending_coinbase_state_update state_body_hash
+                              init_stack
                         ; local_state =
                             { local_state_post with
                               parties =

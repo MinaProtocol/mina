@@ -24,6 +24,7 @@ module Parties_segment_witness : sig
             Parties_logic.Start_data.Stable.V1.t
             list
         ; state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
+        ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
         }
       [@@deriving sexp, to_yojson]
     end

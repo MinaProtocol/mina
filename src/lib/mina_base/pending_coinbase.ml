@@ -642,6 +642,23 @@ module T = struct
 
     let equal_data t1 t2 = Coinbase_stack.equal t1.Poly.data t2.Poly.data
 
+    let connected ~first ~second =
+      let coinbase_stack_connected =
+        (*same as old stack or second could be a new stack with empty data*)
+        equal_data first second || Coinbase_stack.(equal empty second.Poly.data)
+      in
+      let state_stack_connected =
+        (*1. same as old stack or
+          or it is a new stack in which case the curr and init are the same when the stack is initialized.
+          The state stacks are updated as follows:
+          1. [second] could be a new stack initialized with the latest state of [first] or
+          2. [second] starts from the previous state of [first]. This is not available in either [first] or [second]
+          These checks can be performed only between the end of one stack and begining of the next one in the sequence *)
+        equal_state_hash first second
+        || Stack_hash.equal second.state.init second.state.curr
+      in
+      coinbase_stack_connected && state_stack_connected
+
     let push_coinbase (cb : Coinbase.t) t =
       let data = Coinbase_stack.push t.Poly.data cb in
       { t with data }
