@@ -943,6 +943,20 @@ module Block_latency = struct
            included into our frontier"
       end)
       ()
+
+  module Validation_acceptance_time =
+    Moving_time_average (struct
+        include Latency_time_spec
+
+        let subsystem = subsystem
+
+        let name = "validation_acceptance_time"
+
+        let help =
+          "average delay, in seconds, between blocks are initially received \
+           from the libp2p_helper, and when they are accepted as valid"
+      end)
+      ()
 end
 
 module Rejected_blocks = struct
