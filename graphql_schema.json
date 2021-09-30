@@ -2028,7 +2028,7 @@
               "deprecationReason": null
             },
             {
-              "name": "currGlobalSlot",
+              "name": "globalSlotSinceHardFork",
               "description": null,
               "args": [],
               "type": {
@@ -2196,7 +2196,7 @@
               "defaultValue": null
             },
             {
-              "name": "currGlobalSlot",
+              "name": "globalSlotSinceHardFork",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
