@@ -8,7 +8,7 @@
    non-NULL means Check.
 
    Similarly, in OCaml, there are the constructors Set, which takes a value, and
-   Keep, which is nullary. NULL means Set, and non-NULL means Keep.
+   Keep, which is nullary. NULL means Keep, and non-NULL means Set.
 
    The tables that follow this convention have a comment "NULL convention".
 */
