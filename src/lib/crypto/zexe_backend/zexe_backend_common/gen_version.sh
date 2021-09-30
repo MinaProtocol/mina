@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e -o pipefail
-marlin_submodule_dir=$(git submodule status | grep marlin | sed 's/^[-\ ]//g' | cut -d ' ' -f 2)
-marlin_repo_sha=$(cd $marlin_submodule_dir && git rev-parse --short=8 --verify HEAD)
 
-echo "let marlin_repo_sha = \"$marlin_repo_sha\"" >> "$1"
+marlin_commit_id=$(cd ../../marlin_plonk_bindings/stubs && cargo metadata | jq '.packages[] | select(.name == "commitment_dlog").id' | cut -d " " -f 3 | sed 's/"//')
+
+echo "let marlin_repo_sha = \"$marlin_commit_id\"" >> "$1"
