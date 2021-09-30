@@ -884,8 +884,7 @@ module Protocol_state = struct
     let%bind total_currency =
       Numeric.gen Currency.Amount.gen Currency.Amount.compare
     in
-    (* TODO: will be renamed *)
-    let%bind curr_global_slot =
+    let%bind global_slot_since_hard_fork =
       Numeric.gen Global_slot.gen Global_slot.compare
     in
     let%bind global_slot_since_genesis =
@@ -900,7 +899,7 @@ module Protocol_state = struct
     ; min_window_density
     ; last_vrf_output
     ; total_currency
-    ; curr_global_slot
+    ; global_slot_since_hard_fork
     ; global_slot_since_genesis
     ; staking_epoch_data
     ; next_epoch_data
