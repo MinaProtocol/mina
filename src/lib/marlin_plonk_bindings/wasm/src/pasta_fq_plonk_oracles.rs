@@ -121,7 +121,7 @@ pub fn caml_pasta_fq_plonk_oracles_create(
     lgr_comm: WasmVector<WasmPastaPallasPolyComm>,
     index: WasmPastaFqPlonkVerifierIndex,
     proof: WasmPastaFqProverProof,
-) -> WasmPastaFqPlonkOracles {
+) -> Result<WasmPastaFqPlonkOracles, JsValue> {
     let index: DlogVerifierIndex<'_, GAffine> = index.into();
     let proof: DlogProof<GAffine> = proof.into();
     let lgr_comm: Vec<PolyComm<GAffine>> = lgr_comm.into_iter().map(From::from).collect();
@@ -133,13 +133,13 @@ pub fn caml_pasta_fq_plonk_oracles_create(
             .map(|x| x)
             .collect(),
         &proof.public.iter().map(|s| -*s).collect(),
-    );
+    ).ok_or("Could not commit to public inputs")?;
     let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =
-        proof.oracles::<DefaultFqSponge<PallasParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(&index, &p_comm);
+        proof.oracles::<DefaultFqSponge<PallasParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(&index, &p_comm).ok_or("Could not create oracles")?;
 
     sponge.absorb_fr(&[shift_scalar(combined_inner_product)]);
 
-    WasmPastaFqPlonkOracles {
+    Ok(WasmPastaFqPlonkOracles {
         o: WasmPastaFqRandomOracles {
             beta: o.beta.into(),
             gamma: o.gamma.into(),
@@ -161,7 +161,7 @@ pub fn caml_pasta_fq_plonk_oracles_create(
             .map(|x| x.0.into())
             .collect(),
         digest_before_evaluations: digest_before_evaluations.into(),
-    }
+    })
 }
 
 #[wasm_bindgen]

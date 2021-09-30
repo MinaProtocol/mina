@@ -671,6 +671,8 @@ pub fn caml_pasta_fq_plonk_proof_create(
                 oracle::rndoracle::ProofError::EvaluationGroup => "caml_pasta_fq_plonk_proof_create: EvaluationGroup",
                 oracle::rndoracle::ProofError::OracleCommit => "caml_pasta_fq_plonk_proof_create: OracleCommit",
                 oracle::rndoracle::ProofError::RuntimeEnv => "caml_pasta_fq_plonk_proof_create: RuntimeEnv",
+                oracle::rndoracle::ProofError::BadMultiScalarMul => "caml_pasta_fq_plonk_proof_create: BadMultiScalarMul",
+                oracle::rndoracle::ProofError::BadSrsLength => "caml_pasta_fq_plonk_proof_create: BadSrsLength",
             };
         JsValue::from_str(str)
     })
