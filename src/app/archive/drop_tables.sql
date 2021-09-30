@@ -20,13 +20,13 @@ DROP TABLE epoch_data;
 
 DROP TABLE internal_commands;
 
-drop type internal_command_type;
+DROP TYPE internal_command_type;
 
 DROP TABLE user_commands;
 
-drop type user_command_type;
+DROP TYPE user_command_type;
 
-drop type user_command_status;
+DROP TYPE user_command_status;
 
 DROP TABLE snapp_commands;
 
@@ -80,11 +80,11 @@ DROP TABLE snapp_bounded_timestamp;
 
 DROP TABLE snapp_bounded_token_id;
 
-drop type snapp_auth_required_type;
+DROP TYPE snapp_auth_required_type;
 
-drop type snapp_authorization_kind_type;
+DROP TYPE snapp_authorization_kind_type;
 
-drop type snapp_predicate_type;
+DROP TYPE snapp_predicate_type;
 
 DROP TABLE snarked_ledger_hashes;
 
