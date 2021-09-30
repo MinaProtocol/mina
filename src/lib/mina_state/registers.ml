@@ -55,7 +55,7 @@ module Value = struct
       { t with pending_coinbase_stack = () }
       { t' with pending_coinbase_stack = () }
     && Pending_coinbase.Stack.connected ~first:t.pending_coinbase_stack
-         ~second:t'.pending_coinbase_stack
+         ~second:t'.pending_coinbase_stack ()
 end
 
 module Checked = struct

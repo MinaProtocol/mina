@@ -404,7 +404,8 @@ module Statement = struct
       let module PC = struct
         type t = Pending_coinbase.Stack.t [@@deriving sexp_of]
 
-        let equal t1 t2 = Pending_coinbase.Stack.connected ~first:t1 ~second:t2
+        let equal t1 t2 =
+          Pending_coinbase.Stack.connected ~first:t1 ~second:t2 ()
       end in
       Registers.Fields.to_list
         ~ledger:(check (module Ledger_hash))

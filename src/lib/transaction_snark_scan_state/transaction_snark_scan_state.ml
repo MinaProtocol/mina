@@ -463,29 +463,66 @@ struct
                   in
                   Some (merged_statement, proofs @ ps)))
     in
-    let fold_step_a acc_statement job =
+    let merge_pc (acc : Transaction_snark.Statement.t option) s2 :
+        Transaction_snark.Statement.t option Or_error.t =
+      let open Or_error.Let_syntax in
+      match acc with
+      | None ->
+          Ok (Some s2)
+      | Some s1 ->
+          let%map () =
+            if
+              Pending_coinbase.Stack.connected
+                ~prev:(Some s1.source.pending_coinbase_stack)
+                ~first:s1.target.pending_coinbase_stack
+                ~second:s2.source.pending_coinbase_stack ()
+            then return ()
+            else
+              Or_error.errorf
+                !"Base merge proof: invalid pending coinbase transition s1: \
+                  %{sexp: Transaction_snark.Statement.t} s2: %{sexp: \
+                  Transaction_snark.Statement.t}"
+                s1 s2
+          in
+          Some s2
+    in
+    let fold_step_a (acc_statement, acc_pc) job =
+      let open Or_error.Let_syntax in
       match job with
       | Parallel_scan.Merge.Job.Part (proof, message) ->
           let statement = Ledger_proof.statement proof in
-          merge_acc ~proofs:[ (proof, message) ] acc_statement statement
+          let%map acc_stmt =
+            merge_acc ~proofs:[ (proof, message) ] acc_statement statement
+          in
+          (acc_stmt, acc_pc)
       | Empty | Full { status = Parallel_scan.Job_status.Done; _ } ->
-          Or_error.return acc_statement
+          Or_error.return (acc_statement, acc_pc)
       | Full { left = proof_1, message_1; right = proof_2, message_2; _ } ->
           let open Or_error.Let_syntax in
+          let stmt1 = Ledger_proof.statement proof_1 in
+          let stmt2 = Ledger_proof.statement proof_2 in
           let%bind merged_statement =
             Timer.time timer (sprintf "merge:%s" __LOC__) (fun () ->
-                Transaction_snark.Statement.merge
-                  (Ledger_proof.statement proof_1)
-                  (Ledger_proof.statement proof_2))
+                Transaction_snark.Statement.merge stmt1 stmt2)
           in
-          merge_acc acc_statement merged_statement
-            ~proofs:[ (proof_1, message_1); (proof_2, message_2) ]
+          let%map acc_stmt =
+            merge_acc acc_statement merged_statement
+              ~proofs:[ (proof_1, message_1); (proof_2, message_2) ]
+          in
+          (acc_stmt, acc_pc)
     in
-    let fold_step_d acc_statement job =
+    let fold_step_d (acc_statement, acc_pc) job =
+      let open Or_error.Let_syntax in
       match job with
-      | Parallel_scan.Base.Job.Empty
-      | Full { status = Parallel_scan.Job_status.Done; _ } ->
-          Or_error.return acc_statement
+      | Parallel_scan.Base.Job.Empty ->
+          Or_error.return (acc_statement, acc_pc)
+      | Full
+          { status = Parallel_scan.Job_status.Done
+          ; job = (transaction : Transaction_with_witness.t)
+          ; _
+          } ->
+          let%map acc_pc = merge_pc acc_pc transaction.statement in
+          (acc_statement, acc_pc)
       | Full { job = transaction; _ } ->
           with_error "Bad base statement" ~f:(fun () ->
               let open Or_error.Let_syntax in
@@ -497,7 +534,12 @@ struct
               if
                 Transaction_snark.Statement.equal transaction.statement
                   expected_statement
-              then merge_acc ~proofs:[] acc_statement transaction.statement
+              then
+                let%bind acc_stmt =
+                  merge_acc ~proofs:[] acc_statement transaction.statement
+                in
+                let%map acc_pc = merge_pc acc_pc transaction.statement in
+                (acc_stmt, acc_pc)
               else
                 Or_error.error_string
                   (sprintf
@@ -507,7 +549,7 @@ struct
                      transaction.statement expected_statement))
     in
     let res =
-      Fold.fold_chronological_until tree ~init:None
+      Fold.fold_chronological_until tree ~init:(None, None)
         ~f_merge:(fun acc (_weight, job) ->
           let open Container.Continue_or_stop in
           match fold_step_a acc job with
@@ -526,9 +568,9 @@ struct
     in
     Timer.log "scan_statement" timer ;
     match res with
-    | Ok None ->
+    | Ok (None, _) ->
         M.return (Error `Empty)
-    | Ok (Some (res, proofs)) -> (
+    | Ok (Some (res, proofs), _) -> (
         let open M.Let_syntax in
         match%map
           ksprintf time "verify:%s" __LOC__ (fun () ->
@@ -575,7 +617,7 @@ struct
       and () =
         clarify_error
           (Pending_coinbase.Stack.connected ~first:reg1.pending_coinbase_stack
-             ~second:reg2.pending_coinbase_stack)
+             ~second:reg2.pending_coinbase_stack ())
           "did not connect with pending-coinbase stack"
       and () =
         clarify_error

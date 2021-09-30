@@ -2581,7 +2581,7 @@ let%test_module "test" =
             , None )
         }
       in
-      Quickcheck.test (gen_below_capacity ())
+      Quickcheck.test gen_at_capacity
         ~sexp_of:
           [%sexp_of:
             Ledger.init_state * User_command.Valid.t list * int option list]
@@ -2649,7 +2649,7 @@ let%test_module "test" =
                     in
                     return (diff', checked || checked'))
               in
-              (*Note: if this fails, try increasing the number of trials*)
+              (*Note: if this fails, try increasing the number of trials to get a diff that does fail*)
               assert checked))
 
     let%test_unit "Provers can't pay the account creation fee" =
@@ -2723,7 +2723,7 @@ let%test_module "test" =
       else None
 
     (** Like test_simple but with a random number of completed jobs available.
-    *)
+      *)
 
     let test_random_number_of_proofs :
            Ledger.init_state
@@ -2879,7 +2879,7 @@ let%test_module "test" =
           { Transaction_snark_work.Checked.fee; proofs = proofs stmts; prover })
 
     (** Like test_random_number_of_proofs but with random proof fees.
-    *)
+      *)
     let test_random_proof_fee :
            Ledger.init_state
         -> User_command.Valid.t list
