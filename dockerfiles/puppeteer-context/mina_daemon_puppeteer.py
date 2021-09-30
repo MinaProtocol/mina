@@ -101,7 +101,7 @@ def stop_daemon():
   Path('daemon-active').unlink()
   mina_process = None
   print("puppeteer script: daemon fully stopped" )
-  print('{"puppeteer_script_event": true, "event_type": "node_offline"')
+  print('{"puppeteer_script_event": true, "event_type": "node_offline", "message":"daemon is being stopped by puppeteer script and is going offline" ')
 
 
 # technically, doing the loops like this will eventually result in a stack overflow

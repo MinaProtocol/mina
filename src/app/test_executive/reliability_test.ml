@@ -38,35 +38,51 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (List.tl_exn recent_chains)
     in
     let length = Hash_set.length common_prefixes in
-    if length = 0 then (
+    if length = 0 || length < n then Malleable_error.return ()
+    else
       let result =
         Malleable_error.soft_error ~value:()
           (Error.of_string
              (sprintf
-                "Chains don't have any common prefixes among their most recent \
-                 %d blocks"
-                n))
-      in
-      [%log error]
-        "common_prefix test: TEST FAILURE, Chains don't have any common \
-         prefixes among their most recent %d blocks"
-        n ;
-      result )
-    else if length < n then (
-      let result =
-        Malleable_error.soft_error ~value:()
-          (Error.of_string
-             (sprintf
-                !"Chains only have %d common prefixes, expected %d common \
-                  prefixes"
+                "Need to go back %d blocks to reach common chain, which is \
+                 more than the allowed %d blocks."
                 length n))
       in
       [%log error]
-        "common_prefix test: TEST FAILURE, Chains only have %d common \
-         prefixes, expected %d common prefixes"
+        "Need to go back %d blocks to reach common chain, which is more than \
+         the allowed %d blocks."
         length n ;
-      result )
-    else Malleable_error.return ()
+      result
+
+  (* if length = 0 then (
+       let result =
+         Malleable_error.soft_error ~value:()
+           (Error.of_string
+              (sprintf
+                 "Chains don't have any common prefixes among their most recent \
+                  %d blocks"
+                 n))
+       in
+       [%log error]
+         "common_prefix test: TEST FAILURE, Chains don't have any common \
+          prefixes among their most recent %d blocks"
+         n ;
+       result )
+     else if length < n then (
+       let result =
+         Malleable_error.soft_error ~value:()
+           (Error.of_string
+              (sprintf
+                 !"Chains only have %d common prefixes, expected %d common \
+                   prefixes"
+                 length n))
+       in
+       [%log error]
+         "common_prefix test: TEST FAILURE, Chains only have %d common \
+          prefixes, expected %d common prefixes"
+         length n ;
+       result )
+     else Malleable_error.return () *)
 
   let check_peer_connectivity ~nodes_by_peer_id ~peer_id ~connected_peers =
     let get_node_id p =
@@ -148,12 +164,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           let s = String.concat ~sep:"\n" chain in
           [%log info] "\nchain:\n %s" s)
     in
-    section "nodes share common prefix no greater than 2 block back"
+    section "common prefix of all nodes is no farther back than 1 block"
       (* the common prefix test relies on at least 4 blocks having been produced.  previous sections altogether have already produced 5, so no further block production is needed.  if previous sections change, then this may need to be re-adjusted*)
       (let%bind chains =
          Malleable_error.List.map all_nodes
            ~f:(Network.Node.must_get_best_chain ~logger)
        in
        print_chains chains ;
-       check_common_prefixes chains ~number_of_blocks:2 ~logger)
+       check_common_prefixes chains ~number_of_blocks:1 ~logger)
 end

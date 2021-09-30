@@ -256,7 +256,8 @@ type t =
 let event_reader { event_reader; _ } = event_reader
 
 module Puppeteer_message = struct
-  type t = { puppeteer_script_event : bool; event_type : string }
+  type t =
+    { puppeteer_script_event : bool; event_type : string; message : string }
   [@@deriving yojson]
 end
 
@@ -270,9 +271,7 @@ let parse_event_from_log_entry ~network log_entry =
          ~default:
            (Or_error.errorf "failed to find node by pod app id \"%s\"" app_id)
   in
-  let event_id_existence =
-    find string log_entry [ "jsonPayload"; "event_id" ]
-  in
+  let event_id_existence = find string log_entry [ "jsonPayload"; "level" ] in
   match event_id_existence with
   | Ok _ ->
       let%bind log =
