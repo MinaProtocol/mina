@@ -381,7 +381,7 @@ let gen_party_from ?(succeed = true) ?(new_party = false) ~ledger ~balances_tbl
   let%bind data =
     gen_predicated_from ~succeed ~new_party ~ledger ~balances_tbl
   in
-  let%map authorization = Control.gen_with_dummies in
+  let%map authorization = Lazy.force Control.gen_with_dummies in
   { Party.data; authorization }
 
 (* takes an optional public key, if we want to sign this data *)
