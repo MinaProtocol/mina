@@ -2423,7 +2423,7 @@ module For_tests = struct
   module Test_spec = struct
     type t = { init_ledger : Init_ledger.t; specs : Transaction_spec.t list }
 
-    let gen =
+    let mk_gen ?(num_transactions = num_transactions) () =
       let open Quickcheck.Let_syntax in
       let%bind init_ledger = Init_ledger.gen () in
       let%bind specs =
@@ -2439,6 +2439,8 @@ module For_tests = struct
                   (pk, Account_nonce.zero))))
       in
       return { init_ledger; specs }
+
+    let gen = mk_gen ~num_transactions ()
   end
 
   let command_send
@@ -2587,4 +2589,14 @@ module For_tests = struct
     ; staking_epoch_data = epoch_data
     ; next_epoch_data = epoch_data
     }
+
+  (* Quickcheck generator for Parties.t, derived from Test_spec generator *)
+  let gen_parties_from_test_spec =
+    let open Quickcheck.Let_syntax in
+    match%map Test_spec.mk_gen ~num_transactions:1 () with
+    | { specs = [ spec ]; _ } ->
+        party_send spec
+    | { specs; _ } ->
+        failwithf "gen_parties_from_test_spec: expected one spec, got %d"
+          (List.length specs) ()
 end
