@@ -32,6 +32,7 @@ module Variant = struct
     | `Operations_not_valid of Partial_reason.t list
     | `Unsupported_operation_for_construction
     | `Signature_missing
+    | `Invalid_curve_type
     | `Public_key_format_not_valid
     | `No_options_provided
     | `Exception of string
@@ -91,6 +92,8 @@ end = struct
         "Malformed public key"
     | `Operations_not_valid _ ->
         "Cannot convert operations to valid transaction"
+    | `Invalid_curve_type ->
+        "Invalid curve type"
     | `Public_key_format_not_valid ->
         "Invalid public key format"
     | `Unsupported_operation_for_construction ->
@@ -155,6 +158,8 @@ end = struct
              !"Cannot recover transaction for the following reasons: %{sexp: \
                Partial_reason.t list}"
              reasons)
+    | `Invalid_curve_type ->
+        None
     | `Public_key_format_not_valid ->
         None
     | `Unsupported_operation_for_construction ->
@@ -194,6 +199,8 @@ end = struct
     | `Malformed_public_key ->
         false
     | `Operations_not_valid _ ->
+        false
+    | `Invalid_curve_type ->
         false
     | `Public_key_format_not_valid ->
         false
@@ -238,6 +245,8 @@ end = struct
         "The public key you provided was malformed."
     | `Operations_not_valid _ ->
         "We could not convert those operations to a valid transaction."
+    | `Invalid_curve_type ->
+        "The curve type you provided is not valid."
     | `Public_key_format_not_valid ->
         "The public key you provided had an invalid format."
     | `Unsupported_operation_for_construction ->

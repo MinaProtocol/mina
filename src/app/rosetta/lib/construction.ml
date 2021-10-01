@@ -182,6 +182,12 @@ module Derive = struct
 
     let handle ~(env : Env.T(M).t) (req : Construction_derive_request.t) =
       let open M.Let_syntax in
+      let%bind () =
+        if String.equal req.public_key.curve_type "pallas" then
+          M.return ()
+        else
+          M.fail (Errors.create `Invalid_curve_type)
+      in
       let%bind pk =
         let pk_or_error =
           try Ok (Rosetta_coding.Coding.to_public_key req.public_key.hex_bytes)
