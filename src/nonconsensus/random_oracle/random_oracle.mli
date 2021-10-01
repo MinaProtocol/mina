@@ -1,1 +1,1 @@
-../../lib/random_oracle/random_oracle.mli
+../../lib/crypto/random_oracle/random_oracle.mli

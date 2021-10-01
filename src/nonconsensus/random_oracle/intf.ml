@@ -1,1 +1,1 @@
-../../lib/random_oracle/intf.ml
+../../lib/crypto/random_oracle/intf.ml

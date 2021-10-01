@@ -1,1 +1,1 @@
-../../lib/signature_lib/keypair.mli
+../../lib/crypto/signature_lib/keypair.mli

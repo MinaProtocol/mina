@@ -34,4 +34,3 @@ echo "let commit_date = \"$commit_date\"" >> "$1"
 echo "let marlin_commit_id = \"$marlin_commit_id\"" >> "$1"
 
 echo 'let print_version () = Core_kernel.printf "Commit %s on branch %s\n" commit_id branch' >> "$1"
-

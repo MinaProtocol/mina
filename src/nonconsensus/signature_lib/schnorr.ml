@@ -1,1 +1,1 @@
-../../lib/signature_lib/schnorr.ml
+../../lib/crypto/signature_lib/schnorr.ml

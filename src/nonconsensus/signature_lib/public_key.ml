@@ -1,1 +1,1 @@
-../../lib/signature_lib/public_key.ml
+../../lib/crypto/signature_lib/public_key.ml
