@@ -81,7 +81,7 @@ CREATE TABLE snapp_updates
 , verification_key_id      int              REFERENCES snapp_verification_keys(id)
 , permissions_id           int              REFERENCES snapp_permissions(id)
 , snapp_uri                text
-, token_symbol             varchar(6)
+, token_symbol             text
 , timing_id                int              REFERENCES snapp_timing_info(id)
 );
 
@@ -111,13 +111,13 @@ CREATE TABLE snapp_party_body
 , depth                    int              NOT NULL
 );
 
-CREATE TABLE snapp_bounded_balance
+CREATE TABLE snapp_balance_bounds
 ( id                       serial           PRIMARY KEY
 , balance_lower_bound      bigint           NOT NULL
 , balance_upper_bound      bigint           NOT NULL
 );
 
-CREATE TABLE snapp_bounded_nonce
+CREATE TABLE snapp_nonce_bounds
 ( id                       serial           PRIMARY KEY
 , nonce_lower_bound        bigint           NOT NULL
 , nonce_upper_bound        bigint           NOT NULL
@@ -126,10 +126,10 @@ CREATE TABLE snapp_bounded_nonce
 CREATE TYPE snapp_predicate_type AS ENUM ('full', 'nonce', 'accept');
 
 /* NULL convention */
-CREATE TABLE snapp_predicate_account
+CREATE TABLE snapp_account
 ( id                       serial                 PRIMARY KEY
-, balance_id               int                    REFERENCES snapp_bounded_balance(id)
-, nonce_id                 int                    REFERENCES snapp_bounded_nonce(id)
+, balance_id               int                    REFERENCES snapp_balance_bounds(id)
+, nonce_id                 int                    REFERENCES snapp_nonce_bounds(id)
 , receipt_chain_hash       text
 , public_key_id            int                    REFERENCES public_keys(id)
 , delegate_id              int                    REFERENCES public_keys(id)
@@ -144,43 +144,37 @@ CREATE TABLE snapp_predicate_account
 CREATE TABLE snapp_predicate
 ( id               serial                 PRIMARY KEY
 , kind             snapp_predicate_type   NOT NULL
-, account_id       int                    REFERENCES snapp_predicate_account(id)
+, account_id       int                    REFERENCES snapp_account(id)
 , nonce            bigint
-);
-
-CREATE TABLE snapp_party_predicated
-( id               serial    PRIMARY KEY
-, body_id          int       NOT NULL REFERENCES snapp_party_body(id)
-, predicate_id     int       NOT NULL REFERENCES snapp_predicate(id)
 );
 
 CREATE TYPE snapp_authorization_kind_type AS ENUM ('proof','signature','none_given');
 
-CREATE TABLE snapp_bounded_token_id
+CREATE TABLE snapp_token_id_bounds
 ( id                       serial           PRIMARY KEY
 , token_id_lower_bound     bigint           NOT NULL
 , token_id_upper_bound     bigint           NOT NULL
 );
 
-CREATE TABLE snapp_bounded_timestamp
+CREATE TABLE snapp_timestamp_bounds
 ( id                        serial           PRIMARY KEY
 , timestamp_lower_bound     bigint          NOT NULL
 , timestamp_upper_bound     bigint          NOT NULL
 );
 
-CREATE TABLE snapp_bounded_blockchain_length
-( id                                  serial          PRIMARY KEY
-, blockchain_length_lower_bound       bigint          NOT NULL
-, blockchain_length_upper_bound       bigint          NOT NULL
+CREATE TABLE snapp_length_bounds
+( id                       serial          PRIMARY KEY
+, length_lower_bound       bigint          NOT NULL
+, length_upper_bound       bigint          NOT NULL
 );
 
-CREATE TABLE snapp_bounded_amount
+CREATE TABLE snapp_amount_bounds
 ( id                       serial          PRIMARY KEY
 , amount_lower_bound       bigint          NOT NULL
 , amount_upper_bound       bigint          NOT NULL
 );
 
-CREATE TABLE snapp_bounded_global_slot
+CREATE TABLE snapp_global_slot_bounds
 ( id                       serial          PRIMARY KEY
 , global_slot_lower_bound  bigint          NOT NULL
 , global_slot_upper_bound  bigint          NOT NULL
@@ -190,7 +184,7 @@ CREATE TABLE snapp_bounded_global_slot
 CREATE TABLE snapp_epoch_ledger
 ( id                       serial          PRIMARY KEY
 , hash_id                  int             REFERENCES snarked_ledger_hashes(id)
-, total_currency_id        int             REFERENCES snapp_bounded_amount(id)
+, total_currency_id        int             REFERENCES snapp_amount_bounds(id)
 );
 
 /* NULL convention */
@@ -200,11 +194,12 @@ CREATE TABLE snapp_epoch_data
 , epoch_seed               text
 , start_checkpoint         text
 , lock_checkpoint          text
-, epoch_length_id          int             REFERENCES snapp_bounded_blockchain_length(id)
+, epoch_length_id          int             REFERENCES snapp_length_bounds(id)
 );
 
 CREATE TABLE snapp_party
 ( id                       serial                          NOT NULL PRIMARY KEY
-, data_id                  int                             NOT NULL REFERENCES snapp_party_predicated(id)
+, body_id                  int                             NOT NULL REFERENCES snapp_party_body(id)
+, predicate_id             int                             NOT NULL REFERENCES snapp_predicate(id)
 , authorization_kind       snapp_authorization_kind_type   NOT NULL
 );

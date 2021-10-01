@@ -36,17 +36,15 @@ DROP TABLE snapp_party;
 
 DROP TABLE snapp_fee_payers;
 
-DROP TABLE snapp_party_predicated;
-
 DROP TABLE snapp_party_body;
 
 DROP TABLE snapp_updates;
 
-DROP TABLE snapp_protocol_states;
+DROP TABLE snapp_predicate_protocol_states;
 
 DROP TABLE snapp_predicate;
 
-DROP TABLE snapp_predicate_account;
+DROP TABLE snapp_account;
 
 DROP TABLE snapp_epoch_data;
 
@@ -66,19 +64,19 @@ DROP TABLE snapp_timing_info;
 
 DROP TABLE snapp_verification_keys;
 
-DROP TABLE snapp_bounded_amount;
+DROP TABLE snapp_amount_bounds;
 
-DROP TABLE snapp_bounded_balance;
+DROP TABLE snapp_balance_bounds;
 
-DROP TABLE snapp_bounded_blockchain_length;
+DROP TABLE snapp_length_bounds;
 
-DROP TABLE snapp_bounded_global_slot;
+DROP TABLE snapp_global_slot_bounds;
 
-DROP TABLE snapp_bounded_nonce;
+DROP TABLE snapp_nonce_bounds;
 
-DROP TABLE snapp_bounded_timestamp;
+DROP TABLE snapp_timestamp_bounds;
 
-DROP TABLE snapp_bounded_token_id;
+DROP TABLE snapp_token_id_bounds;
 
 DROP TYPE snapp_auth_required_type;
 

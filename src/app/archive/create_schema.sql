@@ -92,28 +92,28 @@ CREATE TABLE snapp_other_parties
 );
 
 /* NULL convention -- see comment at start of snapp_tables.sql */
-CREATE TABLE snapp_protocol_states
+CREATE TABLE snapp_predicate_protocol_states
 ( id                               serial                         NOT NULL PRIMARY KEY
 , snarked_ledger_hash_id           int                            REFERENCES snarked_ledger_hashes(id)
-, snarked_next_available_token_id  int                            REFERENCES snapp_bounded_token_id(id)
-, timestamp_id                     int                            REFERENCES snapp_bounded_timestamp(id)
-, blockchain_length_id             int                            REFERENCES snapp_bounded_blockchain_length(id)
-, min_window_density_id            int                            REFERENCES snapp_bounded_blockchain_length(id)
+, snarked_next_available_token_id  int                            REFERENCES snapp_token_id_bounds(id)
+, timestamp_id                     int                            REFERENCES snapp_timestamp_bounds(id)
+, blockchain_length_id             int                            REFERENCES snapp_length_bounds(id)
+, min_window_density_id            int                            REFERENCES snapp_length_bounds(id)
 /* omitting 'last_vrf_output' for now, it's the unit value in OCaml */
-, total_currency_id                int                            REFERENCES snapp_bounded_amount(id)
-, curr_global_slot_since_hard_fork int                            REFERENCES snapp_bounded_global_slot(id)
-, global_slot_since_genesis        int                            REFERENCES snapp_bounded_global_slot(id)
+, total_currency_id                int                            REFERENCES snapp_amount_bounds(id)
+, curr_global_slot_since_hard_fork int                            REFERENCES snapp_global_slot_bounds(id)
+, global_slot_since_genesis        int                            REFERENCES snapp_global_slot_bounds(id)
 , staking_epoch_data_id            int                            REFERENCES snapp_epoch_data(id)
 , next_epoch_data                  int                            REFERENCES snapp_epoch_data(id)
 );
 
 /* snapp_other_parties_list_id refers to list_id in snapp_other_parties, not a foreign key */
 CREATE TABLE snapp_commands
-( id                            serial           PRIMARY KEY
-, snapp_fee_payer_id            int              NOT NULL REFERENCES snapp_fee_payers(id)
-, snapp_other_parties_list_id   int              NOT NULL
-, snapp_protocol_state_id       int              NOT NULL REFERENCES snapp_protocol_states(id)
-, hash                          text             NOT NULL UNIQUE
+( id			                serial         PRIMARY KEY
+, snapp_fee_payer_id                    int            NOT NULL REFERENCES snapp_fee_payers(id)
+, snapp_other_parties_list_id   	int            NOT NULL
+, snapp_predicate_protocol_state_id     int            NOT NULL REFERENCES snapp_predicate_protocol_states(id)
+, hash                          text                   NOT NULL UNIQUE
 );
 
 CREATE TABLE epoch_data
