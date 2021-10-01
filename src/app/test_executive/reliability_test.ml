@@ -27,31 +27,38 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; num_snark_workers = 0
     }
 
-  let check_common_prefixes ~number_of_blocks:n ~logger chains =
-    let recent_chains =
-      List.map chains ~f:(fun chain ->
-          List.take (List.rev chain) n |> Hash_set.of_list (module String))
+  let check_common_prefixes ~tolerance ~logger chains =
+    let hashset_chains =
+      List.map chains ~f:(fun chain -> Hash_set.of_list (module String) chain)
+    in
+    let longest_chain_length =
+      List.map chains ~f:(fun chain -> List.length chain)
+      |> List.fold ~init:(-1) ~f:(fun accum i -> if accum > i then accum else i)
     in
     let common_prefixes =
       List.fold ~f:Hash_set.inter
-        ~init:(List.hd_exn recent_chains)
-        (List.tl_exn recent_chains)
+        ~init:(List.hd_exn hashset_chains)
+        (List.tl_exn hashset_chains)
     in
-    let length = Hash_set.length common_prefixes in
-    if length = 0 || length < n then Malleable_error.return ()
+    let common_prefixes_length = Hash_set.length common_prefixes in
+    let length_difference = longest_chain_length - common_prefixes_length in
+    if length_difference = 0 || length_difference < tolerance then
+      Malleable_error.return ()
     else
       let result =
         Malleable_error.soft_error ~value:()
           (Error.of_string
              (sprintf
-                "Need to go back %d blocks to reach common chain, which is \
-                 more than the allowed %d blocks."
-                length n))
+                "Chains have common prefix of %d blocks, longest absolute \
+                 chain is %d blocks.  the difference is greater than allowed \
+                 tolerance of %d blocks"
+                common_prefixes_length longest_chain_length length_difference))
       in
       [%log error]
-        "Need to go back %d blocks to reach common chain, which is more than \
-         the allowed %d blocks."
-        length n ;
+        "Chains have common prefix of %d blocks, longest absolute chain is %d \
+         blocks.  the difference is greater than allowed tolerance of %d \
+         blocks"
+        common_prefixes_length longest_chain_length length_difference ;
       result
 
   (* if length = 0 then (
@@ -171,5 +178,5 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            ~f:(Network.Node.must_get_best_chain ~logger)
        in
        print_chains chains ;
-       check_common_prefixes chains ~number_of_blocks:1 ~logger)
+       check_common_prefixes chains ~tolerance:1 ~logger)
 end
