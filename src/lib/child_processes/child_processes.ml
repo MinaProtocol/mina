@@ -174,9 +174,12 @@ let reader_to_strict_pipe reader name output_type =
   in
   don't_wait_for
     (let%map () =
-       Pipe.iter_without_pushback pipe ~f:(Strict_pipe.Writer.write w)
+       Pipe.iter_without_pushback pipe ~f:(fun msg ->
+           if not (Strict_pipe.Writer.is_closed w) then
+             try Strict_pipe.Writer.write w msg
+             with Strict_pipe.Overflow _ -> Strict_pipe.Writer.close w)
      in
-     Strict_pipe.Writer.close w) ;
+     if not (Strict_pipe.Writer.is_closed w) then Strict_pipe.Writer.close w) ;
   r
 
 type output_type = [ `Chunks | `Lines ]
