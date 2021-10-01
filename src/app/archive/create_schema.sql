@@ -109,11 +109,11 @@ CREATE TABLE snapp_predicate_protocol_states
 
 /* snapp_other_parties_list_id refers to list_id in snapp_other_parties, not a foreign key */
 CREATE TABLE snapp_commands
-( id			                serial         PRIMARY KEY
+( id                                    serial         PRIMARY KEY
 , snapp_fee_payer_id                    int            NOT NULL REFERENCES snapp_fee_payers(id)
-, snapp_other_parties_list_id   	int            NOT NULL
+, snapp_other_parties_list_id           int            NOT NULL
 , snapp_predicate_protocol_state_id     int            NOT NULL REFERENCES snapp_predicate_protocol_states(id)
-, hash                          text                   NOT NULL UNIQUE
+, hash                                  text           NOT NULL UNIQUE
 );
 
 CREATE TABLE epoch_data
