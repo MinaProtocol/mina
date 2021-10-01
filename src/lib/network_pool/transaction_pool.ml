@@ -469,11 +469,11 @@ struct
       | Unwanted_fee_token fee_token ->
           [ ("fee_token", Token_id.to_yojson fee_token) ]
       | Expired
-          (`Valid_until valid_until, `Current_global_slot current_global_slot)
-        ->
+          ( `Valid_until valid_until
+          , `Global_slot_since_genesis global_slot_since_genesis ) ->
           [ ("valid_until", Mina_numbers.Global_slot.to_yojson valid_until)
           ; ( "current_global_slot"
-            , Mina_numbers.Global_slot.to_yojson current_global_slot )
+            , Mina_numbers.Global_slot.to_yojson global_slot_since_genesis )
           ]
 
     let indexed_pool_error_log_info e =
@@ -517,7 +517,7 @@ struct
          locally_generated_uncommitted to locally_generated_committed and vice
          versa so those hashtables remain in sync with reality.
       *)
-      let global_slot = Indexed_pool.current_global_slot t.pool in
+      let global_slot = Indexed_pool.global_slot_since_genesis t.pool in
       t.best_tip_ledger <- Some best_tip_ledger ;
       let pool_max_size = t.config.pool_max_size in
       let log_indexed_pool_error error_str ~metadata cmd =
@@ -832,7 +832,9 @@ struct
                  t.best_tip_ledger <- Some validation_ledger ;
                  (* The frontier has changed, so transactions in the pool may
                     not be valid against the current best tip. *)
-                 let global_slot = Indexed_pool.current_global_slot t.pool in
+                 let global_slot =
+                   Indexed_pool.global_slot_since_genesis t.pool
+                 in
                  let new_pool, dropped =
                    Indexed_pool.revalidate t.pool (fun sender ->
                        match
@@ -1097,7 +1099,7 @@ struct
             diffs.sender
         in
         let config = Indexed_pool.config t.pool in
-        let global_slot = Indexed_pool.current_global_slot t.pool in
+        let global_slot = Indexed_pool.global_slot_since_genesis t.pool in
         let pool_max_size = t.config.pool_max_size in
         let sender = Envelope.Incoming.sender diffs in
         let is_sender_local = Envelope.Sender.(equal sender Local) in

@@ -82,7 +82,7 @@ module Command_error = struct
     | Bad_token
     | Expired of
         [ `Valid_until of Mina_numbers.Global_slot.t ]
-        * [ `Current_global_slot of Mina_numbers.Global_slot.t ]
+        * [ `Global_slot_since_genesis of Mina_numbers.Global_slot.t ]
     | Unwanted_fee_token of Token_id.t
     | Invalid_transaction
   [@@deriving sexp, to_yojson]
@@ -323,7 +323,7 @@ let find_by_hash :
     -> Transaction_hash.User_command_with_valid_signature.t option =
  fun { all_by_hash; _ } hash -> Map.find all_by_hash hash
 
-let current_global_slot conf =
+let global_slot_since_genesis conf =
   let current_time = Block_time.now conf.Config.time_controller in
   let current_slot =
     Consensus.Data.Consensus_time.(
@@ -337,12 +337,13 @@ let current_global_slot conf =
       current_slot
 
 let check_expiry t (cmd : User_command.t) =
-  let current_global_slot = current_global_slot t in
+  let global_slot_since_genesis = global_slot_since_genesis t in
   let valid_until = User_command.valid_until cmd in
-  if Global_slot.(valid_until < current_global_slot) then
+  if Global_slot.(valid_until < global_slot_since_genesis) then
     Error
       (Command_error.Expired
-         (`Valid_until valid_until, `Current_global_slot current_global_slot))
+         ( `Valid_until valid_until
+         , `Global_slot_since_genesis global_slot_since_genesis ))
   else Ok ()
 
 (* a cmd is in the transactions_with_expiration map only if it has an expiry*)
@@ -694,9 +695,9 @@ let revalidate :
 
 let remove_expired t :
     Transaction_hash.User_command_with_valid_signature.t Sequence.t * t =
-  let current_global_slot = current_global_slot t.config in
+  let global_slot_since_genesis = global_slot_since_genesis t.config in
   let expired, _, _ =
-    Map.split t.transactions_with_expiration current_global_slot
+    Map.split t.transactions_with_expiration global_slot_since_genesis
   in
   Map.fold expired ~init:(Sequence.empty, t) ~f:(fun ~key:_ ~data:cmds acc ->
       Set.fold cmds ~init:acc ~f:(fun acc' cmd ->
@@ -1214,7 +1215,7 @@ let add_from_backtrack :
       ; config = t.config
       }
 
-let current_global_slot t = current_global_slot t.config
+let global_slot_since_genesis t = global_slot_since_genesis t.config
 
 let%test_module _ =
   ( module struct
@@ -1376,12 +1377,13 @@ let%test_module _ =
                 | Error
                     (Expired
                       ( `Valid_until valid_until
-                      , `Current_global_slot current_global_slot )) ->
+                      , `Global_slot_since_genesis global_slot_since_genesis ))
+                  ->
                     failwithf
                       !"Expired user command. Current global slot is \
                         %{sexp:Mina_numbers.Global_slot.t} but user command is \
                         only valid until %{sexp:Mina_numbers.Global_slot.t}"
-                      current_global_slot valid_until () )
+                      global_slot_since_genesis valid_until () )
           in
           go cmds)
 
