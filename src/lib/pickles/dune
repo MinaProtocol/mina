@@ -17,7 +17,7 @@
   digestif
   mina_version
   zexe_backend
-  random_oracle_input
+  random_oracle.input
   pickles_base
   pickles.composition_types
   pickles.limb_vector
