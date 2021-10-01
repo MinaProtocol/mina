@@ -28,7 +28,7 @@ RUN apt-get -y update \
         ca-certificates \
         dnsutils \
         tzdata \
-        postgresql-11 \
+        postgresql \
         postgresql-contrib \
         apt-utils \
         procps \
