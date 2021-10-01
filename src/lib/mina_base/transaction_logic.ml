@@ -1200,7 +1200,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let apply_body
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(state_view : Snapp_predicate.Protocol_state.View.t) ~check_auth
-      ~has_proof ~is_new ~current_global_slot
+      ~has_proof ~is_new ~global_slot_since_genesis
       ({ body =
            { pk = _
            ; token_id
@@ -1268,17 +1268,20 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             (* This should be a reject, not a failure, otherwise the snark
                circuit becomes unsatisfiable.
             *)
-            Error (failure Update_not_permitted)
+            failwith "Transaction contains invalid timing information"
       | Set _ ->
           Error (failure Update_not_permitted)
     in
     (* Check timing. *)
     let%bind timing =
       match delta.sgn with
-      | Pos ->
+      | Pos when not is_new ->
           Ok timing
-      | Neg ->
-          validate_timing ~txn_amount:delta.magnitude
+      | _ ->
+          let txn_amount =
+            match delta.sgn with Pos -> Amount.zero | Neg -> delta.magnitude
+          in
+          validate_timing ~txn_amount
             ~txn_global_slot:state_view.global_slot_since_genesis
             ~account:{ a with timing }
           |> Result.map_error ~f:timing_error_to_user_command_status
@@ -1321,7 +1324,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         let [ s1; s2; s3; s4; s5 ] = init.rollup_state in
         let last_rollup_slot = init.last_rollup_slot in
         let is_this_slot =
-          Mina_numbers.Global_slot.equal current_global_slot last_rollup_slot
+          Mina_numbers.Global_slot.equal global_slot_since_genesis
+            last_rollup_slot
         in
         (* Shift along if last update wasn't this slot *)
         let s5 = if is_this_slot then s5 else s4 in
@@ -1339,7 +1343,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           else
             Set_or_keep.Set
               ( ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
-              , current_global_slot )
+              , global_slot_since_genesis )
         in
         update a.permissions.edit_rollup_state new_rollup_state
           (init.rollup_state, init.last_rollup_slot)
@@ -1630,8 +1634,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                    (Control.tag p.authorization))
               ~has_proof:(Control.Tag.equal (Control.tag p.authorization) Proof)
               ~is_new:(match loc with `Existing _ -> false | `New -> true)
-              ~current_global_slot:global_state.protocol_state.curr_global_slot
-              p.data a
+              ~global_slot_since_genesis:
+                global_state.protocol_state.global_slot_since_genesis p.data a
           with
           | Error _e ->
               (* TODO: Use this in the failure reason. *)
@@ -2420,7 +2424,7 @@ module For_tests = struct
   module Test_spec = struct
     type t = { init_ledger : Init_ledger.t; specs : Transaction_spec.t list }
 
-    let gen =
+    let mk_gen ?(num_transactions = num_transactions) () =
       let open Quickcheck.Let_syntax in
       let%bind init_ledger = Init_ledger.gen () in
       let%bind specs =
@@ -2436,6 +2440,8 @@ module For_tests = struct
                   (pk, Account_nonce.zero))))
       in
       return { init_ledger; specs }
+
+    let gen = mk_gen ~num_transactions ()
   end
 
   let command_send
@@ -2579,9 +2585,19 @@ module For_tests = struct
     ; min_window_density = len
     ; last_vrf_output = ()
     ; total_currency = a
-    ; curr_global_slot = txn_global_slot
+    ; global_slot_since_hard_fork = txn_global_slot
     ; global_slot_since_genesis = txn_global_slot
     ; staking_epoch_data = epoch_data
     ; next_epoch_data = epoch_data
     }
+
+  (* Quickcheck generator for Parties.t, derived from Test_spec generator *)
+  let gen_parties_from_test_spec =
+    let open Quickcheck.Let_syntax in
+    match%map Test_spec.mk_gen ~num_transactions:1 () with
+    | { specs = [ spec ]; _ } ->
+        party_send spec
+    | { specs; _ } ->
+        failwithf "gen_parties_from_test_spec: expected one spec, got %d"
+          (List.length specs) ()
 end
