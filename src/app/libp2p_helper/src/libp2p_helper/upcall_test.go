@@ -150,10 +150,17 @@ func TestUpcalls(t *testing.T) {
 		errChans = append(errChans, launchFeedUpcallTrap(t, bob.OutChan, bTrap, done))
 		errChans = append(errChans, launchFeedUpcallTrap(t, carol.OutChan, cTrap, done))
 
+		// subscribe
+		topic := "testtopic"
+		var subId uint64 = 123
+		testSubscribeDo(t, alice, topic, subId, 11960)
+
 		// Bob connects to Alice
 		testAddPeerImplDo(t, bob, aliceInfo, true)
+		t.Logf("peer connected: waiting bob <-> alice")
 		checkPeerConnected(t, <-aTrap.PeerConnected, bobInfo)
 		checkPeerConnected(t, <-bTrap.PeerConnected, aliceInfo)
+		t.Logf("peer connected: performed bob <-> alice")
 
 		// Alice initiates and then closes connection to Bob
 		testStreamOpenSendClose(t, alice, alicePort, bob, bobPort, 11900, newProtocol, aTrap, bTrap)
@@ -162,8 +169,11 @@ func TestUpcalls(t *testing.T) {
 
 		// Bob connects to Carol
 		testAddPeerImplDo(t, bob, carolInfo, true)
+		t.Logf("peer connected: waiting bob <-> carol")
 		checkPeerConnected(t, <-cTrap.PeerConnected, bobInfo)
 		checkPeerConnected(t, <-bTrap.PeerConnected, carolInfo)
+		t.Logf("peer connected: performed bob <-> carol")
+
 		_ = carolPort
 		select {
 		case _ = <-aTrap.PeerConnected:
@@ -179,6 +189,7 @@ func TestUpcalls(t *testing.T) {
 		testStreamOpenSendReset(t, bob, bobPort, alice, alicePort, 11940, newProtocol, bTrap, aTrap)
 		require.NoError(t, bob.P2p.Host.Close())
 		for {
+			t.Logf("awaiting disconnect from Alice ...")
 			m := <-aTrap.PeerDisconnected
 			pid := getPeerDisconnectedPeerId(t, m)
 			if pid == peerId(carolInfo) {
@@ -190,18 +201,17 @@ func TestUpcalls(t *testing.T) {
 				t.Logf("Unexpected disconnect from peer id %s", pid)
 			}
 		}
+		t.Logf("stream lost, carol: waiting")
 		checkStreamLost(t, <-cTrap.StreamLost, cStreamId1, "read failure: stream reset")
+		t.Logf("stream lost, carol: processed")
 
 		testAddPeerImplDo(t, alice, carolInfo, true)
 		testStreamOpenSendClose(t, carol, carolPort, alice, alicePort, 11950, newProtocol, cTrap, aTrap)
 
-		// subscribe
-		topic := "testtopic"
-		var subId uint64 = 123
 		msg := []byte("bla-bla")
-		testSubscribeDo(t, alice, topic, subId, 11960)
 		testPublishDo(t, carol, topic, msg, 11970)
 
+		t.Logf("checkGossipReceived: waiting")
 		checkGossipReceived(t, <-aTrap.GossipReceived, msg, subId, peerId(carolInfo))
 	}, "test upcalls: some of upcalls didn't happen")
 	for _, errChan := range errChans {
