@@ -364,6 +364,10 @@ module Network = struct
     let v = Gauge.v
   end)
 
+  module Ipc_latency_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 1000. 10. 5
+  end)
+
   module Rpc_latency_histogram = Histogram (struct
     let spec = Histogram_spec.of_exponential 1000. 10. 5
   end)
@@ -407,6 +411,10 @@ module Network = struct
   let rpc_latency_ms_summary : Rpc_latency_histogram.t =
     let help = "A histogram for all RPC call latencies" in
     Rpc_latency_histogram.v "rpc_latency_ms_summary" ~help ~namespace ~subsystem
+
+  let ipc_latency_ns_summary : Ipc_latency_histogram.t =
+    let help = "A histogram for all IPC message latencies" in
+    Ipc_latency_histogram.v "ipc_latency_ns_summary" ~help ~namespace ~subsystem
 end
 
 module Snark_work = struct

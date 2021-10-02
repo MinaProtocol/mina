@@ -1407,9 +1407,6 @@ include struct
 
   let on_first_high_connectivity t = lift on_first_high_connectivity t
 
-  let ip_for_peer t peer_id =
-    (lift ip_for_peer) t peer_id >>| Option.map ~f:(fun peer -> peer.Peer.host)
-
   let connection_gating_config t = lift connection_gating t
 
   let set_connection_gating_config t config =
