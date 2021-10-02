@@ -9,32 +9,39 @@
 
 extern crate libc;
 
-/* Arkworks types */
+// Arkworks types
 pub mod arkworks;
-/* Caml pointers */
+
+// Caml pointers
 pub mod caml_pointer;
-/* Field vectors */
+pub mod gate_vector;
+pub mod urs_utils; // TODO: move this logic to proof-systems
+
+// Field vectors
 pub mod pasta_fp_vector;
 pub mod pasta_fq_vector;
-/* Groups */
+
+// Groups
 pub mod pasta_pallas;
 pub mod pasta_vesta;
-/* URS */
-pub mod pasta_fp_urs;
-pub mod pasta_fq_urs;
-pub mod urs_utils;
-/* Gates */
-pub mod plonk_gate;
-/* Indices */
-pub mod index_serialization;
+
+// SRS
+pub mod srs;
+
+// Indexes
 pub mod pasta_fp_plonk_index;
-pub mod pasta_fp_plonk_verifier_index;
 pub mod pasta_fq_plonk_index;
-pub mod pasta_fq_plonk_verifier_index;
+
+// Verifier indexes/keys
 pub mod plonk_verifier_index;
-/* Proofs */
-pub mod pasta_fp_plonk_proof;
-pub mod pasta_fq_plonk_proof;
-/* Oracles */
+
+pub mod pasta_fp_plonk_verifier_index;
+pub mod pasta_fq_plonk_verifier_index;
+
+// Oracles
 pub mod pasta_fp_plonk_oracles;
 pub mod pasta_fq_plonk_oracles;
+
+// Proofs
+pub mod pasta_fp_plonk_proof;
+pub mod pasta_fq_plonk_proof;

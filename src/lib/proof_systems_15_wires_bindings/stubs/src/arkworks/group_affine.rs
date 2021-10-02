@@ -1,6 +1,7 @@
 use crate::arkworks::{CamlFp, CamlFq};
 use ark_ff::Zero;
 use mina_curves::pasta::{pallas::Affine as AffinePallas, vesta::Affine as AffineVesta};
+use ocaml_gen::OcamlEnum;
 
 //
 // handy types
@@ -13,7 +14,7 @@ pub type CamlGPallas = CamlGroupAffine<CamlFp>;
 // GroupAffine<G> <-> CamlGroupAffine<F>
 //
 
-#[derive(Clone, Copy, ocaml::IntoValue, ocaml::FromValue)]
+#[derive(Clone, Copy, Debug, ocaml::IntoValue, ocaml::FromValue, OcamlEnum)]
 pub enum CamlGroupAffine<F> {
     Infinity,
     Finite((F, F)),
@@ -41,18 +42,18 @@ impl From<&AffineVesta> for CamlGVesta {
     }
 }
 
-impl Into<AffineVesta> for CamlGVesta {
-    fn into(self) -> AffineVesta {
-        match self {
-            Self::Infinity => AffineVesta::zero(),
-            Self::Finite((x, y)) => AffineVesta::new(x.into(), y.into(), false),
+impl From<CamlGVesta> for AffineVesta {
+    fn from(camlg: CamlGVesta) -> Self {
+        match camlg {
+            CamlGVesta::Infinity => AffineVesta::zero(),
+            CamlGVesta::Finite((x, y)) => AffineVesta::new(x.into(), y.into(), false),
         }
     }
 }
 
-impl Into<AffineVesta> for &CamlGVesta {
-    fn into(self) -> AffineVesta {
-        match self {
+impl From<&CamlGVesta> for AffineVesta {
+    fn from(camlg: &CamlGVesta) -> Self {
+        match camlg {
             CamlGroupAffine::Infinity => AffineVesta::zero(),
             CamlGroupAffine::Finite((x, y)) => AffineVesta::new(x.into(), y.into(), false),
         }
@@ -81,18 +82,18 @@ impl From<&AffinePallas> for CamlGPallas {
     }
 }
 
-impl Into<AffinePallas> for CamlGPallas {
-    fn into(self) -> AffinePallas {
-        match self {
-            Self::Infinity => AffinePallas::zero(),
-            Self::Finite((x, y)) => AffinePallas::new(x.into(), y.into(), false),
+impl From<CamlGPallas> for AffinePallas {
+    fn from(camlg: CamlGPallas) -> Self {
+        match camlg {
+            CamlGPallas::Infinity => AffinePallas::zero(),
+            CamlGPallas::Finite((x, y)) => AffinePallas::new(x.into(), y.into(), false),
         }
     }
 }
 
-impl Into<AffinePallas> for &CamlGPallas {
-    fn into(self) -> AffinePallas {
-        match self {
+impl From<&CamlGPallas> for AffinePallas {
+    fn from(camlg: &CamlGPallas) -> Self {
+        match camlg {
             CamlGroupAffine::Infinity => AffinePallas::zero(),
             CamlGroupAffine::Finite((x, y)) => AffinePallas::new(x.into(), y.into(), false),
         }

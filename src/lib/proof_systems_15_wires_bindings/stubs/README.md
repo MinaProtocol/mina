@@ -81,3 +81,10 @@ pub fn set(&mut self, x: T) {
 * To ease FFI code, we use the `Caml` prefix whenever we're dealing with types that OCaml will be able to understand. This allows to quickly read a function's signature and see that there are only types that support `ocaml::FromValue` and `ocaml::ToValue`.
 * You should not include any value allocated on the OCaml heap within a custom type, otherwise it won't get free'ed by OCaml's GC when the host type gets free'ed. Now, I'm not sure how you could achieve that, but if you end up there think about what you're doing.
 * You should implement a `drop_in_place` finalizer for all custom types. Better be safe than sorry.
+
+## TODOs:
+
+- [ ] figure out if we need the vector types (gate_vector, pasta_fp_vector, etc.)
+- [ ] create a better abstraction for caml_pointer (and document it)
+- [ ] be consistent on errors. Do we return Result (throws an exception), do we panic?
+- [ ] run clippy

@@ -68,15 +68,15 @@ impl From<&Fp> for CamlFp {
     }
 }
 
-impl Into<Fp> for CamlFp {
-    fn into(self) -> Fp {
-        self.0
+impl From<CamlFp> for Fp {
+    fn from(camlfp: CamlFp) -> Fp {
+        camlfp.0
     }
 }
 
-impl Into<Fp> for &CamlFp {
-    fn into(self) -> Fp {
-        self.0
+impl From<&CamlFp> for Fp {
+    fn from(camlfp: &CamlFp) -> Fp {
+        camlfp.0
     }
 }
 

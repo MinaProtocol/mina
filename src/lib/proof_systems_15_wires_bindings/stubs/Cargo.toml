@@ -12,11 +12,14 @@ name = "wires_15_stubs"
 crate-type = ["lib", "staticlib"]
 
 [dependencies]
+array-init = "2.0.0"
+bincode = "1.3.3"
 libc = { version = "0.2.0" }
-rand = { version = "0.8.0" }
 num-bigint = { version = "0.4.0" }
-sprs = { version = "0.11.0", features = ["multi_thread"] }
+rand = { version = "0.8.0" }
 rayon = { version = "1" }
+serde = "1.0.130"
+sprs = { version = "0.11.0", features = ["multi_thread"] }
 
 # arkworks
 ark-ff = { version = "0.3.0", features = ["parallel"] }
@@ -25,16 +28,16 @@ ark-ec = { version = "0.3.0", features = ["parallel"] }
 ark-poly = { version = "0.3.0", features = ["parallel"] }
 
 # proof-systems
-commitment_dlog = { git = "https://github.com/o1-labs/proof-systems/", rev = "9917cc86e84f558525bc5bd0c3829693337dec40", features = ["ocaml_types"] }
-groupmap = { git = "https://github.com/o1-labs/proof-systems/", rev = "9917cc86e84f558525bc5bd0c3829693337dec40" }
-mina-curves = { git = "https://github.com/o1-labs/proof-systems/", rev = "9917cc86e84f558525bc5bd0c3829693337dec40" }
-oracle = { git = "https://github.com/o1-labs/proof-systems/", rev = "9917cc86e84f558525bc5bd0c3829693337dec40", features = ["ocaml_types"] }
-plonk_15_wires_circuits = { git = "https://github.com/o1-labs/proof-systems/", rev = "9917cc86e84f558525bc5bd0c3829693337dec40", features = ["ocaml_types"] }
-plonk_15_wires_protocol_dlog = { git = "https://github.com/o1-labs/proof-systems/", rev = "9917cc86e84f558525bc5bd0c3829693337dec40", features = ["ocaml_types"] }
+commitment_dlog = { path = "/Users/davidwong/Work/marlin/dlog/commitment", features = ["ocaml_types"] }
+groupmap = { path = "/Users/davidwong/Work/marlin/groupmap" }
+mina-curves = { path = "/Users/davidwong/Work/marlin/curves" }
+oracle = { path = "/Users/davidwong/Work/marlin/oracle", features = ["ocaml_types"] }
+plonk_15_wires_circuits = { path = "/Users/davidwong/Work/marlin/circuits/plonk-15-wires", features = ["ocaml_types"] }
+plonk_15_wires_protocol_dlog = { path = "/Users/davidwong/Work/marlin/dlog/plonk-15-wires", features = ["ocaml_types"] }
 
 # ocaml-specific
-ocaml = { version = "0.22.1" }
-ocaml-gen = { git = "https://github.com/o1-labs/proof-systems/", rev = "9917cc86e84f558525bc5bd0c3829693337dec40" }
+ocaml = { version = "0.22.2" }
+ocaml-gen = { path = "/Users/davidwong/Work/marlin/ocaml-gen" }
 
 [profile.release]
 debug = true

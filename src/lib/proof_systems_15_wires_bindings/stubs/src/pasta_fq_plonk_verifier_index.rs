@@ -1,283 +1,224 @@
 use crate::arkworks::{CamlFq, CamlGPallas};
-use crate::caml_pointer;
-use crate::index_serialization;
+use crate::caml_pointer::CamlPointer;
 use crate::pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr;
-use crate::pasta_fq_urs::CamlPastaFqUrs;
 use crate::plonk_verifier_index::{
-    CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerificationShifts,
-    CamlPlonkVerifierIndex,
+    CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
 };
+use crate::srs::fq::CamlFqSRS;
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use commitment_dlog::commitment::caml::CamlPolyComm;
-use commitment_dlog::{
-    commitment::PolyComm,
-    srs::{SRSValue, SRS},
-};
+use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
+use ocaml_gen::ocaml_gen;
+use oracle::poseidon::PlonkSpongeConstants15W;
+use oracle::poseidon::SpongeConstants;
+use plonk_15_wires_circuits::gates::poseidon::ROUNDS_PER_ROW;
 use plonk_15_wires_circuits::nolookup::constraints::{zk_polynomial, zk_w3, ConstraintSystem};
-use plonk_15_wires_protocol_dlog::index::VerifierIndex as DlogVerifierIndex;
-use std::rc::Rc;
-use std::{
-    fs::{File, OpenOptions},
-    io::{BufReader, BufWriter, Seek, SeekFrom::Start},
-};
+use plonk_15_wires_circuits::wires::{GENERICS, PERMUTS};
+use plonk_15_wires_protocol_dlog::index::VerifierIndex;
+use std::convert::TryInto;
+use std::path::Path;
+
+//
+// CamlPastaFqPlonkVerifierIndex
+//
 
 pub type CamlPastaFqPlonkVerifierIndex =
-    CamlPlonkVerifierIndex<CamlFq, CamlPastaFqUrs, CamlPolyComm<CamlGPallas>>;
+    CamlPlonkVerifierIndex<CamlFq, CamlFqSRS, CamlPolyComm<CamlGPallas>>;
 
-pub fn to_ocaml<'a>(
-    urs: &Rc<SRS<GAffine>>,
-    vi: DlogVerifierIndex<'a, GAffine>,
-) -> CamlPastaFqPlonkVerifierIndex {
-    let [sigma_comm0, sigma_comm1, sigma_comm2] = vi.sigma_comm;
-    let [rcm_comm0, rcm_comm1, rcm_comm2] = vi.rcm_comm;
-    CamlPlonkVerifierIndex {
-        domain: CamlPlonkDomain {
-            log_size_of_group: vi.domain.log_size_of_group as isize,
-            group_gen: vi.domain.group_gen.into(),
-        },
-        max_poly_size: vi.max_poly_size as isize,
-        max_quot_size: vi.max_quot_size as isize,
-        urs: caml_pointer::create(Rc::clone(urs)),
-        evals: CamlPlonkVerificationEvals {
-            sigma_comm0: sigma_comm0.into(),
-            sigma_comm1: sigma_comm1.into(),
-            sigma_comm2: sigma_comm2.into(),
-            ql_comm: vi.ql_comm.into(),
-            qr_comm: vi.qr_comm.into(),
-            qo_comm: vi.qo_comm.into(),
-            qm_comm: vi.qm_comm.into(),
-            qc_comm: vi.qc_comm.into(),
-            rcm_comm0: rcm_comm0.into(),
-            rcm_comm1: rcm_comm1.into(),
-            rcm_comm2: rcm_comm2.into(),
-            psm_comm: vi.psm_comm.into(),
-            add_comm: vi.add_comm.into(),
-            mul1_comm: vi.mul1_comm.into(),
-            mul2_comm: vi.mul2_comm.into(),
-            emul1_comm: vi.emul1_comm.into(),
-            emul2_comm: vi.emul2_comm.into(),
-            emul3_comm: vi.emul3_comm.into(),
-        },
-        shifts: CamlPlonkVerificationShifts {
-            r: vi.r.into(),
-            o: vi.o.into(),
-        },
+//
+// Handy conversion functions
+//
+
+impl CamlPastaFqPlonkVerifierIndex {
+    pub fn from_verifier_index(vi: VerifierIndex<GAffine>) -> Self {
+        let sigma_comm = vi.sigma_comm.to_vec().iter().map(Into::into).collect();
+        let qw_comm = vi.qw_comm.to_vec().iter().map(Into::into).collect();
+        let rcm_comm: Vec<Vec<_>> = vi
+            .rcm_comm
+            .to_vec()
+            .iter()
+            .map(|x| x.to_vec().iter().map(Into::into).collect())
+            .collect();
+        let shifts = vi.shift.to_vec().iter().map(Into::into).collect();
+
+        Self {
+            domain: CamlPlonkDomain {
+                log_size_of_group: vi.domain.log_size_of_group as isize,
+                group_gen: CamlFq(vi.domain.group_gen),
+            },
+            max_poly_size: vi.max_poly_size as isize,
+            max_quot_size: vi.max_quot_size as isize,
+            srs: CamlPointer(vi.srs),
+            evals: CamlPlonkVerificationEvals {
+                sigma_comm,
+                qw_comm,
+                qm_comm: vi.qm_comm.into(),
+                qc_comm: vi.qc_comm.into(),
+                rcm_comm,
+                psm_comm: vi.psm_comm.into(),
+                add_comm: vi.add_comm.into(),
+                double_comm: vi.double_comm.into(),
+                mul_comm: vi.mul_comm.into(),
+                emul_comm: vi.emul_comm.into(),
+            },
+            shifts,
+        }
     }
 }
 
-pub fn to_ocaml_copy<'a>(
-    urs: &Rc<SRS<GAffine>>,
-    vi: &DlogVerifierIndex<'a, GAffine>,
-) -> CamlPastaFqPlonkVerifierIndex {
-    let [sigma_comm0, sigma_comm1, sigma_comm2] = &vi.sigma_comm;
-    let [rcm_comm0, rcm_comm1, rcm_comm2] = &vi.rcm_comm;
-    CamlPlonkVerifierIndex {
-        domain: CamlPlonkDomain {
-            log_size_of_group: vi.domain.log_size_of_group as isize,
-            group_gen: vi.domain.group_gen.into(),
-        },
-        max_poly_size: vi.max_poly_size as isize,
-        max_quot_size: vi.max_quot_size as isize,
-        urs: caml_pointer::create(Rc::clone(urs)),
-        evals: CamlPlonkVerificationEvals {
-            sigma_comm0: sigma_comm0.clone().into(),
-            sigma_comm1: sigma_comm1.clone().into(),
-            sigma_comm2: sigma_comm2.clone().into(),
-            ql_comm: vi.ql_comm.clone().into(),
-            qr_comm: vi.qr_comm.clone().into(),
-            qo_comm: vi.qo_comm.clone().into(),
-            qm_comm: vi.qm_comm.clone().into(),
-            qc_comm: vi.qc_comm.clone().into(),
-            rcm_comm0: rcm_comm0.clone().into(),
-            rcm_comm1: rcm_comm1.clone().into(),
-            rcm_comm2: rcm_comm2.clone().into(),
-            psm_comm: vi.psm_comm.clone().into(),
-            add_comm: vi.add_comm.clone().into(),
-            mul1_comm: vi.mul1_comm.clone().into(),
-            mul2_comm: vi.mul2_comm.clone().into(),
-            emul1_comm: vi.emul1_comm.clone().into(),
-            emul2_comm: vi.emul2_comm.clone().into(),
-            emul3_comm: vi.emul3_comm.clone().into(),
-        },
-        shifts: CamlPlonkVerificationShifts {
-            r: vi.r.into(),
-            o: vi.o.into(),
-        },
-    }
-}
-
-pub fn of_ocaml<'a>(
-    max_poly_size: ocaml::Int,
-    max_quot_size: ocaml::Int,
-    log_size_of_group: ocaml::Int,
-    urs: CamlPastaFqUrs,
-    evals: CamlPlonkVerificationEvals<CamlPolyComm<CamlGPallas>>,
-    shifts: CamlPlonkVerificationShifts<CamlFq>,
-) -> (DlogVerifierIndex<'a, GAffine>, Rc<SRS<GAffine>>) {
-    let urs_copy = Rc::clone(&*urs);
-    let urs_copy_outer = Rc::clone(&*urs);
-    let srs = {
-        // We know that the underlying value is still alive, because we never convert any of our
-        // Rc<_>s into weak pointers.
-        SRSValue::Ref(unsafe { &*Rc::into_raw(urs_copy) })
-    };
-    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
-    let domain = Domain::<Fq>::new(1 << log_size_of_group).unwrap();
-    let index = DlogVerifierIndex::<GAffine> {
-        domain,
-        w: zk_w(domain),
-        zkpm: zk_polynomial(domain),
-        max_poly_size: max_poly_size as usize,
-        max_quot_size: max_quot_size as usize,
-        srs,
-        sigma_comm: [
-            evals.sigma_comm0.into(),
-            evals.sigma_comm1.into(),
-            evals.sigma_comm2.into(),
-        ],
-        ql_comm: evals.ql_comm.into(),
-        qr_comm: evals.qr_comm.into(),
-        qo_comm: evals.qo_comm.into(),
-        qm_comm: evals.qm_comm.into(),
-        qc_comm: evals.qc_comm.into(),
-        rcm_comm: [
-            evals.rcm_comm0.into(),
-            evals.rcm_comm1.into(),
-            evals.rcm_comm2.into(),
-        ],
-        psm_comm: evals.psm_comm.into(),
-        add_comm: evals.add_comm.into(),
-        mul1_comm: evals.mul1_comm.into(),
-        mul2_comm: evals.mul2_comm.into(),
-        emul1_comm: evals.emul1_comm.into(),
-        emul2_comm: evals.emul2_comm.into(),
-        emul3_comm: evals.emul3_comm.into(),
-        r: shifts.r.into(),
-        o: shifts.o.into(),
-        fr_sponge_params: oracle::pasta::fq::params(),
-        fq_sponge_params: oracle::pasta::fp::params(),
-        endo: endo_q,
-    };
-    (index, urs_copy_outer)
-}
-
-impl From<CamlPastaFqPlonkVerifierIndex> for DlogVerifierIndex<'_, GAffine> {
+impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
     fn from(index: CamlPastaFqPlonkVerifierIndex) -> Self {
-        of_ocaml(
-            index.max_poly_size,
-            index.max_quot_size,
-            index.domain.log_size_of_group,
-            index.urs,
-            index.evals,
-            index.shifts,
-        )
-        .0
+        let evals = index.evals;
+        let shifts = index.shifts;
+
+        let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
+        let domain = Domain::<Fq>::new(1 << index.domain.log_size_of_group).expect("wrong size");
+
+        let qw_comm: Vec<PolyComm<GAffine>> = evals.qw_comm.iter().map(Into::into).collect();
+        let qw_comm: [_; GENERICS] = qw_comm.try_into().expect("wrong size");
+
+        let sigma_comm: Vec<PolyComm<GAffine>> = evals.sigma_comm.iter().map(Into::into).collect();
+        let sigma_comm: [_; PERMUTS] = sigma_comm
+            .try_into()
+            .expect("vector of sigma comm is of wrong size");
+
+        let rcm_comm: Vec<[PolyComm<GAffine>; PlonkSpongeConstants15W::SPONGE_WIDTH]> = evals
+            .rcm_comm
+            .iter()
+            .map(|x| {
+                x.iter()
+                    .map(Into::into)
+                    .collect::<Vec<PolyComm<GAffine>>>()
+                    .try_into()
+                    .expect("wrong")
+            })
+            .collect();
+        let rcm_comm: [_; ROUNDS_PER_ROW] = rcm_comm.try_into().expect("wrong size");
+
+        let shifts: Vec<Fq> = shifts.iter().map(Into::into).collect();
+        let shift: [Fq; PERMUTS] = shifts.try_into().expect("wrong size");
+
+        let index = VerifierIndex::<GAffine> {
+            domain,
+            w: zk_w3(domain),
+            zkpm: zk_polynomial(domain),
+            max_poly_size: index.max_poly_size as usize,
+            max_quot_size: index.max_quot_size as usize,
+            srs: index.srs.0,
+            sigma_comm,
+            qw_comm,
+            qm_comm: evals.qm_comm.into(),
+            qc_comm: evals.qc_comm.into(),
+            rcm_comm,
+            psm_comm: evals.psm_comm.into(),
+            add_comm: evals.add_comm.into(),
+            double_comm: evals.double_comm.into(),
+            mul_comm: evals.mul_comm.into(),
+            emul_comm: evals.emul_comm.into(),
+            shift,
+            fr_sponge_params: oracle::pasta::fq::params(),
+            fq_sponge_params: oracle::pasta::fp::params(),
+            endo: endo_q,
+        };
+        index
     }
 }
+
+//
+// Serialization helpers
+//
 
 pub fn read_raw<'a>(
     offset: Option<ocaml::Int>,
-    urs: CamlPastaFqUrs,
+    srs: CamlFqSRS,
     path: String,
-) -> Result<(DlogVerifierIndex<'a, GAffine>, Rc<SRS<GAffine>>), ocaml::Error> {
-    match File::open(path) {
-        Err(_) => Err(ocaml::Error::invalid_argument(
-            "caml_pasta_fq_plonk_verifier_index_raw_read",
-        )
-        .err()
-        .unwrap()),
-        Ok(file) => {
-            let mut r = BufReader::new(file);
-            match offset {
-                Some(offset) => {
-                    r.seek(Start(offset as u64))?;
-                }
-                None => (),
-            };
-            let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
-            let urs_copy = Rc::clone(&*urs);
-            let urs_copy2 = Rc::clone(&urs_copy);
-            let t = index_serialization::read_plonk_verifier_index(
-                oracle::pasta::fq::params(),
-                oracle::pasta::fp::params(),
-                endo_q,
-                Rc::into_raw(urs_copy2),
-                &mut r,
-            )?;
-            Ok((t, Rc::clone(&urs_copy)))
-        }
-    }
+) -> Result<VerifierIndex<GAffine>, ocaml::Error> {
+    let path = Path::new(&path);
+    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
+    let fq_sponge_params = oracle::pasta::fp::params();
+    let fr_sponge_params = oracle::pasta::fq::params();
+    VerifierIndex::<GAffine>::from_file(
+        srs.0,
+        &path,
+        offset.map(|x| x as u64),
+        endo_q,
+        fq_sponge_params,
+        fr_sponge_params,
+    )
+    .map_err(|e| {
+        println!("{}", e);
+        ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
+            .err()
+            .unwrap()
+    })
 }
 
+//
+// Methods
+//
+
+#[ocaml_gen]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_verifier_index_read(
     offset: Option<ocaml::Int>,
-    urs: CamlPastaFqUrs,
+    srs: CamlFqSRS,
     path: String,
 ) -> Result<CamlPastaFqPlonkVerifierIndex, ocaml::Error> {
-    let (vi, urs) = read_raw(offset, urs, path)?;
-    Ok(to_ocaml(&urs, vi))
+    let vi = read_raw(offset, srs, path)?;
+    Ok(CamlPastaFqPlonkVerifierIndex::from_verifier_index(vi))
 }
 
-pub fn write_raw(
-    append: Option<bool>,
-    index: &DlogVerifierIndex<GAffine>,
-    path: String,
-) -> Result<(), ocaml::Error> {
-    match OpenOptions::new().append(append.unwrap_or(true)).open(path) {
-        Err(_) => Err(ocaml::Error::invalid_argument(
-            "caml_pasta_fq_plonk_verifier_index_raw_read",
-        )
-        .err()
-        .unwrap()),
-        Ok(file) => {
-            let mut w = BufWriter::new(file);
-
-            Ok(index_serialization::write_plonk_verifier_index(
-                index, &mut w,
-            )?)
-        }
-    }
-}
-
+#[ocaml_gen]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_verifier_index_write(
     append: Option<bool>,
     index: CamlPastaFqPlonkVerifierIndex,
     path: String,
 ) -> Result<(), ocaml::Error> {
-    write_raw(append, &index.into(), path)
+    let index: VerifierIndex<GAffine> = index.into();
+    let path = Path::new(&path);
+    index.to_file(path, append).map_err(|e| {
+        println!("{}", e);
+        ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
+            .err()
+            .unwrap()
+    })
 }
 
+#[ocaml_gen]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_verifier_index_create(
-    index: CamlPastaFqPlonkIndexPtr<'static>,
+    index: CamlPastaFqPlonkIndexPtr,
 ) -> CamlPastaFqPlonkVerifierIndex {
-    let index = index.as_ref();
-    to_ocaml(&index.1, index.0.verifier_index())
+    let verifier_index = index.as_ref().0.verifier_index();
+    CamlPastaFqPlonkVerifierIndex::from_verifier_index(verifier_index)
 }
 
+#[ocaml_gen]
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_verifier_index_shifts(
-    log2_size: ocaml::Int,
-) -> CamlPlonkVerificationShifts<CamlFq> {
-    let (a, b): (Fq, Fq) = ConstraintSystem::sample_shifts(&Domain::new(1 << log2_size).unwrap());
-    CamlPlonkVerificationShifts {
-        r: a.into(),
-        o: b.into(),
-    }
+pub fn caml_pasta_fq_plonk_verifier_index_shifts(log2_size: ocaml::Int) -> Vec<CamlFq> {
+    let domain = Domain::<Fq>::new(1 << log2_size).unwrap();
+    let shifts = ConstraintSystem::sample_shifts(&domain, PERMUTS - 1);
+    shifts.iter().map(Into::into).collect()
 }
 
+#[ocaml_gen]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierIndex {
-    let g = || GAffine::prime_subgroup_generator();
-    let comm = || PolyComm {
-        shifted: Some(g()),
-        unshifted: vec![g(), g(), g()],
-    };
+    fn comm() -> CamlPolyComm<CamlGPallas> {
+        let g: CamlGPallas = GAffine::prime_subgroup_generator().into();
+        CamlPolyComm {
+            shifted: Some(g.clone()),
+            unshifted: vec![g.clone(), g.clone(), g],
+        }
+    }
+    fn vec_comm(num: usize) -> Vec<CamlPolyComm<CamlGPallas>> {
+        (0..num).map(|_| comm()).collect()
+    }
+
     CamlPlonkVerifierIndex {
         domain: CamlPlonkDomain {
             log_size_of_group: 1,
@@ -285,34 +226,26 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
         },
         max_poly_size: 0,
         max_quot_size: 0,
-        urs: caml_pointer::create(Rc::new(SRS::create(0))),
+        srs: CamlPointer::new(SRS::create(0)),
         evals: CamlPlonkVerificationEvals {
-            sigma_comm0: comm().into(),
-            sigma_comm1: comm().into(),
-            sigma_comm2: comm().into(),
-            ql_comm: comm().into(),
-            qr_comm: comm().into(),
-            qo_comm: comm().into(),
-            qm_comm: comm().into(),
-            qc_comm: comm().into(),
-            rcm_comm0: comm().into(),
-            rcm_comm1: comm().into(),
-            rcm_comm2: comm().into(),
-            psm_comm: comm().into(),
-            add_comm: comm().into(),
-            mul1_comm: comm().into(),
-            mul2_comm: comm().into(),
-            emul1_comm: comm().into(),
-            emul2_comm: comm().into(),
-            emul3_comm: comm().into(),
+            sigma_comm: vec_comm(PERMUTS),
+            qw_comm: vec_comm(GENERICS),
+            qm_comm: comm(),
+            qc_comm: comm(),
+            rcm_comm: (0..ROUNDS_PER_ROW)
+                .map(|_| vec_comm(PlonkSpongeConstants15W::SPONGE_WIDTH))
+                .collect(),
+            psm_comm: comm(),
+            add_comm: comm(),
+            double_comm: comm(),
+            mul_comm: comm(),
+            emul_comm: comm(),
         },
-        shifts: CamlPlonkVerificationShifts {
-            r: Fq::one().into(),
-            o: Fq::one().into(),
-        },
+        shifts: (0..PERMUTS - 1).map(|_| Fq::one().into()).collect(),
     }
 }
 
+#[ocaml_gen]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_verifier_index_deep_copy(
     x: CamlPastaFqPlonkVerifierIndex,

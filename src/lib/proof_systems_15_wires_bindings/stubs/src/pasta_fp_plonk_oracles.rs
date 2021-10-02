@@ -6,9 +6,10 @@ use mina_curves::pasta::{
     fp::Fp,
     vesta::{Affine as GAffine, VestaParameters},
 };
+use ocaml_gen::{ocaml_gen, OcamlGen};
 use oracle::{
     self,
-    poseidon::PlonkSpongeConstantsBasic,
+    poseidon::PlonkSpongeConstants15W,
     sponge::{DefaultFqSponge, DefaultFrSponge},
     FqSponge,
 };
@@ -18,21 +19,30 @@ use plonk_15_wires_protocol_dlog::{
     index::VerifierIndex as DlogVerifierIndex, prover::caml::CamlProverProof,
 };
 
-#[derive(ocaml::IntoValue, ocaml::FromValue)]
+//
+// CamlPastaFpPlonkOracles
+//
+
+#[derive(ocaml::IntoValue, ocaml::FromValue, OcamlGen)]
 pub struct CamlPastaFpPlonkOracles {
     pub o: CamlRandomOracles<CamlFp>,
     pub p_eval: (CamlFp, CamlFp),
     pub opening_prechallenges: Vec<CamlFp>,
     pub digest_before_evaluations: CamlFp,
 }
+//
+// Methods
+//
 
+#[ocaml_gen]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_oracles_create(
     lgr_comm: Vec<CamlPolyComm<CamlGVesta>>, // the bases to commit polynomials
     index: CamlPastaFpPlonkVerifierIndex,    // parameters
     proof: CamlProverProof<CamlGVesta, CamlFp>, // the final proof (contains public elements at the beginning)
 ) -> CamlPastaFpPlonkOracles {
-    let index: DlogVerifierIndex<'_, GAffine> = index.into();
+    // conversions
+    let index: DlogVerifierIndex<GAffine> = index.into();
     let lgr_comm: Vec<PolyComm<GAffine>> = lgr_comm
         .into_iter()
         .take(proof.public.len())
@@ -50,8 +60,17 @@ pub fn caml_pasta_fp_plonk_oracles_create(
             .collect(),
     );
     let proof: ProverProof<GAffine> = proof.into();
-    let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =
-        proof.oracles::<DefaultFqSponge<VestaParameters, PlonkSpongeConstantsBasic>, DefaultFrSponge<Fp, PlonkSpongeConstantsBasic>>(&index, &p_comm);
+
+    let oracles_result =
+        proof.oracles::<DefaultFqSponge<VestaParameters, PlonkSpongeConstants15W>, DefaultFrSponge<Fp, PlonkSpongeConstants15W>>(&index, &p_comm);
+
+    let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
+        oracles_result.fq_sponge,
+        oracles_result.combined_inner_product,
+        oracles_result.p_eval,
+        oracles_result.digest,
+        oracles_result.oracles,
+    );
 
     sponge.absorb_fr(&[shift_scalar(combined_inner_product)]);
 
@@ -61,19 +80,22 @@ pub fn caml_pasta_fp_plonk_oracles_create(
         .into_iter()
         .map(|x| x.0.into())
         .collect();
+
     CamlPastaFpPlonkOracles {
-        o: o.into(),
+        o: oracles.into(),
         p_eval: (p_eval[0][0].into(), p_eval[1][0].into()),
         opening_prechallenges,
-        digest_before_evaluations: digest_before_evaluations.into(),
+        digest_before_evaluations: digest.into(),
     }
 }
 
+#[ocaml_gen]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_oracles_dummy() -> CamlRandomOracles<CamlFp> {
-    RandomOracles::<Fp>::zero().into()
+    RandomOracles::<Fp>::default().into()
 }
 
+#[ocaml_gen]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_oracles_deep_copy(
     x: CamlRandomOracles<CamlFp>,

@@ -1,7 +1,9 @@
+use ocaml_gen::OCamlCustomType;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
-#[derive(Debug, Clone)]
+/// A CamlPointer is just a pointer to a reference-counting pointer ([Rc]).
+#[derive(Debug, Clone, OCamlCustomType)]
 pub struct CamlPointer<T>(pub Rc<T>);
 
 impl<T> CamlPointer<T> {
@@ -17,6 +19,10 @@ impl<T> CamlPointer<T> {
         // would be broken anyway.
         0
     }
+
+    pub fn new(x: T) -> Self {
+        CamlPointer(Rc::new(x))
+    }
 }
 
 ocaml::custom!(CamlPointer<T> {
@@ -29,10 +35,6 @@ unsafe impl<'a, T> ocaml::FromValue<'a> for CamlPointer<T> {
         let x = ocaml::Pointer::<Self>::from_value(x);
         CamlPointer(x.as_ref().0.clone())
     }
-}
-
-pub fn create<T>(x: T) -> CamlPointer<T> {
-    CamlPointer(Rc::new(x))
 }
 
 impl<T> Deref for CamlPointer<T> {

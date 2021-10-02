@@ -41,7 +41,7 @@ module Gate_spec = struct
     ; rrow : 'row
     ; rcol : Plonk_gate.Col.t
     ; orow : 'row
-    ; ocol : Plonk_gate.Col.t (* TODO: what's coeffs?*)
+    ; ocol : Plonk_gate.Col.t (* constants (e.g. Poseidon round constants) *)
     ; coeffs : 'f array
     }
 
@@ -171,24 +171,24 @@ module V = struct
 end
 
 type ('a, 'f) t =
-  { (* map of cells that share the same value (enforced by to the permutation) *)
+  { (** map of cells that share the same value (enforced by to the permutation) *)
     equivalence_classes : Position.t list V.Table.t
-  ; (* How to compute each internal variable (as a linear combination of other variables) *)
+  ; (** How to compute each internal variable (as a linear combination of other variables) *)
     internal_vars : (('f * V.t) list * 'f option) Internal_var.Table.t
-  ; (* ?, in reversed order because functional programming *)
+  ; (** ?, in reversed order because functional programming *)
     mutable rows_rev : V.t option array list
-  ; (* a circuit is described by a series of gates. A gate is finalized if TKTK *)
+  ; (** a circuit is described by a series of gates. A gate is finalized if TKTK *)
     mutable gates :
       [ `Finalized | `Unfinalized_rev of (Row.t, 'f) Gate_spec.t list ]
-  ; (* an instruction pointer *)
+  ; (** an instruction pointer *)
     mutable next_row : int
-  ; (* hash of the circuit, for distinguishing different circuits *)
+  ; (** hash of the circuit, for distinguishing different circuits *)
     mutable hash : Hash_state.t
-  ; (* ? *)
+  ; (** ? *)
     mutable constraints : int
-  ; (* the size of the public input (which fills the first rows of our constraint system *)
+  ; (** the size of the public input (which fills the first rows of our constraint system *)
     public_input_size : int Core_kernel.Set_once.t
-  ; (* ? *)
+  ; (** whatever is not public input *)
     mutable auxiliary_input_size : int
   }
 
@@ -204,6 +204,9 @@ let zk_rows = 2
 
 (* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
 
+(* TODO: glossary of terms in this file (terms, reducing, feeding) + module doc *)
+
+(* TODO: rename Fp to F or something *)
 (** ? *)
 module Make
     (Fp : Field.S)
@@ -286,7 +289,7 @@ struct
     | _ ->
         failwith "Unsupported constraint"
 
-  (* TODO: why isn't external_values a hashtable instead? *)
+  (* TODO: why isn't external_values an array instead? *)
 
   (** Compute the witness, given the constraint system `sys` and a function that converts the indexed secret inputs to their concrete values *)
   let compute_witness (sys : t) (external_values : int -> Fp.t) :
