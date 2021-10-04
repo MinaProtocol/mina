@@ -333,11 +333,12 @@ let handle_push_message t push_message =
       t.peer_disconnected_callback peer_id
   | GossipReceived m -> (
       let open GossipReceived in
+      let open UnixNano in
       let data = data_get m in
       let subscription_id = subscription_id_get m in
       let sender = Libp2p_ipc.unsafe_parse_peer (sender_get m) in
       let validation_id = validation_id_get m in
-      let seen_at = seen_at_get m in
+      let seen_at = nano_sec_get (seen_at_get m) in
       let validation_expiration =
         Libp2p_ipc.unix_nano_to_time_span (expiration_get m)
       in
