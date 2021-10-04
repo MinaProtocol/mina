@@ -2181,9 +2181,11 @@ module Base = struct
                { fee_token_l = Token_id.(var_of_t default)
                ; fee_excess_l =
                    Fee.Signed.Checked.of_unsigned
-                     (Amount.Checked.to_fee global.fee_excess)
+                     (Amount.Checked.to_fee (fst init).fee_excess)
                ; fee_token_r = Token_id.(var_of_t default)
-               ; fee_excess_r = Fee.Signed.(Checked.constant zero)
+               ; fee_excess_r =
+                   Fee.Signed.Checked.of_unsigned
+                     (Amount.Checked.to_fee global.fee_excess)
                })) ;
       let `Needs_some_work_for_snapps_on_mainnet = Mina_base.Util.todo_snapps in
       (* TODO: Check various consistency equalities between local and global and the statement *)
