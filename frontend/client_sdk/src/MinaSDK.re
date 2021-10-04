@@ -50,18 +50,18 @@ type payment = {
   validUntil: option(uint32),
 };
 
-type codaSDK;
-[@bs.module "./client_sdk.bc.js"] external codaSDK: codaSDK = "minaSDK";
+type minaSDK;
+[@bs.module "./client_sdk.bc.js"] external minaSDK: minaSDK = "minaSDK";
 
-[@bs.send] external genKeys: (codaSDK, unit) => keypair = "genKeys";
+[@bs.send] external genKeys: (minaSDK, unit) => keypair = "genKeys";
 /**
   * Generates a public/private keypair
  */
 [@genType]
-let genKeys = () => genKeys(codaSDK, ());
+let genKeys = () => genKeys(minaSDK, ());
 
 [@bs.send]
-external publicKeyOfPrivateKey: (codaSDK, privateKey) => publicKey =
+external publicKeyOfPrivateKey: (minaSDK, privateKey) => publicKey =
   "publicKeyOfPrivateKey";
 /**
   * Derives the public key of the corresponding private key
@@ -71,9 +71,9 @@ external publicKeyOfPrivateKey: (codaSDK, privateKey) => publicKey =
  */
 [@genType]
 let derivePublicKey = (privateKey: privateKey) =>
-  publicKeyOfPrivateKey(codaSDK, privateKey);
+  publicKeyOfPrivateKey(minaSDK, privateKey);
 
-[@bs.send] external validKeypair: (codaSDK, keypair) => bool = "validKeypair";
+[@bs.send] external validKeypair: (minaSDK, keypair) => bool = "validKeypair";
 /**
   * Verifies if a keypair is valid by checking if the public key can be derived from
   * the private key and additionally checking if we can use the private key to
@@ -84,11 +84,11 @@ let derivePublicKey = (privateKey: privateKey) =>
   */
 [@genType]
 let verifyKeypair = (keypair: keypair) => {
-  validKeypair(codaSDK, keypair);
+  validKeypair(minaSDK, keypair);
 };
 
 [@bs.send]
-external signString: (codaSDK, privateKey, string) => signature = "signString";
+external signString: (minaSDK, privateKey, string) => signature = "signString";
 /**
   * Signs an arbitrary message
   *
@@ -100,12 +100,12 @@ external signString: (codaSDK, privateKey, string) => signature = "signString";
 let signMessage =
   (. message: string, key: keypair) => {
     publicKey: key.publicKey,
-    signature: signString(codaSDK, key.privateKey, message),
+    signature: signString(minaSDK, key.privateKey, message),
     payload: message,
   };
 
 [@bs.send]
-external verifyStringSignature: (codaSDK, signature, publicKey, string) => bool =
+external verifyStringSignature: (minaSDK, signature, publicKey, string) => bool =
   "verifyStringSignature";
 /**
   * Verifies that a signature matches a message.
@@ -118,7 +118,7 @@ external verifyStringSignature: (codaSDK, signature, publicKey, string) => bool 
 let verifyMessage =
   (. signedMessage: signed(string)) => {
     verifyStringSignature(
-      codaSDK,
+      minaSDK,
       signedMessage.signature,
       signedMessage.publicKey,
       signedMessage.payload,
@@ -200,7 +200,7 @@ type signed_stake_delegation_js = {
 };
 
 [@bs.send]
-external signPayment: (codaSDK, privateKey, payment_js) => signed_js =
+external signPayment: (minaSDK, privateKey, payment_js) => signed_js =
   "signPayment";
 /**
   * Signs a payment transaction using a private key.
@@ -236,7 +236,7 @@ let signPayment =
       },
       signature:
         signPayment(
-          codaSDK,
+          minaSDK,
           key.privateKey,
           {
             "common": {
@@ -258,7 +258,7 @@ let signPayment =
 
 [@bs.send]
 external signStakeDelegation:
-  (codaSDK, privateKey, stake_delegation_js) => signed_js =
+  (minaSDK, privateKey, stake_delegation_js) => signed_js =
   "signStakeDelegation";
 
 /**
@@ -297,7 +297,7 @@ let signStakeDelegation =
       },
       signature:
         signStakeDelegation(
-          codaSDK,
+          minaSDK,
           key.privateKey,
           {
             "common": {
@@ -317,7 +317,7 @@ let signStakeDelegation =
   };
 
 [@bs.send]
-external verifyPaymentSignature: (codaSDK, signed_payment_js) => bool =
+external verifyPaymentSignature: (minaSDK, signed_payment_js) => bool =
   "verifyPaymentSignature";
 
 /**
@@ -339,7 +339,7 @@ let verifyPaymentSignature = (signedPayment: signed(payment)) => {
     Js.String.make(value(~default=defaultValidUntil, payload.validUntil));
 
   verifyPaymentSignature(
-    codaSDK,
+    minaSDK,
     {
       "sender": signedPayment.publicKey,
       "signature": signedPayment.signature,
@@ -363,7 +363,7 @@ let verifyPaymentSignature = (signedPayment: signed(payment)) => {
 
 [@bs.send]
 external verifyStakeDelegationSignature:
-  (codaSDK, signed_stake_delegation_js) => bool =
+  (minaSDK, signed_stake_delegation_js) => bool =
   "verifyStakeDelegationSignature";
 
 /**
@@ -385,7 +385,7 @@ let verifyStakeDelegationSignature =
     Js.String.make(value(~default=defaultValidUntil, payload.validUntil));
 
   verifyStakeDelegationSignature(
-    codaSDK,
+    minaSDK,
     {
       "sender": signedStakeDelegation.publicKey,
       "signature": signedStakeDelegation.signature,
@@ -407,7 +407,7 @@ let verifyStakeDelegationSignature =
 };
 
 [@bs.send]
-external signedRosettaTransactionToSignedCommand: (codaSDK, string) => string =
+external signedRosettaTransactionToSignedCommand: (minaSDK, string) => string =
   "signedRosettaTransactionToSignedCommand";
 
 /**
@@ -420,11 +420,11 @@ external signedRosettaTransactionToSignedCommand: (codaSDK, string) => string =
   */
 [@genType]
 let signedRosettaTransactionToSignedCommand = (signedRosettaTxn: string) => {
-  signedRosettaTransactionToSignedCommand(codaSDK, signedRosettaTxn);
+  signedRosettaTransactionToSignedCommand(minaSDK, signedRosettaTxn);
 };
 
 [@bs.send]
-external rawPublicKeyOfPublicKey: (codaSDK, publicKey) => string =
+external rawPublicKeyOfPublicKey: (minaSDK, publicKey) => string =
   "rawPublicKeyOfPublicKey";
 
 /**
@@ -436,5 +436,5 @@ external rawPublicKeyOfPublicKey: (codaSDK, publicKey) => string =
   */
 [@genType]
 let publicKeyToRaw = (publicKey: string) => {
-  rawPublicKeyOfPublicKey(codaSDK, publicKey);
+  rawPublicKeyOfPublicKey(minaSDK, publicKey);
 };
