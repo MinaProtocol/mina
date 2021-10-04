@@ -4245,6 +4245,153 @@ let%test_module "transaction_snark" =
               let hash_post = Ledger.merkle_root ledger in
               [%test_eq: Field.t] hash_pre hash_post))
 
+    let apply_parties ledger parties =
+      let sparse_ledger =
+        Sparse_ledger.of_ledger_subset_exn ledger
+          (Parties.accounts_accessed parties)
+      in
+      let _, states =
+        Sparse_ledger.apply_parties_unchecked_with_states sparse_ledger
+          ~constraint_constants
+          ~state_view:(Mina_state.Protocol_state.Body.view state_body)
+          parties
+        |> Or_error.ok_exn
+      in
+      let states_rev =
+        group_by_parties_rev
+          [ []; Parties.parties parties ]
+          [ [ List.hd_exn states ]; states ]
+      in
+      let witnesses =
+        let parties : _ Parties_logic.Start_data.t =
+          { protocol_state_predicate = Snapp_predicate.Protocol_state.accept
+          ; parties
+          }
+        in
+        let commitment = ref Local_state.dummy.transaction_commitment in
+        let remaining_parties = ref [ parties ] in
+        List.fold states_rev ~init:[]
+          ~f:(fun
+               witnesses
+               ( kind
+               , spec
+               , (source_global, source_local)
+               , (target_global, target_local) )
+             ->
+            let current_commitment = !commitment in
+            let start_parties, next_commitment =
+              match kind with
+              | `Same ->
+                  ([], current_commitment)
+              | `New -> (
+                  match !remaining_parties with
+                  | parties :: rest ->
+                      let commitment' = Parties.commitment parties.parties in
+                      remaining_parties := rest ;
+                      commitment := commitment' ;
+                      ([ parties ], commitment')
+                  | _ ->
+                      failwith "Not enough remaining parties" )
+              | `Two_new -> (
+                  match !remaining_parties with
+                  | parties1 :: parties2 :: rest ->
+                      let commitment' = Parties.commitment parties2.parties in
+                      remaining_parties := rest ;
+                      commitment := commitment' ;
+                      ([ parties1; parties2 ], commitment')
+                  | _ ->
+                      failwith "Not enough remaining parties" )
+            in
+            let hash_local_state (local : _ Parties_logic.Local_state.t) =
+              let hash_parties_stack ps =
+                ps |> Parties.Party_or_stack.accumulate_hashes'
+                |> List.map
+                     ~f:(Parties.Party_or_stack.map ~f:(fun p -> (p, ())))
+              in
+              { local with
+                Parties_logic.Local_state.parties =
+                  hash_parties_stack local.parties
+              ; call_stack = hash_parties_stack local.call_stack
+              }
+            in
+            let source_local =
+              { (hash_local_state source_local) with
+                transaction_commitment = current_commitment
+              }
+            in
+            let target_local =
+              { (hash_local_state target_local) with
+                transaction_commitment = next_commitment
+              }
+            in
+            let w : Parties_segment.Witness.t =
+              { global_ledger = source_global.ledger
+              ; local_state_init = source_local
+              ; start_parties
+              ; state_body
+              }
+            in
+            let statement : Statement.With_sok.t =
+              { source =
+                  { ledger = Sparse_ledger.merkle_root source_global.ledger
+                  ; next_available_token =
+                      Sparse_ledger.next_available_token source_global.ledger
+                  ; pending_coinbase_stack = Pending_coinbase.Stack.empty
+                  ; local_state =
+                      { source_local with
+                        parties =
+                          Parties.Party_or_stack.stack_hash source_local.parties
+                      ; call_stack =
+                          Parties.Party_or_stack.stack_hash
+                            source_local.call_stack
+                      ; ledger = Sparse_ledger.merkle_root source_local.ledger
+                      }
+                  }
+              ; target =
+                  { ledger = Sparse_ledger.merkle_root target_global.ledger
+                  ; next_available_token =
+                      Sparse_ledger.next_available_token target_global.ledger
+                  ; pending_coinbase_stack = Pending_coinbase.Stack.empty
+                  ; local_state =
+                      { target_local with
+                        parties =
+                          Parties.Party_or_stack.stack_hash target_local.parties
+                      ; call_stack =
+                          Parties.Party_or_stack.stack_hash
+                            target_local.call_stack
+                      ; ledger = Sparse_ledger.merkle_root target_local.ledger
+                      }
+                  }
+              ; supply_increase = Amount.zero
+              ; fee_excess =
+                  { fee_token_l = Token_id.default
+                  ; fee_excess_l =
+                      Fee.Signed.of_unsigned
+                        (Amount.to_fee source_global.fee_excess)
+                  ; fee_token_r = Token_id.default
+                  ; fee_excess_r =
+                      Fee.Signed.of_unsigned
+                        (Amount.to_fee target_global.fee_excess)
+                  }
+              ; sok_digest = Sok_message.Digest.default
+              }
+            in
+            (w, spec, statement) :: witnesses)
+      in
+      let open Impl in
+      List.fold ~init:((), ()) witnesses ~f:(fun _ (witness, spec, statement) ->
+          run_and_check
+            (fun () ->
+              let s =
+                exists Statement.With_sok.typ ~compute:(fun () -> statement)
+              in
+              Base.Parties_snark.main ~constraint_constants
+                (Parties_segment.Basic.to_single_list spec)
+                [] s ~witness ;
+              fun () -> ())
+            ()
+          |> Or_error.ok_exn)
+
     let%test_unit "snapps-based payment" =
       let open Transaction_logic.For_tests in
       Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun { init_ledger; specs } ->
