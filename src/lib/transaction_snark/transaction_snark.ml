@@ -1976,7 +1976,9 @@ module Base = struct
                         match V.get control with
                         | Signature s ->
                             s
-                        | Proof _ | None_given ->
+                        | None_given ->
+                            Signature.dummy
+                        | Proof _ ->
                             assert false)
                   in
                   run_checked
