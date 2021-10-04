@@ -175,7 +175,7 @@ This structure encapsulates the succinct state of the consensus protocol.  The s
 | `has_ancestor_in_same_checkpoint_window` | `bool` | |
 | `block_stake_winner`                     | `Public_key.Compressed.Stable.V1.t` | Compressed public key of winning account |
 | `block_creator`                          | `Public_key.Compressed.Stable.V1.t` | Compressed public key of the block producer |
-| `coinbase_receiver`                      | `Public_key.Compressed.Stable.V1.t` | Compresed public key of account receiving the block reward |
+| `coinbase_receiver`                      | `Public_key.Compressed.Stable.V1.t` | Compressed public key of account receiving the block reward |
 | `supercharge_coinbase`                   | `bool` | `true` if `block_stake_winner` has no locked tokens, `false` otherwise |
 
 ## 4.6 `Epoch_data`
@@ -284,7 +284,7 @@ This is an example of a Mina block in JSON format
 
 # 5. Algorithms
 
-This section outlines the main algorithms and constructs used by Samasikia.
+This section outlines the main algorithms and constructs used by Samasika.
 
 ## 5.1 Common
 
@@ -406,13 +406,13 @@ This rule is triggered whenever the fork is such that the adversary has not yet 
 Choose the longest chain
 ```
 
-A fork is short-range if it occured less than `m` blocks ago.  The naı̈ve implemention of this rule is to always store the last `m` blocks, but for a succinct blockchain this is not desirable.  Mina Samasika adopts an approach that only requires information about two blocks.  The idea is a decentralized checkpointing algorithm, the details of which are given in [Section 5.3](#53-decentralized-checkpointing).
+A fork is short-range if it occurred less than `m` blocks ago.  The naı̈ve implementation of this rule is to always store the last `m` blocks, but for a succinct blockchain this is not desirable.  Mina Samasika adopts an approach that only requires information about two blocks.  The idea is a decentralized checkpointing algorithm, the details of which are given in [Section 5.3](#53-decentralized-checkpointing).
 
 ### 5.2.2 Long-range fork rule
 
 Recall that when an adversary creates a long-range fork, over time it skews the leader selection distribution leading to a longer adversarial chain.  Initially the dishonest chain will have a lower density, but in time the adversary will work to increase it.  Thus, we can only rely on the density difference in the first few slots following the fork, the so-called *critical window*.  The idea is that for the honest chain's critical window the density is overwhelmingly likely to be higher because this chain contains the majority of stake.
 
-As a succint blockchain, Mina does not have a chain into which it can look back on the fork point to observe the densities.  Moreover, the slot range of the desired densities cannot be know ahead of time.
+As a succinct blockchain, Mina does not have a chain into which it can look back on the fork point to observe the densities.  Moreover, the slot range of the desired densities cannot be know ahead of time.
 
 Samasika overcomes this problem by storing a succinct summary of a sliding window of slots over each chain and then tracks the *minimum* of all densities observed for each sliding window.  The intuition is that if the adversary manages to increase the density on the dishonest chain, the tracked minimum density still points to the critical window following the fork.
 
@@ -454,7 +454,7 @@ epoch i: s1 s2 s3 s4 s5 | s6 s7 s8 s9 s10 | s11 s12 s13 s14 s15
 
 As seen above, the slots can be split into 3 parts delimited by `|`.  The first `2/3` of the slots (`s1 ... s10`) are in the seed update range. The epoch seeds of blocks in this rage are used to seed the VRF.
 
-The idea of decentralized checkpointing is that each chain maintains two checkpoints in every epoch, which are used to estimate how long ago a fork has occured.
+The idea of decentralized checkpointing is that each chain maintains two checkpoints in every epoch, which are used to estimate how long ago a fork has occurred.
 
 * **Start checkpoint** - State hash of the first block of the epoch
 * **Lock checkpoint** - State hash of the last known block in the seed update range of an epoch (not including the current block)
@@ -554,7 +554,7 @@ This section describes Mina's succinct sliding window density algorithm, how win
  
 ### 5.4.2 Sliding windows
 
-In the Ouroborus Samasika paper the _`sliding window`_ is referred to as a `v`-shifting `w`-window and it characterisd by two parameters.
+In the Ouroboros Samasika paper the _`sliding window`_ is referred to as a `v`-shifting `w`-window and it characterized by two parameters.
 
 | Parameter | Description                                | Value |
 | - | - | - |
@@ -649,9 +649,9 @@ By definition, the window density is only computed on previous sub-windows, so t
 
 It is, therefore, sufficient to only store `11` sub-windows, allowing the most recent sub-window to either be *in-progress* or *complete*.  Mina uses this optimization for both space-saving and SNARK efficiency.
 
-The window of a block `B` is found in the `sub_window_densities` field of the `Consensus_state` (see [Section 4.4](#44-consensus_state)).  The field is defined as a list of `sub_windows_per_window = 11` sub-window densities upto the global slot of block `B`.  As described above, the most recent sub-window may be a previous sub-window or the current sub-window.
+The window of a block `B` is found in the `sub_window_densities` field of the `Consensus_state` (see [Section 4.4](#44-consensus_state)).  The field is defined as a list of `sub_windows_per_window = 11` sub-window densities up to the global slot of block `B`.  As described above, the most recent sub-window may be a previous sub-window or the current sub-window.
 
-The `sub_windows_per_window` field is of type `Length.Stable.V1.t list` and because it is written into blocks as part of the protocol, Mina implimentations MUST implement serialization for this type.
+The `sub_windows_per_window` field is of type `Length.Stable.V1.t list` and because it is written into blocks as part of the protocol, Mina implementations MUST implement serialization for this type.
 
 **Observe:** Since the window density at sub-window `s` is only calculated when sub-window `s` is a previous sub-window, the calculation must happen during sub-window `> s` (slots and sub-windows can be empty).
 
@@ -696,7 +696,7 @@ For technical reasons we will describe later, in order to compute the minimum wi
 
 When we shift a window `[d1, d2, ..., d11]` in order to add in a new previous sub-window `d12`, we could evict the oldest sub-window `d1` by shifting down all of the other sub-windows.  Unfortunately, shifting a list in a SNARK circuit is very expensive.
 
-It is more efficient (and also equivalent) to just replace the sub-window we wish to evict by overwritting it with the new sub-window, like this -- `[d12, d2, ..., d11]`.  (Recall from [Section 5.4.4](#544-window-density) that the calculation of the window density is order insensitive.)
+It is more efficient (and also equivalent) to just replace the sub-window we wish to evict by overwriting it with the new sub-window, like this -- `[d12, d2, ..., d11]`.  (Recall from [Section 5.4.4](#544-window-density) that the calculation of the window density is order insensitive.)
 
 For example, given the window
 
@@ -733,7 +733,7 @@ Given a window `W` and a future global slot `next`, the projected window of `W` 
 
 In the previous section we introduced the concept of ring shifting by one.  When projecting a window sometimes we must shift by more than one sub-window.
 
-For example, when a new block `B` is produced with parent block `P`, the height of `B` will be the height of `P` plus one, but the global slot of `B` will depend on how much time has elapsed since `P` was created.  Sice sliding windows are based on slots, we must take this into account when computing `B`'s window.
+For example, when a new block `B` is produced with parent block `P`, the height of `B` will be the height of `P` plus one, but the global slot of `B` will depend on how much time has elapsed since `P` was created.  Since sliding windows are based on slots, we must take this into account when computing `B`'s window.
 
 According to the Samasika paper, the window of `B` must be initialized based on `P`'s window, then shifted because `B` is ahead of `P` and finally the value of `B`'s sub-window is incremented to account for `B` belonging to it.  Observe that the first two steps are equivalent to computing the projection of `W = P.sub_window_densities` to slot `next = B.curr_global_slot`.
 
@@ -817,7 +817,7 @@ G.sub_window_densities = u32[slots_per_sub_window; sub_windows_per_window]
 Consequently the genesis density was
 
 ```
-genesis_window_denstiy = sum(G.sub_window_densities)
+genesis_window_density = sum(G.sub_window_densities)
                        = slots_per_window
                        = 77
 ```
@@ -832,9 +832,9 @@ Here we do not use the minimum window density function from [Section 5.4.6](#546
 
 When performing chain selection during the long-range fork rule Mina does not actually directly use the minimum window densities found in the existing and candidate blocks.  Instead, Mina uses the *relative minimum window density*.  To understand the relative minimum window density, we first need to understand the problem with simply using the minimum window density.
 
-Recall from [Section 5.4.6](#546-minimum-window-density) that the minimum window density is monitonically decreasing.  Therefore, a peer that has disconnected from the network for a period and wishes to rejoin could have a higher minimum window density for it current best chain when compared to the canonical chain (i.e. the best chain for the network).
+Recall from [Section 5.4.6](#546-minimum-window-density) that the minimum window density is monotonically decreasing.  Therefore, a peer that has disconnected from the network for a period and wishes to rejoin could have a higher minimum window density for it current best chain when compared to the canonical chain (i.e. the best chain for the network).
 
-Also remember from [Section 5.2.2](#522-long-range-fork-rule) that the long-range fork rule dictates that the peer select the chain with the higher minimum density.  Due to the invesion problem just described, this could actually be the peer's current chain, rather than the network's canonical chain (since the minimum window density is always decreasing). Thus, the peer will be stuck and synchronization will not succeed.
+Also remember from [Section 5.2.2](#522-long-range-fork-rule) that the long-range fork rule dictates that the peer select the chain with the higher minimum density.  Due to the inversion problem just described, this could actually be the peer's current chain, rather than the network's canonical chain (since the minimum window density is non-increasing). Thus, the peer will be stuck and synchronization will not succeed.
 
 ```text
 existing:  B1, B2, B3, B4              (ye olde minimum window density = 43) Stuck! 😭
@@ -1062,7 +1062,7 @@ The following JSON specifies most of the genesis block (work in progress).
 
 ## 6.2 Select chain
 
-**WIP**
+**IN REVIEW**
 
 The _select chain_ event occurs every time a peer's chains are updated.  A chain is said to be _updated_ anytime a valid block is added or removed from its head.  All compatible peers MUST select chains as described here.
 
@@ -1116,12 +1116,12 @@ fn selectLongerChain(tip, candidate) -> Chain
     }
     // tiebreak logic
     else if length(tip) == length(candidate) {
-        // compare last VRF digests lexographically
+        // compare last VRF digests lexicographically
         if lastVRF(candidate) > lastVRF(tip) {
             return candidate
         }
         else if lastVRF(candidate) == lastVRF(tip) {
-            // compare consensus state hashes lexographically
+            // compare consensus state hashes lexicographically
             if stateHash(candidate) > stateHash(tip) {
                 return candidate
             }
