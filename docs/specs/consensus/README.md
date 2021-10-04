@@ -33,9 +33,7 @@ This documents specifies required structures, algorithms and protocol details.
     - [3.1.5 `length`](#315-length)
     - [3.1.6 `lastVRF`](#316-lastvrf)
     - [3.1.7 `stateHash`](#317-statehash)
-    - [3.1.9 `disjointWindow`](#319-disjointwindow)
     - [3.1.10 `subWindow`](#3110-subwindow)
-    - [3.1.11 `sameSubWindow`](#3111-samesubwindow)
     - [3.1.12 `relativeSubWindow`](#3112-relativesubwindow)
   - [3.2 Chain selection rules](#32-chain-selection-rules)
     - [3.2.1 Short-range fork rule](#321-short-range-fork-rule)
@@ -84,9 +82,7 @@ This documents specifies required structures, algorithms and protocol details.
     - [3.1.5 `length`](#315-length)
     - [3.1.6 `lastVRF`](#316-lastvrf)
     - [3.1.7 `stateHash`](#317-statehash)
-    - [3.1.9 `disjointWindow`](#319-disjointwindow)
     - [3.1.10 `subWindow`](#3110-subwindow)
-    - [3.1.11 `sameSubWindow`](#3111-samesubwindow)
     - [3.1.12 `relativeSubWindow`](#3112-relativesubwindow)
   - [3.2 Chain selection rules](#32-chain-selection-rules)
     - [3.2.1 Short-range fork rule](#321-short-range-fork-rule)
@@ -417,17 +413,6 @@ fn stateHash(C) -> Hash
 }
 ```
 
-### 3.1.9 `disjointWindow`
-
-This function returns `true` if the windows of two blocks `B1` and `B2` are non-intersecting and `false` otherwise.
-
-```rust
-fn disjointWindow(B1, B2) -> bool
-{
-   return B1.global_slot + wub_windows_per_window < B2.global_slot
-}
-```
-
 ### 3.1.10 `subWindow`
 
 This function returns the sub-window number of a block.
@@ -436,17 +421,6 @@ This function returns the sub-window number of a block.
 fn subWindow(B) -> u64
 {
    return globalSlot(B)/slots_per_sub_window
-}
-```
-
-### 3.1.11 `sameSubWindow`
-
-This function returns true if two blocks are in the same global sub-window.
-
-```rust
-fn sameSubWindow(A, B) -> bool
-{
-   return subWindow(A) == subWindow(B)
 }
 ```
 
@@ -498,7 +472,7 @@ else {
 }
 ```
 
-The above pseudocode is only to provide intuition about how the chain selection rules work.  A detailed description of the succinct sliding window structure is described in section [Section 3.4](#34-window-min-density) and the actual chain selection algorithm is specified in [Section 4.2](#42-select-chain).
+The above pseudocode is only to provide intuition about how the chain selection rules work.  A detailed description of the succinct sliding window structure is described in section [Section 3.4](#34-sliding-window-density) and the actual chain selection algorithm is specified in [Section 4.2](#42-select-chain).
 
 ## 3.3 Decentralized checkpointing
 
