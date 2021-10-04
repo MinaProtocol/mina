@@ -14,108 +14,62 @@ This documents specifies required structures, algorithms and protocol details.
 
 <!-- TOC depthFrom:1 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
 
-- [1. Constants](#1-constants)
-- [2. Structures](#2-structures)
-  - [2.1 `State_hash.Stable.V1`](#21-state_hashstablev1)
-  - [2.2 `Epoch_seed.Stable.V1.t`](#22-epoch_seedstablev1t)
-  - [2.2 `External_transition`](#22-external_transition)
-  - [2.3 `Protocol_state`](#23-protocol_state)
-    - [2.3.1 `Protocol_state.Body`](#231-protocol_statebody)
-  - [2.4 `Consensus_state`](#24-consensus_state)
-  - [2.6 `Epoch_data`](#26-epoch_data)
-  - [2.7 Example block](#27-example-block)
-- [3. Algorithms](#3-algorithms)
-  - [3.1 Common](#31-common)
-    - [3.1.1 `top`](#311-top)
-    - [3.1.2 `cState`](#312-cstate)
-    - [3.1.3 `globalSlot`](#313-globalslot)
-    - [3.1.4 `epochSlot`](#314-epochslot)
-    - [3.1.5 `length`](#315-length)
-    - [3.1.6 `lastVRF`](#316-lastvrf)
-    - [3.1.7 `stateHash`](#317-statehash)
-    - [3.1.10 `subWindow`](#3110-subwindow)
-    - [3.1.12 `relativeSubWindow`](#3112-relativesubwindow)
-  - [3.2 Chain selection rules](#32-chain-selection-rules)
-    - [3.2.1 Short-range fork rule](#321-short-range-fork-rule)
-    - [3.2.2 Long-range fork rule](#322-long-range-fork-rule)
-  - [3.3 Decentralized checkpointing](#33-decentralized-checkpointing)
-    - [3.3.1 `initCheckpoints`](#331-initcheckpoints)
-    - [3.3.2 `updateCheckpoints`](#332-updatecheckpoints)
-    - [3.3.3 `isShortRange`](#333-isshortrange)
-  - [3.4 Sliding window density](#34-sliding-window-density)
-    - [3.4.1 Terminology](#341-terminology)
-    - [3.4.2 Sliding windows](#342-sliding-windows)
-    - [3.4.3 Sub-windows](#343-sub-windows)
-    - [3.4.4 Window density](#344-window-density)
-    - [3.4.5 Window structure](#345-window-structure)
-    - [3.4.6 Minimum window density](#346-minimum-window-density)
-    - [3.4.7 Relative sub-window index](#347-relative-sub-window-index)
-    - [3.4.8 Ring-shift](#348-ring-shift)
-    - [3.4.9 Projected window](#349-projected-window)
-    - [3.4.10 Genesis window](#3410-genesis-window)
-    - [3.4.11 Genesis minimum window density](#3411-genesis-minimum-window-density)
-    - [3.4.12 Relative minimum window density](#3412-relative-minimum-window-density)
-- [4 Protocol](#4-protocol)
-  - [4.1 Initialize consensus](#41-initialize-consensus)
-    - [4.1.1 Genesis block](#411-genesis-block)
-  - [4.2 Select chain](#42-select-chain)
-    - [4.2.3 Bringing it all together](#423-bringing-it-all-together)
+- [1. Acknowledgements](#1-acknowledgements)
+- [2. Notations and conventions](#2-notations-and-conventions)
+- [3. Constants](#3-constants)
+- [4. Structures](#4-structures)
+  - [4.1 `State_hash.Stable.V1`](#41-state_hashstablev1)
+  - [4.2 `Epoch_seed.Stable.V1.t`](#42-epoch_seedstablev1t)
+  - [4.2 `External_transition`](#42-external_transition)
+  - [4.3 `Protocol_state`](#43-protocol_state)
+    - [4.3.1 `Protocol_state.Body`](#431-protocol_statebody)
+  - [4.4 `Consensus_state`](#44-consensus_state)
+  - [4.6 `Epoch_data`](#46-epoch_data)
+  - [4.7 Example block](#47-example-block)
+- [5. Algorithms](#5-algorithms)
+  - [5.1 Common](#51-common)
+    - [5.1.1 `top`](#511-top)
+    - [5.1.2 `cState`](#512-cstate)
+    - [5.1.3 `globalSlot`](#513-globalslot)
+    - [5.1.4 `epochSlot`](#514-epochslot)
+    - [5.1.5 `length`](#515-length)
+    - [5.1.6 `lastVRF`](#516-lastvrf)
+    - [5.1.7 `stateHash`](#517-statehash)
+    - [5.1.10 `subWindow`](#5110-subwindow)
+    - [5.1.12 `relativeSubWindow`](#5112-relativesubwindow)
+  - [5.2 Chain selection rules](#52-chain-selection-rules)
+    - [5.2.1 Short-range fork rule](#521-short-range-fork-rule)
+    - [5.2.2 Long-range fork rule](#522-long-range-fork-rule)
+  - [5.3 Decentralized checkpointing](#53-decentralized-checkpointing)
+    - [5.3.1 `initCheckpoints`](#531-initcheckpoints)
+    - [5.3.2 `updateCheckpoints`](#532-updatecheckpoints)
+    - [5.3.3 `isShortRange`](#533-isshortrange)
+  - [5.4 Sliding window density](#54-sliding-window-density)
+    - [5.4.1 Terminology](#541-terminology)
+    - [5.4.2 Sliding windows](#542-sliding-windows)
+    - [5.4.3 Sub-windows](#543-sub-windows)
+    - [5.4.4 Window density](#544-window-density)
+    - [5.4.5 Window structure](#545-window-structure)
+    - [5.4.6 Minimum window density](#546-minimum-window-density)
+    - [5.4.7 Relative sub-window index](#547-relative-sub-window-index)
+    - [5.4.8 Ring-shift](#548-ring-shift)
+    - [5.4.9 Projected window](#549-projected-window)
+    - [5.4.10 Genesis window](#5410-genesis-window)
+    - [5.4.11 Genesis minimum window density](#5411-genesis-minimum-window-density)
+    - [5.4.12 Relative minimum window density](#5412-relative-minimum-window-density)
+- [6 Protocol](#6-protocol)
+  - [6.1 Initialize consensus](#61-initialize-consensus)
+    - [6.1.1 Genesis block](#611-genesis-block)
+  - [6.2 Select chain](#62-select-chain)
+    - [6.2.3 Bringing it all together](#623-bringing-it-all-together)
 
-<!-- /TOC --> depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
+<!-- /TOC depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
 
-- [1. Constants](#1-constants)
-- [2. Structures](#2-structures)
-  - [2.1 `State_hash.Stable.V1`](#21-state_hashstablev1)
-  - [2.2 `Epoch_seed.Stable.V1.t`](#22-epoch_seedstablev1t)
-  - [2.2 `External_transition`](#22-external_transition)
-  - [2.3 `Protocol_state`](#23-protocol_state)
-    - [2.3.1 `Protocol_state.Body`](#231-protocol_statebody)
-  - [2.4 `Consensus_state`](#24-consensus_state)
-  - [2.6 `Epoch_data`](#26-epoch_data)
-  - [2.7 Example block](#27-example-block)
-- [3. Algorithms](#3-algorithms)
-  - [3.1 Common](#31-common)
-    - [3.1.1 `top`](#311-top)
-    - [3.1.2 `cState`](#312-cstate)
-    - [3.1.3 `globalSlot`](#313-globalslot)
-    - [3.1.4 `epochSlot`](#314-epochslot)
-    - [3.1.5 `length`](#315-length)
-    - [3.1.6 `lastVRF`](#316-lastvrf)
-    - [3.1.7 `stateHash`](#317-statehash)
-    - [3.1.10 `subWindow`](#3110-subwindow)
-    - [3.1.12 `relativeSubWindow`](#3112-relativesubwindow)
-  - [3.2 Chain selection rules](#32-chain-selection-rules)
-    - [3.2.1 Short-range fork rule](#321-short-range-fork-rule)
-    - [3.2.2 Long-range fork rule](#322-long-range-fork-rule)
-  - [3.3 Decentralized checkpointing](#33-decentralized-checkpointing)
-    - [3.3.1 `initCheckpoints`](#331-initcheckpoints)
-    - [3.3.2 `updateCheckpoints`](#332-updatecheckpoints)
-    - [3.3.3 `isShortRange`](#333-isshortrange)
-  - [3.4 Sliding window density](#34-sliding-window-density)
-    - [3.4.1 Terminology](#341-terminology)
-    - [3.4.2 Sliding windows](#342-sliding-windows)
-    - [3.4.3 Sub-windows](#343-sub-windows)
-    - [3.4.4 Window density](#344-window-density)
-    - [3.4.5 Window structure](#345-window-structure)
-    - [3.4.6 Minimum window density](#346-minimum-window-density)
-    - [3.4.7 Relative sub-window index](#347-relative-sub-window-index)
-    - [3.4.8 Ring-shift](#348-ring-shift)
-    - [3.4.9 Projected window](#349-projected-window)
-    - [3.4.10 Genesis window](#3410-genesis-window)
-    - [3.4.11 Genesis minimum window density](#3411-genesis-minimum-window-density)
-    - [3.4.12 Relative minimum window density](#3412-relative-minimum-window-density)
-- [4 Protocol](#4-protocol)
-  - [4.1 Initialize consensus](#41-initialize-consensus)
-    - [4.1.1 Genesis block](#411-genesis-block)
-  - [4.2 Select chain](#42-select-chain)
-    - [4.2.3 Bringing it all together](#423-bringing-it-all-together)
+# 1. Acknowledgements
 
-<!-- /TOC -->
+Special thanks for Jiawei Tang &lt;tang@o1labs.org&gt; for many detailed discussions about Mina implementation of Ouroboros Samasika.
 
-**Conventions**
-* We use the terms _top_ and _last_ interchangeably to refer to the block with the greatest height on a given chain
-* We use the term _epoch slot number_ to refer to the intra-epoch slot number that resets to 1 every epoch
-* We use _global slot number_ to refer to the global slot number since genesis starting at 1
+# 2. Notations and conventions
 
 **Notations**
 * `a⌢b` - Concatenation of `a` and `b`
@@ -125,7 +79,12 @@ This documents specifies required structures, algorithms and protocol details.
 * `x[-1]` - Last element of array `x`
 * `x[a..b]` - Slice of vector `x` containing elements from indexes `[a, b)`
 
-# 1. Constants
+**Conventions**
+* We use the terms _top_ and _last_ interchangeably to refer to the block with the greatest height on a given chain
+* We use the term _epoch slot number_ to refer to the intra-epoch slot number that resets to 1 every epoch
+* We use _global slot number_ to refer to the global slot number since genesis starting at 1
+
+# 3. Constants
 
 These are the `mainnet` parameters Mina uses for Samasika
 
@@ -139,15 +98,15 @@ These are the `mainnet` parameters Mina uses for Samasika
 | `grace_period_end`              | `1440`                  | Number of slots before minimum window density is used in chain selection |
 | `genesis_state_timestamp`       | `1615939200000` (Mar 17, 2021 00:00:00 GMT+0000) | Timestamp of genesis block in unixtime |
 | `acceptable_network_delay`      | `180000` (= 3m)         | Acceptable network delay in ms |
-| `slots_per_sub_window`          | `7`                     | Slots per sub window (see [Section 3.4](#34-window-min-density)) |
-| `sub_windows_per_window`        | `11`                    | Sub windows per window (see [Section 3.4](#34-window-min-density)) |
+| `slots_per_sub_window`          | `7`                     | Slots per sub window (see [Section 5.4](#54-sliding-window-density)) |
+| `sub_windows_per_window`        | `11`                    | Sub windows per window (see [Section 5.4](#54-sliding-window-density)) |
 | `slots_per_window`              | `slots_per_sub_window*sub_windows_per_window` (= 77) | Slots per window |
 
-# 2. Structures
+# 4. Structures
 
 The main structures used in Mina consensus are as follows
 
-## 2.1 `State_hash.Stable.V1`
+## 4.1 `State_hash.Stable.V1`
 
 | Field                           | Type                               | Description |
 | - | - | - |
@@ -155,14 +114,14 @@ The main structures used in Mina consensus are as follows
 | `version`                       | `u8` (= 0x01)                      | Structure version |
 | `field`                         | `Field.t`                          | Field element |
 
-## 2.2 `Epoch_seed.Stable.V1.t`
+## 4.2 `Epoch_seed.Stable.V1.t`
 
 | Field                           | Type                               | Description |
 | - | - | - |
 | `version`                       | `u8` (= 0x01)                      | Structure version |
 | `field`                         | `Field.t`                          | Field element |
 
-## 2.2 `External_transition`
+## 4.2 `External_transition`
 
 This is Mina's block structure.  In Mina blocks are synonymous with transitions.  A block received from a peer is referred to as an external transition and a block generated and applied locally is referred to as an internal transition.
 
@@ -176,7 +135,7 @@ This is Mina's block structure.  In Mina blocks are synonymous with transitions.
 | `current_protocol_version`      | `Protocol_version.Stable.V1.t`        | Current protocol version |
 | `proposed_protocol_version_opt` | `Protocol_version.Stable.V1.t option` | Proposed protocol version |
 
-## 2.3 `Protocol_state`
+## 4.3 `Protocol_state`
 
 This structure can be thought of like the block header.  It contains the most essential information of a block.
 
@@ -186,7 +145,7 @@ This structure can be thought of like the block header.  It contains the most es
 | `previous_state_hash` | `State_hash.Stable.V1.t` | Commitment to previous block (hash of previous protocol state hash and body hash)|
 | `body`                | `Protocol_state.Body.Value.Stable.V1` | The body of the protocol state |
 
-### 2.3.1 `Protocol_state.Body`
+### 4.3.1 `Protocol_state.Body`
 
 | Field                 | Type                     | Description |
 | - | - | - |
@@ -196,7 +155,7 @@ This structure can be thought of like the block header.  It contains the most es
 | `consensus_state`     | `Consensus.Data.Consensus_state.Value.Stable.V1.t` | Consensus related state |
 | `constants`           | `Protocol_constants_checked.Value.Stable.V1.t` | Consensus constants |
 
-## 2.4 `Consensus_state`
+## 4.4 `Consensus_state`
 
 This structure encapsulates the succinct state of the consensus protocol.  The stake distribution information is contained by the `staking_epoch_data` field.  Due to its succinct nature, Samasika cannot look back into the past to obtain ledger snapshots for the stake distribution.  Instead, Samasika implements a novel approach where the future stake distribution snapshot is prepared by the current consensus epoch.  Samasika prepares the past for the future!  This future state is stored in the `next_epoch_data` field.
 
@@ -205,8 +164,8 @@ This structure encapsulates the succinct state of the consensus protocol.  The s
 | `version`                                | `u8` (= 0x01)            | Block structure version |
 | `blockchain_length`                      | `Length.Stable.V1.t` | Height of block |
 | `epoch_count`                            | `Length.Stable.V1.t` | Epoch number |
-| `min_window_density`                     | `Length.Stable.V1.t` | Minimum windows density observed on this chain (see [Section 3.2.2](#322-long-range-fork-rule)) |
-| `sub_window_densities`                   | `Length.Stable.V1.t list` | Current sliding window of densities (see [Section 3.4](#34-window-min-density)) |
+| `min_window_density`                     | `Length.Stable.V1.t` | Minimum windows density observed on this chain (see [Section 5.2.2](#522-long-range-fork-rule)) |
+| `sub_window_densities`                   | `Length.Stable.V1.t list` | Current sliding window of densities (see [Section 5.4](#54-sliding-window-density)) |
 | `last_vrf_output`                        | `Vrf.Output.Truncated.Stable.V1.t` | Additional VRS output from leader (for seeding Random Oracle) |
 | `total_currency`                         | `Amount.Stable.V1.t` | Total supply of currency |
 | `curr_global_slot`                       | `Global_slot.Stable.V1.t` | Current global slot number relative to the current hard fork  |
@@ -219,18 +178,18 @@ This structure encapsulates the succinct state of the consensus protocol.  The s
 | `coinbase_receiver`                      | `Public_key.Compressed.Stable.V1.t` | Compresed public key of account receiving the block reward |
 | `supercharge_coinbase`                   | `bool` | `true` if `block_stake_winner` has no locked tokens, `false` otherwise |
 
-## 2.6 `Epoch_data`
+## 4.6 `Epoch_data`
 
 | Field              | Type                     | Description |
 | - | - | - |
 | `version`          | `u8` (= 0x01)            | Block structure version |
 | `ledger`           | `Epoch_ledger.Value.Stable.V1.t` | |
 | `seed`             | `Epoch_seed.Stable.V1.t` | |
-| `start_checkpoint` | `State_hash.Stable.V1.t` | State hash of _first block_ of epoch (see [Section 3.3](#33-decentralized-checkpointing))|
-| `lock_checkpoint`  | `State_hash.Stable.V1.t` | State hash of _last known block in the first 2/3 of epoch_ (see [Section 3.3](#33-decentralized-checkpointing)) excluding the current state |
+| `start_checkpoint` | `State_hash.Stable.V1.t` | State hash of _first block_ of epoch (see [Section 5.3](#53-decentralized-checkpointing))|
+| `lock_checkpoint`  | `State_hash.Stable.V1.t` | State hash of _last known block in the first 2/3 of epoch_ (see [Section 5.3](#53-decentralized-checkpointing)) excluding the current state |
 | `epoch_length`     | `Length.Stable.V1.t` | |
 
-## 2.7 Example block
+## 4.7 Example block
 
 This is an example of a Mina block in JSON format
 
@@ -323,15 +282,15 @@ This is an example of a Mina block in JSON format
 }
 ```
 
-# 3. Algorithms
+# 5. Algorithms
 
 This section outlines the main algorithms and constructs used by Samasikia.
 
-## 3.1 Common
+## 5.1 Common
 
 This section outlines some commonly used helpers.
 
-### 3.1.1 `top`
+### 5.1.1 `top`
 
 This function returns the last block of a given chain.  The input is a chain `C` and the output is last block of `C` (i.e. the block with greatest height).
 
@@ -342,7 +301,7 @@ fn top(C) -> Block
 }
 ```
 
-### 3.1.2 `cState`
+### 5.1.2 `cState`
 
 The function returns the consensus state of a block or chain.  The input is a block or chain `X` and the output is the consensus state.
 
@@ -358,7 +317,7 @@ fn cState(X) -> Consensus_state
 }
 ```
 
-### 3.1.3 `globalSlot`
+### 5.1.3 `globalSlot`
 
 The function returns the _global slot number_ of a chain or block.  The input `X` is either a chain or block and the output is the global slot number.
 
@@ -369,7 +328,7 @@ fn globalSlot(X) -> u64
 }
 ```
 
-### 3.1.4 `epochSlot`
+### 5.1.4 `epochSlot`
 
 The function computes the _epoch slot number_ of a block.  The input is the block `B` and the output is the epoch slot number in `[0, slots_per_epoch]`.
 
@@ -380,7 +339,7 @@ fn epochSlot(B) -> u32
 }
 ```
 
-### 3.1.5 `length`
+### 5.1.5 `length`
 
 The function the length of a chain.  The input is the global chain `C` and the output is the length of the chain in blocks.
 
@@ -391,7 +350,7 @@ fn length(C) -> u64
 }
 ```
 
-### 3.1.6 `lastVRF`
+### 5.1.6 `lastVRF`
 
 This function returns the hex digest of the hash of the last VRF output of a given chain.  The input is a chain `C` and the output is the hash digest.
 
@@ -402,7 +361,7 @@ fn lastVRF(C) -> String
 }
 ```
 
-### 3.1.7 `stateHash`
+### 5.1.7 `stateHash`
 
 This function returns hash of the top block's consensus state for a given chain.  The input is a chain `C` and the output is the hash.
 
@@ -413,7 +372,7 @@ fn stateHash(C) -> Hash
 }
 ```
 
-### 3.1.10 `subWindow`
+### 5.1.10 `subWindow`
 
 This function returns the sub-window number of a block.
 
@@ -424,7 +383,7 @@ fn subWindow(B) -> u64
 }
 ```
 
-### 3.1.12 `relativeSubWindow`
+### 5.1.12 `relativeSubWindow`
 
 This function returns the relative sub-window number of a global slot `S`.
 
@@ -435,11 +394,11 @@ fn relativeSubWindow(S) -> u64
 }
 ```
 
-## 3.2 Chain selection rules
+## 5.2 Chain selection rules
 
 Samasika uses two consensus rules: one for *short-range forks* and one for *long-range forks*.
 
-### 3.2.1 Short-range fork rule
+### 5.2.1 Short-range fork rule
 
 This rule is triggered whenever the fork is such that the adversary has not yet had the opportunity to mutate the block density distribution.
 
@@ -447,9 +406,9 @@ This rule is triggered whenever the fork is such that the adversary has not yet 
 Choose the longest chain
 ```
 
-A fork is short-range if it occured less than `m` blocks ago.  The naı̈ve implemention of this rule is to always store the last `m` blocks, but for a succinct blockchain this is not desirable.  Mina Samasika adopts an approach that only requires information about two blocks.  The idea is a decentralized checkpointing algorithm, the details of which are given in [Section 3.3](#33-decentralized-checkpointing).
+A fork is short-range if it occured less than `m` blocks ago.  The naı̈ve implemention of this rule is to always store the last `m` blocks, but for a succinct blockchain this is not desirable.  Mina Samasika adopts an approach that only requires information about two blocks.  The idea is a decentralized checkpointing algorithm, the details of which are given in [Section 5.3](#53-decentralized-checkpointing).
 
-### 3.2.2 Long-range fork rule
+### 5.2.2 Long-range fork rule
 
 Recall that when an adversary creates a long-range fork, over time it skews the leader selection distribution leading to a longer adversarial chain.  Initially the dishonest chain will have a lower density, but in time the adversary will work to increase it.  Thus, we can only rely on the density difference in the first few slots following the fork, the so-called *critical window*.  The idea is that for the honest chain's critical window the density is overwhelmingly likely to be higher because this chain contains the majority of stake.
 
@@ -457,7 +416,7 @@ As a succint blockchain, Mina does not have a chain into which it can look back 
 
 Samasika overcomes this problem by storing a succinct summary of a sliding window of slots over each chain and then tracks the *minimum* of all densities observed for each sliding window.  The intuition is that if the adversary manages to increase the density on the dishonest chain, the tracked minimum density still points to the critical window following the fork.
 
-[Section 3.4](#34-window-min-density) specifies how the sliding windows are tracked and how the minimum density is computed.  For now, we assume that each chain contains the minimum window density and describe the main idea of the long-range fork rule.
+[Section 5.4](#54-sliding-window-density) specifies how the sliding windows are tracked and how the minimum density is computed.  For now, we assume that each chain contains the minimum window density and describe the main idea of the long-range fork rule.
 
 Given chain `C` let `C.min_density` be the minimum density observed in `C` so far.
 
@@ -472,9 +431,9 @@ else {
 }
 ```
 
-The above pseudocode is only to provide intuition about how the chain selection rules work.  A detailed description of the succinct sliding window structure is described in section [Section 3.4](#34-sliding-window-density) and the actual chain selection algorithm is specified in [Section 4.2](#42-select-chain).
+The above pseudocode is only to provide intuition about how the chain selection rules work.  A detailed description of the succinct sliding window structure is described in section [Section 5.4](#54-sliding-window-density) and the actual chain selection algorithm is specified in [Section 6.2](#62-select-chain).
 
-## 3.3 Decentralized checkpointing
+## 5.3 Decentralized checkpointing
 
 <!--
 ; start_checkpoint: 'start_checkpoint
@@ -511,7 +470,7 @@ slots:  s1s2s3s4s5s6s7s8s9|s1s2s3s4s5s6s7s8s9|s1s2s3...
 
 Here the current slot is `s7`, the start checkpoint is `s1` and the lock checkpoint is `s6`.
 
-These are located in the `start_checkpoint` and `lock_checkpoint` fields of the [`Epoch_data`](#26-epoch_data) structure, which is part of the [`Consensus_state`](#25-consensus_state) (See [Section 2.6](#26-epoch_data)).
+These are located in the `start_checkpoint` and `lock_checkpoint` fields of the [`Epoch_data`](#46-epoch_data) structure, which is part of the [`Consensus_state`](#44-consensus_state) (See [Section 4.6](#46-epoch_data)).
 
 As time progresses away from the first slot of the current epoch, the lock checkpoint is pushed along with the last known block until we reach the last block in the first `2/3` of the epoch and it is _frozen_. ❄
 
@@ -522,9 +481,9 @@ A fork is considered _short-range_ if either
 
 Since the leader selection distribution for the current epoch is computed by the end of the first `2/3` of the slots in the previous epoch, an adversarial fork after the previous epoch's `lock_checkpoint` cannot skewed the distribution for the remainder of that epoch, nor the current epoch.  Anything before the previous epoch's `lock_checkpoint` _long-range_ fork.
 
-Since Mina is succinct this means that it must stored the checkpoints for the current epoch in addition to the checkpoints for the previous epoch.  This is why the [`Consensus_state`](#25-consensus_state) structure contains two `Epoch_data` fields: `staking_epoch_data` and `next_epoch_data`.  The former contains the checkpoints for the previous epoch and the latter contains that of the current epoch.
+Since Mina is succinct this means that it must stored the checkpoints for the current epoch in addition to the checkpoints for the previous epoch.  This is why the [`Consensus_state`](#44-consensus_state) structure contains two `Epoch_data` fields: `staking_epoch_data` and `next_epoch_data`.  The former contains the checkpoints for the previous epoch and the latter contains that of the current epoch.
 
-### 3.3.1 `initCheckpoints`
+### 5.3.1 `initCheckpoints`
 
 **WIP**
 
@@ -544,9 +503,9 @@ fn initCheckpoints(G) -> ()
 }
 ```
 
-### 3.3.2 `updateCheckpoints`
+### 5.3.2 `updateCheckpoints`
 
-This algorithm updates the checkpoints of the block being created `B` based on its parent block `P`.  It inputs the blocks `P` and `B` and updates `B`'s checkpoints according to the description in [Section 3.3](#33-decentralized-checkpointing).
+This algorithm updates the checkpoints of the block being created `B` based on its parent block `P`.  It inputs the blocks `P` and `B` and updates `B`'s checkpoints according to the description in [Section 5.3](#53-decentralized-checkpointing).
 
 ```rust
 fn updateCheckpoints(P, B) -> ()
@@ -561,9 +520,9 @@ fn updateCheckpoints(P, B) -> ()
 }
 ```
 
-Specifically, if the epoch slot of the new block `B` is the start of a new epoch, then the `start_checkpoint` of the current epoch data (`next_epoch_data`) is updated to the state hash from the previous block `P`.  Next, if the the new block's slot is also within the first `2/3` of the slots in the epoch ([`slots_per_epoch`](#1-constants)), then the `lock_checkpoint` of the current epoch data is also updated to the same value.
+Specifically, if the epoch slot of the new block `B` is the start of a new epoch, then the `start_checkpoint` of the current epoch data (`next_epoch_data`) is updated to the state hash from the previous block `P`.  Next, if the the new block's slot is also within the first `2/3` of the slots in the epoch ([`slots_per_epoch`](#3-constants)), then the `lock_checkpoint` of the current epoch data is also updated to the same value.
 
-### 3.3.3 `isShortRange`
+### 5.3.3 `isShortRange`
 
 This algorithm uses the checkpoints to determine if the fork of two chains is short-range or long-range.  It inputs two chains with a fork `C1` and `C2` and outputs `true` if the fork is short-range, otherwise the fork is long-range and it outputs `false`.
 
@@ -579,13 +538,13 @@ fn isShortRange(C1, C2) -> bool
 }
 ```
 
-## 3.4 Sliding window density
+## 5.4 Sliding window density
 
 **IN REVIEW**
 
 This section describes Mina's succinct sliding window density algorithm, how windows are represented in blocks, and how to compute *minimum window density*.
 
-### 3.4.1 Terminology
+### 5.4.1 Terminology
 
 * We say a slot is _`filled`_ if it contains a valid non-orphaned block
 * An _`w-window`_ is a sequential list of slots s<sub>1</sub>,...,s<sub>n</sub> of length `w`
@@ -593,20 +552,20 @@ This section describes Mina's succinct sliding window density algorithm, how win
 * The _`density`_ of an w-window (or sub-window) is the number non-orphan block within it
 * We use the terms _`window`_, _`density window`_, _`sliding window`_ and _`w-window`_ synonymously
  
-### 3.4.2 Sliding windows
+### 5.4.2 Sliding windows
 
 In the Ouroborus Samasika paper the _`sliding window`_ is referred to as a `v`-shifting `w`-window and it characterisd by two parameters.
 
 | Parameter | Description                                | Value |
 | - | - | - |
-| `v`       | Length by which the window shifts in slots (shift parameter) | [`slots_per_sub_window`](#1-constants) (= 7) |
-| `w`       | Window length in slots                                       | [`slots_per_sub_window`](#1-constants)` * `[`sub_windows_per_window`](#1-constants) (= 7*11 = 77 slots) |
+| `v`       | Length by which the window shifts in slots (shift parameter) | [`slots_per_sub_window`](#3-constants) (= 7) |
+| `w`       | Window length in slots                                       | [`slots_per_sub_window`](#3-constants)` * `[`sub_windows_per_window`](#3-constants) (= 7*11 = 77 slots) |
 
 This is a `w`-long window that shifts `v`-slots at a time.
 
-The `v`-shifting `w`-window and the selection of `v` as a fraction of `w` are important for the security of Samasika.  Proper selection of these parameters ensures that the succinct window density algorithm captures the critical window (described in [Section 3.2.2](#322-long-range-fork-rule)).  The Samasika research paper presents security proofs that calculate what values of `v`, `w` and sub-windows per window are safe.
+The `v`-shifting `w`-window and the selection of `v` as a fraction of `w` are important for the security of Samasika.  Proper selection of these parameters ensures that the succinct window density algorithm captures the critical window (described in [Section 5.2.2](#522-long-range-fork-rule)).  The Samasika research paper presents security proofs that calculate what values of `v`, `w` and sub-windows per window are safe.
 
-### 3.4.3 Sub-windows
+### 5.4.3 Sub-windows
 
 A `sliding window` can also be viewed as a collection of sub-windows.  That is, you can think of a `w`-length window as being comprised of `k` sub-windows, each of length `v` slots.  For the parameters given in the table above, the sliding window looks like this:
 
@@ -617,14 +576,14 @@ k:      1          2      ...      11
 
 where `si` is slot `i`.
 
-Instead of storing a window as groups of slots, Samasika is only interested in the density of each sub-window, thus, it need only track a list of `k = 11` (a.k.a [`sub_windows_per_window`](#1-constants)) sub-window densities.
+Instead of storing a window as groups of slots, Samasika is only interested in the density of each sub-window, thus, it need only track a list of `k = 11` (a.k.a [`sub_windows_per_window`](#3-constants)) sub-window densities.
 
 ```text
             |s1,...,s7|s8,...,s14| ... |s71,...,s73|
 densities:      d1        d2      ...       dk
 ```
 
-### 3.4.4 Window density
+### 5.4.4 Window density
 
 The density of a window is computed as the sum of the densities of its sub-windows.  Given a window `W` that is a list of sub-window densities, the window density is
 
@@ -632,7 +591,7 @@ The density of a window is computed as the sum of the densities of its sub-windo
 
 **Note:** The density of a window is insensitive to the order of the sub-windows.
 
-### 3.4.5 Window structure
+### 5.4.5 Window structure
 
 Windows looks back in time over previous sub-windows, rather than forward.  We use the phrase "window at sub-window `s`" to refer to the window `W` whose most recent global sub-window is `s`.
 
@@ -690,17 +649,17 @@ By definition, the window density is only computed on previous sub-windows, so t
 
 It is, therefore, sufficient to only store `11` sub-windows, allowing the most recent sub-window to either be *in-progress* or *complete*.  Mina uses this optimization for both space-saving and SNARK efficiency.
 
-The window of a block `B` is found in the `sub_window_densities` field of the `Consensus_state` (see [Section 2.5](#25-consensus_state)).  The field is defined as a list of `sub_windows_per_window = 11` sub-window densities upto the global slot of block `B`.  As described above, the most recent sub-window may be a previous sub-window or the current sub-window.
+The window of a block `B` is found in the `sub_window_densities` field of the `Consensus_state` (see [Section 4.4](#44-consensus_state)).  The field is defined as a list of `sub_windows_per_window = 11` sub-window densities upto the global slot of block `B`.  As described above, the most recent sub-window may be a previous sub-window or the current sub-window.
 
 The `sub_windows_per_window` field is of type `Length.Stable.V1.t list` and because it is written into blocks as part of the protocol, Mina implimentations MUST implement serialization for this type.
 
 **Observe:** Since the window density at sub-window `s` is only calculated when sub-window `s` is a previous sub-window, the calculation must happen during sub-window `> s` (slots and sub-windows can be empty).
 
-### 3.4.6 Minimum window density
+### 5.4.6 Minimum window density
 
 The *minimum window density* at a given slot is defined as the minimum window density observed over all previous sub-windows and previous windows, all the way back to genesis.
 
-The minimum window density is found in the `min_window_density` field of the `Consensus_state` (see [Section 2.5](#25-consensus_state)).
+The minimum window density is found in the `min_window_density` field of the `Consensus_state` (see [Section 4.4](#44-consensus_state)).
 
 When a new block `B` with parent `P` is created, then minimum window density is computed like this.
 
@@ -708,7 +667,7 @@ When a new block `B` with parent `P` is created, then minimum window density is 
 
 **Observe:** By definition the minimum window density `mwd(s)` at slot `s` is monotonically decreasing (i.e. non-increasing).  That is, for all slots `s1` and `s2` such that `s1 <= s2` then `mwd(s1) >= mwd(s2)`.
 
-### 3.4.7 Relative sub-window index
+### 5.4.7 Relative sub-window index
 
 The relative sub-window `i` of a sub-window `sw` is its index within the window.
 
@@ -729,15 +688,15 @@ As the global slot increases the relative sub-window wraps around modulo `sub_wi
  relative sub-window: 00,01,02,03,04,05,06,07,08,09,10  00,01,02,03,04,05,06,07,08,09,10
  ```
 
-**Note:** The global slot of the genesis block is slot `0` and, thus, according to [Section 3.1.10](#3110-subwindow) the genesis block is in sub-window `0`.  Therefore, the genesis block's relative sub-window is also `0`.
+**Note:** The global slot of the genesis block is slot `0` and, thus, according to [Section 5.1.10](#5110-subwindow) the genesis block is in sub-window `0`.  Therefore, the genesis block's relative sub-window is also `0`.
 
-### 3.4.8 Ring-shift
+### 5.4.8 Ring-shift
 
 For technical reasons we will describe later, in order to compute the minimum window density for the long-range fork rule sometimes we must perform a window update to compute the current-window.  The Samasika paper describes a window shifting algorithm.
 
 When we shift a window `[d1, d2, ..., d11]` in order to add in a new previous sub-window `d12`, we could evict the oldest sub-window `d1` by shifting down all of the other sub-windows.  Unfortunately, shifting a list in a SNARK circuit is very expensive.
 
-It is more efficient (and also equivalent) to just replace the sub-window we wish to evict by overwritting it with the new sub-window, like this -- `[d12, d2, ..., d11]`.  (Recall from [Section 3.4.4](#344-window-density) that the calculation of the window density is order insensitive.)
+It is more efficient (and also equivalent) to just replace the sub-window we wish to evict by overwritting it with the new sub-window, like this -- `[d12, d2, ..., d11]`.  (Recall from [Section 5.4.4](#544-window-density) that the calculation of the window density is order insensitive.)
 
 For example, given the window
 
@@ -766,7 +725,7 @@ We continue in this fashion each time we need to insert a new sub-window.
 
 **Note**: The same window can be represented equivalently by many different ring windows.
 
-### 3.4.9 Projected window
+### 5.4.9 Projected window
 
 As we will see in later sections, both creating a new block and selecting the best chain during the long-range fork rule require computing a *projected window*.
 
@@ -778,7 +737,7 @@ For example, when a new block `B` is produced with parent block `P`, the height 
 
 According to the Samasika paper, the window of `B` must be initialized based on `P`'s window, then shifted because `B` is ahead of `P` and finally the value of `B`'s sub-window is incremented to account for `B` belonging to it.  Observe that the first two steps are equivalent to computing the projection of `W = P.sub_window_densities` to slot `next = B.curr_global_slot`.
 
-The correct number of shifts we must perform is subtle.  Recall from [Section 3.4.5](#345-window-structure) that the window density including sub-window `s` is only calculated during sub-window `> s`, after `s` becomes a previous sub-window.  Therefore, if `next` is `k` sub-windows ahead of `W` we must shift only `k - 1` times because we must keep the most recent previous sub-window.
+The correct number of shifts we must perform is subtle.  Recall from [Section 5.4.5](#545-window-structure) that the window density including sub-window `s` is only calculated during sub-window `> s`, after `s` becomes a previous sub-window.  Therefore, if `next` is `k` sub-windows ahead of `W` we must shift only `k - 1` times because we must keep the most recent previous sub-window.
 
 Given window `W` that we are projecting `k` sub-windows ahead, the *shift count* is
 
@@ -818,7 +777,7 @@ To reinforce the concept, consider our earlier block production context with new
 
 In a subsequent section we will understand more about how projected windows are used for chain selection during the long-fork rule.
 
-### 3.4.10 Genesis window
+### 5.4.10 Genesis window
 
 Since the sub-window of a global slot `s` is
 
@@ -845,9 +804,9 @@ u32[0, slots_per_sub_window, slots_per_sub_window, ..., slots_per_sub_window]
                    // sub_windows_per_window - 1
 ```
 
-### 3.4.11 Genesis minimum window density
+### 5.4.11 Genesis minimum window density
 
-As detailed in [Section 3.4.5](#345-window-structure), the window density including sub-window `s` is calculated during sub-window `> s`, once `s` becomes a previous sub-window, and then the oldest density is ring-shifted.
+As detailed in [Section 5.4.5](#545-window-structure), the window density including sub-window `s` is calculated during sub-window `> s`, once `s` becomes a previous sub-window, and then the oldest density is ring-shifted.
 
 Since the genesis block `G` is at the start of a new sub-window and its current sub-window density is `0`, before (block) time, when it was generated all sub-window densities, from oldest to most recent were used to compute the density of the window.  At the time, the density at index `0` was also `slots_per_sub_window` and, thus, the intermediate `sub_window_densities` was
 
@@ -867,15 +826,15 @@ Since there was no previous block, the genesis block's minimum window density is
 
 `G.min_window_density =  77`
 
-Here we do not use the minimum window density function from [Section 3.4.6](#346-minimum-window-density).
+Here we do not use the minimum window density function from [Section 5.4.6](#546-minimum-window-density).
 
-### 3.4.12 Relative minimum window density
+### 5.4.12 Relative minimum window density
 
 When performing chain selection during the long-range fork rule Mina does not actually directly use the minimum window densities found in the existing and candidate blocks.  Instead, Mina uses the *relative minimum window density*.  To understand the relative minimum window density, we first need to understand the problem with simply using the minimum window density.
 
-Recall from [Section 3.4.6](#346-minimum-window-density) that the minimum window density is monitonically decreasing.  Therefore, a peer that has disconnected from the network for a period and wishes to rejoin could have a higher minimum window density for it current best chain when compared to the canonical chain (i.e. the best chain for the network).
+Recall from [Section 5.4.6](#546-minimum-window-density) that the minimum window density is monitonically decreasing.  Therefore, a peer that has disconnected from the network for a period and wishes to rejoin could have a higher minimum window density for it current best chain when compared to the canonical chain (i.e. the best chain for the network).
 
-Also remember from [Section 3.2.2](#322-long-range-fork-rule) that the long-range fork rule dictates that the peer select the chain with the higher minimum density.  Due to the invesion problem just described, this could actually be the peer's current chain, rather than the network's canonical chain (since the minimum window density is always decreasing). Thus, the peer will be stuck and synchronization will not succeed.
+Also remember from [Section 5.2.2](#522-long-range-fork-rule) that the long-range fork rule dictates that the peer select the chain with the higher minimum density.  Due to the invesion problem just described, this could actually be the peer's current chain, rather than the network's canonical chain (since the minimum window density is always decreasing). Thus, the peer will be stuck and synchronization will not succeed.
 
 ```text
 existing:  B1, B2, B3, B4              (ye olde minimum window density = 43) Stuck! 😭
@@ -961,11 +920,11 @@ fn relativeMinimumWindowDensity(B1, B2) -> u64
 ```
 -->
 
-# 4 Protocol
+# 6 Protocol
 
 This section specifies the consensus protocol in terms of events and how they MUST be implemented by a compatible peer.  The required events are:
-* [`Initialize consensus`](#41-initialize-consensus)
-* [`Select chain`](#42-select-chain)
+* [`Initialize consensus`](#61-initialize-consensus)
+* [`Select chain`](#62-select-chain)
 
 Additionally there are certain local data members that all peers MUST maintain in order to participate in consensus.
 
@@ -980,14 +939,14 @@ How these are represented is up to the implementation, but careful consideration
 
 In the following description we use _dot notation_ to refer the local data members of peers. For example, given peer `P`, we use `P.genesis_block` and `P.tip`, to refer to the genesis block and currently selected chain, respectively.
 
-## 4.1 Initialize consensus
+## 6.1 Initialize consensus
 
 Things a peer MUST do to initialize consensus includes
 * Load the genesis block
 * Get head of the current chain
 * Decide if peer should bootstrap or sync
 
-### 4.1.1 Genesis block
+### 6.1.1 Genesis block
 
 **`Consensus_state`**
 
@@ -997,7 +956,7 @@ Things a peer MUST do to initialize consensus includes
 | `blockchain_length`                      | `1`           |
 | `epoch_count`                            | `0`           |
 | `min_window_density`                     | `77 = slots_per_window` |
-| `sub_window_densities`                   | `u32[77, 11]` (See [initSubWindowDensities](#343-initsubwindowdensities)) |
+| `sub_window_densities`                   | `u32[77, 11]` (See [Section 5.4.10](#5410-genesis-window)) |
 | `last_vrf_output`                        | `0x0000000000000000000000000000000000000000000000000000000000000000`
 | `total_currency`                         | `805385692.840039233`
 | `curr_global_slot`                       | `0` |
@@ -1101,17 +1060,17 @@ The following JSON specifies most of the genesis block (work in progress).
 }
 ```
 
-## 4.2 Select chain
+## 6.2 Select chain
 
 **WIP**
 
 The _select chain_ event occurs every time a peer's chains are updated.  A chain is said to be _updated_ anytime a valid block is added or removed from its head.  All compatible peers MUST select chains as described here.
 
-In addition to the high-level idea given in [Section 3.2](#32-chain-selection-rules) and details given in [Section 3.4](#34-sliding-window-density), the chain selection algorithm also employs some tiebreak logic.
+In addition to the high-level idea given in [Section 5.2](#52-chain-selection-rules) and details given in [Section 5.4](#54-sliding-window-density), the chain selection algorithm also employs some tiebreak logic.
 
 Additional tiebreak logic is needed when comparing chains of equal length or equal minimum density.  The rule is simple-- if we are applying the long-range rule and two chains have equal minimum window density, then we apply the short-range rule (i.e. select the longer chain).
 
-### 4.2.3 Bringing it all together
+### 6.2.3 Bringing it all together
 
 Assuming an update to either `P.tip` or `P.chains`, the peer `P` must update its `tip` like this
 
@@ -1147,7 +1106,7 @@ fn selectSecureChain(tip, chains) -> Chain
 }
 ```
 
-It relies on the [`isShortRange`](#333-isshortrange) and [`relativeMinWindowDensity`](#3412-relative-minimum-window-density) algorithms (Section 3.3.3 and Section 3.4.12) and the `selectLongerChain` algorithm below.
+It relies on the [`isShortRange`](#533-isshortrange) and [`relativeMinWindowDensity`](#5412-relative-minimum-window-density) algorithms (Section 5.3.3 and Section 5.4.12) and the `selectLongerChain` algorithm below.
 
 ```rust
 fn selectLongerChain(tip, candidate) -> Chain
