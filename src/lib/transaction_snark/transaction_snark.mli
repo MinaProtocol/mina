@@ -491,7 +491,7 @@ end
 val group_by_parties_rev :
      Party.t list list
   -> 'a list list
-  -> ([ `Same | `New | `Two_new ] * 'a * 'a) list
+  -> ([ `Same | `New | `Two_new ] * Parties_segment.Basic.t * 'a * 'a) list
 
 module Make (Inputs : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t

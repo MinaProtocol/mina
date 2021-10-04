@@ -524,17 +524,17 @@ module Parties_segment = struct
       end
     end]
 
-    type (_, _, _, _) t_typed =
-      (* Corresponds to payment *)
-      | Opt_signed_unsigned : (unit, unit, unit, unit) t_typed
-      | Opt_signed_opt_signed : (unit, unit, unit, unit) t_typed
-      | Opt_signed : (unit, unit, unit, unit) t_typed
-      | Proved
-          : ( Snapp_statement.Checked.t * unit
-            , Snapp_statement.t * unit
-            , Nat.N2.n * unit
-            , N.n * unit )
-            t_typed
+    let of_controls = function
+      | [ Control.Proof _ ] ->
+          Proved
+      | [ (Control.Signature _ | Control.None_given) ] ->
+          Opt_signed
+      | [ Control.(Signature _ | None_given); Control.None_given ] ->
+          Opt_signed_unsigned
+      | [ Control.(Signature _ | None_given); Control.Signature _ ] ->
+          Opt_signed_opt_signed
+      | _ ->
+          failwith "Parties_segment.Basic.of_controls: Unsupported combination"
 
     let opt_signed ~is_start : Spec.single =
       { predicate_type = `Nonce_or_accept; auth_type = Signature; is_start }
@@ -546,6 +546,30 @@ module Parties_segment = struct
       }
 
     let opt_signed = opt_signed ~is_start:`Compute_in_circuit
+
+    let to_single_list : t -> Spec.single list =
+     fun t ->
+      match t with
+      | Opt_signed_unsigned ->
+          [ opt_signed; unsigned ]
+      | Opt_signed_opt_signed ->
+          [ opt_signed; opt_signed ]
+      | Opt_signed ->
+          [ opt_signed ]
+      | Proved ->
+          [ { predicate_type = `Full; auth_type = Proof; is_start = `No } ]
+
+    type (_, _, _, _) t_typed =
+      (* Corresponds to payment *)
+      | Opt_signed_unsigned : (unit, unit, unit, unit) t_typed
+      | Opt_signed_opt_signed : (unit, unit, unit, unit) t_typed
+      | Opt_signed : (unit, unit, unit, unit) t_typed
+      | Proved
+          : ( Snapp_statement.Checked.t * unit
+            , Snapp_statement.t * unit
+            , Nat.N2.n * unit
+            , N.n * unit )
+            t_typed
 
     let spec : type a b c d. (a, b, c, d) t_typed -> Spec.single list =
      fun t ->
@@ -3490,80 +3514,87 @@ let constraint_system_digests ~constraint_constants () =
     pair.
 *)
 let group_by_parties_rev partiess stmtss =
-  (* Maintainance note: this function could easily be moved to anywhere else
-     in the codebase that isn't a dependency of [Mina_base.Party], and it might
-     seem convenient to move it.
-     However, care must be taken to avoid the logic here falling out of sync
-     with the logic for the snark. If it is possible to make the desired use
-     work without separating it from this snark logic, it is better to keep it
-     here, to increase the chances that this remains correct and in sync.
-  *)
   let rec group_by_parties_rev partiess stmtss acc =
     match (partiess, stmtss) with
     | ([] | [ [] ]), [ _ ] ->
         (* We've associated statements with all given parties. *)
         acc
-    | [ [ { Party.authorization = _; _ } ] ], [ [ before; after ] ] ->
+    | [ [ { Party.authorization = a1; _ } ] ], [ [ before; after ] ] ->
         (* There are no later parties to pair this one with. Prove it on its
            own.
         *)
-        (`Same, before, after) :: acc
-    | [ []; [ { Party.authorization = _; _ } ] ], [ [ _ ]; [ before; after ] ]
+        (`Same, Parties_segment.Basic.of_controls [ a1 ], before, after) :: acc
+    | [ []; [ { Party.authorization = a1; _ } ] ], [ [ _ ]; [ before; after ] ]
       ->
         (* This party is part of a new transaction, and there are no later
            parties to pair it with. Prove it on its own.
         *)
-        (`New, before, after) :: acc
-    | ( ({ Party.authorization = Proof _; _ } :: parties) :: partiess
+        (`New, Parties_segment.Basic.of_controls [ a1 ], before, after) :: acc
+    | ( ({ Party.authorization = Proof _ as a1; _ } :: parties) :: partiess
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* This party contains a proof, don't pair it with other parties. *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ((`Same, before, after) :: acc)
-    | ( [] :: ({ Party.authorization = Proof _; _ } :: parties) :: partiess
+          ( (`Same, Parties_segment.Basic.of_controls [ a1 ], before, after)
+          :: acc )
+    | ( [] :: ({ Party.authorization = Proof _ as a1; _ } :: parties) :: partiess
       , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* This party is part of a new transaction, and contains a proof, don't
            pair it with other parties.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ((`New, before, after) :: acc)
-    | ( ({ Party.authorization = _; _ }
-        :: ({ Party.authorization = Proof _; _ } :: _ as parties))
+          ( (`New, Parties_segment.Basic.of_controls [ a1 ], before, after)
+          :: acc )
+    | ( ({ Party.authorization = a1; _ }
+        :: ({ Party.authorization = Proof _ as a2; _ } :: _ as parties))
         :: partiess
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next party contains a proof, don't pair it with this party. *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ((`Same, before, after) :: acc)
-    | ( ({ Party.authorization = _; _ } :: ([] as parties))
-        :: (({ Party.authorization = Proof _; _ } :: _) :: _ as partiess)
+          ( (`Same, Parties_segment.Basic.of_controls [ a1; a2 ], before, after)
+          :: acc )
+    | ( ({ Party.authorization = a1; _ } :: ([] as parties))
+        :: (({ Party.authorization = Proof _ as a2; _ } :: _) :: _ as partiess)
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next party is in the next transaction and contains a proof,
            don't pair it with this party.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ((`Same, before, after) :: acc)
-    | ( (_ :: _ :: parties) :: partiess
+          ( (`Same, Parties_segment.Basic.of_controls [ a1; a2 ], before, after)
+          :: acc )
+    | ( ({ Party.authorization = a1; _ }
+        :: { Party.authorization = a2; _ } :: parties)
+        :: partiess
       , (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next two parties do not contain proofs, and are within the same
            transaction. Pair them.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ((`Same, before, after) :: acc)
-    | ( [] :: (_ :: _ :: parties) :: partiess
+          ( (`Same, Parties_segment.Basic.of_controls [ a1; a2 ], before, after)
+          :: acc )
+    | ( []
+        :: ({ Party.authorization = a1; _ }
+           :: { Party.authorization = a2; _ } :: parties)
+           :: partiess
       , [ _ ] :: (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next two parties do not contain proofs, and are within the same
            new transaction. Pair them.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ((`New, before, after) :: acc)
-    | ( [ _ ] :: (_ :: parties) :: partiess
+          ( (`New, Parties_segment.Basic.of_controls [ a1; a2 ], before, after)
+          :: acc )
+    | ( [ { Party.authorization = a1; _ } ]
+        :: ({ Party.authorization = a2; _ } :: parties) :: partiess
       , (before :: _after1) :: (_before2 :: (after :: _ as stmts)) :: stmtss )
       ->
         (* The next two parties do not contain proofs, and the second is within
            a new transaction. Pair them.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ((`New, before, after) :: acc)
-    | ( [] :: [ _ ] :: (_ :: parties) :: partiess
+          ( (`New, Parties_segment.Basic.of_controls [ a1; a2 ], before, after)
+          :: acc )
+    | ( []
+        :: [ { Party.authorization = a1; _ } ]
+           :: ({ Party.authorization = a2; _ } :: parties) :: partiess
       , [ _ ]
         :: [ before; _after1 ] :: (_before2 :: (after :: _ as stmts)) :: stmtss
       ) ->
@@ -3572,15 +3603,20 @@ let group_by_parties_rev partiess stmtss =
            Pair them.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ((`Two_new, before, after) :: acc)
-    | [ [ _ ] ], (before :: after :: _) :: _ ->
+          ( ( `Two_new
+            , Parties_segment.Basic.of_controls [ a1; a2 ]
+            , before
+            , after )
+          :: acc )
+    | [ [ { Party.authorization = a1; _ } ] ], (before :: after :: _) :: _ ->
         (* This party is the final party given. Prove it on its own. *)
-        (`Same, before, after) :: acc
-    | [] :: [ _ ] :: [] :: _, [ _ ] :: (before :: after :: _) :: _ ->
+        (`Same, Parties_segment.Basic.of_controls [ a1 ], before, after) :: acc
+    | ( [] :: [ { Party.authorization = a1; _ } ] :: [] :: _
+      , [ _ ] :: (before :: after :: _) :: _ ) ->
         (* This party is the final party given, in a new transaction. Prove it
            on its own.
         *)
-        (`New, before, after) :: acc
+        (`New, Parties_segment.Basic.of_controls [ a1 ], before, after) :: acc
     | _, [] ->
         failwith "group_by_parties_rev: No statements remaining"
     | ([] | [ [] ]), _ ->
