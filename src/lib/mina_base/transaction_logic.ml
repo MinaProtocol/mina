@@ -1726,6 +1726,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ; success = true
         } )
     in
+    let user_acc = f init initial_state in
     let start : Inputs.Global_state.t * _ =
       let parties =
         let p = c.fee_payer in
@@ -1745,7 +1746,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       List.map original_account_states
         ~f:(Tuple2.map_snd ~f:(Option.map ~f:snd))
     in
-    let user_acc = f init initial_state in
     match step_all (f user_acc start) start with
     | Error e ->
         Error e
