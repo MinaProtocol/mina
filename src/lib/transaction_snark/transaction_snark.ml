@@ -2012,7 +2012,7 @@ module Base = struct
                      signature_verifies
                        ~shifted:(module S)
                        ~payload_digest:transaction_commitment signature
-                       account.data.public_key)
+                       party.data.body.pk)
             in
             let account', `proof_must_verify proof_must_verify =
               let tag =
