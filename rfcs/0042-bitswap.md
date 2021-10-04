@@ -1,23 +1,23 @@
-## Summary
+# Summary
 [summary]: #summary
 
 This RFC proposes adding Bitswap to our libp2p networking stack in order to address issues related to our current gossip network pub/sub layer.
 
-## Motivation
+# Motivation
 [motivation]: #motivation
 
 Mina has very large messages that are broadcast over the gossip net pub/sub layer. This incurs a high bandwidth cost due to the nature of our pub/sub rebroadcast cycles work in order to consistently broadcast messages throughout the network. For example, we observer blocks on mainnet as large as ~2mb. This would represent only a single block, and each block broadcast message has a multiplicative cost on bandwidth as it's being broadcast throughout the network. This bandwidth cost also translates into CPU cost due to the cost of hashing incoming messages to check against the de-duplication cache before processing them. We currently observe behaviors where the libp2p helper process can be pegged at 100% CPU on certain hardware setups when there is high pub/sub throughput on the network. Since gossip pub/sub is used not only for blocks, but also transactions and snark work, the broadcasting of each of these simultaneously ends up compounding the issue.
 
 Implementing Bitswap in our libp2p layer will address this issue by allowing us to immediately reduce our pub/sub message size, while making the larger data referenced by pub/sub messages available upon request. It provides a mechanism for breaking up large data into chunks that can be distributed throughout the network (streamed back from multiple peers), and a system for finding peers on the network who are able to serve that data.
 
-## Detailed design
+# Detailed design
 [detailed-design]: #detailed-design
 
 [Bitswap](https://docs.ipfs.io/concepts/bitswap/) is a module provided by [libp2p](https://libp2p.io/) that enables distributed data synchronization over a p2p network, somewhat comparable to how [BitTorrent](https://en.wikipedia.org/wiki/BitTorrent) works. It works by splitting up data into chunks called blocks (we will explicitly refer to these as "Bitswap blocks" to disambiguate them from "blockchain blocks"), which are structured into a DAG with a single root. When a node on the network wants to download to some data, it asks it's peers to see which (if any) have the root Bitswap block corresponding to that data. If none of the peers have the data, it falls back to querying the gossip network's [DHT](https://docs.ipfs.io/concepts/dht/#kademlia) to find a suitable node that can serve the data.
 
 In this design, we will lay out an architecture to support Bitswap in our Mina implementation, along with a strategy for migrating Mina blocks into Bitswap to reduce current gossip pub/sub pressure. We limit the scope of migrating Mina data to Bitswap only to blocks for the context of this RFC, but in the future, we will also investigate moving snark work, transactions, and ledger data into Bitswap. Snark work and transactions will likely be modeled similarly to Mina blocks with respect to Bitswap, but ledger data will require some special thought since it's Bitswap block representation will have overlapping Bitswap blocks across different ledgers.
 
-### Bitswap Block Format
+## Bitswap Block Format
 
 Bitswap blocks are chunks of arbitrary binary data which are content addressed by [IPFS CIDs](https://docs.ipfs.io/concepts/content-addressing/#cid-conversion). There is no pre-defined maximum size of each Bitswap block, but IPFS uses 256kb, and the maximum recommended size of a Bitswap block is 1mb. Realistically, we want Bitswap blocks to be as small as possible, so we should start at 256kb for our maximum size, but keep the size of Bitswap blocks as a parameter we can tune so that we can optimize for block size vs block count.
 
@@ -31,139 +31,92 @@ Hence, data blob is converted to a tree of blocks. We advertise the "root" block
 
 For links a 256-bit version of Blake2b hash is to be used. Packing algorithm can be implemented in the way that no padding is used in blocks and there are maximum `n = (blobSize - 32) / (maxBlockSize - 34)` blocks generated with `n - 1` blocks of exactly `maxBlockSize` bytes.
 
-### Bitswap Block Cache
+## Bitswap Block Database
 
-There exist some key constraints in choosing a good solution for the Bitswap block cache. Importantly, the cache needs to support a concurrent reader and writer at the same time. Additionally, the cache should be optimized for existence checks and reads, as these are the operations we will perform the most frequently against the cache. The cache should have a very short delay between when data is written and when it is visible to a reader, so that the libp2p helper process has that information available to serve to other nodes on the network upon broadcast of the root block CIDs. Finally, the cache would ideally be persisted, so that we can quickly reload the cache in the event of node crashes (we want to avoid increasing bootstrap time for a node, as that keeps stake offline after crashes).
+There exist some key constraints in choosing a good solution for the Bitswap block db. Importantly, the block database needs to support a concurrent readers and a writer at the same time. Additionally, the database should be optimized for existence checks and reads, as these are the operations we will perform the most frequently against it. Some consistency guarantees (ability to rely on happens-before relation between write and read events) are also required. The database would ideally be persisted, so that we can quickly reload the data in the event of node crash (we want to avoid increasing bootstrap time for a node, as that keeps stake offline after crashes).
 
-Given these constraints, [LMDB](http://www.lmdb.tech/doc/) is a good choice for the Bitswap block cache. It meets all of the above criteria, including persistence.
+Given these constraints, [LMDB](http://www.lmdb.tech/doc/) is a good choice for the Bitswap block cache. It meets all of the above criteria, including persistence. Also it is very light on extra RAM usage, which is useful.
 
-#### Cache Schema
+### Database Schema
 
-The Bitswap block cache stores 2 key pieces of information: a set of blocks that are available to serve over the network, and a mapping from Mina CIDs and Bitswap block CIDs. To be specific, most resources we want to serve over Bitswap already have content identifiers (hashes) that are computed in the daemon and referenced in the blockchain state. The Bitswap block cache will provide a mapping between these existing CIDs and the set of Bitswap block CIDs that is projected from the resource, so that the Bitswap blocks do not need to be all recomputed in the event of restarts, and we do not need to compute these Bitswap blocks in order to determine what resources are stored in the cache.
+| Key                  | Value                |
+|----------------------|----------------------|
+| `status/<root_cid>`  | integer: 0..2        |
+| `block/<cid>`        | bitswap block bytes  |
 
-| Key                  | Value Type                                                  |
-|----------------------|-------------------------------------------------------------|
-| `res:${mina_cid}`    | `block_cid list` (first entry is the cid of the root block) |
-| `block:${block_cid}` | `bitswap_block`                                             |
+Status is an integer taking one of the values:
 
+  * `0` (not all descendant blocks present)
+  * `1` (all descendant blocks present)
+  * `2` (delete in process)
 
-#### Synchronization Model
+### Additional data to store in the Daemon db
 
-Synchronizing information from the daemon with the Bitswap block cache involves tracking a series of resources and how they relate back to Bitswap blocks stored in the cache. We already follow a pattern in the daemon in which we cache the CIDs of resources in memory to avoid recomputing them (example given: we wrap blocks and breadcrumbs in `With_hash.t`). In addition to this, for any resources we want to advertise over Bitswap, we will want to track both the Mina CID and the set of Bitswap block CIDs that comprise that resource's Bitswap block projection.
+In addition to data already stored in the DB controlled by the Daemon, we would need to store:
 
-There are multiple ways in which a daemon can determine the set of Bitswap block CIDs, related to how the daemon acquired that resource in the first place.
+* `headerHashToRootCid`: relation between header and associated root cid (if known)
+* `rootCidsToDelete`: list of root cids marked for deletion (i.e. root cids related to blocks which were completely removed from frontier)
+* `recentlyCreatedBlocks`: list of recently created blocks for which we didn't receive confirming upcall
 
-1. If the daemon generated the resource, then it needs compute the Bitswap block projection of that resource in order to determine the Bitswap block CIDs.
-2. If the daemon loaded the resource on startup (from persisted state), then it can defer to the Bitswap block cache to determine the CIDs. If the Bitswap block cache data is incomplete, corrupted, or missing, then the daemon needs to recompute the Bitswap block projection.
-3. If the daemon downloaded the resource from the network (via Bitswap), then the libp2p helper will inform the deamon of the set of Bitswap CIDs for that resource.
+### Invariants
 
-#### Caching Protocols
+The following invariants are maintained for the block storage:
 
-When the daemon is in the participation state, all Bitswap advertisable resources will be actively synced with the cache by performing "add resource" or "remove resource" operations as new resources are added and garbage collected from the daemon's internal state.
+* For each `status/{rcid}` in DB, there is an entry for `{rcid}` in the `headerHashToRootCid`
+* For each cid for which `block/{cid}` exists in DB, either holds:
+  * There exists `status/{cid}`
+  * There exists `cid'` such that `cid` is in the link list of bitswap block at `block/{cid'}`
+* `status/{rc}` can progress strictly in the order: `null -> 0 -> 1 -> 2 -> null`
 
-<!-- The daemon will perform the following interactions with the Bitswap cache: -->
+### Initialization
 
-**add resource**
-- compute Bitswap block data projection for resource
-- write `res:${mina_cid}` with all Bitswap block cids for the current resource
-- write a `block:${block_cid}` entry for each Bitswap block
-- store Bitswap block cids in memory, for later retrieval
-- throw away Bitswap block data projection
+Daemon initialization:
 
-**remove resource**
-- load Bitswap block cids for resource
-- delete each `block:${block_cid}` entry pointed to by the set of Bitswap block CIDs for this resource
-- delete the `res:${mina_cid}` entry related to this resource
+1. Remove keys `k` from `rootCidsToDelete` for which `status/{k}` is absent
+2. Remove blocks `b` from `recentlyCreatedBlocks` for which `status/{b.root_cid}` is present and is not equal to `0`
+3. Start Helper
+4. Send bulk delete request to Helper for keys from `rootCidsToDelete`
+5. Send bulk download request to Helper for blocks that are known to frontier but which do not have `status/{b.root_cid} == 1`
+6. Send add resource request for each block in `recentlyCreatedBlocks`
 
-**resync resources (after bootstrap, before participation)**
-- load all daemon resources into memory
-- query all `res:*` keys to get the set of resources stored in cache
-- diff daemon resource hashes against set of resources stored in cache
-- perform "remove resource" for all resources in cache, but not in memory
-- perform "add resource" for all resources in memory, but not in cache
-- for all resources both in memory and in cache
-  - read `res:${mina_cid}` to get the list of block CIDs associated with the resource in the cache
-  - sanity check that all reference block CIDs exist in cache (check DAG integrity)
-  - record block CIDs in memory to avoid computing block data projection for relevant resources
+Helper has no initialization at all.
 
-#### Synchronization Subsystem
+### Helper to Daemon interface
 
-The daemon will have a new subsystem which will track the creation/destruction of resources, and perform the necessary caching protocols. Tracking the destruction of resources will be done using a GC finalizer. We cannot perform the "remove resource" caching protocol from inside of a finalizer, so the finalizer will merely mark removed resources for the subsystem to later remove from the Bitswap block cache when the Async scheduler schedules the subsystem to run.
+Helper receives requests of kind:
 
-**NB:** _This proposed model makes an assumption that each DAG stored in Bitswap will not have any cross references (that is, no 2 DAGs will contain any of the same Bitswap blocks).This model simplifies the initial implementation for storing Mina block bodies, but does not mesh well with the world in which we store ledgers (where it is likely that multiple ledger DAGs share blocks across various roots). We will need to layer a refcounting solution on top of this to support that use case, when the time comes, which will involve adding an extra key-value table to the Bitswap block cache schema._
+* Delete resources with root cid in list `[cid1, cid2, ...]`
+  * Sends a single upcall upon deletion of all of these resources
+* Download resources with root cid in list `[cid1, cid2, ...]`
+  * Sends an upcall upon full retrieval of each resource (one per resource)
+* Add resource with root cid `{root_cid}` and bitswap blocks `[block1, ..., blockN]` (no checks for hashes are made)
+  * Sends an upcall confirming the resource was successfully added
 
-```ocaml
-module Bitswap = struct
-  type cid = <<elided>>
-  type block = <<elided>>
-  type block_tree = Bitswap.block * Bitswap.block list
+### Synchronization
 
-  module type Bitswap_advertisable_intf = sig
-    (* we use the bin_io interface here to serialize/deserialize the binary data stored in blocks *)
-    type t [@@deriving bin_io]
+Block creation:
 
-    type create_args
+1. Block is added to `recentlyCreatedBlocks`
+2. Add resource request is sent to Helper
+3. Upon add resource confirmation upcall, block is removed from `recentlyCreatedBlocks`
 
-    val create : create_args -> t
+Frontier is moved forward and some old blocks get removed:
 
-    (* mapping from an object to a mina cid *)
-    val id : t -> Mina_cid.t 
+1. Remove record for block from `headerHashToRootCid`
+2. Add block to `rootCidsToDelete`
+3. Delete resource request is sent to Helper
+4. Upon delete resource confirmation upcall, block is removed from `rootCidsToDelete`
 
-    val project_bitswap_blocks : t -> block_tree
-  end
+A gossip for the new header is received and Daemon decides that the block body corresponding to the header has to be fetched:
 
-  type 'a advertisable = (module Bitswap_advertisable_intf with type t = 'a)
+1. Store record in `headerHashToRootCid` for the header
+2. Send download request to Helper
+3. Upon download upcall is received, block and header are added to frontier
+  a. In case downloaded block came late and the block is not more of an interest, launch the deletion flow as described above
 
-  module Sync_state = struct
-    (* global sync state *)
-    let sync_table = Mina_cid.Table.create ()
+(We assume root cid is received along with the header in the gossip)
 
-    (* runs a continuous background task to synchronize resources tracked in the daemon with the Bitswap cache *)
-    let run_sync_task () =
-
-    (* track a new resource in global state *)
-    let track ((module Resource) : 'a advertisable) (resource : 'a) =
-      ...
-
-    (* mark a resource currently tracked in global state to be processed for collection in a future async cycle *)
-    let mark_for_collection ((module Resource) : 'a advertisable) (resource : 'a) =
-      ...
-  end
-
-  module Bitswap_advertised (Resource : Bitswap_advertisable_intf) = struct
-    type t = Resource.t
-
-    let create init_args =
-      let resource = Resource.create init_args in
-      Sync_state.add (module Resource) x ;
-      Gc.Expert.attach_finalizer x (fun _ -> Sync_state.mark_for_removal (module Resource) x) ;
-      x
-  end
-end
-```
-
-### Libp2p Helper IPC Modifications
-
-New IPC messages are required in order to support the daemon requesting resources stored in Bitswap blocks from the helper process. When the daemon needs to acquire a resource that is stored in Bitswap, it will send a message to the libp2p helper process asking it to download all the blocks associated with that resource (identified by the root Bitswap block CID). The helper process will begin the process of downloading all Bitswap blocks in the tree pointed to by the root Bitswap block, and will inform the helper upon success or failure of that operation. The helper process will be responsible for tracking a timeout of the download operation, and fail the operation if that timeout is exceeded.
-
-Whenever new Bitswap blocks are available to the node, the libp2p helper needs to mark an entry in the DHT saying that our node can provide this block of data. When the blocks in question are downloaded from another peer in the network, this is done [automatically by the libp2p Bitswap implementation](https://github.com/ipfs/go-bitswap/blob/0fa397581ca6197c6c4ca17842719370f6596e95/bitswap.go#L254). However, we still need to have custom logic for adding new DHT provision keys for data we broadcast from out node locally, and when a node restarts from with a pre-existing Bitswap block cache.
-
-In order to support this, whenever we submit [new pub/sub broadcast messages from the daemon](https://github.com/MinaProtocol/mina/blob/develop/src/app/libp2p_helper/src/libp2p_helper/main.go#L452), the daemon will include a list of Bitswap block CIDs associated with any extraneous data related to the broadcast message. The libp2p helper process will mark these in the DHT.
-
-We do not need to worry about advertising persisted block CIDs on restarts so long as the node is restarted with the same libp2p keypair, as the DHT records informing what block CIDs can be served by this node will persist on the network after the node goes offline. We also don't need to concern ourselves with pruning garbage collected block CIDs from the DHT since all provide keys we store there only persist for 24 hours.
-
-To summarize, the following changes will be made to the libp2p helper IPC protocol:
-
-- daemon -> helper
-  - add `GetResource(root_cid: CID)` :: Informs the helper to begin downloading the resource stored under the specified root Bitswap block CID.
-  - modify `Publish(topic: String, block_cids: [CID], data: RawBinaryData)` :: This message now includes a list of CIDs associated with the newly published message, which the libp2p helper will then `Provide` to the DHT.
-- helper -> daemon
-  - add `DownloadedResource(root_cid: CID, blocks: Map<CID, Block>)` :: Returns a requested resource to the daemon process.
-  - _(if we decide to move to 2-writer or proxy-writer model)_
-    - _add `DownloadedResource(root_cid: CID, cid_set: [CID], data: RawBinaryData)` :: Returns a requested resource to the daemon process._
-  - add `ResourceDownloadError(root_cid: CID, error: String)` :: Informs the daemon that a requested resource could not be downloaded.
-
-### Migrating Mina Blocks to Bitswap
+## Migrating Mina Blocks to Bitswap
 
 To migrate Mina block propagation to Bitswap, we will separate a Mina block into 2 portions: a block header, and a block body. Most of the data in a Mina block is stored inside of the `staged_ledger_diff`. The common data in every Mina block is ~8.06kb (including the `protocol_state_proof`), so using everything __except__ for the `staged_ledger_diff` as the block header seems natural. The `staged_ledger_diff` would then act as the block body for Mina blocks, and would be downloaded/made available via Bitswap rather than broadcast over pub/sub.
 
@@ -198,18 +151,18 @@ Protocol_version.set_current (Protocol_version.create_exn ~major:0 ~minor:0 ~pat
 External_transition.Stable.Latest.bin_size_t (conv small_precomputed_block) ;;
 ```
 
-### Shipping as a Soft-Fork
+# Shipping as a Soft-Fork
 
 We have an option to ship Bitswap as a soft-fork upgrade rather than as a hard-fork upgrade (shoutout to @mrmr1993 for this suggestion; writing this nearly verbatim from him). We can do this by adding a new pub/sub topic for broadcasting the new block header broadcast message format, which we can support in parallel to the current pub/sub topic we use for all of our broadcast messages. We currently use the `"coda/consensus-messages/0.0.1"` topic for blocks, transactions, and snark work. Nodes running the new version of the software can still support this topic, but in addition, can subscribe to and interact over a new topic `"mina/blocks/1.0.0"`, where we can broadcast the new message format for blocks. Nodes are able to filter subscriptions from other nodes based on what they subscribe to, configured using the [`WithSubscriptionFilter` option](https://github.com/libp2p/go-libp2p-pubsub/blob/55d412efa7f5a734d2f926e0c7c948f0ab4def21/subscription_filter.go#L36). Utilizing this, nodes that support the `"mina/blocks/1.0.0"` can filter out the `"coda/consensus-messages/0.0.1"` topic from nodes that support both topics. By filtering the topics like this, nodes running the new version can broadcast new blocks over both topics while avoiding sending the old message format to other nodes which support the new topic. Then, in the next hard fork, we can completely deprecate sending blocks over the old topic.
 
 The main detail to still figure out here is how new nodes will bridge the new topic messages to the old topic. It may be as simple as just broadcasting the block as a fresh message on the old topic, but that isn't normally how a pub/sub rebroadcast cycle would operate. This approach may "just work", but we should do additional research into what differentiates a libp2p pub/sub broadcast from a rebroadcast. If it turns out the only difference is how we select which peers to send the message to, the proposed topic filtering solution may address it automatically.
 
-## Drawbacks
+# Drawbacks
 [drawbacks]: #drawbacks
 
 This adds significant complexity to how the protocol gossips around information. The control flow for validating blocks is more complex than before, and there is new state to synchronize between the processes in the architecture. It also adds new delays to when the full block data will be available to each node (but the tradeoff here is that we are able to more consistently gossip block headers around the network within the same slot those blocks are produced).
 
-## Rationale and alternatives
+# Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
 - it would be possible to download larger data from peers via RPC and still reduce the pub/sub message size, though there are some issues with this approach
@@ -223,7 +176,7 @@ This adds significant complexity to how the protocol gossips around information.
     - would use a lot of inodes and file descriptors if we do not build a mechanism that stores multiple key-value pairs in shared files, which could prove tricky to implement
     - would need to solve concurrency problems related to concurrent readers/writers, which could be tricky to get correct and have confidence in
 
-## Unresolved questions
+# Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
 - should we ship this as a hard fork, or should we take the extra work to ship this as a soft fork?
