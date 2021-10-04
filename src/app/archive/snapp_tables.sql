@@ -22,25 +22,32 @@ CREATE TABLE snapp_state_data
 /* Variable-width arrays of algebraic fields, given as
    id's from snapp_state_data
 
-   Postgresql does not allow enforcing that these are
-   foreign keys.
+   Postgresql does not allow enforcing that the array elements are
+   foreign keys
+
+   The elements of the array are NOT NULL (not enforced by Postgresql)
+
 */
-CREATE TABLE snapp_state_array
+CREATE TABLE snapp_state_data_array
 ( id                       serial  PRIMARY KEY
-, items                    int[]   NOT NULL
+, element_id               int[]   NOT NULL
 );
 
-/* NULL convention */
+/* Fixed-width arrays of algebraic fields, given as id's from
+   snapp_state_data
+
+   We don't specify the width here, as that may change (and not enforced
+   by Postgresql, in any case)
+
+   Postgresql does not allow enforcing that the array elements are
+   foreign keys
+
+   Any element of the array may be NULL, meaning Ignore, per the
+   NULL convention
+*/
 CREATE TABLE snapp_states
 ( id                       serial           PRIMARY KEY
-, element_0_id             int              REFERENCES snapp_state_data(id)
-, element_1_id             int              REFERENCES snapp_state_data(id)
-, element_2_id             int              REFERENCES snapp_state_data(id)
-, element_3_id             int              REFERENCES snapp_state_data(id)
-, element_4_id             int              REFERENCES snapp_state_data(id)
-, element_5_id             int              REFERENCES snapp_state_data(id)
-, element_6_id             int              REFERENCES snapp_state_data(id)
-, element_7_id             int              REFERENCES snapp_state_data(id)
+, element_ids              int[]
 );
 
 CREATE TABLE snapp_verification_keys
@@ -92,7 +99,7 @@ CREATE TABLE snapp_updates
 CREATE TABLE snapp_events
 ( list_id                  int              NOT NULL
 , list_index               int              NOT NULL
-, state_array_id           int              NOT NULL REFERENCES snapp_state_array(id)
+, state_array_id           int              NOT NULL REFERENCES snapp_state_data_array(id)
 , PRIMARY KEY (list_id,list_index)
 );
 
@@ -157,7 +164,7 @@ CREATE TABLE snapp_token_id_bounds
 );
 
 CREATE TABLE snapp_timestamp_bounds
-( id                        serial           PRIMARY KEY
+( id                        serial          PRIMARY KEY
 , timestamp_lower_bound     bigint          NOT NULL
 , timestamp_upper_bound     bigint          NOT NULL
 );

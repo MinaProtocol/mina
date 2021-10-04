@@ -54,7 +54,7 @@ DROP TABLE snapp_events;
 
 DROP TABLE snapp_permissions;
 
-DROP TABLE snapp_state_array;
+DROP TABLE snapp_state_data_array;
 
 DROP TABLE snapp_states;
 
