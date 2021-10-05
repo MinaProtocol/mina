@@ -29,7 +29,8 @@ in
             
             [
               -- Cache test-executive binary
-              Cmd.run "artifact-cache-helper.sh test_executive.exe --upload"
+              Cmd.run "artifact-cache-helper.sh test_executive.exe --upload",
+              Cmd.run "artifact-cache-helper.sh logproc.exe --upload"
             ],
         label = "Build test-executive",
         key = "build-test-executive",
