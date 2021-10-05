@@ -64,6 +64,17 @@ module Hashless_ledger = struct
     in
     (action, Option.value_exn (get ledger loc), loc)
 
+  let create_new_account t account_id account =
+    let open Or_error.Let_syntax in
+    let%bind action, _ = get_or_create_account t account_id account in
+    if [%equal: [ `Existed | `Added ]] action `Existed then
+      Or_error.errorf
+        !"Could not create a new account with pk \
+          %{sexp:Signature_lib.Public_key.Compressed.t}: Account already \
+          exists"
+        (Account_id.public_key account_id)
+    else Ok ()
+
   let get_or_create t id = Or_error.try_with (fun () -> get_or_create_exn t id)
 
   let remove_accounts_exn _t =

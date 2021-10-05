@@ -19,8 +19,7 @@ module type Ledger_intf = sig
   val get_or_create :
     t -> Account_id.t -> (account_state * Account.t * location) Or_error.t
 
-  val get_or_create_account :
-    t -> Account_id.t -> Account.t -> (account_state * location) Or_error.t
+  val create_new_account : t -> Account_id.t -> Account.t -> unit Or_error.t
 
   val remove_accounts_exn : t -> Account_id.t list -> unit
 
@@ -567,10 +566,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         | Some account ->
             Ok (`Existing location, account)
         | None ->
-            Or_error.errorf
-              !"Account %{sexp: Account_id.t} has a location in the ledger, \
-                but is not present"
-              account_id )
+            (* Needed to support sparse ledger. *)
+            Ok (`New, Account.create account_id Balance.zero) )
     | None ->
         Ok (`New, Account.create account_id Balance.zero)
 
@@ -579,8 +576,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     | `Existing location ->
         Ok (set ledger location account)
     | `New ->
-        Or_error.ignore_m
-        @@ get_or_create_account ledger (Account.identifier account) account
+        create_new_account ledger (Account.identifier account) account
 
   let get' ledger tag location =
     error_opt (sprintf "%s account not found" tag) (get ledger location)

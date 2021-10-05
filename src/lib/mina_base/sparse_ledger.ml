@@ -74,7 +74,12 @@ module L = struct
   type location = int
 
   let get : t -> location -> Account.t option =
-   fun t loc -> Option.try_with (fun () -> M.get_exn !t loc)
+   fun t loc ->
+    Option.try_with (fun () ->
+        let account = M.get_exn !t loc in
+        if Public_key.Compressed.(equal empty account.public_key) then
+          assert false ;
+        account)
 
   let location_of_account : t -> Account_id.t -> location option =
    fun t id -> Option.try_with (fun () -> M.find_index_exn !t id)
@@ -112,6 +117,9 @@ module L = struct
           set t loc to_set ;
           (`Added, loc) )
         else (`Existed, loc))
+
+  let create_new_account t id to_set =
+    get_or_create_account t id to_set |> Or_error.map ~f:ignore
 
   let remove_accounts_exn : t -> Account_id.t list -> unit =
    fun _t _xs -> failwith "remove_accounts_exn: not implemented"

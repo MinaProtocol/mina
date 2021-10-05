@@ -306,6 +306,9 @@ module Ledger_inner = struct
              %{sexp:Public_key.Compressed.t}: Account already exists"
            (Account_id.public_key account_id))
 
+  let create_new_account t account_id account =
+    Or_error.try_with (fun () -> create_new_account_exn t account_id account)
+
   (* shadows definition in MaskedLedger, extra assurance hash is of right type  *)
   let merkle_root t =
     Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
