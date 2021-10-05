@@ -32,7 +32,7 @@ variable "artifact_path" {
 
 variable "mina_image" {
   type    = string
-  default = "mina-daemon-baked:1.1.8-b10c0e3-devnet"
+  default = "gcr.io/o1labs-192920/mina-daemon-baked:1.1.8-b10c0e3-devnet"
 }
 
 variable "mina_archive_image" {
