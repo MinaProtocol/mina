@@ -32,7 +32,7 @@ variable "artifact_path" {
 
 variable "mina_image" {
   type    = string
-  default = "codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"
+  default = "mina-daemon-baked:1.1.8-b10c0e3-devnet"
 }
 
 variable "mina_archive_image" {
@@ -205,7 +205,7 @@ variable "gcloud_seeds" {
   default = []
 }
 
-# Coda network services vars
+# Mina network services vars
 
 variable "restart_nodes" {
   type    = bool
