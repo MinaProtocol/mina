@@ -11,15 +11,16 @@ import (
 	"sync"
 	"time"
 
+	ipc "libp2p_ipc"
+
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
+	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns_legacy"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/prometheus/client_golang/prometheus"
-	ipc "libp2p_ipc"
 )
 
 func newApp() *app {

@@ -3,12 +3,13 @@ package main
 import (
 	"bytes"
 	"errors"
-	"github.com/stretchr/testify/require"
 	"hash/fnv"
 	"math/rand"
 	"reflect"
 	"testing"
 	"testing/quick"
+
+	"github.com/stretchr/testify/require"
 )
 
 const BAD_HASH_SEED_1 uint64 = 6854716328964733685
@@ -125,7 +126,7 @@ type blockSplitJoinConfig struct {
 func (blockSplitJoinConfig) Generate(r *rand.Rand, size int) reflect.Value {
 	data := make([]byte, size)
 	_, _ = r.Read(data)
-	return reflect.ValueOf(blockSplitJoinConfig{r.Intn(1 << 24), data})
+	return reflect.ValueOf(blockSplitJoinConfig{40 + r.Intn(1<<24), data})
 }
 
 func TestBitswapBlockSplitJoinQC(t *testing.T) {

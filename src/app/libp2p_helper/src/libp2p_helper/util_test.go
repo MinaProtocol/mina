@@ -148,7 +148,15 @@ func checkRpcResponseSuccess(t *testing.T, resMsg *capnp.Message) (uint64, ipc.L
 	require.True(t, msg.HasRpcResponse())
 	resp, err := msg.RpcResponse()
 	require.NoError(t, err)
-	require.True(t, resp.HasSuccess())
+	if !resp.HasSuccess() {
+		if resp.HasError() {
+			str, _ := resp.Error()
+			t.Logf("Got error: %s", str)
+		} else {
+			t.Log("Neither Error nor Success")
+		}
+		t.FailNow()
+	}
 	header, err := resp.Header()
 	require.NoError(t, err)
 	seqno, err := header.SequenceNumber()

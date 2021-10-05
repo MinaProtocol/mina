@@ -124,7 +124,7 @@ func TestConfigure(t *testing.T) {
 
 	key, _, err := crypto.GenerateEd25519Key(crand.Reader)
 	require.NoError(t, err)
-	keyBytes, err := key.Bytes()
+	keyBytes, err := crypto.MarshalPrivateKey(key)
 	require.NoError(t, err)
 
 	external := "/ip4/0.0.0.0/tcp/7000"
