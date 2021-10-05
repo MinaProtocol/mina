@@ -33,7 +33,7 @@ type sparse_ledger = t
 module Global_state : sig
   type t =
     { ledger : sparse_ledger
-    ; fee_excess : Currency.Amount.t
+    ; fee_excess : Currency.Amount.Signed.t
     ; protocol_state : Snapp_predicate.Protocol_state.View.t
     }
 end

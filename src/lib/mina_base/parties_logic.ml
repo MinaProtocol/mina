@@ -29,12 +29,18 @@ end
 module type Amount_intf = sig
   include Iffable
 
+  type unsigned = t
+
   module Signed : sig
-    type t
+    include Iffable with type bool := bool
 
     val is_pos : t -> bool
 
     val negate : t -> t
+
+    val add_flagged : t -> t -> t * [ `Overflow of bool ]
+
+    val of_unsigned : unsigned -> t
   end
 
   val zero : t
@@ -209,9 +215,11 @@ module Eff = struct
         'global_state
         -> ('ledger, < global_state : 'global_state ; ledger : 'ledger ; .. >) t
     | Modify_global_excess :
-        'global_state * ('amount -> 'amount)
+        'global_state * ('signed_amount -> 'signed_amount)
         -> ( 'global_state
-           , < global_state : 'global_state ; amount : 'amount ; .. > )
+           , < global_state : 'global_state
+             ; signed_amount : 'signed_amount
+             ; .. > )
            t
     | Modify_global_ledger :
         { global_state : 'global_state
@@ -541,13 +549,14 @@ module Make (Inputs : Inputs_intf) = struct
              ( global_state
              , fun amt ->
                  let res, `Overflow overflow =
-                   Amount.add_flagged amt local_state.excess
+                   Amount.Signed.add_flagged amt
+                     (Amount.Signed.of_unsigned local_state.excess)
                  in
                  (global_excess_update_failed :=
                     Bool.(!update_global_state &&& overflow)) ;
                  (update_global_state :=
                     Bool.(!update_global_state &&& not overflow)) ;
-                 Amount.if_ !update_global_state ~then_:res ~else_:amt ))
+                 Amount.Signed.if_ !update_global_state ~then_:res ~else_:amt ))
       , { local_state with
           excess =
             Amount.if_ update_local_excess ~then_:Amount.zero

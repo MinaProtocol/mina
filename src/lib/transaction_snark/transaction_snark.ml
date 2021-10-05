@@ -1222,7 +1222,7 @@ module Base = struct
     module Global_state = struct
       type t =
         { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
-        ; fee_excess : Amount.var
+        ; fee_excess : Amount.Signed.var
         ; protocol_state : Snapp_predicate.Protocol_state.View.Checked.t
         }
     end
@@ -1749,12 +1749,22 @@ module Base = struct
         module Amount = struct
           type t = Amount.Checked.t
 
+          type unsigned = t
+
           module Signed = struct
             type t = Amount.Signed.Checked.t
+
+            let if_ b ~then_ ~else_ =
+              run_checked (Amount.Signed.Checked.if_ b ~then_ ~else_)
 
             let is_pos (t : t) = Sgn.Checked.is_pos t.sgn
 
             let negate = Amount.Signed.Checked.negate
+
+            let of_unsigned = Amount.Signed.Checked.of_unsigned
+
+            let add_flagged x y =
+              run_checked (Amount.Signed.Checked.add_flagged x y)
           end
 
           let if_ b ~then_ ~else_ =
@@ -1790,6 +1800,7 @@ module Base = struct
           ; account : Account.t
           ; ledger : Ledger.t
           ; amount : Amount.t
+          ; signed_amount : Amount.Signed.t
           ; bool : Bool.t
           ; token_id : Token_id.t
           ; global_state : Global_state.t
@@ -2058,7 +2069,8 @@ module Base = struct
           { ledger =
               ( statement.source.ledger
               , V.create (fun () -> !witness.global_ledger) )
-          ; fee_excess = Amount.(var_of_t zero)
+          ; fee_excess =
+              Amount.Signed.Checked.of_fee statement.fee_excess.fee_excess_l
           ; protocol_state =
               Mina_state.Protocol_state.Body.view_checked state_body
           }
@@ -2214,12 +2226,9 @@ module Base = struct
             (Fee_excess.assert_equal_checked statement.fee_excess
                { fee_token_l = Token_id.(var_of_t default)
                ; fee_excess_l =
-                   Fee.Signed.Checked.of_unsigned
-                     (Amount.Checked.to_fee (fst init).fee_excess)
+                   Amount.Signed.Checked.to_fee (fst init).fee_excess
                ; fee_token_r = Token_id.(var_of_t default)
-               ; fee_excess_r =
-                   Fee.Signed.Checked.of_unsigned
-                     (Amount.Checked.to_fee global.fee_excess)
+               ; fee_excess_r = Amount.Signed.Checked.to_fee global.fee_excess
                })) ;
       let `Needs_some_work_for_snapps_on_mainnet = Mina_base.Util.todo_snapps in
       (* TODO: Check various consistency equalities between local and global and the statement *)
@@ -4375,13 +4384,9 @@ let%test_module "transaction_snark" =
               ; supply_increase = Amount.zero
               ; fee_excess =
                   { fee_token_l = Token_id.default
-                  ; fee_excess_l =
-                      Fee.Signed.of_unsigned
-                        (Amount.to_fee source_global.fee_excess)
+                  ; fee_excess_l = Amount.Signed.to_fee source_global.fee_excess
                   ; fee_token_r = Token_id.default
-                  ; fee_excess_r =
-                      Fee.Signed.of_unsigned
-                        (Amount.to_fee target_global.fee_excess)
+                  ; fee_excess_r = Amount.Signed.to_fee target_global.fee_excess
                   }
               ; sok_digest = Sok_message.Digest.default
               }
@@ -4978,8 +4983,7 @@ let%test_module "transaction_snark" =
                     ; supply_increase = Amount.zero
                     ; fee_excess =
                         { fee_token_l = Token_id.default
-                        ; fee_excess_l =
-                            Fee.Signed.of_unsigned (Amount.to_fee excess)
+                        ; fee_excess_l = Amount.Signed.to_fee excess
                         ; fee_token_r = Token_id.default
                         ; fee_excess_r = Fee.Signed.zero
                         }
@@ -5386,8 +5390,7 @@ let%test_module "transaction_snark" =
                     ; supply_increase = Amount.zero
                     ; fee_excess =
                         { fee_token_l = Token_id.default
-                        ; fee_excess_l =
-                            Fee.Signed.of_unsigned (Amount.to_fee excess)
+                        ; fee_excess_l = Amount.Signed.to_fee excess
                         ; fee_token_r = Token_id.default
                         ; fee_excess_r = Fee.Signed.zero
                         }

@@ -345,7 +345,7 @@ module type S = sig
   module Global_state : sig
     type t =
       { ledger : ledger
-      ; fee_excess : Amount.t
+      ; fee_excess : Amount.Signed.t
       ; protocol_state : Snapp_predicate.Protocol_state.View.t
       }
   end
@@ -377,7 +377,7 @@ module type S = sig
            , bool
            , unit )
            Parties_logic.Local_state.t
-         * Amount.t ) )
+         * Amount.Signed.t ) )
        Or_error.t
 
   (** Apply all parties within a parties transaction. This behaves as
@@ -1444,7 +1444,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   module Global_state = struct
     type t =
       { ledger : L.t
-      ; fee_excess : Amount.t
+      ; fee_excess : Amount.Signed.t
       ; protocol_state : Snapp_predicate.Protocol_state.View.t
       }
   end
@@ -1496,12 +1496,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     module Amount = struct
       open Currency.Amount
 
-      type nonrec t = t
+      type unsigned = t
+
+      type t = unsigned
 
       let if_ = Parties.value_if
 
       module Signed = struct
         include Signed
+
+        let if_ = Parties.value_if
 
         let is_pos (t : t) = Sgn.equal t.sgn Pos
       end
@@ -1601,6 +1605,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; account : Account.t
       ; ledger : Ledger.t
       ; amount : Amount.t
+      ; signed_amount : Amount.Signed.t
       ; bool : Bool.t
       ; token_id : Token_id.t
       ; global_state : Global_state.t
@@ -1712,7 +1717,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             step_all (f user_acc s) s
     in
     let initial_state : Inputs.Global_state.t * _ Parties_logic.Local_state.t =
-      ( { protocol_state = state_view; ledger; fee_excess = Amount.zero }
+      ( { protocol_state = state_view; ledger; fee_excess = Amount.Signed.zero }
       , { parties = []
         ; call_stack = []
         ; transaction_commitment = ()

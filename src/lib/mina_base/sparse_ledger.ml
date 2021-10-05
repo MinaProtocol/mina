@@ -48,7 +48,7 @@ end
 module Global_state = struct
   type t =
     { ledger : sparse_ledger
-    ; fee_excess : Currency.Amount.t
+    ; fee_excess : Currency.Amount.Signed.t
     ; protocol_state : Snapp_predicate.Protocol_state.View.t
     }
 end
