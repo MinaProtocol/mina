@@ -33,12 +33,12 @@ func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) *capnp.Message {
 
 	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
 		app.updateConnectionMetrics()
-		app.writeMsg(mkPeerConnectedUpcall(peer.Encode(c.RemotePeer())))
+		app.writeMsg(mkPeerConnectedUpcall(c.RemotePeer()))
 	}
 
 	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
 		app.updateConnectionMetrics()
-		app.writeMsg(mkPeerDisconnectedUpcall(peer.Encode(c.RemotePeer())))
+		app.writeMsg(mkPeerDisconnectedUpcall(c.RemotePeer()))
 	}
 
 	for _, info := range app.AddedPeers {
@@ -344,7 +344,7 @@ func (msg GenerateKeypairReq) handle(app *app, seqno uint64) *capnp.Message {
 		panicOnErr(res.SetPrivateKey(privkBytes))
 		panicOnErr(res.SetPublicKey(pubkBytes))
 		pid, err := res.NewPeerId()
-		panicOnErr(pid.SetId(peer.Encode(peerID)))
+		panicOnErr(pid.SetId([]byte(peerID)))
 	})
 }
 

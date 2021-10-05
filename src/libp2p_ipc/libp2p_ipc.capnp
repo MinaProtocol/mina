@@ -8,7 +8,7 @@ struct Multiaddr {
 }
 
 struct PeerId {
-  id @0 :Text;
+  id @0 :Data;
 }
 
 struct AddrInfo {

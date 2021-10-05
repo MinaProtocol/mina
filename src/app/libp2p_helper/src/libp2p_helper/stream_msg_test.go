@@ -54,7 +54,7 @@ func testOpenStreamDo(t *testing.T, appA *app, appBHost host.Host, appBPort uint
 
 	require.NoError(t, m.SetProtocolId(protocol))
 	pid, err := m.NewPeer()
-	require.NoError(t, pid.SetId(appBHost.ID().String()))
+	require.NoError(t, pid.SetId([]byte(appBHost.ID())))
 	require.NoError(t, err)
 
 	resMsg := OpenStreamReq(m).handle(appA, rpcSeqno)
@@ -146,7 +146,7 @@ func TestRemoveStreamHandler(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, os.SetProtocolId(newProtocol))
 	pid, err := os.NewPeer()
-	require.NoError(t, pid.SetId(appB.P2p.Host.ID().String()))
+	require.NoError(t, pid.SetId([]byte(appB.P2p.Host.ID())))
 	require.NoError(t, err)
 
 	var osRpcSeqno uint64 = 1026

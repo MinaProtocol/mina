@@ -163,7 +163,7 @@ func checkPeerInfo(t *testing.T, actual *codaPeerInfo, host host.Host, port uint
 	// sometimes it's some other IP of the machine
 	// expectedHost, err := host.Addrs()[0].ValueForProtocol(4)
 	require.Equal(t, port, actual.Libp2pPort)
-	require.Equal(t, host.ID().String(), actual.PeerID)
+	require.Equal(t, host.ID(), actual.PeerID)
 }
 
 func beginAdvertisingSendAndCheck(t *testing.T, app *app) {

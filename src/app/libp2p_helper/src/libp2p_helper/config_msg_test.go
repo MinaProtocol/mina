@@ -275,11 +275,13 @@ func TestListen(t *testing.T) {
 func TestSetGatingConfig(t *testing.T) {
 	testApp, _ := newTestApp(t, nil, true)
 
-	allowedID := "12D3KooWJDGPa2hiYCJ2o7XPqEq2tjrWpFJzqa4dy538Gfs7Vn2r"
+	allowedID, err := peer.Decode("12D3KooWJDGPa2hiYCJ2o7XPqEq2tjrWpFJzqa4dy538Gfs7Vn2r")
+	require.NoError(t, err)
 	allowedMultiaddr, err := ma.NewMultiaddr("/ip4/7.8.9.0/tcp/7000")
 	require.NoError(t, err)
 
-	bannedID := "12D3KooWGnQ4vat8EybAeFEK3jk78vmwDu9qMhZzcyQBPb16VCnS"
+	bannedID, err := peer.Decode("12D3KooWGnQ4vat8EybAeFEK3jk78vmwDu9qMhZzcyQBPb16VCnS")
+	require.NoError(t, err)
 	bannedMultiaddr, err := ma.NewMultiaddr("/ip4/1.2.3.4/tcp/7000")
 	require.NoError(t, err)
 
@@ -299,9 +301,9 @@ func TestSetGatingConfig(t *testing.T) {
 	tPids, err := gc.NewTrustedPeerIds(1)
 	require.NoError(t, err)
 	require.NoError(t, bIps.Set(0, "1.2.3.4"))
-	require.NoError(t, bPids.At(0).SetId(bannedID))
+	require.NoError(t, bPids.At(0).SetId([]byte(bannedID)))
 	require.NoError(t, tIps.Set(0, "7.8.9.0"))
-	require.NoError(t, tPids.At(0).SetId(allowedID))
+	require.NoError(t, tPids.At(0).SetId([]byte(allowedID)))
 	gc.SetIsolate(false)
 
 	var mRpcSeqno uint64 = 2003
@@ -312,25 +314,19 @@ func TestSetGatingConfig(t *testing.T) {
 	_, err = respSuccess.SetGatingConfig()
 	require.NoError(t, err)
 
-	allowedPid, err := peer.Decode(allowedID)
-	require.NoError(t, err)
-
-	bannedPid, err := peer.Decode(bannedID)
-	require.NoError(t, err)
-
-	ok := testApp.P2p.GatingState.InterceptPeerDial(bannedPid)
+	ok := testApp.P2p.GatingState.InterceptPeerDial(bannedID)
 	require.False(t, ok)
 
-	ok = testApp.P2p.GatingState.InterceptPeerDial(allowedPid)
+	ok = testApp.P2p.GatingState.InterceptPeerDial(allowedID)
 	require.True(t, ok)
 
-	ok = testApp.P2p.GatingState.InterceptAddrDial(bannedPid, bannedMultiaddr)
+	ok = testApp.P2p.GatingState.InterceptAddrDial(bannedID, bannedMultiaddr)
 	require.False(t, ok)
 
-	ok = testApp.P2p.GatingState.InterceptAddrDial(bannedPid, allowedMultiaddr)
+	ok = testApp.P2p.GatingState.InterceptAddrDial(bannedID, allowedMultiaddr)
 	require.False(t, ok)
 
-	ok = testApp.P2p.GatingState.InterceptAddrDial(allowedPid, allowedMultiaddr)
+	ok = testApp.P2p.GatingState.InterceptAddrDial(allowedID, allowedMultiaddr)
 	require.True(t, ok)
 }
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	ipc "libp2p_ipc"
 	"testing"
 
@@ -192,10 +193,10 @@ func TestUpcalls(t *testing.T) {
 			t.Logf("awaiting disconnect from Alice ...")
 			m := <-aTrap.PeerDisconnected
 			pid := getPeerDisconnectedPeerId(t, m)
-			if pid == peerId(carolInfo) {
+			if bytes.Equal(pid, []byte(peerId(carolInfo))) {
 				// Carol can connect to alice and even disconnect when Bob closes
 				// Seems like a legit behaviour overall
-			} else if pid == peerId(bobInfo) {
+			} else if bytes.Equal(pid, []byte(peerId(bobInfo))) {
 				break
 			} else {
 				t.Logf("Unexpected disconnect from peer id %s", pid)
@@ -221,7 +222,7 @@ func TestUpcalls(t *testing.T) {
 	}
 }
 
-func checkGossipReceived(t *testing.T, m ipc.DaemonInterface_GossipReceived, msg []byte, subId uint64, senderPeerId string) {
+func checkGossipReceived(t *testing.T, m ipc.DaemonInterface_GossipReceived, msg []byte, subId uint64, senderPeerId peer.ID) {
 	pi, err := m.Sender()
 	require.NoError(t, err)
 	actualPI, err := readPeerInfo(pi)
@@ -236,7 +237,7 @@ func checkGossipReceived(t *testing.T, m ipc.DaemonInterface_GossipReceived, msg
 }
 
 func testStreamOpenSend(t *testing.T, appA *app, appAPort uint16, appB *app, appBPort uint16, rpcSeqno uint64, protocol string, aTrap *upcallTrap, bTrap *upcallTrap) (uint64, uint64) {
-	aPeerId := appA.P2p.Host.ID().String()
+	aPeerId := appA.P2p.Host.ID()
 
 	// Open a stream from A to B
 	aStreamId := testOpenStreamDo(t, appA, appB.P2p.Host, appBPort, rpcSeqno, protocol)
@@ -258,7 +259,7 @@ func testStreamOpenSendReset(t *testing.T, appA *app, appAPort uint16, appB *app
 }
 
 func testStreamOpenSendClose(t *testing.T, appA *app, appAPort uint16, appB *app, appBPort uint16, rpcSeqno uint64, protocol string, aTrap *upcallTrap, bTrap *upcallTrap) {
-	aPeerId := appA.P2p.Host.ID().String()
+	aPeerId := appA.P2p.Host.ID()
 
 	// Open a stream from A to B
 	aStreamId := testOpenStreamDo(t, appA, appB.P2p.Host, appBPort, rpcSeqno, protocol)
@@ -285,8 +286,8 @@ func testStreamOpenSendClose(t *testing.T, appA *app, appAPort uint16, appB *app
 	checkStreamComplete(t, <-bTrap.StreamComplete, bStreamId)
 }
 
-func peerId(info peer.AddrInfo) string {
-	return info.ID.String()
+func peerId(info peer.AddrInfo) peer.ID {
+	return info.ID
 }
 
 func checkPeerConnected(t *testing.T, m ipc.DaemonInterface_PeerConnected, peerInfo peer.AddrInfo) {
@@ -294,10 +295,10 @@ func checkPeerConnected(t *testing.T, m ipc.DaemonInterface_PeerConnected, peerI
 	require.NoError(t, err)
 	pid_, err := pid.Id()
 	require.NoError(t, err)
-	require.Equal(t, peerId(peerInfo), pid_)
+	require.Equal(t, []byte(peerId(peerInfo)), pid_)
 }
 
-func getPeerDisconnectedPeerId(t *testing.T, m ipc.DaemonInterface_PeerDisconnected) string {
+func getPeerDisconnectedPeerId(t *testing.T, m ipc.DaemonInterface_PeerDisconnected) []byte {
 	pid, err := m.PeerId()
 	require.NoError(t, err)
 	pid_, err := pid.Id()
@@ -306,10 +307,10 @@ func getPeerDisconnectedPeerId(t *testing.T, m ipc.DaemonInterface_PeerDisconnec
 }
 
 func checkPeerDisconnected(t *testing.T, m ipc.DaemonInterface_PeerDisconnected, peerInfo peer.AddrInfo) {
-	require.Equal(t, peerId(peerInfo), getPeerDisconnectedPeerId(t, m))
+	require.Equal(t, []byte(peerId(peerInfo)), getPeerDisconnectedPeerId(t, m))
 }
 
-func checkIncomingStream(t *testing.T, m ipc.DaemonInterface_IncomingStream, expectedPeerId string, expectedProtocol string) uint64 {
+func checkIncomingStream(t *testing.T, m ipc.DaemonInterface_IncomingStream, expectedPeerId peer.ID, expectedProtocol string) uint64 {
 	sid, err := m.StreamId()
 	require.NoError(t, err)
 	pi, err := m.Peer()

@@ -63,7 +63,7 @@ func parseMultiaddrWithID(ma multiaddr.Multiaddr, id peer.ID) (*codaPeerInfo, er
 		return nil, err
 	}
 
-	return &codaPeerInfo{Libp2pPort: uint16(port), Host: ipComponent.Value(), PeerID: peer.Encode(id)}, nil
+	return &codaPeerInfo{Libp2pPort: uint16(port), Host: ipComponent.Value(), PeerID: id}, nil
 }
 
 func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
@@ -355,7 +355,7 @@ func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {
 	if len(conns) == 0 {
 		if app.UnsafeNoTrustIP {
 			app.P2p.Logger.Info("UnsafeNoTrustIP: pretending it's localhost")
-			return &codaPeerInfo{Libp2pPort: 0, Host: "127.0.0.1", PeerID: peer.Encode(id)}, nil
+			return &codaPeerInfo{Libp2pPort: 0, Host: "127.0.0.1", PeerID: id}, nil
 		}
 		return nil, badp2p(errors.New("tried to find peer info but no open connections to that peer ID"))
 	}

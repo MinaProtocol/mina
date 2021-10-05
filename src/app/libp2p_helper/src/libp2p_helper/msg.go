@@ -17,7 +17,7 @@ import (
 type codaPeerInfo struct {
 	Libp2pPort uint16
 	Host       string
-	PeerID     string
+	PeerID     peer.ID
 }
 
 type ipcRpcRequest = ipc.Libp2pHelperInterface_RpcRequest
@@ -63,13 +63,17 @@ func multiaddrListForeach(l ipc.Multiaddr_List, f func(string) error) error {
 	return nil
 }
 
-func capnpPeerIdListForeach(l ipc.PeerId_List, f func(string) error) error {
+func capnpPeerIdListForeach(l ipc.PeerId_List, f func(peer.ID) error) error {
 	for i := 0; i < l.Len(); i++ {
 		el, err := l.At(i).Id()
 		if err != nil {
 			return err
 		}
-		err = f(el)
+		pid, err := peer.IDFromBytes(el)
+		if err != nil {
+			return err
+		}
+		err = f(pid)
 		if err != nil {
 			return err
 		}
@@ -133,12 +137,9 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 		return nil, err
 	}
 	bannedPeers := peer.NewSet()
-	err = capnpPeerIdListForeach(bannedPeerIds, func(peerID string) error {
-		id, err := peer.Decode(peerID)
-		if err == nil {
-			bannedPeers.Add(id)
-		}
-		return err
+	err = capnpPeerIdListForeach(bannedPeerIds, func(id peer.ID) error {
+		bannedPeers.Add(id)
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -149,8 +150,7 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 		return nil, err
 	}
 	trustedPeers := peer.NewSet()
-	err = capnpPeerIdListForeach(trustedPeerIds, func(peerID string) error {
-		id := peer.ID(peerID)
+	err = capnpPeerIdListForeach(trustedPeerIds, func(id peer.ID) error {
 		trustedPeers.Add(id)
 		return nil
 	})
@@ -237,23 +237,23 @@ func mkPushMsg(f func(ipc.DaemonInterface_PushMessage)) *capnp.Message {
 	})
 }
 
-func mkPeerConnectedUpcall(peerId string) *capnp.Message {
+func mkPeerConnectedUpcall(peerId peer.ID) *capnp.Message {
 	return mkPushMsg(func(m ipc.DaemonInterface_PushMessage) {
 		pc, err := m.NewPeerConnected()
 		panicOnErr(err)
 		pid, err := pc.NewPeerId()
 		panicOnErr(err)
-		pid.SetId(peerId)
+		pid.SetId([]byte(peerId))
 	})
 }
 
-func mkPeerDisconnectedUpcall(peerId string) *capnp.Message {
+func mkPeerDisconnectedUpcall(peerId peer.ID) *capnp.Message {
 	return mkPushMsg(func(m ipc.DaemonInterface_PushMessage) {
 		pc, err := m.NewPeerDisconnected()
 		panicOnErr(err)
 		pid, err := pc.NewPeerId()
 		panicOnErr(err)
-		panicOnErr(pid.SetId(peerId))
+		panicOnErr(pid.SetId([]byte(peerId)))
 	})
 }
 func readPeerInfo(pi ipc.PeerInfo) (*codaPeerInfo, error) {
@@ -261,7 +261,7 @@ func readPeerInfo(pi ipc.PeerInfo) (*codaPeerInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	peerId, err := pid.Id()
+	peerIdBytes, err := pid.Id()
 	if err != nil {
 		return nil, err
 	}
@@ -270,12 +270,16 @@ func readPeerInfo(pi ipc.PeerInfo) (*codaPeerInfo, error) {
 		return nil, err
 	}
 	port := pi.Libp2pPort()
+	peerId, err := peer.IDFromBytes(peerIdBytes)
+	if err != nil {
+		return nil, err
+	}
 	return &codaPeerInfo{PeerID: peerId, Host: host, Libp2pPort: port}, nil
 }
 func setPeerInfo(pi ipc.PeerInfo, info *codaPeerInfo) {
 	pid, err := pi.NewPeerId()
 	panicOnErr(err)
-	panicOnErr(pid.SetId(info.PeerID))
+	panicOnErr(pid.SetId([]byte(info.PeerID)))
 	panicOnErr(pi.SetHost(info.Host))
 	pi.SetLibp2pPort(info.Libp2pPort)
 }

@@ -101,11 +101,11 @@ func (m OpenStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 		if err != nil {
 			return err
 		}
-		peerStr, err := peerId.Id()
+		peerBytes, err := peerId.Id()
 		if err != nil {
 			return err
 		}
-		peerDecoded, err = peer.Decode(peerStr)
+		peerDecoded, err = peer.IDFromBytes(peerBytes)
 		if err != nil {
 			return err
 		}
