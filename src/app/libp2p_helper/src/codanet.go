@@ -34,7 +34,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	record "github.com/libp2p/go-libp2p-record"
 	p2pconfig "github.com/libp2p/go-libp2p/config"
-	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
+	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns_legacy"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"golang.org/x/crypto/blake2b"

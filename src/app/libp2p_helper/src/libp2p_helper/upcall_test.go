@@ -164,8 +164,10 @@ func TestUpcalls(t *testing.T) {
 
 		// Alice initiates and then closes connection to Bob
 		testStreamOpenSendClose(t, alice, alicePort, bob, bobPort, 11900, newProtocol, aTrap, bTrap)
+		t.Logf("alice -> bob: opened, used and closed stream")
 		// Bob initiates and then closes connection to Alice
 		testStreamOpenSendClose(t, bob, bobPort, alice, alicePort, 11910, newProtocol, bTrap, aTrap)
+		t.Logf("bob -> alice: opened, used and closed stream")
 
 		// Bob connects to Carol
 		testAddPeerImplDo(t, bob, carolInfo, true)
@@ -281,7 +283,7 @@ func testStreamOpenSendClose(t *testing.T, appA *app, appAPort uint16, appB *app
 
 	// A closes the stream
 	testCloseStreamDo(t, appA, aStreamId, rpcSeqno+4)
-	checkStreamComplete(t, <-aTrap.StreamComplete, aStreamId)
+	checkStreamLost(t, <-aTrap.StreamLost, aStreamId, "")
 	checkStreamComplete(t, <-bTrap.StreamComplete, bStreamId)
 }
 
@@ -340,7 +342,9 @@ func checkStreamLost(t *testing.T, m ipc.DaemonInterface_StreamLost, expectedStr
 	require.Equal(t, expectedStreamId, sid.Id())
 	reason, err := m.Reason()
 	require.NoError(t, err)
-	require.Equal(t, expectedReason, reason)
+	if expectedReason != "" {
+		require.Equal(t, expectedReason, reason)
+	}
 }
 
 func checkStreamComplete(t *testing.T, m ipc.DaemonInterface_StreamComplete, expectedStreamId uint64) {
