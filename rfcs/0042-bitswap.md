@@ -35,7 +35,7 @@ For links a 256-bit version of Blake2b hash is to be used. Packing algorithm can
 
 There exist some key constraints in choosing a good solution for the Bitswap block db. Importantly, the block database needs to support a concurrent readers and a writer at the same time. Additionally, the database should be optimized for existence checks and reads, as these are the operations we will perform the most frequently against it. Some consistency guarantees (ability to rely on happens-before relation between write and read events) are also required. The database would ideally be persisted, so that we can quickly reload the data in the event of node crash (we want to avoid increasing bootstrap time for a node, as that keeps stake offline after crashes).
 
-Given these constraints, [LMDB](http://www.lmdb.tech/doc/) is a good choice for the Bitswap block cache. It meets all of the above criteria, including persistence. Also it is very light on extra RAM usage, which is useful.
+Given these constraints, [LMDB](http://www.lmdb.tech/doc/) is a good choice for the Bitswap block storage. It meets all of the above criteria, including persistence. As a bonus, it's light on extra RAM usage.
 
 ### Database Schema
 
@@ -122,40 +122,48 @@ To migrate Mina block propagation to Bitswap, we will separate a Mina block into
 
 When blocks are broadcast through the network now, only the block header and a root CID for the `staged_ledger_diff` are in the message. When a node receives a new block header, the node will first verify the `protocol_state_proof` (all public information that needs to be fed in for proof verification will be available in the block header). Once the proof is checked, a node would then download the `staged_ledger_diff` via Bitswap. Once that is downloaded, the node would follow the same pattern right now for generating a breadcrumb by expanding the `staged_ledger` from the parent breadcrumb and the new `staged_ledger_diff`, after which the Mina block will be fully validated. At this point, the breadcrumb is added to the frontier.
 
-One large difference from before, however, is that nodes will rebroadcast the block header to other nodes on the network before the `staged_ledger_diff` is downloaded and verified, in order to avoid increasing block propagation time on the network with the new addition of Bitswap. This change brings some unique problems that we need to solve now, as previously, we wouldn't forward Mina blocks to other nodes until we knew the block was fully valid. In the new world, an adversary could broadcast around the same block header and proof, but swap out the `staged_ledger_diff` root Bitswap block CID with different values to attack the network. In order to prevent this, we must now include a commitment in the snark not only to the target staged ledger hash, but also the root Bitswap block CID of the `staged_ledger_diff` that brings us to that state. This makes the attack more expensive to preform since you need to generate a proof for each `staged_ledger_diff` the adversary wants to broadcast erroneously to the network. In addition to this, we will make a rule such that, if a node ever downloads a `staged_ledger_diff` which does not achieve the target staged ledger hash after application to the parent staged ledger, that node will ban the block producer public key of whoever produced that block. This further removes the incentive to perform this kind of attack, since an adversary doing so would lose their ability to submit blocks to nodes in the future.
-
 In summation, the proposed changes in order to move Mina blocks into Bitswap are:
 
 1. Define separate block header (block w/o `staged_ledger_diff` with new field `staged_ledger_diff_root_cid`).
-2. Add `staged_ledger_diff_root_cid` as a public input to the blockchain snark.
+2. Verify `staged_ledger_diff_root_cid` relation to the header.
 3. Rebroadcast block headers after proofs are checked, but before `staged_ledger_diff`s are verified and the breadcrumb is added to the frontier.
-4. Punish block producer public keys if they submit an invalid `staged_ledger_diff` by ignoring all future block headers from that producer (do not punish senders, as they may not have banned or checked the `staged_ledger_diff` yet).
+4. Punish block producer public keys if they submit an invalid `staged_ledger_diff` by ignoring all future block headers from that producer within the epoch (do not punish senders, as they may not have banned or checked the `staged_ledger_diff` yet).
 
-_For reference on the above computation of ~8.06kb for a block without a staged ledger diff, here is a snippet of OCaml code that can be run in `dune utop src/lib/mina_transition`_
+Punishing is done only within the epoch as otherwise punish lists would be accumulating without boundary and real adversaries will nevertheless find the way around by mnoving stake for to other address for the next epoch.
 
-```ocaml
-let open Core in
-let open Mina_transition in
-let precomputed_block = External_transition.Precomputed_block.t_of_sexp @@ Sexp.of_string External_transition_sample_precomputed_block.sample_block_sexp in
-let small_precomputed_block = {precomputed_block with staged_ledger_diff = Staged_ledger_diff.empty_diff} in
-let conv (t : External_transition.Precomputed_block.t) =
-  External_transition.create
-    ~protocol_state:t.protocol_state
-    ~protocol_state_proof:t.protocol_state_proof
-    ~staged_ledger_diff:t.staged_ledger_diff
-    ~delta_transition_chain_proof:t.delta_transition_chain_proof
-    ~validation_callback:(Mina_net2.Validation_callback.create_without_expiration ())
-    ()
-in
-Protocol_version.set_current (Protocol_version.create_exn ~major:0 ~minor:0 ~patch:0) ;
-External_transition.Stable.Latest.bin_size_t (conv small_precomputed_block) ;;
-```
+## Verifying relation between root CID and header
 
-# Shipping as a Soft-Fork
+One large difference from before is that nodes will rebroadcast the block header to other nodes on the network before the `staged_ledger_diff` is downloaded and verified, in order to avoid increasing block propagation time on the network with the new addition of Bitswap. This change brings some unique problems that we need to solve now, as previously, we wouldn't forward Mina blocks to other nodes until we knew the block was fully valid.
 
-We have an option to ship Bitswap as a soft-fork upgrade rather than as a hard-fork upgrade (shoutout to @mrmr1993 for this suggestion; writing this nearly verbatim from him). We can do this by adding a new pub/sub topic for broadcasting the new block header broadcast message format, which we can support in parallel to the current pub/sub topic we use for all of our broadcast messages. We currently use the `"coda/consensus-messages/0.0.1"` topic for blocks, transactions, and snark work. Nodes running the new version of the software can still support this topic, but in addition, can subscribe to and interact over a new topic `"mina/blocks/1.0.0"`, where we can broadcast the new message format for blocks. Nodes are able to filter subscriptions from other nodes based on what they subscribe to, configured using the [`WithSubscriptionFilter` option](https://github.com/libp2p/go-libp2p-pubsub/blob/55d412efa7f5a734d2f926e0c7c948f0ab4def21/subscription_filter.go#L36). Utilizing this, nodes that support the `"mina/blocks/1.0.0"` can filter out the `"coda/consensus-messages/0.0.1"` topic from nodes that support both topics. By filtering the topics like this, nodes running the new version can broadcast new blocks over both topics while avoiding sending the old message format to other nodes which support the new topic. Then, in the next hard fork, we can completely deprecate sending blocks over the old topic.
+In the new world, an adversary could broadcast around the same block header and proof, but swap out the `staged_ledger_diff` root Bitswap block CID with different values to attack the network. An adversary can do that both being a block producer and as a man-in-the-middle (MITM).
 
-The main detail to still figure out here is how new nodes will bridge the new topic messages to the old topic. It may be as simple as just broadcasting the block as a fresh message on the old topic, but that isn't normally how a pub/sub rebroadcast cycle would operate. This approach may "just work", but we should do additional research into what differentiates a libp2p pub/sub broadcast from a rebroadcast. If it turns out the only difference is how we select which peers to send the message to, the proposed topic filtering solution may address it automatically.
+To rule out the MITM attack vector, a signature is to be carried along with the header. The signature is made of a pair of root CID and header hash with block producer's public key. No MITM actor can forge the signature, hence the attack becomes infeasible.
+
+To mitigate adversary the block producer attack case, the following tactic is employed: if a node ever downloads a `staged_ledger_diff` which does not achieve the target staged ledger hash after application to the parent staged ledger, that node will ban the block producer public key associated with the block. This significantly raises the cost of attack and makes it in effect pointless.
+
+# Shipping plan
+[shipping]: #shipping
+
+Shipping of the feature is two-staged with first stage being shipped as a soft-fork release and the second stage being shipped as part of a hard-fork.
+
+## Soft-fork
+
+For soft-fork stage, here is the anticipated changeset:
+
+1. Support for sharing blocks via Bitswap
+2. New pub/sub topics:
+    * `mina/block-body/1.0.0`
+    * `mina/tx/1.0.0`
+    * `mina/snark-work/1.0.0`
+3. Engine to rebroadcast blocks from the new topics to old `coda/consensus-messages/0.0.1` and vice versa
+
+Most new nodes will support both old and new topics for broadcast. Nodes are able to filter subscriptions from other nodes based on what they subscribe to, configured using the [`WithSubscriptionFilter` option](https://github.com/libp2p/go-libp2p-pubsub/blob/55d412efa7f5a734d2f926e0c7c948f0ab4def21/subscription_filter.go#L36). Utilizing this, nodes that support the new topics can filter out the old topic from nodes that support both topics. By filtering the topics like this, nodes running the new version can broadcast new blocks over both topics while avoiding sending the old message format to other nodes which support the new topic.
+
+Over time, when most of the network participants adopt the newer version, we can release a flag to enable old topic on a node. Only a few specifically configured nodes (including some seeds) will continue servicing the old topic, while most of the network will live entirely on the new topic.
+
+## Hard-fork
+
+In the next hardfork old topic becomes entirely abandoned.
 
 # Drawbacks
 [drawbacks]: #drawbacks
@@ -176,7 +184,39 @@ This adds significant complexity to how the protocol gossips around information.
     - would use a lot of inodes and file descriptors if we do not build a mechanism that stores multiple key-value pairs in shared files, which could prove tricky to implement
     - would need to solve concurrency problems related to concurrent readers/writers, which could be tricky to get correct and have confidence in
 
-# Unresolved questions
-[unresolved-questions]: #unresolved-questions
 
-- should we ship this as a hard fork, or should we take the extra work to ship this as a soft fork?
+## Verifying root CID to header relation
+
+There is another option to verify the relation: include a commitment in the snark not only to the target staged ledger hash, but also the root Bitswap block CID of the `staged_ledger_diff` that brings us to that state.
+
+Two options compare with one other in the following way:
+
+|                          |Snark commitment|Signature |
+|--------------------------|----------------|----------|
+|_Snark proving time_      |Increased       |Unchanged |
+|_Computational complexity_|High            |Low       |
+|_Soft-fork_               |Incompatible    |Compatible|
+
+For the _Snark commitment_ option, adversary needs to generate a snark proof for each `staged_ledger_diff` they want to broadcast to the network, hence the high computational complexity of an attack, which is a desirable property. However, _Signature_ option is preferred due to the fact that it's softfork-compatible and doesn't increase the complexity of circuit.
+
+# Appendix
+
+_For reference on the above computation of ~8.06kb for a block without a staged ledger diff, here is a snippet of OCaml code that can be run in `dune utop src/lib/mina_transition`_
+
+```ocaml
+let open Core in
+let open Mina_transition in
+let precomputed_block = External_transition.Precomputed_block.t_of_sexp @@ Sexp.of_string External_transition_sample_precomputed_block.sample_block_sexp in
+let small_precomputed_block = {precomputed_block with staged_ledger_diff = Staged_ledger_diff.empty_diff} in
+let conv (t : External_transition.Precomputed_block.t) =
+  External_transition.create
+    ~protocol_state:t.protocol_state
+    ~protocol_state_proof:t.protocol_state_proof
+    ~staged_ledger_diff:t.staged_ledger_diff
+    ~delta_transition_chain_proof:t.delta_transition_chain_proof
+    ~validation_callback:(Mina_net2.Validation_callback.create_without_expiration ())
+    ()
+in
+Protocol_version.set_current (Protocol_version.create_exn ~major:0 ~minor:0 ~patch:0) ;
+External_transition.Stable.Latest.bin_size_t (conv small_precomputed_block) ;;
+```
