@@ -773,7 +773,7 @@ To reinforce the concept, consider our earlier block production context with new
 
 * **subWindow(B) == subWindow(P)**  - We do no ring-shift because `B` and `P` have the same previous sub-windows.  In other words, `B.sub_window_densities = P.sub_window_densities` and `B.min_window_density = P.min_window_density`.
 * **subWindow(B) == subWindow(P) + 1 (in same window)** - We ring-shift once and `P`'s most-recent sub-window is now a previous sub-window.  `B`'s window density is computed from the new window and the minimum window density is updated.
-* **B and P are in disjoint windows** - `B`'s entire window is zeroed (`B.min_window_density = 0` also).
+* **B and P are in disjoint windows** - `B`'s entire window is zeroed and `B.min_window_density = 0`.
 
 In a subsequent section we will understand more about how projected windows are used for chain selection during the long-fork rule.
 
