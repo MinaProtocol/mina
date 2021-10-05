@@ -3564,21 +3564,21 @@ let group_by_parties_rev partiess stmtss =
           ( (`New, Parties_segment.Basic.of_controls [ a1 ], before, after)
           :: acc )
     | ( ({ Party.authorization = a1; _ }
-        :: ({ Party.authorization = Proof _ as a2; _ } :: _ as parties))
+        :: ({ Party.authorization = Proof _; _ } :: _ as parties))
         :: partiess
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next party contains a proof, don't pair it with this party. *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`Same, Parties_segment.Basic.of_controls [ a1; a2 ], before, after)
+          ( (`Same, Parties_segment.Basic.of_controls [ a1 ], before, after)
           :: acc )
     | ( ({ Party.authorization = a1; _ } :: ([] as parties))
-        :: (({ Party.authorization = Proof _ as a2; _ } :: _) :: _ as partiess)
+        :: (({ Party.authorization = Proof _; _ } :: _) :: _ as partiess)
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next party is in the next transaction and contains a proof,
            don't pair it with this party.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`Same, Parties_segment.Basic.of_controls [ a1; a2 ], before, after)
+          ( (`Same, Parties_segment.Basic.of_controls [ a1 ], before, after)
           :: acc )
     | ( ({ Party.authorization = a1; _ }
         :: { Party.authorization = a2; _ } :: parties)
@@ -3589,6 +3589,17 @@ let group_by_parties_rev partiess stmtss =
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
           ( (`Same, Parties_segment.Basic.of_controls [ a1; a2 ], before, after)
+          :: acc )
+    | ( []
+        :: ({ Party.authorization = a1; _ }
+           :: ({ Party.authorization = Proof _; _ } :: _ as parties))
+           :: partiess
+      , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
+        (* This party is in the next transaction, and the next party contains a
+           proof, don't pair it with this party.
+        *)
+        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+          ( (`New, Parties_segment.Basic.of_controls [ a1 ], before, after)
           :: acc )
     | ( []
         :: ({ Party.authorization = a1; _ }
@@ -3610,6 +3621,16 @@ let group_by_parties_rev partiess stmtss =
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
           ( (`New, Parties_segment.Basic.of_controls [ a1; a2 ], before, after)
+          :: acc )
+    | ( []
+        :: ({ Party.authorization = a1; _ } :: parties)
+           :: (({ Party.authorization = Proof _; _ } :: _) :: _ as partiess)
+      , [ _ ] :: (before :: ([ after ] as stmts)) :: (_ :: _ as stmtss) ) ->
+        (* The next transaction contains a proof, and this party is in a new
+           transaction, don't pair it with the next party.
+        *)
+        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+          ( (`New, Parties_segment.Basic.of_controls [ a1 ], before, after)
           :: acc )
     | ( []
         :: [ { Party.authorization = a1; _ } ]
