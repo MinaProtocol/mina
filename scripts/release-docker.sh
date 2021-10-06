@@ -82,22 +82,17 @@ esac
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo $EXTRA | tr -d '"')
 if [ -z "$DOCKER_CONTEXT" ]; then
-  cat $DOCKERFILE_PATH | docker build $extra_build_args -t codaprotocol/$SERVICE:$VERSION -
+  cat $DOCKERFILE_PATH | docker build $extra_build_args -t minaprotocol/$SERVICE:$VERSION -
 else
-  docker build $extra_build_args $DOCKER_CONTEXT -t codaprotocol/$SERVICE:$VERSION -f $DOCKERFILE_PATH
+  docker build $extra_build_args $DOCKER_CONTEXT -t minaprotocol/$SERVICE:$VERSION -f $DOCKERFILE_PATH
 fi
 
 tag-and-push() {
-  docker tag "codaprotocol/$SERVICE:$VERSION" "$1"
+  docker tag "minaprotocol/$SERVICE:$VERSION" "$1"
   docker push "$1"
 }
 
 if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then
-  docker push "codaprotocol/$SERVICE:$VERSION"
-  tag-and-push "codaprotocol/$SERVICE:$VERSION-$COMMIT"
+  docker push "minaprotocol/$SERVICE:$VERSION"
   tag-and-push "gcr.io/o1labs-192920/$SERVICE:$VERSION"
-  tag-and-push "gcr.io/o1labs-192920/$SERVICE:$VERSION-$COMMIT"
-  # TODO: Properly set up minaprotocol docker repo
-  # tag-and-push "minaprotocol/$SERVICE:$VERSION"
-  # tag-and-push "minaprotocol/$SERVICE:$VERSION-$COMMIT"
 fi
