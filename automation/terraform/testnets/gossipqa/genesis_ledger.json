@@ -1,0 +1,60 @@
+{
+  "genesis": {
+    "genesis_state_timestamp": "2021-08-26T21:44:44Z"
+  },
+  "ledger": {
+    "name": "gossipqa",
+    "num_accounts": 7,
+    "accounts": [
+      {
+        "pk": "B62qmf1YYE51QoDRdACp9iNNGYGDJD4zVwu3BH4MnPhiAgdEHtMY2uM",
+        "balance": "66000.000000000",
+        "delegate": "B62qmf1YYE51QoDRdACp9iNNGYGDJD4zVwu3BH4MnPhiAgdEHtMY2uM",
+        "sk": null,
+        "timing": {
+          "initial_minimum_balance": "60000",
+          "cliff_time": "150",
+          "cliff_amount": "12000",
+          "vesting_period": "6",
+          "vesting_increment": "150"
+        }
+      },
+      {
+        "pk": "B62qoqAma1289iY1zk6mLuqzky8uL8z8SU7E1uzb5ztUgxwYNQRexSz",
+        "balance": "20000.000000000",
+        "delegate": "B62qoqAma1289iY1zk6mLuqzky8uL8z8SU7E1uzb5ztUgxwYNQRexSz",
+        "sk": null
+      },
+      {
+        "pk": "B62qmDM3GowYKMAfJkdmHB52UAzEvwzJL1Snagm5Zrr5ieuzG4sV178",
+        "balance": "20000.000000000",
+        "delegate": "B62qmDM3GowYKMAfJkdmHB52UAzEvwzJL1Snagm5Zrr5ieuzG4sV178",
+        "sk": null
+      },
+      {
+        "pk": "B62qiVDmrBRYHNufW2t23989uFRDJVbGRW5EwVXunmFicJi1TWRR5h1",
+        "balance": "20000.000000000",
+        "delegate": "B62qoqAma1289iY1zk6mLuqzky8uL8z8SU7E1uzb5ztUgxwYNQRexSz",
+        "sk": null
+      },
+      {
+        "pk": "B62qnuH2nfTgKZvfMePF3gEJzeACEKSjs5PAzmtBEYBDKk2TTm4c73q",
+        "balance": "20000.000000000",
+        "delegate": "B62qmDM3GowYKMAfJkdmHB52UAzEvwzJL1Snagm5Zrr5ieuzG4sV178",
+        "sk": null
+      },
+      {
+        "pk": "B62qqZmkzUMHPyhpMgK6pcWyJmCTx6kt9vJcD5g97TPGtU6cQZ7wY3C",
+        "balance": "2250000.000000000",
+        "delegate": "B62qrE7bUuc15Jj44Z6sJ48w75PUoK2kcap7cDFKkbQbGbDTFSGvkrS",
+        "sk": null
+      },
+      {
+        "pk": "B62qmdPXWfK5itpUdzs2HpkGG2SsrEAyqM528W4v2WZaar4ppNfgVp9",
+        "balance": "2250000.000000000",
+        "delegate": "B62qkLByJMXBo12e6PEzo2VDF7qT4h3qbtA46HFKfev64y7zcak3SaY",
+        "sk": null
+      }
+    ]
+  }
+}
