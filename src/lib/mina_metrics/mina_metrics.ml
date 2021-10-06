@@ -953,8 +953,9 @@ module Block_latency = struct
         let name = "validation_acceptance_time"
 
         let help =
-          "average delay, in seconds, between blocks are initially received \
-           from the libp2p_helper, and when they are accepted as valid"
+          "average delay, in seconds, between the time blocks are initially \
+           received from the libp2p_helper, and when they are accepted as \
+           valid"
       end)
       ()
 end
