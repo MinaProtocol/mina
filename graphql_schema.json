@@ -5600,145 +5600,6 @@
         },
         {
           "kind": "OBJECT",
-          "name": "SnappCommand",
-          "description": null,
-          "fields": [
-            {
-              "name": "id",
-              "description": "A Base58Check string representing the command",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "ID",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "hash",
-              "description": "A cryptographic hash of the Snapp command",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "nonce",
-              "description": "Sequence number of the Snapp transaction for the fee-payer's account",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feePayer",
-              "description": "Account that pays the fees for the Snapp transaction",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "accountsAccessed",
-              "description": "List of accounts accessed to complete the Snapp transaction",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "Account",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feeLowerBound",
-              "description": "Lower bound on the fee paid by the fee-payer for the Snapp transaction, or null if it can't be calculated",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt64",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feeToken",
-              "description": "Token used to pay the fee",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "failureReason",
-              "description": "The reason for the Snapp transaction failure; null means success or the status is unknown",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
           "name": "SendSnappPayload",
           "description": null,
           "fields": [
@@ -9514,7 +9375,7 @@
           "fields": [
             {
               "name": "id",
-              "description": null,
+              "description": "A Base58Check string representing the command",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9530,7 +9391,7 @@
             },
             {
               "name": "hash",
-              "description": null,
+              "description": "A cryptographic hash of the Snapp command",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9602,7 +9463,7 @@
             },
             {
               "name": "feeLowerBound",
-              "description": "Lower bound on the fee paid by the fee-payer for the Snapp transaction, or null if it can't be alculated",
+              "description": "Lower bound on the fee paid by the fee-payer for the Snapp transaction, or null if it can't be calculated",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -11683,7 +11544,7 @@
             },
             {
               "name": "coinbase",
-              "description": "Amount of mina granted to the producer of this block",
+              "description": "Amount of Mina granted to the producer of this block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
