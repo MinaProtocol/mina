@@ -4,15 +4,18 @@
 // run with `cargo +nightly run` due to the concat_idents feature
 //
 
-use commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm};
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, Env};
-use oracle::sponge::caml::CamlScalarChallenge;
-use plonk_15_wires_circuits::{
-    gate::{caml::CamlCircuitGate, GateType},
-    nolookup::scalars::caml::{CamlProofEvaluations, CamlRandomOracles},
-    wires::caml::CamlWire,
+use std::fs::File;
+use wires_15_stubs::{
+    commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
+    oracle::sponge::caml::CamlScalarChallenge,
+    plonk_15_wires_circuits::{
+        gate::{caml::CamlCircuitGate, GateType},
+        nolookup::scalars::caml::{CamlProofEvaluations, CamlRandomOracles},
+        wires::caml::CamlWire,
+    },
+    plonk_15_wires_protocol_dlog::prover::caml::{CamlProverCommitments, CamlProverProof},
 };
-use plonk_15_wires_protocol_dlog::prover::caml::{CamlProverCommitments, CamlProverProof};
 
 // we must import all here, to have access to the derived functions
 use wires_15_stubs::{
@@ -36,14 +39,28 @@ use wires_15_stubs::{
 };
 
 fn main() {
-    println!("(* this file is generated automatically *)\n");
+    let args: Vec<String> = std::env::args().collect();
+
+    let writer = if let Some(output_file) = args.get(1) {
+        let mut file = File::create(output_file).expect("could not create output file");
+        generate_bindings(&mut file);
+    } else {
+        let mut w = std::io::stdout();
+        generate_bindings(&mut w);
+    };
+}
+
+fn generate_bindings(mut w: impl std::io::Write) {
     let env = &mut Env::default();
 
     decl_fake_generic!(T1, 0);
     decl_fake_generic!(T2, 1);
     decl_fake_generic!(T3, 2);
 
-    let w = &mut std::io::stdout();
+    write!(
+        w,
+        "(* This file is generated automatically with ocaml_gen. *)\n"
+    );
 
     decl_module!(w, env, "Foundations", {
         decl_module!(w, env, "BigInt256", {

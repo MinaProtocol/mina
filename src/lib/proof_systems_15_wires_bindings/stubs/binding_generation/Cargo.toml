@@ -1,0 +1,9 @@
+[package]
+name = "binding_generation"
+version = "0.1.0"
+edition = "2018"
+authors = ["opensource@o1labs.org"]
+
+[dependencies]
+ocaml-gen = { path = "/Users/davidwong/Work/marlin/ocaml-gen" }
+wires_15_stubs = { path = "../" }
