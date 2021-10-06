@@ -1,26 +1,25 @@
-{{- if .Values.coordinator.active }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{tpl .Values.coordinator.fullname .}}
+  name: {{$.Values.coordinatorName }}
   labels:
-    app: {{tpl .Values.coordinator.fullname .}}
+    app: {{$.Values.coordinatorName}}
 spec:
-  replicas: {{ .Values.numReplicas }}
+  replicas: 1
   selector:
     matchLabels:
-      app: {{tpl .Values.coordinator.fullname .}}
+      app: {{$.Values.coordinatorName }}
   template:
     metadata:
       labels:
-        app: {{tpl .Values.coordinator.fullname .}}
-        testnet: {{ .Values.testnetName }}
+        app: {{$.Values.coordinatorName}}
+        testnet: {{ $.Values.testnetName }}
         role: snark-coordinator
-        version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
+        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
         syncStatus: INIT
       annotations:
         prometheus.io/scrape: 'true'
-        prometheus.io/port: {{ .Values.coda.ports.metrics | quote }}
+        prometheus.io/port: {{ $.Values.coda.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
       containers:
@@ -59,7 +58,7 @@ spec:
           {{- if $.Values.coda.seedPeersURL }}
           "-peer-list-url", {{ $.Values.coda.seedPeersURL | quote }},
           {{- end }}
-          "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }},
+          "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }},
           {{- if $.Values.coda.enableArchive }}
           "-archive-address", {{ $.Values.coda.archiveAddress }}
           {{- end -}}
@@ -68,49 +67,48 @@ spec:
         - name: "RAYON_NUM_THREADS"
           value: "7"
         - name: DAEMON_REST_PORT
-          value: {{ .Values.coda.ports.graphql | quote }}
+          value: {{ $.Values.coda.ports.graphql | quote }}
         - name: DAEMON_CLIENT_PORT
-          value: {{ .Values.coda.ports.client | quote }}
+          value: {{ $.Values.coda.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
-          value: {{ .Values.coda.ports.metrics | quote }}
+          value: {{ $.Values.coda.ports.metrics | quote }}
         - name: CODA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CONNECT_PRIVATE_IPS
           value: "true"
         - name: CODA_SNARK_KEY
-          value: {{ .Values.coordinator.publicKey | quote }}
+          value: {{ $.Values.publicKey | quote }}
         - name: CODA_SNARK_FEE
-          value: {{ .Values.coordinator.snarkFee | quote }}
+          value: {{ $.Values.snarkFee | quote }}
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ .Values.coda.ports.p2p | quote }}
+          value: {{ $.Values.coda.ports.p2p | quote }}
         - name: WORK_SELECTION
-          value: {{$.Values.coordinator.workSelectionAlgorithm | quote }}
+          value: {{$.Values.workSelectionAlgorithm | quote }}
         ports:
         - name: client-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.client }}
+          containerPort: {{ $.Values.coda.ports.client }}
         - name: graphql-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.graphql }}
+          containerPort: {{ $.Values.coda.ports.graphql }}
         - name: metrics-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.metrics }}
+          containerPort: {{ $.Values.coda.ports.metrics }}
         - name: external-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.p2p }}
-          hostPort: {{ .Values.coda.ports.p2p }}
-{{$name := tpl .Values.coordinator.fullname . }}
+          containerPort: {{ $.Values.coda.ports.p2p }}
+          hostPort: {{ $.Values.coda.ports.p2p }}
+{{$name := $.Values.coordinatorName }}
 {{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.snarkCoordinator.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
-      {{- if .Values.coda.runtimeConfig }}
+      {{- if $.Values.coda.runtimeConfig }}
         volumeMounts:
         - name: daemon-config
           mountPath: "/config/"
       volumes:
       - name: daemon-config
         configMap:
-          name: snark-coordinator-daemon-config
+          name: {{$.Values.coordinatorName }}-daemon-config
       {{- end }}
-{{- include "nodeSelector.preemptible" .Values | indent 6 }}
-{{- end }}
+{{- include "nodeSelector.preemptible" $.Values | indent 6 }}
