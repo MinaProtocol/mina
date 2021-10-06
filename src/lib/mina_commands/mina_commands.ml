@@ -355,8 +355,10 @@ let get_status ~flag t =
       | `Offline ->
           `Active `Offline
       | `Synced | `Catchup ->
-          if abs (!max_block_height - blockchain_length) < 5 then
-            `Active `Synced
+          if
+            (Mina_lib.config t).demo_mode
+            || abs (!max_block_height - blockchain_length) < 5
+          then `Active `Synced
           else `Active `Catchup
     in
     let consensus_time_best_tip =

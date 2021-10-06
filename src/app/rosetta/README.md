@@ -4,11 +4,49 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
-11/30:
+2021/09/12:
+
+- Construction API ready to ship on rosetta-v2
+
+2021/09/02:
+
+- Build off of the rosetta-v2 branch so that compatible does not break in parrallel to this document
+- All docker build instructions and docker image references have been updated accordingly
+
+2021/08/31:
+
+- Add init-db.sh and download-missing-blocks.sh to the normal daemon startup procedure to restore historical block data from O(1) Labs backups (See the Database Bootstrap section for more information about the implementation)
+- Include rosetta-cli, mina-missing-blocks-auditor, and other rosetta/archive tooling in every container
+- Include rosetta.conf and rosetta-dev.conf for the two major networks (mainnet and devnet respectively)
+- Default to storing postgresql data and .mina-config in /data/, and the tools now wait to initialize those until runtime instead of during docker build
+- Convert docker-devnet-start.sh into a special case / configuration of docker-start.sh based on the environment variables `MINA_NETWORK=devnet2` and `MINA_SUFFIX=-dev`
+
+2021/08/24:
+
+- Update docker image links and outdated coda references
+- Support mainnet configuration with docker-start.sh and move devnet setup to docker-devnet-start.sh
+- Include mainnet mina binaries AND devnet mina binaries (as mina-dev and rosetta-dev)
+- Include the mina-rosetta-test-agent for running our internal test suite
+
+2021/08/13:
+
+- Updated Rosetta spec to v1.4.9
+- Preliminary testing on the `devnet2` network
+- Updated dockerfile split into stages
+- New documentation for the start scripts
+- Fixes:
+  - When internal commands create new accounts, use a new operation `Account_creation_fee_via_fee_receiver`,
+     so that the computed balance matches the live balance
+  - Handle duplicate transaction hashes for internal commands where the command types differ,
+     by prepending the type and `:` to the actual hash
+  - Valid balance queries for blocks containing user commands, where the fee payer, source, or
+     receiver balance id is NULL
+
+2020/11/30:
 
 - Upgrades from Rosetta spec 1.4.4 to 1.4.7
 
-9/14:
+2020/9/14:
 
 - Upgrades from Rosetta spec v1.4.2 to v1.4.4
 - Handles case where there are multiple blocks at the same height
@@ -16,26 +54,63 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## How to build your own docker image
 
-Checkout the "rosetta-stable" branch of the mina repository and then run the following:
+Checkout the "rosetta-v2" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
 
-`cat dockerfiles/Dockerfile-rosetta | docker build -t mina-rosetta:stable --build-arg "MINA_BRANCH=rosetta-stable" -`
+`cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu | docker build -t mina-rosetta:v2 --build-arg "deb_codename=stretch" --build-arg "MINA_BRANCH=rosetta-v2" -`
 
-This creates an image (mina-rosetta:stable) based on the most up-to-date changes that support rosetta. This image
-can be used as a drop-in replacement for `gcr.io/o1labs-192920/coda-rosetta:debug-v1.1` in any of the below commands for testing.
+This creates an image (mina-rosetta:v2) based on the most up-to-date changes that support rosetta. This image
+can be used as a drop-in replacement for `gcr.io/o1labs-192920/mina-rosetta:v2` in any of the below commands for testing.
 
 ## How to Run
 
-As there is not currently a live network, the best way to run Rosetta is to run it against a sandbox node. Rosetta is best run using the official docker images provided here that run the Mina daemon, an archive node, and the rosetta process for you. See [Reproduce agent and rosetta-cli Validation](#reproduce-agent-and-rosetta-cli-validation) below for details.
+The container includes 4 scripts in /rosetta which run a different set of services connected to a particular network
+- `docker-standalone-start.sh` is the most straightforward, it starts only the mina-rosetta API endpoint and any flags passed into the script go to mina-rosetta. Use this for the "offline" part of the Construction API.
+- `docker-demo-start.sh` launches a mina node with a very simple 1-address genesis ledger as a sandbox for developing and playing around in. This script starts the full suite of tools (a mina node, mina-archive, a postgresql DB, and mina-rosetta), but for a demo network with all operations occuring inside this container and no external network activity.
+- `docker-test-start.sh` launches the same demo network as in demo-start.sh but also launches the mina-rosetta-test-agent to run a suite of tests against the rosetta API.
+- The default, `docker-start.sh`, which connects the mina node to our [Mainnet](https://docs.minaprotocol.com/en/using-mina/connecting) network and initializes the archive database from publicly-availible nightly O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. The script also periodically checks for blocks that may be missing between the nightly backup and the tip of the chain and will fill in those gaps by walking back the linked list of blocks in the canonical chain and importing them one at a time. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/rosetta-v2/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
+- Finally, the previous default, `docker-devnet-start.sh`, which connects the mina node to our [Devnet](https://docs.minaprotocol.com/en/advanced/connecting-devnet) network with the archive database initalized in a similar way to docker-start.sh. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. `docker-devnet-start.sh` is now just a special case of `docker-start.sh` so inspect the source there for more detailed configuration.
+
+For example, to run the `docker-devnet-start.sh` and connect to the live devnet:
+
+```
+docker run -it --rm --name rosetta --entrypoint=./docker-devnet-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 gcr.io/o1labs-192920/mina-rosetta:v2
+```
+
+Note: It will take 20min-1hr for your node to sync
+
+* Port 10101 is the default P2P port and must be exposed to the open internet
+* The GraphQL API runs on port 3085 (accessible via `localhost:3085/graphql`)
+* PostgreSQL runs on port 3086
+* Rosetta runs on port 3087
+
+Examples queries via Rosetta:
+
+* `curl --data '{ metadata: {} }' 'localhost:3087/network/list'`
+* `curl --data '{ network_identifier: { blockchain: "mina", network: "devnet" }, metadata: {} }' 'localhost:3087/network/status'`
+
+Any queries that rely on historical data will fail until the archive database is populated. This happens automatically with the relevant entrypoints.
 
 ## Design Choices
 
+### Database Bootstrap Scripts
+
+#### init-db.sh
+
+As Mina does not store or broadcast historical blocks beyond the "transition frontier" (approximately 290 blocks), Rosetta requires logic to fetch historical data from a trusted archive node database. `docker-start.sh` and the `init-db.sh` script that it calls set up a fresh database when the node is first launched (located in /data/postgresql by default) and then restores the latest O(1) Labs nightly backup into that new database. If this data is persisted across reboots/deployments then the `init-db.sh` script will short-circuit and refuse to restore from the database backup.
+
+#### download-missing-blocks.sh
+
+In all cases, `download-missing-blocks.sh` will check the database every 5 minutes for any gaps / missing blocks until the first missing block is encountered. Once this happens, `mina-missing-blocks-auditor` will return the state hash and block height for whichever blocks are missing, and the script will download them one at a time from O(1) Labs json block backups until the missing blocks auditor reaches the genesis block.
+
+If the data in postgresql is really stale (>24 hours), it would likely be better/quicker to delete the /data/ directory and force `init-db.sh` to restore from a complete database backup instead of relying on the individual block restore mechanism to download hundreds of blocks.
+
 ### Network names
 
-Networks supported are `dev`, `debug`, and `testnet`. A sandbox network is a `debug` one. The `dev` net is the one with seed peers always located at `dev.o1test.net` (as soon as we turn it on), and otherwise you are connecting to the `testnet`. Currently, the implementation does not distinguish between these networks, but this will change in the future.
+Networks supported are `rosetta-demo`, `devnet`, and `mainnet`. Currently, the rosetta implementation does not distinguish between these networks, but this will change in the future. The default entrypoint script, `docker-start.sh` runs a mina daemon connected to the Mina [Mainnet](https://docs.minaprotocol.com/en/using-mina/connecting) network with an empty archive node and the rosetta api. To connect to our [Devnet](https://docs.minaprotocol.com/en/advanced/connecting-devnet) network, the `docker-devnet-start.sh` entrypoint is provided and it functions identically to `docker-start.sh` except for Devnet. Additionally, there is a built-in entrypoint script for `rosetta-demo` called `docker-demo-start.sh` which runs a sandboxed node with a simple genesis ledger with one keypair, attaches it to an archive-node and postgres database, and launches the rosetta-api so you can make queries against it.
 
 ### Operation Statuses
 
-Operations are always `Pending` if retrieved from the mempool. `Success` if they are in a block. A transaction status of `Failed` occurs for transactions within a block whenever certain invariants are not met such as not sending enough to cover the account creation fee. Other reaons include misconfiguring new tokens or snapps. See [this section of the code](https://github.com/MinaProtocol/mina/blob/4ae482b656c743fc4ea824419cebe2f2ff77ef96/src/lib/coda_base/user_command_status.ml#L8) for an exhaustive list.
+Operations are always `Pending` if retrieved from the mempool. `Success` if they are in a block and fully applied. A transaction status of `Failed` occurs for transactions within a block whenever certain invariants are not met such as not sending enough to cover the account creation fee. Other reaons include misconfiguring new tokens or snapps. See [this section of the code](https://github.com/MinaProtocol/mina/blob/4ae482b656c743fc4ea824419cebe2f2ff77ef96/src/lib/coda_base/user_command_status.ml#L8) for an exhaustive list.
 
 ### Operations Types
 
@@ -47,7 +122,18 @@ Accounts in Mina are not uniquely identified by an address alone, you must also 
 
 ### Operations for Supported Transactions via Construction
 
-All supported transactions via Construction API are shown as ["living" documentation](https://github.com/MinaProtocol/mina/blob/477bbdcdeeeafbcbaff74b9b1a83feacf104e5c9/src/app/rosetta/test-agent/poke.ml#L89) in our integration testing code.
+The following supported transactions on devnet and mainnet for the Construction API are the `payment` and `delegation` ones within the ["living" documentation](https://github.com/MinaProtocol/mina/blob/477bbdcdeeeafbcbaff74b9b1a83feacf104e5c9/src/app/rosetta/test-agent/poke.ml#L89) in our integration testing code. The other transaction types are disabled on the live networks.
+
+## Future Work and Known Issues
+
+- On a live network, in order to work with historical data, you must _sync your archive node_ if you join the network after the genesis block. Some Rosetta endpoints depend on this functionality. Instructions to be provided.
+- On devnet and mainnet there are still a handful of edge cases preventing full reconcilliation that are being worked through
+- There are several references to "coda" instead of the new name "mina"
+- Not fully robust to crashes on adversarial input
+
+---
+
+# Details you probably don't need to dig into
 
 ## Validation
 
@@ -79,37 +165,29 @@ The signer library used by the test agent can be used as a reference for further
 
 ### Rosetta CLI Validation
 
-The Data API is fully validated using the official `rosetta-cli` against private networks that issue every different type of transaction (running the test-agent suite while `check:data` is run). There are no reconcilliation errors.
+The Data API is fully validated using the official `rosetta-cli` against private networks that issue every different type of transaction (running the test-agent suite while `check:data` is run). There are no reconcilliation errors. We are in the middle of verifying reconcilliation errors against devnet.
 
 The Construction API is _not_ validated using `rosetta-cli` as this would require an implementation of the signer in the rosetta-go-sdk. The test-agent does a thorough job of testing the construction API, however, see the integration-test-agent section above.
 
 ### Reproduce agent and rosetta-cli validation
 
-`gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4` and `rosetta-cli @ v0.5.12`
+`gcr.io/o1labs-192920/mina-rosetta:v2` and `rosetta-cli @ v0.5.12`
 using this [`rosetta.conf`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/rosetta.conf) and the [`bootstrap_balances.json`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/bootstrap_balances.json) next to it.
 
-**Create one of each transaction type and exit**
+**Create one of each transaction type using the test-agent and exit**
 
 ```
-$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta-test --entrypoint ./docker-test-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4
+$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-test --entrypoint ./docker-test-start.sh -d gcr.io/o1labs-192920/mina-rosetta:v2
 
-$ docker logs --follow coda-rosetta-test
-
-# Wait for a message that looks like:
-#
-# {"timestamp":"2020-09-08 15:05:30.648082Z","level":"Info","source":{"module":"Lib__Rosetta","location":"File \"src/app/rosetta/lib/rosetta.ml\", line 107, characters 8-19"},"message":"Rosetta process running on http://localhost:$port","metadata":{"pid":50,"port":3087}}
-#
-# wait a few more seconds, and then
-
-$ rosetta-cli --configuration-file rosetta.conf check:data
+$ docker logs --follow mina-rosetta-test
 ```
 
-**Run a fast sandbox network forever**
+**Run a fast sandbox network forever and test with rosetta-cli**
 
 ```
-$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta --entrypoint ./docker-demo-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4
+$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-demo --entrypoint ./docker-demo-start.sh -d gcr.io/o1labs-192920/mina-rosetta:v2
 
-$ docker logs --follow coda-rosetta
+$ docker logs --follow mina-rosetta-demo
 
 # Wait for a message that looks like:
 #
@@ -119,15 +197,6 @@ $ docker logs --follow coda-rosetta
 
 $ rosetta-cli --configuration-file rosetta.conf check:data
 ```
-
-## Future Work and Known Issues
-
-Sorted by priority (highest priority first)
-
-- Untested on a live network
-- On a live network, you must _bootstrap your archive node_ if you join the network after the genesis block. Instructions will be provided when the network is online.
-- Not fully robust to crashes on adversarial input
-- `rosetta.conf` does not properly specify construction scenarios
 
 ## Dev locally
 
@@ -145,14 +214,18 @@ Note: Mina is in the `dev` profile, so snarks are turned off and every runs very
 - `./start.sh CURL` skips the integration test suite and just produces blocks
 - `./start.sh FOREVER` runs the integration test suite and produces blocks forever afterwards
 
-## Model Regen
+## Model Regeneration
 
 To regenerate the models:
 
+Install openapi-generator, instructions [here](https://openapi-generator.tech/docs/installation/),
+then
 ```
 git clone https://github.com/coinbase/rosetta-specifications.git
 cd rosetta-specifications
-`brew install openapi-generator`
 openapi-generator generate -i api.json -g ocaml
-mv src/models $CODA/src/lib/rosetta_models
+cp -p src/models/* $MINA/src/lib/rosetta_models/
 ```
+In the generated files, the type `deriving` clauses will need to have `eq` added manually.
+Any record types with a field named `_type` will need annotate that field with `[@key "type"]`.
+In `lib/network.ml`, update the two instances of the version number.
