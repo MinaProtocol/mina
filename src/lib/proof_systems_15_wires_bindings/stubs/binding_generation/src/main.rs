@@ -7,18 +7,7 @@
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, Env};
 use std::fs::File;
 use wires_15_stubs::{
-    commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
-    oracle::sponge::caml::CamlScalarChallenge,
-    plonk_15_wires_circuits::{
-        gate::{caml::CamlCircuitGate, GateType},
-        nolookup::scalars::caml::{CamlProofEvaluations, CamlRandomOracles},
-        wires::caml::CamlWire,
-    },
-    plonk_15_wires_protocol_dlog::prover::caml::{CamlProverCommitments, CamlProverProof},
-};
-
-// we must import all here, to have access to the derived functions
-use wires_15_stubs::{
+    // we must import all here, to have access to the derived functions
     arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
     caml_pointer::CamlPointer,
     gate_vector::{fp::*, fq::*},
@@ -36,12 +25,22 @@ use wires_15_stubs::{
     pasta_vesta::*,
     plonk_verifier_index::{CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex},
     srs::{fp::*, fq::*},
+    CamlCircuitGate,
+    CamlOpeningProof,
+    CamlPolyComm,
+    CamlProofEvaluations,
+    CamlProverCommitments,
+    CamlProverProof,
+    CamlRandomOracles,
+    CamlScalarChallenge,
+    CamlWire,
+    GateType,
 };
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
-    let writer = if let Some(output_file) = args.get(1) {
+    if let Some(output_file) = args.get(1) {
         let mut file = File::create(output_file).expect("could not create output file");
         generate_bindings(&mut file);
     } else {
@@ -60,7 +59,8 @@ fn generate_bindings(mut w: impl std::io::Write) {
     write!(
         w,
         "(* This file is generated automatically with ocaml_gen. *)\n"
-    );
+    )
+    .unwrap();
 
     decl_module!(w, env, "Foundations", {
         decl_module!(w, env, "BigInt256", {

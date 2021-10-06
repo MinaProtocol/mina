@@ -9,39 +9,51 @@
 
 extern crate libc;
 
-// Arkworks types
+/// Arkworks types
 pub mod arkworks;
 
-// Caml pointers
+/// Caml pointers
 pub mod caml_pointer;
 pub mod gate_vector;
 pub mod urs_utils; // TODO: move this logic to proof-systems
 
-// Field vectors
+/// Field vectors
 pub mod pasta_fp_vector;
 pub mod pasta_fq_vector;
 
-// Groups
+/// Groups
 pub mod pasta_pallas;
 pub mod pasta_vesta;
 
-// SRS
+/// SRS
 pub mod srs;
 
-// Indexes
+/// Indexes
 pub mod pasta_fp_plonk_index;
 pub mod pasta_fq_plonk_index;
 
-// Verifier indexes/keys
+/// Verifier indexes/keys
 pub mod plonk_verifier_index;
 
 pub mod pasta_fp_plonk_verifier_index;
 pub mod pasta_fq_plonk_verifier_index;
 
-// Oracles
+/// Oracles
 pub mod pasta_fp_plonk_oracles;
 pub mod pasta_fq_plonk_oracles;
 
-// Proofs
+/// Proofs
 pub mod pasta_fp_plonk_proof;
 pub mod pasta_fq_plonk_proof;
+
+/// Re-exports
+pub use ::{
+    commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
+    oracle::sponge::caml::CamlScalarChallenge,
+    plonk_15_wires_circuits::{
+        gate::{caml::CamlCircuitGate, GateType},
+        nolookup::scalars::caml::{CamlProofEvaluations, CamlRandomOracles},
+        wires::caml::CamlWire,
+    },
+    plonk_15_wires_protocol_dlog::prover::caml::{CamlProverCommitments, CamlProverProof},
+};

@@ -5,7 +5,7 @@
 ;; Ignore target if it exists locally
 
 (rule
- (targets wires_15_stubs.a target)
+ (targets libwires_15_stubs.a target)
  (deps
   Cargo.toml
   rust-toolchain.toml
@@ -16,12 +16,12 @@
     RUSTFLAGS
     "-C target-feature=+bmi2,+adx"
     (run cargo build --release))
-   (run cp target/release/wires_15_stubs.a .))))
+   (run cp target/release/libwires_15_stubs.a .))))
 
 (library
- (public_name wires_15)
- (name wires_15)
- (foreign_archives marlin_plonk_stubs)
+ (public_name kimchi)
+ (name kimchi)
+ (foreign_archives wires_15_stubs)
  (c_library_flags :standard "-lpthread")
  (instrumentation
   (backend bisect_ppx))
@@ -32,8 +32,16 @@
 ;; generate the OCaml bindings
 
 (rule
- (target lib.ml)
+ (target kimchi.ml)
  (deps
-  (source_tree .))
+  Cargo.toml
+  rust-toolchain.toml
+  (source_tree src)
+  (source_tree binding_generation))
  (action
-  (run cargo +nightly run lib.ml)))
+  (chdir
+   binding_generation
+   (progn
+    (run rm -rf ./target)
+    (run rm -rf ./Cargo.lock)
+    (run cargo +nightly run ../kimchi.ml)))))
