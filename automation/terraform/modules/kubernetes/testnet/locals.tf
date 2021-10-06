@@ -10,7 +10,7 @@ locals {
 
   peers = var.additional_peers
 
-  coda_vars = {
+  daemon = {
     runtimeConfig        = var.runtime_config
     image                = var.mina_image
     useCustomEntrypoint  = var.use_custom_entrypoint
@@ -36,7 +36,7 @@ locals {
   seed_vars = {
     testnetName = var.testnet_name
     coda = {
-      runtimeConfig = local.coda_vars.runtimeConfig
+      runtimeConfig = local.daemon.runtimeConfig
       image         = var.mina_image
       useCustomEntrypoint  = var.use_custom_entrypoint
       customEntrypoint     = var.custom_entrypoint
@@ -76,7 +76,7 @@ locals {
   block_producer_vars = {
     testnetName = var.testnet_name
 
-    coda = local.coda_vars
+    coda = local.daemon
 
     healthcheck = local.healthcheck_vars
 
@@ -94,8 +94,8 @@ locals {
     bots = {
       image = var.mina_bots_image
       faucet = {
-        amount = var.coda_faucet_amount
-        fee    = var.coda_faucet_fee
+        amount = var.mina_faucet_amount
+        fee    = var.mina_faucet_fee
       }
     }
 
@@ -121,8 +121,10 @@ locals {
       testnetName = var.testnet_name
       coda        = {
         image         = var.mina_image
+        useCustomEntrypoint  = var.use_custom_entrypoint
+        customEntrypoint     = var.custom_entrypoint
         seedPeers     = local.peers
-        runtimeConfig = local.coda_vars.runtimeConfig
+        runtimeConfig = local.daemon.runtimeConfig
         seedPeersURL  = var.seed_peers_url
       }
       healthcheck = local.healthcheck_vars
@@ -156,22 +158,32 @@ locals {
       }
     }]
 
-  snark_worker_vars = {
-    testnetName = var.testnet_name
-    coda        = local.coda_vars
-    healthcheck = local.healthcheck_vars
-    worker = {
-      active      = var.snark_worker_replicas > 0
-      numReplicas = var.snark_worker_replicas
+  snark_vars = [
+    for i, snark in var.snark_coordinators: {
+      testnetName = var.testnet_name
+      coda        = local.daemon
+      healthcheck = local.healthcheck_vars
+
+      coordinatorName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}"
+      workerName = "snark-worker-${lower(substr(snark.snark_worker_public_key,0,6))}"
+      workerReplicas = snark.snark_worker_replicas
+      coordinatorHostName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}.${var.testnet_name}"
+      coordinatorRpcPort = 8301
+      coordinatorHostPort = snark.snark_coordinators_host_port
+      publicKey =snark.snark_worker_public_key
+      snarkFee = snark.snark_worker_fee
+      workSelectionAlgorithm = "seq"
     }
-    coordinator = {
-      active        = var.snark_worker_replicas > 0
-      deployService = var.snark_worker_replicas > 0
-      publicKey     = var.snark_worker_public_key
-      snarkFee      = var.snark_worker_fee
-      hostPort      = var.snark_worker_host_port
+  ]
+
+  plain_node_vars = [
+    for i, node in var.plain_node_configs: {
+      testnetName = var.testnet_name
+      coda        = local.daemon
+      healthcheck = local.healthcheck_vars
+      name = node.name
     }
-  }
+  ]
 
   watchdog_vars = {
     testnetName = var.testnet_name

@@ -64,12 +64,16 @@ let coinbase_merkle_tree =
 
 let vrf_message = salt vrf_message
 
+let signature_for_mainnet = salt signature_mainnet
+
+let signature_for_testnet = salt signature_testnet
+
 let signature =
   match Mina_signature_kind.t with
   | Mainnet ->
-      salt signature_mainnet
+      signature_for_mainnet
   | Testnet ->
-      salt signature_testnet
+      signature_for_testnet
 
 let vrf_output = salt vrf_output
 

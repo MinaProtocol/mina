@@ -602,7 +602,7 @@ let of_operations (ops : Operation.t list) :
       let%bind { amount; _ } = find_kind `Mint_tokens ops in
       (* check for Amount_not_some already done for amount_b *)
       let Amount.{ currency = { symbol; _ }; _ } = Option.value_exn amount in
-      if String.equal symbol "CODA+" then return (Unsigned.UInt64.of_int 2)
+      if String.equal symbol "MINA+" then return (Unsigned.UInt64.of_int 2)
       else V.fail Incorrect_token_id
     in
     { Partial.kind = `Mint_tokens
@@ -758,7 +758,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           ; status = Some (Operation_statuses.name status)
           ; account = Some (account_id t.receiver t.token)
           ; _type = Operation_types.name `Account_creation_fee_via_payment
-          ; amount = Some Amount_of.(negated @@ coda account_creation_fee)
+          ; amount = Some Amount_of.(negated @@ mina account_creation_fee)
           ; coin_change = None
           ; metadata
           }
@@ -768,7 +768,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           ; status = Some (Operation_statuses.name status)
           ; account = Some (account_id t.fee_payer t.fee_token)
           ; _type = Operation_types.name `Account_creation_fee_via_fee_payer
-          ; amount = Some Amount_of.(negated @@ coda account_creation_fee)
+          ; amount = Some Amount_of.(negated @@ mina account_creation_fee)
           ; coin_change = None
           ; metadata
           }

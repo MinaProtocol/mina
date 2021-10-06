@@ -53,7 +53,7 @@ echo "Building replayer"
 make replayer
 
 echo "Running replayer"
-./_build/default/src/app/replayer/replayer.exe --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input.json --output-file /dev/null
+./_build/default/src/app/replayer/replayer.exe --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input.json
 
 RESULT=$?
 

@@ -12,7 +12,7 @@ type t =
   ; account_identifier : Account_identifier.t option [@default None]
   ; metadata : Yojson.Safe.t option [@default None]
   }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** ConstructionDeriveResponse is returned by the `/construction/derive` endpoint. *)
 let create () : t =
