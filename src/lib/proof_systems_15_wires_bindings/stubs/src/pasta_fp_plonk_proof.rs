@@ -34,7 +34,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
     prev_sgs: Vec<CamlGVesta>,
 ) -> CamlProverProof<CamlGVesta, CamlFp> {
     let prev: Vec<(Vec<Fp>, PolyComm<GAffine>)> = {
-        if prev_challenges.len() == 0 {
+        if prev_challenges.is_empty() {
             Vec::new()
         } else {
             let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
@@ -49,7 +49,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
                             .map(Into::<Fp>::into)
                             .collect(),
                         PolyComm::<GAffine> {
-                            unshifted: vec![sg.into()],
+                            unshifted: vec![sg],
                             shifted: None,
                         },
                     )

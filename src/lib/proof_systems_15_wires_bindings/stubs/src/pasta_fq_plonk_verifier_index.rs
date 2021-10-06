@@ -101,7 +101,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
         let shifts: Vec<Fq> = shifts.iter().map(Into::into).collect();
         let shift: [Fq; PERMUTS] = shifts.try_into().expect("wrong size");
 
-        let index = VerifierIndex::<GAffine> {
+        VerifierIndex::<GAffine> {
             domain,
             w: zk_w3(domain),
             zkpm: zk_polynomial(domain),
@@ -122,8 +122,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
             fr_sponge_params: oracle::pasta::fq::params(),
             fq_sponge_params: oracle::pasta::fp::params(),
             endo: endo_q,
-        };
-        index
+        }
     }
 }
 
@@ -131,7 +130,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
 // Serialization helpers
 //
 
-pub fn read_raw<'a>(
+pub fn read_raw(
     offset: Option<ocaml::Int>,
     srs: CamlFqSRS,
     path: String,
@@ -142,7 +141,7 @@ pub fn read_raw<'a>(
     let fr_sponge_params = oracle::pasta::fq::params();
     VerifierIndex::<GAffine>::from_file(
         srs.0,
-        &path,
+        path,
         offset.map(|x| x as u64),
         endo_q,
         fq_sponge_params,
@@ -211,8 +210,8 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
     fn comm() -> CamlPolyComm<CamlGPallas> {
         let g: CamlGPallas = GAffine::prime_subgroup_generator().into();
         CamlPolyComm {
-            shifted: Some(g.clone()),
-            unshifted: vec![g.clone(), g.clone(), g],
+            shifted: Some(g),
+            unshifted: vec![g, g, g],
         }
     }
     fn vec_comm(num: usize) -> Vec<CamlPolyComm<CamlGPallas>> {

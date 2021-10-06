@@ -131,11 +131,9 @@ where
         comms: Vec<CamlG>,
         chals: Vec<CamlF>,
     ) -> bool {
-        crate::urs_utils::batch_dlog_accumulator_check(
-            &*srs,
-            &comms.into_iter().map(Into::into).collect(),
-            &chals.into_iter().map(Into::into).collect(),
-        )
+        let comms: Vec<_> = comms.into_iter().map(Into::into).collect();
+        let chals: Vec<_> = chals.into_iter().map(Into::into).collect();
+        crate::urs_utils::batch_dlog_accumulator_check(&*srs, &comms, &chals)
     }
 
     pub fn urs_h(srs: CamlPointer<SRS<G>>) -> CamlG {

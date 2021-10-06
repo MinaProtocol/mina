@@ -13,7 +13,7 @@ pub struct CamlGroupProjectivePallas(pub ProjectivePallas);
 unsafe impl<'a> ocaml::FromValue<'a> for CamlGroupProjectivePallas {
     fn from_value(value: ocaml::Value) -> Self {
         let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
-        x.as_ref().clone()
+        *x.as_ref()
     }
 }
 
@@ -50,15 +50,15 @@ impl From<&ProjectivePallas> for CamlGroupProjectivePallas {
     }
 }
 
-impl Into<ProjectivePallas> for CamlGroupProjectivePallas {
-    fn into(self) -> ProjectivePallas {
-        self.0
+impl From<CamlGroupProjectivePallas> for ProjectivePallas {
+    fn from(x: CamlGroupProjectivePallas) -> Self {
+        x.0
     }
 }
 
-impl Into<ProjectivePallas> for &CamlGroupProjectivePallas {
-    fn into(self) -> ProjectivePallas {
-        self.0
+impl From<&CamlGroupProjectivePallas> for ProjectivePallas {
+    fn from(x: &CamlGroupProjectivePallas) -> Self {
+        x.0
     }
 }
 
@@ -118,7 +118,7 @@ pub struct CamlGroupProjectiveVesta(pub ProjectiveVesta);
 unsafe impl<'a> ocaml::FromValue<'a> for CamlGroupProjectiveVesta {
     fn from_value(value: ocaml::Value) -> Self {
         let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
-        x.as_ref().clone()
+        *x.as_ref()
     }
 }
 
@@ -157,15 +157,15 @@ impl From<&ProjectiveVesta> for CamlGroupProjectiveVesta {
     }
 }
 
-impl Into<ProjectiveVesta> for CamlGroupProjectiveVesta {
-    fn into(self) -> ProjectiveVesta {
-        self.0
+impl From<CamlGroupProjectiveVesta> for ProjectiveVesta {
+    fn from(x: CamlGroupProjectiveVesta) -> Self {
+        x.0
     }
 }
 
-impl Into<ProjectiveVesta> for &CamlGroupProjectiveVesta {
-    fn into(self) -> ProjectiveVesta {
-        self.0
+impl From<&CamlGroupProjectiveVesta> for ProjectiveVesta {
+    fn from(x: &CamlGroupProjectiveVesta) -> Self {
+        x.0
     }
 }
 

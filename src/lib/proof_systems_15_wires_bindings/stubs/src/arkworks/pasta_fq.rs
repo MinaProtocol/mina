@@ -23,7 +23,7 @@ pub struct CamlFq(pub Fq);
 unsafe impl<'a> ocaml::FromValue<'a> for CamlFq {
     fn from_value(value: ocaml::Value) -> Self {
         let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
-        x.as_ref().clone()
+        *x.as_ref()
     }
 }
 
@@ -211,7 +211,7 @@ pub fn caml_pasta_fq_print(x: ocaml::Pointer<CamlFq>) {
 #[ocaml_gen]
 #[ocaml::func]
 pub fn caml_pasta_fq_copy(mut x: ocaml::Pointer<CamlFq>, y: ocaml::Pointer<CamlFq>) {
-    *x.as_mut() = y.as_ref().clone()
+    *x.as_mut() = *y.as_ref()
 }
 
 #[ocaml_gen]

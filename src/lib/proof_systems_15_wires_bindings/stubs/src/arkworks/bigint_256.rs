@@ -32,7 +32,7 @@ impl From<BigInteger256> for CamlBigInteger256 {
 unsafe impl<'a> ocaml::FromValue<'a> for CamlBigInteger256 {
     fn from_value(value: ocaml::Value) -> Self {
         let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
-        x.as_ref().clone()
+        *x.as_ref()
     }
 }
 
@@ -70,15 +70,15 @@ impl Deref for CamlBigInteger256 {
 // BigUint handy methods
 //
 
-impl Into<BigUint> for CamlBigInteger256 {
-    fn into(self) -> BigUint {
-        self.0.into()
+impl From<CamlBigInteger256> for BigUint {
+    fn from(x: CamlBigInteger256) -> BigUint {
+        x.0.into()
     }
 }
 
-impl Into<BigUint> for &CamlBigInteger256 {
-    fn into(self) -> BigUint {
-        self.0.clone().into()
+impl From<&CamlBigInteger256> for BigUint {
+    fn from(x: &CamlBigInteger256) -> BigUint {
+        x.0.into()
     }
 }
 
@@ -139,13 +139,13 @@ pub fn caml_bigint_256_of_decimal_string(s: &[u8]) -> Result<CamlBigInteger256, 
 #[ocaml_gen]
 #[ocaml::func]
 pub fn caml_bigint_256_num_limbs() -> ocaml::Int {
-    return BIGINT256_NUM_LIMBS.try_into().unwrap();
+    BIGINT256_NUM_LIMBS.try_into().unwrap()
 }
 
 #[ocaml_gen]
 #[ocaml::func]
 pub fn caml_bigint_256_bytes_per_limb() -> ocaml::Int {
-    return BIGINT256_LIMB_BYTES.try_into().unwrap();
+    BIGINT256_LIMB_BYTES.try_into().unwrap()
 }
 
 #[ocaml_gen]
@@ -214,7 +214,7 @@ pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<CamlBigInteger256, ocaml::Er
     if x.len() != len {
         ocaml::Error::failwith("caml_bigint_256_of_bytes")?;
     };
-    let result = BigInteger256::deserialize(&mut &x[..])
+    let result = BigInteger256::deserialize(&mut &*x)
         .map_err(|_| ocaml::Error::Message("deserialization error"))?;
     Ok(CamlBigInteger256(result))
 }

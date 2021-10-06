@@ -69,7 +69,7 @@ pub fn caml_pasta_fq_plonk_index_create(
         .iter()
         .map(|gate| CircuitGate::<Fq> {
             row: gate.row,
-            typ: gate.typ.clone(),
+            typ: gate.typ,
             wires: shift_wires(domain_size, gate.wires),
             c: gate.c.clone(),
         })
@@ -78,11 +78,13 @@ pub fn caml_pasta_fq_plonk_index_create(
     // create constraint system
     let cs =
         match ConstraintSystem::<Fq>::create(gates, oracle::pasta::fq::params(), public as usize) {
-            None => Err(ocaml::Error::failwith(
-                "caml_pasta_fq_plonk_index_create: could not create constraint system",
-            )
-            .err()
-            .unwrap())?,
+            None => {
+                return Err(ocaml::Error::failwith(
+                    "caml_pasta_fq_plonk_index_create: could not create constraint system",
+                )
+                .err()
+                .unwrap())
+            }
             Some(cs) => cs,
         };
 
@@ -134,22 +136,21 @@ pub fn caml_pasta_fq_plonk_index_read(
 ) -> Result<CamlPastaFqPlonkIndex, ocaml::Error> {
     // read from file
     let file = match File::open(path) {
-        Err(_) => Err(
-            ocaml::Error::invalid_argument("caml_pasta_fp_plonk_index_read")
-                .err()
-                .unwrap(),
-        )?,
+        Err(_) => {
+            return Err(
+                ocaml::Error::invalid_argument("caml_pasta_fp_plonk_index_read")
+                    .err()
+                    .unwrap(),
+            )
+        }
         Ok(file) => file,
     };
     let mut r = BufReader::new(file);
 
     // optional offset in file
-    match offset {
-        Some(offset) => {
-            r.seek(Start(offset as u64))?;
-        }
-        None => (),
-    };
+    if let Some(offset) = offset {
+        r.seek(Start(offset as u64))?;
+    }
 
     // deserialize the index
     let mut t: DlogIndex<GAffine> = bincode::deserialize_from(&mut r)?;

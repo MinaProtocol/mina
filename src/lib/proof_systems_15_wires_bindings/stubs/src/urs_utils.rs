@@ -9,8 +9,8 @@ use rayon::prelude::*;
 // TODO: Not compatible with variable rounds
 pub fn batch_dlog_accumulator_check<G: CommitmentCurve>(
     urs: &SRS<G>,
-    comms: &Vec<G>,
-    chals: &Vec<G::ScalarField>,
+    comms: &[G],
+    chals: &[G::ScalarField],
 ) -> bool {
     let k = comms.len();
 
@@ -26,7 +26,7 @@ pub fn batch_dlog_accumulator_check<G: CommitmentCurve>(
         let r = G::ScalarField::rand(&mut rand::rngs::OsRng);
         let mut rs = vec![G::ScalarField::one(); k];
         for i in 1..k {
-            rs[i] = r * &rs[i - 1];
+            rs[i] = r * rs[i - 1];
         }
         rs
     };
@@ -39,7 +39,7 @@ pub fn batch_dlog_accumulator_check<G: CommitmentCurve>(
     scalars.extend(&rs[..]);
 
     let chal_invs = {
-        let mut cs = chals.clone();
+        let mut cs = chals.to_vec();
         batch_inversion(&mut cs);
         cs
     };
