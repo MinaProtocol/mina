@@ -52,7 +52,7 @@ in
               ),
 
               -- Execute test based on BUILD image
-              Cmd.run "source ${defaultArtifactStep.deploy_env_file} && ./buildkite/scripts/run-test-executive.sh ${testName}"
+              Cmd.run "MINA_DEB_CODENAME=buster ; source ${defaultArtifactStep.deploy_env_file} && ./buildkite/scripts/run-test-executive.sh ${testName}"
             ],
         artifact_paths = [SelectFiles.exactly "." "${testName}.test.log"],
         label = "${testName} integration test",
