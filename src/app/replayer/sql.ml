@@ -233,6 +233,7 @@ module Internal_command = struct
     ; block_id : int
     ; global_slot : int64
     ; txn_global_slot : int64
+    ; receiver_account_creation_fee_paid : int64 option
     ; sequence_no : int
     ; secondary_sequence_no : int
     }
@@ -241,7 +242,19 @@ module Internal_command = struct
   let typ =
     let open Archive_lib.Processor.Caqti_type_spec in
     let spec =
-      Caqti_type.[ string; int; int; int64; int64; int; int64; int64; int; int ]
+      Caqti_type.
+        [ string
+        ; int
+        ; int
+        ; int64
+        ; int64
+        ; int
+        ; int64
+        ; int64
+        ; option int64
+        ; int
+        ; int
+        ]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
@@ -253,7 +266,9 @@ module Internal_command = struct
   let query =
     Caqti_request.collect Caqti_type.int typ
       {sql| SELECT type,receiver_id,receiver_balance,fee,token,
-                   blocks.id,blocks.global_slot,parent.global_slot,sequence_no,secondary_sequence_no
+                   blocks.id,blocks.global_slot,parent.global_slot,
+                   receiver_account_creation_fee_paid,
+                   sequence_no,secondary_sequence_no
 
             FROM (SELECT * FROM internal_commands WHERE id = ?) AS ic
 
