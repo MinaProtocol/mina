@@ -76,6 +76,7 @@ struct
 
   let one = one ()
 
+  (* TODO: wouldn't be easier if Input_intf exposed a `zero`? *)
   let zero = sub one one
 
   let y_squared x =

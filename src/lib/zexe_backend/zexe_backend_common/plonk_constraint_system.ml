@@ -2,6 +2,7 @@ open Marlin_plonk_bindings.Types
 open Sponge
 open Unsigned.Size_t
 
+(** a gate interface, parameterized by a field *)
 module type Gate_vector_intf = sig
   open Unsigned
 
@@ -16,26 +17,31 @@ module type Gate_vector_intf = sig
   val get : t -> int -> field Plonk_gate.t
 end
 
+(** A row indexing in a constraint system *)
 module Row = struct
+  (** Either a public input row, or a non-public input row that starts at index 0 *)
   type t = Public_input of int | After_public_input of int
 
   let to_absolute ~public_input_size = function
     | Public_input i ->
         i
     | After_public_input i ->
+        (* the first i rows are public-input rows *)
         i + public_input_size
 end
 
+(** A specification for a gate type *)
 module Gate_spec = struct
   type ('row, 'f) t =
     { kind : Plonk_gate.Kind.t
+          (* TODO: what do these fields represent? I think permutation? *)
     ; row : 'row
     ; lrow : 'row
     ; lcol : Plonk_gate.Col.t
     ; rrow : 'row
     ; rcol : Plonk_gate.Col.t
     ; orow : 'row
-    ; ocol : Plonk_gate.Col.t
+    ; ocol : Plonk_gate.Col.t (* TODO: what's coeffs?*)
     ; coeffs : 'f array
     }
 
@@ -43,20 +49,25 @@ module Gate_spec = struct
     { t with row = f t.row; lrow = f t.lrow; rrow = f t.rrow; orow = f t.orow }
 end
 
+(** Represents the state of a hash function at some point *)
 module Hash_state = struct
   open Core_kernel
   module H = Digestif.SHA256
 
   type t = H.ctx
 
+  (* TODO: why `md5(SHA-256(x))`? *)
   let digest t = Md5.digest_string H.(to_raw_string (get t))
 
+  (* TODO: it's weird to have a function that you don't know how to call here, this probably should be wrapped with a safer interface (I'm assuming it's the initial state) *)
   let empty = H.feed_string H.empty "plonk_constraint_system_v3"
 end
 
+(** The PLONK constraints *)
 module Plonk_constraint = struct
   open Core_kernel
 
+  (** A PLONK constraint (or gate) can be [Basic], [Poseidon], [EC_add], [EC_scale] or [EC_endoscale] *)
   module T = struct
     type ('v, 'f) t =
       | Basic of { l : 'f * 'v; r : 'f * 'v; o : 'f * 'v; m : 'f; c : 'f }
@@ -66,6 +77,7 @@ module Plonk_constraint = struct
       | EC_endoscale of { state : 'v Endoscale_round.t array }
     [@@deriving sexp]
 
+    (** ? *)
     let map (type a b f) (t : (a, f) t) ~(f : a -> b) =
       let fp (x, y) = (f x, f y) in
       match t with
@@ -83,6 +95,7 @@ module Plonk_constraint = struct
           EC_endoscale
             { state = Array.map ~f:(fun x -> Endoscale_round.map ~f x) state }
 
+    (* TODO: this seems to be a "double check" type of function? It just checks that the basic gate is equal to 0? what is eval_one? what is v and f? *)
     let eval (type v f)
         (module F : Snarky_backendless.Field_intf.S with type t = f)
         (eval_one : v -> f) (t : (v, f) t) =
@@ -109,21 +122,27 @@ module Plonk_constraint = struct
             false )
           else true
       | _ ->
+          (* TODO: this fails open for other gates than basic? *)
           true
 
     (* TODO *)
   end
 
   include T
+
+  (* adds our constraint enum to the list of constraints handled by Snarky *)
   include Snarky_backendless.Constraint.Add_kind (T)
 end
 
+(** A position is a row and a column *)
 module Position = struct
   type t = { row : Row.t; col : Plonk_gate.Col.t }
 end
 
+(* TODO: what is this? a counter? *)
 module Internal_var = Core_kernel.Unique_id.Int ()
 
+(** A hash table based on a type that represents external and internal variables. )*)
 module V = struct
   open Core_kernel
 
@@ -140,6 +159,7 @@ module V = struct
    external variables and previously generated internal variables.
 *)
 
+  (* TODO: shouldn't this be defined outside of V? What does V mean here? Varaible perhaps? *)
   module T = struct
     type t = External of int | Internal of Internal_var.t
     [@@deriving compare, hash, sexp]
@@ -151,28 +171,45 @@ module V = struct
 end
 
 type ('a, 'f) t =
-  { equivalence_classes : Position.t list V.Table.t
-        (* How to compute each internal variable (as a linaer combination of other variables) *)
-  ; internal_vars : (('f * V.t) list * 'f option) Internal_var.Table.t
-  ; mutable rows_rev : V.t option array list
-  ; mutable gates :
+  { (* map of cells that share the same value (enforced by to the permutation) *)
+    equivalence_classes : Position.t list V.Table.t
+  ; (* How to compute each internal variable (as a linear combination of other variables) *)
+    internal_vars : (('f * V.t) list * 'f option) Internal_var.Table.t
+  ; (* ?, in reversed order because functional programming *)
+    mutable rows_rev : V.t option array list
+  ; (* a circuit is described by a series of gates. A gate is finalized if TKTK *)
+    mutable gates :
       [ `Finalized | `Unfinalized_rev of (Row.t, 'f) Gate_spec.t list ]
-  ; mutable next_row : int
-  ; mutable hash : Hash_state.t
-  ; mutable constraints : int
-  ; public_input_size : int Core_kernel.Set_once.t
-  ; mutable auxiliary_input_size : int
+  ; (* an instruction pointer *)
+    mutable next_row : int
+  ; (* hash of the circuit, for distinguishing different circuits *)
+    mutable hash : Hash_state.t
+  ; (* ? *)
+    mutable constraints : int
+  ; (* the size of the public input (which fills the first rows of our constraint system *)
+    public_input_size : int Core_kernel.Set_once.t
+  ; (* ? *)
+    mutable auxiliary_input_size : int
   }
 
 module Hash = Core.Md5
 
+(* the hash of the circuit *)
 let digest (t : _ t) = Hash_state.digest t.hash
 
+(* TODO: zk_rows is specified on the Rust side now, so I don't think we need this here for the permutation AT LEAST. This should be specified on the Rust side for other polynomials like the wires *)
+
+(** The number of rows used *)
 let zk_rows = 2
 
+(* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
+
+(** ? *)
 module Make
     (Fp : Field.S)
-    (Gates : Gate_vector_intf with type field := Fp.t) (Params : sig
+    (* TODO: why is there a type for gate vector, instead of using Gate.t list? *)
+    (Gates : Gate_vector_intf with type field := Fp.t)
+    (Params : sig
       val params : Fp.t Params.t
     end) =
 struct
@@ -183,13 +220,16 @@ struct
 
   module H = Digestif.SHA256
 
+  (** Used as a helper to unambiguously hash the circuit *)
   let feed_constraint t constr =
-    let fp x acc = H.feed_bytes acc (Fp.to_bytes x) in
+    (* TODO: does to_bytes always return a fixed-size response? That invariant should be checked somewhere (e.g. by checking that `zero |> to_bytes` returns something of the appropriate length )*)
+    let absorb_field field acc = H.feed_bytes acc (Fp.to_bytes field) in
     let lc =
+      (* TODO: Bytes.of_char_list ['\x00', '\x00', '\x00', ...]*)
       let int_buf = Bytes.init 8 ~f:(fun _ -> '\000') in
       fun x t ->
         List.fold x ~init:t ~f:(fun acc (x, index) ->
-            let acc = fp x acc in
+            let acc = absorb_field x acc in
             for i = 0 to 7 do
               Bytes.set int_buf i
                 (Char.of_int_exn ((index lsr (8 * i)) land 255))
@@ -223,8 +263,8 @@ struct
         match constr with
         | Basic { l; r; o; m; c } ->
             let t = H.feed_string t "basic" in
-            let pr (s, x) acc = fp s acc |> cvars [ x ] in
-            t |> pr l |> pr r |> pr o |> fp m |> fp c
+            let pr (s, x) acc = absorb_field s acc |> cvars [ x ] in
+            t |> pr l |> pr r |> pr o |> absorb_field m |> absorb_field c
         | Poseidon { state } ->
             let t = H.feed_string t "poseidon" in
             let row a = cvars (Array.to_list a) in
@@ -246,7 +286,11 @@ struct
     | _ ->
         failwith "Unsupported constraint"
 
-  let compute_witness sys (external_values : int -> Fp.t) : Fp.t array array =
+  (* TODO: why isn't external_values a hashtable instead? *)
+
+  (** Compute the witness, given the constraint system `sys` and a function that converts the indexed secret inputs to their concrete values *)
+  let compute_witness (sys : t) (external_values : int -> Fp.t) :
+      Fp.t array array =
     let internal_values : Fp.t Internal_var.Table.t =
       Internal_var.Table.create ()
     in
@@ -294,14 +338,17 @@ struct
     done ;
     res
 
+  (** Creates an internal variable and assigns it the value lc and constant *)
   let create_internal ?constant sys lc : V.t =
     let v = Internal_var.create () in
     Hashtbl.add_exn sys.internal_vars ~key:v ~data:(lc, constant) ;
     V.Internal v
 
-  let digest t = Hash_state.digest t.hash
+  (* returns a hash of the circuit *)
+  let digest (sys : t) = Hash_state.digest sys.hash
 
-  let create () =
+  (* initializes a constraint system *)
+  let create () : t =
     { public_input_size = Set_once.create ()
     ; internal_vars = Internal_var.Table.create ()
     ; gates = `Unfinalized_rev [] (* Gates.create () *)
@@ -316,30 +363,50 @@ struct
   (* TODO *)
   let to_json _ = `List []
 
+  (** returns the number of auxiliary inputs *)
   let get_auxiliary_input_size t = t.auxiliary_input_size
 
+  (** returns the number of public inputs *)
   let get_primary_input_size t = Set_once.get_exn t.public_input_size [%here]
 
+  (* TODO: are these the private input? *)
   let set_auxiliary_input_size t x = t.auxiliary_input_size <- x
 
-  let set_primary_input_size t x =
-    Set_once.set_exn t.public_input_size [%here] x
+  (** sets the number of public-input. It must and can only be called once. *)
+  let set_primary_input_size (sys : t) num_pub_inputs =
+    Set_once.set_exn sys.public_input_size [%here] num_pub_inputs
 
+  (* TODO: remove this no? isn't that a no-op? *)
   let digest = digest
 
+  (** Adds {row; col} to the system's wiring under a specific key.
+      A key is an external or internal variable.
+      If a {row; col} element already exists, 
+      it replaces it and returns the replaced value.
+      The row must be given relative to the start of the circuit 
+      (so at the start of the public-input rows). *)
   let wire' sys key row col =
     let prev =
       match V.Table.find sys.equivalence_classes key with
       | Some x -> (
-          match List.hd x with Some x -> x | None -> { row; col } )
+          match List.hd x with
+          | Some x ->
+              x
+          | None ->
+              { row; col } (* TODO: rewrite with | Some [] -> | Some x :: _ *) )
       | None ->
+          (* not connected to anything *)
           { row; col }
     in
     V.Table.add_multi sys.equivalence_classes ~key ~data:{ row; col } ;
     prev
 
+  (* TODO: rename to wire_abs and wire_rel? *)
+
+  (** Same as wire', except that the row must be given relatively to the end of the public-input rows *)
   let wire sys key row col = wire' sys key (Row.After_public_input row) col
 
+  (** TKKT *)
   let finalize_and_get_gates sys =
     match sys.gates with
     | `Finalized ->
@@ -406,14 +473,27 @@ struct
               }) ;
         g
 
+  (** Calls [finalize_and_get_gates] and ignores the result. *)
   let finalize t = ignore (finalize_and_get_gates t : Gates.t)
 
+  (** Regroup terms that share the same variable. 
+      For example, (3, i2) ; (2, i2) can be simplified to (5, i2).
+      It assumes that the list of given terms is sorted, 
+      and that i0 is the smallest one.
+      For example, `i0 = 1` and `terms = [(_, 2); (_, 2); (_; 4); ...]`
+
+      Returns `(last_scalar, last_variable, terms, terms_length)`
+      where terms does not contain the last scalar and last variable observed.
+  *)
   let accumulate_sorted_terms (c0, i0) terms =
     Sequence.of_list terms
     |> Sequence.fold ~init:(c0, i0, [], 0) ~f:(fun (acc, i, ts, n) (c, j) ->
            if Int.equal i j then (Fp.add acc c, i, ts, n)
            else (c, j, (acc, i) :: ts, n + 1))
 
+  (** Converts a [Cvar.t] to a `(terms, terms_length, has_constant)`.
+      if `has_constant` is set, then terms start with a constant term in the form of (c, 0).
+    *)
   let canonicalize x =
     let c, terms =
       Fp.(
@@ -425,6 +505,7 @@ struct
       List.sort terms ~compare:(fun (_, i) (_, j) -> Int.compare i j)
     in
     let has_constant_term = Option.is_some c in
+    (* TODO: shouldn't the constant term be (1, c) instead? *)
     let terms = match c with None -> terms | Some c -> (c, 0) :: terms in
     match terms with
     | [] ->
@@ -433,16 +514,16 @@ struct
         let acc, i, ts, n = accumulate_sorted_terms t0 terms in
         Some (List.rev ((acc, i) :: ts), n + 1, has_constant_term)
 
-  open Position
-
-  let add_row sys row t l r o c =
+  (** Adds a row/gate/constraint manually *)
+  let add_row sys row kind l r o c =
     match sys.gates with
     | `Finalized ->
         failwith "add_row called on finalized constraint system"
     | `Unfinalized_rev gates ->
+        let open Position in
         sys.gates <-
           `Unfinalized_rev
-            ( { kind = t
+            ( { kind
               ; row = After_public_input sys.next_row
               ; lrow = l.row
               ; lcol = l.col
@@ -456,6 +537,9 @@ struct
         sys.next_row <- sys.next_row + 1 ;
         sys.rows_rev <- row :: sys.rows_rev
 
+  (* TODO: add more granular functions than general add_generic_constraint? *)
+
+  (** Adds a generic constraint to the constraint system. *)
   let add_generic_constraint ?l ?r ?o c sys : unit =
     let next_row = sys.next_row in
     let lp =
@@ -481,6 +565,21 @@ struct
     in
     add_row sys [| l; r; o |] Generic lp rp op c
 
+  (** Converts a number of scaled additions \sum s_i * x_i 
+      to as many constraints as needed, 
+      creating temporary variables for each new row/constraint,
+      and returning the output variable.
+
+      For example, [(s1, x1), (s2, x2)] is transformed into:
+      - internal_var_1 = s1 * x1 + s2 * x2
+      - return (1, internal_var_1)
+
+      and [(s1, x1), (s2, x2), (s3, x3)] is transformed into:
+      - internal_var_1 = s1 * x1 + s2 * x2
+      - internal_var_2 = 1 * internal_var_1 + s3 * x3
+      - return (1, internal_var_2)
+      
+      It assumes that the list of terms is not empty. *)
   let completely_reduce sys (terms : (Fp.t * int) list) =
     (* just adding constrained variables without values *)
     let rec go = function
@@ -490,6 +589,7 @@ struct
           (s, V.External x)
       | (ls, lx) :: t ->
           let lx = V.External lx in
+          (* TODO: this should be rewritten to be tail-optimized *)
           let rs, rx = go t in
           let s1x1_plus_s2x2 = create_internal sys [ (ls, lx); (rs, rx) ] in
           add_generic_constraint ~l:lx ~r:rx ~o:s1x1_plus_s2x2
@@ -499,6 +599,10 @@ struct
     in
     go terms
 
+  (** Converts a linear combination of variables into a set of constraints.
+      It returns the output variable as (1, `Var res), 
+      unless the output is a constant, in which case it returns (c, `Constant). 
+    *)
   let reduce_lincom sys (x : Fp.t Snarky_backendless.Cvar.t) =
     let constant, terms =
       Fp.(
@@ -537,6 +641,7 @@ struct
                   sys ;
                 (Fp.one, `Var res) )
         | (ls, lx) :: tl ->
+            (* reduce the terms, then add the constant *)
             let rs, rx = completely_reduce sys tl in
             let res =
               create_internal ?constant sys [ (ls, External lx); (rs, rx) ]
@@ -553,6 +658,7 @@ struct
               sys ;
             (Fp.one, `Var res) )
 
+  (** Adds a constraint to the constraint system. *)
   let add_constraint ?label:_ sys
       (constr :
         ( Fp.t Snarky_backendless.Cvar.t
@@ -566,14 +672,14 @@ struct
       | 2 ->
           Plonk_gate.Col.O
       | _ ->
-          assert false
+          failwith "wrong column index used"
     in
     sys.hash <- feed_constraint sys.hash constr ;
     let red = reduce_lincom sys in
+    (* reduce any [Cvar.t] to a single internal variable *)
     let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =
-      let s, x = red x in
-      match x with
-      | `Var x ->
+      match red x with
+      | s, `Var x ->
           if Fp.equal s Fp.one then x
           else
             let sx = create_internal sys [ (s, x) ] in
@@ -582,7 +688,7 @@ struct
               [| s; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero |]
               sys ;
             sx
-      | `Constant ->
+      | s, `Constant ->
           let x = create_internal sys ~constant:s [] in
           add_generic_constraint ~l:x
             [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.negate s |]
@@ -591,63 +697,62 @@ struct
     in
     match constr with
     | Snarky_backendless.Constraint.Square (v1, v2) -> (
-        let (sl, xl), (so, xo) = (red v1, red v2) in
-        match (xl, xo) with
-        | `Var xl, `Var xo ->
+        match (red v1, red v2) with
+        | (sl, `Var xl), (so, `Var xo) ->
             (* (sl * xl)^2 = so * xo
                sl^2 * xl * xl - so * xo = 0
             *)
             add_generic_constraint ~l:xl ~r:xl ~o:xo
               [| Fp.zero; Fp.zero; Fp.negate so; Fp.(sl * sl); Fp.zero |]
               sys
-        | `Var xl, `Constant ->
+        | (sl, `Var xl), (so, `Constant) ->
+            (* TODO: it's hard to read the array of selector values, name them! *)
             add_generic_constraint ~l:xl ~r:xl
               [| Fp.zero; Fp.zero; Fp.zero; Fp.(sl * sl); Fp.negate so |]
               sys
-        | `Constant, `Var xo ->
+        | (sl, `Constant), (so, `Var xo) ->
             (* sl^2 = so * xo *)
             add_generic_constraint ~o:xo
               [| Fp.zero; Fp.zero; so; Fp.zero; Fp.negate (Fp.square sl) |]
               sys
-        | `Constant, `Constant ->
+        | (sl, `Constant), (so, `Constant) ->
             assert (Fp.(equal (square sl) so)) )
     | Snarky_backendless.Constraint.R1CS (v1, v2, v3) -> (
-        let (s1, x1), (s2, x2), (s3, x3) = (red v1, red v2, red v3) in
-        match (x1, x2, x3) with
-        | `Var x1, `Var x2, `Var x3 ->
+        match (red v1, red v2, red v3) with
+        | (s1, `Var x1), (s2, `Var x2), (s3, `Var x3) ->
             (* s1 x1 * s2 x2 = s3 x3
                - s1 s2 (x1 x2) + s3 x3 = 0
             *)
             add_generic_constraint ~l:x1 ~r:x2 ~o:x3
               [| Fp.zero; Fp.zero; s3; Fp.(negate s1 * s2); Fp.zero |]
               sys
-        | `Var x1, `Var x2, `Constant ->
+        | (s1, `Var x1), (s2, `Var x2), (s3, `Constant) ->
             add_generic_constraint ~l:x1 ~r:x2
               [| Fp.zero; Fp.zero; Fp.zero; Fp.(s1 * s2); Fp.negate s3 |]
               sys
-        | `Var x1, `Constant, `Var x3 ->
+        | (s1, `Var x1), (s2, `Constant), (s3, `Var x3) ->
             (* s1 x1 * s2 = s3 x3
             *)
             add_generic_constraint ~l:x1 ~o:x3
               [| Fp.(s1 * s2); Fp.zero; Fp.negate s3; Fp.zero; Fp.zero |]
               sys
-        | `Constant, `Var x2, `Var x3 ->
+        | (s1, `Constant), (s2, `Var x2), (s3, `Var x3) ->
             add_generic_constraint ~r:x2 ~o:x3
               [| Fp.zero; Fp.(s1 * s2); Fp.negate s3; Fp.zero; Fp.zero |]
               sys
-        | `Var x1, `Constant, `Constant ->
+        | (s1, `Var x1), (s2, `Constant), (s3, `Constant) ->
             add_generic_constraint ~l:x1
               [| Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.zero; Fp.negate s3 |]
               sys
-        | `Constant, `Var x2, `Constant ->
+        | (s1, `Constant), (s2, `Var x2), (s3, `Constant) ->
             add_generic_constraint ~r:x2
               [| Fp.zero; Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.negate s3 |]
               sys
-        | `Constant, `Constant, `Var x3 ->
+        | (s1, `Constant), (s2, `Constant), (s3, `Var x3) ->
             add_generic_constraint ~o:x3
               [| Fp.zero; Fp.zero; s3; Fp.zero; Fp.(negate s1 * s2) |]
               sys
-        | `Constant, `Constant, `Constant ->
+        | (s1, `Constant), (s2, `Constant), (s3, `Constant) ->
             assert (Fp.(equal s3 Fp.(s1 * s2))) )
     | Snarky_backendless.Constraint.Boolean v -> (
         let s, x = red v in
