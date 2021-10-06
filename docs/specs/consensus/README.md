@@ -866,11 +866,11 @@ fn relativeMinWindowDensity(B1, B2) -> u64
         let projected_window = B1.sub_window_densities
 
         // Ring-shift
-        for i = relativeSubWindow(B1.curr_global_slot) + 1;
-            shift_count > 0;
-            i = i + 1 mod sub_windows_per_window {
-            projected_window[i] = 0
-            shift_count--;
+        let i = relativeSubWindow(B1.curr_global_slot)
+        while shift_count > 0 {
+          i = i + 1 mod sub_windows_per_window
+          projected_window[i] = 0
+          shift_count--;
         }
 
         return projected_window
