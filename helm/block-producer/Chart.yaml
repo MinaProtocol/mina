@@ -2,12 +2,11 @@ apiVersion: v2
 name: block-producer
 description: A Helm chart for Mina Protocol's block producing network nodes
 type: application
-version: 1.0.5
+version: 1.0.6
 appVersion: 1.16.0
 annotations:
   artifacthub.io/changes: |
-    - enable daemon blockchain archival capability
-    - add flag to log precomputed blocks
+    - All references to the crypto currency now say Mina
 dependencies:
   - name: common-utilities
     version: 0.0.9

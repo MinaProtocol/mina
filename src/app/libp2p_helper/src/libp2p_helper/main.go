@@ -1,16 +1,7 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	cryptorand "crypto/rand"
-	"encoding/base64"
-	"encoding/json"
-	"fmt"
-	"io"
-	"log"
-	"math"
-	gonet "net"
 	"net/http"
 	"os"
 	"runtime/debug"
@@ -21,24 +12,15 @@ import (
 	// importing this automatically registers the pprof api to our metrics server
 	_ "net/http/pprof"
 
-	"codanet"
+	ipc "libp2p_ipc"
 
-	"github.com/go-errors/errors"
+	capnp "capnproto.org/go/capnp/v3"
 	logging "github.com/ipfs/go-log/v2"
-	crypto "github.com/libp2p/go-libp2p-core/crypto"
-	net "github.com/libp2p/go-libp2p-core/network"
-	peer "github.com/libp2p/go-libp2p-core/peer"
-	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
-	protocol "github.com/libp2p/go-libp2p-core/protocol"
-	discovery "github.com/libp2p/go-libp2p-discovery"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
-	"github.com/multiformats/go-multiaddr"
-	ma "github.com/multiformats/go-multiaddr"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+<<<<<<< HEAD
 func min(a, b uint64) uint64 {
 	if a < b {
 		return a
@@ -1108,545 +1090,45 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			continue
 		}
 	}
+=======
+const validationTimeout = 5 * time.Minute
+>>>>>>> origin/compatible
 
-	foundPeerCh := make(chan peerDiscovery)
+func startMetricsServer(port uint16) *codaMetricsServer {
+	log := logging.Logger("metrics server")
+	done := &sync.WaitGroup{}
+	done.Add(1)
+	server := &http.Server{Addr: ":" + strconv.Itoa(int(port))}
 
-	validPeer := func(who peer.ID) bool {
-		return who.Validate() == nil && who != app.P2p.Me
-	}
+	// does this need re-registered every time?
+	// http.Handle("/metrics", promhttp.Handler())
 
-	// report discovery peers local and remote
 	go func() {
-		for discovery := range foundPeerCh {
-			if validPeer(discovery.info.ID) {
-				app.P2p.Logger.Debugf("discovered peer %v via %v; processing", discovery.info.ID, discovery.source)
-				app.P2p.Host.Peerstore().AddAddrs(discovery.info.ID, discovery.info.Addrs, peerstore.ConnectedAddrTTL)
+		defer done.Done()
 
-				if discovery.source == PEER_DISCOVERY_SOURCE_MDNS {
-					for _, addr := range discovery.info.Addrs {
-						app.P2p.GatingState.MarkPrivateAddrAsKnown(addr)
-					}
-				}
-
-				// now connect to the peer we discovered
-				connInfo := app.P2p.ConnectionManager.GetInfo()
-				if connInfo.ConnCount < connInfo.LowWater {
-					err := app.P2p.Host.Connect(app.Ctx, discovery.info)
-					if err != nil {
-						app.P2p.Logger.Error("failed to connect to peer after discovering it: ", discovery.info, err.Error())
-						continue
-					}
-				}
-			} else {
-				app.P2p.Logger.Debugf("discovered peer %v via %v; not processing as it is not a valid peer", discovery.info.ID, discovery.source)
-			}
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("http server error: %v", err)
 		}
 	}()
 
-	if !app.NoMDNS {
-		app.P2p.Logger.Infof("beginning mDNS discovery")
-		err := beginMDNS(app, foundPeerCh)
-		if err != nil {
-			app.P2p.Logger.Error("failed to connect to begin mdns: ", err.Error())
-			return nil, badp2p(err)
-		}
+	return &codaMetricsServer{
+		port:   port,
+		server: server,
+		done:   done,
+	}
+}
+
+func (ms *codaMetricsServer) Shutdown() {
+	if err := ms.server.Shutdown(context.Background()); err != nil {
+		panic(err)
 	}
 
-	if !app.NoDHT {
-		app.P2p.Logger.Infof("beginning DHT discovery")
-		routingDiscovery := discovery.NewRoutingDiscovery(app.P2p.Dht)
-		if routingDiscovery == nil {
-			return nil, errors.New("failed to create routing discovery")
-		}
-
-		app.P2p.Discovery = routingDiscovery
-
-		err := app.P2p.Dht.Bootstrap(app.Ctx)
-		if err != nil {
-			app.P2p.Logger.Error("failed to dht bootstrap: ", err.Error())
-			return nil, badp2p(err)
-		}
-
-		time.Sleep(time.Millisecond * 100)
-		app.P2p.Logger.Debugf("beginning DHT advertising")
-
-		_, err = routingDiscovery.Advertise(app.Ctx, app.P2p.Rendezvous)
-		if err != nil {
-			app.P2p.Logger.Error("failed to routing advertise: ", err.Error())
-			return nil, badp2p(err)
-		}
-
-		go func() {
-			peerCh, err := routingDiscovery.FindPeers(app.Ctx, app.P2p.Rendezvous)
-			if err != nil {
-				app.P2p.Logger.Error("error while trying to find some peers: ", err.Error())
-			}
-
-			for peer := range peerCh {
-				foundPeerCh <- peerDiscovery{
-					info:   peer,
-					source: PEER_DISCOVERY_SOURCE_ROUTING,
-				}
-			}
-		}()
-	}
-
-	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
-		app.updateConnectionMetrics()
-
-		id := c.RemotePeer()
-
-		app.writeMsg(peerConnectionUpcall{
-			ID:     peer.Encode(id),
-			Upcall: "peerConnected",
-		})
-	}
-
-	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
-		app.updateConnectionMetrics()
-
-		id := c.RemotePeer()
-
-		app.writeMsg(peerConnectionUpcall{
-			ID:     peer.Encode(id),
-			Upcall: "peerDisconnected",
-		})
-	}
-
-	return "beginAdvertising success", nil
+	ms.done.Wait()
 }
 
 const (
 	latencyMeasurementTime = time.Second * 5
 )
-
-func (app *app) updateConnectionMetrics() {
-	info := app.P2p.ConnectionManager.GetInfo()
-	connectionCountMetric.Set(float64(info.ConnCount))
-}
-
-// TODO: {peer,protocol}-{min,max,avg}
-func (app *app) checkBandwidth() {
-	totalIn := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "Mina_libp2p_total_bandwidth_in",
-		Help: "The total incoming bandwidth used",
-	})
-	totalOut := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "Mina_libp2p_total_bandwidth_out",
-		Help: "The total outgoing bandwidth used",
-	})
-	rateIn := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "Mina_libp2p_bandwidth_rate_in",
-		Help: "The incoming bandwidth rate",
-	})
-	rateOut := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "Mina_libp2p_bandwidth_rate_out",
-		Help: "The outging bandwidth rate",
-	})
-
-	var err error
-
-	err = prometheus.Register(totalIn)
-	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register total_bandwidth_in; perhaps we've already done so", err.Error())
-		return
-	}
-
-	err = prometheus.Register(totalOut)
-	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register total_bandwidth_out; perhaps we've already done so", err.Error())
-		return
-	}
-
-	err = prometheus.Register(rateIn)
-	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register bandwidth_rate_in; perhaps we've already done so", err.Error())
-		return
-	}
-
-	err = prometheus.Register(rateOut)
-	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register bandwidth_rate_out; perhaps we've already done so", err.Error())
-		return
-	}
-
-	for {
-		stats := app.P2p.BandwidthCounter.GetBandwidthTotals()
-		totalIn.Set(float64(stats.TotalIn))
-		totalOut.Set(float64(stats.TotalOut))
-		rateIn.Set(stats.RateIn)
-		rateOut.Set(stats.RateOut)
-
-		time.Sleep(app.MetricsRefreshTime)
-	}
-}
-
-func (app *app) checkPeerCount() {
-	peerCount := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "Mina_libp2p_peer_count",
-		Help: "The total number of peers in our network",
-	})
-	connectedPeerCount := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "Mina_libp2p_connected_peer_count",
-		Help: "The total number of peers we are actively connected to",
-	})
-
-	var err error
-
-	err = prometheus.Register(peerCount)
-	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register peer_count; perhaps we've already done so", err.Error())
-		return
-	}
-
-	err = prometheus.Register(connectedPeerCount)
-	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register connected_peer_count; perhaps we've already done so", err.Error())
-		return
-	}
-
-	for {
-		peerCount.Set(float64(len(app.P2p.Host.Network().Peers())))
-		connectedPeerCount.Set(float64(app.P2p.ConnectionManager.GetInfo().ConnCount))
-
-		time.Sleep(app.MetricsRefreshTime)
-	}
-}
-
-func (app *app) checkMessageStats() {
-	msgMax := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "Mina_libp2p_message_max_stats",
-		Help: "The max size of network message received",
-	})
-	msgAvg := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "Mina_libp2p_message_avg_stats",
-		Help: "The average size of network message received",
-	})
-	msgMin := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "Mina_libp2p_message_min_stats",
-		Help: "The min size of network message received",
-	})
-
-	err := prometheus.Register(msgMax)
-	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register message_max_stats; perhaps we've already done so", err.Error())
-		return
-	}
-
-	err = prometheus.Register(msgAvg)
-	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register message_avg_stats; perhaps we've already done so", err.Error())
-		return
-	}
-
-	err = prometheus.Register(msgMin)
-	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register message_min_stats; perhaps we've already done so", err.Error())
-		return
-	}
-
-	for {
-		msgStats := app.P2p.MsgStats.GetStats()
-		msgMin.Set(msgStats.Min)
-		msgAvg.Set(msgStats.Avg)
-		msgMax.Set(msgStats.Max)
-
-		time.Sleep(app.MetricsRefreshTime)
-	}
-}
-
-func (app *app) checkLatency() {
-	latencyMin := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "Mina_libp2p_latency_min",
-		Help: fmt.Sprintf("The minimum latency (recorded over %s)", latencyMeasurementTime),
-	})
-	latencyMax := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "Mina_libp2p_latency_max",
-		Help: fmt.Sprintf("The maximum latency (recorded over %s)", latencyMeasurementTime),
-	})
-	latencyAvg := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "Mina_libp2p_latency_avg",
-		Help: fmt.Sprintf("The average latency (recorded over %s)", latencyMeasurementTime),
-	})
-
-	var err error
-
-	err = prometheus.Register(latencyMin)
-	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register latency_min; perhaps we've already done so", err.Error())
-		return
-	}
-
-	err = prometheus.Register(latencyMax)
-	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register latency_max; perhaps we've already done so", err.Error())
-		return
-	}
-
-	err = prometheus.Register(latencyAvg)
-	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register latency_avg; perhaps we've already done so", err.Error())
-		return
-	}
-
-	for {
-		peers := app.P2p.Host.Peerstore().Peers()
-		if len(peers) > 0 {
-			sum := 0.0
-			minimum := math.MaxFloat64
-			maximum := 0.0
-
-			for _, peer := range peers {
-				app.P2p.Host.Peerstore().RecordLatency(peer, latencyMeasurementTime)
-				latency := float64(app.P2p.Host.Peerstore().LatencyEWMA(peer))
-
-				sum += latency
-				minimum = math.Min(minimum, latency)
-				maximum = math.Max(maximum, latency)
-			}
-
-			latencyMin.Set(minimum)
-			latencyMax.Set(maximum)
-			latencyAvg.Set(sum / float64(len(peers)))
-		} else {
-			latencyMin.Set(0.0)
-			latencyMax.Set(0.0)
-			latencyAvg.Set(0.0)
-		}
-
-		time.Sleep(app.MetricsRefreshTime)
-	}
-}
-
-type findPeerMsg struct {
-	PeerID string `json:"peer_id"`
-}
-
-func (ap *findPeerMsg) run(app *app) (interface{}, error) {
-	id, err := peer.Decode(ap.PeerID)
-	if err != nil {
-		return nil, err
-	}
-
-	maybePeer, err := findPeerInfo(app, id)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return *maybePeer, nil
-}
-
-type setNodeStatusMsg struct {
-	Data string `json:"data"`
-}
-
-func (m *setNodeStatusMsg) run(app *app) (interface{}, error) {
-	app.P2p.NodeStatus = m.Data
-	return "setNodeStatus success", nil
-}
-
-type getPeerNodeStatusMsg struct {
-	PeerMultiaddr string `json:"peer_multiaddr"`
-}
-
-func (m *getPeerNodeStatusMsg) run(app *app) (interface{}, error) {
-	ctx, _ := context.WithTimeout(app.Ctx, codanet.NodeStatusTimeout)
-
-	addrInfo, err := addrInfoOfString(m.PeerMultiaddr)
-	if err != nil {
-		return nil, err
-	}
-
-	app.P2p.Host.Peerstore().AddAddrs(addrInfo.ID, addrInfo.Addrs, peerstore.ConnectedAddrTTL)
-
-	// Open a "get node status" stream on m.PeerID,
-	// block until you can read the response, return that.
-	s, err := app.P2p.Host.NewStream(ctx, addrInfo.ID, codanet.NodeStatusProtocolID)
-	if err != nil {
-		app.P2p.Logger.Error("failed to open stream: ", err)
-		return nil, err
-	}
-
-	defer func() {
-		_ = s.Close()
-	}()
-
-	errCh := make(chan error)
-	responseCh := make(chan string)
-
-	go func() {
-		// 1 megabyte
-		size := 1048576
-
-		data := make([]byte, size)
-		n, err := s.Read(data)
-		if err != nil && err != io.EOF {
-			app.P2p.Logger.Errorf("failed to decode node status data: err=%s", err)
-			errCh <- err
-			return
-		}
-
-		if n == size && err == nil {
-			errCh <- fmt.Errorf("node status data was greater than %d bytes", size)
-			return
-		}
-
-		responseCh <- string(data[:n])
-	}()
-
-	select {
-	case <-ctx.Done():
-		s.Reset()
-		return nil, errors.New("timed out requesting node status data from peer")
-	case err := <-errCh:
-		return nil, err
-	case response := <-responseCh:
-		return response, nil
-	}
-}
-
-type listPeersMsg struct {
-}
-
-func (lp *listPeersMsg) run(app *app) (interface{}, error) {
-	if app.P2p == nil {
-		return nil, needsConfigure()
-	}
-
-	connsHere := app.P2p.Host.Network().Conns()
-
-	peerInfos := make([]codaPeerInfo, 0, len(connsHere))
-
-	for _, conn := range connsHere {
-		maybePeer, err := parseMultiaddrWithID(conn.RemoteMultiaddr(), conn.RemotePeer())
-		if err != nil {
-			app.P2p.Logger.Warning("skipping maddr ", conn.RemoteMultiaddr().String(), " because it failed to parse: ", err.Error())
-			continue
-		}
-		peerInfos = append(peerInfos, *maybePeer)
-	}
-
-	return peerInfos, nil
-}
-
-func filterIPString(filters *ma.Filters, ip string, action ma.Action) error {
-	realIP := gonet.ParseIP(ip).To4()
-
-	if realIP == nil {
-		// TODO: how to compute mask for IPv6?
-		return badRPC(errors.New("unparsable IP or IPv6"))
-	}
-
-	ipnet := gonet.IPNet{Mask: gonet.IPv4Mask(255, 255, 255, 255), IP: realIP}
-
-	filters.AddFilter(ipnet, action)
-
-	return nil
-}
-
-type setGatingConfigMsg struct {
-	BannedIPs      []string `json:"banned_ips"`
-	BannedPeerIDs  []string `json:"banned_peers"`
-	TrustedPeerIDs []string `json:"trusted_peers"`
-	TrustedIPs     []string `json:"trusted_ips"`
-	Isolate        bool     `json:"isolate"`
-}
-
-func gatingConfigFromJson(gc *setGatingConfigMsg, addedPeers []peer.AddrInfo) (*codanet.CodaGatingState, error) {
-	_, totalIpNet, err := gonet.ParseCIDR("0.0.0.0/0")
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: perhaps the isolate option should just be passed down to the gating state instead
-	bannedAddrFilters := ma.NewFilters()
-	if gc.Isolate {
-		bannedAddrFilters.AddFilter(*totalIpNet, ma.ActionDeny)
-	}
-	for _, ip := range gc.BannedIPs {
-		err := filterIPString(bannedAddrFilters, ip, ma.ActionDeny)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	trustedAddrFilters := ma.NewFilters()
-	trustedAddrFilters.AddFilter(*totalIpNet, ma.ActionDeny)
-	for _, ip := range gc.TrustedIPs {
-		err := filterIPString(trustedAddrFilters, ip, ma.ActionAccept)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	bannedPeers := peer.NewSet()
-	for _, peerID := range gc.BannedPeerIDs {
-		id := peer.ID(peerID)
-		bannedPeers.Add(id)
-	}
-
-	trustedPeers := peer.NewSet()
-	for _, peerID := range gc.TrustedPeerIDs {
-		id := peer.ID(peerID)
-		trustedPeers.Add(id)
-	}
-	for _, peer := range addedPeers {
-		trustedPeers.Add(peer.ID)
-	}
-
-	return codanet.NewCodaGatingState(bannedAddrFilters, trustedAddrFilters, bannedPeers, trustedPeers), nil
-}
-
-func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
-	if app.P2p == nil {
-		return nil, needsConfigure()
-	}
-
-	newState, err := gatingConfigFromJson(gc, app.AddedPeers)
-	if err != nil {
-		return nil, badRPC(err)
-	}
-
-	app.P2p.GatingState = newState
-
-	return "ok", nil
-}
-
-var msgHandlers = map[methodIdx]func() action{
-	configure:           func() action { return &configureMsg{} },
-	listen:              func() action { return &listenMsg{} },
-	publish:             func() action { return &publishMsg{} },
-	subscribe:           func() action { return &subscribeMsg{} },
-	unsubscribe:         func() action { return &unsubscribeMsg{} },
-	validationComplete:  func() action { return &validationCompleteMsg{} },
-	generateKeypair:     func() action { return &generateKeypairMsg{} },
-	openStream:          func() action { return &openStreamMsg{} },
-	closeStream:         func() action { return &closeStreamMsg{} },
-	resetStream:         func() action { return &resetStreamMsg{} },
-	sendStreamMsg:       func() action { return &sendStreamMsgMsg{} },
-	removeStreamHandler: func() action { return &removeStreamHandlerMsg{} },
-	addStreamHandler:    func() action { return &addStreamHandlerMsg{} },
-	listeningAddrs:      func() action { return &listeningAddrsMsg{} },
-	addPeer:             func() action { return &addPeerMsg{} },
-	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
-	findPeer:            func() action { return &findPeerMsg{} },
-	listPeers:           func() action { return &listPeersMsg{} },
-	setGatingConfig:     func() action { return &setGatingConfigMsg{} },
-	setNodeStatus:       func() action { return &setNodeStatusMsg{} },
-	getPeerNodeStatus:   func() action { return &getPeerNodeStatusMsg{} },
-}
-
-type errorResult struct {
-	Seqno  int    `json:"seqno"`
-	Errorr string `json:"error"`
-}
-
-type successResult struct {
-	Seqno    int             `json:"seqno"`
-	Success  json.RawMessage `json:"success"`
-	Duration string          `json:"duration"`
-}
 
 var connectionCountMetric = prometheus.NewGauge(prometheus.GaugeOpts{
 	Name: "Mina_libp2p_connections_total",
@@ -1659,6 +1141,7 @@ func init() {
 	http.Handle("/metrics", promhttp.Handler())
 }
 
+<<<<<<< HEAD
 func newApp() *app {
 	return &app{
 		P2p:                      nil,
@@ -1679,6 +1162,8 @@ func newApp() *app {
 	}
 }
 
+=======
+>>>>>>> origin/compatible
 func main() {
 	logging.SetupLogging(logging.Config{
 		Format: logging.JSONOutput,
@@ -1734,26 +1219,14 @@ func main() {
 	_ = logging.SetLogLevel("bootstrap", "debug")
 	_ = logging.SetLogLevel("reuseport-transport", "debug")
 
-	go func() {
-		i := 0
-		for {
-			seqs <- i
-			i++
-		}
-	}()
-
-	lines := bufio.NewScanner(os.Stdin)
-	// 22MiB buffer size, larger than the 21.33MB minimum for 16MiB to be b64'd
-	// 4 * (2^24/3) / 2^20 = 21.33
-	bufsize := (1024 * 1024) * 1024
-	lines.Buffer(make([]byte, bufsize), bufsize)
+	decoder := capnp.NewDecoder(os.Stdin)
 
 	app := newApp()
 
 	go func() {
 		for {
 			msg := <-app.OutChan
-			bytes, err := json.Marshal(msg)
+			bytes, err := msg.Marshal()
 			if err != nil {
 				panic(err)
 			}
@@ -1768,64 +1241,36 @@ func main() {
 				panic("short write :(")
 			}
 
-			err = app.Out.WriteByte(0x0a)
-			if err != nil {
-				panic(err)
-			}
-
 			if err := app.Out.Flush(); err != nil {
 				panic(err)
 			}
 		}
 	}()
 
-	var line string
-
 	defer func() {
 		if r := recover(); r != nil {
-			helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", string(debug.Stack()))
+			helperLog.Error("The following panic occurred: ", r, "\nstack:\n", string(debug.Stack()))
 		}
 	}()
 
-	for lines.Scan() {
-		line = lines.Text()
-		helperLog.Debugf("message size is %d", len(line))
-		var raw json.RawMessage
-		env := envelope{
-			Body: &raw,
+	for {
+		rawMsg, err := decoder.Decode()
+		if err != nil {
+			helperLog.Errorf("Error decoding raw message: %w", err)
+			os.Exit(2)
+			return
 		}
-		if err := json.Unmarshal([]byte(line), &env); err != nil {
-			log.Print("when unmarshaling the envelope...")
-			log.Panic(err)
-		}
-		msg := msgHandlers[env.Method]()
-		if err := json.Unmarshal(raw, msg); err != nil {
-			log.Print("when unmarshaling the method invocation...")
-			log.Panic(err)
+		msg, err := ipc.ReadRootLibp2pHelperInterface_Message(rawMsg)
+		if err != nil {
+			helperLog.Errorf("Error decoding capnp message: %w", err)
+			os.Exit(3)
+			return
 		}
 
-		go func() {
-			start := time.Now()
-			ret, err := msg.run(app)
-			if err != nil {
-				app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
-				return
-			}
-
-			res, err := json.Marshal(ret)
-			if err != nil {
-				app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
-				return
-			}
-
-			app.writeMsg(successResult{Seqno: env.Seqno, Success: res, Duration: time.Since(start).String()})
-		}()
+		go app.handleIncomingMsg(&msg)
 	}
-	app.writeMsg(errorResult{Seqno: 0, Errorr: fmt.Sprintf("helper stdin scanning stopped because %v", lines.Err())})
-	// we never want the helper to get here, it should be killed or gracefully
-	// shut down instead of stdin closed.
-	os.Exit(1)
 }
+<<<<<<< HEAD
 
 var _ json.Marshaler = (*methodIdx)(nil)
 
@@ -1863,3 +1308,5 @@ func readLEB128ToUint64(r io.Reader) (uint64, error) {
 	}
 	return out, nil
 }
+=======
+>>>>>>> origin/compatible

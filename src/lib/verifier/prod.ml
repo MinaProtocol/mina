@@ -236,9 +236,6 @@ type worker =
 
 type t = { worker : worker Ivar.t ref; logger : Logger.Stable.Latest.t }
 
-let plus_or_minus initial ~delta =
-  initial +. (Random.float (2. *. delta) -. delta)
-
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
     t Deferred.t =
@@ -313,11 +310,9 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
   let%map worker = create_worker () |> Deferred.Or_error.ok_exn in
   let worker_ref = ref (Ivar.create_full worker) in
   let rec on_worker { connection = _; process; exit_or_signal } =
-    let restart_after = Time.Span.(of_min (15. |> plus_or_minus ~delta:2.5)) in
     let finished =
       Deferred.any
-        [ (after restart_after >>| fun () -> `Time_to_restart)
-        ; ( exit_or_signal
+        [ ( exit_or_signal
           >>| function
           | Ok _ ->
               `Unexpected_termination
@@ -342,7 +337,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
               [%log error] "verifier terminated unexpectedly"
                 ~metadata:[ ("verifier_pid", `Int (Pid.to_int pid)) ] ;
               Ivar.fill_if_empty create_worker_trigger ()
-          | `Time_to_restart | `Wait_threw_an_exception _ -> (
+          | `Wait_threw_an_exception _ -> (
               ( match e with
               | `Wait_threw_an_exception err ->
                   [%log info]

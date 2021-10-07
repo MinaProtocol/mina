@@ -31,7 +31,7 @@ resource "local_file" "alert_rules_config" {
 resource "null_resource" "download_cortextool" {
   provisioner "local-exec" {
     working_dir = path.cwd
-    command     = "curl --fail --show-error --location --output /tmp/cortextool ${local.cortextool_download_url} && chmod a+x /tmp/cortextool"
+    command = "which cortextool || (curl --fail --show-error --location --output ${local.cortextool_install_dir} ${local.cortextool_download_url} && chmod a+x ${local.cortextool_install_dir})"
   }
 }
 
@@ -40,7 +40,7 @@ resource "null_resource" "download_cortextool" {
 resource "null_resource" "alert_rules_lint" {
   provisioner "local-exec" {
     working_dir = path.cwd
-    command     = "/tmp/cortextool rules lint --rule-files alert_rules.yml"
+    command     = "cortextool rules lint --rule-files alert_rules.yml"
   }
 
   depends_on = [local_file.alert_rules_config, null_resource.download_cortextool]
@@ -48,7 +48,7 @@ resource "null_resource" "alert_rules_lint" {
 
 resource "null_resource" "alert_rules_check" {
   provisioner "local-exec" {
-    command = "/tmp/cortextool rules check --rule-files alert_rules.yml"
+    command     = "cortextool rules check --rule-files alert_rules.yml"
   }
 
   depends_on = [local_file.alert_rules_config, null_resource.download_cortextool]

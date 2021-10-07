@@ -701,6 +701,13 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                    ~log_issue:false
                in
                Core.print_string message ; Deferred.unit
+           | Mina_lib.Offline_shutdown ->
+               Core.print_string
+                 "\n\
+                  [FATAL] *** Mina daemon has been offline for too long ***\n\
+                  *** Shutting down ***\n" ;
+               handle_crash Mina_lib.Offline_shutdown ~time_controller ~conf_dir
+                 ~child_pids ~top_logger coda_ref
            | _exn ->
                handle_crash exn ~time_controller ~conf_dir ~child_pids
                  ~top_logger coda_ref
