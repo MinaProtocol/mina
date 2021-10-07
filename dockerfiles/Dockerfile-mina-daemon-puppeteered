@@ -6,7 +6,7 @@
 # build context.
 
 ARG MINA_VERSION
-FROM codaprotocol/mina-daemon:${MINA_VERSION}
+FROM minaprotocol/mina-daemon:${MINA_VERSION}
 
 RUN echo '#!/bin/bash\n\
 pgrep -f --newest "python3 /root/mina_daemon_puppeteer.py"'\
