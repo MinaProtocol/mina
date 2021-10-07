@@ -4302,6 +4302,18 @@ let%test_module "transaction_snark" =
           [ []; Parties.parties parties ]
           [ [ List.hd_exn states ]; states ]
       in
+      let transaction : Parties.Transaction_commitment.t Lazy.t =
+        lazy (Parties.commitment parties)
+      in
+      let tx_statement (remaining_parties : Party.t list) : Snapp_statement.t =
+        let at_party =
+          let hd_depth = (List.hd_exn remaining_parties).data.body.depth in
+          List.take_while remaining_parties ~f:(fun p ->
+              p.data.body.depth >= hd_depth)
+          |> Parties.Party_or_stack.With_hashes.other_parties_hash
+        in
+        { transaction = Lazy.force transaction; at_party }
+      in
       let witnesses =
         let parties : _ Parties_logic.Start_data.t =
           { protocol_state_predicate = Snapp_predicate.Protocol_state.accept
@@ -4310,6 +4322,7 @@ let%test_module "transaction_snark" =
         in
         let commitment = ref Local_state.dummy.transaction_commitment in
         let remaining_parties = ref [ parties ] in
+        let remaining_partys = ref (Parties.parties parties.parties) in
         List.fold states_rev ~init:[]
           ~f:(fun
                witnesses
@@ -4318,6 +4331,20 @@ let%test_module "transaction_snark" =
                , (source_global, source_local)
                , (target_global, target_local) )
              ->
+            let snapp_stmts =
+              match spec with
+              | Proved ->
+                  [ (0, tx_statement !remaining_partys) ]
+              | _ ->
+                  []
+            in
+            ( match spec with
+            | Opt_signed_unsigned | Opt_signed_opt_signed ->
+                remaining_partys := List.tl_exn @@ List.tl_exn !remaining_partys
+            | Opt_signed ->
+                remaining_partys := List.tl_exn !remaining_partys
+            | Proved ->
+                remaining_partys := List.tl_exn !remaining_partys ) ;
             let current_commitment = !commitment in
             let start_parties, next_commitment =
               match kind with
@@ -4412,18 +4439,23 @@ let%test_module "transaction_snark" =
               ; sok_digest = Sok_message.Digest.default
               }
             in
-            (w, spec, statement) :: witnesses)
+            (w, spec, statement, snapp_stmts) :: witnesses)
       in
       let open Impl in
-      List.fold ~init:((), ()) witnesses ~f:(fun _ (witness, spec, statement) ->
+      List.fold ~init:((), ()) witnesses
+        ~f:(fun _ (witness, spec, statement, snapp_stmts) ->
           run_and_check
             (fun () ->
               let s =
                 exists Statement.With_sok.typ ~compute:(fun () -> statement)
               in
+              let snapp_stmts =
+                List.map snapp_stmts ~f:(fun (i, stmt) ->
+                    (i, exists Snapp_statement.typ ~compute:(fun () -> stmt)))
+              in
               Base.Parties_snark.main ~constraint_constants
                 (Parties_segment.Basic.to_single_list spec)
-                [] s ~witness ;
+                snapp_stmts s ~witness ;
               fun () -> ())
             ()
           |> Or_error.ok_exn)
