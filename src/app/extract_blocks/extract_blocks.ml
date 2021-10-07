@@ -28,7 +28,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let creator = Public_key.Compressed.of_base58_check_exn creator_str in
   let%bind block_winner_str =
     query_db
-      ~f:(fun db -> Sql.Public_key.run db block.creator_id)
+      ~f:(fun db -> Sql.Public_key.run db block.block_winner_id)
       ~item:"block winner public key"
   in
   let block_winner =
