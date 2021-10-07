@@ -30,6 +30,7 @@ touch .mina-config/mina-prover.log
 touch .mina-config/mina-verifier.log
 touch .mina-config/mina-best-tip.log
 
+set +ex # Allow wait and kill commands to fail in this loop, don't print these commands
 while true; do
   rm -f .mina-config/.mina-lock
   mina $INPUT_ARGS 2>&1 >mina.log &
@@ -40,10 +41,10 @@ while true; do
 
   wait "$mina_pid"
   echo "Mina process exited with status code $?"
-
+  sleep 15
   kill "$tail_pid"
+
   if [ ! -f stay_alive ]; then
-    sleep 10
     exit 0
   fi
 done
