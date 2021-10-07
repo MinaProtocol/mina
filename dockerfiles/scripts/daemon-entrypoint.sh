@@ -41,9 +41,9 @@ while true; do
   wait "$mina_pid"
   echo "Mina process exited with status code $?"
 
-  kill "$tail_pid"
   if [ ! -f stay_alive ]; then
-    sleep 10
+    sleep 15
+    kill "$tail_pid"
     exit 0
   fi
 done
