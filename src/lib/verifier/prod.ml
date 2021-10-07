@@ -237,6 +237,51 @@ type worker =
 
 type t = {worker: worker Ivar.t ref; logger: Logger.Stable.Latest.t}
 
+let plus_or_minus initial ~delta =
+  initial +. (Random.float (2. *. delta) -. delta)
+
+(** Call this as early as possible after the process is known, and store the
+    resulting [Deferred.t] somewhere to be used later.
+*)
+let wait_safe ~logger process =
+  (* This is a little more nuanced than it may initially seem.
+     - The initial call to [Process.wait] runs a wait syscall -- with the
+       NOHANG flag -- synchronously.
+       * This may raise an error (WNOHANG or otherwise) that we have to handle
+         synchronously at call time.
+     - The [Process.wait] then returns a [Deferred.t] that resolves when a
+       second syscall returns.
+       * This may throw its own errors, so we need to ensure that this is also
+         wrapped to catch them.
+     - Once the child process has died and one or more wait syscalls have
+       resolved, the operating system will drop the process metadata. This
+       means that our wait may hang forever if 1) the process has already died
+       and 2) there was a wait call issued by some other code before we have a
+       chance.
+       * Thus, we should make this initial call while the child process is
+         still alive, preferably on startup, to avoid this hang.
+  *)
+  match
+    Or_error.try_with (fun () ->
+        let deferred_wait =
+          Monitor.try_with ~run:`Now
+            ~rest:
+              (`Call
+                (fun exn ->
+                  [%log warn]
+                    "Saw an error from Process.wait in wait_safe: $err"
+                    ~metadata:
+                      [("err", Error_json.error_to_yojson (Error.of_exn exn))]
+                  ))
+            (fun () -> Process.wait process)
+        in
+        Deferred.Result.map_error ~f:Error.of_exn deferred_wait )
+  with
+  | Ok x ->
+      x
+  | Error err ->
+      Deferred.Or_error.fail err
+
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
     t Deferred.t =
@@ -310,9 +355,11 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
   let%map worker = create_worker () |> Deferred.Or_error.ok_exn in
   let worker_ref = ref (Ivar.create_full worker) in
   let rec on_worker {connection= _; process; exit_or_signal} =
+    let restart_after = Time.Span.(of_min (15. |> plus_or_minus ~delta:2.5)) in
     let finished =
       Deferred.any
-        [ ( exit_or_signal
+        [ (after restart_after >>| fun () -> `Time_to_restart)
+        ; ( exit_or_signal
           >>| function
           | Ok _ ->
               `Unexpected_termination
@@ -335,7 +382,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
               [%log error] "verifier terminated unexpectedly"
                 ~metadata:[("verifier_pid", `Int (Pid.to_int pid))] ;
               Ivar.fill_if_empty create_worker_trigger ()
-          | `Wait_threw_an_exception _ -> (
+          | `Time_to_restart | `Wait_threw_an_exception _ -> (
               ( match e with
               | `Wait_threw_an_exception err ->
                   [%log info]
