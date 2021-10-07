@@ -282,7 +282,9 @@ let create_expected_statement ~constraint_constants
         pending_coinbase_with_state
   in
   let%bind fee_excess = Transaction.fee_excess transaction in
-  (*TODO: source local state should `local_state_init` from the witness and target local state should be whatever `apply_parties_unchecked` returns. Do they have to be in the statement in the scan state? transaction snark*)
+  (*TODO: source local state should `local_state_init` from the witness and
+    target local state should be whatever `apply_parties_unchecked` returns. Do
+    they have to be in the statement in the scan state? transaction snark*)
   let local_state = Mina_state.Local_state.empty in
   let `Needs_some_work_for_snapps_on_mainnet = Mina_base.Util.todo_snapps in
   let%map supply_increase = Transaction.supply_increase transaction in
@@ -917,7 +919,8 @@ let fill_work_and_enqueue_transactions t transactions work =
           Option.value_map ~default:curr_source old_proof
             ~f:(fun ((p', _), _) -> (Ledger_proof.statement p').target)
         in
-        (*prev_target is connected to curr_source- Order of the arguments is important here*)
+        (*prev_target is connected to curr_source- Order of the arguments is
+          important here*)
         if Mina_state.Registers.Value.connected prev_target curr_source then
           Ok (Some (proof, extract_txns txns_with_witnesses))
         else Or_error.error_string "Unexpected ledger proof emitted")

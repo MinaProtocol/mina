@@ -3824,11 +3824,15 @@ let%test_module "transaction_snark" =
 
     let state_body_hash = Mina_state.Protocol_state.Body.hash state_body
 
+    (** Each transaction pushes the previous protocol state (used to validate
+    the transaction) to the pending coinbase stack of protocol states*)
     let pending_coinbase_state_update state_body_hash stack =
       Pending_coinbase.Stack.(push_state state_body_hash stack)
 
     let init_stack = Pending_coinbase.Stack.empty
 
+    (** Push protocol state and coinbase if it is a coinbase transaction to the
+      pending coinbase stacks (coinbase stack and state stack)*)
     let pending_coinbase_stack_target (t : Transaction.Valid.t) state_body_hash
         stack =
       let stack_with_state =
