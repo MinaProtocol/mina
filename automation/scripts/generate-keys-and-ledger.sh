@@ -1,7 +1,7 @@
 #! /bin/bash
 
 # Set defaults before parsing args
-TESTNET=devnet-test
+TESTNET=devnet
 COMMUNITY_KEYFILE=""
 RESET=false
 
@@ -213,13 +213,13 @@ if [[ -s "keys/testnet-keys/${TESTNET}_delegator-keyfiles/delegator_account_1.pu
 echo "using existing delegator keys"
 else
   generate_key_files $z $z "delegator" $delegator_output_dir
-fi
 
-build_keyset_from_testnet_keys $delegator_output_dir "delegator" 1
+  build_keyset_from_testnet_keys $delegator_output_dir "delegator" 1
   #keyset replicating whale keys for delegators (coda-network requires a 1-1 mapping)
-build_keyset_from_testnet_keys $whale_keys_directory "delegatee" $DELEGATORS_PER_WHALE
+  build_keyset_from_testnet_keys $whale_keys_directory "delegatee" $DELEGATORS_PER_WHALE
 
-build_keyset_from_testnet_keys $whale_keys_directory "community_delegatee" $COMMUNITY_DELEGATORS_PER_WHALE
+  build_keyset_from_testnet_keys $whale_keys_directory "community_delegatee" $COMMUNITY_DELEGATORS_PER_WHALE
+fi
 
 
 if [[ -s "keys/testnet-keys/${TESTNET}_online-fish-keyfiles/online_fish_account_1.pub" ]]; then

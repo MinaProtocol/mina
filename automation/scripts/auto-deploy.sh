@@ -38,10 +38,10 @@ echo "WAITING FOR IMAGE ${image} TO APPEAR IN DOCKER REGISTRY"
 #  sleep 10
 #done
 
-if [[ -n "$GENERATE_KEYS" ]] ; then
-  echo 'GENERATING KEYS'
-  scripts/generate-keys-and-ledger.sh "${TESTNET}" "$2" "$3" # Generates whale (10), fish (1), community (variable), and service keys (2)
-fi
+#if [[ -n "$GENERATE_KEYS" ]] ; then
+#  echo 'GENERATING KEYS'
+#  scripts/generate-keys-and-ledger.sh "${TESTNET}" "$2" "$3" # Generates whale (10), fish (1), community (variable), and service keys (2)
+#fi
 
 cd $terraform_dir
 echo 'RUNNING TERRAFORM in '"$terraform_dir"

@@ -55,8 +55,8 @@ variable "seed_count" {
 
 locals {
   testnet_name = "devnet"
-  mina_image = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta7-fix-devnet-new-devnet-5f8f7ef"
-  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:1.2.0beta7-fix-devnet-new-devnet-5f8f7ef"
+  mina_image = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta7-fix-devnet-new-devnet-f4d5164"
+  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:1.2.0beta7-fix-devnet-new-devnet-f4d5164"
   seed_region = "us-east4"
   seed_zone = "us-east4-b"
 
