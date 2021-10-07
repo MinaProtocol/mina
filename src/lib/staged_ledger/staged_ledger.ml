@@ -4,7 +4,7 @@
 (* Only show stdout for failed inline tests. *)
 open Inline_test_quiet_logs
 open Core_kernel
-open Async_kernel
+open Async
 open Mina_base
 open Currency
 open O1trace
@@ -12,6 +12,8 @@ open Signature_lib
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
+
+let yield_result () = Deferred.map (Scheduler.yield ()) ~f:Result.return
 
 module T = struct
   module Scan_state = Transaction_snark_scan_state
@@ -177,13 +179,11 @@ module T = struct
             Error (Couldn't_reach_verifier e) )
 
   module Statement_scanner = struct
-    include Scan_state.Make_statement_scanner
-              (Deferred)
-              (struct
-                type t = unit
+    include Scan_state.Make_statement_scanner (struct
+      type t = unit
 
-                let verify ~verifier:() _proofs = Deferred.return (Ok true)
-              end)
+      let verify ~verifier:() _proofs = Deferred.Or_error.return true
+    end)
   end
 
   module Statement_scanner_proof_verifier = struct
@@ -195,9 +195,7 @@ module T = struct
   end
 
   module Statement_scanner_with_proofs =
-    Scan_state.Make_statement_scanner
-      (Deferred)
-      (Statement_scanner_proof_verifier)
+    Scan_state.Make_statement_scanner (Statement_scanner_proof_verifier)
 
   type t =
     { scan_state: Scan_state.t
@@ -243,18 +241,16 @@ module T = struct
       in
       next_available_token_after
     in
-    match Scan_state.latest_ledger_proof scan_state with
-    | None ->
-        Statement_scanner.check_invariants ~constraint_constants scan_state
-          ~verifier:() ~error_prefix ~ledger_hash_end:ledger
-          ~ledger_hash_begin:None ~next_available_token_begin:None
-          ~next_available_token_end:next_available_token
-    | Some proof ->
-        Statement_scanner.check_invariants ~constraint_constants scan_state
-          ~verifier:() ~error_prefix ~ledger_hash_end:ledger
-          ~ledger_hash_begin:(Some (get_target proof))
-          ~next_available_token_begin:(Some (next_available_token_begin proof))
-          ~next_available_token_end:next_available_token
+    let ledger_hash_begin, next_available_token_begin =
+      Scan_state.latest_ledger_proof scan_state
+      |> Option.value_map ~default:(None, None) ~f:(fun proof ->
+             (Some (get_target proof), Some (next_available_token_begin proof))
+         )
+    in
+    Statement_scanner.check_invariants ~constraint_constants scan_state
+      ~verifier:() ~error_prefix ~ledger_hash_end:ledger ~ledger_hash_begin
+      ~next_available_token_begin
+      ~next_available_token_end:next_available_token
 
   let statement_exn ~constraint_constants t =
     let open Deferred.Let_syntax in
@@ -332,7 +328,7 @@ module T = struct
     let%bind _ =
       Deferred.Or_error.List.iter txs_with_protocol_state
         ~f:(fun (tx, protocol_state) ->
-          let%map.Async () = Async.Scheduler.yield () in
+          let%map.Deferred.Let_syntax () = Scheduler.yield () in
           let%bind.Or_error.Let_syntax txn_with_info =
             Ledger.apply_transaction ~constraint_constants
               ~txn_state_view:
@@ -507,6 +503,7 @@ module T = struct
   let apply_transaction_and_get_witness ~constraint_constants ledger
       pending_coinbase_stack_state s status txn_state_view state_and_body_hash
       =
+    let open Deferred.Result.Let_syntax in
     let account_ids : Transaction.t -> _ = function
       | Fee_transfer t ->
           Fee_transfer.receivers t
@@ -525,15 +522,14 @@ module T = struct
       measure "sparse ledger" (fun () ->
           Sparse_ledger.of_ledger_subset_exn ledger (account_ids s) )
     in
-    let r =
+    let%bind () = yield_result () in
+    let%bind applied_txn, statement, updated_pending_coinbase_stack_state =
       measure "apply+stmt" (fun () ->
           apply_transaction_and_get_statement ~constraint_constants ledger
             pending_coinbase_stack_state s txn_state_view )
+      |> Deferred.return
     in
-    let open Result.Let_syntax in
-    let%bind applied_txn, statement, updated_pending_coinbase_stack_state =
-      r
-    in
+    let%bind () = yield_result () in
     let%map () =
       match status with
       | None ->
@@ -545,7 +541,7 @@ module T = struct
           in
           if Transaction_status.equal status got_status then return ()
           else
-            Result.fail
+            Deferred.Result.fail
               (Staged_ledger_error.Mismatched_statuses
                  ({With_status.data= s; status}, got_status))
     in
@@ -556,13 +552,6 @@ module T = struct
       ; init_stack= Base pending_coinbase_stack_state.init_stack
       ; statement }
     , updated_pending_coinbase_stack_state )
-
-  let rec partition size = function
-    | [] ->
-        []
-    | ls ->
-        let sub, rest = List.split_n ls size in
-        sub :: partition size rest
 
   let update_ledger_and_get_statements ~constraint_constants ledger
       current_stack ts current_state_view state_and_body_hash =
@@ -577,32 +566,28 @@ module T = struct
       in
       let exception Exit of Staged_ledger_error.t in
       Async.try_with ~extract_exn:true (fun () ->
-          let tss = partition 10 ts in
-          Deferred.List.fold tss ~init:([], pending_coinbase_stack_state)
-            ~f:(fun (acc, pending_coinbase_stack_state) ts ->
+          Deferred.List.fold ts ~init:([], pending_coinbase_stack_state)
+            ~f:(fun (acc, pending_coinbase_stack_state) t ->
               let open Deferred.Let_syntax in
-              let%map () = Async.Scheduler.yield () in
-              List.fold ts ~init:(acc, pending_coinbase_stack_state)
-                ~f:(fun (acc, pending_coinbase_stack_state) t ->
-                  ( match
-                      List.find (Transaction.public_keys t.With_status.data)
-                        ~f:(fun pk ->
-                          Option.is_none
-                            (Signature_lib.Public_key.decompress pk) )
-                    with
-                  | None ->
-                      ()
-                  | Some pk ->
-                      raise (Exit (Invalid_public_key pk)) ) ;
-                  match
-                    apply_transaction_and_get_witness ~constraint_constants
-                      ledger pending_coinbase_stack_state t.With_status.data
-                      (Some t.status) current_state_view state_and_body_hash
-                  with
-                  | Ok (res, updated_pending_coinbase_stack_state) ->
-                      (res :: acc, updated_pending_coinbase_stack_state)
-                  | Error err ->
-                      raise (Exit err) ) ) )
+              ( match
+                  List.find (Transaction.public_keys t.With_status.data)
+                    ~f:(fun pk ->
+                      Option.is_none (Signature_lib.Public_key.decompress pk)
+                  )
+                with
+              | None ->
+                  ()
+              | Some pk ->
+                  raise (Exit (Invalid_public_key pk)) ) ;
+              match%map
+                apply_transaction_and_get_witness ~constraint_constants ledger
+                  pending_coinbase_stack_state t.With_status.data
+                  (Some t.status) current_state_view state_and_body_hash
+              with
+              | Ok (res, updated_pending_coinbase_stack_state) ->
+                  (res :: acc, updated_pending_coinbase_stack_state)
+              | Error err ->
+                  raise (Exit err) ) )
       |> Deferred.Result.map_error ~f:(function
            | Exit err ->
                err
@@ -671,7 +656,7 @@ module T = struct
 
   let time ~logger label f =
     let start = Core.Time.now () in
-    let%map x = f () in
+    let%map x = trace_recurring label f in
     [%log debug]
       ~metadata:
         [("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))]
@@ -865,14 +850,13 @@ module T = struct
             && List.length data
                > Scan_state.free_space t.scan_state - required + work_count
           then
-            Deferred.return
-              (Error
-                 (Staged_ledger_error.Insufficient_work
-                    (sprintf
-                       !"Insufficient number of transaction snark work (slots \
-                         occupying: %d)  required %d, got %d"
-                       slots required work_count)))
-          else Deferred.return (Ok ()) )
+            Deferred.Result.fail
+              (Staged_ledger_error.Insufficient_work
+                 (sprintf
+                    !"Insufficient number of transaction snark work (slots \
+                      occupying: %d)  required %d, got %d"
+                    slots required work_count))
+          else Deferred.Result.return () )
     in
     let%bind () = Deferred.return (check_zero_fee_excess t.scan_state data) in
     let%bind res_opt, scan_state' =
@@ -899,6 +883,7 @@ module T = struct
                   the scan_state $scan_state: $error" ) ;
           Deferred.return (to_staged_ledger_or_error r) )
     in
+    let%bind () = yield_result () in
     let%bind updated_pending_coinbase_collection' =
       time ~logger "update_pending_coinbase_collection" (fun () ->
           update_pending_coinbase_collection
@@ -907,9 +892,11 @@ module T = struct
             ~ledger_proof:res_opt
           |> Deferred.return )
     in
+    let%bind () = yield_result () in
     let%bind coinbase_amount =
-      coinbase_for_blockchain_snark coinbases |> Deferred.return
+      Deferred.return (coinbase_for_blockchain_snark coinbases)
     in
+    let%bind () = yield_result () in
     let%map () =
       time ~logger
         (sprintf "verify_scan_state_after_apply (skip=%b)" skip_verification)
