@@ -195,7 +195,7 @@ if [ -n "${BUILDKITE+x}" ]; then
 
     # Export variables for use with downstream steps
     echo "export MINA_SERVICE=mina-archive" >> ./ARCHIVE_DOCKER_DEPLOY
-    echo "export MINA_VERSION=${DOCKER_TAG}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export MINA_VERSION=${ARCHIVE_TAG}" >> ./ARCHIVE_DOCKER_DEPLOY
     echo "export MINA_DEB_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
     echo "export MINA_DEB_RELEASE=${MINA_DEB_RELEASE}" >> ./ARCHIVE_DOCKER_DEPLOY
     echo "export MINA_DEB_CODENAME=${MINA_DEB_CODENAME}" >> ./ARCHIVE_DOCKER_DEPLOY
@@ -209,12 +209,12 @@ else
     echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
 
     docker build \
-      -t codaprotocol/mina-archive:$DOCKER_TAG \
+      -t minaprotocol/mina-archive:$ARCHIVE_TAG \
       -f "../../dockerfiles/Dockerfile-mina-archive" \
       --build-arg deb_version=$VERSION \
       --build-arg deb_codename=$MINA_DEB_CODENAME \
       --build-arg deb_release=$MINA_DEB_RELEASE \
       docker_build
 
-    docker push codaprotocol/mina-archive:$DOCKER_TAG
+    docker push minaprotocol/mina-archive:$ARCHIVE_TAG
 fi
