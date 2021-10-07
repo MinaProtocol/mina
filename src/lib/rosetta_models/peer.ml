@@ -7,7 +7,7 @@
  *)
 
 type t = { peer_id : string; metadata : Yojson.Safe.t option [@default None] }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** A Peer is a representation of a node's peer. *)
 let create (peer_id : string) : t = { peer_id; metadata = None }

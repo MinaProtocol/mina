@@ -103,6 +103,15 @@ module Set_or_keep = struct
 
   let is_keep = function Keep -> true | _ -> false
 
+  let gen gen_a =
+    let open Quickcheck.Let_syntax in
+    (* with equal probability, return a Set or a Keep *)
+    let%bind b = Quickcheck.Generator.bool in
+    if b then
+      let%bind a = gen_a in
+      return (Set a)
+    else return Keep
+
   [%%ifdef consensus_mechanism]
 
   module Checked : sig
@@ -165,6 +174,15 @@ module Or_ignore = struct
       [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
+
+  let gen gen_a =
+    let open Quickcheck.Let_syntax in
+    (* choose constructor *)
+    let%bind b = Quickcheck.Generator.bool in
+    if b then
+      let%map a = gen_a in
+      Check a
+    else return Ignore
 
   let to_option = function Ignore -> None | Check x -> Some x
 

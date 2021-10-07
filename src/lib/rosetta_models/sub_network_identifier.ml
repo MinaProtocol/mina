@@ -7,7 +7,7 @@
  *)
 
 type t = { network : string; metadata : Yojson.Safe.t option [@default None] }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** In blockchains with sharded state, the SubNetworkIdentifier is required to query some object on a specific shard. This identifier is optional for all non-sharded blockchains. *)
 let create (network : string) : t = { network; metadata = None }

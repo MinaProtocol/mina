@@ -388,6 +388,13 @@ module Inner = struct
         ; two : 'two
         }
       [@@deriving sexp, equal, yojson, hash, compare, fields, hlist]
+
+      let to_latest one_to_latest two_to_latest t =
+        { token_id = t.token_id
+        ; fee_payment = t.fee_payment
+        ; one = one_to_latest t.one
+        ; two = two_to_latest t.two
+        }
     end
   end]
 end
