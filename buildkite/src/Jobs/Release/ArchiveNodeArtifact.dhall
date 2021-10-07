@@ -17,6 +17,7 @@ let dependsOn = [ { name = "ArchiveNodeArtifact", key = "build-archive-deb-pkg" 
 let spec = DockerImage.ReleaseSpec::{
     deps=dependsOn,
     deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
+    version="\\\${MINA_VERSION}",
     step_key="archive-docker-image"
 }
 
