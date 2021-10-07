@@ -1,21 +1,35 @@
-# Ocaml-rs
+# OCaml bindings for Kimchi
 
-We use [OCaml-rs](https://github.com/zshipko/ocaml-rs) to facilitate exporting a Rust library to a static library that can be used from within OCaml. Insead of exporting code directly to a C interface, it makes use of the OCaml runtime directly and can store values and custom types on the OCaml heap.
+To call the [Kimchi](https://github.com/o1-labs/proof-systems) library from OCaml we need to generate bindings. 
+These bindings are written in Rust with the help of two libraries: 
 
-The [docs](https://docs.rs/ocaml/0.22.0/ocaml/) are not great there. This is why we are here.
+* [OCaml-rs](https://github.com/zshipko/ocaml-rs) to facilitate exporting a Rust library to a static library that can be used from within OCaml. Insead of exporting code directly to a C interface, it makes use of the OCaml runtime directly and can also store values and custom types on the OCaml heap.
+* [ocaml-gen](https://github.com/o1-labs/proof-systems) to generate the necessary OCaml code. This library is used in [`binding_generation/`](./binding_generation/).
 
-## Dealing with types
+The bindings are generated automatically via the [`dune`](./dune) file's rule. If you want to generate the OCaml binding manually, you can run the following command:
+
+```shell
+$ cargo +nightly run --manifest-path binding_generation/Cargo.toml
+```
+
+If you follow the command with an `output_file` argument it will write the result to the `output_file`:
+
+```shell
+$ cargo +nightly run --manifest-path binding_generation/Cargo.toml ./here.ml
+```
+
+## Some OCaml-rs guidelines
 
 There are two ways of dealing with types:
 
-1. let OCaml handle your types: use the `ocaml::ToValue` and `ocaml::FromValue` traits to let OCaml transform your types into OCaml types.
+1. let OCaml handle your types: use the `ocaml::ToValue` and `ocaml::FromValue` traits to let OCaml convert your types into OCaml types.
 2. Make it opaque to OCaml: use [custom types](https://ocaml.org/manual/intfc.html#s:c-custom) to store opaque blocks within the OCaml heap. There's the [`ocaml::custom!`](https://docs.rs/ocaml/0.22.0/ocaml/macro.custom.html) macro to help you with that.
 
 The first option is the easiest one, unless there are some foreign types in there. (Because of Rust's [*orphan rule*](https://github.com/Ixrec/rust-orphan-rules)) you can't implement the ToValue and FromValue traits on foreign types.)
 
 This means that you'll have to use the second option anytime you're dealing with foreign types, by wrapping them into a local type and using `custom!`. 
 
-## The ToValue and FromValue traits
+### The ToValue and FromValue traits
 
 In both methods, the [traits ToValue and FromValue](https://github.com/zshipko/ocaml-rs/blob/master/src/value.rs#L55:L73) are used:
 
@@ -34,7 +48,7 @@ these traits are implemented for all primitive Rust types ([here](https://github
 $ cargo expand -- some_filename_without_rs > expanded.rs
 ```
 
-## Custom types
+### Custom types
 
 The macro [custom!](https://github.com/zshipko/ocaml-rs/blob/master/src/custom.rs) allows you to quickly create custom types.
 
@@ -76,15 +90,17 @@ pub fn set(&mut self, x: T) {
 }
 ```
 
-## Conventions
+### Function arguments
 
-* To ease FFI code, we use the `Caml` prefix whenever we're dealing with types that OCaml will be able to understand. This allows to quickly read a function's signature and see that there are only types that support `ocaml::FromValue` and `ocaml::ToValue`.
-* You should not include any value allocated on the OCaml heap within a custom type, otherwise it won't get free'ed by OCaml's GC when the host type gets free'ed. Now, I'm not sure how you could achieve that, but if you end up there think about what you're doing.
-* You should implement a `drop_in_place` finalizer for all custom types. Better be safe than sorry.
+Functions that get exported to OCaml have the choice to be passed a pointer, or a value. 
+If passed a value, then a clone happens.
 
-## TODOs:
+TODO: write some guidelines on using either ocaml::pointer or our own `CamlPointer` type.
 
-- [ ] figure out if we need the vector types (gate_vector, pasta_fp_vector, etc.)
-- [ ] create a better abstraction for caml_pointer (and document it)
-- [ ] be consistent on errors. Do we return Result (throws an exception), do we panic?
-- [ ] run clippy
+### Conventions
+
+* To ease eye'ing at FFI code, we use the `Caml` prefix whenever we're dealing with types that will be converted to OCaml. This allows to quickly read a function's signature and see that there are only types that support `ocaml::FromValue` and `ocaml::ToValue`. You can then implement the `From` trait to the non-ocaml types for facilitating back-and-forth conversions.
+* You should not include any value allocated on the OCaml heap within a custom type, otherwise it won't get free'd by OCaml's GC when the host type gets free'ed. Now, I'm not sure how you could achieve that, but if you end up there think about what you're doing.
+* You should implement a `drop_in_place` finalizer for all custom types. Better be safe than sorry. (TODO: lint on this? or mandate this upstream)
+* If a custom type is large, you can use a `Box` to only store a pointer (pointing to the Rust heap) in the OCaml heap. (TODO: why is this better?)
+* TODO: We do not have good conventions on returning errors or throwing exceptions.
