@@ -6,7 +6,8 @@ These bindings are written in Rust with the help of two libraries:
 * [OCaml-rs](https://github.com/zshipko/ocaml-rs) to facilitate exporting a Rust library to a static library that can be used from within OCaml. Insead of exporting code directly to a C interface, it makes use of the OCaml runtime directly and can also store values and custom types on the OCaml heap.
 * [ocaml-gen](https://github.com/o1-labs/proof-systems) to generate the necessary OCaml code. This library is used in [`binding_generation/`](./binding_generation/).
 
-The bindings are generated automatically via the [`dune`](./dune) file's rule. If you want to generate the OCaml binding manually, you can run the following command:
+The bindings are generated automatically via the [`dune`](./dune) file's rule, and you can find them in `_build/default/src/lib/crypto/kimchi_bindings/stubs/kimchi.ml`. 
+If you want to generate the OCaml binding manually, you can run the following command:
 
 ```shell
 $ cargo +nightly run --manifest-path binding_generation/Cargo.toml

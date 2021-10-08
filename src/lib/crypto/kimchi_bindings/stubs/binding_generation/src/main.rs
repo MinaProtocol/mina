@@ -159,18 +159,16 @@ fn generate_bindings(mut w: impl std::io::Write) {
         });
     });
 
-    decl_module!(w, env, "Pointer", {
-        decl_type!(w, env, CamlPointer<T1> => "t");
-    });
-
     decl_module!(w, env, "FieldVectors", {
         decl_module!(w, env, "Fp", {
+            decl_type!(w, env, CamlPointer<T1> => "t");
             decl_func!(w, env, caml_pasta_fp_vector_create => "create");
             decl_func!(w, env, caml_pasta_fp_vector_length => "length");
             decl_func!(w, env, caml_pasta_fp_vector_emplace_back => "emplace_back");
             decl_func!(w, env, caml_pasta_fp_vector_get => "get");
         });
         decl_module!(w, env, "Fq", {
+            decl_type!(w, env, CamlPointer<T1> => "t");
             decl_func!(w, env, caml_pasta_fq_vector_create => "create");
             decl_func!(w, env, caml_pasta_fq_vector_length => "length");
             decl_func!(w, env, caml_pasta_fq_vector_emplace_back => "emplace_back");
