@@ -1182,7 +1182,7 @@ let start t =
     | None ->
         ()
   in
-  Snark_worker.start t
+  stop_long_running_daemon t ; Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
   let%bind () =
