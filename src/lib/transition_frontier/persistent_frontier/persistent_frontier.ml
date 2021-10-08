@@ -54,8 +54,15 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
       ~expected_merkle_root:(Staged_ledger_hash.ledger_hash staged_ledger_hash)
       ~get_state
   in
+  let is_genesis =
+    External_transition.Validated.consensus_state root_transition
+    |> Consensus.Data.Consensus_state.is_genesis_state
+  in
   let constructed_staged_ledger_hash = Staged_ledger.hash staged_ledger in
-  if Staged_ledger_hash.equal staged_ledger_hash constructed_staged_ledger_hash
+  if
+    is_genesis
+    || Staged_ledger_hash.equal staged_ledger_hash
+         constructed_staged_ledger_hash
   then Deferred.return (Ok staged_ledger)
   else
     Deferred.return
