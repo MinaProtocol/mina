@@ -1,3 +1,3 @@
-module Zexe_backend_common = Zexe_backend_common
-module Field = Zexe_backend_common.Field
+module kimchi_backend_common = kimchi_backend_common
+module Field = kimchi_backend_common.Field
 module Pasta = Pasta

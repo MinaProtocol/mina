@@ -1,6 +1,5 @@
 open Core_kernel
-open Marlin_plonk_bindings
-open Zexe_backend_common
+open kimchi_backend_common
 
 (** ? *)
 module Rounds : sig
@@ -69,7 +68,7 @@ end = struct
 end
 
 module Bigint256 =
-  Zexe_backend_common.Bigint.Make
+  kimchi_backend_common.Bigint.Make
     (Bigint_256)
     (struct
       let length_in_bytes = 32
@@ -111,7 +110,7 @@ module Pallas = struct
   include Curve.Make (Fp) (Fq) (Params) (Pasta_pallas)
 end
 
-module Fq_poly_comm = Zexe_backend_common.Poly_comm.Make (struct
+module Fq_poly_comm = kimchi_backend_common.Poly_comm.Make (struct
   module Curve = Pallas
   module Base_field = Fp
 
@@ -126,7 +125,7 @@ module Fq_poly_comm = Zexe_backend_common.Poly_comm.Make (struct
   end
 end)
 
-module Fp_poly_comm = Zexe_backend_common.Poly_comm.Make (struct
+module Fp_poly_comm = kimchi_backend_common.Poly_comm.Make (struct
   module Curve = Vesta
   module Base_field = Fq
 

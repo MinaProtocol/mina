@@ -1,5 +1,5 @@
 open Core_kernel
-open Zexe_backend_common
+open kimchi_backend_common
 open Basic
 module Field = Fp
 module Curve = Vesta
