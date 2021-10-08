@@ -1,5 +1,5 @@
 open Core_kernel
-open kimchi_backend_common
+open Kimchi_backend_common
 
 (** ? *)
 module Rounds : sig
@@ -68,22 +68,22 @@ end = struct
 end
 
 module Bigint256 =
-  kimchi_backend_common.Bigint.Make
-    (Bigint_256)
+  Kimchi_backend_common.Bigint.Make
+    (Kimchi.Foundations.BigInt256)
     (struct
       let length_in_bytes = 32
     end)
 
 module Fp = Field.Make (struct
   module Bigint = Bigint256
-  include Pasta_fp
-  module Vector = Pasta_fp_vector
+  include Kimchi.Foundations.Fp
+  module Vector = Kimchi.FieldVectors.Fp
 end)
 
 module Fq = Field.Make (struct
   module Bigint = Bigint256
-  include Pasta_fq
-  module Vector = Pasta_fq_vector
+  include Kimchi.Foundations.Fq
+  module Vector = Kimchi.FieldVectors.Fq
 end)
 
 module Vesta = struct
@@ -95,7 +95,7 @@ module Vesta = struct
     let b = of_int 5
   end
 
-  include Curve.Make (Fq) (Fp) (Params) (Pasta_vesta)
+  include Curve.Make (Fq) (Fp) (Params) (Kimchi.Vesta)
 end
 
 module Pallas = struct
@@ -107,10 +107,10 @@ module Pallas = struct
     let b = of_int 5
   end
 
-  include Curve.Make (Fp) (Fq) (Params) (Pasta_pallas)
+  include Curve.Make (Fp) (Fq) (Params) (Kimchi.Pallas)
 end
 
-module Fq_poly_comm = kimchi_backend_common.Poly_comm.Make (struct
+module Fq_poly_comm = Kimchi_backend_common.Poly_comm.Make (struct
   module Curve = Pallas
   module Base_field = Fp
 
@@ -125,7 +125,7 @@ module Fq_poly_comm = kimchi_backend_common.Poly_comm.Make (struct
   end
 end)
 
-module Fp_poly_comm = kimchi_backend_common.Poly_comm.Make (struct
+module Fp_poly_comm = Kimchi_backend_common.Poly_comm.Make (struct
   module Curve = Vesta
   module Base_field = Fq
 

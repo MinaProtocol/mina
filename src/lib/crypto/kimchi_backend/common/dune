@@ -17,7 +17,7 @@
   hex
   digestif
   pickles_types
-  marlin_plonk_bindings
+  kimchi
   key_cache
   sgn_type
   snarky.backendless

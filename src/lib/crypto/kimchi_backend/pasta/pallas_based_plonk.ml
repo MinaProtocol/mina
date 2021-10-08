@@ -1,5 +1,5 @@
 open Core_kernel
-open kimchi_backend_common
+open Kimchi_backend_common
 open Basic
 module Field = Fq
 module Curve = Pallas

@@ -30,18 +30,17 @@ module Row = struct
         i + public_input_size
 end
 
+type 'row wired_to = { 
+  row : 'row;
+  col : int;
+}
+
 (** A specification for a gate type *)
 module Gate_spec = struct
   type ('row, 'f) t =
-    { kind : Plonk_gate.Kind.t
+    { kind : Kimchi.Protocol.gate_type
           (* TODO: what do these fields represent? I think permutation? *)
-    ; row : 'row
-    ; lrow : 'row
-    ; lcol : Plonk_gate.Col.t
-    ; rrow : 'row
-    ; rcol : Plonk_gate.Col.t
-    ; orow : 'row
-    ; ocol : Plonk_gate.Col.t (* constants (e.g. Poseidon round constants) *)
+    ; wired_to : ('row wired_to) array
     ; coeffs : 'f array
     }
 
@@ -73,6 +72,7 @@ module Plonk_constraint = struct
       | Basic of { l : 'f * 'v; r : 'f * 'v; o : 'f * 'v; m : 'f; c : 'f }
       | Poseidon of { state : 'v array array }
       | EC_add of { p1 : 'v * 'v; p2 : 'v * 'v; p3 : 'v * 'v }
+      | EC_double
       | EC_scale of { state : 'v Scale_round.t array }
       | EC_endoscale of { state : 'v Endoscale_round.t array }
     [@@deriving sexp]
@@ -88,6 +88,7 @@ module Plonk_constraint = struct
           Poseidon { state = Array.map ~f:(fun x -> Array.map ~f x) state }
       | EC_add { p1; p2; p3 } ->
           EC_add { p1 = fp p1; p2 = fp p2; p3 = fp p3 }
+      | EC_double -> EC_double 
       | EC_scale { state } ->
           EC_scale
             { state = Array.map ~f:(fun x -> Scale_round.map ~f x) state }
@@ -136,7 +137,7 @@ end
 
 (** A position is a row and a column *)
 module Position = struct
-  type t = { row : Row.t; col : Plonk_gate.Col.t }
+  type t = { row : Row.t; col : int }
 end
 
 (* TODO: what is this? a counter? *)
@@ -200,6 +201,7 @@ let digest (t : _ t) = Hash_state.digest t.hash
 (* TODO: zk_rows is specified on the Rust side now, so I don't think we need this here for the permutation AT LEAST. This should be specified on the Rust side for other polynomials like the wires *)
 
 (** The number of rows used *)
+(* TODO: is this 3 or 2? *)
 let zk_rows = 2
 
 (* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
@@ -384,11 +386,9 @@ struct
 
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.
-      If a {row; col} element already exists, 
-      it replaces it and returns the replaced value.
       The row must be given relative to the start of the circuit 
       (so at the start of the public-input rows). *)
-  let wire' sys key row col =
+  let wire' sys key row (col: int) =
     let prev =
       match V.Table.find sys.equivalence_classes key with
       | Some x -> (
@@ -421,18 +421,16 @@ struct
         let pub = [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero |] in
         let pub_input_gate_specs_rev = ref [] in
         for row = 0 to n - 1 do
-          let lp = wire' sys (V.External (row + 1)) (Row.Public_input row) L in
+          let lp = wire' sys (V.External (row + 1)) (Row.Public_input row) 0 in
           let lp_row = Row.to_absolute ~public_input_size:n lp.row in
+          let public_gate =
+            let lp = { row = lp_row ; col = lp.col } in
+            Array.append [| lp |] (Array.init 14 ~f:(fun i -> { row; col=i + 1 }))
+          in
           (* Add to the gate vector *)
           pub_input_gate_specs_rev :=
             { Gate_spec.kind = Generic
-            ; row
-            ; lrow = lp_row
-            ; lcol = lp.col
-            ; rrow = row
-            ; rcol = R
-            ; orow = row
-            ; ocol = O
+            ; wired_to = public_gate
             ; coeffs = pub
             }
             :: !pub_input_gate_specs_rev
@@ -518,7 +516,7 @@ struct
         Some (List.rev ((acc, i) :: ts), n + 1, has_constant_term)
 
   (** Adds a row/gate/constraint manually *)
-  let add_row sys row kind l r o c =
+  let add_row sys rows kind (wired_to: _ wired_to array) coeffs =
     match sys.gates with
     | `Finalized ->
         failwith "add_row called on finalized constraint system"
@@ -528,17 +526,12 @@ struct
           `Unfinalized_rev
             ( { kind
               ; row = After_public_input sys.next_row
-              ; lrow = l.row
-              ; lcol = l.col
-              ; rrow = r.row
-              ; rcol = r.col
-              ; orow = o.row
-              ; ocol = o.col
-              ; coeffs = c
+              ; wired_to
+              ; coeffs
               }
             :: gates ) ;
         sys.next_row <- sys.next_row + 1 ;
-        sys.rows_rev <- row :: sys.rows_rev
+        sys.rows_rev <- rows :: sys.rows_rev
 
   (* TODO: add more granular functions than general add_generic_constraint? *)
 
@@ -667,16 +660,6 @@ struct
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )
         Snarky_backendless.Constraint.basic) =
-    let index_to_col = function
-      | 0 ->
-          Plonk_gate.Col.L
-      | 1 ->
-          Plonk_gate.Col.R
-      | 2 ->
-          Plonk_gate.Col.O
-      | _ ->
-          failwith "wrong column index used"
-    in
     sys.hash <- feed_constraint sys.hash constr ;
     let red = reduce_lincom sys in
     (* reduce any [Cvar.t] to a single internal variable *)
@@ -852,6 +835,9 @@ struct
         add_generic_constraint ?l:(var l) ?r:(var r) ?o:(var o)
           [| coeff l; coeff r; coeff o; m; !c |]
           sys
+    (* | w0 | w1 | w2 | w3 | w4 | w5 
+         x    x     x   y    y    y
+    *)
     | Plonk_constraint.T (Poseidon { state }) ->
         let reduce_state sys (s : Fp.t Snarky_backendless.Cvar.t array array) :
             V.t array array =
@@ -861,7 +847,7 @@ struct
         let add_round_state array ind =
           let prev =
             Array.mapi array ~f:(fun i x ->
-                wire sys x sys.next_row (index_to_col i))
+                wire sys x sys.next_row i)
           in
           add_row sys
             (Array.map array ~f:(fun x -> Some x))
@@ -870,7 +856,7 @@ struct
         in
         Array.iteri
           ~f:(fun i perm ->
-            if i = Array.length state - 1 then
+            if i = Array.length state - 1 then (* last row is zero gate *)
               let prev =
                 Array.mapi perm ~f:(fun i x ->
                     wire sys x sys.next_row (index_to_col i))

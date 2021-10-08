@@ -17,13 +17,13 @@ module type Bindings = sig
 
   val to_string : t -> string
 
-  val of_numeral : string -> int -> int -> t
+  val of_numeral : bytes -> int -> int -> t
 
-  val of_decimal_string : string -> t
+  val of_decimal_string : bytes -> t
 
-  val to_bytes : t -> Bytes.t
+  val to_bytes : t -> bytes
 
-  val of_bytes : Bytes.t -> t
+  val of_bytes : bytes -> t
 end
 
 module type Intf = sig
@@ -109,5 +109,7 @@ module Make
       of_bytes bytes
   end)
 
-  let of_numeral s ~base = of_numeral s (String.length s) base
+  let of_numeral s ~base =
+    let s = Bytes.of_string s in
+    of_numeral s (Bytes.length s) base
 end

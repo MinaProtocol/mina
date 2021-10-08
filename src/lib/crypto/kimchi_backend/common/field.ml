@@ -41,9 +41,9 @@ module type Input_intf = sig
 
   val print : t -> unit
 
-  val to_string : t -> string
+  val to_string : t -> bytes
 
-  val of_string : string -> t
+  val of_string : bytes -> t
 
   val random : unit -> t
 
@@ -61,9 +61,9 @@ module type Input_intf = sig
 
   val copy : over:t -> t -> unit
 
-  val to_bytes : t -> Bytes.t
+  val to_bytes : t -> bytes
 
-  val of_bytes : Bytes.t -> t
+  val of_bytes : bytes -> t
 
   val domain_generator : int -> t
 
