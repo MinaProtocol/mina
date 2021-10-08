@@ -1,4 +1,4 @@
-module node_status_collection_backend
+module backend_utilities
 
 go 1.16
 
