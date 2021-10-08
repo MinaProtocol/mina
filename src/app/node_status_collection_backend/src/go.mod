@@ -7,7 +7,9 @@ require (
 	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/ipfs/go-log/v2 v2.3.0 // indirect
 	github.com/opentracing/opentracing-go v1.1.0 // indirect
-	backend_utilities v0.0.0
+	backend_utilities/misc v0.0.0
+	backend_utilities/counter v0.0.0
 )
 
-replace backend_utilities => ../../../backend_utilities
+replace backend_utilities/misc => ../../../backend_utilities/misc
+replace backend_utilities/counter => ../../../backend_utilities/counter

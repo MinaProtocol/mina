@@ -1,4 +1,4 @@
-package delegation_backend
+package counter
 
 import (
 	"math/rand"

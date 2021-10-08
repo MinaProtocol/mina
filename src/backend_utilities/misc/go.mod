@@ -1,4 +1,4 @@
-module backend_utilities
+module backend_utilities/misc
 
 go 1.16
 

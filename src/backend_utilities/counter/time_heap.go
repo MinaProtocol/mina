@@ -1,4 +1,4 @@
-package delegation_backend
+package counter
 
 import (
 	"container/heap"
@@ -6,13 +6,15 @@ import (
 	"time"
 )
 
+type Key interface{}
+
 const minusOneHour time.Duration = -60 * 60 * 1000000000
 
 type timeHeap []time.Time
 type nowFunc = func() time.Time
 
 type AttemptCounter struct {
-	attempts   map[Pk]*timeHeap
+	attempts   map[Key]*timeHeap
 	maxAttempt int
 	mutex      sync.Mutex
 	now        nowFunc
@@ -45,7 +47,7 @@ func (h *timeHeap) Pop() interface{} {
 func NewAttemptCounter(maxAttemptPerHour int) *AttemptCounter {
 	th := new(AttemptCounter)
 	th.maxAttempt = maxAttemptPerHour
-	th.attempts = make(map[Pk]*timeHeap)
+	th.attempts = make(map[Key]*timeHeap)
 	th.now = func() time.Time { return time.Now() }
 	return th
 }
@@ -53,7 +55,7 @@ func NewAttemptCounter(maxAttemptPerHour int) *AttemptCounter {
 // Record attempt to access the service
 // Returns `true` if attempt was successfully recorded
 // or `false` if amount of attempts per Pk per hour exceeded.
-func (h *AttemptCounter) RecordAttempt(pk Pk) bool {
+func (h *AttemptCounter) RecordAttempt(pk Key) bool {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	curTime := h.now()
