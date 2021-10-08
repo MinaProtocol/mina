@@ -27,8 +27,8 @@ import (
 )
 
 var (
-	testTimeout  = 10 * time.Second
-	testProtocol = protocol.ID("/mina/")
+	defaultTestTimeout = 10 * time.Second
+	testProtocol       = protocol.ID("/mina/")
 )
 
 var testPort uint16 = 7000
@@ -82,10 +82,13 @@ func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool,
 		ValidatorMutex:           &sync.Mutex{},
 		Validators:               make(map[uint64]*validationStatus),
 		Streams:                  make(map[uint64]net.Stream),
+		StreamStates:             make(map[uint64]streamState),
+		StreamsMutex:             sync.Mutex{},
 		AddedPeers:               make([]peer.AddrInfo, 0, 512),
 		OutChan:                  make(chan *capnp.Message, 64),
 		MetricsRefreshTime:       time.Second * 2,
 		NoUpcalls:                noUpcalls,
+		messageBufferPool:        newMessageBufferPool(),
 		metricsServer:            nil,
 		metricsCollectionStarted: false,
 	}
@@ -126,6 +129,69 @@ func multiaddrs(h host.Host) (multiaddrs []ma.Multiaddr) {
 	return multiaddrs
 }
 
+func testDirectionalStream(t *testing.T, from *app, to *app, f func(net.Stream)) {
+	done := make(chan struct{})
+	to.P2p.Host.SetStreamHandler(testProtocol, func(stream net.Stream) {
+		handleStreamReads(to, stream, 0)
+		close(done)
+	})
+
+	stream, err := from.P2p.Host.NewStream(context.Background(), to.P2p.Host.ID(), testProtocol)
+	require.NoError(t, err)
+
+	f(stream)
+
+	err = stream.Close()
+	require.NoError(t, err)
+
+	<-done
+}
+
+func encodeStreamMessage(msg []byte) []byte {
+	lenBytes := uint64ToLEB128(uint64(len(msg)))
+	encodedMsg := make([]byte, len(lenBytes)+len(msg))
+	copy(encodedMsg[:len(lenBytes)], lenBytes)
+	copy(encodedMsg[len(lenBytes):], msg)
+	return encodedMsg
+}
+
+func sendStreamMessage(t *testing.T, stream net.Stream, msg []byte) {
+	_, err := stream.Write(encodeStreamMessage(msg))
+	require.NoError(t, err)
+}
+
+func waitForMessage(t *testing.T, app *app, expectedMessageSize uint64) []byte {
+	receivedMessage := make([]byte, 0)
+	withTimeout(t, func() {
+		for uint64(len(receivedMessage)) < expectedMessageSize {
+			rawMsg := <-app.OutChan
+			require.NotEmpty(t, rawMsg)
+			imsg, err := ipc.ReadRootDaemonInterface_Message(rawMsg)
+			require.NoError(t, err)
+			if !imsg.HasPushMessage() {
+				continue
+			}
+			pmsg, err := imsg.PushMessage()
+			require.NoError(t, err)
+			if pmsg.HasStreamComplete() {
+				return
+			} else if pmsg.HasStreamMessageReceived() {
+				smr, err := pmsg.StreamMessageReceived()
+				require.NoError(t, err)
+				msg, err := smr.Msg()
+				require.NoError(t, err)
+				data, err := msg.Data()
+				require.NoError(t, err)
+				receivedMessage = append(receivedMessage, data...)
+			}
+		}
+
+		require.Equal(t, uint64(len(receivedMessage)), expectedMessageSize)
+	}, "did not receive all expected messages")
+
+	return receivedMessage
+}
+
 func checkRpcResponseError(t *testing.T, resMsg *capnp.Message) (uint64, string) {
 	msg, err := ipc.ReadRootDaemonInterface_Message(resMsg)
 	require.NoError(t, err)
@@ -148,6 +214,14 @@ func checkRpcResponseSuccess(t *testing.T, resMsg *capnp.Message) (uint64, ipc.L
 	require.True(t, msg.HasRpcResponse())
 	resp, err := msg.RpcResponse()
 	require.NoError(t, err)
+	if resp.HasError() {
+		respError, err := resp.Error()
+		require.NoError(t, err)
+		require.FailNowf(t, "unexpected RPC error", respError)
+	} else if !resp.HasSuccess() {
+		require.FailNow(t, "received invalid RPC response")
+	}
+
 	require.True(t, resp.HasSuccess())
 	header, err := resp.Header()
 	require.NoError(t, err)
@@ -181,17 +255,25 @@ func beginAdvertisingSendAndCheck(t *testing.T, app *app) {
 }
 
 func withTimeout(t *testing.T, run func(), timeoutMsg string) {
-	withTimeoutAsync(t, func(done chan interface{}) {
+	withSpecificTimeout(t, run, defaultTestTimeout, timeoutMsg)
+}
+
+func withSpecificTimeout(t *testing.T, run func(), timeout time.Duration, timeoutMsg string) {
+	withSpecificTimeoutAsync(t, func(done chan interface{}) {
 		defer close(done)
 		run()
-	}, timeoutMsg)
+	}, timeout, timeoutMsg)
 }
 
 func withTimeoutAsync(t *testing.T, registerDone func(done chan interface{}), timeoutMsg string) {
+	withSpecificTimeoutAsync(t, registerDone, defaultTestTimeout, timeoutMsg)
+}
+
+func withSpecificTimeoutAsync(t *testing.T, registerDone func(done chan interface{}), timeout time.Duration, timeoutMsg string) {
 	done := make(chan interface{})
 	go registerDone(done)
 	select {
-	case <-time.After(testTimeout):
+	case <-time.After(timeout):
 		close(done)
 		t.Fatal(timeoutMsg)
 	case <-done:

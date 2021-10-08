@@ -59,8 +59,7 @@ struct
                   Deferred.Result.fail exn
             in
             if should_reask then read_until_correct () else read_file ()
-          else
-            Deferred.Result.fail (`Password_not_in_environment [env])
+          else Deferred.Result.fail (`Password_not_in_environment [ env ])
     in
     match result with
     | Ok result ->

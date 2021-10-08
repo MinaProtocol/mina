@@ -136,6 +136,7 @@ func (m OpenStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
 	app.Streams[streamIdx] = stream
+	app.StreamStates[streamIdx] = STREAM_DATA_EXPECTED
 	go func() {
 		// FIXME HACK: allow time for the openStreamResult to get printed before we start inserting stream events
 		time.Sleep(250 * time.Millisecond)
@@ -240,11 +241,17 @@ func (m SendStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[streamId]; ok {
+		msgLen := uint64(len(data))
+		lenBytes := uint64ToLEB128(msgLen)
+		data = append(lenBytes, data...)
+
 		n, err := stream.Write(data)
 		if err != nil {
 			// TODO check that it's correct to error out, not repeat writing
 			return mkRpcRespError(seqno, wrapError(badp2p(err), fmt.Sprintf("only wrote %d out of %d bytes", n, len(data))))
 		}
+
+		app.StreamStates[streamId] = STREAM_DATA_EXPECTED
 		return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
 			_, err := m.NewSendStream()
 			panicOnErr(err)

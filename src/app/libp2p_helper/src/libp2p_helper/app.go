@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	ipc "libp2p_ipc"
+
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
 	net "github.com/libp2p/go-libp2p-core/network"
@@ -19,8 +21,15 @@ import (
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/prometheus/client_golang/prometheus"
-	ipc "libp2p_ipc"
 )
+
+func min(a, b uint64) uint64 {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
+}
 
 func newApp() *app {
 	return &app{
@@ -31,10 +40,13 @@ func newApp() *app {
 		ValidatorMutex:           &sync.Mutex{},
 		Validators:               make(map[uint64]*validationStatus),
 		Streams:                  make(map[uint64]net.Stream),
+		StreamStates:             make(map[uint64]streamState),
+		StreamsMutex:             sync.Mutex{},
 		OutChan:                  make(chan *capnp.Message, 64),
 		Out:                      bufio.NewWriter(os.Stdout),
 		AddedPeers:               []peer.AddrInfo{},
 		MetricsRefreshTime:       time.Minute,
+		messageBufferPool:        newMessageBufferPool(),
 		metricsCollectionStarted: false,
 		metricsServer:            nil,
 	}
@@ -300,32 +312,56 @@ func setMultiaddrList(m ipc.Multiaddr_List, addrs []multiaddr.Multiaddr) {
 }
 
 func handleStreamReads(app *app, stream net.Stream, idx uint64) {
+	// create buffer stream for non-blocking read
+	r := bufio.NewReader(stream)
+	buffer := app.messageBufferPool.Get()
+
 	go func() {
-		buf := make([]byte, 4096)
-		tot := uint64(0)
 		for {
-			n, err := stream.Read(buf)
-
-			if n != 0 {
-				app.writeMsg(mkStreamMessageReceivedUpcall(idx, buf[:n]))
-			}
-
-			if err != nil && err != io.EOF {
+			length, err := readLEB128ToUint64(r)
+			if err == io.EOF {
+				app.writeMsg(mkStreamCompleteUpcall(idx))
+				stream.Close()
+				return
+			} else if err != nil {
 				app.writeMsg(mkStreamLostUpcall(idx, fmt.Sprintf("read failure: %s", err.Error())))
+				return
+			} else if length > MAX_MESSAGE_LENGTH {
+				app.writeMsg(mkStreamLostUpcall(idx, fmt.Sprintf("message length too long: %d", length)))
 				return
 			}
 
-			tot += uint64(n)
-
-			if err == io.EOF {
-				app.P2p.MsgStats.UpdateMetrics(tot)
-				break
+			if length == 0 {
+				app.writeMsg(mkStreamLostUpcall(idx, "invalid length prefix byte (cannot be 0)"))
+				return
 			}
-		}
-		app.writeMsg(mkStreamCompleteUpcall(idx))
-		err := stream.Close()
-		if err != nil {
-			app.P2p.Logger.Warning("Error while closing the stream: ", err.Error())
+
+			app.StreamsMutex.Lock()
+			streamState := app.StreamStates[idx]
+			if streamState == STREAM_DATA_EXPECTED {
+				app.StreamStates[idx] = STREAM_DATA_UNEXPECTED
+			} else {
+				app.writeMsg(mkStreamLostUpcall(idx, "received new message before we responded to previous message"))
+				app.StreamsMutex.Unlock()
+				return
+			}
+			app.StreamsMutex.Unlock()
+
+			app.P2p.MsgStats.UpdateMetrics(length)
+
+			bytesToRead := length
+			for bytesToRead > 0 {
+				bufferReadSize := min(MESSAGE_BUFFER_SIZE, bytesToRead)
+				n, err := io.ReadFull(r, buffer[:bufferReadSize])
+				if err != nil {
+					app.writeMsg(mkStreamLostUpcall(idx, fmt.Sprintf("read failure: %s, read %d bytes", err.Error(), n)))
+					return
+				}
+
+				// shouldn't need to worry about underflow here
+				bytesToRead -= bufferReadSize
+				app.writeMsg(mkStreamMessageReceivedUpcall(idx, buffer[:bufferReadSize]))
+			}
 		}
 	}()
 }

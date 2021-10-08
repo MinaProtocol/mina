@@ -121,27 +121,26 @@ func TestValidationPush(t *testing.T) {
 		pubsub.ValidationIgnore,
 	}
 
-	for i := 0; i < len(ipcValResults); i++ {
-		result := ValidationUnknown
-		seqno := uint64(i)
-		status := &validationStatus{
-			Completion: make(chan pubsub.ValidationResult),
+	withTimeout(t, func() {
+		for i := 0; i < len(ipcValResults); i++ {
+			seqno := uint64(i)
+			status := &validationStatus{
+				Completion: make(chan pubsub.ValidationResult, 1),
+			}
+			testApp.Validators[seqno] = status
+			_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+			require.NoError(t, err)
+			m, err := ipc.NewRootLibp2pHelperInterface_Validation(seg)
+			require.NoError(t, err)
+			validationId, err := m.NewValidationId()
+			require.NoError(t, err)
+			validationId.SetId(seqno)
+			m.SetResult(ipcValResults[i])
+			testApp.handleValidation(m)
+			result := <-status.Completion
+			require.Equal(t, pubsubValResults[i], result)
+			_, has := testApp.Validators[seqno]
+			require.False(t, has)
 		}
-		testApp.Validators[seqno] = status
-		go func() {
-			result = <-status.Completion
-		}()
-		_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
-		require.NoError(t, err)
-		m, err := ipc.NewRootLibp2pHelperInterface_Validation(seg)
-		require.NoError(t, err)
-		validationId, err := m.NewValidationId()
-		validationId.SetId(seqno)
-		m.SetResult(ipcValResults[i])
-		testApp.handleValidation(m)
-		require.NoError(t, err)
-		require.Equal(t, pubsubValResults[i], result)
-		_, has := testApp.Validators[seqno]
-		require.False(t, has)
-	}
+	}, "some validations were never completed")
 }

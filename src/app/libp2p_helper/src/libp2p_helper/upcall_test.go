@@ -87,11 +87,15 @@ func feedUpcallTrap(logf func(format string, args ...interface{}), out chan *cap
 				}
 				trap.IncomingStream <- m
 			} else if pmsg.HasStreamLost() {
-				logf("%s: Stream lost", trap.Tag)
 				m, err := pmsg.StreamLost()
 				if err != nil {
 					return err
 				}
+				reason, err := m.Reason()
+				if err != nil {
+					return err
+				}
+				logf("%s: Stream lost (%s)", trap.Tag, reason)
 				trap.StreamLost <- m
 			} else if pmsg.HasStreamComplete() {
 				logf("%s: Stream complete", trap.Tag)
@@ -169,10 +173,8 @@ func TestUpcalls(t *testing.T) {
 
 		// Bob connects to Carol
 		testAddPeerImplDo(t, bob, carolInfo, true)
-		t.Logf("peer connected: waiting bob <-> carol")
 		checkPeerConnected(t, <-cTrap.PeerConnected, bobInfo)
 		checkPeerConnected(t, <-bTrap.PeerConnected, carolInfo)
-		t.Logf("peer connected: performed bob <-> carol")
 
 		_ = carolPort
 		select {
@@ -180,13 +182,14 @@ func TestUpcalls(t *testing.T) {
 			t.Fatal("Peer connected to Alice (unexpectedly)")
 		default:
 		}
+
 		// Bob initiates and then closes connection to Carol
 		_, cStreamId1 := testStreamOpenSend(t, bob, bobPort, carol, carolPort, 11920, newProtocol, bTrap, cTrap)
-
 		// Alice initiates and then resets connection to Bob
 		testStreamOpenSendReset(t, alice, alicePort, bob, bobPort, 11930, newProtocol, aTrap, bTrap)
 		// Bob initiates and then resets connection to Alice
 		testStreamOpenSendReset(t, bob, bobPort, alice, alicePort, 11940, newProtocol, bTrap, aTrap)
+
 		require.NoError(t, bob.P2p.Host.Close())
 		for {
 			t.Logf("awaiting disconnect from Alice ...")
@@ -266,16 +269,19 @@ func testStreamOpenSendClose(t *testing.T, appA *app, appAPort uint16, appB *app
 
 	// Send a message from A to B
 	msg1 := []byte("somedata")
+	appB.StreamStates[bStreamId] = STREAM_DATA_EXPECTED
 	testSendStreamDo(t, appA, aStreamId, msg1, rpcSeqno+1)
 	checkStreamMessageReceived(t, <-bTrap.StreamMessageReceived, bStreamId, msg1)
 
 	// Send a message from A to B
+	appB.StreamStates[bStreamId] = STREAM_DATA_EXPECTED
 	msg2 := []byte("otherdata")
 	testSendStreamDo(t, appA, aStreamId, msg2, rpcSeqno+2)
 	checkStreamMessageReceived(t, <-bTrap.StreamMessageReceived, bStreamId, msg2)
 
 	// Send a message from B to A
 	msg3 := []byte("reply")
+	appA.StreamStates[aStreamId] = STREAM_DATA_EXPECTED
 	testSendStreamDo(t, appB, bStreamId, msg3, rpcSeqno+3)
 	checkStreamMessageReceived(t, <-aTrap.StreamMessageReceived, aStreamId, msg3)
 

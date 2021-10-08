@@ -167,6 +167,8 @@ let%test_module "coda network tests" =
           open_protocol b ~on_handler_error:`Raise ~protocol:"echo"
             (fun stream ->
               let r, w = Libp2p_stream.pipes stream in
+              (* Prime the pipe by writing to it, in lieu of an RPC menu. *)
+              let () = Pipe.write_without_pushback w "1" in
               let%map () = Pipe.transfer r w ~f:Fn.id in
               Pipe.close w ;
               Ivar.fill_if_empty handler_finished ())
@@ -176,14 +178,16 @@ let%test_module "coda network tests" =
           open_stream c ~protocol:"echo" ~peer:b_peerid >>| Or_error.ok_exn
         in
         let r, w = Libp2p_stream.pipes stream in
+        let%bind _fake_rpc_menu = Pipe.read r in
         Pipe.write_without_pushback w testmsg ;
         Pipe.close w ;
         (* HACK: let our messages send before we reset.
            It would be more principled to add synchronization. *)
         let%bind () = after (Time.Span.of_sec 1.) in
         let%bind () = reset_stream c stream >>| Or_error.ok_exn in
-        let%bind msg = Pipe.read_all r in
-        let msg = Queue.to_list msg |> String.concat in
+        let%bind msg =
+          match%map Pipe.read r with `Ok x -> x | `Eof -> failwith "eof"
+        in
         assert (String.equal msg testmsg) ;
         let%bind () = Ivar.read handler_finished in
         let%bind () = close_protocol b ~protocol:"echo" in
