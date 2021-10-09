@@ -36,6 +36,7 @@ module Generator : sig
        precomputed_values:Precomputed_values.t
     -> verifier:Verifier.t
     -> max_frontier_length:int
+    -> use_super_catchup:bool
     -> peer_state Generator.t
 
   val fresh_peer : peer_config
@@ -46,6 +47,7 @@ module Generator : sig
        precomputed_values:Precomputed_values.t
     -> verifier:Verifier.t
     -> max_frontier_length:int
+    -> use_super_catchup:bool
     -> (peer_config, 'n num_peers) Vect.t
     -> 'n num_peers t Generator.t
 end
