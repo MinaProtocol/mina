@@ -142,6 +142,7 @@ let run_test () : unit Deferred.t =
               ; client_port
               }
           ; trust_system
+          ; min_connections = 20
           ; max_connections = 50
           ; validation_queue_size = 150
           ; keypair = None

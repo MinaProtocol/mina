@@ -32,6 +32,7 @@ module Config = struct
     ; peer_exchange : bool
     ; mina_peer_exchange : bool
     ; seed_peer_list_url : Uri.t option
+    ; min_connections : int
     ; max_connections : int
     ; validation_queue_size : int
     ; mutable keypair : Mina_net2.Keypair.t option
@@ -242,6 +243,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 ~peer_exchange:config.peer_exchange
                 ~mina_peer_exchange:config.mina_peer_exchange
                 ~flooding:config.flooding
+                ~min_connections:config.min_connections
                 ~max_connections:config.max_connections
                 ~validation_queue_size:config.validation_queue_size
                 ~initial_gating_config:

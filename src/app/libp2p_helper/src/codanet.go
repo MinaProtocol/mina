@@ -109,11 +109,11 @@ type CodaConnectionManager struct {
 	OnDisconnect     func(network.Network, network.Conn)
 }
 
-func newCodaConnectionManager(maxConnections int, minaPeerExchange bool) *CodaConnectionManager {
+func newCodaConnectionManager(minConnections, maxConnections int, minaPeerExchange bool) *CodaConnectionManager {
 	noop := func(net network.Network, c network.Conn) {}
 
 	return &CodaConnectionManager{
-		p2pManager:       p2pconnmgr.NewConnManager(25, maxConnections, time.Duration(1*time.Millisecond)),
+		p2pManager:       p2pconnmgr.NewConnManager(minConnections, maxConnections, time.Duration(1*time.Millisecond)),
 		OnConnect:        noop,
 		OnDisconnect:     noop,
 		minaPeerExchange: minaPeerExchange,
@@ -761,7 +761,7 @@ func (h Helper) pxConnectionWorker() {
 }
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, maxConnections int, minaPeerExchange bool) (*Helper, error) {
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, minConnections, maxConnections int, minaPeerExchange bool) (*Helper, error) {
 	me, err := peer.IDFromPrivateKey(pk)
 	if err != nil {
 		return nil, err
@@ -798,7 +798,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	mplex.MaxMessageSize = 1 << 30
 
-	connManager := newCodaConnectionManager(maxConnections, minaPeerExchange)
+	connManager := newCodaConnectionManager(minConnections, maxConnections, minaPeerExchange)
 	bandwidthCounter := metrics.NewBandwidthCounter()
 
 	host, err := p2p.New(ctx,
@@ -842,7 +842,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	// 256MiB, a large enough mmap size to make mmap grow() a rare event
 	opt := lmdbbs.Options{
-		Path:            path.Join(statedir, "libp2p-lmdb-store"),
+		Path:            path.Join(statedir, "block-db"),
 		InitialMmapSize: 256 << 20,
 		CidToKeyMapper:  cidToKeyMapper,
 		KeyToCidMapper:  keyToCidMapper,

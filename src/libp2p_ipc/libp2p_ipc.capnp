@@ -72,6 +72,14 @@ struct Libp2pConfig {
   maxConnections @12 :UInt32;
   validationQueueSize @13 :UInt32;
   minaPeerExchange @14 :Bool;
+  minConnections @15 :UInt32;
+  bitswapConfig @16 :BitswapConfig;
+}
+
+struct BitswapConfig {
+  rootDownloadTimeout @0 :Duration;
+  maxBlockSize @1 :UInt32;
+  maxBlockTreeDepth @2 :UInt8;
 }
 
 # Resource status updated
@@ -92,6 +100,9 @@ struct StreamMessage {
   data @1 :Data;
 }
 
+struct Duration {
+  nanoSec @0 :UInt64;
+}
 # Unix timestamp in nanoseconds
 struct UnixNano {
   nanoSec @0 :Int64;
