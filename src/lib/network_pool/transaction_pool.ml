@@ -689,6 +689,7 @@ struct
         Gauge.set Transaction_pool.pool_size
           (Float.of_int (Indexed_pool.size pool))) ;
       t.pool <- pool ;
+      [%log' debug t.logger] !"Finished updating pool." ;
       Deferred.unit
 
     let create ~constraint_constants ~consensus_constants ~time_controller
