@@ -1,14 +1,23 @@
-Consensus
----------
+Ouroboros Samasika Consensus
+----------------------------
 
 Mina uses [Ouroboros Samasika](https://eprint.iacr.org/2020/352.pdf) for consensus, hereafter referred to as Samasika.  The three fundamental guarantees delivered are
+
 * High decentralization - Self-bootstrap, uncapped participation and dynamic availability
 * Succinctness - Constant-time synchronization with full-validation and high interoperability
 * Universal composability - Proven security for interacting with other protocols, no slashing required
 
-Samasika extends the ideas from [Ouroboros Genesis](https://eprint.iacr.org/2018/378.pdf) and [Ouroboros Praos](https://eprint.iacr.org/2017/573.pdf) to the succinct blockchain setting, where the complexity of fully verifying the entire blockchain is independent of chain length.  The name Samasika comes from the Sanskrit word, meaning small or succinct.
+Samasika was invented by [Joseph Bonneau](https://jbonneau.com), [Izaak Meckler](https://math.berkeley.edu/~izaak), [Vanishree Rao](https://www.linkedin.com/in/vanishree-rao) and [Evan Shapiro](https://twitter.com/evanashapiro) as the first succinct blockchain consensus algorithm.  It extends many ideas from [Ouroboros Genesis](https://eprint.iacr.org/2018/378.pdf) and [Ouroboros Praos](https://eprint.iacr.org/2017/573.pdf) to the succinct setting, where the complexity of fully verifying the entire blockchain is independent of chain length.
 
-This documents specifies required structures, algorithms and protocol details.
+This document describes some important details not found in the original publication in addition to specifying the specific structures, algorithms and protocol details implemented in the Mina blockchain.
+
+The name Samasika comes from the Sanskrit word, meaning small or succinct.
+
+**Changelog**
+
+| Author | Date | Details |
+|-|-|-|
+| Joseph Spadavecchia | October 2021 | Complete specification of Samasika algorithms and Mina's implementation |
 
 **Table of Contents**
 
@@ -67,7 +76,7 @@ This documents specifies required structures, algorithms and protocol details.
 
 # 1. Acknowledgements
 
-Special thanks for Jiawei Tang &lt;tang@o1labs.org&gt; for many detailed discussions about Mina implementation of Ouroboros Samasika.
+This document would not exists without the help of the reviewers: <a href="https://github.com/ghost-not-in-the-shell">Jiawei Tang</a>, <a href="https://github.com/nholland94">Nathan Holland</a> and <a href="https://math.berkeley.edu/~izaak/">Izaak Meckler</a>.  Special thanks to Jiawei for many detailed discussions about Mina implementation of Ouroboros Samasika.
 
 # 2. Notations and conventions
 
@@ -76,7 +85,6 @@ Special thanks for Jiawei Tang &lt;tang@o1labs.org&gt; for many detailed discuss
 * `T[N]` - Array of type `T` containing `N` elements
 * `T[v; N]` - Array of type `T` containing `N` elements of value `v`
 * `x[i]` - Element `i` of array `x`, starting at index `0`
-* `x[-1]` - Last element of array `x`
 * `x[a..b]` - Slice of vector `x` containing elements from indexes `[a, b)`
 
 **Conventions**
@@ -540,9 +548,7 @@ fn isShortRange(C1, C2) -> bool
 
 ## 5.4 Sliding window density
 
-**IN REVIEW**
-
-This section describes Mina's succinct sliding window density algorithm, how windows are represented in blocks, and how to compute *minimum window density*.
+This section describes Mina's succinct sliding window density algorithm used by the long-range fork rule.  It describes in detail how windows are represented in blocks and how to compute *minimum window density*.
 
 ### 5.4.1 Terminology
 
@@ -551,10 +557,10 @@ This section describes Mina's succinct sliding window density algorithm, how win
 * A _`sub-window`_ is a contiguous interval of a `w-window`
 * The _`density`_ of an w-window (or sub-window) is the number non-orphan block within it
 * We use the terms _`window`_, _`density window`_, _`sliding window`_ and _`w-window`_ synonymously
- 
+
 ### 5.4.2 Sliding windows
 
-In the Ouroboros Samasika paper the _`sliding window`_ is referred to as a `v`-shifting `w`-window and it characterized by two parameters.
+In the Samasika paper the _`sliding window`_ is referred to as a `v`-shifting `w`-window and it characterized by two parameters.
 
 | Parameter | Description                                | Value |
 | - | - | - |
@@ -587,17 +593,17 @@ densities:      d1        d2      ...       dk
 
 The density of a window is computed as the sum of the densities of its sub-windows.  Given a window `W` that is a list of sub-window densities, the window density is
 
-> `density(W) = sum(W[..])`
+> `density(W) = sum(W)`
 
 **Note:** The density of a window is insensitive to the order of the sub-windows.
 
 ### 5.4.5 Window structure
 
-Windows looks back in time over previous sub-windows, rather than forward.  We use the phrase "window at sub-window `s`" to refer to the window `W` whose most recent global sub-window is `s`.
+Windows look back in time over previous sub-windows, rather than forward.  We use the phrase "window at sub-window `s`" to refer to the window `W` whose most recent global sub-window is `s`.
 
 In the Samasika paper the window structure actually consists of the `11` previous sub-window densities, the current sub-window density and the minimum window density-- a total of `13` densities.  The window's density, however, is only calculated on the previous `11` sub-windows and excludes the current sub-window and minimum.
 
-We say the a sub-window is *in-progress* until it contains the densities for `sub_windows_per_window = 7` slots.  Once a sub-window spans `sub_windows_per_window` slots we say that it is *complete* and at the next non-empty slot it becomes a *previous sub-window*.  The following example illustrates the concept.
+We say that a sub-window is *in-progress* until it contains the densities for `sub_windows_per_window = 7` slots.  Once a sub-window spans `sub_windows_per_window` slots we say that it is *complete* and at the next non-empty slot it becomes a *previous sub-window*.  The following example illustrates the concept.
 
 ```
                                            current (in-progress)
@@ -607,7 +613,7 @@ sub_windows: 00,01,02,03,04,05,06,07,08,09,10
                          previous
 ```
 
-Initially, above there are only 10 previous sub-windows and the current sub-window is in progress.  Next the current sub-window becomes complete, but not yet a previous sub-window-- see below.
+Initially, above there are only 10 previous sub-windows and the current sub-window is in-progress.  Next, the current sub-window becomes complete, but it's not yet a previous sub-window-- see below.
 
 ```
                                            current (complete)
@@ -617,7 +623,7 @@ sub_windows: 00,01,02,03,04,05,06,07,08,09,10
                        previous
 ```
 
-Next, we advance to the first slot of the next sub-window (e.g. new block at `11`), sub-window (`10`) becomes a previous sub-window and, since there are now `11` previous sub-windows, we compute the window density.
+Now we advance to the first slot of the next sub-window (e.g. a new block in sub-window `11`).  Sub-window (`10`) becomes a previous sub-window and, since there are now `11` previous sub-windows, we compute the window density.
 
 ```
                                               11
@@ -665,7 +671,7 @@ When a new block `B` with parent `P` is created, the minimum window density is c
 
 `B.min_window_density = min(P.min_window_density, current_window_density)`
 
-where `current_window_density` is the density of `B`'s window.
+where `current_window_density` is the density of `B`'s projected window (more on this later).
 
 **Observe:** By definition the minimum window density `mwd(s)` at slot `s` is monotonically decreasing (i.e. non-increasing).  That is, for all slots `s1` and `s2` such that `s1 <= s2` then `mwd(s1) >= mwd(s2)`.
 
@@ -686,7 +692,7 @@ As the global slot increases the relative sub-window wraps around modulo `sub_wi
 
 ```text
                                   window 0                          window 1
-          sub-window: 00,01,02,03,04,05,06,07,08,09,10  11,12,13,14,15,16,17,18,19,20,21 
+          sub-window: 00,01,02,03,04,05,06,07,08,09,10  11,12,13,14,15,16,17,18,19,20,21
  relative sub-window: 00,01,02,03,04,05,06,07,08,09,10  00,01,02,03,04,05,06,07,08,09,10
  ```
 
@@ -694,9 +700,9 @@ As the global slot increases the relative sub-window wraps around modulo `sub_wi
 
 ### 5.4.8 Ring-shift
 
-For technical reasons we will describe later, in order to compute the minimum window density for the long-range fork rule sometimes we must perform a window update to compute the current-window.  The Samasika paper describes a window shifting algorithm.
+For technical reasons we will describe later, in order to compute the minimum window density for the long-range fork rule sometimes we must transform the window.  The Samasika paper describes window updates using a window shifting algorithm.
 
-When we shift a window `[d0, d1, ..., d10]` in order to add in a new sub-window `d11`, we could evict the oldest sub-window `d0` by shifting down all of the other sub-windows.  Unfortunately, shifting a list in a SNARK circuit is very expensive.
+For example, when we shift a window `[d0, d1, ..., d10]` in order to add in a new sub-window `d11`, we could evict the oldest sub-window `d0` by shifting down all of the other sub-windows.  Unfortunately, shifting a list in a SNARK circuit is very expensive.
 
 It is more efficient (and also equivalent) to just replace the sub-window we wish to evict by overwriting it with the new sub-window, like this -- `[d11, d1, ..., d10]`.  (Recall from [Section 5.4.4](#544-window-density) that the calculation of the window density is order insensitive.)
 
@@ -704,7 +710,7 @@ For example, given the window
 
 ```text
 sub_window_densities: d0 | d1 | d2 | d3 | d4 | d5 | d6 | d7 | d8 | d9 | d10
-                      | --->                                        <--- |
+                      | --->                                       <--- |
 ```
 
 where `d0` is the density corresponding to sub-window `0` (i.e. the oldest previous sub-window) and `d10` is the density of the most recent sub-window.
@@ -713,14 +719,14 @@ We insert the new element `d11` by wrapping around like this
 
 ```text
 sub_window_densities: d11 | d1 | d2 | d3 | d4 | d5 | d6 | d7 | d8 | d9 | d10
-                   <--- |   | --->
+                 <--- |     | --->
 ```
 
 Next, if we insert the density `d12` for sub-window `12` then we get
 
 ```text
 sub_window_densities: d11 | d12 | d2 | d3 | d4 | d5 | d6 | d7 | d8 | d9 | d10
-                         <--- |   | --->
+                       <--- |     | --->
 ```
 
 We continue in this fashion each time we need to insert a new sub-window.
@@ -729,7 +735,7 @@ We continue in this fashion each time we need to insert a new sub-window.
 
 ### 5.4.9 Projected window
 
-As we will see in later sections, both creating a new block and selecting the best chain during the long-range fork rule require computing a *projected window*.
+As we will see later, both creating a new block and selecting the best chain during the long-range fork rule require computing a *projected window*.
 
 Given a window `W` and a future global slot `next`, the projected window of `W` to slot `next` is a transformation of `W` into what it would look like if it were positioned at slot `next` (i.e. following itself with no intermediate blocks) by ring-shifting.
 
@@ -741,7 +747,7 @@ According to the Samasika paper, the window of `B` must be initialized based on 
 
 The correct number of shifts we must perform is subtle.  Recall from [Section 5.4.5](#545-window-structure) that the window density including sub-window `s` is only calculated during sub-window `> s`, after `s` becomes a previous sub-window.  Therefore, if `next` is `k` sub-windows ahead of `W` we must shift only `k - 1` times because we must keep the most recent previous sub-window.
 
-Given window `W` that we are projecting `k` sub-windows ahead, the *shift count* is
+Given a window that we are projecting `k` sub-windows ahead, the *shift count* is
 
 `shift_count = min(max(k - 1, 0), sub_windows_per_window)`
 
@@ -753,8 +759,8 @@ Suppose window `W`'s current sub-window is `11` whose density is `d11` and `d1` 
 
 ```text
 sub_window_densities: d11 | d1 | d2 | d3 | d4 | d5 | d6 | d7 | d8 | d9 | d10
-                   <--- |   | --->
-                  current   oldest
+                 <--- |     | --->
+                current     oldest
 ```
 
 Now imagine we want to project `W` to global slot `next = 15`.  This is `k = 15 - 11 = 4` sub-windows ahead of the most recent sub-window.  Therefore, we compute
@@ -790,18 +796,18 @@ and the genesis block's global slot is `0`, the genesis block belongs to sub-win
 ```text
                index: | 0    | 1    | 2    | 3    | 4    | 5    | 6    | 7    | 8    | 9    | 10   |
 sub_window_densities: | d0   | d-10 | d-9  | d-8  | d-7  | d-6  | d-5  | d-4  | d-3  | d-2  | d1   |
-                    <--- |     | --->
-                   current     oldest
+                   <--- |      | --->
+                  current      oldest
 ```
 
 where `d-i` denotes density of imaginary sub-window `-i` and `d0` corresponds to the density of sub-window `0`.   Note that the imaginary windows are all previous sub-windows and `d0` corresponds to the genesis block's sub-window.
 
-The genesis block's sub-window is at index `0` because the genesis block's relative sub-window is zero (i.e. `relativeSubWindow(0) = 0`).  Moreover, since it's the start of a new window we know the density of the genesis block's sub-window must be initialized to `0`.  The imaginary windows are initialized to `slots_per_window`.
+The genesis block's sub-window is at index `0` because the genesis block's relative sub-window is `0` (i.e. `relativeSubWindow(0) = 0`).  This is the start of a new window, so the genesis block sub-window density `d0` must be initialized to `0` and then incremented to `1` to account for the presence of the genesis block.  The imaginary windows are initialized to `slots_per_window`.
 
 Thus, contents of the genesis window are
 
 ```rust
-u32[0, slots_per_sub_window, slots_per_sub_window, ..., slots_per_sub_window]
+u32[1, slots_per_sub_window, slots_per_sub_window, ..., slots_per_sub_window]
        \___________________________________________________________________/
                    // sub_windows_per_window - 1
 ```
@@ -814,43 +820,45 @@ Since the genesis block `G` is at the start of a new sub-window and its current 
 
 ```rust
 G.sub_window_densities = u32[slots_per_sub_window; sub_windows_per_window]
+                       = u32[7; 11]
 ```
 
 Consequently the genesis density was
 
-```
+```text
 genesis_window_density = sum(G.sub_window_densities)
                        = slots_per_window
                        = 77
 ```
 
-Since there was no previous block, the genesis block's minimum window density is simply initialized to
+For technical reasons outside the scope of this document, in Mina there is a negative one block `N`.  The minimum window density of `N` is defined as the maximum window density (`77`).  Therefore, `G`'s minimum window density is initialized to
 
-`G.min_window_density =  77`
-
-Here we do not use the minimum window density function from [Section 5.4.6](#546-minimum-window-density).
+```text
+G.min_window_density = min(N.min_window_density, genesis_window_density)
+                     = min(77, 77) = 77
+```
 
 ### 5.4.12 Relative minimum window density
 
-When performing chain selection during the long-range fork rule Mina does not actually directly use the minimum window densities found in the existing and candidate blocks.  Instead, Mina uses the *relative minimum window density*.  To understand the relative minimum window density, we first need to understand the problem with simply using the minimum window density.
+When performing chain selection during the long-range fork rule Mina does not actually directly use the minimum window densities found in the current and candidate blocks.  Instead, Mina uses the *relative minimum window density*.  To understand the relative minimum window density, we first need to understand the problem with simply using the minimum window density.
 
-Recall from [Section 5.4.6](#546-minimum-window-density) that the minimum window density is monotonically decreasing.  Therefore, a peer that has disconnected from the network for a period and wishes to rejoin could have a higher minimum window density for it current best chain when compared to the canonical chain (i.e. the best chain for the network).
+Recall from [Section 5.4.6](#546-minimum-window-density) that the minimum window density is monotonically decreasing.  Therefore, a peer that has disconnected from the network for a period and wishes to rejoin could have a higher minimum window density for it current best chain when compared to the canonical chain candidate (i.e. the best chain for the network).
 
 Also remember from [Section 5.2.2](#522-long-range-fork-rule) that the long-range fork rule dictates that the peer select the chain with the higher minimum density.  Due to the problem just described, this could actually be the peer's current chain, rather than the network's canonical chain (since the minimum window density is non-increasing). Thus, the peer will be stuck and synchronization will not succeed.
 
 ```text
-existing:  B1, B2, B3, B4              (ye olde minimum window density = 43) Stuck! 😭
+current:   B1, B2, B3, B4              (ye olde minimum window density = 43) Stuck! 😭
 canonical: B1, B2, B3, B4, B5, ..., Bk (current minimum window density = 42)
 ```
 
-The inversion problem occurs because the calculation of the minimum window density does not take into account the relationship between the current best chain and the canonical chain with respect to time.  In Samasika time is captured and secured through the concepts of slots and the VRF.  Our calculation of the minimum window density must also take this into account.
+The inversion problem occurs because the calculation of the minimum window density does not take into account the relationship between the current best chain and the canonical chain with respect to time.  In Samasika, time is captured and secured through the concepts of slots and the VRF.  Our calculation of the minimum window density must also take this into account.
 
-The relative minimum window density solves this problem by projecting the joining peer's existing block's window to the global slot of the candidate block. (N.b. this happens whenever the candidate block's global slot is ahead of the existing block's or vice versa.)  In this way, the projection allows a fair comparison.
+The relative minimum window density solves this problem by projecting the joining peer's current block's window to the global slot of the candidate block. (N.b. As described in [Section 6.2.3](#623-bringing-it-all-together), this happens whenever the candidate block's global slot is ahead of the current block's or vice versa.)  In this way, the projection allows a fair comparison.
 
 The relative minimum window density of blocks `B1` and `B2` is defined as.
 
 ```rust
-fn relativeMinWindowDensity(B1, B2) -> u64
+fn relativeMinWindowDensity(B1, B2) -> u32
 {
     let max_slot = max(globalSlot(B1), globalSlot(B2))
 
@@ -883,48 +891,15 @@ fn relativeMinWindowDensity(B1, B2) -> u64
 
     // Compute minimum window density
     return min(B1.min_window_density, projected_window_density)
+}
 ```
 
 This description was adopted to aid understanding, providing explanations where possible of why strategies have been adopted and what conditions are important.  In a production implementation consideration must be given to performance implications and another implementation may be desirable.
 
-<!--
-```rust
-fn relativeMinimumWindowDensity(B1, B2) -> u64
-{
-    let max_slot = max(globalSlot(B1), globalSlot(B2))
-
-    if max_slot < grace_period_end {
-      return B1.min_window_density
-    }
-
-    if globalSlot(B1) == max_slot {
-      return B1.min_window_density
-    }
-
-    if sameSubWindow(B1, B2) {
-      return B1.min_window_density
-    }
-
-    if disjointWindow(B1, B2) {
-      return 0
-    }
-
-    // Clear all densities that are not in the virtual window
-    let relative_sub_window_densities = B1.sub_window_densities
-    for i = relativeSubWindow(max_slot) + 1;
-        i != relativeSubWindow(B1.curr_global_slot);
-        i = i + 1 mod sub_windows_per_window {
-        sub_window_densities[i] = 0
-    }
-
-    return min(sum(relative_sub_window_densities), B1.min_window_density)
-}
-```
--->
-
 # 6 Protocol
 
 This section specifies the consensus protocol in terms of events and how they MUST be implemented by a compatible peer.  The required events are:
+
 * [`Initialize consensus`](#61-initialize-consensus)
 * [`Select chain`](#62-select-chain)
 
@@ -944,6 +919,7 @@ In the following description we use _dot notation_ to refer the local data membe
 ## 6.1 Initialize consensus
 
 Things a peer MUST do to initialize consensus includes
+
 * Load the genesis block
 * Get head of the current chain
 * Bootstrap
@@ -959,7 +935,7 @@ Things a peer MUST do to initialize consensus includes
 | `blockchain_length`                      | `1`           |
 | `epoch_count`                            | `0`           |
 | `min_window_density`                     | `77 = slots_per_window` |
-| `sub_window_densities`                   | `u32[77, 11]` (See [Section 5.4.10](#5410-genesis-window)) |
+| `sub_window_densities`                   | `u32[1; 1] ⌢ u32[7; 10]` (See [Section 5.4.10](#5410-genesis-window)) |
 | `last_vrf_output`                        | `0x0000000000000000000000000000000000000000000000000000000000000000`
 | `total_currency`                         | `805385692.840039233`
 | `curr_global_slot`                       | `0` |
@@ -1065,8 +1041,6 @@ The following JSON specifies most of the genesis block (work in progress).
 
 ## 6.2 Select chain
 
-**IN REVIEW**
-
 The _select chain_ event occurs every time a peer's chains are updated.  A chain is said to be _updated_ anytime a valid block is added or removed from its head.  All compatible peers MUST select chains as described here.
 
 In addition to the high-level idea given in [Section 5.2](#52-chain-selection-rules) and details given in [Section 5.4](#54-sliding-window-density), the chain selection algorithm also employs some tiebreak logic.
@@ -1075,11 +1049,12 @@ Additional tiebreak logic is needed when comparing chains of equal length or equ
 
 ### 6.2.3 Bringing it all together
 
-Assuming an update to either `P.tip` or `P.chains`, the peer `P` must update its `tip` like this
+Let `P.tip` refer to the top block of peer `P`'s current best chain.  Assuming an update to either `P.tip` or `P.chains`, `P` must update its `tip` like this
 
 ```rust
 P.tip = selectSecureChain(P.tip, P.chains)
 ```
+
 The `selectSecureChain` algorithm, presented below, takes as input the peer's current best chain `P.tip` and its set of known valid chains `P.chains` and outputs the most secure chain.
 
 ```rust
