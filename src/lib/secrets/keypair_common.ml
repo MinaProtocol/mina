@@ -40,7 +40,7 @@ struct
           printf "Using %s private-key password from environment variable %s\n"
             which env ;
           read_privkey (lazy (Deferred.return @@ Bytes.of_string password))
-      | None, None ->
+      | None ->
           if should_prompt_user then
             let read_file () =
               read_privkey
