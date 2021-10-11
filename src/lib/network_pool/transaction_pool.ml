@@ -179,7 +179,8 @@ module Diff_versioned = struct
         [@@deriving sexp, yojson]
 
         let to_latest (t : t) : V2.t =
-          List.map t ~f:(fun (x, y) -> (User_command.Stable.V1.to_latest x, y))
+          List.map t ~f:(fun (cmd, err) ->
+              (User_command.Stable.V1.to_latest cmd, err))
       end
     end]
 
@@ -469,11 +470,11 @@ struct
       | Unwanted_fee_token fee_token ->
           [ ("fee_token", Token_id.to_yojson fee_token) ]
       | Expired
-          (`Valid_until valid_until, `Current_global_slot current_global_slot)
-        ->
+          ( `Valid_until valid_until
+          , `Global_slot_since_genesis global_slot_since_genesis ) ->
           [ ("valid_until", Mina_numbers.Global_slot.to_yojson valid_until)
           ; ( "current_global_slot"
-            , Mina_numbers.Global_slot.to_yojson current_global_slot )
+            , Mina_numbers.Global_slot.to_yojson global_slot_since_genesis )
           ]
 
     let indexed_pool_error_log_info e =
@@ -499,6 +500,14 @@ struct
                   ~initial_minimum_balance))
           |> Option.value ~default:Currency.Balance.zero
 
+    let check_command (t : User_command.t) : User_command.Valid.t option =
+      match t with
+      | Parties _ ->
+          failwith "TODO"
+      | Signed_command t ->
+          Option.map (Signed_command.check t) ~f:(fun x ->
+              User_command.Signed_command x)
+
     let handle_transition_frontier_diff
         ( ({ new_commands; removed_commands; reorg_best_tip = _ } :
             Transition_frontier.best_tip_diff)
@@ -517,7 +526,7 @@ struct
          locally_generated_uncommitted to locally_generated_committed and vice
          versa so those hashtables remain in sync with reality.
       *)
-      let global_slot = Indexed_pool.current_global_slot t.pool in
+      let global_slot = Indexed_pool.global_slot_since_genesis t.pool in
       t.best_tip_ledger <- Some best_tip_ledger ;
       let pool_max_size = t.config.pool_max_size in
       let log_indexed_pool_error error_str ~metadata cmd =
@@ -832,7 +841,9 @@ struct
                  t.best_tip_ledger <- Some validation_ledger ;
                  (* The frontier has changed, so transactions in the pool may
                     not be valid against the current best tip. *)
-                 let global_slot = Indexed_pool.current_global_slot t.pool in
+                 let global_slot =
+                   Indexed_pool.global_slot_since_genesis t.pool
+                 in
                  let new_pool, dropped =
                    Indexed_pool.revalidate t.pool (fun sender ->
                        match
@@ -1097,7 +1108,7 @@ struct
             diffs.sender
         in
         let config = Indexed_pool.config t.pool in
-        let global_slot = Indexed_pool.current_global_slot t.pool in
+        let global_slot = Indexed_pool.global_slot_since_genesis t.pool in
         let pool_max_size = t.config.pool_max_size in
         let sender = Envelope.Incoming.sender diffs in
         let is_sender_local = Envelope.Sender.(equal sender Local) in

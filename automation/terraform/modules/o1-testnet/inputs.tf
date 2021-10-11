@@ -50,7 +50,7 @@ variable "mina_agent_image" {
   default = "codaprotocol/coda-user-agent:0.1.4"
 }
 
-variable "coda_agent_active" {
+variable "mina_agent_active" {
   type    = string
   default = "true"
 }
@@ -71,13 +71,13 @@ variable "watchdog_image" {
 }
 
 # this must be a string to avoid scientific notation truncation
-variable "coda_faucet_amount" {
+variable "mina_faucet_amount" {
   type    = string
   default = "10000000000"
 }
 
 # this must be a string to avoid scientific notation truncation
-variable "coda_faucet_fee" {
+variable "mina_faucet_fee" {
   type    = string
   default = "100000000"
 }
@@ -113,17 +113,22 @@ variable "seed_discovery_keypairs" {
 
 # Block Producer Vars
 
-variable "whale_count" {
-  type    = number
-  default = 1
+variable "whales" {
+  description = "individual whale block producer node deployment configurations"
+  default = null
 }
 
-variable "fish_count" {
-  type    = number
-  default = 1
+variable "fishes" {
+  description = "individual fish block producer node deployment configurations"
+  default = null
 }
 
 variable "seed_count" {
+  type    = number
+  default = 1
+}
+
+variable "plain_node_count" {
   type    = number
   default = 1
 }
@@ -159,24 +164,10 @@ variable "seed_starting_host_port" {
 
 # Snark Worker Vars
 
-variable "snark_worker_replicas" {
-  type    = number
-  default = 1
-}
-
-variable "snark_worker_fee" {
-  type    = string
-  default = "0.025"
-}
-
-variable "snark_worker_public_key" {
-  type    = string
-  default = "4vsRCVadXwWMSGA9q81reJRX3BZ5ZKRtgZU7PtGsNq11w2V9tUNf4urZAGncZLUiP4SfWqur7AZsyhJKD41Ke7rJJ8yDibL41ePBeATLUnwNtMTojPDeiBfvTfgHzbAVFktD65vzxMNCvvAJ"
-}
-
-variable "snark_worker_host_port" {
-  type    = number
-  default = 10400
+variable "snark_coordinators" {
+  description = "configurations for not just the snark coordinators but also the snark workers they coordinate"
+  type    = list(any)
+  default = []
 }
 
 variable "agent_min_fee" {

@@ -275,7 +275,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
   let reorganization_subscription = [] in
   let reader, writer =
     Strict_pipe.create ~name:"Reorganization subscription"
-      Strict_pipe.(Buffered (`Capacity 1, `Overflow Drop_head))
+      Strict_pipe.(Buffered (`Capacity 1, `Overflow (Drop_head ignore)))
   in
   let t =
     { subscribed_payment_users

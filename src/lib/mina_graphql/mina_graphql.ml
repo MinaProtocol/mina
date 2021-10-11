@@ -2863,7 +2863,7 @@ module Types = struct
             (fun snarked_ledger_hash_result snarked_next_available_token_result
                  timestamp_result blockchain_length_result
                  min_window_density_result last_vrf_output_opt
-                 total_currency_result curr_global_slot_result
+                 total_currency_result global_slot_since_hard_fork
                  global_slot_since_genesis_result staking_epoch_data_result
                  next_epoch_data_result ->
             let open Result.Let_syntax in
@@ -2881,7 +2881,9 @@ module Types = struct
               match last_vrf_output_opt with Some () -> () | None -> ()
             in
             let%bind total_currency = total_currency_result in
-            let%bind curr_global_slot = curr_global_slot_result in
+            let%bind global_slot_since_hard_fork =
+              global_slot_since_hard_fork
+            in
             let%bind global_slot_since_genesis =
               global_slot_since_genesis_result
             in
@@ -2895,7 +2897,7 @@ module Types = struct
               ; min_window_density
               ; last_vrf_output
               ; total_currency
-              ; curr_global_slot
+              ; global_slot_since_hard_fork
               ; global_slot_since_genesis
               ; staking_epoch_data
               ; next_epoch_data
@@ -2910,7 +2912,8 @@ module Types = struct
             ; arg "minWindowDensity" ~typ:(non_null snapp_length_numeric)
             ; arg "lastVrfOutput" ~typ:snapp_vrf_output (* nullable! *)
             ; arg "totalCurrency" ~typ:(non_null snapp_currency_amount_numeric)
-            ; arg "currGlobalSlot" ~typ:(non_null snapp_global_slot_numeric)
+            ; arg "globalSlotSinceHardFork"
+                ~typ:(non_null snapp_global_slot_numeric)
             ; arg "globalSlotSinceGenesis"
                 ~typ:(non_null snapp_global_slot_numeric)
             ; arg "stakingEpochData" ~typ:(non_null snapp_epoch_data)
@@ -3111,8 +3114,8 @@ module Types = struct
       let valid_until =
         arg "validUntil" ~typ:uint32_arg
           ~doc:
-            "The global slot number after which this transaction cannot be \
-             applied"
+            "The global slot since genesis after which this transaction cannot \
+             be applied"
 
       let nonce =
         arg "nonce" ~typ:uint32_arg
@@ -4118,15 +4121,23 @@ module Mutations = struct
               | None ->
                   `Snd pk)
         in
+        let unlocked_pks = List.map unlocked ~f:(fun (_kp, pk) -> pk) in
         [%log' info (Mina_lib.top_level_logger coda)]
           ~metadata:
             [ ( "old"
               , [%to_yojson: Public_key.Compressed.t list]
                   (Public_key.Compressed.Set.to_list old_block_production_keys)
               )
-            ; ("new", [%to_yojson: Public_key.Compressed.t list] pks)
+            ; ("new", [%to_yojson: Public_key.Compressed.t list] unlocked_pks)
             ]
-          !"Block production key replacement; old: $old, new: $new" ;
+          "Block production key replacement; old: $old, new: $new" ;
+        if not (List.is_empty locked) then
+          [%log' warn (Mina_lib.top_level_logger coda)]
+            "Some public keys are locked and unavailable as block production \
+             keys"
+            ~metadata:
+              [ ("locked_pks", [%to_yojson: Public_key.Compressed.t list] locked)
+              ] ;
         ignore
         @@ Mina_lib.replace_block_production_keypairs coda
              (Keypair.And_compressed_pk.Set.of_list unlocked) ;
