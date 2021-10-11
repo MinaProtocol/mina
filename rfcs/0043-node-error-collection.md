@@ -34,8 +34,10 @@ The node error collection system would make the following `post` request to the 
   { "peer_id": "<base64 encoding of the libp2p peer id>"
   , "ip_address": "<hash of ip address of the submitter>"
   , "public_key": "<optional, public key of the block producer>"
-  , "git_branch": "<git branch of the mina node>"
+  , "git_branch": "<optional, git branch of the mina node>"
   , "commit_hash": "<commit hash of the mina node>"
+  , "chain_id": "<a hash string to distinguish between different networks>"
+  , "contact_info": "<optional, contact info provided by the block producer>"
   , "timestamp": "<current time and date>"
   , "level": "<log level>"
   , "id": "<random UUID v4>"
@@ -75,8 +77,9 @@ This service would be enabled by default. It turned turned off by setting the `e
 
 Cloud storage for o1labs backend has the following structure:
 
-`<hash_of_ip_address>/<peer_id>/<created_at>.json`
+`<chain_id>/<hash_of_ip_address>/<peer_id>/<created_at>.json`
 
+`<chain_id>` is the hash string taken from the corresponding field of the request
 `<hash_of_ip_address>` is the hash of the ip address of the submitter
 `<peer_id>` is the base64 encoding of the libp2p peer id of the submitter
 The json file contains the content of the request if the request is valid
