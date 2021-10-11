@@ -256,6 +256,14 @@ let setup_daemon logger =
         "true|false Help keep the mesh connected when closing connections \
          (default: true)"
       (optional_with_default true bool)
+  and min_connections =
+    flag "--min-connections" ~aliases:[ "min-connections" ]
+      ~doc:
+        (Printf.sprintf
+           "NN min number of connections that this peer will have to neighbors \
+            in the gossip network (default: %d)"
+           Cli_lib.Default.min_connections)
+      (optional int)
   and max_connections =
     flag "--max-connections" ~aliases:[ "max-connections" ]
       ~doc:
@@ -1026,6 +1034,10 @@ let setup_daemon logger =
       let direct_peers =
         List.map ~f:Mina_net2.Multiaddr.of_string direct_peers_raw
       in
+      let min_connections =
+        or_from_config YJ.Util.to_int_option "min-connections"
+          ~default:Cli_lib.Default.min_connections min_connections
+      in
       let max_connections =
         or_from_config YJ.Util.to_int_option "max-connections"
           ~default:Cli_lib.Default.max_connections max_connections
@@ -1075,6 +1087,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           ; direct_peers
           ; mina_peer_exchange
           ; peer_exchange = Option.value ~default:false peer_exchange
+          ; min_connections
           ; max_connections
           ; validation_queue_size
           ; isolate = Option.value ~default:false isolate

@@ -132,8 +132,8 @@ let create_peer_id peer_id =
 
 let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
     ~external_multiaddr ~network_id ~unsafe_no_trust_ip ~flood ~direct_peers
-    ~seed_peers ~peer_exchange ~mina_peer_exchange ~max_connections
-    ~validation_queue_size ~gating_config =
+    ~seed_peers ~peer_exchange ~mina_peer_exchange ~min_connections
+    ~max_connections ~validation_queue_size ~gating_config =
   build
     (module Builder.Libp2pConfig)
     Builder.Libp2pConfig.(
@@ -150,6 +150,7 @@ let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
       *> op peer_exchange_set peer_exchange
       *> op mina_peer_exchange_set mina_peer_exchange
       *> op max_connections_set_int_exn max_connections
+      *> op min_connections_set_int_exn min_connections
       *> op validation_queue_size_set_int_exn validation_queue_size
       *> reader_op gating_config_set_reader gating_config)
 

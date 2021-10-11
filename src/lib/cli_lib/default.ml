@@ -1,6 +1,8 @@
 (* Default values for cli flags *)
 let work_reassignment_wait = 420000
 
+let min_connections = 20
+
 let max_connections = 50
 
 let validation_queue_size = 150

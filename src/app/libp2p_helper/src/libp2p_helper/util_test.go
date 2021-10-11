@@ -44,7 +44,7 @@ func newTestKey(t *testing.T) crypto.PrivKey {
 
 func testStreamHandler(_ net.Stream) {}
 
-func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool, maxConns int, port uint16) *app {
+func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool, minConns, maxConns int, port uint16) *app {
 	dir, err := ioutil.TempDir("", "mina_test_*")
 	require.NoError(t, err)
 
@@ -59,6 +59,7 @@ func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool,
 		string(testProtocol),
 		seeds,
 		codanet.NewCodaGatingState(nil, nil, nil, nil),
+		minConns,
 		maxConns,
 		true,
 	)
@@ -100,7 +101,7 @@ func nextPort() uint16 {
 
 func newTestApp(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool) (*app, uint16) {
 	port := nextPort()
-	return newTestAppWithMaxConns(t, seeds, noUpcalls, 50, port), port
+	return newTestAppWithMaxConns(t, seeds, noUpcalls, 20, 50, port), port
 }
 
 func addrInfos(h host.Host) (addrInfos []peer.AddrInfo, err error) {

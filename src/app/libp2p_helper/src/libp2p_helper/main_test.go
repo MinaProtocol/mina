@@ -12,16 +12,18 @@ import (
 
 	"codanet"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"strconv"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	logging "github.com/ipfs/go-log"
 
 	net "github.com/libp2p/go-libp2p-core/network"
 
-	"github.com/stretchr/testify/require"
 	ipc "libp2p_ipc"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestMain(m *testing.M) {
@@ -100,7 +102,7 @@ func TestPeerExchange(t *testing.T) {
 	// only allow peer count of 2 for node A
 	maxCount := 2
 	appAPort := nextPort()
-	appA := newTestAppWithMaxConns(t, nil, true, maxCount, appAPort)
+	appA := newTestAppWithMaxConns(t, nil, true, maxCount, maxCount, appAPort)
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
 

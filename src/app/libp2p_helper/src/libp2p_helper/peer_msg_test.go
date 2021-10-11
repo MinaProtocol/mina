@@ -64,7 +64,7 @@ func TestGetPeerNodeStatus(t *testing.T) {
 	// only allow peer count of 1 for node A
 	maxCount := 1
 	port := nextPort()
-	appA := newTestAppWithMaxConns(t, nil, true, maxCount, port)
+	appA := newTestAppWithMaxConns(t, nil, true, maxCount, maxCount, port)
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
 	appA.P2p.NodeStatus = []byte("testdata")

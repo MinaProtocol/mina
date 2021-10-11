@@ -425,6 +425,7 @@ module T = struct
               ; trust_system
               ; flooding = false
               ; direct_peers = []
+              ; min_connections = 20
               ; max_connections = 50
               ; validation_queue_size = 150
               ; peer_exchange = true

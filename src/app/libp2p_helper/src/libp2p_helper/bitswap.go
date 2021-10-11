@@ -43,6 +43,9 @@ type BitswapCtx struct {
 	rootDownloadStates  map[root]*RootDownloadState
 	deadlineChan        chan root
 	outMsgChan          chan<- *capnp.Message
+	rootDownloadTimeout time.Duration
+	maxBlockSize        int
+	maxBlockTreeDepth   int
 }
 
 type ChildDownloadParams struct {
@@ -73,6 +76,9 @@ func NewBitswapCtx(ctx context.Context, outMsgChan chan<- *capnp.Message) *Bitsw
 		blockSink:           make(chan blocks.Block, 100),
 		deadlineChan:        make(chan root, 100),
 		outMsgChan:          outMsgChan,
+		rootDownloadTimeout: time.Minute * 10,
+		maxBlockSize:        2,
+		maxBlockTreeDepth:   1 << 18,
 	}
 }
 
@@ -158,12 +164,6 @@ func (bs *BitswapCtx) sendResourceUpdate(type_ ipc.ResourceUpdateType, roots ...
 	}
 }
 
-// TODO set timeout in the config
-const ROOT_DOWNLOAD_TIMEOUT = time.Minute * 10
-
-// TODO set max depth in the config
-const MAX_BLOCK_TREE_DEPTH = 2
-
 func (bs *BitswapCtx) kickStartRootDownload(root BitswapBlockLink) {
 	rootCid := codanet.BlockHashToCid(root)
 	_, has := bs.childDownloadParams[rootCid]
@@ -180,7 +180,7 @@ func (bs *BitswapCtx) kickStartRootDownload(root BitswapBlockLink) {
 	s2 := cid.NewSet()
 	s1.Add(rootCid)
 	s2.Add(rootCid)
-	ctx, cancelF := context.WithTimeout(bs.ctx, ROOT_DOWNLOAD_TIMEOUT)
+	ctx, cancelF := context.WithTimeout(bs.ctx, bs.rootDownloadTimeout)
 	session := bs.engine.NewSession(ctx)
 	bs.childDownloadParams[rootCid] = &ChildDownloadParams{
 		root:  root,
@@ -205,7 +205,7 @@ func (bs *BitswapCtx) kickStartRootDownload(root BitswapBlockLink) {
 	}
 	if err == nil {
 		go func() {
-			<-time.After(ROOT_DOWNLOAD_TIMEOUT)
+			<-time.After(bs.rootDownloadTimeout)
 			bs.deadlineChan <- root
 		}()
 	} else {
@@ -236,15 +236,19 @@ func (bs *BitswapCtx) processDownloadedBlock(block blocks.Block) {
 		bs.freeRoot(root)
 		bs.sendResourceUpdate(ipc.ResourceUpdateType_broken, root)
 	}
+	if bs.maxBlockTreeDepth < params.depth {
+		reportMalformed("Malformed block tree: too deep a node")
+		return
+	}
 	if rootState.treeDepth != 0 && rootState.treeDepth < params.depth {
 		reportMalformed("Malformed block tree: non-balanced")
 		return
 	}
-	if rootState.treeDepth != 0 && rootState.treeDepth > params.depth && len(block.RawData()) < MAX_BLOCK_SIZE {
+	if rootState.treeDepth != 0 && rootState.treeDepth > params.depth && len(block.RawData()) < bs.maxBlockSize {
 		reportMalformed("Malformed block tree: non-max size of middle node")
 		return
 	}
-	if len(block.RawData()) < MAX_BLOCK_SIZE {
+	if len(block.RawData()) < bs.maxBlockSize {
 		if !rootState.processedNonMaxSizeNode {
 			reportMalformed("Malformed block tree: second non-max size node")
 			return
@@ -252,13 +256,13 @@ func (bs *BitswapCtx) processDownloadedBlock(block blocks.Block) {
 		rootState.processedNonMaxSizeNode = true
 	}
 	rootState.notVisited.Remove(id)
-	maxLink := LinksPerBlock(MAX_BLOCK_SIZE)
+	maxLink := LinksPerBlock(bs.maxBlockSize)
 	links, _, err := ReadBitswapBlock(block.RawData())
 	if err != nil {
 		reportMalformed(err.Error())
 		return
 	}
-	if len(block.RawData()) < MAX_BLOCK_SIZE && len(links) > 0 {
+	if len(block.RawData()) < bs.maxBlockSize && len(links) > 0 {
 		reportMalformed("Malformed block tree: nom-max size of non-leaf node")
 		return
 	}
@@ -344,7 +348,7 @@ func (bs *BitswapCtx) Loop() {
 			bs.freeRoot(root)
 		case cmd := <-bs.addCmds:
 			configuredCheck()
-			blocks, root := SplitDataToBitswapBlocks(cmd.data)
+			blocks, root := SplitDataToBitswapBlocks(bs.maxBlockSize, cmd.data)
 			err := announceNewRootBlock(engine, storage, blocks, root)
 			if err == nil {
 				bs.sendResourceUpdate(ipc.ResourceUpdateType_added, root)

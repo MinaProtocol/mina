@@ -11,10 +11,8 @@ const BITSWAP_BLOCK_LINK_SIZE = blake2b.Size256
 
 type BitswapBlockLink = [BITSWAP_BLOCK_LINK_SIZE]byte
 
-const MAX_BLOCK_SIZE = 1 << 18
-
-func SplitDataToBitswapBlocks(data []byte) (map[BitswapBlockLink][]byte, BitswapBlockLink) {
-	return SplitDataToBitswapBlocksWithHashF(MAX_BLOCK_SIZE, func([]byte) BitswapBlockLink {
+func SplitDataToBitswapBlocks(maxBlockSize int, data []byte) (map[BitswapBlockLink][]byte, BitswapBlockLink) {
+	return SplitDataToBitswapBlocksWithHashF(maxBlockSize, func([]byte) BitswapBlockLink {
 		return blake2b.Sum256(data)
 	}, data)
 }
