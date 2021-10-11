@@ -1084,7 +1084,7 @@ let check_and_stop_daemon t ~wait =
         if Time.Span.(wait_for > max_catchup_time) then `Now
         else `Check_in wait_for
 
-let stop_long_running_daemon t =
+let _stop_long_running_daemon t =
   let wait_mins = (40 * 60) + (Random.int 10 * 60) in
   [%log' info t.config.logger]
     "Stopping daemon after $wait mins and when there are no blocks to be \
@@ -1196,7 +1196,7 @@ let start t =
     ~get_next_producer_timing:(fun () -> t.next_producer_timing)
     ~get_snark_work_fee:(fun () -> snark_work_fee t)
     ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer) ;
-  stop_long_running_daemon t ;
+  (* stop_long_running_daemon t ; *)
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
