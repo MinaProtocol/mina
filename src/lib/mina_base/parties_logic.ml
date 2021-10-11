@@ -258,8 +258,7 @@ module Eff = struct
         'account
         -> ('amount, < account : 'account ; amount : 'amount ; .. >) t
     | Transaction_commitment_on_start :
-        { start_party : 'party
-        ; protocol_state_predicate : 'protocol_state_pred
+        { protocol_state_predicate : 'protocol_state_pred
         ; other_parties : 'parties
         }
         -> ( 'transaction_commitment
@@ -431,8 +430,7 @@ module Make (Inputs : Inputs_intf) = struct
             let on_start =
               h.perform
                 (Transaction_commitment_on_start
-                   { start_party = party
-                   ; protocol_state_predicate =
+                   { protocol_state_predicate =
                        start_data.protocol_state_predicate
                    ; other_parties = remaining
                    })

@@ -1843,8 +1843,7 @@ module Base = struct
         | Get_global_ledger g ->
             g.ledger
         | Transaction_commitment_on_start
-            { start_party = _
-            ; other_parties = other_parties, _
+            { other_parties = other_parties, _
             ; protocol_state_predicate
             } -> (
             match is_start with
