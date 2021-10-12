@@ -1311,12 +1311,17 @@ let%test_module "Ledger_catchup tests" =
       let rec call_read b_list n =
         if n <= List.length target_best_tip_path then
           let%bind breadcrumb =
+            [%log info] "calling read, n=%d..." n ;
             match%map
               Strict_pipe.Reader.read breadcrumbs_reader
               |> Async.with_timeout (Time.Span.create ~sec:30 ())
             with
             | `Timeout ->
-                failwith "read of breadcrumbs_reader pipe timed out"
+                failwith
+                  (String.concat
+                     [ "read of breadcrumbs_reader pipe timed out, n= "
+                     ; string_of_int n
+                     ])
             | `Result res -> (
                 match res with
                 | `Eof ->
