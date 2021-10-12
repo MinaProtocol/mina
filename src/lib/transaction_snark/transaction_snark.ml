@@ -4481,6 +4481,15 @@ let%test_module "transaction_snark" =
               apply_parties ledger [ parties ])
           |> fun ((), ()) -> ())
 
+    let%test_unit "Consecutive snapps-based payments" =
+      let open Transaction_logic.For_tests in
+      Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let partiess = List.map ~f:party_send specs in
+              Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
+              apply_parties ledger partiess)
+          |> fun ((), ()) -> ())
+
     (* Disabling until new-style snapp transactions are fully implemented.
 
        let%test_unit "signed_signed" =
