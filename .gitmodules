@@ -31,5 +31,5 @@
 	branch = master
 [submodule "src/external/prometheus"]
 	path = src/external/prometheus
-	url = git@github.com:MinaProtocol/prometheus.git
-    branch = master
+	url = https://github.com/MinaProtocol/prometheus.git
+  branch = master
