@@ -316,8 +316,8 @@ module Get_peers =
 query get_peers {
   getPeers {
     host
-    libp2pPort
-    peerId
+    libp2p_port
+    peer_id
   }
 }
 |}]
@@ -328,8 +328,8 @@ module Add_peers =
 mutation ($peers: [NetworkPeer!]!, $seed: Boolean) {
   addPeers(peers: $peers, seed: $seed) {
     host
-    libp2pPort
-    peerId
+    libp2p_port
+    peer_id
   }
 }
 |}]

@@ -1848,8 +1848,8 @@ let get_peers_graphql =
              printf "%s\n"
                (Network_peer.Peer.to_multiaddr_string
                   { host = Unix.Inet_addr.of_string peer#host
-                  ; libp2p_port = peer#libp2pPort
-                  ; peer_id = peer#peerId
+                  ; libp2p_port = peer#libp2p_port
+                  ; peer_id = peer#peer_id
                   }))))
 
 let add_peers_graphql =
@@ -1883,9 +1883,9 @@ let add_peers_graphql =
                    object
                      method host = peer.host
 
-                     method libp2pPort = peer.libp2p_port
+                     method libp2p_port = peer.libp2p_port
 
-                     method peerId = peer.peer_id
+                     method peer_id = peer.peer_id
                    end
                | None ->
                    eprintf
@@ -1905,8 +1905,8 @@ let add_peers_graphql =
              printf "%s\n"
                (Network_peer.Peer.to_multiaddr_string
                   { host = Unix.Inet_addr.of_string peer#host
-                  ; libp2p_port = peer#libp2pPort
-                  ; peer_id = peer#peerId
+                  ; libp2p_port = peer#libp2p_port
+                  ; peer_id = peer#peer_id
                   }))))
 
 let compile_time_constants =
