@@ -114,7 +114,7 @@ Operations are always `Pending` if retrieved from the mempool. `Success` if they
 
 ### Operations Types
 
-See [this section of the code](https://github.com/MinaProtocol/mina/blob/4ae482b656c743fc4ea824419cebe2f2ff77ef96/src/lib/rosetta_lib/operation_types.ml#L4) for an exhaustive list of operation types. Notable balance changing events are fee increases and decreases ("fee_payer_dec", "fee_receiver_inc"), payment increases and decreases ("payment_source_dec", "payment_receiver_inc"), and account creation fee ("account_creation_fee_via_payment", "account_creation_fee_via_fee_payer"), and the block reward or coinbase ("coinbase_inc").
+See [this section of the code](https://github.com/MinaProtocol/mina/blob/4ae482b656c743fc4ea824419cebe2f2ff77ef96/src/lib/rosetta_lib/operation_types.ml#L4) for an exhaustive list of operation types. Notable balance changing events are fee increases and decreases ("fee_payer_dec", "fee_receiver_inc") for internal transactions or "fee_payment" via user command, payment increases and decreases ("payment_source_dec", "payment_receiver_inc"), and account creation fee ("account_creation_fee_via_payment", "account_creation_fee_via_fee_payer"), and the block reward or coinbase ("coinbase_inc").
 
 ### Account metadata
 
@@ -228,4 +228,7 @@ cp -p src/models/* $MINA/src/lib/rosetta_models/
 ```
 In the generated files, the type `deriving` clauses will need to have `eq` added manually.
 Any record types with a field named `_type` will need annotate that field with `[@key "type"]`.
-In `lib/network.ml`, update the two instances of the version number.
+
+* In `lib/network.ml`, update the two instances of the version number.
+* In `lib/rosetta-models/operation.ml`, change the type of the field `related_operations` to `Operation_identifier.t list option` and add `[@default None]`. Also, in the `create` function, use `None` as the value of that field in the created record.
+
