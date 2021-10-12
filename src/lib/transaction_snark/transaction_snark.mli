@@ -493,6 +493,39 @@ val group_by_parties_rev :
   -> 'a list list
   -> ([ `Same | `New | `Two_new ] * Parties_segment.Basic.t * 'a * 'a) list
 
+(** [parties_witnesses ledger partiess] generates the parties segment witnesses
+    and corresponding statements needed to prove the application of each
+    parties transaction in [partiess] on top of ledger. If multiple parties are
+    given, they are applied in order and grouped together to minimise the
+    number of transaction proofs that would be required.
+    There must be at least one parties transaction in [parties].
+
+    The returned value is a list of tuples, each corresponding to a single
+    proof for some parts of some parties transactions, comprising:
+    * the witness information for the segment, to be passed to the prover
+    * the segment kind, identifying the type of proof that will be generated
+    * the proof statement, describing the transition between the states before
+      and after the segment
+    * the list of calculated 'snapp statements', corresponding to the expected
+      public input of any snapp parties in the current segment.
+
+    WARNING: This function calls the transaction logic internally, and thus may
+    raise an exception if the transaction logic would also do so. This function
+    should only be used on parties that are already known to pass transaction
+    logic without an exception.
+*)
+val parties_witnesses :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> state_body:Transaction_protocol_state.Block_data.t
+  -> fee_excess:Currency.Amount.Signed.t
+  -> Ledger.t
+  -> Parties.t list
+  -> ( Parties_segment.Witness.t
+     * Parties_segment.Basic.t
+     * Statement.With_sok.t
+     * (int * Snapp_statement.t) list )
+     list
+
 module Make (Inputs : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
