@@ -85,8 +85,8 @@ module "ci_testnet" {
   mina_bots_image    = "codaprotocol/bots:1.0.0"
   mina_points_image  = "codaprotocol/coda-points-hack:32b.4"
 
-  coda_faucet_amount = "10000000000"
-  coda_faucet_fee    = "100000000"
+  mina_faucet_amount = "10000000000"
+  mina_faucet_fee    = "100000000"
 
   agent_min_fee         = "0.05"
   agent_max_fee         = "0.1"
@@ -106,11 +106,27 @@ module "ci_testnet" {
   block_producer_key_pass           = "naughty blue worm"
   block_producer_starting_host_port = 10501
 
-  snark_worker_replicas   = var.snark_worker_count
-  snark_worker_fee        = "0.025"
-  snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
-  snark_worker_host_port  = 10401
+  snark_coordinators = [
+    {
+      snark_worker_replicas   = var.snark_worker_count
+      snark_worker_fee        = "0.025"
+      snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
+      snark_coordinators_host_port  = 10401
+    }
+  ]
 
-  whale_count = var.whale_count
-  fish_count  = var.fish_count
+  whales= [
+    for i in range(var.whale_count):{
+      duplicates = 1
+    }
+  ]
+  
+  fishes= [
+    for i in range(var.fish_count):{
+      duplicates = 1
+    }
+  ]
+
+  plain_node_count = 0
+
 }

@@ -252,6 +252,9 @@ end]
 
 include Codable.Make_base58_check (Stable.Latest)
 
+(* shadow the definitions from Make_base58_check *)
+[%%define_locally Stable.Latest.(of_yojson, to_yojson)]
+
 module Valid = struct
   module Stable = Stable
 
@@ -426,7 +429,7 @@ let of_verifiable (t : Verifiable.t) : t =
 
 let valid_interval (t : t) =
   let open Snapp_predicate.Closed_interval in
-  match t.protocol_state.curr_global_slot with
+  match t.protocol_state.global_slot_since_genesis with
   | Ignore ->
       Mina_numbers.Global_slot.{ lower = zero; upper = max_value }
   | Check i ->

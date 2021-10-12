@@ -120,12 +120,15 @@ type t = { diff : Diff.t } [@@deriving compare, sexp, compare, yojson, fields]
 
 module Stable : sig
   module V2 : sig
-    type t = { diff : Diff.t }
+    type t = { diff : Diff.Stable.V2.t }
     [@@deriving compare, sexp, compare, yojson, bin_io, version]
+
+    val to_latest : t -> t
   end
 
   module V1 : sig
-    type t [@@deriving compare, sexp, compare, yojson, bin_io, version]
+    type t = { diff : Diff.Stable.V1.t }
+    [@@deriving compare, sexp, compare, yojson, bin_io, version]
 
     val to_latest : t -> V2.t
   end

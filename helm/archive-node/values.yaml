@@ -1,4 +1,4 @@
-testnetName: "coda-testnet"
+testnetName: "testnet"
 coda:
   runtimeConfig:
   generateGenesisProof: true

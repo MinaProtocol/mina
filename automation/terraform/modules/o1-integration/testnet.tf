@@ -38,10 +38,14 @@ module "kubernetes_testnet" {
   archive_node_count   = var.archive_node_count
   mina_archive_schema  = var.mina_archive_schema
 
-  snark_worker_replicas   = var.snark_worker_replicas
-  snark_worker_fee        = var.snark_worker_fee
-  snark_worker_public_key = var.snark_worker_public_key
-  snark_worker_host_port  = local.snark_worker_host_port
+  snark_coordinators = var.snark_worker_replicas <= 0 ? [] : [
+    {
+      snark_worker_replicas = var.snark_worker_replicas
+      snark_worker_fee      = var.snark_worker_fee
+      snark_worker_public_key = var.snark_worker_public_key
+      snark_coordinators_host_port = local.snark_worker_host_port
+    }
+  ]
 
   block_producer_key_pass = "naughty blue worm"
   block_producer_configs  = [
@@ -61,4 +65,7 @@ module "kubernetes_testnet" {
       archiveAddress         = element(local.archive_node_names, index)
     }
   ]
+
+  #we don't use plain nodes in the intg test
+  plain_node_configs = []
 }
