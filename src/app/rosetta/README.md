@@ -4,6 +4,11 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2021/10/12:
+
+- Adjust API according to feedback
+- Release rosetta-v3
+
 2021/09/12:
 
 - Construction API ready to ship on rosetta-v2
