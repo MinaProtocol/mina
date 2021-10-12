@@ -3698,6 +3698,170 @@ let group_by_parties_rev partiess stmtss =
   in
   group_by_parties_rev partiess stmtss []
 
+let parties_witnesses ~constraint_constants ~state_body ledger parties =
+  let sparse_ledger =
+    Sparse_ledger.of_ledger_subset_exn ledger
+      (Parties.accounts_accessed parties)
+  in
+  let _, states =
+    Sparse_ledger.apply_parties_unchecked_with_states sparse_ledger
+      ~constraint_constants
+      ~state_view:(Mina_state.Protocol_state.Body.view state_body)
+      parties
+    |> Or_error.ok_exn
+  in
+  let states_rev =
+    group_by_parties_rev
+      [ []; Parties.parties parties ]
+      [ [ List.hd_exn states ]; states ]
+  in
+  let transaction : Parties.Transaction_commitment.t Lazy.t =
+    lazy (Parties.commitment parties)
+  in
+  let tx_statement (remaining_parties : Party.t list) : Snapp_statement.t =
+    let at_party =
+      let hd_depth = (List.hd_exn remaining_parties).data.body.depth in
+      List.take_while remaining_parties ~f:(fun p ->
+          p.data.body.depth >= hd_depth)
+      |> Parties.Party_or_stack.With_hashes.other_parties_hash
+    in
+    { transaction = Lazy.force transaction; at_party }
+  in
+  let parties : _ Parties_logic.Start_data.t =
+    { protocol_state_predicate = Snapp_predicate.Protocol_state.accept
+    ; parties
+    }
+  in
+  let commitment = ref Local_state.dummy.transaction_commitment in
+  let remaining_parties = ref [ parties ] in
+  let remaining_partys = ref (Parties.parties parties.parties) in
+  List.fold_right states_rev ~init:[]
+    ~f:(fun
+         ( kind
+         , spec
+         , (source_global, source_local)
+         , (target_global, target_local) )
+         witnesses
+       ->
+      let snapp_stmts =
+        match spec with
+        | Proved ->
+            [ (0, tx_statement !remaining_partys) ]
+        | _ ->
+            []
+      in
+      ( match spec with
+      | Opt_signed_unsigned | Opt_signed_opt_signed ->
+          remaining_partys := List.tl_exn @@ List.tl_exn !remaining_partys
+      | Opt_signed ->
+          remaining_partys := List.tl_exn !remaining_partys
+      | Proved ->
+          remaining_partys := List.tl_exn !remaining_partys ) ;
+      let current_commitment = !commitment in
+      let start_parties, next_commitment =
+        let empty_if_last mk =
+          match (target_local.parties, target_local.call_stack) with
+          | [], [] ->
+              (* The commitment will be cleared, because this is the last
+                 party.
+              *)
+              Parties.Transaction_commitment.empty
+          | _ ->
+              mk ()
+        in
+        let mk_next_commitment (parties : Parties.t) =
+          empty_if_last (fun () -> Parties.commitment parties)
+        in
+        match kind with
+        | `Same ->
+            ([], empty_if_last (fun () -> current_commitment))
+        | `New -> (
+            match !remaining_parties with
+            | parties :: rest ->
+                let commitment' = mk_next_commitment parties.parties in
+                remaining_parties := rest ;
+                commitment := commitment' ;
+                ([ parties ], commitment')
+            | _ ->
+                failwith "Not enough remaining parties" )
+        | `Two_new -> (
+            match !remaining_parties with
+            | parties1 :: parties2 :: rest ->
+                let commitment' = mk_next_commitment parties2.parties in
+                remaining_parties := rest ;
+                commitment := commitment' ;
+                ([ parties1; parties2 ], commitment')
+            | _ ->
+                failwith "Not enough remaining parties" )
+      in
+      let hash_local_state (local : _ Parties_logic.Local_state.t) =
+        let hash_parties_stack ps =
+          ps |> Parties.Party_or_stack.accumulate_hashes'
+          |> List.map ~f:(Parties.Party_or_stack.map ~f:(fun p -> (p, ())))
+        in
+        { local with
+          Parties_logic.Local_state.parties = hash_parties_stack local.parties
+        ; call_stack = hash_parties_stack local.call_stack
+        }
+      in
+      let source_local =
+        { (hash_local_state source_local) with
+          transaction_commitment = current_commitment
+        }
+      in
+      let target_local =
+        { (hash_local_state target_local) with
+          transaction_commitment = next_commitment
+        }
+      in
+      let w : Parties_segment.Witness.t =
+        { global_ledger = source_global.ledger
+        ; local_state_init = source_local
+        ; start_parties
+        ; state_body
+        }
+      in
+      let statement : Statement.With_sok.t =
+        { source =
+            { ledger = Sparse_ledger.merkle_root source_global.ledger
+            ; next_available_token =
+                Sparse_ledger.next_available_token source_global.ledger
+            ; pending_coinbase_stack = Pending_coinbase.Stack.empty
+            ; local_state =
+                { source_local with
+                  parties =
+                    Parties.Party_or_stack.stack_hash source_local.parties
+                ; call_stack =
+                    Parties.Party_or_stack.stack_hash source_local.call_stack
+                ; ledger = Sparse_ledger.merkle_root source_local.ledger
+                }
+            }
+        ; target =
+            { ledger = Sparse_ledger.merkle_root target_global.ledger
+            ; next_available_token =
+                Sparse_ledger.next_available_token target_global.ledger
+            ; pending_coinbase_stack = Pending_coinbase.Stack.empty
+            ; local_state =
+                { target_local with
+                  parties =
+                    Parties.Party_or_stack.stack_hash target_local.parties
+                ; call_stack =
+                    Parties.Party_or_stack.stack_hash target_local.call_stack
+                ; ledger = Sparse_ledger.merkle_root target_local.ledger
+                }
+            }
+        ; supply_increase = Amount.zero
+        ; fee_excess =
+            { fee_token_l = Token_id.default
+            ; fee_excess_l = Amount.Signed.to_fee source_global.fee_excess
+            ; fee_token_r = Token_id.default
+            ; fee_excess_r = Amount.Signed.to_fee target_global.fee_excess
+            }
+        ; sok_digest = Sok_message.Digest.default
+        }
+      in
+      (w, spec, statement, snapp_stmts) :: witnesses)
+
 module Make (Inputs : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
@@ -4283,173 +4447,8 @@ let%test_module "transaction_snark" =
               [%test_eq: Field.t] hash_pre hash_post))
 
     let apply_parties ledger parties =
-      let sparse_ledger =
-        Sparse_ledger.of_ledger_subset_exn ledger
-          (Parties.accounts_accessed parties)
-      in
-      let _, states =
-        Sparse_ledger.apply_parties_unchecked_with_states sparse_ledger
-          ~constraint_constants
-          ~state_view:(Mina_state.Protocol_state.Body.view state_body)
-          parties
-        |> Or_error.ok_exn
-      in
-      let states_rev =
-        group_by_parties_rev
-          [ []; Parties.parties parties ]
-          [ [ List.hd_exn states ]; states ]
-      in
-      let transaction : Parties.Transaction_commitment.t Lazy.t =
-        lazy (Parties.commitment parties)
-      in
-      let tx_statement (remaining_parties : Party.t list) : Snapp_statement.t =
-        let at_party =
-          let hd_depth = (List.hd_exn remaining_parties).data.body.depth in
-          List.take_while remaining_parties ~f:(fun p ->
-              p.data.body.depth >= hd_depth)
-          |> Parties.Party_or_stack.With_hashes.other_parties_hash
-        in
-        { transaction = Lazy.force transaction; at_party }
-      in
       let witnesses =
-        let parties : _ Parties_logic.Start_data.t =
-          { protocol_state_predicate = Snapp_predicate.Protocol_state.accept
-          ; parties
-          }
-        in
-        let commitment = ref Local_state.dummy.transaction_commitment in
-        let remaining_parties = ref [ parties ] in
-        let remaining_partys = ref (Parties.parties parties.parties) in
-        List.fold_right states_rev ~init:[]
-          ~f:(fun
-               ( kind
-               , spec
-               , (source_global, source_local)
-               , (target_global, target_local) )
-               witnesses
-             ->
-            let snapp_stmts =
-              match spec with
-              | Proved ->
-                  [ (0, tx_statement !remaining_partys) ]
-              | _ ->
-                  []
-            in
-            ( match spec with
-            | Opt_signed_unsigned | Opt_signed_opt_signed ->
-                remaining_partys := List.tl_exn @@ List.tl_exn !remaining_partys
-            | Opt_signed ->
-                remaining_partys := List.tl_exn !remaining_partys
-            | Proved ->
-                remaining_partys := List.tl_exn !remaining_partys ) ;
-            let current_commitment = !commitment in
-            let start_parties, next_commitment =
-              let empty_if_last mk =
-                match (target_local.parties, target_local.call_stack) with
-                | [], [] ->
-                    (* The commitment will be cleared, because this is the last
-                       party.
-                    *)
-                    Parties.Transaction_commitment.empty
-                | _ ->
-                    mk ()
-              in
-              let mk_next_commitment (parties : Parties.t) =
-                empty_if_last (fun () -> Parties.commitment parties)
-              in
-              match kind with
-              | `Same ->
-                  ([], empty_if_last (fun () -> current_commitment))
-              | `New -> (
-                  match !remaining_parties with
-                  | parties :: rest ->
-                      let commitment' = mk_next_commitment parties.parties in
-                      remaining_parties := rest ;
-                      commitment := commitment' ;
-                      ([ parties ], commitment')
-                  | _ ->
-                      failwith "Not enough remaining parties" )
-              | `Two_new -> (
-                  match !remaining_parties with
-                  | parties1 :: parties2 :: rest ->
-                      let commitment' = mk_next_commitment parties2.parties in
-                      remaining_parties := rest ;
-                      commitment := commitment' ;
-                      ([ parties1; parties2 ], commitment')
-                  | _ ->
-                      failwith "Not enough remaining parties" )
-            in
-            let hash_local_state (local : _ Parties_logic.Local_state.t) =
-              let hash_parties_stack ps =
-                ps |> Parties.Party_or_stack.accumulate_hashes'
-                |> List.map
-                     ~f:(Parties.Party_or_stack.map ~f:(fun p -> (p, ())))
-              in
-              { local with
-                Parties_logic.Local_state.parties =
-                  hash_parties_stack local.parties
-              ; call_stack = hash_parties_stack local.call_stack
-              }
-            in
-            let source_local =
-              { (hash_local_state source_local) with
-                transaction_commitment = current_commitment
-              }
-            in
-            let target_local =
-              { (hash_local_state target_local) with
-                transaction_commitment = next_commitment
-              }
-            in
-            let w : Parties_segment.Witness.t =
-              { global_ledger = source_global.ledger
-              ; local_state_init = source_local
-              ; start_parties
-              ; state_body
-              }
-            in
-            let statement : Statement.With_sok.t =
-              { source =
-                  { ledger = Sparse_ledger.merkle_root source_global.ledger
-                  ; next_available_token =
-                      Sparse_ledger.next_available_token source_global.ledger
-                  ; pending_coinbase_stack = Pending_coinbase.Stack.empty
-                  ; local_state =
-                      { source_local with
-                        parties =
-                          Parties.Party_or_stack.stack_hash source_local.parties
-                      ; call_stack =
-                          Parties.Party_or_stack.stack_hash
-                            source_local.call_stack
-                      ; ledger = Sparse_ledger.merkle_root source_local.ledger
-                      }
-                  }
-              ; target =
-                  { ledger = Sparse_ledger.merkle_root target_global.ledger
-                  ; next_available_token =
-                      Sparse_ledger.next_available_token target_global.ledger
-                  ; pending_coinbase_stack = Pending_coinbase.Stack.empty
-                  ; local_state =
-                      { target_local with
-                        parties =
-                          Parties.Party_or_stack.stack_hash target_local.parties
-                      ; call_stack =
-                          Parties.Party_or_stack.stack_hash
-                            target_local.call_stack
-                      ; ledger = Sparse_ledger.merkle_root target_local.ledger
-                      }
-                  }
-              ; supply_increase = Amount.zero
-              ; fee_excess =
-                  { fee_token_l = Token_id.default
-                  ; fee_excess_l = Amount.Signed.to_fee source_global.fee_excess
-                  ; fee_token_r = Token_id.default
-                  ; fee_excess_r = Amount.Signed.to_fee target_global.fee_excess
-                  }
-              ; sok_digest = Sok_message.Digest.default
-              }
-            in
-            (w, spec, statement, snapp_stmts) :: witnesses)
+        parties_witnesses ~constraint_constants ~state_body ledger parties
       in
       let open Impl in
       List.fold ~init:((), ()) witnesses
