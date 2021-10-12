@@ -1216,7 +1216,7 @@ let%test_module "Ledger_catchup tests" =
 
     let max_frontier_length = 10
 
-    let logger = Logger.null ()
+    let logger = Logger.create ()
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
@@ -1308,30 +1308,69 @@ let%test_module "Ledger_catchup tests" =
           ~frontier:my_net.state.frontier ~target_breadcrumb
       in
       (* TODO: expose Strict_pipe.read *)
-      let%map cached_catchup_breadcrumbs =
-        Block_time.Timeout.await_exn time_controller
-          ~timeout_duration:(Block_time.Span.of_ms 30000L)
-          ( match%map Strict_pipe.Reader.read breadcrumbs_reader with
-          | `Eof ->
-              failwith "unexpected EOF"
-          | `Ok (_, `Catchup_scheduler) ->
-              failwith "did not expect a catchup scheduler action"
-          | `Ok (breadcrumbs, `Ledger_catchup ivar) ->
-              Ivar.fill ivar () ; List.hd_exn breadcrumbs )
+      let rec call_read b_list n =
+        if n <= List.length target_best_tip_path then
+          let%bind breadcrumb =
+            match%map
+              Strict_pipe.Reader.read breadcrumbs_reader
+              |> Async.with_timeout (Time.Span.create ~sec:30 ())
+            with
+            | `Timeout ->
+                failwith "read of breadcrumbs_reader pipe timed out"
+            | `Result res -> (
+                match res with
+                | `Eof ->
+                    failwith "breadcrumb not found"
+                | `Ok (_, `Catchup_scheduler) ->
+                    failwith "breadcrumb not found"
+                | `Ok (breadcrumbs, `Ledger_catchup ivar) ->
+                    let breadcrumb : Breadcrumb.t =
+                      Rose_tree.root (List.hd_exn breadcrumbs)
+                      |> Cache_lib.Cached.invalidate_with_success
+                    in
+                    Ivar.fill ivar () ; breadcrumb )
+          in
+          call_read (breadcrumb :: b_list) (n + 1)
+        else Deferred.return b_list
       in
-      let catchup_breadcrumbs =
-        Rose_tree.map cached_catchup_breadcrumbs
-          ~f:Cache_lib.Cached.invalidate_with_success
-      in
+      let%map breadcrumb_list = call_read [] 0 in
+      let breadcrumbs_tree = Rose_tree.of_list_exn breadcrumb_list in
+      (* let%map cached_catchup_breadcrumbs =
+           Block_time.Timeout.await_exn time_controller
+             ~timeout_duration:(Block_time.Span.of_ms 30000L)
+             ( match%map Strict_pipe.Reader.read breadcrumbs_reader with
+             | `Eof ->
+                 failwith "unexpected EOF"
+             | `Ok (_, `Catchup_scheduler) ->
+                 failwith "did not expect a catchup scheduler action"
+             | `Ok (breadcrumbs, `Ledger_catchup ivar) ->
+                 Ivar.fill ivar () ; List.hd_exn breadcrumbs )
+         in *)
+      (* let catchup_breadcrumbs =
+           Rose_tree.map cached_catchup_breadcrumbs
+             ~f:Cache_lib.Cached.invalidate_with_success
+           |> Rose_tree.flatten |> List.rev
+         in *)
       [%test_result: int]
         ~message:
           "Transition_frontier should not have any more catchup jobs at the \
            end of the test"
         ~equal:( = ) ~expect:0
         (Broadcast_pipe.Reader.peek Catchup_jobs.reader) ;
+      [%log info] "target_best_tip_path length: %d"
+        (List.length target_best_tip_path) ;
+      [%log info] "breadcrumb_list length: %d" (List.length breadcrumb_list) ;
       let catchup_breadcrumbs_are_best_tip_path =
+        (* List.equal
+           (fun breadcrumb_tree1 breadcrumb_tree2 ->
+             External_transition.Validated.equal
+               (Transition_frontier.Breadcrumb.validated_transition
+                  breadcrumb_tree1)
+               (Transition_frontier.Breadcrumb.validated_transition
+                  breadcrumb_tree2))
+           catchup_breadcrumbs target_best_tip_path *)
         Rose_tree.equal (Rose_tree.of_list_exn target_best_tip_path)
-          catchup_breadcrumbs ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
+          breadcrumbs_tree ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
             External_transition.Validated.equal
               (Transition_frontier.Breadcrumb.validated_transition
                  breadcrumb_tree1)
