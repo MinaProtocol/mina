@@ -1843,9 +1843,7 @@ module Base = struct
         | Get_global_ledger g ->
             g.ledger
         | Transaction_commitment_on_start
-            { other_parties = other_parties, _
-            ; protocol_state_predicate
-            } -> (
+            { other_parties = other_parties, _; protocol_state_predicate } -> (
             match is_start with
             | `No ->
                 assert false
@@ -4322,13 +4320,13 @@ let%test_module "transaction_snark" =
         let commitment = ref Local_state.dummy.transaction_commitment in
         let remaining_parties = ref [ parties ] in
         let remaining_partys = ref (Parties.parties parties.parties) in
-        List.fold states_rev ~init:[]
+        List.fold_right states_rev ~init:[]
           ~f:(fun
-               witnesses
                ( kind
                , spec
                , (source_global, source_local)
                , (target_global, target_local) )
+               witnesses
              ->
             let snapp_stmts =
               match spec with
