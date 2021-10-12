@@ -2357,9 +2357,9 @@ module For_tests = struct
     [@@deriving sexp, compare]
   end
 
-  let min_init_balance = 80_000
+  let min_init_balance = 8_000_000_000
 
-  let max_init_balance = 80_000_000
+  let max_init_balance = 8_000_000_000_000
 
   let num_accounts = 10
 
@@ -2432,7 +2432,9 @@ module For_tests = struct
         in
         fst init_ledger.(i)
       in
-      let gen_amount () = Currency.Amount.(gen_incl (of_int 1) (of_int 100)) in
+      let gen_amount () =
+        Currency.Amount.(gen_incl (of_int 1_000_000) (of_int 100_000_000))
+      in
       let nonce : Account_nonce.t = Map.find_exn nonces sender in
       let%bind fee = gen_amount () in
       let%bind amount = gen_amount () in
