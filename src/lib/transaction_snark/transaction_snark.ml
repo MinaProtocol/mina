@@ -4344,13 +4344,26 @@ let%test_module "transaction_snark" =
                 remaining_partys := List.tl_exn !remaining_partys ) ;
             let current_commitment = !commitment in
             let start_parties, next_commitment =
+              let empty_if_last mk =
+                match (target_local.parties, target_local.call_stack) with
+                | [], [] ->
+                    (* The commitment will be cleared, because this is the last
+                       party.
+                    *)
+                    Parties.Transaction_commitment.empty
+                | _ ->
+                    mk ()
+              in
+              let mk_next_commitment (parties : Parties.t) =
+                empty_if_last (fun () -> Parties.commitment parties)
+              in
               match kind with
               | `Same ->
-                  ([], current_commitment)
+                  ([], empty_if_last (fun () -> current_commitment))
               | `New -> (
                   match !remaining_parties with
                   | parties :: rest ->
-                      let commitment' = Parties.commitment parties.parties in
+                      let commitment' = mk_next_commitment parties.parties in
                       remaining_parties := rest ;
                       commitment := commitment' ;
                       ([ parties ], commitment')
@@ -4359,7 +4372,7 @@ let%test_module "transaction_snark" =
               | `Two_new -> (
                   match !remaining_parties with
                   | parties1 :: parties2 :: rest ->
-                      let commitment' = Parties.commitment parties2.parties in
+                      let commitment' = mk_next_commitment parties2.parties in
                       remaining_parties := rest ;
                       commitment := commitment' ;
                       ([ parties1; parties2 ], commitment')
