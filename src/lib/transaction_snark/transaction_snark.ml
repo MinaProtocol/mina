@@ -3698,43 +3698,48 @@ let group_by_parties_rev partiess stmtss =
   in
   group_by_parties_rev partiess stmtss []
 
-let parties_witnesses ~constraint_constants ~state_body ledger parties =
+let parties_witnesses ~constraint_constants ~state_body ledger partiess =
   let sparse_ledger =
     Sparse_ledger.of_ledger_subset_exn ledger
-      (Parties.accounts_accessed parties)
+      (List.concat_map ~f:Parties.accounts_accessed partiess)
   in
-  let _, states =
-    Sparse_ledger.apply_parties_unchecked_with_states sparse_ledger
-      ~constraint_constants
-      ~state_view:(Mina_state.Protocol_state.Body.view state_body)
-      parties
-    |> Or_error.ok_exn
+  let _, states_rev =
+    List.fold_left ~init:(sparse_ledger, []) partiess
+      ~f:(fun (sparse_ledger, statess_rev) parties ->
+        let _, states =
+          Sparse_ledger.apply_parties_unchecked_with_states sparse_ledger
+            ~constraint_constants
+            ~state_view:(Mina_state.Protocol_state.Body.view state_body)
+            parties
+          |> Or_error.ok_exn
+        in
+        let final_ledger = (fst (List.last_exn states)).ledger in
+        (final_ledger, states :: statess_rev))
   in
+  let states = List.rev states_rev in
   let states_rev =
     group_by_parties_rev
-      [ []; Parties.parties parties ]
-      [ [ List.hd_exn states ]; states ]
+      ([] :: List.map ~f:Parties.parties partiess)
+      ([ List.hd_exn (List.hd_exn states) ] :: states)
   in
-  let transaction : Parties.Transaction_commitment.t Lazy.t =
-    lazy (Parties.commitment parties)
-  in
-  let tx_statement (remaining_parties : Party.t list) : Snapp_statement.t =
+  let tx_statement transaction
+      (remaining_parties : (Party.t, _) Parties.Party_or_stack.t list) :
+      Snapp_statement.t =
     let at_party =
-      let hd_depth = (List.hd_exn remaining_parties).data.body.depth in
-      List.take_while remaining_parties ~f:(fun p ->
-          p.data.body.depth >= hd_depth)
-      |> Parties.Party_or_stack.With_hashes.other_parties_hash
+      Parties.Party_or_stack.(stack_hash (accumulate_hashes' remaining_parties))
     in
-    { transaction = Lazy.force transaction; at_party }
-  in
-  let parties : _ Parties_logic.Start_data.t =
-    { protocol_state_predicate = Snapp_predicate.Protocol_state.accept
-    ; parties
-    }
+    { transaction; at_party }
   in
   let commitment = ref Local_state.dummy.transaction_commitment in
-  let remaining_parties = ref [ parties ] in
-  let remaining_partys = ref (Parties.parties parties.parties) in
+  let remaining_parties =
+    let partiess =
+      List.map partiess ~f:(fun parties : _ Parties_logic.Start_data.t ->
+          { protocol_state_predicate = Snapp_predicate.Protocol_state.accept
+          ; parties
+          })
+    in
+    ref partiess
+  in
   List.fold_right states_rev ~init:[]
     ~f:(fun
          ( kind
@@ -3743,21 +3748,17 @@ let parties_witnesses ~constraint_constants ~state_body ledger parties =
          , (target_global, target_local) )
          witnesses
        ->
+      let current_commitment = !commitment in
       let snapp_stmts =
         match spec with
         | Proved ->
-            [ (0, tx_statement !remaining_partys) ]
+            (* NB: This is only correct if we assume that a proved party will
+               never appear first in a transaction.
+            *)
+            [ (0, tx_statement current_commitment source_local.parties) ]
         | _ ->
             []
       in
-      ( match spec with
-      | Opt_signed_unsigned | Opt_signed_opt_signed ->
-          remaining_partys := List.tl_exn @@ List.tl_exn !remaining_partys
-      | Opt_signed ->
-          remaining_partys := List.tl_exn !remaining_partys
-      | Proved ->
-          remaining_partys := List.tl_exn !remaining_partys ) ;
-      let current_commitment = !commitment in
       let start_parties, next_commitment =
         let empty_if_last mk =
           match (target_local.parties, target_local.call_stack) with
@@ -4475,7 +4476,7 @@ let%test_module "transaction_snark" =
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let parties = party_send (List.hd_exn specs) in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              apply_parties ledger parties)
+              apply_parties ledger [ parties ])
           |> fun ((), ()) -> ())
 
     (* Disabling until new-style snapp transactions are fully implemented.
@@ -4885,7 +4886,7 @@ let%test_module "transaction_snark" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  apply_parties ledger parties)
+                  apply_parties ledger [ parties ])
               |> fun ((), ()) -> ())
 
         type _ Snarky_backendless.Request.t +=
@@ -5187,7 +5188,7 @@ let%test_module "transaction_snark" =
                     ; protocol_state
                     }
                   in
-                  apply_parties ledger parties)
+                  apply_parties ledger [ parties ])
               |> fun ((), ()) -> ())
       end )
 
