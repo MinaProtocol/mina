@@ -228,4 +228,6 @@ cp -p src/models/* $MINA/src/lib/rosetta_models/
 ```
 In the generated files, the type `deriving` clauses will need to have `eq` added manually.
 Any record types with a field named `_type` will need annotate that field with `[@key "type"]`.
-In `lib/network.ml`, update the two instances of the version number.
+
+* In `lib/network.ml`, update the two instances of the version number.
+* In `lib/rosetta-models/operation.ml`, change `related_operations`'s type to `Operation_identifier.t list option [@default None]` and set the default to None.
