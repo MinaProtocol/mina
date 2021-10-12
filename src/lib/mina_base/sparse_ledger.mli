@@ -82,6 +82,7 @@ val apply_transaction_exn :
 val apply_parties_unchecked_with_states :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> state_view:Snapp_predicate.Protocol_state.View.t
+  -> fee_excess:Currency.Amount.Signed.t
   -> t
   -> Parties.t
   -> ( Transaction_logic.Transaction_applied.Parties_applied.t

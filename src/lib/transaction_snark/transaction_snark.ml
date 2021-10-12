@@ -3698,23 +3698,24 @@ let group_by_parties_rev partiess stmtss =
   in
   group_by_parties_rev partiess stmtss []
 
-let parties_witnesses ~constraint_constants ~state_body ledger partiess =
+let parties_witnesses ~constraint_constants ~state_body ~fee_excess ledger
+    partiess =
   let sparse_ledger =
     Sparse_ledger.of_ledger_subset_exn ledger
       (List.concat_map ~f:Parties.accounts_accessed partiess)
   in
-  let _, states_rev =
-    List.fold_left ~init:(sparse_ledger, []) partiess
-      ~f:(fun (sparse_ledger, statess_rev) parties ->
+  let _, _, states_rev =
+    List.fold_left ~init:(fee_excess, sparse_ledger, []) partiess
+      ~f:(fun (fee_excess, sparse_ledger, statess_rev) parties ->
         let _, states =
           Sparse_ledger.apply_parties_unchecked_with_states sparse_ledger
             ~constraint_constants
             ~state_view:(Mina_state.Protocol_state.Body.view state_body)
-            parties
+            ~fee_excess parties
           |> Or_error.ok_exn
         in
-        let final_ledger = (fst (List.last_exn states)).ledger in
-        (final_ledger, states :: statess_rev))
+        let final_state = fst (List.last_exn states) in
+        (final_state.fee_excess, final_state.ledger, states :: statess_rev))
   in
   let states = List.rev states_rev in
   let states_rev =
@@ -4449,7 +4450,8 @@ let%test_module "transaction_snark" =
 
     let apply_parties ledger parties =
       let witnesses =
-        parties_witnesses ~constraint_constants ~state_body ledger parties
+        parties_witnesses ~constraint_constants ~state_body
+          ~fee_excess:Amount.Signed.zero ledger parties
       in
       let open Impl in
       List.fold ~init:((), ()) witnesses

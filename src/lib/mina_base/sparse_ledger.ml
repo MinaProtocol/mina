@@ -175,11 +175,11 @@ M.
   , iteri
   , next_available_token )]
 
-let apply_parties_unchecked_with_states ~constraint_constants ~state_view ledger
-    c =
+let apply_parties_unchecked_with_states ~constraint_constants ~state_view
+    ~fee_excess ledger c =
   let open T in
-  apply_parties_unchecked_aux ~constraint_constants ~state_view (ref ledger) c
-    ~init:[]
+  apply_parties_unchecked_aux ~constraint_constants ~state_view ~fee_excess
+    (ref ledger) c ~init:[]
     ~f:(fun acc ({ ledger; fee_excess; protocol_state }, local_state) ->
       ( { GS.ledger = !ledger; fee_excess; protocol_state }
       , { local_state with ledger = !(local_state.ledger) } )

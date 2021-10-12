@@ -409,6 +409,7 @@ module type S = sig
                , unit )
                Parties_logic.Local_state.t
           -> 'acc)
+    -> ?fee_excess:Amount.Signed.t
     -> ledger
     -> Parties.t
     -> (Transaction_applied.Parties_applied.t * 'acc) Or_error.t
@@ -1692,7 +1693,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let apply_parties_unchecked_aux (type user_acc)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(state_view : Snapp_predicate.Protocol_state.View.t) ~(init : user_acc)
-      ~(f : user_acc -> _ -> user_acc) (ledger : L.t) (c : Parties.t) :
+      ~(f : user_acc -> _ -> user_acc) ?(fee_excess = Amount.Signed.zero)
+      (ledger : L.t) (c : Parties.t) :
       (Transaction_applied.Parties_applied.t * user_acc) Or_error.t =
     let original_account_states =
       List.map (Parties.accounts_accessed c) ~f:(fun id ->
@@ -1717,7 +1719,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             step_all (f user_acc s) s
     in
     let initial_state : Inputs.Global_state.t * _ Parties_logic.Local_state.t =
-      ( { protocol_state = state_view; ledger; fee_excess = Amount.Signed.zero }
+      ( { protocol_state = state_view; ledger; fee_excess }
       , { parties = []
         ; call_stack = []
         ; transaction_commitment = ()
