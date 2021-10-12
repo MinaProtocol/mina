@@ -230,4 +230,5 @@ In the generated files, the type `deriving` clauses will need to have `eq` added
 Any record types with a field named `_type` will need annotate that field with `[@key "type"]`.
 
 * In `lib/network.ml`, update the two instances of the version number.
-* In `lib/rosetta-models/operation.ml`, change `related_operations`'s type to `Operation_identifier.t list option [@default None]` and set the default to None.
+* In `lib/rosetta-models/operation.ml`, change the type of the field `related_operations` to `Operation_identifier.t list option` and add `[@default None]`. Also, in the `create` function, use `None` as the value of that field in the created record.
+
