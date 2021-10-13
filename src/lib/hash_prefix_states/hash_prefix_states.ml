@@ -115,3 +115,5 @@ let snapp_event = salt snapp_event
 let snapp_events = salt snapp_events
 
 let snapp_rollup_events = salt snapp_rollup_events
+
+let snapp_call_data = salt snapp_call_data
