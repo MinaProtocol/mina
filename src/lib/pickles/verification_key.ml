@@ -1,6 +1,6 @@
 open Core_kernel
 open Pickles_types
-open Import
+open Pickles_base.Import
 open Zexe_backend.Pasta
 
 module Data = struct
@@ -22,7 +22,7 @@ module Repr = struct
         { commitments :
             Backend.Tock.Curve.Affine.Stable.V1.t array
             Plonk_verification_key_evals.Stable.V1.t
-        ; step_domains : Domains.Stable.V1.t array
+        ; step_domains : Pickles_base.Domains.Stable.V1.t array
         ; data : Data.Stable.V1.t
         }
 
@@ -37,8 +37,8 @@ module Stable = struct
     type t =
       { commitments :
           Backend.Tock.Curve.Affine.t array Plonk_verification_key_evals.t
-      ; step_domains : Domains.t array
-      ; index : Impls.Wrap.Verification_key.t
+      ; step_domains : Pickles_base.Domains.t array
+      ; index : Pickles_base.Impls.Wrap.Verification_key.t
       ; data : Data.t
       }
     [@@deriving fields]
@@ -46,10 +46,12 @@ module Stable = struct
     let to_latest = Fn.id
 
     let of_repr urs { Repr.commitments = c; step_domains; data = d } =
-      let t : Impls.Wrap.Verification_key.t =
+      let t : Pickles_base.Impls.Wrap.Verification_key.t =
         let log2_size = Int.ceil_log2 d.constraints in
-        let d = Domain.Pow_2_roots_of_unity log2_size in
-        let max_quot_size = Common.max_quot_size_int (Domain.size d) in
+        let d = Pickles_base.Domain.Pow_2_roots_of_unity log2_size in
+        let max_quot_size =
+          Common.max_quot_size_int (Pickles_base.Domain.size d)
+        in
         { domain =
             { log_size_of_group = log2_size
             ; group_gen = Backend.Tock.Field.domain_generator log2_size
@@ -104,7 +106,7 @@ let dummy_commitments g =
 
 let dummy =
   lazy
-    (let rows = Domain.size Common.wrap_domains.h in
+    (let rows = Pickles_base.Domain.size Common.wrap_domains.h in
      let g =
        let len =
          let max_degree = Common.Max_degree.wrap in

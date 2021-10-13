@@ -19,7 +19,8 @@
    base64
    zexe_backend
    random_oracle_input
-   pickles_base
+   pickles.base
+   pickles.backend
    pickles.composition_types
    pickles.limb_vector
    pickles.plonk_checks

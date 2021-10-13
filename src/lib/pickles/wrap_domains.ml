@@ -1,6 +1,6 @@
 open Core_kernel
 open Pickles_types
-open Import
+open Pickles_base.Import
 open Poly_types
 open Hlist
 
@@ -12,9 +12,9 @@ module Make (A : T0) (A_value : T0) = struct
     let module M_inner =
       H4.Map
         (Tag)
-        (E04 (Domains))
+        (E04 (Pickles_base.Domains))
         (struct
-          let f : type a b c d. (a, b, c, d) Tag.t -> Domains.t =
+          let f : type a b c d. (a, b, c, d) Tag.t -> Pickles_base.Domains.t =
            fun t ->
             Types_map.lookup_map t ~self:self.Tag.id
               ~default:Common.wrap_domains ~f:(function
@@ -28,12 +28,16 @@ module Make (A : T0) (A_value : T0) = struct
       H4.Map
         (I)
         (H4.T
-           (E04 (Domains)))
+           (E04 (Pickles_base.Domains)))
            (struct
              let f :
                  type vars values env widths heights.
                     (vars, values, widths, heights) I.t
-                 -> (vars, values, widths, heights) H4.T(E04(Domains)).t =
+                 -> ( vars
+                    , values
+                    , widths
+                    , heights )
+                    H4.T(E04(Pickles_base.Domains)).t =
               fun rule -> M_inner.f rule.prevs
            end)
     in
@@ -42,9 +46,9 @@ module Make (A : T0) (A_value : T0) = struct
   let result =
     lazy
       (let x =
-         let (T (typ, conv)) = Impls.Wrap.input () in
-         Domain.Pow_2_roots_of_unity
-           (Int.ceil_log2 (Impls.Wrap.Data_spec.size [ typ ]))
+         let (T (typ, conv)) = Pickles_base.Impls.Wrap.input () in
+         Pickles_base.Domain.Pow_2_roots_of_unity
+           (Int.ceil_log2 (Pickles_base.Impls.Wrap.Data_spec.size [ typ ]))
        in
        { Common.wrap_domains with x })
 
@@ -78,7 +82,10 @@ module Make (A : T0) (A_value : T0) = struct
     in
     Timer.clock __LOC__ ;
     let t =
-      Fix_domains.domains (module Impls.Wrap) (Impls.Wrap.input ()) main
+      Fix_domains.domains
+        (module Pickles_base.Impls.Wrap)
+        (Pickles_base.Impls.Wrap.input ())
+        main
     in
     Timer.clock __LOC__ ; t
 
@@ -90,6 +97,6 @@ module Make (A : T0) (A_value : T0) = struct
         f_debug full_signature num_choices choices_length ~self ~choices
           ~max_branching
       in
-      [%test_eq: Domains.t] res res' ) ;
+      [%test_eq: Pickles_base.Domains.t] res res' ) ;
     res
 end

@@ -1,16 +1,16 @@
 (* q > p *)
 open Core_kernel
-open Import
-open Util
+open Pickles_base.Import
+open Pickles_base.Util
 open Types.Pairing_based
-module SC = Scalar_challenge
+module SC = Pickles_base.Scalar_challenge
 open Pickles_types
 open Common
-open Import
+open Pickles_base.Import
 module S = Sponge
 
 module Make
-    (Inputs : Intf.Pairing_main_inputs.S
+    (Inputs : Pickles_base.Intf.Pairing_main_inputs.S
                 with type Impl.field = Backend.Tick.Field.t
                  and type Impl.prover_state = unit
                  and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
@@ -28,12 +28,13 @@ struct
 
     module Constant = Other_field
 
-    type t = Impls.Step.Other_field.t
+    type t = Pickles_base.Impls.Step.Other_field.t
 
-    let typ = Impls.Step.Other_field.typ
+    let typ = Pickles_base.Impls.Step.Other_field.typ
 
     let to_bits_unsafe ((x, b) : t) =
-      Step_main_inputs.Unsafe.unpack_unboolean x ~length:(Field.size_in_bits - 1)
+      Pickles_base.Step_main_inputs.Unsafe.unpack_unboolean x
+        ~length:(Field.size_in_bits - 1)
       @ [ b ]
   end
 
@@ -92,8 +93,9 @@ struct
       ty t
 
   module Scalar_challenge =
-    SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Step_inner_curve)
-  module Ops = Step_main_inputs.Ops
+    SC.Make (Impl) (Inner_curve) (Challenge)
+      (Pickles_base.Endo.Step_inner_curve)
+  module Ops = Pickles_base.Step_main_inputs.Ops
 
   module Inner_curve = struct
     include Inner_curve
@@ -289,7 +291,8 @@ struct
   let lagrange_commitment ~domain i =
     let d =
       Zexe_backend.Pasta.Precomputed.Lagrange_precomputations
-      .index_of_domain_log2 (Domain.log2_size domain)
+      .index_of_domain_log2
+        (Pickles_base.Domain.log2_size domain)
     in
     match Precomputed.Lagrange_precomputations.pallas.(d).(i) with
     | [| g |] ->
@@ -324,7 +327,7 @@ struct
         in
         let sample () =
           let bits, packed = Sponge.squeeze sponge ~length:Challenge.length in
-          Util.boolean_constrain (module Impl) bits ;
+          Pickles_base.Util.boolean_constrain (module Impl) bits ;
           (bits, packed)
         in
         let sample_scalar () = squeeze_scalar sponge in
@@ -336,8 +339,8 @@ struct
                      (Array.of_list x, lagrange_commitment ~domain i)))
               |> Inner_curve.negate)
         in
-        let without = Type.Without_degree_bound in
-        let with_ = Type.With_degree_bound in
+        let without = Pickles_base.Type.Without_degree_bound in
+        let with_ = Pickles_base.Type.With_degree_bound in
         absorb sponge PC x_hat ;
         let l_comm = receive without l_comm in
         let r_comm = receive without r_comm in
@@ -348,7 +351,7 @@ struct
         let alpha, alpha_packed = sample_scalar () in
         let t_comm = receive with_ t_comm in
         let zeta, zeta_packed = sample_scalar () in
-        Util.boolean_constrain
+        Pickles_base.Util.boolean_constrain
           (module Impl)
           (match zeta with Scalar_challenge x -> x) ;
         (* At this point, we should use the previous "bulletproof_challenges" to
@@ -433,7 +436,8 @@ struct
                 ~pcs_batch:
                   (Common.dlog_pcs_batch (Branching.add Nat.N8.n)
                      ~max_quot_size:
-                       (Common.max_quot_size_int (Domain.size domain)))
+                       (Common.max_quot_size_int
+                          (Pickles_base.Domain.size domain)))
                 ~sponge:sponge_before_evaluations ~xi ~combined_inner_product
                 ~advice ~openings_proof
                 ~polynomials:(without_degree_bound, [ t_comm ]))
@@ -742,7 +746,7 @@ struct
 
   module Opt_sponge = struct
     module Underlying =
-      Opt_sponge.Make (Impl) (Step_main_inputs.Sponge.Permutation)
+      Opt_sponge.Make (Impl) (Pickles_base.Step_main_inputs.Sponge.Permutation)
 
     include S.Bit_sponge.Make
               (struct
@@ -751,11 +755,14 @@ struct
               (struct
                 type t = Field.t
 
-                let to_bits t = Step_main_inputs.Unsafe.unpack_unboolean t
+                let to_bits t =
+                  Pickles_base.Step_main_inputs.Unsafe.unpack_unboolean t
 
-                let finalize_discarded = Util.boolean_constrain (module Impl)
+                let finalize_discarded =
+                  Pickles_base.Util.boolean_constrain (module Impl)
 
-                let high_entropy_bits = Step_main_inputs.high_entropy_bits
+                let high_entropy_bits =
+                  Pickles_base.Step_main_inputs.high_entropy_bits
               end)
               (struct
                 type t = Boolean.var * Field.t
@@ -788,7 +795,7 @@ struct
     Shifted_value.Shift.(map ~f:Field.constant (create (module Field.Constant)))
 
   let%test_unit "endo scalar" =
-    SC.test (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
+    SC.test (module Impl) ~endo:Pickles_base.Endo.Wrap_inner_curve.scalar
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
      It
@@ -804,7 +811,7 @@ struct
   let finalize_other_proof (type b branches)
       (module Branching : Nat.Add.Intf with type n = b) ~max_width
       ~(step_domains :
-         [ `Known of (Domains.t, branches) Vector.t
+         [ `Known of (Pickles_base.Domains.t, branches) Vector.t
          | `Side_loaded of
            ( Field.t Side_loaded_verification_key.Domain.t
              Side_loaded_verification_key.Domains.t
@@ -834,7 +841,8 @@ struct
           | `Known domains ->
               ( `Known domains
               , Pseudo.Domain.to_domain ~shifts ~domain_generator
-                  (which_branch, Vector.map domains ~f:Domains.x) )
+                  (which_branch, Vector.map domains ~f:Pickles_base.Domains.x)
+              )
           | `Side_loaded ds ->
               ( `Side_loaded (side_loaded_domains ds which_branch)
               , (* This has to be the max_width of this proof system rather than actual width *)
@@ -849,8 +857,11 @@ struct
           let lengths =
             match step_domains with
             | `Known domains ->
-                let hs = map domains ~f:(fun { Domains.h; _ } -> h) in
-                Commitment_lengths.generic map ~h:(map hs ~f:Domain.size)
+                let hs =
+                  map domains ~f:(fun { Pickles_base.Domains.h; _ } -> h)
+                in
+                Commitment_lengths.generic map
+                  ~h:(map hs ~f:Pickles_base.Domain.size)
                   ~max_degree:Max_degree.step
                 |> Evals.map ~f:(fun lengths ->
                        Bounded.of_pseudo (which_branch, lengths))
@@ -876,14 +887,16 @@ struct
     absorb_evals x_hat2 evals2 ;
     let squeeze () =
       let x = Opt_sponge.squeeze sponge ~length:Challenge.length in
-      Util.boolean_constrain (module Impl) x ;
+      Pickles_base.Util.boolean_constrain (module Impl) x ;
       x
     in
     let xi_actual = squeeze () in
     let r_actual = squeeze () in
     let xi_correct = equal (pack xi_actual) (pack_scalar_challenge xi) in
     let scalar =
-      SC.to_field_checked (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
+      SC.to_field_checked
+        (module Impl)
+        ~endo:Pickles_base.Endo.Wrap_inner_curve.scalar
     in
     let plonk =
       Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
@@ -892,7 +905,7 @@ struct
     let domain =
       match step_domains with
       | `Known ds ->
-          let hs = map ds ~f:(fun { Domains.h; _ } -> h) in
+          let hs = map ds ~f:(fun { Pickles_base.Domains.h; _ } -> h) in
           Pseudo.Domain.to_domain (which_branch, hs) ~shifts ~domain_generator
       | `Side_loaded { h } ->
           (h :> _ Plonk_checks.plonk_domain)
@@ -914,7 +927,8 @@ struct
               `Known
                 ( which_branch
                 , Vector.map step_domains ~f:(fun x ->
-                      Common.max_quot_size_int (Domain.size x.Domains.h)) )
+                      Common.max_quot_size_int
+                        (Pickles_base.Domain.size x.Pickles_base.Domains.h)) )
           | `Side_loaded domains ->
               let conv domain =
                 let deg =
@@ -967,7 +981,7 @@ struct
       let e = Fn.flip actual_evaluation in
       Plonk_checks.checked
         (module Impl)
-        ~endo:(Impl.Field.constant Endo.Step_inner_curve.base)
+        ~endo:(Impl.Field.constant Pickles_base.Endo.Step_inner_curve.base)
         ~domain ~shift plonk ~mds:sponge_params.mds
         ( Dlog_plonk_types.Evals.map ~f:(e plonk.zeta) evals1
         , Dlog_plonk_types.Evals.map ~f:(e zetaw) evals2 )
@@ -1091,7 +1105,7 @@ struct
         Types.Pairing_based.Proof_state.Per_proof.In_circuit.t) =
     let public_input =
       let fp (Shifted_value.Shifted_value x) =
-        [| Step_main_inputs.Unsafe.unpack_unboolean x |]
+        [| Pickles_base.Step_main_inputs.Unsafe.unpack_unboolean x |]
       in
       with_label __LOC__ (fun () ->
           Spec.pack
@@ -1141,4 +1155,4 @@ struct
     bulletproof_success
 end
 
-include Make (Step_main_inputs)
+include Make (Pickles_base.Step_main_inputs)

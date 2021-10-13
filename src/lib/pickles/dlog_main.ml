@@ -1,15 +1,18 @@
-module type Inputs = Intf.Wrap_main_inputs.S
+module type Inputs = Pickles_base.Intf.Wrap_main_inputs.S
 
 module S = Sponge
 open Backend
 open Core_kernel
-open Util
-module SC = Scalar_challenge
+module C = Common
+open Pickles_base
+module Common = C
+open Pickles_base.Util
+module SC = Pickles_base.Scalar_challenge
 open Pickles_types
 open Dlog_plonk_types
 module Accumulator = Pairing_marlin_types.Accumulator
 open Tuple_lib
-open Import
+open Pickles_base.Import
 
 (* given [chals], compute
    \prod_i (1 / chals.(i) + chals.(i) * x^{2^i}) *)
@@ -46,9 +49,9 @@ struct
     module Packed = struct
       module Constant = Other_field
 
-      type t = Impls.Wrap.Other_field.t
+      type t = Pickles_base.Impls.Wrap.Other_field.t
 
-      let typ = Impls.Wrap.Other_field.typ
+      let typ = Pickles_base.Impls.Wrap.Other_field.typ
 
       let to_bits_unsafe (x : t) = Wrap_main_inputs.Unsafe.unpack_unboolean x
 
@@ -121,8 +124,9 @@ struct
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
   module Scalar_challenge =
-    SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Wrap_inner_curve)
-  module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
+    SC.Make (Impl) (Inner_curve) (Challenge)
+      (Pickles_base.Endo.Wrap_inner_curve)
+  module Ops = Pickles_base.Plonk_curve_ops.Make (Impl) (Inner_curve)
 
   let product m f = List.reduce_exn (List.init m ~f) ~f:Field.( * )
 
@@ -207,16 +211,17 @@ struct
         keys
         ~f:(fun b key -> map key ~f:(fun g -> Double.map g ~f:(( * ) (b :> t))))
       |> Vector.reduce_exn ~f:(map2 ~f:(Double.map2 ~f:( + )))
-      |> map ~f:(fun g -> Double.map ~f:(Util.seal (module Impl)) g)
+      |> map ~f:(fun g ->
+             Double.map ~f:(Pickles_base.Util.seal (module Impl)) g)
 
   let lagrange (type n)
       ~domain:
         ( (which_branch : n One_hot_vector.t)
-        , (domains : (Domains.t, n) Vector.t) ) i =
+        , (domains : (Pickles_base.Domains.t, n) Vector.t) ) i =
     Vector.map domains ~f:(fun d ->
         let d =
           Precomputed.Lagrange_precomputations.index_of_domain_log2
-            (Domain.log2_size d.h)
+            (Pickles_base.Domain.log2_size d.h)
         in
         match Precomputed.Lagrange_precomputations.vesta.(d).(i) with
         | [| g |] ->
@@ -232,14 +237,14 @@ struct
   let lagrange_with_correction (type n) ~input_length
       ~domain:
         ( (which_branch : n One_hot_vector.t)
-        , (domains : (Domains.t, n) Vector.t) ) i =
+        , (domains : (Pickles_base.Domains.t, n) Vector.t) ) i =
     let rec pow2pow x i =
       if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
     in
     Vector.map domains ~f:(fun d ->
         let d =
           Precomputed.Lagrange_precomputations.index_of_domain_log2
-            (Domain.log2_size d.h)
+            (Pickles_base.Domain.log2_size d.h)
         in
         match Precomputed.Lagrange_precomputations.vesta.(d).(i) with
         | [| g |] ->
@@ -409,7 +414,8 @@ struct
 
         let to_bits t = Wrap_main_inputs.Unsafe.unpack_unboolean t
 
-        let finalize_discarded = Util.boolean_constrain (module Impl)
+        let finalize_discarded =
+          Pickles_base.Util.boolean_constrain (module Impl)
 
         let high_entropy_bits = Wrap_main_inputs.high_entropy_bits
       end)
@@ -419,7 +425,7 @@ struct
       (Opt_sponge.Make (Impl) (Wrap_main_inputs.Sponge.Permutation))
 
   let absorb sponge ty t =
-    Util.absorb ~absorb_field:(Opt.absorb sponge)
+    Pickles_base.Util.absorb ~absorb_field:(Opt.absorb sponge)
       ~g1_to_field_elements:(fun (b, (x, y)) -> [ (b, x); (b, y) ])
       ~absorb_scalar:(fun x -> Opt.absorb sponge (Boolean.true_, x))
       ~mask_g1_opt:(fun (keep, ((finite : Boolean.var), (x, y))) ->
@@ -496,8 +502,10 @@ struct
       with_label __LOC__ (fun () ->
           let open Vector in
           let lengths =
-            let f field = map step_domains ~f:(Fn.compose Domain.size field) in
-            Commitment_lengths.generic map ~h:(f Domains.h)
+            let f field =
+              map step_domains ~f:(Fn.compose Pickles_base.Domain.size field)
+            in
+            Commitment_lengths.generic map ~h:(f Pickles_base.Domains.h)
               ~max_degree:Common.Max_degree.step
           in
           mask_messages ~lengths which_branch messages)
@@ -520,7 +528,7 @@ struct
         in
         let sample () =
           let xs = Opt.squeeze sponge ~length:Challenge.length in
-          Util.boolean_constrain (module Impl) xs ;
+          Pickles_base.Util.boolean_constrain (module Impl) xs ;
           xs
         in
         let sample_scalar () : Scalar_challenge.t =

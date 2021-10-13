@@ -1,8 +1,8 @@
-module SC = Scalar_challenge
+module SC = Pickles_base.Scalar_challenge
 open Core_kernel
 open Pickles_types
 open Common
-open Import
+open Pickles_base.Import
 open Types
 open Backend
 open Tuple_lib
@@ -11,7 +11,7 @@ module Instance = struct
   type t =
     | T :
         (module Nat.Intf with type n = 'n)
-        * (module Intf.Statement_value with type t = 'a)
+        * (module Pickles_base.Intf.Statement_value with type t = 'a)
         * Verification_key.t
         * 'a
         * ('n, 'n) Proof.t
@@ -58,7 +58,8 @@ let verify_heterogenous (ts : Instance.t list) =
         let open Pairing_marlin_types in
         let open Types.Dlog_based.Proof_state in
         let sc =
-          SC.to_field_constant tick_field ~endo:Endo.Wrap_inner_curve.scalar
+          SC.to_field_constant tick_field
+            ~endo:Pickles_base.Endo.Wrap_inner_curve.scalar
         in
         Timer.clock __LOC__ ;
         let { Deferred_values.xi
@@ -75,7 +76,7 @@ let verify_heterogenous (ts : Instance.t list) =
         let step_domains = key.step_domains.(Index.to_int which_branch) in
         let w =
           Tick.Field.domain_generator
-            ~log2_size:(Domain.log2_size step_domains.h)
+            ~log2_size:(Pickles_base.Domain.log2_size step_domains.h)
         in
         let zetaw = Tick.Field.mul zeta w in
         let plonk =
@@ -83,8 +84,8 @@ let verify_heterogenous (ts : Instance.t list) =
           let p, `Check_equal (lin1, lin2) =
             Plonk_checks.derive_plonk
               (module Tick.Field)
-              ~endo:Endo.Step_inner_curve.base ~shift:Shifts.tick
-              ~mds:Tick_field_sponge.params.mds
+              ~endo:Pickles_base.Endo.Step_inner_curve.base ~shift:Shifts.tick
+              ~mds:Pickles_base.Tick_field_sponge.params.mds
               ~domain:
                 (* TODO: Cache the shifts and domain_generator *)
                 (Plonk_checks.domain
@@ -111,9 +112,9 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         Timer.clock __LOC__ ;
         let absorb, squeeze =
-          let open Tick_field_sponge.Bits in
+          let open Pickles_base.Tick_field_sponge.Bits in
           let sponge =
-            let s = create Tick_field_sponge.params in
+            let s = create Pickles_base.Tick_field_sponge.params in
             absorb s
               (Digest.Constant.to_tick_field
                  statement.proof_state.sponge_digest_before_evaluations) ;
@@ -242,7 +243,7 @@ let verify_heterogenous (ts : Instance.t list) =
       false
 
 let verify (type a n) (max_branching : (module Nat.Intf with type n = n))
-    (a_value : (module Intf.Statement_value with type t = a))
+    (a_value : (module Pickles_base.Intf.Statement_value with type t = a))
     (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
   verify_heterogenous
     (List.map ts ~f:(fun (x, p) ->

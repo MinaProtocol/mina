@@ -1,4 +1,5 @@
 open Core_kernel
+open Pickles_base
 open Common
 open Backend
 module Me = Tock

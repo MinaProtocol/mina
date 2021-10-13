@@ -1,5 +1,6 @@
 open Core_kernel
 open Pickles_types
+open Pickles_base
 include Pickles_base.Common
 
 module Unshifted_acc =

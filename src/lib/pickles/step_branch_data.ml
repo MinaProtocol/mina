@@ -2,7 +2,7 @@ open Core_kernel
 open Pickles_types
 open Hlist
 open Common
-open Import
+open Pickles_base.Import
 
 (* The data obtained from "compiling" an inductive rule into a circuit. *)
 type ( 'a_var
@@ -18,7 +18,7 @@ type ( 'a_var
       { branching : 'branching Nat.t * ('prev_vars, 'branching) Hlist.Length.t
       ; index : Types.Index.t
       ; lte : ('branching, 'max_branching) Nat.Lte.t
-      ; domains : Domains.t
+      ; domains : Pickles_base.Domains.t
       ; rule :
           ( 'prev_vars
           , 'prev_values
@@ -28,10 +28,10 @@ type ( 'a_var
           , 'a_value )
           Inductive_rule.t
       ; main :
-             step_domains:(Domains.t, 'branches) Vector.t
+             step_domains:(Pickles_base.Domains.t, 'branches) Vector.t
           -> ( (Unfinalized.t, 'max_branching) Vector.t
-             , Impls.Step.Field.t
-             , (Impls.Step.Field.t, 'max_branching) Vector.t )
+             , Pickles_base.Impls.Step.Field.t
+             , (Pickles_base.Impls.Step.Field.t, 'max_branching) Vector.t )
              Types.Pairing_based.Statement.t
           -> unit
       ; requests :
@@ -122,10 +122,10 @@ let create
           (Vector.init branches ~f:(fun _ -> Fix_domains.rough_domains))
     in
     let etyp =
-      Impls.Step.input ~branching:max_branching
+      Pickles_base.Impls.Step.input ~branching:max_branching
         ~wrap_rounds:Backend.Tock.Rounds.n
     in
-    Fix_domains.domains (module Impls.Step) etyp main
+    Fix_domains.domains (module Pickles_base.Impls.Step) etyp main
   in
   Timer.clock __LOC__ ;
   T

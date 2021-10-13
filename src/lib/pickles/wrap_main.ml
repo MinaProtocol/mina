@@ -2,7 +2,7 @@ open Core_kernel
 open Pickles_types
 open Hlist
 open Common
-open Import
+open Pickles_base.Import
 open Types
 open Wrap_main_inputs
 open Impl
@@ -39,14 +39,14 @@ let check_wrap_domains ds =
     H4.Iter
       (H4.T
          (E04
-            (Domains)))
+            (Pickles_base.Domains)))
             (H4.Iter
                (E04
-                  (Domains))
+                  (Pickles_base.Domains))
                   (struct
-                    let f (d : Domains.t) =
+                    let f (d : Pickles_base.Domains.t) =
                       let d' = Common.wrap_domains in
-                      [%test_eq: Domain.t] d.h d'.h
+                      [%test_eq: Pickles_base.Domain.t] d.h d'.h
                   end))
   in
   I.f ds
@@ -62,30 +62,32 @@ let pad_domains (type prev_varss prev_valuess branches n)
     (module Max_branching : Nat.Intf with type n = n)
     (pi_branches : (prev_varss, branches) Length.t)
     (prev_wrap_domains :
-      (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t) =
+      (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Pickles_base.Domains))).t)
+    =
   let module Ds = struct
-    type t = (Domains.t, Max_branching.n) Vector.t
+    type t = (Pickles_base.Domains.t, Max_branching.n) Vector.t
   end in
   let ds : (prev_varss, prev_valuess, _, _) H4.T(E04(Ds)).t =
     let dummy_domains =
       (* TODO: The dummy should really be equal to one of the already present domains. *)
-      let d = Domain.Pow_2_roots_of_unity 1 in
-      { Domains.h = d; x = d }
+      let d = Pickles_base.Domain.Pow_2_roots_of_unity 1 in
+      { Pickles_base.Domains.h = d; x = d }
     in
     let module M =
       H4.Map
         (H4.T
            (E04
-              (Domains)))
+              (Pickles_base.Domains)))
               (E04 (Ds))
               (struct
-                module H = H4.T (E04 (Domains))
+                module H = H4.T (E04 (Pickles_base.Domains))
 
-                let f : type a b c d. (a, b, c, d) H4.T(E04(Domains)).t -> Ds.t
-                    =
+                let f :
+                    type a b c d.
+                    (a, b, c, d) H4.T(E04(Pickles_base.Domains)).t -> Ds.t =
                  fun domains ->
                   let (T (len, pi)) = H.length domains in
-                  let module V = H4.To_vector (Domains) in
+                  let module V = H4.To_vector (Pickles_base.Domains) in
                   Vector.extend_exn (V.f pi domains) Max_branching.n
                     dummy_domains
               end)
@@ -109,7 +111,7 @@ end
 let pack_statement max_branching =
   let pack_fq (Shifted_value.Shifted_value (x : Field.t)) =
     with_label __LOC__ (fun () ->
-        let lo, hi = Util.split_last (Unsafe.unpack_unboolean x) in
+        let lo, hi = Pickles_base.Util.split_last (Unsafe.unpack_unboolean x) in
         [| lo; [ hi ] |])
   in
   fun t ->
@@ -138,9 +140,9 @@ let wrap_main
     (step_keys :
       (Wrap_main_inputs.Inner_curve.Constant.t index, branches) Vector.t Lazy.t)
     (step_widths : (int, branches) Vector.t)
-    (step_domains : (Domains.t, branches) Vector.t)
+    (step_domains : (Pickles_base.Domains.t, branches) Vector.t)
     (prev_wrap_domains :
-      (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t)
+      (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Pickles_base.Domains))).t)
     (module Max_branching : Nat.Add.Intf with type n = max_branching) :
     (max_branching, max_local_max_branchings) Requests.Wrap.t
     * (   ( _
@@ -226,7 +228,7 @@ let wrap_main
       with_label __LOC__ (fun () ->
           let typ =
             let module T =
-              H1.Typ (Impls.Wrap) (Nat) (Challenges_vector)
+              H1.Typ (Pickles_base.Impls.Wrap) (Nat) (Challenges_vector)
                 (Challenges_vector.Constant)
                 (struct
                   let f (type n) (n : n Nat.t) =
@@ -260,7 +262,8 @@ let wrap_main
       with_label __LOC__ (fun () ->
           Vector.map domainses ~f:(fun v ->
               Commitment_lengths.generic Vector.map
-                ~h:(Vector.map v ~f:(fun { h; _ } -> Domain.size h))))
+                ~h:
+                  (Vector.map v ~f:(fun { h; _ } -> Pickles_base.Domain.size h))))
     in
     let new_bulletproof_challenges =
       with_label __LOC__ (fun () ->
@@ -289,7 +292,8 @@ let wrap_main
                   ( h
                   , ( which_branch
                     , Vector.map ds ~f:(fun d ->
-                          Common.max_quot_size_int (Domain.size d.h)) ) ))
+                          Common.max_quot_size_int
+                            (Pickles_base.Domain.size d.h)) ) ))
               |> Vector.unzip
             in
             let actual_branchings =
@@ -405,7 +409,9 @@ let wrap_main
                    Commitment_lengths.generic map ~max_degree:Max_degree.step
                      ~h:
                        (Vector.map step_domains
-                          ~f:(Fn.compose Domain.size Domains.h))))
+                          ~f:
+                            (Fn.compose Pickles_base.Domain.size
+                               Pickles_base.Domains.h))))
               ~request:(fun () -> Req.Messages))
       in
       let sponge = Opt.create sponge_params in

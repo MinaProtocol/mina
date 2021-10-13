@@ -1,6 +1,6 @@
 module P = Proof
 
-module type Statement_intf = Intf.Statement
+module type Statement_intf = Pickles_base.Intf.Statement
 
 module type Statement_var_intf =
   Statement_intf
@@ -10,9 +10,9 @@ module type Statement_value_intf =
   Statement_intf with type field := Backend.Tick.Field.t
 
 open Tuple_lib
-module SC = Scalar_challenge
+module SC = Pickles_base.Scalar_challenge
 open Core_kernel
-open Import
+open Pickles_base.Import
 open Types
 open Pickles_types
 open Poly_types
@@ -21,15 +21,15 @@ open Common
 open Backend
 module Backend = Backend
 module Common = Common
-module Sponge_inputs = Sponge_inputs
-module Util = Util
-module Tick_field_sponge = Tick_field_sponge
-module Impls = Impls
+module Sponge_inputs = Pickles_base.Sponge_inputs
+module Util = Pickles_base.Util
+module Tick_field_sponge = Pickles_base.Tick_field_sponge
+module Impls = Pickles_base.Impls
 module Inductive_rule = Inductive_rule
 module Tag = Tag
 module Dirty = Dirty
 module Cache_handle = Cache_handle
-module Step_main_inputs = Step_main_inputs
+module Step_main_inputs = Pickles_base.Step_main_inputs
 module Pairing_main = Pairing_main
 
 let verify = Verify.verify
@@ -474,12 +474,12 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let module M =
         H4.Map
           (Branch_data)
-          (E04 (Domains))
+          (E04 (Pickles_base.Domains))
           (struct
             let f (T b : _ Branch_data.t) = b.domains
           end)
       in
-      let module V = H4.To_vector (Domains) in
+      let module V = H4.To_vector (Pickles_base.Domains) in
       V.f prev_varss_length (M.f step_data)
     in
     let cache_handle = ref (Lazy.return `Cache_hit) in
@@ -564,19 +564,20 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           H4.Map
             (IR)
             (H4.T
-               (E04 (Domains)))
+               (E04 (Pickles_base.Domains)))
                (struct
                  let f :
                      type a b c d.
-                     (a, b, c, d) IR.t -> (a, b, c, d) H4.T(E04(Domains)).t =
+                        (a, b, c, d) IR.t
+                     -> (a, b, c, d) H4.T(E04(Pickles_base.Domains)).t =
                   fun rule ->
                    let module M =
                      H4.Map
                        (Tag)
-                       (E04 (Domains))
+                       (E04 (Pickles_base.Domains))
                        (struct
                          let f (type a b c d) (t : (a, b, c, d) Tag.t) :
-                             Domains.t =
+                             Pickles_base.Domains.t =
                            Types_map.lookup_map t ~self:self.id
                              ~default:wrap_domains ~f:(function
                              | `Compiled d ->
@@ -802,7 +803,7 @@ module Side_loaded = struct
         type nonrec t = t
 
         let to_field_elements = value_to_field_elements
-      end : Intf.Statement_value
+      end : Pickles_base.Intf.Statement_value
         with type t = t )
     in
     (* TODO: This should be the actual max width on a per proof basis *)
@@ -823,7 +824,7 @@ module Side_loaded = struct
                           input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
                             (Width.to_int vk.max_width))
                       in
-                      { Domains.x =
+                      { Pickles_base.Domains.x =
                           Pow_2_roots_of_unity (Int.ceil_log2 input_size)
                       ; h = d.h
                       })

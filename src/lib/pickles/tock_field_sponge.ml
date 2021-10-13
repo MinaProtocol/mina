@@ -1,3 +1,4 @@
+open Pickles_base
 include Make_sponge.Make (Backend.Tock.Field)
 
 let params =

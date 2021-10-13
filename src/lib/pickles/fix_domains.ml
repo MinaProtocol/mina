@@ -1,4 +1,5 @@
 open Core_kernel
+open Pickles_base
 open Import
 
 let domains (sys : _ Zexe_backend_common.Plonk_constraint_system.t) : Domains.t

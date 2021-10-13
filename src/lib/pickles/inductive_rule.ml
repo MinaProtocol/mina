@@ -1,6 +1,7 @@
 open Core_kernel
 open Pickles_types.Poly_types
 open Pickles_types.Hlist
+open Pickles_base
 
 module B = struct
   type t = Impls.Step.Boolean.var

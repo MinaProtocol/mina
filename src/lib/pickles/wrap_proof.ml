@@ -1,5 +1,5 @@
 open Pickles_types
-open Import
+open Pickles_base.Import
 open Backend
 
 type dlog_opening =
@@ -11,17 +11,17 @@ type t =
     , Tock.Curve.Affine.t Or_infinity.t )
     Dlog_plonk_types.Messages.t
 
-open Step_main_inputs
+open Pickles_base.Step_main_inputs
 
 type var =
   ( Inner_curve.t
-  , Impls.Step.Other_field.t Shifted_value.t )
+  , Pickles_base.Impls.Step.Other_field.t Shifted_value.t )
   Types.Pairing_based.Openings.Bulletproof.t
   * ( Inner_curve.t
-    , Impls.Step.Boolean.var * Inner_curve.t )
+    , Pickles_base.Impls.Step.Boolean.var * Inner_curve.t )
     Dlog_plonk_types.Messages.t
 
-open Impls.Step
+open Pickles_base.Impls.Step
 
 let typ : (var, t) Typ.t =
   let shift = Shifted_value.Shift.create (module Tock.Field) in

@@ -1,6 +1,6 @@
 open Core_kernel
 open Pickles_types
-open Import
+open Pickles_base.Import
 open Types
 open Common
 open Backend

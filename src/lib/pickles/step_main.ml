@@ -4,9 +4,9 @@ open Pickles_types
 open Common
 open Poly_types
 open Hlist
-open Import
-open Impls.Step
-open Step_main_inputs
+open Pickles_base.Import
+open Pickles_base.Impls.Step
+open Pickles_base.Step_main_inputs
 module B = Inductive_rule.B
 
 (* The SNARK function corresponding to the input inductive rule. *)
@@ -110,7 +110,8 @@ let step_main :
       local_signature_length local_branches_length
   in
   let module Prev_typ =
-    H4.Typ (Impls.Step) (Typ_with_max_branching) (Per_proof_witness)
+    H4.Typ (Pickles_base.Impls.Step) (Typ_with_max_branching)
+      (Per_proof_witness)
       (Per_proof_witness.Constant)
       (struct
         let f = Fn.id
@@ -118,7 +119,7 @@ let step_main :
   in
   let main (stmt : _ Types.Pairing_based.Statement.t) =
     let open Requests.Step in
-    let open Impls.Step in
+    let open Pickles_base.Impls.Step in
     with_label "step_main" (fun () ->
         let T = Max_branching.eq in
         let dlog_plonk_index =
@@ -261,7 +262,7 @@ let step_main :
                             state.sponge_digest_before_evaluations
                           in
                           let sponge =
-                            let open Step_main_inputs in
+                            let open Pickles_base.Step_main_inputs in
                             let sponge = Sponge.create sponge_params in
                             Sponge.absorb sponge (`Field sponge_digest) ;
                             sponge |> Opt_sponge.Underlying.of_sponge

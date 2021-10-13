@@ -1,8 +1,8 @@
 open Backend
-open Impls.Step
+open Pickles_base.Impls.Step
 open Pickles_types
 open Common
-open Import
+open Pickles_base.Import
 
 (* Unfinalized dlog-based proof, along with a flag which is true iff it
    is expected to verify. This allows for situations like the blockchain
@@ -44,7 +44,7 @@ module Constant = struct
         { plonk =
             { ( Plonk_checks.derive_plonk
                   (module Tock.Field)
-                  ~shift ~endo:Endo.Wrap_inner_curve.base
+                  ~shift ~endo:Pickles_base.Endo.Wrap_inner_curve.base
                   ~mds:Tock_field_sponge.params.mds
                   ~domain:
                     (Plonk_checks.domain

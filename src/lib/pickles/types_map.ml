@@ -1,6 +1,6 @@
 open Core_kernel
 open Pickles_types
-open Import
+open Pickles_base.Import
 open Backend
 
 (* TODO: max_branching is a terrible name. It should be max_width. *)
@@ -15,16 +15,17 @@ type inner_curve_var =
 module Basic = struct
   type ('var, 'value, 'n1, 'n2) t =
     { max_branching : (module Nat.Add.Intf with type n = 'n1)
-    ; value_to_field_elements : 'value -> Impls.Step.Field.Constant.t array
-    ; var_to_field_elements : 'var -> Impls.Step.Field.t array
-    ; typ : ('var, 'value) Impls.Step.Typ.t
+    ; value_to_field_elements :
+        'value -> Pickles_base.Impls.Step.Field.Constant.t array
+    ; var_to_field_elements : 'var -> Pickles_base.Impls.Step.Field.t array
+    ; typ : ('var, 'value) Pickles_base.Impls.Step.Typ.t
     ; branches : 'n2 Nat.t
-    ; wrap_domains : Domains.t
+    ; wrap_domains : Pickles_base.Domains.t
     ; wrap_key :
         Tick.Inner_curve.Affine.t
         Dlog_plonk_types.Poly_comm.Without_degree_bound.t
         Plonk_verification_key_evals.t
-    ; wrap_vk : Impls.Wrap.Verification_key.t
+    ; wrap_vk : Pickles_base.Impls.Wrap.Verification_key.t
     }
 end
 
@@ -40,9 +41,10 @@ module Side_loaded = struct
   module Permanent = struct
     type ('var, 'value, 'n1, 'n2) t =
       { max_branching : (module Nat.Add.Intf with type n = 'n1)
-      ; value_to_field_elements : 'value -> Impls.Step.Field.Constant.t array
-      ; var_to_field_elements : 'var -> Impls.Step.Field.t array
-      ; typ : ('var, 'value) Impls.Step.Typ.t
+      ; value_to_field_elements :
+          'value -> Pickles_base.Impls.Step.Field.Constant.t array
+      ; var_to_field_elements : 'var -> Pickles_base.Impls.Step.Field.t array
+      ; typ : ('var, 'value) Pickles_base.Impls.Step.Typ.t
       ; branches : 'n2 Nat.t
       }
   end
@@ -87,16 +89,16 @@ module Side_loaded = struct
 end
 
 module Compiled = struct
-  type f = Impls.Wrap.field
+  type f = Pickles_base.Impls.Wrap.field
 
   type ('a_var, 'a_value, 'max_branching, 'branches) basic =
-    { typ : ('a_var, 'a_value) Impls.Step.Typ.t
+    { typ : ('a_var, 'a_value) Pickles_base.Impls.Step.Typ.t
     ; branchings : (int, 'branches) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
-    ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
+    ; var_to_field_elements : 'a_var -> Pickles_base.Impls.Step.Field.t array
     ; value_to_field_elements : 'a_value -> Tick.Field.t array
-    ; wrap_domains : Domains.t
-    ; step_domains : (Domains.t, 'branches) Vector.t
+    ; wrap_domains : Pickles_base.Domains.t
+    ; step_domains : (Pickles_base.Domains.t, 'branches) Vector.t
     }
 
   (* This is the data associated to an inductive proof system with statement type
@@ -107,17 +109,17 @@ module Compiled = struct
     ; max_branching : (module Nat.Add.Intf with type n = 'max_branching)
     ; branchings : (int, 'branches) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
-    ; typ : ('a_var, 'a_value) Impls.Step.Typ.t
+    ; typ : ('a_var, 'a_value) Pickles_base.Impls.Step.Typ.t
     ; value_to_field_elements : 'a_value -> Tick.Field.t array
-    ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
+    ; var_to_field_elements : 'a_var -> Pickles_base.Impls.Step.Field.t array
     ; wrap_key :
         Tick.Inner_curve.Affine.t
         Dlog_plonk_types.Poly_comm.Without_degree_bound.t
         Plonk_verification_key_evals.t
         Lazy.t
-    ; wrap_vk : Impls.Wrap.Verification_key.t Lazy.t
-    ; wrap_domains : Domains.t
-    ; step_domains : (Domains.t, 'branches) Vector.t
+    ; wrap_vk : Pickles_base.Impls.Wrap.Verification_key.t Lazy.t
+    ; wrap_domains : Pickles_base.Domains.t
+    ; step_domains : (Pickles_base.Domains.t, 'branches) Vector.t
     }
 
   type packed =
@@ -152,18 +154,18 @@ module For_step = struct
   type ('a_var, 'a_value, 'max_branching, 'branches) t =
     { branches : 'branches Nat.t
     ; max_branching : (module Nat.Add.Intf with type n = 'max_branching)
-    ; branchings : (Impls.Step.Field.t, 'branches) Vector.t
-    ; typ : ('a_var, 'a_value) Impls.Step.Typ.t
+    ; branchings : (Pickles_base.Impls.Step.Field.t, 'branches) Vector.t
+    ; typ : ('a_var, 'a_value) Pickles_base.Impls.Step.Typ.t
     ; value_to_field_elements : 'a_value -> Tick.Field.t array
-    ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
+    ; var_to_field_elements : 'a_var -> Pickles_base.Impls.Step.Field.t array
     ; wrap_key :
         inner_curve_var Dlog_plonk_types.Poly_comm.Without_degree_bound.t
         Plonk_verification_key_evals.t
-    ; wrap_domains : Domains.t
+    ; wrap_domains : Pickles_base.Domains.t
     ; step_domains :
-        [ `Known of (Domains.t, 'branches) Vector.t
+        [ `Known of (Pickles_base.Domains.t, 'branches) Vector.t
         | `Side_loaded of
-          ( Impls.Step.Field.t Side_loaded_verification_key.Domain.t
+          ( Pickles_base.Impls.Step.Field.t Side_loaded_verification_key.Domain.t
             Side_loaded_verification_key.Domains.t
           , 'branches )
           Vector.t ]
@@ -218,13 +220,13 @@ module For_step = struct
     { branches
     ; max_width = None
     ; max_branching
-    ; branchings = Vector.map branchings ~f:Impls.Step.Field.of_int
+    ; branchings = Vector.map branchings ~f:Pickles_base.Impls.Step.Field.of_int
     ; typ
     ; value_to_field_elements
     ; var_to_field_elements
     ; wrap_key =
         Plonk_verification_key_evals.map (Lazy.force wrap_key)
-          ~f:(Array.map ~f:Step_main_inputs.Inner_curve.constant)
+          ~f:(Array.map ~f:Pickles_base.Step_main_inputs.Inner_curve.constant)
     ; wrap_domains
     ; step_domains = `Known step_domains
     }
@@ -266,9 +268,9 @@ let lookup_basic : type a b n m. (a, b, n, m) Tag.t -> (a, b, n, m) Basic.t =
       Side_loaded.to_basic (lookup_side_loaded t.id)
 
 let lookup_step_domains :
-    type a b n m. (a, b, n, m) Tag.t -> (Domain.t, m) Vector.t =
+    type a b n m. (a, b, n, m) Tag.t -> (Pickles_base.Domain.t, m) Vector.t =
  fun t ->
-  let f = Vector.map ~f:Domains.h in
+  let f = Vector.map ~f:Pickles_base.Domains.h in
   match t.kind with
   | Compiled ->
       f (lookup_compiled t.id).step_domains
@@ -282,7 +284,7 @@ let lookup_step_domains :
             At_most.to_array (At_most.map k.step_data ~f:(fun (ds, _) -> ds.h))
           in
           Vector.init t.permanent.branches ~f:(fun i ->
-              try a.(i) with _ -> Domain.Pow_2_roots_of_unity 0) )
+              try a.(i) with _ -> Pickles_base.Domain.Pow_2_roots_of_unity 0) )
 
 let max_branching :
     type n1. (_, _, n1, _) Tag.t -> (module Nat.Add.Intf with type n = n1) =
@@ -294,7 +296,8 @@ let max_branching :
       (lookup_side_loaded tag.id).permanent.max_branching
 
 let typ :
-    type var value. (var, value, _, _) Tag.t -> (var, value) Impls.Step.Typ.t =
+    type var value.
+    (var, value, _, _) Tag.t -> (var, value) Pickles_base.Impls.Step.Typ.t =
  fun tag ->
   match tag.kind with
   | Compiled ->
