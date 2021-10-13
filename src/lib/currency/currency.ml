@@ -719,6 +719,81 @@ module Balance = struct
   [%%endif]
 end
 
+module Fee_rate = struct
+  type t = Q.t
+
+  let uint64_to_z u64 = Z.of_string @@ Unsigned.UInt64.to_string u64
+
+  let uint64_of_z z = Unsigned.UInt64.of_string @@ Z.to_string z
+
+  let max_uint64_z = uint64_to_z Unsigned.UInt64.max_int
+
+  let fits_uint64 z =
+    let open Z in
+    leq zero z && leq z max_uint64_z
+
+  (** check if a Q.t is in range *)
+  let check_q Q.{ num; den } : bool =
+    let open Z in
+    fits_uint64 num && fits_int32 den
+    && if equal zero den then equal zero num else true
+
+  let of_q q = if check_q q then Some q else None
+
+  let of_q_exn q = Option.value_exn (of_q q)
+
+  let to_q = ident
+
+  let make fee weight = of_q @@ Q.make (uint64_to_z fee) (Z.of_int weight)
+
+  let make_exn fee weight = Option.value_exn (make fee weight)
+
+  let to_uint64 Q.{ num; den } =
+    if Z.(equal den Z.one) then Some (uint64_of_z num) else None
+
+  let to_uint64_exn fr = Option.value_exn (to_uint64 fr)
+
+  let add x y = of_q @@ Q.add x y
+
+  let sub x y = of_q @@ Q.sub x y
+
+  let mul x y = of_q @@ Q.mul x y
+
+  let div x y = of_q @@ Q.div x y
+
+  let ( + ) = add
+
+  let ( - ) = sub
+
+  let ( * ) = mul
+
+  let scale fr s = fr * Q.of_int s
+
+  let scale_exn fr s = Option.value_exn (scale fr s)
+
+  let compare = Q.compare
+
+  let t_of_sexp sexp =
+    let open Ppx_sexp_conv_lib.Conv in
+    pair_of_sexp Fee.t_of_sexp int_of_sexp sexp
+    |> fun (fee, weight) -> make_exn fee weight
+
+  let sexp_of_t Q.{ num = fee; den = weight } =
+    let sexp_of_fee fee = Fee.sexp_of_t @@ uint64_of_z fee in
+    let sexp_of_weight weight = sexp_of_int @@ Z.to_int weight in
+    sexp_of_pair sexp_of_fee sexp_of_weight (fee, weight)
+
+  include Comparable.Make (struct
+    type nonrec t = t
+
+    let compare = compare
+
+    let t_of_sexp = t_of_sexp
+
+    let sexp_of_t = sexp_of_t
+  end)
+end
+
 let%test_module "sub_flagged module" =
   ( module struct
     [%%ifdef consensus_mechanism]
