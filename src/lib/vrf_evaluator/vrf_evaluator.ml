@@ -373,9 +373,10 @@ let create ~constraint_constants ~pids ~consensus_constants ~conf_dir ~logger
       ~metadata:[("err", Error_json.error_to_yojson err)] ;
     Error.raise err
   in
+  [%log info] "Starting a new vrf-evaluator process" ;
   let%bind connection, process =
-    Worker.spawn_in_foreground_exn ~on_failure ~shutdown_on:Disconnect
-      ~connection_state_init_arg:()
+    Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
+      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
       {constraint_constants; consensus_constants; conf_dir; logger}
   in
   [%log info]
