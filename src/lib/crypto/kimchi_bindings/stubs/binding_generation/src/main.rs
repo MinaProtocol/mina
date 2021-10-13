@@ -174,11 +174,19 @@ fn generate_bindings(mut w: impl std::io::Write) {
     });
 
     decl_module!(w, env, "Vesta", {
-        decl_type!(w, env, CamlGroupProjectiveVesta => "t");
+        decl_module!(w, env, "BaseField", {
+            decl_type_alias!(w, env, "t" => CamlFq);
+        });
+
+        decl_module!(w, env, "ScalarField", {
+            decl_type_alias!(w, env, "t" => CamlFp);
+        });
 
         decl_module!(w, env, "Affine", {
             decl_type_alias!(w, env, "t" => CamlGroupAffine<CamlFq>);
         });
+
+        decl_type!(w, env, CamlGroupProjectiveVesta => "t");
 
         decl_func!(w, env, caml_pasta_vesta_one => "one");
         decl_func!(w, env, caml_pasta_vesta_add => "add");
@@ -197,11 +205,19 @@ fn generate_bindings(mut w: impl std::io::Write) {
     });
 
     decl_module!(w, env, "Pallas", {
-        decl_type!(w, env, CamlGroupProjectivePallas => "t");
+        decl_module!(w, env, "BaseField", {
+            decl_type_alias!(w, env, "t" => CamlFp);
+        });
+
+        decl_module!(w, env, "ScalarField", {
+            decl_type_alias!(w, env, "t" => CamlFq);
+        });
 
         decl_module!(w, env, "Affine", {
             decl_type_alias!(w, env, "t" => CamlGroupAffine<CamlFp>);
         });
+
+        decl_type!(w, env, CamlGroupProjectivePallas => "t");
 
         decl_func!(w, env, caml_pasta_pallas_one => "one");
         decl_func!(w, env, caml_pasta_pallas_add => "add");

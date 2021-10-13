@@ -3,17 +3,16 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type 'f t = 'f Marlin_plonk_bindings_types.Scalar_challenge.t =
-      | Scalar_challenge of 'f
+    type 'f t = 'f Kimchi.Protocol.scalar_challenge = { inner : 'f }
     [@@deriving sexp, compare, equal, yojson, hash]
   end
 end]
 
-let create t = Scalar_challenge t
+let create t = { inner = t }
 
 let typ f =
-  let there (Scalar_challenge x) = x in
-  let back x = Scalar_challenge x in
+  let there { inner = x } = x in
+  let back x = create x in
   Snarky_backendless.Typ.(transport_var (transport f ~there ~back) ~there ~back)
 
-let map (Scalar_challenge x) ~f = Scalar_challenge (f x)
+let map { inner = x } ~f = create (f x)

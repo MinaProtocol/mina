@@ -1,5 +1,4 @@
 module Poly_comm0 = Poly_comm
-open Marlin_plonk_bindings.Types
 open Unsigned.Size_t
 
 module type Stable_v1 = sig
@@ -26,7 +25,7 @@ module type Inputs_intf = sig
 
     type t
 
-    val wrap : t -> Plonk_gate.Wire.t -> Plonk_gate.Wire.t -> unit
+    val wrap : t -> Kimchi.Protocol.wire -> Kimchi.Protocol.wire -> unit
   end
 
   module Urs : sig

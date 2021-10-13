@@ -3,6 +3,7 @@ open Kimchi_backend_common
 
 (** ? *)
 module Rounds : sig
+  (* TODO: remove open *)
   open Pickles_types
 
   module Wrap : Nat.Add.Intf_transparent
@@ -67,6 +68,7 @@ end = struct
   end
 end
 
+(* why use a functor here? *)
 module Bigint256 =
   Kimchi_backend_common.Bigint.Make
     (Kimchi.Foundations.BigInt256)
@@ -115,7 +117,7 @@ module Fq_poly_comm = Kimchi_backend_common.Poly_comm.Make (struct
   module Base_field = Fp
 
   module Backend = struct
-    include Pasta_fq_urs.Poly_comm
+    include Kimchi.Protocol.Srs.Fq.Poly_comm
 
     let shifted ({ shifted; _ } : t) = shifted
 
@@ -130,7 +132,7 @@ module Fp_poly_comm = Kimchi_backend_common.Poly_comm.Make (struct
   module Base_field = Fq
 
   module Backend = struct
-    include Pasta_fp_urs.Poly_comm
+    include Kimchi.Protocol.Srs.Fp.Poly_comm
 
     let shifted ({ shifted; _ } : t) = shifted
 

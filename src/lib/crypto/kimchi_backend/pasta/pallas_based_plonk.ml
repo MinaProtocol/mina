@@ -177,7 +177,7 @@ module Oracles = Plonk_dlog_oracles.Make (struct
   module Proof = Proof
 
   module Backend = struct
-    include Marlin_plonk_bindings.Pasta_fq_oracles
+    include Kimchi.Oracles.Fq (* Marlin_plonk_bindings.Pasta_fq_oracles *)
 
     let create = with_lagrange create
   end

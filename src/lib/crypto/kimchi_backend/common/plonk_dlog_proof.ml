@@ -1,5 +1,4 @@
 open Core_kernel
-open Pickles_types
 
 module type Stable_v1 = sig
   module Stable : sig
@@ -35,12 +34,12 @@ module type Inputs_intf = sig
       include Stable_v1 with type Stable.V1.t = Base_field.t * Base_field.t
 
       module Backend : sig
-        type t = (Base_field.t * Base_field.t) Or_infinity.t
+        type t = Base_field.t Pickles_types.Or_infinity.t
       end
 
-      val of_backend : Backend.t -> t Or_infinity.t
+      val of_backend : Backend.t -> Base_field.t Pickles_types.Or_infinity.t
 
-      val to_backend : t Or_infinity.t -> Backend.t
+      val to_backend : Base_field.t Pickles_types.Or_infinity.t -> Backend.t
     end
   end
 
@@ -48,7 +47,7 @@ module type Inputs_intf = sig
     type t = Curve.Affine.t Poly_comm.t
 
     module Backend : sig
-      type t = Curve.Affine.Backend.t Marlin_plonk_bindings.Types.Poly_comm.t
+      type t = Curve.Affine.Backend.t Kimchi.Protocol.poly_comm
     end
 
     val of_backend_with_degree_bound : Backend.t -> t
@@ -60,14 +59,11 @@ module type Inputs_intf = sig
 
   module Opening_proof_backend : sig
     type t =
-      ( Scalar_field.t
-      , Curve.Affine.Backend.t )
-      Marlin_plonk_bindings.Types.Plonk_proof.Opening_proof.t
+      (Curve.Affine.Backend.t, Scalar_field.t) Kimchi.Protocol.opening_proof
   end
 
   module Evaluations_backend : sig
-    type t =
-      Scalar_field.t Marlin_plonk_bindings.Types.Plonk_proof.Evaluations.t
+    type t = Scalar_field.t Kimchi.Protocol.proof_evaluations
   end
 
   module Index : sig
@@ -80,10 +76,7 @@ module type Inputs_intf = sig
 
   module Backend : sig
     type t =
-      ( Scalar_field.t
-      , Curve.Affine.Backend.t
-      , Poly_comm.Backend.t )
-      Marlin_plonk_bindings_types.Plonk_proof.t
+      (Curve.Affine.Backend.t, Scalar_field.t) Kimchi.Protocol.prover_proof
 
     val create :
          Index.t
@@ -154,10 +147,11 @@ module Make (Inputs : Inputs_intf) = struct
       module V1 = struct
         type t =
           ( G.Affine.Stable.V1.t
-          , G.Affine.Stable.V1.t Or_infinity.Stable.V1.t
+          , G.Affine.Stable.V1.t Pickles_types.Or_infinity.Stable.V1.t
           , Fq.Stable.V1.t
-          , Fq.Stable.V1.t Dlog_plonk_types.Pc_array.Stable.V1.t )
-          Dlog_plonk_types.Proof.Stable.V1.t
+          , Fq.Stable.V1.t Pickles_types.Dlog_plonk_types.Pc_array.Stable.V1.t
+          )
+          Pickles_types.Dlog_plonk_types.Proof.Stable.V1.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
         let to_latest = Fn.id
@@ -165,19 +159,19 @@ module Make (Inputs : Inputs_intf) = struct
         type 'a creator =
              messages:
                ( G.Affine.t
-               , G.Affine.t Or_infinity.t )
-               Dlog_plonk_types.Messages.Stable.V1.t
+               , G.Affine.t Pickles_types.Or_infinity.t )
+               Pickles_types.Dlog_plonk_types.Messages.Stable.V1.t
           -> openings:
                ( G.Affine.t
                , Fq.t
-               , Fq.t Dlog_plonk_types.Pc_array.t )
-               Dlog_plonk_types.Openings.Stable.V1.t
+               , Fq.t Pickles_types.Dlog_plonk_types.Pc_array.t )
+               Pickles_types.Dlog_plonk_types.Openings.Stable.V1.t
           -> 'a
 
         let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
 
         let create ~messages ~openings =
-          let open Dlog_plonk_types.Proof in
+          let open Pickles_types.Dlog_plonk_types.Proof in
           { messages; openings }
       end
     end]
@@ -199,13 +193,16 @@ module Make (Inputs : Inputs_intf) = struct
     Array.iter arr ~f:(fun fe -> Fq.Vector.emplace_back vec fe) ;
     vec
 
+  (** Note that this function will panic if some of the points are points at infinity *)
   let opening_proof_of_backend (t : Opening_proof_backend.t) =
-    let g x = G.Affine.of_backend x |> Or_infinity.finite_exn in
-    let gpair (type a) (t : G.Affine.Backend.t * G.Affine.Backend.t) :
+    let g x = G.Affine.of_backend x |> Pickles_types.Or_infinity.finite_exn in
+    let gpair (t : G.Affine.Backend.t * G.Affine.Backend.t) :
         G.Affine.t * G.Affine.t =
       (g (fst t), g (snd t))
     in
-    { Dlog_plonk_types.Openings.Bulletproof.lr = Array.map ~f:gpair t.lr
+    let lr : (G.Affine.Backend.t * G.Affine.Backend.t) array = t.lr in
+    { Pickles_types.Dlog_plonk_types.Openings.Bulletproof.lr =
+        Array.map ~f:gpair t.lr
     ; z_1 = t.z1
     ; z_2 = t.z2
     ; delta = g t.delta
@@ -218,14 +215,12 @@ module Make (Inputs : Inputs_intf) = struct
       (fst t.evals, snd t.evals)
       |> Tuple_lib.Double.map ~f:(fun e ->
              let open Evaluations_backend in
-             { Dlog_plonk_types.Evals.l = e.l
-             ; r = e.r
-             ; o = e.o
+             { Pickles_types.Dlog_plonk_types.Evals.w = e.w
              ; z = e.z
-             ; t = e.t
-             ; f = e.f
-             ; sigma1 = e.sigma1
-             ; sigma2 = e.sigma2
+             ; s = e.s
+             ; lookup = e.lookup
+             ; generic_selector = e.generic_selector
+             ; poseidon_selector = e.poseidon_selector
              })
     in
     let wo x =
@@ -244,17 +239,15 @@ module Make (Inputs : Inputs_intf) = struct
     in
     create
       ~messages:
-        { l_comm = wo t.messages.l_comm
-        ; r_comm = wo t.messages.r_comm
-        ; o_comm = wo t.messages.o_comm
-        ; z_comm = wo t.messages.z_comm
-        ; t_comm = w t.messages.t_comm
+        { w_comm = wo t.commitments.w_comm
+        ; z_comm = wo t.commitments.z_comm
+        ; t_comm = wo t.commitments.t_comm
         }
       ~openings:{ proof; evals }
 
   let eval_to_backend
-      { Dlog_plonk_types.Evals.l; r; o; z; t; f; sigma1; sigma2 } :
-      Evaluations_backend.t =
+      { Pickles_types.Dlog_plonk_types.Evals.l; r; o; z; t; f; sigma1; sigma2 }
+      : Evaluations_backend.t =
     { l; r; o; z; t; f; sigma1; sigma2 }
 
   let vec_to_array (type t elt)

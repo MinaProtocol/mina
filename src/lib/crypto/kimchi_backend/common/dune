@@ -27,10 +27,10 @@
   integers
   allocation_functor))
 
-(rule
- (targets version.ml)
- (deps
-  (:< gen_version.sh)
-  (source_tree src/lib/marlin))
- (action
-  (run %{<} %{targets})))
+;(rule
+; (targets version.ml)
+; (deps
+;  (:< gen_version.sh)
+;  (source_tree src/lib/marlin))
+; (action
+;  (run %{<} %{targets})))

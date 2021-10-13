@@ -12,11 +12,15 @@
   (source_tree src))
  (action
   (progn
+   (run rm -rf ./target)
+   (run rm -f ./Cargo.lock)
    (setenv
     RUSTFLAGS
     "-C target-feature=+bmi2,+adx"
     (run cargo build --release))
    (run cp target/release/libwires_15_stubs.a .))))
+
+;; library
 
 (library
  (public_name kimchi)
@@ -43,5 +47,5 @@
    binding_generation
    (progn
     (run rm -rf ./target)
-    (run rm -rf ./Cargo.lock)
+    (run rm -f ./Cargo.lock)
     (run cargo run ../kimchi.ml)))))

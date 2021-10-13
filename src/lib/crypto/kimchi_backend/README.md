@@ -1,11 +1,11 @@
-# Zexe-backend
+# Kimchi Backend
 
 This package contains the glue between:
 
-* [snarky](), TKTK
-* and [marlin-plonk-binding](), the OCaml bindings to [proof-systems]() (the Rust code that implements our proof systems).
+* [snarky]()/[pickles](), TKTK
+* and [kimchi_bindings](../kimchi_bindings), the OCaml bindings to our proof system [kimchi](https://www.github.com/o1-labs/proof-systems) written in Rust.
 
-As snarky expects specific "backend" modules, zexe-backend mostly contains functors that converts the ocaml-bindings found in [marlin-plonk-binding]() into what snarky expects.
+As snarky expects specific "backend" modules, zexe-backend mostly contains functors that converts the ocaml-bindings found in [kimchi_bindings](../kimchi_bindings) into what snarky expects.
 
 There's three things to convert here:
 
@@ -37,13 +37,6 @@ kimchi_backend/
 │   ├── poly_comm.ml
 │   ├── scale_round.ml
 │   ├── var.ml # ?
-│   ├── version.ml # there's a gen_version script that prolly should be called from mina_version/gen.sh, or even live in the stubs directory, not thereq
+│   ├── version.ml # there's a gen_version script that prolly should be called from mina_version/gen.sh, or even live in the stubs directory, not there
 └── kimchi_backend.ml # ?
 ```
-
-## Roadmap
-
-- [ ] since we have multiple proof systems, but some common pieces (arkworks types), move the common pieces to their own module
-- [ ] move this to a crypto/ repo
-- [ ] rename this package (plonk backend?)
-- [ ] implement the 15-wires backend

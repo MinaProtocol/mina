@@ -1,4 +1,3 @@
-open Marlin_plonk_bindings.Types
 open Intf
 open Core_kernel
 
@@ -12,7 +11,7 @@ module type Input_intf = sig
   end
 
   module Affine : sig
-    type t = (BaseField.t * BaseField.t) Or_infinity.t
+    type t = BaseField.t Kimchi.Foundations.or_infinity
   end
 
   type t
@@ -87,9 +86,11 @@ struct
     module Backend = struct
       include C.Affine
 
-      let zero () = Or_infinity.Infinity
+      let zero () =
+        let open Kimchi.Foundations in
+        Infinity
 
-      let create x y = Or_infinity.Finite (x, y)
+      let create x y = Kimchi.Foundations.Finite (x, y)
     end
 
     module Stable = struct
@@ -164,8 +165,8 @@ struct
     match C.to_affine t with
     | Infinity ->
         failwith "to_affine_exn: Got identity"
-    | Finite c ->
-        c
+    | Finite (x, y) ->
+        (x, y)
 
   let of_affine (x, y) = C.of_affine_coordinates x y
 

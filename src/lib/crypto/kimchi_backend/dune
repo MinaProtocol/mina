@@ -8,11 +8,10 @@
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
  (libraries
-  ;;kimchi_backend.common
+  kimchi_backend.common
   kimchi_backend.pasta
   hex
   pickles_types
-  marlin_plonk_bindings
   key_cache
   sgn_type
   snarky.backendless

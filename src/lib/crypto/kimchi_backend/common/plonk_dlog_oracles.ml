@@ -22,7 +22,7 @@ module type Inputs_intf = sig
   end
 
   module Backend : sig
-    type t = Field.t Marlin_plonk_bindings.Types.Oracles.t
+    type t = Field.t Kimchi.Protocol.oracles
 
     val create : Verifier_index.t -> Proof.Backend.t -> t
   end
