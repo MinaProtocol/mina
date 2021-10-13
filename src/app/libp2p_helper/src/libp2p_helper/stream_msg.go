@@ -39,6 +39,7 @@ func (m AddStreamHandlerReq) handle(app *app, seqno uint64) *capnp.Message {
 		app.StreamsMutex.Lock()
 		defer app.StreamsMutex.Unlock()
 		app.Streams[streamIdx] = stream
+		app.StreamStates[streamIdx] = STREAM_DATA_EXPECTED
 		app.writeMsg(mkIncomingStreamUpcall(peerinfo, streamIdx, protocolId))
 		handleStreamReads(app, stream, streamIdx)
 	})
@@ -69,6 +70,7 @@ func (m CloseStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[streamId]; ok {
 		delete(app.Streams, streamId)
+		delete(app.StreamStates, streamId)
 		err := stream.Close()
 		if err != nil {
 			return mkRpcRespError(seqno, badp2p(err))
@@ -136,7 +138,7 @@ func (m OpenStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
 	app.Streams[streamIdx] = stream
-	app.StreamStates[streamIdx] = STREAM_DATA_EXPECTED
+	app.StreamStates[streamIdx] = STREAM_DATA_UNEXPECTED
 	go func() {
 		// FIXME HACK: allow time for the openStreamResult to get printed before we start inserting stream events
 		time.Sleep(250 * time.Millisecond)
@@ -197,6 +199,7 @@ func (m ResetStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 	app.StreamsMutex.Lock()
 	if stream, ok := app.Streams[streamId]; ok {
 		delete(app.Streams, streamId)
+		delete(app.StreamStates, streamId)
 		app.StreamsMutex.Unlock()
 		err := stream.Reset()
 		if err != nil {

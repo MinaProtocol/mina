@@ -112,12 +112,13 @@ let%test_module "coda network tests" =
                 if i = 0 then return ()
                 else
                   let%bind s =
-                    match%map Pipe.read' ~max_queue_length:1 r with
+                    match%map Pipe.read r with
                     | `Eof ->
-                        failwith "Eof"
-                    | `Ok q ->
-                        Base.Queue.peek_exn q
+                        failwith "b: pipe eof"
+                    | `Ok x ->
+                        x
                   in
+                  let%bind () = Pipe.write w (Int.to_string i) in
                   let s' = ref s in
                   let j = ref i in
                   while not (String.is_empty !s') do
@@ -132,8 +133,7 @@ let%test_module "coda network tests" =
                   done ;
                   go !j
               in
-              go 1000
-              >>| fun () ->
+              let%map () = go 1000 in
               Pipe.close w ;
               Ivar.fill handler_finished ())
           >>| Or_error.ok_exn
@@ -145,7 +145,16 @@ let%test_module "coda network tests" =
         let r, w = Libp2p_stream.pipes stream in
         let rec go2 i =
           if i = 0 then return ()
-          else Pipe.write w (Printf.sprintf "%d" i) >>= fun () -> go2 (i - 1)
+          else
+            let%bind () = Pipe.write w (Printf.sprintf "%d" i) in
+            let%bind () =
+              match%map Pipe.read r with
+              | `Eof ->
+                  failwith "c: pipe eof"
+              | `Ok _ ->
+                  ()
+            in
+            go2 (i - 1)
         in
         let%bind () = go2 1000 in
         Pipe.close w ;
@@ -167,8 +176,6 @@ let%test_module "coda network tests" =
           open_protocol b ~on_handler_error:`Raise ~protocol:"echo"
             (fun stream ->
               let r, w = Libp2p_stream.pipes stream in
-              (* Prime the pipe by writing to it, in lieu of an RPC menu. *)
-              let () = Pipe.write_without_pushback w "1" in
               let%map () = Pipe.transfer r w ~f:Fn.id in
               Pipe.close w ;
               Ivar.fill_if_empty handler_finished ())
@@ -178,7 +185,6 @@ let%test_module "coda network tests" =
           open_stream c ~protocol:"echo" ~peer:b_peerid >>| Or_error.ok_exn
         in
         let r, w = Libp2p_stream.pipes stream in
-        let%bind _fake_rpc_menu = Pipe.read r in
         Pipe.write_without_pushback w testmsg ;
         Pipe.close w ;
         (* HACK: let our messages send before we reset.

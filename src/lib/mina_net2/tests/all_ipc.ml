@@ -247,6 +247,7 @@ let%test_module "all-ipc test" =
         open_stream a ~protocol ~peer:ad.b_peerid >>| Or_error.ok_exn
       in
       let stream1_in, stream1_out = Libp2p_stream.pipes stream1 in
+      Pipe.write_without_pushback stream1_out "request" ;
 
       (* Await message 1 on stream 1 *)
       (* This way Bob notifies Alice that he has subscribed to topic "a"
@@ -269,7 +270,8 @@ let%test_module "all-ipc test" =
       let%bind stream2 =
         open_stream a ~protocol ~peer:ad.c_peerid >>| Or_error.ok_exn
       in
-      let stream2_in, _ = Libp2p_stream.pipes stream2 in
+      let stream2_in, stream2_out = Libp2p_stream.pipes stream2 in
+      Pipe.write_without_pushback stream2_out "request" ;
 
       (* Read message on stream 2: upon receiving the message
          we know that Carol stopped publishing on topic "a" and is no longer
@@ -284,8 +286,7 @@ let%test_module "all-ipc test" =
          hence stream is not to be opened or to be reset immediately. *)
       let%bind () =
         open_stream a ~protocol ~peer:ad.c_peerid
-        >>= (fun stream3_res ->
-              match stream3_res with
+        >>= (function
               | Ok s ->
                   let s_in, _ = Libp2p_stream.pipes s in
                   Pipe.read s_in >>| expectEof
@@ -405,7 +406,12 @@ let%test_module "all-ipc test" =
         |> or_timeout ~msg:"Bob: waiting for stream 1"
       in
       let stream1_in, stream1_out = Libp2p_stream.pipes stream1 in
-      (* 20. Send message 1 on stream 1 *)
+      (* 20. Req request on stream 1 and respond with message 1 *)
+      let%bind _ =
+        Pipe.read stream1_in
+        >>| nonEof "Bob: unexpected pipe eof"
+        |> or_timeout ~msg:"Bob: waiting for request on stream 1"
+      in
       let%bind () =
         Pipe.write stream1_out msgs.stream_1_msg_1
         |> or_timeout ~msg:"Bob: send message 1 to stream 1"
@@ -489,6 +495,11 @@ let%test_module "all-ipc test" =
 
       (* Notify Alice that publishing on topic "a" is finished and
          protocol is closed *)
+      let%bind _ =
+        Pipe.read stream2_in
+        >>| nonEof "Carol: unexpected pipe eof"
+        |> or_timeout ~msg:"Carol: waiting for request on stream2"
+      in
       let%bind () =
         Pipe.write stream2_out msgs.stream_2_msg_1
         |> or_timeout ~msg:"Carol: send message 1 on stream 2"
