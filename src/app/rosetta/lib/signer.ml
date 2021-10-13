@@ -55,6 +55,8 @@ let sign ~(keys : Keys.t) ~unsigned_transaction_string =
     |> Result.ok
     |> Option.value_exn ~here:[%here] ?error:None ?message:None
   in
+  (* TODO: Should we use the signer_input explicitly here to dogfood it? *)
+  (* Should we just inline that here? *)
   let signature =
     Schnorr.sign keys.keypair.private_key
       unsigned_transaction.random_oracle_input

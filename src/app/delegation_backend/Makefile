@@ -1,4 +1,4 @@
-.PHONY: clean build test tidy docker docker-run
+.PHONY: clean build test tidy docker docker-run docker-toolchain
 
 ifeq ($(GO),)
 GO := go
@@ -16,11 +16,11 @@ tidy:
 test:
 	GO=$(GO) ./scripts/build.sh test
 
-docker-upload:
-	./scripts/build.sh docker-upload
-
 docker-run:
-	./scripts/build.sh docker-run
+	./scripts/build.sh $@
+
+docker-toolchain:
+	./scripts/build.sh $@
 
 docker:
-	./scripts/build.sh docker
+	./scripts/build.sh $@

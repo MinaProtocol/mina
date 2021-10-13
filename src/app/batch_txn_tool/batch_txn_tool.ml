@@ -97,7 +97,7 @@ let pk_to_str pk =
   pk |> Public_key.compress |> Public_key.Compressed.to_base58_check
 
 let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
-    ~rate_limit ~rate_limit_level ~rate_limit_interval
+    ~txn_fee_option ~rate_limit ~rate_limit_level ~rate_limit_interval
     ~origin_sender_secret_key_path
     ~(origin_sender_secret_key_pw_option : string option)
     ~returner_secret_key_path ~(returner_secret_key_pw_option : string option)
@@ -137,11 +137,15 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   (* contants regarding send amount and fees *)
   let base_send_amount = Currency.Amount.of_formatted_string "0" in
   let fee_amount =
-    Currency.Amount.to_fee
-      (Option.value_exn
-         (Currency.Amount.scale
-            (Currency.Amount.of_fee Mina_base.Signed_command.minimum_fee)
-            10))
+    match txn_fee_option with
+    | None ->
+        Currency.Amount.to_fee
+          (Option.value_exn
+             (Currency.Amount.scale
+                (Currency.Amount.of_fee Mina_base.Signed_command.minimum_fee)
+                10))
+    | Some f ->
+        Currency.Amount.to_fee (Currency.Amount.of_formatted_string f)
   in
   (* let acct_creation_fee = Currency.Amount.of_formatted_string "1" in *)
   let initial_send_amount =
@@ -291,6 +295,11 @@ let output_there_and_back_cmds =
            "NUM Number of transaction that a single block can hold.  Used for \
             rate limiting (default: 128)"
          (optional_with_default 128 int)
+     and txn_fee_option =
+       flag "--txn-fee" ~aliases:[ "txn-fee" ]
+         ~doc:
+           "FEE_AMOUNT Fee to set, a default is provided if this is not present"
+         (optional string)
      and slot_time =
        flag "--slot-time" ~aliases:[ "slot-time" ]
          ~doc:
@@ -353,8 +362,8 @@ let output_there_and_back_cmds =
             format `<ip>:<port>`.  default is `127.0.0.1:3085`"
          (optional string)
      in
-     there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time
-       ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
+     there_and_back_again ~num_txn_per_acct ~txns_per_block ~txn_fee_option
+       ~slot_time ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
        ~origin_sender_secret_key_path ~origin_sender_secret_key_pw_option
        ~returner_secret_key_path ~returner_secret_key_pw_option
        ~graphql_target_node_option)

@@ -47,7 +47,6 @@ chmod 600 /tmpkeys/online-fish-account-1-key;
 
 echo "ran batch txns";
 
-while true; do echo looping; sleep 120; done;
             '
             
             env:

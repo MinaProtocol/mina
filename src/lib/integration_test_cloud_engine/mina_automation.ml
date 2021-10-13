@@ -390,7 +390,7 @@ module Network_manager = struct
       }
     in
     (* we currently only deploy 1 seed and coordinator per deploy (will be configurable later) *)
-    let seed_nodes = [ cons_node "seed" "coda" None None ] in
+    let seed_nodes = [ cons_node "seed" "mina" None None ] in
     let snark_coordinator_name =
       "snark-coordinator-"
       ^ String.lowercase
@@ -408,11 +408,11 @@ module Network_manager = struct
     let block_producer_nodes =
       List.map network_config.terraform.block_producer_configs
         ~f:(fun bp_config ->
-          cons_node bp_config.name "coda" None (Some bp_config.keypair))
+          cons_node bp_config.name "mina" None (Some bp_config.keypair))
     in
     let archive_nodes =
       List.init network_config.terraform.archive_node_count ~f:(fun i ->
-          cons_node (sprintf "archive-%d" (i + 1)) "coda" (Some "archive") None)
+          cons_node (sprintf "archive-%d" (i + 1)) "mina" (Some "archive") None)
     in
     let nodes_by_app_id =
       let all_nodes =

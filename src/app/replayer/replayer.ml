@@ -25,7 +25,7 @@ open Mina_base
 
 type input =
   { target_epoch_ledgers_state_hash : State_hash.t option [@default None]
-  ; start_slot : int64 [@default 0L]
+  ; start_slot_since_genesis : int64 [@default 0L]
   ; genesis_ledger : Runtime_config.Ledger.t
   }
 [@@deriving yojson]
@@ -83,7 +83,7 @@ let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
   ; target_epoch_data
   }
 
-(* map from global slots to state hash, ledger hash pairs *)
+(* map from global slots (since genesis) to state hash, ledger hash pairs *)
 let global_slot_hashes_tbl : (Int64.t, State_hash.t * Ledger_hash.t) Hashtbl.t =
   Int64.Table.create ()
 
@@ -104,8 +104,8 @@ let get_slot_hashes ~logger slot =
     match Hashtbl.find global_slot_hashes_tbl curr_slot with
     | None ->
         [%log info]
-          "State and ledger hashes not available at slot %Ld, will try \
-           predecessor slot"
+          "State and ledger hashes not available at slot since genesis %Ld, \
+           will try predecessor slot"
           curr_slot ;
         go (Int64.pred curr_slot)
     | Some hashes ->
@@ -327,7 +327,7 @@ let cache_fee_transfer_via_coinbase pool (internal_cmd : Sql.Internal_command.t)
       let fee_transfer = Coinbase_fee_transfer.create ~receiver_pk ~fee in
       Hashtbl.add_exn fee_transfer_tbl
         ~key:
-          ( internal_cmd.global_slot
+          ( internal_cmd.global_slot_since_genesis
           , internal_cmd.sequence_no
           , internal_cmd.secondary_sequence_no )
         ~data:fee_transfer
@@ -369,28 +369,129 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
         ] ;
     if continue_on_error then incr error_count else Core_kernel.exit 1 )
 
+let account_creation_fee_uint64 =
+  Currency.Fee.to_uint64 constraint_constants.account_creation_fee
+
+let account_creation_fee_int64 =
+  Currency.Fee.to_int constraint_constants.account_creation_fee |> Int64.of_int
+
+let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
+    ~balance_id ~pk_id ~fee ~continue_on_error =
+  let%map claimed_balance =
+    balance_of_id_and_pk_id pool ~id:balance_id ~pk_id
+  in
+  let balance_uint64 = Currency.Balance.to_uint64 claimed_balance in
+  let fee_uint64 = Currency.Fee.to_uint64 fee in
+  if Unsigned_extended.UInt64.( >= ) fee_uint64 account_creation_fee_uint64 then (
+    (* account may have been created *)
+    let fee_less_account_creation_fee_uint64 =
+      Unsigned.UInt64.sub fee_uint64 account_creation_fee_uint64
+    in
+    if Unsigned.UInt64.equal balance_uint64 fee_less_account_creation_fee_uint64
+    then
+      match receiver_account_creation_fee with
+      | None ->
+          [%log error]
+            "In the archive database, the account balance equals the internal \
+             command fee minus the account creation fee, but the receiver \
+             account creation fee is NULL"
+            ~metadata:
+              [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
+              ; ("fee", Currency.Fee.to_yojson fee)
+              ; ( "constraint_constants.account_creation_fee"
+                , Currency.Fee.to_yojson
+                    constraint_constants.account_creation_fee )
+              ] ;
+          if continue_on_error then incr error_count else Core_kernel.exit 1
+      | Some amount_int64 ->
+          if Int64.equal amount_int64 account_creation_fee_int64 then
+            (* account creation fee in db has the expected value *)
+            ()
+          else (
+            [%log error]
+              "In the archive database, the account balance equals the \
+               internal command fee minus the account creation fee, but the \
+               receiver account creation fee differs from the account creation \
+               fee"
+              ~metadata:
+                [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
+                ; ("fee", Currency.Fee.to_yojson fee)
+                ; ( "constraint_constants.account_creation_fee"
+                  , Currency.Fee.to_yojson
+                      constraint_constants.account_creation_fee )
+                ; ( "receiver_account_creation_fee"
+                  , `String (Int64.to_string amount_int64) )
+                ] ;
+            if continue_on_error then incr error_count else Core_kernel.exit 1 )
+    else
+      match receiver_account_creation_fee with
+      | None ->
+          ()
+      | Some amount_int64 ->
+          [%log error]
+            "In the archive database, the account balance is different than \
+             the internal command fee minus the account creation fee, but the \
+             receiver account creation fee is not NULL"
+            ~metadata:
+              [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
+              ; ("fee", Currency.Fee.to_yojson fee)
+              ; ( "constraint_constants.account_creation_fee"
+                , Currency.Fee.to_yojson
+                    constraint_constants.account_creation_fee )
+              ; ( "receiver_account_creation_fee"
+                , `String (Int64.to_string amount_int64) )
+              ] ;
+          if continue_on_error then incr error_count else Core_kernel.exit 1 )
+  else
+    (* fee less than account creation fee *)
+    match receiver_account_creation_fee with
+    | None ->
+        ()
+    | Some amount_int64 ->
+        [%log error]
+          "The internal command fee is less than the account creation fee, so \
+           no account should have been created, but in the archive database, \
+           the receiver account creation fee is not NULL"
+          ~metadata:
+            [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
+            ; ("fee", Currency.Fee.to_yojson fee)
+            ; ( "constraint_constants.account_creation_fee"
+              , Currency.Fee.to_yojson constraint_constants.account_creation_fee
+              )
+            ; ( "receiver_account_creation_fee"
+              , `String (Int64.to_string amount_int64) )
+            ] ;
+        if continue_on_error then incr error_count else Core_kernel.exit 1
+
 let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
     ~continue_on_error =
   [%log info]
-    "Applying internal command (%s) with global slot %Ld, sequence number %d, \
-     and secondary sequence number %d"
-    cmd.type_ cmd.global_slot cmd.sequence_no cmd.secondary_sequence_no ;
+    "Applying internal command (%s) with global slot since genesis %Ld, \
+     sequence number %d, and secondary sequence number %d"
+    cmd.type_ cmd.global_slot_since_genesis cmd.sequence_no
+    cmd.secondary_sequence_no ;
   let%bind receiver_pk = pk_of_pk_id pool cmd.receiver_id in
   let fee = Currency.Fee.of_uint64 (Unsigned.UInt64.of_int64 cmd.fee) in
   let fee_token = Token_id.of_uint64 (Unsigned.UInt64.of_int64 cmd.token) in
   let txn_global_slot =
-    cmd.txn_global_slot |> Unsigned.UInt32.of_int64
+    cmd.txn_global_slot_since_genesis |> Unsigned.UInt32.of_int64
     |> Mina_numbers.Global_slot.of_uint32
   in
   let fail_on_error err =
     Error.tag_arg err "Could not apply internal command"
-      (("global slot", cmd.global_slot), ("sequence number", cmd.sequence_no))
+      ( ("global slot_since_genesis", cmd.global_slot_since_genesis)
+      , ("sequence number", cmd.sequence_no) )
       [%sexp_of: (string * int64) * (string * int)]
     |> Error.raise
   in
   let pk_id = cmd.receiver_id in
   let balance_id = cmd.receiver_balance in
   let token_int64 = cmd.token in
+  let receiver_account_creation_fee = cmd.receiver_account_creation_fee_paid in
+  let%bind () =
+    verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
+      ~balance_id ~pk_id ~fee ~continue_on_error
+  in
   let open Mina_base.Ledger in
   match cmd.type_ with
   | "fee_transfer" -> (
@@ -412,7 +513,9 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       (* combining situation 1: add cached coinbase fee transfer, if it exists *)
       let fee_transfer =
         Hashtbl.find fee_transfer_tbl
-          (cmd.global_slot, cmd.sequence_no, cmd.secondary_sequence_no)
+          ( cmd.global_slot_since_genesis
+          , cmd.sequence_no
+          , cmd.secondary_sequence_no )
       in
       let coinbase =
         match Coinbase.create ~amount ~receiver:receiver_pk ~fee_transfer with
@@ -460,7 +563,7 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger ~continue_on_error
         |> Error.raise
   in
   let txn_global_slot =
-    cmd2.txn_global_slot |> Unsigned.UInt32.of_int64
+    cmd2.txn_global_slot_since_genesis |> Unsigned.UInt32.of_int64
     |> Mina_numbers.Global_slot.of_uint32
   in
   let applied_or_error =
@@ -484,7 +587,14 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger ~continue_on_error
       |> Error.raise
 
 let body_of_sql_user_cmd pool
-    ({ type_; source_id; receiver_id; token = tok; amount; global_slot; _ } :
+    ({ type_
+     ; source_id
+     ; receiver_id
+     ; token = tok
+     ; amount
+     ; global_slot_since_genesis
+     ; _
+     } :
       Sql.User_command.t) : Signed_command_payload.Body.t Deferred.t =
   let open Signed_command_payload.Body in
   let open Deferred.Let_syntax in
@@ -500,7 +610,8 @@ let body_of_sql_user_cmd pool
   match type_ with
   | "payment" ->
       if Option.is_none amount then
-        failwithf "Payment at global slot %Ld has NULL amount" global_slot () ;
+        failwithf "Payment at global slot since genesis %Ld has NULL amount"
+          global_slot_since_genesis () ;
       let amount = Option.value_exn amount in
       Payment Payment_payload.Poly.{ source_pk; receiver_pk; token_id; amount }
   | "delegation" ->
@@ -521,7 +632,8 @@ let body_of_sql_user_cmd pool
         }
   | "mint_tokens" ->
       if Option.is_none amount then
-        failwithf "Mint token at global slot %Ld has NULL amount" global_slot () ;
+        failwithf "Mint token at global slot since genesis %Ld has NULL amount"
+          global_slot_since_genesis () ;
       let amount = Option.value_exn amount in
       Mint_tokens
         { Minting_payload.token_id
@@ -535,9 +647,9 @@ let body_of_sql_user_cmd pool
 let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
     ~continue_on_error =
   [%log info]
-    "Applying user command (%s) with nonce %Ld, global slot %Ld, and sequence \
-     number %d"
-    cmd.type_ cmd.nonce cmd.global_slot cmd.sequence_no ;
+    "Applying user command (%s) with nonce %Ld, global slot since genesis %Ld, \
+     and sequence number %d"
+    cmd.type_ cmd.nonce cmd.global_slot_since_genesis cmd.sequence_no ;
   let%bind body = body_of_sql_user_cmd pool cmd in
   let%bind fee_payer_pk = pk_of_pk_id pool cmd.fee_payer_id in
   let memo = Signed_command_memo.of_string cmd.memo in
@@ -568,7 +680,9 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
       =
     Signed_command.to_valid_unsafe signed_cmd
   in
-  let txn_global_slot = Unsigned.UInt32.of_int64 cmd.txn_global_slot in
+  let txn_global_slot =
+    Unsigned.UInt32.of_int64 cmd.txn_global_slot_since_genesis
+  in
   match
     Ledger.apply_user_command ~constraint_constants ~txn_global_slot ledger
       valid_signed_cmd
@@ -609,7 +723,8 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
         ~token_int64:cmd.fee_token ~continue_on_error
   | Error err ->
       Error.tag_arg err "User command failed on replay"
-        (("global slot", cmd.global_slot), ("sequence number", cmd.sequence_no))
+        ( ("global slot_since_genesis", cmd.global_slot_since_genesis)
+        , ("sequence number", cmd.sequence_no) )
         [%sexp_of: (string * int64) * (string * int)]
       |> Error.raise
 
@@ -725,7 +840,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                 ~f:(fun db -> Sql.Block.get_max_slot db ())
                 ~item:"max slot"
             in
-            [%log info] "Maximum global slot in blocks is %d" max_slot ;
+            [%log info] "Maximum global slot since genesis in blocks is %d"
+              max_slot ;
             try_slot ~logger pool max_slot
       in
       [%log info] "Loading block information using target state hash" ;
@@ -735,8 +851,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             let ids = List.map block_infos ~f:(fun { id; _ } -> id) in
             (* build mapping from global slots to state and ledger hashes *)
             List.iter block_infos
-              ~f:(fun { global_slot; state_hash; ledger_hash; _ } ->
-                Hashtbl.add_exn global_slot_hashes_tbl ~key:global_slot
+              ~f:(fun { global_slot_since_genesis; state_hash; ledger_hash; _ }
+                 ->
+                Hashtbl.add_exn global_slot_hashes_tbl
+                  ~key:global_slot_since_genesis
                   ~data:
                     ( State_hash.of_string state_hash
                     , Ledger_hash.of_string ledger_hash )) ;
@@ -811,7 +929,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
       *)
       let filtered_internal_cmds =
         List.filter unsorted_internal_cmds ~f:(fun cmd ->
-            Int64.( >= ) cmd.global_slot input.start_slot
+            Int64.( >= ) cmd.global_slot_since_genesis
+              input.start_slot_since_genesis
             && Int.Set.mem block_ids cmd.block_id)
       in
       [%log info] "Will replay %d internal commands"
@@ -819,7 +938,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
       let sorted_internal_cmds =
         List.sort filtered_internal_cmds ~compare:(fun ic1 ic2 ->
             let tuple (ic : Sql.Internal_command.t) =
-              (ic.global_slot, ic.sequence_no, ic.secondary_sequence_no)
+              ( ic.global_slot_since_genesis
+              , ic.sequence_no
+              , ic.secondary_sequence_no )
             in
             [%compare: int64 * int * int] (tuple ic1) (tuple ic2))
       in
@@ -851,7 +972,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
       *)
       let filtered_user_cmds =
         List.filter unsorted_user_cmds ~f:(fun cmd ->
-            Int64.( >= ) cmd.global_slot input.start_slot
+            Int64.( >= ) cmd.global_slot_since_genesis
+              input.start_slot_since_genesis
             && Int.Set.mem block_ids cmd.block_id)
       in
       [%log info] "Will replay %d user commands"
@@ -859,14 +981,14 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
       let sorted_user_cmds =
         List.sort filtered_user_cmds ~compare:(fun uc1 uc2 ->
             let tuple (uc : Sql.User_command.t) =
-              (uc.global_slot, uc.sequence_no)
+              (uc.global_slot_since_genesis, uc.sequence_no)
             in
             [%compare: int64 * int] (tuple uc1) (tuple uc2))
       in
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
-          (user_cmds : Sql.User_command.t list) ~last_global_slot ~last_block_id
-          ~staking_epoch_ledger ~next_epoch_ledger =
+          (user_cmds : Sql.User_command.t list) ~last_global_slot_since_genesis
+          ~last_block_id ~staking_epoch_ledger ~next_epoch_ledger =
         let%bind staking_epoch_ledger, staking_seed =
           update_staking_epoch_data ~logger pool ~last_block_id ~ledger
             ~staking_epoch_ledger
@@ -877,77 +999,83 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
         in
         let log_ledger_hash_after_last_slot () =
           let _state_hash, expected_ledger_hash =
-            get_slot_hashes ~logger last_global_slot
+            get_slot_hashes ~logger last_global_slot_since_genesis
           in
           if Ledger_hash.equal (Ledger.merkle_root ledger) expected_ledger_hash
           then
             [%log info]
-              "Applied all commands at global slot %Ld, got expected ledger \
-               hash"
+              "Applied all commands at global slot since genesis %Ld, got \
+               expected ledger hash"
               ~metadata:[ ("ledger_hash", json_ledger_hash_of_ledger ledger) ]
-              last_global_slot
+              last_global_slot_since_genesis
           else (
             [%log error]
-              "Applied all commands at global slot %Ld, ledger hash differs \
-               from expected ledger hash"
+              "Applied all commands at global slot since genesis %Ld, ledger \
+               hash differs from expected ledger hash"
               ~metadata:
                 [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
                 ; ( "expected_ledger_hash"
                   , Ledger_hash.to_yojson expected_ledger_hash )
                 ]
-              last_global_slot ;
+              last_global_slot_since_genesis ;
             if continue_on_error then incr error_count else Core_kernel.exit 1 )
         in
-        let log_state_hash_on_next_slot curr_global_slot =
+        let log_state_hash_on_next_slot curr_global_slot_since_genesis =
           let state_hash, _ledger_hash =
-            get_slot_hashes ~logger curr_global_slot
+            get_slot_hashes ~logger curr_global_slot_since_genesis
           in
           [%log info]
             ~metadata:
               [ ("state_hash", `String (State_hash.to_base58_check state_hash))
               ]
             "Starting processing of commands in block with state_hash \
-             $state_hash at global slot %Ld"
-            curr_global_slot
+             $state_hash at global slot since genesis %Ld"
+            curr_global_slot_since_genesis
         in
-        let log_on_slot_change curr_global_slot =
-          if Int64.( > ) curr_global_slot last_global_slot then (
+        let log_on_slot_change curr_global_slot_since_genesis =
+          if
+            Int64.( > ) curr_global_slot_since_genesis
+              last_global_slot_since_genesis
+          then (
             log_ledger_hash_after_last_slot () ;
-            log_state_hash_on_next_slot curr_global_slot )
+            log_state_hash_on_next_slot curr_global_slot_since_genesis )
         in
         let combine_or_run_internal_cmds (ic : Sql.Internal_command.t)
             (ics : Sql.Internal_command.t list) =
           match ics with
           | ic2 :: ics2
-            when Int64.equal ic.global_slot ic2.global_slot
+            when Int64.equal ic.global_slot_since_genesis
+                   ic2.global_slot_since_genesis
                  && Int.equal ic.sequence_no ic2.sequence_no
                  && String.equal ic.type_ "fee_transfer"
                  && String.equal ic.type_ ic2.type_ ->
               (* combining situation 2
-                 two fee transfer commands with same global slot, sequence number
+                 two fee transfer commands with same global slot since genesis, sequence number
               *)
-              log_on_slot_change ic.global_slot ;
+              log_on_slot_change ic.global_slot_since_genesis ;
               let%bind () =
                 apply_combined_fee_transfer ~logger ~pool ~ledger
                   ~continue_on_error ic ic2
               in
-              apply_commands ics2 user_cmds ~last_global_slot:ic.global_slot
+              apply_commands ics2 user_cmds
+                ~last_global_slot_since_genesis:ic.global_slot_since_genesis
                 ~last_block_id:ic.block_id ~staking_epoch_ledger
                 ~next_epoch_ledger
           | _ ->
-              log_on_slot_change ic.global_slot ;
+              log_on_slot_change ic.global_slot_since_genesis ;
               let%bind () =
                 run_internal_command ~logger ~pool ~ledger ~continue_on_error ic
               in
-              apply_commands ics user_cmds ~last_global_slot:ic.global_slot
+              apply_commands ics user_cmds
+                ~last_global_slot_since_genesis:ic.global_slot_since_genesis
                 ~last_block_id:ic.block_id ~staking_epoch_ledger
                 ~next_epoch_ledger
         in
-        (* choose command with least global slot, sequence number *)
+        (* choose command with least global slot since genesis, sequence number *)
         let cmp_ic_uc (ic : Sql.Internal_command.t) (uc : Sql.User_command.t) =
           [%compare: int64 * int]
-            (ic.global_slot, ic.sequence_no)
-            (uc.global_slot, uc.sequence_no)
+            (ic.global_slot_since_genesis, ic.sequence_no)
+            (uc.global_slot_since_genesis, uc.sequence_no)
         in
         match (internal_cmds, user_cmds) with
         | [], [] ->
@@ -955,19 +1083,21 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             Deferred.return
               (staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed)
         | [], uc :: ucs ->
-            log_on_slot_change uc.global_slot ;
+            log_on_slot_change uc.global_slot_since_genesis ;
             let%bind () =
               run_user_command ~logger ~pool ~ledger ~continue_on_error uc
             in
-            apply_commands [] ucs ~last_global_slot:uc.global_slot
+            apply_commands [] ucs
+              ~last_global_slot_since_genesis:uc.global_slot_since_genesis
               ~last_block_id:uc.block_id ~staking_epoch_ledger
               ~next_epoch_ledger
         | ic :: _, uc :: ucs when cmp_ic_uc ic uc > 0 ->
-            log_on_slot_change uc.global_slot ;
+            log_on_slot_change uc.global_slot_since_genesis ;
             let%bind () =
               run_user_command ~logger ~pool ~ledger ~continue_on_error uc
             in
-            apply_commands internal_cmds ucs ~last_global_slot:uc.global_slot
+            apply_commands internal_cmds ucs
+              ~last_global_slot_since_genesis:uc.global_slot_since_genesis
               ~last_block_id:uc.block_id ~staking_epoch_ledger
               ~next_epoch_ledger
         | ic :: ics, [] ->
@@ -977,8 +1107,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
         | ic :: _, _ :: __ ->
             failwithf
               "An internal command and a user command have the same global \
-               slot %Ld and sequence number %d"
-              ic.global_slot ic.sequence_no ()
+               slot since_genesis %Ld and sequence number %d"
+              ic.global_slot_since_genesis ic.sequence_no ()
       in
       let%bind unparented_ids =
         query_db pool
@@ -992,13 +1122,15 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
         | _ ->
             failwith "Expected only the genesis block to have an unparented id"
       in
-      [%log info] "At start slot %Ld, ledger hash" input.start_slot
+      [%log info] "At start slot %Ld, ledger hash"
+        input.start_slot_since_genesis
         ~metadata:[ ("ledger_hash", json_ledger_hash_of_ledger ledger) ] ;
       let%bind staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed
           =
         apply_commands sorted_internal_cmds sorted_user_cmds
-          ~last_global_slot:input.start_slot ~last_block_id:genesis_block_id
-          ~staking_epoch_ledger:ledger ~next_epoch_ledger:ledger
+          ~last_global_slot_since_genesis:input.start_slot_since_genesis
+          ~last_block_id:genesis_block_id ~staking_epoch_ledger:ledger
+          ~next_epoch_ledger:ledger
       in
       match input.target_epoch_ledgers_state_hash with
       | None ->
