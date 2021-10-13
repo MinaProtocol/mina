@@ -47,12 +47,12 @@ pub mod pasta_fp_plonk_proof;
 pub mod pasta_fq_plonk_proof;
 
 /// Re-exports
-pub use ::{
+pub use {
     commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
     oracle::sponge::caml::CamlScalarChallenge,
     plonk_15_wires_circuits::{
         gate::{caml::CamlCircuitGate, GateType},
-        nolookup::scalars::caml::{CamlProofEvaluations, CamlRandomOracles},
+        nolookup::scalars::caml::{CamlLookupEvaluations, CamlProofEvaluations, CamlRandomOracles},
         wires::caml::CamlWire,
     },
     plonk_15_wires_protocol_dlog::prover::caml::{CamlProverCommitments, CamlProverProof},

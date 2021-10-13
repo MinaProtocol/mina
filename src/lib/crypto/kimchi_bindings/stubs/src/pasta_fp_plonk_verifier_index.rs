@@ -16,7 +16,7 @@ use oracle::poseidon::PlonkSpongeConstants15W;
 use oracle::poseidon::SpongeConstants;
 use plonk_15_wires_circuits::gates::poseidon::ROUNDS_PER_ROW;
 use plonk_15_wires_circuits::nolookup::constraints::{zk_polynomial, zk_w3, ConstraintSystem};
-use plonk_15_wires_circuits::wires::{GENERICS, PERMUTS};
+use plonk_15_wires_circuits::wires::{COLUMNS, PERMUTS};
 use plonk_15_wires_protocol_dlog::index::VerifierIndex;
 use std::convert::TryInto;
 use std::path::Path;
@@ -32,18 +32,8 @@ pub type CamlPastaFpPlonkVerifierIndex =
 // Handy conversion functions
 //
 
-impl CamlPastaFpPlonkVerifierIndex {
-    pub fn from_verifier_index(vi: VerifierIndex<GAffine>) -> Self {
-        let sigma_comm = vi.sigma_comm.to_vec().iter().map(Into::into).collect();
-        let qw_comm = vi.qw_comm.to_vec().iter().map(Into::into).collect();
-        let rcm_comm: Vec<Vec<_>> = vi
-            .rcm_comm
-            .to_vec()
-            .iter()
-            .map(|x| x.to_vec().iter().map(Into::into).collect())
-            .collect();
-        let shifts = vi.shift.to_vec().iter().map(Into::into).collect();
-
+impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
+    fn from(vi: VerifierIndex<GAffine>) -> Self {
         Self {
             domain: CamlPlonkDomain {
                 log_size_of_group: vi.domain.log_size_of_group as isize,
@@ -53,18 +43,21 @@ impl CamlPastaFpPlonkVerifierIndex {
             max_quot_size: vi.max_quot_size as isize,
             srs: CamlPointer(vi.srs),
             evals: CamlPlonkVerificationEvals {
-                sigma_comm,
-                qw_comm,
-                qm_comm: vi.qm_comm.into(),
-                qc_comm: vi.qc_comm.into(),
-                rcm_comm,
+                sigma_comm: vi.sigma_comm.to_vec().iter().map(Into::into).collect(),
+                coefficients_comm: vi
+                    .coefficients_comm
+                    .to_vec()
+                    .iter()
+                    .map(Into::into)
+                    .collect(),
+                generic_comm: vi.generic_comm.into(),
                 psm_comm: vi.psm_comm.into(),
                 add_comm: vi.add_comm.into(),
                 double_comm: vi.double_comm.into(),
                 mul_comm: vi.mul_comm.into(),
                 emul_comm: vi.emul_comm.into(),
             },
-            shifts,
+            shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
         }
     }
 }
@@ -77,26 +70,14 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
         let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
         let domain = Domain::<Fp>::new(1 << index.domain.log_size_of_group).expect("wrong size");
 
-        let qw_comm: Vec<PolyComm<GAffine>> = evals.qw_comm.iter().map(Into::into).collect();
-        let qw_comm: [_; GENERICS] = qw_comm.try_into().expect("wrong size");
+        let coefficients_comm: Vec<PolyComm<GAffine>> =
+            evals.coefficients_comm.iter().map(Into::into).collect();
+        let coefficients_comm: [_; COLUMNS] = coefficients_comm.try_into().expect("wrong size");
 
         let sigma_comm: Vec<PolyComm<GAffine>> = evals.sigma_comm.iter().map(Into::into).collect();
         let sigma_comm: [_; PERMUTS] = sigma_comm
             .try_into()
             .expect("vector of sigma comm is of wrong size");
-
-        let rcm_comm: Vec<[PolyComm<GAffine>; PlonkSpongeConstants15W::SPONGE_WIDTH]> = evals
-            .rcm_comm
-            .iter()
-            .map(|x| {
-                x.iter()
-                    .map(Into::into)
-                    .collect::<Vec<PolyComm<GAffine>>>()
-                    .try_into()
-                    .expect("wrong")
-            })
-            .collect();
-        let rcm_comm: [_; ROUNDS_PER_ROW] = rcm_comm.try_into().expect("wrong size");
 
         let shifts: Vec<Fp> = shifts.iter().map(Into::into).collect();
         let shift: [Fp; PERMUTS] = shifts.try_into().expect("wrong size");
@@ -109,10 +90,8 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
             max_quot_size: index.max_quot_size as usize,
             srs: index.srs.0,
             sigma_comm,
-            qw_comm,
-            qm_comm: evals.qm_comm.into(),
-            qc_comm: evals.qc_comm.into(),
-            rcm_comm,
+            coefficients_comm,
+            generic_comm: evals.generic_comm.into(),
             psm_comm: evals.psm_comm.into(),
             add_comm: evals.add_comm.into(),
             double_comm: evals.double_comm.into(),
@@ -167,7 +146,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_read(
     path: String,
 ) -> Result<CamlPastaFpPlonkVerifierIndex, ocaml::Error> {
     let vi = read_raw(offset, srs, path)?;
-    Ok(CamlPastaFpPlonkVerifierIndex::from_verifier_index(vi))
+    Ok(vi.into())
 }
 
 #[ocaml_gen]
@@ -193,7 +172,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_create(
     index: CamlPastaFpPlonkIndexPtr,
 ) -> CamlPastaFpPlonkVerifierIndex {
     let verifier_index = index.as_ref().0.verifier_index();
-    CamlPastaFpPlonkVerifierIndex::from_verifier_index(verifier_index)
+    verifier_index.into()
 }
 
 #[ocaml_gen]
@@ -228,12 +207,8 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
         srs: CamlPointer::new(SRS::create(0)),
         evals: CamlPlonkVerificationEvals {
             sigma_comm: vec_comm(PERMUTS),
-            qw_comm: vec_comm(GENERICS),
-            qm_comm: comm(),
-            qc_comm: comm(),
-            rcm_comm: (0..ROUNDS_PER_ROW)
-                .map(|_| vec_comm(PlonkSpongeConstants15W::SPONGE_WIDTH))
-                .collect(),
+            coefficients_comm: vec_comm(COLUMNS),
+            generic_comm: comm(),
             psm_comm: comm(),
             add_comm: comm(),
             double_comm: comm(),
