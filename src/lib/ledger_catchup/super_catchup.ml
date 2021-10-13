@@ -1300,9 +1300,14 @@ let%test_module "Ledger_catchup tests" =
         (parent_hash, [ Rose_tree.T (target_transition, []) ]) ;
       (`Test test, `Cached_transition target_transition)
 
-    let test_successful_catchup ~my_net ~target_best_tip_path =
+    let test_successful_catchup ~my_net ~target_best_tip_path
+        ~frontier_parent_breadcrumb =
       let open Fake_network in
       let target_breadcrumb = List.last_exn target_best_tip_path in
+      let%bind () =
+        Transition_frontier.add_breadcrumb_exn my_net.state.frontier
+          frontier_parent_breadcrumb
+      in
       let `Test { breadcrumbs_reader; _ }, _ =
         run_catchup_with_target ~network:my_net.network
           ~frontier:my_net.state.frontier ~target_breadcrumb
@@ -1408,8 +1413,12 @@ let%test_module "Ledger_catchup tests" =
               path_map ~f:Fn.id peer_net.state.frontier
                 (best_tip peer_net.state.frontier))
           in
+          let frontier_parent_breadcrumb =
+            Transition_frontier.root peer_net.state.frontier
+          in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path))
+              test_successful_catchup ~my_net ~target_best_tip_path
+                ~frontier_parent_breadcrumb))
 
     let%test_unit "catchup succeeds even if the parent transition is already \
                    in the frontier" =
@@ -1424,8 +1433,12 @@ let%test_module "Ledger_catchup tests" =
           let target_best_tip_path =
             [ Transition_frontier.best_tip peer_net.state.frontier ]
           in
+          let frontier_parent_breadcrumb =
+            Transition_frontier.root peer_net.state.frontier
+          in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path))
+              test_successful_catchup ~my_net ~target_best_tip_path
+                ~frontier_parent_breadcrumb))
 
     let%test_unit "catchup fails if one of the parent transitions fail" =
       Quickcheck.test ~trials:1
