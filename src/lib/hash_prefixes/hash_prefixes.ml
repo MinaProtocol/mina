@@ -96,3 +96,5 @@ let snapp_event = create "MinaSnappEvent"
 let snapp_events = create "MinaSnappEvents"
 
 let snapp_rollup_events = create "MinaSnappRollup"
+
+let snapp_memo = create "MinaSnappMemo"

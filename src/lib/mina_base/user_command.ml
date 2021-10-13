@@ -186,7 +186,7 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
   match t with
   | Signed_command c ->
       Signed_command c
-  | Parties { fee_payer; other_parties; protocol_state } ->
+  | Parties { fee_payer; other_parties; protocol_state; memo } ->
       Parties
         { fee_payer
         ; protocol_state
@@ -194,6 +194,7 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
             other_parties
             |> List.map ~f:(fun party -> (party, find_vk party))
             |> Parties.Party_or_stack.With_hashes.of_parties_list
+        ; memo
         }
 
 let of_verifiable (t : Verifiable.t) : t =

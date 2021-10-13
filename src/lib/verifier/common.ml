@@ -12,7 +12,7 @@ let check :
           `Invalid
       | Some c ->
           `Valid (User_command.Signed_command c) )
-  | Parties { fee_payer; other_parties; protocol_state } ->
+  | Parties { fee_payer; other_parties; protocol_state; memo } ->
       with_return (fun { return } ->
           let commitment =
             let other_parties_hash =
@@ -21,6 +21,7 @@ let check :
             Parties.Transaction_commitment.create ~other_parties_hash
               ~protocol_state_predicate_hash:
                 (Snapp_predicate.Protocol_state.digest protocol_state)
+              ~memo_hash:(Signed_command_memo.hash memo)
           in
           let check_signature s pk msg =
             match Signature_lib.Public_key.decompress pk with
@@ -71,6 +72,7 @@ let check :
               ; other_parties =
                   List.map parties_with_hashes_list ~f:(fun ((p, _), _) -> p)
               ; protocol_state
+              ; memo
               }
           in
           match valid_assuming with

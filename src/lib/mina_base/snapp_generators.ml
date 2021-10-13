@@ -430,8 +430,11 @@ let gen_parties_from ?(succeed = true) ~(keypair : Signature_lib.Keypair.t)
   let%bind new_parties =
     gen_parties_with_dynamic_balance ~new_parties:true num_new_parties
   in
+  let%bind memo = Signed_command_memo.gen in
   let other_parties = old_parties @ new_parties in
-  let parties : Parties.t = { fee_payer; other_parties; protocol_state } in
+  let parties : Parties.t =
+    { fee_payer; other_parties; protocol_state; memo }
+  in
   (* replace dummy signature in fee payer *)
   let signature =
     Signature_lib.Schnorr.sign keypair.private_key
