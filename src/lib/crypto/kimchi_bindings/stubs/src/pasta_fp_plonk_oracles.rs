@@ -1,12 +1,14 @@
-use crate::arkworks::{CamlFp, CamlGVesta};
-use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
-use commitment_dlog::commitment::caml::CamlPolyComm;
-use commitment_dlog::commitment::{shift_scalar, PolyComm};
+use crate::{
+    arkworks::{CamlFp, CamlGVesta},
+    oracles::CamlOracles,
+    pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex,
+};
+use commitment_dlog::commitment::{caml::CamlPolyComm, shift_scalar, PolyComm};
 use mina_curves::pasta::{
     fp::Fp,
     vesta::{Affine as GAffine, VestaParameters},
 };
-use ocaml_gen::{ocaml_gen, OcamlGen};
+use ocaml_gen::ocaml_gen;
 use oracle::{
     self,
     poseidon::PlonkSpongeConstants15W,
@@ -20,17 +22,6 @@ use plonk_15_wires_protocol_dlog::{
 };
 
 //
-// CamlPastaFpPlonkOracles
-//
-
-#[derive(ocaml::IntoValue, ocaml::FromValue, OcamlGen)]
-pub struct CamlPastaFpPlonkOracles {
-    pub o: CamlRandomOracles<CamlFp>,
-    pub p_eval: (CamlFp, CamlFp),
-    pub opening_prechallenges: Vec<CamlFp>,
-    pub digest_before_evaluations: CamlFp,
-}
-//
 // Methods
 //
 
@@ -40,7 +31,7 @@ pub fn caml_pasta_fp_plonk_oracles_create(
     lgr_comm: Vec<CamlPolyComm<CamlGVesta>>, // the bases to commit polynomials
     index: CamlPastaFpPlonkVerifierIndex,    // parameters
     proof: CamlProverProof<CamlGVesta, CamlFp>, // the final proof (contains public elements at the beginning)
-) -> CamlPastaFpPlonkOracles {
+) -> CamlOracles<CamlFp> {
     // conversions
     let index: DlogVerifierIndex<GAffine> = index.into();
     let lgr_comm: Vec<PolyComm<GAffine>> = lgr_comm
@@ -81,7 +72,7 @@ pub fn caml_pasta_fp_plonk_oracles_create(
         .map(|x| x.0.into())
         .collect();
 
-    CamlPastaFpPlonkOracles {
+    CamlOracles {
         o: oracles.into(),
         p_eval: (p_eval[0][0].into(), p_eval[1][0].into()),
         opening_prechallenges,

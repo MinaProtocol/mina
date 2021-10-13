@@ -1,5 +1,6 @@
 use crate::{
     arkworks::{CamlFq, CamlGPallas},
+    oracles::CamlOracles,
     pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex,
 };
 use commitment_dlog::commitment::{caml::CamlPolyComm, shift_scalar, PolyComm};
@@ -7,7 +8,7 @@ use mina_curves::pasta::{
     fq::Fq,
     pallas::{Affine as GAffine, PallasParameters},
 };
-use ocaml_gen::{ocaml_gen, OcamlGen};
+use ocaml_gen::ocaml_gen;
 use oracle::{
     self,
     poseidon::PlonkSpongeConstants15W,
@@ -21,18 +22,6 @@ use plonk_15_wires_protocol_dlog::{
 };
 
 //
-// CamlPastaFqPlonkOracles
-//
-
-#[derive(ocaml::IntoValue, ocaml::FromValue, OcamlGen)]
-pub struct CamlPastaFqPlonkOracles {
-    pub o: CamlRandomOracles<CamlFq>,
-    pub p_eval: (CamlFq, CamlFq),
-    pub opening_prechallenges: Vec<CamlFq>,
-    pub digest_before_evaluations: CamlFq,
-}
-
-//
 // Methods
 //
 
@@ -42,7 +31,7 @@ pub fn caml_pasta_fq_plonk_oracles_create(
     lgr_comm: Vec<CamlPolyComm<CamlGPallas>>,
     index: CamlPastaFqPlonkVerifierIndex,
     proof: CamlProverProof<CamlGPallas, CamlFq>,
-) -> CamlPastaFqPlonkOracles {
+) -> CamlOracles<CamlFq> {
     // conversions
     let index: DlogVerifierIndex<GAffine> = index.into();
     let lgr_comm: Vec<PolyComm<GAffine>> = lgr_comm
@@ -83,7 +72,7 @@ pub fn caml_pasta_fq_plonk_oracles_create(
         .into_iter()
         .map(|x| x.0.into())
         .collect();
-    CamlPastaFqPlonkOracles {
+    CamlOracles {
         o: oracles.into(),
         p_eval: (p_eval[0][0].into(), p_eval[1][0].into()),
         opening_prechallenges,

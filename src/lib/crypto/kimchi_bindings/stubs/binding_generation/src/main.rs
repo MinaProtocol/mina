@@ -11,6 +11,7 @@ use wires_15_stubs::{
     arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
     caml_pointer::CamlPointer,
     gate_vector::{fp::*, fq::*},
+    oracles::CamlOracles,
     pasta_fp_plonk_index::*,
     pasta_fp_plonk_oracles::*,
     pasta_fp_plonk_proof::*,
@@ -238,6 +239,8 @@ fn generate_bindings(mut w: impl std::io::Write) {
         decl_type!(w, env, GateType => "gate_type");
         decl_type!(w, env, CamlCircuitGate<T1> => "circuit_gate");
 
+        decl_type!(w, env, CamlOracles<T1> => "oracles");
+
         decl_module!(w, env, "Gates", {
             decl_module!(w, env, "Vector", {
                 decl_module!(w, env, "Fp", {
@@ -347,7 +350,7 @@ fn generate_bindings(mut w: impl std::io::Write) {
 
         decl_module!(w, env, "Oracles", {
             decl_module!(w, env, "Fp", {
-                decl_type!(w, env, CamlPastaFpPlonkOracles => "t");
+                decl_type_alias!(w, env, "t" => CamlOracles<CamlFp>);
 
                 decl_func!(w, env, caml_pasta_fp_plonk_oracles_create => "create");
                 decl_func!(w, env, caml_pasta_fp_plonk_oracles_dummy => "dummy");
@@ -355,7 +358,7 @@ fn generate_bindings(mut w: impl std::io::Write) {
             });
 
             decl_module!(w, env, "Fq", {
-                decl_type!(w, env, CamlPastaFqPlonkOracles => "t");
+                decl_type_alias!(w, env, "t" => CamlOracles<CamlFq>);
 
                 decl_func!(w, env, caml_pasta_fq_plonk_oracles_create => "create");
                 decl_func!(w, env, caml_pasta_fq_plonk_oracles_dummy => "dummy");
