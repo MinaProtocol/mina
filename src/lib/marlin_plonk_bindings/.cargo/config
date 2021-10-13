@@ -1,0 +1,11 @@
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+atomics,+bulk-memory"]
+
+[target.wasm32-wasi]
+rustflags = ["-C", "target-feature=+atomics,+bulk-memory"]
+
+[target.wasm32-unknown-emscripten]
+rustflags = ["-C", "target-feature=+atomics,+bulk-memory"]
+
+[unstable]
+build-std = ["panic_abort", "std"]

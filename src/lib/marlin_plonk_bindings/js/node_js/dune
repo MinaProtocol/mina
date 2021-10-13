@@ -15,9 +15,12 @@
    flags.sexp)
  (deps
   (source_tree ../../wasm)
-  (source_tree ../../../marlin))
+  (source_tree ../../../../external/wasm-bindgen-rayon)
+  (source_tree ../../../marlin)
+  ../../Cargo.toml
+  ../../.cargo/config)
  (action
   (progn
    (run chmod -R +w ../../wasm)
-   (run rustup run nightly-2021-02-11 wasm-pack build --target nodejs --out-dir ../js/node_js ../../wasm)
+   (run rustup run nightly-2021-02-11 wasm-pack build --target nodejs --out-dir ../js/node_js ../../wasm -- --features nodejs)
    (write-file flags.sexp "()"))))

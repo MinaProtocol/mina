@@ -1,5 +1,6 @@
 open Core_kernel
 open Pickles_types
+include Pickles_base.Common
 
 module Unshifted_acc =
   Pairing_marlin_types.Accumulator.Degree_bound_checks.Unshifted_accumulators
@@ -87,28 +88,6 @@ let time lab f =
       x)
     f ()
 
-let bits_random_oracle =
-  let h = Digestif.blake2s 32 in
-  fun ~length s ->
-    Digestif.digest_string h s |> Digestif.to_raw_string h |> String.to_list
-    |> List.concat_map ~f:(fun c ->
-           let c = Char.to_int c in
-           List.init 8 ~f:(fun i -> (c lsr i) land 1 = 1))
-    |> fun a -> List.take a length
-
-let bits_to_bytes bits =
-  let byte_of_bits bs =
-    List.foldi bs ~init:0 ~f:(fun i acc b ->
-        if b then acc lor (1 lsl i) else acc)
-    |> Char.of_int_exn
-  in
-  List.map (List.groupi bits ~break:(fun i _ _ -> i mod 8 = 0)) ~f:byte_of_bits
-  |> String.of_char_list
-
-let group_map m ~a ~b =
-  let params = Group_map.Params.create m { a; b } in
-  stage (fun x -> Group_map.to_group m ~params x)
-
 module Shifts = struct
   let tock : Tock.Field.t Shifted_value.Shift.t =
     Shifted_value.Shift.create (module Tock.Field)
@@ -177,7 +156,8 @@ module Ipa = struct
             Or_infinity.Finite comm)
       in
       let urs = Backend.Tick.Keypair.load_urs () in
-      Async.In_thread.run (fun () ->
+      let (module T) = Zexe_backend_platform_specific.get () in
+      T.run_in_thread (fun () ->
           Marlin_plonk_bindings.Pasta_fp_urs.batch_accumulator_check urs comms
             chals)
   end

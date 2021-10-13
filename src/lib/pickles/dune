@@ -14,7 +14,7 @@
    ppx_deriving_yojson
    h_list.ppx))
  (libraries
-   digestif
+   digestif.ocaml
    mina_version
    base64
    zexe_backend
@@ -26,7 +26,6 @@
    pickles.precomputed
    pickles.one_hot_vector
    pickles.pseudo
-   snarky_log
    sponge
    group_map
    snarky_group_map

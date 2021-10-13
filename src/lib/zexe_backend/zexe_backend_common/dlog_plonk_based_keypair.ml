@@ -97,6 +97,7 @@ module Make (Inputs : Inputs_intf) = struct
     let degree = 1 lsl Pickles_types.Nat.to_int Rounds.n in
     let set_urs_info specs = Set_once.set_exn urs_info Lexing.dummy_pos specs in
     let load () =
+      let (module T) = Zexe_backend_platform_specific.get () in
       match !urs with
       | Some urs ->
           urs
@@ -108,35 +109,21 @@ module Make (Inputs : Inputs_intf) = struct
             | Some t ->
                 t
           in
-          let store =
-            Key_cache.Sync.Disk_storable.simple
-              (fun () -> name)
-              (fun () ~path ->
-                Or_error.try_with_join (fun () ->
-                    match Urs.read path with
-                    | Some urs ->
-                        Ok urs
-                    | None ->
-                        Or_error.errorf
-                          "Could not read the URS from disk; its format did \
-                           not match the expected format"))
-              (fun _ urs path ->
-                Or_error.try_with (fun () -> Urs.write urs path))
-          in
           let u =
-            match Key_cache.Sync.read specs store () with
+            let store = Urs.(T.store ~read ~write) in
+            match T.Store.read specs store name with
             | Ok (u, _) ->
                 u
             | Error _e ->
                 let urs = Urs.create degree in
                 let (_ : (unit, Error.t) Result.t) =
-                  Key_cache.Sync.write
+                  T.Store.write
                     (List.filter specs ~f:(function
                       | On_disk _ ->
                           true
                       | S3 _ ->
                           false))
-                    store () urs
+                    store name urs
                 in
                 urs
           in

@@ -11,10 +11,9 @@
     hex
     pickles_types
     marlin_plonk_bindings
-    key_cache
     sgn_type
     snarky.backendless
     sponge
     snarkette
-    core
+    core_kernel
     integers ))

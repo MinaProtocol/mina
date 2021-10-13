@@ -1,5 +1,5 @@
 module SC = Scalar_challenge
-open Core
+open Core_kernel
 open Pickles_types
 open Common
 open Import
@@ -177,7 +177,7 @@ let verify_heterogenous (ts : Instance.t list) =
         plonk)
   in
   let open Backend.Tock.Proof in
-  let open Async in
+  let open Async_kernel in
   let%bind accumulator_check =
     Ipa.Step.accumulator_check
       (List.map ts ~f:(fun (T (_, _, _, _, T t)) ->
