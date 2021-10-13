@@ -474,8 +474,8 @@ let setup_daemon logger =
           | None ->
               return None
           | Some s ->
-              Secrets.Libp2p_keypair.Terminal_stdin.read_exn
-                ~should_prompt_user:false ~which:"libp2p keypair" s
+              Secrets.Libp2p_keypair.Terminal_stdin.read_from_env_exn ~logger
+                ~which:"libp2p keypair" s
               |> Deferred.map ~f:Option.some )
     in
     let%bind () =
@@ -831,7 +831,7 @@ let setup_daemon logger =
             Deferred.return None
         | Some sk_file, _ ->
             let%map kp =
-              Secrets.Keypair.Terminal_stdin.read_exn ~should_prompt_user:false
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn ~logger
                 ~which:"block producer keypair" sk_file
             in
             Some kp
@@ -840,9 +840,8 @@ let setup_daemon logger =
               Secrets.Wallets.get_tracked_keypair ~logger
                 ~which:"block producer keypair"
                 ~read_from_env_exn:
-                  (Secrets.Keypair.Terminal_stdin.read_exn
-                     ~should_prompt_user:false ~should_reask:false)
-                ~conf_dir tracked_pubkey
+                  Secrets.Keypair.Terminal_stdin.read_from_env_exn ~conf_dir
+                tracked_pubkey
             in
             Some kp
       in
@@ -1112,8 +1111,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               Secrets.Wallets.get_tracked_keypair ~logger
                 ~which:"uptime submitter keypair"
                 ~read_from_env_exn:
-                  (Secrets.Uptime_keypair.Terminal_stdin.read_exn
-                     ~should_prompt_user:false ~should_reask:false)
+                  Secrets.Uptime_keypair.Terminal_stdin.read_from_env_exn
                 ~conf_dir pk
             in
             Some kp
