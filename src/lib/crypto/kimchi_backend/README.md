@@ -23,7 +23,7 @@ kimchi_backend/
 │   ├── basic.ml # instantiate a number of things
 │   ├── {pallas,vesta}_based_plonk.ml # instantiate the backend for the different curves
 │   ├── precomputed.ml # TODO: this should be documented
-├── kimchi_backend_common/ # the stuff that both curves have in common
+├── common/ # the stuff that both curves have in common
 │   ├── bigint.ml
 │   ├── curve.ml
 │   ├── dlog_plonk_based_keypair.ml
