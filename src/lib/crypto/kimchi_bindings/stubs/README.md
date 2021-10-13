@@ -10,13 +10,13 @@ The bindings are generated automatically via the [`dune`](./dune) file's rule, a
 If you want to generate the OCaml binding manually, you can run the following command:
 
 ```shell
-$ cargo +nightly run --manifest-path binding_generation/Cargo.toml
+$ cargo run --manifest-path binding_generation/Cargo.toml
 ```
 
 If you follow the command with an `output_file` argument it will write the result to the `output_file`:
 
 ```shell
-$ cargo +nightly run --manifest-path binding_generation/Cargo.toml ./here.ml
+$ cargo run --manifest-path binding_generation/Cargo.toml ./here.ml
 ```
 
 ## Some OCaml-rs guidelines

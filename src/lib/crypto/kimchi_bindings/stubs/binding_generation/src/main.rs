@@ -1,9 +1,3 @@
-#![feature(concat_idents)]
-
-//
-// run with `cargo +nightly run` due to the concat_idents feature
-//
-
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
 use wires_15_stubs::{

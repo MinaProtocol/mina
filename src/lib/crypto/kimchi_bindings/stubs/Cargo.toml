@@ -37,7 +37,7 @@ plonk_15_wires_protocol_dlog = { path = "/Users/davidwong/Work/marlin/dlog/plonk
 
 # ocaml-specific
 ocaml = { version = "0.22.2" }
-ocaml-gen = { path = "/Users/davidwong/Work/marlin/ocaml-gen" }
+ocaml-gen = { path = "/Users/davidwong/Work/marlin/ocaml/ocaml-gen" }
 
 [profile.release]
 debug = true

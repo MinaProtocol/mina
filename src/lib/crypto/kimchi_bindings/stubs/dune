@@ -44,4 +44,4 @@
    (progn
     (run rm -rf ./target)
     (run rm -rf ./Cargo.lock)
-    (run cargo +nightly run ../kimchi.ml)))))
+    (run cargo run ../kimchi.ml)))))
