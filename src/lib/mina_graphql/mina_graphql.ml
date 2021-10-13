@@ -425,7 +425,7 @@ module Types = struct
 
   let account_timing : (Mina_lib.t, Account_timing.t option) typ =
     obj "AccountTiming" ~fields:(fun _ ->
-        [ field "initialMininumBalance" ~typ:uint64
+        [ field "initial_mininum_balance" ~typ:uint64
             ~doc:"The initial minimum balance for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -434,7 +434,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some (Balance.to_uint64 timing_info.initial_minimum_balance))
-        ; field "cliffTime" ~typ:uint32
+        ; field "cliff_time" ~typ:uint32
             ~doc:"The cliff time for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -443,7 +443,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some timing_info.cliff_time)
-        ; field "cliffAmount" ~typ:uint64
+        ; field "cliff_amount" ~typ:uint64
             ~doc:"The cliff amount for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -452,7 +452,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some (Currency.Amount.to_uint64 timing_info.cliff_amount))
-        ; field "vestingPeriod" ~typ:uint32
+        ; field "vesting_period" ~typ:uint32
             ~doc:"The vesting period for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -461,7 +461,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some timing_info.vesting_period)
-        ; field "vestingIncrement" ~typ:uint64
+        ; field "vesting_increment" ~typ:uint64
             ~doc:"The vesting increment for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -1736,7 +1736,7 @@ module Types = struct
   module Payload = struct
     let peer : ('context, Network_peer.Peer.t option) typ =
       obj "NetworkPeerPayload" ~fields:(fun _ ->
-          [ field "peerId" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
+          [ field "peer_id" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
               ~args:Arg.[]
               ~resolve:(fun _ peer -> peer.Network_peer.Peer.peer_id)
           ; field "host" ~doc:"IP address of the remote host"
@@ -1744,7 +1744,7 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ peer ->
                 Unix.Inet_addr.to_string peer.Network_peer.Peer.host)
-          ; field "libp2pPort" ~typ:(non_null int)
+          ; field "libp2p_port" ~typ:(non_null int)
               ~args:Arg.[]
               ~resolve:(fun _ peer -> peer.Network_peer.Peer.libp2p_port)
           ])
@@ -1834,17 +1834,17 @@ module Types = struct
     let trust_status =
       obj "TrustStatusPayload" ~fields:(fun _ ->
           let open Trust_system.Peer_status in
-          [ field "ipAddr" ~typ:(non_null string) ~doc:"IP address"
+          [ field "ip_addr" ~typ:(non_null string) ~doc:"IP address"
               ~args:Arg.[]
               ~resolve:(fun _ (peer, _) ->
                 Unix.Inet_addr.to_string peer.Network_peer.Peer.host)
-          ; field "peerId" ~typ:(non_null string) ~doc:"libp2p Peer ID"
+          ; field "peer_id" ~typ:(non_null string) ~doc:"libp2p Peer ID"
               ~args:Arg.[]
               ~resolve:(fun _ (peer, __) -> peer.Network_peer.Peer.peer_id)
           ; field "trust" ~typ:(non_null float) ~doc:"Trust score"
               ~args:Arg.[]
               ~resolve:(fun _ (_, { trust; _ }) -> trust)
-          ; field "bannedStatus" ~typ:string ~doc:"Banned status"
+          ; field "banned_status" ~typ:string ~doc:"Banned status"
               ~args:Arg.[]
               ~resolve:(fun _ (_, { banned; _ }) ->
                 string_of_banned_status banned)
@@ -2031,10 +2031,10 @@ module Types = struct
                 { peer_id; host = Unix.Inet_addr.of_string host; libp2p_port }
           with _ -> Error "Invalid format for NetworkPeer.host")
         ~fields:
-          [ arg "peerId" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
+          [ arg "peer_id" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
           ; arg "host" ~doc:"IP address of the remote host"
               ~typ:(non_null string)
-          ; arg "libp2pPort" ~typ:(non_null int)
+          ; arg "libp2p_port" ~typ:(non_null int)
           ]
 
     let public_key_arg =

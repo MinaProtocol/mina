@@ -188,7 +188,7 @@
           "description": "Network identifiers for another protocol participant",
           "fields": [
             {
-              "name": "libp2pPort",
+              "name": "libp2p_port",
               "description": null,
               "args": [],
               "type": {
@@ -220,7 +220,7 @@
               "deprecationReason": null
             },
             {
-              "name": "peerId",
+              "name": "peer_id",
               "description": "base58-encoded peer ID",
               "args": [],
               "type": {
@@ -238,7 +238,7 @@
           ],
           "inputFields": [
             {
-              "name": "libp2pPort",
+              "name": "libp2p_port",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -266,7 +266,7 @@
               "defaultValue": null
             },
             {
-              "name": "peerId",
+              "name": "peer_id",
               "description": "base58-encoded peer ID",
               "type": {
                 "kind": "NON_NULL",
@@ -9287,7 +9287,7 @@
           "description": null,
           "fields": [
             {
-              "name": "ipAddr",
+              "name": "ip_addr",
               "description": "IP address",
               "args": [],
               "type": {
@@ -9303,7 +9303,7 @@
               "deprecationReason": null
             },
             {
-              "name": "peerId",
+              "name": "peer_id",
               "description": "libp2p Peer ID",
               "args": [],
               "type": {
@@ -9335,7 +9335,7 @@
               "deprecationReason": null
             },
             {
-              "name": "bannedStatus",
+              "name": "banned_status",
               "description": "Banned status",
               "args": [],
               "type": {
@@ -12377,7 +12377,7 @@
           "description": null,
           "fields": [
             {
-              "name": "peerId",
+              "name": "peer_id",
               "description": "base58-encoded peer ID",
               "args": [],
               "type": {
@@ -12409,7 +12409,7 @@
               "deprecationReason": null
             },
             {
-              "name": "libp2pPort",
+              "name": "libp2p_port",
               "description": null,
               "args": [],
               "type": {
@@ -12626,7 +12626,7 @@
           "description": null,
           "fields": [
             {
-              "name": "initialMininumBalance",
+              "name": "initial_mininum_balance",
               "description": "The initial minimum balance for a time-locked account",
               "args": [],
               "type": {
@@ -12638,7 +12638,7 @@
               "deprecationReason": null
             },
             {
-              "name": "cliffTime",
+              "name": "cliff_time",
               "description": "The cliff time for a time-locked account",
               "args": [],
               "type": {
@@ -12650,7 +12650,7 @@
               "deprecationReason": null
             },
             {
-              "name": "cliffAmount",
+              "name": "cliff_amount",
               "description": "The cliff amount for a time-locked account",
               "args": [],
               "type": {
@@ -12662,7 +12662,7 @@
               "deprecationReason": null
             },
             {
-              "name": "vestingPeriod",
+              "name": "vesting_period",
               "description": "The vesting period for a time-locked account",
               "args": [],
               "type": {
@@ -12674,7 +12674,7 @@
               "deprecationReason": null
             },
             {
-              "name": "vestingIncrement",
+              "name": "vesting_increment",
               "description": "The vesting increment for a time-locked account",
               "args": [],
               "type": {
