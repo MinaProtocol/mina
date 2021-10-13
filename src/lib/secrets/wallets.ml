@@ -207,7 +207,7 @@ let lock { cache; _ } ~needle =
 let get_tracked_keypair ~logger ~which ~read_from_env_exn ~conf_dir pk =
   let%bind wallets = load ~logger ~disk_location:(conf_dir ^/ "wallets") in
   let sk_file = get_path wallets pk in
-  read_from_env_exn ~which sk_file
+  read_from_env_exn ~logger ~which sk_file
 
 let%test_module "wallets" =
   ( module struct

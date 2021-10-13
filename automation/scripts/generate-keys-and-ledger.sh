@@ -273,9 +273,7 @@ else
 fi
 # ================================================================================
 
-# o1-keys.txt was out-of-date and now does not exist
-# create a new o1-keys.txt and uncomment this to add employee keys to a future network
-# generate_keyset_from_file "o1-keys.txt" "online-o1" "employee"
+generate_keyset_from_file "o1-keys.txt" "online-o1" "employee"
 
 # ================================================================================
 

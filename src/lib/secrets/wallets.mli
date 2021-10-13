@@ -51,7 +51,8 @@ val delete :
 val get_tracked_keypair :
      logger:Logger.t
   -> which:string
-  -> read_from_env_exn:(which:string -> string -> Keypair.t Deferred.t)
+  -> read_from_env_exn:
+       (logger:Logger.t -> which:string -> string -> Keypair.t Deferred.t)
   -> conf_dir:string
   -> Public_key.Compressed.t
   -> Keypair.t Deferred.t

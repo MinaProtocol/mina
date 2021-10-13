@@ -1,0 +1,1 @@
+curl -X PUT -H "Content-Type: application/json" -d @./ingest-pipeline.json https://search-testnet-djtfjlry3tituhytrovphxtleu.us-west-2.es.amazonaws.com/_ingest/pipeline/timestamp_pipeline
