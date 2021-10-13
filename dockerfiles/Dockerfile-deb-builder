@@ -190,7 +190,7 @@ RUN eval $(opam config env) \
   && opam pin add src/external/async_kernel \
   && opam pin add src/external/coda_base58 \
   && opam pin add src/external/graphql_ppx \
-  && opam pin add src/external/prometheus \
+  && opam pin add prometheus src/external/prometheus \
   && opam clean --logs -cs
 
 
