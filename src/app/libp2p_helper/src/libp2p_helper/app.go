@@ -336,8 +336,6 @@ func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 				return
 			}
 
-			app.P2p.Logger.Infof("received message on stream %d", idx)
-
 			app.StreamsMutex.Lock()
 			streamState := app.StreamStates[idx]
 			if streamState == STREAM_DATA_EXPECTED {
