@@ -2413,7 +2413,7 @@ module Types = struct
                 }
             with exn -> Error (Exn.to_string exn))
           ~fields:
-            [ arg "pk" ~doc:"Public key as a Base58Check string"
+            [ arg "publicKey" ~doc:"Public key as a Base58Check string"
                 ~typ:(non_null string)
             ; arg "update" ~doc:"Update part of the body"
                 ~typ:(non_null snapp_update)
@@ -2493,30 +2493,6 @@ module Types = struct
             ; enum_value "Check" ~value:Check
             ]
 
-      let snapp_make_check_or_ignore name value_arg =
-        obj name
-          ~coerce:(fun check_or_ignore value_opt ->
-            match (check_or_ignore, value_opt) with
-            | Ignore, None ->
-                Ok Snapp_basic.Or_ignore.Ignore
-            | Ignore, Some _ ->
-                Error "Got Ignore with a non-null value"
-            | Check, Some value ->
-                Ok (Snapp_basic.Or_ignore.Check value)
-            | Check, None ->
-                Error "Got Check with a null value")
-          ~fields:
-            [ arg "checkOrIgnore" ~doc:"Check or ignore"
-                ~typ:(non_null snapp_check_or_ignore)
-            ; value_arg
-            ]
-
-      let snapp_pk_or_ignore =
-        snapp_make_check_or_ignore "PublicKeyOrIgnore"
-          (arg "publicKey"
-             ~doc:"Public key in Base58Check format, or null if Ignore"
-             ~typ:public_key_arg)
-
       let snapp_balance =
         scalar "Balance" ~coerce:(fun s ->
             try
@@ -2538,20 +2514,14 @@ module Types = struct
 
       let snapp_balance_numeric =
         obj "BalanceNumeric"
-          ~coerce:(fun check_or_ignore balance_interval_opt ->
-            match (check_or_ignore, balance_interval_opt) with
-            | Ignore, None ->
+          ~coerce:(fun balance_interval_opt ->
+            match balance_interval_opt with
+            | None ->
                 Ok Snapp_basic.Or_ignore.Ignore
-            | Ignore, Some _ ->
-                Error "Got Ignore with a non-null value"
-            | Check, Some balance_interval ->
-                Ok (Snapp_basic.Or_ignore.Check balance_interval)
-            | Check, None ->
-                Error "Got Check with a null value")
+            | Some balance_interval ->
+                Ok (Snapp_basic.Or_ignore.Check balance_interval))
           ~fields:
-            [ arg "checkOrIgnore" ~doc:"Check or ignore"
-                ~typ:(non_null snapp_check_or_ignore)
-            ; arg "balanceInterval" ~doc:"Balance interval, or null if Ignore"
+            [ arg "balanceInterval" ~doc:"Balance interval, or null if Ignore"
                 ~typ:snapp_balance_closed_interval
             ]
 
@@ -2563,8 +2533,7 @@ module Types = struct
             [ arg "lower" ~typ:(non_null typ); arg "upper" ~typ:(non_null typ) ]
 
       let snapp_make_numeric ~name ~arg_name ~typ =
-        snapp_make_check_or_ignore name
-          (arg arg_name ~typ:(snapp_make_closed_interval ~name:arg_name ~typ))
+        arg arg_name ~typ:(snapp_make_closed_interval ~name:arg_name ~typ)
 
       let snapp_nonce_numeric =
         snapp_make_numeric ~name:"NonceNumeric" ~arg_name:"nonce" ~typ:nonce
@@ -2696,39 +2665,20 @@ module Types = struct
             | _ ->
                 Error "Expected Snapp proof as base64-encoded string")
 
-      (* like Control.t with nullary constructors *)
-      type snapp_proof_or_signature_or_none_given =
-        | Proof
-        | Signature
-        | None_given
-
-      let snapp_control_enum =
-        enum "ProofOrSignature"
-          ~values:
-            [ enum_value "Proof" ~value:Proof
-            ; enum_value "Signature" ~value:Signature
-            ; enum_value "NoneGiven" ~value:None_given
-            ]
-
       let snapp_control =
         obj "Control"
           ~coerce:(fun proof_or_signature proof_opt signature_opt ->
             match (proof_or_signature, proof_opt, signature_opt) with
-            | Proof, Some proof, None ->
+            | Some proof, None ->
                 Ok (Control.Proof proof)
-            | Proof, _, _ ->
-                Error "Proof requires non-null proof, null other data"
-            | Signature, None, Some signature ->
+            | None, Some signature ->
                 Ok (Control.Signature signature)
-            | Signature, _, _ ->
-                Error "Signature requires non-null signature, null other data"
-            | None_given, None, None ->
-                Ok Control.None_given
-            | None_given, _, _ ->
-                Error "None_given, other data should be null")
+            | Some _, Some _ ->
+                Error "Expected a proof or a signature, but not both"
+            | None, None ->
+                Ok Control.None_given)
           ~fields:
-            [ arg "proofOrSignature" ~typ:(non_null snapp_control_enum)
-            ; arg "proof" ~typ:snapp_proof
+            [ arg "proof" ~typ:snapp_proof
             ; arg "signature" ~typ:snapp_signature
             ]
 
@@ -2856,6 +2806,8 @@ module Types = struct
             ; arg "epochLength" ~typ:(non_null snapp_length_numeric)
             ]
 
+      let check_or_null_doc s = s ^ " Checked if present. Ignored if null."
+
       let snapp_protocol_state_arg :
           (Snapp_predicate.Protocol_state.t, string) result option arg_typ =
         obj "SnappProtocolState" ~doc:"Protocol state for a Snapp transaction"
@@ -2904,12 +2856,27 @@ module Types = struct
               })
           ~fields:
             [ arg "snarkedLedgerHash"
-                ~typ:(non_null snapp_snarked_ledger_hash_or_ignore)
+                ~doc:
+                  (check_or_null_doc
+                     "Snarked ledger hash in Base58Check format.")
+                ~typ:snarked_ledger_hash
             ; arg "snarkedNextAvailableToken"
-                ~typ:(non_null snapp_token_id_numeric)
-            ; arg "timestamp" ~typ:(non_null snapp_block_time_numeric)
-            ; arg "blockchainLength" ~typ:(non_null snapp_length_numeric)
-            ; arg "minWindowDensity" ~typ:(non_null snapp_length_numeric)
+                ~doc:
+                  (check_or_null_doc
+                     "Next available tokenId according to the snarked ledger.")
+                ~typ:token_id_arg
+            ; arg "timestamp"
+                ~doc:
+                  (check_or_null_doc
+                     "Timestamp of the start of the slot where this protocol \
+                      state was created")
+                ~typ:block_time
+            ; arg "blockchainLength"
+                ~doc:(check_or_null_doc "Length of the blockchain.")
+                ~typ:length
+            ; arg "minWindowDensity"
+                ~doc:(check_or_null_doc "Minimum window density")
+                ~typ:(non_null snapp_length_numeric)
             ; arg "lastVrfOutput" ~typ:snapp_vrf_output (* nullable! *)
             ; arg "totalCurrency" ~typ:(non_null snapp_currency_amount_numeric)
             ; arg "globalSlotSinceHardFork"
@@ -3131,17 +3098,17 @@ module Types = struct
              private key"
 
       let snapp_fee_payer =
-        arg "snappFeePayer"
+        arg "feePayer"
           ~typ:(non_null Snapp_inputs.snapp_party_signed)
           ~doc:"The fee payer party to a Snapp transaction"
 
       let snapp_other_parties =
-        arg "snappOtherParties"
+        arg "otherParties"
           ~typ:(non_null (list (non_null Snapp_inputs.snapp_party_arg)))
           ~doc:"The parties other than the fee payer in a Snapp transaction"
 
       let snapp_protocol_state =
-        arg "snappProtocolState"
+        arg "protocolState"
           ~typ:(non_null Snapp_inputs.snapp_protocol_state_arg)
           ~doc:"The protocol state in a Snapp transaction"
     end
