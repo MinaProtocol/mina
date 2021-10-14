@@ -185,11 +185,11 @@ module Update = struct
     end
   end]
 
-  let gen ?(new_party = false) ?(snapp_account = false) () :
+  let gen ?(new_account = false) ?(snapp_account = false) () :
       t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
-    if snapp_account && not new_party then
-      failwith "Party.gen: got snapp_account but not new_party" ;
+    if snapp_account && not new_account then
+      failwith "Party.Update.gen: got snapp_account but not new_account" ;
     let%bind app_state =
       let%bind fields =
         let field_gen = Snark_params.Tick.Field.gen in
@@ -234,7 +234,7 @@ module Update = struct
       Set_or_keep.gen token_gen
     in
     let%map timing =
-      if new_party then Set_or_keep.gen Timing_info.gen
+      if new_account then Set_or_keep.gen Timing_info.gen
       else return Set_or_keep.Keep
     in
     Poly.

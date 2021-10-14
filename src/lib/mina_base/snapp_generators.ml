@@ -237,14 +237,14 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger =
             else return (Party.Predicate.Nonce (Account.Nonce.succ nonce)) )
 
 let gen_party_body ?account_id ?balances_tbl ?(fee_payer = false)
-    ?(new_party = false) ?(snapp_account = false) ?available_public_keys ~ledger
-    () : Party.Body.t Quickcheck.Generator.t =
+    ?(new_account = false) ?(snapp_account = false) ?available_public_keys
+    ~ledger () : Party.Body.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
-  if snapp_account && not new_party then
-    failwith "gen_party_body: snapp_account but not new_party" ;
-  let%bind update = Party.Update.gen ~new_party ~snapp_account () in
+  if snapp_account && not new_account then
+    failwith "gen_party_body: snapp_account but not new_account" ;
+  let%bind update = Party.Update.gen ~new_account ~snapp_account () in
   let%bind account =
-    if new_party then (
+    if new_account then (
       if Option.is_some account_id then
         failwith
           "gen_party_body: new party is true, but an account id, presumably \
@@ -252,8 +252,8 @@ let gen_party_body ?account_id ?balances_tbl ?(fee_payer = false)
       match available_public_keys with
       | None ->
           failwith
-            "gen_party_body: new_party is true, but available_public_keys not \
-             provided"
+            "gen_party_body: new_account is true, but available_public_keys \
+             not provided"
       | Some available_pks ->
           let%map account_with_gen_pk =
             Account.gen_with_constrained_balance ~low:10_000_000_000
@@ -450,11 +450,11 @@ let gen_party_body ?account_id ?balances_tbl ?(fee_payer = false)
   ; depth
   }
 
-let gen_predicated_from ?(succeed = true) ?(new_party = false)
+let gen_predicated_from ?(succeed = true) ?(new_account = false)
     ?(snapp_account = false) ?available_public_keys ~ledger ~balances_tbl =
   let open Quickcheck.Let_syntax in
   let%bind body =
-    gen_party_body ~new_party ~snapp_account ?available_public_keys ~ledger
+    gen_party_body ~new_account ~snapp_account ?available_public_keys ~ledger
       ~balances_tbl ()
   in
   let account_id =
@@ -463,8 +463,8 @@ let gen_predicated_from ?(succeed = true) ?(new_party = false)
   let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger in
   Party.Predicated.Poly.{ body; predicate }
 
-let gen_party_from ?(succeed = true) ?(new_party = false) ~available_public_keys
-    ~ledger ~balances_tbl =
+let gen_party_from ?(succeed = true) ?(new_account = false)
+    ~available_public_keys ~ledger ~balances_tbl =
   let open Quickcheck.Let_syntax in
   let%bind authorization = Lazy.force Control.gen_with_dummies in
   let snapp_account =
@@ -477,9 +477,9 @@ let gen_party_from ?(succeed = true) ?(new_party = false) ~available_public_keys
   (* if it's a Snapp account, generate a new account, since existing accounts in
      ledger may not be Snapp accounts
   *)
-  let new_party = new_party || snapp_account in
+  let new_account = new_account || snapp_account in
   let%map data =
-    gen_predicated_from ~succeed ~new_party ~snapp_account
+    gen_predicated_from ~succeed ~new_account ~snapp_account
       ~available_public_keys ~ledger ~balances_tbl
   in
   { Party.data; authorization }
@@ -526,7 +526,7 @@ let gen_parties_from ?(succeed = true)
   let%bind fee_payer =
     gen_party_signed ~account_id:fee_payer_account_id ~ledger
   in
-  let gen_parties_with_dynamic_balance ~new_parties num_parties =
+  let gen_parties_with_dynamic_balance ~new_accounts num_parties =
     (* table of public keys to balances, removing an entry when generating each party
        a Map would be more principled, but threading that map through the code adds complexity
     *)
@@ -535,8 +535,8 @@ let gen_parties_from ?(succeed = true)
       if n <= 0 then return (List.rev acc)
       else
         let%bind party =
-          gen_party_from ~new_party:new_parties ~available_public_keys ~succeed
-            ~ledger ~balances_tbl
+          gen_party_from ~new_account:new_accounts ~available_public_keys
+            ~succeed ~ledger ~balances_tbl
         in
         go (party :: acc) (n - 1)
     in
@@ -544,15 +544,15 @@ let gen_parties_from ?(succeed = true)
   in
   (* at least 1 party, so that `succeed` affects at least one predicate *)
   let%bind num_parties = Int.gen_uniform_incl 1 max_parties in
-  let%bind num_new_parties = Int.gen_uniform_incl 0 num_parties in
-  let num_old_parties = num_parties - num_new_parties in
+  let%bind num_new_accounts = Int.gen_uniform_incl 0 num_parties in
+  let num_old_parties = num_parties - num_new_accounts in
   let%bind old_parties =
-    gen_parties_with_dynamic_balance ~new_parties:false num_old_parties
+    gen_parties_with_dynamic_balance ~new_accounts:false num_old_parties
   in
-  let%bind new_parties =
-    gen_parties_with_dynamic_balance ~new_parties:true num_new_parties
+  let%bind new_accounts =
+    gen_parties_with_dynamic_balance ~new_accounts:true num_new_accounts
   in
-  let other_parties = old_parties @ new_parties in
+  let other_parties = old_parties @ new_accounts in
   let parties_dummy_signatures : Parties.t =
     { fee_payer; other_parties; protocol_state }
   in

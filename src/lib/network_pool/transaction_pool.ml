@@ -1282,10 +1282,7 @@ struct
               | Error _ | Ok () ->
                   let data =
                     List.filter_map diffs' ~f:(function
-                      | Error `Invalid_command ->
-                          (* If this happens, we should be in the Error branch for !failure above *)
-                          assert false
-                      | Error `Other_command_failed ->
+                      | Error (`Invalid_command | `Other_command_failed) ->
                           (* If this happens, we should be in the Error branch for !failure above *)
                           assert false
                       | Error `Account_not_found ->
