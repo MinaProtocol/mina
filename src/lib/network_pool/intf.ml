@@ -346,5 +346,7 @@ module type Base_ledger_intf = sig
 
   val get : t -> Location.t -> Account.t option
 
+  val accounts : t -> Account_id.Set.t
+
   val detached_signal : t -> unit Deferred.t
 end

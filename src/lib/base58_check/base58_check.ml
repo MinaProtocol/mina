@@ -34,7 +34,10 @@ struct
       encoding and decoding, runs in time O(n^2); limit
       length of input when encoding to avoid bottlenecks
   *)
-  let max_encodable_length = 8192
+
+  (* TODO: temporary fix until #9615 is merged *)
+
+  let max_encodable_length = 50000
 
   let compute_checksum payload =
     (* double-hash using SHA256 *)

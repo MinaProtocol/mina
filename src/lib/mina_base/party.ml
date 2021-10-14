@@ -185,8 +185,11 @@ module Update = struct
     end
   end]
 
-  let gen ?(new_party = false) () : t Quickcheck.Generator.t =
+  let gen ?(new_party = false) ?(snapp_account = false) () :
+      t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
+    if snapp_account && not new_party then
+      failwith "Party.gen: got snapp_account but not new_party" ;
     let%bind app_state =
       let%bind fields =
         let field_gen = Snark_params.Tick.Field.gen in
@@ -197,11 +200,19 @@ module Update = struct
     in
     let%bind delegate = Set_or_keep.gen Public_key.Compressed.gen in
     let%bind verification_key =
-      Set_or_keep.gen
-        (Quickcheck.Generator.return
-           (let data = Pickles.Side_loaded.Verification_key.dummy in
-            let hash = Snapp_account.digest_vk data in
-            { With_hash.data; hash }))
+      if snapp_account then
+        return
+        @@ Set_or_keep.Set
+             With_hash.
+               { data = Pickles.Side_loaded.Verification_key.dummy
+               ; hash = Snapp_account.dummy_vk_hash ()
+               }
+      else
+        Set_or_keep.gen
+          (Quickcheck.Generator.return
+             (let data = Pickles.Side_loaded.Verification_key.dummy in
+              let hash = Snapp_account.digest_vk data in
+              { With_hash.data; hash }))
     in
     let%bind permissions = Set_or_keep.gen Permissions.gen in
     let%bind snapp_uri =
