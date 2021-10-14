@@ -68,7 +68,7 @@ struct
 
      do not change it!
   *)
-  let chunk_marker = '@'
+  let chunk_marker = '0'
 
   let encode_chunked payload =
     let split s =
