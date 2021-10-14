@@ -1539,6 +1539,33 @@ module Types = struct
       field ?doc ?deprecated lab ~typ ~args ~resolve:(fun c cmd ->
           resolve c cmd.With_status.data)
 
+    let mk_field_lists evs =
+      List.map evs ~f:(fun fields ->
+          Array.map fields ~f:Snark_params.Tick.Field.to_string |> Array.to_list)
+
+    let party_display =
+      obj "Party" ~doc:"Party in a snapp transaction" ~fields:(fun _ ->
+          [ field "pk" ~doc:"Public key of the party as a Base58Check string"
+              ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ (party : Party.t) ->
+                Public_key.Compressed.to_base58_check party.data.body.pk)
+          ; field "events"
+              ~doc:"Events associated with the party (fields in Base58Check)"
+              ~typ:(non_null (list (non_null (list (non_null string)))))
+              ~args:Arg.[]
+              ~resolve:(fun _ (party : Party.t) ->
+                mk_field_lists party.data.body.events)
+          ; field "rollupEvents"
+              ~doc:
+                "Rollup events associated with the party (fields in \
+                 Base58Check)"
+              ~typ:(non_null (list (non_null (list (non_null string)))))
+              ~args:Arg.[]
+              ~resolve:(fun _ (party : Party.t) ->
+                mk_field_lists party.data.body.rollup_events)
+          ])
+
     let snapp_command =
       obj "SnappCommand" ~fields:(fun _ ->
           [ field_no_status "id"
@@ -1592,6 +1619,10 @@ module Types = struct
                     None
                 | Included_but_failed failure ->
                     Some (Transaction_status.Failure.to_string failure))
+          ; field_no_status "parties"
+              ~typ:(non_null (list (non_null party_display)))
+              ~args:[] ~doc:"Parties involved in the snapp transaction"
+              ~resolve:(fun _ cmd -> Parties.parties cmd.With_hash.data)
           ])
   end
 
