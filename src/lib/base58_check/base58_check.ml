@@ -263,7 +263,7 @@ let%test_module "base58check tests" =
       let page = String.concat [ para; para; para; para; para ] in
       let book = String.concat [ page; page; page; page; page ] in
       (* length of book is about 35K, several chunks *)
-      let encoded = encode_chunked book in
-      let decoded = decode_chunked_exn encoded in
+      let encoded = encode book in
+      let decoded = decode_exn encoded in
       String.equal decoded book
   end )
