@@ -4,6 +4,8 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+- bump
+
 2021/10/12:
 
 - Adjust API to remove empty array responses
