@@ -1,4 +1,4 @@
-### Mina Seed node healthcheck TEMPLATES ###
+### Mina Node Heatl Status Checks ###
 
 {{/*
 seed-node startup probe settings
