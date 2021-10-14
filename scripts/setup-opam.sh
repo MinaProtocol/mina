@@ -22,16 +22,31 @@ if ! [[ -d ~/.opam ]]; then
   eval $(opam config env)
 fi
 
-opam update
-
 # needed paths for macOS
-if [[ "$OSTYPE" == "darwin*" ]]; then
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  echo "Setting env vars for macOS"
   export PKG_CONFIG_PATH=$(brew --prefix openssl)/lib/pkgconfig
-  export  LIBRARY_PATH=/usr/local/lib
+  export LIBRARY_PATH=/usr/local/lib
 fi
+
+opam update
 
 # create local switch
 opam switch create . 4.11.2
+
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # Workaround for re2 bug
+  #   https://github.com/MinaProtocol/mina/issues/962
+
+  echo "Workaround for re2 bug"
+  ls -l $(ocamlc -where)/version || true
+  rm -fv $(ocamlc -where)/version
+
+  # Can also appear here
+  ls -l $(pwd)/_opam/lib/ocaml/version || true
+  rm -fv $(pwd)/_opam/lib/ocaml/version
+fi
+
 opam switch import src/opam.export --switch .
 sudo chmod -R u+rw _opam
 eval $(opam config env)
