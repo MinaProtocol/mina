@@ -185,3 +185,39 @@ module Balance : sig
   [%%endif]
 end
 [@@warning "-32"]
+
+module Fee_rate : sig
+  type t
+
+  include Arithmetic_intf with type t := t
+
+  include Comparable.S with type t := t
+
+  include Sexpable.S with type t := t
+
+  val of_q : Q.t -> t option
+
+  val of_q_exn : Q.t -> t
+
+  val to_q : t -> Q.t
+
+  (** construct a fee rate from a fee and a weight *)
+  val make : Fee.t -> int -> t option
+
+  (** construct a fee rate from a fee and a weight *)
+  val make_exn : Fee.t -> int -> t
+
+  (** convert to uint64, if the fee rate is equivalent to an integer. *)
+  val to_uint64 : t -> uint64 option
+
+  (** convert to uint64, if the fee rate is equivalent to an integer. *)
+  val to_uint64_exn : t -> uint64
+
+  val mul : t -> t -> t option
+
+  val scale_exn : t -> int -> t
+
+  val div : t -> t -> t option
+
+  val ( * ) : t -> t -> t option
+end

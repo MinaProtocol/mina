@@ -292,3 +292,15 @@ let filter_by_participant (commands : t list) public_key =
           (Fn.compose
              (Signature_lib.Public_key.Compressed.equal public_key)
              Account_id.public_key))
+
+(* A metric on user commands that should correspond roughly to resource costs
+   for validation/application *)
+let weight : Stable.Latest.t -> int = function
+  | Signed_command signed_command ->
+      Signed_command.payload signed_command |> Signed_command_payload.weight
+  | Parties parties ->
+      Parties.weight parties
+
+(* Fee per weight unit *)
+let fee_per_wu (user_command : Stable.Latest.t) : Currency.Fee_rate.t =
+  Currency.Fee_rate.make_exn (fee_exn user_command) (weight user_command)
