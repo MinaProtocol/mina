@@ -1164,7 +1164,7 @@ module Block = struct
           | Error e ->
               Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
         in
-        let account_creation_fee_of_fee_and_balance fee balance =
+        let account_creation_fee_of_fees_and_balance ?(additional_fee=None) fee balance =
           (* TODO: add transaction statuses to internal commands
              the archive lib should not know the details of
              account creation fees; the calculation below is
@@ -1175,9 +1175,22 @@ module Block = struct
           let account_creation_fee_uint64 = Currency.Fee.to_uint64
               constraint_constants.account_creation_fee
           in
+          (* for coinbases, an associated fee transfer may reduce
+             the amount given to the coinbase receiver beyond
+             the account creation fee
+
+             we add that amount to the creation fee for convenience
+          *)
+          let creation_deduction_uint64 =
+            match additional_fee with
+            | None -> account_creation_fee_uint64
+            | Some fee' ->
+              Unsigned.UInt64.add (Currency.Fee.to_uint64 fee')
+                account_creation_fee_uint64
+          in
           if Unsigned.UInt64.equal balance_uint64
-              (Unsigned.UInt64.sub fee_uint64 account_creation_fee_uint64) then
-            Some (Unsigned.UInt64.to_int64 account_creation_fee_uint64)
+              (Unsigned.UInt64.sub fee_uint64 creation_deduction_uint64) then
+            Some (Unsigned.UInt64.to_int64 creation_deduction_uint64)
           else
             None
         in
@@ -1264,7 +1277,7 @@ module Block = struct
                           ~public_key_id:receiver_id ~balance
                       in
                       let receiver_account_creation_fee_paid =
-                        account_creation_fee_of_fee_and_balance fee balance
+                        account_creation_fee_of_fees_and_balance fee balance
                       in
                       Block_and_internal_command.add
                         (module Conn)
@@ -1280,10 +1293,10 @@ module Block = struct
                   Transaction_status.Coinbase_balance_data.of_balance_data_exn
                     (Transaction_status.balance_data status)
                 in
-                let%bind () =
+                let%bind additional_fee =
                   match Mina_base.Coinbase.fee_transfer coinbase with
                   | None ->
-                      return ()
+                      return None
                   | Some {receiver_pk; fee} ->
                       let fee_transfer =
                         Mina_base.Fee_transfer.Single.create ~receiver_pk ~fee
@@ -1309,15 +1322,16 @@ module Block = struct
                           ~balance
                       in
                       let receiver_account_creation_fee_paid =
-                        account_creation_fee_of_fee_and_balance fee balance
+                        account_creation_fee_of_fees_and_balance fee balance
                       in
-                      Block_and_internal_command.add
+                      let%bind () = Block_and_internal_command.add
                         (module Conn)
                         ~block_id ~internal_command_id:id ~sequence_no
                         ~secondary_sequence_no:0
                         ~receiver_account_creation_fee_paid
                         ~receiver_balance_id
-                      >>| ignore
+                      in
+                      return (Some fee)
                 in
                 let%bind id =
                   Coinbase.add_if_doesn't_exist (module Conn) coinbase
@@ -1334,8 +1348,9 @@ module Block = struct
                     ~balance:balances.coinbase_receiver_balance
                 in
                 let receiver_account_creation_fee_paid =
-                  account_creation_fee_of_fee_and_balance
-                    (Currency.Amount.to_fee coinbase.amount) balances.coinbase_receiver_balance
+                  account_creation_fee_of_fees_and_balance ~additional_fee
+                    (Currency.Amount.to_fee coinbase.amount)
+                    balances.coinbase_receiver_balance
                 in
                 let%map () =
                   Block_and_internal_command.add
