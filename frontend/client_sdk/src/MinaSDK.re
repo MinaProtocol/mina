@@ -1,5 +1,6 @@
 type publicKey = string;
 type privateKey = string;
+type proof = string;
 
 [@genType.import "./TSTypes"]
 type uint64 = string;
@@ -49,6 +50,66 @@ type payment = {
   memo: option(string),
   validUntil: option(uint32),
 };
+
+
+// Party Transactions
+module Party = {
+  type predicated = {
+    .
+    "body": TODO
+  };
+
+  type member('auth) = {
+    .
+    "authorization": 'auth,
+    "data": predicated
+  };
+
+  type proof_or_signature = {
+    .
+    "proof": Js.Undefined.t(proof),
+    "signature": Js.Undefined.t(signature)
+  };
+
+  type protocolState = {
+    .
+    "snarkedLedgerHash": Js.Undefined.t(string),
+    "snarkedNextAvailableToken": Js.Undefined.t(string),
+    "snarkedLedgerHash": Js.Undefined.t(string),
+    "timestamp": Js.Undefined.t(string),
+    "blockchainLength": Js.Undefined.t(string),
+    "lastVrfOutput": Js.Undefined.t(string),
+    "totalCurrency": Js.Undefined.t(string),
+    "globalSlotSinceHardFork": Js.Undefined.t(string),
+    "globalSlotSinceGenesis": Js.Undefined.t(string),
+    "stakingEpochData": Js.Undefined.t(string),
+    "nextEpochData": Js.Undefined.t(string),
+  }
+
+  type t = {
+    .
+    "feePayer": party(signature),
+    "otherParties": array(party(proof_or_signature)),
+    "protocolState": protocolState
+  };
+};
+
+{snappFeePayer: {authorization: "7mXNiius9LJidXL1zLJvUqPrzwmwNeZY7ZhuZGtL84zT16ToXGassr9G9vAP2c6QyBNvT4um42AYJ1sVgeNuadBy6KyWNwMV", data: {predicate: "0", body: {depth: "0",
+call_data: "0x0000000000000000000000000000000000000000000000000000000000000000", rollup_events: [], events: [], delta: {sgn: MINUS, magnitude: "15000000000"}, token_id: "1",
+update: {timing: {set_or_keep: Keep}, token_symbol: {set_or_keep: Keep}, snapp_uri: {set_or_keep: Keep}, permissions: {set_or_keep: Keep}, verification_key: {set_or_keep: Keep},
+delegate: {set_or_keep: Keep}, app_state: [{set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}]},
+pk: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"}}}, snappOtherParties: {authorization: {proof_or_signature: None_given}, data: {predicate: {full_or_nonce_or_accept: Accept},
+body: {depth: "0", call_data: "0x0000000000000000000000000000000000000000000000000000000000000000", rollup_events: [], events: [], delta: {sgn: PLUS, magnitude: "10000000000"}, token_id: "1",
+update: {timing: {set_or_keep: Keep}, token_symbol: {set_or_keep: Keep}, snapp_uri: {set_or_keep: Keep}, permissions: {set_or_keep: Keep}, verification_key: {set_or_keep: Keep}, delegate: {set_or_keep: Keep},
+app_state: [{set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}]},
+pk: "B62qjJwgq7kNXYHXQsMeyiMWL7fHsnPeuAiPfYd3yTor3eKpK8VV1gG"}}}, snappProtocolState: {next_epoch_data: {epoch_length: {check_or_ignore: Ignore}, lock_checkpoint: {check_or_ignore: Ignore},
+start_checkpoint: {check_or_ignore: Ignore}, seed: {check_or_ignore: Ignore}, ledger: {total_currency: {check_or_ignore: Ignore}, hash: {check_or_ignore: Ignore}}},
+staking_epoch_data: {epoch_length: {check_or_ignore: Ignore}, lock_checkpoint: {check_or_ignore: Ignore}, start_checkpoint: {check_or_ignore: Ignore}, seed: {check_or_ignore: Ignore},
+ledger: {total_currency: {check_or_ignore: Ignore}, hash: {check_or_ignore: Ignore}}}, global_slot_since_genesis: {check_or_ignore: Ignore}, curr_global_slot: {check_or_ignore: Ignore},
+total_currency: {check_or_ignore: Ignore}, last_vrf_input: null, min_window_density: {check_or_ignore: Ignore}, blockchain_length: {check_or_ignore: Ignore}, timestamp: {check_or_ignore: Ignore},
+snarked_next_available_token: {check_or_ignore: Ignore}, snarked_ledger_hash: {check_or_ignore: Ignore}}}
+
+// ---
 
 type minaSDK;
 [@bs.module "./client_sdk.bc.js"] external minaSDK: minaSDK = "minaSDK";
