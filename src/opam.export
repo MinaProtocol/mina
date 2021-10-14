@@ -126,7 +126,7 @@ installed: [
   "macaddr.3.1.0"
   "magic-mime.1.1.2"
   "menhir.20181113"
-  "merlin.3.6.1"
+  "merlin.3.5.0"
   "mmap.1.1.0"
   "num.1.1"
   "ocaml.4.07.1"
