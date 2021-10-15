@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -109,11 +108,11 @@ type CodaConnectionManager struct {
 	OnDisconnect     func(network.Network, network.Conn)
 }
 
-func newCodaConnectionManager(minConnections, maxConnections int, minaPeerExchange bool) *CodaConnectionManager {
+func newCodaConnectionManager(minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration) *CodaConnectionManager {
 	noop := func(net network.Network, c network.Conn) {}
 
 	return &CodaConnectionManager{
-		p2pManager:       p2pconnmgr.NewConnManager(minConnections, maxConnections, time.Duration(1*time.Millisecond)),
+		p2pManager:       p2pconnmgr.NewConnManager(minConnections, maxConnections, grace),
 		OnConnect:        noop,
 		OnDisconnect:     noop,
 		minaPeerExchange: minaPeerExchange,
@@ -273,7 +272,7 @@ type BitswapStorage interface {
 type BitswapStorageLmdb lmdbbs.Blockstore
 
 func UnmarshalRootBlockStatus(r []byte) (res RootBlockStatus, err error) {
-	err = errors.New("Wrong root block status retrieved")
+	err = fmt.Errorf("wrong root block status retrieved: %v", r)
 	if len(r) != 1 {
 		return
 	}
@@ -316,7 +315,7 @@ func (bs_ *BitswapStorageLmdb) DeleteStatus(key [32]byte) error {
 		}
 		newExists = false
 		if exists && prev != Deleting {
-			err = fmt.Errorf("Wrong status deletion from %d", prev)
+			err = fmt.Errorf("wrong status deletion from %d", prev)
 		}
 		return
 	})
@@ -325,9 +324,12 @@ func (bs_ *BitswapStorageLmdb) DeleteStatus(key [32]byte) error {
 func (bs_ *BitswapStorageLmdb) SetStatus(key [32]byte, newStatus RootBlockStatus) error {
 	bs := (*lmdbbs.Blockstore)(bs_)
 	return bs.PutData(statusKey(key), func(prevVal []byte, exists bool) (newVal []byte, newExists bool, err error) {
-		prev, err := UnmarshalRootBlockStatus(prevVal)
-		if err != nil {
-			return
+		var prev RootBlockStatus
+		if exists {
+			prev, err = UnmarshalRootBlockStatus(prevVal)
+			if err != nil {
+				return
+			}
 		}
 		newVal = []byte{byte(newStatus)}
 		newExists = true
@@ -336,7 +338,7 @@ func (bs_ *BitswapStorageLmdb) SetStatus(key [32]byte, newStatus RootBlockStatus
 		allowed = allowed || (newStatus == Full && (!exists || prev <= Full))
 		allowed = allowed || (newStatus == Deleting && exists)
 		if !allowed {
-			err = fmt.Errorf("Wrong status transition: from %d to %d", prev, newStatus)
+			err = fmt.Errorf("wrong status transition: from %d to %d", prev, newStatus)
 		}
 		return
 	})
@@ -355,24 +357,24 @@ const (
 	BS_STATUS_PREFIX
 )
 
-var blake2b256Code = multihash.Names["blake2b_256"]
+var MULTI_HASH_CODE = multihash.Names["blake2b-256"]
 
 func cidToKeyMapper(id cid.Cid) []byte {
 	mh, err := multihash.Decode(id.Hash())
-	if err == nil && mh.Code == blake2b256Code && id.Prefix().Codec == cid.Raw {
+	if err == nil && mh.Code == MULTI_HASH_CODE && id.Prefix().Codec == cid.Raw {
 		return blockKey(mh.Digest)
 	}
 	return nil
 }
 
 func BlockHashToCid(h [32]byte) cid.Cid {
-	mh, _ := multihash.EncodeName(h[:], "blake2b_256")
+	mh, _ := multihash.Encode(h[:], MULTI_HASH_CODE)
 	return cid.NewCidV1(cid.Raw, mh)
 }
 
 func keyToCidMapper(key []byte) (id cid.Cid) {
 	if len(key) == 33 && key[0] == BS_BLOCK_PREFIX {
-		mh, _ := multihash.Encode(key[1:], blake2b256Code)
+		mh, _ := multihash.Encode(key[1:], MULTI_HASH_CODE)
 		id = cid.NewCidV1(cid.Raw, mh)
 	}
 	return
@@ -761,7 +763,7 @@ func (h Helper) pxConnectionWorker() {
 }
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, minConnections, maxConnections int, minaPeerExchange bool) (*Helper, error) {
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration) (*Helper, error) {
 	me, err := peer.IDFromPrivateKey(pk)
 	if err != nil {
 		return nil, err
@@ -798,7 +800,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	mplex.MaxMessageSize = 1 << 30
 
-	connManager := newCodaConnectionManager(minConnections, maxConnections, minaPeerExchange)
+	connManager := newCodaConnectionManager(minConnections, maxConnections, minaPeerExchange, grace)
 	bandwidthCounter := metrics.NewBandwidthCounter()
 
 	host, err := p2p.New(ctx,

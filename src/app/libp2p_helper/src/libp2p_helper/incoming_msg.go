@@ -7,16 +7,6 @@ import (
 	"github.com/go-errors/errors"
 )
 
-type rpcRequestHandler = func(*app, uint64, ipcRpcRequest) (*capnp.Message, error)
-
-func mkRpcHandler(app *app, seqno uint64, req ipcRpcRequest, f extractRequest) (*capnp.Message, error) {
-	i, err := f(req)
-	if err != nil {
-		return nil, err
-	}
-	return i.handle(app, seqno), nil
-}
-
 var rpcRequestExtractors = map[ipc.Libp2pHelperInterface_RpcRequest_Which]extractRequest{
 	ipc.Libp2pHelperInterface_RpcRequest_Which_configure:           fromConfigureReq,
 	ipc.Libp2pHelperInterface_RpcRequest_Which_setGatingConfig:     fromSetGatingConfigReq,

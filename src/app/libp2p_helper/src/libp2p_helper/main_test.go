@@ -27,8 +27,10 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	_ = logging.SetLogLevel("mina.helper.bitswap", "warning")
 	_ = logging.SetLogLevel("codanet.Helper", "warning")
 	_ = logging.SetLogLevel("codanet.CodaGatingState", "warning")
+	// _ = logging.SetLogLevel("*", "debug")
 	codanet.WithPrivate = true
 
 	os.Exit(m.Run())
@@ -142,6 +144,7 @@ func TestPeerExchange(t *testing.T) {
 
 func sendStreamMessage(t *testing.T, from *app, to *app, msg []byte) {
 	stream, err := from.P2p.Host.NewStream(context.Background(), to.P2p.Host.ID(), testProtocol)
+	require.NoError(t, err)
 	_, err = stream.Write(msg)
 	require.NoError(t, err)
 	err = stream.Close()

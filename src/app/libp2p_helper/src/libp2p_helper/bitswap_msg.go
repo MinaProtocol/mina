@@ -1,7 +1,7 @@
 package main
 
 import (
-	"errors"
+	"fmt"
 	ipc "libp2p_ipc"
 )
 
@@ -39,7 +39,7 @@ func extractRootBlockList(l ipc.RootBlockId_List) ([]BitswapBlockLink, error) {
 		}
 		var link BitswapBlockLink
 		if len(id) != BITSWAP_BLOCK_LINK_SIZE {
-			return nil, errors.New("Bitswap block link of unexpected length")
+			return nil, fmt.Errorf("bitswap block link of unexpected length %d: %v", len(id), id)
 		}
 		copy(link[:], id)
 		ids = append(ids, link)

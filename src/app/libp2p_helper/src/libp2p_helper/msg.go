@@ -323,6 +323,7 @@ func mkGossipReceivedUpcall(sender *codaPeerInfo, expiration time.Time, seenAt t
 		subId.SetId(subIdx)
 
 		sn, err := gr.NewValidationId()
+		panicOnErr(err)
 		sn.SetId(seqno)
 		panicOnErr(gr.SetData(data))
 	})

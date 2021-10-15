@@ -69,7 +69,7 @@ func testSplitJoin(maxBlockSize int, data []byte) error {
 	if err != nil {
 		return err
 	}
-	if bytes.Compare(res, data) != 0 {
+	if !bytes.Equal(res, data) {
 		return errors.New("Unexpected result of join")
 	}
 	n := 0
