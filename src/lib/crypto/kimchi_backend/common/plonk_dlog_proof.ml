@@ -5,6 +5,23 @@ let tuple15_to_vec
   Pickles_types.Vector.
     [ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ]
 
+let tuple15_of_vec
+  Pickles_types.Vector.
+    [ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ]
+  =
+    (w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14) 
+
+let tuple6_to_vec
+    (w0, w1, w2, w3, w4, w5) =
+  Pickles_types.Vector.
+    [ w0; w1; w2; w3; w4; w5]
+
+let tuple6_of_vec
+  Pickles_types.Vector.
+    [ w0; w1; w2; w3; w4; w5]
+  =
+    (w0, w1, w2, w3, w4, w5) 
+
 module type Stable_v1 = sig
   module Stable : sig
     module V1 : sig
@@ -39,7 +56,7 @@ module type Inputs_intf = sig
       include Stable_v1 with type Stable.V1.t = Base_field.t * Base_field.t
 
       module Backend : sig
-        type t = (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t
+        type t = Base_field.t Kimchi.Foundations.or_infinity
       end
 
       val of_backend :
@@ -51,7 +68,7 @@ module type Inputs_intf = sig
   end
 
   module Poly_comm : sig
-    type t = Curve.Affine.t Poly_comm.t
+    type t = Base_field.t Poly_comm.t
 
     module Backend : sig
       type t = Curve.Affine.Backend.t Kimchi.Protocol.poly_comm
@@ -156,7 +173,6 @@ module Make (Inputs : Inputs_intf) = struct
       module V1 = struct
         type t =
           ( G.Affine.Stable.V1.t
-          , G.Affine.Stable.V1.t Pickles_types.Or_infinity.Stable.V1.t
           , Fq.Stable.V1.t
           , Fq.Stable.V1.t array )
           Pickles_types.Dlog_plonk_types.Proof.Stable.V2.t
@@ -166,8 +182,7 @@ module Make (Inputs : Inputs_intf) = struct
 
         type 'a creator =
              messages:
-               ( G.Affine.t
-               , G.Affine.t Pickles_types.Or_infinity.t )
+               ( G.Affine.t)
                Pickles_types.Dlog_plonk_types.Messages.Stable.V2.t
           -> openings:
                ( G.Affine.t
@@ -224,27 +239,19 @@ module Make (Inputs : Inputs_intf) = struct
     let evals =
       (fst t.evals, snd t.evals)
       |> Tuple_lib.Double.map ~f:(fun e ->
-             let s0, s1, s2, s3, s4, s5 = e.s in
              let open Evaluations_backend in
              Pickles_types.Dlog_plonk_types.Evals.
                { w = tuple15_to_vec e.w
                ; z = e.z
-               ; s = [ s0; s1; s2; s3; s4; s5 ]
+               ; s = tuple6_to_vec e.s
                ; generic_selector = e.generic_selector
                ; poseidon_selector = e.poseidon_selector
                })
     in
-    let wo x =
+    let wo x : Inputs.Curve.Affine.t array =
       match Poly_comm.of_backend_without_degree_bound x with
       | `Without_degree_bound gs ->
           gs
-      | _ ->
-          assert false
-    in
-    let _w x =
-      match Poly_comm.of_backend_with_degree_bound x with
-      | `With_degree_bound t ->
-          t
       | _ ->
           assert false
     in
@@ -257,12 +264,16 @@ module Make (Inputs : Inputs_intf) = struct
         ; z_comm = wo t.commitments.z_comm
         ; t_comm = wo t.commitments.t_comm
         }
-      ~openings:{ proof; evals }
+      ~openings:{ proof; evals; ft_eval1= t.ft_eval1 }
 
   let eval_to_backend
-      { Pickles_types.Dlog_plonk_types.Evals.l; r; o; z; t; f; sigma1; sigma2 }
+      { Pickles_types.Dlog_plonk_types.Evals.w; z; s; generic_selector; poseidon_selector}
       : Evaluations_backend.t =
-    { l; r; o; z; t; f; sigma1; sigma2 }
+    { w= tuple15_of_vec w
+    ; z
+    ; s= tuple6_of_vec s
+    ; generic_selector; poseidon_selector
+    }
 
   let vec_to_array (type t elt)
       (module V : Snarky_intf.Vector.S with type t = t and type elt = elt)
@@ -270,31 +281,31 @@ module Make (Inputs : Inputs_intf) = struct
     Array.init (V.length v) ~f:(V.get v)
 
   let to_backend' (chal_polys : Challenge_polynomial.t list) primary_input
-      ({ messages = { l_comm; r_comm; o_comm; z_comm; t_comm }
+      ({ messages = { w_comm; z_comm; t_comm }
        ; openings =
-           { proof = { lr; z_1; z_2; delta; sg }; evals = evals0, evals1 }
+           { proof = { lr; z_1; z_2; delta; sg }; evals = evals0, evals1; ft_eval1 }
        } :
         t) : Backend.t =
-    let g x = G.Affine.to_backend (Or_infinity.Finite x) in
+    let g x = G.Affine.to_backend (Pickles_types.Or_infinity.Finite x) in
     let pcw t = Poly_comm.to_backend (`With_degree_bound t) in
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
     let lr = Array.map lr ~f:(fun (x, y) -> (g x, g y)) in
-    { messages =
-        { l_comm = pcwo l_comm
-        ; r_comm = pcwo r_comm
-        ; o_comm = pcwo o_comm
+    { commitments =
+        { w_comm = 
+            tuple15_of_vec (Pickles_types.Vector.map ~f:pcwo w_comm)
         ; z_comm = pcwo z_comm
-        ; t_comm = pcw t_comm
+        ; t_comm = pcwo t_comm
         }
     ; proof = { lr; delta = g delta; z1 = z_1; z2 = z_2; sg = g sg }
     ; evals = (eval_to_backend evals0, eval_to_backend evals1)
+    ; ft_eval1
     ; public = primary_input
     ; prev_challenges =
         Array.of_list_map chal_polys
-          ~f:(fun { Challenge_polynomial.commitment; challenges } ->
+          ~f:(fun { Challenge_polynomial.commitment=(x,y); challenges } ->
             ( challenges
-            , { Marlin_plonk_bindings.Types.Poly_comm.shifted = None
-              ; unshifted = [| Or_infinity.Finite commitment |]
+            , { Kimchi.Protocol. shifted = None
+              ; unshifted = [| Kimchi.Foundations.Finite (x,y) |]
               } ))
     }
 

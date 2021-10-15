@@ -18,12 +18,12 @@ module type Inputs_intf = sig
         val create : Base_field.t -> Base_field.t -> t
       end
 
-      val of_backend : Backend.t -> t Kimchi.Foundations.or_infinity
+      val of_backend : Backend.t -> t
     end
   end
 
   module Backend : sig
-    type t = Curve.Affine.Backend.t Kimchi.Protocol.poly_comm
+    type t 
 
     val make :
       Curve.Affine.Backend.t array -> Curve.Affine.Backend.t option -> t
@@ -36,7 +36,8 @@ end
 
 type 'a t =
   [ `With_degree_bound of
-    'a Kimchi.Foundations.or_infinity
+      ('a  * 'a)
+      Pickles_types.Or_infinity.t
     Pickles_types.Dlog_plonk_types.Poly_comm.With_degree_bound.t
   | `Without_degree_bound of
     ('a * 'a) Pickles_types.Dlog_plonk_types.Poly_comm.Without_degree_bound.t
@@ -54,51 +55,59 @@ module Make (Inputs : Inputs_intf) = struct
 
   let g_vec arr = Array.map ~f:g arr
 
+  let or_infinity_to_backend : ('a * 'a) Pickles_types.Or_infinity.t ->
+  'a Kimchi.Foundations.or_infinity =
+    function
+    | Infinity -> Infinity
+    | Finite (x, y) -> Finite (x, y)
+
   let with_degree_bound_to_backend
       (commitment :
-        Base_field.t Kimchi.Foundations.or_infinity
+         (Base_field.t  * Base_field.t)
+           Pickles_types.Or_infinity.t
         Pickles_types.Dlog_plonk_types.Poly_comm.With_degree_bound.t) :
       Backend.t =
-    { shifted = Some commitment.shifted; unshifted = commitment.unshifted }
+    Backend.make
+      (Array.map ~f:or_infinity_to_backend commitment.unshifted )
+      (Some(or_infinity_to_backend commitment.shifted))
+
 
   let without_degree_bound_to_backend
       (commitment :
         (Base_field.t * Base_field.t)
         Pickles_types.Dlog_plonk_types.Poly_comm.Without_degree_bound.t) :
       Backend.t =
-    { shifted = None
-    ; unshifted =
-        Array.map
+    Backend.make
+        (Array.map
           ~f:(fun x -> Kimchi.Foundations.Finite (fst x, snd x))
-          commitment
-    }
+          commitment)
+        None
 
   let to_backend (t : t) : Backend.t =
-    let t =
       match t with
       | `With_degree_bound t ->
           with_degree_bound_to_backend t
       | `Without_degree_bound t ->
           without_degree_bound_to_backend t
-    in
-    t
 
   let of_backend' (t : Backend.t) =
-    (t.unshifted, Option.map t.shifted ~f:Curve.Affine.of_backend)
+    (Backend.unshifted t, Option.map (Backend.shifted t) ~f:Curve.Affine.of_backend)
 
   let of_backend_with_degree_bound (t : Backend.t) =
     let open Pickles_types.Dlog_plonk_types.Poly_comm in
-    match t.shifted with
+    match Backend.shifted t with
     | None ->
         assert false
     | Some shifted ->
         `With_degree_bound
-          { With_degree_bound.unshifted = t.unshifted; shifted }
+          { With_degree_bound.unshifted = 
+              Backend.unshifted t; shifted }
 
   let of_backend_without_degree_bound (t : Backend.t) =
     let open Pickles_types.Dlog_plonk_types.Poly_comm in
-    match t with
-    | { unshifted; shifted = None } ->
+    let unshifted = Backend.unshifted t in
+    match Backend.shifted t with
+    | None ->
         `Without_degree_bound
           (Array.map unshifted ~f:(function
             | Infinity ->

@@ -154,9 +154,13 @@ struct
 
     include Stable.Latest
 
-    let to_backend = Fn.id
+    let to_backend : t -> Backend.t =
+      fun (x, y) -> Finite (x, y)
 
-    let of_backend = Fn.id
+    (* TODO: Rename to of_backend_exn *)
+    let of_backend : Backend.t -> t = function
+      | Infinity -> failwith "of_backend: Got identity"
+      | Finite (x, y) -> (x, y)
   end
 
   let to_affine_or_infinity = C.to_affine
