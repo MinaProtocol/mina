@@ -431,35 +431,13 @@ module User_command = struct
     match t with
     | Signed_command c ->
         c
-    | Snapp_command c ->
-        let module S = Mina_base.Snapp_command in
-        let ({source; receiver; amount} : S.transfer) = S.as_transfer c in
-        let fee_payer = S.fee_payer c in
-        { signature= Signature.dummy
-        ; signer= Snark_params.Tick.Field.(zero, zero)
-        ; payload=
-            { common=
-                { fee= S.fee_exn c
-                ; fee_token= Account_id.token_id fee_payer
-                ; fee_payer_pk= Account_id.public_key fee_payer
-                ; nonce=
-                    Option.value (S.nonce c)
-                      ~default:Mina_numbers.Account_nonce.zero
-                ; valid_until= Mina_numbers.Global_slot.max_value
-                ; memo= Signed_command_memo.create_from_string_exn "snapp" }
-            ; body=
-                Payment
-                  { source_pk= source
-                  ; receiver_pk= receiver
-                  ; token_id= S.token_id c
-                  ; amount } } }
+    | Parties _ -> failwith "TODO"
 
   let via (t : User_command.t) : [`Snapp_command | `Ident] =
     match t with
     | Signed_command _ ->
         `Ident
-    | Snapp_command _ ->
-        `Snapp_command
+    | Parties _ -> failwith "TODO"
 
   let add_if_doesn't_exist conn (t : User_command.t) =
     Signed_command.add_if_doesn't_exist conn ~via:(via t) (as_signed_command t)
@@ -596,7 +574,7 @@ module Fee_transfer = struct
   end
 
   type t =
-    {kind: Kind.t; receiver_id: int; fee: int; token: int64; hash: string}
+    {kind: Kind.t; receiver_id: int; fee: int64; token: int64; hash: string}
 
   let typ =
     let encode t =
@@ -616,7 +594,7 @@ module Fee_transfer = struct
       in
       Ok {kind; receiver_id; fee; token; hash}
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int int64) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
@@ -645,13 +623,13 @@ module Fee_transfer = struct
              |sql})
           { kind
           ; receiver_id
-          ; fee= Fee_transfer.Single.fee t |> Currency.Fee.to_int
+          ; fee= Fee_transfer.Single.fee t |> Currency.Fee.to_uint64 |> Unsigned.UInt64.to_int64
           ; token= Token_id.to_string t.fee_token |> Int64.of_string
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
 end
 
 module Coinbase = struct
-  type t = {receiver_id: int; amount: int; hash: string}
+  type t = {receiver_id: int; amount: int64; hash: string}
 
   let coinbase_typ = "coinbase"
 
@@ -667,7 +645,7 @@ module Coinbase = struct
     let decode ((_, receiver_id, amount, _), hash) =
       Ok {receiver_id; amount; hash}
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int int64) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : Coinbase.t) =
@@ -692,7 +670,7 @@ module Coinbase = struct
                    RETURNING id
              |sql})
           { receiver_id
-          ; amount= Coinbase.amount t |> Currency.Amount.to_int
+          ; amount= Coinbase.amount t |> Currency.Amount.to_uint64 |> Unsigned.UInt64.to_int64
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
 end
 
@@ -756,28 +734,32 @@ module Block_and_internal_command = struct
     ; internal_command_id: int
     ; sequence_no: int
     ; secondary_sequence_no: int
+    ; receiver_account_creation_fee_paid: int64 option
     ; receiver_balance_id: int }
   [@@deriving hlist]
 
   let typ =
     let open Caqti_type_spec in
-    let spec = Caqti_type.[int; int; int; int; int] in
+    let spec = Caqti_type.[int; int; int; int; option int64; int] in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
 
   let add (module Conn : CONNECTION) ~block_id ~internal_command_id
-      ~sequence_no ~secondary_sequence_no ~receiver_balance_id =
+      ~sequence_no ~secondary_sequence_no ~receiver_account_creation_fee_paid
+      ~receiver_balance_id =
     Conn.exec
       (Caqti_request.exec typ
          {sql| INSERT INTO blocks_internal_commands
-                (block_id, internal_command_id, sequence_no, secondary_sequence_no, receiver_balance)
-                VALUES (?, ?, ?, ?, ?)
+                (block_id, internal_command_id, sequence_no, secondary_sequence_no,
+                 receiver_account_creation_fee_paid,receiver_balance)
+                VALUES (?, ?, ?, ?, ?, ?)
          |sql})
       { block_id
       ; internal_command_id
       ; sequence_no
       ; secondary_sequence_no
+      ; receiver_account_creation_fee_paid
       ; receiver_balance_id }
 
   let find (module Conn : CONNECTION) ~block_id ~internal_command_id
@@ -796,7 +778,7 @@ module Block_and_internal_command = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
       ~internal_command_id ~sequence_no ~secondary_sequence_no
-      ~receiver_balance_id =
+      ~receiver_account_creation_fee_paid ~receiver_balance_id =
     let open Deferred.Result.Let_syntax in
     match%bind
       find
@@ -809,7 +791,7 @@ module Block_and_internal_command = struct
         add
           (module Conn)
           ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
-          ~receiver_balance_id
+          ~receiver_account_creation_fee_paid ~receiver_balance_id
 end
 
 module Block_and_signed_command = struct
@@ -1209,7 +1191,7 @@ module Block = struct
                           (module Conn)
                           fee_transfer `Normal
                       in
-                      (id, secondary_sequence_no, fee_transfer.receiver_pk)
+                      (id, secondary_sequence_no, fee_transfer.fee, fee_transfer.receiver_pk)
                       :: acc )
                 in
                 let fee_transfer_infos_with_balances =
@@ -1229,7 +1211,7 @@ module Block = struct
                   deferred_result_list_fold fee_transfer_infos_with_balances
                     ~init:()
                     ~f:(fun ()
-                       ( (fee_transfer_id, secondary_sequence_no, receiver_pk)
+                       ( (fee_transfer_id, secondary_sequence_no, fee, receiver_pk)
                        , balance )
                        ->
                       let%bind receiver_id =
@@ -1242,10 +1224,28 @@ module Block = struct
                           (module Conn)
                           ~public_key_id:receiver_id ~balance
                       in
+                      (* TODO: add transaction statuses to internal commands
+                         the archive lib should not know the details of
+                         account creation fees; the calculation below is
+                         a temporizing hack
+                      *)
+                      let receiver_account_creation_fee_paid =
+                        let fee_uint64 = Currency.Fee.to_uint64 fee in
+                        let balance_uint64 = Currency.Balance.to_uint64 balance in
+                        let account_creation_fee_uint64 = Currency.Fee.to_uint64
+                            constraint_constants.account_creation_fee
+                        in
+                        if Unsigned.UInt64.equal balance_uint64
+                            (Unsigned.UInt64.sub fee_uint64 account_creation_fee_uint64) then
+                          Some (Unsigned.UInt64.to_int64 account_creation_fee_uint64)
+                        else
+                          None
+                      in
                       Block_and_internal_command.add
                         (module Conn)
                         ~block_id ~internal_command_id:fee_transfer_id
                         ~sequence_no ~secondary_sequence_no
+                        ~receiver_account_creation_fee_paid
                         ~receiver_balance_id
                       >>| ignore )
                 in
@@ -1274,18 +1274,38 @@ module Block = struct
                           (module Conn)
                           receiver_pk
                       in
+                      let balance = Option.value_exn
+                          balances.fee_transfer_receiver_balance
+                      in
                       let%bind receiver_balance_id =
                         Balance.add_if_doesn't_exist
                           (module Conn)
                           ~public_key_id:fee_transfer_receiver_id
-                          ~balance:
-                            (Option.value_exn
-                               balances.fee_transfer_receiver_balance)
+                          ~balance
+                      in
+                      (* TODO: add transaction statuses to internal commands
+                         the archive lib should not know the details of
+                         account creation fees; the calculation below is
+                         a temporizing hack
+                      *)
+                      let receiver_account_creation_fee_paid =
+                        let fee_uint64 = Currency.Fee.to_uint64 fee in
+                        let balance_uint64 = Currency.Balance.to_uint64 balance in
+                        let account_creation_fee_uint64 = Currency.Fee.to_uint64
+                            constraint_constants.account_creation_fee
+                        in
+                        if Unsigned.UInt64.equal balance_uint64
+                            (Unsigned.UInt64.sub fee_uint64 account_creation_fee_uint64) then
+                          Some (Unsigned.UInt64.to_int64 account_creation_fee_uint64)
+                        else
+                          None
                       in
                       Block_and_internal_command.add
                         (module Conn)
                         ~block_id ~internal_command_id:id ~sequence_no
-                        ~secondary_sequence_no:0 ~receiver_balance_id
+                        ~secondary_sequence_no:0
+                        ~receiver_account_creation_fee_paid
+                        ~receiver_balance_id
                       >>| ignore
                 in
                 let%bind id =
@@ -1306,7 +1326,8 @@ module Block = struct
                   Block_and_internal_command.add
                     (module Conn)
                     ~block_id ~internal_command_id:id ~sequence_no
-                    ~secondary_sequence_no:0 ~receiver_balance_id
+                    ~secondary_sequence_no:0 ~receiver_account_creation_fee_paid:None (* TEMP *)
+                    ~receiver_balance_id
                   >>| ignore
                 in
                 sequence_no + 1 )
@@ -1480,6 +1501,7 @@ module Block = struct
           Block_and_internal_command.add_if_doesn't_exist
             (module Conn)
             ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
+            ~receiver_account_creation_fee_paid:None (* TEMP *)
             ~receiver_balance_id )
     in
     return block_id

@@ -548,18 +548,10 @@ let setup_daemon logger =
         (conf_dir ^/ "daemon.json", `May_be_missing)
       in
       let config_file_envvar =
-        (* TODO: remove deprecated variable, eventually *)
-        let mina_config_file = "MINA_CONFIG_FILE" in
-        let coda_config_file = "CODA_CONFIG_FILE" in
-        match (Sys.getenv mina_config_file, Sys.getenv coda_config_file) with
-        | Some config_file, _ ->
+        match Sys.getenv "MINA_CONFIG_FILE" with
+        | Some config_file ->
             Some (config_file, `Must_exist)
-        | None, Some config_file ->
-            [%log warn]
-              "Using deprecated environment variable %s, please use %s instead"
-              coda_config_file mina_config_file ;
-            Some (config_file, `Must_exist)
-        | None, None ->
+        | None ->
             None
       in
       let config_files =
@@ -839,20 +831,23 @@ let setup_daemon logger =
         >>| Or_error.ok
       in
       let client_trustlist =
-        match Unix.getenv "CODA_CLIENT_TRUSTLIST" with
-        | Some envstr ->
-            let cidrs =
-              String.split ~on:',' envstr
-              |> List.filter_map ~f:(fun str ->
-                     try Some (Unix.Cidr.of_string str)
-                     with _ ->
-                       [%log warn]
-                         "Could not parse address $address in \
-                          CODA_CLIENT_TRUSTLIST"
-                         ~metadata:[ ("address", `String str) ] ;
-                       None)
-            in
-            Some (List.append cidrs (Option.value ~default:[] client_trustlist))
+        let mina_client_trustlist = "MINA_CLIENT_TRUSTLIST" in
+        let cidrs_of_env_str env_str env_var =
+          let cidrs =
+            String.split ~on:',' env_str
+            |> List.filter_map ~f:(fun str ->
+                   try Some (Unix.Cidr.of_string str)
+                   with _ ->
+                     [%log warn] "Could not parse address $address in %s"
+                       env_var
+                       ~metadata:[ ("address", `String str) ] ;
+                     None)
+          in
+          Some (List.append cidrs (Option.value ~default:[] client_trustlist))
+        in
+        match Unix.getenv mina_client_trustlist with
+        | Some env_str ->
+            cidrs_of_env_str env_str mina_client_trustlist
         | None ->
             client_trustlist
       in

@@ -19,7 +19,7 @@ echo "Running"
 echo "Building nonconsensus JS code..."
 make client_sdk
 echo "Running"
-nodejs src/app/client_sdk/tests/test_signatures.js > js.nonconsensus.json
+node src/app/client_sdk/tests/test_signatures.js > js.nonconsensus.json
 
 # we've been careful so that the output formatting of all the signatures is the same
 # so we can use diff (rather parsing the JSON with Python or such)

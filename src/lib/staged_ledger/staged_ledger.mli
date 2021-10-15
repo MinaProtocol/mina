@@ -8,7 +8,7 @@ type t [@@deriving sexp]
 module Scan_state : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t [@@deriving sexp]
 
       val hash : t -> Staged_ledger_hash.Aux_hash.t

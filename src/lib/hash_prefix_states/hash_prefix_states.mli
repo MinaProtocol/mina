@@ -16,6 +16,10 @@ open Random_oracle
 
 val signature : Field.t State.t
 
+val signature_for_mainnet : Field.t State.t
+
+val signature_for_testnet : Field.t State.t
+
 (** [merkle_tree depth] gives the hash prefix for the given node depth.
 
     This function performs caching: all prefixes up to the given depth will be
@@ -54,6 +58,14 @@ val snapp_predicate : Field.t State.t
 val snapp_predicate_account : Field.t State.t
 
 val snapp_predicate_protocol_state : Field.t State.t
+
+val party_predicate : Field.t State.t
+
+val party : Field.t State.t
+
+val party_cons : Field.t State.t
+
+val party_with_protocol_state_predicate : Field.t State.t
 
 val receipt_chain_user_command : Field.t State.t
 
