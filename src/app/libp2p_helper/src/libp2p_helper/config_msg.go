@@ -169,6 +169,9 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 	}
 
 	seedPeersMaList, err := m.SeedPeers()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
 	seeds := make([]peer.AddrInfo, 0, seedPeersMaList.Len())
 	err = multiaddrListForeach(seedPeersMaList, func(v string) error {
 		addr, err := addrInfoOfString(v)
@@ -187,6 +190,9 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 	app.AddedPeers = append(app.AddedPeers, seeds...)
 
 	directPeersMaList, err := m.DirectPeers()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
 	directPeers := make([]peer.AddrInfo, 0, directPeersMaList.Len())
 	err = multiaddrListForeach(directPeersMaList, func(v string) error {
 		addr, err := addrInfoOfString(v)
@@ -242,7 +248,7 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, listenOn, externalMaddr, stateDir, privk, netId, seeds, gatingConfig, int(m.MinConnections()), int(m.MaxConnections()), m.MinaPeerExchange())
+	helper, err := codanet.MakeHelper(app.Ctx, listenOn, externalMaddr, stateDir, privk, netId, seeds, gatingConfig, int(m.MinConnections()), int(m.MaxConnections()), m.MinaPeerExchange(), time.Millisecond)
 	if err != nil {
 		return mkRpcRespError(seqno, badHelper(err))
 	}
@@ -289,7 +295,7 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 		metricsServer.Shutdown()
 	}
 	if m.MetricsPort() > 0 {
-		metricsServer = startMetricsServer(m.MetricsPort())
+		app.metricsServer = startMetricsServer(m.MetricsPort())
 		if !app.metricsCollectionStarted {
 			go app.checkBandwidth()
 			go app.checkPeerCount()
@@ -360,6 +366,7 @@ func (msg GenerateKeypairReq) handle(app *app, seqno uint64) *capnp.Message {
 		panicOnErr(res.SetPrivateKey(privkBytes))
 		panicOnErr(res.SetPublicKey(pubkBytes))
 		pid, err := res.NewPeerId()
+		panicOnErr(err)
 		panicOnErr(pid.SetId(peer.Encode(peerID)))
 	})
 }

@@ -162,7 +162,8 @@ func TestConfigure(t *testing.T) {
 	require.NoError(t, err)
 	_, err = c.NewSeedPeers(0)
 	require.NoError(t, err)
-	c.SetMaxConnections(0)
+	c.SetMinConnections(20)
+	c.SetMaxConnections(50)
 	c.SetValidationQueueSize(16)
 	c.SetMinaPeerExchange(false)
 
@@ -234,6 +235,7 @@ func TestGetListeningAddrs(t *testing.T) {
 	ls, err := respSuccess.GetListeningAddrs()
 	require.NoError(t, err)
 	addrsL, err := ls.Result()
+	require.NoError(t, err)
 	res, err := readMultiaddrList(addrsL)
 	require.NoError(t, err)
 	require.Equal(t, maToStringList(testApp.P2p.Host.Addrs()), res)

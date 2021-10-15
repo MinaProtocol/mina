@@ -5,6 +5,7 @@ import (
 	crand "crypto/rand"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -45,13 +46,16 @@ func newTestKey(t *testing.T) crypto.PrivKey {
 func testStreamHandler(_ net.Stream) {}
 
 func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool, minConns, maxConns int, port uint16) *app {
+	return newTestAppWithMaxConnsAndCtx(t, seeds, noUpcalls, minConns, maxConns, port, context.Background())
+}
+func newTestAppWithMaxConnsAndCtx(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool, minConns, maxConns int, port uint16, ctx context.Context) *app {
 	dir, err := ioutil.TempDir("", "mina_test_*")
 	require.NoError(t, err)
 
 	addr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port))
 	require.NoError(t, err)
 
-	helper, err := codanet.MakeHelper(context.Background(),
+	helper, err := codanet.MakeHelper(ctx,
 		[]ma.Multiaddr{addr},
 		nil,
 		dir,
@@ -62,6 +66,7 @@ func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool,
 		minConns,
 		maxConns,
 		true,
+		time.Second,
 	)
 	require.NoError(t, err)
 
@@ -69,26 +74,29 @@ func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool,
 	helper.Host.SetStreamHandler(testProtocol, testStreamHandler)
 
 	t.Cleanup(func() {
-		err := helper.Host.Close()
-		if err != nil {
-			panic(err)
-		}
+		panicOnErr(os.RemoveAll(dir))
+		panicOnErr(helper.Host.Close())
 	})
+	outChan := make(chan *capnp.Message, 64)
+	bitswapCtx := NewBitswapCtx(ctx, outChan)
+	bitswapCtx.engine = helper.Bitswap
+	bitswapCtx.storage = helper.BitswapStorage
 
 	return &app{
 		P2p:                      helper,
-		Ctx:                      context.Background(),
+		Ctx:                      ctx,
 		Subs:                     make(map[uint64]subscription),
 		Topics:                   make(map[string]*pubsub.Topic),
 		ValidatorMutex:           &sync.Mutex{},
 		Validators:               make(map[uint64]*validationStatus),
 		Streams:                  make(map[uint64]net.Stream),
 		AddedPeers:               make([]peer.AddrInfo, 0, 512),
-		OutChan:                  make(chan *capnp.Message, 64),
+		OutChan:                  outChan,
 		MetricsRefreshTime:       time.Second * 2,
 		NoUpcalls:                noUpcalls,
 		metricsServer:            nil,
 		metricsCollectionStarted: false,
+		bitswapCtx:               bitswapCtx,
 	}
 }
 
@@ -190,19 +198,41 @@ func beginAdvertisingSendAndCheck(t *testing.T, app *app) {
 }
 
 func withTimeout(t *testing.T, run func(), timeoutMsg string) {
-	withTimeoutAsync(t, func(done chan interface{}) {
-		defer close(done)
+	success := withCustomTimeout(run, testTimeout)
+	if !success {
+		t.Fatal(timeoutMsg)
+	}
+}
+
+func withCustomTimeout(run func(), timeout time.Duration) bool {
+	return withCustomTimeoutAsync(func(done chan interface{}) {
 		run()
-	}, timeoutMsg)
+		select {
+		case <-done:
+		default:
+			close(done)
+		}
+	}, timeout)
 }
 
 func withTimeoutAsync(t *testing.T, registerDone func(done chan interface{}), timeoutMsg string) {
+	success := withCustomTimeoutAsync(registerDone, testTimeout)
+	if !success {
+		t.Fatal(timeoutMsg)
+	}
+}
+func withCustomTimeoutAsync(registerDone func(done chan interface{}), timeout time.Duration) bool {
 	done := make(chan interface{})
 	go registerDone(done)
 	select {
-	case <-time.After(testTimeout):
-		close(done)
-		t.Fatal(timeoutMsg)
+	case <-time.After(timeout):
+		select {
+		case <-done:
+		default:
+			close(done)
+		}
+		return false
 	case <-done:
+		return true
 	}
 }

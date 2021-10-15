@@ -2,6 +2,7 @@ package main
 
 import (
 	ipc "libp2p_ipc"
+	"math"
 	"testing"
 
 	capnp "capnproto.org/go/capnp/v3"
@@ -20,9 +21,37 @@ type upcallTrap struct {
 	StreamLost            chan ipc.DaemonInterface_StreamLost
 	StreamComplete        chan ipc.DaemonInterface_StreamComplete
 	StreamMessageReceived chan ipc.DaemonInterface_StreamMessageReceived
+	ResourceUpdate        chan ipc.DaemonInterface_ResourceUpdate
+	DropMask              uint32
 }
 
-func newUpcallTrap(tag string, chanSize int) *upcallTrap {
+func (trap *upcallTrap) Close() {
+	close(trap.PeerConnected)
+	close(trap.PeerDisconnected)
+	close(trap.IncomingStream)
+	close(trap.GossipReceived)
+	close(trap.StreamLost)
+	close(trap.StreamComplete)
+	close(trap.StreamMessageReceived)
+	close(trap.ResourceUpdate)
+}
+
+type upcallSubChan = uint32
+
+const (
+	PeerConnectedChan upcallSubChan = iota
+	PeerDisconnectedChan
+	IncomingStreamChan
+	GossipReceivedChan
+	StreamLostChan
+	StreamCompleteChan
+	StreamMessageReceivedChan
+	ResourceUpdateChan
+)
+
+const upcallDropAllMask = math.MaxUint32
+
+func newUpcallTrap(tag string, chanSize int, dropMask uint32) *upcallTrap {
 	return &upcallTrap{
 		Tag:                   tag,
 		PeerConnected:         make(chan ipc.DaemonInterface_PeerConnected, chanSize),
@@ -32,6 +61,7 @@ func newUpcallTrap(tag string, chanSize int) *upcallTrap {
 		StreamLost:            make(chan ipc.DaemonInterface_StreamLost, chanSize),
 		StreamComplete:        make(chan ipc.DaemonInterface_StreamComplete, chanSize),
 		StreamMessageReceived: make(chan ipc.DaemonInterface_StreamMessageReceived, chanSize),
+		ResourceUpdate:        make(chan ipc.DaemonInterface_ResourceUpdate, chanSize),
 	}
 }
 
@@ -46,6 +76,7 @@ func launchFeedUpcallTrap(t *testing.T, out chan *capnp.Message, trap *upcallTra
 }
 
 func feedUpcallTrap(logf func(format string, args ...interface{}), out chan *capnp.Message, trap *upcallTrap, done chan interface{}) error {
+	defer trap.Close()
 	for {
 		select {
 		case <-done:
@@ -67,52 +98,74 @@ func feedUpcallTrap(logf func(format string, args ...interface{}), out chan *cap
 				if err != nil {
 					return err
 				}
-				trap.PeerConnected <- m
+				if trap.DropMask&(1<<PeerConnectedChan) == 0 {
+					trap.PeerConnected <- m
+				}
 			} else if pmsg.HasPeerDisconnected() {
 				m, err := pmsg.PeerDisconnected()
 				if err != nil {
 					return err
 				}
-				trap.PeerDisconnected <- m
+				if trap.DropMask&(1<<PeerDisconnectedChan) == 0 {
+					trap.PeerDisconnected <- m
+				}
 			} else if pmsg.HasGossipReceived() {
 				m, err := pmsg.GossipReceived()
 				if err != nil {
 					return err
 				}
-				trap.GossipReceived <- m
+				if trap.DropMask&(1<<GossipReceivedChan) == 0 {
+					trap.GossipReceived <- m
+				}
 			} else if pmsg.HasIncomingStream() {
 				m, err := pmsg.IncomingStream()
 				if err != nil {
 					return err
 				}
-				trap.IncomingStream <- m
+				if trap.DropMask&(1<<IncomingStreamChan) == 0 {
+					trap.IncomingStream <- m
+				}
 			} else if pmsg.HasStreamLost() {
 				logf("%s: Stream lost", trap.Tag)
 				m, err := pmsg.StreamLost()
 				if err != nil {
 					return err
 				}
-				trap.StreamLost <- m
+				if trap.DropMask&(1<<StreamLostChan) == 0 {
+					trap.StreamLost <- m
+				}
 			} else if pmsg.HasStreamComplete() {
 				logf("%s: Stream complete", trap.Tag)
 				m, err := pmsg.StreamComplete()
 				if err != nil {
 					return err
 				}
-				trap.StreamComplete <- m
+				if trap.DropMask&(1<<StreamCompleteChan) == 0 {
+					trap.StreamComplete <- m
+				}
 			} else if pmsg.HasStreamMessageReceived() {
 				m, err := pmsg.StreamMessageReceived()
 				if err != nil {
 					return err
 				}
-				trap.StreamMessageReceived <- m
+				if trap.DropMask&(1<<StreamMessageReceivedChan) == 0 {
+					trap.StreamMessageReceived <- m
+				}
+			} else if pmsg.HasResourceUpdated() {
+				m, err := pmsg.ResourceUpdated()
+				if err != nil {
+					return err
+				}
+				if trap.DropMask&(1<<ResourceUpdateChan) == 0 {
+					trap.ResourceUpdate <- m
+				}
 			}
 		}
 	}
 }
 
 func mkAppForUpcallTest(t *testing.T, tag string) (*upcallTrap, *app, uint16, peer.AddrInfo) {
-	trap := newUpcallTrap(tag, 64)
+	trap := newUpcallTrap(tag, 64, 1<<ResourceUpdateChan)
 
 	app, appPort := newTestApp(t, nil, false)
 	app.NoMDNS = true
@@ -178,8 +231,12 @@ func TestUpcalls(t *testing.T) {
 
 		_ = carolPort
 		select {
-		case _ = <-aTrap.PeerConnected:
-			t.Fatal("Peer connected to Alice (unexpectedly)")
+		case pc := <-aTrap.PeerConnected:
+			pid, err := pc.PeerId()
+			require.NoError(t, err)
+			id, err := pid.Id()
+			require.NoError(t, err)
+			t.Fatalf("Peer connected to peer %s (unexpectedly)", id)
 		default:
 		}
 		// Bob initiates and then closes connection to Carol
@@ -305,10 +362,6 @@ func getPeerDisconnectedPeerId(t *testing.T, m ipc.DaemonInterface_PeerDisconnec
 	pid_, err := pid.Id()
 	require.NoError(t, err)
 	return pid_
-}
-
-func checkPeerDisconnected(t *testing.T, m ipc.DaemonInterface_PeerDisconnected, peerInfo peer.AddrInfo) {
-	require.Equal(t, peerId(peerInfo), getPeerDisconnectedPeerId(t, m))
 }
 
 func checkIncomingStream(t *testing.T, m ipc.DaemonInterface_IncomingStream, expectedPeerId string, expectedProtocol string) uint64 {

@@ -25,9 +25,10 @@ import (
 
 func newApp() *app {
 	outChan := make(chan *capnp.Message, 64)
+	ctx := context.Background()
 	return &app{
 		P2p:                      nil,
-		Ctx:                      context.Background(),
+		Ctx:                      ctx,
 		Subs:                     make(map[uint64]subscription),
 		Topics:                   make(map[string]*pubsub.Topic),
 		ValidatorMutex:           &sync.Mutex{},
@@ -39,7 +40,7 @@ func newApp() *app {
 		MetricsRefreshTime:       time.Minute,
 		metricsCollectionStarted: false,
 		metricsServer:            nil,
-		bitswapCtx:               NewBitswapCtx(context.Background(), outChan),
+		bitswapCtx:               NewBitswapCtx(ctx, outChan),
 	}
 }
 
@@ -334,7 +335,7 @@ func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 }
 
 func beginMDNS(app *app, foundPeerCh chan peerDiscovery) error {
-	mdns, err := mdns.NewMdnsService(app.Ctx, app.P2p.Host, time.Minute, "_coda-discovery._udp.local")
+	mdns, err := mdns.NewMdnsService(app.Ctx, app.P2p.Host, time.Second, "_coda-discovery._udp.local")
 	if err != nil {
 		return err
 	}

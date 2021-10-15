@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 
 	"golang.org/x/crypto/blake2b"
 )
@@ -12,8 +13,8 @@ const BITSWAP_BLOCK_LINK_SIZE = blake2b.Size256
 type BitswapBlockLink = [BITSWAP_BLOCK_LINK_SIZE]byte
 
 func SplitDataToBitswapBlocks(maxBlockSize int, data []byte) (map[BitswapBlockLink][]byte, BitswapBlockLink) {
-	return SplitDataToBitswapBlocksWithHashF(maxBlockSize, func([]byte) BitswapBlockLink {
-		return blake2b.Sum256(data)
+	return SplitDataToBitswapBlocksWithHashF(maxBlockSize, func(b []byte) BitswapBlockLink {
+		return blake2b.Sum256(b)
 	}, data)
 }
 
@@ -158,7 +159,7 @@ func ReadBitswapBlock(block []byte) ([]BitswapBlockLink, []byte, error) {
 			return links, block[prefix:], nil
 		}
 	}
-	return nil, nil, errors.New("Block is too short")
+	return nil, nil, fmt.Errorf("block is too short: %d", len(block))
 }
 
 func JoinBitswapBlocks(blocks map[BitswapBlockLink][]byte, root BitswapBlockLink) ([]byte, error) {
@@ -168,7 +169,7 @@ func JoinBitswapBlocks(blocks map[BitswapBlockLink][]byte, root BitswapBlockLink
 	for {
 		block, has := blocks[queue[0]]
 		if !has {
-			return nil, errors.New("Didn't find a block")
+			return nil, errors.New("didn't find a block")
 		}
 		links, data, err := ReadBitswapBlock(block)
 		if err != nil {
