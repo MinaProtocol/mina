@@ -1175,8 +1175,9 @@ module Block = struct
           let account_creation_fee_uint64 = Currency.Fee.to_uint64
               constraint_constants.account_creation_fee
           in
-          if Unsigned.UInt64.equal balance_uint64
-              (Unsigned.UInt64.sub fee_uint64 account_creation_fee_uint64) then
+          if Unsigned.UInt64.compare balance_uint64
+              (Unsigned.UInt64.sub fee_uint64 account_creation_fee_uint64) <= 0
+          then
             Some (Unsigned.UInt64.to_int64 account_creation_fee_uint64)
           else
             None
