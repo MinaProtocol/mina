@@ -4,6 +4,13 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2021/10/15:
+
+- Use a more liberal postgres configuration
+- Set default transaction isolation to Repeatable Read
+- Include new archive node changes for account creation fee edge case
+- Allow for configuring the DUMP_TIME to import archive dumps not made automatically at midnight
+
 2021/10/12:
 
 - Adjust API to remove empty array responses
