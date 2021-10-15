@@ -125,7 +125,7 @@ module Instance = struct
          the old snarked_ledger matches with persistent_frontier;
       3. if not, we just reset all the persisted data and start from genesis
    *)
-  let load_from_disk factory ~snarked_ledger_hash =
+  let load_from_disk factory ~snarked_ledger_hash ~logger =
     let potential_snarked_ledgers =
       load_potential_snarked_ledgers_from_disk factory
     in
@@ -140,6 +140,9 @@ module Instance = struct
             Frozen_ledger_hash.of_ledger_hash
             @@ Ledger.Db.merkle_root potential_snarked_ledger
           in
+          [%log debug]
+            ~metadata:[ ("potential_snarked_ledger_hash", Frozen_ledger_hash.to_yojson potential_snarked_ledger_hash)]
+            "loaded potential_snarked_ledger from disk" ;
           if
             Frozen_ledger_hash.equal potential_snarked_ledger_hash
               snarked_ledger_hash
@@ -255,10 +258,10 @@ let create_instance_exn t =
   t.instance <- Some instance ;
   instance
 
-let load_from_disk_exn t ~snarked_ledger_hash =
+let load_from_disk_exn t ~snarked_ledger_hash ~logger =
   let open Result.Let_syntax in
   assert (Option.is_none t.instance) ;
-  let%map instance = Instance.load_from_disk t ~snarked_ledger_hash in
+  let%map instance = Instance.load_from_disk t ~snarked_ledger_hash ~logger in
   t.instance <- Some instance ;
   instance
 

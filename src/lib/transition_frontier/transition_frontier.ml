@@ -163,7 +163,7 @@ let rec load_with_max_length :
   let continue persistent_frontier_instance ~ignore_consensus_local_state
       ~snarked_ledger_hash =
     match
-      Persistent_root.load_from_disk_exn persistent_root ~snarked_ledger_hash
+      Persistent_root.load_from_disk_exn persistent_root ~snarked_ledger_hash ~logger
     with
     | Error _ as err ->
         let%map () =
