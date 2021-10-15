@@ -2,7 +2,7 @@ open Core_kernel
 
 (* Our custom constraints let us efficiently compute
 
-   f = fun (g, t) -> (t + 2^{len(t) - 1}) g
+   f = fun (g, t) -> (2 * t + 1 + 2^len(t)) g
 
    We want to compute
 
@@ -10,15 +10,15 @@ open Core_kernel
 
    Let n be the field size in bits.
 
-   For a scalar s, let t = s - 2^{n - 1}.
+   For a scalar s, let t = (s - 2^n - 1)/2.
    t can be represented with an n bit string.
 
    Then
 
    f (g, t)
-   = (t + 2^{len(t) - 1}) * g
-   = (t + 2^{n - 1}) * g
-   = (s - 2^{n - 1} + 2^{n - 1}) * g
+   = (2 t + 2^n + 1) * g
+   = (2 (s - 2^n - 1)/2 + 2^n + 1) * g
+   = (s - 2^n - 1 + 2^n + 1) * g
    = s * g
    = f' (g, s)
 
@@ -49,21 +49,27 @@ module type Field_intf = sig
 
   val ( + ) : t -> t -> t
 
+  val ( * ) : t -> t -> t
+
+  val inv : t -> t
+
   val one : t
+
+  val of_int : int -> t
 end
 
 module Shift : sig
-  type 'f t = private 'f
+  type 'f t = private { c : 'f; scale : 'f }
 
   val create : (module Field_intf with type t = 'f) -> 'f t
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 end = struct
-  type 'f t = 'f
+  type 'f t = { c : 'f; scale : 'f }
 
-  let map t ~f = f t
+  let map t ~f = { c = f t.c; scale = f t.scale }
 
-  (* 2^{field size in bits} *)
+  (* 2^{field size in bits} + 1 *)
   let create (type f) (module F : Field_intf with type t = f) : f t =
     let rec two_to_the n =
       if n = 0 then F.one
@@ -71,15 +77,15 @@ end = struct
         let r = two_to_the (n - 1) in
         F.(r + r)
     in
-    two_to_the F.size_in_bits
+    { c = F.(two_to_the size_in_bits + one); scale = F.(inv (of_int 2)) }
 end
 
 let of_field (type f) (module F : Field_intf with type t = f)
     ~(shift : f Shift.t) (s : f) : f t =
-  Shifted_value F.(s - (shift :> t))
+  Shifted_value F.((s - shift.c) * shift.scale)
 
 let to_field (type f) (module F : Field_intf with type t = f)
     ~(shift : f Shift.t) (Shifted_value t : f t) : f =
-  F.(t + (shift :> t))
+  F.(t + t + shift.c)
 
 let equal equal (Shifted_value t1) (Shifted_value t2) = equal t1 t2
