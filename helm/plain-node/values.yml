@@ -1,6 +1,6 @@
 replicaCount: 1
 
-name: "plain-node"
+name: "plain-node-x"
 
 testnetName: "testnet"
 
