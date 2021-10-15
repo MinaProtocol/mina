@@ -3,15 +3,13 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type 'a t = 'a Kimchi.Foundations.or_infinity =
-      | Infinity
-      | Finite of 'a * 'a
+    type 'a t = Infinity | Finite of 'a
     [@@deriving sexp, equal, compare, hash, yojson]
   end
 end]
 
 let finite_exn = function
-  | Finite (x, y) ->
-      (x, y)
+  | Finite x ->
+      x
   | Infinity ->
       failwith "curve point must not be the point at infinity"

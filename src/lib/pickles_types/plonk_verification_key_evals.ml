@@ -1,6 +1,7 @@
 open Core_kernel
+
+(** TKTK *)
 module H_list = Snarky_backendless.H_list
-open Dlog_plonk_types
 
 let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
 
@@ -8,8 +9,8 @@ let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
 module Stable = struct
   module V2 = struct
     type 'comm t =
-      { sigma_comm : 'comm Permuts_vec.Stable.V1.t
-      ; coefficients_comm : 'comm Columns_vec.Stable.V1.t
+      { sigma_comm : 'comm Dlog_plonk_types.Permuts_vec.Stable.V1.t
+      ; coefficients_comm : 'comm Dlog_plonk_types.Columns_vec.Stable.V1.t
       ; generic_comm : 'comm
       ; psm_comm : 'comm
       ; complete_add_comm : 'comm
@@ -50,6 +51,13 @@ let map2 t1 t2 ~f =
 
 let typ g =
   Snarky_backendless.Typ.of_hlistable
-    [ Vector.typ g Permuts.n; Vector.typ g Columns.n; g; g; g; g; g ]
+    [ Vector.typ g Dlog_plonk_types.Permuts.n
+    ; Vector.typ g Dlog_plonk_types.Columns.n
+    ; g
+    ; g
+    ; g
+    ; g
+    ; g
+    ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist

@@ -11,14 +11,14 @@ module type Inputs_intf = sig
       type t = Base_field.t * Base_field.t
 
       module Backend : sig
-        type t = Base_field.t Pickles_types.Or_infinity.t
+        type t = Base_field.t Kimchi.Foundations.or_infinity
 
         val zero : unit -> t
 
         val create : Base_field.t -> Base_field.t -> t
       end
 
-      val of_backend : Backend.t -> t Pickles_types.Or_infinity.t
+      val of_backend : Backend.t -> t Kimchi.Foundations.or_infinity
     end
   end
 
@@ -36,7 +36,7 @@ end
 
 type 'a t =
   [ `With_degree_bound of
-    'a Pickles_types.Or_infinity.t
+    'a Kimchi.Foundations.or_infinity
     Pickles_types.Dlog_plonk_types.Poly_comm.With_degree_bound.t
   | `Without_degree_bound of
     ('a * 'a) Pickles_types.Dlog_plonk_types.Poly_comm.Without_degree_bound.t
@@ -56,7 +56,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let with_degree_bound_to_backend
       (commitment :
-        Base_field.t Pickles_types.Or_infinity.t
+        Base_field.t Kimchi.Foundations.or_infinity
         Pickles_types.Dlog_plonk_types.Poly_comm.With_degree_bound.t) :
       Backend.t =
     { shifted = Some commitment.shifted; unshifted = commitment.unshifted }
@@ -69,7 +69,7 @@ module Make (Inputs : Inputs_intf) = struct
     { shifted = None
     ; unshifted =
         Array.map
-          ~f:(fun x -> Pickles_types.Or_infinity.Finite (fst x, snd x))
+          ~f:(fun x -> Kimchi.Foundations.Finite (fst x, snd x))
           commitment
     }
 

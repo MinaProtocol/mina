@@ -1,5 +1,10 @@
 open Core_kernel
 
+let tuple15_to_vec
+    (w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14) =
+  Pickles_types.Vector.
+    [ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ]
+
 module type Stable_v1 = sig
   module Stable : sig
     module V1 : sig
@@ -34,12 +39,14 @@ module type Inputs_intf = sig
       include Stable_v1 with type Stable.V1.t = Base_field.t * Base_field.t
 
       module Backend : sig
-        type t = Base_field.t Pickles_types.Or_infinity.t
+        type t = (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t
       end
 
-      val of_backend : Backend.t -> Base_field.t Pickles_types.Or_infinity.t
+      val of_backend :
+        Backend.t -> (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t
 
-      val to_backend : Base_field.t Pickles_types.Or_infinity.t -> Backend.t
+      val to_backend :
+        (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t -> Backend.t
     end
   end
 
@@ -142,6 +149,8 @@ module Make (Inputs : Inputs_intf) = struct
   include Allocation_functor.Make.Versioned_v1.Full_compare_eq_hash (struct
     let id = "plong_dlog_proof_" ^ Inputs.id
 
+    let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
+
     [%%versioned
     module Stable = struct
       module V1 = struct
@@ -149,9 +158,8 @@ module Make (Inputs : Inputs_intf) = struct
           ( G.Affine.Stable.V1.t
           , G.Affine.Stable.V1.t Pickles_types.Or_infinity.Stable.V1.t
           , Fq.Stable.V1.t
-          , Fq.Stable.V1.t Pickles_types.Dlog_plonk_types.Pc_array.Stable.V1.t
-          )
-          Pickles_types.Dlog_plonk_types.Proof.Stable.V1.t
+          , Fq.Stable.V1.t array )
+          Pickles_types.Dlog_plonk_types.Proof.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
         let to_latest = Fn.id
@@ -160,12 +168,12 @@ module Make (Inputs : Inputs_intf) = struct
              messages:
                ( G.Affine.t
                , G.Affine.t Pickles_types.Or_infinity.t )
-               Pickles_types.Dlog_plonk_types.Messages.Stable.V1.t
+               Pickles_types.Dlog_plonk_types.Messages.Stable.V2.t
           -> openings:
                ( G.Affine.t
                , Fq.t
-               , Fq.t Pickles_types.Dlog_plonk_types.Pc_array.t )
-               Pickles_types.Dlog_plonk_types.Openings.Stable.V1.t
+               , Fq.t array )
+               Pickles_types.Dlog_plonk_types.Openings.Stable.V2.t
           -> 'a
 
         let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
@@ -195,10 +203,12 @@ module Make (Inputs : Inputs_intf) = struct
 
   (** Note that this function will panic if some of the points are points at infinity *)
   let opening_proof_of_backend (t : Opening_proof_backend.t) =
-    let g x = G.Affine.of_backend x |> Pickles_types.Or_infinity.finite_exn in
-    let gpair (t : G.Affine.Backend.t * G.Affine.Backend.t) :
+    let g (x : G.Affine.Backend.t) : G.Affine.t =
+      G.Affine.of_backend x |> Pickles_types.Or_infinity.finite_exn
+    in
+    let gpair ((g1, g2) : G.Affine.Backend.t * G.Affine.Backend.t) :
         G.Affine.t * G.Affine.t =
-      (g (fst t), g (snd t))
+      (g g1, g g2)
     in
     let lr : (G.Affine.Backend.t * G.Affine.Backend.t) array = t.lr in
     { Pickles_types.Dlog_plonk_types.Openings.Bulletproof.lr =
@@ -214,14 +224,15 @@ module Make (Inputs : Inputs_intf) = struct
     let evals =
       (fst t.evals, snd t.evals)
       |> Tuple_lib.Double.map ~f:(fun e ->
+             let s0, s1, s2, s3, s4, s5 = e.s in
              let open Evaluations_backend in
-             { Pickles_types.Dlog_plonk_types.Evals.w = e.w
-             ; z = e.z
-             ; s = e.s
-             ; lookup = e.lookup
-             ; generic_selector = e.generic_selector
-             ; poseidon_selector = e.poseidon_selector
-             })
+             Pickles_types.Dlog_plonk_types.Evals.
+               { w = tuple15_to_vec e.w
+               ; z = e.z
+               ; s = [ s0; s1; s2; s3; s4; s5 ]
+               ; generic_selector = e.generic_selector
+               ; poseidon_selector = e.poseidon_selector
+               })
     in
     let wo x =
       match Poly_comm.of_backend_without_degree_bound x with
@@ -230,16 +241,19 @@ module Make (Inputs : Inputs_intf) = struct
       | _ ->
           assert false
     in
-    let w x =
+    let _w x =
       match Poly_comm.of_backend_with_degree_bound x with
       | `With_degree_bound t ->
           t
       | _ ->
           assert false
     in
+    let w_comm =
+      tuple15_to_vec t.commitments.w_comm |> Pickles_types.Vector.map ~f:wo
+    in
     create
       ~messages:
-        { w_comm = wo t.commitments.w_comm
+        { w_comm
         ; z_comm = wo t.commitments.z_comm
         ; t_comm = wo t.commitments.t_comm
         }
