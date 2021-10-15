@@ -16,7 +16,11 @@ module Transaction_hash = Mina_base.Transaction_hash
 module Get_nonce =
 [%graphql
 {|
-    query get_nonce($public_key: PublicKey!, $token_id: TokenId) {
+    query get_nonce($public_key: PublicKey!, $token_id: TokenId, $receiver_key: PublicKey!) {
+      receiver: account(publicKey: $receiver_key, token: $token_id) {
+        nonce
+      }
+
       account(publicKey: $public_key, token: $token_id) {
         balance {
           blockHeight @bsDecoder(fn: "Decoders.uint32")
@@ -119,15 +123,16 @@ mutation ($sender: PublicKey!,
 |}]
 
 module Options = struct
-  type t = {sender: Public_key.Compressed.t; token_id: Unsigned.UInt64.t}
+  type t = {sender: Public_key.Compressed.t; token_id: Unsigned.UInt64.t; receiver: Public_key.Compressed.t}
 
   module Raw = struct
-    type t = {sender: string; token_id: string} [@@deriving yojson]
+    type t = {sender: string; token_id: string; receiver: string} [@@deriving yojson]
   end
 
   let to_json t =
     { Raw.sender= Public_key.Compressed.to_base58_check t.sender
-    ; token_id= Unsigned.UInt64.to_string t.token_id }
+    ; token_id= Unsigned.UInt64.to_string t.token_id
+    ; receiver= Public_key.Compressed.to_base58_check t.receiver }
     |> Raw.to_yojson
 
   let of_json r =
@@ -136,14 +141,22 @@ module Options = struct
            Errors.create ~context:"Options of_json" (`Json_parse (Some e)) )
     |> Result.bind ~f:(fun (r : Raw.t) ->
            let open Result.Let_syntax in
-           let%map sender =
-             Public_key.Compressed.of_base58_check r.sender
-             |> Result.map_error ~f:(fun e ->
-                    Errors.create ~context:"Options of_json bad public key"
+           let e = fun which ->
+            fun e ->
+              Errors.create ~context:("Options of_json bad public key (" ^ which ^ ")")
                       (`Json_parse (Some (Core_kernel.Error.to_string_hum e)))
-                )
+
            in
-           {sender; token_id= Unsigned.UInt64.of_string r.token_id} )
+           let%bind sender =
+             Public_key.Compressed.of_base58_check r.sender
+             |> Result.map_error ~f:(e "sender")
+           in
+           let%map receiver =
+             Public_key.Compressed.of_base58_check r.receiver
+             |> Result.map_error ~f:(e "receiver")
+           in
+
+           {sender; token_id= Unsigned.UInt64.of_string r.token_id; receiver} )
 end
 
 (* TODO: unify handling of json between this and Options (above) and everything else in rosetta *)
@@ -151,11 +164,14 @@ module Metadata_data = struct
   type t =
     { sender: string
     ; nonce: Unsigned_extended.UInt32.t
-    ; token_id: Unsigned_extended.UInt64.t }
+    ; token_id: Unsigned_extended.UInt64.t
+    ; receiver: string
+    ; account_creation_fee: Unsigned_extended.UInt64.t option
+    }
   [@@deriving yojson]
 
-  let create ~nonce ~sender ~token_id =
-    {sender= Public_key.Compressed.to_base58_check sender; nonce; token_id}
+  let create ~nonce ~sender ~token_id ~receiver ~account_creation_fee =
+    {sender= Public_key.Compressed.to_base58_check sender; nonce; token_id; receiver = Public_key.Compressed.to_base58_check receiver ; account_creation_fee}
 
   let of_json r =
     of_yojson r
@@ -213,6 +229,7 @@ module Metadata = struct
         { gql:
                ?token_id:Unsigned.UInt64.t
             -> address:Public_key.Compressed.t
+            -> receiver:Public_key.Compressed.t
             -> unit
             -> ('gql, Errors.t) M.t
         ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t
@@ -225,7 +242,7 @@ module Metadata = struct
     let real : graphql_uri:Uri.t -> 'gql Real.t =
      fun ~graphql_uri ->
       { gql=
-          (fun ?token_id:_ ~address () ->
+          (fun ?token_id:_ ~address ~receiver () ->
             Graphql.query
               (Get_nonce.make
                  ~public_key:
@@ -241,6 +258,7 @@ module Metadata = struct
                    | None ->
                        `Null )
                  *)
+                 ~receiver_key:(`String (Public_key.Compressed.to_base58_check receiver))
                  ())
               graphql_uri )
       ; validate_network_choice= Network.Validate_choice.Real.validate
@@ -260,7 +278,7 @@ module Metadata = struct
       in
       let%bind options = Options.of_json req_options |> env.lift in
       let%bind res =
-        env.gql ~token_id:options.token_id ~address:options.sender ()
+        env.gql ~token_id:options.token_id ~address:options.sender ~receiver:options.receiver ()
       in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
@@ -295,9 +313,10 @@ module Metadata = struct
                    (Mina_currency.Fee.to_uint64
                       Mina_compile_config.minimum_user_command_fee)) ) ]
       in
+      let constraint_constants = Genesis_constants.Constraint_constants.compiled in
       { Construction_metadata_response.metadata=
           Metadata_data.create ~sender:options.Options.sender
-            ~token_id:options.Options.token_id ~nonce
+            ~token_id:options.Options.token_id ~nonce ~receiver:options.receiver ~account_creation_fee:(Option.map res#receiver ~f:(fun _ -> Mina_currency.Fee.to_uint64 constraint_constants.account_creation_fee))
           |> Metadata_data.to_yojson
       ; suggested_fee= [{suggested_fee with metadata= Some amount_metadata}] }
   end
@@ -332,18 +351,20 @@ module Preprocess = struct
         User_command_info.of_operations req.operations
         |> lift_reason_validation_to_errors ~env
       in
-      let%map pk =
-        let (`Pk pk) = partial_user_command.User_command_info.Partial.source in
+      let key (`Pk pk) =
         Public_key.Compressed.of_base58_check pk
         |> Result.map_error ~f:(fun _ ->
                Errors.create `Public_key_format_not_valid )
         |> env.lift
       in
+      let%bind sender = key partial_user_command.User_command_info.Partial.source in
+      let%map receiver = key partial_user_command.User_command_info.Partial.receiver in
       { Construction_preprocess_response.options=
           Some
             (Options.to_json
-               { Options.sender= pk
+               { Options.sender
                ; token_id= partial_user_command.User_command_info.Partial.token
+               ; receiver
                })
       ; required_public_keys= [] }
   end
