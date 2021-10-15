@@ -10,4 +10,4 @@ ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:${MINA_DOCKER_TAG}-devnet"
   --archive-image "$ARCHIVE_IMAGE" \
   --mina-automation-location ./automation \
   | tee "$TEST_NAME.test.log" \
-  | coda-logproc -i inline -f '!(.level in ["Debug", "Spam"])'
+  | ./logproc.exe -i inline -f '!(.level in ["Debug", "Spam"])'

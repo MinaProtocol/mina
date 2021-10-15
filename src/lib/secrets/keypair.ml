@@ -1,14 +1,7 @@
-open Signature_lib
-open Core
-open Async
-open Async.Deferred.Let_syntax
-open Keypair_common
-
-module T = struct
-  type t = Keypair.t
-
+module T = Keypair_read_write.Make (struct
   let env = "MINA_PRIVKEY_PASS"
 
+<<<<<<< HEAD
   let which = "Mina keypair"
 
   (** Writes a keypair to [privkey_path] and [privkey_path ^ ".pub"] using [Secret_file] *)
@@ -83,6 +76,13 @@ module T = struct
     in
     read_exn ~privkey_path:path ~password
 end
+=======
+  (* TODO: remove eventually *)
+  let env_deprecated = Some "CODA_PRIVKEY_PASS"
+
+  let which = "Mina keypair"
+end)
+>>>>>>> origin/compatible
 
 include T
-module Terminal_stdin = Make_terminal_stdin (T)
+module Terminal_stdin = Keypair_common.Make_terminal_stdin (T)

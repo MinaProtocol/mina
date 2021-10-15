@@ -19,8 +19,8 @@ Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
       dirtyWhen = [
-        S.strictlyStart (S.contains "automation/terraform/modules/testnet-alerts"),
         S.exactly "automation/terraform/monitoring/o1-testnet-alerts" "tf",
+        S.strictlyStart (S.contains "automation/terraform/modules/testnet-alerts"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/TestnetAlerts"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Release/TestnetAlerts")
       ],

@@ -60,8 +60,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
   let query_random_peers (Any ((module M), t)) = M.query_random_peers t
 
-  let ip_for_peer (Any ((module M), t)) = M.ip_for_peer t
-
   let broadcast (Any ((module M), t)) = M.broadcast t
 
   let on_first_connect (Any ((module M), t)) = M.on_first_connect t
