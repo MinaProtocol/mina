@@ -6,6 +6,8 @@ open Core
 open Async
 open Pickles_types
 
+let () = Zexe_backend_unix.linkme
+
 let proof_string prev_width =
   let dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n prev_width in
   Binable.to_string (module Pickles.Proof.Branching_2.Stable.Latest) dummy

@@ -21,3 +21,5 @@ module T = struct
 end
 
 let () = Zexe_backend_platform_specific.set (module T)
+
+let linkme = ()
