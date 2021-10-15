@@ -19,13 +19,17 @@ end
 let field_size : Bigint.R.t = Field.size
 
 module Verification_key = struct
-  type t = Marlin_plonk_bindings.Pasta_fp_verifier_index.t
+  type t = 
+    (Kimchi.Foundations.Fp.t, Kimchi.Protocol.Srs.Fp.t,
+   Kimchi.Foundations.Fq.t Kimchi.Foundations.or_infinity
+   Kimchi.Protocol.poly_comm)
+  Kimchi.Protocol.VerifierIndex.t
 
   let to_string _ = failwith __LOC__
 
   let of_string _ = failwith __LOC__
 
-  let shifts = Marlin_plonk_bindings.Pasta_fp_verifier_index.shifts
+  let shifts (t:t) = t.shifts
 end
 
 module R1CS_constraint_system =

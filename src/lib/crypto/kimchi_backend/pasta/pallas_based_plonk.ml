@@ -19,37 +19,43 @@ end
 let field_size : Bigint.R.t = Field.size
 
 module Verification_key = struct
-  type t = Marlin_plonk_bindings.Pasta_fq_verifier_index.t
+  type t = 
+    (Kimchi.Foundations.Fq.t, Kimchi.Protocol.Srs.Fq.t,
+   Kimchi.Foundations.Fp.t Kimchi.Foundations.or_infinity
+   Kimchi.Protocol.poly_comm)
+  Kimchi.Protocol.VerifierIndex.t
 
   let to_string _ = failwith __LOC__
 
   let of_string _ = failwith __LOC__
 
-  let shifts = Marlin_plonk_bindings.Pasta_fq_verifier_index.shifts
+  let shifts (t : t) : Field.t array  =
+    t.shifts
 end
 
 module R1CS_constraint_system =
   Plonk_constraint_system.Make
     (Field)
-    (Marlin_plonk_bindings.Pasta_fq_index.Gate_vector)
+    (Kimchi.Protocol.Gates.Vector.Fq)
     (struct
       let params =
         Sponge.Params.(
           map pasta_q ~f:(fun x ->
-              Field.of_bigint (Bigint256.of_decimal_string x)))
+              Field.of_bigint (Bigint256.of_decimal_string (Bytes.of_string x))))
     end)
 
 module Var = Var
 
-let lagrange : int -> Marlin_plonk_bindings.Pasta_fq_urs.Poly_comm.t array =
-  let open Marlin_plonk_bindings.Types in
+let lagrange : int -> 
+  _ Kimchi.Protocol.poly_comm
+  array =
   Memo.general ~hashable:Int.hashable (fun domain_log2 ->
       Array.map
         Precomputed.Lagrange_precomputations.(
           pallas.(index_of_domain_log2 domain_log2))
         ~f:(fun unshifted ->
-          { Poly_comm.unshifted =
-              Array.map unshifted ~f:(fun c -> Or_infinity.Finite c)
+          { Kimchi.Protocol.unshifted =
+              Array.map unshifted ~f:(fun (x, y) -> Kimchi.Foundations.Finite (x,y))
           ; shifted = None
           }))
 
@@ -66,7 +72,6 @@ module Rounds_vector = Rounds.Wrap_vector
 module Rounds = Rounds.Wrap
 
 module Keypair = Dlog_plonk_based_keypair.Make (struct
-  open Marlin_plonk_bindings
 
   let name = "pallas"
 
@@ -77,20 +82,22 @@ module Keypair = Dlog_plonk_based_keypair.Make (struct
   module Poly_comm = Fq_poly_comm
   module Scalar_field = Field
   module Verifier_index = Pasta_fq_verifier_index
-  module Gate_vector = Pasta_fq_index.Gate_vector
+  module Gate_vector = 
+    Kimchi.Protocol.Gates.Vector.Fq
   module Constraint_system = R1CS_constraint_system
 end)
 
 module Proof = Plonk_dlog_proof.Make (struct
-  open Marlin_plonk_bindings
-
   let id = "pasta_pallas"
 
   module Scalar_field = Field
   module Base_field = Fp
 
   module Backend = struct
-    include Pasta_fq_proof
+    type t = (Kimchi.Foundations.Fp.t Kimchi.Foundations.or_infinity,
+     Kimchi.Foundations.Fq.t)
+    Kimchi.Protocol.prover_proof
+    include Kimchi.Protocol.Proof.Fq
 
     let verify = with_lagrange verify
 
@@ -135,14 +142,15 @@ module Proof = Plonk_dlog_proof.Make (struct
 
   module Evaluations_backend = struct
     type t =
-      Scalar_field.t Marlin_plonk_bindings.Types.Plonk_proof.Evaluations.t
+      Scalar_field.t 
+        Kimchi.Protocol.proof_evaluations
   end
 
   module Opening_proof_backend = struct
     type t =
       ( Scalar_field.t
       , Curve.Affine.Backend.t )
-      Marlin_plonk_bindings.Types.Plonk_proof.Opening_proof.t
+      Kimchi.Protocol.opening_proof
   end
 
   module Poly_comm = Fq_poly_comm
@@ -177,7 +185,8 @@ module Oracles = Plonk_dlog_oracles.Make (struct
   module Proof = Proof
 
   module Backend = struct
-    include Kimchi.Oracles.Fq (* Marlin_plonk_bindings.Pasta_fq_oracles *)
+    include Kimchi.Protocol.Oracles.Fq
+      (* Marlin_plonk_bindings.Pasta_fq_oracles *)
 
     let create = with_lagrange create
   end
