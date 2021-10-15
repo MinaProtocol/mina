@@ -104,4 +104,5 @@ TODO: write some guidelines on using either ocaml::pointer or our own `CamlPoint
 * You should not include any value allocated on the OCaml heap within a custom type, otherwise it won't get free'd by OCaml's GC when the host type gets free'ed. Now, I'm not sure how you could achieve that, but if you end up there think about what you're doing.
 * You should implement a `drop_in_place` finalizer for all custom types. Better be safe than sorry. (TODO: lint on this? or mandate this upstream)
 * If a custom type is large, you can use a `Box` to only store a pointer (pointing to the Rust heap) in the OCaml heap. (TODO: why is this better?)
+* Since OCaml does not have fixed-sized arrays, we usually convert any arrays (`[T; N]`) into tuples (`(T, T, T, ...)`)
 * TODO: We do not have good conventions on returning errors or throwing exceptions.
