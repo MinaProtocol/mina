@@ -1812,7 +1812,7 @@ let%test_module _ =
       in
       Test.Resource_pool.Diff.unsafe_apply pool verified
 
-    let mk_linear_case assert_pool_txs pool best_tip_diff_w cmds =
+    let mk_linear_case_test assert_pool_txs pool best_tip_diff_w cmds =
       assert_pool_txs [] ;
       let%bind apply_res = verify_and_apply pool cmds in
       [%test_eq: pool_apply] (accepted_commands apply_res) (Ok cmds) ;
@@ -1845,14 +1845,15 @@ let%test_module _ =
           let%bind assert_pool_txs, pool, best_tip_diff_w, _frontier =
             setup_test ()
           in
-          mk_linear_case assert_pool_txs pool best_tip_diff_w independent_cmds')
+          mk_linear_case_test assert_pool_txs pool best_tip_diff_w
+            independent_cmds')
 
     let%test_unit "transactions are removed in linear case (snapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, _frontier =
             setup_test ()
           in
-          mk_linear_case assert_pool_txs pool best_tip_diff_w
+          mk_linear_case_test assert_pool_txs pool best_tip_diff_w
             (mk_parties_cmds' pool))
 
     let map_set_multi map pairs =
