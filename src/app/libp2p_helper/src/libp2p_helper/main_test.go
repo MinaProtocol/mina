@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"codanet"
-
 	logging "github.com/ipfs/go-log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -25,8 +24,8 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
+	"github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/stretchr/testify/require"
@@ -1000,7 +999,7 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 	msg := createMessage(msgSize)
 
 	testDirectionalStream(t, appA, appB, func(stream net.Stream) {
-		appB.StreamStates[0] = STREAM_DATA_EXPECTED
+		appB.StreamStates[0] = STREAM_QUERY_HANDLED
 		sendStreamMessage(t, stream, msg)
 		require.Equal(t, msg, waitForMessage(t, appB, msgSize))
 	})
@@ -1025,13 +1024,13 @@ func TestMplex_SendMultipleMessage(t *testing.T) {
 	msg := createMessage(msgSize)
 
 	testDirectionalStream(t, appA, appB, func(stream net.Stream) {
-		appB.StreamStates[0] = STREAM_DATA_EXPECTED
+		appB.StreamStates[0] = STREAM_QUERY_HANDLED
 		sendStreamMessage(t, stream, msg)
 		require.Equal(t, msg, waitForMessage(t, appB, msgSize))
-		appB.StreamStates[0] = STREAM_DATA_EXPECTED
+		appB.StreamStates[0] = STREAM_QUERY_HANDLED
 		sendStreamMessage(t, stream, msg)
 		require.Equal(t, msg, waitForMessage(t, appB, msgSize))
-		appB.StreamStates[0] = STREAM_DATA_EXPECTED
+		appB.StreamStates[0] = STREAM_QUERY_HANDLED
 		sendStreamMessage(t, stream, msg)
 		require.Equal(t, msg, waitForMessage(t, appB, msgSize))
 	})
@@ -1061,10 +1060,10 @@ func TestLibp2pMetrics(t *testing.T) {
 
 	// Send multiple messages from A to B
 	testDirectionalStream(t, appA, appB, func(stream net.Stream) {
-		appB.StreamStates[0] = STREAM_DATA_EXPECTED
+		appB.StreamStates[0] = STREAM_QUERY_HANDLED
 		sendStreamMessage(t, stream, createMessage(maxStatsMsg))
 		waitForMessage(t, appB, maxStatsMsg)
-		appB.StreamStates[0] = STREAM_DATA_EXPECTED
+		appB.StreamStates[0] = STREAM_QUERY_HANDLED
 		sendStreamMessage(t, stream, createMessage(minStatsMsg))
 		waitForMessage(t, appB, minStatsMsg)
 	})
