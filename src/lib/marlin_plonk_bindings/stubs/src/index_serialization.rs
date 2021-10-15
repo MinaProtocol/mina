@@ -6,7 +6,7 @@ use algebra::{
 
 use commitment_dlog::{
     commitment::{CommitmentCurve, CommitmentField, PolyComm},
-    srs::{SRS, SRSValue as PlonkSRSValue},
+    srs::{SRSValue as PlonkSRSValue, SRS},
 };
 use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDomain as Domain};
 use oracle::poseidon::ArithmeticSpongeParams;
@@ -234,8 +234,14 @@ where
     let srs = PlonkSRSValue::Ref(unsafe { &(*srs) });
     let vk = PlonkVerifierIndex {
         domain,
-        w: zk_w(domain),
-        zkpm: zk_polynomial(domain),
+        w: zk_w(domain).ok_or(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "zk_w is invalid",
+        ))?,
+        zkpm: zk_polynomial(domain).ok_or(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "zk_polynomial is invalid",
+        ))?,
         max_poly_size,
         max_quot_size,
         srs,
@@ -419,7 +425,10 @@ where
     let o = G::ScalarField::read(&mut r)?;
     let endo = G::ScalarField::read(&mut r)?;
 
-    let zkpm = zk_polynomial(domain.d1);
+    let zkpm = zk_polynomial(domain.d1).ok_or(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "zk_polynomial is invalid",
+    ))?;
     let zkpl = zkpm.evaluate_over_domain_by_ref(domain.d8);
     Ok(PlonkConstraintSystem {
         zkpm,
