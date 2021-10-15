@@ -201,20 +201,17 @@ module Update = struct
     let%bind delegate = Set_or_keep.gen Public_key.Compressed.gen in
     let%bind verification_key =
       if snapp_account then
-        return
-        @@ Set_or_keep.Set
-             With_hash.
-               { data = Pickles.Side_loaded.Verification_key.dummy
-               ; hash = Snapp_account.dummy_vk_hash ()
-               }
-      else
         Set_or_keep.gen
           (Quickcheck.Generator.return
              (let data = Pickles.Side_loaded.Verification_key.dummy in
               let hash = Snapp_account.digest_vk data in
               { With_hash.data; hash }))
+      else return Set_or_keep.Keep
     in
-    let%bind permissions = Set_or_keep.gen Permissions.gen in
+    let%bind permissions =
+      if snapp_account then Set_or_keep.gen Permissions.gen
+      else return Set_or_keep.Keep
+    in
     let%bind snapp_uri =
       let uri_gen =
         Quickcheck.Generator.of_list
