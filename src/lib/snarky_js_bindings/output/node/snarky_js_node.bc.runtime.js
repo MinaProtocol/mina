@@ -390,10 +390,11 @@ k3(a){return Math.LOG10E*Math.log(a)}function
 bx(b,d){for(var
 a=0,c=b.length;a<c;a++)b[a]=d[a]}var
 a3=require("worker_threads"),e6;function
-dQ(g,d,a){c.wasm_workers=[];c.wasm_rayon_poolbuilder=a;return c.Promise.all(Array.from({length:a.numThreads()},function(){var
+dQ(g,d,a){var
+b;c.snarky_ready=new(c.Promise)(function(a){b=a});c.wasm_workers=[];c.wasm_rayon_poolbuilder=a;return c.Promise.all(Array.from({length:a.numThreads()},function(){var
 b=new(a3.Worker)(g,{workerData:{memory:d,receiver:a.receiver()}});c.wasm_workers.push(b);var
 e=b,f=d5;return new(c.Promise)(function(d){var
-c=false;e.on("message",function(a){if(a==null||a.type!==f||c)return;c=true;d(b)})})})).then(function(b){e6=b;try{a.build()}catch(a){}})}function
+c=false;e.on("message",function(a){if(a==null||a.type!==f||c)return;c=true;d(b)})})})).then(function(c){b();e6=c;try{a.build()}catch(a){}})}function
 g4(a){a3.parentPort.postMessage({type:d5});a.wbg_rayon_start_worker(a3.workerData.receiver)}var
 a=function(){c.startWorkers=dQ;var
 b=require("env");if(a3.isMainThread){b.memory=new(c.WebAssembly.Memory)({initial:20,maximum:16384,shared:true});c.startWorkers=dQ}else
