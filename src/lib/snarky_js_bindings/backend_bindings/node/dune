@@ -1,0 +1,27 @@
+(library
+ (name node_backend)
+ (js_of_ocaml
+  (javascript_files node_backend.js))
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version js_of_ocaml-ppx)))
+
+(rule
+ (targets
+   plonk_wasm_bg.wasm.d.ts
+   plonk_wasm_bg.wasm
+   plonk_wasm.d.ts
+   plonk_wasm.js)
+ (action
+  (progn
+   (copy
+     %{project_root}/lib/marlin_plonk_bindings/wasm/node/plonk_wasm_bg.wasm.d.ts
+     plonk_wasm_bg.wasm.d.ts)
+   (copy
+     %{project_root}/lib/marlin_plonk_bindings/wasm/node/plonk_wasm_bg.wasm
+     plonk_wasm_bg.wasm)
+   (copy
+     %{project_root}/lib/marlin_plonk_bindings/wasm/node/plonk_wasm.d.ts
+     plonk_wasm.d.ts)
+   (copy
+     %{project_root}/lib/marlin_plonk_bindings/wasm/node/plonk_wasm.js
+     plonk_wasm.js))))

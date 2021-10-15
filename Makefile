@@ -130,6 +130,12 @@ build_intgtest: ocaml_checks
 	dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 	$(info Build complete)
 
+build_snarkyjs_node:
+	dune build --auto-promote @src/lib/snarky_js_bindings/output/node/build
+
+build_snarkyjs_chrome:
+	dune build --auto-promote @src/lib/snarky_js_bindings/output/chrome/build
+
 client_sdk: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/client_sdk.bc.js --profile=nonconsensus_mainnet

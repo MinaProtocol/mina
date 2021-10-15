@@ -1,0 +1,9 @@
+; Nasty hack :(
+(rule
+ (targets
+   workerHelpers.no-bundler.js)
+ (alias build)
+ (mode promote)
+ (action
+  (progn
+   (run cp ../../../../../backend_bindings/chrome/snippets/wasm-bindgen-rayon-7afa899f36665473/src/workerHelpers.no-bundler.js .))))

@@ -1,0 +1,4 @@
+*.ts binary
+*.wasm binary
+*.js binary
+*.py binary

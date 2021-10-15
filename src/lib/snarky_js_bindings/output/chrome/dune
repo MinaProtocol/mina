@@ -1,0 +1,35 @@
+(rule
+ (targets
+   plonk_wasm_bg.wasm.d.ts
+   plonk_wasm_bg.wasm
+   plonk_wasm.d.ts
+   plonk_wasm.js
+   snarky_js_chrome.bc.js
+   snarky_js_chrome.bc.runtime.js
+   server.py)
+ (alias build)
+ (deps (alias_rec snippets/build))
+ (mode promote)
+ (action
+  (progn
+   (copy
+     ../../backend_bindings/chrome/plonk_wasm_bg.wasm.d.ts
+     plonk_wasm_bg.wasm.d.ts)
+   (copy
+     ../../backend_bindings/chrome/plonk_wasm_bg.wasm
+     plonk_wasm_bg.wasm)
+   (copy
+     ../../backend_bindings/chrome/plonk_wasm.d.ts
+     plonk_wasm.d.ts)
+   (copy
+     ../../backend_bindings/chrome/plonk_wasm.js
+     plonk_wasm.js)
+   (copy
+     ../../snarky_js_chrome.bc.js
+     snarky_js_chrome.bc.js)
+   (copy
+     ../../snarky_js_chrome.bc.runtime.js
+     snarky_js_chrome.bc.runtime.js)
+   (copy
+     ../../backend_bindings/chrome/server.py
+     server.py))))

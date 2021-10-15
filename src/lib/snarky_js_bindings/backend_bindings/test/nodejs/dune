@@ -1,0 +1,41 @@
+(executable
+ (name nodejs_test)
+ (modes js)
+ (js_of_ocaml (flags +toplevel.js +dynlink.js))
+ (libraries bindings_js_test marlin_plonk_bindings js_of_ocaml bindings_js node_backend)
+ (link_deps ../../node_js/plonk_wasm.js ../../node_js/plonk_wasm.wasm)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version js_of_ocaml-ppx)))
+
+(rule
+ (targets
+   plonk_wasm_bg.wasm.d.ts
+   plonk_wasm_bg.wasm
+   plonk_wasm.d.ts
+   plonk_wasm.js)
+ (action
+  (progn
+   (copy
+     ../../node/plonk_wasm_bg.wasm.d.ts
+     plonk_wasm_bg.wasm.d.ts)
+   (copy
+     ../../node/plonk_wasm_bg.wasm
+     plonk_wasm_bg.wasm)
+   (copy
+     ../../node/plonk_wasm.d.ts
+     plonk_wasm.d.ts)
+   (copy
+     ../../node/plonk_wasm.js
+     plonk_wasm.js))))
+
+(rule
+ (deps
+   plonk_wasm_bg.wasm.d.ts
+   plonk_wasm_bg.wasm
+   plonk_wasm.d.ts
+   plonk_wasm.js
+   nodejs_test.bc.js
+   run_test.js)
+ (alias runtest)
+ (action
+  (run nodejs --experimental-wasm-modules --experimental-modules --experimental-wasm-threads run_test.js)))
