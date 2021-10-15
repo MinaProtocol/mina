@@ -10,104 +10,59 @@ let padded_array_typ ~length ~dummy elt =
         typ.store (Array.append a (Array.create ~len:(length - n) dummy)))
   }
 
-module Pc_array = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type 'a t = 'a array [@@deriving compare, sexp, yojson, equal]
-
-      let hash_fold_t f s a = List.hash_fold_t f s (Array.to_list a)
-    end
-  end]
-
-  let hash_fold_t f s a = List.hash_fold_t f s (Array.to_list a)
-end
-
 let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
 
-module LookupEvaluations = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type 'a t = 'a Kimchi.Protocol.lookup_evaluations =
-        { sorted : 'a array array; aggreg : 'a array; table : 'a array }
-      [@@deriving fields, sexp, compare, yojson, hash, equal]
-    end
-  end]
-end
+module Columns = Nat.N15
+module Columns_vec = Vector.Vector_15
+module Permuts_minus_1 = Nat.N6
+module Permuts_minus_1_vec = Vector.Vector_6
+module Permuts = Nat.N7
+module Permuts_vec = Vector.Vector_7
 
 module Evals = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type 'a t = 'a Kimchi.Protocol.proof_evaluations =
-        { w :
-            'a array
-            * 'a array
-            * 'a array
-            * 'a array
-            * 'a array
-            * 'a array
-            * 'a array
-            * 'a array
-            * 'a array
-            * 'a array
-            * 'a array
-            * 'a array
-            * 'a array
-            * 'a array
-            * 'a array
-        ; z : 'a array
-        ; s : 'a array * 'a array * 'a array * 'a array * 'a array * 'a array
-        ; lookup : 'a LookupEvaluations.Stable.V1.t option
-        ; generic_selector : 'a array
-        ; poseidon_selector : 'a array
+    module V2 = struct
+      type 'a t =
+        { w : 'a Columns_vec.Stable.V1.t
+        ; z : 'a
+        ; s : 'a Permuts_minus_1_vec.Stable.V1.t
+        ; generic_selector : 'a
+        ; poseidon_selector : 'a
         }
       [@@deriving fields, sexp, compare, yojson, hash, equal]
     end
   end]
 
-  let map (type _a _b) _t ~_f = failwith "unimplemented"
-
-  (*
-      ({ _w; _z; _s; _lookup; _generic_selector; _poseidon_selector } : a t)
-      ~(_f : a -> b) : b t =
-    { w = Array.map ~f w
-    ; z = Array.map ~f z
-    ; s = Array.map ~f s
+  let map (type a b) ({ w; z; s; generic_selector; poseidon_selector } : a t)
+      ~(f : a -> b) : b t =
+    { w = Vector.map w ~f
+    ; z = f z
+    ; s = Vector.map s ~f
+    ; generic_selector = f generic_selector
+    ; poseidon_selector = f poseidon_selector
     }
-    *)
 
-  let map2 (type a b c) (_t1 : a t) (_t2 : b t) ~(_f : a -> b -> c) : c t =
-    failwith "unimplemented"
-
-  (*
-    { l = f t1.l t2.l
-    ; r = f t1.r t2.r
-    ; o = f t1.o t2.o
+  let map2 (type a b c) (t1 : a t) (t2 : b t) ~(f : a -> b -> c) : c t =
+    { w = Vector.map2 t1.w t2.w ~f
     ; z = f t1.z t2.z
-    ; t = f t1.t t2.t
-    ; f = f t1.f t2.f
-    ; sigma1 = f t1.sigma1 t2.sigma1
-    ; sigma2 = f t1.sigma2 t2.sigma2
+    ; s = Vector.map2 t1.s t2.s ~f
+    ; generic_selector = f t1.generic_selector t2.generic_selector
+    ; poseidon_selector = f t1.poseidon_selector t2.poseidon_selector
     }
-    *)
 
-  let to_vectors _t = failwith "unimplemented"
+  let w_s_len, w_s_add_proof = Columns.add Permuts_minus_1.n
 
-  (* { _w; _z; _s; _lookup; _generic_selector; _poseidon_selector }
-       =
-
-     (Vector.[ l; r; o; z; f; sigma1; sigma2 ], Vector.[ t ]) *)
+  (* TODO: Get rid of second vector *)
+  let to_vectors { w; z; s; generic_selector; poseidon_selector } =
+    let w_s = Vector.append w s w_s_add_proof in
+    (Vector.(z :: generic_selector :: poseidon_selector :: w_s), Vector.[])
 
   let of_vectors
-      ( ([ _w; _z; _s; _lookup; _generic_selector; _poseidon_selector ] :
-          ('a, _) Vector.t)
-      , Vector.[ _t ] ) : 'a t =
-    failwith "unimplemented"
-
-  (*
-     { w; z; s; lookup; generic_selector; poseidon_selector } *)
+      ( (z :: generic_selector :: poseidon_selector :: w_s : ('a, _) Vector.t)
+      , Vector.[] ) : 'a t =
+    let w, s = Vector.split w_s w_s_add_proof in
+    { w; z; s; generic_selector; poseidon_selector }
 
   let typ (lengths : int t) (g : ('a, 'b, 'f) Snarky_backendless.Typ.t) ~default
       : ('a array t, 'b array t, 'f) Snarky_backendless.Typ.t =
@@ -136,12 +91,7 @@ module Openings = struct
     module Stable = struct
       module V1 = struct
         type ('g, 'fq) t =
-          { lr : ('g * 'g) Pc_array.Stable.V1.t
-          ; z_1 : 'fq
-          ; z_2 : 'fq
-          ; delta : 'g
-          ; sg : 'g
-          }
+          { lr : ('g * 'g) array; z_1 : 'fq; z_2 : 'fq; delta : 'g; sg : 'g }
         [@@deriving sexp, compare, yojson, hash, equal, hlist]
       end
     end]
@@ -156,10 +106,11 @@ module Openings = struct
 
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type ('g, 'fq, 'fqv) t =
         { proof : ('g, 'fq) Bulletproof.Stable.V1.t
-        ; evals : 'fqv Evals.Stable.V1.t * 'fqv Evals.Stable.V1.t
+        ; evals : 'fqv Evals.Stable.V2.t * 'fqv Evals.Stable.V2.t
+        ; ft_eval1 : 'fq
         }
       [@@deriving sexp, compare, yojson, hash, equal, hlist]
     end
@@ -172,6 +123,7 @@ module Openings = struct
     of_hlistable
       [ Bulletproof.typ fq g ~length:bulletproof_rounds
       ; double (Evals.typ ~default:dummy_group_element commitment_lengths g)
+      ; fq
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -182,8 +134,7 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g_opt t =
-          { unshifted : 'g_opt Pc_array.Stable.V1.t; shifted : 'g_opt }
+        type 'g_opt t = { unshifted : 'g_opt array; shifted : 'g_opt }
         [@@deriving sexp, compare, yojson, hlist, hash, equal]
       end
     end]
@@ -212,21 +163,19 @@ module Poly_comm = struct
       }
 
     let typ (type f g g_var bool_var)
-        (_g : (g_var, g, f) Snarky_backendless.Typ.t) ~length
-        ~_dummy_group_element
-        ~(_bool : (bool_var, bool, f) Snarky_backendless.Typ.t) :
+        (g : (g_var, g, f) Snarky_backendless.Typ.t) ~length
+        ~dummy_group_element
+        ~(bool : (bool_var, bool, f) Snarky_backendless.Typ.t) :
         ((bool_var * g_var) t, g Or_infinity.t t, f) Snarky_backendless.Typ.t =
       let open Snarky_backendless.Typ in
       let g_inf =
-        failwith "unimplemented"
-        (*
         transport (tuple2 bool g)
           ~there:(function
             | Or_infinity.Infinity ->
                 (false, dummy_group_element)
             | Finite x ->
                 (true, x))
-          ~back:(fun (b, x) -> if b then Infinity else Finite x) *)
+          ~back:(fun (b, x) -> if b then Infinity else Finite x)
       in
       let arr = padded_array_typ0 ~length ~dummy:Or_infinity.Infinity g_inf in
       of_hlistable [ arr; g_inf ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -237,8 +186,7 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g t = 'g Pc_array.Stable.V1.t
-        [@@deriving sexp, compare, yojson, hash, equal]
+        type 'g t = 'g array [@@deriving sexp, compare, yojson, hash, equal]
       end
     end]
 
@@ -249,25 +197,27 @@ end
 module Messages = struct
   open Poly_comm
 
+  module Poly = struct
+    type ('w, 'z, 't) t = { w : 'w; z : 'z; t : 't }
+    [@@deriving sexp, compare, yojson, fields, hash, equal, hlist]
+  end
+
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type 'g t =
-        { w_comm : 'g Without_degree_bound.Stable.V1.t
+    module V2 = struct
+      type ('g, 'g_opt) t =
+        { w_comm : 'g Without_degree_bound.Stable.V1.t Columns_vec.Stable.V1.t
         ; z_comm : 'g Without_degree_bound.Stable.V1.t
-        ; t_comm : 'g Without_degree_bound.Stable.V1.t
+        ; t_comm : 'g_opt With_degree_bound.Stable.V1.t
         }
       [@@deriving sexp, compare, yojson, fields, hash, equal, hlist]
     end
   end]
 
-  let typ (type n) _g ~_dummy ~(_commitment_lengths : (int, n) Vector.t Evals.t)
-      ~_bool =
-    failwith "unimplemented"
-
-  (*
+  let typ (type n) g ~dummy
+      ~(commitment_lengths : (((int, n) Vector.t as 'v), 'v, 'v) Poly.t) ~bool =
     let open Snarky_backendless.Typ in
-    let { Evals.l; r; o; z; t; _ } = commitment_lengths in
+    let { Poly.w = w_lens; z; t } = commitment_lengths in
     let array ~length elt = padded_array_typ ~dummy ~length elt in
     let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
     let w n =
@@ -276,35 +226,33 @@ module Messages = struct
         ~dummy_group_element:dummy ~bool
     in
     of_hlistable
-      [ wo l; wo r; wo o; wo z; w t ]
+      [ Vector.typ (wo w_lens) Columns.n; wo z; w t ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
-      *)
 end
 
 module Proof = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type ('g, 'g_opt, 'fq, 'fqv) t =
-        { messages : ('g, 'g_opt) Messages.Stable.V1.t
-        ; openings : ('g, 'fq, 'fqv) Openings.Stable.V1.t
+        { messages : ('g, 'g_opt) Messages.Stable.V2.t
+        ; openings : ('g, 'fq, 'fqv) Openings.Stable.V2.t
         }
       [@@deriving sexp, compare, yojson, hash, equal]
     end
   end]
 end
 
-let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
-
 module Shifts = struct
+  open Core_kernel
+
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type 'field t = 'field array
-      [@@deriving sexp, compare, yojson, hash, equal]
+    module V2 = struct
+      type 'field t = 'field array [@@deriving sexp, compare, yojson, equal]
     end
   end]
 
-  let map ~f (t : _ t) = Array.map ~f t
+  let map = Array.map
 end

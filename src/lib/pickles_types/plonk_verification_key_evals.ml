@@ -1,18 +1,18 @@
 open Core_kernel
 module H_list = Snarky_backendless.H_list
+open Dlog_plonk_types
 
 let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
-    type 'comm t = 'comm Kimchi.Protocol.VerifierIndex.verification_evals =
-      { sigma_comm : 'comm array
-      ; coefficients_comm : 'comm array
+  module V2 = struct
+    type 'comm t =
+      { sigma_comm : 'comm Permuts_vec.Stable.V1.t
+      ; coefficients_comm : 'comm Columns_vec.Stable.V1.t
       ; generic_comm : 'comm
       ; psm_comm : 'comm
-      ; add_comm : 'comm
-      ; double_comm : 'comm
+      ; complete_add_comm : 'comm
       ; mul_comm : 'comm
       ; emul_comm : 'comm
       }
@@ -25,42 +25,31 @@ let map
     ; coefficients_comm
     ; generic_comm
     ; psm_comm
-    ; add_comm
-    ; double_comm
+    ; complete_add_comm
     ; mul_comm
     ; emul_comm
     } ~f =
-  { sigma_comm = Array.map ~f sigma_comm
-  ; coefficients_comm = Array.map ~f coefficients_comm
+  { sigma_comm = Vector.map ~f sigma_comm
+  ; coefficients_comm = Vector.map ~f coefficients_comm
   ; generic_comm = f generic_comm
   ; psm_comm = f psm_comm
-  ; add_comm = f add_comm
-  ; double_comm = f double_comm
+  ; complete_add_comm = f complete_add_comm
   ; mul_comm = f mul_comm
   ; emul_comm = f emul_comm
   }
 
-let map2 _t1 _t2 ~_f = failwith "unimplemented"
+let map2 t1 t2 ~f =
+  { sigma_comm = Vector.map2 ~f t1.sigma_comm t2.sigma_comm
+  ; coefficients_comm = Vector.map2 ~f t1.coefficients_comm t2.coefficients_comm
+  ; generic_comm = f t1.generic_comm t2.generic_comm
+  ; psm_comm = f t1.psm_comm t2.psm_comm
+  ; complete_add_comm = f t1.complete_add_comm t2.complete_add_comm
+  ; mul_comm = f t1.mul_comm t2.mul_comm
+  ; emul_comm = f t1.emul_comm t2.emul_comm
+  }
 
-(* TODO: uncomment this *)
-(* { sigma_comm = f t1.sigma_comm t2.sigma_comm
-   ; qw_comm = f t1.qw_comm t2.qw_comm
-   ; qm_comm = f t1.qm_comm t2.qm_comm
-   ; qc_comm = f t1.qc_comm t2.qc_comm
-   ; rcm_comm = f t1.rcm_comm t2.rcm_comm
-   ; psm_comm = f t1.psm_comm t2.psm_comm
-   ; add_comm = f t1.add_comm t2.add_comm
-   ; double_comm = f t1.double_comm t2.double_comm
-   ; mul_comm = f t1.mul_comm t2.mul_comm
-   ; emul_comm = f t1.emul_comm t2.emul_comm
-   } *)
-
-let typ _g = failwith "unimplemented"
-
-(*
+let typ g =
   Snarky_backendless.Typ.of_hlistable
-    [ g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g ]
+    [ Vector.typ g Permuts.n; Vector.typ g Columns.n; g; g; g; g; g ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
-
-    *)
