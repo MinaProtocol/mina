@@ -179,6 +179,18 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.get (get_parent t) location
 
+    let get_batch t locations =
+      assert_is_attached t ;
+      let found_accounts, leftover_locations =
+        List.partition_map locations ~f:(fun location ->
+            match self_find_account t location with
+            | Some account ->
+                `Fst (location, Some account)
+            | None ->
+                `Snd location)
+      in
+      found_accounts @ Base.get_batch (get_parent t) leftover_locations
+
     (* fixup_merkle_path patches a Merkle path reported by the parent,
        overriding with hashes which are stored in the mask *)
 
@@ -535,7 +547,16 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let num_accounts t =
       assert_is_attached t ;
-      accounts t |> Account_id.Set.length
+      match t.current_location with
+      | None ->
+          0
+      | Some location -> (
+          match location with
+          | Account addr ->
+              Addr.to_int addr + 1
+          | _ ->
+              failwith "Expected mask current location to represent an account"
+          )
 
     let location_of_account t account_id =
       assert_is_attached t ;
@@ -545,6 +566,19 @@ module Make (Inputs : Inputs_intf.S) = struct
           mask_result
       | None ->
           Base.location_of_account (get_parent t) account_id
+
+    let location_of_account_batch t account_ids =
+      assert_is_attached t ;
+      let found_locations, leftover_account_ids =
+        List.partition_map account_ids ~f:(fun account_id ->
+            match self_find_location t account_id with
+            | Some location ->
+                `Fst (account_id, Some location)
+            | None ->
+                `Snd account_id)
+      in
+      found_locations
+      @ Base.location_of_account_batch (get_parent t) leftover_account_ids
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let make_space_for t =

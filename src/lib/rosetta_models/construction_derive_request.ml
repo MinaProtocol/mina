@@ -11,7 +11,7 @@ type t =
   ; public_key : Public_key.t
   ; metadata : Yojson.Safe.t option [@default None]
   }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** ConstructionDeriveRequest is passed to the `/construction/derive` endpoint. Network is provided in the request because some blockchains have different address formats for different networks. Metadata is provided in the request because some blockchains allow for multiple address types (i.e. different address for validators vs normal accounts). *)
 let create (network_identifier : Network_identifier.t)

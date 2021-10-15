@@ -174,8 +174,6 @@ let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
       !"Merkle list proof does not contain payment %{sexp:User_command.t}"
       verifying_txn
 
-let start_time = Time_ns.now ()
-
 type active_state_fields =
   { num_accounts : int option
   ; blockchain_length : int option
@@ -195,7 +193,7 @@ let get_status ~flag t =
   let constraint_constants = precomputed_values.constraint_constants in
   let consensus_constants = precomputed_values.consensus_constants in
   let uptime_secs =
-    Time_ns.diff (Time_ns.now ()) start_time
+    Time_ns.diff (Time_ns.now ()) Mina_lib.daemon_start_time
     |> Time_ns.Span.to_sec |> Int.of_float
   in
   let commit_id = Mina_version.commit_id in
@@ -315,8 +313,10 @@ let get_status ~flag t =
       | `Offline ->
           `Active `Offline
       | `Synced | `Catchup ->
-          if abs (!max_block_height - blockchain_length) < 5 then
-            `Active `Synced
+          if
+            (Mina_lib.config t).demo_mode
+            || abs (!max_block_height - blockchain_length) < 5
+          then `Active `Synced
           else `Active `Catchup
     in
     let consensus_time_best_tip =
@@ -368,7 +368,9 @@ let get_status ~flag t =
     in
     match Transition_frontier.catchup_tree frontier with
     | Full full ->
-        Some (Hashtbl.to_alist full.states)
+        Some
+          (List.map (Hashtbl.to_alist full.states) ~f:(fun (state, hashes) ->
+               (state, State_hash.Set.length hashes)))
     | _ ->
         None
   in

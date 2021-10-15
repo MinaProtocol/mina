@@ -1,11 +1,11 @@
-testnetName: "coda-testnet"
-coda:
+testnetName: "testnet"
+mina:
   runtimeConfig:
   generateGenesisProof: true
   logPrecomputedBlocks: true
   logTxnPoolGossip: false
   maxConnections: 200
-  image: codaprotocol/coda-daemon:0.0.12-beta-develop-589b507
+  image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
   useCustomEntrypoint: false
   customEntrypoint: ""
   seedPeers:

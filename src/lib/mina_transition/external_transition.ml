@@ -325,10 +325,12 @@ let payments t =
         None)
 
 let accept t =
-  Mina_net2.Validation_callback.fire_exn (validation_callback t) `Accept
+  Mina_net2.Validation_callback.fire_if_not_already_fired
+    (validation_callback t) `Accept
 
 let reject t =
-  Mina_net2.Validation_callback.fire_exn (validation_callback t) `Reject
+  Mina_net2.Validation_callback.fire_if_not_already_fired
+    (validation_callback t) `Reject
 
 let poke_validation_callback t cb = set_validation_callback t cb
 
@@ -914,6 +916,14 @@ module With_validation = struct
   let reject t = lift reject t
 
   let poke_validation_callback t = lift poke_validation_callback t
+
+  let handle_dropped_transition ?pipe_name ~logger t =
+    [%log warn] "Dropping state_hash $state_hash from $pipe transition pipe"
+      ~metadata:
+        [ ("state_hash", State_hash.to_yojson (state_hash t))
+        ; ("pipe", `String (Option.value pipe_name ~default:"an unknown"))
+        ] ;
+    reject t
 end
 
 module Initial_validated = struct
@@ -1067,7 +1077,8 @@ module Validated = struct
     , payments
     , global_slot
     , erase
-    , to_yojson )]
+    , to_yojson
+    , handle_dropped_transition )]
 
   include Comparable.Make (Stable.Latest)
 
