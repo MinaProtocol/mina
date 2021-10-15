@@ -3,8 +3,6 @@
 module T = Keypair_read_write.Make (struct
   let env = "UPTIME_PRIVKEY_PASS"
 
-  let env_deprecated = None
-
   let which = "Uptime service keypair"
 end)
 
