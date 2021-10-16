@@ -518,6 +518,7 @@ val parties_witnesses :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> state_body:Transaction_protocol_state.Block_data.t
   -> fee_excess:Currency.Amount.Signed.t
+  -> pending_coinbase_init_stack:Pending_coinbase.Stack.t
   -> Ledger.t
   -> Parties.t list
   -> ( Parties_segment.Witness.t
