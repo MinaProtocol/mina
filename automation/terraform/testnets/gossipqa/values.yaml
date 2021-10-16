@@ -1,4 +1,5 @@
 # helm install gossipqa-prom prometheus-community/prometheus -f automation/terraform/testnets/gossipqa/values.yaml
+# helm uninstall gossipqa-prom
 
 # rbac:
 #   # If true, create & use RBAC resources
@@ -86,6 +87,9 @@ forceNamespace: gossipqa-prometheus
 
 server:
   enabled: true
-  retention: "60d"
+  retention: "365d"
   persistentVolume:
-    size: 80Gi
+    existingClaim: "gossipqa-prom-pvc"
+    # size: 1000Gi
+    # storageClass: ssd-retain
+    
