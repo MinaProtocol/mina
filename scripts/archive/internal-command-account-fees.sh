@@ -38,6 +38,7 @@ ON ic_fee_transfer.id = bic_fee_transfer.internal_command_id
 INNER JOIN balances
 ON bic_coinbase.receiver_balance = balances.id
 WHERE ic_coinbase.type = 'coinbase'
+AND ic_fee_transfer.type = 'fee_transfer_via_coinbase'
 AND balances.balance = ic_coinbase.fee - 1000000000 - ic_fee_transfer.fee
 EOF
 
