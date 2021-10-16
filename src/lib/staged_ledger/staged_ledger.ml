@@ -249,27 +249,16 @@ module T = struct
       ; pending_coinbase_stack
       }
     in
+    let statement_check = `Partial in
     match Scan_state.latest_ledger_proof scan_state with
     | None ->
         Statement_scanner.check_invariants ~constraint_constants scan_state
-          ~verifier:() ~error_prefix ~registers_end ~registers_begin:None
+          ~statement_check ~verifier:() ~error_prefix ~registers_end
+          ~registers_begin:None
     | Some proof ->
         Statement_scanner.check_invariants ~constraint_constants scan_state
-          ~verifier:() ~error_prefix ~registers_end
+          ~statement_check ~verifier:() ~error_prefix ~registers_end
           ~registers_begin:(Some (get_target proof))
-
-  let statement_exn ~constraint_constants t =
-    let open Deferred.Let_syntax in
-    match%map
-      Statement_scanner.scan_statement ~constraint_constants t.scan_state
-        ~verifier:()
-    with
-    | Ok s ->
-        `Non_empty s
-    | Error `Empty ->
-        `Empty
-    | Error (`Error e) ->
-        failwithf !"statement_exn: %{sexp:Error.t}" e ()
 
   let of_scan_state_and_ledger_unchecked ~ledger ~scan_state
       ~constraint_constants ~pending_coinbase_collection =
@@ -278,7 +267,7 @@ module T = struct
   let of_scan_state_and_ledger ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~verifier ~snarked_registers ~ledger ~scan_state
-      ~pending_coinbase_collection =
+      ~pending_coinbase_collection ~get_state =
     let open Deferred.Or_error.Let_syntax in
     let t =
       of_scan_state_and_ledger_unchecked ~ledger ~scan_state
@@ -291,7 +280,7 @@ module T = struct
     in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants ~constraint_constants
-        scan_state
+        scan_state ~statement_check:(`Full get_state)
         ~verifier:{ Statement_scanner_proof_verifier.logger; verifier }
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~registers_begin:(Some snarked_registers)
@@ -319,7 +308,8 @@ module T = struct
     in
     let%bind () =
       Statement_scanner.check_invariants ~constraint_constants scan_state
-        ~verifier:() ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
+        ~statement_check:`Partial ~verifier:()
+        ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~registers_begin:(Some snarked_registers)
         ~registers_end:
           { local_state = Mina_state.Local_state.empty
@@ -401,7 +391,7 @@ module T = struct
     of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
       ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state
       ~expected_merkle_root ~get_state
-      (of_scan_state_and_ledger ~logger ~verifier)
+      (of_scan_state_and_ledger ~logger ~get_state ~verifier)
 
   let of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
       ~constraint_constants ~scan_state ~snarked_ledger ~snarked_local_state
@@ -608,7 +598,6 @@ module T = struct
     in
     ( { Scan_state.Transaction_with_witness.transaction_with_info = applied_txn
       ; state_hash = state_and_body_hash
-      ; state_view = txn_state_view
       ; ledger_witness
       ; init_stack = Base pending_coinbase_stack_state.init_stack
       ; statement

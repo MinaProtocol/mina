@@ -37,8 +37,6 @@ module Transaction_with_witness = struct
         { transaction_with_info :
             Transaction_logic.Transaction_applied.Stable.V2.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
-              (* TODO: It's inefficient to store this here. Optimize it someday. *)
-        ; state_view : Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
         ; statement : Transaction_snark.Statement.Stable.V2.t
         ; init_stack :
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
@@ -69,7 +67,6 @@ module Transaction_with_witness = struct
             Transaction_logic.Transaction_applied.Stable.V1.to_latest
               t.transaction_with_info
         ; state_hash = t.state_hash
-        ; state_view = t.state_view
         ; statement =
             Transaction_snark.Statement.Stable.V1.to_latest t.statement
         ; init_stack = t.init_stack
@@ -234,9 +231,9 @@ end]
 (**********Helpers*************)
 
 let create_expected_statement ~constraint_constants
+    ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
     { Transaction_with_witness.transaction_with_info
     ; state_hash
-    ; state_view
     ; ledger_witness
     ; init_stack
     ; statement
@@ -252,6 +249,8 @@ let create_expected_statement ~constraint_constants
   let { With_status.data = transaction; status = _ } =
     Ledger.Transaction_applied.transaction transaction_with_info
   in
+  let%bind protocol_state = get_state (fst state_hash) in
+  let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
   let%bind after =
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction_exn ~constraint_constants
@@ -437,7 +436,7 @@ struct
   end
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
-  let scan_statement ~constraint_constants tree ~verifier :
+  let scan_statement ~constraint_constants tree ~statement_check ~verifier :
       (Transaction_snark.Statement.t, [ `Error of Error.t | `Empty ]) Result.t
       M.t =
     let timer = Timer.create () in
@@ -529,9 +528,15 @@ struct
           with_error "Bad base statement" ~f:(fun () ->
               let open Or_error.Let_syntax in
               let%bind expected_statement =
-                Timer.time timer
-                  (sprintf "create_expected_statement:%s" __LOC__) (fun () ->
-                    create_expected_statement ~constraint_constants transaction)
+                match statement_check with
+                | `Full get_state ->
+                    Timer.time timer
+                      (sprintf "create_expected_statement:%s" __LOC__)
+                      (fun () ->
+                        create_expected_statement ~constraint_constants
+                          ~get_state transaction)
+                | `Partial ->
+                    return transaction.statement
               in
               if
                 Transaction_snark.Statement.equal transaction.statement
@@ -587,7 +592,8 @@ struct
     | Error e ->
         M.return (Error (`Error e))
 
-  let check_invariants t ~constraint_constants ~verifier ~error_prefix
+  let check_invariants t ~constraint_constants ~statement_check ~verifier
+      ~error_prefix
       ~(registers_begin :
          ( Frozen_ledger_hash.t
          , Pending_coinbase.Stack.t
@@ -631,7 +637,7 @@ struct
     in
     match%map
       time "scan_statement" (fun () ->
-          scan_statement ~constraint_constants ~verifier t)
+          scan_statement ~constraint_constants ~statement_check ~verifier t)
     with
     | Error (`Error e) ->
         Error e
