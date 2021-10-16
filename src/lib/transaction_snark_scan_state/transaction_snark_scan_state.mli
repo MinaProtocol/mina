@@ -75,24 +75,11 @@ module Make_statement_scanner
 
   val check_invariants :
        t
-    -> pending_coinbase_stack_equal:('a -> 'a -> bool)
-    -> pending_coinbase_stack_equal':('a -> Pending_coinbase.Stack.t -> bool)
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> verifier:Verifier.t
     -> error_prefix:string
-    -> registers_begin:
-         ( Frozen_ledger_hash.t
-         , 'a
-         , Token_id.t
-         , Mina_state.Local_state.t )
-         Mina_state.Registers.t
-         option
-    -> registers_end:
-         ( Frozen_ledger_hash.t
-         , 'a
-         , Token_id.t
-         , Mina_state.Local_state.t )
-         Mina_state.Registers.t
+    -> registers_begin:Mina_state.Registers.Value.t option
+    -> registers_end:Mina_state.Registers.Value.t
     -> (unit, Error.t) result M.t
 end
 

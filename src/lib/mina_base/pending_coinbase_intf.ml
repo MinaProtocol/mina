@@ -133,6 +133,10 @@ module type S = sig
 
     val equal_state_hash : t -> t -> bool
 
+    (** The two stacks are connected. This should be used instead of `equal` to
+    check one transaction snark statement follow the other.*)
+    val connected : ?prev:t option -> first:t -> second:t -> unit -> bool
+
     val push_coinbase : Coinbase.t -> t -> t
 
     val push_state : State_body_hash.t -> t -> t

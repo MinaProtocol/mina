@@ -238,7 +238,7 @@ module T = struct
     target
 
   let verify_scan_state_after_apply ~constraint_constants ~next_available_token
-      ~pending_coinbase_collection ledger (scan_state : Scan_state.t) =
+      ~pending_coinbase_stack ledger (scan_state : Scan_state.t) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
@@ -246,29 +246,16 @@ module T = struct
       { ledger
       ; next_available_token
       ; local_state = Mina_state.Local_state.empty
-      ; pending_coinbase_stack =
-          (let `Needs_some_work_for_snapps_on_mainnet =
-             Mina_base.Util.todo_snapps
-           in
-           Pending_coinbase.latest_stack
-             ~is_new_stack:
-               false (* TODO: Not sure what is_new_stack should be. *)
-             pending_coinbase_collection
-           |> Or_error.ok_exn)
+      ; pending_coinbase_stack
       }
     in
-    let pending_coinbase_stack_equal = Pending_coinbase.Stack_versioned.equal in
     match Scan_state.latest_ledger_proof scan_state with
     | None ->
-        Statement_scanner.check_invariants ~pending_coinbase_stack_equal
-          ~pending_coinbase_stack_equal':pending_coinbase_stack_equal
-          ~constraint_constants scan_state ~verifier:() ~error_prefix
-          ~registers_end ~registers_begin:None
+        Statement_scanner.check_invariants ~constraint_constants scan_state
+          ~verifier:() ~error_prefix ~registers_end ~registers_begin:None
     | Some proof ->
-        Statement_scanner.check_invariants ~pending_coinbase_stack_equal
-          ~pending_coinbase_stack_equal':pending_coinbase_stack_equal
-          ~constraint_constants scan_state ~verifier:() ~error_prefix
-          ~registers_end
+        Statement_scanner.check_invariants ~constraint_constants scan_state
+          ~verifier:() ~error_prefix ~registers_end
           ~registers_begin:(Some (get_target proof))
 
   let statement_exn ~constraint_constants t =
@@ -297,11 +284,14 @@ module T = struct
       of_scan_state_and_ledger_unchecked ~ledger ~scan_state
         ~constraint_constants ~pending_coinbase_collection
     in
+    let%bind pending_coinbase_stack =
+      Pending_coinbase.latest_stack ~is_new_stack:false
+        pending_coinbase_collection
+      |> Deferred.return
+    in
     let%bind () =
-      Statement_scanner_with_proofs.check_invariants
-        ~pending_coinbase_stack_equal:Unit.equal
-        ~pending_coinbase_stack_equal':(fun () _ -> true)
-        ~constraint_constants scan_state
+      Statement_scanner_with_proofs.check_invariants ~constraint_constants
+        scan_state
         ~verifier:{ Statement_scanner_proof_verifier.logger; verifier }
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~registers_begin:(Some snarked_registers)
@@ -310,7 +300,7 @@ module T = struct
           ; ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
           ; next_available_token = Ledger.next_available_token ledger
-          ; pending_coinbase_stack = ()
+          ; pending_coinbase_stack
           }
     in
     return t
@@ -322,26 +312,28 @@ module T = struct
     let t =
       { ledger; scan_state; constraint_constants; pending_coinbase_collection }
     in
+    let%bind pending_coinbase_stack =
+      Pending_coinbase.latest_stack ~is_new_stack:false
+        pending_coinbase_collection
+      |> Deferred.return
+    in
     let%bind () =
-      Statement_scanner.check_invariants
-        ~pending_coinbase_stack_equal:Unit.equal
-        ~pending_coinbase_stack_equal':(fun () _ -> true)
-        ~constraint_constants scan_state ~verifier:()
-        ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
+      Statement_scanner.check_invariants ~constraint_constants scan_state
+        ~verifier:() ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~registers_begin:(Some snarked_registers)
         ~registers_end:
           { local_state = Mina_state.Local_state.empty
           ; ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
           ; next_available_token = Ledger.next_available_token ledger
-          ; pending_coinbase_stack = ()
+          ; pending_coinbase_stack
           }
     in
     return t
 
-  let of_scan_state_pending_coinbases_and_snarked_ledger ~logger
-      ~constraint_constants ~verifier ~scan_state ~snarked_ledger
-      ~snarked_local_state ~expected_merkle_root ~pending_coinbases ~get_state =
+  let of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
+      ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state
+      ~expected_merkle_root ~get_state f =
     let open Deferred.Or_error.Let_syntax in
     let snarked_ledger_hash = Ledger.merkle_root snarked_ledger in
     let snarked_frozen_ledger_hash =
@@ -385,15 +377,38 @@ module T = struct
                   Got:%{sexp:Ledger_hash.t}"
                 expected_merkle_root staged_ledger_hash)
     in
-    of_scan_state_and_ledger ~logger ~constraint_constants ~verifier
+    let pending_coinbase_stack =
+      match Scan_state.latest_ledger_proof scan_state with
+      | Some proof ->
+          (get_target proof).pending_coinbase_stack
+      | None ->
+          Pending_coinbase.Stack.empty
+    in
+    f ~constraint_constants
       ~snarked_registers:
-        { ledger = snarked_frozen_ledger_hash
-        ; next_available_token = snarked_next_available_token
-        ; local_state = snarked_local_state
-        ; pending_coinbase_stack = ()
-        }
+        ( { ledger = snarked_frozen_ledger_hash
+          ; next_available_token = snarked_next_available_token
+          ; local_state = snarked_local_state
+          ; pending_coinbase_stack
+          }
+          : Mina_state.Registers.Value.t )
       ~ledger:snarked_ledger ~scan_state
       ~pending_coinbase_collection:pending_coinbases
+
+  let of_scan_state_pending_coinbases_and_snarked_ledger ~logger
+      ~constraint_constants ~verifier ~scan_state ~snarked_ledger
+      ~snarked_local_state ~expected_merkle_root ~pending_coinbases ~get_state =
+    of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
+      ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state
+      ~expected_merkle_root ~get_state
+      (of_scan_state_and_ledger ~logger ~verifier)
+
+  let of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
+      ~constraint_constants ~scan_state ~snarked_ledger ~snarked_local_state
+      ~expected_merkle_root ~pending_coinbases ~get_state =
+    of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
+      ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state
+      ~expected_merkle_root ~get_state of_scan_state_and_ledger_unchecked
 
   let copy
       { scan_state; ledger; constraint_constants; pending_coinbase_collection }
@@ -954,6 +969,11 @@ module T = struct
     let%bind coinbase_amount =
       coinbase_for_blockchain_snark coinbases |> Deferred.return
     in
+    let%bind latest_pending_coinbase_stack =
+      Pending_coinbase.latest_stack ~is_new_stack:false
+        updated_pending_coinbase_collection'
+      |> to_staged_ledger_or_error |> Deferred.return
+    in
     let%map () =
       time ~logger
         (sprintf "verify_scan_state_after_apply (skip=%b)" skip_verification)
@@ -965,8 +985,8 @@ module T = struct
                 ~next_available_token:(Ledger.next_available_token new_ledger)
                 (Frozen_ledger_hash.of_ledger_hash
                    (Ledger.merkle_root new_ledger))
-                ~pending_coinbase_collection:
-                  updated_pending_coinbase_collection' scan_state'
+                ~pending_coinbase_stack:latest_pending_coinbase_stack
+                scan_state'
               >>| to_staged_ledger_or_error))
     in
     [%log debug]
@@ -2561,7 +2581,7 @@ let%test_module "test" =
             , None )
         }
       in
-      Quickcheck.test (gen_below_capacity ())
+      Quickcheck.test gen_at_capacity
         ~sexp_of:
           [%sexp_of:
             Ledger.init_state * User_command.Valid.t list * int option list]
@@ -2629,7 +2649,7 @@ let%test_module "test" =
                     in
                     return (diff', checked || checked'))
               in
-              (*Note: if this fails, try increasing the number of trials*)
+              (*Note: if this fails, try increasing the number of trials to get a diff that does fail*)
               assert checked))
 
     let%test_unit "Provers can't pay the account creation fee" =
@@ -2703,7 +2723,7 @@ let%test_module "test" =
       else None
 
     (** Like test_simple but with a random number of completed jobs available.
-    *)
+      *)
 
     let test_random_number_of_proofs :
            Ledger.init_state
@@ -2859,7 +2879,7 @@ let%test_module "test" =
           { Transaction_snark_work.Checked.fee; proofs = proofs stmts; prover })
 
     (** Like test_random_number_of_proofs but with random proof fees.
-    *)
+      *)
     let test_random_proof_fee :
            Ledger.init_state
         -> User_command.Valid.t list
