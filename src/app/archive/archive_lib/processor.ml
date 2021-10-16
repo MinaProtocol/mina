@@ -1164,7 +1164,7 @@ module Block = struct
           | Error e ->
               Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
         in
-        let account_creation_fee_of_fees_and_balance ?(additional_fee=None) fee balance =
+        let account_creation_fee_of_fees_and_balance ?additional_fee fee balance =
           (* TODO: add transaction statuses to internal commands
              the archive lib should not know the details of
              account creation fees; the calculation below is
@@ -1348,7 +1348,7 @@ module Block = struct
                     ~balance:balances.coinbase_receiver_balance
                 in
                 let receiver_account_creation_fee_paid =
-                  account_creation_fee_of_fees_and_balance ~additional_fee
+                  account_creation_fee_of_fees_and_balance ?additional_fee
                     (Currency.Amount.to_fee coinbase.amount)
                     balances.coinbase_receiver_balance
                 in
