@@ -13,10 +13,18 @@ module User_command = Mina_base.User_command
 module Signed_command = Mina_base.Signed_command
 module Transaction_hash = Mina_base.Transaction_hash
 
-module Get_nonce =
+module Get_options_metadata =
 [%graphql
 {|
-    query get_nonce($public_key: PublicKey!, $token_id: TokenId, $receiver_key: PublicKey!) {
+    query get_options_metadata($public_key: PublicKey!, $token_id: TokenId, $receiver_key: PublicKey!) {
+      bestChain(maxLength: 5) {
+        transactions {
+          userCommands {
+            fee
+          }
+        }
+      }
+
       receiver: account(publicKey: $receiver_key, token: $token_id) {
         nonce
       }
@@ -244,7 +252,7 @@ module Metadata = struct
       { gql=
           (fun ?token_id:_ ~address ~receiver () ->
             Graphql.query
-              (Get_nonce.make
+              (Get_options_metadata.make
                  ~public_key:
                    (`String (Public_key.Compressed.to_base58_check address))
                    (* for now, nonce is based on the fee payer's account using the default token,
@@ -284,7 +292,7 @@ module Metadata = struct
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~graphql_uri
       in
-      let%map account =
+      let%bind account =
         match res#account with
         | None ->
             M.fail
@@ -300,11 +308,27 @@ module Metadata = struct
           account#nonce
         |> Option.value ~default:Unsigned.UInt32.zero
       in
-      let suggested_fee =
-        Amount_of.mina
-          (Mina_currency.Fee.to_uint64
-             Mina_compile_config.default_transaction_fee)
+      (* suggested fee *)
+      (* Take the average of the fees included in the last 5 blocks, and add an
+       * extra 0.04 MINA *)
+      let%map suggested_fee =
+        let open Unsigned.UInt64 in
+        let open Unsigned.UInt64.Infix in
+        let%map fees =
+          match res#bestChain with
+          | Some chain ->
+            chain |> Array.to_list
+              |> List.bind ~f:(fun block -> Array.to_list block#transactions#userCommands)
+              |> List.map ~f:(fun (`UserCommand cmd) -> of_string (match cmd#fee with `String s -> s | _ -> failwith "GraphQL endpoint is lying"))
+              |> M.return
+          | None ->
+              M.fail (Errors.create `Chain_info_missing)
+        in
+        let avg = (List.fold ~init:zero fees ~f:(+)) / (List.length fees |> of_int) in
+        let reasonably_large_extra_buffer = of_int 40_000_000 in
+        Amount_of.mina (avg + reasonably_large_extra_buffer)
       in
+      (* minimum fee : Pull this from the compile constants *)
       let amount_metadata =
         `Assoc
           [ ( "minimum_fee"
