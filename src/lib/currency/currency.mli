@@ -42,7 +42,10 @@ module Fee : sig
 
   [%%else]
 
-  module Signed : Signed_intf with type magnitude := t
+  module Signed :
+    Signed_intf
+      with type magnitude := t
+       and type signed_fee := (t, Sgn.t) Signed_poly.t
 
   [%%endif]
 
@@ -90,7 +93,8 @@ module Amount : sig
 
   [%%else]
 
-  module Signed : Signed_intf with type magnitude := t
+  module Signed :
+    Signed_intf with type magnitude := t and type signed_fee := Fee.Signed.t
 
   [%%endif]
 
