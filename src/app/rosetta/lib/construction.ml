@@ -20,7 +20,7 @@ module Get_options_metadata =
       bestChain(maxLength: 5) {
         transactions {
           userCommands {
-            fee
+            fee @bsDecoder(fn: "Decoders.uint64")
           }
         }
       }
@@ -131,16 +131,17 @@ mutation ($sender: PublicKey!,
 |}]
 
 module Options = struct
-  type t = {sender: Public_key.Compressed.t; token_id: Unsigned.UInt64.t; receiver: Public_key.Compressed.t}
+  type t = {sender: Public_key.Compressed.t; token_id: Unsigned.UInt64.t; receiver: Public_key.Compressed.t; valid_until: Unsigned_extended.UInt32.t option}
 
   module Raw = struct
-    type t = {sender: string; token_id: string; receiver: string} [@@deriving yojson]
+    type t = {sender: string; token_id: string; receiver: string; valid_until: string option} [@@deriving yojson]
   end
 
   let to_json t =
     { Raw.sender= Public_key.Compressed.to_base58_check t.sender
     ; token_id= Unsigned.UInt64.to_string t.token_id
-    ; receiver= Public_key.Compressed.to_base58_check t.receiver }
+    ; receiver= Public_key.Compressed.to_base58_check t.receiver
+    ; valid_until= Option.map ~f:Unsigned_extended.UInt32.to_string t.valid_until }
     |> Raw.to_yojson
 
   let of_json r =
@@ -164,7 +165,7 @@ module Options = struct
              |> Result.map_error ~f:(e "receiver")
            in
 
-           {sender; token_id= Unsigned.UInt64.of_string r.token_id; receiver} )
+           {sender; token_id= Unsigned.UInt64.of_string r.token_id; receiver; valid_until= Option.map ~f:Unsigned_extended.UInt32.of_string r.valid_until} )
 end
 
 (* TODO: unify handling of json between this and Options (above) and everything else in rosetta *)
@@ -175,11 +176,12 @@ module Metadata_data = struct
     ; token_id: Unsigned_extended.UInt64.t
     ; receiver: string
     ; account_creation_fee: Unsigned_extended.UInt64.t option
+    ; valid_until: Unsigned_extended.UInt32.t option
     }
   [@@deriving yojson]
 
-  let create ~nonce ~sender ~token_id ~receiver ~account_creation_fee =
-    {sender= Public_key.Compressed.to_base58_check sender; nonce; token_id; receiver = Public_key.Compressed.to_base58_check receiver ; account_creation_fee}
+  let create ~nonce ~sender ~token_id ~receiver ~account_creation_fee ~valid_until =
+    {sender= Public_key.Compressed.to_base58_check sender; nonce; token_id; receiver = Public_key.Compressed.to_base58_check receiver ; account_creation_fee ; valid_until }
 
   let of_json r =
     of_yojson r
@@ -319,7 +321,7 @@ module Metadata = struct
           | Some chain ->
             chain |> Array.to_list
               |> List.bind ~f:(fun block -> Array.to_list block#transactions#userCommands)
-              |> List.map ~f:(fun (`UserCommand cmd) -> of_string (match cmd#fee with `String s -> s | _ -> failwith "GraphQL endpoint is lying"))
+              |> List.map ~f:(fun (`UserCommand cmd) -> cmd#fee)
               |> M.return
           | None ->
               M.fail (Errors.create `Chain_info_missing)
@@ -340,7 +342,7 @@ module Metadata = struct
       let constraint_constants = Genesis_constants.Constraint_constants.compiled in
       { Construction_metadata_response.metadata=
           Metadata_data.create ~sender:options.Options.sender
-            ~token_id:options.Options.token_id ~nonce ~receiver:options.receiver ~account_creation_fee:(Option.map res#receiver ~f:(fun _ -> Mina_currency.Fee.to_uint64 constraint_constants.account_creation_fee))
+            ~token_id:options.Options.token_id ~nonce ~receiver:options.receiver ~account_creation_fee:(Option.map res#receiver ~f:(fun _ -> Mina_currency.Fee.to_uint64 constraint_constants.account_creation_fee)) ~valid_until:options.valid_until
           |> Metadata_data.to_yojson
       ; suggested_fee= [{suggested_fee with metadata= Some amount_metadata}] }
   end
@@ -350,6 +352,18 @@ module Metadata = struct
 end
 
 module Preprocess = struct
+  module Metadata = struct
+    type t =
+      { valid_until: Unsigned_extended.UInt32.t option }
+      [@@deriving yojson]
+
+    let of_json r =
+      of_yojson r
+      |> Result.map_error ~f:(fun e ->
+             Errors.create ~context:"Preprocess metadata of_json" (`Json_parse (Some e)) )
+
+  end
+
   module Env = struct
     module T (M : Monad_fail.S) = struct
       type t = {lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t}
@@ -371,6 +385,13 @@ module Preprocess = struct
 
     let handle ~(env : Env.T(M).t) (req : Construction_preprocess_request.t) =
       let open M.Let_syntax in
+      let%bind metadata =
+        match req.metadata with
+        | Some json ->
+            Metadata.of_json json |> env.lift |> M.map ~f:Option.return
+        | None ->
+            M.return None
+      in
       let%bind partial_user_command =
         User_command_info.of_operations req.operations
         |> lift_reason_validation_to_errors ~env
@@ -389,6 +410,7 @@ module Preprocess = struct
                { Options.sender
                ; token_id= partial_user_command.User_command_info.Partial.token
                ; receiver
+               ; valid_until= Option.bind ~f:(fun m -> m.valid_until) metadata
                })
       ; required_public_keys= [] }
   end
@@ -430,7 +452,7 @@ module Payloads = struct
                  (`Json_parse None))
       in
       let%bind partial_user_command =
-        User_command_info.of_operations req.operations
+        User_command_info.of_operations ?valid_until:metadata.valid_until req.operations
         |> lift_reason_validation_to_errors ~env
       in
       let%bind pk =
