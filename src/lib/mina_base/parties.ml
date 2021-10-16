@@ -475,3 +475,27 @@ let commitment (t : t) : Transaction_commitment.t =
     ~protocol_state_predicate_hash:
       (Snapp_predicate.Protocol_state.digest t.protocol_state)
     ~memo_hash:(Signed_command_memo.hash t.memo)
+
+(** This module defines weights for each component of a `Parties.t` element. *)
+module Weight = struct
+  let party : Party.t -> int = fun _ -> 1
+
+  let fee_payer (fp : Party.Signed.t) : int = Party.of_signed fp |> party
+
+  let other_parties : Party.t list -> int = List.sum (module Int) ~f:party
+
+  let protocol_state : Snapp_predicate.Protocol_state.t -> int = fun _ -> 0
+
+  let memo : Signed_command_memo.t -> int = fun _ -> 0
+end
+
+let weight (parties : t) : int =
+  let { fee_payer; other_parties; protocol_state; memo } = parties in
+  List.sum
+    (module Int)
+    ~f:Fn.id
+    [ Weight.fee_payer fee_payer
+    ; Weight.other_parties other_parties
+    ; Weight.protocol_state protocol_state
+    ; Weight.memo memo
+    ]

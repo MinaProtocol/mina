@@ -44,12 +44,18 @@ module Value = struct
     , Local_state.t )
     Stable.Latest.t
   [@@deriving compare, equal, sexp, yojson, hash]
-end
 
-module Without_pending_coinbase_stack = struct
-  type t =
-    (Frozen_ledger_hash.t, unit, Token_id.t, Local_state.t) Stable.Latest.t
-  [@@deriving compare, equal, sexp, yojson, hash]
+  let connected t t' =
+    let module Without_pending_coinbase_stack = struct
+      type t =
+        (Frozen_ledger_hash.t, unit, Token_id.t, Local_state.t) Stable.Latest.t
+      [@@deriving compare, equal, sexp, yojson, hash]
+    end in
+    Without_pending_coinbase_stack.equal
+      { t with pending_coinbase_stack = () }
+      { t' with pending_coinbase_stack = () }
+    && Pending_coinbase.Stack.connected ~first:t.pending_coinbase_stack
+         ~second:t'.pending_coinbase_stack ()
 end
 
 module Checked = struct
