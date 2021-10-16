@@ -3,7 +3,7 @@
 # add account creation fee of 1 Mina to blocks_internal_commands for internal commands, where
 # the balance is the command amount minus 1 Mina
 
-ARCHIVE=archive
+ARCHIVE=postgres://postgres:foobar@localhost:5432/archive
 TMPFILE=$(mktemp -t internal-cmd-acct-fee.XXXXX)
 
 psql $ARCHIVE <<EOF
