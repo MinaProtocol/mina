@@ -2,8 +2,11 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"hash/fnv"
+	"math"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -63,8 +66,69 @@ func badHash(data []byte) [32]byte {
 	}
 }
 
+type linkIxPair struct {
+	id BitswapBlockLink
+	ix int
+}
+
+func testSplitJoinPrefix(maxBlockSize int, data []byte) error {
+	blocks, root := SplitDataToBitswapBlocksLengthPrefixedWithHashF(maxBlockSize, badHash, data)
+	schema := MkBitswapBlockSchemaLengthPrefixed(maxBlockSize, len(data))
+	// len(blocks) < schema.totalBlocks is an ok case because some blocks and block subtrees
+	// may appear more than once in the tree (in case of data containing repeative subranges)
+	if len(blocks) > schema.totalBlocks {
+		return fmt.Errorf("mismatch of block count: %d > %d", len(blocks), schema.totalBlocks)
+	}
+	di := MkDepthIndices(schema.maxLinksPerBlock, schema.totalBlocks)
+	for q := []linkIxPair{{id: root}}; len(q) > 0; q = q[1:] {
+		id := q[0].id
+		ix := q[0].ix
+		block, hasBlock := blocks[id]
+		if !hasBlock {
+			return errors.New("unexpected no block")
+		}
+		if len(block) != schema.BlockSize(ix) {
+			return fmt.Errorf("block doesn't match schema: block size %d != %d",
+				len(block), schema.BlockSize(ix))
+		}
+		links, _, err := ReadBitswapBlock(block)
+		if err != nil {
+			return err
+		}
+		if len(links) != schema.LinkCount(ix) {
+			return fmt.Errorf("block doesn't match schema: link count %d != %d",
+				len(links), schema.LinkCount(ix))
+		}
+		fstChildIx := di.FirstChildId(ix)
+		if fstChildIx < 0 && len(links) > 0 {
+			return fmt.Errorf("wrong first child for %d", ix)
+		}
+		for i, link := range links {
+			q = append(q, linkIxPair{id: link, ix: fstChildIx + i})
+		}
+	}
+	res, err := JoinBitswapBlocks(blocks, root)
+	if err != nil {
+		return err
+	}
+	l := binary.LittleEndian.Uint32(res)
+	if int(l) != len(data) {
+		return errors.New("unexpected encoded length")
+	}
+	if !bytes.Equal(res[4:], data) {
+		return errors.New("unexpected result of join")
+	}
+	return nil
+}
+
 func testSplitJoin(maxBlockSize int, data []byte) error {
 	blocks, root := SplitDataToBitswapBlocksWithHashF(maxBlockSize, badHash, data)
+	schema := MkBitswapBlockSchema(maxBlockSize, len(data))
+	// len(blocks) < schema.totalBlocks is an ok case because some blocks and block subtrees
+	// may appear more than once in the tree (in case of data containing repeative subranges)
+	if len(blocks) > schema.totalBlocks {
+		return fmt.Errorf("mismatch of block count: %d > %d", len(blocks), schema.totalBlocks)
+	}
 	res, err := JoinBitswapBlocks(blocks, root)
 	if err != nil {
 		return err
@@ -86,36 +150,41 @@ func testSplitJoin(maxBlockSize int, data []byte) error {
 
 const louis = "I see trees of green, red roses too\nI see them bloom for me and you\nAnd I think to myself\nWhat a wonderful world\n\nI see skies of blue and clouds of white\nThe bright blessed days, the dark sacred nights\nAnd I think to myself\nWhat a wonderful world"
 
-func TestBitswapBlockSplitJoin(t *testing.T) {
-	require.NoError(t, testSplitJoin(40, []byte("Hello world!")))
-	require.NoError(t, testSplitJoin(40, []byte(louis)))
+func testBitswapBlockSplitJoinImpl(t *testing.T, testImpl func(int, []byte) error) {
+	require.NoError(t, testImpl(40, []byte("Hello world!")))
+	require.NoError(t, testImpl(40, []byte(louis)))
 	var data [65536 * 2 * 32]byte
 	chunk := badHash([]byte(louis))
 	copy(data[:], chunk[:])
-	for i := 1; i < len(data)<<5; i++ {
-		chunk = badHash(data[(i-1)>>5 : i>>5])
-		copy(data[i>>5:], chunk[:])
+	for i := 1; i < len(data)>>5; i++ {
+		chunk = badHash(data[(i-1)<<5 : i<<5])
+		copy(data[i<<5:], chunk[:])
 	}
-	require.NoError(t, testSplitJoin(64, data[:93]))
-	for i := 35; i <= 128; i++ {
+	require.NoError(t, testImpl(64, data[:93]))
+	for i := 39; i <= 128; i++ {
 		for j := 1; j <= 1000; j++ {
 			t.Logf("i=%d j=%d", i, j)
-			err := testSplitJoin(i, data[:j])
-			if err != nil {
-				t.Error(err)
-			}
+			err := testImpl(i, data[:j])
+			require.NoError(t, err)
 		}
 	}
-	require.NoError(t, testSplitJoin(65534*32, data[:]))
-	require.NoError(t, testSplitJoin(65535*32, data[:]))
-	require.NoError(t, testSplitJoin(65536*32, data[:]))
+	require.NoError(t, testImpl(65534*32, data[:]))
+	require.NoError(t, testImpl(65535*32, data[:]))
+	require.NoError(t, testImpl(65536*32, data[:]))
 	for i := 65533; i <= 65540; i++ {
 		for j := 65533; j <= 65540; j++ {
-			require.NoError(t, testSplitJoin(i*32, data[:j*32]))
+			require.NoError(t, testImpl(i*32, data[:j*32]))
 		}
 	}
-	require.NoError(t, testSplitJoin(65536*64, data[:]))
-	require.NoError(t, testSplitJoin(100000*32, data[:]))
+	require.NoError(t, testImpl(65536*64, data[:]))
+	require.NoError(t, testImpl(100000*32, data[:]))
+}
+func TestBitswapBlockSplitJoin(t *testing.T) {
+	testBitswapBlockSplitJoinImpl(t, testSplitJoin)
+}
+
+func TestBitswapBlockSplitJoinPrefix(t *testing.T) {
+	testBitswapBlockSplitJoinImpl(t, testSplitJoinPrefix)
 }
 
 type blockSplitJoinConfig struct {
@@ -134,7 +203,37 @@ func TestBitswapBlockSplitJoinQC(t *testing.T) {
 		err := testSplitJoin(c.maxBlockSize, c.data)
 		return err == nil
 	}
-	if err := quick.Check(f, nil); err != nil {
-		t.Error(err)
+	require.NoError(t, quick.Check(f, nil))
+}
+
+func TestBitswapBlockSplitJoinPrefixQC(t *testing.T) {
+	f := func(c blockSplitJoinConfig) bool {
+		err := testSplitJoinPrefix(c.maxBlockSize, c.data)
+		return err == nil
 	}
+	require.NoError(t, quick.Check(f, nil))
+}
+
+func TestDepthIndicesSequence(t *testing.T) {
+	lpb := LinksPerBlock(1 << 18)
+	di := MkDepthIndices(lpb, math.MaxInt32)
+	lastIx := 0
+	for id := 0; id < 10000000; id++ {
+		fstChild := di.FirstChildId(id)
+		if lastIx+1 == fstChild {
+			lastIx = lastIx + lpb
+		} else {
+			t.Fatalf("Unexpected first child %d for id %d", fstChild, id)
+		}
+	}
+}
+
+func TestDepth3(t *testing.T) {
+	di := MkDepthIndices(3, 100)
+	require.Equal(t, di.FirstChildId(0), 1)
+	require.Equal(t, di.FirstChildId(1), 4)
+	require.Equal(t, di.FirstChildId(2), 7)
+	require.Equal(t, di.FirstChildId(3), 10)
+	require.Equal(t, di.FirstChildId(4), 13)
+	require.Equal(t, di.FirstChildId(5), 16)
 }

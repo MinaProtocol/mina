@@ -19,7 +19,10 @@ func (m AddResourcePush) handle(app *app) {
 		app.P2p.Logger.Errorf("AddResourcePush.handle: error %w", err)
 		return
 	}
-	app.bitswapCtx.addCmds <- bitswapAddCmd{d}
+	app.bitswapCtx.addCmds <- bitswapAddCmd{
+		tag:  BitswapDataTag(AddResourcePushT(m).Tag()),
+		data: d,
+	}
 }
 
 type DeleteResourcePushT = ipc.Libp2pHelperInterface_DeleteResource
@@ -78,5 +81,8 @@ func (m DownloadResourcePush) handle(app *app) {
 		app.P2p.Logger.Errorf("DownloadResourcePush.handle: error %w", err)
 		return
 	}
-	app.bitswapCtx.downloadCmds <- bitswapDownloadCmd{links}
+	app.bitswapCtx.downloadCmds <- bitswapDownloadCmd{
+		rootIds: links,
+		tag:     BitswapDataTag(DownloadResourcePushT(m).Tag()),
+	}
 }
