@@ -3374,6 +3374,8 @@ end
 module type S = sig
   include Verification.S
 
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
   val cache_handle : Pickles.Cache_handle.t
 
   val of_non_parties_transaction :
@@ -3404,6 +3406,24 @@ module type S = sig
 
   val merge :
     t -> t -> sok_digest:Sok_message.Digest.t -> t Async.Deferred.Or_error.t
+
+  val group_by_parties_rev :
+       Party.t list list
+    -> 'a list list
+    -> ([ `Same | `New | `Two_new ] * Parties_segment.Basic.t * 'a * 'a) list
+
+  val parties_witnesses_exn :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> state_body:Transaction_protocol_state.Block_data.t
+    -> fee_excess:Currency.Amount.Signed.t
+    -> pending_coinbase_init_stack:Pending_coinbase.Stack.t
+    -> [ `Ledger of Ledger.t | `Sparse_ledger of Sparse_ledger.t ]
+    -> Parties.t list
+    -> ( Parties_segment.Witness.t
+       * Parties_segment.Basic.t
+       * Statement.With_sok.t
+       * (int * Snapp_statement.t) list )
+       list
 end
 
 let check_transaction_union ?(preeval = false) ~constraint_constants sok_message
@@ -3574,7 +3594,7 @@ let constraint_system_digests ~constraint_constants () =
     will need to be passed as part of the snark witness while applying that
     pair.
 *)
-let group_by_parties_rev partiess stmtss =
+let group_by_parties_rev' partiess stmtss =
   let rec group_by_parties_rev partiess stmtss acc =
     match (partiess, stmtss) with
     | ([] | [ [] ]), [ _ ] ->
@@ -3743,11 +3763,15 @@ let group_by_parties_rev partiess stmtss =
   in
   group_by_parties_rev partiess stmtss []
 
-let parties_witnesses ~constraint_constants ~state_body ~fee_excess
+let parties_witnesses_exn' ~constraint_constants ~state_body ~fee_excess
     ~pending_coinbase_init_stack ledger partiess =
   let sparse_ledger =
-    Sparse_ledger.of_ledger_subset_exn ledger
-      (List.concat_map ~f:Parties.accounts_accessed partiess)
+    match ledger with
+    | `Ledger ledger ->
+        Sparse_ledger.of_ledger_subset_exn ledger
+          (List.concat_map ~f:Parties.accounts_accessed partiess)
+    | `Sparse_ledger sparse_ledger ->
+        sparse_ledger
   in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
@@ -3764,7 +3788,7 @@ let parties_witnesses ~constraint_constants ~state_body ~fee_excess
   in
   let states = List.rev states_rev in
   let states_rev =
-    group_by_parties_rev
+    group_by_parties_rev'
       ([] :: List.map ~f:Parties.parties partiess)
       ([ List.hd_exn (List.hd_exn states) ] :: states)
   in
@@ -3920,6 +3944,8 @@ module Make (Inputs : sig
 end) =
 struct
   open Inputs
+
+  let constraint_constants = constraint_constants
 
   let ( tag
       , cache_handle
@@ -4109,6 +4135,10 @@ struct
 
   let constraint_system_digests =
     lazy (constraint_system_digests ~constraint_constants ())
+
+  let parties_witnesses_exn = parties_witnesses_exn'
+
+  let group_by_parties_rev = group_by_parties_rev'
 end
 
 let%test_module "transaction_snark" =
@@ -4510,9 +4540,9 @@ let%test_module "transaction_snark" =
 
     let apply_parties ledger parties =
       let witnesses =
-        parties_witnesses ~constraint_constants ~state_body
+        parties_witnesses_exn ~constraint_constants ~state_body
           ~fee_excess:Amount.Signed.zero ~pending_coinbase_init_stack:init_stack
-          ledger parties
+          (`Ledger ledger) parties
       in
       let open Impl in
       List.fold ~init:((), ()) witnesses

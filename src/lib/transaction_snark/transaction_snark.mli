@@ -435,6 +435,8 @@ end
 module type S = sig
   include Verification.S
 
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
   val cache_handle : Pickles.Cache_handle.t
 
   val of_non_parties_transaction :
@@ -465,9 +467,8 @@ module type S = sig
 
   val merge :
     t -> t -> sok_digest:Sok_message.Digest.t -> t Async.Deferred.Or_error.t
-end
 
-(** [group_by_parties_rev partiess stmtss] identifies before/after pairs of
+  (** [group_by_parties_rev partiess stmtss] identifies before/after pairs of
     statements, corresponding to parties in [partiess] which minimize the
     number of snark proofs needed to prove all of the parties.
 
@@ -488,12 +489,12 @@ end
     will need to be passed as part of the snark witness while applying that
     pair.
 *)
-val group_by_parties_rev :
-     Party.t list list
-  -> 'a list list
-  -> ([ `Same | `New | `Two_new ] * Parties_segment.Basic.t * 'a * 'a) list
+  val group_by_parties_rev :
+       Party.t list list
+    -> 'a list list
+    -> ([ `Same | `New | `Two_new ] * Parties_segment.Basic.t * 'a * 'a) list
 
-(** [parties_witnesses ledger partiess] generates the parties segment witnesses
+  (** [parties_witnesses_exn ledger partiess] generates the parties segment witnesses
     and corresponding statements needed to prove the application of each
     parties transaction in [partiess] on top of ledger. If multiple parties are
     given, they are applied in order and grouped together to minimise the
@@ -514,18 +515,19 @@ val group_by_parties_rev :
     should only be used on parties that are already known to pass transaction
     logic without an exception.
 *)
-val parties_witnesses :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> state_body:Transaction_protocol_state.Block_data.t
-  -> fee_excess:Currency.Amount.Signed.t
-  -> pending_coinbase_init_stack:Pending_coinbase.Stack.t
-  -> Ledger.t
-  -> Parties.t list
-  -> ( Parties_segment.Witness.t
-     * Parties_segment.Basic.t
-     * Statement.With_sok.t
-     * (int * Snapp_statement.t) list )
-     list
+  val parties_witnesses_exn :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> state_body:Transaction_protocol_state.Block_data.t
+    -> fee_excess:Currency.Amount.Signed.t
+    -> pending_coinbase_init_stack:Pending_coinbase.Stack.t
+    -> [ `Ledger of Ledger.t | `Sparse_ledger of Sparse_ledger.t ]
+    -> Parties.t list
+    -> ( Parties_segment.Witness.t
+       * Parties_segment.Basic.t
+       * Statement.With_sok.t
+       * (int * Snapp_statement.t) list )
+       list
+end
 
 module Make (Inputs : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t

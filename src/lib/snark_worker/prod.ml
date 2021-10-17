@@ -91,12 +91,47 @@ module Inputs = struct
               | Work.Single.Spec.Transition (input, (w : Transaction_witness.t))
                 ->
                   process (fun () ->
-                      match w with
-                      | Parties_segment witness ->
-                          Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                              M.of_parties_segment_exn
-                                ~statement:{ input with sok_digest } ~witness)
-                      | Non_parties w ->
+                      match w.transaction with
+                      | Command (Parties parties) ->
+                          let witnesses_specs_stmts =
+                            M.parties_witnesses_exn
+                              ~constraint_constants:M.constraint_constants
+                              ~state_body:w.protocol_state_body
+                              ~fee_excess:Currency.Amount.Signed.zero
+                              ~pending_coinbase_init_stack:w.init_stack
+                              (`Sparse_ledger w.ledger) [ parties ]
+                          in
+                          let deferred_or_error d =
+                            Deferred.map d ~f:(fun p -> Ok p)
+                          in
+                          Deferred.Or_error.try_with_join ~here:[%here]
+                            (fun () ->
+                              match witnesses_specs_stmts with
+                              | [] ->
+                                  failwith "no witnesses generated"
+                              | (witness, _spec, stmt, _) :: rest ->
+                                  let%bind (p1 : Ledger_proof.t) =
+                                    M.of_parties_segment_exn
+                                      ~statement:{ stmt with sok_digest }
+                                      ~witness
+                                    |> deferred_or_error
+                                  in
+                                  let%map (p : Ledger_proof.t) =
+                                    Deferred.List.fold ~init:(Ok p1) rest
+                                      ~f:(fun acc (witness, _spec, stmt, _) ->
+                                        let%bind (prev : Ledger_proof.t) =
+                                          Deferred.return acc
+                                        in
+                                        let%bind (curr : Ledger_proof.t) =
+                                          M.of_parties_segment_exn
+                                            ~statement:{ stmt with sok_digest }
+                                            ~witness
+                                          |> deferred_or_error
+                                        in
+                                        M.merge ~sok_digest prev curr)
+                                  in
+                                  p)
+                      | _ ->
                           let%bind t =
                             Deferred.return
                             @@
@@ -110,8 +145,8 @@ module Inputs = struct
                                 | None ->
                                     Or_error.errorf
                                       "Command has an invalid signature" )
-                            | Command (Parties cmd) ->
-                                Ok (Command (Parties cmd))
+                            | Command (Parties _) ->
+                                assert false
                             | Fee_transfer ft ->
                                 Ok (Fee_transfer ft)
                             | Coinbase cb ->

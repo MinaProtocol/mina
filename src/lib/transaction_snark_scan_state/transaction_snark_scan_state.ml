@@ -857,39 +857,12 @@ let all_work_pairs t
             | Merge ->
                 Or_error.error_string "init_stack was Merge"
           in
-          match transaction with
-          | Transaction.Command (Parties c) ->
-              let transaction_commitment = Parties.commitment c in
-              let start_parties : _ Parties_logic.Start_data.t =
-                { parties = c
-                ; protocol_state_predicate = c.protocol_state
-                ; memo_hash = Signed_command_memo.hash c.memo
-                }
-              in
-              Transaction_witness.Parties_segment
-                { Transaction_witness.Parties_segment_witness.global_ledger =
-                    ledger_witness
-                ; local_state_init =
-                    { Parties_logic.Local_state.parties = []
-                    ; call_stack = []
-                    ; transaction_commitment
-                    ; token_id = Token_id.invalid
-                    ; excess = Currency.Amount.zero
-                    ; ledger = ledger_witness
-                    ; success = true
-                    }
-                ; start_parties = [ start_parties ]
-                ; state_body = protocol_state_body
-                ; init_stack
-                }
-          | _ ->
-              Non_parties
-                { ledger = ledger_witness
-                ; transaction
-                ; protocol_state_body
-                ; init_stack
-                ; status
-                }
+          { Transaction_witness.ledger = ledger_witness
+          ; transaction
+          ; protocol_state_body
+          ; init_stack
+          ; status
+          }
         in
         Snark_work_lib.Work.Single.Spec.Transition (statement, witness)
     | Second (p1, p2) ->
