@@ -2,8 +2,11 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
+	"sort"
 
 	"golang.org/x/crypto/blake2b"
 )
@@ -18,12 +21,161 @@ func SplitDataToBitswapBlocks(maxBlockSize int, data []byte) (map[BitswapBlockLi
 	}, data)
 }
 
+type BitswapBlockSchema struct {
+	totalBlocks              int
+	fullLinkBlocks           int
+	nonMaxLinkBlockLinkCount int
+	lastBlockDataSize        int
+	maxBlockSize             int
+	maxLinksPerBlock         int
+}
+
+// ReadBitswapRootBlockLengthPrefixed tries to read root block from the given bytes.
+// It assumes data section to be at least 4 bytes long and interprets first 4 bytes of data as
+// length of the whole data blob encoded into block tree associated with the given root block.
+func ReadBitswapRootBlockLengthPrefixed(block []byte) (links []BitswapBlockLink, data []byte, length int, err error) {
+	links, data, err = ReadBitswapBlock(block)
+	if err == nil {
+		if len(data) < 4 {
+			err = errors.New("data less than 4 bytes long")
+			return
+		}
+		length = int(binary.LittleEndian.Uint32(data))
+		data = data[4:]
+	}
+	return
+}
+
+func SplitDataToBitswapBlocksLengthPrefixedWithTag(maxBlockSize int, data []byte, tag BitswapDataTag) (map[BitswapBlockLink][]byte, BitswapBlockLink) {
+	return SplitDataToBitswapBlocksLengthPrefixed(maxBlockSize, append([]byte{byte(tag)}, data...))
+}
+
+func SplitDataToBitswapBlocksLengthPrefixed(maxBlockSize int, data []byte) (map[BitswapBlockLink][]byte, BitswapBlockLink) {
+	return SplitDataToBitswapBlocksLengthPrefixedWithHashF(maxBlockSize, func(b []byte) BitswapBlockLink {
+		return blake2b.Sum256(b)
+	}, data)
+}
+
+// SplitDataToBitswapBlocksLengthPrefixedWithHashF provides a special version of block encoding
+// in which first 4 bytes of data is length of the rest of data
+// This extension of format allows to provide stronger guarantees on encoding, especially
+// in the case when not all of the blocks are available at once.
+func SplitDataToBitswapBlocksLengthPrefixedWithHashF(maxBlockSize int, hashF func([]byte) BitswapBlockLink, data []byte) (map[BitswapBlockLink][]byte, BitswapBlockLink) {
+	if maxBlockSize < 2+BITSWAP_BLOCK_LINK_SIZE+4 {
+		panic("Max block size too small")
+	}
+	if len(data) > math.MaxUint32 {
+		panic("data too large")
+	}
+	l := uint32(len(data))
+	dataWL := make([]byte, len(data)+4)
+	binary.LittleEndian.PutUint32(dataWL, l)
+	copy(dataWL[4:], data)
+	return SplitDataToBitswapBlocksWithHashF(maxBlockSize, hashF, dataWL)
+}
+
 func LinksPerBlock(maxBlockSize int) int {
 	linksPerBlock := (maxBlockSize - 2) / BITSWAP_BLOCK_LINK_SIZE
 	if linksPerBlock > 65535 {
 		linksPerBlock = 65535
 	}
 	return linksPerBlock
+}
+
+// DepthIndices is a data structure that keeps indicies
+// of left-most vertex on each depth of a block tree
+type DepthIndices struct {
+	indices       []int
+	linksPerBlock int
+}
+
+// MkDepthIndices calculates DepthIndices for a given number of links per block
+// up to a maximum number of blocks in Bitswap tree
+// This structure can be pre-computed and used for all of processing
+// with the same `linksPerBlock` parameter
+func MkDepthIndices(linksPerBlock, maxTotalBlocks int) DepthIndices {
+	res := []int{0}
+	for val := 1; res[len(res)-1]+val < maxTotalBlocks; val = val * linksPerBlock {
+		res = append(res, res[len(res)-1]+val)
+	}
+	return DepthIndices{indices: res, linksPerBlock: linksPerBlock}
+}
+
+func MkBitswapBlockSchemaLengthPrefixed(maxBlockSize int, dataLength int) BitswapBlockSchema {
+	return MkBitswapBlockSchema(maxBlockSize, dataLength+4)
+}
+func MkBitswapBlockSchema(maxBlockSize int, dataLength int) BitswapBlockSchema {
+	// `n` is the total number of bitswap blocks
+	//   formula for `n` is derived as follows
+	//   (for s_i the data part of bitswap block i,
+	//   l_i the number of links in the block i):
+	//      1. 2 + LINK_SIZE * l_i + s_i <= maxBlockSize
+	//      2. sum_i{1..n} ( 2 + LINK_SIZE * l_i + s_i ) <= n * maxBlockSize
+	//      3. sum_i{1..n} l_i = n - 1 (as each block is referenced by
+	//         a single link and root block is referenced by none)
+	//      4. sum_i{1..n} s_i = len(data) (sum of all data parts is
+	//         equal to the size of the data blob)
+	//      5. 2 * n + LINK_SIZE * (n - 1) + len(data) <= n * maxBlockSize
+	//         (following from 2., 3. and 4.)
+	//      6. n >= (len(data) - LINK_SIZE) / (maxBlockSize - LINK_SIZE - 2)
+	n := 1
+	if dataLength > maxBlockSize-2 {
+		n1 := dataLength - BITSWAP_BLOCK_LINK_SIZE
+		n2 := maxBlockSize - BITSWAP_BLOCK_LINK_SIZE - 2
+		n = n1 / n2
+		if n1%n2 > 0 {
+			n++
+		}
+	}
+	// calculate size of the data chunk in the last block
+	//   note that by definition last block contains no links
+	//   to calculate last block data chunk size, we subtract
+	//   amount of data fit in first (n - 1) blocks from total
+	//   length of data
+	lastBlockDataSz := dataLength - (maxBlockSize-BITSWAP_BLOCK_LINK_SIZE-2)*(n-1)
+	// Maximum number of links that can fit in a single Bitswap block
+	linksPerBlock := LinksPerBlock(maxBlockSize)
+	// number of bitswap blocks containing exactly
+	// `linksPerBlock` links
+	fullLinkBlocks := (n - 1) / linksPerBlock
+	return BitswapBlockSchema{
+		totalBlocks:              n,
+		lastBlockDataSize:        lastBlockDataSz,
+		fullLinkBlocks:           fullLinkBlocks,
+		nonMaxLinkBlockLinkCount: (n - 1) % linksPerBlock,
+		maxBlockSize:             maxBlockSize,
+		maxLinksPerBlock:         linksPerBlock,
+	}
+}
+
+// FirstChildId returns id of the first child of a node with id.
+// Subsequent children of the node will occupy following sequential numbers.
+func (di *DepthIndices) FirstChildId(id int) int {
+	ixs := di.indices
+	depth := sort.Search(len(ixs), func(i int) bool {
+		return ixs[i] > id
+	})
+	if depth >= len(ixs) || depth == 0 {
+		return -1
+	}
+	return ixs[depth] + (id-ixs[depth-1])*di.linksPerBlock
+}
+
+func (schema *BitswapBlockSchema) BlockSize(id int) int {
+	if id == schema.totalBlocks-1 {
+		return schema.lastBlockDataSize + 2
+	}
+	return schema.maxBlockSize
+}
+
+func (schema *BitswapBlockSchema) LinkCount(id int) int {
+	if id < schema.fullLinkBlocks {
+		return schema.maxLinksPerBlock
+	}
+	if id == schema.fullLinkBlocks {
+		return schema.nonMaxLinkBlockLinkCount
+	}
+	return 0
 }
 
 // Split data blob to a series of bitswap
@@ -51,36 +203,11 @@ func SplitDataToBitswapBlocksWithHashF(maxBlockSize int, hashF func([]byte) Bits
 		panic("Max block size too small")
 	}
 	// Maximum number of links that can fit in a single Bitswap block
-	linksPerBlock := LinksPerBlock(maxBlockSize)
-	// `n` is the total number of bitswap blocks
-	//   formula for `n` is derived as follows
-	//   (for s_i the data part of bitswap block i,
-	//   l_i the number of links in the block i):
-	//      1. 2 + LINK_SIZE * l_i + s_i <= maxBlockSize
-	//      2. sum_i{1..n} ( 2 + LINK_SIZE * l_i + s_i ) <= n * maxBlockSize
-	//      3. sum_i{1..n} l_i = n - 1 (as each block is referenced by
-	//         a single link and root block is referenced by none)
-	//      4. sum_i{1..n} s_i = len(data) (sum of all data parts is
-	//         equal to the size of the data blob)
-	//      5. 2 * n + LINK_SIZE * (n - 1) + len(data) <= n * maxBlockSize
-	//         (following from 2., 3. and 4.)
-	//      6. n >= (len(data) - LINK_SIZE) / (maxBlockSize - LINK_SIZE - 2)
-	n := 1
-	if len(data) > maxBlockSize-2 {
-		n1 := len(data) - BITSWAP_BLOCK_LINK_SIZE
-		n2 := maxBlockSize - BITSWAP_BLOCK_LINK_SIZE - 2
-		n = n1 / n2
-		if n1%n2 > 0 {
-			n++
-		}
-	}
-	// calculate size of the data chunk in the last block
-	//   note that by definition last block contains no links
-	//   to calculate last block data chunk size, we subtract
-	//   amount of data fit in first (n - 1) blocks from total
-	//   length of data
-
-	lastBlockDataSz := len(data) - (maxBlockSize-BITSWAP_BLOCK_LINK_SIZE-2)*(n-1)
+	schema := MkBitswapBlockSchema(maxBlockSize, len(data))
+	linksPerBlock := schema.maxLinksPerBlock
+	n := schema.totalBlocks
+	fullLinkBlocks := schema.fullLinkBlocks
+	lRem := schema.nonMaxLinkBlockLinkCount
 
 	res := make(map[BitswapBlockLink][]byte)
 	queue := make([]BitswapBlockLink, 0, n)
@@ -91,13 +218,12 @@ func SplitDataToBitswapBlocksWithHashF(maxBlockSize int, hashF func([]byte) Bits
 			panic("DataToBlocks: invalid block produced")
 		}
 		block := make([]byte, sz)
-		block[0] = byte(l >> 8)
-		block[1] = byte(l & 0xFF)
+		binary.LittleEndian.PutUint16(block, uint16(l))
 		for i_ := range links {
 			// We iterate links in reverse order as they were
 			// taken out of queue which has the order reversed
 			i := len(links) - i_ - 1
-			copy(block[2+BITSWAP_BLOCK_LINK_SIZE*i:], links[i][:])
+			copy(block[2+BITSWAP_BLOCK_LINK_SIZE*i:], links[i_][:])
 		}
 		copy(block[2+l*BITSWAP_BLOCK_LINK_SIZE:], chunk)
 		blockLink := hashF(block)
@@ -106,17 +232,13 @@ func SplitDataToBitswapBlocksWithHashF(maxBlockSize int, hashF func([]byte) Bits
 	}
 
 	// end of data not yet allocated to some block
-	dataEnd := len(data) - lastBlockDataSz
+	dataEnd := len(data) - schema.lastBlockDataSize
 	addBlock([]BitswapBlockLink{}, data[dataEnd:])
 
 	if n > 1 {
 		// number of bitswap blocks containing exactly
-		// `linksPerBlock` links
-		fullLinkBlocks := (n - 1) / linksPerBlock
-		// number of bitswap blocks containing exactly
 		// `maxBlockSize - 2` bytes of data
 		dataBlocks := n - fullLinkBlocks - 1
-		lRem := (n - 1) % linksPerBlock
 		if lRem > 0 {
 			dataBlocks--
 		}
@@ -148,7 +270,7 @@ func SplitDataToBitswapBlocksWithHashF(maxBlockSize int, hashF func([]byte) Bits
 // Parses block
 func ReadBitswapBlock(block []byte) ([]BitswapBlockLink, []byte, error) {
 	if len(block) >= 2 {
-		l := (int(block[0]) << 8) | int(block[1])
+		l := int(binary.LittleEndian.Uint16(block))
 		prefix := BITSWAP_BLOCK_LINK_SIZE*l + 2
 		if len(block) >= prefix {
 			links := make([]BitswapBlockLink, l)

@@ -3,7 +3,9 @@ package main
 import (
 	"codanet"
 	"context"
+	"fmt"
 	ipc "libp2p_ipc"
+	"math"
 	"time"
 
 	"capnproto.org/go/capnp/v3"
@@ -22,14 +24,36 @@ type bitswapDeleteCmd struct {
 }
 
 type bitswapAddCmd struct {
+	tag  BitswapDataTag
 	data []byte
 }
 
 type bitswapDownloadCmd struct {
+	tag     BitswapDataTag
 	rootIds []BitswapBlockLink
 }
 
 type root BitswapBlockLink
+
+// IsValidMaxBlockSize checks that maxBlobSize is not too short
+// and has padding that allows to store at least 5 bytes of data in root
+// block even in case of root block being full occupied with links
+// P.S. all multiples of 32b are valid
+func IsValidMaxBlockSize(maxBlobSize int) bool {
+	return maxBlobSize >= 7+BITSWAP_BLOCK_LINK_SIZE && (maxBlobSize-2)%BITSWAP_BLOCK_LINK_SIZE >= 5
+}
+
+type BitswapDataTag byte
+
+const (
+	BlockBodyTag BitswapDataTag = iota
+	// EpochLedger // uncomment in future to serve epoch ledger via Bitswap
+)
+
+type BitswapDataConfig = struct {
+	maxSize         int
+	downloadTimeout time.Duration
+}
 
 type BitswapCtx struct {
 	downloadCmds        chan bitswapDownloadCmd
@@ -43,27 +67,28 @@ type BitswapCtx struct {
 	rootDownloadStates  map[root]*RootDownloadState
 	deadlineChan        chan root
 	outMsgChan          chan<- *capnp.Message
-	rootDownloadTimeout time.Duration
 	maxBlockSize        int
-	maxBlockTreeDepth   int
+	dataConfig          map[BitswapDataTag]BitswapDataConfig
+	depthIndices        DepthIndices
 }
 
 type ChildDownloadParams struct {
-	root  root
-	depth int
+	root root
+	id   int
 }
 
 type RootDownloadState struct {
-	notVisited              *cid.Set
-	allDescedants           *cid.Set
-	session                 exchange.Fetcher
-	ctx                     context.Context
-	cancelF                 context.CancelFunc
-	treeDepth               int // either 0 or depth of block tree for the root
-	processedNonMaxSizeNode bool
+	notVisited    *cid.Set
+	allDescedants *cid.Set
+	session       exchange.Fetcher
+	ctx           context.Context
+	cancelF       context.CancelFunc
+	schema        *BitswapBlockSchema
+	tag           BitswapDataTag
 }
 
 func NewBitswapCtx(ctx context.Context, outMsgChan chan<- *capnp.Message) *BitswapCtx {
+	maxBlockSize := 1 << 18 // 256 KiB
 	return &BitswapCtx{
 		downloadCmds:        make(chan bitswapDownloadCmd, 100),
 		addCmds:             make(chan bitswapAddCmd, 100),
@@ -74,9 +99,14 @@ func NewBitswapCtx(ctx context.Context, outMsgChan chan<- *capnp.Message) *Bitsw
 		blockSink:           make(chan blocks.Block, 100),
 		deadlineChan:        make(chan root, 100),
 		outMsgChan:          outMsgChan,
-		rootDownloadTimeout: time.Minute * 10,
-		maxBlockTreeDepth:   2,
-		maxBlockSize:        1 << 18,
+		maxBlockSize:        maxBlockSize,
+		dataConfig: map[BitswapDataTag]BitswapDataConfig{
+			BlockBodyTag: {
+				maxSize:         1 << 26, // 64 MiB
+				downloadTimeout: time.Minute * 10,
+			},
+		},
+		depthIndices: MkDepthIndices(LinksPerBlock(maxBlockSize), math.MaxInt32),
 	}
 }
 
@@ -165,12 +195,16 @@ func (bs *BitswapCtx) sendResourceUpdate(type_ ipc.ResourceUpdateType, roots ...
 	}
 }
 
-func (bs *BitswapCtx) kickStartRootDownload(root BitswapBlockLink) {
+func (bs *BitswapCtx) kickStartRootDownload(root BitswapBlockLink, tag BitswapDataTag) {
 	rootCid := codanet.BlockHashToCid(root)
 	_, has := bs.childDownloadParams[rootCid]
 	if has {
 		bitswapLogger.Debugf("Skipping download request for %s (downloading already in progress)", codanet.BlockHashToCid(root))
 		return // downloading already in progress
+	}
+	_, hasDC := bs.dataConfig[tag]
+	if !hasDC {
+		bitswapLogger.Errorf("Tag %d is not supported by Bitswap downloader", tag)
 	}
 	err := bs.storage.SetStatus(root, codanet.Partial)
 	if err != nil {
@@ -185,11 +219,11 @@ func (bs *BitswapCtx) kickStartRootDownload(root BitswapBlockLink) {
 	s2 := cid.NewSet()
 	s1.Add(rootCid)
 	s2.Add(rootCid)
-	ctx, cancelF := context.WithTimeout(bs.ctx, bs.rootDownloadTimeout)
+	downloadTimeout := bs.dataConfig[tag].downloadTimeout
+	ctx, cancelF := context.WithTimeout(bs.ctx, downloadTimeout)
 	session := bs.engine.NewSession(ctx)
 	bs.childDownloadParams[rootCid] = &ChildDownloadParams{
-		root:  root,
-		depth: 1,
+		root: root,
 	}
 	bs.rootDownloadStates[root] = &RootDownloadState{
 		notVisited:    s1,
@@ -197,6 +231,7 @@ func (bs *BitswapCtx) kickStartRootDownload(root BitswapBlockLink) {
 		ctx:           ctx,
 		session:       session,
 		cancelF:       cancelF,
+		tag:           tag,
 	}
 	var rootBlock []byte
 	err = bs.storage.ViewBlock(root, func(b []byte) error {
@@ -211,7 +246,7 @@ func (bs *BitswapCtx) kickStartRootDownload(root BitswapBlockLink) {
 	}
 	if err == nil {
 		go func() {
-			<-time.After(bs.rootDownloadTimeout)
+			<-time.After(downloadTimeout)
 			bs.deadlineChan <- root
 		}()
 	} else {
@@ -232,72 +267,80 @@ func (bs *BitswapCtx) processDownloadedBlock(block blocks.Block) {
 		return
 	}
 	root := params.root
-	bitswapLogger.Debugf("Received block %s of root %s", block.Cid(), codanet.BlockHashToCid(root))
+	bitswapLogger.Debugf("Received block %s of root %s", id, codanet.BlockHashToCid(root))
 	rootState := bs.rootDownloadStates[root]
 	if !rootState.notVisited.Has(id) {
 		bitswapLogger.Warnf("Block %s of root %s visited twice", id, codanet.BlockHashToCid(root))
 		return
 	}
+	rootState.notVisited.Remove(id)
 	reportMalformed := func(err string) {
 		bitswapLogger.Warnf("Block %s of root %s is malformed: %s", id, codanet.BlockHashToCid(root), err)
 		bs.freeRoot(root)
 		bs.sendResourceUpdate(ipc.ResourceUpdateType_broken, root)
 	}
-	if bs.maxBlockTreeDepth < params.depth {
-		reportMalformed("Malformed block tree: too deep a node")
-		return
-	}
-	if rootState.treeDepth != 0 && rootState.treeDepth < params.depth {
-		reportMalformed("Malformed block tree: non-balanced")
-		return
-	}
-	if rootState.treeDepth != 0 && rootState.treeDepth > params.depth && len(block.RawData()) < bs.maxBlockSize {
-		reportMalformed("Malformed block tree: non-max size of middle node")
-		return
-	}
-	if len(block.RawData()) < bs.maxBlockSize {
-		if rootState.processedNonMaxSizeNode {
-			reportMalformed("Malformed block tree: second non-max size node")
+	var links []BitswapBlockLink
+	var err error
+	if params.id == 0 { //root
+		var blockData []byte
+		var dataLen int
+		links, blockData, dataLen, err = ReadBitswapRootBlockLengthPrefixed(block.RawData())
+		if err == nil && len(blockData) < 1 {
+			err = fmt.Errorf("error reading tag from block %s", id)
+		}
+		if err == nil {
+			tag := BitswapDataTag(blockData[0])
+			if tag != rootState.tag {
+				err = fmt.Errorf("tag mismatch for %s: %d != %d", id, tag, rootState.tag)
+			}
+		}
+		if err != nil {
+			errStr := fmt.Sprintf("error reading root block %s: %v", id, err)
+			reportMalformed(errStr)
 			return
 		}
-		rootState.processedNonMaxSizeNode = true
+		schema := MkBitswapBlockSchemaLengthPrefixed(bs.maxBlockSize, dataLen)
+		rootState.schema = &schema
 	}
-	rootState.notVisited.Remove(id)
-	links, _, err := ReadBitswapBlock(block.RawData())
-	if err != nil {
-		bitswapLogger.Errorf("Error reading block: %v", block.RawData())
-		reportMalformed(err.Error())
+	if rootState.schema == nil {
+		bitswapLogger.Errorf("Invariant broken for %s (root %s): schema not set for non-root block",
+			id, codanet.BlockHashToCid(root))
 		return
 	}
-	if len(block.RawData()) < bs.maxBlockSize && len(links) > 0 {
-		reportMalformed("Malformed block tree: nom-max size of non-leaf node")
+	schema := rootState.schema
+	if len(block.RawData()) != schema.BlockSize(params.id) {
+		reportMalformed(fmt.Sprintf("unexpected size for block #%d (%s) of root %s: %d != %d",
+			params.id, id, codanet.BlockHashToCid(root), len(block.RawData()), schema.BlockSize(params.id)))
 		return
 	}
-	maxLink := LinksPerBlock(bs.maxBlockSize)
-	if rootState.treeDepth == 0 && len(links) < maxLink {
-		if len(links) == 0 {
-			rootState.treeDepth = params.depth
-		} else {
-			rootState.treeDepth = params.depth + 1
+	if params.id != 0 {
+		links, _, err = ReadBitswapBlock(block.RawData())
+		if err != nil {
+			errStr := fmt.Sprintf("Error reading block %s of root %s: %v",
+				id, codanet.BlockHashToCid(root), err)
+			reportMalformed(errStr)
+			return
 		}
 	}
-	if rootState.treeDepth == params.depth && len(links) > 0 {
-		reportMalformed("Malformed block tree: child of a parent with non-max" +
-			" amount of links must have no links itself")
+	if len(links) != schema.LinkCount(params.id) {
+		reportMalformed(fmt.Sprintf("unexpected link count for block %s of root %s: %d != %d",
+			id, codanet.BlockHashToCid(root), len(links), schema.LinkCount(params.id)))
 		return
 	}
 	blocksToProcess := make([]blocks.Block, 0)
 	toDownload := make([]cid.Cid, 0, len(links))
-	for _, link := range links {
+	fstChildId := bs.depthIndices.FirstChildId(params.id)
+	for childIx, link := range links {
 		childId := codanet.BlockHashToCid(link)
 		_, has := bs.childDownloadParams[childId]
 		if has {
-			reportMalformed("Not a tree: DAG supplied")
-			return
+			// block tree might be a DAG, in this case we just skip the child
+			// if it was already cheduled for downloading
+			continue
 		}
 		bs.childDownloadParams[childId] = &ChildDownloadParams{
-			root:  root,
-			depth: params.depth + 1,
+			root: root,
+			id:   fstChildId + childIx,
 		}
 		rootState.notVisited.Add(childId)
 		rootState.allDescedants.Add(childId)
@@ -356,7 +399,7 @@ func (bs *BitswapCtx) Loop() {
 			bs.freeRoot(root)
 		case cmd := <-bs.addCmds:
 			configuredCheck()
-			blocks, root := SplitDataToBitswapBlocks(bs.maxBlockSize, cmd.data)
+			blocks, root := SplitDataToBitswapBlocksLengthPrefixedWithTag(bs.maxBlockSize, cmd.data, BlockBodyTag)
 			err := announceNewRootBlock(engine, storage, blocks, root)
 			if err == nil {
 				bs.sendResourceUpdate(ipc.ResourceUpdateType_added, root)
@@ -387,7 +430,7 @@ func (bs *BitswapCtx) Loop() {
 				m[root] = true
 			}
 			for root := range m {
-				bs.kickStartRootDownload(root)
+				bs.kickStartRootDownload(root, cmd.tag)
 			}
 		case block := <-bs.blockSink:
 			configuredCheck()

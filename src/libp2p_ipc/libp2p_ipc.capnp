@@ -73,13 +73,6 @@ struct Libp2pConfig {
   validationQueueSize @13 :UInt32;
   minaPeerExchange @14 :Bool;
   minConnections @15 :UInt32;
-  bitswapConfig @16 :BitswapConfig;
-}
-
-struct BitswapConfig {
-  rootDownloadTimeout @0 :Duration;
-  maxBlockSize @1 :UInt32;
-  maxBlockTreeDepth @2 :UInt8;
 }
 
 # Resource status updated
@@ -308,11 +301,13 @@ struct Libp2pHelperInterface {
   }
 
   struct DownloadResource {
-    ids @0 :List(RootBlockId);
+    tag @0 :UInt8;
+    ids @1 :List(RootBlockId);
   }
 
   struct AddResource {
-    data @0 :Data;
+    tag @0 :UInt8;
+    data @1 :Data;
   }
 
   struct RpcRequest {

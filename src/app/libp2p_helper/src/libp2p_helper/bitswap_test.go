@@ -171,7 +171,7 @@ func (at *bitswapTestAttempt) awaitPublish(nodes [NUM_NODES]bitswapTestNode) (re
 				return
 			}
 			data := nconf.resource
-			_, root := SplitDataToBitswapBlocks(n.node.bitswapCtx.maxBlockSize, data)
+			_, root := SplitDataToBitswapBlocksLengthPrefixedWithTag(n.node.bitswapCtx.maxBlockSize, data, BlockBodyTag)
 			resIds[ni] = root
 			var ids ipc.RootBlockId_List
 			ids, err = m.Ids()
@@ -196,7 +196,7 @@ func (at *bitswapTestAttempt) awaitPublish(nodes [NUM_NODES]bitswapTestNode) (re
 }
 
 func confirmBlocksNotInStorage(bs *BitswapCtx, resource []byte) error {
-	blocks, _ := SplitDataToBitswapBlocks(bs.maxBlockSize, resource)
+	blocks, _ := SplitDataToBitswapBlocksLengthPrefixedWithTag(bs.maxBlockSize, resource, BlockBodyTag)
 	for h := range blocks {
 		err := bs.storage.ViewBlock(h, func(actualB []byte) error {
 			return nil
@@ -211,7 +211,7 @@ func confirmBlocksNotInStorage(bs *BitswapCtx, resource []byte) error {
 }
 
 func confirmBlocksInStorage(bs *BitswapCtx, resource []byte) error {
-	blocks, root := SplitDataToBitswapBlocks(bs.maxBlockSize, resource)
+	blocks, root := SplitDataToBitswapBlocksLengthPrefixedWithTag(bs.maxBlockSize, resource, BlockBodyTag)
 	_, hasRootBlock := blocks[root]
 	if !hasRootBlock {
 		return fmt.Errorf("unexpected no root block")
@@ -244,6 +244,7 @@ func (at *bitswapTestAttempt) requestResources(nodes [NUM_NODES]bitswapTestNode,
 		if err != nil {
 			return err
 		}
+		m.SetTag(uint8(BlockBodyTag))
 		for i, resId := range requests {
 			err := ids.At(i).SetBlake2bHash(roots[resId][:])
 			if err != nil {

@@ -253,20 +253,6 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, badHelper(err))
 	}
 
-	if m.HasBitswapConfig() {
-		bc, err := m.BitswapConfig()
-		if err != nil {
-			return mkRpcRespError(seqno, badRPC(err))
-		}
-		rootDownloadTimeoutObj, err := bc.RootDownloadTimeout()
-		if err != nil {
-			return mkRpcRespError(seqno, badRPC(err))
-		}
-
-		app.bitswapCtx.rootDownloadTimeout = time.Duration(rootDownloadTimeoutObj.NanoSec())
-		app.bitswapCtx.maxBlockSize = int(bc.MaxBlockSize())
-		app.bitswapCtx.maxBlockTreeDepth = int(bc.MaxBlockTreeDepth())
-	}
 	// SOMEDAY:
 	// - stop putting block content on the mesh.
 	// - bigger than 32MiB block size?

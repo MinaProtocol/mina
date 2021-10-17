@@ -149,8 +149,8 @@ let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
       *> list_op seed_peers_set_list seed_peers
       *> op peer_exchange_set peer_exchange
       *> op mina_peer_exchange_set mina_peer_exchange
-      *> op max_connections_set_int_exn max_connections
       *> op min_connections_set_int_exn min_connections
+      *> op max_connections_set_int_exn max_connections
       *> op validation_queue_size_set_int_exn validation_queue_size
       *> reader_op gating_config_set_reader gating_config)
 
