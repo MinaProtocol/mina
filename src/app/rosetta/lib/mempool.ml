@@ -32,7 +32,7 @@ module Get_transactions_by_hash =
         fee @bsDecoder(fn: "Decoders.uint64")
         kind
         feeToken @bsDecoder(fn: "Decoders.uint64")
-        validUntil @bsDecoder(fn: "Decoders.uint32")
+        validUntil @bsDecoder(fn: "Decoders.optional_uint32")
         feePayer {
           publicKey
         }
