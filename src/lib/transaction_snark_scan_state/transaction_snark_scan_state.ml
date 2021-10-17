@@ -842,32 +842,56 @@ let all_work_pairs t
         , state_hash
         , ledger_witness
         , init_stack ) ->
-        let `Needs_update_for_multiple_slots_per_txn =
-          Mina_base.Util.todo_multiple_slots_per_transaction
+        let%map witness =
+          let { With_status.data = transaction; status } =
+            Ledger.Transaction_applied.transaction transaction_with_info
+          in
+          let%bind protocol_state_body =
+            let%map state = get_state (fst state_hash) in
+            Mina_state.Protocol_state.body state
+          in
+          let%map init_stack =
+            match init_stack with
+            | Base x ->
+                Ok x
+            | Merge ->
+                Or_error.error_string "init_stack was Merge"
+          in
+          match transaction with
+          | Transaction.Command (Parties c) ->
+              let transaction_commitment = Parties.commitment c in
+              let start_parties : _ Parties_logic.Start_data.t =
+                { parties = c
+                ; protocol_state_predicate = c.protocol_state
+                ; memo_hash = Signed_command_memo.hash c.memo
+                }
+              in
+              Transaction_witness.Parties_segment
+                { Transaction_witness.Parties_segment_witness.global_ledger =
+                    ledger_witness
+                ; local_state_init =
+                    { Parties_logic.Local_state.parties = []
+                    ; call_stack = []
+                    ; transaction_commitment
+                    ; token_id = Token_id.invalid
+                    ; excess = Currency.Amount.zero
+                    ; ledger = ledger_witness
+                    ; success = true
+                    }
+                ; start_parties = [ start_parties ]
+                ; state_body = protocol_state_body
+                ; init_stack
+                }
+          | _ ->
+              Non_parties
+                { ledger = ledger_witness
+                ; transaction
+                ; protocol_state_body
+                ; init_stack
+                ; status
+                }
         in
-        let { With_status.data = transaction; status } =
-          Ledger.Transaction_applied.transaction transaction_with_info
-        in
-        let%bind protocol_state_body =
-          let%map state = get_state (fst state_hash) in
-          Mina_state.Protocol_state.body state
-        in
-        let%map init_stack =
-          match init_stack with
-          | Base x ->
-              Ok x
-          | Merge ->
-              Or_error.error_string "init_stack was Merge"
-        in
-        Snark_work_lib.Work.Single.Spec.Transition
-          ( statement
-          , Transaction_witness.Non_parties
-              { ledger = ledger_witness
-              ; transaction
-              ; protocol_state_body
-              ; init_stack
-              ; status
-              } )
+        Snark_work_lib.Work.Single.Spec.Transition (statement, witness)
     | Second (p1, p2) ->
         let%map merged =
           Transaction_snark.Statement.merge
