@@ -146,7 +146,7 @@ module Unsigned = struct
           ; token = command.token
           ; memo = None
           ; amount
-          ; valid_until = None
+          ; valid_until = command.valid_until
           }
         in
         Result.return (`Payment payment)
@@ -157,7 +157,7 @@ module Unsigned = struct
           ; fee = command.fee
           ; nonce
           ; memo = None
-          ; valid_until = None
+          ; valid_until = command.valid_until
           }
         in
         Result.return (`Delegation delegation)
@@ -168,7 +168,7 @@ module Unsigned = struct
           ; fee = command.fee
           ; nonce
           ; memo = None
-          ; valid_until = None
+          ; valid_until = command.valid_until
           }
         in
         Result.return (`Create_token create_token)
@@ -181,7 +181,7 @@ module Unsigned = struct
           ; fee = command.fee
           ; nonce
           ; memo = None
-          ; valid_until = None
+          ; valid_until = command.valid_until
           }
         in
         Result.return (`Create_token_account create_token_account)
@@ -201,7 +201,7 @@ module Unsigned = struct
           ; fee = command.fee
           ; nonce
           ; memo = None
-          ; valid_until = None
+          ; valid_until = command.valid_until
           }
         in
         Result.return (`Mint_tokens mint_tokens)
