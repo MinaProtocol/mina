@@ -339,10 +339,14 @@ module Metadata = struct
                    (Mina_currency.Fee.to_uint64
                       Mina_compile_config.minimum_user_command_fee)) ) ]
       in
+      (* GraphQL ppx thinks that res#receiver is an option, but it's really
+       * always Some, we have to peak at the nonce to really check if the
+       * account doesn't exist *)
+      let receiver_exists = Option.bind res#receiver ~f:(fun r -> r#nonce) |> Option.is_some in
       let constraint_constants = Genesis_constants.Constraint_constants.compiled in
       { Construction_metadata_response.metadata=
           Metadata_data.create ~sender:options.Options.sender
-            ~token_id:options.Options.token_id ~nonce ~receiver:options.receiver ~account_creation_fee:(Option.map res#receiver ~f:(fun _ -> Mina_currency.Fee.to_uint64 constraint_constants.account_creation_fee)) ~valid_until:options.valid_until
+            ~token_id:options.Options.token_id ~nonce ~receiver:options.receiver ~account_creation_fee:(if receiver_exists then None else Some (Mina_currency.Fee.to_uint64 constraint_constants.account_creation_fee)) ~valid_until:options.valid_until
           |> Metadata_data.to_yojson
       ; suggested_fee= [{suggested_fee with metadata= Some amount_metadata}] }
   end
