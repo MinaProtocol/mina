@@ -30,19 +30,19 @@ type BitswapBlockSchema struct {
 	maxLinksPerBlock         int
 }
 
-// ReadBitswapRootBlockLengthPrefixed tries to read root block from the given bytes.
+// NodeIndex is an index of a node within a specific block tree
+type NodeIndex int
+
+// ExtractLengthFromRootBlockData tries to extract length from root block bytes
 // It assumes data section to be at least 4 bytes long and interprets first 4 bytes of data as
 // length of the whole data blob encoded into block tree associated with the given root block.
-func ReadBitswapRootBlockLengthPrefixed(block []byte) (links []BitswapBlockLink, data []byte, length int, err error) {
-	links, data, err = ReadBitswapBlock(block)
-	if err == nil {
-		if len(data) < 4 {
-			err = errors.New("data less than 4 bytes long")
-			return
-		}
-		length = int(binary.LittleEndian.Uint32(data))
-		data = data[4:]
+func ExtractLengthFromRootBlockData(data_ []byte) (data []byte, length int, err error) {
+	if len(data_) < 4 {
+		err = errors.New("data less than 4 bytes long")
+		return
 	}
+	length = int(binary.LittleEndian.Uint32(data_))
+	data = data_[4:]
 	return
 }
 
@@ -85,7 +85,7 @@ func LinksPerBlock(maxBlockSize int) int {
 // DepthIndices is a data structure that keeps indicies
 // of left-most vertex on each depth of a block tree
 type DepthIndices struct {
-	indices       []int
+	indices       []NodeIndex
 	linksPerBlock int
 }
 
@@ -94,9 +94,9 @@ type DepthIndices struct {
 // This structure can be pre-computed and used for all of processing
 // with the same `linksPerBlock` parameter
 func MkDepthIndices(linksPerBlock, maxTotalBlocks int) DepthIndices {
-	res := []int{0}
-	for val := 1; res[len(res)-1]+val < maxTotalBlocks; val = val * linksPerBlock {
-		res = append(res, res[len(res)-1]+val)
+	res := []NodeIndex{0}
+	for val := 1; int(res[len(res)-1])+val < maxTotalBlocks; val = val * linksPerBlock {
+		res = append(res, NodeIndex(int(res[len(res)-1])+val))
 	}
 	return DepthIndices{indices: res, linksPerBlock: linksPerBlock}
 }
@@ -150,7 +150,7 @@ func MkBitswapBlockSchema(maxBlockSize int, dataLength int) BitswapBlockSchema {
 
 // FirstChildId returns id of the first child of a node with id.
 // Subsequent children of the node will occupy following sequential numbers.
-func (di *DepthIndices) FirstChildId(id int) int {
+func (di *DepthIndices) FirstChildId(id NodeIndex) NodeIndex {
 	ixs := di.indices
 	depth := sort.Search(len(ixs), func(i int) bool {
 		return ixs[i] > id
@@ -158,21 +158,22 @@ func (di *DepthIndices) FirstChildId(id int) int {
 	if depth >= len(ixs) || depth == 0 {
 		return -1
 	}
-	return ixs[depth] + (id-ixs[depth-1])*di.linksPerBlock
+	return ixs[depth] + (id-ixs[depth-1])*NodeIndex(di.linksPerBlock)
 }
 
-func (schema *BitswapBlockSchema) BlockSize(id int) int {
-	if id == schema.totalBlocks-1 {
+func (schema *BitswapBlockSchema) BlockSize(id NodeIndex) int {
+	if id == NodeIndex(schema.totalBlocks-1) {
 		return schema.lastBlockDataSize + 2
 	}
 	return schema.maxBlockSize
 }
 
-func (schema *BitswapBlockSchema) LinkCount(id int) int {
-	if id < schema.fullLinkBlocks {
+func (schema *BitswapBlockSchema) LinkCount(id NodeIndex) int {
+	flb := NodeIndex(schema.fullLinkBlocks)
+	if id < flb {
 		return schema.maxLinksPerBlock
 	}
-	if id == schema.fullLinkBlocks {
+	if id == flb {
 		return schema.nonMaxLinkBlockLinkCount
 	}
 	return 0
