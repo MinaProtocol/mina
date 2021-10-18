@@ -56,13 +56,10 @@ module Op = struct
               }
             in
             let related_operations =
-              match op.related_to with
-              | Some relate ->
-                  List.findi plan ~f:(fun _ a -> a_eq relate a.label)
-                  |> Option.map ~f:(fun (i, _) -> operation_identifier i)
-                  |> Option.to_list
-              | None ->
-                  []
+              op.related_to
+              |> Option.bind ~f:(fun relate ->
+                     List.findi plan ~f:(fun _ a -> a_eq relate a.label))
+              |> Option.map ~f:(fun (i, _) -> [ operation_identifier i ])
             in
             let%map a =
               f ~related_operations
@@ -271,7 +268,7 @@ let of_operations (ops : Operation.t list) :
      * ops = length exactly 3
      *
      * payment_source_dec with account 'a, some amount 'x, status="Pending"
-     * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+     * fee_payment with account 'a, some amount 'y, status="Pending"
      * payment_receiver_inc with account 'b, some amount 'x, status="Pending"
   *)
   let payment =
@@ -281,7 +278,7 @@ let of_operations (ops : Operation.t list) :
     and account_a =
       let open Result.Let_syntax in
       let%bind { account; _ } = find_kind `Payment_source_dec ops
-      and { account = account'; _ } = find_kind `Fee_payer_dec ops in
+      and { account = account'; _ } = find_kind `Fee_payment ops in
       match (account, account') with
       | Some x, Some y when Account_identifier.equal x y ->
           V.return x
@@ -303,7 +300,7 @@ let of_operations (ops : Operation.t list) :
           V.fail Account_not_some
     and fee_token =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       match account with
       | Some account -> (
           match token_id_of_account account with
@@ -336,7 +333,7 @@ let of_operations (ops : Operation.t list) :
           V.fail Amount_not_some
     and payment_amount_y =
       let open Result.Let_syntax in
-      let%bind { amount; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { amount; _ } = find_kind `Fee_payment ops in
       match amount with
       | Some x ->
           V.return (Amount_of.negated x)
@@ -357,7 +354,7 @@ let of_operations (ops : Operation.t list) :
      *
      * ops = length exactly 2
      *
-     * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+     * fee_payment with account 'a, some amount 'y, status="Pending"
      * delegate_change with account 'a, metadata:{delegate_change_target:'b}, status="Pending"
   *)
   let delegation =
@@ -366,11 +363,11 @@ let of_operations (ops : Operation.t list) :
       else V.fail Length_mismatch
     and account_a =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
     and fee_token =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       match account with
       | Some account -> (
           match token_id_of_account account with
@@ -400,7 +397,7 @@ let of_operations (ops : Operation.t list) :
       else V.fail Status_not_pending
     and payment_amount_y =
       let open Result.Let_syntax in
-      let%bind { amount; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { amount; _ } = find_kind `Fee_payment ops in
       match amount with
       | Some x ->
           V.return (Amount_of.negated x)
@@ -423,7 +420,7 @@ let of_operations (ops : Operation.t list) :
      *
      * ops = length exactly 2
      *
-     * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+     * fee_payment with account 'a, some amount 'y, status="Pending"
      * create_token with account=None, status="Pending"
   *)
   let create_token =
@@ -432,11 +429,11 @@ let of_operations (ops : Operation.t list) :
       else V.fail Length_mismatch
     and account_a =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
     and fee_token =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       match account with
       | Some account -> (
           match token_id_of_account account with
@@ -454,7 +451,7 @@ let of_operations (ops : Operation.t list) :
       else V.fail Status_not_pending
     and payment_amount_y =
       let open Result.Let_syntax in
-      let%bind { amount; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { amount; _ } = find_kind `Fee_payment ops in
       match amount with
       | Some x ->
           V.return (Amount_of.negated x)
@@ -489,7 +486,7 @@ let of_operations (ops : Operation.t list) :
      *
      * ops = length exactly 1
      *
-     * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+     * fee_payment with account 'a, some amount 'y, status="Pending"
   *)
   let create_token_account =
     let%map () =
@@ -497,11 +494,11 @@ let of_operations (ops : Operation.t list) :
       else V.fail Length_mismatch
     and account_a =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
     and fee_token =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       match account with
       | Some account -> (
           match token_id_of_account account with
@@ -519,7 +516,7 @@ let of_operations (ops : Operation.t list) :
       else V.fail Status_not_pending
     and payment_amount_y =
       let open Result.Let_syntax in
-      let%bind { amount; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { amount; _ } = find_kind `Fee_payment ops in
       match amount with
       | Some x ->
           V.return (Amount_of.negated x)
@@ -540,7 +537,7 @@ let of_operations (ops : Operation.t list) :
      *
      * ops = length exactly 2
      *
-     * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+     * fee_payment with account 'a, some amount 'y, status="Pending"
      * mint_tokens with account 'a, some amount 'y with the minted token id, metadata={token_owner_pk:'b}, status=Pending
   *)
   let mint_tokens =
@@ -549,11 +546,11 @@ let of_operations (ops : Operation.t list) :
       else V.fail Length_mismatch
     and account_a =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
     and fee_token =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       match account with
       | Some account -> (
           match token_id_of_account account with
@@ -571,7 +568,7 @@ let of_operations (ops : Operation.t list) :
       else V.fail Status_not_pending
     and payment_amount_y =
       let open Result.Let_syntax in
-      let%bind { amount; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { amount; _ } = find_kind `Fee_payment ops in
       match amount with
       | Some x ->
           V.return (Amount_of.negated x)
@@ -641,7 +638,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
   *)
   let plan : 'a Op.t list =
     ( if not Unsigned.UInt64.(equal t.fee zero) then
-      [ { Op.label = `Fee_payer_dec; related_to = None } ]
+      [ { Op.label = `Fee_payment; related_to = None } ]
     else [] )
     @ ( match failure_status with
       | Some (`Applied (Account_creation_fees_paid.By_receiver amount)) ->
@@ -686,7 +683,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
   Op.build
     ~a_eq:
       [%eq:
-        [ `Fee_payer_dec
+        [ `Fee_payment
         | `Payment_source_dec of Unsigned.UInt64.t
         | `Payment_receiver_inc of Unsigned.UInt64.t ]] ~plan
     ~f:(fun ~related_operations ~operation_identifier op ->
@@ -718,13 +715,13 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
             failwith "Unexpected pattern"
       in
       match op.label with
-      | `Fee_payer_dec ->
+      | `Fee_payment ->
           { Operation.operation_identifier
           ; related_operations
           ; status =
               Some (status |> pending_or_success_only |> Operation_statuses.name)
           ; account = Some (account_id t.fee_payer t.fee_token)
-          ; _type = Operation_types.name `Fee_payer_dec
+          ; _type = Operation_types.name `Fee_payment
           ; amount = Some Amount_of.(negated @@ token t.fee_token t.fee)
           ; coin_change = None
           ; metadata

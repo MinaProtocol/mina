@@ -134,4 +134,4 @@ RUN mkdir go-tmp \
     && /usr/lib/go/bin/go build -o capnpc-go capnproto.org/go/capnp/v3/capnpc-go \
     && sudo mv capnpc-go /usr/local/bin \
     && cd - \
-    && sudo rm -rf go go-tmp
+    && sudo rm -rf go-tmp
