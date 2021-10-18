@@ -1194,7 +1194,7 @@ module Data = struct
            between, and not including, prev and next (relative).
        *)
       let current_sub_window_densities =
-        List.mapi prev_sub_window_densities ~f:(fun i length ->
+        List.mapi prev_sub_window_densities ~f:(fun i density ->
             let gt_prev_sub_window =
               Sub_window.(of_int i > prev_relative_sub_window)
             in
@@ -1208,8 +1208,8 @@ module Data = struct
               then gt_prev_sub_window && lt_next_sub_window
               else gt_prev_sub_window || lt_next_sub_window
             in
-            if same_sub_window then length
-            else if overlapping_window && not within_range then length
+            if same_sub_window then density
+            else if overlapping_window && not within_range then density
             else Length.zero)
       in
       let current_window_density =
@@ -1230,14 +1230,14 @@ module Data = struct
 
       (* Compute the next window by mutating the current window *)
       let next_sub_window_densities =
-        List.mapi current_sub_window_densities ~f:(fun i length ->
+        List.mapi current_sub_window_densities ~f:(fun i density ->
             let is_next_sub_window =
               Sub_window.(of_int i = next_relative_sub_window)
             in
             if is_next_sub_window then
               let f = if incr_window then Length.succ else Fn.id in
-              if same_sub_window then f length else f Length.zero
-            else length)
+              if same_sub_window then f density else f Length.zero
+            else density)
       in
 
       (* Final result is the min window density and window for the new (or virtual) block *)
@@ -1276,7 +1276,7 @@ module Data = struct
           Length.Checked.if_ cond ~then_ ~else_
         in
         let%bind current_sub_window_densities =
-          Checked.List.mapi prev_sub_window_densities ~f:(fun i length ->
+          Checked.List.mapi prev_sub_window_densities ~f:(fun i density ->
               let%bind gt_prev_sub_window =
                 Sub_window.Checked.(
                   constant (UInt32.of_int i) > prev_relative_sub_window)
@@ -1298,11 +1298,11 @@ module Data = struct
               in
               if_
                 (Checked.return same_sub_window)
-                ~then_:(Checked.return length)
+                ~then_:(Checked.return density)
                 ~else_:
                   (if_
                      Boolean.(overlapping_window && not within_range)
-                     ~then_:(Checked.return length)
+                     ~then_:(Checked.return density)
                      ~else_:(Checked.return Length.Checked.zero)))
         in
         let%bind current_window_density =
@@ -1323,7 +1323,7 @@ module Data = struct
               (Length.Checked.min current_window_density prev_min_window_density)
         in
         let%bind next_sub_window_densities =
-          Checked.List.mapi current_sub_window_densities ~f:(fun i length ->
+          Checked.List.mapi current_sub_window_densities ~f:(fun i density ->
               let%bind is_next_sub_window =
                 Sub_window.Checked.(
                   constant (UInt32.of_int i) = next_relative_sub_window)
@@ -1333,9 +1333,9 @@ module Data = struct
                 ~then_:
                   (if_
                      (Checked.return same_sub_window)
-                     ~then_:Length.Checked.(succ length)
+                     ~then_:Length.Checked.(succ density)
                      ~else_:Length.Checked.(succ zero))
-                ~else_:(Checked.return length))
+                ~else_:(Checked.return density))
         in
         return (min_window_density, next_sub_window_densities)
     end
