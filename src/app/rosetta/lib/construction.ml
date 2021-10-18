@@ -134,7 +134,7 @@ module Options = struct
   type t = {sender: Public_key.Compressed.t; token_id: Unsigned.UInt64.t; receiver: Public_key.Compressed.t; valid_until: Unsigned_extended.UInt32.t option}
 
   module Raw = struct
-    type t = {sender: string; token_id: string; receiver: string; valid_until: string option} [@@deriving yojson]
+    type t = {sender: string; token_id: string; receiver: string; valid_until: string option [@default None]} [@@deriving yojson]
   end
 
   let to_json t =
