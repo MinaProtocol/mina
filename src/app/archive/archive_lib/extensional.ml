@@ -82,7 +82,7 @@ module Block = struct
     ; next_epoch_ledger_hash : Frozen_ledger_hash.Stable.Latest.t
     ; ledger_hash : Ledger_hash.Stable.Latest.t
     ; height : Unsigned_extended.UInt32.Stable.Latest.t
-    ; global_slot : Mina_numbers.Global_slot.Stable.Latest.t
+    ; global_slot_since_hard_fork : Mina_numbers.Global_slot.Stable.Latest.t
     ; global_slot_since_genesis : Mina_numbers.Global_slot.Stable.Latest.t
     ; timestamp : Block_time.Stable.Latest.t
     ; user_cmds : User_command.t list

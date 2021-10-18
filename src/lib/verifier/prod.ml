@@ -5,6 +5,7 @@ open Async
 open Mina_base
 open Mina_state
 open Blockchain_snark
+open O1trace
 
 type ledger_proof = Ledger_proof.Prod.t
 
@@ -236,9 +237,6 @@ type worker =
 
 type t = { worker : worker Ivar.t ref; logger : Logger.Stable.Latest.t }
 
-let plus_or_minus initial ~delta =
-  initial +. (Random.float (2. *. delta) -. delta)
-
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
     t Deferred.t =
@@ -313,11 +311,9 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
   let%map worker = create_worker () |> Deferred.Or_error.ok_exn in
   let worker_ref = ref (Ivar.create_full worker) in
   let rec on_worker { connection = _; process; exit_or_signal } =
-    let restart_after = Time.Span.(of_min (15. |> plus_or_minus ~delta:2.5)) in
     let finished =
       Deferred.any
-        [ (after restart_after >>| fun () -> `Time_to_restart)
-        ; ( exit_or_signal
+        [ ( exit_or_signal
           >>| function
           | Ok _ ->
               `Unexpected_termination
@@ -342,7 +338,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
               [%log error] "verifier terminated unexpectedly"
                 ~metadata:[ ("verifier_pid", `Int (Pid.to_int pid)) ] ;
               Ivar.fill_if_empty create_worker_trigger ()
-          | `Time_to_restart | `Wait_threw_an_exception _ -> (
+          | `Wait_threw_an_exception _ -> (
               ( match e with
               | `Wait_threw_an_exception err ->
                   [%log info]
@@ -420,56 +416,60 @@ let with_retry ~logger f =
   go 4
 
 let verify_blockchain_snarks { worker; logger } chains =
-  with_retry ~logger (fun () ->
-      let%bind { connection; _ } =
-        let ivar = !worker in
-        match Ivar.peek ivar with
-        | Some worker ->
-            Deferred.return worker
-        | None ->
-            [%log debug] "Waiting for the verifier process to restart" ;
-            let%map worker = Ivar.read ivar in
-            [%log debug] "Verifier process has restarted; finished waiting" ;
-            worker
-      in
-      Deferred.any
-        [ ( after (Time.Span.of_min 3.)
-          >>| fun _ ->
-          Or_error.return
-          @@ `Stop (Error.of_string "verify_blockchain_snarks timeout") )
-        ; Worker.Connection.run connection
-            ~f:Worker.functions.verify_blockchains ~arg:chains
-          |> Deferred.Or_error.map ~f:(fun x -> `Continue x)
-        ])
+  trace_recurring "Verifier.verify_blockchain_snarks" (fun () ->
+      with_retry ~logger (fun () ->
+          let%bind { connection; _ } =
+            let ivar = !worker in
+            match Ivar.peek ivar with
+            | Some worker ->
+                Deferred.return worker
+            | None ->
+                [%log debug] "Waiting for the verifier process to restart" ;
+                let%map worker = Ivar.read ivar in
+                [%log debug] "Verifier process has restarted; finished waiting" ;
+                worker
+          in
+          Deferred.any
+            [ ( after (Time.Span.of_min 3.)
+              >>| fun _ ->
+              Or_error.return
+              @@ `Stop (Error.of_string "verify_blockchain_snarks timeout") )
+            ; Worker.Connection.run connection
+                ~f:Worker.functions.verify_blockchains ~arg:chains
+              |> Deferred.Or_error.map ~f:(fun x -> `Continue x)
+            ]))
 
 module Id = Unique_id.Int ()
 
 let verify_transaction_snarks { worker; logger } ts =
-  let id = Id.create () in
-  let n = List.length ts in
-  let metadata () =
-    ("id", `String (Id.to_string id))
-    :: ("n", `Int n)
-    :: Memory_stats.(jemalloc_memory_stats () @ ocaml_memory_stats ())
-  in
-  [%log trace] "verify $n transaction_snarks (before)" ~metadata:(metadata ()) ;
-  let res =
-    with_retry ~logger (fun () ->
-        let%bind { connection; _ } = Ivar.read !worker in
-        Worker.Connection.run connection
-          ~f:Worker.functions.verify_transaction_snarks ~arg:ts
-        |> Deferred.Or_error.map ~f:(fun x -> `Continue x))
-  in
-  upon res (fun x ->
+  trace_recurring "Verifier.verify_transaction_snarks" (fun () ->
+      let id = Id.create () in
+      let n = List.length ts in
+      let metadata () =
+        ("id", `String (Id.to_string id))
+        :: ("n", `Int n)
+        :: Memory_stats.(jemalloc_memory_stats () @ ocaml_memory_stats ())
+      in
+      [%log trace] "verify $n transaction_snarks (before)"
+        ~metadata:(metadata ()) ;
+      let%map res =
+        with_retry ~logger (fun () ->
+            let%bind { connection; _ } = Ivar.read !worker in
+            Worker.Connection.run connection
+              ~f:Worker.functions.verify_transaction_snarks ~arg:ts
+            |> Deferred.Or_error.map ~f:(fun x -> `Continue x))
+      in
       [%log trace] "verify $n transaction_snarks (after)!"
         ~metadata:
-          ( ("result", `String (Sexp.to_string ([%sexp_of: bool Or_error.t] x)))
-          :: metadata () )) ;
-  res
+          ( ( "result"
+            , `String (Sexp.to_string ([%sexp_of: bool Or_error.t] res)) )
+          :: metadata () ) ;
+      res)
 
 let verify_commands { worker; logger } ts =
-  with_retry ~logger (fun () ->
-      let%bind { connection; _ } = Ivar.read !worker in
-      Worker.Connection.run connection ~f:Worker.functions.verify_commands
-        ~arg:ts
-      |> Deferred.Or_error.map ~f:(fun x -> `Continue x))
+  trace_recurring "Verifier.verify_commands" (fun () ->
+      with_retry ~logger (fun () ->
+          let%bind { connection; _ } = Ivar.read !worker in
+          Worker.Connection.run connection ~f:Worker.functions.verify_commands
+            ~arg:ts
+          |> Deferred.Or_error.map ~f:(fun x -> `Continue x)))

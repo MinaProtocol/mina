@@ -24,7 +24,7 @@ module type Gossip_net_intf = sig
 
   val initial_peers : t -> Mina_net2.Multiaddr.t list
 
-  val add_peer : t -> Peer.t -> seed:bool -> unit Deferred.Or_error.t
+  val add_peer : t -> Peer.t -> is_seed:bool -> unit Deferred.Or_error.t
 
   val connection_gating : t -> Mina_net2.connection_gating Deferred.t
 
@@ -61,8 +61,6 @@ module type Gossip_net_intf = sig
     -> ('q, 'r) Rpc_intf.rpc
     -> 'q
     -> 'r rpc_response Deferred.t List.t Deferred.t
-
-  val ip_for_peer : t -> Peer.Id.t -> Peer.t option Deferred.t
 
   val broadcast : t -> Message.msg -> unit
 
