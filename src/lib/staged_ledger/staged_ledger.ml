@@ -453,6 +453,16 @@ module T = struct
       (Ledger.merkle_root ledger) ;
     { t with ledger }
 
+  let time ~logger label f =
+    let start = Core.Time.now () in
+    let%map x = f () in
+    [%log debug]
+      ~metadata:
+        [ ("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))
+        ]
+      "%s took $time_elapsed" label ;
+    x
+
   let sum_fees xs ~f =
     with_return (fun { return } ->
         Ok
@@ -516,7 +526,7 @@ module T = struct
     and supply_increase =
       Transaction.supply_increase s |> to_staged_ledger_or_error
     in
-    let source =
+    let source_merkle_root =
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
     let next_available_token_before = Ledger.next_available_token ledger in
@@ -526,24 +536,66 @@ module T = struct
     let new_init_stack =
       push_coinbase pending_coinbase_stack_state.init_stack s
     in
-    let%map applied_txn =
-      Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger s
-      |> to_staged_ledger_or_error
+    let source_local_state =
+      { Mina_state.Local_state.empty with ledger = source_merkle_root }
+    in
+    let%map applied_txn, target_local_state =
+      match s with
+      | Command (Parties p) ->
+          let%map applied_txn, local_state =
+            Or_error.map
+              (Ledger.apply_parties_unchecked ~state_view:txn_state_view
+                 ~constraint_constants ledger p)
+              ~f:(fun (applied, (local_state, _)) ->
+                ( { Ledger.Transaction_applied.previous_hash = source_merkle_root
+                  ; varying =
+                      Ledger.Transaction_applied.Varying.Command
+                        (Parties applied)
+                  }
+                , local_state ))
+            |> to_staged_ledger_or_error
+          in
+          let transaction_commitment = Parties.commitment p in
+          let hash_parties_stack ps =
+            ps |> Parties.Party_or_stack.accumulate_hashes'
+            |> List.map ~f:(Parties.Party_or_stack.map ~f:(fun p -> (p, ())))
+            |> Parties.Party_or_stack.stack_hash
+          in
+          ( applied_txn
+          , { local_state with
+              Parties_logic.Local_state.parties =
+                hash_parties_stack local_state.parties
+            ; call_stack = hash_parties_stack local_state.call_stack
+            ; ledger = source_merkle_root (*updated later*)
+            ; transaction_commitment
+            } )
+      | _ ->
+          let%map applied_txn =
+            Ledger.apply_transaction ~constraint_constants ~txn_state_view
+              ledger s
+            |> to_staged_ledger_or_error
+          in
+          (applied_txn, source_local_state)
     in
     let next_available_token_after = Ledger.next_available_token ledger in
+    let target_merkle_root =
+      Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
+    in
+    let target_local_state =
+      { target_local_state with ledger = target_merkle_root }
+    in
     ( applied_txn
     , { Transaction_snark.Statement.source =
-          { ledger = source
+          { ledger = source_merkle_root
           ; next_available_token = next_available_token_before
           ; pending_coinbase_stack = pending_coinbase_stack_state.pc.source
-          ; local_state = Mina_state.Local_state.empty
+          ; local_state = source_local_state
           }
       ; target =
-          { ledger =
-              Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
+          { ledger = target_merkle_root
           ; next_available_token = next_available_token_after
           ; pending_coinbase_stack = pending_coinbase_target
-          ; local_state = Mina_state.Local_state.empty
+          ; local_state = target_local_state
           }
       ; fee_excess
       ; supply_increase
@@ -716,16 +768,6 @@ module T = struct
     Option.value_map ~default:(Result.return ())
       ~f:(fun _ -> check (List.drop data (fst partitions.first)) partitions)
       partitions.second
-
-  let time ~logger label f =
-    let start = Core.Time.now () in
-    let%map x = f () in
-    [%log debug]
-      ~metadata:
-        [ ("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))
-        ]
-      "%s took $time_elapsed" label ;
-    x
 
   let update_coinbase_stack_and_get_data ~constraint_constants scan_state ledger
       pending_coinbase_collection transactions current_state_view

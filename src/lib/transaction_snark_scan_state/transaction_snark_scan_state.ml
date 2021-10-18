@@ -239,7 +239,7 @@ let create_expected_statement ~constraint_constants
     ; statement
     } =
   let open Or_error.Let_syntax in
-  let source =
+  let source_merkle_root =
     Frozen_ledger_hash.of_ledger_hash
     @@ Sparse_ledger.merkle_root ledger_witness
   in
@@ -251,15 +251,49 @@ let create_expected_statement ~constraint_constants
   in
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
-  let%bind after =
-    Or_error.try_with (fun () ->
-        Sparse_ledger.apply_transaction_exn ~constraint_constants
-          ~txn_state_view:state_view ledger_witness transaction)
+  let source_local_state =
+    { Mina_state.Local_state.empty with ledger = source_merkle_root }
   in
-  let target =
-    Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
+  let%bind after, target_local_state =
+    match transaction with
+    | Command (Parties p) ->
+        let%map _applied_txn, states =
+          Sparse_ledger.apply_parties_unchecked_with_states ~state_view
+            ~fee_excess:Amount.Signed.zero ~constraint_constants ledger_witness
+            p
+        in
+        (*should at least have fee payer party and therefore the state after applying it*)
+        let _global_state, local_state = List.last_exn states in
+        let after = local_state.ledger in
+        let transaction_commitment = Parties.commitment p in
+        let hash_parties_stack ps =
+          ps |> Parties.Party_or_stack.accumulate_hashes'
+          |> List.map ~f:(Parties.Party_or_stack.map ~f:(fun p -> (p, ())))
+          |> Parties.Party_or_stack.stack_hash
+        in
+        ( after
+        , { local_state with
+            Parties_logic.Local_state.parties =
+              hash_parties_stack local_state.parties
+          ; call_stack = hash_parties_stack local_state.call_stack
+          ; ledger = source_merkle_root (*updated later*)
+          ; transaction_commitment
+          } )
+    | _ ->
+        let%map after =
+          Or_error.try_with (fun () ->
+              Sparse_ledger.apply_transaction_exn ~constraint_constants
+                ~txn_state_view:state_view ledger_witness transaction)
+        in
+        (after, source_local_state)
   in
   let next_available_token_after = Sparse_ledger.next_available_token after in
+  let target_merkle_root =
+    Sparse_ledger.merkle_root after |> Frozen_ledger_hash.of_ledger_hash
+  in
+  let target_local_state =
+    { target_local_state with ledger = target_merkle_root }
+  in
   let%bind pending_coinbase_before =
     match init_stack with
     | Base source ->
@@ -281,23 +315,18 @@ let create_expected_statement ~constraint_constants
         pending_coinbase_with_state
   in
   let%bind fee_excess = Transaction.fee_excess transaction in
-  (*TODO: source local state should `local_state_init` from the witness and
-    target local state should be whatever `apply_parties_unchecked` returns. Do
-    they have to be in the statement in the scan state? transaction snark*)
-  let local_state = Mina_state.Local_state.empty in
-  let `Needs_some_work_for_snapps_on_mainnet = Mina_base.Util.todo_snapps in
   let%map supply_increase = Transaction.supply_increase transaction in
   { Transaction_snark.Statement.source =
-      { ledger = source
+      { ledger = source_merkle_root
       ; pending_coinbase_stack = statement.source.pending_coinbase_stack
       ; next_available_token = next_available_token_before
-      ; local_state
+      ; local_state = source_local_state
       }
   ; target =
-      { ledger = target
+      { ledger = target_merkle_root
       ; pending_coinbase_stack = pending_coinbase_after
       ; next_available_token = next_available_token_after
-      ; local_state
+      ; local_state = target_local_state
       }
   ; fee_excess
   ; supply_increase
