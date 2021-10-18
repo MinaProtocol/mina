@@ -68,7 +68,7 @@ func badHash(data []byte) [32]byte {
 
 type linkIxPair struct {
 	id BitswapBlockLink
-	ix int
+	ix NodeIndex
 }
 
 func testSplitJoinPrefix(maxBlockSize int, data []byte) error {
@@ -104,7 +104,7 @@ func testSplitJoinPrefix(maxBlockSize int, data []byte) error {
 			return fmt.Errorf("wrong first child for %d", ix)
 		}
 		for i, link := range links {
-			q = append(q, linkIxPair{id: link, ix: fstChildIx + i})
+			q = append(q, linkIxPair{id: link, ix: fstChildIx + NodeIndex(i)})
 		}
 	}
 	res, err := JoinBitswapBlocks(blocks, root)
@@ -217,11 +217,11 @@ func TestBitswapBlockSplitJoinPrefixQC(t *testing.T) {
 func TestDepthIndicesSequence(t *testing.T) {
 	lpb := LinksPerBlock(1 << 18)
 	di := MkDepthIndices(lpb, math.MaxInt32)
-	lastIx := 0
-	for id := 0; id < 10000000; id++ {
+	lastIx := NodeIndex(0)
+	for id := NodeIndex(0); id < 10000000; id++ {
 		fstChild := di.FirstChildId(id)
 		if lastIx+1 == fstChild {
-			lastIx = lastIx + lpb
+			lastIx = lastIx + NodeIndex(lpb)
 		} else {
 			t.Fatalf("Unexpected first child %d for id %d", fstChild, id)
 		}
