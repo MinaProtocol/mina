@@ -393,7 +393,7 @@ WITH RECURSIVE chain AS (
         blocks_user_commands.fee_payer_account_creation_fee_paid,
         blocks_user_commands.receiver_account_creation_fee_paid,
         blocks_user_commands.created_token,
-        blocks_user_commands.valid_until
+        u.valid_until,
         FROM user_commands u
         INNER JOIN blocks_user_commands ON blocks_user_commands.user_command_id = u.id
         INNER JOIN public_keys pk1 ON pk1.id = u.fee_payer_id
