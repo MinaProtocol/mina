@@ -5,51 +5,54 @@ module H_list = Snarky_backendless.H_list
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type 'a t =
-      { b2i1 : 'a
-      ; xt : 'a
-      ; b2i : 'a
-      ; xq : 'a
+      { xt : 'a
       ; yt : 'a
       ; xp : 'a
-      ; l1 : 'a
       ; yp : 'a
-      ; xs : 'a
-      ; ys : 'a
+      ; n_acc : 'a
+      ; xr : 'a
+      ; yr : 'a
+      ; s1 : 'a
+      ; s3 : 'a
+      ; b1 : 'a
+      ; b2 : 'a
+      ; b3 : 'a
+      ; b4 : 'a
       }
     [@@deriving sexp, fields, hlist]
   end
 end]
 
-let typ g =
-  Snarky_backendless.Typ.of_hlistable
-    [ g; g; g; g; g; g; g; g; g; g ]
-    ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-    ~value_of_hlist:of_hlist
-
-let map { b2i1; xt; b2i; xq; yt; xp; l1; yp; xs; ys } ~f =
-  { b2i1 = f b2i1
-  ; xt = f xt
-  ; b2i = f b2i
-  ; xq = f xq
+let map { xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4 } ~f =
+  { xt = f xt
   ; yt = f yt
   ; xp = f xp
-  ; l1 = f l1
   ; yp = f yp
-  ; xs = f xs
-  ; ys = f ys
+  ; n_acc = f n_acc
+  ; xr = f xr
+  ; yr = f yr
+  ; s1 = f s1
+  ; s3 = f s3
+  ; b1 = f b1
+  ; b2 = f b2
+  ; b3 = f b3
+  ; b4 = f b4
   }
 
 let map2 t1 t2 ~f =
-  { b2i1 = f t1.b2i1 t2.b2i1
-  ; xt = f t1.xt t2.xt
-  ; b2i = f t1.b2i t2.b2i
-  ; xq = f t1.xq t2.xq
+  { xt = f t1.xt t2.xt
   ; yt = f t1.yt t2.yt
   ; xp = f t1.xp t2.xp
-  ; l1 = f t1.l1 t2.l1
   ; yp = f t1.yp t2.yp
-  ; xs = f t1.xs t2.xs
-  ; ys = f t1.ys t2.ys
+  ; n_acc = f t1.n_acc t2.n_acc
+  ; xr = f t1.xr t2.xr
+  ; yr = f t1.yr t2.yr
+  ; s1 = f t1.s1 t2.s1
+  ; s3 = f t1.s3 t2.s3
+  ; b1 = f t1.b1 t2.b1
+  ; b2 = f t1.b2 t2.b2
+  ; b3 = f t1.b3 t2.b3
+  ; b4 = f t1.b4 t2.b4
   }
