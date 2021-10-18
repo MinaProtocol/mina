@@ -140,8 +140,8 @@ module Plonk_constraint = struct
     type ('v, 'f) t =
       | Basic of { l : 'f * 'v; r : 'f * 'v; o : 'f * 'v; m : 'f; c : 'f }
       | Poseidon of { state : 'v array array }
-      | EC_add of { p1 : 'v * 'v; p2 : 'v * 'v; p3 : 'v * 'v }
-      | EC_double
+      | EC_add_complete of
+          { p1 : 'v * 'v; p2 : 'v * 'v; p3 : 'v * 'v; result_infinite : 'v }
       | EC_scale of { state : 'v Scale_round.t array }
       | EC_endoscale of { state : 'v Endoscale_round.t array }
     [@@deriving sexp]
@@ -155,10 +155,13 @@ module Plonk_constraint = struct
           Basic { l = p l; r = p r; o = p o; m; c }
       | Poseidon { state } ->
           Poseidon { state = Array.map ~f:(fun x -> Array.map ~f x) state }
-      | EC_add { p1; p2; p3 } ->
-          EC_add { p1 = fp p1; p2 = fp p2; p3 = fp p3 }
-      | EC_double ->
-          EC_double
+      | EC_add_complete { p1; p2; p3; result_infinite } ->
+          EC_add_complete
+            { p1 = fp p1
+            ; p2 = fp p2
+            ; p3 = fp p3
+            ; result_infinite = f result_infinite
+            }
       | EC_scale { state } ->
           EC_scale
             { state = Array.map ~f:(fun x -> Scale_round.map ~f x) state }
@@ -334,12 +337,10 @@ struct
             let t = H.feed_string t "poseidon" in
             let row a = cvars (Array.to_list a) in
             Array.fold state ~init:t ~f:(fun acc a -> row a acc)
-        | EC_add { p1; p2; p3 } ->
-            let t = H.feed_string t "ec_add" in
+        | EC_add_complete { p1; p2; p3; result_infinite } ->
+            let t = H.feed_string t "ec_add_complete" in
             let pr (x, y) = cvars [ x; y ] in
-            t |> pr p1 |> pr p2 |> pr p3
-        | EC_double ->
-            failwith "not_implemented"
+            t |> cvars [ result_infinite ] |> pr p1 |> pr p2 |> pr p3
         | EC_scale { state } ->
             let t = H.feed_string t "ec_scale" in
             Array.fold state ~init:t
@@ -923,7 +924,7 @@ struct
                 [| Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero |]
             else add_round_state perm i)
           state
-    | Plonk_constraint.T (EC_add { p1; p2; p3 }) ->
+    | Plonk_constraint.T (EC_add_complete { p1; p2; p3; result_infinite }) ->
         let red =
           Array.map [| p1; p2; p3 |] ~f:(fun (x, y) ->
               (reduce_to_v x, reduce_to_v y))
@@ -973,31 +974,54 @@ struct
         ()
     | Plonk_constraint.T (EC_endoscale { state }) ->
         let add_endoscale_round (round : V.t Endoscale_round.t) =
-          let b2i1 = wire sys round.b2i1 sys.next_row L in
-          let xt = wire sys round.xt sys.next_row R in
-          let b2i = wire sys round.b2i (sys.next_row + 1) L in
-          let xq = wire sys round.xq (sys.next_row + 1) R in
-          let yt = wire sys round.yt (sys.next_row + 1) O in
-          let xp = wire sys round.xp (sys.next_row + 2) L in
-          let l1 = wire sys round.l1 (sys.next_row + 2) R in
-          let yp = wire sys round.yp (sys.next_row + 2) O in
-          let xs = wire sys round.xs (sys.next_row + 3) L in
-          let xq1 = wire sys round.xq (sys.next_row + 3) R in
-          let ys = wire sys round.ys (sys.next_row + 3) O in
+          let xt = wire sys round.xt sys.next_row 0 in
+          let yt = wire sys round.xt sys.next_row 1 in
+          let xp = wire sys round.xt sys.next_row 4 in
+          let yp = wire sys round.xt sys.next_row 5 in
+          let n_acc = wire sys round.n_acc sys.next_row 6 in
+          let xr = wire sys round.xr sys.next_row 7 in
+          let yr = wire sys round.yr sys.next_row 8 in
+          let s1 = wire sys round.s1 sys.next_row 9 in
+          let s3 = wire sys round.s3 sys.next_row 10 in
+          let b1 = wire sys round.b1 sys.next_row 11 in
+          let b2 = wire sys round.b2 sys.next_row 12 in
+          let b3 = wire sys round.b3 sys.next_row 13 in
+          let b4 = wire sys round.b4 sys.next_row 14 in
           add_row sys
-            [| Some round.b2i1; Some round.xt; None |]
-            Endomul1 b2i1 xt
-            { row = After_public_input sys.next_row; col = O }
-            [||] ;
-          add_row sys
-            [| Some round.b2i; Some round.xq; Some round.yt |]
-            Endomul2 b2i xq yt [||] ;
-          add_row sys
-            [| Some round.xp; Some round.l1; Some round.yp |]
-            Endomul3 xp l1 yp [||] ;
-          add_row sys
-            [| Some round.xs; Some round.xq; Some round.ys |]
-            Endomul4 xs xq1 ys [||]
+            [| Some round.xt
+             ; Some round.yt
+             ; None
+             ; None
+             ; Some round.xp
+             ; Some round.yp
+             ; Some round.n_acc
+             ; Some round.xr
+             ; Some round.yr
+             ; Some round.s1
+             ; Some round.s3
+             ; Some round.b1
+             ; Some round.b2
+             ; Some round.b3
+             ; Some round.b4
+            |]
+            Kimchi.Protocol.Endomul
+            [| xt
+             ; yt
+             ; { row = After_public_input sys.next_row; col = 2 }
+             ; { row = After_public_input sys.next_row; col = 3 }
+             ; xp
+             ; yp
+             ; n_acc
+             ; xr
+             ; yr
+             ; s1
+             ; s3
+             ; b1
+             ; b2
+             ; b3
+             ; b4
+            |]
+            [||]
         in
         Array.iter
           ~f:(fun round -> add_endoscale_round round)
