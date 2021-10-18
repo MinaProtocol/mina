@@ -335,8 +335,7 @@ WITH RECURSIVE chain AS (
         ; failure_reason: string option
         ; fee_payer_account_creation_fee_paid: int64 option
         ; receiver_account_creation_fee_paid: int64 option
-        ; created_token: int64 option
-        ; valid_until: int64 option }
+        ; created_token: int64 option }
       [@@deriving hlist]
 
       let fee_payer t = `Pk t.fee_payer
@@ -357,8 +356,6 @@ WITH RECURSIVE chain AS (
 
       let created_token t = t.created_token
 
-      let valid_until t = t.valid_until
-
       let typ =
         let open Archive_lib.Processor.Caqti_type_spec in
         let spec =
@@ -368,7 +365,6 @@ WITH RECURSIVE chain AS (
             ; string
             ; option string
             ; option string
-            ; option int64
             ; option int64
             ; option int64
             ; option int64 ]
@@ -392,8 +388,7 @@ WITH RECURSIVE chain AS (
         blocks_user_commands.failure_reason,
         blocks_user_commands.fee_payer_account_creation_fee_paid,
         blocks_user_commands.receiver_account_creation_fee_paid,
-        blocks_user_commands.created_token,
-        u.valid_until,
+        blocks_user_commands.created_token
         FROM user_commands u
         INNER JOIN blocks_user_commands ON blocks_user_commands.user_command_id = u.id
         INNER JOIN public_keys pk1 ON pk1.id = u.fee_payer_id
@@ -584,7 +579,7 @@ WITH RECURSIVE chain AS (
           ; fee= Unsigned.UInt64.of_int64 uc.fee
           ; hash= uc.hash
           ; failure_status= Some failure_status
-          ; valid_until= Option.map ~f:Unsigned.UInt32.of_int64 (User_commands.Extras.valid_until extras)
+          ; valid_until= Option.map ~f:Unsigned.UInt32.of_int64 uc.valid_until
           } )
     in
     { Block_info.block_identifier=
