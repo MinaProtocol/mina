@@ -35,27 +35,27 @@ provider "google" {
 }
 
 
-# variable "whale_count" {
-#   type = number
+variable "whale_count" {
+  type = number
 
-#   description = "Number of online whales for the network to run"
-#   default     = 24
-# }
+  description = "Number of unique online whales for the network to run"
+  default     = 24
+}
 
-# variable "fish_count" {
-#   type = number
+variable "fish_count" {
+  type = number
 
-#   description = "Number of online fish for the network to run"
-#   default     = 72
-# }
+  description = "Number of unique online fish for the network to run"
+  default     = 72
+}
 
 variable "seed_count" {
   default     = 2
 }
 
 variable "plain_node_count" {
-  default     = 2
-  # default     = 10
+  # default     = 2
+  default     = 10
 }
 
 locals {
@@ -154,109 +154,109 @@ module "gossipqa" {
       snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
       snark_coordinators_host_port = 10402
     }
-    # ,
-    # {
-    #   snark_worker_replicas = 5
-    #   snark_worker_fee      = "0.025"
-    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
-    #   snark_coordinators_host_port = 10403
-    # },
-    # {
-    #   snark_worker_replicas = 5
-    #   snark_worker_fee      = "0.025"
-    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
-    #   snark_coordinators_host_port = 10404
-    # },
-    # {
-    #   snark_worker_replicas = 5
-    #   snark_worker_fee      = "0.025"
-    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
-    #   snark_coordinators_host_port = 10405
-    # },
-    # {
-    #   snark_worker_replicas = 5
-    #   snark_worker_fee      = "0.025"
-    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
-    #   snark_coordinators_host_port = 10406
-    # }
-    # ,
-    # {
-    #   snark_worker_replicas = 5
-    #   snark_worker_fee      = "0.025"
-    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
-    #   snark_coordinators_host_port = 10407
-    # },
-    # {
-    #   snark_worker_replicas = 5
-    #   snark_worker_fee      = "0.025"
-    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
-    #   snark_coordinators_host_port = 10408
-    # },
-    # {
-    #   snark_worker_replicas = 5
-    #   snark_worker_fee      = "0.025"
-    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
-    #   snark_coordinators_host_port = 10409
-    # },
-    # {
-    #   snark_worker_replicas = 5
-    #   snark_worker_fee      = "0.025"
-    #   snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
-    #   snark_coordinators_host_port = 10410
-    # }
+    ,
+    {
+      snark_worker_replicas = 5
+      snark_worker_fee      = "0.025"
+      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_coordinators_host_port = 10403
+    },
+    {
+      snark_worker_replicas = 5
+      snark_worker_fee      = "0.025"
+      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_coordinators_host_port = 10404
+    },
+    {
+      snark_worker_replicas = 5
+      snark_worker_fee      = "0.025"
+      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_coordinators_host_port = 10405
+    },
+    {
+      snark_worker_replicas = 5
+      snark_worker_fee      = "0.025"
+      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_coordinators_host_port = 10406
+    }
+    ,
+    {
+      snark_worker_replicas = 5
+      snark_worker_fee      = "0.025"
+      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_coordinators_host_port = 10407
+    },
+    {
+      snark_worker_replicas = 5
+      snark_worker_fee      = "0.025"
+      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_coordinators_host_port = 10408
+    },
+    {
+      snark_worker_replicas = 5
+      snark_worker_fee      = "0.025"
+      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_coordinators_host_port = 10409
+    },
+    {
+      snark_worker_replicas = 5
+      snark_worker_fee      = "0.025"
+      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_coordinators_host_port = 10410
+    }
   ]
 
   seed_count            = var.seed_count
 
   plain_node_count = var.plain_node_count
 
-  whales= [    
-    {
-      duplicates = 2
-    },
-    {
-      duplicates = 1
-    }
-  ]
+  # whales= [    
+  #   {
+  #     duplicates = 2
+  #   },
+  #   {
+  #     duplicates = 1
+  #   }
+  # ]
 
-  fishes= [    
-    {
-      duplicates = 2
-    },
-    {
-      duplicates = 1
-    }
-  ]
+  # fishes= [    
+  #   {
+  #     duplicates = 2
+  #   },
+  #   {
+  #     duplicates = 1
+  #   }
+  # ]
 
-  # whales= concat( 
-  #   [for i in range(var.whale_count)/3:{
-  #       duplicates = 3
-  #       class  = "whale"
-  #     }], 
-  #   [for i in range(var.whale_count)/3:{
-  #       duplicates = 2
-  #       class  = "whale"
-  #     }], 
-  #   [for i in range(var.whale_count)/3:{
-  #       duplicates = 1
-  #       class  = "whale"
-  #     }]
-  # )
+  whales= concat( 
+    [for i in range(var.whale_count)/3:{
+        duplicates = 3
+        class  = "whale"
+      }], 
+    [for i in range(var.whale_count)/3:{
+        duplicates = 2
+        class  = "whale"
+      }], 
+    [for i in range(var.whale_count)/3:{
+        duplicates = 1
+        class  = "whale"
+      }]
+  )
   
-  # fishes=concat( 
-  #   [for i in range(var.fish_count)/3:{
-  #       duplicates = 3
-  #       class  = "fish"
-  #     }], 
-  #   [for i in range(var.fish_count)/3:{
-  #       duplicates = 2
-  #       class  = "fish"
-  #     }], 
-  #   [for i in range(var.fish_count)/3:{
-  #       duplicates = 1
-  #       class  = "fish"
-  #     }]
-  # )
+  fishes=concat( 
+    [for i in range(var.fish_count)/3:{
+        duplicates = 3
+        class  = "fish"
+      }], 
+    [for i in range(var.fish_count)/3:{
+        duplicates = 2
+        class  = "fish"
+      }], 
+    [for i in range(var.fish_count)/3:{
+        duplicates = 1
+        class  = "fish"
+      }]
+  )
 
   upload_blocks_to_gcloud         = false
   restart_nodes                   = false
