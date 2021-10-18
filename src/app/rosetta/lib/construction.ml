@@ -175,8 +175,8 @@ module Metadata_data = struct
     ; nonce: Unsigned_extended.UInt32.t
     ; token_id: Unsigned_extended.UInt64.t
     ; receiver: string
-    ; account_creation_fee: Unsigned_extended.UInt64.t option
-    ; valid_until: Unsigned_extended.UInt32.t option
+    ; account_creation_fee: Unsigned_extended.UInt64.t option [@default None]
+    ; valid_until: Unsigned_extended.UInt32.t option [@default None]
     }
   [@@deriving yojson]
 
