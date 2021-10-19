@@ -34,6 +34,7 @@ HTTPServer.timeout = 1
 
 def log(s):
   script_log_output_file.write("%s\n" % s)
+  script_log_output_file.flush()
 
 class MockRequestHandler(BaseHTTPRequestHandler):
   def do_GET(s):
