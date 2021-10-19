@@ -16,7 +16,7 @@ module Transaction_hash = Mina_base.Transaction_hash
 module Get_options_metadata =
 [%graphql
 {|
-    query get_options_metadata($public_key: PublicKey!, $token_id: TokenId, $receiver_key: PublicKey!) {
+    query get_options_metadata($sender: PublicKey!, $token_id: TokenId, $receiver_key: PublicKey!) {
       bestChain(maxLength: 5) {
         transactions {
           userCommands {
@@ -29,7 +29,7 @@ module Get_options_metadata =
         nonce
       }
 
-      account(publicKey: $public_key, token: $token_id) {
+      account(publicKey: $sender, token: $token_id) {
         balance {
           blockHeight @bsDecoder(fn: "Decoders.uint32")
           stateHash
@@ -163,19 +163,19 @@ module Options = struct
            Errors.create ~context:"Options of_json" (`Json_parse (Some e)))
     |> Result.bind ~f:(fun (r : Raw.t) ->
            let open Result.Let_syntax in
-           let e which e =
-             Errors.create
-               ~context:("Options of_json bad public key (" ^ which ^ ")")
-               (`Json_parse (Some (Core_kernel.Error.to_string_hum e)))
+           let error which e =
+              Errors.create
+                ~context:("Options of_json bad public key (" ^ which ^ ")")
+                (`Json_parse (Some (Core_kernel.Error.to_string_hum e)))
            in
 
            let%bind sender =
              Public_key.Compressed.of_base58_check r.sender
-             |> Result.map_error ~f:(e "sender")
+             |> Result.map_error ~f:(error "sender")
            in
            let%map receiver =
              Public_key.Compressed.of_base58_check r.receiver
-             |> Result.map_error ~f:(e "receiver")
+             |> Result.map_error ~f:(error "receiver")
            in
 
            { sender
@@ -285,7 +285,7 @@ module Metadata = struct
           (fun ?token_id:_ ~address ~receiver () ->
             Graphql.query
               (Get_options_metadata.make
-                 ~public_key:
+                 ~sender:
                    (`String (Public_key.Compressed.to_base58_check address))
                    (* for now, nonce is based on the fee payer's account using the default token,
                       per @mrmr1993
