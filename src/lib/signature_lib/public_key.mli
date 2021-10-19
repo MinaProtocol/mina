@@ -20,8 +20,15 @@ include Codable.S with type t := t
 
 module Stable : sig
   module V1 : sig
+<<<<<<< HEAD
     type nonrec t = t
     [@@deriving bin_io, sexp, compare, equal, hash, yojson, version]
+||||||| 260701a0b
+    type nonrec t = t
+    [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
+=======
+    type nonrec t = t [@@deriving bin_io, sexp, compare, hash, yojson, version]
+>>>>>>> origin/release/1.2.0
   end
 
   module Latest = V1
@@ -66,6 +73,8 @@ module Compressed : sig
       type nonrec t = t [@@deriving sexp, bin_io, equal, compare, hash, version]
 
       include Codable.S with type t := t
+
+      include Hashable.S_binable with type t := t
     end
 
     module Latest = V1

@@ -3068,8 +3068,23 @@ module Mutations = struct
     field "setStaking" ~doc:"Set keys you wish to stake with"
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.set_staking) ]
       ~typ:(non_null Types.Payload.set_staking)
+<<<<<<< HEAD
       ~resolve:(fun { ctx = coda; _ } () pks ->
+||||||| 260701a0b
+      ~resolve:(fun {ctx= coda; _} () pks ->
+=======
+      ~resolve:(fun {ctx= coda; _} () _pks ->
+        [%log' error (Mina_lib.top_level_logger coda)]
+          "setStaking is temorarily disabled in this build. Please restart \
+           the daemon with the new block producer key" ;
+>>>>>>> origin/release/1.2.0
         let old_block_production_keys =
+          Mina_lib.block_production_pubkeys coda
+          |> Public_key.Compressed.Set.to_list
+        in
+        (old_block_production_keys, [], old_block_production_keys)
+        (*TODO: uncomment this after key swaps are fixed for the new VRF evaluator implementation *)
+        (*let old_block_production_keys =
           Mina_lib.block_production_pubkeys coda
         in
         let wallet = Mina_lib.wallets coda in
@@ -3103,7 +3118,14 @@ module Mutations = struct
              (Keypair.And_compressed_pk.Set.of_list unlocked) ;
         ( Public_key.Compressed.Set.to_list old_block_production_keys
         , locked
+<<<<<<< HEAD
         , List.map ~f:Tuple.T2.get2 unlocked ))
+||||||| 260701a0b
+        , List.map ~f:Tuple.T2.get2 unlocked ) )
+=======
+        , List.map ~f:Tuple.T2.get2 unlocked )*)
+        )
+>>>>>>> origin/release/1.2.0
 
   let set_coinbase_receiver =
     field "setCoinbaseReceiver" ~doc:"Set the key to receive coinbases"

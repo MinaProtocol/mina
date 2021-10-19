@@ -25,8 +25,9 @@ if [[ -n "${THIS_COMMIT_TAG}" ]]; then # If the commit is tagged
     export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}" | sed 's!/!-!g; s!_!-!g')-${MINA_DEB_CODENAME}"
 else
     export MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
-    export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}" | sed 's!/!-!g; s!_!-!g')-${MINA_DEB_CODENAME}"
+    export MINA_DOCKER_TAG="$(echo "${GITTAG}-${GITBRANCH}-${GITHASH}" | sed 's!/!-!g; s!_!-!g')"
 fi
+
 
 # Determine deb repo to use
 case $GITBRANCH in

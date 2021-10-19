@@ -2,15 +2,35 @@
 
 open Core
 
+<<<<<<< HEAD
 type t = { uuid : Uuid.Stable.V1.t; db : (Rocks.t[@sexp.opaque]) }
 [@@deriving sexp]
+||||||| 260701a0b
+(* Uuid.t deprecates sexp functions; use Uuid.Stable.V1 *)
+
+module T = struct
+  type t = {uuid: Uuid.Stable.V1.t; db: Rocks.t sexp_opaque} [@@deriving sexp]
+end
+
+include T
+=======
+type t = {uuid: Uuid.Stable.V1.t; db: Rocks.t sexp_opaque} [@@deriving sexp]
+>>>>>>> origin/release/1.2.0
 
 let create directory =
   let opts = Rocks.Options.create () in
   Rocks.Options.set_create_if_missing opts true ;
+<<<<<<< HEAD
   Rocks.Options.set_prefix_extractor opts
     (Rocks.Options.SliceTransform.Noop.create_no_gc ()) ;
   { uuid = Uuid_unix.create (); db = Rocks.open_db ~opts directory }
+||||||| 260701a0b
+  {uuid= Uuid_unix.create (); db= Rocks.open_db ~opts directory}
+=======
+  Rocks.Options.set_prefix_extractor opts
+    (Rocks.Options.SliceTransform.Noop.create_no_gc ()) ;
+  {uuid= Uuid_unix.create (); db= Rocks.open_db ~opts directory}
+>>>>>>> origin/release/1.2.0
 
 let create_checkpoint t dir =
   Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None ;
@@ -81,6 +101,7 @@ let to_alist t : (Bigstring.t * Bigstring.t) list =
 
 let to_bigstring = Bigstring.of_string
 
+<<<<<<< HEAD
 let%test_unit "get_batch" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       File_system.with_temp_dir "/tmp/mina-rocksdb-test" ~f:(fun db_dir ->
@@ -99,6 +120,27 @@ let%test_unit "get_batch" =
           assert ([%equal: Bigstring.t option] res3 (Some data)) ;
           Async.Deferred.unit))
 
+||||||| 260701a0b
+=======
+let%test_unit "get_batch" =
+  Async.Thread_safe.block_on_async_exn (fun () ->
+      File_system.with_temp_dir "/tmp/mina-rocksdb-test" ~f:(fun db_dir ->
+          let db = create db_dir in
+          let[@warning "-8"] [key1; key2; key3] =
+            List.map ~f:Bigstring.of_string ["a"; "b"; "c"]
+          in
+          let data = Bigstring.of_string "test" in
+          set db ~key:key1 ~data ;
+          set db ~key:key3 ~data ;
+          let[@warning "-8"] [res1; res2; res3] =
+            get_batch db ~keys:[key1; key2; key3]
+          in
+          assert (res1 = Some data) ;
+          assert (res2 = None) ;
+          assert (res3 = Some data) ;
+          Async.Deferred.unit ) )
+
+>>>>>>> origin/release/1.2.0
 let%test_unit "to_alist (of_alist l) = l" =
   Async.Thread_safe.block_on_async_exn
   @@ fun () ->

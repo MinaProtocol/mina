@@ -5,7 +5,6 @@ FROM debian:${deb_codename}-slim
 ARG deb_version
 ARG deb_codename=stretch
 ARG deb_release=alpha
-ARG network=mainnet
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $deb_codename $deb_release $deb_version"

@@ -50,12 +50,27 @@ type snark_worker =
   }
 
 type processes =
+<<<<<<< HEAD
   { prover : Prover.t
   ; verifier : Verifier.t
   ; mutable snark_worker :
       [ `On of snark_worker * Currency.Fee.t | `Off of Currency.Fee.t ]
   ; uptime_snark_worker_opt : Uptime_service.Uptime_snark_worker.t option
   }
+||||||| 260701a0b
+  { prover: Prover.t
+  ; verifier: Verifier.t
+  ; mutable snark_worker:
+      [`On of snark_worker * Currency.Fee.t | `Off of Currency.Fee.t]
+  ; uptime_snark_worker_opt: Uptime_service.Uptime_snark_worker.t option }
+=======
+  { prover: Prover.t
+  ; verifier: Verifier.t
+  ; vrf_evaluator: Vrf_evaluator.t
+  ; mutable snark_worker:
+      [`On of snark_worker * Currency.Fee.t | `Off of Currency.Fee.t]
+  ; uptime_snark_worker_opt: Uptime_service.Uptime_snark_worker.t option }
+>>>>>>> origin/release/1.2.0
 
 type components =
   { net : Mina_networking.t
@@ -1084,8 +1099,16 @@ let check_and_stop_daemon t ~wait =
         if Time.Span.(wait_for > max_catchup_time) then `Now
         else `Check_in wait_for
 
+<<<<<<< HEAD
 let _stop_long_running_daemon t =
   let wait_mins = (40 * 60) + (Random.int 10 * 60) in
+||||||| 260701a0b
+let stop_long_running_daemon t =
+  let wait_mins = (40 * 60) + (Random.int 10 * 60) in
+=======
+let stop_long_running_daemon t =
+  let wait_mins = (t.config.stop_time * 60) + (Random.int 10 * 60) in
+>>>>>>> origin/release/1.2.0
   [%log' info t.config.logger]
     "Stopping daemon after $wait mins and when there are no blocks to be \
      produced"
@@ -1134,11 +1157,18 @@ let start t =
       in
       let status, timing =
         match timing with
-        | `Check_again time ->
+        | `Check_again block_time ->
             ( `Free
             , Daemon_rpcs.Types.Status.Next_producer_timing.Check_again
+<<<<<<< HEAD
                 (time |> Block_time.Span.of_ms |> Block_time.of_span_since_epoch)
             )
+||||||| 260701a0b
+                ( time |> Block_time.Span.of_ms
+                |> Block_time.of_span_since_epoch ) )
+=======
+                block_time )
+>>>>>>> origin/release/1.2.0
         | `Produce_now (block_data, _) ->
             let info :
                 Daemon_rpcs.Types.Status.Next_producer_timing.producing_time =
@@ -1168,7 +1198,8 @@ let start t =
     t.block_production_status := block_production_status ;
     t.next_producer_timing <- Some next_producer_timing
   in
-  Block_producer.run ~logger:t.config.logger ~verifier:t.processes.verifier
+  Block_producer.run ~logger:t.config.logger
+    ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
     ~set_next_producer_timing ~prover:t.processes.prover
     ~trust_system:t.config.trust_system
     ~transaction_resource_pool:
@@ -1254,6 +1285,15 @@ let create ?wallets (config : Config.t) =
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       trace "mina_lib" (fun () ->
+          let block_production_keypairs =
+            Agent.create
+              ~f:(fun kps ->
+                Keypair.Set.to_list kps
+                |> List.map ~f:(fun kp ->
+                       (kp, Public_key.compress kp.Keypair.public_key) )
+                |> Keypair.And_compressed_pk.Set.of_list )
+              config.initial_block_production_keypairs
+          in
           let%bind prover =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -1288,6 +1328,25 @@ let create ?wallets (config : Config.t) =
                       ~constraint_constants:
                         config.precomputed_values.constraint_constants
                       ~pids:config.pids ~conf_dir:(Some config.conf_dir)))
+            >>| Result.ok_exn
+          in
+          let%bind vrf_evaluator =
+            Monitor.try_with ~here:[%here]
+              ~rest:
+                (`Call
+                  (fun exn ->
+                    let err = Error.of_exn ~backtrace:`Get exn in
+                    [%log' warn config.logger]
+                      "unhandled exception from daemon-side vrf evaluator \
+                       server: $exn"
+                      ~metadata:[("exn", Error_json.error_to_yojson err)] ))
+              (fun () ->
+                trace "vrf_evaluator" (fun () ->
+                    Vrf_evaluator.create ~constraint_constants
+                      ~pids:config.pids ~logger:config.logger
+                      ~conf_dir:config.conf_dir ~consensus_constants
+                      ~keypairs:(Agent.get block_production_keypairs |> fst) )
+                )
             >>| Result.ok_exn
           in
           let snark_worker =
@@ -1389,6 +1448,7 @@ let create ?wallets (config : Config.t) =
           (* knot-tying hacks so we can pass a get_node_status function before net, Mina_lib.t created *)
           let net_ref = ref None in
           let sync_status_ref = ref None in
+<<<<<<< HEAD
           let block_production_keypairs =
             Agent.create
               ~f:(fun kps ->
@@ -1398,6 +1458,18 @@ let create ?wallets (config : Config.t) =
                 |> Keypair.And_compressed_pk.Set.of_list)
               config.initial_block_production_keypairs
           in
+||||||| 260701a0b
+          let block_production_keypairs =
+            Agent.create
+              ~f:(fun kps ->
+                Keypair.Set.to_list kps
+                |> List.map ~f:(fun kp ->
+                       (kp, Public_key.compress kp.Keypair.public_key) )
+                |> Keypair.And_compressed_pk.Set.of_list )
+              config.initial_block_production_keypairs
+          in
+=======
+>>>>>>> origin/release/1.2.0
           let get_node_status _env =
             trace_recurring "get_node_status" (fun () ->
                 let node_ip_addr =
@@ -1987,9 +2059,23 @@ let create ?wallets (config : Config.t) =
           sync_status_ref := Some sync_status ;
           Deferred.return
             { config
+<<<<<<< HEAD
             ; next_producer_timing = None
             ; processes =
                 { prover; verifier; snark_worker; uptime_snark_worker_opt }
+||||||| 260701a0b
+            ; next_producer_timing= None
+            ; processes=
+                {prover; verifier; snark_worker; uptime_snark_worker_opt}
+=======
+            ; next_producer_timing= None
+            ; processes=
+                { prover
+                ; verifier
+                ; snark_worker
+                ; uptime_snark_worker_opt
+                ; vrf_evaluator }
+>>>>>>> origin/release/1.2.0
             ; initialization_finish_signal
             ; components =
                 { net
