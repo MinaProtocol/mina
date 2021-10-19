@@ -85,6 +85,8 @@ end = struct
 
   let get _t _loc = None
 
+  let get_batch _t locs = List.map locs ~f:(fun loc -> (loc, None))
+
   let get_uuid t = t.uuid
 
   let get_directory _ = None
@@ -97,6 +99,9 @@ end = struct
     failwith "get_or_create_account: null ledgers cannot be mutated"
 
   let location_of_account _t _ = None
+
+  let location_of_account_batch _t accts =
+    List.map accts ~f:(fun acct -> (acct, None))
 
   let accounts _t = Account_id.Set.empty
 

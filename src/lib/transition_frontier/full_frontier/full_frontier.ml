@@ -694,6 +694,7 @@ let update_metrics_with_diff (type mutant) t
       let best_tip = best_tip t in
       let open Consensus.Data.Consensus_state in
       let slot_time = slot_time t best_tip in
+      let height = blockchain_length (Breadcrumb.consensus_state best_tip) in
       let is_recent_block =
         let now = Block_time.now t.time_controller in
         let two_slots =
@@ -717,6 +718,8 @@ let update_metrics_with_diff (type mutant) t
           (Int.to_float (longest_fork t)) ;
         Gauge.set Transition_frontier.best_tip_slot_time_sec
           (slot_time_to_offset_time_span slot_time) ;
+        Gauge.set Transition_frontier.best_tip_block_height
+          (Mina_numbers.Length.to_int height |> Int.to_float) ;
         Gauge.set Transition_frontier.empty_blocks_at_best_tip
           (Int.to_float (empty_blocks_at_best_tip t)))
 

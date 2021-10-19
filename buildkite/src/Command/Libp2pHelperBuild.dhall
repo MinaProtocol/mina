@@ -11,6 +11,7 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 let commands = \(debVersion : DebianVersions.DebVersion) ->
   [
     Cmd.run "chmod -R 777 src/app/libp2p_helper",
+    Cmd.run "chmod -R 777 src/libp2p_ipc",
     Cmd.runInDocker
       Cmd.Docker::{
         image = DebianVersions.toolchainImage debVersion,

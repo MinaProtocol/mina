@@ -43,7 +43,7 @@ variable "deploy_watchdog" {
 
 variable "mina_image" {
   type    = string
-  default = "codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"
+  default = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet"
 }
 
 variable "use_custom_entrypoint" {
@@ -111,7 +111,7 @@ variable "mina_faucet_fee" {
 
 variable "testnet_name" {
   type    = string
-  default = "coda-testnet"
+  default = "mina-testnet"
 }
 
 variable "additional_peers" {
@@ -258,7 +258,7 @@ variable "gcloud_seeds" {
   default = []
 }
 
-# Coda network services vars
+# Mina network services vars
 
 variable "restart_nodes" {
   type    = bool
