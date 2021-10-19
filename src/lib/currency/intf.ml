@@ -83,6 +83,8 @@ module type Arithmetic_intf = sig
 
   val add : t -> t -> t option
 
+  val add_flagged : t -> t -> t * [ `Overflow of bool ]
+
   val sub : t -> t -> t option
 
   val ( + ) : t -> t -> t option
@@ -94,6 +96,8 @@ end
 
 module type Signed_intf = sig
   type magnitude
+
+  type signed_fee
 
   [%%ifdef consensus_mechanism]
 
@@ -125,11 +129,17 @@ module type Signed_intf = sig
 
   val add : t -> t -> t option
 
+  val add_flagged : t -> t -> t * [ `Overflow of bool ]
+
   val ( + ) : t -> t -> t option
 
   val negate : t -> t
 
   val of_unsigned : magnitude -> t
+
+  val to_fee : t -> signed_fee
+
+  val of_fee : signed_fee -> t
 
   [%%ifdef consensus_mechanism]
 
@@ -138,6 +148,8 @@ module type Signed_intf = sig
   val typ : (var, t) Typ.t
 
   module Checked : sig
+    type signed_fee_var
+
     val constant : t -> var
 
     val of_unsigned : magnitude_var -> var
@@ -149,6 +161,9 @@ module type Signed_intf = sig
     val to_input : var -> (_, Boolean.var) Random_oracle.Input.t
 
     val add : var -> var -> (var, _) Checked.t
+
+    val add_flagged :
+      var -> var -> (var * [ `Overflow of Boolean.var ], _) Checked.t
 
     val assert_equal : var -> var -> (unit, _) Checked.t
 
@@ -165,6 +180,10 @@ module type Signed_intf = sig
       -> (magnitude_var, Sgn.t) Signed_poly.t
          * (magnitude_var, Sgn.t) Signed_poly.t
       -> (var * var, _) Checked.t
+
+    val to_fee : var -> signed_fee_var
+
+    val of_fee : signed_fee_var -> var
 
     type t = var
   end

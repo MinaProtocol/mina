@@ -64,6 +64,17 @@ module Hashless_ledger = struct
     in
     (action, Option.value_exn (get ledger loc), loc)
 
+  let create_new_account t account_id account =
+    let open Or_error.Let_syntax in
+    let%bind action, _ = get_or_create_account t account_id account in
+    if [%equal: [ `Existed | `Added ]] action `Existed then
+      Or_error.errorf
+        !"Could not create a new account with pk \
+          %{sexp:Signature_lib.Public_key.Compressed.t}: Account already \
+          exists"
+        (Account_id.public_key account_id)
+    else Ok ()
+
   let get_or_create t id = Or_error.try_with (fun () -> get_or_create_exn t id)
 
   let remove_accounts_exn _t =
@@ -86,6 +97,38 @@ module Hashless_ledger = struct
   let next_available_token { next_available_token; _ } = next_available_token
 
   let set_next_available_token t tid = t.next_available_token <- tid
+
+  (** Create a new ledger mask 'on top of' the given ledger.
+
+      Warning: For technical reasons, this mask cannot be applied directly to
+      the parent ledger; instead, use
+      [apply_mask parent_ledger ~masked:this_ledger] to update the parent
+      ledger as necessary.
+  *)
+  let create_masked t =
+    { base = t.base
+    ; overlay = Hashtbl.copy t.overlay
+    ; next_available_token = t.next_available_token
+    }
+
+  (** [apply_mask ledger ~masked] applies any updates in [masked] to the ledger
+      [ledger]. [masked] should be created by calling [create_masked ledger].
+
+      Warning: This function may behave unexpectedly if [ledger] was modified
+      after calling [create_masked], or the given [ledger] was not used to
+      create [masked].
+  *)
+  let apply_mask t ~masked =
+    Hashtbl.merge_into ~src:masked.overlay ~dst:t.overlay
+      ~f:(fun ~key:_ src _dst -> Set_to src) ;
+    t.next_available_token <- masked.next_available_token
+
+  (** Create a new 'empty' ledger. *)
+  let empty ~depth () =
+    let ledger = Ledger.create_ephemeral ~depth () in
+    let res = create ledger in
+    (* This ledger should never be modified or read. *)
+    Ledger.close ledger ; res
 end
 
 include Transaction_logic.Make (Hashless_ledger)
