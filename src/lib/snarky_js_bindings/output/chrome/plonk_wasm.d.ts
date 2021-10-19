@@ -1,71 +1,21 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
-* @returns {WasmPastaFpPlonkGateVector}
+* @param {Uint32Array} lgr_comm
+* @param {WasmPastaFpPlonkVerifierIndex} index
+* @param {WasmPastaFpProverProof} proof
+* @returns {WasmPastaFpPlonkOracles}
 */
-export function caml_pasta_fp_plonk_gate_vector_create(): WasmPastaFpPlonkGateVector;
+export function caml_pasta_fp_plonk_oracles_create(lgr_comm: Uint32Array, index: WasmPastaFpPlonkVerifierIndex, proof: WasmPastaFpProverProof): WasmPastaFpPlonkOracles;
 /**
-* @param {WasmPastaFpPlonkGateVector} v
-* @param {WasmPastaFpPlonkGate} gate
+* @returns {WasmPastaFpPlonkOracles}
 */
-export function caml_pasta_fp_plonk_gate_vector_add(v: WasmPastaFpPlonkGateVector, gate: WasmPastaFpPlonkGate): void;
+export function caml_pasta_fp_plonk_oracles_dummy(): WasmPastaFpPlonkOracles;
 /**
-* @param {WasmPastaFpPlonkGateVector} v
-* @param {number} i
-* @returns {WasmPastaFpPlonkGate}
+* @param {WasmPastaFpPlonkOracles} x
+* @returns {WasmPastaFpPlonkOracles}
 */
-export function caml_pasta_fp_plonk_gate_vector_get(v: WasmPastaFpPlonkGateVector, i: number): WasmPastaFpPlonkGate;
-/**
-* @param {WasmPastaFpPlonkGateVector} v
-* @param {WasmPlonkWire} t
-* @param {WasmPlonkWire} h
-*/
-export function caml_pasta_fp_plonk_gate_vector_wrap(v: WasmPastaFpPlonkGateVector, t: WasmPlonkWire, h: WasmPlonkWire): void;
-/**
-* @param {WasmPastaFpPlonkGateVector} gates
-* @param {number} public_
-* @param {WasmPastaFpUrs} urs
-* @returns {WasmPastaFpPlonkIndex}
-*/
-export function caml_pasta_fp_plonk_index_create(gates: WasmPastaFpPlonkGateVector, public_: number, urs: WasmPastaFpUrs): WasmPastaFpPlonkIndex;
-/**
-* @param {WasmPastaFpPlonkIndex} index
-* @returns {number}
-*/
-export function caml_pasta_fp_plonk_index_max_degree(index: WasmPastaFpPlonkIndex): number;
-/**
-* @param {WasmPastaFpPlonkIndex} index
-* @returns {number}
-*/
-export function caml_pasta_fp_plonk_index_public_inputs(index: WasmPastaFpPlonkIndex): number;
-/**
-* @param {WasmPastaFpPlonkIndex} index
-* @returns {number}
-*/
-export function caml_pasta_fp_plonk_index_domain_d1_size(index: WasmPastaFpPlonkIndex): number;
-/**
-* @param {WasmPastaFpPlonkIndex} index
-* @returns {number}
-*/
-export function caml_pasta_fp_plonk_index_domain_d4_size(index: WasmPastaFpPlonkIndex): number;
-/**
-* @param {WasmPastaFpPlonkIndex} index
-* @returns {number}
-*/
-export function caml_pasta_fp_plonk_index_domain_d8_size(index: WasmPastaFpPlonkIndex): number;
-/**
-* @param {number | undefined} offset
-* @param {WasmPastaFpUrs} urs
-* @param {string} path
-* @returns {WasmPastaFpPlonkIndex}
-*/
-export function caml_pasta_fp_plonk_index_read(offset: number | undefined, urs: WasmPastaFpUrs, path: string): WasmPastaFpPlonkIndex;
-/**
-* @param {boolean | undefined} append
-* @param {WasmPastaFpPlonkIndex} index
-* @param {string} path
-*/
-export function caml_pasta_fp_plonk_index_write(append: boolean | undefined, index: WasmPastaFpPlonkIndex, path: string): void;
+export function caml_pasta_fp_plonk_oracles_deep_copy(x: WasmPastaFpPlonkOracles): WasmPastaFpPlonkOracles;
 /**
 * @param {WasmPastaFpPlonkIndex} index
 * @param {Uint8Array} primary_input
@@ -360,22 +310,6 @@ export function caml_pasta_fq_of_bytes(x: Uint8Array): Uint8Array;
 * @returns {Uint8Array}
 */
 export function caml_pasta_fq_deep_copy(x: Uint8Array): Uint8Array;
-/**
-* @param {Uint32Array} lgr_comm
-* @param {WasmPastaFpPlonkVerifierIndex} index
-* @param {WasmPastaFpProverProof} proof
-* @returns {WasmPastaFpPlonkOracles}
-*/
-export function caml_pasta_fp_plonk_oracles_create(lgr_comm: Uint32Array, index: WasmPastaFpPlonkVerifierIndex, proof: WasmPastaFpProverProof): WasmPastaFpPlonkOracles;
-/**
-* @returns {WasmPastaFpPlonkOracles}
-*/
-export function caml_pasta_fp_plonk_oracles_dummy(): WasmPastaFpPlonkOracles;
-/**
-* @param {WasmPastaFpPlonkOracles} x
-* @returns {WasmPastaFpPlonkOracles}
-*/
-export function caml_pasta_fp_plonk_oracles_deep_copy(x: WasmPastaFpPlonkOracles): WasmPastaFpPlonkOracles;
 /**
 * @param {Uint32Array} lgr_comm
 * @param {WasmPastaFqPlonkVerifierIndex} index
@@ -768,6 +702,72 @@ export function caml_pasta_fq_plonk_index_read(offset: number | undefined, urs: 
 * @param {string} path
 */
 export function caml_pasta_fq_plonk_index_write(append: boolean | undefined, index: WasmPastaFqPlonkIndex, path: string): void;
+/**
+* @returns {WasmPastaFpPlonkGateVector}
+*/
+export function caml_pasta_fp_plonk_gate_vector_create(): WasmPastaFpPlonkGateVector;
+/**
+* @param {WasmPastaFpPlonkGateVector} v
+* @param {WasmPastaFpPlonkGate} gate
+*/
+export function caml_pasta_fp_plonk_gate_vector_add(v: WasmPastaFpPlonkGateVector, gate: WasmPastaFpPlonkGate): void;
+/**
+* @param {WasmPastaFpPlonkGateVector} v
+* @param {number} i
+* @returns {WasmPastaFpPlonkGate}
+*/
+export function caml_pasta_fp_plonk_gate_vector_get(v: WasmPastaFpPlonkGateVector, i: number): WasmPastaFpPlonkGate;
+/**
+* @param {WasmPastaFpPlonkGateVector} v
+* @param {WasmPlonkWire} t
+* @param {WasmPlonkWire} h
+*/
+export function caml_pasta_fp_plonk_gate_vector_wrap(v: WasmPastaFpPlonkGateVector, t: WasmPlonkWire, h: WasmPlonkWire): void;
+/**
+* @param {WasmPastaFpPlonkGateVector} gates
+* @param {number} public_
+* @param {WasmPastaFpUrs} urs
+* @returns {WasmPastaFpPlonkIndex}
+*/
+export function caml_pasta_fp_plonk_index_create(gates: WasmPastaFpPlonkGateVector, public_: number, urs: WasmPastaFpUrs): WasmPastaFpPlonkIndex;
+/**
+* @param {WasmPastaFpPlonkIndex} index
+* @returns {number}
+*/
+export function caml_pasta_fp_plonk_index_max_degree(index: WasmPastaFpPlonkIndex): number;
+/**
+* @param {WasmPastaFpPlonkIndex} index
+* @returns {number}
+*/
+export function caml_pasta_fp_plonk_index_public_inputs(index: WasmPastaFpPlonkIndex): number;
+/**
+* @param {WasmPastaFpPlonkIndex} index
+* @returns {number}
+*/
+export function caml_pasta_fp_plonk_index_domain_d1_size(index: WasmPastaFpPlonkIndex): number;
+/**
+* @param {WasmPastaFpPlonkIndex} index
+* @returns {number}
+*/
+export function caml_pasta_fp_plonk_index_domain_d4_size(index: WasmPastaFpPlonkIndex): number;
+/**
+* @param {WasmPastaFpPlonkIndex} index
+* @returns {number}
+*/
+export function caml_pasta_fp_plonk_index_domain_d8_size(index: WasmPastaFpPlonkIndex): number;
+/**
+* @param {number | undefined} offset
+* @param {WasmPastaFpUrs} urs
+* @param {string} path
+* @returns {WasmPastaFpPlonkIndex}
+*/
+export function caml_pasta_fp_plonk_index_read(offset: number | undefined, urs: WasmPastaFpUrs, path: string): WasmPastaFpPlonkIndex;
+/**
+* @param {boolean | undefined} append
+* @param {WasmPastaFpPlonkIndex} index
+* @param {string} path
+*/
+export function caml_pasta_fp_plonk_index_write(append: boolean | undefined, index: WasmPastaFpPlonkIndex, path: string): void;
 /**
 * @param {string} s
 * @param {number} _len
@@ -1907,28 +1907,21 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
   readonly __wasm_init_memory: () => void;
-  readonly __wbg_wasmpastafpplonkgatevector_free: (a: number) => void;
-  readonly __wbg_wasmpastafpplonkgate_free: (a: number) => void;
-  readonly __wbg_get_wasmpastafpplonkgate_typ: (a: number) => number;
-  readonly __wbg_set_wasmpastafpplonkgate_typ: (a: number, b: number) => void;
-  readonly __wbg_get_wasmpastafpplonkgate_wires: (a: number) => number;
-  readonly __wbg_set_wasmpastafpplonkgate_wires: (a: number, b: number) => void;
-  readonly wasmpastafpplonkgate_new: (a: number, b: number, c: number, d: number) => number;
-  readonly wasmpastafpplonkgate_c: (a: number, b: number) => void;
-  readonly wasmpastafpplonkgate_set_c: (a: number, b: number, c: number) => void;
-  readonly caml_pasta_fp_plonk_gate_vector_create: () => number;
-  readonly caml_pasta_fp_plonk_gate_vector_add: (a: number, b: number) => void;
-  readonly caml_pasta_fp_plonk_gate_vector_get: (a: number, b: number) => number;
-  readonly caml_pasta_fp_plonk_gate_vector_wrap: (a: number, b: number, c: number) => void;
-  readonly __wbg_wasmpastafpplonkindex_free: (a: number) => void;
-  readonly caml_pasta_fp_plonk_index_create: (a: number, b: number, c: number) => number;
-  readonly caml_pasta_fp_plonk_index_max_degree: (a: number) => number;
-  readonly caml_pasta_fp_plonk_index_public_inputs: (a: number) => number;
-  readonly caml_pasta_fp_plonk_index_domain_d1_size: (a: number) => number;
-  readonly caml_pasta_fp_plonk_index_domain_d4_size: (a: number) => number;
-  readonly caml_pasta_fp_plonk_index_domain_d8_size: (a: number) => number;
-  readonly caml_pasta_fp_plonk_index_read: (a: number, b: number, c: number, d: number, e: number) => number;
-  readonly caml_pasta_fp_plonk_index_write: (a: number, b: number, c: number, d: number) => void;
+  readonly __wbg_wasmpastafpplonkoracles_free: (a: number) => void;
+  readonly __wbg_get_wasmpastafpplonkoracles_o: (a: number, b: number) => void;
+  readonly __wbg_set_wasmpastafpplonkoracles_o: (a: number, b: number, c: number) => void;
+  readonly __wbg_get_wasmpastafpplonkoracles_p_eval0: (a: number, b: number) => void;
+  readonly __wbg_set_wasmpastafpplonkoracles_p_eval0: (a: number, b: number, c: number) => void;
+  readonly __wbg_get_wasmpastafpplonkoracles_p_eval1: (a: number, b: number) => void;
+  readonly __wbg_set_wasmpastafpplonkoracles_p_eval1: (a: number, b: number, c: number) => void;
+  readonly __wbg_get_wasmpastafpplonkoracles_digest_before_evaluations: (a: number, b: number) => void;
+  readonly __wbg_set_wasmpastafpplonkoracles_digest_before_evaluations: (a: number, b: number, c: number) => void;
+  readonly wasmpastafpplonkoracles_new: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => number;
+  readonly wasmpastafpplonkoracles_opening_prechallenges: (a: number, b: number) => void;
+  readonly wasmpastafpplonkoracles_set_opening_prechallenges: (a: number, b: number, c: number) => void;
+  readonly caml_pasta_fp_plonk_oracles_create: (a: number, b: number, c: number, d: number) => number;
+  readonly caml_pasta_fp_plonk_oracles_dummy: () => number;
+  readonly caml_pasta_fp_plonk_oracles_deep_copy: (a: number) => number;
   readonly __wbg_wasmpastafpproofevaluations_free: (a: number) => void;
   readonly wasmpastafpproofevaluations_new: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number) => number;
   readonly wasmpastafpproofevaluations_l: (a: number, b: number) => void;
@@ -2053,21 +2046,7 @@ export interface InitOutput {
   readonly caml_pasta_fq_to_bytes: (a: number, b: number, c: number) => void;
   readonly caml_pasta_fq_of_bytes: (a: number, b: number, c: number) => void;
   readonly caml_pasta_fq_deep_copy: (a: number, b: number, c: number) => void;
-  readonly __wbg_wasmpastafpplonkoracles_free: (a: number) => void;
-  readonly __wbg_get_wasmpastafpplonkoracles_o: (a: number, b: number) => void;
-  readonly __wbg_set_wasmpastafpplonkoracles_o: (a: number, b: number, c: number) => void;
-  readonly __wbg_get_wasmpastafpplonkoracles_p_eval0: (a: number, b: number) => void;
-  readonly __wbg_set_wasmpastafpplonkoracles_p_eval0: (a: number, b: number, c: number) => void;
-  readonly __wbg_get_wasmpastafpplonkoracles_p_eval1: (a: number, b: number) => void;
-  readonly __wbg_set_wasmpastafpplonkoracles_p_eval1: (a: number, b: number, c: number) => void;
-  readonly __wbg_get_wasmpastafpplonkoracles_digest_before_evaluations: (a: number, b: number) => void;
-  readonly __wbg_set_wasmpastafpplonkoracles_digest_before_evaluations: (a: number, b: number, c: number) => void;
-  readonly wasmpastafpplonkoracles_new: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => number;
-  readonly wasmpastafpplonkoracles_opening_prechallenges: (a: number, b: number) => void;
-  readonly wasmpastafpplonkoracles_set_opening_prechallenges: (a: number, b: number, c: number) => void;
-  readonly caml_pasta_fp_plonk_oracles_create: (a: number, b: number, c: number, d: number) => number;
-  readonly caml_pasta_fp_plonk_oracles_dummy: () => number;
-  readonly caml_pasta_fp_plonk_oracles_deep_copy: (a: number) => number;
+  readonly __wbg_wasmpastafqplonkoracles_free: (a: number) => void;
   readonly __wbg_get_wasmpastafqplonkoracles_o: (a: number, b: number) => void;
   readonly __wbg_set_wasmpastafqplonkoracles_o: (a: number, b: number, c: number) => void;
   readonly __wbg_get_wasmpastafqplonkoracles_p_eval0: (a: number, b: number) => void;
@@ -2080,7 +2059,6 @@ export interface InitOutput {
   readonly wasmpastafqplonkoracles_opening_prechallenges: (a: number, b: number) => void;
   readonly wasmpastafqplonkoracles_set_opening_prechallenges: (a: number, b: number, c: number) => void;
   readonly caml_pasta_fq_plonk_oracles_create: (a: number, b: number, c: number, d: number) => number;
-  readonly __wbg_wasmpastafqplonkoracles_free: (a: number) => void;
   readonly caml_pasta_fq_plonk_oracles_dummy: () => number;
   readonly caml_pasta_fq_plonk_oracles_deep_copy: (a: number) => number;
   readonly caml_pasta_fq_size_in_bits: () => number;
@@ -2286,8 +2264,6 @@ export interface InitOutput {
   readonly caml_pasta_fq_urs_commit_evaluations: (a: number, b: number, c: number, d: number) => number;
   readonly caml_pasta_fq_urs_b_poly_commitment: (a: number, b: number, c: number) => number;
   readonly caml_pasta_fq_urs_batch_accumulator_check: (a: number, b: number, c: number, d: number, e: number) => number;
-  readonly caml_pasta_fq_urs_h: (a: number) => number;
-  readonly __wbg_wasmpastafqurs_free: (a: number) => void;
   readonly __wbg_wasmpastafqplonkgatevector_free: (a: number) => void;
   readonly __wbg_wasmpastafqplonkgate_free: (a: number) => void;
   readonly __wbg_get_wasmpastafqplonkgate_typ: (a: number) => number;
@@ -2310,6 +2286,30 @@ export interface InitOutput {
   readonly caml_pasta_fq_plonk_index_domain_d8_size: (a: number) => number;
   readonly caml_pasta_fq_plonk_index_read: (a: number, b: number, c: number, d: number, e: number) => number;
   readonly caml_pasta_fq_plonk_index_write: (a: number, b: number, c: number, d: number) => void;
+  readonly caml_pasta_fq_urs_h: (a: number) => number;
+  readonly __wbg_wasmpastafqurs_free: (a: number) => void;
+  readonly __wbg_wasmpastafpplonkgatevector_free: (a: number) => void;
+  readonly __wbg_wasmpastafpplonkgate_free: (a: number) => void;
+  readonly __wbg_get_wasmpastafpplonkgate_typ: (a: number) => number;
+  readonly __wbg_set_wasmpastafpplonkgate_typ: (a: number, b: number) => void;
+  readonly __wbg_get_wasmpastafpplonkgate_wires: (a: number) => number;
+  readonly __wbg_set_wasmpastafpplonkgate_wires: (a: number, b: number) => void;
+  readonly wasmpastafpplonkgate_new: (a: number, b: number, c: number, d: number) => number;
+  readonly wasmpastafpplonkgate_c: (a: number, b: number) => void;
+  readonly wasmpastafpplonkgate_set_c: (a: number, b: number, c: number) => void;
+  readonly caml_pasta_fp_plonk_gate_vector_create: () => number;
+  readonly caml_pasta_fp_plonk_gate_vector_add: (a: number, b: number) => void;
+  readonly caml_pasta_fp_plonk_gate_vector_get: (a: number, b: number) => number;
+  readonly caml_pasta_fp_plonk_gate_vector_wrap: (a: number, b: number, c: number) => void;
+  readonly __wbg_wasmpastafpplonkindex_free: (a: number) => void;
+  readonly caml_pasta_fp_plonk_index_create: (a: number, b: number, c: number) => number;
+  readonly caml_pasta_fp_plonk_index_max_degree: (a: number) => number;
+  readonly caml_pasta_fp_plonk_index_public_inputs: (a: number) => number;
+  readonly caml_pasta_fp_plonk_index_domain_d1_size: (a: number) => number;
+  readonly caml_pasta_fp_plonk_index_domain_d4_size: (a: number) => number;
+  readonly caml_pasta_fp_plonk_index_domain_d8_size: (a: number) => number;
+  readonly caml_pasta_fp_plonk_index_read: (a: number, b: number, c: number, d: number, e: number) => number;
+  readonly caml_pasta_fp_plonk_index_write: (a: number, b: number, c: number, d: number) => void;
   readonly wasmpastavestapolycomm_new: (a: number, b: number, c: number) => number;
   readonly wasmpastavestapolycomm_unshifted: (a: number, b: number) => void;
   readonly wasmpastavestapolycomm_set_unshifted: (a: number, b: number, c: number) => void;
@@ -2437,9 +2437,9 @@ export interface InitOutput {
   readonly initThreadPool: (a: number) => number;
   readonly wbg_rayon_start_worker: (a: number) => void;
   readonly memory: WebAssembly.Memory;
-  readonly __wbindgen_malloc: (a: number) => number;
   readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
   readonly __wbindgen_free: (a: number, b: number) => void;
+  readonly __wbindgen_malloc: (a: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number) => number;
   readonly __wbindgen_exn_store: (a: number) => void;
   readonly __wbindgen_start: () => void;

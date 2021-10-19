@@ -1,71 +1,21 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
-* @returns {WasmPastaFpPlonkGateVector}
+* @param {Uint32Array} lgr_comm
+* @param {WasmPastaFpPlonkVerifierIndex} index
+* @param {WasmPastaFpProverProof} proof
+* @returns {WasmPastaFpPlonkOracles}
 */
-export function caml_pasta_fp_plonk_gate_vector_create(): WasmPastaFpPlonkGateVector;
+export function caml_pasta_fp_plonk_oracles_create(lgr_comm: Uint32Array, index: WasmPastaFpPlonkVerifierIndex, proof: WasmPastaFpProverProof): WasmPastaFpPlonkOracles;
 /**
-* @param {WasmPastaFpPlonkGateVector} v
-* @param {WasmPastaFpPlonkGate} gate
+* @returns {WasmPastaFpPlonkOracles}
 */
-export function caml_pasta_fp_plonk_gate_vector_add(v: WasmPastaFpPlonkGateVector, gate: WasmPastaFpPlonkGate): void;
+export function caml_pasta_fp_plonk_oracles_dummy(): WasmPastaFpPlonkOracles;
 /**
-* @param {WasmPastaFpPlonkGateVector} v
-* @param {number} i
-* @returns {WasmPastaFpPlonkGate}
+* @param {WasmPastaFpPlonkOracles} x
+* @returns {WasmPastaFpPlonkOracles}
 */
-export function caml_pasta_fp_plonk_gate_vector_get(v: WasmPastaFpPlonkGateVector, i: number): WasmPastaFpPlonkGate;
-/**
-* @param {WasmPastaFpPlonkGateVector} v
-* @param {WasmPlonkWire} t
-* @param {WasmPlonkWire} h
-*/
-export function caml_pasta_fp_plonk_gate_vector_wrap(v: WasmPastaFpPlonkGateVector, t: WasmPlonkWire, h: WasmPlonkWire): void;
-/**
-* @param {WasmPastaFpPlonkGateVector} gates
-* @param {number} public_
-* @param {WasmPastaFpUrs} urs
-* @returns {WasmPastaFpPlonkIndex}
-*/
-export function caml_pasta_fp_plonk_index_create(gates: WasmPastaFpPlonkGateVector, public_: number, urs: WasmPastaFpUrs): WasmPastaFpPlonkIndex;
-/**
-* @param {WasmPastaFpPlonkIndex} index
-* @returns {number}
-*/
-export function caml_pasta_fp_plonk_index_max_degree(index: WasmPastaFpPlonkIndex): number;
-/**
-* @param {WasmPastaFpPlonkIndex} index
-* @returns {number}
-*/
-export function caml_pasta_fp_plonk_index_public_inputs(index: WasmPastaFpPlonkIndex): number;
-/**
-* @param {WasmPastaFpPlonkIndex} index
-* @returns {number}
-*/
-export function caml_pasta_fp_plonk_index_domain_d1_size(index: WasmPastaFpPlonkIndex): number;
-/**
-* @param {WasmPastaFpPlonkIndex} index
-* @returns {number}
-*/
-export function caml_pasta_fp_plonk_index_domain_d4_size(index: WasmPastaFpPlonkIndex): number;
-/**
-* @param {WasmPastaFpPlonkIndex} index
-* @returns {number}
-*/
-export function caml_pasta_fp_plonk_index_domain_d8_size(index: WasmPastaFpPlonkIndex): number;
-/**
-* @param {number | undefined} offset
-* @param {WasmPastaFpUrs} urs
-* @param {string} path
-* @returns {WasmPastaFpPlonkIndex}
-*/
-export function caml_pasta_fp_plonk_index_read(offset: number | undefined, urs: WasmPastaFpUrs, path: string): WasmPastaFpPlonkIndex;
-/**
-* @param {boolean | undefined} append
-* @param {WasmPastaFpPlonkIndex} index
-* @param {string} path
-*/
-export function caml_pasta_fp_plonk_index_write(append: boolean | undefined, index: WasmPastaFpPlonkIndex, path: string): void;
+export function caml_pasta_fp_plonk_oracles_deep_copy(x: WasmPastaFpPlonkOracles): WasmPastaFpPlonkOracles;
 /**
 * @param {WasmPastaFpPlonkIndex} index
 * @param {Uint8Array} primary_input
@@ -360,22 +310,6 @@ export function caml_pasta_fq_of_bytes(x: Uint8Array): Uint8Array;
 * @returns {Uint8Array}
 */
 export function caml_pasta_fq_deep_copy(x: Uint8Array): Uint8Array;
-/**
-* @param {Uint32Array} lgr_comm
-* @param {WasmPastaFpPlonkVerifierIndex} index
-* @param {WasmPastaFpProverProof} proof
-* @returns {WasmPastaFpPlonkOracles}
-*/
-export function caml_pasta_fp_plonk_oracles_create(lgr_comm: Uint32Array, index: WasmPastaFpPlonkVerifierIndex, proof: WasmPastaFpProverProof): WasmPastaFpPlonkOracles;
-/**
-* @returns {WasmPastaFpPlonkOracles}
-*/
-export function caml_pasta_fp_plonk_oracles_dummy(): WasmPastaFpPlonkOracles;
-/**
-* @param {WasmPastaFpPlonkOracles} x
-* @returns {WasmPastaFpPlonkOracles}
-*/
-export function caml_pasta_fp_plonk_oracles_deep_copy(x: WasmPastaFpPlonkOracles): WasmPastaFpPlonkOracles;
 /**
 * @param {Uint32Array} lgr_comm
 * @param {WasmPastaFqPlonkVerifierIndex} index
@@ -768,6 +702,72 @@ export function caml_pasta_fq_plonk_index_read(offset: number | undefined, urs: 
 * @param {string} path
 */
 export function caml_pasta_fq_plonk_index_write(append: boolean | undefined, index: WasmPastaFqPlonkIndex, path: string): void;
+/**
+* @returns {WasmPastaFpPlonkGateVector}
+*/
+export function caml_pasta_fp_plonk_gate_vector_create(): WasmPastaFpPlonkGateVector;
+/**
+* @param {WasmPastaFpPlonkGateVector} v
+* @param {WasmPastaFpPlonkGate} gate
+*/
+export function caml_pasta_fp_plonk_gate_vector_add(v: WasmPastaFpPlonkGateVector, gate: WasmPastaFpPlonkGate): void;
+/**
+* @param {WasmPastaFpPlonkGateVector} v
+* @param {number} i
+* @returns {WasmPastaFpPlonkGate}
+*/
+export function caml_pasta_fp_plonk_gate_vector_get(v: WasmPastaFpPlonkGateVector, i: number): WasmPastaFpPlonkGate;
+/**
+* @param {WasmPastaFpPlonkGateVector} v
+* @param {WasmPlonkWire} t
+* @param {WasmPlonkWire} h
+*/
+export function caml_pasta_fp_plonk_gate_vector_wrap(v: WasmPastaFpPlonkGateVector, t: WasmPlonkWire, h: WasmPlonkWire): void;
+/**
+* @param {WasmPastaFpPlonkGateVector} gates
+* @param {number} public_
+* @param {WasmPastaFpUrs} urs
+* @returns {WasmPastaFpPlonkIndex}
+*/
+export function caml_pasta_fp_plonk_index_create(gates: WasmPastaFpPlonkGateVector, public_: number, urs: WasmPastaFpUrs): WasmPastaFpPlonkIndex;
+/**
+* @param {WasmPastaFpPlonkIndex} index
+* @returns {number}
+*/
+export function caml_pasta_fp_plonk_index_max_degree(index: WasmPastaFpPlonkIndex): number;
+/**
+* @param {WasmPastaFpPlonkIndex} index
+* @returns {number}
+*/
+export function caml_pasta_fp_plonk_index_public_inputs(index: WasmPastaFpPlonkIndex): number;
+/**
+* @param {WasmPastaFpPlonkIndex} index
+* @returns {number}
+*/
+export function caml_pasta_fp_plonk_index_domain_d1_size(index: WasmPastaFpPlonkIndex): number;
+/**
+* @param {WasmPastaFpPlonkIndex} index
+* @returns {number}
+*/
+export function caml_pasta_fp_plonk_index_domain_d4_size(index: WasmPastaFpPlonkIndex): number;
+/**
+* @param {WasmPastaFpPlonkIndex} index
+* @returns {number}
+*/
+export function caml_pasta_fp_plonk_index_domain_d8_size(index: WasmPastaFpPlonkIndex): number;
+/**
+* @param {number | undefined} offset
+* @param {WasmPastaFpUrs} urs
+* @param {string} path
+* @returns {WasmPastaFpPlonkIndex}
+*/
+export function caml_pasta_fp_plonk_index_read(offset: number | undefined, urs: WasmPastaFpUrs, path: string): WasmPastaFpPlonkIndex;
+/**
+* @param {boolean | undefined} append
+* @param {WasmPastaFpPlonkIndex} index
+* @param {string} path
+*/
+export function caml_pasta_fp_plonk_index_write(append: boolean | undefined, index: WasmPastaFpPlonkIndex, path: string): void;
 /**
 * @param {string} s
 * @param {number} _len
