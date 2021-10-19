@@ -442,7 +442,7 @@ open Hash_prefix_states_nonconsensus
 module Message = struct
   open Tick
 
-  type t = (Field.t, bool) Random_oracle.Input.t [@@deriving sexp]
+  type t = (Field.t, bool) Random_oracle_input.t [@@deriving sexp]
 
   let network_id =
     match Mina_signature_kind.t with
@@ -454,7 +454,7 @@ module Message = struct
   let derive t ~private_key ~public_key =
     let input =
       let x, y = Tick.Inner_curve.to_affine_exn public_key in
-      Random_oracle.Input.append t
+      Random_oracle_input.append t
         { field_elements = [| x; y |]
         ; bitstrings =
             [| Tock.Field.unpack private_key
@@ -462,7 +462,7 @@ module Message = struct
             |]
         }
     in
-    Random_oracle.Input.to_bits ~unpack:Field.unpack input
+    Random_oracle_input.to_bits ~unpack:Field.unpack input
     |> Array.of_list |> Blake2.bits_to_string |> Blake2.digest_string
     |> Blake2.to_raw_string |> Blake2.string_to_bits |> Array.to_list
     |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
@@ -471,10 +471,10 @@ module Message = struct
   let make_hash ~init t ~public_key ~r =
     let input =
       let px, py = Inner_curve.to_affine_exn public_key in
-      Random_oracle.Input.append t
+      Random_oracle_input.append t
         { field_elements = [| px; py; r |]; bitstrings = [||] }
     in
-    let open Random_oracle in
+    let open Random_oracle.Legacy in
     hash ~init (pack_input input)
     |> Digest.to_bits ~length:Field.size_in_bits
     |> Inner_curve.Scalar.of_bits
@@ -489,16 +489,16 @@ module Message = struct
 
   [%%ifdef consensus_mechanism]
 
-  type var = (Field.Var.t, Boolean.var) Random_oracle.Input.t
+  type var = (Field.Var.t, Boolean.var) Random_oracle_input.t
 
   let%snarkydef hash_checked t ~public_key ~r =
     let input =
       let px, py = public_key in
-      Random_oracle.Input.append t
+      Random_oracle_input.append t
         { field_elements = [| px; py; r |]; bitstrings = [||] }
     in
     make_checked (fun () ->
-        let open Random_oracle.Checked in
+        let open Random_oracle.Legacy.Checked in
         hash ~init:Hash_prefix_states.signature (pack_input input)
         |> Digest.to_bits ~length:Field.size_in_bits
         |> Bitstring_lib.Bitstring.Lsb_first.of_list)
@@ -513,15 +513,15 @@ module S = Make (Tick) (Tick.Inner_curve) (Message)
 let gen =
   let open Quickcheck.Let_syntax in
   let%map pk = Private_key.gen and msg = Tick.Field.gen in
-  (pk, Random_oracle.Input.field_elements [| msg |])
+  (pk, Random_oracle_input.field_elements [| msg |])
 
 (* Use for reading only. *)
 let message_typ () : (Message.var, Message.t) Tick.Typ.t =
   let open Tick.Typ in
-  { alloc = Alloc.return (Random_oracle.Input.field_elements [||])
+  { alloc = Alloc.return (Random_oracle_input.field_elements [||])
   ; store =
       Store.Let_syntax.(
-        fun { Random_oracle.Input.field_elements; bitstrings } ->
+        fun { Random_oracle_input.field_elements; bitstrings } ->
           let%bind field_elements =
             Store.all @@ Array.to_list
             @@ Array.map ~f:(store Tick.Field.typ) field_elements
@@ -531,12 +531,12 @@ let message_typ () : (Message.var, Message.t) Tick.Typ.t =
             @@ Array.map bitstrings ~f:(fun l ->
                    Store.all @@ List.map ~f:(store Tick.Boolean.typ) l)
           in
-          { Random_oracle.Input.field_elements = Array.of_list field_elements
+          { Random_oracle_input.field_elements = Array.of_list field_elements
           ; bitstrings = Array.of_list bitstrings
           })
   ; read =
       Read.Let_syntax.(
-        fun { Random_oracle.Input.field_elements; bitstrings } ->
+        fun { Random_oracle_input.field_elements; bitstrings } ->
           let%bind field_elements =
             Read.all @@ Array.to_list
             @@ Array.map ~f:(read Tick.Field.typ) field_elements
@@ -546,7 +546,7 @@ let message_typ () : (Message.var, Message.t) Tick.Typ.t =
             @@ Array.map bitstrings ~f:(fun l ->
                    Read.all @@ List.map ~f:(read Tick.Boolean.typ) l)
           in
-          { Random_oracle.Input.field_elements = Array.of_list field_elements
+          { Random_oracle_input.field_elements = Array.of_list field_elements
           ; bitstrings = Array.of_list bitstrings
           })
   ; check = (fun _ -> Tick.Checked.return ())
