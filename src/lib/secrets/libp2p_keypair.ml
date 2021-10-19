@@ -8,7 +8,7 @@ module T = struct
 
   let env = "MINA_LIBP2P_PASS"
 
-  let env_deprecated = "CODA_LIBP2P_PASS"
+  let env_deprecated = Some "CODA_LIBP2P_PASS"
 
   let which = "libp2p keypair"
 

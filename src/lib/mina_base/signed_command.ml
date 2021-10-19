@@ -373,15 +373,15 @@ Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
 
 [%%ifdef consensus_mechanism]
 
-let check_signature ({ payload; signer; signature } : t) =
-  Signature_lib.Schnorr.verify signature
+let check_signature ?signature_kind ({ payload; signer; signature } : t) =
+  Signature_lib.Schnorr.verify ?signature_kind signature
     (Snark_params.Tick.Inner_curve.of_affine signer)
     (to_input payload)
 
 [%%else]
 
-let check_signature ({ payload; signer; signature } : t) =
-  Signature_lib_nonconsensus.Schnorr.verify signature
+let check_signature ?signature_kind ({ payload; signer; signature } : t) =
+  Signature_lib_nonconsensus.Schnorr.verify ?signature_kind signature
     (Snark_params_nonconsensus.Inner_curve.of_affine signer)
     (to_input payload)
 
@@ -394,11 +394,11 @@ let check_valid_keys t =
   List.for_all [ fee_payer; source; receiver ] ~f:(fun pk ->
       Option.is_some (Public_key.decompress pk))
 
-let create_with_signature_checked signature signer payload =
+let create_with_signature_checked ?signature_kind signature signer payload =
   let open Option.Let_syntax in
   let%bind signer = Public_key.decompress signer in
   let t = Poly.{ payload; signature; signer } in
-  Option.some_if (check_signature t && check_valid_keys t) t
+  Option.some_if (check_signature ?signature_kind t && check_valid_keys t) t
 
 let gen_test =
   let open Quickcheck.Let_syntax in

@@ -12,16 +12,6 @@ module Get_balance =
 [%graphql
 {|
     query get_balance($public_key: PublicKey!, $token_id: TokenId) {
-      genesisBlock {
-        stateHash
-      }
-      bestChain {
-        stateHash
-      }
-      initialPeers
-      daemonStatus {
-        chainId
-      }
       account(publicKey: $public_key, token: $token_id) {
         balance {
           blockHeight @bsDecoder(fn: "Decoders.uint32")
@@ -283,7 +273,7 @@ module Balance = struct
                block_query:Block_query.t
             -> address:string
             -> (Block_identifier.t * Balance_info.t, Errors.t) M.t
-        ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t }
+        ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
     end
 
     (* The real environment does things asynchronously *)
@@ -319,17 +309,6 @@ module Balance = struct
             (* TODO: Add variants to cover every branch *)
             Result.return
             @@ object
-                 method genesisBlock =
-                   object
-                     method stateHash = "STATE_HASH_GENESIS"
-                   end
-
-                 method bestChain =
-                   Some
-                     [| object
-                          method stateHash = "STATE_HASH_TIP"
-                        end |]
-
                  method account =
                    Some
                      (object
@@ -364,10 +343,11 @@ module Balance = struct
     module Query = Block_query.T (M)
 
     let handle :
-           env:'gql E.t
+            graphql_uri: Uri.t
+        -> env:'gql E.t
         -> Account_balance_request.t
         -> (Account_balance_response.t, Errors.t) M.t =
-     fun ~env req ->
+     fun ~graphql_uri ~env req ->
       let open M.Let_syntax in
       let address = req.account_identifier.address in
       let%bind token_id = Token_id.decode req.account_identifier.metadata in
@@ -378,7 +358,7 @@ module Balance = struct
       in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~gql_response:res
+          ~graphql_uri
       in
       let%bind account =
         match res#account with
@@ -473,7 +453,7 @@ module Balance = struct
       let%test_unit "account exists lookup" =
         Test.assert_ ~f:Account_balance_response.to_yojson
           ~expected:
-            (Mock.handle ~env:Env.mock
+            (Mock.handle ~graphql_uri:(Uri.of_string "http://minaprotocol.com") ~env:Env.mock
                (Account_balance_request.create
                   (Network_identifier.create "x" "y")
                   (Account_identifier.create "x")))
@@ -523,7 +503,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
             |> Errors.Lift.wrap
           in
           let%map res =
-            Balance.Real.handle ~env:(Balance.Env.real ~db ~graphql_uri) req
+            Balance.Real.handle ~graphql_uri ~env:(Balance.Env.real ~db ~graphql_uri) req
             |> Errors.Lift.wrap
           in
           Account_balance_response.to_yojson res)
