@@ -95,7 +95,7 @@ def stop_daemon():
   mina_process.send_signal(signal.SIGTERM)
 
   child_pids = get_child_processes(mina_process.pid)
-  log("stop_daemon, child_pids: %s" % ', '.join(child_pids))
+  log("stop_daemon, child_pids: %s" % ', '.join([str(i) for i in child_pids]))
   mina_process.wait()
   for child_pid in child_pids:
       log("puppeteer script, waiting for child_pid: " + str(child_pid) )

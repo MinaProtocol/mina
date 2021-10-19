@@ -42,7 +42,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let common_prefixes_length = Hash_set.length common_prefixes in
     let length_difference = longest_chain_length - common_prefixes_length in
-    if length_difference = 0 || length_difference < tolerance then
+    if length_difference = 0 || length_difference <= tolerance then
       Malleable_error.return ()
     else
       let result =
@@ -171,17 +171,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 180.0)) in
          check_peers ~logger all_nodes)
     in
-    let print_chains (chain_list : string list list) =
-      List.iter chain_list ~f:(fun chain ->
-          let s = String.concat ~sep:"\n" chain in
-          [%log info] "\nchain:\n %s" s)
+    let print_chains (labeled_chain_list : (string * string list) list) =
+      List.iter labeled_chain_list ~f:(fun labeled_chain ->
+          let label, chain = labeled_chain in
+          let chain_str = String.concat ~sep:"\n" chain in
+          [%log info] "\nchain of %s:\n %s" label chain_str)
     in
     section "common prefix of all nodes is no farther back than 1 block"
       (* the common prefix test relies on at least 4 blocks having been produced.  previous sections altogether have already produced 5, so no further block production is needed.  if previous sections change, then this may need to be re-adjusted*)
-      (let%bind chains =
-         Malleable_error.List.map all_nodes
-           ~f:(Network.Node.must_get_best_chain ~logger)
+      (let%bind (labeled_chains : (string * string list) list) =
+         Malleable_error.List.map all_nodes ~f:(fun node ->
+             let%bind chain = Network.Node.must_get_best_chain ~logger node in
+             Malleable_error.return (Node.id node, chain))
        in
-       print_chains chains ;
+       let (chains : string list list) =
+         List.map labeled_chains ~f:(fun labeled_chain ->
+             let _, chain = labeled_chain in
+             chain)
+         (* Malleable_error.List.map all_nodes
+            ~f:(Network.Node.must_get_best_chain ~logger
+             ) *)
+       in
+       print_chains labeled_chains ;
        check_common_prefixes chains ~tolerance:1 ~logger)
 end
