@@ -39,3 +39,25 @@ module Checked :
      and module State := State
 
 [%%endif]
+
+module Legacy : sig
+  include
+    Intf.S
+      with type field := Field.t
+       and type field_constant := Field.t
+       and type bool := bool
+       and module State := State
+
+  val salt : string -> Field.t State.t
+
+  [%%ifdef consensus_mechanism]
+
+  module Checked :
+    Intf.S
+      with type field := Field.Var.t
+       and type field_constant := Field.t
+       and type bool := Boolean.var
+       and module State := State
+
+  [%%endif]
+end
