@@ -9,6 +9,9 @@ module Constants = struct
   (** number of witness *)
   let columns = 15
 
+  (** number of columns that take part in the permutation *)
+  let permutation_cols = 7
+
   (* TODO: zk_rows is specified on the Rust side now, so I don't think we need this here for the permutation AT LEAST. This should be specified on the Rust side for other polynomials like the wires *)
 
   (* TODO: is this 3 or 2? *)
@@ -45,14 +48,18 @@ module Row = struct
         i + public_input_size
 end
 
+(* TODO: rename module Position to Permutation? *)
+
 (** A position represents the position of a cell in the constraint system *)
 module Position = struct
+  open Core_kernel
+
   (** A position is a row and a column *)
   type 'row t = { row : 'row; col : int }
 
   (** Generates a full row of positions that each points to itself *)
   let create_cols (row : 'row) : _ t array =
-    Array.init Constants.columns (fun i -> { row; col = i })
+    Array.init Constants.permutation_cols (fun i -> { row; col = i })
 
   (** Given a number of columns, 
       append enough column wires to get an entire row.
@@ -60,12 +67,16 @@ module Position = struct
       as to not take part in the permutation argument. *)
   let append_cols (row : 'row) (cols : _ t array) : _ t array =
     let padding_offset = Array.length cols in
-    assert (padding_offset <= Constants.columns) ;
-    let padding_len = Constants.columns - padding_offset in
+    assert (padding_offset <= Constants.permutation_cols) ;
+    let padding_len = Constants.permutation_cols - padding_offset in
     let padding =
       Array.init padding_len (fun i -> { row; col = i + padding_offset })
     in
     Array.append cols padding
+
+  (** converts an array of [Constants.columns] to [Constants.permutation_cols]. 
+    This is useful to truncate arrays of cells to the ones that only matter for the permutation argument. *)
+  let cols_to_perms cols = Array.slice cols 0 Constants.permutation_cols
 
   (** converts a [Position.t] into the Rust-compatible type [Kimchi.Protocol.wire] *)
   let to_rust_wire { row; col } : Kimchi.Protocol.wire = { row; col }
@@ -141,9 +152,17 @@ module Plonk_constraint = struct
       | Basic of { l : 'f * 'v; r : 'f * 'v; o : 'f * 'v; m : 'f; c : 'f }
       | Poseidon of { state : 'v array array }
       | EC_add_complete of
-          { p1 : 'v * 'v; p2 : 'v * 'v; p3 : 'v * 'v; result_infinite : 'v }
+          { p1 : 'v * 'v
+          ; p2 : 'v * 'v
+          ; p3 : 'v * 'v
+          ; inf : 'v
+          ; same_x : 'v
+          ; slope : 'v
+          ; inf_z : 'v
+          ; x21_inv : 'v
+          }
       | EC_scale of { state : 'v Scale_round.t array }
-      | EC_endoscale of { state : 'v Endoscale_round.t array }
+      | EC_endoscale of { state : 'v Endoscale_round.t array } (* acc : 'v * 'v; n_acc : 'v ? *)
     [@@deriving sexp]
 
     (** ? *)
@@ -155,12 +174,16 @@ module Plonk_constraint = struct
           Basic { l = p l; r = p r; o = p o; m; c }
       | Poseidon { state } ->
           Poseidon { state = Array.map ~f:(fun x -> Array.map ~f x) state }
-      | EC_add_complete { p1; p2; p3; result_infinite } ->
+      | EC_add_complete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv } ->
           EC_add_complete
             { p1 = fp p1
             ; p2 = fp p2
             ; p3 = fp p3
-            ; result_infinite = f result_infinite
+            ; inf = f inf
+            ; same_x = f same_x
+            ; slope = f slope
+            ; inf_z = f inf_z
+            ; x21_inv = f x21_inv
             }
       | EC_scale { state } ->
           EC_scale
@@ -349,8 +372,13 @@ struct
         | EC_endoscale { state } ->
             let t = H.feed_string t "ec_endoscale" in
             Array.fold state ~init:t
-              ~f:(fun acc { b2i1; xt; b2i; xq; yt; xp; l1; yp; xs; ys } ->
-                cvars [ b2i1; xt; b2i; xq; yt; xp; l1; yp; xs; ys ] acc) )
+              ~f:(fun
+                   acc
+                   { xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4 }
+                 ->
+                cvars
+                  [ xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4 ]
+                  acc) )
     | _ ->
         failwith "Unsupported constraint"
 
@@ -566,8 +594,8 @@ struct
         let acc, i, ts, n = accumulate_sorted_terms t0 terms in
         Some (List.rev ((acc, i) :: ts), n + 1, has_constant_term)
 
-  (** Adds a row/gate/constraint manually *)
-  let add_row sys rows kind (wired_to : _ Position.t array) coeffs =
+  (** Adds a row/gate/constraint to a constraint system `sys` *)
+  let add_row sys row kind (wired_to : _ Position.t array) coeffs =
     match sys.gates with
     | `Finalized ->
         failwith "add_row called on finalized constraint system"
@@ -578,7 +606,7 @@ struct
             ( { kind; row = After_public_input sys.next_row; wired_to; coeffs }
             :: gates ) ;
         sys.next_row <- sys.next_row + 1 ;
-        sys.rows_rev <- rows :: sys.rows_rev
+        sys.rows_rev <- row :: sys.rows_rev
 
   (* TODO: add more granular functions than general add_generic_constraint? *)
 
@@ -889,63 +917,95 @@ struct
                  i=0, perm^   i=1, perm^
     *)
     | Plonk_constraint.T (Poseidon { state }) ->
+        (* reduce the state *)
         let reduce_state sys (s : Fp.t Snarky_backendless.Cvar.t array array) :
             V.t array array =
           Array.map ~f:(Array.map ~f:reduce_to_v) s
         in
         let state = reduce_state sys state in
-        let add_round_state array ind =
-          let prev =
-            (* same row, except for last 3
-               also order is different except for first 3 -.-
-               0,1,2 -> 0,1,2 (mapped to what `wire` says)
-               3, 4, 5 -> ... (mapped to itself)
-               6, 7, 8 -> ... (mapped to itself)
-               9, 10, 11 -> ... (mapped to itself)
-               14, 15, 16 -> 3, 4, 5 (mapped to next row 0, 1, 2) *)
-            Array.mapi array ~f:(fun i x -> wire sys x sys.next_row i)
+        (* add_round_state adds a row that contains 5 rounds of permutation *)
+        let add_round_state state_i ind =
+          let row = Array.map state_i ~f:(fun x -> Some x) in
+          let wired_to =
+            Array.mapi state_i ~f:(fun i x -> wire sys x sys.next_row i)
+            |> Position.cols_to_perms
           in
-          add_row sys
-            (Array.map array ~f:(fun x -> Some x))
-            Poseidon prev.(0) prev.(1) prev.(2)
-            Params.params.round_constants.(ind + 1)
+          let coeffs = Params.params.round_constants.(ind + 1) in
+          add_row sys row Poseidon wired_to coeffs
         in
-        Array.iteri
-          ~f:(fun i perm ->
-            if i = Array.length state - 1 then
-              (* last row is zero gate *)
-              let prev =
-                Array.mapi perm ~f:(fun i x ->
-                    wire sys x sys.next_row (index_to_col i))
+        (* iterate through the state *)
+        let last_row = Array.length state - 1 in
+        Array.iteri state ~f:(fun i state_i ->
+            if i <> last_row then add_round_state state_i i
+            else
+              (* last row is zero gate, only the first three columns matter *)
+              let row =
+                [| Some state_i.(0)
+                 ; Some state_i.(1)
+                 ; Some state_i.(2)
+                 ; None
+                 ; None
+                 ; None
+                 ; None
+                 ; None
+                 ; None
+                 ; None
+                 ; None
+                 ; None
+                 ; None
+                 ; None
+                |]
               in
-              add_row sys
-                (Array.map perm ~f:(fun x -> Some x))
-                Zero prev.(0) prev.(1) prev.(2)
-                [| Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero |]
-            else add_round_state perm i)
-          state
-    | Plonk_constraint.T (EC_add_complete { p1; p2; p3; result_infinite }) ->
-        let red =
-          Array.map [| p1; p2; p3 |] ~f:(fun (x, y) ->
-              (reduce_to_v x, reduce_to_v y))
+              let wired_to =
+                Position.append_cols (Row.After_public_input sys.next_row)
+                  [| wire sys state_i.(0) sys.next_row 0
+                   ; wire sys state_i.(1) sys.next_row 1
+                   ; wire sys state_i.(2) sys.next_row 2
+                  |]
+              in
+              let coeffs = [||] in
+              add_row sys row Zero wired_to coeffs)
+    | Plonk_constraint.T
+        (EC_add_complete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv }) ->
+        let reduce_curve_point (x, y) = (reduce_to_v x, reduce_to_v y) in
+
+        (*
+        //! 0   1   2   3   4   5   6   7      8   9      10      11   12   13   14
+        //! x1  y1  x2  y2  x3  y3  inf same_x s   inf_z  x21_inv
+
+        *)
+        let x1, y1 = reduce_curve_point p1 in
+        let x2, y2 = reduce_curve_point p1 in
+        let x3, y3 = reduce_curve_point p1 in
+        let row =
+          [| Some x1
+           ; Some y1
+           ; Some x2
+           ; Some y2
+           ; Some x3
+           ; Some y3
+           ; Some (reduce_to_v inf)
+           ; Some (reduce_to_v same_x)
+           ; Some (reduce_to_v slope)
+           ; Some (reduce_to_v inf_z)
+           ; Some (reduce_to_v x21_inv)
+           ; None
+           ; None
+           ; None
+           ; None
+          |]
         in
-        let y =
-          Array.mapi
-            ~f:(fun i (x, y) -> wire sys y sys.next_row (index_to_col i))
-            red
+        let wired_to =
+          Position.append_cols (Row.After_public_input sys.next_row)
+            [| wire sys x1 sys.next_row 0
+             ; wire sys y1 sys.next_row 1
+             ; wire sys x2 sys.next_row 2
+             ; wire sys y2 sys.next_row 3
+             ; wire sys x3 sys.next_row 4
+             ; wire sys y3 sys.next_row 5
+            |]
         in
-        add_row sys
-          (Array.map red ~f:(fun (_, y) -> Some y))
-          Add1 y.(0) y.(1) y.(2) [||] ;
-        let x =
-          Array.mapi
-            ~f:(fun i (x, y) -> wire sys x sys.next_row (index_to_col i))
-            red
-        in
-        add_row sys
-          (Array.map red ~f:(fun (x, _) -> Some x))
-          Add2 x.(0) x.(1) x.(2) [||] ;
-        ()
+        add_row sys row EcAddComplete wired_to [||]
     | Plonk_constraint.T (EC_scale { state }) ->
         let i = ref 0 in
         let add_ecscale_round (round : V.t Scale_round.t) =
@@ -1023,10 +1083,36 @@ struct
             |]
             [||]
         in
-        Array.iter
-          ~f:(fun round -> add_endoscale_round round)
-          (Array.map state ~f:(Endoscale_round.map ~f:reduce_to_v)) ;
-        ()
+        let state = Array.map state ~f:(Endoscale_round.map ~f:reduce_to_v) in
+        let last_row = Array.length state - 1 in
+        Array.iteri state ~f:(fun i round ->
+            if i <> last_row then add_endoscale_round round
+            else
+              let row =
+                [| None
+                 ; None
+                 ; None
+                 ; None
+                 ; Some round.xp
+                 ; Some round.yp
+                 ; Some round.n_acc
+                 ; None
+                 ; None
+                 ; None
+                 ; None
+                 ; None
+                 ; None
+                 ; None
+                |]
+              in
+              let wired_to =
+                Position.create_cols (Row.After_public_input sys.next_row)
+              in
+              wired_to.(4) <- wire sys round.xp sys.next_row 4 ;
+              wired_to.(5) <- wire sys round.yp sys.next_row 5 ;
+              wired_to.(6) <- wire sys round.n_acc sys.next_row 6 ;
+              let coeffs = [||] in
+              add_row sys row Zero wired_to coeffs)
     | constr ->
         failwithf "Unhandled constraint %s"
           Obj.(Extension_constructor.name (Extension_constructor.of_val constr))

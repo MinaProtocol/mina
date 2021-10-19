@@ -1,6 +1,8 @@
 use plonk_circuits::gate::{GateType, GateType::*};
 use plonk_circuits::wires::{Col, Col::*, Wire, Wires};
 
+// TODO: this shouldn't have to be its own type, we should be able to reuse the proof-systems type
+
 #[derive(ocaml::IntoValue, ocaml::FromValue)]
 pub enum CamlPlonkGateType {
     Zero,    // zero gate
