@@ -20,7 +20,7 @@ module Get_options_metadata =
       bestChain(maxLength: 5) {
         transactions {
           userCommands {
-            fee
+            fee @bsDecoder(fn: "Decoders.uint64")
           }
         }
       }
@@ -273,6 +273,33 @@ module Metadata = struct
       ; lift= Deferred.return }
   end
 
+  (* Invariant: fees is sorted *)
+  module type Field_like = sig
+    type t
+
+    val of_int : int -> t
+
+    val (+) : t -> t -> t
+    val (-) : t -> t -> t
+    val ( * ) : t -> t -> t
+    val ( / ) : t -> t -> t
+  end
+
+  let suggest_fee (type a) (module F : Field_like with type t = a) fees =
+    let len = Array.length fees in
+    let med = fees.(len / 2) in
+    let iqr =
+      let threeq = fees.(3 * len / 4) in
+      let oneq = fees.(len / 4) in
+      F.(threeq - oneq)
+    in
+    let open F in
+    med + (iqr / of_int 2)
+
+  let%test_unit "suggest_fee is reasonable" =
+    let sugg = suggest_fee (module Int) [| 100; 200; 300; 400; 500; 600; 700; 800 |] in
+    [%test_eq: int] sugg 700
+
   module Impl (M : Monad_fail.S) = struct
     let handle ~graphql_uri ~(env : 'gql Env.T(M).t) (req : Construction_metadata_request.t)
         =
@@ -309,24 +336,26 @@ module Metadata = struct
         |> Option.value ~default:Unsigned.UInt32.zero
       in
       (* suggested fee *)
-      (* Take the average of the fees included in the last 5 blocks, and add an
-       * extra 0.04 MINA *)
+      (* Take the median of all the fees in blocks and add a bit extra using
+       * the interquartile range *)
       let%map suggested_fee =
-        let open Unsigned.UInt64 in
-        let open Unsigned.UInt64.Infix in
         let%map fees =
           match res#bestChain with
           | Some chain ->
-            chain |> Array.to_list
-              |> List.bind ~f:(fun block -> Array.to_list block#transactions#userCommands)
-              |> List.map ~f:(fun (`UserCommand cmd) -> of_string (match cmd#fee with `String s -> s | _ -> failwith "GraphQL endpoint is lying"))
-              |> M.return
+            let a = 
+              Array.fold chain ~init:[] ~f:(fun fees block ->
+                  Array.fold block#transactions#userCommands ~init:fees ~f:(fun fees (`UserCommand cmd) -> cmd#fee :: fees) )
+              |> Array.of_list
+            in
+            Array.sort a ~compare:Unsigned_extended.UInt64.compare;
+            M.return a
           | None ->
               M.fail (Errors.create `Chain_info_missing)
         in
-        let avg = (List.fold ~init:zero fees ~f:(+)) / (List.length fees |> of_int) in
-        let reasonably_large_extra_buffer = of_int 40_000_000 in
-        Amount_of.mina (avg + reasonably_large_extra_buffer)
+        Amount_of.mina (suggest_fee (module struct
+          include Unsigned_extended.UInt64
+          include Infix
+  end) fees)
       in
       (* minimum fee : Pull this from the compile constants *)
       let amount_metadata =
