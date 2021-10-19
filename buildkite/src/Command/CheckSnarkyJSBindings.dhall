@@ -12,7 +12,7 @@ let Cmd = ../Lib/Cmds.dhall in
         commands = [
           Cmd.runInDocker
             Cmd.Docker::{
-              image = (../Constants/ContainerImages.dhall).ubuntu1804
+              image = (../Constants/ContainerImages.dhall).toolchainBase
             }
             "./buildkite/scripts/check-snarkyjs-bindings.sh"
         ],
