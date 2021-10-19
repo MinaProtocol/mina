@@ -5,7 +5,7 @@ var old_log = console.log;
 console.log = function(string) {
     trace += string + "\n";
 }
-global.snarky_ready.then(function () {
+tests.snarky_ready.then(function () {
     console.log("bigint_256_test");
     tests.bigint_256_test.run();
     console.log("pasta_fp_test");
