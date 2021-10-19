@@ -90,13 +90,13 @@ def stop_daemon():
   mina_process.send_signal(signal.SIGTERM)
 
   child_pids = get_child_processes(mina_process.pid)
-  print("stop_daemon, child_pids: " )
+  print("puppeteer script, child_pids to stop: " )
   print(*child_pids)
   mina_process.wait()
   for child_pid in child_pids:
-      print("waiting for child_pid: " + str(child_pid) )
+      print("puppeteer script, waiting for child_pid: " + str(child_pid) )
       wait_for_pid(child_pid)
-      print("done waiting for: " + str(child_pid) )
+      print("puppeteer script, done waiting for: " + str(child_pid) )
   print("puppeteer script: removing /root/daemon-active" )
   Path('daemon-active').unlink()
   mina_process = None
@@ -117,7 +117,7 @@ def inactive_loop():
       server.handle_request()
       signal.sigtimedwait(ALL_SIGNALS, 0)
       if active_daemon_request:
-        print("inactive_loop: active_daemon_request received, starting daemon" )
+        print("puppeteer script, inactive_loop: active_daemon_request received, starting daemon" )
         start_daemon()
         active_daemon_request = False
         break
@@ -127,7 +127,7 @@ def inactive_loop():
   finally:
     if server != None:
       server.server_close()
-    print("puppeteer script: mock server closed. inactive_loop terminating" )
+    print("puppeteer script: inactive_loop terminating. mock server closed." )
     
   active_loop()
 
@@ -139,10 +139,10 @@ def active_loop():
     signal.pause()
     status = mina_process.poll()
     if status != None:
-      print("active_loop: status not None, cleaning up and exiting")
+      print("puppeteer script, active_loop: status not None, cleaning up and exiting")
       cleanup_and_exit(status)
     elif inactive_daemon_request:
-      print("active_loop: inactive daemon request detected, stopping daemon")
+      print("puppeteer script, active_loop: inactive daemon request detected, stopping daemon")
       stop_daemon()
       inactive_daemon_request = False
       break
