@@ -37,8 +37,11 @@ end
 
 (** A row indexing in a constraint system *)
 module Row = struct
+  open Core_kernel
+
   (** Either a public input row, or a non-public input row that starts at index 0 *)
   type t = Public_input of int | After_public_input of int
+  [@@deriving hash, sexp, compare]
 
   let to_absolute ~public_input_size = function
     | Public_input i ->
@@ -55,7 +58,7 @@ module Position = struct
   open Core_kernel
 
   (** A position is a row and a column *)
-  type 'row t = { row : 'row; col : int }
+  type 'row t = { row : 'row; col : int } [@@deriving hash, sexp, compare]
 
   (** Generates a full row of positions that each points to itself *)
   let create_cols (row : 'row) : _ t array =
@@ -271,7 +274,7 @@ type ('a, 'f) t =
     mutable rows_rev : V.t option array list
   ; (* a circuit is described by a series of gates. A gate is finalized if TKTK *)
     mutable gates :
-      [ `Finalized | `Unfinalized_rev of (Row.t, 'f) Gate_spec.t list ]
+      [ `Finalized | `Unfinalized_rev of (unit, 'f) Gate_spec.t list ]
   ; (* an instruction pointer *)
     mutable next_row : int
   ; (* hash of the circuit, for distinguishing different circuits *)
@@ -500,6 +503,23 @@ struct
   (** Same as wire', except that the row must be given relatively to the end of the public-input rows *)
   let wire sys key row col = wire' sys key (Row.After_public_input row) col
 
+  let permutation =
+    let module Relative_position = struct
+      module T = struct
+        type t = Row.t Position.t [@@deriving hash, sexp, compare]
+      end
+
+      include Core_kernel.Hashable.Make (T)
+    end in
+    fun ~(equivalence_classes : Row.t Position.t list V.Table.t) ->
+      let res = Relative_position.Table.create () in
+      Hashtbl.iter equivalence_classes ~f:(fun ps ->
+          List.iter2_exn ps (List.last_exn ps :: List.tl_exn ps)
+            ~f:(fun input output -> Hashtbl.add_exn res ~key:input ~data:output)) ;
+      res
+
+  let permutation_columns = 7
+
   (** Adds zero-knowledgeness to the gates/rows, and convert into Rust type [Gates.t].
       This can only be called once *)
   let finalize_and_get_gates sys =
@@ -529,10 +549,16 @@ struct
             }
             :: !pub_input_gate_specs_rev
         done ;
+        let permutation : Row.t Position.t -> int Position.t =
+          let perm = permutation ~equivalence_classes:sys.equivalence_classes in
+          fun pos ->
+            let pos' = Hashtbl.find_exn perm pos in
+            { pos' with row = Row.to_absolute pos'.row ~public_input_size }
+        in
         (* Add zero-knowledge rows/gates at the very end *)
         let all_gates =
-          let rev_map_append xs tl ~f =
-            List.fold xs ~init:tl ~f:(fun acc x -> f x :: acc)
+          let rev_mapi_append xs tl ~f =
+            List.foldi xs ~init:tl ~f:(fun i acc x -> f i x :: acc)
           in
           let to_absolute_rows =
             Gate_spec.map_rows ~f:(Row.to_absolute ~public_input_size)
@@ -545,7 +571,15 @@ struct
                 to_absolute_rows { kind = Generic; row; wired_to; coeffs })
           in
           List.rev_append !pub_input_gate_specs_rev
-            (rev_map_append gates random_rows ~f:to_absolute_rows)
+            (rev_mapi_append gates random_rows ~f:(fun i g ->
+                 let curr_row = Row.After_public_input i in
+                 let () = g.row in
+                 { g with
+                   row = Row.to_absolute ~public_input_size curr_row
+                 ; wired_to =
+                     Array.init permutation_columns ~f:(fun i ->
+                         permutation { row = curr_row; col = i })
+                 }))
         in
         (* Convert all the gates into our Gates.t Rust vector type *)
         List.iter all_gates ~f:(fun g ->
@@ -595,16 +629,14 @@ struct
         Some (List.rev ((acc, i) :: ts), n + 1, has_constant_term)
 
   (** Adds a row/gate/constraint to a constraint system `sys` *)
-  let add_row sys row kind (wired_to : _ Position.t array) coeffs =
+  let add_row sys row kind coeffs =
     match sys.gates with
     | `Finalized ->
         failwith "add_row called on finalized constraint system"
     | `Unfinalized_rev gates ->
         let open Position in
         sys.gates <-
-          `Unfinalized_rev
-            ( { kind; row = After_public_input sys.next_row; wired_to; coeffs }
-            :: gates ) ;
+          `Unfinalized_rev ({ kind; row = (); wired_to = [||]; coeffs } :: gates) ;
         sys.next_row <- sys.next_row + 1 ;
         sys.rows_rev <- row :: sys.rows_rev
 
