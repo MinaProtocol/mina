@@ -243,7 +243,7 @@ let main inputs =
     { Test_config.Container_images.mina = inputs.mina_image
     ; archive_node = inputs.archive_image
     ; user_agent = "codaprotocol/coda-user-agent:0.1.5"
-    ; bots = "codaprotocol/coda-bots:0.0.13-beta-1"
+    ; bots = "minaprotocol/mina-bots:latest"
     ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in
@@ -383,7 +383,7 @@ let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 
 let engine_cmd ((engine_name, (module Engine)) : engine) =
   let info =
-    let doc = "Run coda integration test(s) on remote cloud provider." in
+    let doc = "Run mina integration test(s) on remote cloud provider." in
     Term.info engine_name ~doc ~exits:Term.default_exits
   in
   let test_inputs_with_cli_inputs_arg =
@@ -410,7 +410,7 @@ let help_cmd =
   (help_term, info)
 
 let default_cmd =
-  let doc = "Run coda integration test(s)." in
+  let doc = "Run mina integration test(s)." in
   let info = Term.info "test_executive" ~doc ~exits:Term.default_error_exits in
   (help_term, info)
 

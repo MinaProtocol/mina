@@ -3,6 +3,8 @@
 S3_LOCKFILE_DATE="$(aws s3 ls s3://packages.o1test.net/dists/unstable/main/binary-/lockfile | awk '{print $1 " " $2}')"
 if [[ "$S3_LOCKFILE_DATE" == "" ]]; then
     echo "Could not get the lockfile timestamp from the S3 bucket. Have you set your AWS credentials correctly?"
+    aws s3 rm s3://packages.o1test.net/dists/unstable/main/binary-/lockfile
+    echo "Lockfile deleted anyway"
     exit 1
 fi
 S3_LOCKFILE_SECONDS=$(date -d "$S3_LOCKFILE_DATE" +%s)

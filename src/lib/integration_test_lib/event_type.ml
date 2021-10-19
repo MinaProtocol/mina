@@ -56,6 +56,7 @@ module Node_initialization = struct
   let parse = Fn.const (Or_error.return ())
 end
 
+(* NOTE: the daemon does not emit a node offline event organically.  it is the repsonsibility of the test execution engine to emit, in whatever way, the Node offline event.  this can be achived with the wrapping script emitting printouts, or by checking whatever systems tools, and so on-- the best way will depend on the engine *)
 module Node_offline = struct
   let name = "Node_offline"
 
