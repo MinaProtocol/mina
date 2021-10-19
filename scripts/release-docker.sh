@@ -67,6 +67,7 @@ bot)
 mina-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
   DOCKER_CONTEXT="dockerfiles/"
+  VERSION="${VERSION}-${NETWORK##*=}"
   ;;
 mina-toolchain)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps"
