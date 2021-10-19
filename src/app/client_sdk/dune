@@ -11,6 +11,7 @@
   data_hash_lib_nonconsensus
   random_oracle_nonconsensus
   signature_lib_nonconsensus
+  string_sign_nonconsensus
   zarith_stubs_js
   integers
   integers_stubs_js

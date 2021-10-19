@@ -19,6 +19,11 @@ module Make (Key : Binable.S) (Value : Binable.S) :
     in
     Binable.of_bigstring (module Value) serialized_value
 
+  let get_batch t ~keys =
+    Database.get_batch t
+      ~keys:(List.map keys ~f:(Binable.to_bigstring (module Key)))
+    |> List.map ~f:(Option.map ~f:(Binable.of_bigstring (module Value)))
+
   let set t ~key ~data =
     Database.set t
       ~key:(Binable.to_bigstring (module Key) key)

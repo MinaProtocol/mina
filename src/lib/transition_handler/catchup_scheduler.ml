@@ -367,7 +367,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
     let%test_unit "catchup jobs do not fire after timeout if they are \
                    invalidated" =
       let timeout_duration = Block_time.Span.of_ms 200L in
-      let test_delta = Block_time.Span.of_ms 100L in
+      let test_delta = Block_time.Span.of_ms 400L in
       Quickcheck.test ~trials:3
         (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
            ~verifier ~max_length ~frontier_size:1 ~branch_size:2 ())
