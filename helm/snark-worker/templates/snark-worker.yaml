@@ -15,7 +15,7 @@ spec:
         app: {{$.Values.workerName}}
         testnet: {{ $.Values.testnetName }}
         role: snark-worker
-        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
+        version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '10000'
@@ -29,9 +29,9 @@ spec:
           requests:
             memory: 6.0Gi
             cpu: 4
-        image: {{ $.Values.coda.image }}
-        {{ if $.Values.coda.useCustomEntrypoint -}}
-        command: [{{ $.Values.coda.customEntrypoint }}]
+        image: {{ $.Values.mina.image }}
+        {{ if $.Values.mina.useCustomEntrypoint -}}
+        command: [{{ $.Values.mina.customEntrypoint }}]
         {{- else }}
         command: ["bash", "-c"]
         {{- end }}

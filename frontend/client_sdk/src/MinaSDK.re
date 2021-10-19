@@ -407,6 +407,97 @@ let verifyStakeDelegationSignature =
 };
 
 [@bs.send]
+external hashPayment:
+  (minaSDK, signed_payment_js) => string =
+  "hashPayment";
+
+/**
+  * Compute the hash of a signed payment.
+  *
+  * @param signedPayment - A signed payment transaction
+  * @returns A transaction hash
+  */
+[@genType]
+let hashPayment = (. signedPayment: signed(payment)) => {
+  let payload = signedPayment.payload;
+  // Stringify all numeric inputs since they may be passed as
+  // number/bigint in TS/JS
+  let memo = value(~default="", payload.memo);
+  let fee = Js.String.make(payload.fee);
+  let amount = Js.String.make(payload.amount);
+  let nonce = Js.String.make(payload.nonce);
+  let validUntil =
+    Js.String.make(value(~default=defaultValidUntil, payload.validUntil));
+
+  hashPayment(
+    minaSDK,
+    {
+      "sender": signedPayment.publicKey,
+      "signature": signedPayment.signature,
+      "payment": {
+        "common": {
+          "fee": fee,
+          "feePayer": payload.from,
+          "nonce": nonce,
+          "validUntil": validUntil,
+          "memo": memo,
+        },
+        "paymentPayload": {
+          "source": payload.from,
+          "receiver": payload.to_,
+          "amount": amount,
+        },
+      },
+    },
+  );
+};
+
+[@bs.send]
+external hashStakeDelegation:
+  (minaSDK, signed_stake_delegation_js) => string =
+  "hashStakeDelegation";
+
+/**
+  * Compute the hash of a signed stake delegation.
+  *
+  * @param signedStakeDelegation - A signed stake delegation
+  * @returns A transaction hash
+  */
+[@genType]
+let hashStakeDelegation =
+    (. signedStakeDelegation: signed(stakeDelegation)) => {
+  let payload = signedStakeDelegation.payload;
+  // Stringify all numeric inputs since they may be passed as
+  // number/bigint in TS/JS
+  let memo = value(~default="", payload.memo);
+  let fee = Js.String.make(payload.fee);
+  let nonce = Js.String.make(payload.nonce);
+  let validUntil =
+    Js.String.make(value(~default=defaultValidUntil, payload.validUntil));
+
+  hashStakeDelegation(
+    minaSDK,
+    {
+      "sender": signedStakeDelegation.publicKey,
+      "signature": signedStakeDelegation.signature,
+      "stakeDelegation": {
+        "common": {
+          "fee": fee,
+          "feePayer": payload.from,
+          "nonce": nonce,
+          "validUntil": validUntil,
+          "memo": memo,
+        },
+        "delegationPayload": {
+          "newDelegate": payload.to_,
+          "delegator": payload.from,
+        },
+      },
+    },
+  );
+};
+
+[@bs.send]
 external signedRosettaTransactionToSignedCommand: (minaSDK, string) => string =
   "signedRosettaTransactionToSignedCommand";
 

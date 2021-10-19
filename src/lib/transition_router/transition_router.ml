@@ -280,7 +280,7 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
                 [ ( "max seconds to wait for high connectivity"
                   , `Float connectivity_time_upperbound )
                 ]
-              "Will start initialization without connecting with too any peers"
+              "Will start initialization without connecting to any peers"
           else (
             [%log error]
               "Failed to find any peers during initialization (crashing \
@@ -293,8 +293,7 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
               ; ( "max seconds to wait for high connectivity"
                 , `Float connectivity_time_upperbound )
               ]
-            "Will start initialization without connecting with too many peers"
-      )
+            "Will start initialization without connecting to too many peers" )
     ]
 
 let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system

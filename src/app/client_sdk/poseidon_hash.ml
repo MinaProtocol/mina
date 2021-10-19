@@ -93,6 +93,8 @@ module Hash = struct
       ~pack:Field.project
 end
 
+module String_sign = String_sign_nonconsensus.String_sign
+
 (* ************************ *
  *   javascript interface   *
  * ************************ *)
