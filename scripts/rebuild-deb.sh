@@ -127,7 +127,7 @@ cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc
 cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
 
 mkdir -p "${BUILDDIR}/usr/lib/systemd/user"
-cp ../scripts/mina.service "${BUILDDIR}/usr/lib/systemd/user/"
+sed s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt% ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
 
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
@@ -200,6 +200,11 @@ sudo cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe "${BUILDDIR}/us
 
 # Switch the default configuration to devnet.json:
 sudo cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+
+# Overwrite the mina.service with a new default PEERS_URL
+rm -f "${BUILDDIR}/usr/lib/systemd/user/mina.service"
+sed s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/seed-lists/devnet_seeds.txt% ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
+
 
 # echo contents of deb
 echo "------------------------------------------------------------"
