@@ -488,16 +488,8 @@ module T = struct
                  ~archive_process_location:
                    (Option.map archive_process_location ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
-<<<<<<< HEAD
                           { name = "dummy"; value = host_and_port }))
-                 ~log_precomputed_blocks:false ())
-||||||| 260701a0b
-                          {name= "dummy"; value= host_and_port} ))
-                 ~log_precomputed_blocks:false ())
-=======
-                          {name= "dummy"; value= host_and_port} ))
                  ~log_precomputed_blocks:false ~stop_time:48 ())
->>>>>>> origin/release/1.2.0
           in
           let coda_ref : Mina_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir

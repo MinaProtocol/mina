@@ -980,7 +980,8 @@ module Block_latency = struct
       ()
 
   module Validation_acceptance_time =
-    Moving_time_average (struct
+    Moving_time_average
+      (struct
         include Latency_time_spec
 
         let subsystem = subsystem

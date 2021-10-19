@@ -230,110 +230,12 @@ module Worker = struct
 end
 
 type worker =
-<<<<<<< HEAD
   { connection : Worker.Connection.t
   ; process : Process.t
   ; exit_or_signal : Unix.Exit_or_signal.t Deferred.Or_error.t
   }
 
 type t = { worker : worker Ivar.t ref; logger : Logger.Stable.Latest.t }
-||||||| 260701a0b
-  { connection: Worker.Connection.t
-  ; process: Process.t
-  ; exit_or_signal: Unix.Exit_or_signal.t Deferred.Or_error.t }
-
-type t = {worker: worker Ivar.t ref; logger: Logger.Stable.Latest.t}
-
-let plus_or_minus initial ~delta =
-  initial +. (Random.float (2. *. delta) -. delta)
-
-(** Call this as early as possible after the process is known, and store the
-    resulting [Deferred.t] somewhere to be used later.
-*)
-let wait_safe ~logger process =
-  (* This is a little more nuanced than it may initially seem.
-     - The initial call to [Process.wait] runs a wait syscall -- with the
-       NOHANG flag -- synchronously.
-       * This may raise an error (WNOHANG or otherwise) that we have to handle
-         synchronously at call time.
-     - The [Process.wait] then returns a [Deferred.t] that resolves when a
-       second syscall returns.
-       * This may throw its own errors, so we need to ensure that this is also
-         wrapped to catch them.
-     - Once the child process has died and one or more wait syscalls have
-       resolved, the operating system will drop the process metadata. This
-       means that our wait may hang forever if 1) the process has already died
-       and 2) there was a wait call issued by some other code before we have a
-       chance.
-       * Thus, we should make this initial call while the child process is
-         still alive, preferably on startup, to avoid this hang.
-  *)
-  match
-    Or_error.try_with (fun () ->
-        let deferred_wait =
-          Monitor.try_with ~run:`Now
-            ~rest:
-              (`Call
-                (fun exn ->
-                  [%log warn]
-                    "Saw an error from Process.wait in wait_safe: $err"
-                    ~metadata:
-                      [("err", Error_json.error_to_yojson (Error.of_exn exn))]
-                  ))
-            (fun () -> Process.wait process)
-        in
-        Deferred.Result.map_error ~f:Error.of_exn deferred_wait )
-  with
-  | Ok x ->
-      x
-  | Error err ->
-      Deferred.Or_error.fail err
-=======
-  { connection: Worker.Connection.t
-  ; process: Process.t
-  ; exit_or_signal: Unix.Exit_or_signal.t Deferred.Or_error.t }
-
-type t = {worker: worker Ivar.t ref; logger: Logger.Stable.Latest.t}
-
-let wait_safe ~logger process =
-  (* This is a little more nuanced than it may initially seem.
-     - The initial call to [Process.wait] runs a wait syscall -- with the
-       NOHANG flag -- synchronously.
-       * This may raise an error (WNOHANG or otherwise) that we have to handle
-         synchronously at call time.
-     - The [Process.wait] then returns a [Deferred.t] that resolves when a
-       second syscall returns.
-       * This may throw its own errors, so we need to ensure that this is also
-         wrapped to catch them.
-     - Once the child process has died and one or more wait syscalls have
-       resolved, the operating system will drop the process metadata. This
-       means that our wait may hang forever if 1) the process has already died
-       and 2) there was a wait call issued by some other code before we have a
-       chance.
-       * Thus, we should make this initial call while the child process is
-         still alive, preferably on startup, to avoid this hang.
-  *)
-  match
-    Or_error.try_with (fun () ->
-        let deferred_wait =
-          Monitor.try_with ~run:`Now
-            ~rest:
-              (`Call
-                (fun exn ->
-                  [%log warn]
-                    "Saw an error from Process.wait in wait_safe: $err"
-                    ~metadata:
-                      [("err", Error_json.error_to_yojson (Error.of_exn exn))]
-                  ))
-            (fun () -> Process.wait process)
-        in
-        Deferred.Result.map_error ~f:Error.of_exn deferred_wait )
-  with
-  | Ok x ->
-      x
-  | Error err ->
-      Deferred.Or_error.fail err
->>>>>>> origin/release/1.2.0
 
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
@@ -408,14 +310,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
   in
   let%map worker = create_worker () |> Deferred.Or_error.ok_exn in
   let worker_ref = ref (Ivar.create_full worker) in
-<<<<<<< HEAD
   let rec on_worker { connection = _; process; exit_or_signal } =
-||||||| 260701a0b
-  let rec on_worker {connection= _; process; exit_or_signal} =
-    let restart_after = Time.Span.(of_min (15. |> plus_or_minus ~delta:2.5)) in
-=======
-  let rec on_worker {connection= _; process; exit_or_signal} =
->>>>>>> origin/release/1.2.0
     let finished =
       Deferred.any
         [ ( exit_or_signal
@@ -520,7 +415,6 @@ let with_retry ~logger f =
   in
   go 4
 
-<<<<<<< HEAD
 let verify_blockchain_snarks { worker; logger } chains =
   trace_recurring "Verifier.verify_blockchain_snarks" (fun () ->
       with_retry ~logger (fun () ->
@@ -544,56 +438,9 @@ let verify_blockchain_snarks { worker; logger } chains =
                 ~f:Worker.functions.verify_blockchains ~arg:chains
               |> Deferred.Or_error.map ~f:(fun x -> `Continue x)
             ]))
-||||||| 260701a0b
-let verify_blockchain_snarks {worker; logger} chains =
-  with_retry ~logger (fun () ->
-      let%bind {connection; _} =
-        let ivar = !worker in
-        match Ivar.peek ivar with
-        | Some worker ->
-            Deferred.return worker
-        | None ->
-            [%log debug] "Waiting for the verifier process to restart" ;
-            let%map worker = Ivar.read ivar in
-            [%log debug] "Verifier process has restarted; finished waiting" ;
-            worker
-      in
-      Deferred.any
-        [ ( after (Time.Span.of_min 3.)
-          >>| fun _ ->
-          Or_error.return
-          @@ `Stop (Error.of_string "verify_blockchain_snarks timeout") )
-        ; Worker.Connection.run connection
-            ~f:Worker.functions.verify_blockchains ~arg:chains
-          |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ] )
-=======
-let verify_blockchain_snarks {worker; logger} chains =
-  trace_recurring "Verifier.verify_blockchain_snarks" (fun () ->
-      with_retry ~logger (fun () ->
-          let%bind {connection; _} =
-            let ivar = !worker in
-            match Ivar.peek ivar with
-            | Some worker ->
-                Deferred.return worker
-            | None ->
-                [%log debug] "Waiting for the verifier process to restart" ;
-                let%map worker = Ivar.read ivar in
-                [%log debug] "Verifier process has restarted; finished waiting" ;
-                worker
-          in
-          Deferred.any
-            [ ( after (Time.Span.of_min 3.)
-              >>| fun _ ->
-              Or_error.return
-              @@ `Stop (Error.of_string "verify_blockchain_snarks timeout") )
-            ; Worker.Connection.run connection
-                ~f:Worker.functions.verify_blockchains ~arg:chains
-              |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ] ) )
->>>>>>> origin/release/1.2.0
 
 module Id = Unique_id.Int ()
 
-<<<<<<< HEAD
 let verify_transaction_snarks { worker; logger } ts =
   trace_recurring "Verifier.verify_transaction_snarks" (fun () ->
       let id = Id.create () in
@@ -612,47 +459,8 @@ let verify_transaction_snarks { worker; logger } ts =
               ~f:Worker.functions.verify_transaction_snarks ~arg:ts
             |> Deferred.Or_error.map ~f:(fun x -> `Continue x))
       in
-||||||| 260701a0b
-let verify_transaction_snarks {worker; logger} ts =
-  let id = Id.create () in
-  let n = List.length ts in
-  let metadata () =
-    ("id", `String (Id.to_string id))
-    :: ("n", `Int n)
-    :: Memory_stats.(jemalloc_memory_stats () @ ocaml_memory_stats ())
-  in
-  [%log trace] "verify $n transaction_snarks (before)" ~metadata:(metadata ()) ;
-  let res =
-    with_retry ~logger (fun () ->
-        let%bind {connection; _} = Ivar.read !worker in
-        Worker.Connection.run connection
-          ~f:Worker.functions.verify_transaction_snarks ~arg:ts
-        |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
-  in
-  upon res (fun x ->
-=======
-let verify_transaction_snarks {worker; logger} ts =
-  trace_recurring "Verifier.verify_transaction_snarks" (fun () ->
-      let id = Id.create () in
-      let n = List.length ts in
-      let metadata () =
-        ("id", `String (Id.to_string id))
-        :: ("n", `Int n)
-        :: Memory_stats.(jemalloc_memory_stats () @ ocaml_memory_stats ())
-      in
-      [%log trace] "verify $n transaction_snarks (before)"
-        ~metadata:(metadata ()) ;
-      let%map res =
-        with_retry ~logger (fun () ->
-            let%bind {connection; _} = Ivar.read !worker in
-            Worker.Connection.run connection
-              ~f:Worker.functions.verify_transaction_snarks ~arg:ts
-            |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
-      in
->>>>>>> origin/release/1.2.0
       [%log trace] "verify $n transaction_snarks (after)!"
         ~metadata:
-<<<<<<< HEAD
           ( ( "result"
             , `String (Sexp.to_string ([%sexp_of: bool Or_error.t] res)) )
           :: metadata () ) ;
@@ -665,28 +473,3 @@ let verify_commands { worker; logger } ts =
           Worker.Connection.run connection ~f:Worker.functions.verify_commands
             ~arg:ts
           |> Deferred.Or_error.map ~f:(fun x -> `Continue x)))
-||||||| 260701a0b
-          ( ("result", `String (Sexp.to_string ([%sexp_of: bool Or_error.t] x)))
-          :: metadata () ) ) ;
-  res
-
-let verify_commands {worker; logger} ts =
-  with_retry ~logger (fun () ->
-      let%bind {connection; _} = Ivar.read !worker in
-      Worker.Connection.run connection ~f:Worker.functions.verify_commands
-        ~arg:ts
-      |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
-=======
-          ( ( "result"
-            , `String (Sexp.to_string ([%sexp_of: bool Or_error.t] res)) )
-          :: metadata () ) ;
-      res )
-
-let verify_commands {worker; logger} ts =
-  trace_recurring "Verifier.verify_commands" (fun () ->
-      with_retry ~logger (fun () ->
-          let%bind {connection; _} = Ivar.read !worker in
-          Worker.Connection.run connection ~f:Worker.functions.verify_commands
-            ~arg:ts
-          |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) )
->>>>>>> origin/release/1.2.0

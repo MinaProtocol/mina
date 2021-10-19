@@ -84,13 +84,7 @@ module Stack_id : sig
     module Latest = V1
   end
 
-<<<<<<< HEAD
-  type t = Stable.Latest.t [@@deriving sexp, compare, equal, to_yojson]
-||||||| 260701a0b
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, to_yojson]
-=======
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson]
->>>>>>> origin/release/1.2.0
+  type t = Stable.Latest.t [@@deriving sexp, compare, equal, yojson]
 
   val of_int : int -> t
 

@@ -53,20 +53,13 @@ module Compressed = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-<<<<<<< HEAD
-      type t = (Field.t, bool) Poly.Stable.V1.t
-      [@@deriving compare, equal, hash]
-||||||| 260701a0b
-      type t = (Field.t, bool) Poly.Stable.V1.t [@@deriving eq, compare, hash]
-=======
       module T = struct
         type t = (Field.t, bool) Poly.Stable.V1.t
-        [@@deriving eq, compare, hash]
->>>>>>> origin/release/1.2.0
+        [@@deriving equal, compare, hash]
 
         (* dummy type for inserting constraint
-         adding constraint to t produces "unused rec" error
-      *)
+           adding constraint to t produces "unused rec" error
+        *)
         type unused = unit constraint t = Arg.Stable.V1.t
 
         let to_latest = Fn.id

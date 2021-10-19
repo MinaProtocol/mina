@@ -43,40 +43,18 @@ end
 module Make_statement_scanner (Verifier : sig
   type t
 
-<<<<<<< HEAD
   val verify :
        verifier:t
     -> Ledger_proof_with_sok_message.t list
     -> bool Deferred.Or_error.t
 end) : sig
-||||||| 260701a0b
-        val verify :
-             verifier:t
-          -> Ledger_proof_with_sok_message.t list
-          -> sexp_bool M.Or_error.t
-    end) : sig
-=======
-  val verify :
-       verifier:t
-    -> Ledger_proof_with_sok_message.t list
-    -> sexp_bool Deferred.Or_error.t
-end) : sig
->>>>>>> origin/release/1.2.0
   val scan_statement :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> t
     -> verifier:Verifier.t
-<<<<<<< HEAD
     -> ( Transaction_snark.Statement.t
        , [ `Empty | `Error of Error.t ] )
        Deferred.Result.t
-||||||| 260701a0b
-    -> (Transaction_snark.Statement.t, [`Empty | `Error of Error.t]) result M.t
-=======
-    -> ( Transaction_snark.Statement.t
-       , [`Empty | `Error of Error.t] )
-       Deferred.Result.t
->>>>>>> origin/release/1.2.0
 
   val check_invariants :
        t

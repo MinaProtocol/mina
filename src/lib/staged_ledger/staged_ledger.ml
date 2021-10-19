@@ -246,7 +246,6 @@ module T = struct
       in
       next_available_token_after
     in
-<<<<<<< HEAD
     let ledger_hash_begin, next_available_token_begin =
       Scan_state.latest_ledger_proof scan_state
       |> Option.value_map ~default:(None, None) ~f:(fun proof ->
@@ -255,31 +254,6 @@ module T = struct
     Statement_scanner.check_invariants ~constraint_constants scan_state
       ~verifier:() ~error_prefix ~ledger_hash_end:ledger ~ledger_hash_begin
       ~next_available_token_begin ~next_available_token_end:next_available_token
-||||||| 260701a0b
-    match Scan_state.latest_ledger_proof scan_state with
-    | None ->
-        Statement_scanner.check_invariants ~constraint_constants scan_state
-          ~verifier:() ~error_prefix ~ledger_hash_end:ledger
-          ~ledger_hash_begin:None ~next_available_token_begin:None
-          ~next_available_token_end:next_available_token
-    | Some proof ->
-        Statement_scanner.check_invariants ~constraint_constants scan_state
-          ~verifier:() ~error_prefix ~ledger_hash_end:ledger
-          ~ledger_hash_begin:(Some (get_target proof))
-          ~next_available_token_begin:(Some (next_available_token_begin proof))
-          ~next_available_token_end:next_available_token
-=======
-    let ledger_hash_begin, next_available_token_begin =
-      Scan_state.latest_ledger_proof scan_state
-      |> Option.value_map ~default:(None, None) ~f:(fun proof ->
-             (Some (get_target proof), Some (next_available_token_begin proof))
-         )
-    in
-    Statement_scanner.check_invariants ~constraint_constants scan_state
-      ~verifier:() ~error_prefix ~ledger_hash_end:ledger ~ledger_hash_begin
-      ~next_available_token_begin
-      ~next_available_token_end:next_available_token
->>>>>>> origin/release/1.2.0
 
   let statement_exn ~constraint_constants t =
     let open Deferred.Let_syntax in
@@ -357,16 +331,8 @@ module T = struct
     let%bind _ =
       Deferred.Or_error.List.iter txs_with_protocol_state
         ~f:(fun (tx, protocol_state) ->
-<<<<<<< HEAD
           let%map.Deferred () = Scheduler.yield () in
           let%bind.Or_error txn_with_info =
-||||||| 260701a0b
-          let%map.Async () = Async.Scheduler.yield () in
-          let%bind.Or_error.Let_syntax txn_with_info =
-=======
-          let%map.Deferred.Let_syntax () = Scheduler.yield () in
-          let%bind.Or_error.Let_syntax txn_with_info =
->>>>>>> origin/release/1.2.0
             Ledger.apply_transaction ~constraint_constants
               ~txn_state_view:
                 (Mina_state.Protocol_state.Body.view protocol_state.body)
@@ -548,17 +514,8 @@ module T = struct
       } )
 
   let apply_transaction_and_get_witness ~constraint_constants ledger
-<<<<<<< HEAD
       pending_coinbase_stack_state s status txn_state_view state_and_body_hash =
     let open Deferred.Result.Let_syntax in
-||||||| 260701a0b
-      pending_coinbase_stack_state s status txn_state_view state_and_body_hash
-      =
-=======
-      pending_coinbase_stack_state s status txn_state_view state_and_body_hash
-      =
-    let open Deferred.Result.Let_syntax in
->>>>>>> origin/release/1.2.0
     let account_ids : Transaction.t -> _ = function
       | Fee_transfer t ->
           Fee_transfer.receivers t
@@ -581,24 +538,10 @@ module T = struct
     let%bind applied_txn, statement, updated_pending_coinbase_stack_state =
       measure "apply+stmt" (fun () ->
           apply_transaction_and_get_statement ~constraint_constants ledger
-<<<<<<< HEAD
             pending_coinbase_stack_state s txn_state_view)
       |> Deferred.return
     in
     let%bind () = yield_result () in
-||||||| 260701a0b
-            pending_coinbase_stack_state s txn_state_view )
-    in
-    let open Result.Let_syntax in
-    let%bind applied_txn, statement, updated_pending_coinbase_stack_state =
-      r
-    in
-=======
-            pending_coinbase_stack_state s txn_state_view )
-      |> Deferred.return
-    in
-    let%bind () = yield_result () in
->>>>>>> origin/release/1.2.0
     let%map () =
       match status with
       | None ->
@@ -640,7 +583,6 @@ module T = struct
           Deferred.List.fold ts ~init:([], pending_coinbase_stack_state)
             ~f:(fun (acc, pending_coinbase_stack_state) t ->
               let open Deferred.Let_syntax in
-<<<<<<< HEAD
               ( match
                   List.find (Transaction.public_keys t.With_status.data)
                     ~f:(fun pk ->
@@ -659,50 +601,6 @@ module T = struct
                   (res :: acc, updated_pending_coinbase_stack_state)
               | Error err ->
                   raise (Exit err)))
-||||||| 260701a0b
-              let%map () = Async.Scheduler.yield () in
-              List.fold ts ~init:(acc, pending_coinbase_stack_state)
-                ~f:(fun (acc, pending_coinbase_stack_state) t ->
-                  ( match
-                      List.find (Transaction.public_keys t.With_status.data)
-                        ~f:(fun pk ->
-                          Option.is_none
-                            (Signature_lib.Public_key.decompress pk) )
-                    with
-                  | None ->
-                      ()
-                  | Some pk ->
-                      raise (Exit (Invalid_public_key pk)) ) ;
-                  match
-                    apply_transaction_and_get_witness ~constraint_constants
-                      ledger pending_coinbase_stack_state t.With_status.data
-                      (Some t.status) current_state_view state_and_body_hash
-                  with
-                  | Ok (res, updated_pending_coinbase_stack_state) ->
-                      (res :: acc, updated_pending_coinbase_stack_state)
-                  | Error err ->
-                      raise (Exit err) ) ) )
-=======
-              ( match
-                  List.find (Transaction.public_keys t.With_status.data)
-                    ~f:(fun pk ->
-                      Option.is_none (Signature_lib.Public_key.decompress pk)
-                  )
-                with
-              | None ->
-                  ()
-              | Some pk ->
-                  raise (Exit (Invalid_public_key pk)) ) ;
-              match%map
-                apply_transaction_and_get_witness ~constraint_constants ledger
-                  pending_coinbase_stack_state t.With_status.data
-                  (Some t.status) current_state_view state_and_body_hash
-              with
-              | Ok (res, updated_pending_coinbase_stack_state) ->
-                  (res :: acc, updated_pending_coinbase_stack_state)
-              | Error err ->
-                  raise (Exit err) ) )
->>>>>>> origin/release/1.2.0
       |> Deferred.Result.map_error ~f:(function
            | Exit err ->
                err
@@ -963,7 +861,6 @@ module T = struct
             && List.length data
                > Scan_state.free_space t.scan_state - required + work_count
           then
-<<<<<<< HEAD
             Deferred.Result.fail
               (Staged_ledger_error.Insufficient_work
                  (sprintf
@@ -971,24 +868,6 @@ module T = struct
                       occupying: %d)  required %d, got %d"
                     slots required work_count))
           else Deferred.Result.return ())
-||||||| 260701a0b
-            Deferred.return
-              (Error
-                 (Staged_ledger_error.Insufficient_work
-                    (sprintf
-                       !"Insufficient number of transaction snark work (slots \
-                         occupying: %d)  required %d, got %d"
-                       slots required work_count)))
-          else Deferred.return (Ok ()) )
-=======
-            Deferred.Result.fail
-              (Staged_ledger_error.Insufficient_work
-                 (sprintf
-                    !"Insufficient number of transaction snark work (slots \
-                      occupying: %d)  required %d, got %d"
-                    slots required work_count))
-          else Deferred.Result.return () )
->>>>>>> origin/release/1.2.0
     in
     let%bind () = Deferred.return (check_zero_fee_excess t.scan_state data) in
     let%bind res_opt, scan_state' =
@@ -3455,14 +3334,7 @@ let%test_module "test" =
           in
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
               supercharge_coinbase_test ~self:locked_self
-<<<<<<< HEAD
                 ~delegator:locked_delegator ~block_count f_expected_balance sl))
-||||||| 260701a0b
-                ~delegator:locked_delegator ~block_count f_expected_balance sl
-          ) )
-=======
-                ~delegator:locked_delegator ~block_count f_expected_balance sl
-          ) )
 
     let command_insufficient_funds =
       let open Quickcheck.Generator.Let_syntax in
@@ -3482,8 +3354,9 @@ let%test_module "test" =
           Payment_payload.Poly.
             { source_pk
             ; receiver_pk
-            ; token_id= Token_id.default
-            ; amount= insufficient_account_creation_fee }
+            ; token_id = Token_id.default
+            ; amount = insufficient_account_creation_fee
+            }
       in
       let fee = Currency.Amount.to_fee balance in
       let payload =
@@ -3504,7 +3377,7 @@ let%test_module "test" =
               let diff =
                 Sl.create_diff ~constraint_constants !sl ~logger
                   ~current_state_view:(dummy_state_view ())
-                  ~transactions_by_fee:(Sequence.of_list [invalid_command])
+                  ~transactions_by_fee:(Sequence.of_list [ invalid_command ])
                   ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
                   ~coinbase_receiver ~supercharge_coinbase:false
               in
@@ -3516,7 +3389,7 @@ let%test_module "test" =
                        .commands x) )
               | Error e ->
                   Error.raise (Pre_diff_info.Error.to_error e) ) ;
-              Deferred.unit ) )
+              Deferred.unit))
 
     let%test_unit "Blocks having commands with insufficient funds are rejected"
         =
@@ -3525,7 +3398,7 @@ let%test_module "test" =
         let open Quickcheck.Generator.Let_syntax in
         let%map ledger_init_state = Ledger.gen_initial_ledger_state in
         let command (kp : Keypair.t) (balance : Currency.Amount.t)
-            (nonce : Account.Nonce.t) (validity : [`Valid | `Invalid]) =
+            (nonce : Account.Nonce.t) (validity : [ `Valid | `Invalid ]) =
           let receiver_pk =
             Quickcheck.random_value ~seed:(`Deterministic "receiver_pk")
               Public_key.Compressed.gen
@@ -3554,13 +3427,14 @@ let%test_module "test" =
               Payment_payload.Poly.
                 { source_pk
                 ; receiver_pk
-                ; token_id= Token_id.default
-                ; amount= account_creation_fee }
+                ; token_id = Token_id.default
+                ; amount = account_creation_fee
+                }
           in
           let payload =
             Signed_command.Payload.create ~fee ~fee_payer_pk:source_pk
-              ~fee_token:Token_id.default ~nonce
-              ~memo:Signed_command_memo.dummy ~valid_until:None ~body
+              ~fee_token:Token_id.default ~nonce ~memo:Signed_command_memo.dummy
+              ~valid_until:None ~body
           in
           User_command.Signed_command (Signed_command.sign kp payload)
         in
@@ -3580,7 +3454,7 @@ let%test_module "test" =
               let diff =
                 Sl.create_diff ~constraint_constants !sl ~logger
                   ~current_state_view:(dummy_state_view ())
-                  ~transactions_by_fee:(Sequence.of_list [valid_command])
+                  ~transactions_by_fee:(Sequence.of_list [ valid_command ])
                   ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
                   ~coinbase_receiver ~supercharge_coinbase:false
               in
@@ -3600,20 +3474,23 @@ let%test_module "test" =
                     |> Yojson.Safe.to_string ) ;
                   let failed_command =
                     With_status.
-                      { data= invalid_command
-                      ; status=
+                      { data = invalid_command
+                      ; status =
                           Transaction_status.Failed
                             ( Transaction_status.Failure
                               .Amount_insufficient_to_create_account
                             , Transaction_status.Balance_data.
-                                { fee_payer_balance= None
-                                ; source_balance= None
-                                ; receiver_balance= None } ) }
+                                { fee_payer_balance = None
+                                ; source_balance = None
+                                ; receiver_balance = None
+                                } )
+                      }
                   in
                   (*Replace the valid command with an invalid command)*)
                   let diff =
-                    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff=
-                        ({f with commands= [failed_command]}, s) }
+                    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff =
+                        ({ f with commands = [ failed_command ] }, s)
+                    }
                   in
                   let%map res =
                     Sl.apply ~constraint_constants !sl
@@ -3632,6 +3509,5 @@ let%test_module "test" =
                       [%log info] "Error %s" (Staged_ledger_error.to_string e) ;
                       assert true
                   | Error _ ->
-                      assert false ) ) )
->>>>>>> origin/release/1.2.0
+                      assert false )))
   end )

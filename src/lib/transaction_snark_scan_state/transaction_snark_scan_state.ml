@@ -368,20 +368,10 @@ struct
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
   let scan_statement ~constraint_constants tree ~verifier :
-<<<<<<< HEAD
       ( Transaction_snark.Statement.t
       , [ `Error of Error.t | `Empty ] )
       Deferred.Result.t =
     let open Deferred.Or_error.Let_syntax in
-||||||| 260701a0b
-      (Transaction_snark.Statement.t, [`Error of Error.t | `Empty]) Result.t
-      M.t =
-=======
-      ( Transaction_snark.Statement.t
-      , [`Error of Error.t | `Empty] )
-      Deferred.Result.t =
-    let open Deferred.Or_error.Let_syntax in
->>>>>>> origin/release/1.2.0
     let timer = Timer.create () in
     let yield_occasionally =
       let f = Staged.unstage (Async.Scheduler.yield_every ~n:50) in
@@ -398,16 +388,8 @@ struct
     in
     let with_error ~f message =
       let result = f () in
-<<<<<<< HEAD
       Deferred.Result.map_error result ~f:(fun e ->
           Error.createf !"%s: %{sexp:Error.t}" (write_error message) e)
-||||||| 260701a0b
-      Result.map_error result ~f:(fun e ->
-          Error.createf !"%s: %{sexp:Error.t}" (write_error message) e )
-=======
-      Deferred.Result.map_error result ~f:(fun e ->
-          Error.createf !"%s: %{sexp:Error.t}" (write_error message) e )
->>>>>>> origin/release/1.2.0
     in
     let merge_acc ~proofs (acc : Acc.t) s2 : Acc.t Deferred.Or_error.t =
       Timer.time timer (sprintf "merge_acc:%s" __LOC__) (fun () ->
@@ -419,54 +401,23 @@ struct
                   let%bind merged_statement =
                     Deferred.return (Transaction_snark.Statement.merge s1 s2)
                   in
-<<<<<<< HEAD
                   let%map () = yield_occasionally () in
                   Some (merged_statement, proofs @ ps)))
-||||||| 260701a0b
-                  Some (merged_statement, proofs @ ps) ) )
-=======
-                  let%map () = yield_occasionally () in
-                  Some (merged_statement, proofs @ ps) ) )
->>>>>>> origin/release/1.2.0
     in
     let fold_step_a acc_statement job =
       match job with
       | Parallel_scan.Merge.Job.Part (proof, message) ->
           let statement = Ledger_proof.statement proof in
-<<<<<<< HEAD
           merge_acc ~proofs:[ (proof, message) ] acc_statement statement
       | Empty | Full { status = Parallel_scan.Job_status.Done; _ } ->
           return acc_statement
       | Full { left = proof_1, message_1; right = proof_2, message_2; _ } ->
-||||||| 260701a0b
-          merge_acc ~proofs:[(proof, message)] acc_statement statement
-      | Empty | Full {status= Parallel_scan.Job_status.Done; _} ->
-          Or_error.return acc_statement
-      | Full {left= proof_1, message_1; right= proof_2, message_2; _} ->
-          let open Or_error.Let_syntax in
-=======
-          merge_acc ~proofs:[(proof, message)] acc_statement statement
-      | Empty | Full {status= Parallel_scan.Job_status.Done; _} ->
-          return acc_statement
-      | Full {left= proof_1, message_1; right= proof_2, message_2; _} ->
->>>>>>> origin/release/1.2.0
           let%bind merged_statement =
             Timer.time timer (sprintf "merge:%s" __LOC__) (fun () ->
-<<<<<<< HEAD
                 Deferred.return
                   (Transaction_snark.Statement.merge
                      (Ledger_proof.statement proof_1)
                      (Ledger_proof.statement proof_2)))
-||||||| 260701a0b
-                Transaction_snark.Statement.merge
-                  (Ledger_proof.statement proof_1)
-                  (Ledger_proof.statement proof_2) )
-=======
-                Deferred.return
-                  (Transaction_snark.Statement.merge
-                     (Ledger_proof.statement proof_1)
-                     (Ledger_proof.statement proof_2)) )
->>>>>>> origin/release/1.2.0
           in
           merge_acc acc_statement merged_statement
             ~proofs:[ (proof_1, message_1); (proof_2, message_2) ]
@@ -474,35 +425,16 @@ struct
     let fold_step_d acc_statement job =
       match job with
       | Parallel_scan.Base.Job.Empty
-<<<<<<< HEAD
       | Full { status = Parallel_scan.Job_status.Done; _ } ->
           return acc_statement
       | Full { job = transaction; _ } ->
-||||||| 260701a0b
-      | Full {status= Parallel_scan.Job_status.Done; _} ->
-          Or_error.return acc_statement
-      | Full {job= transaction; _} ->
-=======
-      | Full {status= Parallel_scan.Job_status.Done; _} ->
-          return acc_statement
-      | Full {job= transaction; _} ->
->>>>>>> origin/release/1.2.0
           with_error "Bad base statement" ~f:(fun () ->
               let%bind expected_statement =
                 Timer.time timer
                   (sprintf "create_expected_statement:%s" __LOC__) (fun () ->
-<<<<<<< HEAD
                     Deferred.return
                       (create_expected_statement ~constraint_constants
                          transaction))
-||||||| 260701a0b
-                    create_expected_statement ~constraint_constants transaction
-                )
-=======
-                    Deferred.return
-                      (create_expected_statement ~constraint_constants
-                         transaction) )
->>>>>>> origin/release/1.2.0
               in
               let%bind () = yield_always () in
               if
@@ -517,63 +449,30 @@ struct
                        %{sexp:Transaction_snark.Statement.t}"
                      transaction.statement expected_statement))
     in
-<<<<<<< HEAD
     let%bind.Deferred res =
-||||||| 260701a0b
-    let res =
-=======
-    let%bind.Deferred.Let_syntax res =
->>>>>>> origin/release/1.2.0
       Fold.fold_chronological_until tree ~init:None
         ~f_merge:(fun acc (_weight, job) ->
           let open Container.Continue_or_stop in
-<<<<<<< HEAD
           match%map.Deferred fold_step_a acc job with
-||||||| 260701a0b
-          match fold_step_a acc job with
-=======
-          match%map.Deferred.Let_syntax fold_step_a acc job with
->>>>>>> origin/release/1.2.0
           | Ok next ->
               Continue next
           | e ->
               Stop e)
         ~f_base:(fun acc (_weight, job) ->
           let open Container.Continue_or_stop in
-<<<<<<< HEAD
           match%map.Deferred fold_step_d acc job with
-||||||| 260701a0b
-          match fold_step_d acc job with
-=======
-          match%map.Deferred.Let_syntax fold_step_d acc job with
->>>>>>> origin/release/1.2.0
           | Ok next ->
               Continue next
           | e ->
-<<<<<<< HEAD
               Stop e)
         ~finish:return
-||||||| 260701a0b
-              Stop e )
-        ~finish:Result.return
-=======
-              Stop e )
-        ~finish:return
->>>>>>> origin/release/1.2.0
     in
     Timer.log "scan_statement" timer ;
     match res with
     | Ok None ->
         Deferred.return (Error `Empty)
     | Ok (Some (res, proofs)) -> (
-<<<<<<< HEAD
         match%map.Deferred
-||||||| 260701a0b
-        let open M.Let_syntax in
-        match%map
-=======
-        match%map.Deferred.Let_syntax
->>>>>>> origin/release/1.2.0
           ksprintf time "verify:%s" __LOC__ (fun () ->
               Verifier.verify ~verifier proofs)
         with

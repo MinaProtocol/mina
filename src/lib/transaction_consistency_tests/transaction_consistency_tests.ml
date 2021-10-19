@@ -68,7 +68,7 @@ let%test_module "transaction logic consistency" =
       let count = ref 0 in
       List.iter account_ids ~f:(fun account_id ->
           let (_ : _ * _) = Ledger.create_empty_exn base_ledger account_id in
-          incr count ) ;
+          incr count) ;
       Sparse_ledger.of_ledger_subset_exn base_ledger account_ids
 
     (* Helpers for applying transactions *)
@@ -78,13 +78,13 @@ let%test_module "transaction logic consistency" =
     let sparse_ledger ledger t =
       Or_error.try_with ~backtrace:true (fun () ->
           Sparse_ledger.apply_transaction_exn ~constraint_constants
-            ~txn_state_view ledger (Transaction.forget t) )
+            ~txn_state_view ledger (Transaction.forget t))
 
     let transaction_logic ledger t =
       let ledger = ref ledger in
       let target_ledger =
-        Sparse_txn_logic.apply_transaction ~constraint_constants
-          ~txn_state_view ledger (Transaction.forget t)
+        Sparse_txn_logic.apply_transaction ~constraint_constants ~txn_state_view
+          ledger (Transaction.forget t)
       in
       Or_error.map ~f:(const !ledger) target_ledger
 
@@ -92,22 +92,26 @@ let%test_module "transaction logic consistency" =
       Or_error.try_with ~backtrace:true (fun () ->
           Transaction_snark.check_transaction ~constraint_constants
             ~sok_message:
-              {Sok_message.fee= Fee.zero; prover= Public_key.Compressed.empty}
+              { Sok_message.fee = Fee.zero
+              ; prover = Public_key.Compressed.empty
+              }
             ~source:(Sparse_ledger.merkle_root source)
             ~target:(Sparse_ledger.merkle_root target)
             ~init_stack:coinbase_stack_source
             ~pending_coinbase_stack_state:
-              { source= coinbase_stack_source
-              ; target=
+              { source = coinbase_stack_source
+              ; target =
                   pending_coinbase_stack_target
                     (Transaction.forget transaction)
-                    coinbase_stack_source }
+                    coinbase_stack_source
+              }
             ~next_available_token_before:
               (Sparse_ledger.next_available_token source)
             ~next_available_token_after:
               (Sparse_ledger.next_available_token target)
-            ~snapp_account1:None ~snapp_account2:None {transaction; block_data}
-            (unstage (Sparse_ledger.handler source)) )
+            ~snapp_account1:None ~snapp_account2:None
+            { transaction; block_data }
+            (unstage (Sparse_ledger.handler source)))
 
     let check_consistent source transaction =
       let res_sparse =
@@ -141,7 +145,8 @@ let%test_module "transaction logic consistency" =
                             |> Snark_params.Tick.Field.to_string )
                         ; Atom
                             ( Sparse_ledger.merkle_root target2
-                            |> Snark_params.Tick.Field.to_string ) ])) )
+                            |> Snark_params.Tick.Field.to_string )
+                        ])) )
         | Ok target, _ | _, Ok target ->
             (target, None)
       in
@@ -197,7 +202,8 @@ let%test_module "transaction logic consistency" =
       ; timed 5 16 (* not yet vesting, already hit cliff *)
       ; timed 15 1 (* not yet vesting, just hit cliff *)
       ; timed 30 1
-        (* not yet vesting, hasn't hit cliff *) ]
+        (* not yet vesting, hasn't hit cliff *)
+      ]
 
     let gen_account pk =
       let open Quickcheck.Generator.Let_syntax in
@@ -219,15 +225,15 @@ let%test_module "transaction logic consistency" =
         in
         let%map memo = String.gen_with_length memo_length Char.gen_print in
         let memo =
-          Signed_command_memo.create_by_digesting_string memo
-          |> Or_error.ok_exn
+          Signed_command_memo.create_by_digesting_string memo |> Or_error.ok_exn
         in
         ( { fee
-          ; fee_token= Token_id.default
-          ; fee_payer_pk= sender
+          ; fee_token = Token_id.default
+          ; fee_payer_pk = sender
           ; nonce
           ; valid_until
-          ; memo }
+          ; memo
+          }
           : Signed_command_payload.Common.t )
       in
       let payment =
@@ -235,15 +241,16 @@ let%test_module "transaction logic consistency" =
         let%map amount = Amount.gen in
         let body =
           Signed_command_payload.Body.Payment
-            { source_pk= sender
-            ; receiver_pk= receiver
-            ; token_id= Token_id.default
-            ; amount }
+            { source_pk = sender
+            ; receiver_pk = receiver
+            ; token_id = Token_id.default
+            ; amount
+            }
         in
-        let payload : Signed_command_payload.t = {common; body} in
+        let payload : Signed_command_payload.t = { common; body } in
         let signed =
           Signed_command.sign
-            {public_key= sender'; private_key= sender_sk}
+            { public_key = sender'; private_key = sender_sk }
             payload
         in
         Transaction.Command (User_command.Signed_command signed)
@@ -252,12 +259,12 @@ let%test_module "transaction logic consistency" =
         let%map common = gen_user_command_common in
         let body =
           Signed_command_payload.Body.Stake_delegation
-            (Set_delegate {delegator= sender; new_delegate= receiver})
+            (Set_delegate { delegator = sender; new_delegate = receiver })
         in
-        let payload : Signed_command_payload.t = {common; body} in
+        let payload : Signed_command_payload.t = { common; body } in
         let signed =
           Signed_command.sign
-            {public_key= sender'; private_key= sender_sk}
+            { public_key = sender'; private_key = sender_sk }
             payload
         in
         Transaction.Command (User_command.Signed_command signed)
@@ -302,7 +309,7 @@ let%test_module "transaction logic consistency" =
       in
       ignore coinbase ;
       ignore fee_transfer ;
-      [payment; delegation (*coinbase; fee_transfer*)]
+      [ payment; delegation (*coinbase; fee_transfer*) ]
 
     let gen_transaction sender_sk sender' sender receiver =
       let open Quickcheck.Generator.Let_syntax in
@@ -324,7 +331,9 @@ let%test_module "transaction logic consistency" =
           (pk, account)
       in
       let account_ids =
-        List.map ~f:(fun pk -> Account_id.create pk Token_id.default) [pk1; pk2]
+        List.map
+          ~f:(fun pk -> Account_id.create pk Token_id.default)
+          [ pk1; pk2 ]
         |> List.dedup_and_sort ~compare:Account_id.compare
       in
       let ledger = ref (empty_sparse_ledger account_ids) in
@@ -333,7 +342,7 @@ let%test_module "transaction logic consistency" =
             Sparse_ledger.L.get_or_create_account ledger
               (Account_id.create pk Token_id.default)
               account
-            |> Or_error.ok_exn |> ignore )
+            |> Or_error.ok_exn |> ignore)
       in
       add_to_ledger pk1 account1 ;
       add_to_ledger pk2 account2 ;
@@ -361,8 +370,7 @@ let%test_module "transaction logic consistency" =
               (Yojson.Safe.pretty_to_string
                  (Transaction.Valid.to_yojson transaction))
               (Yojson.Safe.to_string (Sparse_ledger.to_yojson ledger))
-              (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson error))
-      ) ;
+              (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson error))) ;
       !passed
 
     let txn_jsons =
@@ -564,7 +572,8 @@ let%test_module "transaction logic consistency" =
         , {json|
 {"indexes":[[["B62qpeSLPUieLnbs8fJncbZ9qwxJSTFGDHDhMUWxwg1uFxG6jrBSFjE","1"],0]],"depth":10,"tree":["Node","jwLRMxvbBU31KmLtEpApzwFFkG5U6C6Vs3XZnw8vzDQJt85EDdK",["Node","jwmhEsU9gv86qUdiyd2LLK8xFezNgc7VNenHJJrwz4xgbMNAXNP",["Node","jxZiDu3G32ckUvwwNMGLzSWHhgKF2ZHuyd9nvdCdW7g4xEy2i3Z",["Node","jxfTKqPjMYWhjoRk8u7gGPr2JeRVqT6knAjfHaQ1xN1FJzqZcQo",["Node","jxchHaqhYBkB1JyegA8q9fyxHCkLrmRNNA1DbL7ANGfB9qDFYPe",["Node","jxJ5RiQLddGxZ6LNcmGnRNhECoVqW6DhAWamZBRokC98xTfbNXY",["Node","jxCSYq3DjvasUknRdYTZyMWxKFqg2BaJ5UvKeHgeWLnuQynbABT",["Node","jxa9rRM9iJ4jq1Z3xthLyiYTLgCLDHNQeKWhJBipsxuhaMDkqyd",["Node","jxTtxGDDatStBD8spdSEgiq2JHZi6ZMDKwFE3HkV8fSXo7K64gr",["Node","jx5e2UBCPx6TMHUy6aN5i9NMfhCyBxnAJmRs2UTmATCkuCZceSK",["Account",{"public_key":"B62qpeSLPUieLnbs8fJncbZ9qwxJSTFGDHDhMUWxwg1uFxG6jrBSFjE","token_id":"1","token_permissions":["Not_owned",{"account_disabled":false}],"balance":"17009607841493601729","nonce":"0","receipt_chain_hash":"2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe","delegate":"B62qpeSLPUieLnbs8fJncbZ9qwxJSTFGDHDhMUWxwg1uFxG6jrBSFjE","voting_for":"3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x","timing":["Timed",{"initial_minimum_balance":"4135254886733070390","cliff_time":"0","cliff_amount":"0","vesting_period":"16","vesting_increment":"8483500404270949136"}],"permissions":{"stake":true,"edit_state":["Signature"],"send":["Signature"],"receive":["None"],"set_delegate":["Signature"],"set_permissions":["Signature"],"set_verification_key":["Signature"]},"snapp":null}],["Hash","jwxHKCNJsFjFJrxSusJ1SnzFLJWosGRFdR5iNznUo3VJPA3fTXX"]],["Hash","jxXGdw6qfqz96eqvitzV2yJ4Tawk1PhqyjF86e3n4ZNPwmDmp5T"]],["Hash","jxPA47eC73ibqELdRRE5fN3paDzecBfiZ5Nfaj3f6xc4Rkgy2eZ"]],["Hash","jxFGQbPEuwz8DWnhAwuYypdiX6aBCkc55RPF6poUfFSikDK64GU"]],["Hash","jwSjnoWdZ2wyyUhesr6eoxbhcFjHVLBWHHiPNoVe5Q86P5yz2Ad"]],["Hash","jwdEug2AL1iCDDXQpFUbMptiryaU1BRaqV6aL4rnknp7ZcdsT8k"]],["Hash","jxfwfExD2JRGmfwaLkUS2g1HpH896umBLKq3e865m1SbLJW6CrT"]],["Hash","jw8DqJUfNarG33bpL9rUySBwrfBuz7fRHZr5TEvALMS5Rb2S7jE"]],["Hash","jxQLSBPmWYGRDRQaUE7Ye21jhsb185H25nWSSYtg8drSemrQA4P"]],["Hash","jxFokLd9y68j9htcedV8ThzPa8me8kX5FNeRmvVo75NyrqZTLgx"]],"next_available_token":"2"}
 |json}
-        ) ]
+        )
+      ]
 
     let%test "one" =
       let passed = ref true in
@@ -587,7 +596,6 @@ let%test_module "transaction logic consistency" =
               (Yojson.Safe.pretty_to_string
                  (Transaction.Valid.to_yojson transaction))
               (Yojson.Safe.to_string (Sparse_ledger.to_yojson ledger))
-              (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson error))
-      ) ;
+              (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson error))) ;
       !passed
   end )

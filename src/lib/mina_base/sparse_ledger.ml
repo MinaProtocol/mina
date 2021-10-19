@@ -44,7 +44,7 @@ module L = struct
     Option.try_with (fun () ->
         let account = M.get_exn !t loc in
         if Public_key.Compressed.(equal empty account.public_key) then None
-        else Some account )
+        else Some account)
     |> Option.bind ~f:Fn.id
 
   let location_of_account : t -> Account_id.t -> location option =

@@ -361,12 +361,12 @@ let setup_daemon logger =
          paid for)"
       (optional txn_amount)
   and stop_time =
-    flag "--stop-time" ~aliases:["stop-time"] (optional int)
+    flag "--stop-time" ~aliases:[ "stop-time" ] (optional int)
       ~doc:
         (sprintf
-           "UPTIME in hours after which the daemon stops itself (only if \
-            there were no slots won within an hour after the stop time) \
-            (Default: %d)"
+           "UPTIME in hours after which the daemon stops itself (only if there \
+            were no slots won within an hour after the stop time) (Default: \
+            %d)"
            Cli_lib.Default.stop_time)
   and upload_blocks_to_gcloud =
     flag "--upload-blocks-to-gcloud"
@@ -386,28 +386,20 @@ let setup_daemon logger =
   and uptime_url_string =
     flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
       ~doc:"URL URL of the uptime service of the Mina delegation program"
-<<<<<<< HEAD
-  and uptime_submitter_string =
-    flag "--uptime-submitter" ~aliases:[ "uptime-submitter" ] (optional string)
-||||||| 260701a0b
-  and uptime_submitter_string =
-    flag "--uptime-submitter" ~aliases:["uptime-submitter"] (optional string)
-=======
   and uptime_submitter_key =
-    flag "--uptime-submitter-key" ~aliases:["uptime-submitter-key"]
+    flag "--uptime-submitter-key" ~aliases:[ "uptime-submitter-key" ]
       ~doc:
-        "KEYFILE Private key file for the uptime submitter. You cannot \
-         provide both `uptime-submitter-key` and `uptime-submitter-pubkey`."
+        "KEYFILE Private key file for the uptime submitter. You cannot provide \
+         both `uptime-submitter-key` and `uptime-submitter-pubkey`."
       (optional string)
   and uptime_submitter_pubkey =
     flag "--uptime-submitter-pubkey"
-      ~aliases:["uptime-submitter-pubkey"]
+      ~aliases:[ "uptime-submitter-pubkey" ]
       (optional string)
->>>>>>> origin/release/1.2.0
       ~doc:
-        "PUBLICKEY Public key of the submitter to the Mina delegation \
-         program, for the associated private key that is being tracked by \
-         this daemon. You cannot provide both `uptime-submitter-key` and \
+        "PUBLICKEY Public key of the submitter to the Mina delegation program, \
+         for the associated private key that is being tracked by this daemon. \
+         You cannot provide both `uptime-submitter-key` and \
          `uptime-submitter-pubkey`."
   in
   fun () ->
@@ -1152,7 +1144,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
             Some kp
         | Some sk_file, None ->
             let%map kp =
-              Secrets.Uptime_keypair.Terminal_stdin.read_from_env_exn ~logger
+              Secrets.Uptime_keypair.Terminal_stdin.read_exn
+                ~should_prompt_user:false ~should_reask:false
                 ~which:"uptime submitter keypair" sk_file
             in
             Some kp

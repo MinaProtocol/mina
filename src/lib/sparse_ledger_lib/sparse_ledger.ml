@@ -10,13 +10,7 @@ module Tree = struct
         | Account of 'account
         | Hash of 'hash
         | Node of 'hash * ('hash, 'account) t * ('hash, 'account) t
-<<<<<<< HEAD
-      [@@deriving equal, sexp, to_yojson]
-||||||| 260701a0b
-      [@@deriving eq, sexp, to_yojson]
-=======
-      [@@deriving eq, sexp, yojson]
->>>>>>> origin/release/1.2.0
+      [@@deriving equal, sexp, yojson]
     end
   end]
 
@@ -24,13 +18,7 @@ module Tree = struct
     | Account of 'account
     | Hash of 'hash
     | Node of 'hash * ('hash, 'account) t * ('hash, 'account) t
-<<<<<<< HEAD
-  [@@deriving equal, sexp, to_yojson]
-||||||| 260701a0b
-  [@@deriving eq, sexp, to_yojson]
-=======
-  [@@deriving eq, sexp, yojson]
->>>>>>> origin/release/1.2.0
+  [@@deriving equal, sexp, yojson]
 end
 
 module T = struct
@@ -40,51 +28,23 @@ module T = struct
 
     module V1 = struct
       type ('hash, 'key, 'account, 'token_id) t =
-<<<<<<< HEAD
         { indexes : ('key * int) list
         ; depth : int
         ; tree : ('hash, 'account) Tree.Stable.V1.t
         ; next_available_token : 'token_id
         }
-      [@@deriving sexp, to_yojson]
-||||||| 260701a0b
-        { indexes: ('key * int) list
-        ; depth: int
-        ; tree: ('hash, 'account) Tree.Stable.V1.t
-        ; next_available_token: 'token_id }
-      [@@deriving sexp, to_yojson]
-=======
-        { indexes: ('key * int) list
-        ; depth: int
-        ; tree: ('hash, 'account) Tree.Stable.V1.t
-        ; next_available_token: 'token_id }
       [@@deriving sexp, yojson]
->>>>>>> origin/release/1.2.0
     end
   end]
 
   type ('hash, 'key, 'account, 'token_id) t =
         ('hash, 'key, 'account, 'token_id) Stable.Latest.t =
-<<<<<<< HEAD
     { indexes : ('key * int) list
     ; depth : int
     ; tree : ('hash, 'account) Tree.t
     ; next_available_token : 'token_id
     }
-  [@@deriving sexp, to_yojson]
-||||||| 260701a0b
-    { indexes: ('key * int) list
-    ; depth: int
-    ; tree: ('hash, 'account) Tree.t
-    ; next_available_token: 'token_id }
-  [@@deriving sexp, to_yojson]
-=======
-    { indexes: ('key * int) list
-    ; depth: int
-    ; tree: ('hash, 'account) Tree.t
-    ; next_available_token: 'token_id }
   [@@deriving sexp, yojson]
->>>>>>> origin/release/1.2.0
 end
 
 module type S = sig
@@ -126,13 +86,7 @@ let of_hash ~depth ~next_available_token h =
   { T.indexes = []; depth; tree = Hash h; next_available_token }
 
 module Make (Hash : sig
-<<<<<<< HEAD
-  type t [@@deriving equal, sexp, to_yojson, compare]
-||||||| 260701a0b
-  type t [@@deriving eq, sexp, to_yojson, compare]
-=======
-  type t [@@deriving eq, sexp, yojson, compare]
->>>>>>> origin/release/1.2.0
+  type t [@@deriving equal, sexp, yojson, compare]
 
   val merge : height:int -> t -> t -> t
 end) (Token_id : sig
@@ -142,21 +96,9 @@ end) (Token_id : sig
 
   val max : t -> t -> t
 end) (Account_id : sig
-<<<<<<< HEAD
-  type t [@@deriving equal, sexp, to_yojson]
-||||||| 260701a0b
-  type t [@@deriving eq, sexp, to_yojson]
-=======
-  type t [@@deriving eq, sexp, yojson]
->>>>>>> origin/release/1.2.0
+  type t [@@deriving equal, sexp, yojson]
 end) (Account : sig
-<<<<<<< HEAD
-  type t [@@deriving equal, sexp, to_yojson]
-||||||| 260701a0b
-  type t [@@deriving eq, sexp, to_yojson]
-=======
-  type t [@@deriving eq, sexp, yojson]
->>>>>>> origin/release/1.2.0
+  type t [@@deriving equal, sexp, yojson]
 
   val data_hash : t -> Hash.t
 
@@ -379,16 +321,8 @@ let%test_module "sparse-ledger-test" =
 
     module Account = struct
       module T = struct
-<<<<<<< HEAD
         type t = { name : string; favorite_number : int }
-        [@@deriving bin_io, equal, sexp, to_yojson]
-||||||| 260701a0b
-        type t = {name: string; favorite_number: int}
-        [@@deriving bin_io, eq, sexp, to_yojson]
-=======
-        type t = {name: string; favorite_number: int}
-        [@@deriving bin_io, eq, sexp, yojson]
->>>>>>> origin/release/1.2.0
+        [@@deriving bin_io, equal, sexp, yojson]
       end
 
       include T
@@ -407,13 +341,7 @@ let%test_module "sparse-ledger-test" =
     end
 
     module Account_id = struct
-<<<<<<< HEAD
-      type t = string [@@deriving sexp, equal, to_yojson]
-||||||| 260701a0b
-      type t = string [@@deriving sexp, eq, to_yojson]
-=======
-      type t = string [@@deriving sexp, eq, yojson]
->>>>>>> origin/release/1.2.0
+      type t = string [@@deriving sexp, equal, yojson]
     end
 
     include Make (Hash) (Token_id) (Account_id) (Account)

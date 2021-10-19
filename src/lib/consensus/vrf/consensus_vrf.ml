@@ -415,7 +415,7 @@ module Output_hash = struct
     module V1 = struct
       module T = struct
         type t = Snark_params.Tick.Field.t
-        [@@deriving sexp, compare, hash, version {asserted}]
+        [@@deriving sexp, compare, hash, version { asserted }]
       end
 
       include T
@@ -634,11 +634,4 @@ let%test_unit "Standalone and integrates vrfs are consistent" =
       let standalone_vrf =
         Standalone.Evaluation.verified_output standalone_eval context
       in
-<<<<<<< HEAD
-      [%test_eq: Output_hash.value option] (Some integrated_vrf) standalone_vrf)
-||||||| 260701a0b
-      [%test_eq: Output_hash.value option] (Some integrated_vrf) standalone_vrf
-  )
-=======
-      [%test_eq: Output_hash.t option] (Some integrated_vrf) standalone_vrf )
->>>>>>> origin/release/1.2.0
+      [%test_eq: Output_hash.t option] (Some integrated_vrf) standalone_vrf)

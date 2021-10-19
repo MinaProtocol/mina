@@ -350,20 +350,20 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
   let open Account.Timing.Poly in
   let nsf_error kind =
     Or_error.errorf
-      !"For %s account, the requested transaction for amount %{sexp: \
-        Amount.t} at global slot %{sexp: Global_slot.t}, the balance %{sexp: \
-        Balance.t} is insufficient"
+      !"For %s account, the requested transaction for amount %{sexp: Amount.t} \
+        at global slot %{sexp: Global_slot.t}, the balance %{sexp: Balance.t} \
+        is insufficient"
       kind txn_amount txn_global_slot account.balance
     |> Or_error.tag ~tag:nsf_tag
   in
   match account.timing with
   | Untimed -> (
-    (* no time restrictions *)
-    match Balance.(account.balance - txn_amount) with
-    | None ->
-        nsf_error "untimed"
-    | _ ->
-        Or_error.return (Untimed, `Min_balance Balance.zero) )
+      (* no time restrictions *)
+      match Balance.(account.balance - txn_amount) with
+      | None ->
+          nsf_error "untimed"
+      | _ ->
+          Or_error.return (Untimed, `Min_balance Balance.zero) )
   | Timed
       { initial_minimum_balance
       ; cliff_time
@@ -422,31 +422,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let get_with_location ledger account_id =
     match location_of_account ledger account_id with
     | Some location -> (
-<<<<<<< HEAD
         match get ledger location with
         | Some account ->
             Ok (`Existing location, account)
         | None ->
-            Or_error.errorf
-              !"Account %{sexp: Account_id.t} has a location in the ledger, \
-                but is not present"
-              account_id )
-||||||| 260701a0b
-      match get ledger location with
-      | Some account ->
-          Ok (`Existing location, account)
-      | None ->
-          Or_error.errorf
-            !"Account %{sexp: Account_id.t} has a location in the ledger, but \
-              is not present"
-            account_id )
-=======
-      match get ledger location with
-      | Some account ->
-          Ok (`Existing location, account)
-      | None ->
-          Ok (`New, Account.create account_id Balance.zero) )
->>>>>>> origin/release/1.2.0
+            Ok (`New, Account.create account_id Balance.zero) )
     | None ->
         Ok (`New, Account.create account_id Balance.zero)
 
@@ -788,51 +768,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let receiver_location, receiver_account =
             get_with_location ledger receiver |> ok_or_reject
           in
-<<<<<<< HEAD
-          (* Charge the account creation fee. *)
-          let%bind receiver_amount =
-            match receiver_location with
-            | `Existing _ ->
-                return amount
-            | `New ->
-                if Token_id.(equal default) token then
-                  (* Subtract the creation fee from the transaction amount. *)
-                  sub_account_creation_fee ~constraint_constants `Added amount
-                  |> Result.map_error ~f:(fun _ ->
-                         Transaction_status.Failure
-                         .Amount_insufficient_to_create_account)
-                else
-                  Result.fail
-                    Transaction_status.Failure.Cannot_pay_creation_fee_in_token
-          in
-          let%bind receiver_account =
-            incr_balance receiver_account receiver_amount
-          in
-          let%map source_location, source_timing, source_account =
-||||||| 260701a0b
-          (* Charge the account creation fee. *)
-          let%bind receiver_amount =
-            match receiver_location with
-            | `Existing _ ->
-                return amount
-            | `New ->
-                if Token_id.(equal default) token then
-                  (* Subtract the creation fee from the transaction amount. *)
-                  sub_account_creation_fee ~constraint_constants `Added amount
-                  |> Result.map_error ~f:(fun _ ->
-                         Transaction_status.Failure
-                         .Amount_insufficient_to_create_account )
-                else
-                  Result.fail
-                    Transaction_status.Failure.Cannot_pay_creation_fee_in_token
-          in
-          let%bind receiver_account =
-            incr_balance receiver_account receiver_amount
-          in
-          let%map source_location, source_timing, source_account =
-=======
           let%bind source_location, source_timing, source_account =
->>>>>>> origin/release/1.2.0
             let ret =
               if Account_id.equal source receiver then
                 (*just check if the timing needs updating*)
@@ -842,51 +778,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                       return (receiver_location, receiver_account)
                   | `New ->
                       Result.fail Transaction_status.Failure.Source_not_present
-<<<<<<< HEAD
-                else return (get_with_location ledger source |> ok_or_reject)
-              in
-              let%bind () =
-                match location with
-                | `Existing _ ->
-                    return ()
-                | `New ->
-                    Result.fail Transaction_status.Failure.Source_not_present
-              in
-              let source_timing = account.timing in
-              let%bind timing =
-                validate_timing ~txn_amount:amount
-                  ~txn_global_slot:current_global_slot ~account
-                |> Result.map_error ~f:timing_error_to_user_command_status
-              in
-              let%map balance =
-                Result.map_error (sub_amount account.balance amount)
-                  ~f:(fun _ ->
-                    Transaction_status.Failure.Source_insufficient_balance)
-              in
-              (location, source_timing, { account with timing; balance })
-||||||| 260701a0b
-                else return (get_with_location ledger source |> ok_or_reject)
-              in
-              let%bind () =
-                match location with
-                | `Existing _ ->
-                    return ()
-                | `New ->
-                    Result.fail Transaction_status.Failure.Source_not_present
-              in
-              let source_timing = account.timing in
-              let%bind timing =
-                validate_timing ~txn_amount:amount
-                  ~txn_global_slot:current_global_slot ~account
-                |> Result.map_error ~f:timing_error_to_user_command_status
-              in
-              let%map balance =
-                Result.map_error (sub_amount account.balance amount)
-                  ~f:(fun _ ->
-                    Transaction_status.Failure.Source_insufficient_balance )
-              in
-              (location, source_timing, {account with timing; balance})
-=======
                 in
                 let source_timing = account.timing in
                 let%map timing =
@@ -894,7 +785,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                     ~txn_global_slot:current_global_slot ~account
                   |> Result.map_error ~f:timing_error_to_user_command_status
                 in
-                (location, source_timing, {account with timing})
+                (location, source_timing, { account with timing })
               else
                 let location, account =
                   get_with_location ledger source |> ok_or_reject
@@ -915,15 +806,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 let%map balance =
                   Result.map_error (sub_amount account.balance amount)
                     ~f:(fun _ ->
-                      Transaction_status.Failure.Source_insufficient_balance )
+                      Transaction_status.Failure.Source_insufficient_balance)
                 in
-                (location, source_timing, {account with timing; balance})
->>>>>>> origin/release/1.2.0
+                (location, source_timing, { account with timing; balance })
             in
             if Account_id.equal fee_payer source then
               (* Don't process transactions with insufficient balance from the
-               fee-payer.
-            *)
+                 fee-payer.
+              *)
               match ret with
               | Ok x ->
                   Ok x
@@ -945,7 +835,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   sub_account_creation_fee ~constraint_constants `Added amount
                   |> Result.map_error ~f:(fun _ ->
                          Transaction_status.Failure
-                         .Amount_insufficient_to_create_account )
+                         .Amount_insufficient_to_create_account)
                 else
                   Result.fail
                     Transaction_status.Failure.Cannot_pay_creation_fee_in_token

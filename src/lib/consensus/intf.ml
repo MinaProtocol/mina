@@ -374,11 +374,10 @@ module type S = sig
         -> producer_public_key:Signature_lib.Public_key.Compressed.t
         -> total_stake:Amount.t
         -> logger:Logger.t
-        -> get_delegators:(   Public_key.Compressed.t
-                           -> Mina_base.Account.t
-                              Mina_base.Account.Index.Table.t
-                              option)
-        -> ( ( [> `Vrf_output of Consensus_vrf.Output_hash.t]
+        -> get_delegators:
+             (   Public_key.Compressed.t
+              -> Mina_base.Account.t Mina_base.Account.Index.Table.t option)
+        -> ( ( [> `Vrf_output of Consensus_vrf.Output_hash.t ]
              * [> `Delegator of
                   Signature_lib.Public_key.Compressed.t
                   * Mina_base.Account.Index.t ] )
@@ -594,15 +593,16 @@ module type S = sig
       module Stable : sig
         module V1 : sig
           type t =
-            { epoch_ledger: Mina_base.Epoch_ledger.Value.Stable.V1.t
-            ; epoch_seed: Mina_base.Epoch_seed.Stable.V1.t
-            ; epoch: Mina_numbers.Length.Stable.V1.t
-            ; global_slot: Mina_numbers.Global_slot.Stable.V1.t
-            ; global_slot_since_genesis: Mina_numbers.Global_slot.Stable.V1.t
-            ; delegatee_table:
+            { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
+            ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
+            ; epoch : Mina_numbers.Length.Stable.V1.t
+            ; global_slot : Mina_numbers.Global_slot.Stable.V1.t
+            ; global_slot_since_genesis : Mina_numbers.Global_slot.Stable.V1.t
+            ; delegatee_table :
                 Mina_base.Account.Stable.V1.t
                 Mina_base.Account.Index.Stable.V1.Table.t
-                Public_key.Compressed.Stable.V1.Table.t }
+                Public_key.Compressed.Stable.V1.Table.t
+            }
           [@@deriving sexp]
 
           val to_latest : t -> t
@@ -615,13 +615,14 @@ module type S = sig
       module Stable : sig
         module V1 : sig
           type t =
-            { delegator:
+            { delegator :
                 Signature_lib.Public_key.Compressed.Stable.V1.t
                 * Mina_base.Account.Index.Stable.V1.t
-            ; producer: Signature_lib.Keypair.Stable.V1.t
-            ; global_slot: Mina_numbers.Global_slot.Stable.V1.t
-            ; global_slot_since_genesis: Mina_numbers.Global_slot.Stable.V1.t
-            ; vrf_result: Consensus_vrf.Output_hash.Stable.V1.t }
+            ; producer : Signature_lib.Keypair.Stable.V1.t
+            ; global_slot : Mina_numbers.Global_slot.Stable.V1.t
+            ; global_slot_since_genesis : Mina_numbers.Global_slot.Stable.V1.t
+            ; vrf_result : Consensus_vrf.Output_hash.Stable.V1.t
+            }
           [@@deriving sexp]
 
           val to_latest : t -> t

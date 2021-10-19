@@ -3068,16 +3068,10 @@ module Mutations = struct
     field "setStaking" ~doc:"Set keys you wish to stake with"
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.set_staking) ]
       ~typ:(non_null Types.Payload.set_staking)
-<<<<<<< HEAD
-      ~resolve:(fun { ctx = coda; _ } () pks ->
-||||||| 260701a0b
-      ~resolve:(fun {ctx= coda; _} () pks ->
-=======
-      ~resolve:(fun {ctx= coda; _} () _pks ->
+      ~resolve:(fun { ctx = coda; _ } () _pks ->
         [%log' error (Mina_lib.top_level_logger coda)]
-          "setStaking is temorarily disabled in this build. Please restart \
+          "setStaking is temporarily disabled in this build. Please restart \
            the daemon with the new block producer key" ;
->>>>>>> origin/release/1.2.0
         let old_block_production_keys =
           Mina_lib.block_production_pubkeys coda
           |> Public_key.Compressed.Set.to_list
@@ -3085,47 +3079,40 @@ module Mutations = struct
         (old_block_production_keys, [], old_block_production_keys)
         (*TODO: uncomment this after key swaps are fixed for the new VRF evaluator implementation *)
         (*let old_block_production_keys =
-          Mina_lib.block_production_pubkeys coda
-        in
-        let wallet = Mina_lib.wallets coda in
-        let unlocked, locked =
-          List.partition_map pks ~f:(fun pk ->
-              match Secrets.Wallets.find_unlocked ~needle:pk wallet with
-              | Some kp ->
-                  `Fst (kp, pk)
-              | None ->
-                  `Snd pk)
-        in
-        let unlocked_pks = List.map unlocked ~f:(fun (_kp, pk) -> pk) in
-        [%log' info (Mina_lib.top_level_logger coda)]
-          ~metadata:
-            [ ( "old"
-              , [%to_yojson: Public_key.Compressed.t list]
-                  (Public_key.Compressed.Set.to_list old_block_production_keys)
-              )
-            ; ("new", [%to_yojson: Public_key.Compressed.t list] unlocked_pks)
-            ]
-          "Block production key replacement; old: $old, new: $new" ;
-        if not (List.is_empty locked) then
-          [%log' warn (Mina_lib.top_level_logger coda)]
-            "Some public keys are locked and unavailable as block production \
-             keys"
+            Mina_lib.block_production_pubkeys coda
+          in
+          let wallet = Mina_lib.wallets coda in
+          let unlocked, locked =
+            List.partition_map pks ~f:(fun pk ->
+                match Secrets.Wallets.find_unlocked ~needle:pk wallet with
+                | Some kp ->
+                    `Fst (kp, pk)
+                | None ->
+                    `Snd pk)
+          in
+          let unlocked_pks = List.map unlocked ~f:(fun (_kp, pk) -> pk) in
+          [%log' info (Mina_lib.top_level_logger coda)]
             ~metadata:
-              [ ("locked_pks", [%to_yojson: Public_key.Compressed.t list] locked)
-              ] ;
-        ignore
-        @@ Mina_lib.replace_block_production_keypairs coda
-             (Keypair.And_compressed_pk.Set.of_list unlocked) ;
-        ( Public_key.Compressed.Set.to_list old_block_production_keys
-        , locked
-<<<<<<< HEAD
-        , List.map ~f:Tuple.T2.get2 unlocked ))
-||||||| 260701a0b
-        , List.map ~f:Tuple.T2.get2 unlocked ) )
-=======
-        , List.map ~f:Tuple.T2.get2 unlocked )*)
-        )
->>>>>>> origin/release/1.2.0
+              [ ( "old"
+                , [%to_yojson: Public_key.Compressed.t list]
+                    (Public_key.Compressed.Set.to_list old_block_production_keys)
+                )
+              ; ("new", [%to_yojson: Public_key.Compressed.t list] unlocked_pks)
+              ]
+            "Block production key replacement; old: $old, new: $new" ;
+          if not (List.is_empty locked) then
+            [%log' warn (Mina_lib.top_level_logger coda)]
+              "Some public keys are locked and unavailable as block production \
+               keys"
+              ~metadata:
+                [ ("locked_pks", [%to_yojson: Public_key.Compressed.t list] locked)
+                ] ;
+          ignore
+          @@ Mina_lib.replace_block_production_keypairs coda
+               (Keypair.And_compressed_pk.Set.of_list unlocked) ;
+          ( Public_key.Compressed.Set.to_list old_block_production_keys
+          , locked
+          , List.map ~f:Tuple.T2.get2 unlocked )*))
 
   let set_coinbase_receiver =
     field "setCoinbaseReceiver" ~doc:"Set the key to receive coinbases"
