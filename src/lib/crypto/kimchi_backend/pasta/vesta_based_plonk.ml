@@ -19,23 +19,22 @@ end
 let field_size : Bigint.R.t = Field.size
 
 module Verification_key = struct
-  type t = 
-    (Kimchi.Foundations.Fp.t, Kimchi.Protocol.Srs.Fp.t,
-   Kimchi.Foundations.Fq.t Kimchi.Foundations.or_infinity
-   Kimchi.Protocol.poly_comm)
-  Kimchi.Protocol.VerifierIndex.t
+  type t =
+    ( Kimchi.Foundations.Fp.t
+    , Kimchi.Protocol.SRS.Fp.t
+    , Kimchi.Foundations.Fq.t Kimchi.Foundations.or_infinity
+      Kimchi.Protocol.poly_comm )
+    Kimchi.Protocol.VerifierIndex.verifier_index
 
   let to_string _ = failwith __LOC__
 
   let of_string _ = failwith __LOC__
 
-  let shifts (t:t) = t.shifts
+  let shifts (t : t) = t.shifts
 end
 
 module R1CS_constraint_system =
-  Plonk_constraint_system.Make
-    (Field)
-    (Marlin_plonk_bindings.Pasta_fp_index.Gate_vector)
+  Plonk_constraint_system.Make (Field) (Kimchi.Protocol.Gates.Vector.Fp)
     (struct
       let params =
         Sponge.Params.(
@@ -45,15 +44,15 @@ module R1CS_constraint_system =
 
 module Var = Var
 
-let lagrange : int -> Marlin_plonk_bindings.Pasta_fp_urs.Poly_comm.t array =
-  let open Marlin_plonk_bindings.Types in
+let lagrange : int -> _ Kimchi.Protocol.poly_comm array =
   Memo.general ~hashable:Int.hashable (fun domain_log2 ->
       Array.map
         Precomputed.Lagrange_precomputations.(
           vesta.(index_of_domain_log2 domain_log2))
         ~f:(fun unshifted ->
-          { Poly_comm.unshifted =
-              Array.map unshifted ~f:(fun c -> Or_infinity.Finite c)
+          { Kimchi.Protocol.unshifted =
+              Array.map unshifted ~f:(fun (x, y) ->
+                  Kimchi.Foundations.Finite (x, y))
           ; shifted = None
           }))
 
@@ -70,31 +69,32 @@ module Rounds_vector = Rounds.Step_vector
 module Rounds = Rounds.Step
 
 module Keypair = Dlog_plonk_based_keypair.Make (struct
-  open Marlin_plonk_bindings
-
   let name = "vesta"
 
   module Rounds = Rounds
-  module Urs = Pasta_fp_urs
-  module Index = Pasta_fp_index
+  module Urs = Kimchi.Protocol.SRS.Fp
+  module Index = Kimchi.Protocol.Index.Fp
   module Curve = Curve
   module Poly_comm = Fp_poly_comm
   module Scalar_field = Field
-  module Verifier_index = Pasta_fp_verifier_index
-  module Gate_vector = Pasta_fp_index.Gate_vector
+  module Verifier_index = Kimchi.Protocol.VerifierIndex.Fp
+  module Gate_vector = Kimchi.Protocol.Gates.Vector.Fp
   module Constraint_system = R1CS_constraint_system
 end)
 
 module Proof = Plonk_dlog_proof.Make (struct
-  open Marlin_plonk_bindings
-
   let id = "pasta_vesta"
 
   module Scalar_field = Field
   module Base_field = Fq
 
   module Backend = struct
-    include Pasta_fp_proof
+    type t =
+      ( Kimchi.Foundations.Fq.t Kimchi.Foundations.or_infinity
+      , Kimchi.Foundations.Fp.t )
+      Kimchi.Protocol.prover_proof
+
+    include Kimchi.Protocol.Proof.Fp
 
     let verify = with_lagrange verify
 
@@ -104,49 +104,51 @@ module Proof = Plonk_dlog_proof.Make (struct
 
     let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
         prev_comms =
+      (* external values contains [1, primary..., auxiliary ] *)
       let external_values i =
         let open Field.Vector in
         if i = 0 then Field.one
         else if i - 1 < length primary then get primary (i - 1)
         else get auxiliary (i - 1 - length primary)
       in
-      let w = R1CS_constraint_system.compute_witness pk.cs external_values in
-      let n = Pasta_fp_index.domain_d1_size pk.index in
-      let witness = Field.Vector.create () in
-      for i = 0 to Array.length w.(0) - 1 do
-        for j = 0 to n - 1 do
-          Field.Vector.emplace_back witness
-            (if j < Array.length w then w.(j).(i) else Field.zero)
-        done
-      done ;
-      create pk.index ~primary_input:(Field.Vector.create ())
-        ~auxiliary_input:witness ~prev_challenges:prev_chals
-        ~prev_sgs:prev_comms
+
+      (* compute witness *)
+      let computed_witness =
+        R1CS_constraint_system.compute_witness pk.cs external_values
+      in
+      let num_rows = Array.length computed_witness.(0) in
+
+      (* convert to Rust vector *)
+      let witness_cols =
+        Array.init Kimchi_backend_common.Constants.columns ~f:(fun col ->
+            let witness = Field.Vector.create () in
+            for row = 0 to num_rows - 1 do
+              Field.Vector.emplace_back witness computed_witness.(col).(row)
+            done ;
+            witness)
+      in
+      create pk.index witness_cols prev_chals prev_comms
 
     let create_async (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
       create_aux pk primary auxiliary prev_chals prev_comms
-        ~f:(fun pk ~primary_input ~auxiliary_input ~prev_challenges ~prev_sgs ->
+        ~f:(fun pk auxiliary_input prev_challenges prev_sgs ->
           Async.In_thread.run (fun () ->
-              create pk ~primary_input ~auxiliary_input ~prev_challenges
-                ~prev_sgs))
+              create pk auxiliary_input prev_challenges prev_sgs))
 
     let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
       create_aux pk primary auxiliary prev_chals prev_comms ~f:create
   end
 
-  module Verifier_index = Pasta_fp_verifier_index
+  module Verifier_index = Kimchi.Protocol.VerifierIndex.Fp
   module Index = Keypair
 
   module Evaluations_backend = struct
-    type t =
-      Scalar_field.t Marlin_plonk_bindings.Types.Plonk_proof.Evaluations.t
+    type t = Scalar_field.t Kimchi.Protocol.proof_evaluations
   end
 
   module Opening_proof_backend = struct
     type t =
-      ( Scalar_field.t
-      , Curve.Affine.Backend.t )
-      Marlin_plonk_bindings.Types.Plonk_proof.Opening_proof.t
+      (Curve.Affine.Backend.t, Scalar_field.t) Kimchi.Protocol.opening_proof
   end
 
   module Poly_comm = Fp_poly_comm
@@ -181,7 +183,7 @@ module Oracles = Plonk_dlog_oracles.Make (struct
   module Proof = Proof
 
   module Backend = struct
-    include Marlin_plonk_bindings.Pasta_fp_oracles
+    include Kimchi.Protocol.Oracles.Fp
 
     let create = with_lagrange create
   end

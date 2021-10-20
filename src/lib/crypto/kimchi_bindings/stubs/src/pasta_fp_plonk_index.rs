@@ -1,11 +1,7 @@
 use crate::{gate_vector::fp::CamlPastaFpPlonkGateVectorPtr, srs::fp::CamlFpSrs};
-use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
+use ark_poly::EvaluationDomain;
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
-use plonk_15_wires_circuits::{
-    gate::CircuitGate,
-    nolookup::constraints::ConstraintSystem,
-    wires::{GateWires, Wire},
-};
+use plonk_15_wires_circuits::{gate::CircuitGate, nolookup::constraints::ConstraintSystem};
 use plonk_15_wires_protocol_dlog::index::Index as DlogIndex;
 use std::{
     fs::{File, OpenOptions},
@@ -36,16 +32,6 @@ ocaml::custom!(CamlPastaFpPlonkIndex {
 // CamlPastaFpPlonkIndex methods
 //
 
-// shifted rows/cols, why? not sure
-fn shift_wires(domain_size: usize, wires: GateWires) -> GateWires {
-    array_init::array_init(|col: usize| {
-        let shift = col * domain_size;
-        let row = wires[col].row + shift;
-        let col = wires[col].col + shift;
-        Wire { row, col }
-    })
-}
-
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_create(
@@ -53,14 +39,6 @@ pub fn caml_pasta_fp_plonk_index_create(
     public: ocaml::Int,
     srs: CamlFpSrs,
 ) -> Result<CamlPastaFpPlonkIndex, ocaml::Error> {
-    // create domain
-    let domain_size =
-        Domain::<Fp>::compute_size_of_domain(gates.as_ref().0.len()).ok_or_else(|| {
-            ocaml::Error::invalid_argument("caml_pasta_fp_plonk_index_create")
-                .err()
-                .unwrap()
-        })?;
-
     // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
     let gates: Vec<_> = gates
         .as_ref()
@@ -69,15 +47,16 @@ pub fn caml_pasta_fp_plonk_index_create(
         .map(|gate| CircuitGate::<Fp> {
             row: gate.row,
             typ: gate.typ,
-            wires: shift_wires(domain_size, gate.wires),
+            wires: gate.wires,
             c: gate.c.clone(),
         })
         .collect();
+    println!("{}:{}", file!(), line!());
 
     // create constraint system
     let cs = match ConstraintSystem::<Fp>::create(
         gates,
-        vec![vec![]],
+        vec![],
         oracle::pasta::fp::params(),
         public as usize,
     ) {
@@ -90,6 +69,7 @@ pub fn caml_pasta_fp_plonk_index_create(
         }
         Some(cs) => cs,
     };
+    println!("{}:{}", file!(), line!());
 
     // endo
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();

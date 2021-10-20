@@ -6,21 +6,15 @@ let tuple15_to_vec
     [ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ]
 
 let tuple15_of_vec
-  Pickles_types.Vector.
-    [ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ]
-  =
-    (w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14) 
+    Pickles_types.Vector.
+      [ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ] =
+  (w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14)
 
-let tuple6_to_vec
-    (w0, w1, w2, w3, w4, w5) =
-  Pickles_types.Vector.
-    [ w0; w1; w2; w3; w4; w5]
+let tuple6_to_vec (w0, w1, w2, w3, w4, w5) =
+  Pickles_types.Vector.[ w0; w1; w2; w3; w4; w5 ]
 
-let tuple6_of_vec
-  Pickles_types.Vector.
-    [ w0; w1; w2; w3; w4; w5]
-  =
-    (w0, w1, w2, w3, w4, w5) 
+let tuple6_of_vec Pickles_types.Vector.[ w0; w1; w2; w3; w4; w5 ] =
+  (w0, w1, w2, w3, w4, w5)
 
 module type Stable_v1 = sig
   module Stable : sig
@@ -182,8 +176,7 @@ module Make (Inputs : Inputs_intf) = struct
 
         type 'a creator =
              messages:
-               ( G.Affine.t)
-               Pickles_types.Dlog_plonk_types.Messages.Stable.V2.t
+               G.Affine.t Pickles_types.Dlog_plonk_types.Messages.Stable.V2.t
           -> openings:
                ( G.Affine.t
                , Fq.t
@@ -264,15 +257,20 @@ module Make (Inputs : Inputs_intf) = struct
         ; z_comm = wo t.commitments.z_comm
         ; t_comm = wo t.commitments.t_comm
         }
-      ~openings:{ proof; evals; ft_eval1= t.ft_eval1 }
+      ~openings:{ proof; evals; ft_eval1 = t.ft_eval1 }
 
   let eval_to_backend
-      { Pickles_types.Dlog_plonk_types.Evals.w; z; s; generic_selector; poseidon_selector}
-      : Evaluations_backend.t =
-    { w= tuple15_of_vec w
+      { Pickles_types.Dlog_plonk_types.Evals.w
+      ; z
+      ; s
+      ; generic_selector
+      ; poseidon_selector
+      } : Evaluations_backend.t =
+    { w = tuple15_of_vec w
     ; z
-    ; s= tuple6_of_vec s
-    ; generic_selector; poseidon_selector
+    ; s = tuple6_of_vec s
+    ; generic_selector
+    ; poseidon_selector
     }
 
   let vec_to_array (type t elt)
@@ -283,7 +281,10 @@ module Make (Inputs : Inputs_intf) = struct
   let to_backend' (chal_polys : Challenge_polynomial.t list) primary_input
       ({ messages = { w_comm; z_comm; t_comm }
        ; openings =
-           { proof = { lr; z_1; z_2; delta; sg }; evals = evals0, evals1; ft_eval1 }
+           { proof = { lr; z_1; z_2; delta; sg }
+           ; evals = evals0, evals1
+           ; ft_eval1
+           }
        } :
         t) : Backend.t =
     let g x = G.Affine.to_backend (Pickles_types.Or_infinity.Finite x) in
@@ -291,8 +292,7 @@ module Make (Inputs : Inputs_intf) = struct
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
     let lr = Array.map lr ~f:(fun (x, y) -> (g x, g y)) in
     { commitments =
-        { w_comm = 
-            tuple15_of_vec (Pickles_types.Vector.map ~f:pcwo w_comm)
+        { w_comm = tuple15_of_vec (Pickles_types.Vector.map ~f:pcwo w_comm)
         ; z_comm = pcwo z_comm
         ; t_comm = pcwo t_comm
         }
@@ -302,10 +302,10 @@ module Make (Inputs : Inputs_intf) = struct
     ; public = primary_input
     ; prev_challenges =
         Array.of_list_map chal_polys
-          ~f:(fun { Challenge_polynomial.commitment=(x,y); challenges } ->
+          ~f:(fun { Challenge_polynomial.commitment = x, y; challenges } ->
             ( challenges
-            , { Kimchi.Protocol. shifted = None
-              ; unshifted = [| Kimchi.Foundations.Finite (x,y) |]
+            , { Kimchi.Protocol.shifted = None
+              ; unshifted = [| Kimchi.Foundations.Finite (x, y) |]
               } ))
     }
 

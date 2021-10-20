@@ -2,36 +2,45 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type 'a t =
-      { xt : 'a; b : 'a; yt : 'a; xp : 'a; l1 : 'a; yp : 'a; xs : 'a; ys : 'a }
+      { accs : ('a * 'a) array
+      ; bits : 'a array
+      ; ss : 'a array
+      ; base : 'a * 'a
+      ; n_prev : 'a
+      ; n_next : 'a
+      }
     [@@deriving sexp, fields, hlist]
   end
 end]
 
-let typ g =
-  Snarky_backendless.Typ.of_hlistable [ g; g; g; g; g; g; g; g ]
-    ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-    ~value_of_hlist:of_hlist
-
-let map { xt; b; yt; xp; l1; yp; xs; ys } ~f =
-  { xt = f xt
-  ; b = f b
-  ; yt = f yt
-  ; xp = f xp
-  ; l1 = f l1
-  ; yp = f yp
-  ; xs = f xs
-  ; ys = f ys
+let map { accs; bits; ss; base; n_prev; n_next } ~f =
+  { accs = Array.map accs ~f:(fun (x, y) -> (f x, f y))
+  ; bits = Array.map bits ~f
+  ; ss = Array.map ss ~f
+  ; base = (f (fst base), f (snd base))
+  ; n_prev = f n_prev
+  ; n_next = f n_next
   }
 
 let map2 t1 t2 ~f =
-  { xt = f t1.xt t2.xt
-  ; b = f t1.b t2.b
-  ; yt = f t1.yt t2.yt
-  ; xp = f t1.xp t2.xp
-  ; l1 = f t1.l1 t2.l1
-  ; yp = f t1.yp t2.yp
-  ; xs = f t1.xs t2.xs
-  ; ys = f t1.ys t2.ys
+  { accs =
+      Array.map (Array.zip_exn t1.accs t2.accs) ~f:(fun ((x1, y1), (x2, y2)) ->
+          (f x1 x2, f y1 y2))
+  ; bits =
+      Array.map (Array.zip_exn t1.bits t2.bits) ~f:(fun (x1, x2) -> f x1 x2)
+  ; ss = Array.map (Array.zip_exn t1.ss t2.ss) ~f:(fun (x1, x2) -> f x1 x2)
+  ; base = (f (fst t1.base) (fst t2.base), f (snd t1.base) (snd t2.base))
+  ; n_prev = f t1.n_prev t2.n_prev
+  ; n_next = f t1.n_next t2.n_next
   }
+
+let fold { accs; bits; ss; base; n_prev; n_next } ~f ~init =
+  let t = Array.fold accs ~init ~f:(fun acc (x, y) -> f [ x; y ] acc) in
+  let t = Array.fold bits ~init:t ~f:(fun acc x -> f [ x ] acc) in
+  let t = Array.fold ss ~init:t ~f:(fun acc x -> f [ x ] acc) in
+  let t = f [ fst base; snd base ] t in
+  let t = f [ n_prev ] t in
+  let t = f [ n_next ] t in
+  t

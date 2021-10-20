@@ -1,3 +1,11 @@
+(** 
+    These are the Lagrange pre-computations. 
+    We have a set for each curve and they are generated from 
+    https://github.com/MinaProtocol/mina/blob/b137fbd750d9de1b5dfe009c12de134de0eb7200/src/lib/pickles/precomputed/gen_values/gen_values.ml
+    The number we generate for each curve depends on the max_poly_size 
+    of the curve which is set here 
+    https://github.com/MinaProtocol/mina/blob/3d16db598630d8865c04b189b9d41f24bbc73b18/src/lib/zexe_backend/pasta/basic.ml#L17
+*)
 module Lagrange_precomputations = struct
   let index_of_domain_log2 d = d - 1
 

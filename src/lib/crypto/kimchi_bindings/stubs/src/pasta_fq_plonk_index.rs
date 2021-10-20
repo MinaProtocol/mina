@@ -1,11 +1,7 @@
 use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
-use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
+use ark_poly::EvaluationDomain;
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
-use plonk_15_wires_circuits::{
-    gate::CircuitGate,
-    nolookup::constraints::ConstraintSystem,
-    wires::{GateWires, Wire},
-};
+use plonk_15_wires_circuits::{gate::CircuitGate, nolookup::constraints::ConstraintSystem};
 use plonk_15_wires_protocol_dlog::index::Index as DlogIndex;
 use std::{
     fs::{File, OpenOptions},
@@ -36,15 +32,6 @@ ocaml::custom!(CamlPastaFqPlonkIndex {
 // CamlPastaFqPlonkIndex methods
 //
 
-fn shift_wires(domain_size: usize, wires: GateWires) -> GateWires {
-    array_init::array_init(|col: usize| {
-        let shift = col * domain_size;
-        let row = wires[col].row + shift;
-        let col = wires[col].col + shift;
-        Wire { row, col }
-    })
-}
-
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_index_create(
@@ -52,14 +39,6 @@ pub fn caml_pasta_fq_plonk_index_create(
     public: ocaml::Int,
     srs: CamlFqSrs,
 ) -> Result<CamlPastaFqPlonkIndex, ocaml::Error> {
-    // create domain
-    let domain_size =
-        Domain::<Fq>::compute_size_of_domain(gates.as_ref().0.len()).ok_or_else(|| {
-            ocaml::Error::invalid_argument("caml_pasta_fq_plonk_index_create")
-                .err()
-                .unwrap()
-        })?;
-
     // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
     let gates: Vec<_> = gates
         .as_ref()
@@ -68,7 +47,7 @@ pub fn caml_pasta_fq_plonk_index_create(
         .map(|gate| CircuitGate::<Fq> {
             row: gate.row,
             typ: gate.typ,
-            wires: shift_wires(domain_size, gate.wires),
+            wires: gate.wires,
             c: gate.c.clone(),
         })
         .collect();
@@ -76,7 +55,7 @@ pub fn caml_pasta_fq_plonk_index_create(
     // create constraint system
     let cs = match ConstraintSystem::<Fq>::create(
         gates,
-        vec![vec![]],
+        vec![],
         oracle::pasta::fq::params(),
         public as usize,
     ) {

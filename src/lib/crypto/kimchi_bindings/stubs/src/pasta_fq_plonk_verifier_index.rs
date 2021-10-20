@@ -12,7 +12,7 @@ use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 
 use plonk_15_wires_circuits::expr::Linearization;
-use plonk_15_wires_circuits::nolookup::constraints::{zk_polynomial, zk_w3, ConstraintSystem};
+use plonk_15_wires_circuits::nolookup::constraints::{zk_polynomial, zk_w3, Shifts};
 use plonk_15_wires_circuits::wires::{COLUMNS, PERMUTS};
 use plonk_15_wires_protocol_dlog::index::VerifierIndex;
 use std::convert::TryInto;
@@ -195,8 +195,9 @@ pub fn caml_pasta_fq_plonk_verifier_index_create(
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_verifier_index_shifts(log2_size: ocaml::Int) -> Vec<CamlFq> {
     let domain = Domain::<Fq>::new(1 << log2_size).unwrap();
-    let shifts = ConstraintSystem::sample_shifts(&domain, PERMUTS - 1);
-    shifts.iter().map(Into::into).collect()
+    let shifts = Shifts::new(&domain);
+
+    shifts.shifts().iter().map(Into::into).collect()
 }
 
 #[ocaml_gen::func]

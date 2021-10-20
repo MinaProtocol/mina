@@ -41,6 +41,8 @@ module type Intf = sig
 
   val of_hex_string : string -> t
 
+  val of_decimal_string : string -> t
+
   val of_numeral : string -> base:int -> t
 end
 
@@ -55,6 +57,8 @@ module Make
   let bytes_per_limb = bytes_per_limb ()
 
   let length_in_bytes = num_limbs * bytes_per_limb
+
+  let of_decimal_string x = Bytes.of_string x |> of_decimal_string
 
   let to_hex_string t =
     let data = to_bytes t in

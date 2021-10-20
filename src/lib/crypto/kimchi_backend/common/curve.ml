@@ -73,6 +73,8 @@ module Make
 struct
   include (C : module type of C with type t = C.t with module Affine := C.Affine)
 
+  module Base_field = BaseField
+
   let one = one ()
 
   (* TODO: wouldn't be easier if Input_intf exposed a `zero`? *)
@@ -86,9 +88,7 @@ struct
     module Backend = struct
       include C.Affine
 
-      let zero () =
-        let open Kimchi.Foundations in
-        Infinity
+      let zero () = Kimchi.Foundations.Infinity
 
       let create x y = Kimchi.Foundations.Finite (x, y)
     end
@@ -154,13 +154,22 @@ struct
 
     include Stable.Latest
 
-    let to_backend : t -> Backend.t =
-      fun (x, y) -> Finite (x, y)
+    let to_backend :
+        (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t -> Backend.t =
+      function
+      | Infinity ->
+          Infinity
+      | Finite (x, y) ->
+          Finite (x, y)
 
     (* TODO: Rename to of_backend_exn *)
-    let of_backend : Backend.t -> t = function
-      | Infinity -> failwith "of_backend: Got identity"
-      | Finite (x, y) -> (x, y)
+    let of_backend :
+        Backend.t -> (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t =
+      function
+      | Infinity ->
+          Infinity
+      | Finite (x, y) ->
+          Finite (x, y)
   end
 
   let to_affine_or_infinity = C.to_affine
