@@ -30,3 +30,12 @@ pub fn caml_pasta_fp_vector_get(
             .unwrap()),
     }
 }
+
+#[ocaml::func]
+pub fn caml_pasta_fp_vector_set(
+    mut v: CamlPastaFpVector,
+    i: ocaml::Int,
+    x: Fp,
+) {
+    v[i as usize] = x
+}

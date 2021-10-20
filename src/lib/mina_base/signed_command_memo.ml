@@ -229,8 +229,9 @@ let%test_module "user_command_memo" =
             assert false
       in
       let memo_var =
-        Snarky_backendless.Typ_monads.Store.run (typ.store memo) (fun x ->
-            Snarky_backendless.Cvar.Constant x)
+        Snarky_backendless.Typ_monads.Store.run (typ.store memo)
+          (fun x -> Snarky_backendless.Cvar.Constant x)
+          (fun () -> failwith "No delayed variables supported")
       in
       let memo_read =
         Snarky_backendless.Typ_monads.Read.run (typ.read memo_var) read_constant

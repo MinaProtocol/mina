@@ -9,3 +9,5 @@ external length : t -> int = "caml_pasta_fq_vector_length"
 external emplace_back : t -> elt -> unit = "caml_pasta_fq_vector_emplace_back"
 
 external get : t -> int -> elt = "caml_pasta_fq_vector_get"
+
+external set : t -> int -> elt -> unit = "caml_pasta_fq_vector_set"
