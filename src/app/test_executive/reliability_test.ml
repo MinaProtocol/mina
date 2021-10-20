@@ -50,46 +50,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           (Error.of_string
              (sprintf
                 "Chains have common prefix of %d blocks, longest absolute \
-                 chain is %d blocks.  the difference is greater than allowed \
-                 tolerance of %d blocks"
-                common_prefixes_length longest_chain_length length_difference))
+                 chain is %d blocks.  the difference is %d blocks, which is \
+                 greater than allowed tolerance of %d blocks"
+                common_prefixes_length longest_chain_length length_difference
+                tolerance))
       in
       [%log error]
         "Chains have common prefix of %d blocks, longest absolute chain is %d \
-         blocks.  the difference is greater than allowed tolerance of %d \
-         blocks"
-        common_prefixes_length longest_chain_length length_difference ;
+         blocks.  the difference is %d blocks, which is greater than allowed \
+         tolerance of %d blocks"
+        common_prefixes_length longest_chain_length length_difference tolerance ;
       result
-
-  (* if length = 0 then (
-       let result =
-         Malleable_error.soft_error ~value:()
-           (Error.of_string
-              (sprintf
-                 "Chains don't have any common prefixes among their most recent \
-                  %d blocks"
-                 n))
-       in
-       [%log error]
-         "common_prefix test: TEST FAILURE, Chains don't have any common \
-          prefixes among their most recent %d blocks"
-         n ;
-       result )
-     else if length < n then (
-       let result =
-         Malleable_error.soft_error ~value:()
-           (Error.of_string
-              (sprintf
-                 !"Chains only have %d common prefixes, expected %d common \
-                   prefixes"
-                 length n))
-       in
-       [%log error]
-         "common_prefix test: TEST FAILURE, Chains only have %d common \
-          prefixes, expected %d common prefixes"
-         length n ;
-       result )
-     else Malleable_error.return () *)
 
   let check_peer_connectivity ~nodes_by_peer_id ~peer_id ~connected_peers =
     let get_node_id p =
@@ -153,7 +124,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%bind () = Node.stop node_c in
          [%log info] "%s stopped, will now wait for blocks to be produced"
            (Node.id node_c) ;
-         let%bind _ = wait_for t (Wait_condition.blocks_to_be_produced 3) in
+         let%bind _ = wait_for t (Wait_condition.blocks_to_be_produced 2) in
          let%bind () = Node.start ~fresh_state:true node_c in
          [%log info]
            "%s started again, will now wait for this node to initialize"
@@ -178,7 +149,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           [%log info] "\nchain of %s:\n %s" label chain_str)
     in
     section "common prefix of all nodes is no farther back than 1 block"
-      (* the common prefix test relies on at least 4 blocks having been produced.  previous sections altogether have already produced 5, so no further block production is needed.  if previous sections change, then this may need to be re-adjusted*)
+      (* the common prefix test relies on at least 4 blocks having been produced.  previous sections altogether have already produced 4, so no further block production is needed.  if previous sections change, then this may need to be re-adjusted*)
       (let%bind (labeled_chains : (string * string list) list) =
          Malleable_error.List.map all_nodes ~f:(fun node ->
              let%bind chain = Network.Node.must_get_best_chain ~logger node in
