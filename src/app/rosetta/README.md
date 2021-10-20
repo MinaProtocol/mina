@@ -4,6 +4,19 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2021/10/??:
+
+- New Construction API features
+  - Add account_creation_fee is populated in /construction/metadata response iff the receiver account does not exist in the ledger at the time this endpoint is called. Account_creation_fee is omitted from the JSON if the account does exist. If the account does not exist, then it is present and set to the account_creation_fee value (which is currently hardcoded to 1.0 MINA)
+  - Suggested_fee in the metadata response now dynamically adjusts based on recent activity. The algorithm for predicting fee is: Take all the user-generated transactions from the most recent five blocks and then find the median and interquartile range for the fee amounts. The suggested fee is `median + (interquartile-range/2)`
+  - Transactions can be set to expire using the newly exposed `valid_until` field. This is set during the /construction/preprocess step. Valid_until is a unsigned-32bit integer represented as a string in JSON. Example: `{ valid_until : "200000" }`. The unit for valid_until is a "global slot". To set a transaction's expiry date to 3 hours from the current time, you would take the current time, add 3 hours, subtract the genesis timestamp, and then divide the result by 3 to get the slot.
+    Example:
+      I want to expire a transaction in a few hours at UTC time x=1634767563.
+      Genesis time is: 2021-03-17 00:00:00.000000Z or g=1615939200
+
+      We can do 'x-g / 180' to get the slot number to give to valid_until.
+      In this case, "104602" -- so we send `{ valid_until : "104602" }`
+
 2021/10/15:
 
 - Use a more liberal postgres configuration
