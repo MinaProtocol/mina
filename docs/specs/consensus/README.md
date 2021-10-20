@@ -460,14 +460,14 @@ epoch i: s1 s2 s3 s4 s5 | s6 s7 s8 s9 s10 | s11 s12 s13 s14 s15
               2/3 (seed update range)
 ```
 
-As seen above, the slots can be split into 3 parts delimited by `|`.  The first `2/3` of the slots (`s1 ... s10`) are in the seed update range. The epoch seeds of blocks in this rage are used to seed the VRF.
+As seen above, the slots can be split into 3 parts delimited by `|`.  The first `2/3` of the slots (`s1 ... s10`) are in the seed update range. The epoch seeds of blocks in this range are used to seed the VRF.
 
 The idea of decentralized checkpointing is that each chain maintains two checkpoints in every epoch, which are used to estimate how long ago a fork has occurred.
 
 * **Start checkpoint** - State hash of the first block of the epoch
 * **Lock checkpoint** - State hash of the last known block in the seed update range of an epoch (not including the current block)
 
-For example, consider epoch `e1 ... e3` below.
+For example, consider epochs `e1 ... e3` below.
 
 ```text
 epochs:         e1                e2                 e3
@@ -487,9 +487,9 @@ A fork is considered _short-range_ if either
 1. the fork point of the candidate chains are in the same epoch
 2. or the fork point is in the previous epoch with the same `lock_checkpoint`
 
-Since the leader selection distribution for the current epoch is computed by the end of the first `2/3` of the slots in the previous epoch, an adversarial fork after the previous epoch's `lock_checkpoint` cannot skewed the distribution for the remainder of that epoch, nor the current epoch.  Anything before the previous epoch's `lock_checkpoint` _long-range_ fork.
+Since the leader selection distribution for the current epoch is computed by the end of the first `2/3` of the slots in the previous epoch, an adversarial fork after (and including) the previous epoch's `lock_checkpoint` cannot skew the distribution for the remainder of that epoch, nor the current epoch.  Anything before the previous epoch's `lock_checkpoint` is a _long-range_ fork.
 
-Since Mina is succinct this means that it must stored the checkpoints for the current epoch in addition to the checkpoints for the previous epoch.  This is why the [`Consensus_state`](#44-consensus_state) structure contains two `Epoch_data` fields: `staking_epoch_data` and `next_epoch_data`.  The former contains the checkpoints for the previous epoch and the latter contains that of the current epoch.
+Since Mina is succinct this means that it must stor the checkpoints for the current epoch in addition to the checkpoints for the previous epoch.  This is why the [`Consensus_state`](#44-consensus_state) structure contains two `Epoch_data` fields: `staking_epoch_data` and `next_epoch_data`.  The former contains the checkpoints for the previous epoch and the latter contains that of the current epoch.
 
 ### 5.3.1 `initCheckpoints`
 
