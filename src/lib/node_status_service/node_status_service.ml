@@ -3,7 +3,14 @@ open Core
 open Pipe_lib
 
 type catchup_job_states =
-  (Transition_frontier.Full_catchup_tree.Node.State.Enum.t * int) list option
+  { finished : int
+  ; failed : int
+  ; to_download : int
+  ; to_initial_validate : int
+  ; wait_for_parent : int
+  ; to_verify : int
+  ; to_build_breadcrumb : int
+  }
 [@@deriving to_yojson]
 
 type rpc_count =
@@ -46,7 +53,7 @@ type node_status_data =
   { block_height_at_best_tip : int
   ; max_observed_block_height : int
   ; max_observed_unvalidated_block_height : int
-  ; catchup_job_states : catchup_job_states
+  ; catchup_job_states : catchup_job_states option
   ; sync_status : Sync_status.Stable.V1.t
   ; libp2p_input_bandwidth : float
   ; libp2p_output_bandwidth : float
@@ -154,9 +161,45 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
       let catchup_job_states =
         match Transition_frontier.catchup_tree tf with
         | Full catchup_tree ->
+            let catchup_states =
+              Transition_frontier.Full_catchup_tree.to_node_status_report
+                catchup_tree
+            in
+            let finished = ref 0
+            and failed = ref 0
+            and to_download = ref 0
+            and to_initial_validate = ref 0
+            and to_verify = ref 0
+            and wait_for_parent = ref 0
+            and to_build_breadcrumb = ref 0 in
+            List.iter catchup_states ~f:(fun (state, n) ->
+                match state with
+                | Transition_frontier.Full_catchup_tree.Node.State.Enum.Finished
+                  ->
+                    finished := n
+                | Failed ->
+                    failed := n
+                | To_download ->
+                    to_download := n
+                | To_initial_validate ->
+                    to_initial_validate := n
+                | To_verify ->
+                    to_verify := n
+                | Wait_for_parent ->
+                    wait_for_parent := n
+                | To_build_breadcrumb ->
+                    to_build_breadcrumb := n
+                | Root ->
+                    ()) ;
             Some
-              (Transition_frontier.Full_catchup_tree.to_node_status_report
-                 catchup_tree)
+              { finished = !finished
+              ; failed = !failed
+              ; to_download = !to_download
+              ; to_initial_validate = !to_initial_validate
+              ; to_verify = !to_verify
+              ; wait_for_parent = !wait_for_parent
+              ; to_build_breadcrumb = !to_build_breadcrumb
+              }
         | _ ->
             None
       in
