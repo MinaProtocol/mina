@@ -1,7 +1,7 @@
 open Core_kernel
 open Pickles_types
 open Common
-open Import
+open Pickles_base.Import
 module V = Pickles_base.Side_loaded_verification_key
 
 include (
@@ -17,9 +17,10 @@ let input_size ~of_int ~add ~mul w =
   (* This should be an affine function in [a]. *)
   let size a =
     let (T (typ, conv)) =
-      Impls.Step.input ~branching:a ~wrap_rounds:Backend.Tock.Rounds.n
+      Pickles_base.Impls.Step.input ~branching:a
+        ~wrap_rounds:Backend.Tock.Rounds.n
     in
-    Impls.Step.Data_spec.size [ typ ]
+    Pickles_base.Impls.Step.Data_spec.size [ typ ]
   in
   let f0 = size Nat.N0.n in
   let slope = size Nat.N1.n - f0 in
@@ -42,7 +43,7 @@ module Width : sig
 
   val zero : t
 
-  open Impls.Step
+  open Pickles_base.Impls.Step
 
   module Checked : sig
     type t
@@ -54,7 +55,7 @@ module Width : sig
 
   val typ : (Checked.t, t) Typ.t
 
-  module Max : Nat.Add.Intf_transparent
+  module Max = Nat.N2
 
   module Max_vector : Vector.With_version(Max).S
 
@@ -71,7 +72,7 @@ module Width : sig
   module Length : Nat.Add.Intf_transparent
 end = struct
   include V.Width
-  open Impls.Step
+  open Pickles_base.Impls.Step
 
   module Checked = struct
     (* A "width" is represented by a 4 bit integer. *)
@@ -104,7 +105,7 @@ module Domains = struct
   include V.Domains
 
   let typ =
-    let open Impls.Step in
+    let open Pickles_base.Impls.Step in
     let dom =
       Typ.transport Typ.field
         ~there:(fun (Plonk_checks.Domain.Pow_2_roots_of_unity n) ->
@@ -134,7 +135,8 @@ let max_domains_with_x =
   { Ds.h = conv max_domains.h; x }
 
 module Vk = struct
-  type t = (Impls.Wrap.Verification_key.t[@sexp.opaque]) [@@deriving sexp]
+  type t = (Pickles_base.Impls.Wrap.Verification_key.t[@sexp.opaque])
+  [@@deriving sexp]
 
   let to_yojson _ = `String "opaque"
 
@@ -178,11 +180,11 @@ module Stable = struct
 
                   let of_repr
                       { Repr.Stable.V1.step_data; max_width; wrap_index = c } :
-                      Impls.Wrap.Verification_key.t =
+                      Pickles_base.Impls.Wrap.Verification_key.t =
                     let d = Common.wrap_domains.h in
-                    let log2_size = Import.Domain.log2_size d in
+                    let log2_size = Pickles_base.Domain.log2_size d in
                     let max_quot_size =
-                      Common.max_quot_size_int (Import.Domain.size d)
+                      Common.max_quot_size_int (Pickles_base.Domain.size d)
                     in
                     { domain =
                         { log_size_of_group = log2_size
@@ -248,7 +250,7 @@ let dummy : t =
   }
 
 module Checked = struct
-  open Step_main_inputs
+  open Pickles_base.Step_main_inputs
   open Impl
 
   type t =
@@ -288,12 +290,13 @@ let%test_unit "input_size" =
         (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) n)
         (let (T a) = Nat.of_int n in
          let (T (typ, conv)) =
-           Impls.Step.input ~branching:a ~wrap_rounds:Backend.Tock.Rounds.n
+           Pickles_base.Impls.Step.input ~branching:a
+             ~wrap_rounds:Backend.Tock.Rounds.n
          in
-         Impls.Step.Data_spec.size [ typ ]))
+         Pickles_base.Impls.Step.Data_spec.size [ typ ]))
 
-let typ : (Checked.t, t) Impls.Step.Typ.t =
-  let open Step_main_inputs in
+let typ : (Checked.t, t) Pickles_base.Impls.Step.Typ.t =
+  let open Pickles_base.Step_main_inputs in
   let open Impl in
   Typ.of_hlistable
     [ Vector.typ Domains.typ Max_branches.n

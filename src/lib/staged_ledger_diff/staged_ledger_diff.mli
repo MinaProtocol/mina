@@ -120,7 +120,7 @@ type t = { diff : Diff.t } [@@deriving compare, sexp, compare, yojson, fields]
 
 module Stable : sig
   module V2 : sig
-    type t = { diff : Diff.t }
+    type t = { diff : Diff.Stable.V2.t }
     [@@deriving compare, sexp, compare, yojson, bin_io, version]
 
     val to_latest : t -> t

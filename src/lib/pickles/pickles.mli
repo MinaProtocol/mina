@@ -2,12 +2,12 @@ open Core_kernel
 open Pickles_types
 open Hlist
 module Common = Common
-module Tick_field_sponge = Tick_field_sponge
-module Util = Util
-module Step_main_inputs = Step_main_inputs
+module Tick_field_sponge = Pickles_base.Tick_field_sponge
+module Util = Pickles_base.Util
+module Step_main_inputs = Pickles_base.Step_main_inputs
 module Backend = Backend
-module Sponge_inputs = Sponge_inputs
-module Impls = Impls
+module Sponge_inputs = Pickles_base.Sponge_inputs
+module Impls = Pickles_base.Impls
 module Inductive_rule = Inductive_rule
 module Tag = Tag
 module Pairing_main = Pairing_main
@@ -21,10 +21,10 @@ module type Statement_intf = sig
 end
 
 module type Statement_var_intf =
-  Statement_intf with type field := Impls.Step.Field.t
+  Statement_intf with type field := Pickles_base.Impls.Step.Field.t
 
 module type Statement_value_intf =
-  Statement_intf with type field := Impls.Step.field
+  Statement_intf with type field := Pickles_base.Impls.Step.field
 
 module Verification_key : sig
   [%%versioned:
@@ -132,7 +132,7 @@ module Side_loaded : sig
 
     val dummy : t
 
-    open Impls.Step
+    open Pickles_base.Impls.Step
 
     val to_input : t -> (Field.Constant.t, bool) Random_oracle_input.t
 
@@ -142,11 +142,13 @@ module Side_loaded : sig
       val to_input : t -> (Field.t, Boolean.var) Random_oracle_input.t
     end
 
-    val typ : (Checked.t, t) Impls.Step.Typ.t
+    val typ : (Checked.t, t) Pickles_base.Impls.Step.Typ.t
+
+    val of_compiled : _ Tag.t -> t
 
     module Max_branches : Nat.Add.Intf
 
-    module Max_width : Nat.Add.Intf
+    module Max_width = Nat.N2
   end
 
   module Proof : sig
@@ -157,20 +159,30 @@ module Side_loaded : sig
         type t =
           (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
         [@@deriving sexp, equal, yojson, hash, compare]
+
+        val to_base64 : t -> string
+
+        val of_base64 : string -> (t, string) Result.t
       end
     end]
+
+    val to_base64 : t -> string
+
+    val of_base64 : string -> (t, string) Result.t
   end
 
   val create :
        name:string
     -> max_branching:(module Nat.Add.Intf with type n = 'n1)
-    -> value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
-    -> var_to_field_elements:('var -> Impls.Step.Field.t array)
-    -> typ:('var, 'value) Impls.Step.Typ.t
+    -> value_to_field_elements:
+         ('value -> Pickles_base.Impls.Step.Field.Constant.t array)
+    -> var_to_field_elements:('var -> Pickles_base.Impls.Step.Field.t array)
+    -> typ:('var, 'value) Pickles_base.Impls.Step.Typ.t
     -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 
   val verify :
-       value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
+       value_to_field_elements:
+         ('value -> Pickles_base.Impls.Step.Field.Constant.t array)
     -> (Verification_key.t * 'value * Proof.t) list
     -> bool Async_kernel.Deferred.t
 
@@ -195,7 +207,7 @@ val compile :
        * Cache.Wrap.Key.Verification.t
   -> (module Statement_var_intf with type t = 'a_var)
   -> (module Statement_value_intf with type t = 'a_value)
-  -> typ:('a_var, 'a_value) Impls.Step.Typ.t
+  -> typ:('a_var, 'a_value) Pickles_base.Impls.Step.Typ.t
   -> branches:(module Nat.Intf with type n = 'branches)
   -> max_branching:(module Nat.Add.Intf with type n = 'max_branching)
   -> name:string

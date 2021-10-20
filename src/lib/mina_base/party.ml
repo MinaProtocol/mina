@@ -32,15 +32,133 @@ module Update = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('state_element, 'pk, 'vk, 'perms) t =
+        type ( 'state_element
+             , 'pk
+             , 'vk
+             , 'perms
+             , 'snapp_uri
+             , 'token_symbol
+             , 'timing )
+             t =
           { app_state : 'state_element Snapp_state.V.Stable.V1.t
           ; delegate : 'pk
           ; verification_key : 'vk
           ; permissions : 'perms
+          ; snapp_uri : 'snapp_uri
+          ; token_symbol : 'token_symbol
+          ; timing : 'timing
           }
         [@@deriving compare, equal, sexp, hash, yojson, hlist]
       end
     end]
+  end
+
+  module Timing_info = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          { initial_minimum_balance : Balance.Stable.V1.t
+          ; cliff_time : Global_slot.Stable.V1.t
+          ; cliff_amount : Amount.Stable.V1.t
+          ; vesting_period : Global_slot.Stable.V1.t
+          ; vesting_increment : Amount.Stable.V1.t
+          }
+        [@@deriving compare, equal, sexp, hash, yojson, hlist]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type value = t
+
+    let gen =
+      let open Quickcheck.Let_syntax in
+      let%bind initial_minimum_balance = Balance.gen in
+      let%bind cliff_time = Global_slot.gen in
+      let%bind cliff_amount =
+        Amount.gen_incl Amount.zero (Balance.to_amount initial_minimum_balance)
+      in
+      let%bind vesting_period =
+        Global_slot.gen_incl Global_slot.(succ zero) (Global_slot.of_int 10)
+      in
+      let%map vesting_increment =
+        Amount.gen_incl Amount.one (Amount.of_int 100)
+      in
+      { initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment
+      }
+
+    let to_input (t : t) =
+      List.reduce_exn ~f:Random_oracle_input.append
+        [ Balance.to_input t.initial_minimum_balance
+        ; Global_slot.to_input t.cliff_time
+        ; Amount.to_input t.cliff_amount
+        ; Global_slot.to_input t.vesting_period
+        ; Amount.to_input t.vesting_increment
+        ]
+
+    let dummy =
+      let slot_unused = Global_slot.zero in
+      let balance_unused = Balance.zero in
+      let amount_unused = Amount.zero in
+      { initial_minimum_balance = balance_unused
+      ; cliff_time = slot_unused
+      ; cliff_amount = amount_unused
+      ; vesting_period = slot_unused
+      ; vesting_increment = amount_unused
+      }
+
+    module Checked = struct
+      type t =
+        { initial_minimum_balance : Balance.Checked.t
+        ; cliff_time : Global_slot.Checked.t
+        ; cliff_amount : Amount.Checked.t
+        ; vesting_period : Global_slot.Checked.t
+        ; vesting_increment : Amount.Checked.t
+        }
+      [@@deriving hlist]
+
+      let constant (t : value) : t =
+        { initial_minimum_balance = Balance.var_of_t t.initial_minimum_balance
+        ; cliff_time = Global_slot.Checked.constant t.cliff_time
+        ; cliff_amount = Amount.var_of_t t.cliff_amount
+        ; vesting_period = Global_slot.Checked.constant t.vesting_period
+        ; vesting_increment = Amount.var_of_t t.vesting_increment
+        }
+
+      let to_input
+          ({ initial_minimum_balance
+           ; cliff_time
+           ; cliff_amount
+           ; vesting_period
+           ; vesting_increment
+           } :
+            t) =
+        List.reduce_exn ~f:Random_oracle_input.append
+          [ Balance.var_to_input initial_minimum_balance
+          ; Snark_params.Tick.Run.run_checked
+              (Global_slot.Checked.to_input cliff_time)
+          ; Amount.var_to_input cliff_amount
+          ; Snark_params.Tick.Run.run_checked
+              (Global_slot.Checked.to_input vesting_period)
+          ; Amount.var_to_input vesting_increment
+          ]
+    end
+
+    let typ : (Checked.t, t) Typ.t =
+      Typ.of_hlistable
+        [ Balance.typ
+        ; Global_slot.typ
+        ; Amount.typ
+        ; Global_slot.typ
+        ; Amount.typ
+        ]
+        ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
+        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
   end
 
   open Snapp_basic
@@ -56,13 +174,67 @@ module Update = struct
           , F.Stable.V1.t )
           With_hash.Stable.V1.t
           Set_or_keep.Stable.V1.t
-        , Permissions.Stable.V1.t Set_or_keep.Stable.V1.t )
+        , Permissions.Stable.V1.t Set_or_keep.Stable.V1.t
+        , string Set_or_keep.Stable.V1.t
+        , Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
+        , Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
 
       let to_latest = Fn.id
     end
   end]
+
+  let gen ?(new_party = false) () : t Quickcheck.Generator.t =
+    let open Quickcheck.Let_syntax in
+    let%bind app_state =
+      let%bind fields =
+        let field_gen = Snark_params.Tick.Field.gen in
+        Quickcheck.Generator.list_with_length 8 (Set_or_keep.gen field_gen)
+      in
+      (* won't raise because length is correct *)
+      Quickcheck.Generator.return (Snapp_state.V.of_list_exn fields)
+    in
+    let%bind delegate = Set_or_keep.gen Public_key.Compressed.gen in
+    let%bind verification_key =
+      Set_or_keep.gen
+        (Quickcheck.Generator.return
+           (let data = Pickles.Side_loaded.Verification_key.dummy in
+            let hash = Snapp_account.digest_vk data in
+            { With_hash.data; hash }))
+    in
+    let%bind permissions = Set_or_keep.gen Permissions.gen in
+    let%bind snapp_uri =
+      let uri_gen =
+        Quickcheck.Generator.of_list
+          [ "https://www.example.com"
+          ; "https://www.minaprotocol.com"
+          ; "https://www.gurgle.com"
+          ; "https://faceplant.com"
+          ]
+      in
+      Set_or_keep.gen uri_gen
+    in
+    let%bind token_symbol =
+      let token_gen =
+        Quickcheck.Generator.of_list
+          [ "MINA"; "TOKEN1"; "TOKEN2"; "TOKEN3"; "TOKEN4"; "TOKEN5" ]
+      in
+      Set_or_keep.gen token_gen
+    in
+    let%map timing =
+      if new_party then Set_or_keep.gen Timing_info.gen
+      else return Set_or_keep.Keep
+    in
+    Poly.
+      { app_state
+      ; delegate
+      ; verification_key
+      ; permissions
+      ; snapp_uri
+      ; token_symbol
+      ; timing
+      }
 
   module Checked = struct
     open Pickles.Impls.Step
@@ -71,10 +243,22 @@ module Update = struct
       ( Field.t Set_or_keep.Checked.t
       , Public_key.Compressed.var Set_or_keep.Checked.t
       , Field.t Set_or_keep.Checked.t
-      , Permissions.Checked.t Set_or_keep.Checked.t )
+      , Permissions.Checked.t Set_or_keep.Checked.t
+      , string Data_as_hash.t Set_or_keep.Checked.t
+      , Account.Token_symbol.var Set_or_keep.Checked.t
+      , Timing_info.Checked.t Set_or_keep.Checked.t )
       Poly.t
 
-    let to_input ({ app_state; delegate; verification_key; permissions } : t) =
+    let to_input
+        ({ app_state
+         ; delegate
+         ; verification_key
+         ; permissions
+         ; snapp_uri
+         ; token_symbol
+         ; timing
+         } :
+          t) =
       let open Random_oracle_input in
       List.reduce_exn ~f:append
         [ Snapp_state.to_input app_state
@@ -84,6 +268,10 @@ module Update = struct
         ; Set_or_keep.Checked.to_input verification_key ~f:field
         ; Set_or_keep.Checked.to_input permissions
             ~f:Permissions.Checked.to_input
+        ; Set_or_keep.Checked.to_input snapp_uri ~f:Data_as_hash.to_input
+        ; Set_or_keep.Checked.to_input token_symbol
+            ~f:Account.Token_symbol.var_to_input
+        ; Set_or_keep.Checked.to_input timing ~f:Timing_info.Checked.to_input
         ]
   end
 
@@ -93,11 +281,23 @@ module Update = struct
     ; delegate = Keep
     ; verification_key = Keep
     ; permissions = Keep
+    ; snapp_uri = Keep
+    ; token_symbol = Keep
+    ; timing = Keep
     }
 
   let dummy = noop
 
-  let to_input ({ app_state; delegate; verification_key; permissions } : t) =
+  let to_input
+      ({ app_state
+       ; delegate
+       ; verification_key
+       ; permissions
+       ; snapp_uri
+       ; token_symbol
+       ; timing
+       } :
+        t) =
     let open Random_oracle_input in
     List.reduce_exn ~f:append
       [ Snapp_state.to_input app_state
@@ -110,6 +310,14 @@ module Update = struct
           ~dummy:Field.zero ~f:field
       ; Set_or_keep.to_input permissions ~dummy:Permissions.user_default
           ~f:Permissions.to_input
+      ; Set_or_keep.to_input
+          (Set_or_keep.map ~f:Account.hash_snapp_uri snapp_uri)
+          ~dummy:(Account.hash_snapp_uri_opt None)
+          ~f:field
+      ; Set_or_keep.to_input token_symbol ~dummy:Account.Token_symbol.default
+          ~f:Account.Token_symbol.to_input
+      ; Set_or_keep.to_input timing ~dummy:Timing_info.dummy
+          ~f:Timing_info.to_input
       ]
 
   let typ () : (Checked.t, t) Typ.t =
@@ -124,26 +332,54 @@ module Update = struct
              ~there:(Set_or_keep.map ~f:With_hash.hash)
              ~back:(Set_or_keep.map ~f:(fun _ -> failwith "vk typ"))
       ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
+      ; (* We have to do this unfortunate dance to provide a dummy value. *)
+        Set_or_keep.typ ~dummy:None
+          (Data_as_hash.optional_typ ~hash:Account.hash_snapp_uri
+             ~non_preimage:(Account.hash_snapp_uri_opt None)
+             ~dummy_value:"")
+        |> Typ.transport
+             ~there:(Set_or_keep.map ~f:Option.some)
+             ~back:(Set_or_keep.map ~f:(fun x -> Option.value_exn x))
+      ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
+          Account.Token_symbol.typ
+      ; Set_or_keep.typ ~dummy:Timing_info.dummy Timing_info.typ
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
+
+module Events = Snapp_account.Events
+module Rollup_events = Snapp_account.Rollup_events
 
 module Body = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('pk, 'update, 'token_id, 'signed_amount) t =
+        type ( 'pk
+             , 'update
+             , 'token_id
+             , 'signed_amount
+             , 'events
+             , 'call_data
+             , 'int )
+             t =
           { pk : 'pk
           ; update : 'update
           ; token_id : 'token_id
           ; delta : 'signed_amount
+          ; events : 'events
+          ; rollup_events : 'events
+          ; call_data : 'call_data
+          ; depth : 'int
           }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
     end]
   end
+
+  (* Why isn't this derived automatically? *)
+  let hash_fold_array f init x = Array.fold ~init ~f x
 
   [%%versioned
   module Stable = struct
@@ -152,7 +388,10 @@ module Body = struct
         ( Public_key.Compressed.Stable.V1.t
         , Update.Stable.V1.t
         , Token_id.Stable.V1.t
-        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t )
+        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        , Pickles.Backend.Tick.Field.Stable.V1.t array list
+        , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
+        , int )
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -165,15 +404,31 @@ module Body = struct
       ( Public_key.Compressed.var
       , Update.Checked.t
       , Token_id.Checked.t
-      , Amount.Signed.var )
+      , Amount.Signed.var
+      , Events.var
+      , Field.Var.t
+      , int As_prover.Ref.t )
       Poly.t
 
-    let to_input ({ pk; update; token_id; delta } : t) =
+    let to_input
+        ({ pk
+         ; update
+         ; token_id
+         ; delta
+         ; events
+         ; rollup_events
+         ; call_data
+         ; depth = _depth (* ignored *)
+         } :
+          t) =
       List.reduce_exn ~f:Random_oracle_input.append
         [ Public_key.Compressed.Checked.to_input pk
         ; Update.Checked.to_input update
         ; Impl.run_checked (Token_id.Checked.to_input token_id)
         ; Amount.Signed.Checked.to_input delta
+        ; Events.var_to_input events
+        ; Events.var_to_input rollup_events
+        ; Random_oracle_input.field call_data
         ]
 
     let digest (t : t) =
@@ -188,6 +443,10 @@ module Body = struct
       ; Update.typ ()
       ; Token_id.typ
       ; Amount.Signed.typ
+      ; Events.typ
+      ; Events.typ
+      ; Field.typ
+      ; Typ.Internal.ref ()
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -197,14 +456,31 @@ module Body = struct
     ; update = Update.dummy
     ; token_id = Token_id.default
     ; delta = Amount.Signed.zero
+    ; events = []
+    ; rollup_events = []
+    ; call_data = Field.zero
+    ; depth = 0
     }
 
-  let to_input ({ pk; update; token_id; delta } : t) =
+  let to_input
+      ({ pk
+       ; update
+       ; token_id
+       ; delta
+       ; events
+       ; rollup_events
+       ; call_data
+       ; depth = _ (* ignored *)
+       } :
+        t) =
     List.reduce_exn ~f:Random_oracle_input.append
       [ Public_key.Compressed.to_input pk
       ; Update.to_input update
       ; Token_id.to_input token_id
       ; Amount.Signed.to_input delta
+      ; Events.to_input events
+      ; Events.to_input rollup_events
+      ; Random_oracle_input.field call_data
       ]
 
   let digest (t : t) =
@@ -224,7 +500,7 @@ module Predicate = struct
   module Stable = struct
     module V1 = struct
       type t =
-        | Full of Snapp_predicate.Account.Stable.V1.t
+        | Full of Snapp_predicate.Account.Stable.V2.t
         | Nonce of Account.Nonce.Stable.V1.t
         | Accept
       [@@deriving sexp, equal, yojson, hash, compare]
@@ -471,3 +747,11 @@ let account_id (t : t) : Account_id.t =
 
 let of_signed ({ data; authorization } : Signed.t) : t =
   { authorization = Signature authorization; data = Predicated.of_signed data }
+
+(** The change in balance to apply to the target account of this party.
+    When this is negative, the amount will be withdrawn from the account and
+    made available to later parties in the same transaction.
+    When this is positive, the amount will be deposited into the account from
+    the funds made available by previous parties in the same transaction.
+*)
+let delta (t : t) : Amount.Signed.t = t.data.body.delta

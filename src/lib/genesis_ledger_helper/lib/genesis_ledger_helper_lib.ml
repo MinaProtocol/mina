@@ -55,6 +55,9 @@ module Accounts = struct
             ; set_delegate
             ; set_permissions
             ; set_verification_key
+            ; set_snapp_uri
+            ; edit_rollup_state
+            ; set_token_symbol
             } ->
             let auth_required a =
               match a with
@@ -78,6 +81,9 @@ module Accounts = struct
             ; set_delegate = auth_required set_delegate
             ; set_permissions = auth_required set_permissions
             ; set_verification_key = auth_required set_verification_key
+            ; set_snapp_uri = auth_required set_snapp_uri
+            ; edit_rollup_state = auth_required edit_rollup_state
+            ; set_token_symbol = auth_required set_token_symbol
             }
       in
       let token_permissions =
@@ -87,11 +93,31 @@ module Accounts = struct
               Mina_base.Token_permissions.Token_owned { disable_new_accounts }
             else Not_owned { account_disabled })
       in
+      let%bind token_symbol =
+        try
+          let token_symbol =
+            Option.value ~default:Mina_base.Account.Token_symbol.default
+              t.token_symbol
+          in
+          Mina_base.Account.Token_symbol.check token_symbol ;
+          return token_symbol
+        with _ ->
+          Or_error.errorf "Token symbol exceeds max length: %d > %d"
+            (String.length (Option.value_exn t.token_symbol))
+            Mina_base.Account.Token_symbol.max_length
+      in
       let%map snapp =
         match t.snapp with
         | None ->
             Ok None
-        | Some { state; verification_key } ->
+        | Some
+            { state
+            ; verification_key
+            ; snapp_version
+            ; rollup_state
+            ; last_rollup_slot
+            ; proved_state
+            } ->
             let%bind app_state =
               if
                 Pickles_types.Vector.Nat.to_int Snapp_state.Max_state_size.n
@@ -103,7 +129,7 @@ module Accounts = struct
                   t (List.length state)
               else Ok (Snapp_state.V.of_list_exn state)
             in
-            let%map verification_key =
+            let%bind verification_key =
               (* Use a URI-safe alphabet to make life easier for maintaining json
                    We prefer this to base58-check here because users should not
                    be manually entering verification keys.
@@ -127,24 +153,50 @@ module Accounts = struct
                   in
                   Some (With_hash.of_data ~hash_data:Snapp_account.digest_vk vk))
             in
-            Some { Snapp_account.verification_key; app_state }
+            let%map rollup_state =
+              if
+                Pickles_types.Vector.Nat.to_int Pickles_types.Nat.N5.n
+                <> List.length rollup_state
+              then
+                Or_error.errorf
+                  !"Snap account rollup_state has invalid length %{sexp: \
+                    Runtime_config.Accounts.Single.t} length: %d"
+                  t (List.length rollup_state)
+              else Ok (Pickles_types.Vector.Vector_5.of_list_exn rollup_state)
+            in
+            let last_rollup_slot =
+              Mina_numbers.Global_slot.of_int last_rollup_slot
+            in
+            Some
+              { Snapp_account.verification_key
+              ; app_state
+              ; snapp_version
+              ; rollup_state
+              ; last_rollup_slot
+              ; proved_state
+              }
       in
-      { account with
-        delegate =
-          (if Option.is_some delegate then delegate else account.delegate)
-      ; token_id
-      ; token_permissions
-      ; nonce = Account.Nonce.of_uint32 t.nonce
-      ; receipt_chain_hash =
-          Option.value_map t.receipt_chain_hash
-            ~default:account.receipt_chain_hash
-            ~f:Mina_base.Receipt.Chain_hash.of_base58_check_exn
-      ; voting_for =
-          Option.value_map ~default:account.voting_for
-            ~f:Mina_base.State_hash.of_base58_check_exn t.voting_for
-      ; snapp
-      ; permissions
-      }
+      ( { public_key = account.public_key
+        ; balance = account.balance
+        ; timing = account.timing
+        ; token_symbol
+        ; delegate =
+            (if Option.is_some delegate then delegate else account.delegate)
+        ; token_id
+        ; token_permissions
+        ; nonce = Account.Nonce.of_uint32 t.nonce
+        ; receipt_chain_hash =
+            Option.value_map t.receipt_chain_hash
+              ~default:account.receipt_chain_hash
+              ~f:Mina_base.Receipt.Chain_hash.of_base58_check_exn
+        ; voting_for =
+            Option.value_map ~default:account.voting_for
+              ~f:Mina_base.State_hash.of_base58_check_exn t.voting_for
+        ; snapp
+        ; permissions
+        ; snapp_uri = Option.value ~default:"" t.snapp_uri
+        }
+        : Mina_base.Account.t )
 
     let of_account :
            Mina_base.Account.t
@@ -204,6 +256,9 @@ module Accounts = struct
             ; set_delegate
             ; set_permissions
             ; set_verification_key
+            ; set_snapp_uri
+            ; edit_rollup_state
+            ; set_token_symbol
             } =
           account.permissions
         in
@@ -215,10 +270,22 @@ module Accounts = struct
           ; set_delegate = auth_required set_delegate
           ; set_permissions = auth_required set_permissions
           ; set_verification_key = auth_required set_verification_key
+          ; set_snapp_uri = auth_required set_snapp_uri
+          ; edit_rollup_state = auth_required edit_rollup_state
+          ; set_token_symbol = auth_required set_token_symbol
           }
       in
       let snapp =
-        Option.map account.snapp ~f:(fun { app_state; verification_key } ->
+        Option.map account.snapp
+          ~f:(fun
+               { app_state
+               ; verification_key
+               ; snapp_version
+               ; rollup_state
+               ; last_rollup_slot
+               ; proved_state
+               }
+             ->
             let state = Snapp_state.V.to_list app_state in
             let verification_key =
               Option.map verification_key ~f:(fun vk ->
@@ -228,8 +295,16 @@ module Accounts = struct
                                 .Latest )
                   |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet)
             in
+            let rollup_state = Pickles_types.Vector.to_list rollup_state in
+            let last_rollup_slot =
+              Mina_numbers.Global_slot.to_int last_rollup_slot
+            in
             { Runtime_config.Accounts.Single.Snapp_account.state
             ; verification_key
+            ; snapp_version
+            ; rollup_state
+            ; last_rollup_slot
+            ; proved_state
             })
       in
       { pk =
@@ -253,6 +328,8 @@ module Accounts = struct
           Some (Mina_base.State_hash.to_base58_check account.voting_for)
       ; snapp
       ; permissions
+      ; token_symbol = Some account.token_symbol
+      ; snapp_uri = Some account.snapp_uri
       }
   end
 

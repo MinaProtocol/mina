@@ -1,11 +1,11 @@
-module SC = Scalar_challenge
+module SC = Pickles_base.Scalar_challenge
 module P = Proof
 open Pickles_types
 open Hlist
 open Tuple_lib
 open Common
 open Core_kernel
-open Import
+open Pickles_base.Import
 open Types
 open Backend
 
@@ -24,7 +24,7 @@ let combined_inner_product (type actual_branching)
     ~actual_branching:(module AB : Nat.Add.Intf with type n = actual_branching)
     (e1, e2) ~(old_bulletproof_challenges : (_, actual_branching) Vector.t) ~r
     ~xi ~zeta ~zetaw ~x_hat:(x_hat_1, x_hat_2)
-    ~(step_branch_domains : Domains.t) =
+    ~(step_branch_domains : Pickles_base.Domains.t) =
   let T = AB.eq in
   let b_polys =
     Vector.map
@@ -43,7 +43,8 @@ let combined_inner_product (type actual_branching)
     Pcs_batch.combine_split_evaluations
       (Common.dlog_pcs_batch (AB.add Nat.N8.n)
          ~max_quot_size:
-           (Common.max_quot_size_int (Domain.size step_branch_domains.h)))
+           (Common.max_quot_size_int
+              (Pickles_base.Domain.size step_branch_domains.h)))
       ~xi ~init:Fn.id ~mul
       ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
       ~last:Array.last ~evaluation_point:pt
@@ -213,7 +214,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     let to_field =
       SC.to_field_constant
         (module Tick.Field)
-        ~endo:Endo.Wrap_inner_curve.scalar
+        ~endo:Pickles_base.Endo.Wrap_inner_curve.scalar
     in
     let module As_field = struct
       let r = to_field r
@@ -225,12 +226,14 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
       let alpha = to_field plonk0.alpha
     end in
     let domain =
-      Domain.Pow_2_roots_of_unity pairing_vk.domain.log_size_of_group
+      Pickles_base.Domain.Pow_2_roots_of_unity
+        pairing_vk.domain.log_size_of_group
     in
     let w = pairing_vk.domain.group_gen in
     (* Debug *)
     [%test_eq: Tick.Field.t] w
-      (Tick.Field.domain_generator ~log2_size:(Domain.log2_size domain)) ;
+      (Tick.Field.domain_generator
+         ~log2_size:(Pickles_base.Domain.log2_size domain)) ;
     let zetaw = Tick.Field.mul As_field.zeta w in
     let combined_inner_product =
       let open As_field in
@@ -274,8 +277,8 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     let plonk, _ =
       Plonk_checks.derive_plonk
         (module Tick.Field)
-        ~shift:Shifts.tick ~endo:Endo.Step_inner_curve.base
-        ~mds:Tick_field_sponge.params.mds
+        ~shift:Shifts.tick ~endo:Pickles_base.Endo.Step_inner_curve.base
+        ~mds:Pickles_base.Tick_field_sponge.params.mds
         ~domain:
           (Plonk_checks.domain
              (module Tick.Field)
@@ -319,10 +322,13 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     P.Base.Me_only.Dlog_based.prepare next_statement.proof_state.me_only
   in
   let%map.Async_kernel.Deferred next_proof =
-    let (T (input, conv)) = Impls.Wrap.input () in
+    let (T (input, conv)) = Pickles_base.Impls.Wrap.input () in
     Common.time "wrap proof" (fun () ->
-        Impls.Wrap.generate_witness_conv
-          ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } ->
+        Pickles_base.Impls.Wrap.generate_witness_conv
+          ~f:
+            (fun { Pickles_base.Impls.Wrap.Proof_inputs.auxiliary_inputs
+                 ; public_inputs
+                 } ->
             Backend.Tock.Proof.create_async ~primary:public_inputs
               ~auxiliary:auxiliary_inputs pk
               ~message:
@@ -338,7 +344,9 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
                 |> Vector.to_list ))
           [ input ]
           (fun x () : unit ->
-            Impls.Wrap.handle (fun () : unit -> wrap_main (conv x)) handler)
+            Pickles_base.Impls.Wrap.handle
+              (fun () : unit -> wrap_main (conv x))
+              handler)
           ()
           { pass_through = prev_statement_with_hashes.proof_state.me_only
           ; proof_state =

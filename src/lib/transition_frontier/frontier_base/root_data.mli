@@ -11,6 +11,10 @@ module Historical : sig
     module V2 : sig
       type t
     end
+
+    module V1 : sig
+      type t
+    end
   end]
 
   val transition : t -> External_transition.Validated.t
@@ -31,6 +35,12 @@ module Limited : sig
   module Stable : sig
     module V2 : sig
       type t [@@deriving to_yojson]
+    end
+
+    module V1 : sig
+      type t
+
+      val to_latest : t -> V2.t
     end
   end]
 
@@ -64,6 +74,10 @@ module Minimal : sig
     module V2 : sig
       type t
     end
+
+    module V1 : sig
+      type t
+    end
   end]
 
   val hash : t -> State_hash.t
@@ -77,9 +91,8 @@ module Minimal : sig
   val upgrade :
        t
     -> transition:External_transition.Validated.t
-    -> protocol_states:( Mina_base.State_hash.t
-                       * Mina_state.Protocol_state.Value.t )
-                       list
+    -> protocol_states:
+         (Mina_base.State_hash.t * Mina_state.Protocol_state.Value.t) list
     -> Limited.t
 
   val create :
@@ -90,10 +103,11 @@ module Minimal : sig
 end
 
 type t =
-  { transition: External_transition.Validated.t
-  ; staged_ledger: Staged_ledger.t
-  ; protocol_states:
-      (Mina_base.State_hash.t * Mina_state.Protocol_state.Value.t) list }
+  { transition : External_transition.Validated.t
+  ; staged_ledger : Staged_ledger.t
+  ; protocol_states :
+      (Mina_base.State_hash.t * Mina_state.Protocol_state.Value.t) list
+  }
 
 val minimize : t -> Minimal.t
 

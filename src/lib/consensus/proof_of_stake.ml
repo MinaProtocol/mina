@@ -2437,13 +2437,13 @@ module Hooks = struct
         include Master
       end)
 
-      module V1 = struct
+      module V2 = struct
         module T = struct
           type query = Mina_base.Ledger_hash.Stable.V1.t
           [@@deriving bin_io, version { rpc }]
 
           type response =
-            ( Mina_base.Sparse_ledger.Stable.V1.t
+            ( Mina_base.Sparse_ledger.Stable.V2.t
             , string )
             Core_kernel.Result.Stable.V1.t
           [@@deriving bin_io, version { rpc }]

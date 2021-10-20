@@ -98,6 +98,13 @@ module Pre_diff_two = struct
         Transaction_status.Internal_command_balance_data.t list
     }
   [@@deriving compare, sexp, yojson]
+
+  let map t ~f1 ~f2 =
+    { completed_works = List.map t.completed_works ~f:f1
+    ; commands = List.map t.commands ~f:f2
+    ; coinbase = t.coinbase
+    ; internal_command_balances = t.internal_command_balances
+    }
 end
 
 module Pre_diff_one = struct
@@ -125,6 +132,13 @@ module Pre_diff_one = struct
         Transaction_status.Internal_command_balance_data.t list
     }
   [@@deriving compare, sexp, yojson]
+
+  let map t ~f1 ~f2 =
+    { completed_works = List.map t.completed_works ~f:f1
+    ; commands = List.map t.commands ~f:f2
+    ; coinbase = t.coinbase
+    ; internal_command_balances = t.internal_command_balances
+    }
 end
 
 module Pre_diff_with_at_most_two_coinbase = struct
@@ -134,7 +148,7 @@ module Pre_diff_with_at_most_two_coinbase = struct
 
     module V2 = struct
       type t =
-        ( Transaction_snark_work.Stable.V1.t
+        ( Transaction_snark_work.Stable.V2.t
         , User_command.Stable.V2.t With_status.Stable.V1.t )
         Pre_diff_two.Stable.V1.t
       [@@deriving compare, sexp, yojson]
@@ -150,14 +164,8 @@ module Pre_diff_with_at_most_two_coinbase = struct
       [@@deriving compare, sexp, yojson]
 
       let to_latest (t : t) : V2.t =
-        { completed_works = t.completed_works
-        ; commands =
-            List.map
-              ~f:(With_status.map ~f:User_command.Stable.V1.to_latest)
-              t.commands
-        ; coinbase = t.coinbase
-        ; internal_command_balances = t.internal_command_balances
-        }
+        Pre_diff_two.map t ~f1:Transaction_snark_work.Stable.V1.to_latest
+          ~f2:(With_status.map ~f:User_command.Stable.V1.to_latest)
     end
   end]
 
@@ -171,7 +179,7 @@ module Pre_diff_with_at_most_one_coinbase = struct
 
     module V2 = struct
       type t =
-        ( Transaction_snark_work.Stable.V1.t
+        ( Transaction_snark_work.Stable.V2.t
         , User_command.Stable.V2.t With_status.Stable.V1.t )
         Pre_diff_one.Stable.V1.t
       [@@deriving compare, sexp, yojson]
@@ -187,14 +195,8 @@ module Pre_diff_with_at_most_one_coinbase = struct
       [@@deriving compare, sexp, yojson]
 
       let to_latest (t : t) : V2.t =
-        { completed_works = t.completed_works
-        ; commands =
-            List.map
-              ~f:(With_status.map ~f:User_command.Stable.V1.to_latest)
-              t.commands
-        ; coinbase = t.coinbase
-        ; internal_command_balances = t.internal_command_balances
-        }
+        Pre_diff_one.map t ~f1:Transaction_snark_work.Stable.V1.to_latest
+          ~f2:(With_status.map ~f:User_command.Stable.V1.to_latest)
     end
   end]
 
@@ -221,10 +223,10 @@ module Diff = struct
         * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
       [@@deriving compare, sexp, yojson]
 
-      let to_latest (diff2, diff1) =
-        ( Pre_diff_with_at_most_two_coinbase.Stable.V1.to_latest diff2
-        , Option.map ~f:Pre_diff_with_at_most_one_coinbase.Stable.V1.to_latest
-            diff1 )
+      let to_latest ((d1, d2) : t) : V2.t =
+        ( Pre_diff_with_at_most_two_coinbase.Stable.V1.to_latest d1
+        , Option.map d2
+            ~f:Pre_diff_with_at_most_one_coinbase.Stable.V1.to_latest )
     end
   end]
 

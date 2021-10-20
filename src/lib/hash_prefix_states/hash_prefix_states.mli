@@ -86,3 +86,13 @@ val checkpoint_list : Field.t State.t
 val merge_snark : Field.t State.t
 
 val base_snark : Field.t State.t
+
+val snapp_uri : Field.t State.t
+
+val snapp_event : Field.t State.t
+
+val snapp_events : Field.t State.t
+
+val snapp_rollup_events : Field.t State.t
+
+val snapp_call_data : Field.t State.t

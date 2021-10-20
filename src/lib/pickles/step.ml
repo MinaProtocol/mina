@@ -1,4 +1,4 @@
-module SC = Scalar_challenge
+module SC = Pickles_base.Scalar_challenge
 open Core_kernel
 module P = Proof
 open Pickles_types
@@ -6,7 +6,7 @@ open Poly_types
 open Hlist
 open Backend
 open Tuple_lib
-open Import
+open Pickles_base.Import
 open Types
 open Common
 
@@ -100,7 +100,7 @@ struct
       let f :
           type var value max local_max_branching m.
              max Nat.t
-          -> Impls.Wrap.Verification_key.t
+          -> Pickles_base.Impls.Wrap.Verification_key.t
           -> 'a
           -> (value, local_max_branching, m) P.With_data.t
           -> (var, value, local_max_branching, m) Tag.t
@@ -123,19 +123,21 @@ struct
           let to_field =
             SC.to_field_constant
               (module Tick.Field)
-              ~endo:Endo.Wrap_inner_curve.scalar
+              ~endo:Pickles_base.Endo.Wrap_inner_curve.scalar
           in
           let alpha = to_field plonk0.alpha in
           let zeta = to_field plonk0.zeta in
           let zetaw =
             Tick.Field.(
-              zeta * domain_generator ~log2_size:(Domain.log2_size domain))
+              zeta
+              * domain_generator
+                  ~log2_size:(Pickles_base.Domain.log2_size domain))
           in
           time "plonk_checks" (fun () ->
               Plonk_checks.derive_plonk
                 (module Tick.Field)
-                ~endo:Endo.Step_inner_curve.base ~shift:Shifts.tick
-                ~mds:Tick_field_sponge.params.mds
+                ~endo:Pickles_base.Endo.Step_inner_curve.base ~shift:Shifts.tick
+                ~mds:Pickles_base.Tick_field_sponge.params.mds
                 ~domain:
                   (Plonk_checks.domain
                      (module Tick.Field)
@@ -228,7 +230,7 @@ struct
         let to_field =
           SC.to_field_constant
             (module Tock.Field)
-            ~endo:Endo.Step_inner_curve.scalar
+            ~endo:Pickles_base.Endo.Step_inner_curve.scalar
         in
         let module As_field = struct
           let r = to_field r
@@ -241,7 +243,7 @@ struct
         end in
         let w =
           Tock.Field.domain_generator
-            ~log2_size:(Domain.log2_size data.wrap_domains.h)
+            ~log2_size:(Pickles_base.Domain.log2_size data.wrap_domains.h)
         in
         let zetaw = Tock.Field.mul As_field.zeta w in
         let new_bulletproof_challenges, b =
@@ -306,7 +308,8 @@ struct
               (Common.dlog_pcs_batch
                  (Local_max_branching.add Nat.N8.n)
                  ~max_quot_size:
-                   (Common.max_quot_size_int (Domain.size domains.h)))
+                   (Common.max_quot_size_int
+                      (Pickles_base.Domain.size domains.h)))
               ~xi ~init:Fn.id ~mul ~last:Array.last
               ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
               ~evaluation_point:pt
@@ -322,7 +325,7 @@ struct
         let plonk =
           Plonk_checks.derive_plonk
             (module Tock.Field)
-            ~shift:Shifts.tock ~endo:Endo.Wrap_inner_curve.base
+            ~shift:Shifts.tock ~endo:Pickles_base.Endo.Wrap_inner_curve.base
             ~mds:Tock_field_sponge.params.mds
             ~domain:
               (Plonk_checks.domain
@@ -462,7 +465,8 @@ struct
     in
     let%map.Async_kernel.Deferred (next_proof : Tick.Proof.t) =
       let (T (input, conv)) =
-        Impls.Step.input ~branching:Max_branching.n ~wrap_rounds:Tock.Rounds.n
+        Pickles_base.Impls.Step.input ~branching:Max_branching.n
+          ~wrap_rounds:Tock.Rounds.n
       in
       let rec pad :
           type n k maxes pvals lws lhs.
@@ -488,7 +492,7 @@ struct
             in
             Common.hash_dlog_me_only Max_branching.n t :: pad [] ms n
       in
-      let { Domains.h; x } =
+      let { Pickles_base.Domains.h; x } =
         List.nth_exn
           (Vector.to_list step_domains)
           (Index.to_int branch_data.index)
@@ -506,11 +510,13 @@ struct
         V.f prev_values_length (M.f prev_with_proofs)
       in
       ksprintf Common.time "step-prover %d (%d, %d)"
-        (Index.to_int branch_data.index) (Domain.size h) (Domain.size x)
-        (fun () ->
-          Impls.Step.generate_witness_conv
+        (Index.to_int branch_data.index) (Pickles_base.Domain.size h)
+        (Pickles_base.Domain.size x) (fun () ->
+          Pickles_base.Impls.Step.generate_witness_conv
             ~f:
-              (fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs } ->
+              (fun { Pickles_base.Impls.Step.Proof_inputs.auxiliary_inputs
+                   ; public_inputs
+                   } ->
               Backend.Tick.Proof.create_async ~primary:public_inputs
                 ~auxiliary:auxiliary_inputs
                 ~message:
@@ -526,7 +532,7 @@ struct
                 pk)
             [ input ]
             (fun x () : unit ->
-              Impls.Step.handle
+              Pickles_base.Impls.Step.handle
                 (fun () : unit -> branch_data.main ~step_domains (conv x))
                 handler)
             ()

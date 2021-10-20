@@ -93,7 +93,7 @@ module Step = struct
     let (module T) = Zexe_backend_platform_specific.get () in
     let s_p = storable () in
     let s_v = vk_storable () in
-    let open Impls.Step in
+    let open Pickles_base.Impls.Step in
     let pk =
       lazy
         ( match
@@ -192,7 +192,7 @@ module Wrap = struct
 
   let read_or_generate step_domains cache k_p k_v typ main =
     let module Vk = Verification_key in
-    let open Impls.Wrap in
+    let open Pickles_base.Impls.Wrap in
     let (module T) = Zexe_backend_platform_specific.get () in
     let s_p = storable () in
     let pk =

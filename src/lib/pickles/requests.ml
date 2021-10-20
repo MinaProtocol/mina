@@ -1,5 +1,5 @@
 open Core_kernel
-open Import
+open Pickles_base.Import
 open Types
 open Pickles_types
 open Hlist
@@ -13,7 +13,7 @@ module Wrap = struct
 
     type max_local_max_branchings
 
-    open Impls.Wrap
+    open Pickles_base.Impls.Wrap
     open Wrap_main_inputs
     open Snarky_backendless.Request
 

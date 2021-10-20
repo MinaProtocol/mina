@@ -107,3 +107,13 @@ let party_cons = salt party_cons
 
 let party_with_protocol_state_predicate =
   salt party_with_protocol_state_predicate
+
+let snapp_uri = salt snapp_uri
+
+let snapp_event = salt snapp_event
+
+let snapp_events = salt snapp_events
+
+let snapp_rollup_events = salt snapp_rollup_events
+
+let snapp_call_data = salt snapp_call_data

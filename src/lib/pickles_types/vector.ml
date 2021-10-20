@@ -465,6 +465,7 @@ end
 
 module Vector_2 = Make_versioned (Nat.N2)
 module Vector_4 = Make_versioned (Nat.N4)
+module Vector_5 = Make_versioned (Nat.N5)
 module Vector_8 = Make_versioned (Nat.N8)
 module Vector_9 = Make_versioned (Nat.N9)
 module Vector_10 = Make_versioned (Nat.N10)

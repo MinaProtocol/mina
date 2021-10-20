@@ -14,23 +14,24 @@
    ppx_deriving_yojson
    h_list.ppx))
  (libraries
-  digestif
-  mina_version
-  zexe_backend
-  random_oracle_input
-  pickles_base
-  pickles.composition_types
-  pickles.limb_vector
-  pickles.plonk_checks
-  pickles.precomputed
-  pickles.one_hot_vector
-  pickles.pseudo
-  snarky_log
-  sponge
-  group_map
-  snarky_group_map
-  snarky_curve
-  snarky.backendless
-  key_cache
-  core_kernel
-  snark_keys_header))
+   digestif.ocaml
+   mina_version
+   base64
+   zexe_backend
+   random_oracle_input
+   pickles.base
+   pickles.backend
+   pickles.composition_types
+   pickles.limb_vector
+   pickles.plonk_checks
+   pickles.precomputed
+   pickles.one_hot_vector
+   pickles.pseudo
+   sponge
+   group_map
+   snarky_group_map
+   snarky_curve
+   snarky.backendless
+   key_cache
+   core_kernel
+   snark_keys_header))

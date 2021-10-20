@@ -1,5 +1,4 @@
 open Core
-open Mina_base
 open Async
 
 let command_name = "snark-worker"
@@ -24,7 +23,7 @@ module type Inputs_intf = sig
   val perform_single :
        Worker_state.t
     -> message:Mina_base.Sok_message.t
-    -> (Transaction.t, Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
+    -> (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
     -> (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t
 end
 
@@ -66,8 +65,7 @@ module type Work_S = sig
 
   module Single : sig
     module Spec : sig
-      type t =
-        (Transaction.t, Transaction_witness.t, ledger_proof) Work.Single.Spec.t
+      type t = (Transaction_witness.t, ledger_proof) Work.Single.Spec.t
       [@@deriving sexp, to_yojson]
     end
   end

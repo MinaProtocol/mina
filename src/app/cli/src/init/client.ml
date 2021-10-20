@@ -1884,9 +1884,9 @@ let add_peers_graphql =
                    object
                      method host = peer.host
 
-                     method libp2p_port = peer.libp2p_port
+                     method libp2pPort = peer.libp2p_port
 
-                     method peer_id = peer.peer_id
+                     method peerId = peer.peer_id
                    end
                | None ->
                    eprintf
