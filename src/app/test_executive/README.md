@@ -39,28 +39,29 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 
 ## Routine Test Run
 
-1) Go to mina protocol's dockerhub and pick a `coda-daemon-puppeteered` image to run the tests with.  usually, this image should be a recent image on the same branch as one is currently on.
+1) Go to dockerhub [minaprotocol/mina-daemon](https://hub.docker.com/r/minaprotocol/mina-daemon/tags?page=1&ordering=last_updated) and pick an image to run the tests with.  When choosing an image, keep in mind the following tips.
+- Usually, one should choose the most recent image from the branch one is currently working on.  
+- Note that changes to the integration test framework itself do not make it into the daemon image, so one might as well just use the latest image off of the develop or compatible branch.  
+- Generally use "-devnet" instead of "-mainnet" for testing although it usually won't make a difference.  
 
 2) Build `test_executive.exe` with the `integration_tests` profile
 
-3) Run `test_executive.exe`, passing in the coda image selected in step 1, and the name of the test one intends to run
-
-3.1) It's recommended to run with the `--debug` flag when iterating on the development of tests.  this flag will pause the destruction and cleanup of the generated testnet and associated terraform configuration files, so that those things can be inspected post-hoc
-
-3.2) It's also recommended to pipe log output through logproc with a filter to remove Debug and Spam logs be default (those log levels are very verbose and are intended for debugging test framework internals).  Use `tee test.log` to store the raw output into the file `test.log` so that it can be saved and later inspected.
+3) Run `test_executive.exe`, passing in the mina image selected in step 1, and the name of the test one intends to run
+- It's recommended to run with the `--debug` flag when iterating on the development of tests.  this flag will pause the destruction and cleanup of the generated testnet and associated terraform configuration files, so that those things can be inspected post-hoc
+- It's also recommended to pipe log output through logproc with a filter to remove Debug and Spam logs be default (those log levels are very verbose and are intended for debugging test framework internals).  Use `tee test.log` to store the raw output into the file `test.log` so that it can be saved and later inspected.
 
 ```sh
 alias test_executive=./_build/default/src/app/test_executive/test_executive.exe
 alias logproc=./_build/default/src/app/logproc/logproc.exe
 
-MINA_IMAGE=... # pick a suitable (recent) "coda-daemon-puppeteered:XXX-develop-XXX" dockerhub
+MINA_IMAGE=... # pick a suitable (recent) image from dockerhub or GCR
 TEST=... # name of the test one wants to run
 
 dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 test_executive cloud $TEST --mina-image=$MINA_IMAGE --debug | tee test.log | logproc -i inline -f '!(.level in ["Debug", "Spam"])'
 ```
 
-4) OPTIONAL: In the event that the automatic cleanup doesn't work properly, one needs to do it manually.  Firstly, destroy what's on GCP with `kubectl delete namespace <namespace of test>`.  Then, delete the local testnet directory, which is in `./automation/terraform/testnets/`
+4) OPTIONAL: In the event that the automatic cleanup doesn't work properly, one needs to do it manually.  Firstly, destroy what's on GCP with `kubectl delete namespace <namespace of test>`.  Then, `rm -r` the local testnet directory, which is in `./automation/terraform/testnets/`
 
 ## Notes on GCP namespace name
 
@@ -68,6 +69,6 @@ Running the integration test will of course create a testnet on GCP.  In order t
 
 format is: `it-{username}-{gitHash}-{testname}`
 
-ex: `it-adalo-3a9f8ce-block-prod`; user is adalovelace, git commit 3a9f8ce, running block production test
+ex: `it-adalo-3a9f8ce-payments`; user is adalovelace, git commit 3a9f8ce, running payments integration test
 
 GCP namespaces are limited to 53 characters.    This format uses up a fixed minimum of 22 characters, the integration tests will need a further number of those characters when constructing release names, and the longest release name for any resource happens to be "-block-producers" which is another 16 characters. As such the name of an integration test including dashes cannot exceed 15 characters
