@@ -38,8 +38,9 @@ let log_filter_of_event_type =
          \"Fatal\")"
       ]
   | Event_type Node_offline ->
-      let filter = Printf.sprintf "jsonPayload.event_type=\"node_offline\"" in
-      [ filter ]
+      [ "jsonPayload.puppeteer_script_event=true"
+      ; "jsonPayload.event_type=\"node_offline\""
+      ]
   | Event_type t ->
       let event_id =
         to_structured_event_id (Event_type t)

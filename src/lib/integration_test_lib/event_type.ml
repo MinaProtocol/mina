@@ -62,8 +62,6 @@ module Node_offline = struct
 
   let structured_event_id : Structured_log_events.id option = None
 
-  (* TODO figure out what event gets triggered when a node goes offline, or how we can tell*)
-
   type t = unit [@@deriving to_yojson]
 
   let parse = Fn.const (Or_error.return ())

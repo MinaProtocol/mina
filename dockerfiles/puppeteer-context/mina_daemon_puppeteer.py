@@ -33,7 +33,9 @@ TCPServer.allow_reuse_address = True
 HTTPServer.timeout = 1
 
 def log(s):
-  script_log_output_file.write("%s\n" % s)
+  line = "mina_daemon_puppeteer_script: "+s
+  print(line)
+  script_log_output_file.write("%s\n" % line)
   script_log_output_file.flush()
 
 class MockRequestHandler(BaseHTTPRequestHandler):
@@ -44,16 +46,16 @@ class MockRequestHandler(BaseHTTPRequestHandler):
     s.wfile.write(b'<html><body>The daemon is currently offline.<br/><i>This broadcast was brought to you by the puppeteer mock server</i></body></html>')
 
 def handle_child_termination(signum, frame):
-  log("puppeteer script: SIGCHLD received " )
+  log("SIGCHLD received" )
   os.waitpid(-1, os.WNOHANG)
 
 def handle_start_request(signum, frame):
-  log("puppeteer script: SIGUSR1 handle_start_request received, setting active_daemon_request to True" )
+  log("SIGUSR1 handle_start_request received, setting active_daemon_request to True" )
   global active_daemon_request
   active_daemon_request = True
 
 def handle_stop_request(signum, frame):
-  log("puppeteer script: SIGUSR2 handle_stop_request received, setting inactive_daemon_request to True" )
+  log("SIGUSR2 handle_stop_request received, setting inactive_daemon_request to True" )
   global inactive_daemon_request
   inactive_daemon_request = True
 
@@ -77,7 +79,7 @@ def wait_for_pid(pid):
         time.sleep(0.25)
 
 def start_daemon():
-  log("puppeteer script: start_daemon called" )
+  log("start_daemon called" )
   global mina_process
   with open('mina.log', 'a') as f:
     mina_process = subprocess.Popen(
@@ -85,13 +87,13 @@ def start_daemon():
         stdout=f,
         stderr=subprocess.STDOUT
     )
-  log("puppeteer script: touching /root/daemon-active" )
+  log("touching /root/daemon-active" )
   Path('daemon-active').touch()
-  log("puppeteer script: daemon fully started" )
+  log("daemon fully started" )
   # log('{"puppeteer_script_event": true, "event_type": "node_initialized"')
 
 def stop_daemon():
-  log("puppeteer script: stop_daemon called" )
+  log("stop_daemon called" )
   global mina_process
   mina_process.send_signal(signal.SIGTERM)
 
@@ -99,20 +101,20 @@ def stop_daemon():
   log("stop_daemon, child_pids: %s" % ', '.join([str(i) for i in child_pids]))
   mina_process.wait()
   for child_pid in child_pids:
-      log("puppeteer script, waiting for child_pid: " + str(child_pid) )
+      log("waiting for child_pid: " + str(child_pid) )
       wait_for_pid(child_pid)
-      log("puppeteer script, done waiting for: " + str(child_pid) )
-  log("puppeteer script: removing /root/daemon-active" )
+      log("done waiting for: " + str(child_pid) )
+  log("removing /root/daemon-active" )
   Path('daemon-active').unlink()
   mina_process = None
-  log("puppeteer script: daemon fully stopped" )
+  log("daemon fully stopped" )
   log('{"puppeteer_script_event": true, "event_type": "node_offline", "message":"daemon is being stopped by puppeteer script and is going offline"}')
 
 # technically, doing the loops like this will eventually result in a stack overflow
 # however, you would need to do a lot of starts and stops to hit this condition
 
 def inactive_loop():
-  log("puppeteer script: inactive_loop beginning" )
+  log("inactive_loop beginning" )
   global active_daemon_request
   server = None
   try:
@@ -121,32 +123,32 @@ def inactive_loop():
       server.handle_request()
       signal.sigtimedwait(ALL_SIGNALS, 0)
       if active_daemon_request:
-        log("puppeteer script, inactive_loop: active_daemon_request received, starting daemon" )
+        log("inactive_loop: active_daemon_request received, starting daemon" )
         start_daemon()
         active_daemon_request = False
         break
   except Exception as err:
-    log("puppeteer script: inactive_loop experienced an error: ")
+    log("inactive_loop experienced an error: ")
     log(err)
   finally:
     if server != None:
       server.server_close()
-    log("puppeteer script: inactive_loop terminating. mock server closed." )
+    log("inactive_loop terminating. mock server closed." )
     
   active_loop()
 
 def active_loop():
-  log("puppeteer script: active_loop beginning" )
+  log("active_loop beginning" )
   global mina_process, inactive_daemon_request
 
   while True:
     signal.pause()
     status = mina_process.poll()
     if status != None:
-      log("puppeteer script, active_loop: status not None, cleaning up and exiting")
+      log("active_loop: status not None, cleaning up and exiting")
       cleanup_and_exit(status)
     elif inactive_daemon_request:
-      log("puppeteer script, active_loop: inactive daemon request detected, stopping daemon")
+      log("active_loop: inactive daemon request detected, stopping daemon")
       stop_daemon()
       inactive_daemon_request = False
       break
@@ -161,7 +163,7 @@ def cleanup_and_exit(status):
 
 if __name__ == '__main__':
   script_log_output_file = open(SCRIPT_LOG_OUTPUT_FILENAME, 'w')
-  log("puppeteer script: starting...")
+  log("starting...")
   signal.signal(signal.SIGCHLD, handle_child_termination)
   signal.signal(signal.SIGUSR1, handle_stop_request)
   signal.signal(signal.SIGUSR2, handle_start_request)
