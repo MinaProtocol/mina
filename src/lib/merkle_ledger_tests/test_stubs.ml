@@ -121,6 +121,8 @@ struct
 
   let get t ~key = Bigstring_frozen.Table.find t.table key
 
+  let get_batch t ~keys = List.map keys ~f:(Bigstring_frozen.Table.find t.table)
+
   let set t ~key ~data = Bigstring_frozen.Table.set t.table ~key ~data
 
   let set_batch t ?(remove_keys = []) ~key_data_pairs =

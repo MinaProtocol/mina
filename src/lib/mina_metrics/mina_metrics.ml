@@ -118,9 +118,19 @@ module Runtime = struct
 
   let current_jemalloc = ref (Jemalloc.get_memory_stats ())
 
-  let update () =
-    current_gc := Gc.stat () ;
-    current_jemalloc := Jemalloc.get_memory_stats ()
+  let gc_stat_interval_mins = ref 15.
+
+  let gc_allocated_bytes = ref (Gc.allocated_bytes ())
+
+  let rec gc_stat () =
+    Async.Deferred.(
+      upon
+        (after (Time_ns.Span.of_min !gc_stat_interval_mins))
+        (fun () ->
+          current_gc := Gc.stat () ;
+          current_jemalloc := Jemalloc.get_memory_stats () ;
+          gc_allocated_bytes := Gc.allocated_bytes () ;
+          gc_stat ()))
 
   let simple_metric ~metric_type ~help name fn =
     let name = Printf.sprintf "%s_%s_%s" namespace subsystem name in
@@ -136,7 +146,7 @@ module Runtime = struct
 
   let ocaml_gc_allocated_bytes =
     simple_metric ~metric_type:Counter "ocaml_gc_allocated_bytes"
-      Gc.allocated_bytes
+      (fun () -> !gc_allocated_bytes)
       ~help:"Total number of bytes allocated since the program was started."
 
   let ocaml_gc_major_words =
@@ -255,7 +265,6 @@ module Runtime = struct
 
   let () =
     let open CollectorRegistry in
-    register_pre_collect default update ;
     List.iter metrics ~f:(fun (info, collector) ->
         register default info collector)
 end
@@ -540,6 +549,10 @@ module Network = struct
     let v = Gauge.v
   end)
 
+  module Ipc_latency_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 1000. 10. 5
+  end)
+
   module Rpc_latency_histogram = Histogram (struct
     let spec = Histogram_spec.of_exponential 1000. 10. 5
   end)
@@ -583,6 +596,10 @@ module Network = struct
   let rpc_latency_ms_summary : Rpc_latency_histogram.t =
     let help = "A histogram for all RPC call latencies" in
     Rpc_latency_histogram.v "rpc_latency_ms_summary" ~help ~namespace ~subsystem
+
+  let ipc_latency_ns_summary : Ipc_latency_histogram.t =
+    let help = "A histogram for all IPC message latencies" in
+    Ipc_latency_histogram.v "ipc_latency_ns_summary" ~help ~namespace ~subsystem
 end
 
 module Snark_work = struct
@@ -865,6 +882,10 @@ module Transition_frontier = struct
        best tip"
     in
     Gauge.v "best_tip_slot_time_sec" ~help ~namespace ~subsystem
+
+  let best_tip_block_height : Gauge.t =
+    let help = "Height of most recent best tip" in
+    Gauge.v "best_tip_block_height" ~help ~namespace ~subsystem
 
   (* TODO:
      let recently_finalized_snarked_txns : Gauge.t =
@@ -1175,6 +1196,7 @@ let generic_server ?forward_uri ~port ~logger ~registry () =
     callback
 
 let server ?forward_uri ~port ~logger () =
+  Runtime.gc_stat () ;
   generic_server ?forward_uri ~port ~logger ~registry:CollectorRegistry.default
     ()
 

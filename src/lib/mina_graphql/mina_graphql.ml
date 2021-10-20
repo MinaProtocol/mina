@@ -3188,12 +3188,12 @@ module Mutations = struct
           |> Deferred.return
         in
         let net = Mina_lib.net coda in
-        let seed = Option.value ~default:true seed in
+        let is_seed = Option.value ~default:true seed in
         let%bind.Async.Deferred maybe_failure =
           (* Add peers until we find an error *)
           Deferred.List.find_map peers ~f:(fun peer ->
               match%map.Async.Deferred
-                Mina_networking.add_peer net peer ~seed
+                Mina_networking.add_peer net peer ~is_seed
               with
               | Ok () ->
                   None
