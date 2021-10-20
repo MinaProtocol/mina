@@ -1227,6 +1227,10 @@ module Types = struct
           ; abstract_field "feePayer"
               ~typ:(non_null AccountObj.account)
               ~args:[] ~doc:"Account that pays the fees for the command"
+          ; abstract_field "validUntil" ~typ:(non_null uint32) ~args:[]
+              ~doc:
+                "The global slot number after which this transaction cannot be \
+                 applied"
           ; abstract_field "token" ~typ:(non_null token_id) ~args:[]
               ~doc:"Token used by the command"
           ; abstract_field "amount" ~typ:(non_null uint64) ~args:[]
@@ -1318,6 +1322,11 @@ module Types = struct
           ~resolve:(fun { ctx = coda; _ } cmd ->
             AccountObj.get_best_ledger_account coda
               (Signed_command.fee_payer cmd.With_hash.data))
+      ; field_no_status "validUntil" ~typ:(non_null uint32) ~args:[]
+          ~doc:
+            "The global slot number after which this transaction cannot be \
+             applied" ~resolve:(fun _ cmd ->
+            Signed_command.valid_until cmd.With_hash.data)
       ; field_no_status "token" ~typ:(non_null token_id) ~args:[]
           ~doc:"Token used for the transaction" ~resolve:(fun _ cmd ->
             Signed_command.token cmd.With_hash.data)
