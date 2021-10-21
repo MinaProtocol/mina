@@ -246,7 +246,7 @@ let direct_graphql_no_account_fee_through_block ~logger ~rosetta_uri
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Ignore } ]
 
 let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
@@ -273,7 +273,7 @@ let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None } ]
 
 (* token creation disabled in daemon for now *)
@@ -296,7 +296,7 @@ let direct_graphql_create_token_through_block ~logger ~rosetta_uri ~graphql_uri
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None }
         ; { amount= None
           ; account= None
@@ -322,7 +322,7 @@ let direct_graphql_create_token_account_through_block ~logger ~rosetta_uri
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None } ]
 *)
 
@@ -449,7 +449,7 @@ let construction_api_payment_through_mempool =
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None } ]
 
 let construction_api_delegation_through_mempool =
@@ -470,7 +470,7 @@ let construction_api_delegation_through_mempool =
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None } ]
 
 (* token creation disabled in daemon for now *)
@@ -486,7 +486,7 @@ let construction_api_create_token_through_mempool =
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None }
         ; { amount= None
           ; account= None
@@ -505,7 +505,7 @@ let construction_api_create_token_account_through_mempool =
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None } ]
 *)
 

@@ -6,7 +6,12 @@ open Async
 open Core_kernel
 include Hashable.Make_binable (Pid)
 
-type process_kind = Prover | Verifier | Libp2p_helper | Snark_worker
+type process_kind =
+  | Prover
+  | Verifier
+  | Libp2p_helper
+  | Snark_worker
+  | Uptime_snark_worker
 [@@deriving show { with_path = false }, yojson]
 
 type t = process_kind Pid.Table.t

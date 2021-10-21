@@ -76,7 +76,9 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   in
   let ledger_hash = Ledger_hash.of_base58_check_exn block.ledger_hash in
   let height = Unsigned.UInt32.of_int64 block.height in
-  let global_slot = Unsigned.UInt32.of_int64 block.global_slot in
+  let global_slot_since_hard_fork =
+    Unsigned.UInt32.of_int64 block.global_slot_since_hard_fork
+  in
   let global_slot_since_genesis =
     Unsigned.UInt32.of_int64 block.global_slot_since_genesis
   in
@@ -94,7 +96,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; next_epoch_ledger_hash
     ; ledger_hash
     ; height
-    ; global_slot
+    ; global_slot_since_hard_fork
     ; global_slot_since_genesis
     ; timestamp
     ; user_cmds = []

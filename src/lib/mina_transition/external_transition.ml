@@ -394,10 +394,12 @@ let payments t =
         None)
 
 let accept t =
-  Mina_net2.Validation_callback.fire_exn (validation_callback t) `Accept
+  Mina_net2.Validation_callback.fire_if_not_already_fired
+    (validation_callback t) `Accept
 
 let reject t =
-  Mina_net2.Validation_callback.fire_exn (validation_callback t) `Reject
+  Mina_net2.Validation_callback.fire_if_not_already_fired
+    (validation_callback t) `Reject
 
 let poke_validation_callback t cb = set_validation_callback t cb
 

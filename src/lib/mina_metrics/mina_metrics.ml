@@ -118,9 +118,19 @@ module Runtime = struct
 
   let current_jemalloc = ref (Jemalloc.get_memory_stats ())
 
-  let update () =
-    current_gc := Gc.stat () ;
-    current_jemalloc := Jemalloc.get_memory_stats ()
+  let gc_stat_interval_mins = ref 15.
+
+  let gc_allocated_bytes = ref (Gc.allocated_bytes ())
+
+  let rec gc_stat () =
+    Async.Deferred.(
+      upon
+        (after (Time_ns.Span.of_min !gc_stat_interval_mins))
+        (fun () ->
+          current_gc := Gc.stat () ;
+          current_jemalloc := Jemalloc.get_memory_stats () ;
+          gc_allocated_bytes := Gc.allocated_bytes () ;
+          gc_stat ()))
 
   let simple_metric ~metric_type ~help name fn =
     let name = Printf.sprintf "%s_%s_%s" namespace subsystem name in
@@ -136,7 +146,7 @@ module Runtime = struct
 
   let ocaml_gc_allocated_bytes =
     simple_metric ~metric_type:Counter "ocaml_gc_allocated_bytes"
-      Gc.allocated_bytes
+      (fun () -> !gc_allocated_bytes)
       ~help:"Total number of bytes allocated since the program was started."
 
   let ocaml_gc_major_words =
@@ -255,7 +265,6 @@ module Runtime = struct
 
   let () =
     let open CollectorRegistry in
-    register_pre_collect default update ;
     List.iter metrics ~f:(fun (info, collector) ->
         register default info collector)
 end
@@ -356,12 +365,126 @@ module Network = struct
     let help = "# of messages received" in
     Counter.v "messages_received" ~help ~namespace ~subsystem
 
+  let rpc_requests_received : Counter.t =
+    let help = "# of rpc requests received" in
+    Counter.v "rpc_requests_received" ~help ~namespace ~subsystem
+
+  let rpc_requests_sent : Counter.t =
+    let help = "# of rpc requests sent" in
+    Counter.v "rpc_requests_sent" ~help ~namespace ~subsystem
+
+  let get_some_initial_peers_rpcs_sent : Counter.t =
+    let help = "# of Get_some_initial_peers rpc requests sent" in
+    Counter.v "get_some_initial_peers_rpcs_sent" ~help ~namespace ~subsystem
+
+  let get_some_initial_peers_rpcs_received : Counter.t =
+    let help = "# of Get_some_initial_peers rpc requests received" in
+    Counter.v "get_some_initial_peers_rpcs_received" ~help ~namespace ~subsystem
+
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent : Counter.t
+      =
+    let help =
+      "# of Get_staged_ledger_aux_and_pending_coinbases_at_hash rpc requests \
+       sent"
+    in
+    Counter.v "get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent"
+      ~help ~namespace ~subsystem
+
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received :
+      Counter.t =
+    let help =
+      "# of Get_staged_ledger_aux_and_pending_coinbases_at_hash rpc requests \
+       received"
+    in
+    Counter.v
+      "get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received" ~help
+      ~namespace ~subsystem
+
+  let answer_sync_ledger_query_rpcs_sent : Counter.t =
+    let help = "# of Answer_sync_ledger_query rpc requests sent" in
+    Counter.v "answer_sync_ledger_query_rpcs_sent" ~help ~namespace ~subsystem
+
+  let answer_sync_ledger_query_rpcs_received : Counter.t =
+    let help = "# of Answer_synce_ledger_query rpc requests received" in
+    Counter.v "answer_sync_ledger_query_rpcs_received" ~help ~namespace
+      ~subsystem
+
+  let get_transition_chain_rpcs_sent : Counter.t =
+    let help = "# of Get_transition_chain rpc requests sent" in
+    Counter.v "get_transition_chain_rpcs_sent" ~help ~namespace ~subsystem
+
+  let get_transition_chain_rpcs_received : Counter.t =
+    let help = "# of Get_transition_chain rpc requests received" in
+    Counter.v "get_transition_chain_rpcs_received" ~help ~namespace ~subsystem
+
+  let get_transition_knowledge_rpcs_sent : Counter.t =
+    let help = "# of Get_transition_knowledge rpc requests sent" in
+    Counter.v "get_transition_knowledge_rpcs_sent" ~help ~namespace ~subsystem
+
+  let get_transition_knowledge_rpcs_received : Counter.t =
+    let help = "# of Get_transition_knowledge rpc requests received" in
+    Counter.v "get_transition_knowledge_rpcs_received" ~help ~namespace
+      ~subsystem
+
+  let get_transition_chain_proof_rpcs_sent : Counter.t =
+    let help = "# of Get_transition_chain_proof rpc requests sent" in
+    Counter.v "get_transition_chain_proof_rpcs_sent" ~help ~namespace ~subsystem
+
+  let get_transition_chain_proof_rpcs_received : Counter.t =
+    let help = "# of Get_transition_chain_proof rpc requests received" in
+    Counter.v "get_transition_chain_proof_rpcs_received" ~help ~namespace
+      ~subsystem
+
+  let get_node_status_rpcs_sent : Counter.t =
+    let help = "# of Get_node_status rpc requests sent" in
+    Counter.v "get_node_status_rpcs_sent" ~help ~namespace ~subsystem
+
+  let get_node_status_rpcs_received : Counter.t =
+    let help = "# of Get_node_status rpc requests received" in
+    Counter.v "get_node_status_rpcs_received" ~help ~namespace ~subsystem
+
+  let get_ancestry_rpcs_sent : Counter.t =
+    let help = "# of Get_ancestry rpc requests sent" in
+    Counter.v "get_ancestry_rpcs_sent" ~help ~namespace ~subsystem
+
+  let get_ancestry_rpcs_received : Counter.t =
+    let help = "# of Get_ancestry rpc requests received" in
+    Counter.v "get_ancestry_rpcs_received" ~help ~namespace ~subsystem
+
+  let ban_notify_rpcs_sent : Counter.t =
+    let help = "# of Ban_notify rpc requests sent" in
+    Counter.v "ban_notify_rpcs_sent" ~help ~namespace ~subsystem
+
+  let ban_notify_rpcs_received : Counter.t =
+    let help = "# of Ban_notify rpc requests received" in
+    Counter.v "ban_notify_rpcs_received" ~help ~namespace ~subsystem
+
+  let get_best_tip_rpcs_sent : Counter.t =
+    let help = "# of Get_best_tip rpc requests sent" in
+    Counter.v "get_best_tip_rpcs_sent" ~help ~namespace ~subsystem
+
+  let get_best_tip_rpcs_received : Counter.t =
+    let help = "# of Get_best_tip rpc requests received" in
+    Counter.v "get_best_tip_rpcs_received" ~help ~namespace ~subsystem
+
+  let get_epoch_ledger_rpcs_sent : Counter.t =
+    let help = "# of Get_epoch_ledger rpc requests sent" in
+    Counter.v "get_epoch_ledger_rpcs_sent" ~help ~namespace ~subsystem
+
+  let get_epoch_ledger_rpcs_received : Counter.t =
+    let help = "# of Get_epoch_ledger rpc requests received" in
+    Counter.v "get_epoch_ledger_rpcs_received" ~help ~namespace ~subsystem
+
   module Gauge_map = Metric_map (struct
     type t = Gauge.t
 
     let subsystem = subsystem
 
     let v = Gauge.v
+  end)
+
+  module Ipc_latency_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 1000. 10. 5
   end)
 
   module Rpc_latency_histogram = Histogram (struct
@@ -407,6 +530,10 @@ module Network = struct
   let rpc_latency_ms_summary : Rpc_latency_histogram.t =
     let help = "A histogram for all RPC call latencies" in
     Rpc_latency_histogram.v "rpc_latency_ms_summary" ~help ~namespace ~subsystem
+
+  let ipc_latency_ns_summary : Ipc_latency_histogram.t =
+    let help = "A histogram for all IPC message latencies" in
+    Ipc_latency_histogram.v "ipc_latency_ns_summary" ~help ~namespace ~subsystem
 end
 
 module Snark_work = struct
@@ -689,6 +816,10 @@ module Transition_frontier = struct
        best tip"
     in
     Gauge.v "best_tip_slot_time_sec" ~help ~namespace ~subsystem
+
+  let best_tip_block_height : Gauge.t =
+    let help = "Height of most recent best tip" in
+    Gauge.v "best_tip_block_height" ~help ~namespace ~subsystem
 
   (* TODO:
      let recently_finalized_snarked_txns : Gauge.t =
@@ -999,6 +1130,7 @@ let generic_server ?forward_uri ~port ~logger ~registry () =
     callback
 
 let server ?forward_uri ~port ~logger () =
+  Runtime.gc_stat () ;
   generic_server ?forward_uri ~port ~logger ~registry:CollectorRegistry.default
     ()
 
