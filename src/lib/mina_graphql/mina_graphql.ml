@@ -2517,6 +2517,38 @@ module Types = struct
                   Error "Expected balance as a string"
             with exn -> Error (Exn.to_string exn))
 
+      let snapp_receipt_chain_hash =
+        scalar "ReceiptChainHash" ~coerce:(fun s ->
+            try
+              match s with
+              | `String chain_hash ->
+                  Receipt.Chain_hash.of_base58_check chain_hash
+                  |> Result.map_error ~f:Error.to_string_hum
+              | _ ->
+                  Error "Expected balance as a string"
+            with exn -> Error (Exn.to_string exn))
+
+      let snapp_state =
+        obj "SnappState" ~doc:"Snapp state, a list of 8 field elements"
+          ~coerce:(fun element_results ->
+            let elements =
+              List.map ~f:Snapp_basic.Or_ignore.of_option element_results
+            in
+            if List.length elements = 8 then
+              (* length check means this won't raise *)
+              Ok (Snapp_state.V.of_list_exn elements)
+            else Error "Expected 8 elements for Snapp state")
+          ~fields:[ arg "elements" ~typ:(non_null (list field)) ]
+
+      let snapp_global_slot =
+        scalar "GlobalSlot" ~coerce:(fun amt ->
+            match amt with
+            | `String s -> (
+                try Ok (Mina_numbers.Global_slot.of_string s)
+                with exn -> Error (Exn.to_string exn) )
+            | _ ->
+                Error "Expected string for global slot")
+
       module Interval = struct
         let i name typ =
           obj (name ^ "Interval")
@@ -2536,65 +2568,39 @@ module Types = struct
         let block_time = i "BlockTime" block_time
 
         let global_slot = i "GlobalSlot" snapp_global_slot
+
+        let currency_amount = i "CurrencyAmount" currency_amount
+
+        let token_id = i "TokenId" token_id_arg
       end
-
-      let snapp_receipt_chain_hash =
-        scalar "ReceiptChainHash" ~coerce:(fun s ->
-            try
-              match s with
-              | `String chain_hash ->
-                  Receipt.Chain_hash.of_base58_check chain_hash
-                  |> Result.map_error ~f:Error.to_string_hum
-              | _ ->
-                  Error "Expected balance as a string"
-            with exn -> Error (Exn.to_string exn))
-
-      let snapp_state =
-        obj "SnappState" ~doc:"Snapp state, a list of 8 field elements"
-          ~coerce:(fun element_results ->
-            let open Result.Let_syntax in
-            let%bind elements = Result.all element_results in
-            if List.length elements = 8 then
-              (* length check means this won't raise *)
-              Ok (Snapp_state.V.of_list_exn elements)
-            else Error "Expected 8 elements for Snapp state")
-          ~fields:[ arg "elements" ~typ:(non_null (list field)) ]
 
       let snapp_predicate_account =
         obj "SnappPredicateAccount"
           ~coerce:
-            (fun balance_result nonce_result receipt_chain_hash_result
-                 public_key_result delegate_result state_result
-                 rollup_state_result proved_state_result ->
+            (fun balance nonce receipt_chain_hash public_key delegate
+                 state_result rollup_state proved_state ->
             let open Result.Let_syntax in
-            let%bind balance = balance_result in
-            let%bind nonce = nonce_result in
-            let%bind receipt_chain_hash = receipt_chain_hash_result in
-            let%bind public_key = public_key_result in
-            let%bind delegate = delegate_result in
-            let%bind state = state_result in
-            let%bind rollup_state = rollup_state_result in
-            let%bind proved_state = proved_state_result in
-            return
-              ( Snapp_predicate.Account.Poly.
-                  { balance
-                  ; nonce
-                  ; receipt_chain_hash
-                  ; public_key
-                  ; delegate
-                  ; state
-                  ; rollup_state
-                  ; proved_state
-                  }
-                : Snapp_predicate.Account.t ))
+            let v o = Snapp_basic.Or_ignore.of_option o in
+            let%map state = state_result in
+            ( Snapp_predicate.Account.Poly.
+                { balance = v balance
+                ; nonce = v nonce
+                ; receipt_chain_hash = v receipt_chain_hash
+                ; public_key = v public_key
+                ; delegate = v delegate
+                ; state
+                ; rollup_state = v rollup_state
+                ; proved_state = v proved_state
+                }
+              : Snapp_predicate.Account.t ))
           ~fields:
             [ arg "balance" ~typ:Interval.balance
             ; arg "nonce" ~typ:Interval.nonce
             ; arg "receiptChainHash"
                 ~doc:"receipt chain hash, or null if Ignore"
                 ~typ:snapp_receipt_chain_hash
-            ; arg "publicKey" ~typ:public_key
-            ; arg "delegate" ~typ:public_key
+            ; arg "publicKey" ~typ:public_key_arg
+            ; arg "delegate" ~typ:public_key_arg
             ; arg "state" ~typ:(non_null snapp_state)
             ; arg "rollupState" ~typ:field
             ; arg "provedState" ~typ:bool
@@ -2648,8 +2654,8 @@ module Types = struct
 
       let snapp_control =
         obj "Control"
-          ~coerce:(fun proof_or_signature proof_opt signature_opt ->
-            match (proof_or_signature, proof_opt, signature_opt) with
+          ~coerce:(fun proof_opt signature_opt ->
+            match (proof_opt, signature_opt) with
             | Some proof, None ->
                 Ok (Control.Proof proof)
             | None, Some signature ->
@@ -2685,15 +2691,6 @@ module Types = struct
             | _ ->
                 Error "VRF output, expected null")
 
-      let snapp_global_slot =
-        scalar "GlobalSlot" ~coerce:(fun amt ->
-            match amt with
-            | `String s -> (
-                try Ok (Mina_numbers.Global_slot.of_string s)
-                with exn -> Error (Exn.to_string exn) )
-            | _ ->
-                Error "Expected string for global slot")
-
       let snapp_state_hash =
         scalar "StateHash" ~coerce:(fun state_hash ->
             match state_hash with
@@ -2714,11 +2711,12 @@ module Types = struct
 
       let snapp_epoch_ledger =
         obj "EpochLedger"
-          ~coerce:(fun hash_result total_currency_result ->
-            let open Result.Let_syntax in
-            let%bind hash = hash_result in
-            let%bind total_currency = total_currency_result in
-            Ok { Epoch_ledger.Poly.hash; total_currency })
+          ~coerce:(fun hash total_currency ->
+            let v o = Snapp_basic.Or_ignore.of_option o in
+            Ok
+              { Epoch_ledger.Poly.hash = v hash
+              ; total_currency = v total_currency
+              })
           ~fields:
             [ arg "hash" ~typ:snarked_ledger_hash
             ; arg "totalCurrency" ~typ:Interval.currency_amount
@@ -2727,21 +2725,17 @@ module Types = struct
       let snapp_epoch_data =
         obj "EpochData"
           ~coerce:
-            (fun ledger_result seed_result start_checkpoint_result
-                 lock_checkpoint_result epoch_length_result ->
+            (fun ledger_result seed start_checkpoint lock_checkpoint
+                 epoch_length ->
             let open Result.Let_syntax in
-            let%bind ledger = ledger_result in
-            let%bind seed = seed_result in
-            let%bind start_checkpoint = start_checkpoint_result in
-            let%bind lock_checkpoint = lock_checkpoint_result in
-            let%bind epoch_length = epoch_length_result in
-            Ok
-              { Snapp_predicate.Protocol_state.Epoch_data.Poly.ledger
-              ; seed
-              ; start_checkpoint
-              ; lock_checkpoint
-              ; epoch_length
-              })
+            let v o = Snapp_basic.Or_ignore.of_option o in
+            let%map ledger = ledger_result in
+            { Snapp_predicate.Protocol_state.Epoch_data.Poly.ledger
+            ; seed = v seed
+            ; start_checkpoint = v start_checkpoint
+            ; lock_checkpoint = v lock_checkpoint
+            ; epoch_length = v epoch_length
+            })
           ~fields:
             [ arg "ledger" ~typ:(non_null snapp_epoch_ledger)
             ; arg "seed" ~typ:snapp_epoch_seed
@@ -2756,45 +2750,32 @@ module Types = struct
           (Snapp_predicate.Protocol_state.t, string) result option arg_typ =
         obj "SnappProtocolState" ~doc:"Protocol state for a Snapp transaction"
           ~coerce:
-            (fun snarked_ledger_hash_result snarked_next_available_token_result
-                 timestamp_result blockchain_length_result
-                 min_window_density_result last_vrf_output_opt
-                 total_currency_result global_slot_since_hard_fork
-                 global_slot_since_genesis_result staking_epoch_data_result
+            (fun snarked_ledger_hash snarked_next_available_token timestamp
+                 blockchain_length min_window_density last_vrf_output_opt
+                 total_currency global_slot_since_hard_fork
+                 global_slot_since_genesis staking_epoch_data_result
                  next_epoch_data_result ->
             let open Result.Let_syntax in
-            let%bind snarked_ledger_hash = snarked_ledger_hash_result in
-            let%bind snarked_next_available_token =
-              snarked_next_available_token_result
-            in
-            let%bind timestamp = timestamp_result in
-            let%bind blockchain_length = blockchain_length_result in
-            let%bind min_window_density = min_window_density_result in
+            let v o = Snapp_basic.Or_ignore.of_option o in
             let last_vrf_output =
               (* if the value is given, it's null
                  if it's not given, provide the null
               *)
               match last_vrf_output_opt with Some () -> () | None -> ()
             in
-            let%bind total_currency = total_currency_result in
-            let%bind global_slot_since_hard_fork =
-              global_slot_since_hard_fork
-            in
-            let%bind global_slot_since_genesis =
-              global_slot_since_genesis_result
-            in
             let%bind staking_epoch_data = staking_epoch_data_result in
             let%bind next_epoch_data = next_epoch_data_result in
             Ok
-              { Snapp_predicate.Protocol_state.Poly.snarked_ledger_hash
-              ; snarked_next_available_token
-              ; timestamp
-              ; blockchain_length
-              ; min_window_density
+              { Snapp_predicate.Protocol_state.Poly.snarked_ledger_hash =
+                  v snarked_ledger_hash
+              ; snarked_next_available_token = v snarked_next_available_token
+              ; timestamp = v timestamp
+              ; blockchain_length = v blockchain_length
+              ; min_window_density = v min_window_density
               ; last_vrf_output
-              ; total_currency
-              ; global_slot_since_hard_fork
-              ; global_slot_since_genesis
+              ; total_currency = v total_currency
+              ; global_slot_since_hard_fork = v global_slot_since_hard_fork
+              ; global_slot_since_genesis = v global_slot_since_genesis
               ; staking_epoch_data
               ; next_epoch_data
               })
@@ -2805,16 +2786,21 @@ module Types = struct
                      "Snarked ledger hash in Base58Check format.")
                 ~typ:snarked_ledger_hash
             ; arg "snarkedNextAvailableToken"
-                ~doc:"Next available tokenId according to the snarked ledger."
+                ~doc:
+                  (check_or_null_doc
+                     "Next available tokenId according to the snarked ledger.")
                 ~typ:Interval.token_id
             ; arg "timestamp"
                 ~doc:
-                  "Timestamp of the start of the slot where this protocol \
-                   state was created"
+                  (check_or_null_doc
+                     "Timestamp of the start of the slot where this protocol \
+                      state was created")
                 ~typ:Interval.block_time
-            ; arg "blockchainLength" ~doc:"Length of the blockchain."
+            ; arg "blockchainLength"
+                ~doc:(check_or_null_doc "Length of the blockchain.")
                 ~typ:Interval.length
-            ; arg "minWindowDensity" ~doc:"Minimum window density"
+            ; arg "minWindowDensity"
+                ~doc:(check_or_null_doc "Minimum window density")
                 ~typ:Interval.length
             ; arg "lastVrfOutput" ~typ:snapp_vrf_output (* nullable! *)
             ; arg "totalCurrency" ~typ:Interval.currency_amount
