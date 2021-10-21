@@ -2158,59 +2158,6 @@ module Types = struct
             ; arg "sign" ~doc:"The sign of the amount" ~typ:(non_null sign)
             ]
 
-      (* like Snapp_basic.Set_or_keep.t, but Set is nullary *)
-      type set_or_keep = Set | Keep
-
-      let snapp_set_or_keep =
-        enum "SetOrKeep" ~doc:"Keep or set a value"
-          ~values:[ enum_value "Keep" ~value:Keep; enum_value "Set" ~value:Set ]
-
-      let snapp_make_set_or_keep name value_arg =
-        obj name
-          ~coerce:(fun set_or_keep value_opt ->
-            match (set_or_keep, value_opt) with
-            | Keep, None ->
-                Ok Snapp_basic.Set_or_keep.Keep
-            | Set, Some value ->
-                Ok (Snapp_basic.Set_or_keep.Set value)
-            | Keep, Some _ ->
-                Error "Non-null value given with Keep"
-            | Set, None ->
-                Error "No value given for Set")
-          ~fields:
-            [ arg "setOrKeep" ~doc:"Flag to keep or set"
-                ~typ:(non_null snapp_set_or_keep)
-            ; value_arg
-            ]
-
-      let snapp_make_set_or_keep_for_result name value_arg =
-        obj name
-          ~coerce:(fun set_or_keep value_opt ->
-            match (set_or_keep, value_opt) with
-            | Keep, None ->
-                Ok Snapp_basic.Set_or_keep.Keep
-            | Set, Some value_result -> (
-                match value_result with
-                | Ok value ->
-                    Ok (Snapp_basic.Set_or_keep.Set value)
-                | Error err ->
-                    Error err )
-            | Keep, Some _ ->
-                Error "Non-null value given with Keep"
-            | Set, None ->
-                Error "No value given for Set")
-          ~fields:
-            [ arg "setOrKeep" ~doc:"Flag to keep or set"
-                ~typ:(non_null snapp_set_or_keep)
-            ; value_arg
-            ]
-
-      let snapp_pk_set_or_keep =
-        snapp_make_set_or_keep "PublicKeySetOrKeep"
-          (arg "publicKey"
-             ~doc:"A public key in Base58Check format, or null if Keep"
-             ~typ:public_key_arg)
-
       let snapp_vk_with_hash =
         obj "VerificationKeyWithHash" ~doc:"Verification key with hash"
           ~coerce:(fun vk hash ->
@@ -2229,20 +2176,10 @@ module Types = struct
             ; arg "hash" ~doc:"Hash of verification key" ~typ:(non_null string)
             ]
 
-      let snapp_vk_with_hash_set_or_keep =
-        snapp_make_set_or_keep_for_result "VerificationKeyWithHashSetOrKeep"
-          (arg "verificationKeyWithHash"
-             ~doc:"A verification key and hash, or null if Keep"
-             ~typ:snapp_vk_with_hash)
-
       (* TODO: What is the shape of this? Should it be a string? *)
       let snapp_token =
         scalar "AccountToken" ~coerce:(fun tok ->
             Account.Token_symbol.of_yojson (to_yojson tok))
-
-      let snapp_token_symbol_set_or_keep =
-        snapp_make_set_or_keep "AccountTokenSetOrKeep"
-          (arg "tokenSymbol" ~doc:"Token symbol" ~typ:snapp_token)
 
       let snapp_auth_required =
         let open Permissions.Auth_required in
@@ -2287,20 +2224,6 @@ module Types = struct
             ; arg "setTokenSymbol" ~typ:(non_null snapp_auth_required)
             ]
 
-      let snapp_permissions_set_or_keep =
-        snapp_make_set_or_keep_for_result "PermissionsSetOrKeep"
-          (arg "permissions" ~doc:"Permissions, or null if Keep"
-             ~typ:snapp_permissions)
-
-      let snapp_field_set_or_keep =
-        snapp_make_set_or_keep "FieldSetOrKeep"
-          (arg "field" ~doc:"A field in string format, or null if Keep"
-             ~typ:field)
-
-      let snapp_uri_set_or_keep =
-        snapp_make_set_or_keep "SnappUriSetOrKeep"
-          (arg "uri" ~doc:"A URI string, or null if Keep" ~typ:string)
-
       let snapp_timing =
         obj "Timing"
           ~coerce:
@@ -2342,10 +2265,6 @@ module Types = struct
             ; arg "vestingIncrement" ~doc:"Vesting amount, as a string"
                 ~typ:(non_null string)
             ]
-
-      let snapp_timing_set_or_keep =
-        snapp_make_set_or_keep_for_result "TimingSetOrKeep"
-          (arg "timing" ~doc:"Timing info, or null if Keep" ~typ:snapp_timing)
 
       let snapp_update : (Party.Update.t, string) Result.t option arg_typ =
         obj "PartyUpdate" ~doc:"Update component of a Snapp Party"
