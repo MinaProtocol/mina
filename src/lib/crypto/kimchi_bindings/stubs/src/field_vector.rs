@@ -1,5 +1,5 @@
 //! TKTK
-//!
+
 use paste::paste;
 
 macro_rules! impl_vector {

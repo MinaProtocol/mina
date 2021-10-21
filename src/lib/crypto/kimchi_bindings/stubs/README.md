@@ -91,6 +91,12 @@ pub fn set(&mut self, x: T) {
 }
 ```
 
+### A note on generic custom types
+
+Note that the generated bindings do not allow you to differentiate the same custom type used in different context. 
+If you want to differentiate custom types, differentiate the Rust types first. 
+For example, if you have a generic custom type that must be converted to different OCaml types depending on the concrete parameter used, you will have to instead create non-generic custom types
+
 ### Function arguments
 
 Functions that get exported to OCaml have the choice to be passed as pointer, or as value. 

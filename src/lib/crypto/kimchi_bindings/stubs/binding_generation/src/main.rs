@@ -5,13 +5,11 @@ use wires_15_stubs::{
     arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
     field_vector::{fp::*, fq::*},
     gate_vector::{fp::*, fq::*},
-    oracles::CamlOracles,
+    oracles::{fp::*, fq::*, CamlOracles},
     pasta_fp_plonk_index::*,
-    pasta_fp_plonk_oracles::*,
     pasta_fp_plonk_proof::*,
     pasta_fp_plonk_verifier_index::*,
     pasta_fq_plonk_index::*,
-    pasta_fq_plonk_oracles::*,
     pasta_fq_plonk_proof::*,
     pasta_fq_plonk_verifier_index::*,
     pasta_pallas::*,
@@ -360,17 +358,17 @@ fn generate_bindings(mut w: impl std::io::Write) {
             decl_module!(w, env, "Fp", {
                 decl_type_alias!(w, env, "t" => CamlOracles<CamlFp>);
 
-                decl_func!(w, env, caml_pasta_fp_plonk_oracles_create => "create");
-                decl_func!(w, env, caml_pasta_fp_plonk_oracles_dummy => "dummy");
-                decl_func!(w, env, caml_pasta_fp_plonk_oracles_deep_copy => "deep_copy");
+                decl_func!(w, env, fp_oracles_create => "create");
+                decl_func!(w, env, fp_oracles_dummy => "dummy");
+                decl_func!(w, env, fp_oracles_deep_copy => "deep_copy");
             });
 
             decl_module!(w, env, "Fq", {
                 decl_type_alias!(w, env, "t" => CamlOracles<CamlFq>);
 
-                decl_func!(w, env, caml_pasta_fq_plonk_oracles_create => "create");
-                decl_func!(w, env, caml_pasta_fq_plonk_oracles_dummy => "dummy");
-                decl_func!(w, env, caml_pasta_fq_plonk_oracles_deep_copy => "deep_copy");
+                decl_func!(w, env, fq_oracles_create => "create");
+                decl_func!(w, env, fq_oracles_dummy => "dummy");
+                decl_func!(w, env, fq_oracles_deep_copy => "deep_copy");
             });
         });
 
