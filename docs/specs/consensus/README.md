@@ -489,7 +489,7 @@ A fork is considered _short-range_ if either
 
 Since the leader selection distribution for the current epoch is computed by the end of the first `2/3` of the slots in the previous epoch, an adversarial fork after (and including) the previous epoch's `lock_checkpoint` cannot skew the distribution for the remainder of that epoch, nor the current epoch.  Anything before the previous epoch's `lock_checkpoint` is a _long-range_ fork.
 
-Since Mina is succinct this means that it must stor the checkpoints for the current epoch in addition to the checkpoints for the previous epoch.  This is why the [`Consensus_state`](#44-consensus_state) structure contains two `Epoch_data` fields: `staking_epoch_data` and `next_epoch_data`.  The former contains the checkpoints for the previous epoch and the latter contains that of the current epoch.
+Since Mina is succinct this means that it must store the checkpoints for the current epoch in addition to the checkpoints for the previous epoch.  This is why the [`Consensus_state`](#44-consensus_state) structure contains two `Epoch_data` fields: `staking_epoch_data` and `next_epoch_data`.  The former contains the checkpoints for the previous epoch and the latter contains that of the current epoch.
 
 ### 5.3.1 `initCheckpoints`
 
@@ -506,6 +506,7 @@ fn initCheckpoints(G) -> ()
     cState(G).staking_epoch_data.length = 1
 
     state_hash = poseidon_3w_hash(latest state ϵ cState(G).next_epoch_data.seed's update range) ?
+    cState(G).next_epoch.data.seed = ???
     cState(G).next_epoch_data.start_checkpoint = state_hash ?
     cState(G).next_epoch_data.lock_checkpoint =  state_hash ?
 }
@@ -518,12 +519,28 @@ This algorithm updates the checkpoints of the block being created `B` based on i
 ```rust
 fn updateCheckpoints(P, B) -> ()
 {
-    state_hash = poseidon_3w_hash(latest state ϵ cState(P).next_epoch_data.seed's update range) ?
     if epochSlot(B) == 0 then
-        cState(B).next_epoch_data.start_checkpoint = state_hash
 
+    // Set the start_checkpoint
+    if cState(B).epoch_count > cState(P).epochCount {
+        cState(B).staking_epoch_data = cState(P).next_epoch_data
+        cState(B).next_epoch_data.start_checkpoint = poseidon_3w_hash(protocol_state_init_sponge_state, P.protocol_state.to_random_oracle_input()) // OR B.protocol_state.previous_state_hash
+    }
+    else {
+        cState(B).staking_epoch_data = cState(P).staking_epoch_data
+        cState(B).next_epoch_data = cState(P).next_epoch_data
+        cState(B).next_epoch_data.epoch_length++
+    }
+
+    // Set the seed and lock_checkpoint
     if 0 ≤ epochSlot(B) < 2/3*slots_per_epoch {
-        cState(B).next_epoch_data.lock_checkpoint = state_hash
+        cState(B).next_epoch.data.seed = poseidon_3w_hash(epoch_seed_init_sponge_state, [next_data.seed.to_vesta_field_element(), producer_vrf_result])
+        cState(B).next_epoch_data.lock_checkpoint = poseidon_3w_hash(protocol_state_init_sponge_state, P.protocol_state.to_random_oracle_input()) // OR B.protocol_state.previous_state_hash
+    }
+    else {
+        cState(B).next_epoch.data.seed = cState(P).next_epoch_data.seed
+        cState(B).next_epoch_data.lock_checkpoint = cState(P).next_epoch_data.lock_checkpoint
+        // todo: epoch count
     }
 }
 ```
@@ -673,7 +690,7 @@ When a new block `B` with parent `P` is created, the minimum window density is c
 
 where `current_window_density` is the density of `B`'s projected window (more on this later).
 
-**Observe:** By definition the minimum window density `mwd(s)` at slot `s` is monotonically decreasing (i.e. non-increasing).  That is, for all slots `s1` and `s2` such that `s1 <= s2` then `mwd(s1) >= mwd(s2)`.
+**Observe:** By definition the minimum window density `mwd(s)` at slot `s` is monotonically decreasing (i.e. non-increasing) on the canonical chain.  That is, for all slots `s1` and `s2` such that `s1 ≤ s2` then `mwd(s1) ≥ mwd(s2)`.  N.b. when reorganizing based on the long-range fork rule, the new canonical chain's minimum window density is higher than the previous canonical chain's by definition of the rule.  This increase, however, is found between two chains (the previous and new canonical chains) rather than within a single chain-- the new canonical chain still has non-increasing minimum window density within it.
 
 ### 5.4.7 Relative sub-window index
 
