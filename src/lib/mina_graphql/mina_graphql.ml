@@ -5,6 +5,19 @@ open Mina_base
 open Signature_lib
 open Currency
 
+module Option = struct
+  include Option
+
+  module Result = struct
+    let sequence (type a b) (o : (a, b) result option) =
+      match o with
+      | None ->
+          Ok None
+      | Some r ->
+          Result.map r ~f:(fun a -> Some a)
+  end
+end
+
 (** Convert a GraphQL constant to the equivalent json representation.
     We can't coerce this directly because of the presence of the [`Enum]
     constructor, so we have to recurse over the structure replacing all of the
@@ -2337,10 +2350,10 @@ module Types = struct
       let snapp_update : (Party.Update.t, string) Result.t option arg_typ =
         obj "PartyUpdate" ~doc:"Update component of a Snapp Party"
           ~coerce:
-            (fun app_state_elt_results delegate_result vk_result perms_result
-                 snapp_uri_result tok_sym_result timing_result ->
+            (fun app_state_elts delegate vk perms snapp_uri tok_sym timing ->
             let open Result.Let_syntax in
-            let%bind app_state_elts = Result.all app_state_elt_results in
+            let v o = Snapp_basic.Set_or_keep.of_option o in
+            let app_state_elts = List.map app_state_elts ~f:v in
             let%bind app_state =
               let expected_len = 8 in
               let len = List.length app_state_elts in
@@ -2352,26 +2365,24 @@ module Types = struct
                   (sprintf "Expected %d field elements in app state, got %d"
                      expected_len len)
             in
-            let%bind delegate = delegate_result in
-            let%bind verification_key = vk_result in
-            let%bind permissions = perms_result in
-            let%bind snapp_uri = snapp_uri_result in
-            let%bind token_symbol = tok_sym_result in
-            let%map timing = timing_result in
+            let s = Option.Result.sequence in
+            let%bind vk' = s vk in
+            let%bind perms' = s perms in
+            let%map timing' = s timing in
             Party.Update.Poly.
               { app_state
-              ; delegate
-              ; verification_key
-              ; permissions
-              ; snapp_uri
-              ; token_symbol
-              ; timing
+              ; delegate = v delegate
+              ; verification_key = v vk'
+              ; permissions = v perms'
+              ; snapp_uri = v snapp_uri
+              ; token_symbol = v tok_sym
+              ; timing = v timing'
               })
           ~fields:
             [ arg "appState"
                 ~doc:"List of _exactly_ 8 field elements (null if keep)"
                 ~typ:(non_null (list field))
-            ; arg "delegate" ~doc:"TODO: What is this?" ~typ:publicKey
+            ; arg "delegate" ~doc:"TODO: What is this?" ~typ:public_key_arg
             ; arg "verificationKey"
                 ~doc:"A verification key and hash, or null if Keep"
                 ~typ:snapp_vk_with_hash
@@ -2512,12 +2523,18 @@ module Types = struct
             ~coerce:(fun lower upper ->
               Snapp_predicate.Closed_interval.{ lower; upper })
             ~fields:
-              [ arg "lower" ~typ:(non_null typ); arg "upper" ~typ:(non_null typ) ]
+              [ arg "lower" ~typ:(non_null typ)
+              ; arg "upper" ~typ:(non_null typ)
+              ]
 
         let nonce = i "Nonce" nonce
+
         let balance = i "Balance" snapp_balance
+
         let length = i "Length" length
+
         let block_time = i "BlockTime" block_time
+
         let global_slot = i "GlobalSlot" snapp_global_slot
       end
 
@@ -2541,11 +2558,7 @@ module Types = struct
               (* length check means this won't raise *)
               Ok (Snapp_state.V.of_list_exn elements)
             else Error "Expected 8 elements for Snapp state")
-          ~fields:
-            [ arg "elements"
-                ~typ:(non_null (list field))
-            ]
-
+          ~fields:[ arg "elements" ~typ:(non_null (list field)) ]
 
       let snapp_predicate_account =
         obj "SnappPredicateAccount"
@@ -2580,8 +2593,8 @@ module Types = struct
             ; arg "receiptChainHash"
                 ~doc:"receipt chain hash, or null if Ignore"
                 ~typ:snapp_receipt_chain_hash
-            ; arg "publicKey" ~typ:publicKey
-            ; arg "delegate" ~typ:publicKey
+            ; arg "publicKey" ~typ:public_key
+            ; arg "delegate" ~typ:public_key
             ; arg "state" ~typ:(non_null snapp_state)
             ; arg "rollupState" ~typ:field
             ; arg "provedState" ~typ:bool
@@ -2602,7 +2615,9 @@ module Types = struct
             | None, Some nonce ->
                 Ok (Party.Predicate.Nonce nonce)
             | Some _, Some _ ->
-                Error "Ill-defined predicate. Account and nonce cannot both be provided.")
+                Error
+                  "Ill-defined predicate. Account and nonce cannot both be \
+                   provided.")
           ~fields:
             [ arg "account" ~doc:"TODO: Needs a doc"
                 ~typ:snapp_predicate_account
@@ -2790,25 +2805,21 @@ module Types = struct
                      "Snarked ledger hash in Base58Check format.")
                 ~typ:snarked_ledger_hash
             ; arg "snarkedNextAvailableToken"
-                ~doc: "Next available tokenId according to the snarked ledger."
+                ~doc:"Next available tokenId according to the snarked ledger."
                 ~typ:Interval.token_id
             ; arg "timestamp"
                 ~doc:
-                     "Timestamp of the start of the slot where this protocol \
-                      state was created"
+                  "Timestamp of the start of the slot where this protocol \
+                   state was created"
                 ~typ:Interval.block_time
-            ; arg "blockchainLength"
-                ~doc:"Length of the blockchain."
+            ; arg "blockchainLength" ~doc:"Length of the blockchain."
                 ~typ:Interval.length
-            ; arg "minWindowDensity"
-                ~doc:"Minimum window density"
+            ; arg "minWindowDensity" ~doc:"Minimum window density"
                 ~typ:Interval.length
             ; arg "lastVrfOutput" ~typ:snapp_vrf_output (* nullable! *)
             ; arg "totalCurrency" ~typ:Interval.currency_amount
-            ; arg "globalSlotSinceHardFork"
-                ~typ:Interval.global_slot
-            ; arg "globalSlotSinceGenesis"
-                ~typ:Interval.global_slot
+            ; arg "globalSlotSinceHardFork" ~typ:Interval.global_slot
+            ; arg "globalSlotSinceGenesis" ~typ:Interval.global_slot
             ; arg "stakingEpochData" ~typ:(non_null snapp_epoch_data)
             ; arg "nextEpochData" ~typ:(non_null snapp_epoch_data)
             ]
@@ -2858,19 +2869,19 @@ module Types = struct
                      [Unsigned.UInt*] parsers:
                      * if the absolute value is greater than [max_int], the value
                        returned is [max_int]
-                       - ["99999999999999999999999999999999999"] is [max_int]
-                       - ["-99999999999999999999999999999999999"] is [max_int]
+                   - ["99999999999999999999999999999999999"] is [max_int]
+                   - ["-99999999999999999999999999999999999"] is [max_int]
                      * if otherwise the value is negative, the value returned is
                        [max_int - (x - 1)]
-                       - ["-1"] is [max_int]
+                   - ["-1"] is [max_int]
                      * if there is a non-numeric character part-way through the
                        string, the numeric prefix is treated as a number
-                       - ["1_000_000"] is [1]
-                       - ["-1_000_000"] is [max_int]
-                       - ["1.1"] is [1]
-                       - ["0x15"] is [0]
+                   - ["1_000_000"] is [1]
+                   - ["-1_000_000"] is [max_int]
+                   - ["1.1"] is [1]
+                   - ["0x15"] is [0]
                      * leading spaces are ignored
-                       - [" 1"] is [1]
+                   - [" 1"] is [1]
                      This is annoying to document, none of these behaviors are
                      useful to users, and unexpectedly triggering one of them
                      could have nasty consequences. Thus, we raise an error
@@ -4669,8 +4680,8 @@ module Queries = struct
           let height_uint32 =
             (* GraphQL int is signed 32-bit
                  empirically, conversion does not raise even if
-                 - the number is negative
-                 - the number is not representable using 32 bits
+               - the number is negative
+               - the number is not representable using 32 bits
             *)
             Unsigned.UInt32.of_int height
           in
