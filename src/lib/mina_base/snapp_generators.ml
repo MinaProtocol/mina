@@ -233,11 +233,57 @@ let gen_predicate_from ?(succeed = true) ~pk ~ledger =
             if succeed then return (Party.Predicate.Nonce nonce)
             else return (Party.Predicate.Nonce (Account.Nonce.succ nonce)) )
 
-let gen_party_body ?pk ?balances_tbl ?(new_party = false) ~ledger () :
-    Party.Body.t Quickcheck.Generator.t =
+let gen_fee (account : Account.t) =
+  Currency.Fee.gen_incl Mina_compile_config.minimum_user_command_fee
+    Currency.(Amount.to_fee (Balance.to_amount account.balance))
+
+let fee_to_amt fee = Currency.Amount.(Signed.of_unsigned (of_fee fee))
+
+let gen_delta ?balances_tbl (account : Account.t) =
+  let pk = account.public_key in
   let open Quickcheck.Let_syntax in
+  match%bind Quickcheck.Generator.of_list [ Sgn.Pos; Neg ] with
+  | Pos ->
+      (* if positive, the account balance does not impose a constraint on the magnitude; but
+         to avoid overflow over several Party.t, we'll limit the value
+      *)
+      let%map magnitude =
+        Currency.Amount.gen_incl Currency.Amount.zero
+          (Currency.Amount.of_int 100_000_000_000_000)
+      in
+      Currency.Signed_poly.{ magnitude; sgn = Sgn.Pos }
+  | Neg ->
+      (* if negative, magnitude constrained to balance in account
+         the effective balance is either what's in the balances table,
+         if provided, or what's in the ledger
+      *)
+      let effective_balance =
+        match balances_tbl with
+        | Some tbl -> (
+            match Signature_lib.Public_key.Compressed.Table.find tbl pk with
+            | None ->
+                account.balance
+            | Some balance ->
+                balance )
+        | None ->
+            account.balance
+      in
+      let%map magnitude =
+        Currency.Amount.gen_incl Currency.Amount.zero
+          (Currency.Balance.to_amount effective_balance)
+      in
+      Currency.Signed_poly.{ magnitude; sgn = Sgn.Neg }
+
+let gen_party_body (type a b) ?pk ?balances_tbl ?(new_party = false)
+    ?(is_fee_payer = false) ~(gen_a : a Quickcheck.Generator.t)
+    ~(gen_b : Account.t -> b Quickcheck.Generator.t)
+    ~(f_delta : b -> Currency.Amount.Signed.t) ~ledger () :
+    (_, _, a, b, _, _, _) Party.Body.Poly.t Quickcheck.Generator.t =
+  let open Quickcheck.Let_syntax in
+  (*fee payers have to be in the ledger*)
+  assert (not (is_fee_payer && new_party)) ;
+  let%bind token_id = gen_a in
   let%bind update = Party.Update.gen ~new_party () in
-  let%bind token_id = Token_id.gen in
   let%bind account =
     if new_party then (
       if Option.is_some pk then
@@ -276,39 +322,7 @@ let gen_party_body ?pk ?balances_tbl ?(new_party = false) ~ledger () :
                   return acct ) )
   in
   let pk = account.public_key in
-  let%bind delta =
-    match%bind Quickcheck.Generator.of_list [ Sgn.Pos; Neg ] with
-    | Pos ->
-        (* if positive, the account balance does not impose a constraint on the magnitude; but
-           to avoid overflow over several Party.t, we'll limit the value
-        *)
-        let%map magnitude =
-          Currency.Amount.gen_incl Currency.Amount.zero
-            (Currency.Amount.of_int 100_000_000_000_000)
-        in
-        Currency.Signed_poly.{ magnitude; sgn = Sgn.Pos }
-    | Neg ->
-        (* if negative, magnitude constrained to balance in account
-           the effective balance is either what's in the balances table,
-           if provided, or what's in the ledger
-        *)
-        let effective_balance =
-          match balances_tbl with
-          | Some tbl -> (
-              match Signature_lib.Public_key.Compressed.Table.find tbl pk with
-              | None ->
-                  account.balance
-              | Some balance ->
-                  balance )
-          | None ->
-              account.balance
-        in
-        let%map magnitude =
-          Currency.Amount.gen_incl Currency.Amount.zero
-            (Currency.Balance.to_amount effective_balance)
-        in
-        Currency.Signed_poly.{ magnitude; sgn = Sgn.Neg }
-  in
+  let%bind delta = gen_b account in
   (* update balances table, if provided, with generated delta *)
   ( match balances_tbl with
   | None ->
@@ -330,6 +344,7 @@ let gen_party_body ?pk ?balances_tbl ?(new_party = false) ~ledger () :
             | None ->
                 failwith "add_balance_and_delta: underflow for difference" )
       in
+      let delta = f_delta delta in
       Signature_lib.Public_key.Compressed.Table.change tbl pk ~f:(function
         | None ->
             (* new entry in table *)
@@ -370,7 +385,10 @@ let gen_party_body ?pk ?balances_tbl ?(new_party = false) ~ledger () :
 let gen_predicated_from ?(succeed = true) ?(new_party = false) ~ledger
     ~balances_tbl =
   let open Quickcheck.Let_syntax in
-  let%bind body = gen_party_body ~new_party ~ledger ~balances_tbl () in
+  let%bind body =
+    gen_party_body ~new_party ~ledger ~balances_tbl ~gen_a:Token_id.gen
+      ~gen_b:(gen_delta ~balances_tbl) ~f_delta:Fn.id ()
+  in
   let pk = body.Party.Body.Poly.pk in
   let%map predicate = gen_predicate_from ~succeed ~pk ~ledger in
   Party.Predicated.Poly.{ body; predicate }
@@ -388,7 +406,22 @@ let gen_party_from ?(succeed = true) ?(new_party = false) ~ledger ~balances_tbl
 let gen_party_predicated_signed ?pk ~ledger :
     Party.Predicated.Signed.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
-  let%bind body = gen_party_body ?pk ~ledger () in
+  let%bind body =
+    gen_party_body ~gen_a:Token_id.gen ~gen_b:gen_delta ~f_delta:Fn.id ?pk
+      ~ledger ()
+  in
+  let%map predicate = Account.Nonce.gen in
+  Party.Predicated.Poly.{ body; predicate }
+
+(* takes an optional public key, if we want to sign this data *)
+let gen_party_predicated_fee_payer ~pk ~ledger :
+    Party.Predicated.Fee_payer.t Quickcheck.Generator.t =
+  let open Quickcheck.Let_syntax in
+  let%bind body =
+    gen_party_body ~pk ~is_fee_payer:true
+      ~gen_a:(Quickcheck.Generator.return ())
+      ~gen_b:gen_fee ~f_delta:fee_to_amt ~ledger ()
+  in
   let%map predicate = Account.Nonce.gen in
   Party.Predicated.Poly.{ body; predicate }
 
@@ -399,12 +432,19 @@ let gen_party_signed ?pk ~ledger : Party.Signed.t Quickcheck.Generator.t =
   let authorization = Signature.dummy in
   Party.Signed.{ data; authorization }
 
+let gen_fee_payer ~pk ~ledger : Party.Fee_payer.t Quickcheck.Generator.t =
+  let open Quickcheck.Let_syntax in
+  let%map data = gen_party_predicated_fee_payer ~pk ~ledger in
+  (* real signature to be added when this data inserted into a Parties.t *)
+  let authorization = Signature.dummy in
+  Party.Fee_payer.{ data; authorization }
+
 let gen_parties_from ?(succeed = true) ~(keypair : Signature_lib.Keypair.t)
     ~ledger ~protocol_state =
   let max_parties = 6 in
   let open Quickcheck.Let_syntax in
   let pk = Signature_lib.Public_key.compress keypair.public_key in
-  let%bind fee_payer = gen_party_signed ~pk ~ledger in
+  let%bind fee_payer = gen_fee_payer ~pk ~ledger in
   let gen_parties_with_dynamic_balance ~new_parties num_parties =
     (* table of public keys to balances, updated when generating each party
        a Map would be more principled, but threading that map through the code adds complexity
@@ -443,7 +483,7 @@ let gen_parties_from ?(succeed = true) ~(keypair : Signature_lib.Keypair.t)
          |> Parties.Transaction_commitment.with_fee_payer
               ~fee_payer_hash:
                 (Party.Predicated.digest
-                   (Party.Predicated.of_signed parties.fee_payer.data)) ))
+                   (Party.Predicated.of_fee_payer parties.fee_payer.data)) ))
   in
   return
     { parties with

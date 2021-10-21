@@ -1582,7 +1582,7 @@ module Types = struct
               ~resolve:(fun _ parties ->
                 try
                   Some
-                    ( Parties.fee_lower_bound_exn parties.With_hash.data
+                    ( Parties.fee parties.With_hash.data
                     |> Currency.Fee.to_uint64 )
                 with _ -> None)
           ; field_no_status "feeToken" ~typ:(non_null token_id) ~args:[]
@@ -2130,6 +2130,15 @@ module Types = struct
           | _ ->
               Error "Expected string for currency amount")
 
+    let fee =
+      scalar "Fee" ~coerce:(fun fee ->
+          match fee with
+          | `String s -> (
+              try Ok (Currency.Fee.of_string s)
+              with exn -> Error (Exn.to_string exn) )
+          | _ ->
+              Error "Expected string for fee")
+
     module Snapp_inputs = struct
       (* inputs particular to Snapps *)
 
@@ -2429,9 +2438,58 @@ module Types = struct
                 ~typ:(non_null string)
             ]
 
-      let snapp_party_predicated_signed :
-          (Party.Predicated.Signed.t, string) Result.t option arg_typ =
-        obj "SnappPartyPredicatedSigned"
+      let snapp_fee_payer_party_body =
+        obj "FeePayerPartyBody" ~doc:"Body component of a Snapp Fee Payer Party"
+          ~coerce:
+            (fun pk update_result fee events rollup_events call_data depth ->
+            try
+              let open Result.Let_syntax in
+              let%bind pk =
+                Result.map_error
+                  (Public_key.Compressed.of_base58_check pk)
+                  ~f:Error.to_string_hum
+              in
+              let token_id = () in
+              let mk_field_arrays evs =
+                List.map evs ~f:(fun fields ->
+                    List.map fields ~f:Snark_params.Tick.Field.of_string
+                    |> Array.of_list)
+              in
+              let%map update = update_result in
+              let delta = fee in
+              let events = mk_field_arrays events in
+              let rollup_events = mk_field_arrays rollup_events in
+              let call_data = Snark_params.Tick.Field.of_string call_data in
+              let depth = Int.of_string depth in
+              { Party.Body.Poly.pk
+              ; update
+              ; token_id
+              ; delta
+              ; events
+              ; rollup_events
+              ; call_data
+              ; depth
+              }
+            with exn -> Error (Exn.to_string exn))
+          ~fields:
+            [ arg "pk" ~doc:"Public key as a Base58Check string"
+                ~typ:(non_null string)
+            ; arg "update" ~doc:"Update part of the body"
+                ~typ:(non_null snapp_update)
+            ; arg "fee" ~doc:"Transaction fee" ~typ:(non_null fee)
+            ; arg "events" ~doc:"A list of list of fields in Base58Check"
+                ~typ:(non_null (list (non_null (list (non_null string)))))
+            ; arg "rollupEvents" ~doc:"A list of list of fields in Base58Check"
+                ~typ:(non_null (list (non_null (list (non_null string)))))
+            ; arg "callData" ~doc:"A field in Base58Check"
+                ~typ:(non_null string)
+            ; arg "depth" ~doc:"An integer in string format"
+                ~typ:(non_null string)
+            ]
+
+      let snapp_party_predicated_fee_payer :
+          (Party.Predicated.Fee_payer.t, string) Result.t option arg_typ =
+        obj "SnappPartyPredicatedFeePayer"
           ~doc:"A party to a Snapp transaction with a nonce predicate"
           ~coerce:(fun body nonce ->
             let open Result.Let_syntax in
@@ -2439,8 +2497,8 @@ module Types = struct
             let predicate = nonce in
             Party.Predicated.Poly.{ body; predicate })
           ~fields:
-            [ arg "body" ~doc:"signed predicated party"
-                ~typ:(non_null snapp_party_body)
+            [ arg "body" ~doc:"fee payer party"
+                ~typ:(non_null snapp_fee_payer_party_body)
             ; arg "predicate" ~doc:"nonce" ~typ:(non_null nonce)
             ]
 
@@ -2454,19 +2512,19 @@ module Types = struct
             | _ ->
                 Error "Expected signature as a string in Base58Check format")
 
-      (* TODO: define a type otherwise identical to Party.Signed.t, but
+      (* TODO: define a type otherwise identical to Party.Fee_party.t, but
          which makes the nonce optional
       *)
-      let snapp_party_signed =
-        obj "SnappPartySigned"
+      let snapp_party_fee_payer =
+        obj "SnappPartyFeePayer"
           ~doc:"A party to a Snapp transaction with a signature authorization"
           ~coerce:(fun data authorization ->
             let open Result.Let_syntax in
             let%bind data = data in
-            Ok Party.Signed.{ data; authorization })
+            Ok Party.Fee_payer.{ data; authorization })
           ~fields:
             [ arg "data" ~doc:"party with a signature and nonce predicate"
-                ~typ:(non_null snapp_party_predicated_signed)
+                ~typ:(non_null snapp_party_predicated_fee_payer)
             ; arg "authorization" ~doc:"signature"
                 ~typ:(non_null snapp_signature)
             ]
@@ -3132,7 +3190,7 @@ module Types = struct
 
       let snapp_fee_payer =
         arg "snappFeePayer"
-          ~typ:(non_null Snapp_inputs.snapp_party_signed)
+          ~typ:(non_null Snapp_inputs.snapp_party_fee_payer)
           ~doc:"The fee payer party to a Snapp transaction"
 
       let snapp_other_parties =
