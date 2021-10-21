@@ -2142,7 +2142,7 @@ module Types = struct
           ~fields:
             [ arg "magnitude" ~doc:"An amount of Mina"
                 ~typ:(non_null currency_amount)
-            ; arg "sgn" ~doc:"The sign of the amount" ~typ:(non_null sign)
+            ; arg "sign" ~doc:"The sign of the amount" ~typ:(non_null sign)
             ]
 
       (* like Snapp_basic.Set_or_keep.t, but Set is nullary *)
@@ -2222,6 +2222,7 @@ module Types = struct
              ~doc:"A verification key and hash, or null if Keep"
              ~typ:snapp_vk_with_hash)
 
+      (* TODO: What is the shape of this? Should it be a string? *)
       let snapp_token =
         scalar "AccountToken" ~coerce:(fun tok ->
             Account.Token_symbol.of_yojson (to_yojson tok))
@@ -2313,6 +2314,7 @@ module Types = struct
                 ; vesting_increment
                 }
             with exn -> Error (Exn.to_string exn))
+            (* TODO: These all should be their precise scalar types rather than strings *)
           ~fields:
             [ arg "initialMinimumBalance"
                 ~doc:"Initial minimum balance as a string"
@@ -2366,15 +2368,18 @@ module Types = struct
               ; timing
               })
           ~fields:
-            [ arg "appState" ~doc:"List of 8 field elements"
-                ~typ:(non_null (list (non_null snapp_field_set_or_keep)))
-            ; arg "delegate" ~typ:(non_null snapp_pk_set_or_keep)
+            [ arg "appState"
+                ~doc:"List of _exactly_ 8 field elements (null if keep)"
+                ~typ:(non_null (list field))
+            ; arg "delegate" ~doc:"TODO: What is this?" ~typ:publicKey
             ; arg "verificationKey"
-                ~typ:(non_null snapp_vk_with_hash_set_or_keep)
-            ; arg "permissions" ~typ:(non_null snapp_permissions_set_or_keep)
-            ; arg "snappUri" ~typ:(non_null snapp_uri_set_or_keep)
-            ; arg "tokenSymbol" ~typ:(non_null snapp_token_symbol_set_or_keep)
-            ; arg "timing" ~typ:(non_null snapp_timing_set_or_keep)
+                ~doc:"A verification key and hash, or null if Keep"
+                ~typ:snapp_vk_with_hash
+            ; arg "permissions" ~doc:"Permissions, or null if Keep"
+                ~typ:snapp_permissions
+            ; arg "snappUri" ~doc:"A URI string, or null if Keep" ~typ:string
+            ; arg "tokenSymbol" ~doc:"Token symbol" ~typ:snapp_token
+            ; arg "timing" ~doc:"Timing info, or null if Keep" ~typ:snapp_timing
             ]
 
       let snapp_party_body : (Party.Body.t, string) Result.t option arg_typ =
@@ -2400,7 +2405,6 @@ module Types = struct
               let events = mk_field_arrays events in
               let rollup_events = mk_field_arrays rollup_events in
               let call_data = Snark_params.Tick.Field.of_string call_data in
-              let depth = Int.of_string depth in
               Party.Body.Poly.
                 { pk
                 ; update
@@ -2418,15 +2422,24 @@ module Types = struct
             ; arg "update" ~doc:"Update part of the body"
                 ~typ:(non_null snapp_update)
             ; arg "tokenId" ~doc:"Token id" ~typ:(non_null string)
-            ; arg "delta" ~doc:"Signed amount" ~typ:(non_null snapp_delta)
-            ; arg "events" ~doc:"A list of list of fields in Base58Check"
+            ; arg "delta"
+                ~doc:
+                  "Signed amount representing the amount to change for this \
+                   particular relevant party."
+                ~typ:(non_null snapp_delta)
+              (* TODO: Do we want fields in base58 in graphQL? Should we use a string of the base10 number like in other parts? Should we use a hex 32bytes -- that seems most natural to me? *)
+            ; arg "events"
+                ~doc:
+                  "TODO: Description. A list of list of fields in Base58Check"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
-            ; arg "rollupEvents" ~doc:"A list of list of fields in Base58Check"
+            ; arg "rollupEvents"
+                ~doc:
+                  "TODO: Description. A list of list of fields in Base58Check"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
-            ; arg "callData" ~doc:"A field in Base58Check"
+            ; arg "callData"
+                ~doc:"TODO: What is call data? A field in Base58Check"
                 ~typ:(non_null string)
-            ; arg "depth" ~doc:"An integer in string format"
-                ~typ:(non_null string)
+            ; arg "depth" ~doc:"TODO: What is this?" ~typ:(non_null int)
             ]
 
       let snapp_party_predicated_signed :
