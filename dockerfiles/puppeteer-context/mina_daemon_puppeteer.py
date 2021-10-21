@@ -34,7 +34,6 @@ HTTPServer.timeout = 1
 
 def log(s):
   line = "mina_daemon_puppeteer_script: "+s
-  print(line)
   script_log_output_file.write("%s\n" % line)
   script_log_output_file.flush()
 

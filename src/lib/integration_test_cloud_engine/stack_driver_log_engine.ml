@@ -272,28 +272,27 @@ let parse_event_from_log_entry ~network log_entry =
          ~default:
            (Or_error.errorf "failed to find node by pod app id \"%s\"" app_id)
   in
-  let event_id_existence = find string log_entry [ "jsonPayload"; "level" ] in
-  match event_id_existence with
-  | Ok _ ->
-      let%bind log =
-        find
-          (parser_from_of_yojson Logger.Message.of_yojson)
-          log_entry [ "jsonPayload" ]
+  let%bind payload = find json log_entry [ "jsonPayload" ] in
+  let%map event =
+    if
+      Result.ok (find bool payload [ "puppeteer_script_event" ])
+      |> Option.value ~default:false
+    then
+      let%map msg =
+        parse (parser_from_of_yojson Puppeteer_message.of_yojson) payload
       in
-      let%map event = Event_type.parse_event log in
-      (node, event)
-  | Error _ -> (
-      let%map log =
-        find
-          (parser_from_of_yojson Puppeteer_message.of_yojson)
-          log_entry [ "jsonPayload" ]
-      in
-      match log.event_type with
+      match msg.event_type with
       | "node_offline" ->
-          let ev = Event_type.Event (Event_type.Node_offline, ()) in
-          (node, ev)
+          Event_type.Event (Event_type.Node_offline, ())
       | _ ->
-          failwith "Could not process a puppeteer message from the logs" )
+          failwith "Could not process a puppeteer message from the logs"
+    else
+      let%bind msg =
+        parse (parser_from_of_yojson Logger.Message.of_yojson) payload
+      in
+      Event_type.parse_event msg
+  in
+  (node, event)
 
 let rec pull_subscription_in_background ~logger ~network ~event_writer
     ~subscription =
