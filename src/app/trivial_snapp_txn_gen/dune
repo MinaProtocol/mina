@@ -1,0 +1,23 @@
+(executable
+ (package trivial_snapp_txn_gen)
+ (name trivial_snapp_txn_gen)
+ (public_name trivial_snapp_txn_gen)
+ (libraries
+   async_kernel
+   core
+   caqti
+   caqti-async
+   caqti-driver-postgresql
+   archive_lib
+   mina_base
+   mina_state
+   genesis_constants
+   genesis_ledger_helper
+   secrets
+   yojson
+   transaction_snark
+ )
+ (preprocessor_deps ../../config.mlh)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_coda ppx_version ppx_let ppx_sexp_conv
+                  ppx_hash ppx_compare ppx_deriving_yojson h_list.ppx)))
