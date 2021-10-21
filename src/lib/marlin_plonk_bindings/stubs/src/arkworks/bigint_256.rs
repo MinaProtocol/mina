@@ -1,7 +1,6 @@
 use ark_ff::{BigInteger as ark_BigInteger, BigInteger256};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use num_bigint::BigUint;
-use ocaml_gen::{ocaml_gen, OCamlCustomType};
 use std::cmp::Ordering::{Equal, Greater, Less};
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
@@ -20,7 +19,7 @@ const BIGINT256_NUM_LIMBS: i32 =
 // Wrapper struct to implement OCaml bindings
 //
 
-#[derive(Clone, Copy, Debug, OCamlCustomType)]
+#[derive(Clone, Copy, Debug, ocaml_gen::CustomType)]
 pub struct CamlBigInteger256(pub BigInteger256);
 
 impl From<BigInteger256> for CamlBigInteger256 {
@@ -108,7 +107,7 @@ impl ToString for CamlBigInteger256 {
 // OCaml stuff
 //
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_of_numeral(
     s: &[u8],
