@@ -8,6 +8,12 @@ type uint64 = string;
 [@genType.import "./TSTypes"]
 type uint32 = string;
 
+[@genType.import "./TSTypes"]
+type int64 = string;
+
+[@genType.import "./TSTypes"]
+type field = string;
+
 // Max uint32
 let defaultValidUntil = "4294967295";
 
@@ -19,7 +25,7 @@ type keypair = {
 
 [@genType]
 type signature = {
-  field: string,
+  field: field,
   scalar: string,
 };
 
@@ -51,12 +57,91 @@ type payment = {
   validUntil: option(uint32),
 };
 
+[@genType.import "./TSTypes"]
+type sign = string; /* "PLUS" or "MINUS" */
 
 // Party Transactions
 module Party = {
+  [@genType.import "./TSTypes"]
+  type authRequired = string; /* "None" | "Either" | "Proof" | "Signature" | "Both" | "Impossible" */
+
+  type timing = {
+    // TODO: These all will change to the precise values instead
+    .
+    "initialMinimumBalance": string,
+    "cliffTime": string,
+    "cliffAmount": string,
+    "vestingPeriod": string,
+    "vestingIncrement": string
+  };
+
+  type permissions = {
+    .
+    "stake": bool,
+    "editState": authRequired,
+    "send": authRequired,
+    "receive": authRequired,
+    "setDelegate": authRequired,
+    "setPermissions": authRequired,
+    "setVerificationKey": authRequired,
+    "setSnappUri": authRequired,
+    "editRollupState": authRequired,
+    "setTokenSymbol": authRequired
+  };
+
+  type verificationKeyWithHash = {
+    .
+    "verificationKey": string,
+    "hash": string
+  };
+
+  type delta = {
+    .
+    "sign": sign,
+    "magnitude": uint64
+  };
+
+  type update = {
+    .
+    "appState": list(Js.Undefined.t(field)),
+    "delegate": Js.Undefined.t(publicKey),
+    "verificationKey": Js.Undefined.t(verificationKeyWithHash),
+    "permissions": Js.Undefined.t(permissions),
+    "snappUri": Js.Undefined.t(string),
+    "tokenSymbol": Js.Undefined.t(string),
+    "timing": Js.Undefined.t(timing)
+  };
+
+  type body = {
+    .
+    "publicKey": publicKey,
+    "update": update,
+    "tokenId": int64,
+    "delta": delta,
+    "events": list(list(string)),
+    "rollupEvents": list(list(string)),
+    "callData": string
+  };
+
+  type account = {
+    .
+    "TODO": todo
+  };
+
+  // null, null = Accept
+  // Some, null = Full
+  // null, Some = Nonce
+  // Some, Some = <ill typed>
+  type predicate = {
+    .
+    "account": Js.Undefined.t(account),
+    "nonce": Js.Undefined.t(uint32)
+  };
+
   type predicated = {
     .
-    "body": TODO
+    "body": body,
+    "predicate": predicate
   };
 
   type member('auth) = {
@@ -74,40 +159,27 @@ module Party = {
   type protocolState = {
     .
     "snarkedLedgerHash": Js.Undefined.t(string),
-    "snarkedNextAvailableToken": Js.Undefined.t(string),
+    "snarkedNextAvailableToken": Js.Undefined.t(int64),
     "snarkedLedgerHash": Js.Undefined.t(string),
-    "timestamp": Js.Undefined.t(string),
-    "blockchainLength": Js.Undefined.t(string),
+    "timestamp": Js.Undefined.t(uint64),
+    "blockchainLength": Js.Undefined.t(uint32),
+    "minWindowDensity": Js.Undefined.t(uint32),
     "lastVrfOutput": Js.Undefined.t(string),
-    "totalCurrency": Js.Undefined.t(string),
+    "totalCurrency": Js.Undefined.t(uint64),
     "globalSlotSinceHardFork": Js.Undefined.t(string),
     "globalSlotSinceGenesis": Js.Undefined.t(string),
     "stakingEpochData": Js.Undefined.t(string),
     "nextEpochData": Js.Undefined.t(string),
   }
 
+  [@genType]
   type t = {
     .
-    "feePayer": party(signature),
-    "otherParties": array(party(proof_or_signature)),
+    "feePayer": member(signature),
+    "otherParties": array(member(proof_or_signature)),
     "protocolState": protocolState
   };
 };
-
-{snappFeePayer: {authorization: "7mXNiius9LJidXL1zLJvUqPrzwmwNeZY7ZhuZGtL84zT16ToXGassr9G9vAP2c6QyBNvT4um42AYJ1sVgeNuadBy6KyWNwMV", data: {predicate: "0", body: {depth: "0",
-call_data: "0x0000000000000000000000000000000000000000000000000000000000000000", rollup_events: [], events: [], delta: {sgn: MINUS, magnitude: "15000000000"}, token_id: "1",
-update: {timing: {set_or_keep: Keep}, token_symbol: {set_or_keep: Keep}, snapp_uri: {set_or_keep: Keep}, permissions: {set_or_keep: Keep}, verification_key: {set_or_keep: Keep},
-delegate: {set_or_keep: Keep}, app_state: [{set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}]},
-pk: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"}}}, snappOtherParties: {authorization: {proof_or_signature: None_given}, data: {predicate: {full_or_nonce_or_accept: Accept},
-body: {depth: "0", call_data: "0x0000000000000000000000000000000000000000000000000000000000000000", rollup_events: [], events: [], delta: {sgn: PLUS, magnitude: "10000000000"}, token_id: "1",
-update: {timing: {set_or_keep: Keep}, token_symbol: {set_or_keep: Keep}, snapp_uri: {set_or_keep: Keep}, permissions: {set_or_keep: Keep}, verification_key: {set_or_keep: Keep}, delegate: {set_or_keep: Keep},
-app_state: [{set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}, {set_or_keep: Keep}]},
-pk: "B62qjJwgq7kNXYHXQsMeyiMWL7fHsnPeuAiPfYd3yTor3eKpK8VV1gG"}}}, snappProtocolState: {next_epoch_data: {epoch_length: {check_or_ignore: Ignore}, lock_checkpoint: {check_or_ignore: Ignore},
-start_checkpoint: {check_or_ignore: Ignore}, seed: {check_or_ignore: Ignore}, ledger: {total_currency: {check_or_ignore: Ignore}, hash: {check_or_ignore: Ignore}}},
-staking_epoch_data: {epoch_length: {check_or_ignore: Ignore}, lock_checkpoint: {check_or_ignore: Ignore}, start_checkpoint: {check_or_ignore: Ignore}, seed: {check_or_ignore: Ignore},
-ledger: {total_currency: {check_or_ignore: Ignore}, hash: {check_or_ignore: Ignore}}}, global_slot_since_genesis: {check_or_ignore: Ignore}, curr_global_slot: {check_or_ignore: Ignore},
-total_currency: {check_or_ignore: Ignore}, last_vrf_input: null, min_window_density: {check_or_ignore: Ignore}, blockchain_length: {check_or_ignore: Ignore}, timestamp: {check_or_ignore: Ignore},
-snarked_next_available_token: {check_or_ignore: Ignore}, snarked_ledger_hash: {check_or_ignore: Ignore}}}
 
 // ---
 
