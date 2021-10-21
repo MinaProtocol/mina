@@ -152,8 +152,7 @@ module Make
                     ~data:false
                 in
                 let best_tips_by_node' =
-                  String.Map.set state.best_tips_by_node ~key:(Node.id node)
-                    ~data:(Marlin_plonk_bindings_pasta_fp.random ())
+                  String.Map.remove state.best_tips_by_node (Node.id node)
                 in
                 { state with
                   node_initialization = node_initialization'
