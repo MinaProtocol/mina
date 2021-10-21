@@ -16,16 +16,15 @@ pub mod caml;
 /// Arkworks types
 pub mod arkworks;
 
-/// utils
+/// Utils
 pub mod urs_utils; // TODO: move this logic to proof-systems
 
+/// Vectors
 pub mod field_vector;
-/// vectors
 pub mod gate_vector;
 
-/// Groups
-pub mod pasta_pallas;
-pub mod pasta_vesta;
+/// Curves
+pub mod projective;
 
 /// SRS
 pub mod srs;

@@ -12,9 +12,8 @@ use wires_15_stubs::{
     pasta_fq_plonk_index::*,
     pasta_fq_plonk_proof::*,
     pasta_fq_plonk_verifier_index::*,
-    pasta_pallas::*,
-    pasta_vesta::*,
     plonk_verifier_index::{CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex},
+    projective::{pallas::*, vesta::*},
     srs::{fp::*, fq::*},
     CamlCircuitGate,
     CamlLookupEvaluations,
@@ -184,20 +183,20 @@ fn generate_bindings(mut w: impl std::io::Write) {
 
         decl_type!(w, env, CamlGroupProjectiveVesta => "t");
 
-        decl_func!(w, env, caml_pasta_vesta_one => "one");
-        decl_func!(w, env, caml_pasta_vesta_add => "add");
-        decl_func!(w, env, caml_pasta_vesta_sub => "sub");
-        decl_func!(w, env, caml_pasta_vesta_negate => "negate");
-        decl_func!(w, env, caml_pasta_vesta_double => "double");
-        decl_func!(w, env, caml_pasta_vesta_scale => "scale");
-        decl_func!(w, env, caml_pasta_vesta_random => "random");
-        decl_func!(w, env, caml_pasta_vesta_rng => "rng");
-        decl_func!(w, env, caml_pasta_vesta_endo_base => "endo_base");
-        decl_func!(w, env, caml_pasta_vesta_endo_scalar => "endo_scalar");
-        decl_func!(w, env, caml_pasta_vesta_to_affine => "to_affine");
-        decl_func!(w, env, caml_pasta_vesta_of_affine => "of_affine");
-        decl_func!(w, env, caml_pasta_vesta_of_affine_coordinates => "of_affine_coordinates");
-        decl_func!(w, env, caml_pasta_vesta_affine_deep_copy => "deep_copy");
+        decl_func!(w, env, caml_vesta_one => "one");
+        decl_func!(w, env, caml_vesta_add => "add");
+        decl_func!(w, env, caml_vesta_sub => "sub");
+        decl_func!(w, env, caml_vesta_negate => "negate");
+        decl_func!(w, env, caml_vesta_double => "double");
+        decl_func!(w, env, caml_vesta_scale => "scale");
+        decl_func!(w, env, caml_vesta_random => "random");
+        decl_func!(w, env, caml_vesta_rng => "rng");
+        decl_func!(w, env, caml_vesta_endo_base => "endo_base");
+        decl_func!(w, env, caml_vesta_endo_scalar => "endo_scalar");
+        decl_func!(w, env, caml_vesta_to_affine => "to_affine");
+        decl_func!(w, env, caml_vesta_of_affine => "of_affine");
+        decl_func!(w, env, caml_vesta_of_affine_coordinates => "of_affine_coordinates");
+        decl_func!(w, env, caml_vesta_affine_deep_copy => "deep_copy");
     });
 
     decl_module!(w, env, "Pallas", {
@@ -215,20 +214,20 @@ fn generate_bindings(mut w: impl std::io::Write) {
 
         decl_type!(w, env, CamlGroupProjectivePallas => "t");
 
-        decl_func!(w, env, caml_pasta_pallas_one => "one");
-        decl_func!(w, env, caml_pasta_pallas_add => "add");
-        decl_func!(w, env, caml_pasta_pallas_sub => "sub");
-        decl_func!(w, env, caml_pasta_pallas_negate => "negate");
-        decl_func!(w, env, caml_pasta_pallas_double => "double");
-        decl_func!(w, env, caml_pasta_pallas_scale => "scale");
-        decl_func!(w, env, caml_pasta_pallas_random => "random");
-        decl_func!(w, env, caml_pasta_pallas_rng => "rng");
-        decl_func!(w, env, caml_pasta_pallas_endo_base => "endo_base");
-        decl_func!(w, env, caml_pasta_pallas_endo_scalar => "endo_scalar");
-        decl_func!(w, env, caml_pasta_pallas_to_affine => "to_affine");
-        decl_func!(w, env, caml_pasta_pallas_of_affine => "of_affine");
-        decl_func!(w, env, caml_pasta_pallas_of_affine_coordinates => "of_affine_coordinates");
-        decl_func!(w, env, caml_pasta_pallas_affine_deep_copy => "deep_copy");
+        decl_func!(w, env, caml_pallas_one => "one");
+        decl_func!(w, env, caml_pallas_add => "add");
+        decl_func!(w, env, caml_pallas_sub => "sub");
+        decl_func!(w, env, caml_pallas_negate => "negate");
+        decl_func!(w, env, caml_pallas_double => "double");
+        decl_func!(w, env, caml_pallas_scale => "scale");
+        decl_func!(w, env, caml_pallas_random => "random");
+        decl_func!(w, env, caml_pallas_rng => "rng");
+        decl_func!(w, env, caml_pallas_endo_base => "endo_base");
+        decl_func!(w, env, caml_pallas_endo_scalar => "endo_scalar");
+        decl_func!(w, env, caml_pallas_to_affine => "to_affine");
+        decl_func!(w, env, caml_pallas_of_affine => "of_affine");
+        decl_func!(w, env, caml_pallas_of_affine_coordinates => "of_affine_coordinates");
+        decl_func!(w, env, caml_pallas_affine_deep_copy => "deep_copy");
     });
 
     decl_module!(w, env, "Protocol", {
