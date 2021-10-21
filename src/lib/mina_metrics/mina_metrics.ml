@@ -1,6 +1,11 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+
+(* We re-export a constrained subset of prometheus to keep consumers of this
+   module abstract over implementation.
+*)
+include Prometheus
 open Prometheus
 open Namespace
 open Metric_generators
@@ -91,6 +96,14 @@ module TextFormat_0_0_4 = struct
           output_unquoted help MetricName.pp name output_metric_type metric_type
           (LabelSetMap.pp ~sep:Fmt.nop (output_metric ~name ~label_names))
           samples)
+end
+
+module type Histogram = sig
+  type t
+
+  val observe : t -> float -> unit
+
+  val time : t -> (unit -> float) -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 end
 
 module Runtime = struct
@@ -1180,30 +1193,3 @@ module Archive = struct
     ; gauge_metrics = Hashtbl.create (module String)
     }
 end
-
-(* re-export a constrained subset of prometheus to keep consumers of this module abstract over implementation *)
-include (
-  Prometheus :
-    sig
-      module Counter : sig
-        type t = Prometheus.Counter.t
-
-        val inc_one : t -> unit
-
-        val inc : t -> float -> unit
-      end
-
-      module Gauge : sig
-        type t = Prometheus.Gauge.t
-
-        val inc_one : t -> unit
-
-        val inc : t -> float -> unit
-
-        val dec_one : t -> unit
-
-        val dec : t -> float -> unit
-
-        val set : t -> float -> unit
-      end
-    end )
