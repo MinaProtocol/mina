@@ -123,9 +123,21 @@ module Party = {
     "callData": string
   };
 
+  type state = {
+    .
+    "elements": list(Js.Undefined.t(field))
+  };
+
   type account = {
     .
-    "TODO": todo
+    "balance": Js.Undefined.t(interval(uint64)),
+    "nonce": Js.Undefined.t(interval(uint32)),
+    "receipt_chain_hash": Js.Undefined.t(string),
+    "publicKey": Js.Undefined.t(publicKey),
+    "delegate": Js.Undefined.t(publicKey),
+    "state": state,
+    "rollupState": Js.Undefined.t(field),
+    "provedState": Js.Undefined.t(bool),
   };
 
   // null, null = Accept
@@ -138,16 +150,16 @@ module Party = {
     "nonce": Js.Undefined.t(uint32)
   };
 
-  type predicated = {
+  type predicated('predicate) = {
     .
     "body": body,
-    "predicate": predicate
+    "predicate": 'predicate
   };
 
-  type member('auth) = {
+  type member('auth, 'predicate) = {
     .
     "authorization": 'auth,
-    "data": predicated
+    "data": predicated('predicate)
   };
 
   type proof_or_signature = {
@@ -175,8 +187,8 @@ module Party = {
   [@genType]
   type t = {
     .
-    "feePayer": member(signature),
-    "otherParties": array(member(proof_or_signature)),
+    "feePayer": member(signature, uint32),
+    "otherParties": array(member(proof_or_signature, predicate)),
     "protocolState": protocolState
   };
 };
