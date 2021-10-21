@@ -1,7 +1,6 @@
 use crate::{gate_vector::fp::CamlPastaFpPlonkGateVectorPtr, srs::fp::CamlFpSrs};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
-use ocaml_gen::{ocaml_gen, OCamlCustomType};
 use plonk_15_wires_circuits::{
     gate::CircuitGate,
     nolookup::constraints::ConstraintSystem,
@@ -18,7 +17,7 @@ use std::{
 //
 
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
-#[derive(OCamlCustomType)]
+#[derive(ocaml_gen::CustomType)]
 pub struct CamlPastaFpPlonkIndex(pub Box<DlogIndex<GAffine>>);
 pub type CamlPastaFpPlonkIndexPtr<'a> = ocaml::Pointer<'a, CamlPastaFpPlonkIndex>;
 
@@ -47,7 +46,7 @@ fn shift_wires(domain_size: usize, wires: GateWires) -> GateWires {
     })
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_create(
     gates: CamlPastaFpPlonkGateVectorPtr,
@@ -101,37 +100,37 @@ pub fn caml_pasta_fp_plonk_index_create(
     )))
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_max_degree(index: CamlPastaFpPlonkIndexPtr) -> ocaml::Int {
     index.as_ref().0.srs.max_degree() as isize
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_public_inputs(index: CamlPastaFpPlonkIndexPtr) -> ocaml::Int {
     index.as_ref().0.cs.public as isize
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_domain_d1_size(index: CamlPastaFpPlonkIndexPtr) -> ocaml::Int {
     index.as_ref().0.cs.domain.d1.size() as isize
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_domain_d4_size(index: CamlPastaFpPlonkIndexPtr) -> ocaml::Int {
     index.as_ref().0.cs.domain.d4.size() as isize
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_domain_d8_size(index: CamlPastaFpPlonkIndexPtr) -> ocaml::Int {
     index.as_ref().0.cs.domain.d8.size() as isize
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_read(
     offset: Option<ocaml::Int>,
@@ -166,7 +165,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     Ok(CamlPastaFpPlonkIndex(Box::new(t)))
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_write(
     append: Option<bool>,

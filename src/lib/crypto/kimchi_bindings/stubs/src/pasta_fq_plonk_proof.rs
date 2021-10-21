@@ -15,7 +15,7 @@ use mina_curves::pasta::{
     fq::Fq,
     pallas::{Affine as GAffine, PallasParameters},
 };
-use ocaml_gen::ocaml_gen;
+
 use oracle::{
     poseidon::PlonkSpongeConstants15W,
     sponge::{DefaultFqSponge, DefaultFrSponge},
@@ -27,11 +27,11 @@ use plonk_15_wires_protocol_dlog::prover::caml::CamlProverProof;
 use plonk_15_wires_protocol_dlog::prover::{ProverCommitments, ProverProof};
 use std::convert::TryInto;
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_create(
     index: CamlPastaFqPlonkIndexPtr<'static>,
-    witness: Vec<CamlPastaFqVector>,
+    witness: Vec<CamlFqVector>,
     prev_challenges: Vec<CamlFq>,
     prev_sgs: Vec<CamlGPallas>,
 ) -> CamlProverProof<CamlGPallas, CamlFq> {
@@ -84,7 +84,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
     })
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_verify(
     lgr_comm: Vec<CamlPolyComm<CamlGPallas>>,
@@ -105,7 +105,7 @@ pub fn caml_pasta_fq_plonk_proof_verify(
     .is_ok()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_batch_verify(
     lgr_comms: Vec<Vec<CamlPolyComm<CamlGPallas>>>,
@@ -128,7 +128,7 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
     .is_ok()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq> {
     fn comm() -> PolyComm<GAffine> {
@@ -180,7 +180,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
     dlogproof.into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_deep_copy(
     x: CamlProverProof<CamlGPallas, CamlFq>,

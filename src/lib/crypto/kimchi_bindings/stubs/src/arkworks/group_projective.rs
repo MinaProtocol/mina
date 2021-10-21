@@ -3,11 +3,10 @@ use std::ops::{Add, Deref, Neg, Sub};
 use mina_curves::pasta::{
     pallas::Projective as ProjectivePallas, vesta::Projective as ProjectiveVesta,
 };
-use ocaml_gen::OCamlCustomType;
 
 // Pallas
 
-#[derive(Clone, Copy, OCamlCustomType)]
+#[derive(Clone, Copy, ocaml_gen::CustomType)]
 pub struct CamlGroupProjectivePallas(pub ProjectivePallas);
 
 unsafe impl<'a> ocaml::FromValue<'a> for CamlGroupProjectivePallas {
@@ -112,7 +111,7 @@ impl Neg for &CamlGroupProjectivePallas {
 
 // Vesta
 
-#[derive(Clone, Copy, OCamlCustomType)]
+#[derive(Clone, Copy, ocaml_gen::CustomType)]
 pub struct CamlGroupProjectiveVesta(pub ProjectiveVesta);
 
 unsafe impl<'a> ocaml::FromValue<'a> for CamlGroupProjectiveVesta {

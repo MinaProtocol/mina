@@ -6,16 +6,16 @@ use mina_curves::pasta::{
     fq::Fq,
     pallas::{Affine as GAffine, Projective},
 };
-use ocaml_gen::ocaml_gen;
+
 use rand::rngs::StdRng;
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_pallas_one() -> CamlGroupProjectivePallas {
     Projective::prime_subgroup_generator().into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_pallas_add(
     x: ocaml::Pointer<CamlGroupProjectivePallas>,
@@ -24,7 +24,7 @@ pub fn caml_pasta_pallas_add(
     x.as_ref() + y.as_ref()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_pallas_sub(
     x: ocaml::Pointer<CamlGroupProjectivePallas>,
@@ -33,7 +33,7 @@ pub fn caml_pasta_pallas_sub(
     x.as_ref() - y.as_ref()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_pallas_negate(
     x: ocaml::Pointer<CamlGroupProjectivePallas>,
@@ -41,7 +41,7 @@ pub fn caml_pasta_pallas_negate(
     -(*x.as_ref())
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_pallas_double(
     x: ocaml::Pointer<CamlGroupProjectivePallas>,
@@ -49,7 +49,7 @@ pub fn caml_pasta_pallas_double(
     x.as_ref().double().into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_pallas_scale(
     x: ocaml::Pointer<CamlGroupProjectivePallas>,
@@ -60,7 +60,7 @@ pub fn caml_pasta_pallas_scale(
     x.as_ref().mul(&y).into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_pallas_random() -> CamlGroupProjectivePallas {
     let rng = &mut rand::rngs::OsRng;
@@ -68,7 +68,7 @@ pub fn caml_pasta_pallas_random() -> CamlGroupProjectivePallas {
     proj.into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_pallas_rng(i: ocaml::Int) -> CamlGroupProjectivePallas {
     // We only care about entropy here, so we force a conversion i32 -> u32.
@@ -78,40 +78,40 @@ pub fn caml_pasta_pallas_rng(i: ocaml::Int) -> CamlGroupProjectivePallas {
     proj.into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub extern "C" fn caml_pasta_pallas_endo_base() -> CamlFp {
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffine>();
     endo_q.into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub extern "C" fn caml_pasta_pallas_endo_scalar() -> CamlFq {
     let (_endo_q, endo_r) = commitment_dlog::srs::endos::<GAffine>();
     endo_r.into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_pallas_to_affine(x: ocaml::Pointer<CamlGroupProjectivePallas>) -> CamlGPallas {
     x.as_ref().into_affine().into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_pallas_of_affine(x: CamlGPallas) -> CamlGroupProjectivePallas {
     Into::<GAffine>::into(x).into_projective().into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_pallas_of_affine_coordinates(x: CamlFp, y: CamlFp) -> CamlGroupProjectivePallas {
     let res = Projective::new(x.into(), y.into(), Fp::one());
     res.into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_pallas_affine_deep_copy(x: CamlGPallas) -> CamlGPallas {
     x

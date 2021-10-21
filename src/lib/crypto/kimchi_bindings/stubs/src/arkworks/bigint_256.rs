@@ -1,7 +1,6 @@
 use ark_ff::{BigInteger as ark_BigInteger, BigInteger256};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use num_bigint::BigUint;
-use ocaml_gen::{ocaml_gen, OCamlCustomType};
 use std::cmp::Ordering::{Equal, Greater, Less};
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
@@ -20,7 +19,7 @@ const BIGINT256_NUM_LIMBS: i32 =
 // Wrapper struct to implement OCaml bindings
 //
 
-#[derive(Clone, Copy, Debug, OCamlCustomType)]
+#[derive(Clone, Copy, Debug, ocaml_gen::CustomType)]
 pub struct CamlBigInteger256(pub BigInteger256);
 
 impl From<BigInteger256> for CamlBigInteger256 {
@@ -108,7 +107,7 @@ impl ToString for CamlBigInteger256 {
 // OCaml stuff
 //
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_of_numeral(
     s: &[u8],
@@ -126,7 +125,7 @@ pub fn caml_bigint_256_of_numeral(
     }
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_of_decimal_string(s: &[u8]) -> Result<CamlBigInteger256, ocaml::Error> {
     match BigUint::parse_bytes(s, 10) {
@@ -136,19 +135,19 @@ pub fn caml_bigint_256_of_decimal_string(s: &[u8]) -> Result<CamlBigInteger256, 
     }
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_num_limbs() -> ocaml::Int {
     BIGINT256_NUM_LIMBS.try_into().unwrap()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_bytes_per_limb() -> ocaml::Int {
     BIGINT256_LIMB_BYTES.try_into().unwrap()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_div(x: CamlBigInteger256, y: CamlBigInteger256) -> CamlBigInteger256 {
     let x: BigUint = x.into();
@@ -158,7 +157,7 @@ pub fn caml_bigint_256_div(x: CamlBigInteger256, y: CamlBigInteger256) -> CamlBi
     inner.into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_compare(
     x: ocaml::Pointer<CamlBigInteger256>,
@@ -171,19 +170,19 @@ pub fn caml_bigint_256_compare(
     }
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_print(x: CamlBigInteger256) {
     println!("{}", x.to_string());
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_to_string(x: CamlBigInteger256) -> String {
     x.to_string()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_test_bit(
     x: ocaml::Pointer<CamlBigInteger256>,
@@ -197,7 +196,7 @@ pub fn caml_bigint_256_test_bit(
     }
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_to_bytes(
     x: ocaml::Pointer<CamlBigInteger256>,
@@ -207,7 +206,7 @@ pub fn caml_bigint_256_to_bytes(
     res
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<CamlBigInteger256, ocaml::Error> {
     let len = std::mem::size_of::<BigInteger256>();
@@ -219,7 +218,7 @@ pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<CamlBigInteger256, ocaml::Er
     Ok(CamlBigInteger256(result))
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_deep_copy(x: CamlBigInteger256) -> CamlBigInteger256 {
     x

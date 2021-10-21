@@ -10,7 +10,7 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
-use ocaml_gen::ocaml_gen;
+
 use plonk_15_wires_circuits::expr::Linearization;
 use plonk_15_wires_circuits::nolookup::constraints::{zk_polynomial, zk_w3, ConstraintSystem};
 use plonk_15_wires_circuits::wires::{COLUMNS, PERMUTS};
@@ -154,7 +154,7 @@ pub fn read_raw(
 // Methods
 //
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_verifier_index_read(
     offset: Option<ocaml::Int>,
@@ -165,7 +165,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_read(
     Ok(vi.into())
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_verifier_index_write(
     append: Option<bool>,
@@ -182,7 +182,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_write(
     })
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_verifier_index_create(
     index: CamlPastaFpPlonkIndexPtr,
@@ -191,7 +191,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_create(
     verifier_index.into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_verifier_index_shifts(log2_size: ocaml::Int) -> Vec<CamlFp> {
     let domain = Domain::<Fp>::new(1 << log2_size).unwrap();
@@ -199,7 +199,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_shifts(log2_size: ocaml::Int) -> Vec<C
     shifts.iter().map(Into::into).collect()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierIndex {
     fn comm() -> CamlPolyComm<CamlGVesta> {
@@ -235,7 +235,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
     }
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_verifier_index_deep_copy(
     x: CamlPastaFpPlonkVerifierIndex,

@@ -8,7 +8,7 @@ use mina_curves::pasta::{
     fp::Fp,
     vesta::{Affine as GAffine, VestaParameters},
 };
-use ocaml_gen::ocaml_gen;
+
 use oracle::{
     self,
     poseidon::PlonkSpongeConstants15W,
@@ -25,7 +25,7 @@ use plonk_15_wires_protocol_dlog::{
 // Methods
 //
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_oracles_create(
     lgr_comm: Vec<CamlPolyComm<CamlGVesta>>, // the bases to commit polynomials
@@ -80,13 +80,13 @@ pub fn caml_pasta_fp_plonk_oracles_create(
     }
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_oracles_dummy() -> CamlRandomOracles<CamlFp> {
     RandomOracles::<Fp>::default().into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_oracles_deep_copy(
     x: CamlRandomOracles<CamlFp>,

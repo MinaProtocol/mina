@@ -5,16 +5,16 @@ use mina_curves::pasta::{
     fq::Fq,
     vesta::{Affine as GAffine, Projective},
 };
-use ocaml_gen::ocaml_gen;
+
 use rand::rngs::StdRng;
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_vesta_one() -> CamlGroupProjectiveVesta {
     Projective::prime_subgroup_generator().into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_vesta_add(
     x: ocaml::Pointer<CamlGroupProjectiveVesta>,
@@ -23,7 +23,7 @@ pub fn caml_pasta_vesta_add(
     x.as_ref() + y.as_ref()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_vesta_sub(
     x: ocaml::Pointer<CamlGroupProjectiveVesta>,
@@ -32,7 +32,7 @@ pub fn caml_pasta_vesta_sub(
     x.as_ref() - y.as_ref()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_vesta_negate(
     x: ocaml::Pointer<CamlGroupProjectiveVesta>,
@@ -40,7 +40,7 @@ pub fn caml_pasta_vesta_negate(
     -x.as_ref()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_vesta_double(
     x: ocaml::Pointer<CamlGroupProjectiveVesta>,
@@ -48,7 +48,7 @@ pub fn caml_pasta_vesta_double(
     x.as_ref().double().into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_vesta_scale(
     x: ocaml::Pointer<CamlGroupProjectiveVesta>,
@@ -58,7 +58,7 @@ pub fn caml_pasta_vesta_scale(
     x.as_ref().mul(&y).into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_vesta_random() -> CamlGroupProjectiveVesta {
     let rng = &mut rand::rngs::OsRng;
@@ -66,7 +66,7 @@ pub fn caml_pasta_vesta_random() -> CamlGroupProjectiveVesta {
     proj.into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_vesta_rng(i: ocaml::Int) -> CamlGroupProjectiveVesta {
     // We only care about entropy here, so we force a conversion i32 -> u32.
@@ -76,40 +76,40 @@ pub fn caml_pasta_vesta_rng(i: ocaml::Int) -> CamlGroupProjectiveVesta {
     proj.into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub extern "C" fn caml_pasta_vesta_endo_base() -> CamlFq {
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffine>();
     endo_q.into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub extern "C" fn caml_pasta_vesta_endo_scalar() -> CamlFp {
     let (_endo_q, endo_r) = commitment_dlog::srs::endos::<GAffine>();
     endo_r.into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_vesta_to_affine(x: ocaml::Pointer<CamlGroupProjectiveVesta>) -> CamlGVesta {
     x.as_ref().into_affine().into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_vesta_of_affine(x: CamlGVesta) -> CamlGroupProjectiveVesta {
     Into::<GAffine>::into(x).into_projective().into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_vesta_of_affine_coordinates(x: CamlFq, y: CamlFq) -> CamlGroupProjectiveVesta {
     let res = Projective::new(x.into(), y.into(), Fq::one());
     res.into()
 }
 
-#[ocaml_gen]
+#[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_vesta_affine_deep_copy(x: CamlGVesta) -> CamlGVesta {
     x

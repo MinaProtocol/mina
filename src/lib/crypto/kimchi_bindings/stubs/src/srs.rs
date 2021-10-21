@@ -4,8 +4,6 @@ use commitment_dlog::{
     commitment::{b_poly_coefficients, caml::CamlPolyComm},
     srs::{endos, SRS},
 };
-
-use ocaml_gen::ocaml_gen;
 use paste::paste;
 use std::{
     fs::{File, OpenOptions},

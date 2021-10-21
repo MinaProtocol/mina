@@ -1,6 +1,5 @@
 //! A GateVector: this is used to represent a list of gates.
 
-use ocaml_gen::{ocaml_gen, OCamlCustomType};
 use plonk_15_wires_circuits::{
     gate::{caml::CamlCircuitGate, CircuitGate},
     wires::caml::CamlWire,
@@ -19,7 +18,7 @@ pub mod fp {
     // CamlPastaFpPlonkGateVector
     //
 
-    #[derive(OCamlCustomType)]
+    #[derive(ocaml_gen::CustomType)]
     pub struct CamlPastaFpPlonkGateVector(pub Vec<CircuitGate<Fp>>);
     pub type CamlPastaFpPlonkGateVectorPtr<'a> = ocaml::Pointer<'a, CamlPastaFpPlonkGateVector>;
 
@@ -38,13 +37,13 @@ pub mod fp {
     // Functions
     //
 
-    #[ocaml_gen]
+    #[ocaml_gen::func]
     #[ocaml::func]
     pub fn caml_pasta_fp_plonk_gate_vector_create() -> CamlPastaFpPlonkGateVector {
         CamlPastaFpPlonkGateVector(Vec::new())
     }
 
-    #[ocaml_gen]
+    #[ocaml_gen::func]
     #[ocaml::func]
     pub fn caml_pasta_fp_plonk_gate_vector_add(
         mut v: CamlPastaFpPlonkGateVectorPtr,
@@ -54,7 +53,7 @@ pub mod fp {
         v.as_mut().0.push(gate);
     }
 
-    #[ocaml_gen]
+    #[ocaml_gen::func]
     #[ocaml::func]
     pub fn caml_pasta_fp_plonk_gate_vector_get(
         v: CamlPastaFpPlonkGateVectorPtr,
@@ -64,7 +63,8 @@ pub mod fp {
         gate.into()
     }
 
-    #[ocaml_gen]
+    // TODO: remove this function
+    #[ocaml_gen::func]
     #[ocaml::func]
     pub fn caml_pasta_fp_plonk_gate_vector_wrap(
         mut v: CamlPastaFpPlonkGateVectorPtr,
@@ -88,7 +88,7 @@ pub mod fq {
     // CamlPastaFqPlonkGateVector
     //
 
-    #[derive(OCamlCustomType)]
+    #[derive(ocaml_gen::CustomType)]
     pub struct CamlPastaFqPlonkGateVector(pub Vec<CircuitGate<Fq>>);
     pub type CamlPastaFqPlonkGateVectorPtr<'a> = ocaml::Pointer<'a, CamlPastaFqPlonkGateVector>;
 
@@ -107,13 +107,13 @@ pub mod fq {
     // Functions
     //
 
-    #[ocaml_gen]
+    #[ocaml_gen::func]
     #[ocaml::func]
     pub fn caml_pasta_fq_plonk_gate_vector_create() -> CamlPastaFqPlonkGateVector {
         CamlPastaFqPlonkGateVector(Vec::new())
     }
 
-    #[ocaml_gen]
+    #[ocaml_gen::func]
     #[ocaml::func]
     pub fn caml_pasta_fq_plonk_gate_vector_add(
         mut v: CamlPastaFqPlonkGateVectorPtr,
@@ -122,7 +122,7 @@ pub mod fq {
         v.as_mut().0.push(gate.into());
     }
 
-    #[ocaml_gen]
+    #[ocaml_gen::func]
     #[ocaml::func]
     pub fn caml_pasta_fq_plonk_gate_vector_get(
         v: CamlPastaFqPlonkGateVectorPtr,
@@ -132,7 +132,7 @@ pub mod fq {
         gate.into()
     }
 
-    #[ocaml_gen]
+    #[ocaml_gen::func]
     #[ocaml::func]
     pub fn caml_pasta_fq_plonk_gate_vector_wrap(
         mut v: CamlPastaFqPlonkGateVectorPtr,

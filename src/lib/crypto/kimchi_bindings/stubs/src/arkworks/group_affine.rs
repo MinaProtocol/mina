@@ -1,7 +1,6 @@
 use crate::arkworks::{CamlFp, CamlFq};
 use ark_ff::Zero;
 use mina_curves::pasta::{pallas::Affine as AffinePallas, vesta::Affine as AffineVesta};
-use ocaml_gen::OcamlEnum;
 
 //
 // handy types
@@ -14,7 +13,7 @@ pub type CamlGPallas = CamlGroupAffine<CamlFp>;
 // GroupAffine<G> <-> CamlGroupAffine<F>
 //
 
-#[derive(Clone, Copy, Debug, ocaml::IntoValue, ocaml::FromValue, OcamlEnum)]
+#[derive(Clone, Copy, Debug, ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Enum)]
 pub enum CamlGroupAffine<F> {
     Infinity,
     Finite((F, F)),
