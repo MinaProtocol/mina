@@ -30,6 +30,11 @@ type BitswapBlockSchema struct {
 	maxLinksPerBlock         int
 }
 
+func (s BitswapBlockSchema) String() string {
+	return fmt.Sprintf("{total: %d, fullLink: %d, lastLinkCount: %d, lastBlockDataSize: %d, maxBlockSize: %d, linksPerBlock: %d}",
+		s.totalBlocks, s.fullLinkBlocks, s.nonMaxLinkBlockLinkCount, s.lastBlockDataSize, s.maxBlockSize, s.maxLinksPerBlock)
+}
+
 // NodeIndex is an index of a node within a specific block tree
 type NodeIndex int
 
@@ -280,6 +285,8 @@ func ReadBitswapBlock(block []byte) ([]BitswapBlockLink, []byte, error) {
 				copy(links[i][:], block[2+i*BITSWAP_BLOCK_LINK_SIZE:])
 			}
 			return links, block[prefix:], nil
+		} else {
+			return nil, nil, fmt.Errorf("invalid link count: %d (len=%d)", l, len(block))
 		}
 	}
 	return nil, nil, fmt.Errorf("block is too short: %d", len(block))
