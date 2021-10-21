@@ -2483,16 +2483,6 @@ module Types = struct
             ; enum_value "Accept" ~value:Accept
             ]
 
-      (* like Snapp_basic.Or_ignore.t, with nullary constructors *)
-      type snapp_or_ignore = Check | Ignore
-
-      let snapp_check_or_ignore =
-        enum "OrIgnore"
-          ~values:
-            [ enum_value "Ignore" ~value:Ignore
-            ; enum_value "Check" ~value:Check
-            ]
-
       let snapp_balance =
         scalar "Balance" ~coerce:(fun s ->
             try
@@ -2503,40 +2493,20 @@ module Types = struct
                   Error "Expected balance as a string"
             with exn -> Error (Exn.to_string exn))
 
-      let snapp_balance_closed_interval =
-        obj "BalanceClosedInterval"
-          ~coerce:(fun lower upper ->
-            Snapp_predicate.Closed_interval.{ lower; upper })
-          ~fields:
-            [ arg "lower" ~typ:(non_null snapp_balance)
-            ; arg "upper" ~typ:(non_null snapp_balance)
-            ]
+      module Interval = struct
+        let i name typ =
+          obj (name ^ "Interval")
+            ~coerce:(fun lower upper ->
+              Snapp_predicate.Closed_interval.{ lower; upper })
+            ~fields:
+              [ arg "lower" ~typ:(non_null typ); arg "upper" ~typ:(non_null typ) ]
 
-      let snapp_balance_numeric =
-        obj "BalanceNumeric"
-          ~coerce:(fun balance_interval_opt ->
-            match balance_interval_opt with
-            | None ->
-                Ok Snapp_basic.Or_ignore.Ignore
-            | Some balance_interval ->
-                Ok (Snapp_basic.Or_ignore.Check balance_interval))
-          ~fields:
-            [ arg "balanceInterval" ~doc:"Balance interval, or null if Ignore"
-                ~typ:snapp_balance_closed_interval
-            ]
-
-      let snapp_make_closed_interval ~name ~typ =
-        obj name
-          ~coerce:(fun lower upper ->
-            Snapp_predicate.Closed_interval.{ lower; upper })
-          ~fields:
-            [ arg "lower" ~typ:(non_null typ); arg "upper" ~typ:(non_null typ) ]
-
-      let snapp_make_numeric ~name ~arg_name ~typ =
-        arg arg_name ~typ:(snapp_make_closed_interval ~name:arg_name ~typ)
-
-      let snapp_nonce_numeric =
-        snapp_make_numeric ~name:"NonceNumeric" ~arg_name:"nonce" ~typ:nonce
+        let nonce = i "Nonce" nonce
+        let balance = i "Balance" snapp_balance
+        let length = i "Length" length
+        let block_time = i "BlockTime" block_time
+        let global_slot = i "GlobalSlot" snapp_global_slot
+      end
 
       let snapp_receipt_chain_hash =
         scalar "ReceiptChainHash" ~coerce:(fun s ->
@@ -2549,16 +2519,6 @@ module Types = struct
                   Error "Expected balance as a string"
             with exn -> Error (Exn.to_string exn))
 
-      let snapp_receipt_chain_hash_or_ignore =
-        snapp_make_check_or_ignore "SnappReceiptChainHashOrIgnore"
-          (arg "receiptChainHash" ~doc:"receipt chain hash, or null if Ignore"
-             ~typ:snapp_receipt_chain_hash)
-
-      let snapp_field_or_ignore =
-        snapp_make_check_or_ignore "SnappFieldOrIgnore"
-          (arg "field" ~doc:"Field in string format, or null if Ignore"
-             ~typ:field)
-
       let snapp_state =
         obj "SnappState" ~doc:"Snapp state, a list of 8 field elements"
           ~coerce:(fun element_results ->
@@ -2570,12 +2530,9 @@ module Types = struct
             else Error "Expected 8 elements for Snapp state")
           ~fields:
             [ arg "elements"
-                ~typ:(non_null (list (non_null snapp_field_or_ignore)))
+                ~typ:(non_null (list field))
             ]
 
-      let snapp_bool_or_ignore =
-        snapp_make_check_or_ignore "BoolOrIgnore"
-          (arg "bool" ~doc:"A boolean, or null if Ignore" ~typ:bool)
 
       let snapp_predicate_account =
         obj "SnappPredicateAccount"
@@ -2605,42 +2562,38 @@ module Types = struct
                   }
                 : Snapp_predicate.Account.t ))
           ~fields:
-            [ arg "balance" ~typ:(non_null snapp_balance_numeric)
-            ; arg "nonce" ~typ:(non_null snapp_nonce_numeric)
+            [ arg "balance" ~typ:Interval.balance
+            ; arg "nonce" ~typ:Interval.nonce
             ; arg "receiptChainHash"
-                ~typ:(non_null snapp_receipt_chain_hash_or_ignore)
-            ; arg "publicKey" ~typ:(non_null snapp_pk_or_ignore)
-            ; arg "delegate" ~typ:(non_null snapp_pk_or_ignore)
+                ~doc:"receipt chain hash, or null if Ignore"
+                ~typ:snapp_receipt_chain_hash
+            ; arg "publicKey" ~typ:publicKey
+            ; arg "delegate" ~typ:publicKey
             ; arg "state" ~typ:(non_null snapp_state)
-            ; arg "rollupState" ~typ:(non_null snapp_field_or_ignore)
-            ; arg "provedState" ~typ:(non_null snapp_bool_or_ignore)
+            ; arg "rollupState" ~typ:field
+            ; arg "provedState" ~typ:bool
             ]
 
       let snapp_predicate =
         obj "SnappPredicate"
-          ~coerce:(fun ctor account_opt nonce_opt ->
-            match (ctor, account_opt, nonce_opt) with
-            | Accept, None, None ->
+          ~coerce:(fun account_opt nonce_opt ->
+            match (account_opt, nonce_opt) with
+            | None, None ->
                 Ok Party.Predicate.Accept
-            | Accept, _, _ ->
-                Error "Non-null account or nonces given for Accept"
-            | Full, Some account_result, None -> (
+            | Some account_result, None -> (
                 match account_result with
                 | Ok account ->
                     Ok (Party.Predicate.Full account)
                 | Error err ->
                     Error err )
-            | Full, _, _ ->
-                Error "Full requires a non-null account value"
-            | Nonce, None, Some nonce ->
+            | None, Some nonce ->
                 Ok (Party.Predicate.Nonce nonce)
-            | Nonce, _, _ ->
-                Error "Nonce requires a non-null nonce value")
+            | Some _, Some _ ->
+                Error "Ill-defined predicate. Account and nonce cannot both be provided.")
           ~fields:
-            [ arg "fullOrNonceOrAccept" ~typ:(non_null snapp_predicate_enum)
-            ; arg "account" ~doc:"An account for Full, null otherwise"
+            [ arg "account" ~doc:"TODO: Needs a doc"
                 ~typ:snapp_predicate_account
-            ; arg "nonce" ~doc:"A nonce for Nonce, null otherwise" ~typ:nonce
+            ; arg "nonce" ~doc:"TODO: Needs a doc" ~typ:nonce
             ]
 
       let snapp_party_predicated =
@@ -2696,27 +2649,6 @@ module Types = struct
                 ~typ:(non_null snapp_control)
             ]
 
-      let snapp_snarked_ledger_hash_or_ignore =
-        snapp_make_check_or_ignore "SnarkedLedgerHashOrIgnore"
-          (arg "snarkedLedgerHash"
-             ~doc:"Snarked ledger hash in Base58Check format, or null if Ignore"
-             ~typ:snarked_ledger_hash)
-
-      let snapp_token_id_closed_interval =
-        snapp_make_closed_interval ~name:"SnappTokenIdClosedInterval"
-          ~typ:token_id_arg
-
-      let snapp_token_id_numeric =
-        snapp_make_numeric ~name:"SnappNumericTokenId" ~arg_name:"tokenId"
-          ~typ:token_id_arg
-
-      let snapp_block_time_numeric =
-        snapp_make_numeric ~name:"BlockTimeNumeric" ~arg_name:"blockTime"
-          ~typ:block_time
-
-      let snapp_length_numeric =
-        snapp_make_numeric ~name:"LengthNumeric" ~arg_name:"length" ~typ:length
-
       let snapp_vrf_output =
         scalar "VrfOutput" ~coerce:(fun vrf_output ->
             match vrf_output with
@@ -2724,10 +2656,6 @@ module Types = struct
                 Ok ()
             | _ ->
                 Error "VRF output, expected null")
-
-      let snapp_currency_amount_numeric =
-        snapp_make_numeric ~name:"CurrencyAmountNumeric"
-          ~arg_name:"currencyAmount" ~typ:currency_amount
 
       let snapp_global_slot =
         scalar "GlobalSlot" ~coerce:(fun amt ->
@@ -2737,10 +2665,6 @@ module Types = struct
                 with exn -> Error (Exn.to_string exn) )
             | _ ->
                 Error "Expected string for global slot")
-
-      let snapp_global_slot_numeric =
-        snapp_make_numeric ~name:"GlobalSlotNumeric" ~arg_name:"globalSlot"
-          ~typ:snapp_global_slot
 
       let snapp_state_hash =
         scalar "StateHash" ~coerce:(fun state_hash ->
@@ -2752,10 +2676,6 @@ module Types = struct
             | _ ->
                 Error "Expected state hash in Base58Check format")
 
-      let snapp_state_hash_or_ignore =
-        snapp_make_check_or_ignore "SnappStateHashOrIgnore"
-          (arg "stateHash" ~typ:snapp_state_hash)
-
       let snapp_epoch_seed =
         scalar "EpochSeed" ~coerce:(fun field ->
             match field with
@@ -2763,10 +2683,6 @@ module Types = struct
                 Ok (Snark_params.Tick.Field.of_string s)
             | _ ->
                 Error "Expected a string representing a field element")
-
-      let snapp_epoch_seed_or_ignore =
-        snapp_make_check_or_ignore "EpochSeedOrIgnore"
-          (arg "epochSeed" ~typ:snapp_epoch_seed)
 
       let snapp_epoch_ledger =
         obj "EpochLedger"
@@ -2776,8 +2692,8 @@ module Types = struct
             let%bind total_currency = total_currency_result in
             Ok { Epoch_ledger.Poly.hash; total_currency })
           ~fields:
-            [ arg "hash" ~typ:(non_null snapp_snarked_ledger_hash_or_ignore)
-            ; arg "totalCurrency" ~typ:(non_null snapp_currency_amount_numeric)
+            [ arg "hash" ~typ:snarked_ledger_hash
+            ; arg "totalCurrency" ~typ:Interval.currency_amount
             ]
 
       let snapp_epoch_data =
@@ -2800,10 +2716,10 @@ module Types = struct
               })
           ~fields:
             [ arg "ledger" ~typ:(non_null snapp_epoch_ledger)
-            ; arg "seed" ~typ:(non_null snapp_epoch_seed_or_ignore)
-            ; arg "startCheckpoint" ~typ:(non_null snapp_state_hash_or_ignore)
-            ; arg "lockCheckpoint" ~typ:(non_null snapp_state_hash_or_ignore)
-            ; arg "epochLength" ~typ:(non_null snapp_length_numeric)
+            ; arg "seed" ~typ:snapp_epoch_seed
+            ; arg "startCheckpoint" ~typ:snapp_state_hash
+            ; arg "lockCheckpoint" ~typ:snapp_state_hash
+            ; arg "epochLength" ~typ:Interval.length
             ]
 
       let check_or_null_doc s = s ^ " Checked if present. Ignored if null."
@@ -2861,28 +2777,25 @@ module Types = struct
                      "Snarked ledger hash in Base58Check format.")
                 ~typ:snarked_ledger_hash
             ; arg "snarkedNextAvailableToken"
-                ~doc:
-                  (check_or_null_doc
-                     "Next available tokenId according to the snarked ledger.")
-                ~typ:token_id_arg
+                ~doc: "Next available tokenId according to the snarked ledger."
+                ~typ:Interval.token_id
             ; arg "timestamp"
                 ~doc:
-                  (check_or_null_doc
                      "Timestamp of the start of the slot where this protocol \
-                      state was created")
-                ~typ:block_time
+                      state was created"
+                ~typ:Interval.block_time
             ; arg "blockchainLength"
-                ~doc:(check_or_null_doc "Length of the blockchain.")
-                ~typ:length
+                ~doc:"Length of the blockchain."
+                ~typ:Interval.length
             ; arg "minWindowDensity"
-                ~doc:(check_or_null_doc "Minimum window density")
-                ~typ:(non_null snapp_length_numeric)
+                ~doc:"Minimum window density"
+                ~typ:Interval.length
             ; arg "lastVrfOutput" ~typ:snapp_vrf_output (* nullable! *)
-            ; arg "totalCurrency" ~typ:(non_null snapp_currency_amount_numeric)
+            ; arg "totalCurrency" ~typ:Interval.currency_amount
             ; arg "globalSlotSinceHardFork"
-                ~typ:(non_null snapp_global_slot_numeric)
+                ~typ:Interval.global_slot
             ; arg "globalSlotSinceGenesis"
-                ~typ:(non_null snapp_global_slot_numeric)
+                ~typ:Interval.global_slot
             ; arg "stakingEpochData" ~typ:(non_null snapp_epoch_data)
             ; arg "nextEpochData" ~typ:(non_null snapp_epoch_data)
             ]
@@ -2952,6 +2865,7 @@ module Types = struct
                 *)
                 assert (String.equal s s') ;
                 Ok n
+                (* TODO: We need a better error message to the user here *)
               with _ -> Error (sprintf "Could not decode %s." lower_name) )
           | `Int n ->
               if n < 0 then
