@@ -215,7 +215,7 @@ module Worker = struct
           Logger.Consumer_registry.register ~id:"default"
             ~processor:(Logger.Processor.raw ())
             ~transport:
-              (Logger.Transport.File_system.dumb_logrotate
+              (Logger_file_system.dumb_logrotate
                  ~directory:(Option.value_exn conf_dir)
                  ~log_filename:"mina-verifier.log" ~max_size ~num_rotate) ) ;
         [%log info] "Verifier started" ;

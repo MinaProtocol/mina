@@ -347,7 +347,7 @@ let main ~input_dir ~output_dir ~output_format ~min_peers () =
   Logger.Consumer_registry.register ~id:"default"
     ~processor:(Logger.Processor.raw ())
     ~transport:
-      (Logger.Transport.File_system.dumb_logrotate ~directory:output_dir
+      (Logger_file_system.dumb_logrotate ~directory:output_dir
          ~log_filename:"mina-best-tip-merger.log" ~max_size:logrotate_max_size
          ~num_rotate) ;
   let logger = Logger.create () in
