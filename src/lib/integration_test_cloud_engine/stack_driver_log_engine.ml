@@ -262,7 +262,7 @@ module Puppeteer_message = struct
   [@@deriving yojson]
 end
 
-let parse_event_from_log_entry ~network log_entry =
+let parse_event_from_log_entry ~logger ~network log_entry =
   let open Or_error.Let_syntax in
   let open Json_parsing in
   let%bind app_id = find string log_entry [ "labels"; "k8s-pod/app" ] in
@@ -283,6 +283,7 @@ let parse_event_from_log_entry ~network log_entry =
       in
       match msg.event_type with
       | "node_offline" ->
+          [%log info] "hitting node_offline event from puppeteer" ;
           Event_type.Event (Event_type.Node_offline, ())
       | _ ->
           failwith "Could not process a puppeteer message from the logs"
@@ -308,7 +309,7 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
     let%bind () =
       Deferred.List.iter ~how:`Sequential log_entries ~f:(fun log_entry ->
           log_entry
-          |> parse_event_from_log_entry ~network
+          |> parse_event_from_log_entry ~logger ~network
           |> Or_error.ok_exn
           |> Pipe.write_without_pushback_if_open event_writer ;
           Deferred.unit)
