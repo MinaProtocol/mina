@@ -6,7 +6,12 @@ open Core_kernel
 
 [%%ifdef consensus_mechanism]
 
-open Snark_params.Tick
+module Tick = Snark_params.Tick
+open Tick
+
+[%%else]
+
+module Tick = Snark_params_nonconsensus
 
 [%%endif]
 
@@ -98,4 +103,4 @@ val to_bits : t -> bool list
 val gen : t Quickcheck.Generator.t
 
 (** Compute a standalone hash of the current memo. *)
-val hash : t -> Snark_params.Tick.Field.t
+val hash : t -> Tick.Field.t
