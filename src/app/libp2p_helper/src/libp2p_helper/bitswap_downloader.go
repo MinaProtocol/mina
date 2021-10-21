@@ -3,6 +3,7 @@ package main
 import (
 	"codanet"
 	"context"
+	"errors"
 	"fmt"
 	ipc "libp2p_ipc"
 	"time"
@@ -33,7 +34,7 @@ const (
 	// EpochLedger // uncomment in future to serve epoch ledger via Bitswap
 )
 
-type BitswapDataConfig = struct {
+type BitswapDataConfig struct {
 	maxSize         int
 	downloadTimeout time.Duration
 }
@@ -140,7 +141,10 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 	if err == nil {
 		go func() {
 			<-time.After(downloadTimeout)
-			bs.DeadlineChan() <- root_
+			_, has := bs.RootDownloadStates()[root_]
+			if has {
+				bs.DeadlineChan() <- root_
+			}
 		}()
 	} else {
 		bitswapLogger.Errorf("Error initializing block download: %w", err)
@@ -159,11 +163,11 @@ type malformedRoots map[root]error
 func processDownloadedBlockImpl(params map[root][]NodeIndex, block blocks.Block, rootParams map[root]RootParams,
 	maxBlockSize int, di DepthIndices, tagConfig map[BitswapDataTag]BitswapDataConfig) (map[BitswapBlockLink]map[root][]NodeIndex, malformedRoots) {
 	id := block.Cid()
-	links, fullBlockData, err := ReadBitswapBlock(block.RawData())
 	malformed := make(malformedRoots)
+	links, fullBlockData, err := ReadBitswapBlock(block.RawData())
 	if err != nil {
 		for root := range params {
-			malformed[root] = (fmt.Errorf("Error reading block %s: %v", id, err))
+			malformed[root] = fmt.Errorf("Error reading block %s: %v", id, err)
 		}
 		return nil, malformed
 	}
@@ -186,21 +190,21 @@ func processDownloadedBlockImpl(params map[root][]NodeIndex, block blocks.Block,
 		if hasRootIx {
 			blockData, dataLen, err := ExtractLengthFromRootBlockData(fullBlockData)
 			if err == nil && len(blockData) < 1 {
-				err = fmt.Errorf("error reading tag from block %s", id)
+				err = errors.New("error reading tag from block")
 			}
 			tag := rp.getTag()
 			if err == nil {
 				tag_ := BitswapDataTag(blockData[0])
 				if tag_ != tag {
-					err = fmt.Errorf("tag mismatch for %s: %d != %d", id, tag_, tag)
+					err = fmt.Errorf("tag mismatch: %d != %d", tag_, tag)
 				}
 			}
-			dataConf, hasDataConf := tagConfig[tag]
 			if err == nil {
+				dataConf, hasDataConf := tagConfig[tag]
 				if !hasDataConf {
 					err = fmt.Errorf("no tag config for tag %d", tag)
-				} else if dataConf.maxSize < dataLen {
-					err = fmt.Errorf("data is too large: %d > %d", dataLen, dataConf.maxSize)
+				} else if dataConf.maxSize < dataLen-1 {
+					err = fmt.Errorf("data is too large: %d > %d", dataLen-1, dataConf.maxSize)
 				}
 			}
 			if err != nil {
@@ -218,13 +222,13 @@ func processDownloadedBlockImpl(params map[root][]NodeIndex, block blocks.Block,
 		}
 		for _, ix := range ixs {
 			if len(block.RawData()) != schema.BlockSize(ix) {
-				malformed[root_] = (fmt.Errorf("unexpected size for block #%d (%s) of root %s: %d != %d",
-					ix, id, codanet.BlockHashToCid(root_), len(block.RawData()), schema.BlockSize(ix)))
+				malformed[root_] = fmt.Errorf("unexpected size for block #%d (%s) of root %s: %d != %d",
+					ix, id, codanet.BlockHashToCid(root_), len(block.RawData()), schema.BlockSize(ix))
 				break
 			}
 			if len(links) != schema.LinkCount(ix) {
-				malformed[root_] = (fmt.Errorf("unexpected link count for block %s of root %s: %d != %d",
-					id, codanet.BlockHashToCid(root_), len(links), schema.LinkCount(ix)))
+				malformed[root_] = fmt.Errorf("unexpected link count for block %s of root %s: %d != %d (fullLinkBlocks: %d, ix: %d)",
+					id, codanet.BlockHashToCid(root_), len(links), schema.LinkCount(ix), schema.fullLinkBlocks, ix)
 				break
 			}
 			fstChildId := di.FirstChildId(ix)
