@@ -3,19 +3,17 @@ use std::fs::File;
 use wires_15_stubs::{
     // we must import all here, to have access to the derived functions
     arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
-    caml_pointer::CamlPointer,
+    field_vector::{fp::*, fq::*},
     gate_vector::{fp::*, fq::*},
     oracles::CamlOracles,
     pasta_fp_plonk_index::*,
     pasta_fp_plonk_oracles::*,
     pasta_fp_plonk_proof::*,
     pasta_fp_plonk_verifier_index::*,
-    pasta_fp_vector::*,
     pasta_fq_plonk_index::*,
     pasta_fq_plonk_oracles::*,
     pasta_fq_plonk_proof::*,
     pasta_fq_plonk_verifier_index::*,
-    pasta_fq_vector::*,
     pasta_pallas::*,
     pasta_vesta::*,
     plonk_verifier_index::{CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex},
@@ -153,23 +151,23 @@ fn generate_bindings(mut w: impl std::io::Write) {
 
     decl_module!(w, env, "FieldVectors", {
         decl_module!(w, env, "Fp", {
-            decl_type!(w, env, CamlPointer<T1> => "t");
+            decl_type!(w, env, CamlFpVector => "t");
             decl_type_alias!(w, env, "elt" => CamlFp);
 
-            decl_func!(w, env, caml_pasta_fp_vector_create => "create");
-            decl_func!(w, env, caml_pasta_fp_vector_length => "length");
-            decl_func!(w, env, caml_pasta_fp_vector_emplace_back => "emplace_back");
-            decl_func!(w, env, caml_pasta_fp_vector_get => "get");
+            decl_func!(w, env, caml_fp_vector_create => "create");
+            decl_func!(w, env, caml_fp_vector_length => "length");
+            decl_func!(w, env, caml_fp_vector_emplace_back => "emplace_back");
+            decl_func!(w, env, caml_fp_vector_get => "get");
         });
 
         decl_module!(w, env, "Fq", {
-            decl_type!(w, env, CamlPointer<T1> => "t");
+            decl_type!(w, env, CamlFqVector => "t");
             decl_type_alias!(w, env, "elt" => CamlFq);
 
-            decl_func!(w, env, caml_pasta_fq_vector_create => "create");
-            decl_func!(w, env, caml_pasta_fq_vector_length => "length");
-            decl_func!(w, env, caml_pasta_fq_vector_emplace_back => "emplace_back");
-            decl_func!(w, env, caml_pasta_fq_vector_get => "get");
+            decl_func!(w, env, caml_fq_vector_create => "create");
+            decl_func!(w, env, caml_fq_vector_length => "length");
+            decl_func!(w, env, caml_fq_vector_emplace_back => "emplace_back");
+            decl_func!(w, env, caml_fq_vector_get => "get");
         });
     });
 
@@ -274,6 +272,38 @@ fn generate_bindings(mut w: impl std::io::Write) {
             });
         });
 
+        decl_module!(w, env, "SRS", {
+            decl_module!(w, env, "Fp", {
+                decl_type!(w, env, CamlFpSrs => "t");
+
+                decl_module!(w, env, "Poly_comm", {
+                    decl_type_alias!(w, env, "t" => CamlPolyComm<CamlGroupAffine<CamlFp>>);
+                });
+
+                decl_func!(w, env, caml_fp_srs_create => "create");
+                decl_func!(w, env, caml_fp_srs_write => "write");
+                decl_func!(w, env, caml_fp_srs_read => "read");
+                decl_func!(w, env, caml_fp_srs_lagrange_commitment => "lagrange_commitment");
+                decl_func!(w, env, caml_fp_srs_commit_evaluations => "commit_evaluations");
+                decl_func!(w, env, caml_fp_srs_b_poly_commitment => "b_poly_commitment");
+                decl_func!(w, env, caml_fp_srs_batch_accumulator_check => "batch_accumulator_check");
+                decl_func!(w, env, caml_fp_srs_h => "urs_h");
+            });
+
+            decl_module!(w, env, "Fq", {
+                decl_type!(w, env, CamlFqSrs => "t");
+
+                decl_func!(w, env, caml_fq_srs_create => "create");
+                decl_func!(w, env, caml_fq_srs_write => "write");
+                decl_func!(w, env, caml_fq_srs_read => "read");
+                decl_func!(w, env, caml_fq_srs_lagrange_commitment => "lagrange_commitment");
+                decl_func!(w, env, caml_fq_srs_commit_evaluations => "commit_evaluations");
+                decl_func!(w, env, caml_fq_srs_b_poly_commitment => "b_poly_commitment");
+                decl_func!(w, env, caml_fq_srs_batch_accumulator_check => "batch_accumulator_check");
+                decl_func!(w, env, caml_fq_srs_h => "urs_h");
+            });
+        });
+
         decl_module!(w, env, "Index", {
             decl_module!(w, env, "Fp", {
                 decl_type!(w, env, CamlPastaFpPlonkIndex => "t");
@@ -299,38 +329,6 @@ fn generate_bindings(mut w: impl std::io::Write) {
                 decl_func!(w, env, caml_pasta_fq_plonk_index_domain_d8_size => "domain_d8_size");
                 decl_func!(w, env, caml_pasta_fq_plonk_index_read => "read");
                 decl_func!(w, env, caml_pasta_fq_plonk_index_write => "write");
-            });
-        });
-
-        decl_module!(w, env, "Srs", {
-            decl_module!(w, env, "Fp", {
-                decl_type!(w, env, CamlPointer<T1> => "t");
-
-                decl_module!(w, env, "Poly_comm", {
-                    decl_type_alias!(w, env, "t" => CamlPolyComm<CamlGroupAffine<CamlFp>>);
-                });
-
-                decl_func!(w, env, caml_pasta_fp_urs_create => "create");
-                decl_func!(w, env, caml_pasta_fp_urs_write => "write");
-                decl_func!(w, env, caml_pasta_fp_urs_read => "read");
-                decl_func!(w, env, caml_pasta_fp_urs_lagrange_commitment => "lagrange_commitment");
-                decl_func!(w, env, caml_pasta_fp_urs_commit_evaluations => "commit_evaluations");
-                decl_func!(w, env, caml_pasta_fp_urs_b_poly_commitment => "b_poly_commitment");
-                decl_func!(w, env, caml_pasta_fp_urs_batch_accumulator_check => "batch_accumulator_check");
-                decl_func!(w, env, caml_pasta_fp_urs_h => "urs_h");
-            });
-
-            decl_module!(w, env, "Fq", {
-                decl_type!(w, env, CamlPointer<T1> => "t");
-
-                decl_func!(w, env, caml_pasta_fq_urs_create => "create");
-                decl_func!(w, env, caml_pasta_fq_urs_write => "write");
-                decl_func!(w, env, caml_pasta_fq_urs_read => "read");
-                decl_func!(w, env, caml_pasta_fq_urs_lagrange_commitment => "lagrange_commitment");
-                decl_func!(w, env, caml_pasta_fq_urs_commit_evaluations => "commit_evaluations");
-                decl_func!(w, env, caml_pasta_fq_urs_b_poly_commitment => "b_poly_commitment");
-                decl_func!(w, env, caml_pasta_fq_urs_batch_accumulator_check => "batch_accumulator_check");
-                decl_func!(w, env, caml_pasta_fq_urs_h => "urs_h");
             });
         });
 

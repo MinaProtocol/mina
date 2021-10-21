@@ -93,10 +93,15 @@ pub fn set(&mut self, x: T) {
 
 ### Function arguments
 
-Functions that get exported to OCaml have the choice to be passed a pointer, or a value. 
-If passed a value, then a clone happens.
+Functions that get exported to OCaml have the choice to be passed as pointer, or as value. 
+If passed as value, then a clone happens.
 
-TODO: write some guidelines on using either ocaml::pointer or our own `CamlPointer` type.
+TODO: guidelines on what to do with this information
+
+To avoid large clones, we use shared references. See:
+
+* the [impl_shared_ref!](src/caml/shared_reference.rs) macro for a thread-safe shared reference
+* the [impl_shared_rwlock!](src/caml/shared_rwlock.rs) macro for a thread-safe shared mutable object.
 
 ### Conventions
 

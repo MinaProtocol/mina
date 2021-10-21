@@ -9,17 +9,19 @@
 
 extern crate libc;
 
+/// Caml helpers
+#[macro_use]
+pub mod caml;
+
 /// Arkworks types
 pub mod arkworks;
 
-/// Caml pointers
-pub mod caml_pointer;
-pub mod gate_vector;
+/// utils
 pub mod urs_utils; // TODO: move this logic to proof-systems
 
-/// Field vectors
-pub mod pasta_fp_vector;
-pub mod pasta_fq_vector;
+pub mod field_vector;
+/// vectors
+pub mod gate_vector;
 
 /// Groups
 pub mod pasta_pallas;
@@ -47,7 +49,7 @@ pub mod pasta_fq_plonk_oracles;
 pub mod pasta_fp_plonk_proof;
 pub mod pasta_fq_plonk_proof;
 
-/// Re-exports
+/// Handy re-exports
 pub use {
     commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
     oracle::sponge::caml::CamlScalarChallenge,

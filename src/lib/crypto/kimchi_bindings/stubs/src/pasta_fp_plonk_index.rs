@@ -1,4 +1,4 @@
-use crate::{gate_vector::fp::CamlPastaFpPlonkGateVectorPtr, srs::fp::CamlFpSRS};
+use crate::{gate_vector::fp::CamlPastaFpPlonkGateVectorPtr, srs::fp::CamlFpSrs};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 use ocaml_gen::{ocaml_gen, OCamlCustomType};
@@ -11,7 +11,6 @@ use plonk_15_wires_protocol_dlog::index::Index as DlogIndex;
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
-    rc::Rc,
 };
 
 //
@@ -53,7 +52,7 @@ fn shift_wires(domain_size: usize, wires: GateWires) -> GateWires {
 pub fn caml_pasta_fp_plonk_index_create(
     gates: CamlPastaFpPlonkGateVectorPtr,
     public: ocaml::Int,
-    srs: CamlFpSRS,
+    srs: CamlFpSrs,
 ) -> Result<CamlPastaFpPlonkIndex, ocaml::Error> {
     // create domain
     let domain_size =
@@ -98,7 +97,7 @@ pub fn caml_pasta_fp_plonk_index_create(
 
     // create index
     Ok(CamlPastaFpPlonkIndex(Box::new(
-        DlogIndex::<GAffine>::create(cs, oracle::pasta::fq::params(), endo_q, Rc::clone(&srs.0)),
+        DlogIndex::<GAffine>::create(cs, oracle::pasta::fq::params(), endo_q, srs.clone()),
     )))
 }
 
@@ -136,7 +135,7 @@ pub fn caml_pasta_fp_plonk_index_domain_d8_size(index: CamlPastaFpPlonkIndexPtr)
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_read(
     offset: Option<ocaml::Int>,
-    srs: CamlFpSRS,
+    srs: CamlFpSrs,
     path: String,
 ) -> Result<CamlPastaFpPlonkIndex, ocaml::Error> {
     // read from file
@@ -160,7 +159,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     // deserialize the index
     let mut t: DlogIndex<GAffine> = bincode::deserialize_from(&mut r)?;
     t.cs.fr_sponge_params = oracle::pasta::fp::params();
-    t.srs = Rc::clone(&srs.0);
+    t.srs = srs.clone();
     t.fq_sponge_params = oracle::pasta::fq::params();
 
     //

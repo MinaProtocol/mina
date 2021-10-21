@@ -1,7 +1,9 @@
-use crate::arkworks::{CamlFq, CamlGPallas};
-use crate::pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr;
-use crate::pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex;
-use crate::pasta_fq_vector::CamlPastaFqVector;
+use crate::{
+    arkworks::{CamlFq, CamlGPallas},
+    field_vector::fq::CamlFqVector,
+    pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr,
+    pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex,
+};
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
@@ -58,7 +60,10 @@ pub fn caml_pasta_fq_plonk_proof_create(
         }
     };
 
-    let witness: Vec<Vec<_>> = witness.iter().map(|x| (*x.0).clone()).collect();
+    let witness: Vec<Vec<_>> = witness
+        .iter()
+        .map(|x| x.read().expect("lock poisoned").clone())
+        .collect();
     let witness: [Vec<_>; COLUMNS] = witness
         .try_into()
         .expect("the witness should be a column of 15 vectors");

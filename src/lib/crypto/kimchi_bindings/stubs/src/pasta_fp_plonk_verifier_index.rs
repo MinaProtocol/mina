@@ -1,10 +1,9 @@
 use crate::arkworks::{CamlFp, CamlGVesta};
-use crate::caml_pointer::CamlPointer;
 use crate::pasta_fp_plonk_index::CamlPastaFpPlonkIndexPtr;
 use crate::plonk_verifier_index::{
     CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
 };
-use crate::srs::fp::CamlFpSRS;
+use crate::srs::fp::CamlFpSrs;
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
@@ -24,7 +23,7 @@ use std::path::Path;
 //
 
 pub type CamlPastaFpPlonkVerifierIndex =
-    CamlPlonkVerifierIndex<CamlFp, CamlFpSRS, CamlPolyComm<CamlGVesta>>;
+    CamlPlonkVerifierIndex<CamlFp, CamlFpSrs, CamlPolyComm<CamlGVesta>>;
 
 //
 // Handy conversion functions
@@ -39,7 +38,7 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
             },
             max_poly_size: vi.max_poly_size as isize,
             max_quot_size: vi.max_quot_size as isize,
-            srs: CamlPointer(vi.srs),
+            srs: CamlFpSrs(vi.srs),
             evals: CamlPlonkVerificationEvals {
                 sigma_comm: vi.sigma_comm.to_vec().iter().map(Into::into).collect(),
                 coefficients_comm: vi
@@ -128,7 +127,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
 
 pub fn read_raw(
     offset: Option<ocaml::Int>,
-    srs: CamlFpSRS,
+    srs: CamlFpSrs,
     path: String,
 ) -> Result<VerifierIndex<GAffine>, ocaml::Error> {
     let path = Path::new(&path);
@@ -159,7 +158,7 @@ pub fn read_raw(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_verifier_index_read(
     offset: Option<ocaml::Int>,
-    srs: CamlFpSRS,
+    srs: CamlFpSrs,
     path: String,
 ) -> Result<CamlPastaFpPlonkVerifierIndex, ocaml::Error> {
     let vi = read_raw(offset, srs, path)?;
@@ -221,7 +220,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
         },
         max_poly_size: 0,
         max_quot_size: 0,
-        srs: CamlPointer::new(SRS::create(0)),
+        srs: CamlFpSrs::new(SRS::create(0)),
         evals: CamlPlonkVerificationEvals {
             sigma_comm: vec_comm(PERMUTS),
             coefficients_comm: vec_comm(COLUMNS),
