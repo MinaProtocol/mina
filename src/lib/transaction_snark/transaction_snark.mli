@@ -540,3 +540,10 @@ val constraint_system_digests :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> unit
   -> (string * Md5.t) list
+
+module For_tests : sig
+  val create_trivial_predicate_snapp :
+       Transaction_logic.For_tests.Transaction_spec.t
+    -> Ledger.t
+    -> Parties.t Async.Deferred.t
+end

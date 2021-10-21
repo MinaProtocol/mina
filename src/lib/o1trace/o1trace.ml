@@ -7,9 +7,12 @@ open Async
 open Webkit_trace_event
 module Scheduler = Async_kernel_scheduler
 
-let buf = Bigstring.create 128
+let buf = Bigstring.create 512
 
-let emit_event = Output.Binary.emit_event ~buf
+let emit_event w event =
+  try Output.Binary.emit_event ~buf w event
+  with exn ->
+    Writer.writef w "failed to write o1trace event: %s\n" (Exn.to_string exn)
 
 let timestamp () =
   Time_stamp_counter.now () |> Time_stamp_counter.to_int63 |> Int63.to_int_exn

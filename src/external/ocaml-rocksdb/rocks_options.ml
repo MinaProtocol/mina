@@ -128,6 +128,22 @@ module BlockBasedTableOptions =
   end
 
 module Options = struct
+  module SliceTransform = struct
+    type t = Rocks_common.t
+
+    let t = Rocks_common.t
+
+    module Noop = struct
+      include CreateConstructors(struct
+        let super_name = "slicetransform"
+        let name = "noop"
+        let constructor = "rocksdb_" ^ super_name ^ "_create_" ^ name
+        let destructor  = "rocksdb_" ^ super_name ^ "_destroy"
+        let setter_prefix = "rocksdb_" ^ super_name ^ "_" ^ name ^ "_"
+      end)
+    end
+  end
+
   (* extern rocksdb_options_t* rocksdb_options_create(); *)
   (* extern void rocksdb_options_destroy(rocksdb_options_t*\); *)
   module C = CreateConstructors_(struct let name = "options" end)
@@ -210,8 +226,11 @@ module Options = struct
 
   (* extern void rocksdb_options_set_compression_options( *)
   (*     rocksdb_options_t*, int, int, int); *)
-  (* extern void rocksdb_options_set_prefix_extractor( *)
-  (*     rocksdb_options_t*, rocksdb_slicetransform_t*\); *)
+
+  (* extern void rocksdb_options_set_prefix_extractor(rocksdb_options_t* opt, rocksdb_slicetransform_t* trans); *)
+  let set_prefix_extractor =
+    create_setter "set_prefix_extractor" SliceTransform.t
+
   (* extern void rocksdb_options_set_num_levels(rocksdb_options_t*, int); *)
   (* extern void rocksdb_options_set_level0_file_num_compaction_trigger( *)
   (*     rocksdb_options_t*, int); *)

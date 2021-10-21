@@ -48,11 +48,12 @@ module Inputs = struct
     let worker_wait_time = 5.
   end
 
+  (* bin_io is for uptime service SNARK worker *)
   type single_spec =
-    ( Transaction_witness.t
-    , Transaction_snark.t )
-    Snark_work_lib.Work.Single.Spec.t
-  [@@deriving sexp]
+    ( Transaction_witness.Stable.Latest.t
+    , Transaction_snark.Stable.Latest.t )
+    Snark_work_lib.Work.Single.Spec.Stable.Latest.t
+  [@@deriving bin_io_unversioned, sexp]
 
   let perform_single ({ m; cache; proof_level } : Worker_state.t) ~message =
     let open Deferred.Or_error.Let_syntax in
@@ -130,6 +131,9 @@ module Inputs = struct
                                         in
                                         M.merge ~sok_digest prev curr)
                                   in
+                                  assert (
+                                    Transaction_snark.Statement.equal
+                                      (Ledger_proof.statement p) input ) ;
                                   p)
                       | _ ->
                           let%bind t =

@@ -1,4 +1,5 @@
 open Core_kernel
+open Async_kernel
 open Mina_base
 
 [%%versioned:
@@ -46,25 +47,14 @@ module Job_view : sig
   type t [@@deriving sexp, to_yojson]
 end
 
-module type Monad_with_Or_error_intf = sig
-  type 'a t
+module Make_statement_scanner (Verifier : sig
+  type t
 
-  include Monad.S with type 'a t := 'a t
-
-  module Or_error : sig
-    type nonrec 'a t = 'a Or_error.t t
-
-    include Monad.S with type 'a t := 'a t
-  end
-end
-
-module Make_statement_scanner
-    (M : Monad_with_Or_error_intf) (Verifier : sig
-      type t
-
-      val verify :
-        verifier:t -> Ledger_proof_with_sok_message.t list -> bool M.Or_error.t
-    end) : sig
+  val verify :
+       verifier:t
+    -> Ledger_proof_with_sok_message.t list
+    -> bool Deferred.Or_error.t
+end) : sig
   val scan_statement :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> t
@@ -72,8 +62,9 @@ module Make_statement_scanner
          [ `Full of State_hash.t -> Mina_state.Protocol_state.value Or_error.t
          | `Partial ]
     -> verifier:Verifier.t
-    -> (Transaction_snark.Statement.t, [ `Empty | `Error of Error.t ]) result
-       M.t
+    -> ( Transaction_snark.Statement.t
+       , [ `Empty | `Error of Error.t ] )
+       Deferred.Result.t
 
   val check_invariants :
        t
@@ -85,7 +76,7 @@ module Make_statement_scanner
     -> error_prefix:string
     -> registers_begin:Mina_state.Registers.Value.t option
     -> registers_end:Mina_state.Registers.Value.t
-    -> (unit, Error.t) result M.t
+    -> (unit, Error.t) Deferred.Result.t
 end
 
 (*All the transactions with undos*)
