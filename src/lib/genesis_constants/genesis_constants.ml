@@ -204,8 +204,11 @@ The types are defined such that this module doesn't depend on any of the coda li
 TODO: #4659 move key generation to runtime_genesis_ledger.exe to include scan_state constants, consensus constants (c and  block_window_duration) and ledger depth here*)
 
 let genesis_timestamp_of_string str =
-  let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
-  Core.Time.of_string_gen ~if_no_timezone:(`Use_this_one default_timezone) str
+  let default_zone = Time.Zone.of_utc_offset ~hours:(-8) in
+  Time.of_string_gen
+    ~find_zone:(fun _ -> assert false)
+    ~default_zone:(fun () -> default_zone)
+    str
 
 let of_time t = Time.to_span_since_epoch t |> Time.Span.to_ms |> Int64.of_float
 
@@ -225,8 +228,7 @@ let validate_time time_str =
 
 let genesis_timestamp_to_string time =
   Int64.to_float time |> Time.Span.of_ms |> Time.of_span_since_epoch
-  |> Core.Time.to_string_iso8601_basic
-       ~zone:(Core.Time.Zone.of_utc_offset ~hours:(-8))
+  |> Time.to_string_iso8601_basic ~zone:(Time.Zone.of_utc_offset ~hours:(-8))
 
 (*Protocol constants required for consensus and snarks. Consensus constants is generated using these*)
 module Protocol = struct
@@ -355,7 +357,7 @@ module T = struct
           ]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
-      ^ Core.Time.to_string_abs ~zone:Time.Zone.utc
+      ^ Time.to_string_abs ~zone:Time.Zone.utc
           (Time.of_span_since_epoch
              (Time.Span.of_ms
                 (Int64.to_float t.protocol.genesis_state_timestamp)))
