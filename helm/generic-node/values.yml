@@ -10,7 +10,6 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: "1.2.0beta8-develop-5b35b37"
 
-
 features:
   runtimeConfig:
     enabled: true
