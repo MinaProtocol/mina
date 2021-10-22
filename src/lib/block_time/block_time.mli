@@ -102,7 +102,7 @@ module Time : sig
         with type Unpacked.value = t
          and type Packed.value = t
 
-    val to_time_ns_span : t -> Core.Time_ns.Span.t
+    val to_time_ns_span : t -> Core_kernel.Time_ns.Span.t
 
     val to_string_hum : t -> string
 

@@ -77,7 +77,7 @@ module Time = struct
             (* TODO: remove eventually *)
             let env_deprecated = "CODA_TIME_OFFSET" in
             let env_offset =
-              match (Core.Sys.getenv env, Core.Sys.getenv env_deprecated) with
+              match (Sys.getenv_opt env, Sys.getenv_opt env_deprecated) with
               | Some tm, _ ->
                   Int.of_string tm
               | _, Some tm ->
