@@ -46,6 +46,8 @@ The name Samasika comes from the Sanskrit word, meaning small or succinct.
     - [5.1.7 `stateHash`](#517-statehash)
     - [5.1.10 `subWindow`](#5110-subwindow)
     - [5.1.12 `relativeSubWindow`](#5112-relativesubwindow)
+    - [5.1.13 `hashEpochSeed`](#5113-hashepochseed)
+    - [5.1.14 `hashProtocolState`](#5114-hashprotocolstate)
   - [5.2 Chain selection rules](#52-chain-selection-rules)
     - [5.2.1 Short-range fork rule](#521-short-range-fork-rule)
     - [5.2.2 Long-range fork rule](#522-long-range-fork-rule)
@@ -398,7 +400,23 @@ This function returns the relative sub-window number of a global slot `S`.
 ```rust
 fn relativeSubWindow(S) -> u64
 {
-   return (S/slots_per_sub_window) mod sub_windows_per_window
+    return (S/slots_per_sub_window) mod sub_windows_per_window
+}
+```
+
+### 5.1.13 `hashEpochSeed`
+
+```rust
+fn hashEpochSeed(data: Field[]) -> State_hash {
+    return poseidon_3w_hash(POSEIDON_EPOCH_SEED_HASH, [next_data.seed.to_vesta_field_element(), producer_vrf_result])
+}
+```
+
+### 5.1.14 `hashProtocolState`
+
+```rust
+fn hashProtocolState(data: Field[]) -> State_hash {
+    return poseidon_3w_hash(POSEIDON_PROTOCOL_STATE_HASH, data)
 }
 ```
 
@@ -503,28 +521,30 @@ fn initCheckpoints(G) -> ()
     cState(G).staking_epoch_data.seed = zero
     cState(G).staking_epoch_data.start_checkpoint = zero
     cState(G).staking_epoch_data.lock_checkpoint = zero
-    cState(G).staking_epoch_data.length = 1
+    cState(G).staking_epoch_data.epoch_length = 1
 
     state_hash = poseidon_3w_hash(latest state ϵ cState(G).next_epoch_data.seed's update range) ?
-    cState(G).next_epoch.data.seed = ???
-    cState(G).next_epoch_data.start_checkpoint = state_hash ?
+    cState(G).next_epoch.data.seed = Epoch_seed::from_hex("0d01257f75d0a794630bdaf2d90725f4c95da11abd862fb8a2f88ab94c41fa0b8d353769f9bb")
+    cState(G).next_epoch_data.start_checkpoint = zero
     cState(G).next_epoch_data.lock_checkpoint =  state_hash ?
+    cState(G).staking_epoch_data.epoch_length = 2
 }
 ```
 
 ### 5.3.2 `updateCheckpoints`
+
+**WIP**
 
 This algorithm updates the checkpoints of the block being created `B` based on its parent block `P`.  It inputs the blocks `P` and `B` and updates `B`'s checkpoints according to the description in [Section 5.3](#53-decentralized-checkpointing).
 
 ```rust
 fn updateCheckpoints(P, B) -> ()
 {
-    if epochSlot(B) == 0 then
-
     // Set the start_checkpoint
     if cState(B).epoch_count > cState(P).epochCount {
         cState(B).staking_epoch_data = cState(P).next_epoch_data
-        cState(B).next_epoch_data.start_checkpoint = poseidon_3w_hash(protocol_state_init_sponge_state, P.protocol_state.to_random_oracle_input()) // OR B.protocol_state.previous_state_hash
+        cState(B).next_epoch_data.start_checkpoint = hashProtocolState(P.protocol_state.to_roinput().to_fields())
+        cState(B).next_epoch_data.epoch_length = 1
     }
     else {
         cState(B).staking_epoch_data = cState(P).staking_epoch_data
@@ -534,13 +554,12 @@ fn updateCheckpoints(P, B) -> ()
 
     // Set the seed and lock_checkpoint
     if 0 ≤ epochSlot(B) < 2/3*slots_per_epoch {
-        cState(B).next_epoch.data.seed = poseidon_3w_hash(epoch_seed_init_sponge_state, [next_data.seed.to_vesta_field_element(), producer_vrf_result])
-        cState(B).next_epoch_data.lock_checkpoint = poseidon_3w_hash(protocol_state_init_sponge_state, P.protocol_state.to_random_oracle_input()) // OR B.protocol_state.previous_state_hash
+        cState(B).next_epoch.data.seed = hashEpochSeed([next_data.seed.to_vesta_field_element(), producer_vrf_result]).to_epoch_seed()
+        cState(B).next_epoch_data.lock_checkpoint = hashProtocolState(P.protocol_state.to_roinput().to_fields())
     }
     else {
         cState(B).next_epoch.data.seed = cState(P).next_epoch_data.seed
         cState(B).next_epoch_data.lock_checkpoint = cState(P).next_epoch_data.lock_checkpoint
-        // todo: epoch count
     }
 }
 ```
