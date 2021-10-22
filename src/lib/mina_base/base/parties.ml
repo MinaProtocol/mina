@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 module Digest = Zexe_backend.Pasta.Fp
 
 module Party_or_stack = struct

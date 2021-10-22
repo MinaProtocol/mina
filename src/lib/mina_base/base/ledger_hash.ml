@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Import
 open Snark_params
 open Snarky_backendless
