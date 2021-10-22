@@ -6,6 +6,7 @@
   (instrumentation (backend bisect_ppx))
   (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving_yojson ppx_deriving.std h_list.ppx))
   (libraries
+    run_in_thread
     hex
     digestif
     pickles_types
