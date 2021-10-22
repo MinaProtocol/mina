@@ -6010,8 +6010,8 @@
               "deprecationReason": null
             },
             {
-              "name": "feeLowerBound",
-              "description": "Lower bound on the fee paid by the fee-payer for the Snapp transaction, or null if it can't be calculated",
+              "name": "fee",
+              "description": "Transaction fee paid by the fee-payer for the Snapp transaction",
               "args": [],
               "type": {
                 "kind": "SCALAR",

@@ -1575,11 +1575,10 @@ module Types = struct
                 in
                 List.map account_ids ~f:(fun acct_id ->
                     AccountObj.get_best_ledger_account coda acct_id))
-          ; field_no_status "feeLowerBound" ~typ:uint64 ~args:[]
+          ; field_no_status "fee" ~typ:uint64 ~args:[]
               ~doc:
-                "Lower bound on the fee paid by the fee-payer for the Snapp \
-                 transaction, or null if it can't be calculated"
-              ~resolve:(fun _ parties ->
+                "Transaction fee paid by the fee-payer for the Snapp \
+                 transaction" ~resolve:(fun _ parties ->
                 try
                   Some
                     ( Parties.fee parties.With_hash.data

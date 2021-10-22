@@ -4869,10 +4869,11 @@ let%test_module "transaction_snark" =
                     in
                     { Party.Update.dummy with permissions }
                   in
+                  let sender_pk = sender.public_key |> Public_key.compress in
                   let fee_payer =
                     { Party.Fee_payer.data =
                         { body =
-                            { pk = sender.public_key |> Public_key.compress
+                            { pk = sender_pk
                             ; update = update_empty_permissions
                             ; token_id = ()
                             ; delta = fee
@@ -4887,20 +4888,20 @@ let%test_module "transaction_snark" =
                     ; authorization = Signature.dummy
                     }
                   in
-                  (*let sender_party : Party.Predicated.t =
-                      { body =
-                          { pk = trivial_account_pk
-                          ; update = update_empty_permissions
-                          ; token_id = Token_id.default
-                          ; delta = Amount.(Signed.(negate (of_unsigned amount)))
-                          ; events = []
-                          ; rollup_events = []
-                          ; call_data = Field.zero
-                          ; depth = 0
-                          }
-                      ; predicate = Full Snapp_predicate.Account.accept
-                      }
-                    in*)
+                  let sender_party_data : Party.Predicated.t =
+                    { body =
+                        { pk = sender_pk
+                        ; update = Party.Update.noop
+                        ; token_id = Token_id.default
+                        ; delta = Amount.(Signed.(negate (of_unsigned amount)))
+                        ; events = []
+                        ; rollup_events = []
+                        ; call_data = Field.zero
+                        ; depth = 0
+                        }
+                    ; predicate = Nonce (Account.Nonce.succ sender_nonce)
+                    }
+                  in
                   let snapp_party_data : Party.Predicated.t =
                     { body =
                         { pk = trivial_account_pk
@@ -4921,7 +4922,7 @@ let%test_module "transaction_snark" =
                     Parties.Party_or_stack.of_parties_list
                       ~party_depth:(fun (p : Party.Predicated.t) ->
                         p.body.depth)
-                      [ snapp_party_data ]
+                      [ sender_party_data; snapp_party_data ]
                     |> Parties.Party_or_stack.accumulate_hashes_predicated
                   in
                   let other_parties_hash =
@@ -4949,24 +4950,32 @@ let%test_module "transaction_snark" =
                     (fun () -> trivial_prover ~handler [] tx_statement)
                     |> Async.Thread_safe.block_on_async_exn
                   in
-                  let other_parties =
-                    [ { Party.data = snapp_party_data
-                      ; authorization = Proof pi
-                      }
-                    ]
-                  in
-                  let fee_payer =
+                  let fee_payer_signature_auth =
                     let txn_comm =
                       Parties.Transaction_commitment.with_fee_payer transaction
                         ~fee_payer_hash:
                           Party.Predicated.(
                             digest (of_fee_payer fee_payer.data))
                     in
-                    { fee_payer with
-                      authorization =
-                        Signature_lib.Schnorr.sign sender.private_key
-                          (Random_oracle.Input.field txn_comm)
+                    Signature_lib.Schnorr.sign sender.private_key
+                      (Random_oracle.Input.field txn_comm)
+                  in
+                  let fee_payer =
+                    { fee_payer with authorization = fee_payer_signature_auth }
+                  in
+                  let sender_signature_auth =
+                    Signature_lib.Schnorr.sign sender.private_key
+                      (Random_oracle.Input.field transaction)
+                  in
+                  let sender =
+                    { Party.data = sender_party_data
+                    ; authorization = Signature sender_signature_auth
                     }
+                  in
+                  let other_parties =
+                    [ sender
+                    ; { data = snapp_party_data; authorization = Proof pi }
+                    ]
                   in
                   let parties : Parties.t =
                     { fee_payer; other_parties; protocol_state; memo }

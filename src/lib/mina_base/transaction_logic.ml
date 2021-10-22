@@ -2373,7 +2373,7 @@ module For_tests = struct
   let depth = Int.ceil_log2 (num_accounts + num_transactions)
 
   module Init_ledger = struct
-    type t = (Keypair.t * int) array
+    type t = (Keypair.t * int) array [@@deriving sexp]
 
     let init (type l) (module L : Ledger_intf with type t = l) (init_ledger : t)
         (l : L.t) =
@@ -2411,6 +2411,7 @@ module For_tests = struct
       ; receiver : Public_key.Compressed.t
       ; amount : Currency.Amount.t
       }
+    [@@deriving sexp]
 
     let gen ~(init_ledger : Init_ledger.t) ~nonces =
       let pk ((kp : Keypair.t), _) = Public_key.compress kp.public_key in
@@ -2455,6 +2456,7 @@ module For_tests = struct
 
   module Test_spec = struct
     type t = { init_ledger : Init_ledger.t; specs : Transaction_spec.t list }
+    [@@deriving sexp]
 
     let mk_gen ?(num_transactions = num_transactions) () =
       let open Quickcheck.Let_syntax in
