@@ -1,0 +1,5 @@
+(library
+ (public_name run_in_thread.native)
+ (name run_in_thread_native)
+ (libraries async)
+ (implements run_in_thread))
