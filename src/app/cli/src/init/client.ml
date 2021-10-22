@@ -1883,9 +1883,9 @@ let add_peers_graphql =
                    object
                      method host = peer.host
 
-                     method libp2p_port = peer.libp2p_port
+                     method libp2pPort = peer.libp2p_port
 
-                     method peer_id = peer.peer_id
+                     method peerId = peer.peer_id
                    end
                | None ->
                    eprintf
@@ -1920,16 +1920,10 @@ let compile_time_constants =
            home ^/ Cli_lib.Default.conf_dir_name
          in
          let config_file =
-           (* TODO: eventually, remove CODA_ variable *)
-           let mina_config_file = "MINA_CONFIG_FILE" in
-           let coda_config_file = "CODA_CONFIG_FILE" in
-           match (Sys.getenv mina_config_file, Sys.getenv coda_config_file) with
-           | Some config_file, _ ->
+           match Sys.getenv "MINA_CONFIG_FILE" with
+           | Some config_file ->
                config_file
-           | None, Some config_file ->
-               (* we print a deprecation warning on daemon startup, don't print here *)
-               config_file
-           | None, None ->
+           | None ->
                conf_dir ^/ "daemon.json"
          in
          let open Async in

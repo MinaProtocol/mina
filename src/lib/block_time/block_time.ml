@@ -74,19 +74,11 @@ module Time = struct
       | None ->
           let offset =
             let env = "MINA_TIME_OFFSET" in
-            (* TODO: remove eventually *)
-            let env_deprecated = "CODA_TIME_OFFSET" in
             let env_offset =
-              match (Sys.getenv_opt env, Sys.getenv_opt env_deprecated) with
-              | Some tm, _ ->
+              match Sys.getenv_opt env with
+              | Some tm ->
                   Int.of_string tm
-              | _, Some tm ->
-                  [%log warn]
-                    "Using deprecated environment variable %s, please use %s \
-                     instead"
-                    env_deprecated env ;
-                  Int.of_string tm
-              | None, None ->
+              | None ->
                   [%log debug]
                     "Environment variable %s not found, using default of 0" env ;
                   0

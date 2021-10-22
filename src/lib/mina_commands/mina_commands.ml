@@ -93,7 +93,7 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
   | Ok ([ Signed_command txn ], []) ->
       [%log' info (Mina_lib.top_level_logger t)]
         ~metadata:[ ("command", User_command.to_yojson (Signed_command txn)) ]
-        "Scheduled payment $command" ;
+        "Scheduled command $command" ;
       Ok txn
   | Ok (valid_commands, invalid_commands) ->
       [%log' info (Mina_lib.top_level_logger t)]
@@ -110,8 +110,8 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
                         .to_yojson snd)
                    invalid_commands) )
           ]
-        "Invalid result from scheduling a payment" ;
-      Error (Error.of_string "Internal error while scheduling a payment")
+        "Invalid result from scheduling a user command" ;
+      Error (Error.of_string "Internal error while scheduling a user command")
   | Error e ->
       Error e
 
@@ -124,6 +124,47 @@ let setup_and_submit_user_commands t user_command_list =
       [ ("mina_command", `String "scheduling a batch of user transactions") ] ;
   Mina_lib.add_transactions t user_command_list
 
+let setup_and_submit_snapp_command t (snapp_parties : Parties.t) =
+  let open Participating_state.Let_syntax in
+  (* hack to get types to work out *)
+  let%map () = return () in
+  let open Deferred.Let_syntax in
+  let%map result = Mina_lib.add_snapp_transactions t [ snapp_parties ] in
+  txn_count := !txn_count + 1 ;
+  match result with
+  | Ok ([], [ failed_txn ]) ->
+      Error
+        (Error.of_string
+           (sprintf !"%s"
+              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                .to_yojson (snd failed_txn)
+              |> Yojson.Safe.to_string )))
+  | Ok ([ User_command.Parties txn ], []) ->
+      [%log' info (Mina_lib.top_level_logger t)]
+        ~metadata:[ ("snapp_command", Parties.to_yojson txn) ]
+        "Scheduled Snapp command $snapp_command" ;
+      Ok txn
+  | Ok (valid_commands, invalid_commands) ->
+      [%log' info (Mina_lib.top_level_logger t)]
+        ~metadata:
+          [ ( "valid_snapp_commands"
+            , `List (List.map ~f:User_command.to_yojson valid_commands) )
+          ; ( "invalid_snapp_commands"
+            , `List
+                (List.map
+                   ~f:
+                     (Fn.compose
+                        Network_pool.Transaction_pool.Resource_pool.Diff
+                        .Diff_error
+                        .to_yojson snd)
+                   invalid_commands) )
+          ]
+        "Invalid result from scheduling a Snapp transaction" ;
+      Error
+        (Error.of_string "Internal error while scheduling a Snapp transaction")
+  | Error e ->
+      Error e
+
 module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
   type proof_elem = User_command.t
 
@@ -134,9 +175,8 @@ module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
       match proof_elem with
       | Signed_command c ->
           Receipt.Elt.Signed_command (Signed_command.payload c)
-      | Snapp_command x ->
-          Receipt.Elt.Snapp_command
-            Snapp_command.(Payload.(Digested.digest (digested (to_payload x))))
+      | Parties x ->
+          Receipt.Elt.Parties (Parties.commitment x)
     in
     Receipt.Chain_hash.cons p parent_hash
 end)

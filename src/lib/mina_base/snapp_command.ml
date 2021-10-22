@@ -229,12 +229,23 @@ module Party = struct
     module Proved = struct
       [%%versioned
       module Stable = struct
+        module V2 = struct
+          type t =
+            (Body.Stable.V1.t, Snapp_predicate.Stable.V2.t) Poly.Stable.V1.t
+          [@@deriving sexp, equal, yojson, hash, compare]
+
+          let to_latest = Fn.id
+        end
+
         module V1 = struct
           type t =
             (Body.Stable.V1.t, Snapp_predicate.Stable.V1.t) Poly.Stable.V1.t
           [@@deriving sexp, equal, yojson, hash, compare]
 
-          let to_latest = Fn.id
+          let to_latest (t : t) : V2.t =
+            { body = t.body
+            ; predicate = Snapp_predicate.Stable.V1.to_latest t.predicate
+            }
         end
       end]
 
@@ -312,6 +323,16 @@ module Party = struct
     module Proved = struct
       [%%versioned
       module Stable = struct
+        module V2 = struct
+          type t =
+            ( Predicated.Proved.Stable.V2.t
+            , Control.Stable.V1.t )
+            Poly.Stable.V1.t
+          [@@deriving sexp, equal, yojson, hash, compare]
+
+          let to_latest = Fn.id
+        end
+
         module V1 = struct
           type t =
             ( Predicated.Proved.Stable.V1.t
@@ -319,7 +340,10 @@ module Party = struct
             Poly.Stable.V1.t
           [@@deriving sexp, equal, yojson, hash, compare]
 
-          let to_latest = Fn.id
+          let to_latest (t : t) : V2.t =
+            { data = Predicated.Proved.Stable.V1.to_latest t.data
+            ; authorization = t.authorization
+            }
         end
       end]
     end
@@ -364,6 +388,13 @@ module Inner = struct
         ; two : 'two
         }
       [@@deriving sexp, equal, yojson, hash, compare, fields, hlist]
+
+      let to_latest one_to_latest two_to_latest t =
+        { token_id = t.token_id
+        ; fee_payment = t.fee_payment
+        ; one = one_to_latest t.one
+        ; two = two_to_latest t.two
+        }
     end
   end]
 end
@@ -371,6 +402,37 @@ end
 module Binable_arg = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        | Proved_empty of
+            ( Party.Authorized.Proved.Stable.V2.t
+            , Party.Authorized.Empty.Stable.V1.t option )
+            Inner.Stable.V1.t
+        | Proved_signed of
+            ( Party.Authorized.Proved.Stable.V2.t
+            , Party.Authorized.Signed.Stable.V1.t )
+            Inner.Stable.V1.t
+        | Proved_proved of
+            ( Party.Authorized.Proved.Stable.V2.t
+            , Party.Authorized.Proved.Stable.V2.t )
+            Inner.Stable.V1.t
+        | Signed_signed of
+            ( Party.Authorized.Signed.Stable.V1.t
+            , Party.Authorized.Signed.Stable.V1.t )
+            Inner.Stable.V1.t
+        | Signed_empty of
+            ( Party.Authorized.Signed.Stable.V1.t
+            , Party.Authorized.Empty.Stable.V1.t option )
+            Inner.Stable.V1.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+
+      let description = "Snapp command"
+
+      let version_byte = Base58_check.Version_bytes.snapp_command
+    end
+
     module V1 = struct
       type t =
         | Proved_empty of
@@ -395,11 +457,32 @@ module Binable_arg = struct
             Inner.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
-      let to_latest = Fn.id
-
-      let description = "Snapp command"
-
-      let version_byte = Base58_check.Version_bytes.snapp_command
+      let to_latest : t -> V2.t = function
+        | Proved_empty { token_id; fee_payment; one; two } ->
+            Proved_empty
+              { token_id
+              ; fee_payment
+              ; one = Party.Authorized.Proved.Stable.V1.to_latest one
+              ; two
+              }
+        | Proved_signed { token_id; fee_payment; one; two } ->
+            Proved_signed
+              { token_id
+              ; fee_payment
+              ; one = Party.Authorized.Proved.Stable.V1.to_latest one
+              ; two
+              }
+        | Proved_proved { token_id; fee_payment; one; two } ->
+            Proved_proved
+              { token_id
+              ; fee_payment
+              ; one = Party.Authorized.Proved.Stable.V1.to_latest one
+              ; two = Party.Authorized.Proved.Stable.V1.to_latest two
+              }
+        | Signed_signed { token_id; fee_payment; one; two } ->
+            Signed_signed { token_id; fee_payment; one; two }
+        | Signed_empty { token_id; fee_payment; one; two } ->
+            Signed_empty { token_id; fee_payment; one; two }
     end
   end]
 end
@@ -412,6 +495,47 @@ include Binable_arg
 
 [%%versioned_binable
 module Stable = struct
+  module V2 = struct
+    type t = Binable_arg.Stable.V2.t =
+      | Proved_empty of
+          ( Party.Authorized.Proved.Stable.V2.t
+          , Party.Authorized.Empty.Stable.V1.t option )
+          Inner.Stable.V1.t
+      | Proved_signed of
+          ( Party.Authorized.Proved.Stable.V2.t
+          , Party.Authorized.Signed.Stable.V1.t )
+          Inner.Stable.V1.t
+      | Proved_proved of
+          ( Party.Authorized.Proved.Stable.V2.t
+          , Party.Authorized.Proved.Stable.V2.t )
+          Inner.Stable.V1.t
+      | Signed_signed of
+          ( Party.Authorized.Signed.Stable.V1.t
+          , Party.Authorized.Signed.Stable.V1.t )
+          Inner.Stable.V1.t
+      | Signed_empty of
+          ( Party.Authorized.Signed.Stable.V1.t
+          , Party.Authorized.Empty.Stable.V1.t option )
+          Inner.Stable.V1.t
+    [@@deriving sexp, equal, yojson, hash, compare]
+
+    include Binable.Of_binable
+              (Binable_arg.Stable.V2)
+              (struct
+                type nonrec t = t
+
+                let to_binable _ = failwith "Snapps disabled"
+
+                let of_binable _ = failwith "Snapps disabled"
+              end)
+
+    let to_latest = Fn.id
+
+    let description = "Snapp command"
+
+    let version_byte = Base58_check.Version_bytes.snapp_command
+  end
+
   module V1 = struct
     type t = Binable_arg.Stable.V1.t =
       | Proved_empty of
@@ -446,7 +570,7 @@ module Stable = struct
                 let of_binable _ = failwith "Snapps disabled"
               end)
 
-    let to_latest = Fn.id
+    let to_latest = Binable_arg.Stable.V1.to_latest
 
     let description = "Snapp command"
 
@@ -813,6 +937,19 @@ module Payload = struct
   module One_proved = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+          ( bool
+          , Token_id.Stable.V1.t
+          , Other_fee_payer.Payload.Stable.V1.t option
+          , Party.Predicated.Proved.Stable.V2.t
+          , Party.Predicated.Signed.Stable.V1.t )
+          Inner.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           ( bool
@@ -823,7 +960,14 @@ module Payload = struct
           Inner.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
-        let to_latest = Fn.id
+        let to_latest (t : t) : V2.t =
+          { second_starts_empty = t.second_starts_empty
+          ; second_ends_empty = t.second_ends_empty
+          ; token_id = t.token_id
+          ; other_fee_payer_opt = t.other_fee_payer_opt
+          ; one = Party.Predicated.Proved.Stable.V1.to_latest t.one
+          ; two = t.two
+          }
       end
     end]
 
@@ -851,6 +995,19 @@ module Payload = struct
   module Two_proved = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+          ( bool
+          , Token_id.Stable.V1.t
+          , Other_fee_payer.Payload.Stable.V1.t option
+          , Party.Predicated.Proved.Stable.V2.t
+          , Party.Predicated.Proved.Stable.V2.t )
+          Inner.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           ( bool
@@ -861,7 +1018,14 @@ module Payload = struct
           Inner.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
-        let to_latest = Fn.id
+        let to_latest (t : t) : V2.t =
+          { second_starts_empty = t.second_starts_empty
+          ; second_ends_empty = t.second_ends_empty
+          ; token_id = t.token_id
+          ; other_fee_payer_opt = t.other_fee_payer_opt
+          ; one = Party.Predicated.Proved.Stable.V1.to_latest t.one
+          ; two = Party.Predicated.Proved.Stable.V1.to_latest t.two
+          }
       end
     end]
 
@@ -904,6 +1068,17 @@ module Payload = struct
 
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        ( Zero_proved.Stable.V1.t
+        , One_proved.Stable.V2.t
+        , Two_proved.Stable.V2.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         ( Zero_proved.Stable.V1.t
@@ -912,7 +1087,13 @@ module Payload = struct
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
-      let to_latest = Fn.id
+      let to_latest : t -> V2.t = function
+        | Zero_proved zero ->
+            Zero_proved zero
+        | One_proved one ->
+            One_proved (One_proved.Stable.V1.to_latest one)
+        | Two_proved two ->
+            Two_proved (Two_proved.Stable.V1.to_latest two)
     end
   end]
 
