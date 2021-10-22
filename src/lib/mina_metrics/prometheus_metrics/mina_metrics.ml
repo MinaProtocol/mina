@@ -102,8 +102,6 @@ module type Histogram = sig
   type t
 
   val observe : t -> float -> unit
-
-  val time : t -> (unit -> float) -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 end
 
 module Runtime = struct
@@ -1141,6 +1139,8 @@ let generic_server ?forward_uri ~port ~logger ~registry () =
   Server.create ~mode:`TCP ~on_handler_error:(`Call handle_error)
     (Async.Tcp.Where_to_listen.of_port port)
     callback
+
+type t = (Async.Socket.Address.Inet.t, int) Cohttp_async.Server.t
 
 let server ?forward_uri ~port ~logger () =
   Runtime.gc_stat () ;

@@ -1,3 +1,6 @@
+open Core_kernel
+open Async_kernel
+
 val time_offset_sec : float
 
 module Counter : sig
@@ -26,8 +29,6 @@ module type Histogram = sig
   type t
 
   val observe : t -> float -> unit
-
-  val time : t -> (unit -> float) -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 end
 
 module Runtime : sig
@@ -264,8 +265,6 @@ module Catchup : sig
 end
 
 module Transition_frontier_controller : sig
-  val subsystem : string
-
   val transitions_being_processed : Gauge.t
 
   val transitions_in_catchup_scheduler : Gauge.t
@@ -284,8 +283,6 @@ module Block_latency : sig
     val upload_to_gcloud_blocks : Gauge.t
   end
 
-  val block_window_duration : int
-
   module Gossip_slots : sig
     val v : Gauge.t
 
@@ -297,7 +294,7 @@ module Block_latency : sig
   module Gossip_time : sig
     val v : Gauge.t
 
-    val update : Core.Time.Span.t -> unit
+    val update : Time.Span.t -> unit
 
     val clear : unit -> unit
   end
@@ -305,7 +302,7 @@ module Block_latency : sig
   module Inclusion_time : sig
     val v : Gauge.t
 
-    val update : Core.Time.Span.t -> unit
+    val update : Time.Span.t -> unit
 
     val clear : unit -> unit
   end
@@ -324,8 +321,6 @@ module Rejected_blocks : sig
 end
 
 module Object_lifetime_statistics : sig
-  val subsystem : string
-
   val allocated_count : name:string -> Counter.t
 
   val collected_count : name:string -> Counter.t
@@ -336,20 +331,13 @@ module Object_lifetime_statistics : sig
     name:string -> quartile:[< `Q1 | `Q2 | `Q3 | `Q4 ] -> Gauge.t
 end
 
+type t
+
 val server :
-     ?forward_uri:Uri.t
-  -> port:int
-  -> logger:Logger.t
-  -> unit
-  -> (Async.Socket.Address.Inet.t, int) Cohttp_async.Server.t Async.Deferred.t
+  ?forward_uri:Uri.t -> port:int -> logger:Logger.t -> unit -> t Deferred.t
 
 module Archive : sig
   type t
-
-  val subsystem : string
-
-  val find_or_add :
-    t -> name:string -> help:string -> subsystem:string -> Gauge.t
 
   val unparented_blocks : t -> Gauge.t
 
@@ -358,9 +346,5 @@ module Archive : sig
   val missing_blocks : t -> Gauge.t
 
   val create_archive_server :
-       ?forward_uri:Uri.t
-    -> port:int
-    -> logger:Logger.t
-    -> unit
-    -> t Async.Deferred.t
+    ?forward_uri:Uri.t -> port:int -> logger:Logger.t -> unit -> t Deferred.t
 end
