@@ -68,7 +68,7 @@ module Processor : sig
 
   val raw : ?log_level:Level.t -> unit -> t
 
-  val pretty : log_level:Level.t -> config:Logproc_lib.Interpolator.config -> t
+  val pretty : log_level:Level.t -> config:Interpolator_lib.Interpolator.config -> t
 end
 
 (** A Transport is a module which represent a destination

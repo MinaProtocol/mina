@@ -95,7 +95,7 @@ module Message = struct
   [@@deriving yojson]
 
   let check_invariants (t : t) =
-    match Logproc_lib.Interpolator.parse t.message with
+    match Interpolator_lib.Interpolator.parse t.message with
     | Error _ ->
         false
     | Ok items ->
@@ -137,7 +137,7 @@ module Processor = struct
   end
 
   module Pretty = struct
-    type t = { log_level : Level.t; config : Logproc_lib.Interpolator.config }
+    type t = { log_level : Level.t; config : Interpolator_lib.Interpolator.config }
 
     let create ~log_level ~config = { log_level; config }
 
@@ -146,7 +146,7 @@ module Processor = struct
       if Level.compare msg.level log_level < 0 then None
       else
         match
-          Logproc_lib.Interpolator.interpolate config msg.message msg.metadata
+          Interpolator_lib.Interpolator.interpolate config msg.message msg.metadata
         with
         | Error err ->
             Option.iter msg.source ~f:(fun source ->
