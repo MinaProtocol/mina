@@ -1,0 +1,17 @@
+(rule
+ (targets
+   plonk_wasm_bg.wasm.d.ts
+   plonk_wasm_bg.wasm
+   plonk_wasm.d.ts
+   plonk_wasm.js
+   snippets/)
+ (deps
+  (source_tree ..)
+  (source_tree %{project_root}/external/wasm-bindgen-rayon)
+  (source_tree %{project_root}/lib/marlin)
+  ../../Cargo.toml
+  ../../.cargo/config)
+ (action
+  (progn
+   (run chmod -R +w ..)
+   (run rustup run nightly-2021-02-11 wasm-pack build --target web --out-dir chrome ..))))
