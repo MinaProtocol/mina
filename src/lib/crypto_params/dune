@@ -6,7 +6,6 @@
  (inline_tests)
  (libraries
    cache_dir
-   core
    hash_prefixes
    group_map
    snarky.backendless
