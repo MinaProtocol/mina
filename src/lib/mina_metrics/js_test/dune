@@ -1,0 +1,5 @@
+(executable
+ (name mina_metrics_js_test)
+ (libraries mina_metrics mina_metrics.none)
+ (modes js)
+ (forbidden_libraries async core re2))
