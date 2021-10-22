@@ -332,9 +332,11 @@ fn generate_bindings(mut w: impl std::io::Write) {
         decl_module!(w, env, "VerifierIndex", {
             decl_type!(w, env, CamlPlonkDomain<T1> => "domain");
             decl_type!(w, env, CamlPlonkVerificationEvals<T1> => "verification_evals");
-            decl_type!(w, env, CamlPlonkVerifierIndex<T1, T2, T3> => "t");
+            decl_type!(w, env, CamlPlonkVerifierIndex<T1, T2, T3> => "verifier_index");
 
             decl_module!(w, env, "Fp", {
+                decl_type_alias!(w, env, "t" => CamlPlonkVerifierIndex<CamlFp, CamlFpSrs, CamlPolyComm<CamlGVesta>>);
+
                 decl_func!(w, env, caml_pasta_fp_plonk_verifier_index_create => "create");
                 decl_func!(w, env, caml_pasta_fp_plonk_verifier_index_read => "read");
                 decl_func!(w, env, caml_pasta_fp_plonk_verifier_index_write => "write");
@@ -344,6 +346,8 @@ fn generate_bindings(mut w: impl std::io::Write) {
             });
 
             decl_module!(w, env, "Fq", {
+                decl_type_alias!(w, env, "t" => CamlPlonkVerifierIndex<CamlFq, CamlFqSrs, CamlPolyComm<CamlGPallas>>);
+
                 decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_create => "create");
                 decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_read => "read");
                 decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_write => "write");
