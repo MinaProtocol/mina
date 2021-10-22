@@ -267,6 +267,10 @@ func genProto(r *rand.Rand) (proto bitswapTreeProto) {
 	for i := 0; i <= si; i++ {
 		proto.maxSizeMask[i] = r.Uint64()
 	}
+	rootMaxLinkRem := maxBlockSize - lpb*BITSWAP_BLOCK_LINK_SIZE - 2 - 5
+	if rootMaxLinkRem == 0 {
+		proto.maxSizeMask[0] = proto.maxSizeMask[0] | 1
+	}
 	return
 }
 
@@ -431,8 +435,7 @@ func TestProcessDownloadedBlockImplInvalidStructure(t *testing.T) {
 	require.True(t, proto2.isValid())
 	for j := 0; j < 1000; j++ {
 		tree := proto2.genTreeFromProto(r, 0, j&1 == 0)
-		m := tree.execute(r, tagConfig)
-		require.Equal(t, 0, len(m))
+		require.Equal(t, 0, len(tree.execute(r, tagConfig)))
 	}
 
 	for i := 0; i < 10000; i++ {
