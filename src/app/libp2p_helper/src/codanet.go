@@ -367,6 +367,13 @@ func cidToKeyMapper(id cid.Cid) []byte {
 	return nil
 }
 
+// BlockHashToCidSuffix is a funciton useful for debug output
+func BlockHashToCidSuffix(h [32]byte) string {
+	mh, _ := multihash.Encode(h[:], MULTI_HASH_CODE)
+	s := cid.NewCidV1(cid.Raw, mh).String()
+	return s[len(s)-6:]
+}
+
 func BlockHashToCid(h [32]byte) cid.Cid {
 	mh, _ := multihash.Encode(h[:], MULTI_HASH_CODE)
 	return cid.NewCidV1(cid.Raw, mh)
