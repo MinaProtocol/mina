@@ -23,45 +23,56 @@ spec:
         prometheus.io/port: {{ .Values.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
-      initContainers:     
+      initContainers:
+      {{ if $config.libp2pSecret -}}
+      - name: libp2p-init-my-service
+        image: busybox:1.28
+        command: [ 'bash', '-c', '/bin/cp /libp2p-keys/* /root/libp2p-keys && /bin/chmod -R 0700 /root/libp2p-keys/' ]
+      volumeMounts:
+      - name: source-libp2p-keys
+        mountPath: /libp2p-keys
+      - name: destination-libp2p
+        mountPath: /root/libp2p-keys       
       containers:
-      - name: mina
+      - name: features
         resources:
           limits:
           requests:
             memory: 32.0Gi
             cpu: 12.0
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag  }}"
-        {{- if .Values.mina.customEntrypoint.enabled }}
-        command: [{{ .Values.mina.customEntrypoint.command }}]
+        {{- if .Values.features.customEntrypoint.enabled }}
+        command: [{{ .Values.features.customEntrypoint.command }}]
         {{- end }}
         args: [ "daemon",
           "-log-level", "Debug",
           "-log-json",
           "-log-snark-work-gossip", "true",
-          "-config-directory", "/root/.mina-config",
+          "-config-directory", "/root/.features-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-enable-peer-exchange", "true",
-          {{- if .Values.mina.runtimeConfig.enabled }}
+          "--discovery-keypair", "/root/libp2p-keys/key"
+          "-seed", {{ .Values.libp2p.seed.enabled | enabled}}
+          {{- if .Values.features.runtimeConfig.enabled }}
           "-config-file", "/config/daemon.json",
           {{- end }}
-          {{- if .Values.mina.logPrecomputedBlocks.enabled }}
+          {{- if .Values.features.logPrecomputedBlocks.enabled }}
           "-log-precomputed-blocks", "true",
           {{- end -}}
-          {{- if .Values.mina.logTxnPoolGossip.enabled }}
+          {{- if .Values.features.logTxnPoolGossip.enabled }}
           "-log-txn-pool-gossip", "true",
           {{- end -}}
-          {{- if .Values.mina.maxConnections }}
-          "--max-connections", {{ .Values.mina.maxConnections | quote }},
+          {{- if .Values.features.maxConnections }}
+          "--max-connections", {{ .Values.features.maxConnections | quote }},
           {{- end -}}
-          {{- range .Values.mina.seedPeers }}
+          {{- range .Values.features.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}
-          "-generate-genesis-proof", {{ .Values.mina.generateGenesisProof.enabled | quote }},
-          {{- if .Values.mina.uploadBlocksToGCloud.enabled }}
+          "-generate-genesis-proof", {{ .Values.features.generateGenesisProof.enabled | quote }},
+          {{- if .Values.features.uploadBlocksToGCloud.enabled }}
           "-upload-blocks-to-gcloud", "true",
           {{- end }}
         ]
@@ -74,7 +85,7 @@ spec:
           value: {{ .Values.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
           value: {{ .Values.ports.metrics | quote }}
-        - name:.mina_CLIENT_TRUSTLIST
+        - name:.features_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CONNECT_PRIVATE_IPS
           value: "true"
@@ -83,7 +94,7 @@ spec:
         - name: NETWORK_NAME
           value: {{ .Values.testnetName }}
         - name: GCLOUD_BLOCK_UPLOAD_BUCKET
-          value: "mina_network_block_data"
+          value: "features_network_block_data"
         - name: DAEMON_EXTERNAL_PORT
           value: {{ .Values.ports.p2p | quote }}
         ports:
@@ -105,21 +116,21 @@ spec:
 {{- include "healthcheck.seed.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
-        {{- if .Values.mina.uploadBlocksToGCloud.enabled }}
+        {{- if .Values.features.uploadBlocksToGCloud.enabled }}
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
         {{- end }}
-        {{- if .Values.mina.runtimeConfig.enabled }}
+        {{- if .Values.features.runtimeConfig.enabled }}
         - name: daemon-config
           mountPath: "/config/"
         {{- end }}
       volumes:
-      {{- if .Values.mina.runtimeConfig.enabled }}
+      {{- if .Values.features.runtimeConfig.enabled }}
       - name: daemon-config
         configMap:
           name: seed-daemon-config
       {{- end }}
-      {{- if .Values.mina.uploadBlocksToGCloud.enabled }}
+      {{- if .Values.features.uploadBlocksToGCloud.enabled }}
       - name: gcloud-keyfile
         secret:
           secretName: gcloud-keyfile
@@ -132,7 +143,7 @@ spec:
         emptyDir: {}
 {{- include "nodeSelector.preemptible" .Values | indent 6 }}
 ---
-{{- if .Values.mina.exposeGraphql.enabled }}
+{{- if .Values.features.exposeGraphql.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -146,7 +157,7 @@ spec:
   - name: http-graphql
     protocol: TCP
     port: 80
-    targetPort: {{ $.Values.mina.ports.graphql }}
+    targetPort: {{ $.Values.features.ports.graphql }}
 {{- end }}
 ---
 

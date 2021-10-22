@@ -1,5 +1,5 @@
 apiVersion: v2
-name: plain-node
+name: generic node
 description: A Helm chart for Mina Protocol's plain nodes
 type: application
 version: 1.0.3

@@ -1,0 +1,59 @@
+replicaCount: 1
+
+name: "generic-node"
+
+testnetName: "testnet"
+
+image:
+  repository: codaprotocol/coda-daemon
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "0.0.12-beta-develop-589b507"
+
+
+coda:
+  runtimeConfig:
+    enabled: true
+  generateGenesisProof: 
+    enabled: true
+  logPrecomputedBlocks: 
+    enabled: true
+  logTxnPoolGossip: 
+    enabled: false
+  exposeGraphql: 
+    enabled: false
+  uploadBlocksToGCloud: # Added this
+    enabled: false
+  maxConnections: 200
+  customEntrypoint:
+    enabled: false
+    command: ""
+  seedPeers:
+    - /ip4/35.185.66.37/tcp/10105/p2p/12D3KooWQ7Pz3SPizarzx9ZhCJ6jNmQ2iDPgHQxVzRzqYU2SgRSd
+    - /ip4/35.237.214.144/tcp/10120/p2p/12D3KooWGtjWnCcvkaSEbKuNbPivEogxqtLWcsJiQtURydptvrsA
+
+libp2p:
+  seed:
+    enabled: true
+  staticKeypair:
+    enabled: true
+    secretName: some-libp2p-key
+  loadBalancer:
+    enabled: true
+
+ports:
+  client: "8301"
+  graphql: "3085"
+  metrics: "10001"
+  p2p: "10909"
+
+healthcheck:
+  enabled: true
+  failureThreshold: 60
+  periodSeconds: 5
+  initialDelaySeconds: 30
+  seed:
+    healthcheck.seed.allChecks:
+
+nodeSelector:
+  preemptible: false
