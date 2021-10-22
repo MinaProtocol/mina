@@ -1,0 +1,6 @@
+(rule
+ (alias build)
+ (deps
+  (alias chrome/build)
+  (alias node/build))
+ (action (progn)))

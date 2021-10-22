@@ -1,1 +1,2 @@
+(data_only_dirs wasm-bindgen-rayon)
 (dirs :standard \ async_kernel)

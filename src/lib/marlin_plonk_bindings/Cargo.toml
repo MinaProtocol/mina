@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "stubs",
+    "wasm",
+]
+
+[profile.release]
+debug = true

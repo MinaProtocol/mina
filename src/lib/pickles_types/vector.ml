@@ -434,17 +434,17 @@ module With_version (N : Nat.Intf) = struct
   end
 end
 
-module Vector_2 = struct
-  module T = With_length (Nat.N2)
+module Make_versioned (N : Nat.Intf) = struct
+  module T = With_length (N)
 
   [%%versioned_binable
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type 'a t = ('a, Nat.N2.n) vec
+      type 'a t = ('a, N.n) vec
 
-      include Make.Binable (Nat.N2)
+      include Make.Binable (N)
 
       include (T : module type of T with type 'a t := 'a t)
 
@@ -463,147 +463,17 @@ module Vector_2 = struct
     ()
 end
 
-module Vector_4 = struct
-  module T = With_length (Nat.N4)
-
-  [%%versioned_binable
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    module V1 = struct
-      type 'a t = ('a, Nat.N4.n) vec
-
-      include Make.Binable (Nat.N4)
-
-      include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
-    end
-  end]
-
-  include T
-
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
-end
-
-module Vector_5 = struct
-  module T = With_length (Nat.N5)
-
-  [%%versioned_binable
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    module V1 = struct
-      type 'a t = ('a, Nat.N5.n) vec
-
-      include Make.Binable (Nat.N5)
-
-      include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
-    end
-  end]
-
-  include T
-
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
-end
-
-module Vector_8 = struct
-  module T = With_length (Nat.N8)
-
-  [%%versioned_binable
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    module V1 = struct
-      type 'a t = ('a, Nat.N8.n) vec
-
-      include Make.Binable (Nat.N8)
-
-      include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
-    end
-  end]
-
-  include T
-
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
-end
-
-module Vector_17 = struct
-  module T = With_length (Nat.N17)
-
-  [%%versioned_binable
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    module V1 = struct
-      type 'a t = ('a, Nat.N17.n) vec
-
-      include Make.Binable (Nat.N17)
-
-      include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
-    end
-  end]
-
-  include T
-
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
-end
-
-module Vector_18 = struct
-  module T = With_length (Nat.N18)
-
-  [%%versioned_binable
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    module V1 = struct
-      type 'a t = ('a, Nat.N18.n) vec
-
-      include Make.Binable (Nat.N18)
-
-      include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
-    end
-  end]
-
-  include T
-
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
-end
+module Vector_2 = Make_versioned (Nat.N2)
+module Vector_4 = Make_versioned (Nat.N4)
+module Vector_5 = Make_versioned (Nat.N5)
+module Vector_8 = Make_versioned (Nat.N8)
+module Vector_9 = Make_versioned (Nat.N9)
+module Vector_10 = Make_versioned (Nat.N10)
+module Vector_11 = Make_versioned (Nat.N11)
+module Vector_12 = Make_versioned (Nat.N12)
+module Vector_13 = Make_versioned (Nat.N13)
+module Vector_14 = Make_versioned (Nat.N14)
+module Vector_15 = Make_versioned (Nat.N15)
+module Vector_16 = Make_versioned (Nat.N16)
+module Vector_17 = Make_versioned (Nat.N17)
+module Vector_18 = Make_versioned (Nat.N18)

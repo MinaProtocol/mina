@@ -15,6 +15,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 #wasm-bindgen-rayon = { version = "1.0", features = ["no-bundler"] }
+wasm-bindgen-rayon = { path = "../../../external/wasm-bindgen-rayon", features = ["no-bundler"] }
 wasm-bindgen = { version = "0.2" }
 console_error_panic_hook = { version = "0.1.6" }
 web-sys = { version = "0.3.35", features = ["Window", "Document", "HtmlElement", "Text", "Node", "Element" ] }
@@ -33,8 +34,11 @@ mina-curves = { path = "../../marlin/curves" }
 oracle = { path = "../../marlin/oracle" }
 plonk_circuits = { path = "../../marlin/circuits/plonk", features = [ ] }
 
-commitment_dlog = { path = "../../marlin/dlog/commitment", features = [ ] }
+commitment_dlog = { path = "../../marlin/dlog/commitment" }
 plonk_protocol_dlog = { path = "../../marlin/dlog/plonk", features = [ ] }
 
 [profile.release]
 debug = true
+
+[features]
+nodejs = ["wasm-bindgen-rayon/no-modules"]

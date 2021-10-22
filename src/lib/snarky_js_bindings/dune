@@ -1,0 +1,23 @@
+(executable
+ (name snarky_js_node)
+ (modules snarky_js_node)
+ (modes js)
+ (js_of_ocaml (flags +toplevel.js +dynlink.js))
+ (libraries snarky_curve pickles_base zexe_backend marlin_plonk_bindings js_of_ocaml bindings_js node_backend integers_stubs_js snarky_js_bindings_lib)
+ (link_deps
+ ../marlin_plonk_bindings/js/node_js/plonk_wasm.js
+ ../marlin_plonk_bindings/js/node_js/plonk_wasm.wasm)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version js_of_ocaml-ppx)))
+
+(executable
+ (name snarky_js_chrome)
+ (modules snarky_js_chrome)
+ (modes js)
+ (js_of_ocaml (flags +toplevel.js +dynlink.js))
+ (libraries snarky_curve pickles_base zexe_backend marlin_plonk_bindings js_of_ocaml bindings_js chrome_backend integers_stubs_js snarky_js_bindings_lib)
+ (link_deps
+ ../marlin_plonk_bindings/js/chrome/plonk_wasm.js
+ ../marlin_plonk_bindings/js/chrome/plonk_wasm.wasm)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version js_of_ocaml-ppx)))

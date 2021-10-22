@@ -1,4 +1,4 @@
-(data_only_dirs wasm)
+(data_only_dirs .cargo)
 
 (library
  (public_name marlin_plonk_bindings)
