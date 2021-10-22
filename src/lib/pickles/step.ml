@@ -1,5 +1,6 @@
 module SC = Scalar_challenge
 open Core_kernel
+open Async_kernel
 module P = Proof
 open Pickles_types
 open Poly_types
@@ -55,7 +56,7 @@ struct
       , _
       , (_, Max_branching.n) Vector.t )
       P.Base.Pairing_based.t
-      Async.Deferred.t =
+      Deferred.t =
     let _, prev_vars_length = branch_data.branching in
     let T = Length.contr prev_vars_length prevs_length in
     let (module Req) = branch_data.requests in
@@ -460,7 +461,7 @@ struct
           | None ->
               Snarky_backendless.Request.unhandled )
     in
-    let%map.Async.Deferred (next_proof : Tick.Proof.t) =
+    let%map.Deferred (next_proof : Tick.Proof.t) =
       let (T (input, conv)) =
         Impls.Step.input ~branching:Max_branching.n ~wrap_rounds:Tock.Rounds.n
       in
