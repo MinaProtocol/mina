@@ -518,15 +518,16 @@ This algorithm initializes the checkpoints for genesis block `G`
 ```rust
 fn initCheckpoints(G) -> ()
 {
+    // Set staking epoch data
     cState(G).staking_epoch_data.seed = zero
     cState(G).staking_epoch_data.start_checkpoint = zero
     cState(G).staking_epoch_data.lock_checkpoint = zero
     cState(G).staking_epoch_data.epoch_length = 1
 
-    state_hash = poseidon_3w_hash(latest state ϵ cState(G).next_epoch_data.seed's update range) ?
-    cState(G).next_epoch.data.seed = Epoch_seed::from_hex("0d01257f75d0a794630bdaf2d90725f4c95da11abd862fb8a2f88ab94c41fa0b8d353769f9bb")
+    // Set next epoch data
+    cState(G).next_epoch.data.seed = Epoch_seed::from_b58("2vaRh7FQ5wSzmpFReF9gcRKjv48CcJvHs25aqb3SSZiPgHQBy5Dt")
     cState(G).next_epoch_data.start_checkpoint = zero
-    cState(G).next_epoch_data.lock_checkpoint =  state_hash ?
+    cState(G).next_epoch_data.lock_checkpoint =  Epoch_seed::from_b58("3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d")
     cState(G).staking_epoch_data.epoch_length = 2
 }
 ```
