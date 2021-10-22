@@ -5,15 +5,21 @@ name: "generic-node"
 testnetName: "testnet"
 
 image:
-  repository: codaprotocol/coda-daemon
+  repository: minaprotocol/mina-daemon
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "0.0.12-beta-develop-589b507"
+  tag: "1.2.0beta8-develop-5b35b37"
 
 
-coda:
+features:
   runtimeConfig:
     enabled: true
+  maxConnections: 200
+  daemon:
+    flags:
+    - "--log-precomputed-blocks"
+    - "true"
+    - "--log-json"
   generateGenesisProof: 
     enabled: true
   logPrecomputedBlocks: 
@@ -24,7 +30,6 @@ coda:
     enabled: false
   uploadBlocksToGCloud: # Added this
     enabled: false
-  maxConnections: 200
   customEntrypoint:
     enabled: false
     command: ""
