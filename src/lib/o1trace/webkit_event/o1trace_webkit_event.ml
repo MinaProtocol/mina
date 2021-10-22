@@ -7,7 +7,7 @@ module T = struct
   let buf = Bigstring.create 512
 
   let emit_event w event =
-    try Output.Binary.emit_event ~buf w event
+    try Webkit_trace_event_binary_output.emit_event ~buf w event
     with exn ->
       Writer.writef w "failed to write o1trace event: %s\n" (Exn.to_string exn)
 
