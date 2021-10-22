@@ -399,7 +399,8 @@ module Body = struct
     end
   end]
 
-  (* Delta for the fee payer is always going to Neg and token id is always going to be Mina and so represent it using an unsigned fee*)
+  (* Delta for the fee payer is always going to be Neg and token id is always
+     going to be Mina and so represent it using an unsigned fee*)
   module Fee_payer = struct
     [%%versioned
     module Stable = struct
