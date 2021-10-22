@@ -37,6 +37,7 @@ let log_filter_of_event_type =
       [ "jsonPayload.level=(\"Warn\" OR \"Error\" OR \"Faulty_peer\" OR \
          \"Fatal\")"
       ]
+      (* TODO change this condition to Event_type Framework t (ie events from the Puppeteer), and then the following condition is Event_type Daemon t (ie events from the mina daemon, which is most of them) *)
   | Event_type Node_offline ->
       [ "jsonPayload.puppeteer_script_event=true"
       ; "jsonPayload.event_type=\"node_offline\""
@@ -283,7 +284,7 @@ let parse_event_from_log_entry ~logger ~network log_entry =
       in
       match msg.event_type with
       | "node_offline" ->
-          [%log info] "hitting node_offline event from puppeteer" ;
+          [%log spam] "hitting node_offline event from puppeteer" ;
           Event_type.Event (Event_type.Node_offline, ())
       | _ ->
           failwith "Could not process a puppeteer message from the logs"
