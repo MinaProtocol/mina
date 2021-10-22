@@ -3465,6 +3465,10 @@ let%test_module "test" =
                     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff=
                         ({f with commands= [failed_command]}, s) }
                   in
+                  let pids = Child_processes.Termination.create_pid_table () in
+                  let%bind verifier =
+                    Verifier.create ~logger ~proof_level ~pids ~conf_dir:None
+                  in
                   let%map res =
                     Sl.apply ~constraint_constants !sl
                       (Staged_ledger_diff.forget diff)
