@@ -1,5 +1,5 @@
 module SC = Scalar_challenge
-open Core
+open Core_kernel
 module P = Proof
 open Pickles_types
 open Poly_types

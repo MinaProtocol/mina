@@ -4,7 +4,7 @@ open Pickles_types
 open Hlist
 open Tuple_lib
 open Common
-open Core
+open Core_kernel
 open Import
 open Types
 open Backend
