@@ -1,3 +1,4 @@
+open Mina_base_base
 open Core
 open Import
 module Fee_transfer = Coinbase_fee_transfer

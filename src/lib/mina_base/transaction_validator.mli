@@ -1,3 +1,4 @@
+open Mina_base_base
 open Core_kernel
 
 module Hashless_ledger : Transaction_logic.Ledger_intf

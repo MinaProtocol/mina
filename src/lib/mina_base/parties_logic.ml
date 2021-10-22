@@ -1,3 +1,5 @@
+open Mina_base_base
+
 module type Iffable = sig
   type bool
 

@@ -1,3 +1,5 @@
+open Mina_base_base
+
 (* snapp_generators -- Quickcheck generators for Snapp transactions *)
 
 (* Ledger depends on Party, so Party generators can't refer back to Ledger

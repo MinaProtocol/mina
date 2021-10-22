@@ -1,3 +1,5 @@
+open Mina_base_base
+
 [%%import "/src/config.mlh"]
 
 open Core_kernel

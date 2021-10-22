@@ -1,3 +1,4 @@
+open Mina_base_base
 open Core_kernel
 open Currency
 open Signature_lib
