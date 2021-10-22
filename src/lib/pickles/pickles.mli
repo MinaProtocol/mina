@@ -1,7 +1,3 @@
-open Core_kernel
-open Async_kernel
-open Pickles_types
-open Hlist
 module Tick_field_sponge = Tick_field_sponge
 module Util = Util
 module Step_main_inputs = Step_main_inputs
@@ -11,6 +7,12 @@ module Impls = Impls
 module Inductive_rule = Inductive_rule
 module Tag = Tag
 module Pairing_main = Pairing_main
+module Endo = Endo
+module Scalar_challenge = Scalar_challenge
+open Core_kernel
+open Async_kernel
+open Pickles_types
+open Hlist
 
 module type Statement_intf = sig
   type field

@@ -1,17 +1,13 @@
 module Backend = Zexe_backend.Pasta.Vesta_based_plonk
 module Other_backend = Zexe_backend.Pasta.Pallas_based_plonk
 
-let () = Backend.Keypair.set_urs_info []
-
-module Impl = Pickles_base.Impls.Step
-module Other_impl = Pickles_base.Impls.Wrap
+module Impl = Pickles.Impls.Step
+module Other_impl = Pickles.Impls.Wrap
 module Challenge = Limb_vector.Challenge.Make (Impl)
 module Sc =
-  Pickles_base.Scalar_challenge.Make
-    (Impl)
-    (Pickles_base.Step_main_inputs.Inner_curve)
+  Pickles.Scalar_challenge.Make (Impl) (Pickles.Step_main_inputs.Inner_curve)
     (Challenge)
-    (Pickles_base.Endo.Step_inner_curve)
+    (Pickles.Endo.Step_inner_curve)
 open Js_of_ocaml
 
 let raise_errorf fmt =
@@ -830,7 +826,7 @@ let () =
       let p1, p2 =
         (As_group.value (As_group.of_group_obj p1), As_group.value p2)
       in
-      let open Pickles_base.Step_main_inputs in
+      let open Pickles.Step_main_inputs in
       match (p1, p2) with
       | (Constant x1, Constant y1), (Constant x2, Constant y2) ->
           constant (Inner_curve.Constant.( + ) (x1, y1) (x2, y2))
@@ -838,7 +834,7 @@ let () =
           (* TODO: Make this handle the edge cases *)
           Ops.add_fast p1 p2 |> mk) ;
   method_ "neg" (fun (p1 : group_class Js.t) : group_class Js.t ->
-      Pickles_base.Step_main_inputs.Inner_curve.negate
+      Pickles.Step_main_inputs.Inner_curve.negate
         (As_group.value (As_group.of_group_obj p1))
       |> mk) ;
   method_ "sub"
@@ -846,7 +842,7 @@ let () =
       p1##add (As_group.to_group_obj p2)##neg) ;
   method_ "scale"
     (fun (p1 : group_class Js.t) (s : scalar_class Js.t) : group_class Js.t ->
-      let open Pickles_base.Step_main_inputs in
+      let open Pickles.Step_main_inputs in
       match
         ( As_group.(value (of_group_obj p1))
         , Js.Optdef.to_option s##.constantValue )
@@ -878,7 +874,7 @@ let () =
         (As_bool.of_boolean
            (Boolean.all [ Field.equal x1 x2; Field.equal y1 y2 ]))) ;
   static "generator"
-    (mk Pickles_base.Step_main_inputs.Inner_curve.one : group_class Js.t) ;
+    (mk Pickles.Step_main_inputs.Inner_curve.one : group_class Js.t) ;
   static_method "add"
     (fun (p1 : As_group.t) (p2 : As_group.t) : group_class Js.t ->
       (As_group.to_group_obj p1)##add_ p2) ;
@@ -913,7 +909,7 @@ let () =
         (As_field.of_field_obj (array_get_exn xs 1))) ;
   static_method "sizeInFieldElements" (fun () : int -> 2) ;
   static_method "check" (fun (p : group_class Js.t) : unit ->
-      let open Pickles_base.Step_main_inputs in
+      let open Pickles.Step_main_inputs in
       Inner_curve.assert_on_curve
         Field.((p##.x##.value :> t), (p##.y##.value :> t))) ;
   method_ "toJSON" (fun (p : group_class Js.t) : < .. > Js.t ->
@@ -939,7 +935,7 @@ let () =
 let poseidon =
   object%js
     method hash (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t =
-      let open Pickles_base.Step_main_inputs in
+      let open Pickles.Step_main_inputs in
       let s = Sponge.create sponge_params in
       for i = 0 to xs##.length - 1 do
         Sponge.absorb s (`Field (array_get_exn xs i)##.value)

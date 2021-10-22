@@ -1,5 +1,5 @@
 (library
  (name snarky_js_bindings_lib)
- (libraries snarky_curve pickles.base zexe_backend.js marlin_plonk_bindings js_of_ocaml bindings_js integers_stubs_js zarith_stubs_js)
+ (libraries mina_base.base snarky_curve pickles zexe_backend marlin_plonk_bindings js_of_ocaml bindings_js integers_stubs_js zarith_stubs_js digestif.ocaml cache_dir.fake mina_metrics.none run_in_thread.fake)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version js_of_ocaml-ppx)))

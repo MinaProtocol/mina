@@ -6,17 +6,6 @@ module type Statement_var_intf = Intf.Statement_var
 
 module type Statement_value_intf = Intf.Statement_value
 
-open Tuple_lib
-module SC = Scalar_challenge
-open Core_kernel
-open Async_kernel
-open Import
-open Types
-open Pickles_types
-open Poly_types
-open Hlist
-open Common
-open Backend
 module Backend = Backend
 module Sponge_inputs = Sponge_inputs
 module Util = Util
@@ -28,6 +17,19 @@ module Dirty = Dirty
 module Cache_handle = Cache_handle
 module Step_main_inputs = Step_main_inputs
 module Pairing_main = Pairing_main
+module Endo = Endo
+module Scalar_challenge = Scalar_challenge
+open Tuple_lib
+module SC = Scalar_challenge
+open Core_kernel
+open Async_kernel
+open Import
+open Types
+open Pickles_types
+open Poly_types
+open Hlist
+open Common
+open Backend
 
 let verify = Verify.verify
 

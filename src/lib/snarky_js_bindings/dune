@@ -8,6 +8,7 @@
  ../marlin_plonk_bindings/js/node_js/plonk_wasm.js
  ../marlin_plonk_bindings/js/node_js/plonk_wasm.wasm)
  (instrumentation (backend bisect_ppx))
+ (forbidden_libraries async core re2 digestif.c)
  (preprocess (pps ppx_version js_of_ocaml-ppx)))
 
 (executable
