@@ -1,0 +1,6 @@
+(library
+ (public_name run_in_thread)
+ (name run_in_thread)
+ (libraries async_kernel)
+ (virtual_modules run_in_thread)
+ (default_implementation run_in_thread.native))
