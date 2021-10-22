@@ -1621,7 +1621,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           , Transaction_commitment.t )
           Parties_logic.Local_state.t
       ; protocol_state_predicate : Snapp_predicate.Protocol_state.t
-      ; transaction_commitment : unit >
+      ; transaction_commitment : unit
+      ; field : Snark_params.Tick.Field.t >
 
     let perform ~constraint_constants ~state_view ledger (type r)
         (eff : (r, t) Parties_logic.Eff.t) : r =
@@ -1743,6 +1744,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       M.start ~constraint_constants
         { parties = Inputs.Parties.of_parties_list parties
         ; protocol_state_predicate = c.protocol_state
+        ; memo_hash = Signed_command_memo.hash c.memo
         }
         { perform } initial_state
     in
@@ -2563,6 +2565,7 @@ module For_tests = struct
             }
           ]
       ; protocol_state = Snapp_predicate.Protocol_state.accept
+      ; memo = Signed_command_memo.empty
       }
     in
     let commitment = Parties.commitment parties in

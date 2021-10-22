@@ -1815,7 +1815,8 @@ module Base = struct
               , Transaction_commitment.t )
               Parties_logic.Local_state.t
           ; protocol_state_predicate : Snapp_predicate.Protocol_state.Checked.t
-          ; transaction_commitment : Transaction_commitment.t >
+          ; transaction_commitment : Transaction_commitment.t
+          ; field : Field.t >
       end
 
       include Parties_logic.Make (Inputs)
@@ -1843,7 +1844,10 @@ module Base = struct
         | Get_global_ledger g ->
             g.ledger
         | Transaction_commitment_on_start
-            { other_parties = other_parties, _; protocol_state_predicate } -> (
+            { other_parties = other_parties, _
+            ; protocol_state_predicate
+            ; memo_hash
+            } -> (
             match is_start with
             | `No ->
                 assert false
@@ -1852,7 +1856,8 @@ module Base = struct
                   ~other_parties_hash:other_parties
                   ~protocol_state_predicate_hash:
                     (Snapp_predicate.Protocol_state.Checked.digest
-                       protocol_state_predicate) )
+                       protocol_state_predicate)
+                  ~memo_hash )
         | Get_account ({ party; _ }, (_root, ledger)) ->
             let idx =
               V.map ledger ~f:(fun l -> idx l (body_id party.data.body))
@@ -2174,6 +2179,13 @@ module Base = struct
                             Snapp_predicate.Protocol_state.accept
                         | `Start p ->
                             p.protocol_state_predicate)
+                ; memo_hash =
+                    exists Field.typ ~compute:(fun () ->
+                        match V.get v with
+                        | `Skip ->
+                            Field.Constant.zero
+                        | `Start p ->
+                            p.memo_hash)
                 }
               in
               S.apply ~constraint_constants
@@ -3770,6 +3782,7 @@ let parties_witnesses ~constraint_constants ~state_body ~fee_excess
       List.map partiess ~f:(fun parties : _ Parties_logic.Start_data.t ->
           { protocol_state_predicate = Snapp_predicate.Protocol_state.accept
           ; parties
+          ; memo_hash = Signed_command_memo.hash parties.memo
           })
     in
     ref partiess
@@ -4012,7 +4025,8 @@ struct
                           (Parties.Party_or_stack.stack_hash ps)
                         ~protocol_state_predicate_hash:
                           (Snapp_predicate.Protocol_state.digest
-                             s.protocol_state_predicate) )
+                             s.protocol_state_predicate)
+                        ~memo_hash:s.memo_hash )
                   in
                   List.filter_map
                     (Parties.Party_or_stack.to_parties_with_hashes_list
@@ -4467,6 +4481,7 @@ let%test_module "transaction_snark" =
             }
           ]
       ; protocol_state = Snapp_predicate.Protocol_state.accept
+      ; memo = Signed_command_memo.empty
       }
 
     let%test_unit "merkle_root_after_snapp_command_exn_immutable" =
@@ -4888,6 +4903,7 @@ let%test_module "transaction_snark" =
                     }
                   in
                   let protocol_state = Snapp_predicate.Protocol_state.accept in
+                  let memo = Signed_command_memo.empty in
                   let ps =
                     Parties.Party_or_stack.of_parties_list
                       ~party_depth:(fun (p : Party.Predicated.t) ->
@@ -4906,6 +4922,7 @@ let%test_module "transaction_snark" =
                     (*FIXME: is this correct? *)
                     Parties.Transaction_commitment.create ~other_parties_hash
                       ~protocol_state_predicate_hash
+                      ~memo_hash:(Signed_command_memo.hash memo)
                   in
                   let at_party = Parties.Party_or_stack.stack_hash ps in
                   let tx_statement : Snapp_statement.t =
@@ -4938,7 +4955,7 @@ let%test_module "transaction_snark" =
                     }
                   in
                   let parties : Parties.t =
-                    { fee_payer; other_parties; protocol_state }
+                    { fee_payer; other_parties; protocol_state; memo }
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -5173,6 +5190,7 @@ let%test_module "transaction_snark" =
                     }
                   in
                   let protocol_state = Snapp_predicate.Protocol_state.accept in
+                  let memo = Signed_command_memo.empty in
                   let ps =
                     Parties.Party_or_stack.of_parties_list
                       ~party_depth:(fun (p : Party.Predicated.t) ->
@@ -5191,6 +5209,7 @@ let%test_module "transaction_snark" =
                     (*FIXME: is this correct? *)
                     Parties.Transaction_commitment.create ~other_parties_hash
                       ~protocol_state_predicate_hash
+                      ~memo_hash:(Signed_command_memo.hash memo)
                   in
                   let at_party = Parties.Party_or_stack.stack_hash ps in
                   let tx_statement : Snapp_statement.t =
@@ -5243,6 +5262,7 @@ let%test_module "transaction_snark" =
                         [ { data = snapp_party_data; authorization = Proof pi }
                         ]
                     ; protocol_state
+                    ; memo
                     }
                   in
                   apply_parties ledger [ parties ])

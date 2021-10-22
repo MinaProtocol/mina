@@ -260,6 +260,7 @@ module Eff = struct
     | Transaction_commitment_on_start :
         { protocol_state_predicate : 'protocol_state_pred
         ; other_parties : 'parties
+        ; memo_hash : 'field
         }
         -> ( 'transaction_commitment
            , < party : 'party
@@ -267,6 +268,7 @@ module Eff = struct
              ; bool : 'bool
              ; protocol_state_predicate : 'protocol_state_pred
              ; transaction_commitment : 'transaction_commitment
+             ; field : 'field
              ; .. > )
            t
 end
@@ -304,8 +306,11 @@ module Start_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('parties, 'protocol_state_pred) t =
-        { parties : 'parties; protocol_state_predicate : 'protocol_state_pred }
+      type ('parties, 'protocol_state_pred, 'field) t =
+        { parties : 'parties
+        ; protocol_state_predicate : 'protocol_state_pred
+        ; memo_hash : 'field
+        }
       [@@deriving sexp, yojson]
     end
   end]
@@ -433,6 +438,7 @@ module Make (Inputs : Inputs_intf) = struct
                    { protocol_state_predicate =
                        start_data.protocol_state_predicate
                    ; other_parties = remaining
+                   ; memo_hash = start_data.memo_hash
                    })
             in
             Transaction_commitment.if_ is_start' ~then_:on_start
