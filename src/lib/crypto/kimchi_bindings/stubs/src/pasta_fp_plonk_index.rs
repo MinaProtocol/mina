@@ -77,17 +77,21 @@ pub fn caml_pasta_fp_plonk_index_create(
         .collect();
 
     // create constraint system
-    let cs =
-        match ConstraintSystem::<Fp>::create(gates, oracle::pasta::fp::params(), public as usize) {
-            None => {
-                return Err(ocaml::Error::failwith(
-                    "caml_pasta_fp_plonk_index_create: could not create constraint system",
-                )
-                .err()
-                .unwrap())
-            }
-            Some(cs) => cs,
-        };
+    let cs = match ConstraintSystem::<Fp>::create(
+        gates,
+        vec![vec![]],
+        oracle::pasta::fp::params(),
+        public as usize,
+    ) {
+        None => {
+            return Err(ocaml::Error::failwith(
+                "caml_pasta_fp_plonk_index_create: could not create constraint system",
+            )
+            .err()
+            .unwrap())
+        }
+        Some(cs) => cs,
+    };
 
     // endo
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();

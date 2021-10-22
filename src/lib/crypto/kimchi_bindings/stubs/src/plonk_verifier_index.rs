@@ -12,10 +12,10 @@ pub struct CamlPlonkVerificationEvals<PolyComm> {
     pub coefficients_comm: Vec<PolyComm>,
     pub generic_comm: PolyComm,
     pub psm_comm: PolyComm,
-    pub add_comm: PolyComm,
-    pub double_comm: PolyComm,
+    pub complete_add_comm: PolyComm,
     pub mul_comm: PolyComm,
     pub emul_comm: PolyComm,
+    pub chacha_comm: Option<Vec<PolyComm>>,
 }
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, OcamlGen)]

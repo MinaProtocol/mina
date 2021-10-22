@@ -163,6 +163,7 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
             w_comm: array_init(|_| comm()),
             z_comm: comm(),
             t_comm: comm(),
+            lookup: None,
         },
         proof,
         evals,

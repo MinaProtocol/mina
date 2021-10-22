@@ -12,6 +12,7 @@ use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 use ocaml_gen::ocaml_gen;
+use plonk_15_wires_circuits::expr::Linearization;
 use plonk_15_wires_circuits::nolookup::constraints::{zk_polynomial, zk_w3, ConstraintSystem};
 use plonk_15_wires_circuits::wires::{COLUMNS, PERMUTS};
 use plonk_15_wires_protocol_dlog::index::VerifierIndex;
@@ -49,10 +50,12 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
                     .collect(),
                 generic_comm: vi.generic_comm.into(),
                 psm_comm: vi.psm_comm.into(),
-                add_comm: vi.add_comm.into(),
-                double_comm: vi.double_comm.into(),
+                complete_add_comm: vi.complete_add_comm.into(),
                 mul_comm: vi.mul_comm.into(),
                 emul_comm: vi.emul_comm.into(),
+                chacha_comm: vi
+                    .chacha_comm
+                    .map(|x| x.to_vec().iter().map(Into::into).collect()),
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
         }
@@ -76,28 +79,45 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
             .try_into()
             .expect("vector of sigma comm is of wrong size");
 
+        let chacha_comm: Option<Vec<PolyComm<GAffine>>> = evals
+            .chacha_comm
+            .map(|x| x.iter().map(Into::into).collect());
+        let chacha_comm: Option<[_; 4]> =
+            chacha_comm.map(|x| x.try_into().expect("vector of sigma comm is of wrong size"));
+
         let shifts: Vec<Fq> = shifts.iter().map(Into::into).collect();
         let shift: [Fq; PERMUTS] = shifts.try_into().expect("wrong size");
 
         VerifierIndex::<GAffine> {
             domain,
-            w: zk_w3(domain),
-            zkpm: zk_polynomial(domain),
             max_poly_size: index.max_poly_size as usize,
             max_quot_size: index.max_quot_size as usize,
             srs: index.srs.0,
+
             sigma_comm,
             coefficients_comm,
             generic_comm: evals.generic_comm.into(),
+
             psm_comm: evals.psm_comm.into(),
-            add_comm: evals.add_comm.into(),
-            double_comm: evals.double_comm.into(),
+
+            complete_add_comm: evals.complete_add_comm.into(),
             mul_comm: evals.mul_comm.into(),
             emul_comm: evals.emul_comm.into(),
+
+            chacha_comm,
+
             shift,
+            zkpm: zk_polynomial(domain),
+            w: zk_w3(domain),
+            endo: endo_q,
+
+            lookup_used: None,
+            lookup_tables: vec![],
+            lookup_selectors: vec![],
+            linearization: Linearization::default(),
+
             fr_sponge_params: oracle::pasta::fq::params(),
             fq_sponge_params: oracle::pasta::fp::params(),
-            endo: endo_q,
         }
     }
 }
@@ -207,10 +227,10 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
             coefficients_comm: vec_comm(COLUMNS),
             generic_comm: comm(),
             psm_comm: comm(),
-            add_comm: comm(),
-            double_comm: comm(),
+            complete_add_comm: comm(),
             mul_comm: comm(),
             emul_comm: comm(),
+            chacha_comm: None,
         },
         shifts: (0..PERMUTS - 1).map(|_| Fq::one().into()).collect(),
     }
