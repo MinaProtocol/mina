@@ -1,4 +1,4 @@
-Run Instructions
+GossipQA testnet deployment Instructions
 
 0: Before starting, make sure that no pre-existing gossipqa deployment exists, and also make sure one is working within us-central-1 by running 
 
@@ -18,4 +18,38 @@ Run Instructions
 
 
 when you're all done, clean up with either `terraform destroy`, or `kubectl delete namespace gossipqa`
+
+------------------------------------------------
+
+Metrics Deployment Instructions
+
+1: create a separate namspace so that all the metrics stuff is isolated in one place.  technically it doesn't matter what namespace this is deployed in.
+
+kubectl create namespace gossipqa-metrics
+kubectl config set-context --current --namespace=gossipqa-metrics
+
+2: deploy the stack
+
+2.1: make the permanent volume claim.  if you don't do this then you'll lose all of the data that prometheus gathers when promtheus goes down.  
+kubectl apply -f automation/terraform/testnets/gossipqa/gossipqa-prom-pvc.yaml
+
+2.2: make a config map with all the configs which create for us a useful dashboard on grafana.
+
+2.3: install the stack with helm.  this deploys both prometheus, and grafana in one single command.  the values.yaml file that we give the command contains a bunch of configs which override the default configs of "prometheus-community/kube-prometheus-stack".  notably, we need to configure it to use the PVC for prometheus and the config map for graphana.  
+helm install gossipqa-metrics-stack prometheus-community/kube-prometheus-stack -f automation/terraform/testnets/gossipqa/values-stack.yaml
+
+3: In order to see all those nice colorful charts we deployed on grafana
+
+#get the login credentials if you don't already have it.  the username is "admin"
+kubectl get secret gossipqa-metrics-stack-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
+#run kubectl get pods and find the grafana pod, then do a port forward
+kubectl port-forward pod/gossipqa-metrics-stack-grafana-56d9c65796-s6dbw 3000:3000
+
+
+4: uninstall
+helm uninstall gossipqa-metrics-stack
+
+#if you really want to nuke everything, you can delete the entire namespace.  however this will delete the permanent volume claim, and thus delete all the data you've gathered
+kubectl delete namespace gossipqa-metrics
 
