@@ -1,0 +1,43 @@
+serviceAccounts:
+  alertmanager:
+    create: false
+  nodeExporter:
+    create: false
+  pushgateway:
+    create: false
+  server:
+    create: true
+
+nodeExporter:
+  enabled: false
+
+alertmanager:
+  enabled: false
+
+pushgateway:
+  enabled: false
+
+kubeStateMetrics:
+  enabled: false
+
+forceNamespace: gossipqa-metrics
+
+server:
+  enabled: true
+  retention: "365d"
+  # persistentVolume:
+  #   existingClaim: "gossipqa-prom-pvc"
+
+
+
+
+    # size: 1000Gi
+    # storageClass: ssd-retain
+  
+
+grafana:
+  extraConfigmapMounts: []
+  # - name: certs-configmap
+  #   mountPath: /etc/grafana/ssl/
+  #   configMap: certs-configmap
+  #   readOnly: true
