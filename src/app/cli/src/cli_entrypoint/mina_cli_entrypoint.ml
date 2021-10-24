@@ -428,7 +428,7 @@ let setup_daemon logger =
       ]
     in
     [%log info]
-      "Coda daemon is booting up; built with commit $commit on branch $branch"
+      "Mina daemon is booting up; built with commit $commit on branch $branch"
       ~metadata:version_metadata ;
     let%bind () = Mina_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir in
     if not @@ String.equal daemon_expiry "never" then (
