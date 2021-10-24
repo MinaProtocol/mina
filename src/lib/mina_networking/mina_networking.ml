@@ -1500,7 +1500,7 @@ let create (config : Config.t)
                    ; sender = Envelope.Incoming.sender envelope
                    }) ;
             Mina_net2.Validation_callback.set_message_type valid_cb `Block ;
-            Mina_metrics.(Counter.inc_one Network.blocks_received) ;
+            Mina_metrics.(Counter.inc_one Network.Block.received) ;
             `Fst
               ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
               , Block_time.now config.time_controller
@@ -1512,7 +1512,7 @@ let create (config : Config.t)
                   [%str_log debug]
                     (Snark_work_received
                        { work; sender = Envelope.Incoming.sender envelope })) ;
-            Mina_metrics.(Counter.inc_one Network.snark_work_received) ;
+            Mina_metrics.(Counter.inc_one Network.Snark_work.received) ;
             Mina_net2.Validation_callback.set_message_type valid_cb `Snark_work ;
             `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
         | Transaction_pool_diff diff ->
@@ -1521,7 +1521,7 @@ let create (config : Config.t)
                 (Transactions_received
                    { txns = diff; sender = Envelope.Incoming.sender envelope }) ;
             Mina_net2.Validation_callback.set_message_type valid_cb `Transaction ;
-            Mina_metrics.(Counter.inc_one Network.transactions_received) ;
+            Mina_metrics.(Counter.inc_one Network.Transaction.received) ;
             `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb))
   in
   { gossip_net

@@ -367,61 +367,13 @@ module Network = struct
     let help = "# of received messages whose validation timed out" in
     Counter.v "validations_timed_out" ~help ~namespace ~subsystem
 
-  let block_validations_timed_out : Counter.t =
-    let help = "# of received blocks whose validation timed out" in
-    Counter.v "block_validations_timed_out" ~help ~namespace ~subsystem
-
-  let snark_work_validations_timed_out : Counter.t =
-    let help = "# of received snark work whose validation timed out" in
-    Counter.v "snark_work_validations_timed_out" ~help ~namespace ~subsystem
-
-  let transaction_validations_timed_out : Counter.t =
-    let help = "# of received transactions whose validation timed out" in
-    Counter.v "transaction_validations_timed_out" ~help ~namespace ~subsystem
-
   let gossip_messages_failed_to_decode : Counter.t =
     let help = "# of received messages that could not be decoded" in
     Counter.v "gossip_messages_failed_to_decode" ~help ~namespace ~subsystem
 
-  let blocks_rejected : Counter.t =
-    let help = "# of received blocks failing validation" in
-    Counter.v "blocks_rejected" ~help ~namespace ~subsystem
-
-  let snark_work_rejected : Counter.t =
-    let help = "# of received snark work failing validation" in
-    Counter.v "snark_work_rejected" ~help ~namespace ~subsystem
-
-  let transactions_rejected : Counter.t =
-    let help = "# of received transactions failing validation" in
-    Counter.v "transactions_rejected" ~help ~namespace ~subsystem
-
-  let blocks_ignored : Counter.t =
-    let help = "# of received blocks ignored" in
-    Counter.v "blocks_ignored" ~help ~namespace ~subsystem
-
-  let snark_work_ignored : Counter.t =
-    let help = "# of received snark work ignored" in
-    Counter.v "snark_work_ignored" ~help ~namespace ~subsystem
-
-  let transactions_ignored : Counter.t =
-    let help = "# of received transactions ignored" in
-    Counter.v "transactions_ignored" ~help ~namespace ~subsystem
-
   let gossip_messages_received : Counter.t =
     let help = "# of messages received" in
     Counter.v "messages_received" ~help ~namespace ~subsystem
-
-  let blocks_received : Counter.t =
-    let help = "# of blocks received" in
-    Counter.v "blocks_received" ~help ~namespace ~subsystem
-
-  let snark_work_received : Counter.t =
-    let help = "# of snark work received" in
-    Counter.v "snark_work_received" ~help ~namespace ~subsystem
-
-  let transactions_received : Counter.t =
-    let help = "# of transactions received" in
-    Counter.v "transactions_received" ~help ~namespace ~subsystem
 
   module Delay_time_spec = struct
     let tick_interval =
@@ -431,49 +383,109 @@ module Network = struct
       Core.Time.Span.of_ms (Int.to_float (block_window_duration * 20))
   end
 
-  module Block_validation_time =
-    Moving_time_average
-      (struct
-        include Delay_time_spec
+  module Block = struct
+    let subsystem = "Block"
 
-        let subsystem = subsystem
+    let validations_timed_out : Counter.t =
+      let help = "# of received blocks whose validation timed out" in
+      Counter.v "validations_timed_out" ~help ~namespace ~subsystem
 
-        let name = "block_validation_time"
+    let rejected : Counter.t =
+      let help = "# of received blocks failing validation" in
+      Counter.v "rejected" ~help ~namespace ~subsystem
 
-        let help =
-          "average time, in ms, for blocks to be validated and rebroadcasted"
-      end)
-      ()
+    let ignored : Counter.t =
+      let help = "# of received blocks ignored" in
+      Counter.v "ignored" ~help ~namespace ~subsystem
 
-  module Snark_work_validation_time =
-    Moving_time_average
-      (struct
-        include Delay_time_spec
+    let received : Counter.t =
+      let help = "# of blocks received" in
+      Counter.v "received" ~help ~namespace ~subsystem
 
-        let subsystem = subsystem
+    module Validation_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
 
-        let name = "snark_work_validation_time"
+          let subsystem = subsystem
 
-        let help =
-          "average delay, in ms, for snark work to be validated and \
-           rebroadcasted"
-      end)
-      ()
+          let name = "validation_time"
 
-  module Transaction_validation_time =
-    Moving_time_average
-      (struct
-        include Delay_time_spec
+          let help =
+            "average time, in ms, for blocks to be validated and rebroadcasted"
+        end)
+        ()
+  end
 
-        let subsystem = subsystem
+  module Snark_work = struct
+    let subsystem = "Snark_work"
 
-        let name = "transaction_validation_time"
+    let validations_timed_out : Counter.t =
+      let help = "# of received snark work whose validation timed out" in
+      Counter.v "validations_timed_out" ~help ~namespace ~subsystem
 
-        let help =
-          "average delay, in ms, for transactions to be validated and \
-           rebroadcasted"
-      end)
-      ()
+    let rejected : Counter.t =
+      let help = "# of received snark work failing validation" in
+      Counter.v "rejected" ~help ~namespace ~subsystem
+
+    let ignored : Counter.t =
+      let help = "# of received snark work ignored" in
+      Counter.v "ignored" ~help ~namespace ~subsystem
+
+    let received : Counter.t =
+      let help = "# of snark work received" in
+      Counter.v "received" ~help ~namespace ~subsystem
+
+    module Validation_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "validation_time"
+
+          let help =
+            "average delay, in ms, for snark work to be validated and \
+             rebroadcasted"
+        end)
+        ()
+  end
+
+  module Transaction = struct
+    let subsystem = "Transaction"
+
+    let validations_timed_out : Counter.t =
+      let help = "# of received transactions whose validation timed out" in
+      Counter.v "validations_timed_out" ~help ~namespace ~subsystem
+
+    let rejected : Counter.t =
+      let help = "# of received transactions failing validation" in
+      Counter.v "rejected" ~help ~namespace ~subsystem
+
+    let ignored : Counter.t =
+      let help = "# of received transactions ignored" in
+      Counter.v "ignored" ~help ~namespace ~subsystem
+
+    let received : Counter.t =
+      let help = "# of transactions received" in
+      Counter.v "received" ~help ~namespace ~subsystem
+
+    module Validation_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "validation_time"
+
+          let help =
+            "average delay, in ms, for transactions to be validated and \
+             rebroadcasted"
+        end)
+        ()
+  end
 
   let rpc_requests_received : Counter.t =
     let help = "# of rpc requests received" in

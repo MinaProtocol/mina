@@ -26,41 +26,50 @@ let is_expired cb =
   | Some expires_at ->
       Time_ns.(now () >= expires_at)
 
-let record_timeout_metrics cb =
-  match cb.message_type with
+module type Metric_intf = sig
+  val validations_timed_out : Mina_metrics.Counter.t
+
+  val rejected : Mina_metrics.Counter.t
+
+  val ignored : Mina_metrics.Counter.t
+
+  module Validation_time : sig
+    val update : Time.Span.t -> unit
+  end
+end
+
+let metrics_of_message_type m : (module Metric_intf) option =
+  match m with
   | `Unknown ->
-      Mina_metrics.(Counter.inc_one Network.validations_timed_out)
+      None
   | `Block ->
-      Mina_metrics.(Counter.inc_one Network.block_validations_timed_out)
+      Some (module Mina_metrics.Network.Block)
   | `Snark_work ->
-      Mina_metrics.(Counter.inc_one Network.snark_work_validations_timed_out)
+      Some (module Mina_metrics.Network.Snark_work)
   | `Transaction ->
-      Mina_metrics.(Counter.inc_one Network.transaction_validations_timed_out)
+      Some (module Mina_metrics.Network.Transaction)
+
+let record_timeout_metrics cb =
+  Mina_metrics.(Counter.inc_one Network.validations_timed_out) ;
+  match metrics_of_message_type cb.message_type with
+  | None ->
+      ()
+  | Some (module M) ->
+      Mina_metrics.Counter.inc_one M.validations_timed_out
 
 let record_validation_metrics message_type (result : validation_result)
     validation_time =
-  match (message_type, result) with
-  | `Unknown, _ ->
-      (*should not be unknown if the result was computed*)
+  match metrics_of_message_type message_type with
+  | None ->
       ()
-  | `Block, `Ignore ->
-      Mina_metrics.(Counter.inc_one Network.blocks_ignored)
-  | `Block, `Reject ->
-      Mina_metrics.(Counter.inc_one Network.blocks_rejected)
-  | `Block, `Accept ->
-      Mina_metrics.(Network.Block_validation_time.update validation_time)
-  | `Snark_work, `Ignore ->
-      Mina_metrics.(Counter.inc_one Network.snark_work_ignored)
-  | `Snark_work, `Reject ->
-      Mina_metrics.(Counter.inc_one Network.snark_work_rejected)
-  | `Snark_work, `Accept ->
-      Mina_metrics.(Network.Snark_work_validation_time.update validation_time)
-  | `Transaction, `Ignore ->
-      Mina_metrics.(Counter.inc_one Network.transactions_ignored)
-  | `Transaction, `Reject ->
-      Mina_metrics.(Counter.inc_one Network.transactions_rejected)
-  | `Transaction, `Accept ->
-      Mina_metrics.(Network.Transaction_validation_time.update validation_time)
+  | Some (module M) -> (
+      match result with
+      | `Ignore ->
+          Mina_metrics.Counter.inc_one M.ignored
+      | `Accept ->
+          M.Validation_time.update validation_time
+      | `Reject ->
+          Mina_metrics.Counter.inc_one M.rejected )
 
 let await_timeout cb =
   if is_expired cb then Deferred.return ()
@@ -87,7 +96,7 @@ let await cb =
         with
         | `Ok result ->
             let validation_time =
-              Time_ns.diff expires_at (Time_ns.now ())
+              Time_ns.abs_diff expires_at (Time_ns.now ())
               |> Time_ns.Span.to_ms |> Time.Span.of_ms
             in
             record_validation_metrics cb.message_type result validation_time ;
