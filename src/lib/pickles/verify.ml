@@ -1,5 +1,5 @@
 module SC = Scalar_challenge
-open Core
+open Core_kernel
 open Pickles_types
 open Common
 open Import
