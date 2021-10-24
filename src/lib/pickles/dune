@@ -14,7 +14,6 @@
    ppx_deriving_yojson
    h_list.ppx))
  (libraries
-  async
   digestif
   mina_version
   zexe_backend
