@@ -519,14 +519,14 @@ This algorithm initializes the checkpoints for genesis block `G`
 fn initCheckpoints(G) -> ()
 {
     // Set staking epoch data
-    cState(G).staking_epoch_data.seed = zero
-    cState(G).staking_epoch_data.start_checkpoint = zero
-    cState(G).staking_epoch_data.lock_checkpoint = zero
+    cState(G).staking_epoch_data.seed = Epoch_seed(zero)
+    cState(G).staking_epoch_data.start_checkpoint = State_hash(zero)
+    cState(G).staking_epoch_data.lock_checkpoint = State_hash(zero)
     cState(G).staking_epoch_data.epoch_length = 1
 
     // Set next epoch data
     cState(G).next_epoch.data.seed = Epoch_seed::from_b58("2vaRh7FQ5wSzmpFReF9gcRKjv48CcJvHs25aqb3SSZiPgHQBy5Dt")
-    cState(G).next_epoch_data.start_checkpoint = zero
+    cState(G).next_epoch_data.start_checkpoint = State_hash(zero)
     cState(G).next_epoch_data.lock_checkpoint =  State_hash::from_b58("3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d")
     cState(G).staking_epoch_data.epoch_length = 2
 }
