@@ -2485,6 +2485,12 @@ module Hooks = struct
 
       let received_counter = Mina_metrics.Network.get_epoch_ledger_rpcs_received
 
+      let failed_request_counter =
+        Mina_metrics.Network.get_epoch_ledger_rpc_requests_failed
+
+      let failed_response_counter =
+        Mina_metrics.Network.get_epoch_ledger_rpc_responses_failed
+
       module M = Versioned_rpc.Both_convert.Plain.Make (Master)
       include M
 
@@ -2577,6 +2583,7 @@ module Hooks = struct
                 Option.value res ~default:(Error "epoch ledger not found")
             in
             Result.iter_error response ~f:(fun err ->
+                Mina_metrics.Counter.inc_one failed_response_counter ;
                 [%log info]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson conn)

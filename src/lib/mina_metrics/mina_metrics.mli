@@ -70,7 +70,53 @@ module Network : sig
 
   val all_peers : Gauge.t
 
+  val validations_timed_out : Counter.t
+
+  val gossip_messages_failed_to_decode : Counter.t
+
   val gossip_messages_received : Counter.t
+
+  module Block : sig
+    val validations_timed_out : Counter.t
+
+    val rejected : Counter.t
+
+    val ignored : Counter.t
+
+    val received : Counter.t
+
+    module Validation_time : sig
+      val update : Time.Span.t -> unit
+    end
+  end
+
+  module Snark_work : sig
+    val validations_timed_out : Counter.t
+
+    val rejected : Counter.t
+
+    val ignored : Counter.t
+
+    val received : Counter.t
+
+    module Validation_time : sig
+      val update : Time.Span.t -> unit
+    end
+  end
+
+  module Transaction : sig
+    val validations_timed_out : Counter.t
+
+    val rejected : Counter.t
+
+    val ignored : Counter.t
+
+    val received : Counter.t
+
+    module Validation_time : sig
+      val update : Time.Span.t -> unit
+    end
+  end
 
   val rpc_requests_received : Counter.t
 
@@ -80,46 +126,94 @@ module Network : sig
 
   val get_some_initial_peers_rpcs_received : Counter.t
 
+  val get_some_initial_peers_rpc_requests_failed : Counter.t
+
+  val get_some_initial_peers_rpc_responses_failed : Counter.t
+
   val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent : Counter.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received :
+    Counter.t
+
+  val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_requests_failed :
+    Counter.t
+
+  val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_responses_failed :
     Counter.t
 
   val answer_sync_ledger_query_rpcs_sent : Counter.t
 
   val answer_sync_ledger_query_rpcs_received : Counter.t
 
+  val answer_sync_ledger_query_rpc_requests_failed : Counter.t
+
+  val answer_sync_ledger_query_rpc_responses_failed : Counter.t
+
   val get_transition_chain_rpcs_sent : Counter.t
 
   val get_transition_chain_rpcs_received : Counter.t
+
+  val get_transition_chain_rpc_requests_failed : Counter.t
+
+  val get_transition_chain_rpc_responses_failed : Counter.t
 
   val get_transition_knowledge_rpcs_sent : Counter.t
 
   val get_transition_knowledge_rpcs_received : Counter.t
 
+  val get_transition_knowledge_rpc_requests_failed : Counter.t
+
+  val get_transition_knowledge_rpc_responses_failed : Counter.t
+
   val get_transition_chain_proof_rpcs_sent : Counter.t
 
   val get_transition_chain_proof_rpcs_received : Counter.t
+
+  val get_transition_chain_proof_rpc_requests_failed : Counter.t
+
+  val get_transition_chain_proof_rpc_responses_failed : Counter.t
 
   val get_node_status_rpcs_sent : Counter.t
 
   val get_node_status_rpcs_received : Counter.t
 
+  val get_node_status_rpc_requests_failed : Counter.t
+
+  val get_node_status_rpc_responses_failed : Counter.t
+
   val get_ancestry_rpcs_sent : Counter.t
 
   val get_ancestry_rpcs_received : Counter.t
+
+  val get_ancestry_rpc_requests_failed : Counter.t
+
+  val get_ancestry_rpc_responses_failed : Counter.t
 
   val ban_notify_rpcs_sent : Counter.t
 
   val ban_notify_rpcs_received : Counter.t
 
+  val ban_notify_rpc_requests_failed : Counter.t
+
+  val ban_notify_rpc_responses_failed : Counter.t
+
   val get_best_tip_rpcs_sent : Counter.t
 
   val get_best_tip_rpcs_received : Counter.t
 
+  val get_best_tip_rpc_requests_failed : Counter.t
+
+  val get_best_tip_rpc_responses_failed : Counter.t
+
   val get_epoch_ledger_rpcs_sent : Counter.t
 
   val get_epoch_ledger_rpcs_received : Counter.t
+
+  val get_epoch_ledger_rpc_requests_failed : Counter.t
+
+  val get_epoch_ledger_rpc_responses_failed : Counter.t
+
+  val rpc_connections_failed : Counter.t
 
   module Ipc_latency_histogram : Histogram
 
@@ -140,10 +234,30 @@ module Network : sig
   val ipc_latency_ns_summary : Ipc_latency_histogram.t
 end
 
+module Pipe : sig
+  module Drop_on_overflow : sig
+    val bootstrap_sync_ledger : Counter.t
+
+    val verified_network_pool_diffs : Counter.t
+
+    val transition_frontier_valid_transitions : Counter.t
+
+    val transition_frontier_primary_transitions : Counter.t
+
+    val router_transition_frontier_controller : Counter.t
+
+    val router_bootstrap_controller : Counter.t
+
+    val router_verified_transitions : Counter.t
+
+    val router_transitions : Counter.t
+
+    val router_valid_transitions : Counter.t
+  end
+end
+
 module Snark_work : sig
   val useful_snark_work_received_time_sec : Gauge.t
-
-  val completed_snark_work_received_gossip : Counter.t
 
   val completed_snark_work_received_rpc : Counter.t
 

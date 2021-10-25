@@ -13,6 +13,8 @@ open Async_kernel
 
 let time_offset_sec = 1609459200.
 
+[%%inject "block_window_duration", block_window_duration]
+
 (* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct
   let re_unquoted_escapes = Re.compile @@ Re.set "\\\n"
@@ -372,9 +374,129 @@ module Network = struct
     let help = "# of peers ever seen through gossip net" in
     Gauge.v "all_peers" ~help ~namespace ~subsystem
 
+  let validations_timed_out : Counter.t =
+    let help = "# of received messages whose validation timed out" in
+    Counter.v "validations_timed_out" ~help ~namespace ~subsystem
+
+  let gossip_messages_failed_to_decode : Counter.t =
+    let help = "# of received messages that could not be decoded" in
+    Counter.v "gossip_messages_failed_to_decode" ~help ~namespace ~subsystem
+
   let gossip_messages_received : Counter.t =
     let help = "# of messages received" in
     Counter.v "messages_received" ~help ~namespace ~subsystem
+
+  module Delay_time_spec = struct
+    let tick_interval =
+      Core.Time.Span.of_ms (Int.to_float block_window_duration)
+
+    let rolling_interval =
+      Core.Time.Span.of_ms (Int.to_float (block_window_duration * 20))
+  end
+
+  module Block = struct
+    let subsystem = "Block"
+
+    let validations_timed_out : Counter.t =
+      let help = "# of received blocks whose validation timed out" in
+      Counter.v "validations_timed_out" ~help ~namespace ~subsystem
+
+    let rejected : Counter.t =
+      let help = "# of received blocks failing validation" in
+      Counter.v "rejected" ~help ~namespace ~subsystem
+
+    let ignored : Counter.t =
+      let help = "# of received blocks ignored" in
+      Counter.v "ignored" ~help ~namespace ~subsystem
+
+    let received : Counter.t =
+      let help = "# of blocks received" in
+      Counter.v "received" ~help ~namespace ~subsystem
+
+    module Validation_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "validation_time"
+
+          let help =
+            "average time, in ms, for blocks to be validated and rebroadcasted"
+        end)
+        ()
+  end
+
+  module Snark_work = struct
+    let subsystem = "Snark_work"
+
+    let validations_timed_out : Counter.t =
+      let help = "# of received snark work whose validation timed out" in
+      Counter.v "validations_timed_out" ~help ~namespace ~subsystem
+
+    let rejected : Counter.t =
+      let help = "# of received snark work failing validation" in
+      Counter.v "rejected" ~help ~namespace ~subsystem
+
+    let ignored : Counter.t =
+      let help = "# of received snark work ignored" in
+      Counter.v "ignored" ~help ~namespace ~subsystem
+
+    let received : Counter.t =
+      let help = "# of snark work received" in
+      Counter.v "received" ~help ~namespace ~subsystem
+
+    module Validation_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "validation_time"
+
+          let help =
+            "average delay, in ms, for snark work to be validated and \
+             rebroadcasted"
+        end)
+        ()
+  end
+
+  module Transaction = struct
+    let subsystem = "Transaction"
+
+    let validations_timed_out : Counter.t =
+      let help = "# of received transactions whose validation timed out" in
+      Counter.v "validations_timed_out" ~help ~namespace ~subsystem
+
+    let rejected : Counter.t =
+      let help = "# of received transactions failing validation" in
+      Counter.v "rejected" ~help ~namespace ~subsystem
+
+    let ignored : Counter.t =
+      let help = "# of received transactions ignored" in
+      Counter.v "ignored" ~help ~namespace ~subsystem
+
+    let received : Counter.t =
+      let help = "# of transactions received" in
+      Counter.v "received" ~help ~namespace ~subsystem
+
+    module Validation_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "validation_time"
+
+          let help =
+            "average delay, in ms, for transactions to be validated and \
+             rebroadcasted"
+        end)
+        ()
+  end
 
   let rpc_requests_received : Counter.t =
     let help = "# of rpc requests received" in
@@ -391,6 +513,16 @@ module Network = struct
   let get_some_initial_peers_rpcs_received : Counter.t =
     let help = "# of Get_some_initial_peers rpc requests received" in
     Counter.v "get_some_initial_peers_rpcs_received" ~help ~namespace ~subsystem
+
+  let get_some_initial_peers_rpc_requests_failed : Counter.t =
+    let help = "# of Get_some_initial_peers rpc requests failed" in
+    Counter.v "get_some_initial_peers_rpc_requests_failed" ~help ~namespace
+      ~subsystem
+
+  let get_some_initial_peers_rpc_responses_failed : Counter.t =
+    let help = "# of Get_some_initial_peers rpc requests failed to respond" in
+    Counter.v "get_some_initial_peers_rpc_responses_failed" ~help ~namespace
+      ~subsystem
 
   let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent : Counter.t
       =
@@ -411,6 +543,26 @@ module Network = struct
       "get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received" ~help
       ~namespace ~subsystem
 
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_requests_failed :
+      Counter.t =
+    let help =
+      "# of Get_staged_ledger_aux_and_pending_coinbases_at_hash rpc requests \
+       failed"
+    in
+    Counter.v
+      "get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_requests_failed"
+      ~help ~namespace ~subsystem
+
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_responses_failed :
+      Counter.t =
+    let help =
+      "# of Get_staged_ledger_aux_and_pending_coinbases_at_hash rpc requests \
+       failed to respond"
+    in
+    Counter.v
+      "get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_responses_failed"
+      ~help ~namespace ~subsystem
+
   let answer_sync_ledger_query_rpcs_sent : Counter.t =
     let help = "# of Answer_sync_ledger_query rpc requests sent" in
     Counter.v "answer_sync_ledger_query_rpcs_sent" ~help ~namespace ~subsystem
@@ -418,6 +570,16 @@ module Network = struct
   let answer_sync_ledger_query_rpcs_received : Counter.t =
     let help = "# of Answer_synce_ledger_query rpc requests received" in
     Counter.v "answer_sync_ledger_query_rpcs_received" ~help ~namespace
+      ~subsystem
+
+  let answer_sync_ledger_query_rpc_requests_failed : Counter.t =
+    let help = "# of Answer_sync_ledger_query rpc requests failed" in
+    Counter.v "answer_sync_ledger_query_rpc_requests_failed" ~help ~namespace
+      ~subsystem
+
+  let answer_sync_ledger_query_rpc_responses_failed : Counter.t =
+    let help = "# of Answer_sync_ledger_query rpc requests failed to respond" in
+    Counter.v "answer_sync_ledger_query_rpc_responses_failed" ~help ~namespace
       ~subsystem
 
   let get_transition_chain_rpcs_sent : Counter.t =
@@ -428,6 +590,16 @@ module Network = struct
     let help = "# of Get_transition_chain rpc requests received" in
     Counter.v "get_transition_chain_rpcs_received" ~help ~namespace ~subsystem
 
+  let get_transition_chain_rpc_requests_failed : Counter.t =
+    let help = "# of Get_some_initial_peers rpc requests failed" in
+    Counter.v "get_transition_chain_rpc_requests_failed" ~help ~namespace
+      ~subsystem
+
+  let get_transition_chain_rpc_responses_failed : Counter.t =
+    let help = "# of Get_transition_chain rpc requests failed to respond" in
+    Counter.v "get_transition_chain_rpc_responses_failed" ~help ~namespace
+      ~subsystem
+
   let get_transition_knowledge_rpcs_sent : Counter.t =
     let help = "# of Get_transition_knowledge rpc requests sent" in
     Counter.v "get_transition_knowledge_rpcs_sent" ~help ~namespace ~subsystem
@@ -435,6 +607,16 @@ module Network = struct
   let get_transition_knowledge_rpcs_received : Counter.t =
     let help = "# of Get_transition_knowledge rpc requests received" in
     Counter.v "get_transition_knowledge_rpcs_received" ~help ~namespace
+      ~subsystem
+
+  let get_transition_knowledge_rpc_requests_failed : Counter.t =
+    let help = "# of Get_transition_knowledge rpc requests failed" in
+    Counter.v "get_transition_knowledge_rpc_requests_failed" ~help ~namespace
+      ~subsystem
+
+  let get_transition_knowledge_rpc_responses_failed : Counter.t =
+    let help = "# of Get_transition_knowledge rpc requests failed to respond" in
+    Counter.v "get_transition_knowledge_rpc_responses_failed" ~help ~namespace
       ~subsystem
 
   let get_transition_chain_proof_rpcs_sent : Counter.t =
@@ -446,6 +628,18 @@ module Network = struct
     Counter.v "get_transition_chain_proof_rpcs_received" ~help ~namespace
       ~subsystem
 
+  let get_transition_chain_proof_rpc_requests_failed : Counter.t =
+    let help = "# of Get_transition_chain_proof rpc requests failed" in
+    Counter.v "get_transition_chain_proof_rpc_requests_failed" ~help ~namespace
+      ~subsystem
+
+  let get_transition_chain_proof_rpc_responses_failed : Counter.t =
+    let help =
+      "# of Get_transition_chain_proof rpc requests failed to respond"
+    in
+    Counter.v "get_transition_chain_proof_rpc_responses_failed" ~help ~namespace
+      ~subsystem
+
   let get_node_status_rpcs_sent : Counter.t =
     let help = "# of Get_node_status rpc requests sent" in
     Counter.v "get_node_status_rpcs_sent" ~help ~namespace ~subsystem
@@ -453,6 +647,14 @@ module Network = struct
   let get_node_status_rpcs_received : Counter.t =
     let help = "# of Get_node_status rpc requests received" in
     Counter.v "get_node_status_rpcs_received" ~help ~namespace ~subsystem
+
+  let get_node_status_rpc_requests_failed : Counter.t =
+    let help = "# of Get_node_status rpc requests failed" in
+    Counter.v "get_node_status_rpc_requests_failed" ~help ~namespace ~subsystem
+
+  let get_node_status_rpc_responses_failed : Counter.t =
+    let help = "# of Get_node_status rpc requests failed to respond" in
+    Counter.v "get_node_status_rpc_responses_failed" ~help ~namespace ~subsystem
 
   let get_ancestry_rpcs_sent : Counter.t =
     let help = "# of Get_ancestry rpc requests sent" in
@@ -462,6 +664,14 @@ module Network = struct
     let help = "# of Get_ancestry rpc requests received" in
     Counter.v "get_ancestry_rpcs_received" ~help ~namespace ~subsystem
 
+  let get_ancestry_rpc_requests_failed : Counter.t =
+    let help = "# of Get_ancestry rpc requests failed" in
+    Counter.v "get_ancestry_rpc_requests_failed" ~help ~namespace ~subsystem
+
+  let get_ancestry_rpc_responses_failed : Counter.t =
+    let help = "# of Get_ancestry rpc requests failed to respond" in
+    Counter.v "get_ancestry_rpc_responses_failed" ~help ~namespace ~subsystem
+
   let ban_notify_rpcs_sent : Counter.t =
     let help = "# of Ban_notify rpc requests sent" in
     Counter.v "ban_notify_rpcs_sent" ~help ~namespace ~subsystem
@@ -469,6 +679,14 @@ module Network = struct
   let ban_notify_rpcs_received : Counter.t =
     let help = "# of Ban_notify rpc requests received" in
     Counter.v "ban_notify_rpcs_received" ~help ~namespace ~subsystem
+
+  let ban_notify_rpc_requests_failed : Counter.t =
+    let help = "# of Ban_notify rpc requests failed" in
+    Counter.v "ban_notify_rpc_requests_failed" ~help ~namespace ~subsystem
+
+  let ban_notify_rpc_responses_failed : Counter.t =
+    let help = "# of Ban_notify rpc requests failed to respond" in
+    Counter.v "ban_notify_rpc_responses_failed" ~help ~namespace ~subsystem
 
   let get_best_tip_rpcs_sent : Counter.t =
     let help = "# of Get_best_tip rpc requests sent" in
@@ -478,6 +696,14 @@ module Network = struct
     let help = "# of Get_best_tip rpc requests received" in
     Counter.v "get_best_tip_rpcs_received" ~help ~namespace ~subsystem
 
+  let get_best_tip_rpc_requests_failed : Counter.t =
+    let help = "# of Get_best_tip rpc requests failed" in
+    Counter.v "get_best_tip_rpc_requests_failed" ~help ~namespace ~subsystem
+
+  let get_best_tip_rpc_responses_failed : Counter.t =
+    let help = "# of Get_best_tip rpc requests failed to respond" in
+    Counter.v "get_best_tip_rpc_responses_failed" ~help ~namespace ~subsystem
+
   let get_epoch_ledger_rpcs_sent : Counter.t =
     let help = "# of Get_epoch_ledger rpc requests sent" in
     Counter.v "get_epoch_ledger_rpcs_sent" ~help ~namespace ~subsystem
@@ -485,6 +711,19 @@ module Network = struct
   let get_epoch_ledger_rpcs_received : Counter.t =
     let help = "# of Get_epoch_ledger rpc requests received" in
     Counter.v "get_epoch_ledger_rpcs_received" ~help ~namespace ~subsystem
+
+  let get_epoch_ledger_rpc_requests_failed : Counter.t =
+    let help = "# of Get_epoch_ledger rpc requests failed" in
+    Counter.v "get_epoch_ledger_rpc_requests_failed" ~help ~namespace ~subsystem
+
+  let get_epoch_ledger_rpc_responses_failed : Counter.t =
+    let help = "# of Get_epoch_ledger rpc requests failed to respond" in
+    Counter.v "get_epoch_ledger_rpc_responses_failed" ~help ~namespace
+      ~subsystem
+
+  let rpc_connections_failed : Counter.t =
+    let help = "# of failed connections for rpc requests" in
+    Counter.v "rpc_connections_failed" ~help ~namespace ~subsystem
 
   module Gauge_map = Metric_map (struct
     type t = Gauge.t
@@ -547,6 +786,61 @@ module Network = struct
     Ipc_latency_histogram.v "ipc_latency_ns_summary" ~help ~namespace ~subsystem
 end
 
+module Pipe = struct
+  let subsystem = "Pipe"
+
+  module Drop_on_overflow = struct
+    let subsystem = subsystem ^ "_overflow"
+
+    let bootstrap_sync_ledger : Counter.t =
+      let help = "Overflow in sync ledger pipe when bootstrapping" in
+      Counter.v "bootstrap_sync_ledger_pipe" ~help ~namespace ~subsystem
+
+    let verified_network_pool_diffs : Counter.t =
+      let help =
+        "Overflow in verified network pool diffs pipe (transactions or snark \
+         work)"
+      in
+      Counter.v "verified_network_pool_diffs" ~help ~namespace ~subsystem
+
+    let transition_frontier_valid_transitions : Counter.t =
+      let help =
+        "Overflow in valid transitions pipe that has validated network \
+         transitions"
+      in
+      Counter.v "transition_frontier_valid_transitions" ~help ~namespace
+        ~subsystem
+
+    let transition_frontier_primary_transitions : Counter.t =
+      let help = "Overflow in primary transitions pipe" in
+      Counter.v "transition_frontier_primary_transitions" ~help ~namespace
+        ~subsystem
+
+    let router_transition_frontier_controller : Counter.t =
+      let help =
+        "Overflow in transition frontier controller pipe in Transition_router"
+      in
+      Counter.v "router_transition_frontier_controller" ~help ~namespace
+        ~subsystem
+
+    let router_bootstrap_controller : Counter.t =
+      let help = "Overflow in bootstrap controller pipe in Transition_router" in
+      Counter.v "router_bootstrap_controller_pipe" ~help ~namespace ~subsystem
+
+    let router_verified_transitions : Counter.t =
+      let help = "Overflow in verified transitions pipe in Transition_router" in
+      Counter.v "router_verified_transitions" ~help ~namespace ~subsystem
+
+    let router_transitions : Counter.t =
+      let help = "Overflow in transitions pipe in Transition_router" in
+      Counter.v "router_transitions" ~help ~namespace ~subsystem
+
+    let router_valid_transitions : Counter.t =
+      let help = "Overflow in valid transitions pipe in Transition_router" in
+      Counter.v "router_valid_transitions" ~help ~namespace ~subsystem
+  end
+end
+
 module Snark_work = struct
   let subsystem = "Snark_work"
 
@@ -555,10 +849,6 @@ module Snark_work = struct
       "Time at which useful snark work was seen (seconds since 1/1/1970)"
     in
     Gauge.v "useful_snark_work_received_time_sec" ~help ~namespace ~subsystem
-
-  let completed_snark_work_received_gossip : Counter.t =
-    let help = "# of completed snark work bundles received from peers" in
-    Counter.v "completed_snark_work_received_gossip" ~help ~namespace ~subsystem
 
   let completed_snark_work_received_rpc : Counter.t =
     let help = "# of completed snark work bundles received via rpc" in
@@ -925,8 +1215,6 @@ module Block_latency = struct
       let help = "Number of pending `gsutil cp` jobs for block dumping" in
       Gauge.v "upload_to_gcloud_blocks" ~help ~namespace ~subsystem
   end
-
-  [%%inject "block_window_duration", block_window_duration]
 
   module Latency_time_spec = struct
     let tick_interval =
