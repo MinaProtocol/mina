@@ -3,7 +3,7 @@
  (public_name merkle_address)
  (library_flags -linkall)
  (inline_tests)
- (libraries core bitstring direction ppx_version.runtime)
+ (libraries core_kernel bitstring direction ppx_version.runtime)
  (preprocess
   (pps ppx_coda ppx_version ppx_jane ppx_hash ppx_compare ppx_deriving_yojson bitstring.ppx))
  (instrumentation (backend bisect_ppx))
