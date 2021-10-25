@@ -1,0 +1,36 @@
+ARG deb_codename=stretch
+FROM debian:${deb_codename}-slim
+
+# Run with `docker build --build-arg deb_version=<version>`
+ARG deb_version
+ARG deb_codename=stretch
+ARG deb_release=stable
+
+ENV DEBIAN_FRONTEND noninteractive
+RUN echo "Building image with version $deb_version"
+
+# Dependencies
+# stretch-slim configures apt to not store any cache, so no need to rm it
+# TODO: make sure this is the minimum runtime deps
+RUN apt-get -y update \
+  && apt -y install \
+    apt-transport-https \
+    ca-certificates \
+    dnsutils \
+    dumb-init \
+    libffi6 \
+    libgmp10 \
+    libgomp1 \
+    libprocps6 \
+    libjemalloc-dev \
+    libssl1.1 \
+    tzdata
+
+# mina keypair package
+RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+   && apt-get update \
+   && apt-get install -y "mina-generate-keypair=$deb_version"
+
+WORKDIR /
+
+ENTRYPOINT [ "mina-generate-keypair" ]

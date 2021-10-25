@@ -4,7 +4,7 @@ FROM debian:${deb_codename}-slim
 # Run with `docker build --build-arg deb_version=<version>`
 ARG deb_version
 ARG deb_codename=stretch
-ARG deb_release=alpha
+ARG deb_release=stable
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $deb_version"

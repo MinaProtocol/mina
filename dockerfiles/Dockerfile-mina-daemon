@@ -2,7 +2,7 @@ ARG deb_codename=stretch
 FROM debian:${deb_codename}-slim
 # Run with `docker build --build-arg deb_version=<version>`
 ARG deb_version
-ARG deb_release=alpha
+ARG deb_release=stable
 ARG deb_codename=stretch
 ARG network=mainnet
 
