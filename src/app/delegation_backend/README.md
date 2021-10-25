@@ -22,7 +22,7 @@ Backend Service is a web server that exposes the following entrypoints:
 
     ```json
     { "data":
-       { "peer_id": "<base64-encoded peer id of the node from libp2p library>"
+       { "peer_id": "<base58-encoded peer id of the node from libp2p library>"
        , "block": "<base64-encoded bytes of the latest known block>"
        , "created_at": "<current time>"
 
@@ -67,7 +67,7 @@ Cloud storage has the following structure:
         - `snark_work` (optional, as in user's JSON submission)
         - `submitter` is base58check-encoded submitter's public key
         - `created_at` is UTC-based `RFC-3339` -encoded
-        - `block_hash` is base64check-encoded hash of a block
+        - `block_hash` is base58check-encoded hash of a block
 - `blocks`
     - `<block-hash>.dat`
         - Contains raw block

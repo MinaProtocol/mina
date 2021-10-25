@@ -33,7 +33,7 @@ func main() {
 		log.Fatalf("Error creating Cloud client: %v", err1)
 		return
 	}
-	gctx := GoogleContext{Bucket: client.Bucket(CLOUD_BUCKET_NAME), Context: ctx, Log: log}
+	gctx := GoogleContext{Bucket: client.Bucket(CloudBucketName()), Context: ctx, Log: log}
 	app.Save = func(objs ObjectsToSave) {
 		gctx.GoogleStorageSave(objs)
 	}

@@ -1,6 +1,9 @@
 package delegation_backend
 
-import "time"
+import (
+	"os"
+	"time"
+)
 
 const MAX_SUBMIT_PAYLOAD_SIZE = 50000000 // max payload size in bytes
 const REQUESTS_PER_PK_HOURLY = 120
@@ -11,10 +14,27 @@ const DELEGATION_WHITELIST_LIST = "Form Responses 1"
 const DELEGATION_WHITELIST_COLUMN = "E"
 
 // Production
-// const DELEGATION_WHITELIST_SPREADSHEET_ID = "1xiKppb0BFUo8IKM2itIx2EWIQbBzUlFxgtZlKdnrLCU"
-// const CLOUD_BUCKET_NAME = "foundation-delegation-snark-work"
-const DELEGATION_WHITELIST_SPREADSHEET_ID = "1NODwwcVxLNnCI4XnIrGdGBSjointN4MZ8QZ7wqgtSTQ"
-const CLOUD_BUCKET_NAME = "georgeee-delegation-test-1"
+const PROD_WHITELIST_SPREADSHEET_ID = "1xiKppb0BFUo8IKM2itIx2EWIQbBzUlFxgtZlKdnrLCU"
+const PROD_CLOUD_BUCKET_NAME = "foundation-delegation-snark-work"
+
+const TEST_WHITELIST_SPREADSHEET_ID = "1NODwwcVxLNnCI4XnIrGdGBSjointN4MZ8QZ7wqgtSTQ"
+const TEST_CLOUD_BUCKET_NAME = "georgeee-delegation-test-1"
+
+func CloudBucketName() string {
+	if os.Getenv("TEST") == "" {
+		return PROD_CLOUD_BUCKET_NAME
+	} else {
+		return TEST_CLOUD_BUCKET_NAME
+	}
+}
+
+func WhitelistSpreadsheetId() string {
+	if os.Getenv("TEST") == "" {
+		return PROD_WHITELIST_SPREADSHEET_ID
+	} else {
+		return TEST_WHITELIST_SPREADSHEET_ID
+	}
+}
 
 var PK_PREFIX = [...]byte{1, 1}
 var SIG_PREFIX = [...]byte{1}
