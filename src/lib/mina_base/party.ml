@@ -755,3 +755,11 @@ let account_id (t : t) : Account_id.t =
 
 let of_signed ({ data; authorization } : Signed.t) : t =
   { authorization = Signature authorization; data = Predicated.of_signed data }
+
+(** The change in balance to apply to the target account of this party.
+    When this is negative, the amount will be withdrawn from the account and
+    made available to later parties in the same transaction.
+    When this is positive, the amount will be deposited into the account from
+    the funds made available by previous parties in the same transaction.
+*)
+let delta (t : t) : Amount.Signed.t = t.data.body.delta

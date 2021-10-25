@@ -239,6 +239,7 @@ module Stable = struct
       { fee_payer : Party.Signed.Stable.V1.t
       ; other_parties : Party.Stable.V1.t list
       ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
+      ; memo : Signed_command_memo.Stable.V1.t
       }
     [@@deriving sexp, compare, equal, hash, yojson]
 
@@ -412,6 +413,7 @@ module Verifiable = struct
             Pickles.Side_loaded.Verification_key.Stable.V1.t option
             Party_or_stack.With_hashes.Stable.V1.t
         ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
+        ; memo : Signed_command_memo.Stable.V1.t
         }
       [@@deriving sexp, compare, equal, hash, yojson]
 
@@ -425,6 +427,7 @@ let of_verifiable (t : Verifiable.t) : t =
   ; other_parties =
       List.map ~f:fst (Party_or_stack.to_parties_list t.other_parties)
   ; protocol_state = t.protocol_state
+  ; memo = t.memo
   }
 
 let valid_interval (t : t) =
@@ -444,9 +447,9 @@ module Transaction_commitment = struct
 
   let typ = Snark_params.Tick.Field.typ
 
-  let create ~other_parties_hash ~protocol_state_predicate_hash : t =
+  let create ~other_parties_hash ~protocol_state_predicate_hash ~memo_hash : t =
     Random_oracle.hash ~init:Hash_prefix.party_with_protocol_state_predicate
-      [| protocol_state_predicate_hash; other_parties_hash |]
+      [| protocol_state_predicate_hash; other_parties_hash; memo_hash |]
 
   let with_fee_payer (t : t) ~fee_payer_hash =
     Random_oracle.hash ~init:Hash_prefix.party_cons [| fee_payer_hash; t |]
@@ -454,10 +457,10 @@ module Transaction_commitment = struct
   module Checked = struct
     type t = Pickles.Impls.Step.Field.t
 
-    let create ~other_parties_hash ~protocol_state_predicate_hash =
+    let create ~other_parties_hash ~protocol_state_predicate_hash ~memo_hash =
       Random_oracle.Checked.hash
         ~init:Hash_prefix.party_with_protocol_state_predicate
-        [| protocol_state_predicate_hash; other_parties_hash |]
+        [| protocol_state_predicate_hash; other_parties_hash; memo_hash |]
 
     let with_fee_payer (t : t) ~fee_payer_hash =
       Random_oracle.Checked.hash ~init:Hash_prefix.party_cons
@@ -471,6 +474,7 @@ let commitment (t : t) : Transaction_commitment.t =
       (Party_or_stack.With_hashes.other_parties_hash t.other_parties)
     ~protocol_state_predicate_hash:
       (Snapp_predicate.Protocol_state.digest t.protocol_state)
+    ~memo_hash:(Signed_command_memo.hash t.memo)
 
 (** This module defines weights for each component of a `Parties.t` element. *)
 module Weight = struct
@@ -481,14 +485,17 @@ module Weight = struct
   let other_parties : Party.t list -> int = List.sum (module Int) ~f:party
 
   let protocol_state : Snapp_predicate.Protocol_state.t -> int = fun _ -> 0
+
+  let memo : Signed_command_memo.t -> int = fun _ -> 0
 end
 
 let weight (parties : t) : int =
-  let { fee_payer; other_parties; protocol_state } = parties in
+  let { fee_payer; other_parties; protocol_state; memo } = parties in
   List.sum
     (module Int)
     ~f:Fn.id
     [ Weight.fee_payer fee_payer
     ; Weight.other_parties other_parties
     ; Weight.protocol_state protocol_state
+    ; Weight.memo memo
     ]

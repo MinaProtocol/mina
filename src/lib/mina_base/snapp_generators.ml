@@ -556,6 +556,11 @@ let gen_parties_from ?(succeed = true)
   let parties_dummy_signatures : Parties.t =
     { fee_payer; other_parties; protocol_state }
   in
+  let%bind memo = Signed_command_memo.gen in
+  let other_parties = old_parties @ new_parties in
+  let parties : Parties.t =
+    { fee_payer; other_parties; protocol_state; memo }
+  in
   (* replace dummy signature in fee payer *)
   let fee_payer_signature =
     Signature_lib.Schnorr.sign fee_payer_keypair.private_key

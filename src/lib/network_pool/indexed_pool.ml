@@ -131,7 +131,8 @@ let currency_consumed_unchecked :
               Currency.Amount.of_fee constraint_constants.account_creation_fee
           | Mint_tokens _ ->
               zero )
-    | Parties { fee_payer; other_parties = _; protocol_state = _ } -> (
+    | Parties { fee_payer; other_parties = _; protocol_state = _; memo = _ }
+      -> (
         match fee_payer.data.body.delta.sgn with
         | Pos ->
             None

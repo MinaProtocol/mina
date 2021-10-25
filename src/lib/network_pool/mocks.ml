@@ -26,6 +26,8 @@ module Base_ledger = struct
 
   let accounts t = Account_id.Table.keys t |> Account_id.Set.of_list
 
+  let get_batch t ls = List.map ls ~f:(fun l -> (l, get t l))
+
   let detached_signal _ = Deferred.never ()
 end
 

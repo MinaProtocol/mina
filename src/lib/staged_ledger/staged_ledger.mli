@@ -98,12 +98,7 @@ val of_scan_state_and_ledger :
      logger:Logger.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> verifier:Verifier.t
-  -> snarked_registers:
-       ( Frozen_ledger_hash.t
-       , unit
-       , Token_id.t
-       , Mina_state.Local_state.t )
-       Mina_state.Registers.t
+  -> snarked_registers:Mina_state.Registers.Value.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t
@@ -111,12 +106,7 @@ val of_scan_state_and_ledger :
 
 val of_scan_state_and_ledger_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> snarked_registers:
-       ( Frozen_ledger_hash.t
-       , unit
-       , Token_id.t
-       , Mina_state.Local_state.t )
-       Mina_state.Registers.t
+  -> snarked_registers:Mina_state.Registers.Value.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t
@@ -204,6 +194,16 @@ val of_scan_state_pending_coinbases_and_snarked_ledger :
      logger:Logger.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> verifier:Verifier.t
+  -> scan_state:Scan_state.t
+  -> snarked_ledger:Ledger.t
+  -> snarked_local_state:Mina_state.Local_state.t
+  -> expected_merkle_root:Ledger_hash.t
+  -> pending_coinbases:Pending_coinbase.t
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> t Or_error.t Deferred.t
+
+val of_scan_state_pending_coinbases_and_snarked_ledger_unchecked :
+     constraint_constants:Genesis_constants.Constraint_constants.t
   -> scan_state:Scan_state.t
   -> snarked_ledger:Ledger.t
   -> snarked_local_state:Mina_state.Local_state.t
