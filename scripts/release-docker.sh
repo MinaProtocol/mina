@@ -54,7 +54,6 @@ mina-archive)
   ;;
 mina-generate-keypair)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-generate-keypair"
-  DOCKER_CONTEXT=""
   ;;
 bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"
