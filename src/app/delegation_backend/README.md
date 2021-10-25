@@ -56,15 +56,18 @@ Backend Service is a web server that exposes the following entrypoints:
 Cloud storage has the following structure:
 
 - `submissions`
-    - `<submitter>/<block_hash>/<created_at>.json`
-        - File contents:
-           - `submitted_at` with server's timestamp (of the time of submission)
-           - `remote_addr` with the `ip:port` address from which request has come
-           - `peer_id` (as in user's JSON submission)
-           - `snark_work` (optional, as in user's JSON submission)
-        - `<submitter>` is base58check-encoded submitter's public key
-        - `<created_at>` is UTC-based `RFC-3339` -encoded
-        - `<block_hash>` is base64check-encoded hash of a block
+    - `<submitted_at_date>/<submitted_at>-<submitter>.json`
+      - Path contents:
+        - `submitted_at_date` with server's date (of the time of submission) in format `YYYY-MM-DD`
+        - `submitted_at` with server's timestamp (of the time of submission) in RFC-3339
+        - `submitter` is base58check-encoded submitter's public key
+      - File contents:
+        - `remote_addr` with the `ip:port` address from which request has come
+        - `peer_id` (as in user's JSON submission)
+        - `snark_work` (optional, as in user's JSON submission)
+        - `submitter` is base58check-encoded submitter's public key
+        - `created_at` is UTC-based `RFC-3339` -encoded
+        - `block_hash` is base64check-encoded hash of a block
 - `blocks`
     - `<block-hash>.dat`
         - Contains raw block

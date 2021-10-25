@@ -11,8 +11,10 @@ const DELEGATION_WHITELIST_LIST = "Form Responses 1"
 const DELEGATION_WHITELIST_COLUMN = "E"
 
 // Production
-const DELEGATION_WHITELIST_SPREADSHEET_ID = "1xiKppb0BFUo8IKM2itIx2EWIQbBzUlFxgtZlKdnrLCU"
-const CLOUD_BUCKET_NAME = "foundation-delegation-snark-work"
+// const DELEGATION_WHITELIST_SPREADSHEET_ID = "1xiKppb0BFUo8IKM2itIx2EWIQbBzUlFxgtZlKdnrLCU"
+// const CLOUD_BUCKET_NAME = "foundation-delegation-snark-work"
+const DELEGATION_WHITELIST_SPREADSHEET_ID = "1NODwwcVxLNnCI4XnIrGdGBSjointN4MZ8QZ7wqgtSTQ"
+const CLOUD_BUCKET_NAME = "georgeee-delegation-test-1"
 
 var PK_PREFIX = [...]byte{1, 1}
 var SIG_PREFIX = [...]byte{1}

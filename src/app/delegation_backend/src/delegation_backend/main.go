@@ -1,14 +1,15 @@
 package main
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
 	. "delegation_backend"
+	"net/http"
+	"time"
+
+	"cloud.google.com/go/storage"
 	logging "github.com/ipfs/go-log/v2"
 	"google.golang.org/api/option"
 	sheets "google.golang.org/api/sheets/v4"
-	"net/http"
-	"time"
 )
 
 func main() {
@@ -32,7 +33,7 @@ func main() {
 		log.Fatalf("Error creating Cloud client: %v", err1)
 		return
 	}
-	gctx := GoogleContext{client.Bucket(CLOUD_BUCKET_NAME), ctx, log}
+	gctx := GoogleContext{Bucket: client.Bucket(CLOUD_BUCKET_NAME), Context: ctx, Log: log}
 	app.Save = func(objs ObjectsToSave) {
 		gctx.GoogleStorageSave(objs)
 	}
