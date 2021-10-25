@@ -178,15 +178,15 @@ let command =
             | Error `Invalid_proof ->
                 display_error
                   "fail to verify the protocol state proof inside the block" ;
-                exit 5
+                Deferred.unit
             | Error (`Verifier_error e) ->
                 display_error @@ "verifier error: " ^ Error.to_string_hum e ;
-                exit 5
+                Deferred.unit
             | Error `Fail_to_decode_snark_work ->
                 display_error "fail to decode snark work" ;
-                exit 5
+                Deferred.unit
             | Error `Invalid_snark_work ->
                 display_error "fail to verify the snark work" ;
-                exit 5))
+                Deferred.unit))
 
 let () = Command.run command
