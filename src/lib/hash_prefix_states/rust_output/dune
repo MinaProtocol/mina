@@ -1,0 +1,8 @@
+(executable
+ (name gen_rust_states)
+ (libraries hash_prefix_states))
+
+(rule
+ (targets out.rs)
+ (mode promote)
+ (action (run %{exe:gen_rust_states.exe} out.rs)))
