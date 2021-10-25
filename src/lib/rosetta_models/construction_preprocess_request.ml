@@ -10,7 +10,7 @@ type t =
   { network_identifier : Network_identifier.t
   ; operations : Operation.t list
   ; metadata : Yojson.Safe.t option [@default None]
-  ; max_fee : Amount.t list
+  ; max_fee : Amount.t list [@default []]
   ; suggested_fee_multiplier : float option [@default None]
   }
 [@@deriving yojson { strict = false }, show, eq]
