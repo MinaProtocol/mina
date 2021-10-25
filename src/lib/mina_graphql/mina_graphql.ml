@@ -3521,9 +3521,14 @@ module Queries = struct
               ~typ:Types.Input.token_id_arg ~default:Token_id.default
           ]
       ~resolve:(fun { ctx = coda; _ } () pk token ->
-        Option.map (get_ledger_and_breadcrumb coda) ~f:(fun _ ->
-            Account_id.create pk token
-            |> Types.AccountObj.Partial_account.of_account_id coda
+        Option.bind (get_ledger_and_breadcrumb coda)
+          ~f:(fun (ledger, breadcrumb) ->
+            let open Option.Let_syntax in
+            let%bind location =
+              Ledger.location_of_account ledger (Account_id.create pk token)
+            in
+            let%map account = Ledger.get ledger location in
+            Types.AccountObj.Partial_account.of_full_account ~breadcrumb account
             |> Types.AccountObj.lift coda pk))
 
   let accounts_for_pk =
