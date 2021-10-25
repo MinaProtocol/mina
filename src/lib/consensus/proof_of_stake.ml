@@ -3017,9 +3017,9 @@ module Hooks = struct
               [%log fatal]
                 "An empty epoch is detected! This could be caused by the \
                  following reasons: system time is out of sync with protocol \
-                 state time; or internet connection is down or unstable \
-                 If it is the first case, please setup NTP. If it is the \
-                 second case, please check the internet connection." ;
+                 state time; or internet connection is down or unstable If it \
+                 is the first case, please setup NTP. If it is the second \
+                 case, please check the internet connection." ;
               exit 99
         in
         let total_stake = epoch_data.ledger.total_currency in
