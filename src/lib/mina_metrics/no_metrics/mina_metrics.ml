@@ -76,7 +76,53 @@ module Network = struct
 
   let all_peers : Gauge.t = ()
 
+  let validations_timed_out : Counter.t = ()
+
+  let gossip_messages_failed_to_decode : Counter.t = ()
+
   let gossip_messages_received : Counter.t = ()
+
+  module Block = struct
+    let validations_timed_out : Counter.t = ()
+
+    let rejected : Counter.t = ()
+
+    let ignored : Counter.t = ()
+
+    let received : Counter.t = ()
+
+    module Validation_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+  end
+
+  module Snark_work = struct
+    let validations_timed_out : Counter.t = ()
+
+    let rejected : Counter.t = ()
+
+    let ignored : Counter.t = ()
+
+    let received : Counter.t = ()
+
+    module Validation_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+  end
+
+  module Transaction = struct
+    let validations_timed_out : Counter.t = ()
+
+    let rejected : Counter.t = ()
+
+    let ignored : Counter.t = ()
+
+    let received : Counter.t = ()
+
+    module Validation_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+  end
 
   let rpc_requests_received : Counter.t = ()
 
@@ -86,6 +132,10 @@ module Network = struct
 
   let get_some_initial_peers_rpcs_received : Counter.t = ()
 
+  let get_some_initial_peers_rpc_requests_failed : Counter.t = ()
+
+  let get_some_initial_peers_rpc_responses_failed : Counter.t = ()
+
   let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent : Counter.t
       =
     ()
@@ -94,41 +144,87 @@ module Network = struct
       Counter.t =
     ()
 
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_requests_failed :
+      Counter.t =
+    ()
+
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_responses_failed :
+      Counter.t =
+    ()
+
   let answer_sync_ledger_query_rpcs_sent : Counter.t = ()
 
   let answer_sync_ledger_query_rpcs_received : Counter.t = ()
+
+  let answer_sync_ledger_query_rpc_requests_failed : Counter.t = ()
+
+  let answer_sync_ledger_query_rpc_responses_failed : Counter.t = ()
 
   let get_transition_chain_rpcs_sent : Counter.t = ()
 
   let get_transition_chain_rpcs_received : Counter.t = ()
 
+  let get_transition_chain_rpc_requests_failed : Counter.t = ()
+
+  let get_transition_chain_rpc_responses_failed : Counter.t = ()
+
   let get_transition_knowledge_rpcs_sent : Counter.t = ()
 
   let get_transition_knowledge_rpcs_received : Counter.t = ()
+
+  let get_transition_knowledge_rpc_requests_failed : Counter.t = ()
+
+  let get_transition_knowledge_rpc_responses_failed : Counter.t = ()
 
   let get_transition_chain_proof_rpcs_sent : Counter.t = ()
 
   let get_transition_chain_proof_rpcs_received : Counter.t = ()
 
+  let get_transition_chain_proof_rpc_requests_failed : Counter.t = ()
+
+  let get_transition_chain_proof_rpc_responses_failed : Counter.t = ()
+
   let get_node_status_rpcs_sent : Counter.t = ()
 
   let get_node_status_rpcs_received : Counter.t = ()
+
+  let get_node_status_rpc_requests_failed : Counter.t = ()
+
+  let get_node_status_rpc_responses_failed : Counter.t = ()
 
   let get_ancestry_rpcs_sent : Counter.t = ()
 
   let get_ancestry_rpcs_received : Counter.t = ()
 
+  let get_ancestry_rpc_requests_failed : Counter.t = ()
+
+  let get_ancestry_rpc_responses_failed : Counter.t = ()
+
   let ban_notify_rpcs_sent : Counter.t = ()
 
   let ban_notify_rpcs_received : Counter.t = ()
+
+  let ban_notify_rpc_requests_failed : Counter.t = ()
+
+  let ban_notify_rpc_responses_failed : Counter.t = ()
 
   let get_best_tip_rpcs_sent : Counter.t = ()
 
   let get_best_tip_rpcs_received : Counter.t = ()
 
+  let get_best_tip_rpc_requests_failed : Counter.t = ()
+
+  let get_best_tip_rpc_responses_failed : Counter.t = ()
+
   let get_epoch_ledger_rpcs_sent : Counter.t = ()
 
   let get_epoch_ledger_rpcs_received : Counter.t = ()
+
+  let get_epoch_ledger_rpc_requests_failed : Counter.t = ()
+
+  let get_epoch_ledger_rpc_responses_failed : Counter.t = ()
+
+  let rpc_connections_failed : Counter.t = ()
 
   module Ipc_latency_histogram = Histogram
   module Rpc_latency_histogram = Histogram
@@ -147,10 +243,30 @@ module Network = struct
   let ipc_latency_ns_summary : Ipc_latency_histogram.t = ()
 end
 
+module Pipe = struct
+  module Drop_on_overflow = struct
+    let bootstrap_sync_ledger : Counter.t = ()
+
+    let verified_network_pool_diffs : Counter.t = ()
+
+    let transition_frontier_valid_transitions : Counter.t = ()
+
+    let transition_frontier_primary_transitions : Counter.t = ()
+
+    let router_transition_frontier_controller : Counter.t = ()
+
+    let router_bootstrap_controller : Counter.t = ()
+
+    let router_verified_transitions : Counter.t = ()
+
+    let router_transitions : Counter.t = ()
+
+    let router_valid_transitions : Counter.t = ()
+  end
+end
+
 module Snark_work = struct
   let useful_snark_work_received_time_sec : Gauge.t = ()
-
-  let completed_snark_work_received_gossip : Counter.t = ()
 
   let completed_snark_work_received_rpc : Counter.t = ()
 
