@@ -15,6 +15,7 @@ let DockerImage = ./DockerImage.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
 let dirtyWhen = [
   S.strictlyStart (S.contains "src"),
+  S.strictlyStart (S.contains "genesis_ledgers"),
   S.strictlyStart (S.contains "automation"),
   S.strictly (S.contains "Makefile"),
   S.strictlyStart (S.contains "buildkite/src/Command/MinaArtifact"),
