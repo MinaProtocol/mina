@@ -5,7 +5,7 @@ authors = ["opensource@o1labs.org"]
 description = "OCaml stubs for the plonk proof systems"
 repository = "https://github.com/MinaProtocol/mina"
 license = "MIT/Apache-2.0"
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "wires_15_stubs"
