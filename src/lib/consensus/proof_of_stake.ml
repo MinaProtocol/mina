@@ -1156,7 +1156,6 @@ module Data = struct
 
          All of these are derived from prev_sub_window_densities using ring-shifting and relative sub-window indexes.
       *)
-
       let prev_global_sub_window =
         Global_sub_window.of_global_slot ~constants prev_global_slot
       in
@@ -1192,7 +1191,7 @@ module Data = struct
            If we are not in the same sub-window and the previous window
            and the current windows overlap, then we zero the densities
            between, and not including, prev and next (relative).
-       *)
+      *)
       let current_sub_window_densities =
         List.mapi prev_sub_window_densities ~f:(fun i density ->
             let gt_prev_sub_window =
@@ -1306,8 +1305,8 @@ module Data = struct
                      ~else_:(Checked.return Length.Checked.zero)))
         in
         let%bind current_window_density =
-          Checked.List.fold current_sub_window_densities ~init:Length.Checked.zero
-            ~f:Length.Checked.add
+          Checked.List.fold current_sub_window_densities
+            ~init:Length.Checked.zero ~f:Length.Checked.add
         in
         let%bind min_window_density =
           let%bind in_grace_period =
@@ -1320,7 +1319,8 @@ module Data = struct
             Boolean.(same_sub_window || in_grace_period)
             ~then_:(Checked.return prev_min_window_density)
             ~else_:
-              (Length.Checked.min current_window_density prev_min_window_density)
+              (Length.Checked.min current_window_density
+                 prev_min_window_density)
         in
         let%bind next_sub_window_densities =
           Checked.List.mapi current_sub_window_densities ~f:(fun i density ->
@@ -1372,7 +1372,8 @@ module Data = struct
                 else Length.zero)
           in
           let current_window_density =
-            Array.fold current_sub_window_densities ~init:Length.zero ~f:Length.add
+            Array.fold current_sub_window_densities ~init:Length.zero
+              ~f:Length.add
           in
           let min_window_density =
             if
