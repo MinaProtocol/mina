@@ -1,4 +1,5 @@
 open Core_kernel
+open Async_kernel
 open Pickles_types
 
 module type Stable_v1 = sig
@@ -99,12 +100,11 @@ module type Inputs_intf = sig
       -> Scalar_field.Vector.t
       -> Scalar_field.t array
       -> Curve.Affine.Backend.t array
-      -> t Async.Deferred.t
+      -> t Deferred.t
 
     val verify : Verifier_index.t -> t -> bool
 
-    val batch_verify :
-      Verifier_index.t array -> t array -> bool Async.Deferred.t
+    val batch_verify : Verifier_index.t array -> t array -> bool Deferred.t
   end
 end
 
@@ -325,7 +325,7 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
           G.Affine.to_backend (Finite commitment))
     in
-    let%map.Async.Deferred res =
+    let%map.Deferred res =
       Backend.create_async pk primary auxiliary challenges commitments
     in
     of_backend res
