@@ -69,7 +69,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -234,7 +234,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "links": []
@@ -341,7 +341,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "fill": 1,
       "fillGradient": 1,
       "gridPos": {
@@ -459,7 +459,7 @@
       }
     },
     {
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -527,7 +527,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "links": []
@@ -803,7 +803,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "links": []
@@ -902,7 +902,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "decimals": 4,
       "fieldConfig": {
         "defaults": {
@@ -1044,7 +1044,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "links": []
@@ -1157,7 +1157,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "links": []
@@ -1260,7 +1260,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "links": []
@@ -1385,7 +1385,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "fill": 1,
       "fillGradient": 1,
       "gridPos": {
@@ -1478,7 +1478,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "links": []
@@ -1584,7 +1584,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "links": []
@@ -1688,7 +1688,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "links": []
@@ -1785,7 +1785,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "links": []
@@ -1882,7 +1882,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "links": []
@@ -1987,7 +1987,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+      "datasource": "Prometheus",
       "description": "",
       "fieldConfig": {
         "defaults": {
@@ -2091,7 +2091,7 @@
       {
         "allValue": null,
         "current": {},
-        "datasource": "${DS_GRAFANACLOUD-O1TESTNET-PROM}",
+        "datasource": "Prometheus",
         "definition": "Coda_Runtime_process_uptime_ms_total",
         "description": null,
         "error": {

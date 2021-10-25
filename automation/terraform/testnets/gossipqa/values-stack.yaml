@@ -36,8 +36,8 @@ server:
   
 
 grafana:
-  extraConfigmapMounts: [./gossipqa-metrics-graf-dash.yaml]
-  # - name: certs-configmap
-  #   mountPath: /etc/grafana/ssl/
-  #   configMap: certs-configmap
-  #   readOnly: true
+  extraConfigmapMounts: 
+  - name: simplified-mainnet-dashboard
+    mountPath: /var/lib/grafana/dashboards
+    configMap: simplified-mainnet-dashboard
+    readOnly: true

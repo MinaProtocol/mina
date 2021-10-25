@@ -31,12 +31,25 @@ kubectl config set-context --current --namespace=gossipqa-metrics
 2: deploy the stack
 
 2.1: make the permanent volume claim.  if you don't do this then you'll lose all of the data that prometheus gathers when promtheus goes down.  
+
+```
+# make the permanent volume claim
 kubectl apply -f automation/terraform/testnets/gossipqa/gossipqa-prom-pvc.yaml
+```
 
 2.2: make a config map with all the configs which create for us a useful dashboard on grafana.
 
+```
+# upload the config map which gives us a useful dashboard in grafana.  the label is necessary for the grafana sidecar that monitors the config maps and installs them.
+kubectl create configmap simplified-mainnet-dashboard --namespace gossipqa-metrics --from-file automation/terraform/testnets/gossipqa/Grafana_Export_Simplified_Mainnet_Overview-1634935128244.json
+kubectl label configmap simplified-mainnet-dashboard grafana_dashboard=1
+```
+
 2.3: install the stack with helm.  this deploys both prometheus, and grafana in one single command.  the values.yaml file that we give the command contains a bunch of configs which override the default configs of "prometheus-community/kube-prometheus-stack".  notably, we need to configure it to use the PVC for prometheus and the config map for graphana.  
-helm install gossipqa-metrics-stack prometheus-community/kube-prometheus-stack -f automation/terraform/testnets/gossipqa/values-stack.yaml
+
+```
+#install prometheus and grafana
+helm install gossipqa-metrics-stack prometheus-community/kube-prometheus-stack -f automation/terraform/testnets/gossipqa/values-stack.yaml```
 
 3: In order to see all those nice colorful charts we deployed on grafana
 
