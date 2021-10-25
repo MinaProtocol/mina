@@ -101,7 +101,7 @@
         {
           "kind": "SCALAR",
           "name": "RosettaTransaction",
-          "description": "A transaction encoded in the rosetta format",
+          "description": "A transaction encoded in the Rosetta format",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -3649,7 +3649,7 @@
             },
             {
               "name": "magnitude",
-              "description": "An amount of Mina",
+              "description": "An amount of MINA",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3681,7 +3681,7 @@
             },
             {
               "name": "magnitude",
-              "description": "An amount of Mina",
+              "description": "An amount of MINA",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -7910,7 +7910,7 @@
             },
             {
               "name": "sendRosettaTransaction",
-              "description": "Send a transaction in rosetta format",
+              "description": "Send a transaction in Rosetta format",
               "args": [
                 {
                   "name": "input",
@@ -8736,7 +8736,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount of mina to send to receiver",
+              "description": "Amount of MINA to send to receiver",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8842,7 +8842,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount of mina to send to receiver",
+              "description": "Amount of MINA to send to receiver",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -9374,7 +9374,7 @@
           "description": "Party in a snapp transaction",
           "fields": [
             {
-              "name": "pk",
+              "name": "publicKey",
               "description": "Public key of the party as a Base58Check string",
               "args": [],
               "type": {
@@ -11659,7 +11659,7 @@
             },
             {
               "name": "coinbase",
-              "description": "Amount of Mina granted to the producer of this block",
+              "description": "Amount of MINA granted to the producer of this block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -12661,7 +12661,7 @@
           "fields": [
             {
               "name": "total",
-              "description": "The amount of mina owned by the account",
+              "description": "The amount of MINA owned by the account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -12677,7 +12677,7 @@
             },
             {
               "name": "unknown",
-              "description": "The amount of mina owned by the account whose origin is currently unknown",
+              "description": "The amount of MINA owned by the account whose origin is currently unknown",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -12693,7 +12693,7 @@
             },
             {
               "name": "liquid",
-              "description": "The amount of mina owned by the account which is currently available. Can be null if bootstrapping.",
+              "description": "The amount of MINA owned by the account which is currently available. Can be null if bootstrapping.",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -12705,7 +12705,7 @@
             },
             {
               "name": "locked",
-              "description": "The amount of mina owned by the account which is currently locked. Can be null if bootstrapping.",
+              "description": "The amount of MINA owned by the account which is currently locked. Can be null if bootstrapping.",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -12905,7 +12905,7 @@
             },
             {
               "name": "balance",
-              "description": "The amount of mina owned by the account",
+              "description": "The amount of MINA owned by the account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",

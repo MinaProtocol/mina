@@ -717,19 +717,19 @@ module Types = struct
              unknown with the invariant unknown <= total, as well as the \
              currently liquid and locked balances." ~fields:(fun _ ->
             [ field "total" ~typ:(non_null uint64)
-                ~doc:"The amount of mina owned by the account"
+                ~doc:"The amount of MINA owned by the account"
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.total)
             ; field "unknown" ~typ:(non_null uint64)
                 ~doc:
-                  "The amount of mina owned by the account whose origin is \
+                  "The amount of MINA owned by the account whose origin is \
                    currently unknown"
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.unknown)
             ; field "liquid" ~typ:uint64
                 ~doc:
-                  "The amount of mina owned by the account which is currently \
+                  "The amount of MINA owned by the account which is currently \
                    available. Can be null if bootstrapping."
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
@@ -744,7 +744,7 @@ module Types = struct
                       else Unsigned.UInt64.zero))
             ; field "locked" ~typ:uint64
                 ~doc:
-                  "The amount of mina owned by the account which is currently \
+                  "The amount of MINA owned by the account which is currently \
                    locked. Can be null if bootstrapping."
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
@@ -968,7 +968,7 @@ module Types = struct
                  ~resolve:(fun _ { account; _ } -> account.Account.Poly.timing)
              ; field "balance"
                  ~typ:(non_null AnnotatedBalance.obj)
-                 ~doc:"The amount of mina owned by the account"
+                 ~doc:"The amount of MINA owned by the account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } -> account.Account.Poly.balance)
              ; field "nonce" ~typ:string
@@ -1545,7 +1545,8 @@ module Types = struct
 
     let party_display =
       obj "Party" ~doc:"Party in a snapp transaction" ~fields:(fun _ ->
-          [ field "pk" ~doc:"Public key of the party as a Base58Check string"
+          [ field "publicKey"
+              ~doc:"Public key of the party as a Base58Check string"
               ~typ:(non_null string)
               ~args:Arg.[]
               ~resolve:(fun _ (party : Party.t) ->
@@ -1679,7 +1680,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ { fee_transfers; _ } -> fee_transfers)
         ; field "coinbase" ~typ:(non_null uint64)
-            ~doc:"Amount of Mina granted to the producer of this block"
+            ~doc:"Amount of MINA granted to the producer of this block"
             ~args:Arg.[]
             ~resolve:(fun _ { coinbase; _ } ->
               Currency.Amount.to_uint64 coinbase)
@@ -2185,7 +2186,7 @@ module Types = struct
             try Ok Currency.Signed_poly.{ magnitude; sgn }
             with exn -> Error (Exn.to_string exn))
           ~fields:
-            [ arg "magnitude" ~doc:"An amount of Mina"
+            [ arg "magnitude" ~doc:"An amount of MINA"
                 ~typ:(non_null currency_amount)
             ; arg "sgn" ~doc:"The sign of the amount" ~typ:(non_null sign)
             ]
@@ -3200,7 +3201,7 @@ module Types = struct
           [ from ~doc:"Public key of sender of payment"
           ; to_ ~doc:"Public key of recipient of payment"
           ; token_opt ~doc:"Token to send"
-          ; arg "amount" ~doc:"Amount of mina to send to receiver"
+          ; arg "amount" ~doc:"Amount of MINA to send to receiver"
               ~typ:(non_null uint64_arg)
           ; fee ~doc:"Fee amount in order to send payment"
           ; valid_until
@@ -3295,7 +3296,7 @@ module Types = struct
 
     let rosetta_transaction =
       Schema.Arg.scalar "RosettaTransaction"
-        ~doc:"A transaction encoded in the rosetta format"
+        ~doc:"A transaction encoded in the Rosetta format"
         ~coerce:(fun graphql_json ->
           Rosetta_lib.Transaction.to_mina_signed (to_yojson graphql_json)
           |> Result.map_error ~f:Error.to_string_hum)
@@ -4109,7 +4110,7 @@ module Mutations = struct
 
   let send_rosetta_transaction =
     io_field "sendRosettaTransaction"
-      ~doc:"Send a transaction in rosetta format"
+      ~doc:"Send a transaction in Rosetta format"
       ~typ:(non_null Types.Payload.send_rosetta_transaction)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.rosetta_transaction) ]
       ~resolve:(fun { ctx = mina; _ } () signed_command ->
