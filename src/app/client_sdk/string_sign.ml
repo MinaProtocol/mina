@@ -67,7 +67,7 @@ module Message = struct
     |> Base.(Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1)))
     |> Tock.Field.project
 
-  let hash t ~public_key ~r =
+  let make_hash ~init t ~public_key ~r =
     let string_to_input s =
       Random_oracle.Input.
         { field_elements = [||]
@@ -81,8 +81,14 @@ module Message = struct
         { field_elements = [| px; py; r |]; bitstrings = [||] }
     in
     let open Random_oracle in
-    hash ~init:Hash_prefix.signature (pack_input input)
+    hash ~init (pack_input input)
     |> Digest.to_bits |> Inner_curve.Scalar.of_bits
+
+  let hash = make_hash ~init:Hash_prefix.signature
+
+  let hash_for_mainnet = make_hash ~init:Hash_prefix.signature_for_mainnet
+
+  let hash_for_testnet = make_hash ~init:Hash_prefix.signature_for_testnet
 end
 
 module Schnorr =

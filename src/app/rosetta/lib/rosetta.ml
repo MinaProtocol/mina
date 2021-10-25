@@ -100,7 +100,7 @@ let command =
       Cli.optional_uri
   and graphql_uri =
     flag "--graphql-uri" ~aliases:["graphql-uri"]
-      ~doc:"URI of Coda GraphQL endpoint to connect to" Cli.optional_uri
+      ~doc:"URI of Mina GraphQL endpoint to connect to" Cli.optional_uri
   and log_json =
     flag "--log-json" ~aliases:["log-json"]
       ~doc:"Print log output as JSON (default: plain text)" no_arg

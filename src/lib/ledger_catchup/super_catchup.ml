@@ -392,16 +392,19 @@ let with_lengths hs ~target_length =
 
 (* returns a list of state-hashes with the older ones at the front *)
 let download_state_hashes t ~logger ~trust_system ~network ~frontier
-    ~target_hash ~target_length ~downloader ~blockchain_length_of_target_hash =
+    ~target_hash ~target_length ~downloader ~blockchain_length_of_target_hash
+    ~preferred_peers =
   [%log debug]
     ~metadata:[ ("target_hash", State_hash.to_yojson target_hash) ]
     "Doing a catchup job with target $target_hash" ;
-  let%bind peers =
-    (* TODO: Find some preferred peers, e.g., whoever told us about this target_hash *)
-    Mina_networking.peers network >>| List.permute
+  let%bind all_peers = Mina_networking.peers network >>| Peer.Set.of_list in
+  let preferred_peers_alive = Peer.Set.inter all_peers preferred_peers in
+  let non_preferred_peers = Peer.Set.diff all_peers preferred_peers_alive in
+  let peers =
+    Peer.Set.to_list preferred_peers @ Peer.Set.to_list non_preferred_peers
   in
   let open Deferred.Result.Let_syntax in
-  find_map_ok ~how:(`Max_concurrent_jobs 12) peers ~f:(fun peer ->
+  find_map_ok ~how:(`Max_concurrent_jobs 5) peers ~f:(fun peer ->
       let%bind transition_chain_proof =
         let open Deferred.Let_syntax in
         match%map
@@ -836,6 +839,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
     | Failed | Finished | Root _ ->
         return ()
     | To_download download_job ->
+        let start_time = Time.now () in
         let%bind b, attempts = step (Downloader.Job.result download_job) in
         [%log' debug t.logger]
           ~metadata:
@@ -859,9 +863,13 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
             ]
           "download finished $state_hash" ;
         node.attempts <- attempts ;
+        Mina_metrics.(
+          Gauge.set Catchup.download_time
+            Time.(Span.to_ms @@ diff (now ()) start_time)) ;
         set_state t node (To_initial_validate b) ;
         run_node node
     | To_initial_validate b -> (
+        let start_time = Time.now () in
         match%bind
           step
             ( initial_validate ~precomputed_values ~logger ~trust_system
@@ -876,13 +884,19 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
             failed ~error:e ~sender:b.sender `Initial_validate
         | Error `Couldn't_reach_verifier ->
             retry ()
-        | Ok (`In_frontier hash) ->
-            finish t node (Ok (Transition_frontier.find_exn frontier hash)) ;
-            Deferred.return (Ok ())
-        | Ok (`Building_path tv) ->
-            set_state t node (To_verify tv) ;
-            run_node node )
+        | Ok result -> (
+            Mina_metrics.(
+              Gauge.set Catchup.initial_validation_time
+                Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+            match result with
+            | `In_frontier hash ->
+                finish t node (Ok (Transition_frontier.find_exn frontier hash)) ;
+                Deferred.return (Ok ())
+            | `Building_path tv ->
+                set_state t node (To_verify tv) ;
+                run_node node ) )
     | To_verify tv -> (
+        let start_time = Time.now () in
         let iv = Cached.peek tv in
         (* TODO: Set up job to invalidate tv on catchup_breadcrumbs_writer closing *)
         match%bind
@@ -897,32 +911,39 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
               ~metadata:[ ("state_hash", State_hash.to_yojson node.state_hash) ] ;
             (* No need to redownload in this case. We just wait a little and try again. *)
             retry ()
-        | Ok (Error ()) ->
-            [%log' warn t.logger] "verification failed! redownloading"
-              ~metadata:[ ("state_hash", State_hash.to_yojson node.state_hash) ] ;
-            ( match iv.sender with
-            | Local ->
-                ()
-            | Remote peer ->
-                Trust_system.(
-                  record trust_system logger peer
-                    Actions.(Sent_invalid_proof, None))
-                |> don't_wait_for ) ;
-            ignore
-              ( Cached.invalidate_with_failure tv
-                : External_transition.Initial_validated.t Envelope.Incoming.t ) ;
-            failed ~sender:iv.sender `Verify
-        | Ok (Ok av) ->
-            let av =
-              { av with
-                data =
-                  External_transition.skip_frontier_dependencies_validation
-                    `This_transition_belongs_to_a_detached_subtree av.data
-              }
-            in
-            let av = Cached.transform tv ~f:(fun _ -> av) in
-            set_state t node (Wait_for_parent av) ;
-            run_node node )
+        | Ok result -> (
+            Mina_metrics.(
+              Gauge.set Catchup.verification_time
+                Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+            match result with
+            | Error () ->
+                [%log' warn t.logger] "verification failed! redownloading"
+                  ~metadata:
+                    [ ("state_hash", State_hash.to_yojson node.state_hash) ] ;
+                ( match iv.sender with
+                | Local ->
+                    ()
+                | Remote peer ->
+                    Trust_system.(
+                      record trust_system logger peer
+                        Actions.(Sent_invalid_proof, None))
+                    |> don't_wait_for ) ;
+                ignore
+                  ( Cached.invalidate_with_failure tv
+                    : External_transition.Initial_validated.t
+                      Envelope.Incoming.t ) ;
+                failed ~sender:iv.sender `Verify
+            | Ok av ->
+                let av =
+                  { av with
+                    data =
+                      External_transition.skip_frontier_dependencies_validation
+                        `This_transition_belongs_to_a_detached_subtree av.data
+                  }
+                in
+                let av = Cached.transform tv ~f:(fun _ -> av) in
+                set_state t node (Wait_for_parent av) ;
+                run_node node ) )
     | Wait_for_parent av ->
         let%bind parent =
           step
@@ -941,7 +962,8 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
         set_state t node (To_build_breadcrumb (`Parent parent, av)) ;
         run_node node
     | To_build_breadcrumb (`Parent parent_hash, c) -> (
-        let transition_receipt_time = Some (Time.now ()) in
+        let start_time = Time.now () in
+        let transition_receipt_time = Some start_time in
         let av = Cached.peek c in
         match%bind
           let s =
@@ -984,6 +1006,9 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
             in
             failed ~error:e ~sender:av.sender `Build_breadcrumb
         | Ok breadcrumb ->
+            Mina_metrics.(
+              Gauge.set Catchup.build_breadcrumb_time
+                Time.(Span.to_ms @@ diff (now ()) start_time)) ;
             let%bind () = Scheduler.yield () |> Deferred.map ~f:Result.return in
             let finished = Ivar.create () in
             let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
@@ -1055,9 +1080,18 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                       ~blockchain_length_of_target_hash))
            with
            | None ->
+               let preferred_peers =
+                 List.fold (List.concat_map ~f:Rose_tree.flatten forest)
+                   ~init:Peer.Set.empty ~f:(fun acc c ->
+                     match (Cached.peek c).sender with
+                     | Local ->
+                         acc
+                     | Remote peer ->
+                         Peer.Set.add acc peer)
+               in
                download_state_hashes t ~logger ~trust_system ~network ~frontier
                  ~downloader ~target_length ~target_hash:target_parent_hash
-                 ~blockchain_length_of_target_hash
+                 ~blockchain_length_of_target_hash ~preferred_peers
            | Some res ->
                [%log debug] "Succeeded in using cache." ;
                Deferred.Result.return res

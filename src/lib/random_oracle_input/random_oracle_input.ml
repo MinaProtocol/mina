@@ -61,11 +61,9 @@ module Coding = struct
     let fields =
       (* We only support 32byte fields *)
       let () =
-        match t.field_elements with
-        | [| x; _ |] ->
-            assert (String.length (string_of_field x) = 32)
-        | _ ->
-            ()
+        if Array.length t.field_elements > 0 then
+          assert (String.length (string_of_field t.field_elements.(0)) = 32)
+        else ()
       in
       Array.map t.field_elements ~f:string_of_field |> String.concat_array
     in
@@ -251,8 +249,50 @@ module Coding = struct
     |> Result.return
 end
 
+(** Coding2 is an alternate binary coding setup where we pass two arrays of
+ *  field elements instead of a single structure to simplify manipulation
+ *  outside of the Mina construction API
+ *
+ * This is described as the second mechanism for coding Random_oracle_input in
+ * RFC0038
+ *
+*)
+module Coding2 = struct
+  module Rendered = struct
+    (* as bytes, you must hex this later *)
+    type 'field t_ = { prefix : 'field array; suffix : 'field array }
+    [@@deriving yojson]
+
+    type t = string t_ [@@deriving yojson]
+
+    let map ~f { prefix; suffix } =
+      { prefix = Array.map ~f prefix; suffix = Array.map ~f suffix }
+  end
+
+  let string_of_field : bool list -> string = Coding.string_of_field
+
+  let field_of_string = Coding.field_of_string
+
+  let serialize' t ~pack =
+    { Rendered.prefix = t.field_elements
+    ; suffix = pack_bits ~max_size:254 ~pack t |> Array.of_list_rev
+    }
+
+  let serialize t ~string_of_field ~pack =
+    let () =
+      if Array.length t.field_elements > 0 then
+        assert (String.length (string_of_field t.field_elements.(0)) = 32)
+      else ()
+    in
+    serialize' t ~pack |> Rendered.map ~f:string_of_field
+end
+
 let%test_module "random_oracle input" =
   ( module struct
+    let gen_field ~size_in_bits =
+      let open Quickcheck.Generator in
+      list_with_length size_in_bits bool
+
     let gen_input ?size_in_bits () =
       let open Quickcheck.Generator in
       let open Let_syntax in
@@ -262,13 +302,31 @@ let%test_module "random_oracle input" =
       in
       let%bind field_elements =
         (* Treat a field as a list of bools of length [size_in_bits]. *)
-        list (list_with_length size_in_bits bool)
+        list (gen_field ~size_in_bits)
       in
       let%map bitstrings = list (list bool) in
       ( size_in_bits
       , { field_elements = Array.of_list field_elements
         ; bitstrings = Array.of_list bitstrings
         } )
+
+    let%test_unit "coding2 equiv to hash directly" =
+      let size_in_bits = 255 in
+      let field = gen_field ~size_in_bits in
+      Quickcheck.test ~trials:300
+        Quickcheck.Generator.(
+          tuple2 (gen_input ~size_in_bits ()) (tuple2 field field))
+        ~f:(fun ((_, input), (x, y)) ->
+          let middle = [| x; y |] in
+          let expected =
+            append input (field_elements middle)
+            |> pack_to_fields ~size_in_bits ~pack:Fn.id
+          in
+          let { Coding2.Rendered.prefix; suffix } =
+            Coding2.serialize' input ~pack:Fn.id
+          in
+          let actual = Array.(concat [ prefix; middle; suffix ]) in
+          [%test_eq: bool list array] expected actual)
 
     let%test_unit "field/string partial isomorphism bitstrings" =
       Quickcheck.test ~trials:300

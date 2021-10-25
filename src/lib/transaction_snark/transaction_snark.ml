@@ -1995,7 +1995,8 @@ module Base = struct
                 Option.map snapp_statement ~f:(fun (i, _) -> side_loaded i)
               in
               apply_body ~constraint_constants ?tag
-                ~txn_global_slot:global_state.protocol_state.curr_global_slot
+                ~txn_global_slot:
+                  global_state.protocol_state.global_slot_since_hard_fork
                 ~add_check
                 ~check_auth:(fun t ->
                   Permissions.Auth_required.Checked.spec_eval

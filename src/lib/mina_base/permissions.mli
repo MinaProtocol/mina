@@ -70,6 +70,8 @@ module Stable : sig
   end
 end]
 
+val gen : t Core_kernel.Quickcheck.Generator.t
+
 val to_input : t -> (_, bool) Random_oracle_input.t
 
 [%%ifdef consensus_mechanism]

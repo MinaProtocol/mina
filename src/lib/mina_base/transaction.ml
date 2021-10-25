@@ -119,7 +119,7 @@ let next_available_token (t : t) next_available_token =
   | Command (Signed_command cmd) ->
       Signed_command.next_available_token cmd next_available_token
   | Command (Parties _t) ->
-      failwith "TODO"
+      next_available_token
   | Fee_transfer _ ->
       next_available_token
   | Coinbase _ ->

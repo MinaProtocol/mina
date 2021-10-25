@@ -12,7 +12,7 @@ type call = Overflow_behavior_call
 
 type (_, _, _) overflow_behavior =
   | Crash : ('a, crash, unit) overflow_behavior
-  | Drop_head : ('a, drop_head, unit) overflow_behavior
+  | Drop_head : ('a -> unit) -> ('a, drop_head, unit) overflow_behavior
   | Call : ('a -> 'r) -> ('a, call, 'r option) overflow_behavior
 
 type synchronous = Type_synchronous
@@ -43,6 +43,8 @@ module Reader : sig
   val to_linear_pipe : 't t -> 't Linear_pipe.Reader.t
 
   val of_linear_pipe : ?name:string -> 't Linear_pipe.Reader.t -> 't t
+
+  val pipe_name : _ t -> string option
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 
@@ -114,6 +116,8 @@ end
 
 module Writer : sig
   type ('t, 'behavior, 'return) t
+
+  val pipe_name : (_, _, _) t -> string option
 
   val to_linear_pipe : ('t, 'behavior, 'return) t -> 't Linear_pipe.Writer.t
 

@@ -179,7 +179,8 @@ module Diff_versioned = struct
         [@@deriving sexp, yojson]
 
         let to_latest (t : t) : V2.t =
-          List.map t ~f:(fun (x, y) -> (User_command.Stable.V1.to_latest x, y))
+          List.map t ~f:(fun (cmd, err) ->
+              (User_command.Stable.V1.to_latest cmd, err))
       end
     end]
 
@@ -469,11 +470,11 @@ struct
       | Unwanted_fee_token fee_token ->
           [ ("fee_token", Token_id.to_yojson fee_token) ]
       | Expired
-          (`Valid_until valid_until, `Current_global_slot current_global_slot)
-        ->
+          ( `Valid_until valid_until
+          , `Global_slot_since_genesis global_slot_since_genesis ) ->
           [ ("valid_until", Mina_numbers.Global_slot.to_yojson valid_until)
           ; ( "current_global_slot"
-            , Mina_numbers.Global_slot.to_yojson current_global_slot )
+            , Mina_numbers.Global_slot.to_yojson global_slot_since_genesis )
           ]
 
     let indexed_pool_error_log_info e =
@@ -499,6 +500,14 @@ struct
                   ~initial_minimum_balance))
           |> Option.value ~default:Currency.Balance.zero
 
+    let check_command (t : User_command.t) : User_command.Valid.t option =
+      match t with
+      | Parties _ ->
+          failwith "TODO"
+      | Signed_command t ->
+          Option.map (Signed_command.check t) ~f:(fun x ->
+              User_command.Signed_command x)
+
     let handle_transition_frontier_diff
         ( ({ new_commands; removed_commands; reorg_best_tip = _ } :
             Transition_frontier.best_tip_diff)
@@ -517,7 +526,7 @@ struct
          locally_generated_uncommitted to locally_generated_committed and vice
          versa so those hashtables remain in sync with reality.
       *)
-      let global_slot = Indexed_pool.current_global_slot t.pool in
+      let global_slot = Indexed_pool.global_slot_since_genesis t.pool in
       t.best_tip_ledger <- Some best_tip_ledger ;
       let pool_max_size = t.config.pool_max_size in
       let log_indexed_pool_error error_str ~metadata cmd =
@@ -832,7 +841,9 @@ struct
                  t.best_tip_ledger <- Some validation_ledger ;
                  (* The frontier has changed, so transactions in the pool may
                     not be valid against the current best tip. *)
-                 let global_slot = Indexed_pool.current_global_slot t.pool in
+                 let global_slot =
+                   Indexed_pool.global_slot_since_genesis t.pool
+                 in
                  let new_pool, dropped =
                    Indexed_pool.revalidate t.pool (fun sender ->
                        match
@@ -1097,7 +1108,7 @@ struct
             diffs.sender
         in
         let config = Indexed_pool.config t.pool in
-        let global_slot = Indexed_pool.current_global_slot t.pool in
+        let global_slot = Indexed_pool.global_slot_since_genesis t.pool in
         let pool_max_size = t.config.pool_max_size in
         let sender = Envelope.Incoming.sender diffs in
         let is_sender_local = Envelope.Sender.(equal sender Local) in
@@ -1959,22 +1970,21 @@ let%test_module _ =
           in
           assert_pool_txs [] ;
           let curr_slot = current_global_slot () in
-          let curr_slot_plus_three =
-            Mina_numbers.Global_slot.(succ (succ (succ curr_slot)))
+          let curr_slot_plus_ten =
+            Mina_numbers.Global_slot.(add curr_slot (of_int 10))
           in
-          let curr_slot_plus_seven =
-            Mina_numbers.Global_slot.(
-              succ (succ (succ (succ curr_slot_plus_three))))
+          let curr_slot_plus_twenty =
+            Mina_numbers.Global_slot.(add curr_slot_plus_ten (of_int 10))
           in
           let few_now, _few_later =
             List.split_n independent_cmds (List.length independent_cmds / 2)
           in
           let expires_later1 =
-            mk_payment ~valid_until:curr_slot_plus_three 0 1_000_000_000 1 9
+            mk_payment ~valid_until:curr_slot_plus_ten 0 1_000_000_000 1 9
               10_000_000_000
           in
           let expires_later2 =
-            mk_payment ~valid_until:curr_slot_plus_seven 0 1_000_000_000 2 9
+            mk_payment ~valid_until:curr_slot_plus_twenty 0 1_000_000_000 2 9
               10_000_000_000
           in
           let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
@@ -2010,7 +2020,7 @@ let%test_module _ =
             mk_payment ~valid_until:curr_slot 9 1_000_000_000 0 5 1_000_000_000
           in
           let unexpired_command =
-            mk_payment ~valid_until:curr_slot_plus_seven 8 1_000_000_000 0 9
+            mk_payment ~valid_until:curr_slot_plus_twenty 8 1_000_000_000 0 9
               1_000_000_000
           in
           let valid_forever = List.nth_exn few_now 0 in
@@ -2046,9 +2056,9 @@ let%test_module _ =
           in
           let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
           assert_pool_txs cmds_wo_check ;
-          (*after 5 block times there should be no expired transactions*)
+          (*after 20 block times there should be no expired transactions*)
           let%bind () =
-            after (Block_time.Span.to_time_span (n_block_times 5L))
+            after (Block_time.Span.to_time_span (n_block_times 20L))
           in
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w

@@ -57,6 +57,8 @@ module Internal_command = struct
     ; secondary_sequence_no : int
     ; typ : string
     ; receiver : Public_key.Compressed.Stable.Latest.t
+    ; receiver_account_creation_fee_paid :
+        Currency.Amount.Stable.Latest.t option
     ; receiver_balance : Currency.Balance.Stable.Latest.t
     ; fee : Currency.Fee.Stable.Latest.t
     ; token : Token_id.Stable.Latest.t

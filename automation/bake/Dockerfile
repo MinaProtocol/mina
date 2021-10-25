@@ -1,6 +1,6 @@
 ARG BAKE_VERSION
 
-FROM codaprotocol/coda-daemon:${BAKE_VERSION}
+FROM minaprotocol/mina-daemon:${BAKE_VERSION}
 
 ARG COMMIT_HASH=master
 ARG TESTNET_NAME=testworld

@@ -16,6 +16,7 @@ module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Mina_compile_config =
   Mina_compile_config_nonconsensus.Mina_compile_config
+open Snark_params_nonconsensus
 
 [%%endif]
 
@@ -175,6 +176,8 @@ module Token_symbol = struct
     Random_oracle_input.bitstrings
       [| Pickles_types.Vector.to_list (to_bits x) |]
 
+  [%%ifdef consensus_mechanism]
+
   type var = (Boolean.var, Num_bits.n) Pickles_types.Vector.t
 
   let var_of_value x =
@@ -190,6 +193,8 @@ module Token_symbol = struct
   let if_ (b : Boolean.var) ~(then_ : var) ~(else_ : var) : var =
     Pickles_types.Vector.map2 then_ else_ ~f:(fun then_ else_ ->
         Snark_params.Tick.Run.Boolean.if_ b ~then_ ~else_)
+
+  [%%endif]
 end
 
 module Poly = struct

@@ -16,6 +16,10 @@ open Random_oracle
 
 val signature : Field.t State.t
 
+val signature_for_mainnet : Field.t State.t
+
+val signature_for_testnet : Field.t State.t
+
 (** [merkle_tree depth] gives the hash prefix for the given node depth.
 
     This function performs caching: all prefixes up to the given depth will be

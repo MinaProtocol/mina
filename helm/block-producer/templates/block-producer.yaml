@@ -165,7 +165,7 @@ spec:
 {{- include "healthcheck.bots.allChecks" $.Values | indent 8 }}
         imagePullPolicy: Always
       {{- end }}
-      - name: coda
+      - name: mina
         resources:
           limits:
           requests:

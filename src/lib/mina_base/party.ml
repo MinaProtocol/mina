@@ -72,6 +72,26 @@ module Update = struct
 
     type value = t
 
+    let gen =
+      let open Quickcheck.Let_syntax in
+      let%bind initial_minimum_balance = Balance.gen in
+      let%bind cliff_time = Global_slot.gen in
+      let%bind cliff_amount =
+        Amount.gen_incl Amount.zero (Balance.to_amount initial_minimum_balance)
+      in
+      let%bind vesting_period =
+        Global_slot.gen_incl Global_slot.(succ zero) (Global_slot.of_int 10)
+      in
+      let%map vesting_increment =
+        Amount.gen_incl Amount.one (Amount.of_int 100)
+      in
+      { initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment
+      }
+
     let to_input (t : t) =
       List.reduce_exn ~f:Random_oracle_input.append
         [ Balance.to_input t.initial_minimum_balance
@@ -164,6 +184,57 @@ module Update = struct
       let to_latest = Fn.id
     end
   end]
+
+  let gen ?(new_party = false) () : t Quickcheck.Generator.t =
+    let open Quickcheck.Let_syntax in
+    let%bind app_state =
+      let%bind fields =
+        let field_gen = Snark_params.Tick.Field.gen in
+        Quickcheck.Generator.list_with_length 8 (Set_or_keep.gen field_gen)
+      in
+      (* won't raise because length is correct *)
+      Quickcheck.Generator.return (Snapp_state.V.of_list_exn fields)
+    in
+    let%bind delegate = Set_or_keep.gen Public_key.Compressed.gen in
+    let%bind verification_key =
+      Set_or_keep.gen
+        (Quickcheck.Generator.return
+           (let data = Pickles.Side_loaded.Verification_key.dummy in
+            let hash = Snapp_account.digest_vk data in
+            { With_hash.data; hash }))
+    in
+    let%bind permissions = Set_or_keep.gen Permissions.gen in
+    let%bind snapp_uri =
+      let uri_gen =
+        Quickcheck.Generator.of_list
+          [ "https://www.example.com"
+          ; "https://www.minaprotocol.com"
+          ; "https://www.gurgle.com"
+          ; "https://faceplant.com"
+          ]
+      in
+      Set_or_keep.gen uri_gen
+    in
+    let%bind token_symbol =
+      let token_gen =
+        Quickcheck.Generator.of_list
+          [ "MINA"; "TOKEN1"; "TOKEN2"; "TOKEN3"; "TOKEN4"; "TOKEN5" ]
+      in
+      Set_or_keep.gen token_gen
+    in
+    let%map timing =
+      if new_party then Set_or_keep.gen Timing_info.gen
+      else return Set_or_keep.Keep
+    in
+    Poly.
+      { app_state
+      ; delegate
+      ; verification_key
+      ; permissions
+      ; snapp_uri
+      ; token_symbol
+      ; timing
+      }
 
   module Checked = struct
     open Pickles.Impls.Step
@@ -663,8 +734,8 @@ end
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = Poly(Predicated.Stable.V1)(Control.Stable.V1).t =
-      { data : Predicated.Stable.V1.t; authorization : Control.Stable.V1.t }
+    type t = Poly(Predicated.Stable.V1)(Control.Stable.V2).t =
+      { data : Predicated.Stable.V1.t; authorization : Control.Stable.V2.t }
     [@@deriving sexp, equal, yojson, hash, compare]
 
     let to_latest = Fn.id

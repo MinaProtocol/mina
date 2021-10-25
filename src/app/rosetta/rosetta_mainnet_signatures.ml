@@ -3,4 +3,4 @@ open Async
 
 let () =
   Command.run
-    (Command.async ~summary:"Run Rosetta process on top of Coda" command)
+    (Command.async ~summary:"Run Rosetta process on top of Mina" command)

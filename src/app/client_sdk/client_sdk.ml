@@ -228,6 +228,7 @@ let _ =
          match Transaction.Unsigned.Rendered.of_yojson unsigned_txn_json with
          | Ok
              { random_oracle_input = _
+             ; signer_input = _
              ; payment = Some payment
              ; stake_delegation = None
              ; create_token = None
@@ -238,6 +239,7 @@ let _ =
              make_signed_transaction command payment.nonce
          | Ok
              { random_oracle_input = _
+             ; signer_input = _
              ; payment = None
              ; stake_delegation = Some delegation
              ; create_token = None

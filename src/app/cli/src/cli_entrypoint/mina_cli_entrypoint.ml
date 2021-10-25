@@ -378,8 +378,9 @@ let setup_daemon logger =
       if is_background then (
         Core.printf "Starting background mina daemon. (Log Dir: %s)\n%!"
           conf_dir ;
-        Daemon.daemonize ~redirect_stdout:`Dev_null ?cd:working_dir
-          ~redirect_stderr:`Dev_null () )
+        Daemon.daemonize ~allow_threads_to_have_been_created:true
+          ~redirect_stdout:`Dev_null ?cd:working_dir ~redirect_stderr:`Dev_null
+          () )
       else ignore (Option.map working_dir ~f:Caml.Sys.chdir)
     in
     Stdout_log.setup log_json log_level ;
@@ -548,18 +549,10 @@ let setup_daemon logger =
         (conf_dir ^/ "daemon.json", `May_be_missing)
       in
       let config_file_envvar =
-        (* TODO: remove deprecated variable, eventually *)
-        let mina_config_file = "MINA_CONFIG_FILE" in
-        let coda_config_file = "CODA_CONFIG_FILE" in
-        match (Sys.getenv mina_config_file, Sys.getenv coda_config_file) with
-        | Some config_file, _ ->
+        match Sys.getenv "MINA_CONFIG_FILE" with
+        | Some config_file ->
             Some (config_file, `Must_exist)
-        | None, Some config_file ->
-            [%log warn]
-              "Using deprecated environment variable %s, please use %s instead"
-              coda_config_file mina_config_file ;
-            Some (config_file, `Must_exist)
-        | None, None ->
+        | None ->
             None
       in
       let config_files =

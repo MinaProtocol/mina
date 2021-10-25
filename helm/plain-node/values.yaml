@@ -1,0 +1,30 @@
+testnetName: "testnet"
+coda:
+  runtimeConfig:
+  generateGenesisProof: true
+  logPrecomputedBlocks: true
+  logTxnPoolGossip: false
+  maxConnections: 200
+  image: codaprotocol/coda-daemon:0.0.12-beta-develop-589b507
+  useCustomEntrypoint: false
+  customEntrypoint: ""
+  seedPeers:
+    - /ip4/35.185.66.37/tcp/10105/p2p/12D3KooWQ7Pz3SPizarzx9ZhCJ6jNmQ2iDPgHQxVzRzqYU2SgRSd
+    - /ip4/35.237.214.144/tcp/10120/p2p/12D3KooWGtjWnCcvkaSEbKuNbPivEogxqtLWcsJiQtURydptvrsA
+  ports:
+    client: "8301"
+    graphql: "3085"
+    metrics: "10001"
+    p2p: "10909"
+  exposeGraphql: false
+
+name: "plain-node-x"
+
+healthcheck:
+  enabled: true
+  failureThreshold: 60
+  periodSeconds: 5
+  initialDelaySeconds: 30
+
+nodeSelector:
+  preemptible: false

@@ -39,7 +39,7 @@ spec:
           mountPath: /root/libp2p-keys
       {{- end }}
       containers:
-      - name: coda
+      - name: mina
         resources:
           limits:
           requests:

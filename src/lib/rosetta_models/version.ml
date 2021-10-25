@@ -16,7 +16,7 @@ type t =
   ; (* Any other information that may be useful about versioning of dependent services should be returned here. *)
     metadata : Yojson.Safe.t option [@default None]
   }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** The Version object is utilized to inform the client of the versions of different components of the Rosetta implementation. *)
 let create (rosetta_version : string) (node_version : string) : t =

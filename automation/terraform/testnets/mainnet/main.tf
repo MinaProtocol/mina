@@ -116,10 +116,21 @@ module "mainnet" {
   log_level           = "Info"
   log_txn_pool_gossip = false
 
-  snark_worker_replicas = 0
-  whale_count           = var.whale_count
-  fish_count            = var.fish_count
+  snark_coordinators = []
+
+  whales= [
+    for i in range(var.whale_count):{
+      duplicates = 1
+    }
+  ]
+  
+  fishes= [
+    for i in range(var.fish_count):{
+      duplicates = 1
+    }
+  ]
   seed_count            = var.seed_count
+  plain_node_count = 0
 
   upload_blocks_to_gcloud         = true
   restart_nodes                   = false

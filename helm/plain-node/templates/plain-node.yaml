@@ -1,0 +1,151 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Values.name }}
+  labels:
+    app: {{ $.Values.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $.Values.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $.Values.name }}
+        testnet: {{ $.Values.testnetName }}
+        role: seed
+        class: "plain-node"
+        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
+        syncStatus: INIT
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: {{ $.Values.coda.ports.metrics | quote }}
+        prometheus.io/path: '/metrics'
+    spec:
+      initContainers:
+      containers:
+      - name: mina
+        resources:
+          limits:
+          requests:
+            memory: 32.0Gi
+            cpu: 12.0
+        image: {{ $.Values.coda.image }}
+        {{ if $.Values.coda.useCustomEntrypoint -}}
+        command: [{{ $.Values.coda.customEntrypoint }}]
+        {{- end }}
+        args: [ "daemon",
+          "-log-level", "Debug",
+          "-log-json",
+          "-log-snark-work-gossip", "true",
+          "-config-directory", "/root/.mina-config",
+          "-client-port", "$(DAEMON_CLIENT_PORT)",
+          "-rest-port", "$(DAEMON_REST_PORT)",
+          "-external-port", "$(DAEMON_EXTERNAL_PORT)",
+          "-metrics-port", "$(DAEMON_METRICS_PORT)",
+          "-enable-peer-exchange", "true",
+          {{- if $.Values.coda.runtimeConfig }}
+          "-config-file", "/config/daemon.json",
+          {{- end }}
+          {{- if $.Values.coda.logPrecomputedBlocks }}
+          "-log-precomputed-blocks", "true",
+          {{- end -}}
+          {{- if $.Values.coda.logTxnPoolGossip }}
+          "-log-txn-pool-gossip", "true",
+          {{- end -}}
+          {{- if $.Values.coda.maxConnections }}
+          "--max-connections", {{ $.Values.coda.maxConnections | quote }},
+          {{- end -}}
+          {{- range $.Values.coda.seedPeers }}
+          "-peer", {{ . | quote }},
+          {{- end }}
+          "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }},
+          {{- if $.Values.coda.uploadBlocksToGCloud }}
+          "-upload-blocks-to-gcloud", "true",
+          {{- end }}
+        ]
+        env:
+        - name: "RAYON_NUM_THREADS"
+          value: "6"
+        - name: DAEMON_REST_PORT
+          value: {{ $.Values.coda.ports.graphql | quote }}
+        - name: DAEMON_CLIENT_PORT
+          value: {{ $.Values.coda.ports.client | quote }}
+        - name: DAEMON_METRICS_PORT
+          value: {{ $.Values.coda.ports.metrics | quote }}
+        - name: CODA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
+        - name: CONNECT_PRIVATE_IPS
+          value: "true"
+        - name: GCLOUD_KEYFILE
+          value: "/gcloud/keyfile.json"
+        - name: NETWORK_NAME
+          value: {{ $.Values.testnetName }}
+        - name: GCLOUD_BLOCK_UPLOAD_BUCKET
+          value: "mina_network_block_data"
+        - name: DAEMON_EXTERNAL_PORT
+          value: {{ $.Values.coda.ports.p2p | quote }}
+        ports:
+        - name: client-port
+          protocol: TCP
+          containerPort: {{ $.Values.coda.ports.client }}
+        - name: graphql-port
+          protocol: TCP
+          containerPort: {{ $.Values.coda.ports.graphql }}
+        - name: metrics-port
+          protocol: TCP
+          containerPort: {{ $.Values.coda.ports.metrics }}
+        - name: external-port
+          protocol: TCP
+          containerPort: {{ $.Values.coda.ports.p2p }}
+          hostPort: {{ $.Values.coda.ports.external }}
+{{$data := dict "name" $.Values.name "healthcheck" $.Values.healthcheck }}
+{{- include "healthcheck.seed.allChecks" $data | indent 8 }}
+        imagePullPolicy: Always
+        volumeMounts:
+        {{- if $.Values.coda.uploadBlocksToGCloud }}
+        - name: gcloud-keyfile
+          mountPath: "/gcloud/"
+        {{- end }}
+        {{- if $.Values.coda.runtimeConfig }}
+        - name: daemon-config
+          mountPath: "/config/"
+        {{- end }}
+      volumes:
+      {{- if $.Values.coda.runtimeConfig }}
+      - name: daemon-config
+        configMap:
+          name: seed-daemon-config
+      {{- end }}
+      {{- if $.Values.coda.uploadBlocksToGCloud }}
+      - name: gcloud-keyfile
+        secret:
+          secretName: gcloud-keyfile
+          defaultMode: 256
+          items:
+          - key: keyfile
+            path: keyfile.json
+      {{- end }}
+      - name: actual-libp2p
+        emptyDir: {}
+{{- include "nodeSelector.preemptible" $.Values | indent 6 }}
+---
+{{- if $.Values.coda.exposeGraphql }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Values.name  }}-graphql
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $.Values.name  }}
+  ports:
+  - name: http-graphql
+    protocol: TCP
+    port: 80
+    targetPort: {{ $.Values.coda.ports.graphql }}
+{{- end }}
+---
+

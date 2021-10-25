@@ -14,6 +14,7 @@ module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
 module Currency = Currency_nonconsensus.Currency
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Hash_prefix_states = Hash_prefix_states_nonconsensus.Hash_prefix_states
+open Snark_params_nonconsensus
 
 [%%endif]
 
@@ -24,17 +25,19 @@ module Events = struct
     (* Arbitrary hash input, encoding determined by the snapp's developer. *)
     type t = Field.t array
 
-    type var = Field.Var.t array
-
     let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.snapp_event x
+
+    [%%ifdef consensus_mechanism]
+
+    type var = Field.Var.t array
 
     let hash_var (x : Field.Var.t array) =
       Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_event x
+
+    [%%endif]
   end
 
   type t = Event.t list
-
-  type var = t Data_as_hash.t
 
   let empty_hash = lazy Random_oracle.(salt "MinaSnappEventsEmpty" |> digest)
 
@@ -46,6 +49,10 @@ module Events = struct
   let hash (x : t) = List.fold ~init:(Lazy.force empty_hash) ~f:push_event x
 
   let to_input (x : t) = Random_oracle_input.field (hash x)
+
+  [%%ifdef consensus_mechanism]
+
+  type var = t Data_as_hash.t
 
   let var_to_input (x : var) = Data_as_hash.to_input x
 
@@ -88,6 +95,8 @@ module Events = struct
          [| Data_as_hash.hash events; Event.hash_var e |])
       (Data_as_hash.hash res) ;
     res
+
+  [%%endif]
 end
 
 module Rollup_events = struct
@@ -99,9 +108,13 @@ module Rollup_events = struct
 
   let push_events acc events = push_hash acc (Events.hash events)
 
+  [%%ifdef consensus_mechanism]
+
   let push_events_checked x (e : Events.var) =
     Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_rollup_events
       [| x; Data_as_hash.hash e |]
+
+  [%%endif]
 end
 
 module Poly = struct

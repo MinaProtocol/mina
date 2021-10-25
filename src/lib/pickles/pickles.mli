@@ -157,8 +157,16 @@ module Side_loaded : sig
         type t =
           (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
         [@@deriving sexp, equal, yojson, hash, compare]
+
+        val to_base64 : t -> string
+
+        val of_base64 : string -> (t, string) Result.t
       end
     end]
+
+    val to_base64 : t -> string
+
+    val of_base64 : string -> (t, string) Result.t
   end
 
   val create :

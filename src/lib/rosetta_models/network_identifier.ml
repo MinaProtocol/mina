@@ -12,7 +12,7 @@ type t =
     network : string
   ; sub_network_identifier : Sub_network_identifier.t option [@default None]
   }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** The network_identifier specifies which network a particular object is associated with. *)
 let create (blockchain : string) (network : string) : t =

@@ -110,17 +110,17 @@ If you don't know if you _should_ do this, you probably shouldn't!
 ### Quick steps to launch a small network
 
 1) make a new `terraform/testnets/<testnet>`
-2) `./scripts/generate-keys-and-ledger.sh --testnet=<testnet> --wc=10 --fc=10`
-3) run `./scripts/bake.sh --testnet=<testnet> --docker-tag=<tag, ex. 0.0.17-beta6-develop> --automation-commit=$(git log -1 --pretty=format:%H) --cloud=true`
-4) copy the image tag from the output of bake.sh to `mina_image` in `terraform/testnets/<testnet>/main.tf`
-5) set the archive image tag to the corresponding tag name - for example, if the image is `0.0.17-beta10-880882e`, use  `gcr.io/o1labs-192920/coda-archive:0.0.17-beta10-880882e`
-6) run `terraform apply`
-7) after its done applying, run `./scripts/upload-keys-k8s.sh <testnet>`
+2) if necessary, modify the `main.tf` file in order to change the number of fish or whales
+3) run the generate keys and ledger script to generate the genesis ledger with all the necessary libp2p and account keys.  make sure the argument you pass to --wc and --fc matches the number of whales and fish you specified in the main.tf  `./scripts/generate-keys-and-ledger.sh --testnet=<testnet> --wc=10 --fc=10`
+4) optionally, run `./scripts/bake.sh --testnet=<testnet> --docker-tag=<tag, ex. 0.0.17-beta6-develop> --automation-commit=$(git log -1 --pretty=format:%H) --cloud=true`.  in our current system, baking a new image (which would put the newly generated genesis ledger and onto the image itself) is not necessary because when running terraform apply in a later step, terraform will run `./scripts/upload-keys-k8s.sh <testnet>` which uploads the ledger and mounts it on a volume which will override anything baked into the image.
+4.1) copy the image tag from the output of bake.sh to `mina_image` in `terraform/testnets/<testnet>/main.tf`
+4.2) set the archive image tag to the corresponding tag name - for example, if the image is `0.0.17-beta10-880882e`, use  `gcr.io/o1labs-192920/coda-archive:0.0.17-beta10-880882e`
+5) run `terraform apply`
 
-For a public network, add on
+For a public network, the bake script is required, and also add the following steps
 
-8) run `python3 scripts/get_peers.py <testnet>`
-9) run `scripts/upload_cloud_bake_to_docker.sh --testnet=<TESTNET> --docker-tag=<tag> --automation-commit=<automation commit>`
+6) run `python3 scripts/get_peers.py <testnet>`
+7) run `scripts/upload_cloud_bake_to_docker.sh --testnet=<TESTNET> --docker-tag=<tag> --automation-commit=<automation commit>`
 
 ### Creating the Testnet directory
 

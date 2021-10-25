@@ -53,7 +53,7 @@ module All = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
         { gql: unit -> ('gql, Errors.t) M.t
-        ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t }
+        ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
     end
 
     (* The real environment does things asynchronously *)
@@ -88,15 +88,16 @@ module All = struct
 
   module Impl (M : Monad_fail.S) = struct
     let handle :
-           env:'gql Env.T(M).t
+      graphql_uri:Uri.t
+        -> env:'gql Env.T(M).t
         -> Network_request.t
         -> (Mempool_response.t, Errors.t) M.t =
-     fun ~env req ->
+     fun ~graphql_uri ~env req ->
       let open M.Let_syntax in
       let%bind res = env.gql () in
       let%map () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~gql_response:res
+          ~graphql_uri
       in
       { Mempool_response.transaction_identifiers=
           res#pooledUserCommands |> Array.to_list
@@ -112,7 +113,7 @@ module All = struct
 
       let%test_unit "succeeds" =
         Test.assert_ ~f:Mempool_response.to_yojson
-          ~expected:(Mock.handle ~env:Env.mock Network.dummy_network_request)
+          ~expected:(Mock.handle ~graphql_uri:(Uri.of_string "https://minaprotocol.com") ~env:Env.mock Network.dummy_network_request)
           ~actual:
             (Result.return
                { Mempool_response.transaction_identifiers=
@@ -126,7 +127,8 @@ module Transaction = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
         { gql: hash:string -> ('gql, Errors.t) M.t
-        ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t }
+        ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
+
     end
 
     module Real = T (Deferred.Result)
@@ -218,7 +220,7 @@ module Transaction = struct
                  ~context:
                    (sprintf
                       "Received a public key of an unexpected shape %s when \
-                       accessing the Coda GraphQL API."
+                       accessing the Mina GraphQL API."
                       (Yojson.Basic.pretty_to_string x))
                  `Invariant_violation)
       in
@@ -240,7 +242,7 @@ module Transaction = struct
                  ~context:
                    (sprintf
                       "Received a user command of an unexpected kind %s when \
-                       accessing the Coda GrpahQL API."
+                       accessing the Mina GrpahQL API."
                       (Yojson.Basic.pretty_to_string kind))
                  `Invariant_violation)
       in
@@ -260,15 +262,16 @@ module Transaction = struct
       ; hash= obj#hash }
 
     let handle :
-           env:'gql Env.T(M).t
+      graphql_uri:Uri.t
+        -> env:'gql Env.T(M).t
         -> Mempool_transaction_request.t
         -> (Mempool_transaction_response.t, Errors.t) M.t =
-     fun ~env req ->
+     fun ~graphql_uri ~env req ->
       let open M.Let_syntax in
       let%bind res = env.gql ~hash:req.transaction_identifier.hash in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~gql_response:res
+          ~graphql_uri
       in
       let%bind user_command_obj =
         if Array.is_empty res#pooledUserCommands then
@@ -320,7 +323,7 @@ let router ~graphql_uri ~logger (route : string list) body =
         |> Errors.Lift.wrap
       in
       let%map res =
-        All.Real.handle ~env:(All.Env.real ~graphql_uri) req
+        All.Real.handle ~graphql_uri ~env:(All.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap
       in
       Mempool_response.to_yojson res
@@ -331,7 +334,7 @@ let router ~graphql_uri ~logger (route : string list) body =
         |> Errors.Lift.wrap
       in
       let%map res =
-        Transaction.Real.handle ~env:(Transaction.Env.real ~graphql_uri) req
+        Transaction.Real.handle ~graphql_uri ~env:(Transaction.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap
       in
       Mempool_transaction_response.to_yojson res

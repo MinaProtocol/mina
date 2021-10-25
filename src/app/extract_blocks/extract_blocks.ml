@@ -28,7 +28,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let creator = Public_key.Compressed.of_base58_check_exn creator_str in
   let%bind block_winner_str =
     query_db
-      ~f:(fun db -> Sql.Public_key.run db block.creator_id)
+      ~f:(fun db -> Sql.Public_key.run db block.block_winner_id)
       ~item:"block winner public key"
   in
   let block_winner =
@@ -246,6 +246,7 @@ let fill_in_internal_commands pool block_state_hash =
          { internal_command_id
          ; sequence_no
          ; secondary_sequence_no
+         ; receiver_account_creation_fee_paid
          ; receiver_balance_id
          }
        ->
@@ -271,11 +272,16 @@ let fill_in_internal_commands pool block_state_hash =
         internal_cmd.token |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64
       in
       let hash = internal_cmd.hash |> Transaction_hash.of_base58_check_exn in
+      let receiver_account_creation_fee_paid =
+        Option.map receiver_account_creation_fee_paid ~f:(fun fee ->
+            fee |> Unsigned.UInt64.of_int64 |> Currency.Amount.of_uint64)
+      in
       let cmd =
         { Extensional.Internal_command.sequence_no
         ; secondary_sequence_no
         ; typ
         ; receiver
+        ; receiver_account_creation_fee_paid
         ; receiver_balance
         ; fee
         ; token

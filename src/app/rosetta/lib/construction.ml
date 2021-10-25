@@ -3,7 +3,7 @@ open Async
 open Rosetta_lib
 
 (* Rosetta_models.Currency shadows our Currency so we "save" it as MinaCurrency first *)
-module MinaCurrency = Currency
+module Mina_currency = Currency
 open Rosetta_models
 module Signature = Mina_base.Signature
 module Transaction = Rosetta_lib.Transaction
@@ -30,13 +30,6 @@ module Get_nonce =
       initialPeers
      }
 |}]
-
-module Validate_payment =
-[%graphql
-{|
-  query validate($from: PublicKey!, $to_: PublicKey!, $token: UInt64, $amount: UInt64, $fee: UInt64, $validUntil: UInt64, $memo: String, $nonce: UInt32!, $signature: String!) {
-    validatePayment(signature: {rawSignature: $signature}, input: {from: $from, to:$to_, token:$token, amount:$amount, fee:$fee, validUntil: $validUntil, memo: $memo, nonce:$nonce}) }
-  |}]
 
 module Send_payment =
 [%graphql
@@ -222,7 +215,7 @@ module Metadata = struct
             -> address:Public_key.Compressed.t
             -> unit
             -> ('gql, Errors.t) M.t
-        ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t
+        ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t
         ; lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
     end
 
@@ -255,7 +248,7 @@ module Metadata = struct
   end
 
   module Impl (M : Monad_fail.S) = struct
-    let handle ~(env : 'gql Env.T(M).t) (req : Construction_metadata_request.t)
+    let handle ~graphql_uri ~(env : 'gql Env.T(M).t) (req : Construction_metadata_request.t)
         =
       let open M.Let_syntax in
       let%bind req_options =
@@ -271,7 +264,7 @@ module Metadata = struct
       in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~gql_response:res
+          ~graphql_uri
       in
       let%map account =
         match res#account with
@@ -290,16 +283,16 @@ module Metadata = struct
         |> Option.value ~default:Unsigned.UInt32.zero
       in
       let suggested_fee =
-        Amount_of.coda
-          (MinaCurrency.Fee.to_uint64
+        Amount_of.mina
+          (Mina_currency.Fee.to_uint64
              Mina_compile_config.default_transaction_fee)
       in
       let amount_metadata =
         `Assoc
           [ ( "minimum_fee"
             , Amount.to_yojson
-                (Amount_of.coda
-                   (MinaCurrency.Fee.to_uint64
+                (Amount_of.mina
+                   (Mina_currency.Fee.to_uint64
                       Mina_compile_config.minimum_user_command_fee)) ) ]
       in
       { Construction_metadata_response.metadata=
@@ -497,37 +490,81 @@ end
 module Parse = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
-      type 'gql t =
-        { send_validation_request:
-               payment:Transaction.Unsigned.Rendered.Payment.t
+      type t =
+        { verify_payment_signature:
+            network_identifier : Rosetta_models.Network_identifier.t
+            ->  payment:Transaction.Unsigned.Rendered.Payment.t
             -> signature:string
             -> unit
-            -> ('gql, Errors.t) M.t
+            -> (bool, Errors.t) M.t
         ; lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
     end
 
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
-    let real : graphql_uri:Uri.t -> 'gql_payment Real.t =
-      let uint64 x = `String (Unsigned.UInt64.to_string x) in
-      let uint32 x = `String (Unsigned.UInt32.to_string x) in
-      fun ~graphql_uri ->
-        { send_validation_request=
-            (fun ~payment ~signature () ->
-              Graphql.query
-                (Validate_payment.make ~from:(`String payment.from)
-                   ~to_:(`String payment.to_) ~token:(uint64 payment.token)
-                   ~amount:(uint64 payment.amount) ~fee:(uint64 payment.fee)
-                   ?validUntil:(Option.map ~f:uint32 payment.valid_until)
-                   ?memo:payment.memo ~nonce:(uint32 payment.nonce) ~signature
-                   ())
-                graphql_uri )
-        ; lift= Deferred.return }
+    let real : Real.t =
+      { verify_payment_signature=
+          (fun ~network_identifier ~payment ~signature () ->
+             let open Deferred.Result.Let_syntax in
+             let parse_pk ~which s =
+               match Public_key.Compressed.of_base58_check s with
+               | Ok pk ->
+                 return pk
+               | Error e ->
+                 Deferred.Result.fail
+                   (Errors.create ~context:(sprintf "Parsing verify_payment_signature, bad %s public key" which)
+                      (`Json_parse (Some (Core_kernel.Error.to_string_hum e))))
+             in
+             let%bind source_pk = parse_pk ~which:"source" payment.from in
+             let%map receiver_pk = parse_pk ~which:"receiver" payment.to_ in
+             let body =
+                 Signed_command_payload.Body.Payment
+                   { source_pk
+                   ; receiver_pk
+                   ; token_id = Mina_base.Token_id.of_uint64 payment.token
+                   ; amount = Mina_currency.Amount.of_uint64 payment.amount
+                   }
+               in
+               let fee_payer_pk = source_pk in
+               let fee_token = Mina_base.Token_id.default in
+               let fee = Mina_currency.Fee.of_uint64 payment.fee in
+               let signer = fee_payer_pk in
+               let valid_until = Option.map payment.valid_until
+                   ~f:Mina_numbers.Global_slot.of_uint32
+               in
+               let nonce = payment.nonce in
+               let memo =
+                 Option.value_map payment.memo ~default:User_command_info.Signed_command_memo.empty
+                   ~f:User_command_info.Signed_command_memo.create_from_string_exn
+               in
+               let payload =
+                 Signed_command_payload.create ~fee ~fee_token ~fee_payer_pk ~nonce
+                   ~valid_until ~memo ~body
+               in
+               match Signature.Raw.decode signature with
+               | None ->
+                 (* signature ill-formed, so invalid *)
+                 false
+               | Some signature ->
+                 (* choose signature verification based on network *)
+                 let signature_kind : Mina_signature_kind.t =
+                   if String.equal network_identifier.network "mainnet"
+                   then Mainnet
+                   else Testnet
+                 in
+                 match Signed_command.create_with_signature_checked ~signature_kind signature signer payload with
+                 | None ->
+                   (* invalid signature *)
+                   false
+                 | Some _ ->
+                   (* valid signature *)
+                   true)
+      ; lift= Deferred.return }
   end
 
   module Impl (M : Monad_fail.S) = struct
-    let handle ~(env : 'graphql_txn Env.T(M).t)
+    let handle ~(env : Env.T(M).t)
         (req : Construction_parse_request.t) =
       let open M.Let_syntax in
       let%bind json =
@@ -550,12 +587,12 @@ module Parse = struct
             let%map () =
               match signed_rendered_transaction.payment with
               | Some payment ->
-                  (* Only perform validation on payments. *)
+                  (* Only perform signature validation on payments. *)
                   let%bind res =
-                    env.send_validation_request ~payment
+                    env.verify_payment_signature ~network_identifier:req.network_identifier ~payment
                       ~signature:signed_transaction.signature ()
                   in
-                  if res#validatePayment then M.return ()
+                  if res then M.return ()
                   else M.fail (Errors.create `Signature_invalid)
               | None ->
                   M.return ()
@@ -643,8 +680,9 @@ module Hash = struct
       let hash =
         Transaction_hash.hash_command
           (User_command.Signed_command full_command)
+      |> Transaction_hash.to_base58_check
       in
-      Construction_hash_response.create (Transaction_hash.to_base58_check hash)
+      Transaction_identifier_response.create (Transaction_identifier.create hash)
   end
 
   module Real = Impl (Deferred.Result)
@@ -830,9 +868,7 @@ module Submit = struct
                     createTokenAccount, or mintTokens"
                  (`Json_parse None))
       in
-      { Construction_submit_response.transaction_identifier=
-          Transaction_identifier.create hash
-      ; metadata= None }
+      Transaction_identifier_response.create (Transaction_identifier.create hash)
   end
 
   module Real = Impl (Deferred.Result)
@@ -872,7 +908,7 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
       in
       let%bind graphql_uri = get_graphql_uri_or_error () in
       let%map res =
-        Metadata.Real.handle ~env:(Metadata.Env.real ~graphql_uri) req
+        Metadata.Real.handle ~graphql_uri ~env:(Metadata.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap
       in
       Construction_metadata_response.to_yojson res
@@ -902,9 +938,8 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
         @@ Construction_parse_request.of_yojson body
         |> Errors.Lift.wrap
       in
-      let%bind graphql_uri = get_graphql_uri_or_error () in
       let%map res =
-        Parse.Real.handle ~env:(Parse.Env.real ~graphql_uri) req
+        Parse.Real.handle ~env:Parse.Env.real req
         |> Errors.Lift.wrap
       in
       Construction_parse_response.to_yojson res
@@ -917,7 +952,7 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
       let%map res =
         Hash.Real.handle ~env:Hash.Env.real req |> Errors.Lift.wrap
       in
-      Construction_hash_response.to_yojson res
+      Transaction_identifier_response.to_yojson res
   | ["submit"] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
@@ -929,6 +964,6 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
         Submit.Real.handle ~env:(Submit.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap
       in
-      Construction_submit_response.to_yojson res
+      Transaction_identifier_response.to_yojson res
   | _ ->
       Deferred.Result.fail `Page_not_found

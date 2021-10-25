@@ -12,7 +12,7 @@ type t =
   ; (* Idempotent indicates that if `/call` is invoked with the same CallRequest again, at any point in time, it will return the same CallResponse. Integrators may cache the CallResponse if this is set to true to avoid making unnecessary calls to the Rosetta implementation. For this reason, implementers should be very conservative about returning true here or they could cause issues for the caller. *)
     idempotent : bool
   }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** CallResponse contains the result of a `/call` invocation. *)
 let create (_result : Yojson.Safe.t) (idempotent : bool) : t =

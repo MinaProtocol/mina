@@ -12,7 +12,7 @@ type t =
     options : Yojson.Safe.t option [@default None]
   ; public_keys : Public_key.t list
   }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** A ConstructionMetadataRequest is utilized to get information required to construct a transaction. The Options object used to specify which metadata to return is left purposely unstructured to allow flexibility for implementers. Options is not required in the case that there is network-wide metadata of interest. Optionally, the request can also include an array of PublicKeys associated with the AccountIdentifiers returned in ConstructionPreprocessResponse. *)
 let create (network_identifier : Network_identifier.t) : t =

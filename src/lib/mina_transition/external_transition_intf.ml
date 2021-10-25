@@ -127,6 +127,20 @@ module type S = sig
 
         (*         val to_latest : t -> t *)
       end
+
+      module V1 : sig
+        type nonrec t =
+          { scheduled_time : Block_time.Stable.V1.t
+          ; protocol_state : Protocol_state.Value.Stable.V1.t
+          ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
+          ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
+          ; delta_transition_chain_proof :
+              Frozen_ledger_hash.Stable.V1.t
+              * Frozen_ledger_hash.Stable.V1.t list
+          }
+
+        val to_latest : t -> V2.t
+      end
     end]
 
     val of_external_transition :
@@ -304,6 +318,9 @@ module type S = sig
       (external_transition, State_hash.t) With_hash.t * Validation.initial_valid
     [@@deriving compare]
 
+    val handle_dropped_transition :
+      ?pipe_name:string -> logger:Logger.t -> t -> unit
+
     include External_transition_common_intf with type t := t
   end
 
@@ -327,6 +344,9 @@ module type S = sig
 
     val create_unsafe :
       external_transition -> [ `I_swear_this_is_safe_see_my_comment of t ]
+
+    val handle_dropped_transition :
+      ?pipe_name:string -> logger:Logger.t -> t -> unit
 
     include External_transition_base_intf with type t := t
 

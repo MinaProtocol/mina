@@ -7,7 +7,7 @@
  *)
 
 type t = { block_identifier : Block_identifier.t; transaction : Transaction.t }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** BlockTransaction contains a populated Transaction and the BlockIdentifier that contains it. *)
 let create (block_identifier : Block_identifier.t) (transaction : Transaction.t)

@@ -34,7 +34,7 @@ module Preprocess = struct
         ~body:
           Construction_preprocess_request.(
             { network_identifier= net_id network_response
-            ; max_fee= [Amount_of.coda max_fee]
+            ; max_fee= [Amount_of.mina max_fee]
             ; operations
             ; suggested_fee_multiplier= None
             ; metadata= None }
@@ -121,6 +121,6 @@ module Hash = struct
             |> to_yojson)
         ~path:"construction/hash"
     in
-    Lift.res r ~logger ~of_yojson:Construction_hash_response.of_yojson
+    Lift.res r ~logger ~of_yojson:Transaction_identifier_response.of_yojson
     |> Lift.successfully
 end

@@ -7,7 +7,7 @@ let generate_keypair =
     (let open Command.Let_syntax in
     let env = Secrets.Keypair.env in
     if Option.is_some (Sys.getenv env) then
-      printf "Using password from environment variable %s\n" env ;
+      eprintf "Using password from environment variable %s\n" env ;
     let%map_open privkey_path = Flag.privkey_write_path in
     Exceptions.handle_nicely
     @@ fun () ->
@@ -150,7 +150,7 @@ module Vrf = struct
       (let open Command.Let_syntax in
       let env = Secrets.Keypair.env in
       if Option.is_some (Sys.getenv env) then
-        printf "Using password from environment variable %s\n" env ;
+        eprintf "Using password from environment variable %s\n" env ;
       let%map_open privkey_path = Flag.privkey_write_path
       and global_slot =
         flag "--global-slot" ~doc:"NUM Global slot to evaluate the VRF for"
@@ -241,7 +241,7 @@ module Vrf = struct
       (let open Command.Let_syntax in
       let env = Secrets.Keypair.env in
       if Option.is_some (Sys.getenv env) then
-        printf "Using password from environment variable %s\n" env ;
+        eprintf "Using password from environment variable %s\n" env ;
       let%map_open privkey_path = Flag.privkey_write_path in
       Exceptions.handle_nicely
       @@ fun () ->

@@ -72,6 +72,10 @@ module Auth_required = struct
     end
   end]
 
+  let gen : t Quickcheck.Generator.t =
+    Quickcheck.Generator.of_list
+      [ None; Either; Proof; Signature; Both; Impossible ]
+
   (* The encoding is chosen so that it is easy to write this function
 
       let spec_eval t ~signature_verifies =
@@ -326,6 +330,31 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+let gen : t Quickcheck.Generator.t =
+  let open Quickcheck.Let_syntax in
+  let%bind stake = Quickcheck.Generator.bool in
+  let%bind edit_state = Auth_required.gen in
+  let%bind send = Auth_required.gen in
+  let%bind receive = Auth_required.gen in
+  let%bind set_delegate = Auth_required.gen in
+  let%bind set_permissions = Auth_required.gen in
+  let%bind set_verification_key = Auth_required.gen in
+  let%bind set_snapp_uri = Auth_required.gen in
+  let%bind edit_rollup_state = Auth_required.gen in
+  let%bind set_token_symbol = Auth_required.gen in
+  return
+    { Poly.stake
+    ; edit_state
+    ; send
+    ; receive
+    ; set_delegate
+    ; set_permissions
+    ; set_verification_key
+    ; set_snapp_uri
+    ; edit_rollup_state
+    ; set_token_symbol
+    }
 
 [%%ifdef consensus_mechanism]
 

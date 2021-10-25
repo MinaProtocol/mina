@@ -21,7 +21,7 @@ module Variant = struct
   type t =
     [ `Sql of string
     | `Json_parse of string option
-    | `Graphql_coda_query of string
+    | `Graphql_mina_query of string
     | `Network_doesn't_exist of string * string
     | `Chain_info_missing
     | `Account_not_found of string
@@ -73,7 +73,7 @@ end = struct
         "SQL failure"
     | `Json_parse _ ->
         "JSON parse error"
-    | `Graphql_coda_query _ ->
+    | `Graphql_mina_query _ ->
         "GraphQL query failed"
     | `Network_doesn't_exist _ ->
         "Network doesn't exist"
@@ -113,7 +113,7 @@ end = struct
         Some msg
     | `Json_parse optional_msg ->
         optional_msg
-    | `Graphql_coda_query msg ->
+    | `Graphql_mina_query msg ->
         Some msg
     | `Network_doesn't_exist (req, conn) ->
         Some
@@ -177,8 +177,8 @@ end = struct
         false
     | `Json_parse _ ->
         false
-    | `Graphql_coda_query _ ->
-        false
+    | `Graphql_mina_query _ ->
+        true
     | `Network_doesn't_exist _ ->
         false
     | `Chain_info_missing ->
@@ -218,7 +218,7 @@ end = struct
         "We encountered a SQL failure."
     | `Json_parse _ ->
         "We encountered an error while parsing JSON."
-    | `Graphql_coda_query _ ->
+    | `Graphql_mina_query _ ->
         "The GraphQL query failed."
     | `Network_doesn't_exist _ ->
         "The network doesn't exist."

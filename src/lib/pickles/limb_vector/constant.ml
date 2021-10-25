@@ -11,10 +11,22 @@ let to_bits t =
 
 module Hex64 = struct
   module T = struct
-    (* use string encoding for Yojson, because value may need to
-       be parsed in GraphQL, which uses signed 32-bit integers
+    type t = Int64.t [@@deriving yojson]
+
+    (* Modify the [of_yojson] handler to add a case for [`String].
+       This isn't necessary when using Yojson's parser, because it will
+       correctly infer [`Intlit] for any possible value that appears here.
+       However, if this json was constructed from a GraphQL query then it will
+       be encoded as a [`String] and the conversion will fail unless we handle
+       it ourselves.
     *)
-    type t = (Int64.t[@encoding `string]) [@@deriving yojson]
+    let of_yojson yojson =
+      match yojson with
+      | `String x -> (
+          try Result.Ok (Int64.of_string x)
+          with _ -> Result.Error "Constant.Make.Hex64.t" )
+      | _ ->
+          of_yojson yojson
 
     include (Int64 : module type of Int64 with type t := t)
 
