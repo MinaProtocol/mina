@@ -1020,7 +1020,7 @@ module T = struct
       (User_command.Valid.t list, _) result Deferred.Or_error.t =
     Result.all
       (List.map cs ~f:(function
-        | Snapp_command _ ->
+        | Parties _ ->
             Error
               (Verifier.Failure.Verification_failed
                  (Error.of_string "check_commands: snapp commands disabled"))

@@ -309,5 +309,11 @@ let _ =
          in
          Js.string (Yojson.Safe.to_string result_json)
 
+       method hashBytearray = Poseidon_hash.hash_bytearray
+
+       method hashFieldElems = Poseidon_hash.hash_field_elems
+
+       val hashOrder = Poseidon_hash.Field.(Hex.encode @@ Nat.to_bytes order)
+
        method runUnitTests () : bool Js.t = Coding.run_unit_tests () ; Js._true
     end)
