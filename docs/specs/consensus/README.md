@@ -52,9 +52,8 @@ The name Samasika comes from the Sanskrit word, meaning small or succinct.
     - [5.2.1 Short-range fork rule](#521-short-range-fork-rule)
     - [5.2.2 Long-range fork rule](#522-long-range-fork-rule)
   - [5.3 Decentralized checkpointing](#53-decentralized-checkpointing)
-    - [5.3.1 `initCheckpoints`](#531-initcheckpoints)
-    - [5.3.2 `updateCheckpoints`](#532-updatecheckpoints)
-    - [5.3.3 `isShortRange`](#533-isshortrange)
+    - [5.3.1 Genesis checkpoints](#531-genesis-checkpoints)
+    - [5.3.2 `isShortRange`](#532-isshortrange)
   - [5.4 Sliding window density](#54-sliding-window-density)
     - [5.4.1 Terminology](#541-terminology)
     - [5.4.2 Sliding windows](#542-sliding-windows)
@@ -362,6 +361,8 @@ fn length(C) -> u64
 
 ### 5.1.6 `lastVRF`
 
+**WIP**
+
 This function returns the hex digest of the hash of the last VRF output of a given chain.  The input is a chain `C` and the output is the hash digest.
 
 ```rust
@@ -372,6 +373,8 @@ fn lastVRF(C) -> String
 ```
 
 ### 5.1.7 `stateHash`
+
+**WIP**
 
 This function returns hash of the top block's consensus state for a given chain.  The input is a chain `C` and the output is the hash.
 
@@ -461,12 +464,7 @@ The above pseudocode is only to provide intuition about how the chain selection 
 
 ## 5.3 Decentralized checkpointing
 
-<!--
-; start_checkpoint: 'start_checkpoint
-      (* The lock checkpoint is the hash of the latest state in the seed update range, not including
-         the current state. *)
-; lock_checkpoint: 'lock_checkpoint
--->
+**IN REVIEW**
 
 Samasika uses decentralized checkpointing to determine whether a fork is short- or long-range.  Each epoch is split into three parts with an equal number of slots.  The first 2/3 are called the *seed update range* because this is when the VRF is seeded.
 
@@ -509,9 +507,7 @@ Since the leader selection distribution for the current epoch is computed by the
 
 Since Mina is succinct this means that it must store the checkpoints for the current epoch in addition to the checkpoints for the previous epoch.  This is why the [`Consensus_state`](#44-consensus_state) structure contains two `Epoch_data` fields: `staking_epoch_data` and `next_epoch_data`.  The former contains the checkpoints for the previous epoch and the latter contains that of the current epoch.
 
-### 5.3.1 `initCheckpoints`
-
-**WIP**
+### 5.3.1 Genesis checkpoints
 
 This algorithm initializes the checkpoints for genesis block `G`
 
@@ -532,42 +528,9 @@ fn initCheckpoints(G) -> ()
 }
 ```
 
-### 5.3.2 `updateCheckpoints`
+The functions `Epoch_seed::from_b58` and `State_hash::from_b58` are provided by the `bin_prot` implementation.
 
-**WIP**
-
-This algorithm updates the checkpoints of the block being created `B` based on its parent block `P`.  It inputs the blocks `P` and `B` and updates `B`'s checkpoints according to the description in [Section 5.3](#53-decentralized-checkpointing).
-
-```rust
-fn updateCheckpoints(P, B) -> ()
-{
-    // Set the start_checkpoint
-    if cState(B).epoch_count > cState(P).epochCount {
-        cState(B).staking_epoch_data = cState(P).next_epoch_data
-        cState(B).next_epoch_data.start_checkpoint = hashProtocolState(P.protocol_state.to_roinput().to_fields())
-        cState(B).next_epoch_data.epoch_length = 1
-    }
-    else {
-        cState(B).staking_epoch_data = cState(P).staking_epoch_data
-        cState(B).next_epoch_data = cState(P).next_epoch_data
-        cState(B).next_epoch_data.epoch_length++
-    }
-
-    // Set the seed and lock_checkpoint
-    if 0 ≤ epochSlot(B) < 2/3*slots_per_epoch {
-        cState(B).next_epoch.data.seed = hashEpochSeed([next_data.seed.to_vesta_field_element(), producer_vrf_result]).to_epoch_seed()
-        cState(B).next_epoch_data.lock_checkpoint = hashProtocolState(P.protocol_state.to_roinput().to_fields())
-    }
-    else {
-        cState(B).next_epoch.data.seed = cState(P).next_epoch_data.seed
-        cState(B).next_epoch_data.lock_checkpoint = cState(P).next_epoch_data.lock_checkpoint
-    }
-}
-```
-
-Specifically, if the epoch slot of the new block `B` is the start of a new epoch, then the `start_checkpoint` of the current epoch data (`next_epoch_data`) is updated to the state hash from the previous block `P`.  Next, if the the new block's slot is also within the first `2/3` of the slots in the epoch ([`slots_per_epoch`](#3-constants)), then the `lock_checkpoint` of the current epoch data is also updated to the same value.
-
-### 5.3.3 `isShortRange`
+### 5.3.2 `isShortRange`
 
 This algorithm uses the checkpoints to determine if the fork of two chains is short-range or long-range.  It inputs two chains with a fork `C1` and `C2` and outputs `true` if the fork is short-range, otherwise the fork is long-range and it outputs `false`.
 
@@ -1121,7 +1084,7 @@ fn selectSecureChain(tip, chains) -> Chain
 }
 ```
 
-It relies on the [`isShortRange`](#533-isshortrange) and [`relativeMinWindowDensity`](#5412-relative-minimum-window-density) algorithms (Section 5.3.3 and Section 5.4.12) and the `selectLongerChain` algorithm below.
+It relies on the [`isShortRange`](#532-isshortrange) and [`relativeMinWindowDensity`](#5412-relative-minimum-window-density) algorithms (Section 5.3.2 and Section 5.4.12) and the `selectLongerChain` algorithm below.
 
 ```rust
 fn selectLongerChain(tip, candidate) -> Chain
