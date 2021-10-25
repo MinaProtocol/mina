@@ -1999,19 +1999,19 @@ module Types = struct
                      [Unsigned.UInt*] parsers:
                      * if the absolute value is greater than [max_int], the value
                        returned is [max_int]
-                       - ["99999999999999999999999999999999999"] is [max_int]
-                       - ["-99999999999999999999999999999999999"] is [max_int]
+                   - ["99999999999999999999999999999999999"] is [max_int]
+                   - ["-99999999999999999999999999999999999"] is [max_int]
                      * if otherwise the value is negative, the value returned is
                        [max_int - (x - 1)]
-                       - ["-1"] is [max_int]
+                   - ["-1"] is [max_int]
                      * if there is a non-numeric character part-way through the
                        string, the numeric prefix is treated as a number
-                       - ["1_000_000"] is [1]
-                       - ["-1_000_000"] is [max_int]
-                       - ["1.1"] is [1]
-                       - ["0x15"] is [0]
+                   - ["1_000_000"] is [1]
+                   - ["-1_000_000"] is [max_int]
+                   - ["1.1"] is [1]
+                   - ["0x15"] is [0]
                      * leading spaces are ignored
-                       - [" 1"] is [1]
+                   - [" 1"] is [1]
                      This is annoying to document, none of these behaviors are
                      useful to users, and unexpectedly triggering one of them
                      could have nasty consequences. Thus, we raise an error
@@ -3502,6 +3502,13 @@ module Queries = struct
           ]
       ~resolve:account_resolver
 
+  let get_ledger_and_breadcrumb coda =
+    coda |> Mina_lib.best_tip |> Participating_state.active
+    |> Option.map ~f:(fun tip ->
+           ( Transition_frontier.Breadcrumb.staged_ledger tip
+             |> Staged_ledger.ledger
+           , tip ))
+
   let account =
     field "account" ~doc:"Find any account via a public key and token"
       ~typ:Types.AccountObj.account
@@ -3514,10 +3521,10 @@ module Queries = struct
               ~typ:Types.Input.token_id_arg ~default:Token_id.default
           ]
       ~resolve:(fun { ctx = coda; _ } () pk token ->
-        Some
-          ( Account_id.create pk token
-          |> Types.AccountObj.Partial_account.of_account_id coda
-          |> Types.AccountObj.lift coda pk ))
+        Option.map (get_ledger_and_breadcrumb coda) ~f:(fun _ ->
+            Account_id.create pk token
+            |> Types.AccountObj.Partial_account.of_account_id coda
+            |> Types.AccountObj.lift coda pk))
 
   let accounts_for_pk =
     field "accounts" ~doc:"Find all accounts for a public key"
@@ -3528,13 +3535,7 @@ module Queries = struct
               ~typ:(non_null Types.Input.public_key_arg)
           ]
       ~resolve:(fun { ctx = coda; _ } () pk ->
-        match
-          coda |> Mina_lib.best_tip |> Participating_state.active
-          |> Option.map ~f:(fun tip ->
-                 ( Transition_frontier.Breadcrumb.staged_ledger tip
-                   |> Staged_ledger.ledger
-                 , tip ))
-        with
+        match get_ledger_and_breadcrumb coda with
         | Some (ledger, breadcrumb) ->
             let tokens = Ledger.tokens ledger pk |> Set.to_list in
             List.filter_map tokens ~f:(fun token ->
@@ -3740,8 +3741,8 @@ module Queries = struct
           let height_uint32 =
             (* GraphQL int is signed 32-bit
                  empirically, conversion does not raise even if
-                 - the number is negative
-                 - the number is not representable using 32 bits
+               - the number is negative
+               - the number is not representable using 32 bits
             *)
             Unsigned.UInt32.of_int height
           in
