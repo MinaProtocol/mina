@@ -36,6 +36,7 @@ module Global_state : sig
     ; fee_excess : Currency.Amount.Signed.t
     ; protocol_state : Snapp_predicate.Protocol_state.View.t
     }
+  [@@deriving sexp, to_yojson]
 end
 
 val merkle_root : t -> Ledger_hash.t

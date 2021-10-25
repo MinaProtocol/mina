@@ -236,7 +236,7 @@ end
 module Stable = struct
   module V1 = struct
     type t =
-      { fee_payer : Party.Signed.Stable.V1.t
+      { fee_payer : Party.Fee_payer.Stable.V1.t
       ; other_parties : Party.Stable.V1.t list
       ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
       ; memo : Signed_command_memo.Stable.V1.t
@@ -274,55 +274,25 @@ let check_depths (t : t) =
     true
   with _ -> false
 
-let check (t : t) =
-  let p = t.fee_payer in
-  Token_id.(equal default) p.data.body.token_id
-  && Sgn.(equal Neg) p.data.body.delta.sgn
-  && check_depths t
+let check (t : t) = check_depths t
 
 let parties (t : t) : Party.t list =
   let p = t.fee_payer in
+  let body = Party.Body.of_fee_payer p.data.body in
   { authorization = Control.Signature p.authorization
-  ; data = { p.data with predicate = Party.Predicate.Nonce p.data.predicate }
+  ; data = { body; predicate = Party.Predicate.Nonce p.data.predicate }
   }
   :: t.other_parties
 
-(** [fee_lower_bound_exn t] may raise if [check t = false] *)
-let fee_lower_bound_exn (t : t) : Currency.Fee.t =
-  let x = t.fee_payer.data.body.delta in
-  match x.sgn with
-  | Neg ->
-      (* See what happens if all the parties that use up balance succeed,
-         and all the non-fee-payer parties that contribute balance fail.
-
-         In the future we could have this function take in the current view of the
-         world to get a more accurate lower bound.
-      *)
-      List.fold_until t.other_parties ~init:x.magnitude ~finish:Fn.id
-        ~f:(fun acc p ->
-          if Token_id.(p.data.body.token_id <> default) then Continue acc
-          else
-            let y = p.data.body.delta in
-            match y.sgn with
-            | Neg ->
-                Continue acc
-            | Pos -> (
-                match Currency.Amount.sub acc y.magnitude with
-                | None ->
-                    Stop Currency.Amount.zero
-                | Some acc' ->
-                    Continue acc' ))
-      |> Currency.Amount.to_fee
-  | Pos ->
-      assert false
+let fee (t : t) : Currency.Fee.t = t.fee_payer.data.body.delta
 
 let fee_payer_party ({ fee_payer; _ } : t) = fee_payer
 
-let fee_payer (t : t) = Party.Signed.account_id (fee_payer_party t)
+let fee_payer (t : t) = Party.Fee_payer.account_id (fee_payer_party t)
 
 let nonce (t : t) : Account.Nonce.t = (fee_payer_party t).data.predicate
 
-let fee_token (t : t) = (fee_payer_party t).data.body.token_id
+let fee_token (_t : t) = Token_id.default
 
 let accounts_accessed (t : t) =
   List.map (parties t) ~f:(fun p ->
@@ -408,7 +378,7 @@ module Verifiable = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { fee_payer : Party.Signed.Stable.V1.t
+        { fee_payer : Party.Fee_payer.Stable.V1.t
         ; other_parties :
             Pickles.Side_loaded.Verification_key.Stable.V1.t option
             Party_or_stack.With_hashes.Stable.V1.t
@@ -480,7 +450,7 @@ let commitment (t : t) : Transaction_commitment.t =
 module Weight = struct
   let party : Party.t -> int = fun _ -> 1
 
-  let fee_payer (fp : Party.Signed.t) : int = Party.of_signed fp |> party
+  let fee_payer (fp : Party.Fee_payer.t) : int = Party.of_fee_payer fp |> party
 
   let other_parties : Party.t list -> int = List.sum (module Int) ~f:party
 

@@ -2160,7 +2160,7 @@ module Base = struct
                   | `Skip ->
                       []
                   | `Start p ->
-                      Party.of_signed p.parties.Parties.fee_payer
+                      Party.of_fee_payer p.parties.Parties.fee_payer
                       :: p.parties.Parties.other_parties
                       |> List.map ~f:(fun party -> (party, ()))
                       |> Parties.Party_or_stack.With_hashes.of_parties_list)
@@ -4175,6 +4175,7 @@ module For_tests = struct
       in
       ()
     in
+    let spec = List.hd_exn specs in
     let tag, _, (module P), Pickles.Provers.[ trivial_prover; _ ] =
       let trivial_rule : _ Pickles.Inductive_rule.t =
         let trivial_main (tx_commitment : Snapp_statement.Checked.t) :
@@ -4261,7 +4262,8 @@ module For_tests = struct
       in
       Ledger.get_or_create_account ledger id account |> Or_error.ok_exn
     in
-    let total = Option.value_exn (Amount.add fee amount) in
+    (*TODO: Add another signed party for the transfer*)
+    (*let total = Option.value_exn (Amount.add fee amount) in*)
     let update_empty_permissions =
       let permissions =
         { Permissions.user_default with send = Permissions.Auth_required.Proof }
@@ -4269,13 +4271,14 @@ module For_tests = struct
       in
       { Party.Update.dummy with permissions }
     in
+    let sender_pk = sender.public_key |> Public_key.compress in
     let fee_payer =
-      { Party.Signed.data =
+      { Party.Fee_payer.data =
           { body =
-              { pk = sender.public_key |> Public_key.compress
-              ; update = update_empty_permissions
-              ; token_id = Token_id.default
-              ; delta = Amount.Signed.(negate (of_unsigned total))
+              { pk = sender_pk
+              ; update = Party.Update.noop
+              ; token_id = ()
+              ; delta = fee
               ; events = []
               ; rollup_events = []
               ; call_data = Field.zero
@@ -4285,6 +4288,20 @@ module For_tests = struct
           }
           (* Real signature added in below *)
       ; authorization = Signature.dummy
+      }
+    in
+    let sender_party_data : Party.Predicated.t =
+      { body =
+          { pk = sender_pk
+          ; update = Party.Update.noop
+          ; token_id = Token_id.default
+          ; delta = Amount.(Signed.(negate (of_unsigned amount)))
+          ; events = []
+          ; rollup_events = []
+          ; call_data = Field.zero
+          ; depth = 0
+          }
+      ; predicate = Nonce (Account.Nonce.succ sender_nonce)
       }
     in
     let snapp_party_data : Party.Predicated.t =
@@ -4306,7 +4323,7 @@ module For_tests = struct
     let ps =
       Parties.Party_or_stack.of_parties_list
         ~party_depth:(fun (p : Party.Predicated.t) -> p.body.depth)
-        [ snapp_party_data ]
+        [ sender_party_data; snapp_party_data ]
       |> Parties.Party_or_stack.accumulate_hashes_predicated
     in
     let other_parties_hash = Parties.Party_or_stack.stack_hash ps in
@@ -4325,24 +4342,33 @@ module For_tests = struct
     let handler (Snarky_backendless.Request.With { request; respond }) =
       match request with _ -> respond Unhandled
     in
-    let%map.Async.Deferred pi : Pickles.Side_loaded.Proof.t Async.Deferred.t =
-      Or_error.try_with (fun () -> trivial_prover ~handler [] tx_statement)
-      |> Or_error.ok_exn
+    let pi : Pickles.Side_loaded.Proof.t =
+      (fun () -> trivial_prover ~handler [] tx_statement)
+      |> Async.Thread_safe.block_on_async_exn
     in
-    Core.printf "proof: %s%!\n" (Pickles.Side_loaded.Proof.to_base64 pi) ;
-    let other_parties =
-      [ { Party.data = snapp_party_data; authorization = Proof pi } ]
-    in
-    let fee_payer =
+    let fee_payer_signature_auth =
       let txn_comm =
         Parties.Transaction_commitment.with_fee_payer transaction
-          ~fee_payer_hash:Party.Predicated.(digest (of_signed fee_payer.data))
+          ~fee_payer_hash:
+            Party.Predicated.(digest (of_fee_payer fee_payer.data))
       in
-      let signature =
-        Signature_lib.Schnorr.sign sender.private_key
-          (Random_oracle.Input.field txn_comm)
-      in
-      { fee_payer with authorization = signature }
+      Signature_lib.Schnorr.sign sender.private_key
+        (Random_oracle.Input.field txn_comm)
+    in
+    let fee_payer =
+      { fee_payer with authorization = fee_payer_signature_auth }
+    in
+    let sender_signature_auth =
+      Signature_lib.Schnorr.sign sender.private_key
+        (Random_oracle.Input.field transaction)
+    in
+    let sender =
+      { Party.data = sender_party_data
+      ; authorization = Signature sender_signature_auth
+      }
+    in
+    let other_parties =
+      [ sender; { data = snapp_party_data; authorization = Proof pi } ]
     in
     let parties : Parties.t =
       { fee_payer; other_parties; protocol_state; memo }
@@ -4660,7 +4686,7 @@ let%test_module "transaction_snark" =
         Vector.init Snapp_state.Max_state_size.n ~f:Field.of_int
       in
       { fee_payer =
-          { Party.Signed.data =
+          { Party.Fee_payer.data =
               { body =
                   { pk = acct1.account.public_key
                   ; update =
@@ -4674,10 +4700,8 @@ let%test_module "transaction_snark" =
                       ; token_symbol = Keep
                       ; timing = Keep
                       }
-                  ; token_id = Token_id.default
-                  ; delta =
-                      Amount.(
-                        Signed.(negate (of_unsigned (of_int full_amount))))
+                  ; token_id = ()
+                  ; delta = Fee.of_int full_amount
                   ; events = []
                   ; rollup_events = []
                   ; call_data = Field.zero
@@ -5262,56 +5286,192 @@ let%test_module "transaction_snark" =
                               Signature_lib.Schnorr.sign sender.private_key
                                 (Random_oracle.Input.field txn_comm)
                           }
-                        in
-                        let parties : Parties.t =
-                          { fee_payer
-                          ; other_parties =
-                              [ { data = snapp_party_data; authorization = Proof pi }
-                              ]
-                          ; protocol_state
-                          ; memo
-                          }
-                        in
-                        apply_parties ledger [ parties ])
-                    |> fun ((), ()) -> ())
-            end )
-
-          let account_fee = Fee.to_int constraint_constants.account_creation_fee
-
-          let test_transaction ~constraint_constants ?txn_global_slot ledger txn =
-            let source = Ledger.merkle_root ledger in
-            let pending_coinbase_stack = Pending_coinbase.Stack.empty in
-            let next_available_token = Ledger.next_available_token ledger in
-            let state_body, state_body_hash =
-              match txn_global_slot with
-              | None ->
-                  (state_body, state_body_hash)
-              | Some txn_global_slot ->
-                  let state_body =
-                    let state =
-                      (* NB: The [previous_state_hash] is a dummy, do not use. *)
-                      Mina_state.Protocol_state.create
-                        ~previous_state_hash:Tick0.Field.zero ~body:state_body
-                    in
-                    let consensus_state_at_slot =
-                      Consensus.Data.Consensus_state.Value.For_tests
-                      .with_global_slot_since_genesis
-                        (Mina_state.Protocol_state.consensus_state state)
-                        txn_global_slot
-                    in
-                    Mina_state.Protocol_state.(
-                      create_value
-                        ~previous_state_hash:(previous_state_hash state)
-                        ~genesis_state_hash:(genesis_state_hash state)
-                        ~blockchain_state:(blockchain_state state)
-                        ~consensus_state:consensus_state_at_slot
-                        ~constants:
-                          (Protocol_constants_checked.value_of_t
-                             Genesis_constants.compiled.protocol))
-                      .body
+                        ])
                   in
-                  let state_body_hash =
-                    Mina_state.Protocol_state.Body.hash state_body
+                  let vk =
+                    Pickles.Side_loaded.Verification_key.of_compiled tag
+                  in
+                  let { Transaction_logic.For_tests.Transaction_spec.fee
+                      ; sender = sender, sender_nonce
+                      ; receiver = multisig_account_pk
+                      ; amount
+                      } =
+                    spec
+                  in
+                  let vk =
+                    With_hash.of_data ~hash_data:Snapp_account.digest_vk vk
+                  in
+                  (* TODO: add another party for sending amount
+                     let total = Option.value_exn (Amount.add fee amount) in*)
+                  (let _is_new, _loc =
+                     let pk = Public_key.compress sender.public_key in
+                     let id = Account_id.create pk Token_id.default in
+                     Ledger.get_or_create_account ledger id
+                       (Account.create id
+                          Balance.(Option.value_exn (add_amount zero amount)))
+                     |> Or_error.ok_exn
+                   in
+                   let _is_new, loc =
+                     let id =
+                       Account_id.create multisig_account_pk Token_id.default
+                     in
+                     Ledger.get_or_create_account ledger id
+                       (Account.create id Balance.(of_int 0))
+                     |> Or_error.ok_exn
+                   in
+                   let a = Ledger.get ledger loc |> Option.value_exn in
+                   Ledger.set ledger loc
+                     { a with
+                       permissions =
+                         { Permissions.user_default with
+                           set_permissions = Proof
+                         }
+                     ; snapp =
+                         Some
+                           { (Option.value ~default:Snapp_account.default
+                                a.snapp)
+                             with
+                             verification_key = Some vk
+                           }
+                     }) ;
+                  let update_empty_permissions =
+                    let permissions =
+                      Snapp_basic.Set_or_keep.Set Permissions.empty
+                    in
+                    { Party.Update.noop with permissions }
+                  in
+                  let sender_pk = sender.public_key |> Public_key.compress in
+                  let fee_payer =
+                    { Party.Fee_payer.data =
+                        { body =
+                            { pk = sender_pk
+                            ; update = Party.Update.noop
+                            ; token_id = ()
+                            ; delta = fee
+                            ; events = []
+                            ; rollup_events = []
+                            ; call_data = Field.zero
+                            ; depth = 0
+                            }
+                        ; predicate = sender_nonce
+                        }
+                        (* Real signature added in below *)
+                    ; authorization = Signature.dummy
+                    }
+                  in
+                  let sender_party_data : Party.Predicated.t =
+                    { body =
+                        { pk = sender_pk
+                        ; update = Party.Update.noop
+                        ; token_id = Token_id.default
+                        ; delta = Amount.(Signed.(negate (of_unsigned amount)))
+                        ; events = []
+                        ; rollup_events = []
+                        ; call_data = Field.zero
+                        ; depth = 0
+                        }
+                    ; predicate = Nonce (Account.Nonce.succ sender_nonce)
+                    }
+                  in
+                  let snapp_party_data : Party.Predicated.t =
+                    { Party.Predicated.Poly.body =
+                        { pk = multisig_account_pk
+                        ; update = update_empty_permissions
+                        ; token_id = Token_id.default
+                        ; delta = Amount.Signed.(of_unsigned amount)
+                        ; events = []
+                        ; rollup_events = []
+                        ; call_data = Field.zero
+                        ; depth = 0
+                        }
+                    ; predicate = Full Snapp_predicate.Account.accept
+                    }
+                  in
+                  let protocol_state = Snapp_predicate.Protocol_state.accept in
+                  let memo = Signed_command_memo.empty in
+                  let ps =
+                    Parties.Party_or_stack.of_parties_list
+                      ~party_depth:(fun (p : Party.Predicated.t) ->
+                        p.body.depth)
+                      [ sender_party_data; snapp_party_data ]
+                    |> Parties.Party_or_stack.accumulate_hashes_predicated
+                  in
+                  let other_parties_hash =
+                    Parties.Party_or_stack.stack_hash ps
+                  in
+                  let protocol_state_predicate_hash =
+                    (*FIXME: is this ok? *)
+                    Snapp_predicate.Protocol_state.digest protocol_state
+                  in
+                  let transaction : Parties.Transaction_commitment.t =
+                    (*FIXME: is this correct? *)
+                    Parties.Transaction_commitment.create ~other_parties_hash
+                      ~protocol_state_predicate_hash
+                      ~memo_hash:(Signed_command_memo.hash memo)
+                  in
+                  let at_party = Parties.Party_or_stack.stack_hash ps in
+                  let tx_statement : Snapp_statement.t =
+                    { transaction; at_party }
+                  in
+                  let msg =
+                    tx_statement |> Snapp_statement.to_field_elements
+                    |> Random_oracle_input.field_elements
+                  in
+                  let sigma0 = Schnorr.sign sk0 msg in
+                  let sigma1 = Schnorr.sign sk1 msg in
+                  let sigma2 = Schnorr.sign sk2 msg in
+                  let handler
+                      (Snarky_backendless.Request.With { request; respond }) =
+                    match request with
+                    | Pubkey 0 ->
+                        respond @@ Provide pk0
+                    | Pubkey 1 ->
+                        respond @@ Provide pk1
+                    | Pubkey 2 ->
+                        respond @@ Provide pk2
+                    | Sigma 0 ->
+                        respond @@ Provide sigma0
+                    | Sigma 1 ->
+                        respond @@ Provide sigma1
+                    | Sigma 2 ->
+                        respond @@ Provide sigma2
+                    | _ ->
+                        respond Unhandled
+                  in
+                  let pi : Pickles.Side_loaded.Proof.t =
+                    (fun () -> multisig_prover ~handler [] tx_statement)
+                    |> Async.Thread_safe.block_on_async_exn
+                  in
+                  let fee_payer =
+                    let txn_comm =
+                      Parties.Transaction_commitment.with_fee_payer transaction
+                        ~fee_payer_hash:
+                          Party.Predicated.(
+                            digest (of_fee_payer fee_payer.data))
+                    in
+                    { fee_payer with
+                      authorization =
+                        Signature_lib.Schnorr.sign sender.private_key
+                          (Random_oracle.Input.field txn_comm)
+                    }
+                  in
+                  let sender =
+                    { Party.data = sender_party_data
+                    ; authorization =
+                        Signature
+                          (Signature_lib.Schnorr.sign sender.private_key
+                             (Random_oracle.Input.field transaction))
+                    }
+                  in
+                  let parties : Parties.t =
+                    { fee_payer
+                    ; other_parties =
+                        [ sender
+                        ; { data = snapp_party_data; authorization = Proof pi }
+                        ]
+                    ; protocol_state
+                    ; memo
+                    }
                   in
                   (state_body, state_body_hash)
             in
