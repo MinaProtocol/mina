@@ -170,7 +170,7 @@ module Verifiable = struct
     | Signed_command x ->
         Signed_command.fee_payer x
     | Parties p ->
-        Party.Signed.account_id p.fee_payer
+        Party.Fee_payer.account_id p.fee_payer
 end
 
 let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
@@ -204,16 +204,16 @@ let of_verifiable (t : Verifiable.t) : t =
   | Parties p ->
       Parties (Parties.of_verifiable p)
 
-let fee_exn : t -> Currency.Fee.t = function
+let fee : t -> Currency.Fee.t = function
   | Signed_command x ->
       Signed_command.fee x
   | Parties p ->
-      Parties.fee_lower_bound_exn p
+      Parties.fee p
 
 (* for filtering *)
 let minimum_fee = Mina_compile_config.minimum_user_command_fee
 
-let has_insufficient_fee t = Currency.Fee.(fee_exn t < minimum_fee)
+let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
 let accounts_accessed (t : t) ~next_available_token =
   match t with
@@ -304,4 +304,5 @@ let weight : Stable.Latest.t -> int = function
 
 (* Fee per weight unit *)
 let fee_per_wu (user_command : Stable.Latest.t) : Currency.Fee_rate.t =
-  Currency.Fee_rate.make_exn (fee_exn user_command) (weight user_command)
+  (*TODO: return Or_error*)
+  Currency.Fee_rate.make_exn (fee user_command) (weight user_command)

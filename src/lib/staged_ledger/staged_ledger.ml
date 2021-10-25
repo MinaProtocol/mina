@@ -1014,7 +1014,7 @@ module T = struct
     let commands = Staged_ledger_diff.commands witness in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind total_txn_fee =
-      sum_fees commands ~f:(fun { data = cmd; _ } -> User_command.fee_exn cmd)
+      sum_fees commands ~f:(fun { data = cmd; _ } -> User_command.fee cmd)
     in
     let%bind total_snark_fee = sum_fees work ~f:Transaction_snark_work.fee in
     let%bind () = Scan_state.update_metrics t.scan_state in
@@ -1343,7 +1343,7 @@ module T = struct
       let budget =
         Or_error.map2
           (sum_fees (Sequence.to_list uc_seq) ~f:(fun t ->
-               User_command.fee_exn (t.data :> User_command.t)))
+               User_command.fee (t.data :> User_command.t)))
           (sum_fees
              (List.filter
                 ~f:(fun (k, _) ->
@@ -1424,7 +1424,7 @@ module T = struct
       let open Or_error.Let_syntax in
       let payment_fees =
         sum_fees (Sequence.to_list t.commands_rev) ~f:(fun t ->
-            User_command.fee_exn (t.data :> User_command.t))
+            User_command.fee (t.data :> User_command.t))
       in
       let prover_fee_others =
         Public_key.Compressed.Map.fold t.fee_transfers ~init:(Ok Fee.zero)
@@ -1555,7 +1555,7 @@ module T = struct
             match t.budget with
             | Ok b ->
                 option "Fee insufficient"
-                  (Fee.sub b (User_command.fee_exn (uc.data :> User_command.t)))
+                  (Fee.sub b (User_command.fee (uc.data :> User_command.t)))
             | _ ->
                 rebudget new_t
           in
