@@ -19,6 +19,8 @@ module Base_ledger = struct
 
   let location_of_account _t k = Some k
 
+  let location_of_account_batch _t ks = List.map ks ~f:(fun k -> (k, Some k))
+
   let get t l = Account_id.Table.find t l
 
   let add t ~account_id ~account =

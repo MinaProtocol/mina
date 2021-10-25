@@ -553,12 +553,9 @@ let gen_parties_from ?(succeed = true)
     gen_parties_with_dynamic_balance ~new_accounts:true num_new_accounts
   in
   let other_parties = old_parties @ new_accounts in
-  let parties_dummy_signatures : Parties.t =
-    { fee_payer; other_parties; protocol_state }
-  in
   let%bind memo = Signed_command_memo.gen in
-  let other_parties = old_parties @ new_parties in
-  let parties : Parties.t =
+  let memo_hash = Signed_command_memo.hash memo in
+  let parties_dummy_signatures : Parties.t =
     { fee_payer; other_parties; protocol_state; memo }
   in
   (* replace dummy signature in fee payer *)
@@ -585,10 +582,11 @@ let gen_parties_from ?(succeed = true)
     Snapp_predicate.Protocol_state.digest
       parties_dummy_signatures.protocol_state
   in
+
   let sign_for_other_party sk =
     Signature_lib.Schnorr.sign sk
       (Random_oracle.Input.field
-         (Parties.Transaction_commitment.create ~other_parties_hash
+         (Parties.Transaction_commitment.create ~memo_hash ~other_parties_hash
             ~protocol_state_predicate_hash))
   in
   (* replace dummy signatures in other parties *)
