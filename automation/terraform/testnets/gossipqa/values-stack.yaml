@@ -36,7 +36,7 @@ server:
   
 
 grafana:
-  extraConfigmapMounts: []
+  extraConfigmapMounts: [./gossipqa-metrics-graf-dash.yaml]
   # - name: certs-configmap
   #   mountPath: /etc/grafana/ssl/
   #   configMap: certs-configmap
