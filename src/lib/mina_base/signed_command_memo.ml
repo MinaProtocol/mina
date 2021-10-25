@@ -6,7 +6,12 @@ open Core_kernel
 
 [%%ifdef consensus_mechanism]
 
-open Crypto_params
+module Tick = Snark_params.Tick
+
+[%%else]
+
+module Tick = Snark_params_nonconsensus
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 

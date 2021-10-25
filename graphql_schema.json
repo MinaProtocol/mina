@@ -5486,6 +5486,18 @@
           "description": null,
           "fields": [
             {
+              "name": "memo",
+              "description": "Short arbitrary message provided by the sender",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "snappProtocolState",
               "description": "The protocol state in a Snapp transaction",
               "args": [],
@@ -5543,6 +5555,16 @@
             }
           ],
           "inputFields": [
+            {
+              "name": "memo",
+              "description": "Short arbitrary message provided by the sender",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
             {
               "name": "snappProtocolState",
               "description": "The protocol state in a Snapp transaction",
