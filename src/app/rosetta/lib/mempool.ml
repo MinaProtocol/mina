@@ -32,6 +32,7 @@ module Get_transactions_by_hash =
         fee @bsDecoder(fn: "Decoders.uint64")
         kind
         feeToken @bsDecoder(fn: "Decoders.uint64")
+        validUntil @bsDecoder(fn: "Decoders.optional_uint32")
         feePayer {
           publicKey
         }
@@ -258,6 +259,7 @@ module Transaction = struct
       ; fee_token= obj#feeToken
       ; nonce= Unsigned.UInt32.of_int obj#nonce
       ; amount= Some obj#amount
+      ; valid_until= obj#validUntil
       ; failure_status= None
       ; hash= obj#hash }
 

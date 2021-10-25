@@ -1121,37 +1121,79 @@ module Data = struct
   [%%if true]
 
   module Min_window_density = struct
-    (* Three cases for updating the lengths of sub_windows
-       - same sub_window, then add 1 to the sub_window_densities
+    (* Three cases for updating the densities of sub-windows
+       - same sub-window, then add 1 to the sub-window densities
        - passed a few sub_windows, but didn't skip a window, then
-         assign 0 to all the skipped sub_window, then mark next_sub_window_length to be 1
-       - skipped more than a window, set every sub_windows to be 0 and mark next_sub_window_length to be 1
+         assign 0 to all the skipped sub-windows, then mark next sub-window density to be 1
+       - skipped more than a window, set every sub-window to be 0 and mark next sub-window density to be 1
     *)
 
     let update_min_window_density ~incr_window ~constants ~prev_global_slot
         ~next_global_slot ~prev_sub_window_densities ~prev_min_window_density =
+      (* This function takes the previous window (prev_sub_window_densities) and the next_global_slot
+         (e.g. the slot of the new block) and returns minimum window density and the new block's
+         window (i.e. the next window).
+
+         The current window is obtained by projecting the previous window to the next_global_slot
+         as described in the Mina consensus spec.
+
+         Next, we use the current window and prev_min_window_density to compute the minimum window density.
+
+         Finally, we update the current window to obtain the next window that accounts for the presenence
+         of the new block.  Note that we only increment the block's sub-window when the incr_window
+         parameter is true, which happens when creating a new block, but not when evaluating virtual
+         minimum window densities (a.k.a. the relative minimum window density) for the long-range fork rule.
+
+         In the following code, we deal with three different windows
+           * Previous window - the previous window
+                               (prev_global_sub_window - sub_windows_per_window, prev_global_sub_window]
+
+           * Current window  - the projected window used to compute the minimum window density
+                               [next_global_sub_window - sub_windows_per_window, next_global_sub_window)
+
+           * Next window     - the new (or virtual) block's window that is returned
+                               (next_global_sub_window - sub_windows_per_window, next_global_sub_window]
+
+         All of these are derived from prev_sub_window_densities using ring-shifting and relative sub-window indexes.
+      *)
       let prev_global_sub_window =
         Global_sub_window.of_global_slot ~constants prev_global_slot
       in
       let next_global_sub_window =
         Global_sub_window.of_global_slot ~constants next_global_slot
       in
+
+      (*
+         Compute the relative sub-window indexes in [0, sub_windows_per_window) needed for ring-shifting
+       *)
       let prev_relative_sub_window =
         Global_sub_window.sub_window ~constants prev_global_sub_window
       in
       let next_relative_sub_window =
         Global_sub_window.sub_window ~constants next_global_sub_window
       in
+
       let same_sub_window =
         Global_sub_window.equal prev_global_sub_window next_global_sub_window
       in
-      let same_window =
+
+      (* This function checks whether the current window overlaps with the previous window.
+       *   N.B. this requires the precondition that next_global_sub_window >= prev_global_sub_window
+       *        whenever update_min_window_density is called.
+       *)
+      let overlapping_window =
         Global_sub_window.(
           add prev_global_sub_window (constant constants.sub_windows_per_window)
           >= next_global_sub_window)
       in
-      let new_sub_window_densities =
-        List.mapi prev_sub_window_densities ~f:(fun i length ->
+
+      (* Compute the current window (equivalent to ring-shifting)
+           If we are not in the same sub-window and the previous window
+           and the current windows overlap, then we zero the densities
+           between, and not including, prev and next (relative).
+      *)
+      let current_sub_window_densities =
+        List.mapi prev_sub_window_densities ~f:(fun i density ->
             let gt_prev_sub_window =
               Sub_window.(of_int i > prev_relative_sub_window)
             in
@@ -1165,13 +1207,15 @@ module Data = struct
               then gt_prev_sub_window && lt_next_sub_window
               else gt_prev_sub_window || lt_next_sub_window
             in
-            if same_sub_window then length
-            else if same_window && not within_range then length
+            if same_sub_window then density
+            else if overlapping_window && not within_range then density
             else Length.zero)
       in
-      let new_window_length =
-        List.fold new_sub_window_densities ~init:Length.zero ~f:Length.add
+      let current_window_density =
+        List.fold current_sub_window_densities ~init:Length.zero ~f:Length.add
       in
+
+      (* Compute minimum window density, taking into account the grace-period *)
       let min_window_density =
         if
           same_sub_window
@@ -1180,24 +1224,29 @@ module Data = struct
                constants.grace_period_end
              < 0
         then prev_min_window_density
-        else Length.min new_window_length prev_min_window_density
+        else Length.min current_window_density prev_min_window_density
       in
-      let sub_window_densities =
-        List.mapi new_sub_window_densities ~f:(fun i length ->
+
+      (* Compute the next window by mutating the current window *)
+      let next_sub_window_densities =
+        List.mapi current_sub_window_densities ~f:(fun i density ->
             let is_next_sub_window =
               Sub_window.(of_int i = next_relative_sub_window)
             in
             if is_next_sub_window then
               let f = if incr_window then Length.succ else Fn.id in
-              if same_sub_window then f length else f Length.zero
-            else length)
+              if same_sub_window then f density else f Length.zero
+            else density)
       in
-      (min_window_density, sub_window_densities)
+
+      (* Final result is the min window density and window for the new (or virtual) block *)
+      (min_window_density, next_sub_window_densities)
 
     module Checked = struct
       let%snarkydef update_min_window_density ~(constants : Constants.var)
           ~prev_global_slot ~next_global_slot ~prev_sub_window_densities
           ~prev_min_window_density =
+        (* Please see Min_window_density.update_min_window_density for documentation *)
         let open Tick in
         let open Tick.Checked.Let_syntax in
         let%bind prev_global_sub_window =
@@ -1216,7 +1265,7 @@ module Data = struct
           Global_sub_window.Checked.equal prev_global_sub_window
             next_global_sub_window
         in
-        let%bind same_window =
+        let%bind overlapping_window =
           Global_sub_window.Checked.(
             add prev_global_sub_window constants.sub_windows_per_window
             >= next_global_sub_window)
@@ -1225,8 +1274,8 @@ module Data = struct
           let%bind cond = cond and then_ = then_ and else_ = else_ in
           Length.Checked.if_ cond ~then_ ~else_
         in
-        let%bind new_sub_window_densities =
-          Checked.List.mapi prev_sub_window_densities ~f:(fun i length ->
+        let%bind current_sub_window_densities =
+          Checked.List.mapi prev_sub_window_densities ~f:(fun i density ->
               let%bind gt_prev_sub_window =
                 Sub_window.Checked.(
                   constant (UInt32.of_int i) > prev_relative_sub_window)
@@ -1248,16 +1297,16 @@ module Data = struct
               in
               if_
                 (Checked.return same_sub_window)
-                ~then_:(Checked.return length)
+                ~then_:(Checked.return density)
                 ~else_:
                   (if_
-                     Boolean.(same_window && not within_range)
-                     ~then_:(Checked.return length)
+                     Boolean.(overlapping_window && not within_range)
+                     ~then_:(Checked.return density)
                      ~else_:(Checked.return Length.Checked.zero)))
         in
-        let%bind new_window_length =
-          Checked.List.fold new_sub_window_densities ~init:Length.Checked.zero
-            ~f:Length.Checked.add
+        let%bind current_window_density =
+          Checked.List.fold current_sub_window_densities
+            ~init:Length.Checked.zero ~f:Length.Checked.add
         in
         let%bind min_window_density =
           let%bind in_grace_period =
@@ -1270,10 +1319,11 @@ module Data = struct
             Boolean.(same_sub_window || in_grace_period)
             ~then_:(Checked.return prev_min_window_density)
             ~else_:
-              (Length.Checked.min new_window_length prev_min_window_density)
+              (Length.Checked.min current_window_density
+                 prev_min_window_density)
         in
-        let%bind sub_window_densities =
-          Checked.List.mapi new_sub_window_densities ~f:(fun i length ->
+        let%bind next_sub_window_densities =
+          Checked.List.mapi current_sub_window_densities ~f:(fun i density ->
               let%bind is_next_sub_window =
                 Sub_window.Checked.(
                   constant (UInt32.of_int i) = next_relative_sub_window)
@@ -1283,11 +1333,11 @@ module Data = struct
                 ~then_:
                   (if_
                      (Checked.return same_sub_window)
-                     ~then_:Length.Checked.(succ length)
+                     ~then_:Length.Checked.(succ density)
                      ~else_:Length.Checked.(succ zero))
-                ~else_:(Checked.return length))
+                ~else_:(Checked.return density))
         in
-        return (min_window_density, sub_window_densities)
+        return (min_window_density, next_sub_window_densities)
     end
 
     let%test_module "Min window length tests" =
@@ -1315,14 +1365,15 @@ module Data = struct
                    prev_global_sub_window)
           in
           let n = Array.length prev_sub_window_densities in
-          let new_sub_window_densities =
+          let current_sub_window_densities =
             Array.init n ~f:(fun i ->
                 if i + sub_window_diff < n then
                   prev_sub_window_densities.(i + sub_window_diff)
                 else Length.zero)
           in
-          let new_window_length =
-            Array.fold new_sub_window_densities ~init:Length.zero ~f:Length.add
+          let current_window_density =
+            Array.fold current_sub_window_densities ~init:Length.zero
+              ~f:Length.add
           in
           let min_window_density =
             if
@@ -1332,11 +1383,11 @@ module Data = struct
                    constants.grace_period_end
                  < 0
             then prev_min_window_density
-            else Length.min new_window_length prev_min_window_density
+            else Length.min current_window_density prev_min_window_density
           in
-          new_sub_window_densities.(n - 1) <-
-            Length.succ new_sub_window_densities.(n - 1) ;
-          (min_window_density, new_sub_window_densities)
+          current_sub_window_densities.(n - 1) <-
+            Length.succ current_sub_window_densities.(n - 1) ;
+          (min_window_density, current_sub_window_densities)
 
         let constants = Lazy.force Constants.for_unit_tests
 
@@ -2434,6 +2485,12 @@ module Hooks = struct
 
       let received_counter = Mina_metrics.Network.get_epoch_ledger_rpcs_received
 
+      let failed_request_counter =
+        Mina_metrics.Network.get_epoch_ledger_rpc_requests_failed
+
+      let failed_response_counter =
+        Mina_metrics.Network.get_epoch_ledger_rpc_responses_failed
+
       module M = Versioned_rpc.Both_convert.Plain.Make (Master)
       include M
 
@@ -2526,6 +2583,7 @@ module Hooks = struct
                 Option.value res ~default:(Error "epoch ledger not found")
             in
             Result.iter_error response ~f:(fun err ->
+                Mina_metrics.Counter.inc_one failed_response_counter ;
                 [%log info]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson conn)
@@ -3017,13 +3075,9 @@ module Hooks = struct
               [%log fatal]
                 "An empty epoch is detected! This could be caused by the \
                  following reasons: system time is out of sync with protocol \
-                 state time; or internet connection is down or unstable; or \
-                 the testnet has crashed. If it is the first case, please \
-                 setup NTP. If it is the second case, please check the \
-                 internet connection. If it is the last case, in our current \
-                 version of testnet this is unrecoverable, but we will fix it \
-                 in future versions once the planned change to consensus is \
-                 finished." ;
+                 state time; or internet connection is down or unstable If it \
+                 is the first case, please setup NTP. If it is the second \
+                 case, please check the internet connection." ;
               exit 99
         in
         let total_stake = epoch_data.ledger.total_currency in
