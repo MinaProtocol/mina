@@ -10,8 +10,8 @@ else
   branch=$(git rev-parse --verify --abbrev-ref HEAD || echo "<none found>")
 fi
 
-# we are nested 5 directories deep (_build/<context>/src/lib/mina_version)
-pushd ../../../../..
+# we are nested 6 directories deep (_build/<context>/src/lib/mina_version/normal)
+pushd ../../../../../..
   if [ -n "$MINA_COMMIT_SHA1" ]; then
     # pull from env var if set
     id="$MINA_COMMIT_SHA1"
