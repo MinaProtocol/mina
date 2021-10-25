@@ -8149,7 +8149,7 @@
               "deprecationReason": null
             },
             {
-              "name": "libp2pPort",
+              "name": "libp2p_port",
               "description": null,
               "args": [],
               "type": {
@@ -8897,7 +8897,7 @@
               "deprecationReason": null
             },
             {
-              "name": "libp2pPort",
+              "name": "libp2p_port",
               "description": null,
               "args": [],
               "type": {
