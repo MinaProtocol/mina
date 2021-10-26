@@ -77,14 +77,14 @@ func (pk *Pk) UnmarshalJSON(b []byte) error {
 	}
 	return err
 }
-func (d Pk) MarshalJSON() ([]byte, error) {
-	return json.Marshal(base58.CheckEncode(append(PK_PREFIX[:], d[:]...), BASE58CHECK_VERSION_PK))
+func (pk Pk) MarshalJSON() ([]byte, error) {
+	return json.Marshal(pk.String())
 }
 func (pk Pk) Format() string {
 	return pk.String()
 }
 func (pk Pk) String() string {
-	return base58.CheckEncode(pk[:], BASE58CHECK_VERSION_PK)
+	return base58.CheckEncode(append(PK_PREFIX[:], pk[:]...), BASE58CHECK_VERSION_PK)
 }
 
 type Base64 struct {
@@ -143,6 +143,6 @@ type MetaToBeSaved struct {
 	PeerId     string  `json:"peer_id"`
 	SnarkWork  *Base64 `json:"snark_work,omitempty"`
 	RemoteAddr string  `json:"remote_addr"`
-	Submitter  string  `json:"submitter"`  // is base58check-encoded submitter's public key
-	BlockHash  string  `json:"block_hash"` // is base64check-encoded hash of a block
+	Submitter  Pk      `json:"submitter"`  // is base58check-encoded submitter's public key
+	BlockHash  string  `json:"block_hash"` // is base58check-encoded hash of a block
 }

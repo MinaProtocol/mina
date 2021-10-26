@@ -68,17 +68,16 @@ type Paths struct {
 	Block string
 }
 
-func MakePathsImpl(submittedAt string, blockHash string, submitter string) (res Paths) {
-	res.Meta = strings.Join([]string{"submissions", submittedAt[:10], submittedAt + "-" + submitter + ".json"}, "/")
+func MakePathsImpl(submittedAt string, blockHash string, submitter Pk) (res Paths) {
+	res.Meta = strings.Join([]string{"submissions", submittedAt[:10], submittedAt + "-" + submitter.String() + ".json"}, "/")
 	res.Block = "blocks/" + blockHash + ".dat"
 	return
 }
-func makePaths(submittedAt time.Time, req *submitRequest) (res Paths, blockHash string, pkStr string) {
+func makePaths(submittedAt time.Time, req *submitRequest) (Paths, string) {
 	blockHashBytes := blake2b.Sum256(req.Data.Block.data)
-	blockHash = base58.CheckEncode(blockHashBytes[:], BASE58CHECK_VERSION_BLOCK_HASH)
+	blockHash := base58.CheckEncode(blockHashBytes[:], BASE58CHECK_VERSION_BLOCK_HASH)
 	submittedAtStr := submittedAt.UTC().Format(time.RFC3339)
-	pkStr = base58.CheckEncode(req.Submitter[:], BASE58CHECK_VERSION_PK)
-	return MakePathsImpl(submittedAtStr, blockHash, pkStr), blockHash, pkStr
+	return MakePathsImpl(submittedAtStr, blockHash, req.Submitter), blockHash
 }
 
 func makeSignPayload(req *submitRequestData) ([]byte, error) {
@@ -173,15 +172,15 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ps, blockHashStr, pkStr := makePaths(submittedAt, &req)
+	ps, blockHash := makePaths(submittedAt, &req)
 
 	meta := MetaToBeSaved{
 		CreatedAt:  req.Data.CreatedAt.Format(time.RFC3339),
 		PeerId:     req.Data.PeerId,
 		SnarkWork:  req.Data.SnarkWork,
 		RemoteAddr: r.RemoteAddr,
-		BlockHash:  blockHashStr,
-		Submitter:  pkStr,
+		BlockHash:  blockHash,
+		Submitter:  req.Submitter,
 	}
 
 	metaBytes, err1 := json.Marshal(meta)

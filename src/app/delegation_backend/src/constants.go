@@ -38,11 +38,13 @@ func WhitelistSpreadsheetId() string {
 
 var PK_PREFIX = [...]byte{1, 1}
 var SIG_PREFIX = [...]byte{1}
+var BLOCK_HASH_PREFIX = [...]byte{1}
 
 const NETWORK_ID = 1  // mainnet
 const PK_LENGTH = 33  // one field element (32B) + 1 bit (encoded as full byte)
 const SIG_LENGTH = 64 // one field element (32B) and one scalar (32B)
 
+// we use state hash code here, although it's not state hash
 const BASE58CHECK_VERSION_BLOCK_HASH byte = 0x10
 const BASE58CHECK_VERSION_PK byte = 0xCB
 const BASE58CHECK_VERSION_SIG byte = 0x9A

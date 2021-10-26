@@ -188,14 +188,14 @@ func TestSuccess(t *testing.T) {
 			t.Logf("Failed testing %s: %v", f, rep)
 			t.FailNow()
 		}
-		paths, bhStr, pkStr := makePaths(tm.Now(), &req)
+		paths, bhStr := makePaths(tm.Now(), &req)
 		var meta MetaToBeSaved
 		meta.CreatedAt = req.Data.CreatedAt.Format(time.RFC3339)
 		meta.PeerId = req.Data.PeerId
 		meta.SnarkWork = req.Data.SnarkWork
 		meta.RemoteAddr = "192.0.2.1:1234"
 		meta.BlockHash = bhStr
-		meta.Submitter = pkStr
+		meta.Submitter = req.Submitter
 		metaBytes, err2 := json.Marshal(meta)
 		if err2 != nil || !bytes.Equal((*objs)[paths.Meta], metaBytes) ||
 			!bytes.Equal((*objs)[paths.Block], req.Data.Block.data) {
