@@ -2109,119 +2109,121 @@ let%test_module _ =
           mk_expired_not_accepted_test assert_pool_txs pool
             (mk_parties_cmds pool))
 
-    let mk_expired_already_in_pool_test assert_pool_txs pool best_tip_diff_w
-        best_tip_ref cmds =
-      assert_pool_txs [] ;
-      let curr_slot = current_global_slot () in
-      let curr_slot_plus_twenty =
-        Mina_numbers.Global_slot.(add curr_slot (of_int 20))
-      in
-      let curr_slot_plus_forty =
-        Mina_numbers.Global_slot.(add curr_slot_plus_twenty (of_int 20))
-      in
-      let few_now, _few_later = List.split_n cmds (List.length cmds / 2) in
-      let expires_later1 =
-        mk_payment ~valid_until:curr_slot_plus_twenty 0 1_000_000_000 1 9
-          10_000_000_000
-      in
-      let expires_later2 =
-        mk_payment ~valid_until:curr_slot_plus_forty 0 1_000_000_000 2 9
-          10_000_000_000
-      in
-      let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
-      let cmds_wo_check =
-        List.map valid_commands ~f:User_command.forget_check
-      in
-      let%bind apply_res = verify_and_apply pool cmds_wo_check in
-      [%test_eq: pool_apply] (accepted_commands apply_res) (Ok cmds_wo_check) ;
-      assert_pool_txs cmds_wo_check ;
-      (* new commands from best tip diff should be removed from the pool *)
-      (* update the nonce to be consistent with the commands in the block *)
-      map_set_multi !best_tip_ref [ mk_account 0 1_000_000_000_000_000 2 ] ;
-      let%bind _ =
-        Broadcast_pipe.Writer.write best_tip_diff_w
-          ( { new_commands =
-                List.map ~f:mk_with_status
-                  [ List.nth_exn few_now 0; expires_later1 ]
-            ; removed_commands = []
-            ; reorg_best_tip = false
-            }
-            : Mock_transition_frontier.best_tip_diff )
-      in
-      let cmds_wo_check =
-        List.map ~f:User_command.forget_check
-          (expires_later2 :: List.drop few_now 1)
-      in
-      let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
-      assert_pool_txs cmds_wo_check ;
-      (* Add new commands, remove old commands some of which are now expired *)
-      let expired_command =
-        mk_payment ~valid_until:curr_slot 9 1_000_000_000 0 5 1_000_000_000
-      in
-      let unexpired_command =
-        mk_payment ~valid_until:curr_slot_plus_forty 8 1_000_000_000 0 9
-          1_000_000_000
-      in
-      let valid_forever = List.nth_exn few_now 0 in
-      let removed_commands =
-        [ valid_forever; expires_later1; expired_command; unexpired_command ]
-        |> List.map ~f:mk_with_status
-      in
-      let n_block_times n =
-        Int64.(
-          Block_time.Span.to_ms consensus_constants.block_window_duration_ms * n)
-        |> Block_time.Span.of_ms
-      in
-      let%bind () = after (Block_time.Span.to_time_span (n_block_times 3L)) in
-      let%bind _ =
-        Broadcast_pipe.Writer.write best_tip_diff_w
-          ( { new_commands = [ mk_with_status valid_forever ]
-            ; removed_commands
-            ; reorg_best_tip = true
-            }
-            : Mock_transition_frontier.best_tip_diff )
-      in
-      (* expired_command should not be in the pool because they are expired
-         and (List.nth few_now 0) because it was committed in a block
-      *)
-      let cmds_wo_check =
-        List.map ~f:User_command.forget_check
-          ( expires_later1 :: expires_later2 :: unexpired_command
-          :: List.drop few_now 1 )
-      in
-      let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
-      assert_pool_txs cmds_wo_check ;
-      (* after 40 block times there should be no expired transactions *)
-      let%bind () = after (Block_time.Span.to_time_span (n_block_times 40L)) in
-      let%bind _ =
-        Broadcast_pipe.Writer.write best_tip_diff_w
-          ( { new_commands = []; removed_commands = []; reorg_best_tip = false }
-            : Mock_transition_frontier.best_tip_diff )
-      in
-      let cmds_wo_check =
-        List.map ~f:User_command.forget_check (List.drop few_now 1)
-      in
-      let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
-      assert_pool_txs cmds_wo_check ;
-      Deferred.unit
-
     let%test_unit "Expired transactions that are already in the pool are \
                    removed from the pool when best tip changes (user cmds)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
             setup_test ()
           in
-          mk_expired_already_in_pool_test assert_pool_txs pool best_tip_diff_w
-            best_tip_ref independent_cmds)
-
-    let%test_unit "Expired transactions that are already in the pool are \
-                   removed from the pool when best tip changes (snapps)" =
-      Thread_safe.block_on_async_exn (fun () ->
-          let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
-            setup_test ()
+          assert_pool_txs [] ;
+          let curr_slot = current_global_slot () in
+          let curr_slot_plus_three =
+            Mina_numbers.Global_slot.(add curr_slot (of_int 3))
           in
-          mk_expired_already_in_pool_test assert_pool_txs pool best_tip_diff_w
-            best_tip_ref (mk_parties_cmds pool))
+          let curr_slot_plus_seven =
+            Mina_numbers.Global_slot.(add curr_slot (of_int 7))
+          in
+          let few_now =
+            List.take independent_cmds (List.length independent_cmds / 2)
+          in
+          let expires_later1 =
+            mk_payment ~valid_until:curr_slot_plus_three 0 1_000_000_000 1 9
+              10_000_000_000
+          in
+          let expires_later2 =
+            mk_payment ~valid_until:curr_slot_plus_seven 0 1_000_000_000 2 9
+              10_000_000_000
+          in
+          let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
+          let cmds_wo_check =
+            List.map valid_commands ~f:User_command.forget_check
+          in
+          let%bind apply_res = verify_and_apply pool cmds_wo_check in
+          [%test_eq: pool_apply]
+            (accepted_commands apply_res)
+            (Ok cmds_wo_check) ;
+          assert_pool_txs cmds_wo_check ;
+          (* new commands from best tip diff should be removed from the pool *)
+          (* update the nonce to be consistent with the commands in the block *)
+          map_set_multi !best_tip_ref [ mk_account 0 1_000_000_000_000_000 2 ] ;
+          let%bind _ =
+            Broadcast_pipe.Writer.write best_tip_diff_w
+              ( { new_commands =
+                    List.map ~f:mk_with_status
+                      [ List.nth_exn few_now 0; expires_later1 ]
+                ; removed_commands = []
+                ; reorg_best_tip = false
+                }
+                : Mock_transition_frontier.best_tip_diff )
+          in
+          let cmds_wo_check =
+            List.map ~f:User_command.forget_check
+              (expires_later2 :: List.drop few_now 1)
+          in
+          let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
+          assert_pool_txs cmds_wo_check ;
+          (* Add new commands, remove old commands some of which are now expired *)
+          let expired_command =
+            mk_payment ~valid_until:curr_slot 9 1_000_000_000 0 5 1_000_000_000
+          in
+          let unexpired_command =
+            mk_payment ~valid_until:curr_slot_plus_seven 8 1_000_000_000 0 9
+              1_000_000_000
+          in
+          let valid_forever = List.nth_exn few_now 0 in
+          let removed_commands =
+            [ valid_forever
+            ; expires_later1
+            ; expired_command
+            ; unexpired_command
+            ]
+            |> List.map ~f:mk_with_status
+          in
+          let n_block_times n =
+            Int64.(
+              Block_time.Span.to_ms consensus_constants.block_window_duration_ms
+              * n)
+            |> Block_time.Span.of_ms
+          in
+          let%bind () =
+            after (Block_time.Span.to_time_span (n_block_times 3L))
+          in
+          let%bind _ =
+            Broadcast_pipe.Writer.write best_tip_diff_w
+              ( { new_commands = [ mk_with_status valid_forever ]
+                ; removed_commands
+                ; reorg_best_tip = true
+                }
+                : Mock_transition_frontier.best_tip_diff )
+          in
+          (* expired_command should not be in the pool because they are expired
+             and (List.nth few_now 0) because it was committed in a block
+          *)
+          let cmds_wo_check =
+            List.map ~f:User_command.forget_check
+              ( expires_later1 :: expires_later2 :: unexpired_command
+              :: List.drop few_now 1 )
+          in
+          let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
+          assert_pool_txs cmds_wo_check ;
+          (* after 5 block times there should be no expired transactions *)
+          let%bind () =
+            after (Block_time.Span.to_time_span (n_block_times 5L))
+          in
+          let%bind _ =
+            Broadcast_pipe.Writer.write best_tip_diff_w
+              ( { new_commands = []
+                ; removed_commands = []
+                ; reorg_best_tip = false
+                }
+                : Mock_transition_frontier.best_tip_diff )
+          in
+          let cmds_wo_check =
+            List.map ~f:User_command.forget_check (List.drop few_now 1)
+          in
+          let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
+          assert_pool_txs cmds_wo_check ;
+          Deferred.unit)
 
     let%test_unit "Now-invalid transactions are removed from the pool when the \
                    transition frontier is recreated (user cmds)" =
