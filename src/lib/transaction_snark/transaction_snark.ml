@@ -4175,7 +4175,6 @@ module For_tests = struct
       in
       ()
     in
-    let spec = List.hd_exn specs in
     let tag, _, (module P), Pickles.Provers.[ trivial_prover; _ ] =
       let trivial_rule : _ Pickles.Inductive_rule.t =
         let trivial_main (tx_commitment : Snapp_statement.Checked.t) :
@@ -4342,9 +4341,8 @@ module For_tests = struct
     let handler (Snarky_backendless.Request.With { request; respond }) =
       match request with _ -> respond Unhandled
     in
-    let pi : Pickles.Side_loaded.Proof.t =
-      (fun () -> trivial_prover ~handler [] tx_statement)
-      |> Async.Thread_safe.block_on_async_exn
+    let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
+      trivial_prover ~handler [] tx_statement
     in
     let fee_payer_signature_auth =
       let txn_comm =
