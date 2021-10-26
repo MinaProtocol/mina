@@ -95,6 +95,7 @@ module "gossipqa" {
   mina_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
   mina_points_image  = "codaprotocol/coda-points-hack:32b.4"
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.3"
+  use_embedded_runtime_config = true
 
   archive_node_count  = 3
   mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/fd3980820fb82c7355af49462ffefe6718800b77/src/app/archive/create_schema.sql"
@@ -257,6 +258,8 @@ module "gossipqa" {
         class  = "fish"
       }]
   )
+
+  nodes_with_user_agent = ["fish-1-1","fish-2-1", "fish-3-1", "fish-4-1", "fish-5-1", "fish-6-1", "fish-7-1", "fish-8-1", "fish-9-1", "fish-10-1" ]
 
   upload_blocks_to_gcloud         = false
   restart_nodes                   = false

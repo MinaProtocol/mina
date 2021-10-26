@@ -50,7 +50,7 @@ module "kubernetes_testnet" {
   agent_send_every_mins = var.agent_send_every_mins
 
   additional_peers = [for peer in local.static_peers : peer.full_peer]
-  runtime_config   = ""
+  runtime_config   = var.use_embedded_runtime_config ? "" : data.local_file.genesis_ledger.content
   #jsonencode ({
   #"genesis": {
   #  "genesis_state_timestamp": "2021-10-25 11:00:00-7:00"},"ledger": {"name": "gossip-data-dummy","num_accounts": 0,"accounts": []}})
@@ -78,7 +78,7 @@ module "kubernetes_testnet" {
       private_key_secret     = "online-${bp.class}-account-${bp.unique_node_index}-key"
       libp2p_secret          = "online-${bp.class}-libp2p-${bp.total_node_index}-key"
       enable_gossip_flooding = false
-      run_with_user_agent    = bp.class =="whale" ? false : contains(["fish-1-1","fish-2-1", "fish-3-1", "fish-4-1", "fish-5-1", "fish-6-1", "fish-7-1", "fish-8-1", "fish-9-1", "fish-10-1" ], bp.name)
+      run_with_user_agent    = bp.class =="whale" ? false : ( var.nodes_with_user_agent == [] ? true : contains(var.nodes_with_user_agent, bp.name) )
       run_with_bots          = false
       enable_peer_exchange   = true
       isolated               = false
