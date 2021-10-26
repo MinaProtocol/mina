@@ -412,11 +412,8 @@ module Metadata = struct
                       Mina_compile_config.minimum_user_command_fee)) )
           ]
       in
-      (* GraphQL ppx thinks that res#receiver is an option, but it's really
-       * always Some, we have to peak at the nonce to really check if the
-       * account doesn't exist *)
       let receiver_exists =
-        Option.bind res#receiver ~f:(fun r -> r#nonce) |> Option.is_some
+        Option.is_some res#receiver
       in
       let constraint_constants =
         Genesis_constants.Constraint_constants.compiled
