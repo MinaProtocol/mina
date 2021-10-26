@@ -17,10 +17,17 @@ spec:
             - /bin/bash
             - -c
             - '
-printf "/dns4/seed-1.gossipqa.o1test.net/tcp/10000/p2p/12D3KooWLpjCfeBWdiVRG3mqRS5ixfPQpF4gRJooFiXMa8wGpt1A\n/dns4/seed-2.gossipqa.o1test.net/tcp/10001/p2p/12D3KooWS5MQzph8pjCQ9uvjhzsEDos5P8rysBFR673Hs4UrnwTc" > /gossipqa_seed_list.txt;
+ORIGIN_ACCT_KEY=/keys/whale-key1/online-whale-account-1-key;
+RETURNER_ACCT_KEY=/keys/whale-key2/online-whale-account-2-key;
 
+echo "origin acct: $ORIGIN_ACCT_KEY";
+echo "returner acct: $RETURNER_ACCT_KEY";
+
+curl https://raw.githubusercontent.com/MinaProtocol/mina/feature/gossip-qa-ledger/genesis_ledgers/devnet.json > /gossip-data-config.json
+
+printf "/dns4/seed-1.gossip-data.o1test.net/tcp/10000/p2p/12D3KooWNG8JcntzQsRmLWK29oyG8nEVMBjT3VLd3FHjTm78u8ZG\n/dns4/seed-2.gossip-data.o1test.net/tcp/10001/p2p/12D3KooWT1hnGjh2g6v5idFR6SpP7j17tGTocjYt7r8f362Hm1cp" > /gossip-data_seed_list.txt;
 echo "booting mina daemon";
-mina daemon --config-file /config/daemon.json --generate-genesis-proof true --peer-list-file /gossipqa_seed_list.txt --background;
+mina daemon --config-file /gossip-data-config.json --generate-genesis-proof true --peer-list-file /gossip-data_seed_list.txt --background;
 sleep 480;
 echo "done sleeping";
 while true; do
@@ -40,12 +47,12 @@ done;
 mkdir /tmpkeys;
 chmod 700 /tmpkeys;
 
-cp /keys/whale-key1/online-whale-account-1-key /tmpkeys;
-chmod 600 /tmpkeys/online-whale-account-1-key;
-cp /keys/whale-key2/online-whale-account-2-key /tmpkeys;
-chmod 600 /tmpkeys/online-whale-account-2-key;
+cp $ORIGIN_ACCT_KEY /tmpkeys;
+chmod 600 /tmpkeys/$(basename $ORIGIN_ACCT_KEY);
+cp $RETURNER_ACCT_KEY /tmpkeys;
+chmod 600 /tmpkeys/$(basename $RETURNER_ACCT_KEY);
 
-./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe gen-there-and-back-txns --num-txn-per-acct 100 --rate-limit-level 1 --rate-limit-interval 5000 --origin-sender-sk-path "/tmpkeys/online-whale-account-1-key" --origin-sender-sk-pw "naughty blue worm" --returner-sk-path "/tmpkeys/online-whale-account-2-key" --returner-sk-pw "naughty blue worm";
+./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe gen-there-and-back-txns --num-txn-per-acct 100 --rate-limit-level 1 --rate-limit-interval 5000 --origin-sender-sk-path "/tmpkeys/$(basename $ORIGIN_ACCT_KEY)" --origin-sender-sk-pw "naughty blue worm" --returner-sk-path "/tmpkeys/$(basename $RETURNER_ACCT_KEY)" --returner-sk-pw "naughty blue worm";
 
 echo "ran batch txns";
 
@@ -67,20 +74,20 @@ echo "ran batch txns";
               name: whale-key1
             - mountPath: /keys/whale-key2/
               name: whale-key2
-            - mountPath: /config
-              name: daemon-config
+            # - mountPath: /config
+            #   name: daemon-config
           dnsPolicy: ClusterFirst
           restartPolicy: Never
           schedulerName: default-scheduler
           securityContext: {}
           terminationGracePeriodSeconds: 30
           volumes: [
-            {
-              "name":"daemon-config",
-              "configMap": {
-                "name": "seed-daemon-config"
-              }
-            },
+            # {
+            #   "name":"daemon-config",
+            #   "configMap": {
+            #     "name": "seed-daemon-config"
+            #   }
+            # },
             {
               "name": "whale-key1",
               "secret": {
@@ -113,6 +120,23 @@ echo "ran batch txns";
                   }
                 ],
                 "secretName": "online-whale-account-2-key"
+              }
+            },
+            {
+              "name": "whale-key3",
+              "secret": {
+                "defaultMode": 0600,
+                "items": [
+                  {
+                    "key": "key",
+                    "path": "online-whale-account-3-key"
+                  },
+                  {
+                    "key": "pub",
+                    "path": "online-whale-account-3-key.pub"
+                  }
+                ],
+                "secretName": "online-whale-account-3-key"
               }
             }
 
