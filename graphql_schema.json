@@ -15169,11 +15169,11 @@
             },
             {
               "name": "pooledUserCommands",
-              "description": "Retrieve all the scheduled user commands for a specified sender that the current daemon sees in their transaction pool. All scheduled commands are queried if no sender is specified",
+              "description": "Retrieve all the scheduled user commands for a specified sender that the current daemon sees in its transaction pool. All scheduled commands are queried if no sender is specified",
               "args": [
                 {
                   "name": "ids",
-                  "description": "Ids of UserCommands",
+                  "description": "Ids of User commands",
                   "type": {
                     "kind": "LIST",
                     "name": null,
@@ -15230,6 +15230,77 @@
                     "ofType": {
                       "kind": "INTERFACE",
                       "name": "UserCommand",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "pooledSnappCommands",
+              "description": "Retrieve all the scheduled Snapp commands for a specified sender that the current daemon sees in its transaction pool. All scheduled commands are queried if no sender is specified",
+              "args": [
+                {
+                  "name": "ids",
+                  "description": "Ids of Snapp commands",
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "SCALAR",
+                        "name": "ID",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "hashes",
+                  "description": "Hashes of the Snapp commands to find in the pool",
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "SCALAR",
+                        "name": "String",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "publicKey",
+                  "description": "Public key of sender of pooled Snapp commands",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "PublicKey",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "SnappCommand",
                       "ofType": null
                     }
                   }
