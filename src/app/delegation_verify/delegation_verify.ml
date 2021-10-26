@@ -5,10 +5,12 @@ open Async
 open Signature_lib
 
 type metadata =
-  { submitted_at : string
+  { created_at : string
   ; peer_id : string
   ; snark_work : string option [@default None]
   ; remote_addr : string
+  ; submitter : string
+  ; block_hash : string
   }
 [@@deriving yojson]
 
@@ -21,20 +23,7 @@ let get_filenames =
       filenames
 
 (* This check seems unnecessary if the submission data is published by ourselfes *)
-let check_path str =
-  match String.split str ~on:'/' with
-  | [ _basedir; submitter; block_hash; created_at ] -> (
-      match submitter |> Yojson.Safe.from_string |> Public_key.of_yojson with
-      | Ok submitter -> (
-          match Ptime.of_rfc3339 created_at with
-          | Ok (_, _, _) ->
-              Ok (submitter, block_hash)
-          | Error _ ->
-              Error `Path_is_invalid )
-      | Error _ ->
-          Error `Path_is_invalid )
-  | _ ->
-      Error `Path_is_invalid
+let check_path _ = Ok ()
 
 let load_metadata str =
   try Ok (In_channel.read_all str) with _ -> Error `Fail_to_load_metadata
@@ -42,8 +31,19 @@ let load_metadata str =
 (* This decoding is also unnecessarily complicated given that we are the creator of those data *)
 let decode_metadata str =
   match Yojson.Safe.from_string str |> metadata_of_yojson with
-  | Ok { submitted_at = _; peer_id = _; snark_work; remote_addr = _ } ->
-      Ok snark_work
+  | Ok
+      { created_at = _
+      ; peer_id = _
+      ; snark_work
+      ; remote_addr = _
+      ; submitter
+      ; block_hash
+      } -> (
+      match submitter |> Public_key.Compressed.of_base58_check with
+      | Ok submitter ->
+          Ok (snark_work, submitter, block_hash)
+      | Error _ ->
+          Error `Fail_to_decode_metadata )
   | Error _ ->
       Error `Fail_to_decode_metadata
 
@@ -52,12 +52,8 @@ let load_block ~block_dir ~block_hash =
   try Ok (In_channel.read_all block_path) with _ -> Error `Fail_to_load_block
 
 let decode_block str =
-  match Base64.decode str with
-  | Ok str -> (
-      try Ok (Binable.of_string (module External_transition.Stable.Latest) str)
-      with _ -> Error `Fail_to_decode_block )
-  | Error _ ->
-      Error `Fail_to_decode_block
+  try Ok (Binable.of_string (module External_transition.Stable.Latest) str)
+  with _ -> Error `Fail_to_decode_block
 
 let verify_block ~verifier ~block =
   let open External_transition in
@@ -93,11 +89,11 @@ let verify_snark_work ~verifier ~proof ~message =
 
 let validate_submission ~verifier ~block_dir ~metadata_path =
   let open Deferred.Result.Let_syntax in
-  let%bind submitter, block_hash =
-    Deferred.return @@ check_path metadata_path
-  in
+  let%bind () = Deferred.return @@ check_path metadata_path in
   let%bind metadata_str = Deferred.return @@ load_metadata metadata_path in
-  let%bind snark_work_opt = Deferred.return @@ decode_metadata metadata_str in
+  let%bind snark_work_opt, submitter, block_hash =
+    Deferred.return @@ decode_metadata metadata_str
+  in
   let%bind block_str = Deferred.return @@ load_block ~block_dir ~block_hash in
   let%bind block = Deferred.return @@ decode_block block_str in
   let%bind () = verify_block ~verifier ~block in
@@ -111,8 +107,7 @@ let validate_submission ~verifier ~block_dir ~metadata_path =
           Deferred.return @@ decode_snark_work snark_work_str
         in
         let message =
-          Mina_base.Sok_message.create ~fee:snark_work_fee
-            ~prover:(Public_key.compress submitter)
+          Mina_base.Sok_message.create ~fee:snark_work_fee ~prover:submitter
         in
         verify_snark_work ~verifier ~proof ~message
   in
@@ -156,7 +151,8 @@ let command =
             ~proof_level:Genesis_constants.Proof_level.compiled
             ~constraint_constants:
               Genesis_constants.Constraint_constants.compiled
-            ~pids:(Pid.Table.create ()) ~conf_dir:None
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            ~conf_dir:None
         in
         let metadata_pathes = get_filenames inputs in
         Deferred.List.iter metadata_pathes ~f:(fun metadata_path ->
@@ -189,4 +185,4 @@ let command =
                 display_error "fail to verify the snark work" ;
                 Deferred.unit))
 
-let () = Command.run command
+let () = Rpc_parallel.start_app command
