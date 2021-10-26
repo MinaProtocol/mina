@@ -166,10 +166,10 @@ else
   offline_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_offline-whale-keyfiles"
 
   generate_key_files $WHALE_COUNT_UNIQUE $WHALE_COUNT_TOTAL "online_whale" $online_output_dir
-  generate_key_files $WHALE_COUNT_UNIQUE $WHALE_COUNT_TOTAL "offline_whale" $offline_output_dir
+  #generate_key_files $WHALE_COUNT_UNIQUE $WHALE_COUNT_TOTAL "offline_whale" $offline_output_dir
 
   build_keyset_from_testnet_keys $online_output_dir "online-whales"
-  build_keyset_from_testnet_keys $offline_output_dir "offline-whales"
+  #build_keyset_from_testnet_keys $offline_output_dir "offline-whales"
 fi
 
 online_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_online-whale-keyfiles"
@@ -177,8 +177,8 @@ cp ${online_output_dir}/*libp2p*.peerid ${LIBP2PPEERS}
 
 echo "Online Whale Keyset:"
 cat "keys/keysets/${TESTNET}_online-whales"
-echo "Offline Whale Keyset:"
-cat "keys/keysets/${TESTNET}_offline-whales"
+#echo "Offline Whale Keyset:"
+#cat "keys/keysets/${TESTNET}_offline-whales"
 echo
 
 if [[ -s "keys/testnet-keys/${TESTNET}_online-fish-keyfiles/online_fish_account_1.pub" ]]; then
@@ -188,10 +188,10 @@ else
   offline_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_offline-fish-keyfiles"
 
   generate_key_files $FISH_COUNT_UNIQUE $FISH_COUNT_TOTAL "online_fish" $online_output_dir
-  generate_key_files $FISH_COUNT_UNIQUE $FISH_COUNT_TOTAL "offline_fish" $offline_output_dir
+  #generate_key_files $FISH_COUNT_UNIQUE $FISH_COUNT_TOTAL "offline_fish" $offline_output_dir
 
   build_keyset_from_testnet_keys $online_output_dir "online-fish"
-  build_keyset_from_testnet_keys $offline_output_dir "offline-fish"
+  #build_keyset_from_testnet_keys $offline_output_dir "offline-fish"
 fi
 
 online_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_online-fish-keyfiles"
@@ -199,8 +199,8 @@ cp ${online_output_dir}/*libp2p*.peerid ${LIBP2PPEERS}
 
 echo "Online Fish Keyset:"
 cat keys/keysets/${TESTNET}_online-fish
-echo "Offline Fish Keyset:"
-cat keys/keysets/${TESTNET}_offline-fish
+#echo "Offline Fish Keyset:"
+#cat keys/keysets/${TESTNET}_offline-fish
 echo
 
 # TODO make this just check libp2p instead of unnecessarily generating seed public keys
@@ -374,7 +374,7 @@ ${TESTNET}_extra-fish
 add_another_to_prompt ${TESTNET}_offline-whales ${WHALE_AMOUNT} ${TESTNET}_online-whales
 add_another_to_prompt ${TESTNET}_offline-fish ${FISH_AMOUNT} ${TESTNET}_online-fish
 add_another_to_prompt ${TESTNET}_online-fish ${FISH_AMOUNT} ${TESTNET}_online-fish
-add_another_to_prompt ${TESTNET}_online-o1 ${FISH_AMOUNT} ${TESTNET}_online-o1
+#add_another_to_prompt ${TESTNET}_online-o1 ${FISH_AMOUNT} ${TESTNET}_online-o1
 
 if [ -s keys/keysets/${TESTNET}_bots_keyfiles ];
 then
