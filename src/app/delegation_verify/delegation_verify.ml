@@ -129,10 +129,11 @@ let valid_payload_to_yojson { state_hash; height; slot } : Yojson.Safe.t =
     ]
 
 let display valid_payload =
-  printf "%s" @@ Yojson.Safe.to_string @@ valid_payload_to_yojson valid_payload
+  printf "%s\n" @@ Yojson.Safe.to_string
+  @@ valid_payload_to_yojson valid_payload
 
 let display_error e =
-  eprintf "%s" @@ Yojson.Safe.to_string @@ `Assoc [ ("error", `String e) ]
+  eprintf "%s\n" @@ Yojson.Safe.to_string @@ `Assoc [ ("error", `String e) ]
 
 let command =
   Command.async
@@ -145,7 +146,7 @@ let command =
       and inputs = anon (sequence ("filename" %: Filename.arg_type)) in
       fun () ->
         let open Deferred.Let_syntax in
-        let logger = Logger.create () in
+        let logger = Logger.null () in
         let%bind verifier =
           Verifier.create ~logger
             ~proof_level:Genesis_constants.Proof_level.compiled
