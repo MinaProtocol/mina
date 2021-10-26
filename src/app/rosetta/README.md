@@ -4,6 +4,11 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2021/10/26:
+
+- Fix /account/balance returns an Account-not-found error instead of a Chain-info-missing error when an account is missing.
+- Fix max_fee is now properly optional in the /construction/preprocess request.
+
 2021/10/21:
 
 - New Construction API features
