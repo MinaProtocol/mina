@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/btcsuite/btcutil/base58"
@@ -35,7 +36,7 @@ func readOldPk(pkOld string) (pk dg.Pk, err error) {
 }
 
 type oldMeta struct {
-	SubmittedAt string     `json:"submitted_at"`
+	SubmittedAt time.Time  `json:"submitted_at"`
 	PeerId      string     `json:"peer_id"`
 	SnarkWork   *dg.Base64 `json:"snark_work,omitempty"`
 	RemoteAddr  string     `json:"remote_addr"`
@@ -76,7 +77,7 @@ func main() {
 			log.Warnf("Malformed submission name: %s", fullName)
 			continue
 		}
-		log.Debug("Processing", fullName)
+		log.Debug("Processing ", fullName)
 		pkStr := parts[0]
 		blockHashStr := parts[1]
 		createdAtStr := parts[2]
@@ -97,7 +98,8 @@ func main() {
 			log.Warnf("Malformed pk in %s: %v", fullName, err)
 			continue
 		}
-		pathsNew := dg.MakePathsImpl(oldMeta.SubmittedAt, blockHashStr, pk)
+		submittedAt := oldMeta.SubmittedAt.UTC().Format(time.RFC3339)
+		pathsNew := dg.MakePathsImpl(submittedAt, blockHashStr, pk)
 		newMetaPath := pathsNew.Meta
 		newMeta := dg.MetaToBeSaved{
 			CreatedAt:  createdAtStr,
