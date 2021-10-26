@@ -31,16 +31,11 @@ RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
 
 WORKDIR $HOME/${MINA_DIR}
 
-# Build libp2p_helper and clear go module caches
-# Could maybe also delete go during this step / build it as part of the deps stage?
-RUN git pull \
-   && cd src/app/libp2p_helper/src \
-   && go mod download \
-   && cd generate_methodidx \
-   && go build -o ${HOME}/app/generate_methodidx \
-   && cd ../libp2p_helper \
-   && go build -o ${HOME}/app/libp2p_helper \
-   && go clean --cache --modcache --testcache -r
+RUN mkdir ${HOME}/app
+
+# Build libp2p_helper
+RUN make libp2p_helper \
+   && mv src/app/libp2p_helper/result/bin/libp2p_helper ${HOME}/app/libp2p_helper
 
 # HACK: build without special cpu features to allow more people to run mina-rosetta
 RUN ./scripts/zexe-standardize.sh
@@ -75,3 +70,7 @@ RUN eval $(opam config env) \
   && mv _build/default/src/app/rosetta/ocaml-signer/signer.exe $HOME/app/mina-ocaml-signer \
   && mv _build/default/src/app/rosetta/test-agent/agent.exe $HOME/app/mina-rosetta-test-agent \
   && rm -rf _build
+
+# Clear go module caches
+RUN cd src/app/libp2p_helper/src/libp2p_helper \
+  && go clean --cache --modcache --testcache -r

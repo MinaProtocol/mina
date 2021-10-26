@@ -31,6 +31,8 @@ module Stable = struct
   end
 end]
 
+type sparse_ledger = t [@@deriving sexp, to_yojson]
+
 module Hash = struct
   include Ledger_hash
 
@@ -43,10 +45,29 @@ module Account = struct
   let data_hash = Fn.compose Ledger_hash.of_digest Account.digest
 end
 
+module Global_state = struct
+  type t =
+    { ledger : sparse_ledger
+    ; fee_excess : Currency.Amount.Signed.t
+    ; protocol_state : Snapp_predicate.Protocol_state.View.t
+    }
+  [@@deriving sexp, to_yojson]
+end
+
+module GS = Global_state
 module M =
   Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Token_id) (Account_id) (Account)
 
 type account_state = [ `Added | `Existed ] [@@deriving equal]
+
+(** Create a new 'empty' ledger.
+    This ledger has an invalid root hash, and cannot be used except as a
+    placeholder.
+*)
+let empty ~depth () =
+  M.of_hash
+    ~next_available_token:Token_id.(next default)
+    ~depth Outside_hash_image.t
 
 module L = struct
   type t = M.t ref
@@ -54,7 +75,12 @@ module L = struct
   type location = int
 
   let get : t -> location -> Account.t option =
-   fun t loc -> Option.try_with (fun () -> M.get_exn !t loc)
+   fun t loc ->
+    Option.try_with (fun () ->
+        let account = M.get_exn !t loc in
+        if Public_key.Compressed.(equal empty account.public_key) then
+          assert false ;
+        account)
 
   let location_of_account : t -> Account_id.t -> location option =
    fun t id -> Option.try_with (fun () -> M.find_index_exn !t id)
@@ -93,6 +119,9 @@ module L = struct
           (`Added, loc) )
         else (`Existed, loc))
 
+  let create_new_account t id to_set =
+    get_or_create_account t id to_set |> Or_error.map ~f:ignore
+
   let remove_accounts_exn : t -> Account_id.t list -> unit =
    fun _t _xs -> failwith "remove_accounts_exn: not implemented"
 
@@ -106,6 +135,30 @@ module L = struct
 
   let set_next_available_token : t -> Token_id.t -> unit =
    fun t token -> t := { !t with next_available_token = token }
+
+  (** Create a new ledger mask 'on top of' the given ledger.
+
+      Warning: For technical reasons, this mask cannot be applied directly to
+      the parent ledger; instead, use
+      [apply_mask parent_ledger ~masked:this_ledger] to update the parent
+      ledger as necessary.
+  *)
+  let create_masked t = ref !t
+
+  (** [apply_mask ledger ~masked] applies any updates in [masked] to the ledger
+      [ledger]. [masked] should be created by calling [create_masked ledger].
+
+      Warning: This function may behave unexpectedly if [ledger] was modified
+      after calling [create_masked], or the given [ledger] was not used to
+      create [masked].
+  *)
+  let apply_mask t ~masked = t := !masked
+
+  (** Create a new 'empty' ledger.
+      This ledger has an invalid root hash, and cannot be used except as a
+      placeholder.
+  *)
+  let empty ~depth () = ref (empty ~depth ())
 end
 
 module T = Transaction_logic.Make (L)
@@ -122,6 +175,21 @@ M.
   , merkle_root
   , iteri
   , next_available_token )]
+
+let apply_parties_unchecked_with_states ~constraint_constants ~state_view
+    ~fee_excess ledger c =
+  let open T in
+  apply_parties_unchecked_aux ~constraint_constants ~state_view ~fee_excess
+    (ref ledger) c ~init:[]
+    ~f:(fun acc ({ ledger; fee_excess; protocol_state }, local_state) ->
+      ( { GS.ledger = !ledger; fee_excess; protocol_state }
+      , { local_state with ledger = !(local_state.ledger) } )
+      :: acc)
+  |> Result.map ~f:(fun (party_applied, states) ->
+         (* We perform a [List.rev] here to ensure that the states are in order
+            wrt. the parties that generated the states.
+         *)
+         (party_applied, List.rev states))
 
 let of_root ~depth ~next_available_token (h : Ledger_hash.t) =
   of_hash ~depth ~next_available_token

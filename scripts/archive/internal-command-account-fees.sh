@@ -18,7 +18,7 @@ INNER JOIN internal_commands as ic
 ON bic.internal_command_id = ic.id
 INNER JOIN balances
 ON bic.receiver_balance = balances.id
-WHERE balances.balance = ic.fee - 1000000000
+WHERE balances.balance <= ic.fee - 1000000000
 EOF
 
 while read -r block_id internal_command_id sequence_no secondary_sequence_no; do

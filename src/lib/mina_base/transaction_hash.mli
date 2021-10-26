@@ -17,6 +17,8 @@ val of_base58_check_exn : string -> t
 
 val to_base58_check : t -> string
 
+val hash_signed_command : Signed_command.t -> t
+
 val hash_command : User_command.t -> t
 
 val hash_fee_transfer : Fee_transfer.Single.t -> t

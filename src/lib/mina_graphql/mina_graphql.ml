@@ -1598,14 +1598,13 @@ module Types = struct
                 in
                 List.map account_ids ~f:(fun acct_id ->
                     AccountObj.get_best_ledger_account coda acct_id))
-          ; field_no_status "feeLowerBound" ~typ:uint64 ~args:[]
+          ; field_no_status "fee" ~typ:uint64 ~args:[]
               ~doc:
-                "Lower bound on the fee paid by the fee-payer for the Snapp \
-                 transaction, or null if it can't be calculated"
-              ~resolve:(fun _ parties ->
+                "Transaction fee paid by the fee-payer for the Snapp \
+                 transaction" ~resolve:(fun _ parties ->
                 try
                   Some
-                    ( Parties.fee_lower_bound_exn parties.With_hash.data
+                    ( Parties.fee parties.With_hash.data
                     |> Currency.Fee.to_uint64 )
                 with _ -> None)
           ; field_no_status "feeToken" ~typ:(non_null token_id) ~args:[]
@@ -2176,6 +2175,15 @@ module Types = struct
           | _ ->
               Error "Expected string for currency amount")
 
+    let fee =
+      scalar "Fee" ~coerce:(fun fee ->
+          match fee with
+          | `String s -> (
+              try Ok (Currency.Fee.of_string s)
+              with exn -> Error (Exn.to_string exn) )
+          | _ ->
+              Error "Expected string for fee")
+
     module Snapp_inputs = struct
       (* inputs particular to Snapps *)
 
@@ -2475,9 +2483,58 @@ module Types = struct
                 ~typ:(non_null string)
             ]
 
-      let snapp_party_predicated_signed :
-          (Party.Predicated.Signed.t, string) Result.t option arg_typ =
-        obj "SnappPartyPredicatedSigned"
+      let snapp_fee_payer_party_body =
+        obj "FeePayerPartyBody" ~doc:"Body component of a Snapp Fee Payer Party"
+          ~coerce:
+            (fun pk update_result fee events rollup_events call_data depth ->
+            try
+              let open Result.Let_syntax in
+              let%bind pk =
+                Result.map_error
+                  (Public_key.Compressed.of_base58_check pk)
+                  ~f:Error.to_string_hum
+              in
+              let token_id = () in
+              let mk_field_arrays evs =
+                List.map evs ~f:(fun fields ->
+                    List.map fields ~f:Snark_params.Tick.Field.of_string
+                    |> Array.of_list)
+              in
+              let%map update = update_result in
+              let delta = fee in
+              let events = mk_field_arrays events in
+              let rollup_events = mk_field_arrays rollup_events in
+              let call_data = Snark_params.Tick.Field.of_string call_data in
+              let depth = Int.of_string depth in
+              { Party.Body.Poly.pk
+              ; update
+              ; token_id
+              ; delta
+              ; events
+              ; rollup_events
+              ; call_data
+              ; depth
+              }
+            with exn -> Error (Exn.to_string exn))
+          ~fields:
+            [ arg "pk" ~doc:"Public key as a Base58Check string"
+                ~typ:(non_null string)
+            ; arg "update" ~doc:"Update part of the body"
+                ~typ:(non_null snapp_update)
+            ; arg "fee" ~doc:"Transaction fee" ~typ:(non_null fee)
+            ; arg "events" ~doc:"A list of list of fields in Base58Check"
+                ~typ:(non_null (list (non_null (list (non_null string)))))
+            ; arg "rollupEvents" ~doc:"A list of list of fields in Base58Check"
+                ~typ:(non_null (list (non_null (list (non_null string)))))
+            ; arg "callData" ~doc:"A field in Base58Check"
+                ~typ:(non_null string)
+            ; arg "depth" ~doc:"An integer in string format"
+                ~typ:(non_null string)
+            ]
+
+      let snapp_party_predicated_fee_payer :
+          (Party.Predicated.Fee_payer.t, string) Result.t option arg_typ =
+        obj "SnappPartyPredicatedFeePayer"
           ~doc:"A party to a Snapp transaction with a nonce predicate"
           ~coerce:(fun body nonce ->
             let open Result.Let_syntax in
@@ -2485,8 +2542,8 @@ module Types = struct
             let predicate = nonce in
             Party.Predicated.Poly.{ body; predicate })
           ~fields:
-            [ arg "body" ~doc:"signed predicated party"
-                ~typ:(non_null snapp_party_body)
+            [ arg "body" ~doc:"fee payer party"
+                ~typ:(non_null snapp_fee_payer_party_body)
             ; arg "predicate" ~doc:"nonce" ~typ:(non_null nonce)
             ]
 
@@ -2500,19 +2557,19 @@ module Types = struct
             | _ ->
                 Error "Expected signature as a string in Base58Check format")
 
-      (* TODO: define a type otherwise identical to Party.Signed.t, but
+      (* TODO: define a type otherwise identical to Party.Fee_party.t, but
          which makes the nonce optional
       *)
-      let snapp_party_signed =
-        obj "SnappPartySigned"
+      let snapp_party_fee_payer =
+        obj "SnappPartyFeePayer"
           ~doc:"A party to a Snapp transaction with a signature authorization"
           ~coerce:(fun data authorization ->
             let open Result.Let_syntax in
             let%bind data = data in
-            Ok Party.Signed.{ data; authorization })
+            Ok Party.Fee_payer.{ data; authorization })
           ~fields:
             [ arg "data" ~doc:"party with a signature and nonce predicate"
-                ~typ:(non_null snapp_party_predicated_signed)
+                ~typ:(non_null snapp_party_predicated_fee_payer)
             ; arg "authorization" ~doc:"signature"
                 ~typ:(non_null snapp_signature)
             ]
@@ -3178,7 +3235,7 @@ module Types = struct
 
       let snapp_fee_payer =
         arg "snappFeePayer"
-          ~typ:(non_null Snapp_inputs.snapp_party_signed)
+          ~typ:(non_null Snapp_inputs.snapp_party_fee_payer)
           ~doc:"The fee payer party to a Snapp transaction"
 
       let snapp_other_parties =
@@ -3212,9 +3269,10 @@ module Types = struct
     let send_snapp =
       let open Fields in
       obj "SendSnappInput"
-        ~coerce:(fun fee_payer other_parties protocol_state ->
-          (fee_payer, other_parties, protocol_state))
-        ~fields:[ snapp_fee_payer; snapp_other_parties; snapp_protocol_state ]
+        ~coerce:(fun fee_payer other_parties protocol_state memo ->
+          (fee_payer, other_parties, protocol_state, memo))
+        ~fields:
+          [ snapp_fee_payer; snapp_other_parties; snapp_protocol_state; memo ]
 
     let send_delegation =
       let open Fields in
@@ -3989,14 +4047,23 @@ module Mutations = struct
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.send_snapp) ]
       ~resolve:
         (fun { ctx = coda; _ } ()
-             (fee_payer_result, other_parties_results, protocol_state_result) ->
+             ( fee_payer_result
+             , other_parties_results
+             , protocol_state_result
+             , memo ) ->
         let parties_result =
           let open Result.Let_syntax in
           let other_parties_result = Result.all other_parties_results in
           let%bind fee_payer = fee_payer_result in
           let%bind other_parties = other_parties_result in
-          let%map protocol_state = protocol_state_result in
-          { Parties.fee_payer; other_parties; protocol_state }
+          let%bind protocol_state = protocol_state_result in
+          let%map memo =
+            Option.value_map memo ~default:(Ok Signed_command_memo.empty)
+              ~f:(fun memo ->
+                result_of_exn Signed_command_memo.create_from_string_exn memo
+                  ~error:"Invalid `memo` provided.")
+          in
+          { Parties.fee_payer; other_parties; protocol_state; memo }
         in
         match parties_result with
         | Ok parties ->
@@ -4274,12 +4341,12 @@ module Mutations = struct
           |> Deferred.return
         in
         let net = Mina_lib.net coda in
-        let seed = Option.value ~default:true seed in
+        let is_seed = Option.value ~default:true seed in
         let%bind.Async.Deferred maybe_failure =
           (* Add peers until we find an error *)
           Deferred.List.find_map peers ~f:(fun peer ->
               match%map.Async.Deferred
-                Mina_networking.add_peer net peer ~seed
+                Mina_networking.add_peer net peer ~is_seed
               with
               | Ok () ->
                   None

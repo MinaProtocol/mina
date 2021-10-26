@@ -229,7 +229,7 @@ val apply_parties_unchecked :
          , bool
          , unit )
          Parties_logic.Local_state.t
-       * Currency.Amount.t ) )
+       * Currency.Amount.Signed.t ) )
      Or_error.t
 
 val undo :
