@@ -27,7 +27,7 @@ spec:
         resources:
           limits:
           requests:
-            memory: 24Gi
+            memory: 16Gi
             cpu: 8.0
         image: {{ $.Values.mina.image }}
         {{ if $.Values.mina.useCustomEntrypoint -}}
