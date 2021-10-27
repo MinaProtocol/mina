@@ -413,7 +413,7 @@ let gen_party_predicated_signed ?pk ~ledger :
   let%map predicate = Account.Nonce.gen in
   Party.Predicated.Poly.{ body; predicate }
 
-(* takes an optional public key, if we want to sign this data *)
+(* takes a public key, if we want to sign this data *)
 let gen_party_predicated_fee_payer ~pk ~ledger :
     Party.Predicated.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in

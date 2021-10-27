@@ -2256,7 +2256,10 @@ module Types = struct
           ~coerce:(fun vk hash ->
             let open Result.Let_syntax in
             let%bind data =
-              Pickles.Side_loaded.Verification_key.of_yojson (`String vk)
+              let vk_or_err =
+                Pickles.Side_loaded.Verification_key.of_base58_check vk
+              in
+              Result.map_error vk_or_err ~f:Error.to_string_hum
             in
             let%map hash =
               Pickles.Backend.Tick.Field.of_yojson (`String hash)
