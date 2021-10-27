@@ -129,29 +129,9 @@ module Accounts = struct
                   t (List.length state)
               else Ok (Snapp_state.V.of_list_exn state)
             in
-            let%bind verification_key =
-              (* Use a URI-safe alphabet to make life easier for maintaining json
-                   We prefer this to base58-check here because users should not
-                   be manually entering verification keys.
-              *)
-              Option.value_map ~default:(Ok None) verification_key
-                ~f:(fun verification_key ->
-                  let%map vk =
-                    Base64.decode ~alphabet:Base64.uri_safe_alphabet
-                      verification_key
-                    |> Result.map_error ~f:(function `Msg s ->
-                           Error.createf
-                             !"Could not parse verification key account \
-                               %{sexp:Runtime_config.Accounts.Single.t}: %s"
-                             t s)
-                    |> Result.map
-                         ~f:
-                           (Binable.of_string
-                              ( module Pickles.Side_loaded.Verification_key
-                                       .Stable
-                                       .Latest ))
-                  in
-                  Some (With_hash.of_data ~hash_data:Snapp_account.digest_vk vk))
+            let verification_key =
+              Option.map verification_key
+                ~f:(With_hash.of_data ~hash_data:Snapp_account.digest_vk)
             in
             let%map rollup_state =
               if
@@ -288,12 +268,7 @@ module Accounts = struct
              ->
             let state = Snapp_state.V.to_list app_state in
             let verification_key =
-              Option.map verification_key ~f:(fun vk ->
-                  With_hash.data vk
-                  |> Binable.to_string
-                       ( module Pickles.Side_loaded.Verification_key.Stable
-                                .Latest )
-                  |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet)
+              Option.map verification_key ~f:With_hash.data
             in
             let rollup_state = Pickles_types.Vector.to_list rollup_state in
             let last_rollup_slot =
