@@ -6,50 +6,8 @@ module Digest = Digest
 module Spec = Spec
 open Core_kernel
 
-let index_to_field_elements (k : 'a Plonk_verification_key_evals.t) ~g =
-  let [ g1
-      ; g2
-      ; g3
-      ; g4
-      ; g5
-      ; g6
-      ; g7
-      ; g8
-      ; g9
-      ; g10
-      ; g11
-      ; g12
-      ; g13
-      ; g14
-      ; g15
-      ; g16
-      ; g17
-      ; g18
-      ] =
-    Plonk_verification_key_evals.to_hlist k
-  in
-  List.map
-    [ g1
-    ; g2
-    ; g3
-    ; g4
-    ; g5
-    ; g6
-    ; g7
-    ; g8
-    ; g9
-    ; g10
-    ; g11
-    ; g12
-    ; g13
-    ; g14
-    ; g15
-    ; g16
-    ; g17
-    ; g18
-    ]
-    ~f:g
-  |> Array.concat
+let index_to_field_elements =
+  Pickles_base.Side_loaded_verification_key.index_to_field_elements
 
 module Dlog_based = struct
   module Proof_state = struct
@@ -73,6 +31,7 @@ module Dlog_based = struct
         end
 
         open Pickles_types
+        module Generic_coeffs_vec = Vector.With_length (Nat.N5)
 
         module In_circuit = struct
           type ('challenge, 'scalar_challenge, 'fp) t =
@@ -80,18 +39,13 @@ module Dlog_based = struct
             ; beta : 'challenge
             ; gamma : 'challenge
             ; zeta : 'scalar_challenge
-            ; perm0 : 'fp
-            ; perm1 : 'fp
-            ; gnrc_l : 'fp
-            ; gnrc_r : 'fp
-            ; gnrc_o : 'fp
-            ; psdn0 : 'fp
-            ; ecad0 : 'fp
-            ; vbmul0 : 'fp
-            ; vbmul1 : 'fp
-            ; endomul0 : 'fp
-            ; endomul1 : 'fp
-            ; endomul2 : 'fp
+            ; zeta_n : 'fp
+            ; poseidon_selector : 'fp
+            ; vbmul : 'fp
+            ; complete_add : 'fp
+            ; endomul : 'fp
+            ; perm : 'fp
+            ; generic : 'fp Generic_coeffs_vec.t
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
@@ -105,18 +59,13 @@ module Dlog_based = struct
 
           let map_fields t ~f =
             { t with
-              perm0 = f t.perm0
-            ; perm1 = f t.perm1
-            ; gnrc_l = f t.gnrc_l
-            ; gnrc_r = f t.gnrc_r
-            ; gnrc_o = f t.gnrc_o
-            ; psdn0 = f t.psdn0
-            ; ecad0 = f t.ecad0
-            ; vbmul0 = f t.vbmul0
-            ; vbmul1 = f t.vbmul1
-            ; endomul0 = f t.endomul0
-            ; endomul1 = f t.endomul1
-            ; endomul2 = f t.endomul2
+              poseidon_selector = f t.poseidon_selector
+            ; zeta_n = f t.zeta_n
+            ; vbmul = f t.vbmul
+            ; complete_add = f t.complete_add
+            ; endomul = f t.endomul
+            ; perm = f t.perm
+            ; generic = Vector.map ~f t.generic
             }
 
           let typ (type f fp) ~challenge ~scalar_challenge
@@ -132,12 +81,7 @@ module Dlog_based = struct
               ; fp
               ; fp
               ; fp
-              ; fp
-              ; fp
-              ; fp
-              ; fp
-              ; fp
-              ; fp
+              ; Vector.typ fp Nat.N5.n
               ]
               ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
               ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -527,7 +471,7 @@ module Dlog_based = struct
       let spec =
         let open Spec in
         Struct
-          [ Vector (B Field, Nat.N14.n)
+          [ Vector (B Field, Nat.N13.n)
           ; Vector (B Challenge, Nat.N2.n)
           ; Vector (Scalar Challenge, Nat.N3.n)
           ; Vector (B Digest, Nat.N3.n)
@@ -548,18 +492,13 @@ module Dlog_based = struct
                        ; beta
                        ; gamma
                        ; zeta
-                       ; perm0
-                       ; perm1
-                       ; gnrc_l
-                       ; gnrc_r
-                       ; gnrc_o
-                       ; psdn0
-                       ; ecad0
-                       ; vbmul0
-                       ; vbmul1
-                       ; endomul0
-                       ; endomul1
-                       ; endomul2
+                       ; zeta_n
+                       ; poseidon_selector
+                       ; vbmul
+                       ; complete_add
+                       ; endomul
+                       ; perm
+                       ; generic
                        }
                    }
                ; sponge_digest_before_evaluations
@@ -570,21 +509,8 @@ module Dlog_based = struct
             _ t) =
         let open Vector in
         let fp =
-          [ combined_inner_product
-          ; b
-          ; perm0
-          ; perm1
-          ; gnrc_l
-          ; gnrc_r
-          ; gnrc_o
-          ; psdn0
-          ; ecad0
-          ; vbmul0
-          ; vbmul1
-          ; endomul0
-          ; endomul1
-          ; endomul2
-          ]
+          combined_inner_product :: b :: zeta_n :: poseidon_selector :: vbmul
+          :: complete_add :: endomul :: perm :: generic
         in
         let challenge = [ beta; gamma ] in
         let scalar_challenge = [ alpha; zeta; xi ] in
@@ -611,21 +537,11 @@ module Dlog_based = struct
             ; index
             ] : _ t =
         let open Vector in
-        let [ combined_inner_product
-            ; b
-            ; perm0
-            ; perm1
-            ; gnrc_l
-            ; gnrc_r
-            ; gnrc_o
-            ; psdn0
-            ; ecad0
-            ; vbmul0
-            ; vbmul1
-            ; endomul0
-            ; endomul1
-            ; endomul2
-            ] =
+        let (combined_inner_product
+            :: b
+               :: zeta_n
+                  :: poseidon_selector
+                     :: vbmul :: complete_add :: endomul :: perm :: generic) =
           fp
         in
         let [ beta; gamma ] = challenge in
@@ -646,18 +562,13 @@ module Dlog_based = struct
                     ; beta
                     ; gamma
                     ; zeta
-                    ; perm0
-                    ; perm1
-                    ; gnrc_l
-                    ; gnrc_r
-                    ; gnrc_o
-                    ; psdn0
-                    ; ecad0
-                    ; vbmul0
-                    ; vbmul1
-                    ; endomul0
-                    ; endomul1
-                    ; endomul2
+                    ; zeta_n
+                    ; poseidon_selector
+                    ; vbmul
+                    ; complete_add
+                    ; endomul
+                    ; perm
+                    ; generic
                     }
                 }
             ; sponge_digest_before_evaluations
@@ -803,7 +714,7 @@ module Pairing_based = struct
         let spec bp_log2 =
           let open Spec in
           Struct
-            [ Vector (B Field, Nat.N14.n)
+            [ Vector (B Field, Nat.N13.n)
             ; Vector (B Digest, Nat.N1.n)
             ; Vector (B Challenge, Nat.N2.n)
             ; Vector (Scalar Challenge, Nat.N3.n)
@@ -822,18 +733,13 @@ module Pairing_based = struct
                      ; beta
                      ; gamma
                      ; zeta
-                     ; perm0
-                     ; perm1
-                     ; gnrc_l
-                     ; gnrc_r
-                     ; gnrc_o
-                     ; psdn0
-                     ; ecad0
-                     ; vbmul0
-                     ; vbmul1
-                     ; endomul0
-                     ; endomul1
-                     ; endomul2
+                     ; zeta_n
+                     ; poseidon_selector
+                     ; vbmul
+                     ; complete_add
+                     ; endomul
+                     ; perm
+                     ; generic
                      }
                  }
              ; should_finalize
@@ -842,21 +748,8 @@ module Pairing_based = struct
               _ t) =
           let open Vector in
           let fq =
-            [ combined_inner_product
-            ; b
-            ; perm0
-            ; perm1
-            ; gnrc_l
-            ; gnrc_r
-            ; gnrc_o
-            ; psdn0
-            ; ecad0
-            ; vbmul0
-            ; vbmul1
-            ; endomul0
-            ; endomul1
-            ; endomul2
-            ]
+            combined_inner_product :: b :: zeta_n :: poseidon_selector :: vbmul
+            :: complete_add :: endomul :: perm :: generic
           in
           let challenge = [ beta; gamma ] in
           let scalar_challenge = [ alpha; zeta; xi ] in
@@ -873,22 +766,13 @@ module Pairing_based = struct
 
         let of_data
             Hlist.HlistId.
-              [ Vector.
-                  [ combined_inner_product
-                  ; b
-                  ; perm0
-                  ; perm1
-                  ; gnrc_l
-                  ; gnrc_r
-                  ; gnrc_o
-                  ; psdn0
-                  ; ecad0
-                  ; vbmul0
-                  ; vbmul1
-                  ; endomul0
-                  ; endomul1
-                  ; endomul2
-                  ]
+              [ Vector.(
+                  combined_inner_product
+                  :: b
+                     :: zeta_n
+                        :: poseidon_selector
+                           :: vbmul
+                              :: complete_add :: endomul :: perm :: generic)
               ; Vector.[ sponge_digest_before_evaluations ]
               ; Vector.[ beta; gamma ]
               ; Vector.[ alpha; zeta; xi ]
@@ -905,18 +789,13 @@ module Pairing_based = struct
                   ; beta
                   ; gamma
                   ; zeta
-                  ; perm0
-                  ; perm1
-                  ; gnrc_l
-                  ; gnrc_r
-                  ; gnrc_o
-                  ; psdn0
-                  ; ecad0
-                  ; vbmul0
-                  ; vbmul1
-                  ; endomul0
-                  ; endomul1
-                  ; endomul2
+                  ; zeta_n
+                  ; poseidon_selector
+                  ; vbmul
+                  ; complete_add
+                  ; endomul
+                  ; perm
+                  ; generic
                   }
               }
           ; should_finalize
