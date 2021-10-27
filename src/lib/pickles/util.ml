@@ -86,6 +86,31 @@ let seal (type f)
       let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
       Field.Assert.equal x y ; y
 
+let lowest_128_bits (type f) ~constrain_low_bits ~assert_128_bits
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) x =
+  let open Impl in
+  let pow2 =
+    (* 2 ^ n *)
+    let rec pow2 x i =
+      if i = 0 then x else pow2 Field.Constant.(x + x) (i - 1)
+    in
+    fun n -> pow2 Field.Constant.one n
+  in
+  let lo, hi =
+    exists
+      Typ.(field * field)
+      ~compute:(fun () ->
+        let lo, hi =
+          Field.Constant.unpack (As_prover.read_var x)
+          |> Fn.flip List.split_n 128
+        in
+        (Field.Constant.project lo, Field.Constant.project hi))
+  in
+  assert_128_bits hi ;
+  if constrain_low_bits then assert_128_bits lo ;
+  Field.Assert.equal x Field.(lo + scale hi (pow2 128)) ;
+  lo
+
 let unsafe_unpack_with_partial_sum (type f)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) x ~n =
   let open Impl in
@@ -113,3 +138,11 @@ let squeeze_with_packed (type f)
   let lo, hi_bits = unsafe_unpack_with_partial_sum (module Impl) x ~n in
   boolean_constrain (module Impl) hi_bits ;
   lo
+
+let constant_var (type f)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+    (c : f) =
+  (* Hack for plonk constraints *)
+  let x = Impl.exists Impl.Field.typ ~compute:(fun () -> c) in
+  Impl.Field.Assert.equal x (Impl.Field.constant c) ;
+  x
