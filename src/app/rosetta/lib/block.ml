@@ -580,6 +580,7 @@ WITH RECURSIVE chain AS (
           ; hash= uc.hash
           ; failure_status= Some failure_status
           ; valid_until= Option.map ~f:Unsigned.UInt32.of_int64 uc.valid_until
+          ; memo = if String.equal uc.memo "" then None else Some uc.memo
           } )
     in
     { Block_info.block_identifier=
