@@ -10,18 +10,7 @@ let padded_array_typ ~length ~dummy elt =
         typ.store (Array.append a (Array.create ~len:(length - n) dummy)))
   }
 
-module Pc_array = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type 'a t = 'a array [@@deriving compare, sexp, yojson, equal]
-
-      let hash_fold_t f s a = List.hash_fold_t f s (Array.to_list a)
-    end
-  end]
-
-  let hash_fold_t f s a = List.hash_fold_t f s (Array.to_list a)
-end
+let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
 
 module Columns = Nat.N15
 module Columns_vec = Vector.Vector_15
@@ -40,20 +29,6 @@ module Evals = struct
         ; s : 'a Permuts_minus_1_vec.Stable.V1.t
         ; generic_selector : 'a
         ; poseidon_selector : 'a
-        }
-      [@@deriving fields, sexp, compare, yojson, hash, equal]
-    end
-
-    module V1 = struct
-      type 'a t =
-        { l : 'a
-        ; r : 'a
-        ; o : 'a
-        ; z : 'a
-        ; t : 'a
-        ; f : 'a
-        ; sigma1 : 'a
-        ; sigma2 : 'a
         }
       [@@deriving fields, sexp, compare, yojson, hash, equal]
     end
@@ -168,12 +143,7 @@ module Openings = struct
     module Stable = struct
       module V1 = struct
         type ('g, 'fq) t =
-          { lr : ('g * 'g) Pc_array.Stable.V1.t
-          ; z_1 : 'fq
-          ; z_2 : 'fq
-          ; delta : 'g
-          ; sg : 'g
-          }
+          { lr : ('g * 'g) array; z_1 : 'fq; z_2 : 'fq; delta : 'g; sg : 'g }
         [@@deriving sexp, compare, yojson, hash, equal, hlist]
       end
     end]
@@ -193,14 +163,6 @@ module Openings = struct
         { proof : ('g, 'fq) Bulletproof.Stable.V1.t
         ; evals : 'fqv Evals.Stable.V2.t * 'fqv Evals.Stable.V2.t
         ; ft_eval1 : 'fq
-        }
-      [@@deriving sexp, compare, yojson, hash, equal, hlist]
-    end
-
-    module V1 = struct
-      type ('g, 'fq, 'fqv) t =
-        { proof : ('g, 'fq) Bulletproof.Stable.V1.t
-        ; evals : 'fqv Evals.Stable.V1.t * 'fqv Evals.Stable.V1.t
         }
       [@@deriving sexp, compare, yojson, hash, equal, hlist]
     end
@@ -224,8 +186,7 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g_opt t =
-          { unshifted : 'g_opt Pc_array.Stable.V1.t; shifted : 'g_opt }
+        type 'g_opt t = { unshifted : 'g_opt array; shifted : 'g_opt }
         [@@deriving sexp, compare, yojson, hlist, hash, equal]
       end
     end]
@@ -277,8 +238,7 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g t = 'g Pc_array.Stable.V1.t
-        [@@deriving sexp, compare, yojson, hash, equal]
+        type 'g t = 'g array [@@deriving sexp, compare, yojson, hash, equal]
       end
     end]
 
@@ -297,21 +257,10 @@ module Messages = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ('g, 'g_opt) t =
+      type 'g t =
         { w_comm : 'g Without_degree_bound.Stable.V1.t Columns_vec.Stable.V1.t
         ; z_comm : 'g Without_degree_bound.Stable.V1.t
-        ; t_comm : 'g_opt Without_degree_bound.Stable.V1.t
-        }
-      [@@deriving sexp, compare, yojson, fields, hash, equal, hlist]
-    end
-
-    module V1 = struct
-      type ('g, 'g_opt) t =
-        { l_comm : 'g Without_degree_bound.Stable.V1.t
-        ; r_comm : 'g Without_degree_bound.Stable.V1.t
-        ; o_comm : 'g Without_degree_bound.Stable.V1.t
-        ; z_comm : 'g Without_degree_bound.Stable.V1.t
-        ; t_comm : 'g_opt With_degree_bound.Stable.V1.t
+        ; t_comm : 'g Without_degree_bound.Stable.V1.t
         }
       [@@deriving sexp, compare, yojson, fields, hash, equal, hlist]
     end
@@ -339,17 +288,9 @@ module Proof = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ('g, 'g_opt, 'fq, 'fqv) t =
-        { messages : ('g, 'g_opt) Messages.Stable.V2.t
+      type ('g, 'fq, 'fqv) t =
+        { messages : 'g Messages.Stable.V2.t
         ; openings : ('g, 'fq, 'fqv) Openings.Stable.V2.t
-        }
-      [@@deriving sexp, compare, yojson, hash, equal]
-    end
-
-    module V1 = struct
-      type ('g, 'g_opt, 'fq, 'fqv) t =
-        { messages : ('g, 'g_opt) Messages.Stable.V1.t
-        ; openings : ('g, 'fq, 'fqv) Openings.Stable.V1.t
         }
       [@@deriving sexp, compare, yojson, hash, equal]
     end

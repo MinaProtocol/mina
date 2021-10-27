@@ -1,0 +1,9 @@
+[package]
+name = "binding_generation"
+version = "0.1.0"
+edition = "2021"
+authors = ["opensource@o1labs.org"]
+
+[dependencies]
+ocaml-gen = { git = "https://github.com/o1-labs/proof-systems", branch = "mimoo/backend" }
+wires_15_stubs = { path = "../" }

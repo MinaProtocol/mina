@@ -21,11 +21,8 @@ pushd ../../../../..
     if [ -n "$(git diff --stat)" ]; then id="[DIRTY]$id"; fi
   fi
   commit_date=$(git show HEAD -s --format="%cI")
-  pushd src/lib/marlin
-    marlin_commit_id=$(git rev-parse --verify HEAD)
-    if [ -n "$(git diff --stat)" ]; then marlin_commit_id="[DIRTY]$id"; fi
-    marlin_commit_id_short=$(git rev-parse --short=8 --verify HEAD)
-    marlin_commit_date=$(git show HEAD -s --format="%cI")
+  pushd src/lib/marlin_plonk_bindings/stubs
+    marlin_commit_id=$(cargo metadata | jq '.packages[] | select(.name == "commitment_dlog").id' | cut -d " " -f 3 | sed 's/"//')
   popd
 popd
 
@@ -35,7 +32,6 @@ echo "let branch = \"$branch\"" >> "$1"
 echo "let commit_date = \"$commit_date\"" >> "$1"
 
 echo "let marlin_commit_id = \"$marlin_commit_id\"" >> "$1"
-echo "let marlin_commit_id_short = \"$marlin_commit_id_short\"" >> "$1"
-echo "let marlin_commit_date = \"$marlin_commit_date\"" >> "$1"
 
-echo "let print_version () = Core_kernel.printf \"Commit %s on branch %s\n\" commit_id branch" >> "$1"
+echo 'let print_version () = Core_kernel.printf "Commit %s on branch %s\n" commit_id branch' >> "$1"
+

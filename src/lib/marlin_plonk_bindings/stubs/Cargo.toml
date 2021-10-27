@@ -2,35 +2,39 @@
 name = "marlin_plonk_stubs"
 version = "0.1.0"
 authors = ["opensource@o1labs.org"]
-description = "OCaml stubs for marlin and plonk proof systems"
+description = "OCaml stubs for the plonk proof systems"
 repository = "https://github.com/MinaProtocol/mina"
 license = "MIT/Apache-2.0"
 edition = "2018"
 
 [lib]
 name = "marlin_plonk_stubs"
-crate-type = ["staticlib"]
-
-################################# Dependencies ################################
+crate-type = ["lib", "staticlib"]
 
 [dependencies]
-groupmap = { path = "../../marlin/groupmap" }
 libc = { version = "0.2.0" }
-algebra = { path = "../../marlin/zexe/algebra", features = [ "asm", "parallel", "pasta", "ocaml_types" ] }
-ff-fft = { path = "../../marlin/zexe/ff-fft", features = [ "parallel" ] }
-rand = { version = "0.7" }
-num-bigint = { version = "0.2.3" }
-sprs = { version = "0.7.1" }
-rand_core = { version = "0.5" }
+rand = { version = "0.8.0" }
+num-bigint = { version = "0.4.0" }
+sprs = { version = "0.11.0", features = ["multi_thread"] }
 rayon = { version = "1" }
-ocaml = { version = "0.22.0" }
 
-oracle = { path = "../../marlin/oracle" }
-plonk_circuits = { path = "../../marlin/circuits/plonk", features = [ "ocaml_types" ] }
+# arkworks
+ark-ff = { version = "0.3.0", features = ["parallel"] }
+ark-serialize = "0.3.0"
+ark-ec = { version = "0.3.0", features = ["parallel"] }
+ark-poly = { version = "0.3.0", features = ["parallel"] }
 
-commitment_dlog = { path = "../../marlin/dlog/commitment", features = [ "ocaml_types" ] }
-plonk_protocol_dlog = { path = "../../marlin/dlog/plonk", features = [ "ocaml_types" ] }
-mina-curves = { path = "../../marlin/curves" }
+# proof-systems
+commitment_dlog = { git = "https://github.com/o1-labs/proof-systems/", branch = "master", features = ["ocaml_types"] }
+groupmap = { git = "https://github.com/o1-labs/proof-systems/", branch = "master" }
+mina-curves = { git = "https://github.com/o1-labs/proof-systems/", branch = "master" }
+oracle = { git = "https://github.com/o1-labs/proof-systems/", branch = "master", features = ["ocaml_types"] }
+plonk_circuits = { git = "https://github.com/o1-labs/proof-systems/", branch = "master", features = ["ocaml_types"] }
+plonk_protocol_dlog = { git = "https://github.com/o1-labs/proof-systems/", branch = "master", features = ["ocaml_types"] }
+
+# ocaml-specific
+ocaml = { version = "0.22.1" }
+ocaml-gen = { git = "https://github.com/o1-labs/proof-systems/", branch = "master" }
 
 [profile.release]
 debug = true
