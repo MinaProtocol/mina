@@ -78,7 +78,19 @@ module Evals = struct
 
   let w_s_len, w_s_add_proof = Columns.add Permuts_minus_1.n
 
-  (* TODO: Get rid of second vector *)
+  (*
+      This is in the same order as the evaluations in the opening proof:
+     added later:
+     - old sg polynomials
+     - public input polynomial
+     - ft
+     here:
+     - z
+     - generic selector
+     - poseidon selector
+     - w (witness columns)
+     - s (sigma columns)
+  *)
   let to_vectors { w; z; s; generic_selector; poseidon_selector } =
     let w_s = Vector.append w s w_s_add_proof in
     (Vector.(z :: generic_selector :: poseidon_selector :: w_s), Vector.[])
@@ -108,6 +120,46 @@ module Evals = struct
     in
     Snarky_backendless.Typ.transport t ~there:to_vectors ~back:of_vectors
     |> Snarky_backendless.Typ.transport_var ~there:to_vectors ~back:of_vectors
+end
+
+module All_evals = struct
+  module With_public_input = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('f, 'f_multi) t =
+          { public_input : 'f; evals : 'f_multi Evals.Stable.V2.t }
+        [@@deriving sexp, compare, yojson, hash, equal, hlist]
+      end
+    end]
+
+    let typ lengths (elt : ('a, 'b, 'f) Snarky_backendless.Typ.t) ~default =
+      let open Snarky_backendless.Typ in
+      let evals = Evals.typ lengths elt ~default in
+      of_hlistable [ elt; evals ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+  end
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('f, 'f_multi) t =
+        { evals :
+            ('f, 'f_multi) With_public_input.Stable.V1.t
+            * ('f, 'f_multi) With_public_input.Stable.V1.t
+        ; ft_eval1 : 'f
+        }
+      [@@deriving sexp, compare, yojson, hash, equal, hlist]
+    end
+  end]
+
+  let typ lengths (elt : ('a, 'b, 'f) Snarky_backendless.Typ.t) ~default =
+    let open Snarky_backendless.Typ in
+    let evals = With_public_input.typ lengths elt ~default in
+    of_hlistable
+      [ tuple2 evals evals; elt ]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
 end
 
 module Openings = struct
@@ -248,7 +300,7 @@ module Messages = struct
       type ('g, 'g_opt) t =
         { w_comm : 'g Without_degree_bound.Stable.V1.t Columns_vec.Stable.V1.t
         ; z_comm : 'g Without_degree_bound.Stable.V1.t
-        ; t_comm : 'g_opt With_degree_bound.Stable.V1.t
+        ; t_comm : 'g_opt Without_degree_bound.Stable.V1.t
         }
       [@@deriving sexp, compare, yojson, fields, hash, equal, hlist]
     end
@@ -266,18 +318,19 @@ module Messages = struct
   end]
 
   let typ (type n) g ~dummy
-      ~(commitment_lengths : (((int, n) Vector.t as 'v), 'v, 'v) Poly.t) ~bool =
+      ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) ~bool
+      =
     let open Snarky_backendless.Typ in
     let { Poly.w = w_lens; z; t } = commitment_lengths in
     let array ~length elt = padded_array_typ ~dummy ~length elt in
     let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
-    let w n =
+    let _w n =
       With_degree_bound.typ g
         ~length:(Vector.reduce_exn n ~f:Int.max)
         ~dummy_group_element:dummy ~bool
     in
     of_hlistable
-      [ Vector.typ (wo w_lens) Columns.n; wo z; w t ]
+      [ Vector.typ (wo w_lens) Columns.n; wo [ z ]; wo [ t ] ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
