@@ -53,7 +53,7 @@ The name Samasika comes from the Sanskrit word, meaning small or succinct.
     - [5.2.2 Long-range fork rule](#522-long-range-fork-rule)
   - [5.3 Decentralized checkpointing](#53-decentralized-checkpointing)
     - [5.3.1 Genesis checkpoints](#531-genesis-checkpoints)
-    - [5.3.2 `isShortRange`](#532-isshortrange)
+    - [5.3.2 Short-range fork check](#532-short-range-fork-check)
   - [5.4 Sliding window density](#54-sliding-window-density)
     - [5.4.1 Terminology](#541-terminology)
     - [5.4.2 Sliding windows](#542-sliding-windows)
@@ -507,28 +507,25 @@ Since Mina is succinct this means that it must store the checkpoints for the cur
 
 ### 5.3.1 Genesis checkpoints
 
-This algorithm initializes the checkpoints for genesis block `G`
+The checkpoints for genesis block `G` are initialized like this
 
 ```rust
-fn initCheckpoints(G) -> ()
-{
-    // Set staking epoch data
-    cState(G).staking_epoch_data.seed = Epoch_seed(zero)
-    cState(G).staking_epoch_data.start_checkpoint = State_hash(zero)
-    cState(G).staking_epoch_data.lock_checkpoint = State_hash(zero)
-    cState(G).staking_epoch_data.epoch_length = 1
+// Set staking epoch data
+cState(G).staking_epoch_data.seed = Epoch_seed(zero)
+cState(G).staking_epoch_data.start_checkpoint = State_hash(zero)
+cState(G).staking_epoch_data.lock_checkpoint = State_hash(zero)
+cState(G).staking_epoch_data.epoch_length = 1
 
-    // Set next epoch data
-    cState(G).next_epoch.data.seed = Epoch_seed::from_b58("2vaRh7FQ5wSzmpFReF9gcRKjv48CcJvHs25aqb3SSZiPgHQBy5Dt")
-    cState(G).next_epoch_data.start_checkpoint = State_hash(zero)
-    cState(G).next_epoch_data.lock_checkpoint =  State_hash::from_b58("3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d")
-    cState(G).staking_epoch_data.epoch_length = 2
-}
+// Set next epoch data
+cState(G).next_epoch.data.seed = Epoch_seed::from_b58("2vaRh7FQ5wSzmpFReF9gcRKjv48CcJvHs25aqb3SSZiPgHQBy5Dt")
+cState(G).next_epoch_data.start_checkpoint = State_hash(zero)
+cState(G).next_epoch_data.lock_checkpoint =  State_hash::from_b58("3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d")
+cState(G).staking_epoch_data.epoch_length = 2
 ```
 
 The functions `Epoch_seed::from_b58` and `State_hash::from_b58` are provided by the `bin_prot` implementation.
 
-### 5.3.2 `isShortRange`
+### 5.3.2 Short-range fork check
 
 Given two candidate chains, we can use the previous epoch data (`staking_epoch_data`) and the current epoch data (`next_epoch_data`) to determine whether the fork point is short-range or long-range.
 
@@ -546,7 +543,7 @@ e1 |
 
 In this example, `B1`'s current epoch is `e3` and its previous epoch is `e2`, but `B2`'s current and previous epochs are `e2` and `e1` respectively.  Observe that it is not possible to have a short-range fork if the blocks are more than one epoch apart (because the fork point would be beyond one of the blocks' previous epoch's lock checkpoint).
 
-On the other hand, if the blocks are in the same epoch, then both blocks will have the same previous epoch and thus we can simply check whether the blocks have the same `lock_checkpoint` in their previous epoch data (i.e. `B1.staking_epoch_data.lock_checkpoint == B2.staking_data.lock_checkpoint`).  This gives rise to the following algorithm.
+On the other hand, if the blocks are in the same epoch, then both blocks will have the same previous epoch and thus we can simply check whether the blocks have the same `lock_checkpoint` in their previous epoch data (i.e. `B1.staking_epoch_data.lock_checkpoint == B2.staking_epoch_data.lock_checkpoint`).  This gives rise to the following algorithm.
 
 Given two chains `C1` and `C2` `isShortRange` outputs `true` if the fork is short-range, otherwise the fork is long-range and it outputs `false`.
 
@@ -849,8 +846,8 @@ As detailed in [Section 5.4.5](#545-window-structure), the window density includ
 Since the genesis block `G` is at the start of a new sub-window and its current sub-window density is `0`, we know that when it was generated all sub-window densities, from oldest to most recent were used to compute the density of the window.  At the time, the density at index `0` was also `slots_per_sub_window` and, thus, the intermediate `sub_window_densities` was
 
 ```rust
-G.sub_window_densities = u32[slots_per_sub_window; sub_windows_per_window]
-                       = u32[7; 11]
+cState(G).sub_window_densities = u32[slots_per_sub_window; sub_windows_per_window]
+                               = u32[7; 11]
 ```
 
 Consequently the genesis density was
@@ -864,8 +861,8 @@ genesis_window_density = sum(G.sub_window_densities)
 For technical reasons outside the scope of this document, in Mina there is a negative one block `N`.  The minimum window density of `N` is defined as the maximum window density (`77`).  Therefore, `G`'s minimum window density is initialized to
 
 ```text
-G.min_window_density = min(N.min_window_density, genesis_window_density)
-                     = min(77, 77) = 77
+cState(G).min_window_density = min(N.min_window_density, genesis_window_density)
+                             = min(77, 77) = 77
 ```
 
 ### 5.4.12 Relative minimum window density
@@ -1114,7 +1111,7 @@ fn selectSecureChain(tip, chains) -> Chain
 }
 ```
 
-It relies on the [`isShortRange`](#532-isshortrange) and [`relativeMinWindowDensity`](#5412-relative-minimum-window-density) algorithms (Section 5.3.2 and Section 5.4.12) and the `selectLongerChain` algorithm below.
+It relies on the [`isShortRange`](#532-short-range-fork-check) and [`relativeMinWindowDensity`](#5412-relative-minimum-window-density) algorithms (Section 5.3.2 and Section 5.4.12) and the `selectLongerChain` algorithm below.
 
 ```rust
 fn selectLongerChain(tip, candidate) -> Chain
