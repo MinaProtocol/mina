@@ -134,6 +134,9 @@ itn-orchestrator)
   DOCKER_CONTEXT="src/app/itn_orchestrator"
   ;;
 
+delegation-verify)
+  DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-stateless-verify"
+  ;;
 esac
 
 
