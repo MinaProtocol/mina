@@ -12,12 +12,14 @@ let check :
           `Invalid
       | Some c ->
           `Valid (User_command.Signed_command c) )
-  | Parties { fee_payer; other_parties; protocol_state; memo } ->
+  | Parties ({ fee_payer; other_parties; protocol_state; memo } as p) ->
       with_return (fun { return } ->
+          Core.printf "parties txn: %s\n%!"
+            (Parties.Verifiable.to_yojson p |> Yojson.Safe.to_string) ;
+          let other_parties_hash =
+            Parties.Party_or_stack.With_hashes.stack_hash other_parties
+          in
           let commitment =
-            let other_parties_hash =
-              Parties.Party_or_stack.With_hashes.stack_hash other_parties
-            in
             Parties.Transaction_commitment.create ~other_parties_hash
               ~protocol_state_predicate_hash:
                 (Snapp_predicate.Protocol_state.digest protocol_state)
@@ -26,16 +28,34 @@ let check :
           let check_signature s pk msg =
             match Signature_lib.Public_key.decompress pk with
             | None ->
+                Core.printf "Invalid key %s\n%!"
+                  ( Signature_lib.Public_key.Compressed.to_yojson pk
+                  |> Yojson.Safe.to_string ) ;
                 return `Invalid
-            | Some pk ->
+            | Some pk' ->
                 if
                   not
                     (Signature_lib.Schnorr.verify s
-                       (Backend.Tick.Inner_curve.of_affine pk)
+                       (Backend.Tick.Inner_curve.of_affine pk')
                        (Random_oracle_input.field msg))
-                then return `Invalid
+                then (
+                  Core.printf "Invalid signature %s msg %s\n%!"
+                    (Mina_base.Signature.to_base58_check s)
+                    (Pickles.Backend.Tick.Field.to_string msg) ;
+                  return `Invalid )
                 else ()
           in
+          Core.printf
+            "otherparties hash: %s protocol hash: %s memo hash: %s fee_paer \
+             hash: %s\n\
+             %!"
+            (Pickles.Backend.Tick.Field.to_string other_parties_hash)
+            (Pickles.Backend.Tick.Field.to_string
+               (Snapp_predicate.Protocol_state.digest protocol_state))
+            (Pickles.Backend.Tick.Field.to_string
+               (Signed_command_memo.hash memo))
+            (Pickles.Backend.Tick.Field.to_string
+               Party.Predicated.(digest (of_fee_payer fee_payer.data))) ;
           check_signature fee_payer.authorization fee_payer.data.body.pk
             (Parties.Transaction_commitment.with_fee_payer commitment
                ~fee_payer_hash:
@@ -57,14 +77,18 @@ let check :
                 | Proof pi -> (
                     match vk_opt with
                     | None ->
+                        (*TODO: should this return None?*)
+                        Core.printf "No verification keys!\n%!" ;
                         return `Invalid
                     | Some vk ->
-                        Some
-                          ( vk
-                          , { Snapp_statement.Poly.transaction = commitment
-                            ; at_party
-                            }
-                          , pi ) ))
+                        let stmt =
+                          { Snapp_statement.Poly.transaction = commitment
+                          ; at_party
+                          }
+                        in
+                        Core.printf "snapp statement: %s\n%!"
+                          (Snapp_statement.sexp_of_t stmt |> Sexp.to_string) ;
+                        Some (vk, stmt, pi) ))
           in
           let v =
             User_command.Poly.Parties

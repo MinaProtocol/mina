@@ -2210,12 +2210,18 @@ module Types = struct
         obj "VerificationKeyWithHash" ~doc:"Verification key with hash"
           ~coerce:(fun vk hash ->
             let open Result.Let_syntax in
-            let%bind data =
-              Pickles.Side_loaded.Verification_key.of_yojson (`String vk)
+            let%map data =
+              let%map d =
+                Base64.decode ~alphabet:Base64.uri_safe_alphabet vk
+                |> Result.map_error ~f:(fun (`Msg str) -> str)
+              in
+              Binable.of_string
+                (module Side_loaded_verification_key.Stable.Latest)
+                d
+              (*in
+                Pickles.Side_loaded.Verification_key.of_yojson (`String vk)*)
             in
-            let%map hash =
-              Pickles.Backend.Tick.Field.of_yojson (`String hash)
-            in
+            let hash = Pickles.Backend.Tick.Field.of_string hash in
             { With_hash.data; hash })
           ~fields:
             [ arg "verificationKey"

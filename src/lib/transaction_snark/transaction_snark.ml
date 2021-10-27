@@ -3473,7 +3473,7 @@ let check_transaction ?preeval ~constraint_constants ~sok_message ~source
   let state_body = Transaction_protocol_state.block_data transaction_in_block in
   match to_preunion (transaction :> Transaction.t) with
   | `Parties _ ->
-      failwith "TODO"
+      failwith "Called non-party transaction with parties transaction"
   | `Transaction t ->
       check_transaction_union ?preeval ~constraint_constants sok_message source
         target init_stack pending_coinbase_stack_state
@@ -3532,7 +3532,7 @@ let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
         :> Transaction.t )
   with
   | `Parties _ ->
-      failwith "TODO"
+      failwith "Called non-party transaction with parties transaction"
   | `Transaction t ->
       generate_transaction_union_witness ?preeval ~constraint_constants
         sok_message source target
@@ -4097,7 +4097,7 @@ struct
     in
     match to_preunion transaction with
     | `Parties _ ->
-        failwith "TODO"
+        failwith "Called Non-parties transaction with parties transaction"
     | `Transaction t ->
         of_transaction_union ~statement ~init_stack
           (Transaction_union.of_transaction t)
@@ -4159,7 +4159,7 @@ module For_tests = struct
     let proof_level = proof_level
   end)
 
-  let create_trivial_predicate_snapp spec ledger =
+  let create_trivial_predicate_snapp spec _ledger =
     let local_dummy_constraints () =
       let open Run in
       let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
@@ -4241,34 +4241,41 @@ module For_tests = struct
       spec
     in
     let vk = With_hash.of_data ~hash_data:Snapp_account.digest_vk vk in
-    let _is_new, _loc =
-      let id =
-        Public_key.compress sender.public_key
-        |> fun pk -> Account_id.create pk Token_id.default
+    Core.printf "vk: %s\n hash: %s%!"
+      (Side_loaded_verification_key.to_yojson vk.data |> Yojson.Safe.to_string)
+      (Field.to_string vk.hash) ;
+    (*let _is_new, _loc =
+        let id =
+          Public_key.compress sender.public_key
+          |> fun pk -> Account_id.create pk Token_id.default
+        in
+        Ledger.get_or_create_account ledger id
+          (Account.create id Balance.(of_int 888_888))
+        |> Or_error.ok_exn
       in
-      Ledger.get_or_create_account ledger id
-        (Account.create id Balance.(of_int 888_888))
-      |> Or_error.ok_exn
-    in
-    let _is_new, _loc =
-      let id = Account_id.create trivial_account_pk Token_id.default in
-      let account : Account.t =
-        { (Account.create id Balance.(of_int 0)) with
-          permissions =
-            { Permissions.user_default with set_permissions = Proof }
-        ; snapp = Some { Snapp_account.default with verification_key = Some vk }
-        }
-      in
-      Ledger.get_or_create_account ledger id account |> Or_error.ok_exn
-    in
-    (*TODO: Add another signed party for the transfer*)
-    (*let total = Option.value_exn (Amount.add fee amount) in*)
+      let _is_new, _loc =
+        let id = Account_id.create trivial_account_pk Token_id.default in
+        let account : Account.t =
+          { (Account.create id Balance.(of_int 0)) with
+            permissions =
+              { Permissions.user_default with set_permissions = Proof }
+          ; snapp = Some { Snapp_account.default with verification_key = Some vk }
+          }
+        in
+        Ledger.get_or_create_account ledger id account |> Or_error.ok_exn
+      in*)
     let update_empty_permissions =
       let permissions =
-        { Permissions.user_default with send = Permissions.Auth_required.Proof }
+        { Permissions.user_default with
+          send = Permissions.Auth_required.Proof
+        ; set_verification_key = Permissions.Auth_required.Proof
+        }
         |> Snapp_basic.Set_or_keep.Set
       in
-      { Party.Update.dummy with permissions }
+      { Party.Update.dummy with
+        permissions
+      ; verification_key = Snapp_basic.Set_or_keep.Set vk
+      }
     in
     let sender_pk = sender.public_key |> Public_key.compress in
     let fee_payer =
@@ -4336,30 +4343,58 @@ module For_tests = struct
         ~protocol_state_predicate_hash
         ~memo_hash:(Signed_command_memo.hash memo)
     in
-    let at_party = Parties.Party_or_stack.stack_hash ps in
-    let tx_statement : Snapp_statement.t = { transaction; at_party } in
+    let proof_party =
+      let ps =
+        Parties.Party_or_stack.of_parties_list
+          ~party_depth:(fun (p : Party.Predicated.t) -> p.body.depth)
+          [ snapp_party_data ]
+        |> Parties.Party_or_stack.accumulate_hashes_predicated
+      in
+      Parties.Party_or_stack.stack_hash ps
+    in
+    let tx_statement : Snapp_statement.t =
+      { transaction; at_party = proof_party }
+    in
+    Core.printf "snapp statement: %s\n%!"
+      (Snapp_statement.sexp_of_t tx_statement |> Sexp.to_string) ;
     let handler (Snarky_backendless.Request.With { request; respond }) =
       match request with _ -> respond Unhandled
     in
     let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
       trivial_prover ~handler [] tx_statement
     in
+    Core.printf "proof: %s\n%!" (Pickles.Side_loaded.Proof.to_base64 pi) ;
     let fee_payer_signature_auth =
       let txn_comm =
         Parties.Transaction_commitment.with_fee_payer transaction
           ~fee_payer_hash:
             Party.Predicated.(digest (of_fee_payer fee_payer.data))
       in
+      Core.printf
+        "fee payer commitment: %s otherparties hash: %s protocol hash: %s memo \
+         hash: %s fee_paer hash: %s\n\
+         %!"
+        (Tick.Field.to_string txn_comm)
+        (Tick.Field.to_string other_parties_hash)
+        (Tick.Field.to_string protocol_state_predicate_hash)
+        (Tick.Field.to_string (Signed_command_memo.hash memo))
+        (Tick.Field.to_string
+           Party.Predicated.(digest (of_fee_payer fee_payer.data))) ;
       Signature_lib.Schnorr.sign sender.private_key
         (Random_oracle.Input.field txn_comm)
     in
+    Core.printf "fee-payer signature: %s\n%!"
+      (Signature.to_base58_check fee_payer_signature_auth) ;
     let fee_payer =
       { fee_payer with authorization = fee_payer_signature_auth }
     in
+    Core.printf !"sender commitment: %s\n%!" (Tick.Field.to_string transaction) ;
     let sender_signature_auth =
       Signature_lib.Schnorr.sign sender.private_key
         (Random_oracle.Input.field transaction)
     in
+    Core.printf "sender signature: %s\n%!"
+      (Signature.to_base58_check sender_signature_auth) ;
     let sender =
       { Party.data = sender_party_data
       ; authorization = Signature sender_signature_auth
@@ -4371,6 +4406,31 @@ module For_tests = struct
     let parties : Parties.t =
       { fee_payer; other_parties; protocol_state; memo }
     in
+    Binable.to_string
+      (module Side_loaded_verification_key.Stable.Latest)
+      vk.data
+    |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
+    |> printf "vk:\n%s\n\n" ;
+    (* print fee payer *)
+    Party.Fee_payer.to_yojson fee_payer
+    |> Yojson.Safe.pretty_to_string
+    |> printf "fee_payer:\n%s\n\n"
+    |> fun () ->
+    (* print other_party data *)
+    List.hd_exn parties.other_parties
+    |> (fun (p : Party.t) -> Party.Predicated.to_yojson p.data)
+    |> Yojson.Safe.pretty_to_string
+    |> printf "other_party_data:\n%s\n\n"
+    |> fun () ->
+    (* print other_party proof *)
+    Pickles.Side_loaded.Proof.Stable.V1.sexp_of_t pi
+    |> Sexp.to_string |> Base64.encode_exn
+    |> printf "other_party_proof:\n%s\n\n"
+    |> fun () ->
+    (* print protocol_state *)
+    Snapp_predicate.Protocol_state.to_yojson protocol_state
+    |> Yojson.Safe.pretty_to_string
+    |> printf "protocol_state:\n%s\n\n" ;
     parties
 end
 

@@ -294,6 +294,9 @@ let nonce (t : t) : Account.Nonce.t = (fee_payer_party t).data.predicate
 
 let fee_token (_t : t) = Token_id.default
 
+let fee_excess (t : t) =
+  Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
+
 let accounts_accessed (t : t) =
   List.map (parties t) ~f:(fun p ->
       Account_id.create p.data.body.pk p.data.body.token_id)
@@ -409,7 +412,7 @@ let valid_interval (t : t) =
       i
 
 module Transaction_commitment = struct
-  module Stable = Zexe_backend.Pasta.Fp.Stable
+  module Stable = Zexe_backend.Pasta.Fp.Stable [@deriving sexp]
 
   type t = Stable.Latest.t
 
