@@ -1,16 +1,8 @@
 terraform {
   required_version = ">= 0.14.0"
-  backend "s3" {
-    key     = "terraform-test-develop.tfstate"
-    encrypt = true
-    region  = "us-west-2"
-    bucket  = "o1labs-terraform-state"
-    acl     = "bucket-owner-full-control"
+  backend "local" {
+    path = "terraform-test-georgeee-5.tfstate"
   }
-}
-
-provider "aws" {
-  region = "us-west-2"
 }
 
 provider "google" {

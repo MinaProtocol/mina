@@ -6,19 +6,6 @@ resource "google_compute_address" "seed_static_ip" {
   project      = "o1labs-192920"
 }
 
-data "aws_route53_zone" "selected" {
-  name = "o1test.net."
-}
-
-resource "aws_route53_record" "seed_record" {
-  count   = var.seed_count
-  zone_id = data.aws_route53_zone.selected.zone_id
-  name    = "seed-${count.index + 1}.${var.testnet_name}.${data.aws_route53_zone.selected.name}"
-  type    = "A"
-  ttl     = "300"
-  records = [google_compute_address.seed_static_ip[count.index].address]
-}
-
 module "kubernetes_testnet" {
   providers = { google = google.gke }
   source    = "../kubernetes/testnet"
