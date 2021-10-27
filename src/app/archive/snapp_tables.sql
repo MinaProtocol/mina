@@ -30,7 +30,7 @@ CREATE TABLE snapp_state_data
 */
 CREATE TABLE snapp_state_data_array
 ( id                       serial  PRIMARY KEY
-, element_id               int[]   NOT NULL
+, element_ids              int[]   NOT NULL
 );
 
 /* Fixed-width arrays of algebraic fields, given as id's from
@@ -68,7 +68,7 @@ CREATE TABLE snapp_permissions
 , set_permissions          snapp_auth_required_type    NOT NULL
 , set_verification_key     snapp_auth_required_type    NOT NULL
 , set_snapp_uri            snapp_auth_required_type    NOT NULL
-, edit_rollup_state        snapp_auth_required_type    NOT NULL
+, edit_sequence_state      snapp_auth_required_type    NOT NULL
 , set_token_symbol         snapp_auth_required_type    NOT NULL
 );
 
@@ -92,28 +92,16 @@ CREATE TABLE snapp_updates
 , timing_id                int              REFERENCES snapp_timing_info(id)
 );
 
-/* in OCaml, events are a list of array of field elements
-   here, a list is given by an id, each contained array is given its
-    order within the list
-*/
-CREATE TABLE snapp_events
-( list_id                  int              NOT NULL
-, list_index               int              NOT NULL
-, state_array_id           int              NOT NULL REFERENCES snapp_state_data_array(id)
-, PRIMARY KEY (list_id,list_index)
-);
-
-/* events_list_id and sequence_events_list_id indicate a list_id in snapp_events, which
-   is not a key, since it appears as many times as there are list elements
-*/
+/* events_ids and sequence_events_ids indicate a list of ids in
+   snapp_state_data_array. */
 CREATE TABLE snapp_party_body
 ( id                       serial           PRIMARY KEY
 , public_key_id            int              NOT NULL REFERENCES public_keys(id)
 , update_id                int              NOT NULL REFERENCES snapp_updates(id)
 , token_id                 bigint           NOT NULL
 , delta                    bigint           NOT NULL
-, events_list_id           int              NOT NULL
-, sequence_events_list_id  int              NOT NULL
+, events_ids               int[]            NOT NULL
+, sequence_events_ids      int[]            NOT NULL
 , call_data_id             int              NOT NULL REFERENCES snapp_state_data(id)
 , depth                    int              NOT NULL
 );
@@ -141,7 +129,7 @@ CREATE TABLE snapp_account
 , public_key_id            int                    REFERENCES public_keys(id)
 , delegate_id              int                    REFERENCES public_keys(id)
 , state_id                 int                    NOT NULL REFERENCES snapp_states(id)
-, rollup_state_id          int                    REFERENCES snapp_state_data(id)
+, sequence_state_id        int                    REFERENCES snapp_state_data(id)
 , proved_state             boolean
 );
 
