@@ -40,7 +40,7 @@ let check :
             (Parties.Transaction_commitment.with_fee_payer commitment
                ~fee_payer_hash:
                  (Party.Predicated.digest
-                    (Party.Predicated.of_signed fee_payer.data))) ;
+                    (Party.Predicated.of_fee_payer fee_payer.data))) ;
           let parties_with_hashes_list =
             Parties.Party_or_stack.With_hashes.to_parties_with_hashes_list
               other_parties

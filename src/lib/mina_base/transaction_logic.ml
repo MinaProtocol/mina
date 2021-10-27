@@ -1734,7 +1734,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let user_acc = f init initial_state in
     let start : Inputs.Global_state.t * _ =
       let parties =
-        let p = c.fee_payer in
+        let p = Party.Fee_payer.to_signed c.fee_payer in
         { Party.authorization = Control.Signature p.authorization
         ; data =
             { p.data with predicate = Party.Predicate.Nonce p.data.predicate }
@@ -2373,7 +2373,7 @@ module For_tests = struct
   let depth = Int.ceil_log2 (num_accounts + num_transactions)
 
   module Init_ledger = struct
-    type t = (Keypair.t * int) array
+    type t = (Keypair.t * int) array [@@deriving sexp]
 
     let init (type l) (module L : Ledger_intf with type t = l) (init_ledger : t)
         (l : L.t) =
@@ -2406,11 +2406,12 @@ module For_tests = struct
 
   module Transaction_spec = struct
     type t =
-      { fee : Currency.Amount.t
+      { fee : Currency.Fee.t
       ; sender : Keypair.t * Account_nonce.t
       ; receiver : Public_key.Compressed.t
       ; amount : Currency.Amount.t
       }
+    [@@deriving sexp]
 
     let gen ~(init_ledger : Init_ledger.t) ~nonces =
       let pk ((kp : Keypair.t), _) = Public_key.compress kp.public_key in
@@ -2440,8 +2441,11 @@ module For_tests = struct
       let gen_amount () =
         Currency.Amount.(gen_incl (of_int 1_000_000) (of_int 100_000_000))
       in
+      let gen_fee () =
+        Currency.Fee.(gen_incl (of_int 1_000_000) (of_int 100_000_000))
+      in
       let nonce : Account_nonce.t = Map.find_exn nonces sender in
-      let%bind fee = gen_amount () in
+      let%bind fee = gen_fee () in
       let%bind amount = gen_amount () in
       let nonces =
         Map.set nonces ~key:sender ~data:(Account_nonce.succ nonce)
@@ -2452,6 +2456,7 @@ module For_tests = struct
 
   module Test_spec = struct
     type t = { init_ledger : Init_ledger.t; specs : Transaction_spec.t list }
+    [@@deriving sexp]
 
     let mk_gen ?(num_transactions = num_transactions) () =
       let open Quickcheck.Let_syntax in
@@ -2479,7 +2484,7 @@ module For_tests = struct
     let sender_pk = Public_key.compress sender.public_key in
     Signed_command.sign sender
       { common =
-          { fee = Amount.to_fee fee
+          { fee
           ; fee_token = Token_id.default
           ; fee_payer_pk = sender_pk
           ; nonce = sender_nonce
@@ -2516,12 +2521,12 @@ module For_tests = struct
     in
     let parties : Parties.t =
       { fee_payer =
-          { Party.Signed.data =
+          { Party.Fee_payer.data =
               { body =
                   { pk = sender_pk
                   ; update = Party.Update.noop
-                  ; token_id = Token_id.default
-                  ; delta = Amount.Signed.(negate (of_unsigned fee))
+                  ; token_id = ()
+                  ; delta = fee
                   ; events = []
                   ; rollup_events = []
                   ; call_data = Snark_params.Tick.Field.zero
@@ -2587,7 +2592,7 @@ module For_tests = struct
            |> Parties.Transaction_commitment.with_fee_payer
                 ~fee_payer_hash:
                   (Party.Predicated.digest
-                     (Party.Predicated.of_signed parties.fee_payer.data)) ))
+                     (Party.Predicated.of_fee_payer parties.fee_payer.data)) ))
     in
     { parties with
       fee_payer = { parties.fee_payer with authorization = signature }

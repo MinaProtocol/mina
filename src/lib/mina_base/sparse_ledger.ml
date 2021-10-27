@@ -31,7 +31,7 @@ module Stable = struct
   end
 end]
 
-type sparse_ledger = t
+type sparse_ledger = t [@@deriving sexp, to_yojson]
 
 module Hash = struct
   include Ledger_hash
@@ -51,6 +51,7 @@ module Global_state = struct
     ; fee_excess : Currency.Amount.Signed.t
     ; protocol_state : Snapp_predicate.Protocol_state.View.t
     }
+  [@@deriving sexp, to_yojson]
 end
 
 module GS = Global_state
