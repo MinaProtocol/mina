@@ -364,18 +364,11 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ( 'pk
-             , 'update
-             , 'token_id
-             , 'signed_amount
-             , 'events
-             , 'call_data
-             , 'int )
-             t =
+        type ('pk, 'update, 'token_id, 'amount, 'events, 'call_data, 'int) t =
           { pk : 'pk
           ; update : 'update
           ; token_id : 'token_id
-          ; delta : 'signed_amount
+          ; delta : 'amount
           ; events : 'events
           ; rollup_events : 'events
           ; call_data : 'call_data
@@ -407,8 +400,9 @@ module Body = struct
     end
   end]
 
-  (* Delta for the fee payer is always going to be Neg and token id is always
-     going to be Mina and so represent it using an unsigned fee*)
+  (* Delta for the fee payer is always going to be Neg, so represent it using an unsigned fee,
+     token id is always going to be the default, so use unit value as a placeholder
+  *)
   module Fee_payer = struct
     [%%versioned
     module Stable = struct
