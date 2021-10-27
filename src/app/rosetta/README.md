@@ -274,4 +274,4 @@ cp -p src/models/* $MINA/src/lib/rosetta_models/
 In the generated files, the type `deriving` clauses will need to have `eq` added manually.
 Any record types with a field named `_type` will need annotate that field with `[@key "type"]`.
 In `lib/network.ml`, update the two instances of the version number.
-In `construction_preprocess_request`, add a `[@default []]` to max-fee so that it isn't required.
+Check the diff after regeneration and be sure to add `[@default None]` and `[@default []]` to all relevant fields of the models
