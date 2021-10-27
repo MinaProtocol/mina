@@ -181,5 +181,9 @@ module Make (Inputs : Inputs_intf) = struct
       | _ ->
           assert false
     in
+    failwith "TODO"
+
+  (*
     Plonk_verification_key_evals.map ~f t.evals
+       *)
 end

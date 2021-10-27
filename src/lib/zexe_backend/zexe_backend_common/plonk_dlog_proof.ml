@@ -146,18 +146,18 @@ module Make (Inputs : Inputs_intf) = struct
 
   type message = Challenge_polynomial.t list
 
-  include Allocation_functor.Make.Versioned_v1.Full_compare_eq_hash (struct
+  include Allocation_functor.Make.Versioned_v2.Full_compare_eq_hash (struct
     let id = "plong_dlog_proof_" ^ Inputs.id
 
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
           ( G.Affine.Stable.V1.t
           , G.Affine.Stable.V1.t Or_infinity.Stable.V1.t
           , Fq.Stable.V1.t
           , Fq.Stable.V1.t Dlog_plonk_types.Pc_array.Stable.V1.t )
-          Dlog_plonk_types.Proof.Stable.V1.t
+          Dlog_plonk_types.Proof.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
         let to_latest = Fn.id
@@ -166,12 +166,12 @@ module Make (Inputs : Inputs_intf) = struct
              messages:
                ( G.Affine.t
                , G.Affine.t Or_infinity.t )
-               Dlog_plonk_types.Messages.Stable.V1.t
+               Dlog_plonk_types.Messages.Stable.V2.t
           -> openings:
                ( G.Affine.t
                , Fq.t
                , Fq.t Dlog_plonk_types.Pc_array.t )
-               Dlog_plonk_types.Openings.Stable.V1.t
+               Dlog_plonk_types.Openings.Stable.V2.t
           -> 'a
 
         let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
@@ -212,7 +212,9 @@ module Make (Inputs : Inputs_intf) = struct
     ; sg = g t.sg
     }
 
-  let of_backend (t : Backend.t) : t =
+  let of_backend (t : Backend.t) : t = failwith "TODO"
+
+  (*
     let proof = opening_proof_of_backend t.proof in
     let evals =
       (fst t.evals, snd t.evals)
@@ -251,11 +253,14 @@ module Make (Inputs : Inputs_intf) = struct
         ; t_comm = w t.messages.t_comm
         }
       ~openings:{ proof; evals }
+                       *)
 
   let eval_to_backend
-      { Dlog_plonk_types.Evals.l; r; o; z; t; f; sigma1; sigma2 } :
+      { Dlog_plonk_types.Evals.w; z; s; generic_selector; poseidon_selector } :
       Evaluations_backend.t =
-    { l; r; o; z; t; f; sigma1; sigma2 }
+    failwith "TODO"
+
+  (*     { l; r; o; z; t; f; sigma1; sigma2 } *)
 
   let vec_to_array (type t elt)
       (module V : Snarky_intf.Vector.S with type t = t and type elt = elt)
@@ -263,15 +268,21 @@ module Make (Inputs : Inputs_intf) = struct
     Array.init (V.length v) ~f:(V.get v)
 
   let to_backend' (chal_polys : Challenge_polynomial.t list) primary_input
-      ({ messages = { l_comm; r_comm; o_comm; z_comm; t_comm }
+      ({ messages = { w_comm; z_comm; t_comm }
        ; openings =
-           { proof = { lr; z_1; z_2; delta; sg }; evals = evals0, evals1 }
+           { ft_eval1
+           ; proof = { lr; z_1; z_2; delta; sg }
+           ; evals = evals0, evals1
+           }
        } :
         t) : Backend.t =
     let g x = G.Affine.to_backend (Or_infinity.Finite x) in
     let pcw t = Poly_comm.to_backend (`With_degree_bound t) in
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
     let lr = Array.map lr ~f:(fun (x, y) -> (g x, g y)) in
+    failwith "TODO"
+
+  (*
     { messages =
         { l_comm = pcwo l_comm
         ; r_comm = pcwo r_comm
@@ -290,6 +301,7 @@ module Make (Inputs : Inputs_intf) = struct
               ; unshifted = [| Or_infinity.Finite commitment |]
               } ))
     }
+       *)
 
   let to_backend chal_polys primary_input t =
     to_backend' chal_polys (List.to_array primary_input) t
