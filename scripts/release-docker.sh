@@ -104,6 +104,9 @@ delegation-backend-toolchain)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
   DOCKER_CONTEXT="src/app/delegation_backend"
   ;;
+delegation-verify)
+  DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-stateless-verify"
+  ;;
 esac
 
 
