@@ -21,8 +21,9 @@ let tick_shifts, tock_shifts =
     in
     fun ~log2_size -> f log2_size
   in
-  ( mk Backend.Tick.Verification_key.shifts
-  , mk Backend.Tock.Verification_key.shifts )
+  let tick : log2_size:int -> Tick.Field.t array = failwith "TODO" in
+  let tock : log2_size:int -> Tock.Field.t array = failwith "TODO" in
+  (mk tick, mk tock)
 
 let wrap_domains =
   { Domains.h = Pow_2_roots_of_unity 17
@@ -56,19 +57,8 @@ let hash_dlog_me_only (type n) (_max_branching : n Nat.t)
 
 let dlog_pcs_batch (type n_branching total)
     ((without_degree_bound, _pi) :
-      total Nat.t * (n_branching, Nat.N8.n, total) Nat.Adds.t) ~max_quot_size =
-  Pcs_batch.create ~without_degree_bound ~with_degree_bound:[ max_quot_size ]
-
-module Pairing_pcs_batch = struct
-  let beta_1 : (int, _, _) Pcs_batch.t =
-    Pcs_batch.create ~without_degree_bound:Nat.N6.n ~with_degree_bound:[]
-
-  let beta_2 : (int, _, _) Pcs_batch.t =
-    Pcs_batch.create ~without_degree_bound:Nat.N2.n ~with_degree_bound:[]
-
-  let beta_3 : (int, _, _) Pcs_batch.t =
-    Pcs_batch.create ~without_degree_bound:Nat.N14.n ~with_degree_bound:[]
-end
+      total Nat.t * (n_branching, Nat.N26.n, total) Nat.Adds.t) =
+  Pcs_batch.create ~without_degree_bound ~with_degree_bound:[]
 
 let when_profiling profiling default =
   match Option.map (Sys.getenv_opt "PICKLES_PROFILING") ~f:String.lowercase with
@@ -110,11 +100,17 @@ let group_map m ~a ~b =
   stage (fun x -> Group_map.to_group m ~params x)
 
 module Shifts = struct
-  let tock : Tock.Field.t Shifted_value.Shift.t =
-    Shifted_value.Shift.create (module Tock.Field)
+  let tock1 : Tock.Field.t Shifted_value.Type1.Shift.t =
+    Shifted_value.Type1.Shift.create (module Tock.Field)
 
-  let tick : Tick.Field.t Shifted_value.Shift.t =
-    Shifted_value.Shift.create (module Tick.Field)
+  let tock2 : Tock.Field.t Shifted_value.Type2.Shift.t =
+    Shifted_value.Type2.Shift.create (module Tock.Field)
+
+  let tick1 : Tick.Field.t Shifted_value.Type1.Shift.t =
+    Shifted_value.Type1.Shift.create (module Tick.Field)
+
+  let tick2 : Tick.Field.t Shifted_value.Type2.Shift.t =
+    Shifted_value.Type2.Shift.create (module Tick.Field)
 end
 
 module Ipa = struct
