@@ -55,7 +55,7 @@ func NewAttemptCounter(maxAttemptPerHour int) *AttemptCounter {
 // Record attempt to access the service
 // Returns `true` if attempt was successfully recorded
 // or `false` if amount of attempts per Pk per hour exceeded.
-func (h *AttemptCounter) RecordAttempt(pk Key) bool {
+func (h *AttemptCounter) RecordAttempt(key Key) bool {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	curTime := h.now()
