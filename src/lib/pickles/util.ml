@@ -139,3 +139,11 @@ let squeeze_with_packed (type f)
   let lo, hi_bits = unsafe_unpack_with_partial_sum (module Impl) x ~n in
   boolean_constrain (module Impl) hi_bits ;
   lo
+
+let constant_var (type f)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+    (c : f) =
+  (* Hack for plonk constraints *)
+  let x = Impl.exists Impl.Field.typ ~compute:(fun () -> c) in
+  Impl.Field.Assert.equal x (Impl.Field.constant c) ;
+  x
