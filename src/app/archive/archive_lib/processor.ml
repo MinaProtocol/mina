@@ -1173,7 +1173,8 @@ module Block = struct
           | Error e ->
               Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
         in
-        let account_creation_fee_of_fees_and_balance ?additional_fee fee balance =
+        let account_creation_fee_of_fees_and_balance ?additional_fee fee balance
+            =
           (* TODO: add transaction statuses to internal commands
              the archive lib should not know the details of
              account creation fees; the calculation below is
@@ -1190,18 +1191,20 @@ module Block = struct
           *)
           let creation_deduction_uint64 =
             match additional_fee with
-            | None -> account_creation_fee_uint64
-            | Some fee' ->
-              Unsigned.UInt64.add (Currency.Fee.to_uint64 fee')
+            | None ->
                 account_creation_fee_uint64
+            | Some fee' ->
+                Unsigned.UInt64.add
+                  (Currency.Fee.to_uint64 fee')
+                  account_creation_fee_uint64
           in
           (* first compare guards against underflow in subtraction *)
-          if Unsigned.UInt64.compare fee_uint64 creation_deduction_uint64 >= 0 &&
-             Unsigned.UInt64.equal balance_uint64
-               (Unsigned.UInt64.sub fee_uint64 creation_deduction_uint64) then
-            Some (Unsigned.UInt64.to_int64 account_creation_fee_uint64)
-          else
-            None
+          if
+            Unsigned.UInt64.compare fee_uint64 creation_deduction_uint64 >= 0
+            && Unsigned.UInt64.equal balance_uint64
+                 (Unsigned.UInt64.sub fee_uint64 creation_deduction_uint64)
+          then Some (Unsigned.UInt64.to_int64 account_creation_fee_uint64)
+          else None
         in
         let%bind (_ : int) =
           deferred_result_list_fold transactions ~init:0 ~f:(fun sequence_no ->
@@ -1314,7 +1317,7 @@ module Block = struct
                   match Mina_base.Coinbase.fee_transfer coinbase with
                   | None ->
                       return None
-                  | Some {receiver_pk; fee} ->
+                  | Some { receiver_pk; fee } ->
                       let fee_transfer =
                         Mina_base.Fee_transfer.Single.create ~receiver_pk ~fee
                           ~fee_token:Token_id.default
@@ -1340,12 +1343,13 @@ module Block = struct
                       let receiver_account_creation_fee_paid =
                         account_creation_fee_of_fees_and_balance fee balance
                       in
-                      let%bind () = Block_and_internal_command.add
-                        (module Conn)
-                        ~block_id ~internal_command_id:id ~sequence_no
-                        ~secondary_sequence_no:0
-                        ~receiver_account_creation_fee_paid
-                        ~receiver_balance_id
+                      let%bind () =
+                        Block_and_internal_command.add
+                          (module Conn)
+                          ~block_id ~internal_command_id:id ~sequence_no
+                          ~secondary_sequence_no:0
+                          ~receiver_account_creation_fee_paid
+                          ~receiver_balance_id
                       in
                       return (Some fee)
                 in
