@@ -395,8 +395,9 @@ let setup_daemon logger =
       if is_background then (
         Core.printf "Starting background mina daemon. (Log Dir: %s)\n%!"
           conf_dir ;
-        Daemon.daemonize ~redirect_stdout:`Dev_null ?cd:working_dir
-          ~redirect_stderr:`Dev_null () )
+        Daemon.daemonize ~allow_threads_to_have_been_created:true
+          ~redirect_stdout:`Dev_null ?cd:working_dir ~redirect_stderr:`Dev_null
+          () )
       else ignore (Option.map working_dir ~f:Caml.Sys.chdir)
     in
     Stdout_log.setup log_json log_level ;

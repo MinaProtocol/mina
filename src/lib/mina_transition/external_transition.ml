@@ -30,7 +30,7 @@ module Stable = struct
   module V2 = struct
     module T = struct
       type t =
-        { protocol_state : Protocol_state.Value.Stable.V1.t
+        { protocol_state : Protocol_state.Value.Stable.V2.t
         ; protocol_state_proof : Proof.Stable.V1.t [@sexp.opaque]
         ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
         ; delta_transition_chain_proof :
@@ -121,7 +121,8 @@ module Stable = struct
     [@@deriving compare, sexp, fields]
 
     let to_latest (t : t) : V2.t =
-      { protocol_state = t.protocol_state
+      { protocol_state =
+          Protocol_state.Value.Stable.V1.to_latest t.protocol_state
       ; protocol_state_proof = t.protocol_state_proof
       ; staged_ledger_diff =
           Staged_ledger_diff.Stable.V1.to_latest t.staged_ledger_diff
@@ -226,9 +227,10 @@ module Precomputed_block = struct
     module V2 = struct
       type t = T.t =
         { scheduled_time : Block_time.Stable.V1.t
-        ; protocol_state : Protocol_state.Value.Stable.V1.t
+        ; protocol_state : Protocol_state.Value.Stable.V2.t
         ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
         ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
+              (* TODO: Delete this or find out why it is here. *)
         ; delta_transition_chain_proof :
             Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
         }
@@ -248,7 +250,8 @@ module Precomputed_block = struct
 
       let to_latest (t : t) : V2.t =
         { scheduled_time = t.scheduled_time
-        ; protocol_state = t.protocol_state
+        ; protocol_state =
+            Protocol_state.Value.Stable.V1.to_latest t.protocol_state
         ; protocol_state_proof = t.protocol_state_proof
         ; staged_ledger_diff =
             Staged_ledger_diff.Stable.V1.to_latest t.staged_ledger_diff
@@ -1043,7 +1046,7 @@ module Validated = struct
   module Stable = struct
     module V2 = struct
       type t =
-        (external_transition, State_hash.t) With_hash.t
+        (Stable.V2.t, State_hash.t) With_hash.t
         * ( [ `Time_received ] * (unit, Truth.True.t) Truth.t
           , [ `Genesis_state ] * (unit, Truth.True.t) Truth.t
           , [ `Proof ] * (unit, Truth.True.t) Truth.t
@@ -1321,7 +1324,7 @@ end
 module Staged_ledger_validation = struct
   let target_hash_of_ledger_proof =
     let open Ledger_proof in
-    Fn.compose statement_target statement
+    Fn.compose Registers.ledger (Fn.compose statement_target statement)
 
   let validate_staged_ledger_diff :
          ?skip_staged_ledger_verification:[ `All | `Proofs ]

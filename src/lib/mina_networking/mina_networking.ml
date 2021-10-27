@@ -184,7 +184,7 @@ module Rpcs = struct
           ( Staged_ledger.Scan_state.Stable.V2.t
           * Ledger_hash.Stable.V1.t
           * Pending_coinbase.Stable.V1.t
-          * Mina_state.Protocol_state.Value.Stable.V1.t list )
+          * Mina_state.Protocol_state.Value.Stable.V2.t list )
           option
         [@@deriving bin_io, version { rpc }]
 
@@ -195,6 +195,46 @@ module Rpcs = struct
         let response_of_callee_model = Fn.id
 
         let caller_model_of_response = Fn.id
+      end
+
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io
+          (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
+    end
+
+    module V1 = struct
+      module T = struct
+        type query = State_hash.Stable.V1.t [@@deriving bin_io, version { rpc }]
+
+        type response =
+          ( Staged_ledger.Scan_state.Stable.V1.t
+          * Ledger_hash.Stable.V1.t
+          * Pending_coinbase.Stable.V1.t
+          * Mina_state.Protocol_state.Value.Stable.V1.t list )
+          option
+        [@@deriving bin_io, version { rpc }]
+
+        let query_of_caller_model : Master.Caller.query -> query = Fn.id
+
+        let callee_model_of_query : query -> Master.Callee.query = Fn.id
+
+        let response_of_callee_model : Master.Callee.response -> response =
+         fun _ -> failwith "Cannot downgrade staged ledger"
+
+        let caller_model_of_response (t : response) : Master.Caller.response =
+          Option.map t ~f:(fun (x1, x2, x3, x4) ->
+              ( Staged_ledger.Scan_state.Stable.V1.to_latest x1
+              , x2
+              , x3
+              , List.map ~f:Mina_state.Protocol_state.Value.Stable.V1.to_latest
+                  x4 ))
       end
 
       module T' =
@@ -245,12 +285,12 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+    module V2 = struct
       module T = struct
         type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
         [@@deriving bin_io, sexp, version { rpc }]
 
-        type response = Sync_ledger.Answer.Stable.V1.t Core.Or_error.Stable.V1.t
+        type response = Sync_ledger.Answer.Stable.V2.t Core.Or_error.Stable.V1.t
         [@@deriving bin_io, sexp, version { rpc }]
 
         let query_of_caller_model = Fn.id
@@ -325,6 +365,37 @@ module Rpcs = struct
         let response_of_callee_model = Fn.id
 
         let caller_model_of_response = Fn.id
+      end
+
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io
+          (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
+    end
+
+    module V1 = struct
+      module T = struct
+        type query = State_hash.Stable.V1.t list
+        [@@deriving bin_io, sexp, version { rpc }]
+
+        type response = External_transition.Stable.V1.t list option
+        [@@deriving bin_io, version { rpc }]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model : Master.Callee.response -> response =
+         fun _ -> failwith "Cannot downgrade external transition"
+
+        let caller_model_of_response (t : response) : Master.Caller.response =
+          Option.map t ~f:(List.map ~f:External_transition.Stable.V1.to_latest)
       end
 
       module T' =
@@ -547,6 +618,49 @@ module Rpcs = struct
       include T'
       include Register (T')
     end
+
+    module V1 = struct
+      module T = struct
+        type query =
+          ( Consensus.Data.Consensus_state.Value.Stable.V1.t
+          , State_hash.Stable.V1.t )
+          With_hash.Stable.V1.t
+        [@@deriving bin_io, sexp, version { rpc }]
+
+        type response =
+          ( External_transition.Stable.V1.t
+          , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t
+          )
+          Proof_carrying_data.Stable.V1.t
+          option
+        [@@deriving bin_io, version { rpc }]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model : Master.Callee.response -> response =
+         fun _ -> failwith "Cannot downgrade external transition"
+
+        let caller_model_of_response (t : response) : Master.Caller.response =
+          Option.map t
+            ~f:
+              (Proof_carrying_data.map
+                 ~f1:External_transition.Stable.V1.to_latest
+                 ~f2:(Tuple2.map_snd ~f:External_transition.Stable.V1.to_latest))
+      end
+
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io
+          (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
+    end
   end
 
   module Ban_notify = struct
@@ -670,6 +784,45 @@ module Rpcs = struct
         let response_of_callee_model = Fn.id
 
         let caller_model_of_response = Fn.id
+      end
+
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io
+          (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
+    end
+
+    module V1 = struct
+      module T = struct
+        type query = unit [@@deriving bin_io, sexp, version { rpc }]
+
+        type response =
+          ( External_transition.Stable.V1.t
+          , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t
+          )
+          Proof_carrying_data.Stable.V1.t
+          option
+        [@@deriving bin_io, version { rpc }]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model : Master.Callee.response -> response =
+         fun _ -> failwith "Cannot downgrade external transition"
+
+        let caller_model_of_response (t : response) : Master.Caller.response =
+          Option.map t
+            ~f:
+              (Proof_carrying_data.map
+                 ~f1:External_transition.Stable.V1.to_latest
+                 ~f2:(Tuple2.map_snd ~f:External_transition.Stable.V1.to_latest))
       end
 
       module T' =
