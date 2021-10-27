@@ -12,7 +12,7 @@ type t =
   ; (* Include state from the mempool when looking up an account's unspent coins. Note, using this functionality breaks any guarantee of idempotency. *)
     include_mempool : bool
   ; (* In some cases, the caller may not want to retrieve coins for all currencies for an AccountIdentifier. If the currencies field is populated, only coins for the specified currencies will be returned. If not populated, all unspent coins will be returned. *)
-    currencies : Currency.t list
+    currencies : Currency.t list [@default []]
   }
 [@@deriving yojson { strict = false }, show, eq]
 
