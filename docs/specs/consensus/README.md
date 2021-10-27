@@ -339,12 +339,12 @@ fn globalSlot(X) -> u64
 
 ### 5.1.4 `epochSlot`
 
-The function computes the _epoch slot number_ of a block.  The input is the block `B` and the output is the epoch slot number in `[0, slots_per_epoch]`.
+The function computes the _epoch slot number_ of a block.  The input is the block's consensus state `C` and the output is the epoch slot number in `[0, slots_per_epoch]`.
 
 ```rust
 fn epochSlot(B) -> u32
 {
-   return globalSlot(B) mod slots_per_epoch
+   return C.curr_global_slot mod slots_per_epoch
 }
 ```
 
