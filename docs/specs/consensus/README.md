@@ -361,14 +361,12 @@ fn length(C) -> u64
 
 ### 5.1.6 `lastVRF`
 
-**WIP**
-
 This function returns the hex digest of the hash of the last VRF output of a given chain.  The input is a chain `C` and the output is the hash digest.
 
 ```rust
 fn lastVRF(C) -> String
 {
-   return Digest(Blake2b(cState(C).last_vrf_output))
+   return Blake2b(cState(C).last_vrf_output).digest()
 }
 ```
 
@@ -532,17 +530,49 @@ The functions `Epoch_seed::from_b58` and `State_hash::from_b58` are provided by 
 
 ### 5.3.2 `isShortRange`
 
-This algorithm uses the checkpoints to determine if the fork of two chains is short-range or long-range.  It inputs two chains with a fork `C1` and `C2` and outputs `true` if the fork is short-range, otherwise the fork is long-range and it outputs `false`.
+Given two candidate chains, we can use the previous epoch data (`staking_epoch_data`) and the current epoch data (`next_epoch_data`) to determine whether the fork point is short-range or long-range.
+
+Remember that short-range forks are those where the fork point happens after the `lock_checkpoint` of the previous epoch, otherwise it is a long-range fork.  Observe, however, that the location of the previous epoch is a relative measurement from the perspective of a block.  If the candidate blocks are in different epochs, then they will each have a different current and previous epoch-- see the figure below.
+
+```text
+  ---
+e3 |     B1
+  ---
+e2 |     B2
+  ---
+e1 |
+  ---
+```
+
+In this example, `B1`'s current epoch is `e3` and its previous epoch is `e2`, but `B2`'s current and previous epochs are `e2` and `e1` respectively.  Observe that it is not possible to have a short-range fork if the blocks are more than one epoch apart (because the fork point would be beyond one of the blocks' previous epoch's lock checkpoint).
+
+On the other hand, if the blocks are in the same epoch, then both blocks will have the same previous epoch and thus we can simply check whether the blocks have the same `lock_checkpoint` in their previous epoch data (i.e. `B1.staking_epoch_data.lock_checkpoint == B2.staking_data.lock_checkpoint`).  This gives rise to the following algorithm.
+
+Given two chains `C1` and `C2` `isShortRange` outputs `true` if the fork is short-range, otherwise the fork is long-range and it outputs `false`.
 
 ```rust
 fn isShortRange(C1, C2) -> bool
 {
-    if cState(C1).staking_epoch_data.lock_checkpoint == cState(C2).staking_epoch_data.lock_checkpoint {
-        return true
-    }
-    else {
-        return false
-    }
+    // Get consensus state from top blocks of each chain
+    let S1 = cState(C1);
+    let S2 = cState(C2);
+
+    let check = | S1, S2 | {
+      if S1.epoch_count == S2.epoch_count => {
+        // Blocks have same previous epoch, so compare previous epochs' lock_checkpoints
+        S1.staking_epoch_data.lock_checkpoint == S2.staking_epoch_data.lock_checkpoint
+      },
+      else if S1.epoch_count == S2.epoch_count + 1  && epochSlot(S2) >= 2/3*slots_per_epoch => {
+        // S1 is one epoch ahead of S2 and S2 is not in the seed update range
+        S1.staking_epoch_data.lock_checkpoint == S2.next_epoch_data.lock_checkpoint
+      },
+      else {
+        false
+      }
+    };
+
+    // Check both orientations
+    return check(S1, S2) || check(S2, S1)
 }
 ```
 
