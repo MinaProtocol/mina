@@ -264,8 +264,7 @@ let step_main :
                             let open Step_main_inputs in
                             let sponge = Sponge.create sponge_params in
                             Sponge.absorb sponge (`Field sponge_digest) ;
-                            sponge |> Opt_sponge.Underlying.of_sponge
-                            |> S.Bit_sponge.make
+                            sponge |> Opt_sponge.of_sponge
                           in
                           finalize_other_proof d.max_branching
                             ~max_width:d.max_width ~step_widths:d.branchings
