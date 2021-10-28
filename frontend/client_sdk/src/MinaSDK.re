@@ -60,11 +60,13 @@ type payment = {
 [@genType.import "./TSTypes"]
 type sign = string; /* "PLUS" or "MINUS" */
 
+[@genType.import "./TSTypes"]
+type authRequired = string; /* "None" | "Either" | "Proof" | "Signature" | "Both" | "Impossible" */
+
 // Party Transactions
 module Party = {
-  [@genType.import "./TSTypes"]
-  type authRequired = string; /* "None" | "Either" | "Proof" | "Signature" | "Both" | "Impossible" */
 
+  [@genType]
   type timing = {
     // TODO: These all will change to the precise values instead
     .
@@ -75,6 +77,7 @@ module Party = {
     "vestingIncrement": string
   };
 
+  [@genType]
   type permissions = {
     .
     "stake": bool,
@@ -89,18 +92,21 @@ module Party = {
     "setTokenSymbol": authRequired
   };
 
+  [@genType]
   type verificationKeyWithHash = {
     .
     "verificationKey": string,
     "hash": string
   };
 
+  [@genType]
   type delta = {
     .
     "sign": sign,
     "magnitude": uint64
   };
 
+  [@genType]
   type update = {
     .
     "appState": list(Js.Undefined.t(field)),
@@ -112,6 +118,7 @@ module Party = {
     "timing": Js.Undefined.t(timing)
   };
 
+  [@genType]
   type body = {
     .
     "publicKey": publicKey,
@@ -123,11 +130,20 @@ module Party = {
     "callData": string
   };
 
+  [@genType]
+  type interval('a) = {
+    .
+    "lower": 'a,
+    "upper": 'a
+  };
+
+  [@genType]
   type state = {
     .
     "elements": list(Js.Undefined.t(field))
   };
 
+  [@genType]
   type account = {
     .
     "balance": Js.Undefined.t(interval(uint64)),
@@ -144,30 +160,35 @@ module Party = {
   // Some, null = Full
   // null, Some = Nonce
   // Some, Some = <ill typed>
+  [@genType]
   type predicate = {
     .
     "account": Js.Undefined.t(account),
     "nonce": Js.Undefined.t(uint32)
   };
 
+  [@genType]
   type predicated('predicate) = {
     .
     "body": body,
     "predicate": 'predicate
   };
 
+  [@genType]
   type member('auth, 'predicate) = {
     .
     "authorization": 'auth,
     "data": predicated('predicate)
   };
 
+  [@genType]
   type proof_or_signature = {
     .
     "proof": Js.Undefined.t(proof),
     "signature": Js.Undefined.t(signature)
   };
 
+  [@genType]
   type protocolState = {
     .
     "snarkedLedgerHash": Js.Undefined.t(string),
@@ -182,7 +203,7 @@ module Party = {
     "globalSlotSinceGenesis": Js.Undefined.t(string),
     "stakingEpochData": Js.Undefined.t(string),
     "nextEpochData": Js.Undefined.t(string),
-  }
+  };
 
   [@genType]
   type t = {

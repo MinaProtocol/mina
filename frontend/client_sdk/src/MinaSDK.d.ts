@@ -1,15 +1,24 @@
+import type { Party_authRequired as $$Party_authRequired } from './TSTypes';
+import type { Undefined_t as Js_Undefined_t } from './Js.gen';
+import type { field as $$field } from './TSTypes';
+import type { int64 as $$int64 } from './TSTypes';
+import type { list } from './ReasonPervasives.gen';
+import type { sign as $$sign } from './TSTypes';
 import type { uint32 as $$uint32 } from './TSTypes';
 import type { uint64 as $$uint64 } from './TSTypes';
 export declare type publicKey = string;
 export declare type privateKey = string;
+export declare type proof = string;
 export declare type uint64 = $$uint64;
 export declare type uint32 = $$uint32;
+export declare type int64 = $$int64;
+export declare type field = $$field;
 export declare type keypair = {
     readonly privateKey: privateKey;
     readonly publicKey: publicKey;
 };
 export declare type signature = {
-    readonly field: string;
+    readonly field: field;
     readonly scalar: string;
 };
 export declare type signed<signable> = {
@@ -33,6 +42,105 @@ export declare type payment = {
     readonly nonce: uint32;
     readonly memo?: string;
     readonly validUntil?: uint32;
+};
+export declare type sign = $$sign;
+export declare type Party_authRequired = $$Party_authRequired;
+export declare type Party_timing = {
+    readonly initialMinimumBalance: string;
+    readonly cliffTime: string;
+    readonly cliffAmount: string;
+    readonly vestingPeriod: string;
+    readonly vestingIncrement: string;
+};
+export declare type Party_permissions = {
+    readonly stake: boolean;
+    readonly editState: Party_authRequired;
+    readonly send: Party_authRequired;
+    readonly receive: Party_authRequired;
+    readonly setDelegate: Party_authRequired;
+    readonly setPermissions: Party_authRequired;
+    readonly setVerificationKey: Party_authRequired;
+    readonly setSnappUri: Party_authRequired;
+    readonly editRollupState: Party_authRequired;
+    readonly setTokenSymbol: Party_authRequired;
+};
+export declare type Party_verificationKeyWithHash = {
+    readonly verificationKey: string;
+    readonly hash: string;
+};
+export declare type Party_delta = {
+    readonly sign: sign;
+    readonly magnitude: uint64;
+};
+export declare type Party_update = {
+    readonly appState: list<Js_Undefined_t<field>>;
+    readonly delegate: Js_Undefined_t<publicKey>;
+    readonly verificationKey: Js_Undefined_t<Party_verificationKeyWithHash>;
+    readonly permissions: Js_Undefined_t<Party_permissions>;
+    readonly snappUri: Js_Undefined_t<string>;
+    readonly tokenSymbol: Js_Undefined_t<string>;
+    readonly timing: Js_Undefined_t<Party_timing>;
+};
+export declare type Party_body = {
+    readonly publicKey: publicKey;
+    readonly update: Party_update;
+    readonly tokenId: [number, number];
+    readonly delta: Party_delta;
+    readonly events: list<list<string>>;
+    readonly rollupEvents: list<list<string>>;
+    readonly callData: string;
+};
+export declare type Party_interval<a> = {
+    readonly lower: a;
+    readonly upper: a;
+};
+export declare type Party_state = {
+    readonly elements: list<Js_Undefined_t<field>>;
+};
+export declare type Party_account = {
+    readonly balance: Js_Undefined_t<Party_interval<uint64>>;
+    readonly nonce: Js_Undefined_t<Party_interval<uint32>>;
+    readonly receipt_chain_hash: Js_Undefined_t<string>;
+    readonly publicKey: Js_Undefined_t<publicKey>;
+    readonly delegate: Js_Undefined_t<publicKey>;
+    readonly state: Party_state;
+    readonly rollupState: Js_Undefined_t<field>;
+    readonly provedState: Js_Undefined_t<boolean>;
+};
+export declare type Party_predicate = {
+    readonly account: Js_Undefined_t<Party_account>;
+    readonly nonce: Js_Undefined_t<uint32>;
+};
+export declare type Party_predicated<predicate> = {
+    readonly body: Party_body;
+    readonly predicate: predicate;
+};
+export declare type Party_member<auth, predicate> = {
+    readonly authorization: auth;
+    readonly data: Party_predicated<predicate>;
+};
+export declare type Party_proof_or_signature = {
+    readonly proof: Js_Undefined_t<proof>;
+    readonly signature: Js_Undefined_t<signature>;
+};
+export declare type Party_protocolState = {
+    readonly snarkedLedgerHash: Js_Undefined_t<string>;
+    readonly snarkedNextAvailableToken: Js_Undefined_t<[number, number]>;
+    readonly snarkedLedgerHash: Js_Undefined_t<string>;
+    readonly timestamp: Js_Undefined_t<uint64>;
+    readonly blockchainLength: Js_Undefined_t<uint32>;
+    readonly minWindowDensity: Js_Undefined_t<uint32>;
+    readonly lastVrfOutput: Js_Undefined_t<string>;
+    readonly totalCurrency: Js_Undefined_t<uint64>;
+    readonly globalSlotSinceHardFork: Js_Undefined_t<string>;
+    readonly globalSlotSinceGenesis: Js_Undefined_t<string>;
+    readonly stakingEpochData: Js_Undefined_t<string>;
+    readonly nextEpochData: Js_Undefined_t<string>;
+};
+export declare type Party_t = {
+    readonly feePayer: Party_member<signature, uint32>;
+    readonly otherParties: Party_member<Party_proof_or_signature, Party_predicate>[];
+    readonly protocolState: Party_protocolState;
 };
 /**
   * Generates a public/private keypair
