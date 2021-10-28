@@ -357,7 +357,22 @@ let raw ({ id; _ } as t) msg =
   if t.null then ()
   else if Message.check_invariants msg then
     Consumer_registry.broadcast_log_message ~id msg
-  else failwithf "invalid log call \"%s\"" (String.escaped msg.message) ()
+  else
+    let msg' =
+      Message.
+        { timestamp = msg.timestamp
+        ; level = Error
+        ; source = None
+        ; message =
+            String.concat
+              [ "invalid log call: "
+              ; String.tr ~target:'$' ~replacement:'.' msg.message
+              ]
+        ; metadata = Metadata.empty
+        ; event_id = None
+        }
+    in
+    Consumer_registry.broadcast_log_message ~id msg'
 
 let add_tags_to_metadata metadata tags =
   Option.value_map tags ~default:metadata ~f:(fun tags ->
