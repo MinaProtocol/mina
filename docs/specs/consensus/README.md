@@ -75,7 +75,7 @@ The name Samasika comes from the Sanskrit word, meaning small or succinct.
 
 # 1. Acknowledgements
 
-This document would not exists without the help of the reviewers: <a href="https://github.com/ghost-not-in-the-shell">Jiawei Tang</a>, <a href="https://github.com/nholland94">Nathan Holland</a> and <a href="https://math.berkeley.edu/~izaak/">Izaak Meckler</a>.  Special thanks to Jiawei for many detailed discussions about Mina implementation of Ouroboros Samasika.
+This document would not exist without the help of the reviewers: <a href="https://github.com/ghost-not-in-the-shell">Jiawei Tang</a>, <a href="https://github.com/nholland94">Nathan Holland</a> and <a href="https://math.berkeley.edu/~izaak/">Izaak Meckler</a>.  Special thanks to Jiawei for many detailed discussions about Mina implementation of Ouroboros Samasika.
 
 # 2. Notations and conventions
 
