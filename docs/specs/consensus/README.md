@@ -42,12 +42,10 @@ The name Samasika comes from the Sanskrit word, meaning small or succinct.
     - [5.1.3 `globalSlot`](#513-globalslot)
     - [5.1.4 `epochSlot`](#514-epochslot)
     - [5.1.5 `length`](#515-length)
-    - [5.1.6 `lastVRF`](#516-lastvrf)
-    - [5.1.7 `stateHash`](#517-statehash)
+    - [5.1.6 `hashLastVRF`](#516-hashlastvrf)
+    - [5.1.7 `hashState`](#517-hashstate)
     - [5.1.10 `subWindow`](#5110-subwindow)
     - [5.1.12 `relativeSubWindow`](#5112-relativesubwindow)
-    - [5.1.13 `hashEpochSeed`](#5113-hashepochseed)
-    - [5.1.14 `hashProtocolState`](#5114-hashprotocolstate)
   - [5.2 Chain selection rules](#52-chain-selection-rules)
     - [5.2.1 Short-range fork rule](#521-short-range-fork-rule)
     - [5.2.2 Long-range fork rule](#522-long-range-fork-rule)
@@ -359,29 +357,31 @@ fn length(C) -> u64
 }
 ```
 
-### 5.1.6 `lastVRF`
+### 5.1.6 `hashLastVRF`
 
 This function returns the hex digest of the hash of the last VRF output of a given chain.  The input is a chain `C` and the output is the hash digest.
 
 ```rust
-fn lastVRF(C) -> String
+fn hashLastVRF(C) -> String
 {
    return Blake2b(cState(C).last_vrf_output).digest()
 }
 ```
 
-### 5.1.7 `stateHash`
+### 5.1.7 `hashState`
 
-**WIP**
+**IN REVIEW**
 
-This function returns hash of the top block's consensus state for a given chain.  The input is a chain `C` and the output is the hash.
+This function returns hash of the top block's protocol state for a given chain.  The input is a chain `C` and the output is the hash.
 
 ```rust
-fn stateHash(C) -> Hash
+fn hashState(C) -> State_hash
 {
-   return Blake2b(cState(C))
+   return poseidon_3w_hash(POSEIDON_PROTOCOL_STATE_HASH, C.protocol_state.to_roinput())
 }
 ```
+
+The `poseidon_3w_hash` function, `POSEIDON_PROTOCOL_STATE_HASH` parameter and `to_roinput()` method will be provided by the rust signer library.
 
 ### 5.1.10 `subWindow`
 
@@ -402,22 +402,6 @@ This function returns the relative sub-window number of a global slot `S`.
 fn relativeSubWindow(S) -> u64
 {
     return (S/slots_per_sub_window) mod sub_windows_per_window
-}
-```
-
-### 5.1.13 `hashEpochSeed`
-
-```rust
-fn hashEpochSeed(data: Field[]) -> State_hash {
-    return poseidon_3w_hash(POSEIDON_EPOCH_SEED_HASH, [next_data.seed.to_vesta_field_element(), producer_vrf_result])
-}
-```
-
-### 5.1.14 `hashProtocolState`
-
-```rust
-fn hashProtocolState(data: Field[]) -> State_hash {
-    return poseidon_3w_hash(POSEIDON_PROTOCOL_STATE_HASH, data)
 }
 ```
 
@@ -511,14 +495,14 @@ The checkpoints for genesis block `G` are initialized like this
 
 ```rust
 // Set staking epoch data
-cState(G).staking_epoch_data.seed = Epoch_seed(zero)
-cState(G).staking_epoch_data.start_checkpoint = State_hash(zero)
-cState(G).staking_epoch_data.lock_checkpoint = State_hash(zero)
+cState(G).staking_epoch_data.seed = Epoch_seed::zero
+cState(G).staking_epoch_data.start_checkpoint = State_hash::zero
+cState(G).staking_epoch_data.lock_checkpoint = State_hash::zero
 cState(G).staking_epoch_data.epoch_length = 1
 
 // Set next epoch data
 cState(G).next_epoch.data.seed = Epoch_seed::from_b58("2vaRh7FQ5wSzmpFReF9gcRKjv48CcJvHs25aqb3SSZiPgHQBy5Dt")
-cState(G).next_epoch_data.start_checkpoint = State_hash(zero)
+cState(G).next_epoch_data.start_checkpoint = State_hash::zero
 cState(G).next_epoch_data.lock_checkpoint =  State_hash::from_b58("3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d")
 cState(G).staking_epoch_data.epoch_length = 2
 ```
@@ -1072,7 +1056,7 @@ The _select chain_ event occurs every time a peer's chains are updated.  A chain
 
 In addition to the high-level idea given in [Section 5.2](#52-chain-selection-rules) and details given in [Section 5.4](#54-sliding-window-density), the chain selection algorithm also employs some tiebreak logic.
 
-Additional tiebreak logic is needed when comparing chains of equal length or equal minimum density.  The rule is simple-- if we are applying the long-range rule and two chains have equal minimum window density, then we apply the short-range rule (i.e. select the longer chain).
+Additional tiebreak logic is needed when comparing chains of equal length or equal minimum density.  The minimum density tiebreak rule is simple-- if we are applying the long-range rule and two chains have equal minimum window density, then we apply the short-range rule (i.e. select the longer chain).
 
 ### 6.2.3 Bringing it all together
 
@@ -1101,7 +1085,7 @@ fn selectSecureChain(tip, chains) -> Chain
                 tip = candidate
             }
             else if candidate_density == tip_density  {
-                // tiebreak
+                // tiebreak with short-range rule
                 tip = selectLongerChain(tip, candidate)
             }
         }
@@ -1122,12 +1106,12 @@ fn selectLongerChain(tip, candidate) -> Chain
     // tiebreak logic
     else if length(tip) == length(candidate) {
         // compare last VRF digests lexicographically
-        if lastVRF(candidate) > lastVRF(tip) {
+        if hashLastVRF(candidate) > hashLastVRF(tip) {
             return candidate
         }
-        else if lastVRF(candidate) == lastVRF(tip) {
+        else if hashLastVRF(candidate) == hashLastVRF(tip) {
             // compare consensus state hashes lexicographically
-            if stateHash(candidate) > stateHash(tip) {
+            if hashState(candidate) > hashState(tip) {
                 return candidate
             }
         }
@@ -1136,3 +1120,5 @@ fn selectLongerChain(tip, candidate) -> Chain
     return tip
 }
 ```
+
+As mentioned above, tiebreak logic is also needed when the candidate chains have equal length.  In this case the tie is broken using the hashes of the last VRF output ([`hashLastVRF`](#516-hashlastvrf)).  If there is still a tie, we use the protocol state hashes to decide ([`hashState`](#517-hashstate)).  Note that collisions here are overwhelmingly unlikely.
