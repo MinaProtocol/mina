@@ -28,7 +28,7 @@ Metrics Deployment Instructions
 kubectl create namespace gossipqa-metrics
 kubectl config set-context --current --namespace=gossipqa-metrics
 
-2: deploy the stack
+2: create prometheus with helm
 
 2.1: make the permanent volume claim.  if you don't do this then you'll lose all of the data that prometheus gathers when promtheus goes down.  
 
@@ -37,7 +37,14 @@ kubectl config set-context --current --namespace=gossipqa-metrics
 kubectl apply -f automation/terraform/testnets/gossipqa/gossipqa-prom-pvc.yaml
 ```
 
-2.2: make a config map with all the configs which create for us a useful dashboard on grafana.
+2.2: use helm to install prometheus
+```
+helm install gossipqa-prom prometheus-community/prometheus -f automation/terraform/testnets/gossipqa/values.yaml
+```
+
+3: create grafana using helm
+
+3.1: make a config map with all the configs which create for us a useful dashboard on grafana.
 
 ```
 # upload the config map which gives us a useful dashboard in grafana.  the label is necessary for the grafana sidecar that monitors the config maps and installs them.
@@ -45,13 +52,13 @@ kubectl create configmap simplified-mainnet-dashboard --namespace gossipqa-metri
 kubectl label configmap simplified-mainnet-dashboard grafana_dashboard=1
 ```
 
-2.3: install the stack with helm.  this deploys both prometheus, and grafana in one single command.  the values.yaml file that we give the command contains a bunch of configs which override the default configs of "prometheus-community/kube-prometheus-stack".  notably, we need to configure it to use the PVC for prometheus and the config map for graphana.  
+2.2: install grafana using a the stack deployer `kube-prometheus-stack`.  this stack theoretically could give us both prometheus and grafana, but we've turned off prometheus and are only deploying grafana since we are deploying prometheus separately
 
 ```
-#install prometheus and grafana
+#install grafana
 helm install gossipqa-metrics-stack prometheus-community/kube-prometheus-stack -f automation/terraform/testnets/gossipqa/values-stack.yaml```
 
-3: In order to see all those nice colorful charts we deployed on grafana
+3: In order access grafana
 
 #get the login credentials if you don't already have it.  the username is "admin"
 kubectl get secret gossipqa-metrics-stack-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
@@ -59,10 +66,15 @@ kubectl get secret gossipqa-metrics-stack-grafana -o jsonpath="{.data.admin-pass
 #run kubectl get pods and find the grafana pod, then do a port forward
 kubectl port-forward pod/gossipqa-metrics-stack-grafana-56d9c65796-s6dbw 3000:3000
 
+3.1: you may have to manually configure graphana to use the datasource deployed in step 2.
 
 4: uninstall
+```helm uninstall gossipqa-prom
+
 helm uninstall gossipqa-metrics-stack
+```
 
 #if you really want to nuke everything, you can delete the entire namespace.  however this will delete the permanent volume claim, and thus delete all the data you've gathered
+kubectl delete namespace gossipqa-prom
 kubectl delete namespace gossipqa-metrics
 

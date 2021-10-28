@@ -1,13 +1,3 @@
-serviceAccounts:
-  alertmanager:
-    create: false
-  nodeExporter:
-    create: false
-  pushgateway:
-    create: false
-  server:
-    create: true
-
 nodeExporter:
   enabled: false
 
@@ -20,20 +10,30 @@ pushgateway:
 kubeStateMetrics:
   enabled: false
 
-forceNamespace: gossipqa-metrics
+kubeApiServer:
+  enabled: false
 
-server:
-  enabled: true
-  retention: "365d"
-  # persistentVolume:
-  #   existingClaim: "gossipqa-prom-pvc"
+kubeApiServer:
+  enabled: false
 
+kubelet:
+  enabled: false
 
+kubeControllerManager:
+  enabled: false
 
+kubeEtcd:
+  enabled: false
 
-    # size: 1000Gi
-    # storageClass: ssd-retain
-  
+kubeScheduler:
+  enabled: false
+
+kubeProxy:
+  enabled: false
+
+prometheusOperator:
+  enabled: false
+
 
 grafana:
   extraConfigmapMounts: 
