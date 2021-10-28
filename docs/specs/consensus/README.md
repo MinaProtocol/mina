@@ -370,8 +370,6 @@ fn hashLastVRF(C) -> String
 
 ### 5.1.7 `hashState`
 
-**IN REVIEW**
-
 This function returns hash of the top block's protocol state for a given chain.  The input is a chain `C` and the output is the hash.
 
 ```rust
