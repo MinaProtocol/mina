@@ -905,6 +905,8 @@ fn relativeMinWindowDensity(B1, B2) -> u32
 
 This description was adopted to aid understanding, providing explanations where possible of why strategies have been adopted and what conditions are important.  In a production implementation consideration must be given to performance implications and another implementation may be desirable.
 
+**Security note:**  It is important that implementations verify blocks correctly to prevent attacks on the sliding window.  An adversary may attempt to increase the min window density of an adversarial chain relative to the canonical chain, either by increasing the min window density of the adversarial chain or by causing the relative window density of the canonical chain to be decreased by ring-shifting.  The prior is thwarted by only accepting blocks with valid proofs (a valid proof attests to the verification of checked computations on the sliding window during block production).  The latter is thwarted by rejecting blocks whose timestamps are ahead of the current time of the peer verifying the block.  We describe more details in the verification section.
+
 # 6 Protocol
 
 This section specifies the consensus protocol in terms of events and how they MUST be implemented by a compatible peer.  The required events are:
