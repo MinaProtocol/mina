@@ -31,7 +31,7 @@
 	branch = master
 [submodule "src/external/prometheus"]
 	path = src/external/prometheus
-	url = git@github.com:MinaProtocol/prometheus.git
+	url = https://github.com/MinaProtocol/prometheus.git
     branch = master
 [submodule "src/external/c-reference-signer"]
 	path = src/external/c-reference-signer
