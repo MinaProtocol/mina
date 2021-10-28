@@ -33,22 +33,13 @@ WORKDIR $HOME/${MINA_DIR}
 
 RUN mkdir ${HOME}/app
 
-# Build libp2p_helper
-RUN make libp2p_helper \
-   && mv src/app/libp2p_helper/result/bin/libp2p_helper ${HOME}/app/libp2p_helper
-
-# HACK: build without special cpu features to allow more people to run mina-rosetta
+# HACK: build without special cpu features to allow more people to run delegation verification tool
 RUN ./scripts/zexe-standardize.sh
 
-# Make rosetta-crucial components and the generate_keypair tool
 RUN eval $(opam config env) \
   && dune build --profile=${DUNE_PROFILE} \
     src/app/delegation_verify.exe \
   && mv _build/default/src/app/delegation_verify/delegation_verify.exe /usr/local/bin/delegation-verify \
   && rm -rf _build
-
-# Clear go module caches
-RUN cd src/app/libp2p_helper/src/libp2p_helper \
-  && go clean --cache --modcache --testcache -r
 
 ENTRYPOINT ["delegation-verify"]
