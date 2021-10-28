@@ -11,7 +11,7 @@ type t =
   ; account_identifier : Account_identifier.t
   ; block_identifier : Partial_block_identifier.t option [@default None]
   ; (* In some cases, the caller may not want to retrieve all available balances for an AccountIdentifier. If the currencies field is populated, only balances for the specified currencies will be returned. If not populated, all available balances will be returned. *)
-    currencies : Currency.t list
+    currencies : Currency.t list [@default []]
   }
 [@@deriving yojson { strict = false }, show, eq]
 
