@@ -2631,4 +2631,25 @@ let%test_module _ =
           in
           mk_rebroadcastable_test assert_pool_txs pool best_tip_diff_w
             (mk_parties_cmds pool))
+
+    let%test_unit "apply user cmds and snapps" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind assert_pool_txs, pool, _best_tip_diff_w, _frontier =
+            setup_test ()
+          in
+          let num_cmds = Array.length test_keys in
+          (* the user cmds and snapp cmds are taken from the same list of keys,
+             so splitting by the order from that list makes sure that they
+             don't share fee payer keys
+             therefore, the original nonces in the accounts are valid
+          *)
+          let take_len = num_cmds / 2 in
+          let snapp_cmds = List.take (mk_parties_cmds' pool) take_len in
+          let user_cmds = List.drop independent_cmds' take_len in
+          let all_cmds = snapp_cmds @ user_cmds in
+          assert_pool_txs [] ;
+          let%bind apply_res = verify_and_apply pool all_cmds in
+          [%test_eq: pool_apply] (accepted_commands apply_res) (Ok all_cmds) ;
+          assert_pool_txs all_cmds ;
+          Deferred.unit)
   end )
