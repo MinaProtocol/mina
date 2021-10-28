@@ -377,7 +377,7 @@ This function returns hash of the top block's protocol state for a given chain. 
 ```rust
 fn hashState(C) -> State_hash
 {
-   return poseidon_3w_hash(POSEIDON_PROTOCOL_STATE_HASH, C.protocol_state.to_roinput())
+   return poseidon_3w_hash(POSEIDON_PROTOCOL_STATE_HASH, top(C).protocol_state.to_roinput())
 }
 ```
 
