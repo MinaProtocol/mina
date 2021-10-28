@@ -3,7 +3,7 @@
 # - builds stateless verification tool
 # - should not include any data related to joining a specific network, only the node software itself
 #################################################################################################
-FROM opam-deps AS builder
+FROM gcr.io/o1labs-192920/mina-toolchain@sha256:7ef5827fa0854a0bcfdee69dcc0c2c7aef86e1662c630e71f07c1f9162e757fa AS builder
 
 # Use --build-arg "DUNE_PROFILE=dev" to build a dev image or for CI
 ARG DUNE_PROFILE=devnet
@@ -38,8 +38,8 @@ RUN ./scripts/zexe-standardize.sh
 
 RUN eval $(opam config env) \
   && dune build --profile=${DUNE_PROFILE} \
-    src/app/delegation_verify.exe \
-  && mv _build/default/src/app/delegation_verify/delegation_verify.exe /usr/local/bin/delegation-verify \
+    src/app/delegation_verify/delegation_verify.exe \
+  && cp _build/default/src/app/delegation_verify/delegation_verify.exe ./delegation-verify \
   && rm -rf _build
 
-ENTRYPOINT ["delegation-verify"]
+ENTRYPOINT ["./delegation-verify"]
