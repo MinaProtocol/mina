@@ -2060,11 +2060,10 @@ let%test_module _ =
           mk_now_invalid_test assert_pool_txs pool best_tip_diff_w best_tip_ref
             (mk_parties_cmds pool))
 
-    let mk_expired_not_accepted_test assert_pool_txs pool cmds =
+    let mk_expired_not_accepted_test assert_pool_txs pool ~padding cmds =
       assert_pool_txs [] ;
       let curr_slot = current_global_slot () in
-      (* need more of a cushion for Snapps than the 3 we had for user cmds *)
-      let slot_padding = Mina_numbers.Global_slot.of_int 10 in
+      let slot_padding = Mina_numbers.Global_slot.of_int padding in
       let curr_slot_plus_padding =
         Mina_numbers.Global_slot.add curr_slot slot_padding
       in
@@ -2104,14 +2103,15 @@ let%test_module _ =
           let%bind assert_pool_txs, pool, _best_tip_diff_w, (_, _best_tip_ref) =
             setup_test ()
           in
-          mk_expired_not_accepted_test assert_pool_txs pool independent_cmds)
+          mk_expired_not_accepted_test assert_pool_txs pool ~padding:10
+            independent_cmds)
 
     let%test_unit "expired transactions are not accepted (snapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, _best_tip_diff_w, (_, _best_tip_ref) =
             setup_test ()
           in
-          mk_expired_not_accepted_test assert_pool_txs pool
+          mk_expired_not_accepted_test assert_pool_txs pool ~padding:25
             (mk_parties_cmds pool))
 
     let%test_unit "Expired transactions that are already in the pool are \
