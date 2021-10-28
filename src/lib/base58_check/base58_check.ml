@@ -33,10 +33,6 @@ struct
 
   let version_string = String.make 1 version_byte
 
-  (* the Base58 library's "convert" routine, used for both
-      encoding and decoding, runs in time O(n^2); chunk
-      the input to limit the time spent
-  *)
   let chunk_size = 8192
 
   let compute_checksum payload =
