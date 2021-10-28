@@ -4,6 +4,6 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_compare))
  (libraries
-   core
+   core_kernel
    mina_numbers
 ))

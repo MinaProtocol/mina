@@ -123,6 +123,7 @@ module For_tests : sig
                             Quickcheck.Generator.t
     -> max_length:int
     -> size:int
+    -> ?use_super_catchup:bool
     -> unit
     -> t Quickcheck.Generator.t
 
@@ -143,6 +144,7 @@ module For_tests : sig
     -> max_length:int
     -> frontier_size:int
     -> branch_size:int
+    -> ?use_super_catchup:bool
     -> unit
     -> (t * Breadcrumb.t list) Quickcheck.Generator.t
 end

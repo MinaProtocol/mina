@@ -600,6 +600,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
            ?heartbeat_timeout:Time_ns.Span.t
         -> ?timeout:Time.Span.t
         -> rpc_counter:Mina_metrics.Counter.t * Mina_metrics.Gauge.t
+        -> rpc_failed_counter:Mina_metrics.Counter.t
         -> rpc_name:string
         -> t
         -> Peer.t
@@ -607,8 +608,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         -> (r, q) dispatch
         -> r
         -> q Deferred.Or_error.t =
-     fun ?heartbeat_timeout ?timeout ~rpc_counter ~rpc_name t peer transport
-         dispatch query ->
+     fun ?heartbeat_timeout ?timeout ~rpc_counter ~rpc_failed_counter ~rpc_name
+         t peer transport dispatch query ->
       let call () =
         Monitor.try_with ~here:[%here] (fun () ->
             (* Async_rpc_kernel takes a transport instead of a Reader.t *)
@@ -662,6 +663,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 [ ("rpc", `String rpc_name)
                 ; ("error", Error_json.error_to_yojson err)
                 ] ;
+            Mina_metrics.(Counter.inc_one rpc_failed_counter) ;
             match (Error.to_exn err, Error.sexp_of_t err) with
             | ( _
               , Sexp.List
@@ -673,6 +675,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                   ; _rpc_tag
                   ; _rpc_version
                   ] ) ->
+                Mina_metrics.(Counter.inc_one Network.rpc_connections_failed) ;
                 let%map () =
                   Trust_system.(
                     record t.config.trust_system t.config.logger peer
@@ -695,6 +698,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         | Error monitor_exn ->
             (* call itself failed *)
             (* TODO: learn what other exceptions are raised here *)
+            Mina_metrics.(Counter.inc_one rpc_failed_counter) ;
             let exn = Monitor.extract_exn monitor_exn in
             let () =
               match Error.sexp_of_t (Error.of_exn exn) with
@@ -730,8 +734,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
      fun ?heartbeat_timeout ?timeout t peer transport rpc query ->
       let (module Impl) = implementation_of_rpc rpc in
       try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
-        ~rpc_counter:Impl.sent_counter ~rpc_name:Impl.name t peer transport
-        Impl.dispatch_multi query
+        ~rpc_counter:Impl.sent_counter
+        ~rpc_failed_counter:Impl.failed_request_counter ~rpc_name:Impl.name t
+        peer transport Impl.dispatch_multi query
 
     let query_peer ?heartbeat_timeout ?timeout t (peer_id : Peer.Id.t) rpc
         rpc_input =
@@ -747,6 +752,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
           >>| fun data ->
           Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
       | Error e ->
+          Mina_metrics.(Counter.inc_one Network.rpc_connections_failed) ;
           return (Failed_to_connect e)
 
     let query_peer' (type q r) ?how ?heartbeat_timeout ?timeout t
@@ -760,7 +766,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
           let transport = prepare_stream_transport stream in
           let (module Impl) = implementation_of_rpc rpc in
           try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
-            ~rpc_counter:Impl.sent_counter ~rpc_name:Impl.name t peer transport
+            ~rpc_counter:Impl.sent_counter
+            ~rpc_failed_counter:Impl.failed_request_counter ~rpc_name:Impl.name
+            t peer transport
             (fun conn qs ->
               Deferred.Or_error.List.map ?how qs ~f:(fun q ->
                   Impl.dispatch_multi conn q))
@@ -768,6 +776,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
           >>| fun data ->
           Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
       | Error e ->
+          Mina_metrics.(Counter.inc_one Network.rpc_connections_failed) ;
           return (Failed_to_connect e)
 
     let query_random_peers t n rpc query =

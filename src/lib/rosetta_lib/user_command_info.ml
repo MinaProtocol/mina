@@ -8,6 +8,7 @@ module Mina_base = Mina_base_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 module Signature_lib = Signature_lib_nonconsensus
 module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
+module Mina_numbers = Mina_numbers_nonconsensus
 
 [%%endif]
 
@@ -122,6 +123,8 @@ type t =
   ; fee : Unsigned_extended.UInt64.t
   ; nonce : Unsigned_extended.UInt32.t
   ; amount : Unsigned_extended.UInt64.t option
+  ; valid_until : Unsigned_extended.UInt32.t option
+  ; memo : string option
   ; hash : string
   ; failure_status : Failure_status.t option
   }
@@ -137,24 +140,24 @@ module Partial = struct
     ; token : Unsigned_extended.UInt64.t
     ; fee : Unsigned_extended.UInt64.t
     ; amount : Unsigned_extended.UInt64.t option
+    ; valid_until : Unsigned_extended.UInt32.t option
+    ; memo : string option
     }
   [@@deriving to_yojson, sexp, compare]
 
   module Reason = Errors.Partial_reason
 
   let to_user_command_payload :
-         ?memo:string
-      -> ?valid_until:Unsigned_extended.UInt32.t
-      -> t
+         t
       -> nonce:Unsigned_extended.UInt32.t
       -> (Signed_command.Payload.t, Errors.t) Result.t =
-   fun ?memo ?valid_until t ~nonce ->
+   fun t ~nonce ->
     let open Result.Let_syntax in
     let%bind fee_payer_pk = pk_to_public_key ~context:"Fee payer" t.fee_payer in
     let%bind source_pk = pk_to_public_key ~context:"Source" t.source in
     let%bind receiver_pk = pk_to_public_key ~context:"Receiver" t.receiver in
     let%bind memo =
-      match memo with
+      match t.memo with
       | Some memo -> (
           try Ok (Signed_command_memo.create_from_string_exn memo)
           with _ -> Error (Errors.create `Memo_invalid) )
@@ -223,7 +226,9 @@ module Partial = struct
     Signed_command.Payload.create
       ~fee:(Fee_currency.of_uint64 t.fee)
       ~fee_token:(Token_id.of_uint64 t.fee_token)
-      ~fee_payer_pk ~nonce ~body ~memo ~valid_until
+      ~fee_payer_pk ~nonce ~body ~memo
+      ~valid_until:
+        (Option.map ~f:Mina_numbers.Global_slot.of_uint32 t.valid_until)
 end
 
 let forget (t : t) : Partial.t =
@@ -235,6 +240,8 @@ let forget (t : t) : Partial.t =
   ; token = t.token
   ; fee = t.fee
   ; amount = t.amount
+  ; valid_until = t.valid_until
+  ; memo = t.memo
   }
 
 let remember ~nonce ~hash t =
@@ -246,12 +253,14 @@ let remember ~nonce ~hash t =
   ; token = t.token
   ; fee = t.fee
   ; amount = t.amount
+  ; valid_until = t.valid_until
+  ; memo = t.memo
   ; hash
   ; nonce
   ; failure_status = None
   }
 
-let of_operations (ops : Operation.t list) :
+let of_operations ?memo ?valid_until (ops : Operation.t list) :
     (Partial.t, Partial.Reason.t) Validation.t =
   (* TODO: If we care about DoS attacks, break early if length too large *)
   (* Note: It's better to have nice errors with the validation than micro-optimize searching through a small list a minimal number of times. *)
@@ -348,6 +357,8 @@ let of_operations (ops : Operation.t list) :
     ; token (* TODO: Catch exception properly on these uint64 decodes *)
     ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount = Some (Unsigned.UInt64.of_string payment_amount_x.Amount.value)
+    ; valid_until
+    ; memo
     }
   in
   (* For a delegation we demand:
@@ -414,6 +425,8 @@ let of_operations (ops : Operation.t list) :
         (* only default token can be delegated *)
     ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount = None
+    ; valid_until
+    ; memo
     }
   in
   (* For token creation, we demand:
@@ -480,6 +493,8 @@ let of_operations (ops : Operation.t list) :
     ; token = Token_id.(default |> to_uint64)
     ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount = None
+    ; valid_until
+    ; memo
     }
   in
   (* For token account creation, we demand:
@@ -531,6 +546,8 @@ let of_operations (ops : Operation.t list) :
     ; token = Token_id.(default |> to_uint64)
     ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount = None
+    ; valid_until
+    ; memo
     }
   in
   (* For token minting, we demand:
@@ -610,6 +627,8 @@ let of_operations (ops : Operation.t list) :
     ; token
     ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount = Some (amount_b.Amount.value |> Unsigned.UInt64.of_string)
+    ; valid_until
+    ; memo
     }
   in
   let partials =
@@ -832,10 +851,12 @@ let%test_unit "payment_round_trip" =
     ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
     ; failure_status = None
     ; hash = "TXN_1_HASH"
+    ; valid_until = Some (Unsigned.UInt32.of_int 10_000)
+    ; memo = Some "hello"
     }
   in
   let ops = to_operations' start in
-  match of_operations ops with
+  match of_operations ?valid_until:start.valid_until ops with
   | Ok partial ->
       [%test_eq: Partial.t] partial (forget start)
   | Error e ->
@@ -854,6 +875,8 @@ let%test_unit "delegation_round_trip" =
     ; amount = None
     ; failure_status = None
     ; hash = "TXN_2_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   in
   let ops = to_operations' start in
@@ -875,6 +898,8 @@ let dummies =
     ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
     ; hash = "TXN_1_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Payment (* new account created *)
     ; fee_payer = `Pk "Alice"
@@ -891,6 +916,8 @@ let dummies =
             (Account_creation_fees_paid.By_receiver
                (Unsigned.UInt64.of_int 1_000_000)))
     ; hash = "TXN_1new_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Payment (* failed payment *)
     ; fee_payer = `Pk "Alice"
@@ -903,6 +930,8 @@ let dummies =
     ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
     ; failure_status = Some (`Failed "Failure")
     ; hash = "TXN_1fail_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Payment (* custom token *)
     ; fee_payer = `Pk "Alice"
@@ -915,6 +944,8 @@ let dummies =
     ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
     ; hash = "TXN_1a_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Payment (* custom fee-token *)
     ; fee_payer = `Pk "Alice"
@@ -927,6 +958,8 @@ let dummies =
     ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
     ; hash = "TXN_1b_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Delegation
     ; fee_payer = `Pk "Alice"
@@ -939,6 +972,8 @@ let dummies =
     ; amount = None
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
     ; hash = "TXN_2_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Create_token (* no new account *)
     ; fee_payer = `Pk "Alice"
@@ -951,6 +986,8 @@ let dummies =
     ; amount = None
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
     ; hash = "TXN_3a_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Create_token (* new account fee *)
     ; fee_payer = `Pk "Alice"
@@ -967,6 +1004,8 @@ let dummies =
             (Account_creation_fees_paid.By_fee_payer
                (Unsigned.UInt64.of_int 3_000)))
     ; hash = "TXN_3b_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Create_token_account
     ; fee_payer = `Pk "Alice"
@@ -979,6 +1018,8 @@ let dummies =
     ; amount = None
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
     ; hash = "TXN_4_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Mint_tokens
     ; fee_payer = `Pk "Alice"
@@ -991,5 +1032,7 @@ let dummies =
     ; amount = Some (Unsigned.UInt64.of_int 30_000)
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
     ; hash = "TXN_5_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ]
