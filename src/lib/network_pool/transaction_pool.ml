@@ -3,6 +3,8 @@
     transactions (user commands) and providing them to the block producer code.
 *)
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Core
 open Async
 open Mina_base
@@ -1806,15 +1808,16 @@ let%test_module _ =
 
     let verify_and_apply (pool : Test.Resource_pool.t) cs =
       let logger = Logger.create ~id:"verify_and_apply" ~metadata:[] () in
-      let tm0 = Unix.gettimeofday () in
+      let tm0 = Time.now () in
       let%bind verified =
         Test.Resource_pool.Diff.verify' ~allow_failures_for_tests:true pool
           (Envelope.Incoming.local cs)
         >>| Or_error.ok_exn
       in
       let result = Test.Resource_pool.Diff.unsafe_apply pool verified in
-      let tm1 = Unix.gettimeofday () in
-      [%log info] "Time for verify_and_apply: %0.04f sec" (tm1 -. tm0) ;
+      let tm1 = Time.now () in
+      [%log info] "Time for verify_and_apply: %0.04f sec"
+        (Time.diff tm1 tm0 |> Time.Span.to_sec) ;
       result
 
     let mk_linear_case_test assert_pool_txs pool best_tip_diff_w cmds =
