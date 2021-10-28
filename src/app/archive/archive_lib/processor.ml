@@ -218,7 +218,7 @@ end
 
 module Snarked_ledger_hash = struct
   let find (module Conn : CONNECTION) (t : Frozen_ledger_hash.t) =
-    let hash = Frozen_ledger_hash.to_string t in
+    let hash = Frozen_ledger_hash.to_base58_check t in
     Conn.find
       (Caqti_request.find Caqti_type.string Caqti_type.int
          "SELECT id FROM snarked_ledger_hashes WHERE value = ?")
@@ -227,7 +227,7 @@ module Snarked_ledger_hash = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (t : Frozen_ledger_hash.t) =
     let open Deferred.Result.Let_syntax in
-    let hash = Frozen_ledger_hash.to_string t in
+    let hash = Frozen_ledger_hash.to_base58_check t in
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt Caqti_type.string Caqti_type.int
@@ -256,7 +256,7 @@ module Epoch_data = struct
   let add_from_seed_and_ledger_hash_id (module Conn : CONNECTION) ~seed
       ~ledger_hash_id =
     let open Deferred.Result.Let_syntax in
-    let seed = Epoch_seed.to_string seed in
+    let seed = Epoch_seed.to_base58_check seed in
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt typ Caqti_type.int
@@ -1051,13 +1051,13 @@ module Block = struct
     Conn.find
       (Caqti_request.find Caqti_type.string Caqti_type.int
          "SELECT id FROM blocks WHERE state_hash = ?")
-      (State_hash.to_string state_hash)
+      (State_hash.to_base58_check state_hash)
 
   let find_opt (module Conn : CONNECTION) ~(state_hash : State_hash.t) =
     Conn.find_opt
       (Caqti_request.find_opt Caqti_type.string Caqti_type.int
          "SELECT id FROM blocks WHERE state_hash = ?")
-      (State_hash.to_string state_hash)
+      (State_hash.to_base58_check state_hash)
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
@@ -1119,11 +1119,11 @@ module Block = struct
                       global_slot_since_genesis, timestamp)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
                |sql})
-            { state_hash= hash |> State_hash.to_string
+            { state_hash= hash |> State_hash.to_base58_check
             ; parent_id
             ; parent_hash=
                 Protocol_state.previous_state_hash protocol_state
-                |> State_hash.to_string
+                |> State_hash.to_base58_check
             ; creator_id
             ; block_winner_id
             ; snarked_ledger_hash_id
@@ -1132,7 +1132,7 @@ module Block = struct
             ; ledger_hash=
                 Protocol_state.blockchain_state protocol_state
                 |> Blockchain_state.staged_ledger_hash
-                |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_string
+                |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_base58_check
             ; height=
                 consensus_state
                 |> Consensus.Data.Consensus_state.blockchain_length
@@ -1430,15 +1430,15 @@ module Block = struct
                       global_slot_since_genesis, timestamp)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
                |sql})
-            { state_hash= block.state_hash |> State_hash.to_string
+            { state_hash= block.state_hash |> State_hash.to_base58_check
             ; parent_id
-            ; parent_hash= block.parent_hash |> State_hash.to_string
+            ; parent_hash= block.parent_hash |> State_hash.to_base58_check
             ; creator_id
             ; block_winner_id
             ; snarked_ledger_hash_id
             ; staking_epoch_data_id
             ; next_epoch_data_id
-            ; ledger_hash= block.ledger_hash |> Ledger_hash.to_string
+            ; ledger_hash= block.ledger_hash |> Ledger_hash.to_base58_check
             ; height= block.height |> Unsigned.UInt32.to_int64
             ; global_slot_since_hard_fork= block.global_slot_since_hard_fork |> Unsigned.UInt32.to_int64
             ; global_slot_since_genesis=
