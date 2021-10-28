@@ -1,4 +1,7 @@
 #[macro_use]
+pub mod caml_pointer;
+
+#[macro_use]
 pub mod shared_reference;
 
 #[macro_use]
