@@ -1968,7 +1968,8 @@ let%test_module _ =
           mk_invalid_test assert_pool_txs pool best_tip_diff_w best_tip_ref
             (mk_parties_cmds' pool))
 
-    let mk_payment' ?valid_until sender_idx fee nonce receiver_idx amount =
+    let mk_payment' ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount
+        () =
       let get_pk idx = Public_key.compress test_keys.(idx).public_key in
       Signed_command.sign test_keys.(sender_idx)
         (Signed_command_payload.create ~fee:(Currency.Fee.of_int fee)
@@ -1984,9 +1985,11 @@ let%test_module _ =
                 ; amount = Currency.Amount.of_int amount
                 }))
 
-    let mk_payment ?valid_until sender_idx fee nonce receiver_idx amount =
+    let mk_payment ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount ()
+        =
       User_command.Signed_command
-        (mk_payment' ?valid_until sender_idx fee nonce receiver_idx amount)
+        (mk_payment' ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount
+           ())
 
     let current_global_slot () =
       let current_time = Block_time.now time_controller in
@@ -2025,7 +2028,10 @@ let%test_module _ =
         (accepted_commands apply_res)
         (Ok [ User_command.forget_check cmd1 ]) ;
       assert_pool_txs [ User_command.forget_check cmd1 ] ;
-      let cmd2 = mk_payment 0 1_000_000_000 0 5 999_000_000_000 in
+      let cmd2 =
+        mk_payment ~sender_idx:0 ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:5
+          ~amount:999_000_000_000 ()
+      in
       map_set_multi !best_tip_ref [ mk_account 0 0 1 ] ;
       let%bind _ =
         Broadcast_pipe.Writer.write best_tip_diff_w
@@ -2068,12 +2074,14 @@ let%test_module _ =
         Mina_numbers.Global_slot.add curr_slot slot_padding
       in
       let valid_command =
-        mk_payment ~valid_until:curr_slot_plus_padding 1 1_000_000_000 1 9
-          1_000_000_000
+        mk_payment ~valid_until:curr_slot_plus_padding ~sender_idx:1
+          ~fee:1_000_000_000 ~nonce:1 ~receiver_idx:9 ~amount:1_000_000_000 ()
       in
       let expired_commands =
-        [ mk_payment ~valid_until:curr_slot 0 1_000_000_000 1 9 1_000_000_000
-        ; mk_payment 0 1_000_000_000 2 9 1_000_000_000
+        [ mk_payment ~valid_until:curr_slot ~sender_idx:0 ~fee:1_000_000_000
+            ~nonce:1 ~receiver_idx:9 ~amount:1_000_000_000 ()
+        ; mk_payment ~sender_idx:0 ~fee:1_000_000_000 ~nonce:2 ~receiver_idx:9
+            ~amount:1_000_000_000 ()
         ]
       in
       (* Wait till global slot increases by 1 which invalidates
@@ -2132,12 +2140,14 @@ let%test_module _ =
             List.take independent_cmds (List.length independent_cmds / 2)
           in
           let expires_later1 =
-            mk_payment ~valid_until:curr_slot_plus_three 0 1_000_000_000 1 9
-              10_000_000_000
+            mk_payment ~valid_until:curr_slot_plus_three ~sender_idx:0
+              ~fee:1_000_000_000 ~nonce:1 ~receiver_idx:9 ~amount:10_000_000_000
+              ()
           in
           let expires_later2 =
-            mk_payment ~valid_until:curr_slot_plus_seven 0 1_000_000_000 2 9
-              10_000_000_000
+            mk_payment ~valid_until:curr_slot_plus_seven ~sender_idx:0
+              ~fee:1_000_000_000 ~nonce:2 ~receiver_idx:9 ~amount:10_000_000_000
+              ()
           in
           let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
           let cmds_wo_check =
@@ -2169,11 +2179,13 @@ let%test_module _ =
           assert_pool_txs cmds_wo_check ;
           (* Add new commands, remove old commands some of which are now expired *)
           let expired_command =
-            mk_payment ~valid_until:curr_slot 9 1_000_000_000 0 5 1_000_000_000
+            mk_payment ~valid_until:curr_slot ~sender_idx:9 ~fee:1_000_000_000
+              ~nonce:0 ~receiver_idx:5 ~amount:1_000_000_000 ()
           in
           let unexpired_command =
-            mk_payment ~valid_until:curr_slot_plus_seven 8 1_000_000_000 0 9
-              1_000_000_000
+            mk_payment ~valid_until:curr_slot_plus_seven ~sender_idx:8
+              ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:9 ~amount:1_000_000_000
+              ()
           in
           let valid_forever = List.nth_exn few_now 0 in
           let removed_commands =
@@ -2320,9 +2332,12 @@ let%test_module _ =
         User_command.Signed_command (Signed_command.sign sender_kp payload)
       in
       let txs0 =
-        [ mk_payment' 0 1_000_000_000 0 9 20_000_000_000
-        ; mk_payment' 0 1_000_000_000 1 9 12_000_000_000
-        ; mk_payment' 0 1_000_000_000 2 9 500_000_000_000
+        [ mk_payment' ~sender_idx:0 ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:9
+            ~amount:20_000_000_000 ()
+        ; mk_payment' ~sender_idx:0 ~fee:1_000_000_000 ~nonce:1 ~receiver_idx:9
+            ~amount:12_000_000_000 ()
+        ; mk_payment' ~sender_idx:0 ~fee:1_000_000_000 ~nonce:2 ~receiver_idx:9
+            ~amount:500_000_000_000 ()
         ]
       in
       let txs0' = List.map txs0 ~f:Signed_command.forget_check in
@@ -2339,11 +2354,14 @@ let%test_module _ =
       assert_pool_txs @@ txs_all ;
       let replace_txs =
         [ (* sufficient fee *)
-          mk_payment 0 16_000_000_000 0 1 440_000_000_000
+          mk_payment ~sender_idx:0 ~fee:16_000_000_000 ~nonce:0 ~receiver_idx:1
+            ~amount:440_000_000_000 ()
         ; (* insufficient fee *)
-          mk_payment 1 4_000_000_000 0 1 788_000_000_000
+          mk_payment ~sender_idx:1 ~fee:4_000_000_000 ~nonce:0 ~receiver_idx:1
+            ~amount:788_000_000_000 ()
         ; (* sufficient *)
-          mk_payment 2 20_000_000_000 1 4 721_000_000_000
+          mk_payment ~sender_idx:2 ~fee:20_000_000_000 ~nonce:1 ~receiver_idx:4
+            ~amount:721_000_000_000 ()
         ; (* insufficient *)
           (let amount = 927_000_000_000 in
            let fee =
@@ -2363,7 +2381,7 @@ let%test_module _ =
              in
              Currency.Balance.to_int account.balance - amount
            in
-           mk_payment 3 fee 1 4 amount)
+           mk_payment ~sender_idx:3 ~fee ~nonce:1 ~receiver_idx:4 ~amount ())
         ]
       in
       let replace_txs = List.map replace_txs ~f:User_command.forget_check in
@@ -2381,12 +2399,18 @@ let%test_module _ =
         setup_test ()
       in
       let txs =
-        [ mk_payment 0 5_000_000_000 0 9 20_000_000_000
-        ; mk_payment 0 6_000_000_000 1 5 77_000_000_000
-        ; mk_payment 0 1_000_000_000 2 3 891_000_000_000
+        [ mk_payment ~sender_idx:0 ~fee:5_000_000_000 ~nonce:0 ~receiver_idx:9
+            ~amount:20_000_000_000 ()
+        ; mk_payment ~sender_idx:0 ~fee:6_000_000_000 ~nonce:1 ~receiver_idx:5
+            ~amount:77_000_000_000 ()
+        ; mk_payment ~sender_idx:0 ~fee:1_000_000_000 ~nonce:2 ~receiver_idx:3
+            ~amount:891_000_000_000 ()
         ]
       in
-      let committed_tx = mk_payment 0 5_000_000_000 0 2 25_000_000_000 in
+      let committed_tx =
+        mk_payment ~sender_idx:0 ~fee:5_000_000_000 ~nonce:0 ~receiver_idx:2
+          ~amount:25_000_000_000 ()
+      in
       let txs = txs |> List.map ~f:User_command.forget_check in
       let%bind apply_res = verify_and_apply pool txs in
       [%test_eq: pool_apply] (Ok txs) (accepted_commands apply_res) ;
