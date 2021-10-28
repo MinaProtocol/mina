@@ -2,6 +2,47 @@
 
 use paste::paste;
 
+macro_rules! impl_vector_old {
+    ($name: ident, $CamlF: ty, $F: ty) => {
+
+        impl_caml_pointer!($name => Vec<$F>);
+
+        paste! {
+            #[ocaml_gen::func]
+            #[ocaml::func]
+            pub fn [<$name:snake _create>]() -> $name {
+                $name::create(Vec::new())
+            }
+
+            #[ocaml_gen::func]
+            #[ocaml::func]
+            pub fn [<$name:snake _length>](v: $name) -> ocaml::Int {
+                v.len() as isize
+            }
+
+            #[ocaml_gen::func]
+            #[ocaml::func]
+            pub fn [<$name:snake _emplace_back>](mut v: $name, x: $CamlF) {
+                (*v).push(x.into());
+            }
+
+            #[ocaml_gen::func]
+            #[ocaml::func]
+            pub fn [<$name:snake _get>](
+                v: $name,
+                i: ocaml::Int,
+            ) -> Result<$CamlF, ocaml::Error> {
+                match v.get(i as usize) {
+                    Some(x) => Ok(x.into()),
+                    None => Err(ocaml::Error::invalid_argument("caml_pasta_fp_vector_get")
+                        .err()
+                        .unwrap()),
+                }
+            }
+        }
+    };
+}
+
 macro_rules! impl_vector {
     ($name: ident, $CamlF: ty, $F: ty) => {
 
@@ -51,7 +92,7 @@ pub mod fp {
     use crate::arkworks::CamlFp;
     use mina_curves::pasta::fp::Fp;
 
-    impl_vector!(CamlFpVector, CamlFp, Fp);
+    impl_vector_old!(CamlFpVector, CamlFp, Fp);
 }
 
 pub mod fq {
@@ -59,5 +100,5 @@ pub mod fq {
     use crate::arkworks::CamlFq;
     use mina_curves::pasta::fq::Fq;
 
-    impl_vector!(CamlFqVector, CamlFq, Fq);
+    impl_vector_old!(CamlFqVector, CamlFq, Fq);
 }

@@ -60,10 +60,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
         }
     };
 
-    let witness: Vec<Vec<_>> = witness
-        .iter()
-        .map(|x| x.read().expect("lock poisoned").clone())
-        .collect();
+    let witness: Vec<Vec<_>> = witness.iter().map(|x| (*x.0).clone()).collect();
     let witness: [Vec<_>; COLUMNS] = witness
         .try_into()
         .expect("the witness should be a column of 15 vectors");
