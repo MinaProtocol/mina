@@ -1877,9 +1877,9 @@ let%test_module _ =
       in
       go pairs
 
-    let mk_account i balance nonce =
-      let public_key = Public_key.compress @@ test_keys.(i).public_key in
-      ( i
+    let mk_account ~idx ~balance ~nonce =
+      let public_key = Public_key.compress @@ test_keys.(idx).public_key in
+      ( idx
       , { Account.Poly.Stable.Latest.public_key
         ; token_id = Token_id.default
         ; token_permissions =
@@ -1906,7 +1906,8 @@ let%test_module _ =
       let cmds_to_apply = List.hd_exn cmds' :: List.drop cmds' 2 in
       let%bind apply_res = verify_and_apply pool cmds_to_apply in
       [%test_eq: pool_apply] (accepted_commands apply_res) (Ok cmds_to_apply) ;
-      map_set_multi !best_tip_ref [ mk_account 1 1_000_000_000_000 1 ] ;
+      map_set_multi !best_tip_ref
+        [ mk_account ~idx:1 ~balance:1_000_000_000_000 ~nonce:1 ] ;
       let%bind () =
         Broadcast_pipe.Writer.write best_tip_diff_w
           ( { new_commands = List.map ~f:mk_with_status @@ List.take valid_cmds 1
@@ -1941,7 +1942,9 @@ let%test_module _ =
         =
       assert_pool_txs [] ;
       map_set_multi !best_tip_ref
-        [ mk_account 0 0 0; mk_account 1 1_000_000_000_000 1 ] ;
+        [ mk_account ~idx:0 ~balance:0 ~nonce:0
+        ; mk_account ~idx:1 ~balance:1_000_000_000_000 ~nonce:1
+        ] ;
       (* need a best tip diff so the ref is actually read *)
       let%bind _ =
         Broadcast_pipe.Writer.write best_tip_diff_w
@@ -2004,7 +2007,8 @@ let%test_module _ =
         cmds =
       let cmds' = List.map cmds ~f:User_command.forget_check in
       assert_pool_txs [] ;
-      map_set_multi !best_tip_ref [ mk_account 0 1_000_000_000_000 1 ] ;
+      map_set_multi !best_tip_ref
+        [ mk_account ~idx:0 ~balance:1_000_000_000_000 ~nonce:1 ] ;
       let%bind _ =
         Broadcast_pipe.Writer.write best_tip_diff_w
           ( { new_commands = List.map ~f:mk_with_status @@ List.take cmds 2
@@ -2035,7 +2039,7 @@ let%test_module _ =
         mk_payment ~sender_idx:0 ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:5
           ~amount:999_000_000_000 ()
       in
-      map_set_multi !best_tip_ref [ mk_account 0 0 1 ] ;
+      map_set_multi !best_tip_ref [ mk_account ~idx:0 ~balance:0 ~nonce:1 ] ;
       let%bind _ =
         Broadcast_pipe.Writer.write best_tip_diff_w
           ( { new_commands =
@@ -2163,7 +2167,8 @@ let%test_module _ =
           assert_pool_txs cmds_wo_check ;
           (* new commands from best tip diff should be removed from the pool *)
           (* update the nonce to be consistent with the commands in the block *)
-          map_set_multi !best_tip_ref [ mk_account 0 1_000_000_000_000_000 2 ] ;
+          map_set_multi !best_tip_ref
+            [ mk_account ~idx:0 ~balance:1_000_000_000_000_000 ~nonce:2 ] ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               ( { new_commands =
@@ -2294,9 +2299,9 @@ let%test_module _ =
             Mock_transition_frontier.create ()
           in
           map_set_multi !ledger_ref2
-            [ mk_account 0 20_000_000_000_000 5
-            ; mk_account 1 0 0
-            ; mk_account 2 0 1
+            [ mk_account ~idx:0 ~balance:20_000_000_000_000 ~nonce:5
+            ; mk_account ~idx:1 ~balance:0 ~nonce:0
+            ; mk_account ~idx:2 ~balance:0 ~nonce:1
             ] ;
           let%bind _ =
             Broadcast_pipe.Writer.write frontier_pipe_w (Some frontier2)
@@ -2418,7 +2423,8 @@ let%test_module _ =
       let%bind apply_res = verify_and_apply pool txs in
       [%test_eq: pool_apply] (Ok txs) (accepted_commands apply_res) ;
       assert_pool_txs @@ txs ;
-      map_set_multi !best_tip_ref [ mk_account 0 970_000_000_000 1 ] ;
+      map_set_multi !best_tip_ref
+        [ mk_account ~idx:0 ~balance:970_000_000_000 ~nonce:1 ] ;
       let%bind () =
         Broadcast_pipe.Writer.write best_tip_diff_w
           { new_commands = List.map ~f:mk_with_status @@ [ committed_tx ]
