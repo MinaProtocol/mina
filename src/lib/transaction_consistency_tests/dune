@@ -1,0 +1,9 @@
+(library
+ (name transaction_consistency_tests)
+ (inline_tests)
+ (libraries
+   core_kernel
+   mina_base
+   transaction_snark
+   precomputed_values)
+ (preprocess (pps ppx_inline_test ppx_let)))
