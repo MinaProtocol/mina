@@ -15,7 +15,7 @@ spec:
         app: {{ .Values.name }}
         testnet: {{ .Values.testnetName }}
         role: seed
-        class: "plain-node"
+        class: "generic-node"
         version: {{ .Values.image.tag}}
         syncStatus: INIT
       annotations:
@@ -43,7 +43,7 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag  }}"
         {{- if .Values.features.customEntrypoint.enabled }}
         command: [{{ .Values.features.customEntrypoint.command }}]
-        {{- end }}
+        {{-- end }}
         args: [ "daemon",
           "-log-level", "Debug",
           "-log-json",
@@ -55,7 +55,13 @@ spec:
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-enable-peer-exchange", "true",
           "--discovery-keypair", "/root/libp2p-keys/key"
-          "-seed", {{ .Values.libp2p.seed.enabled | enabled}}
+          {{- if .Values.libp2p.seed.enabled }}
+          "-seed","true",
+          {{- end }}
+          {- if .Values.libp2p.loadBalancer.enabled }}
+          "-LoadBalancer", "true"
+          {{else}}
+          "type = ClusterIP"
           {{- if .Values.features.runtimeConfig.enabled }}
           "-config-file", "/config/daemon.json",
           {{- end }}
@@ -72,7 +78,7 @@ spec:
           "-peer", {{ . | quote }},
           {{- end }}
           "-generate-genesis-proof", {{ .Values.features.generateGenesisProof.enabled | quote }},
-          {{- if .Values.features.uploadBlocksToGCloud.enabled }}
+          {{-  if .Values.features.uploadBlocksToGCloud.enabled }}
           "-upload-blocks-to-gcloud", "true",
           {{- end }}
         ]
@@ -85,7 +91,9 @@ spec:
           value: {{ .Values.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
           value: {{ .Values.ports.metrics | quote }}
-        - name:.features_CLIENT_TRUSTLIST
+        - name: MINA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
+        - name: CODA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CONNECT_PRIVATE_IPS
           value: "true"

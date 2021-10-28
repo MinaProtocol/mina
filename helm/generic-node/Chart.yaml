@@ -1,6 +1,6 @@
 apiVersion: v2
 name: generic node
-description: A Helm chart for Mina Protocol's plain nodes
+description: A Helm chart for Mina Protocol's generic nodes
 type: application
 version: 1.0.3
 appVersion: 1.16.0
@@ -27,7 +27,7 @@ icon: https://storage.googleapis.com/coda-charts/Mina_Icon_Secondary_RGB_Black.p
 keywords:
   - mina
   - testnet
-  - plain-node
+  - generic-node
 home: https://minaprotocol.com/
 sources:
-  - https://github.com/MinaProtocol/mina/tree/develop/helm/plain-node
+  - https://github.com/MinaProtocol/mina/tree/compatib;e/helm/generic-node

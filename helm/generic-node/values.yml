@@ -14,15 +14,15 @@ features:
   runtimeConfig:
     enabled: true
   maxConnections: 200
-  daemon:
-    flags:
-    - "--log-precomputed-blocks"
-    - "true"
-    - "--log-json"
-  generateGenesisProof: 
-    enabled: true
-  logPrecomputedBlocks: 
-    enabled: true
+  # daemon:
+  #   flags:
+  #   - "--log-precomputed-blocks"
+  #   - "true"
+  #   - "--log-json"
+  # generateGenesisProof: 
+  #   enabled: true
+  # logPrecomputedBlocks: 
+  #   enabled: true
   logTxnPoolGossip: 
     enabled: false
   exposeGraphql: 
