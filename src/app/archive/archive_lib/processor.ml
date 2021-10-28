@@ -1026,7 +1026,7 @@ module Block = struct
     ; next_epoch_data_id : int
     ; ledger_hash : string
     ; height : int64
-    ; global_slot : int64
+    ; global_slot_since_hard_fork : int64
     ; global_slot_since_genesis : int64
     ; timestamp : int64
     }
@@ -1145,7 +1145,7 @@ module Block = struct
                 consensus_state
                 |> Consensus.Data.Consensus_state.blockchain_length
                 |> Unsigned.UInt32.to_int64
-            ; global_slot =
+            ; global_slot_since_hard_fork =
                 Consensus.Data.Consensus_state.curr_global_slot consensus_state
                 |> Unsigned.UInt32.to_int64
             ; global_slot_since_genesis =
@@ -1172,6 +1172,24 @@ module Block = struct
               transactions
           | Error e ->
               Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
+        in
+        let account_creation_fee_of_fee_and_balance fee balance =
+          (* TODO: add transaction statuses to internal commands
+             the archive lib should not know the details of
+             account creation fees; the calculation below is
+             a temporizing hack
+          *)
+          let fee_uint64 = Currency.Fee.to_uint64 fee in
+          let balance_uint64 = Currency.Balance.to_uint64 balance in
+          let account_creation_fee_uint64 =
+            Currency.Fee.to_uint64 constraint_constants.account_creation_fee
+          in
+          if
+            Unsigned.UInt64.compare balance_uint64
+              (Unsigned.UInt64.sub fee_uint64 account_creation_fee_uint64)
+            <= 0
+          then Some (Unsigned.UInt64.to_int64 account_creation_fee_uint64)
+          else None
         in
         let%bind (_ : int) =
           deferred_result_list_fold transactions ~init:0 ~f:(fun sequence_no ->
@@ -1264,29 +1282,8 @@ module Block = struct
                           (module Conn)
                           ~public_key_id:receiver_id ~balance
                       in
-                      (* TODO: add transaction statuses to internal commands
-                         the archive lib should not know the details of
-                         account creation fees; the calculation below is
-                         a temporizing hack
-                      *)
                       let receiver_account_creation_fee_paid =
-                        let fee_uint64 = Currency.Fee.to_uint64 fee in
-                        let balance_uint64 =
-                          Currency.Balance.to_uint64 balance
-                        in
-                        let account_creation_fee_uint64 =
-                          Currency.Fee.to_uint64
-                            constraint_constants.account_creation_fee
-                        in
-                        if
-                          Unsigned.UInt64.equal balance_uint64
-                            (Unsigned.UInt64.sub fee_uint64
-                               account_creation_fee_uint64)
-                        then
-                          Some
-                            (Unsigned.UInt64.to_int64
-                               account_creation_fee_uint64)
-                        else None
+                        account_creation_fee_of_fee_and_balance fee balance
                       in
                       Block_and_internal_command.add
                         (module Conn)
@@ -1328,29 +1325,8 @@ module Block = struct
                           (module Conn)
                           ~public_key_id:fee_transfer_receiver_id ~balance
                       in
-                      (* TODO: add transaction statuses to internal commands
-                         the archive lib should not know the details of
-                         account creation fees; the calculation below is
-                         a temporizing hack
-                      *)
                       let receiver_account_creation_fee_paid =
-                        let fee_uint64 = Currency.Fee.to_uint64 fee in
-                        let balance_uint64 =
-                          Currency.Balance.to_uint64 balance
-                        in
-                        let account_creation_fee_uint64 =
-                          Currency.Fee.to_uint64
-                            constraint_constants.account_creation_fee
-                        in
-                        if
-                          Unsigned.UInt64.equal balance_uint64
-                            (Unsigned.UInt64.sub fee_uint64
-                               account_creation_fee_uint64)
-                        then
-                          Some
-                            (Unsigned.UInt64.to_int64
-                               account_creation_fee_uint64)
-                        else None
+                        account_creation_fee_of_fee_and_balance fee balance
                       in
                       Block_and_internal_command.add
                         (module Conn)
@@ -1373,12 +1349,16 @@ module Block = struct
                     ~public_key_id:coinbase_receiver_id
                     ~balance:balances.coinbase_receiver_balance
                 in
+                let receiver_account_creation_fee_paid =
+                  account_creation_fee_of_fee_and_balance
+                    (Currency.Amount.to_fee coinbase.amount)
+                    balances.coinbase_receiver_balance
+                in
                 let%map () =
                   Block_and_internal_command.add
                     (module Conn)
                     ~block_id ~internal_command_id:id ~sequence_no
-                    ~secondary_sequence_no:0
-                    ~receiver_account_creation_fee_paid:None (* TEMP *)
+                    ~secondary_sequence_no:0 ~receiver_account_creation_fee_paid
                     ~receiver_balance_id
                   >>| ignore
                 in
@@ -1462,7 +1442,8 @@ module Block = struct
             ; next_epoch_data_id
             ; ledger_hash = block.ledger_hash |> Ledger_hash.to_string
             ; height = block.height |> Unsigned.UInt32.to_int64
-            ; global_slot = block.global_slot |> Unsigned.UInt32.to_int64
+            ; global_slot_since_hard_fork =
+                block.global_slot_since_hard_fork |> Unsigned.UInt32.to_int64
             ; global_slot_since_genesis =
                 block.global_slot_since_genesis |> Unsigned.UInt32.to_int64
             ; timestamp = block.timestamp |> Block_time.to_int64

@@ -20,10 +20,11 @@ module Parties_segment_witness = struct
         ; start_parties :
             ( Parties.Stable.V1.t
             , Snapp_predicate.Protocol_state.Stable.V1.t
-            , bool )
+            , Zexe_backend.Pasta.Fp.Stable.V1.t )
             Parties_logic.Start_data.Stable.V1.t
             list
         ; state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
+        ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
         }
       [@@deriving sexp, to_yojson]
 

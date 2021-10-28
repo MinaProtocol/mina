@@ -364,18 +364,11 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ( 'pk
-             , 'update
-             , 'token_id
-             , 'signed_amount
-             , 'events
-             , 'call_data
-             , 'int )
-             t =
+        type ('pk, 'update, 'token_id, 'amount, 'events, 'call_data, 'int) t =
           { pk : 'pk
           ; update : 'update
           ; token_id : 'token_id
-          ; delta : 'signed_amount
+          ; delta : 'amount
           ; events : 'events
           ; rollup_events : 'events
           ; call_data : 'call_data
@@ -406,6 +399,46 @@ module Body = struct
       let to_latest = Fn.id
     end
   end]
+
+  (* Delta for the fee payer is always going to be Neg, so represent it using an unsigned fee,
+     token id is always going to be the default, so use unit value as a placeholder
+  *)
+  module Fee_payer = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Public_key.Compressed.Stable.V1.t
+          , Update.Stable.V1.t
+          , unit
+          , Fee.Stable.V1.t
+          , Pickles.Backend.Tick.Field.Stable.V1.t array list
+          , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
+          , int )
+          Poly.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let dummy : t =
+      { pk = Public_key.Compressed.empty
+      ; update = Update.dummy
+      ; token_id = ()
+      ; delta = Fee.zero
+      ; events = []
+      ; rollup_events = []
+      ; call_data = Field.zero
+      ; depth = 0
+      }
+  end
+
+  let of_fee_payer (t : Fee_payer.t) : t =
+    { t with
+      delta = { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.delta }
+    ; token_id = Token_id.default
+    }
 
   module Checked = struct
     type t =
@@ -666,6 +699,31 @@ module Predicated = struct
     let dummy : t = { body = Body.dummy; predicate = Account_nonce.zero }
   end
 
+  module Fee_payer = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Body.Fee_payer.Stable.V1.t
+          , Account_nonce.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    module Checked = struct
+      type t = (Body.Checked.t, Account_nonce.Checked.t) Poly.t
+    end
+
+    let dummy : t =
+      { body = Body.Fee_payer.dummy; predicate = Account_nonce.zero }
+
+    let to_signed (t : t) : Signed.t =
+      { body = Body.of_fee_payer t.body; predicate = t.predicate }
+  end
+
   module Empty = struct
     [%%versioned
     module Stable = struct
@@ -684,6 +742,9 @@ module Predicated = struct
 
   let of_signed ({ body; predicate } : Signed.t) : t =
     { body; predicate = Nonce predicate }
+
+  let of_fee_payer ({ body; predicate } : Fee_payer.t) : t =
+    { body = Body.of_fee_payer body; predicate = Nonce predicate }
 end
 
 module Poly (Data : Type) (Auth : Type) = struct
@@ -726,6 +787,29 @@ module Signed = struct
     Account_id.create t.data.body.pk t.data.body.token_id
 end
 
+module Fee_payer = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Poly(Predicated.Fee_payer.Stable.V1)(Signature.Stable.V1).t =
+        { data : Predicated.Fee_payer.Stable.V1.t
+        ; authorization : Signature.Stable.V1.t
+        }
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let account_id (t : t) : Account_id.t =
+    Account_id.create t.data.body.pk Token_id.default
+
+  let to_signed (t : t) : Signed.t =
+    { authorization = t.authorization
+    ; data = Predicated.Fee_payer.to_signed t.data
+    }
+end
+
 module Empty = struct
   [%%versioned
   module Stable = struct
@@ -755,3 +839,16 @@ let account_id (t : t) : Account_id.t =
 
 let of_signed ({ data; authorization } : Signed.t) : t =
   { authorization = Signature authorization; data = Predicated.of_signed data }
+
+let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
+  { authorization = Signature authorization
+  ; data = Predicated.of_fee_payer data
+  }
+
+(** The change in balance to apply to the target account of this party.
+    When this is negative, the amount will be withdrawn from the account and
+    made available to later parties in the same transaction.
+    When this is positive, the amount will be deposited into the account from
+    the funds made available by previous parties in the same transaction.
+*)
+let delta (t : t) : Amount.Signed.t = t.data.body.delta

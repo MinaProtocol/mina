@@ -106,37 +106,32 @@ let currency_consumed_unchecked :
     -> User_command.t
     -> Currency.Amount.t option =
  fun ~constraint_constants cmd ->
-  let fee_amt = Currency.Amount.of_fee @@ User_command.fee_exn cmd in
+  let fee_amt = Currency.Amount.of_fee @@ User_command.fee cmd in
   let open Currency.Amount in
-  let%bind.Option amt =
+  let amt =
     match cmd with
-    | Signed_command c ->
-        Some
-          ( match c.payload.body with
-          | Payment ({ amount; _ } as payload) ->
-              if
-                Token_id.equal c.payload.common.fee_token
-                  (Payment_payload.token payload)
-              then
-                (* The fee-payer is also the sender account, include the amount. *)
-                amount
-              else
-                (* The payment won't affect the balance of this account. *)
-                zero
-          | Stake_delegation _ ->
+    | Signed_command c -> (
+        match c.payload.body with
+        | Payment ({ amount; _ } as payload) ->
+            if
+              Token_id.equal c.payload.common.fee_token
+                (Payment_payload.token payload)
+            then
+              (* The fee-payer is also the sender account, include the amount. *)
+              amount
+            else (* The payment won't affect the balance of this account. *)
               zero
-          | Create_new_token _ ->
-              Currency.Amount.of_fee constraint_constants.account_creation_fee
-          | Create_token_account _ ->
-              Currency.Amount.of_fee constraint_constants.account_creation_fee
-          | Mint_tokens _ ->
-              zero )
-    | Parties { fee_payer; other_parties = _; protocol_state = _ } -> (
-        match fee_payer.data.body.delta.sgn with
-        | Pos ->
-            None
-        | Neg ->
-            Some fee_payer.data.body.delta.magnitude )
+        | Stake_delegation _ ->
+            zero
+        | Create_new_token _ ->
+            Currency.Amount.of_fee constraint_constants.account_creation_fee
+        | Create_token_account _ ->
+            Currency.Amount.of_fee constraint_constants.account_creation_fee
+        | Mint_tokens _ ->
+            zero )
+    | Parties _ ->
+        (*TODO: document- txns succeeds with source amount insufficient in the case of snapps*)
+        zero
   in
   fee_amt + amt
 
@@ -249,7 +244,7 @@ module For_tests = struct
       let unchecked =
         Transaction_hash.User_command_with_valid_signature.command tx
       in
-      [%test_eq: Currency.Fee.t] fee (User_command.fee_exn unchecked) ;
+      [%test_eq: Currency.Fee.t] fee (User_command.fee unchecked) ;
       let sender_txs, _currency_reserved =
         Map.find_exn all_by_sender (User_command.fee_payer unchecked)
       in
@@ -288,7 +283,7 @@ module For_tests = struct
             assert_all_by_hash tx)) ;
     Map.iter all_by_hash ~f:(fun tx ->
         check_sender_applicable
-          (User_command.fee_exn
+          (User_command.fee
              (Transaction_hash.User_command_with_valid_signature.command tx))
           tx ;
         assert_all_by_fee tx) ;
@@ -887,7 +882,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
               (User_command.hash unchecked_cmd))
     in
     let unchecked = Transaction_hash.User_command.data unchecked_cmd in
-    let fee = User_command.fee_exn unchecked in
+    let fee = User_command.fee unchecked in
     let fee_per_wu = User_command.fee_per_wu unchecked in
     let nonce = User_command.nonce_exn unchecked in
     (* Result errors indicate problems with the command, while assert failures
@@ -1015,7 +1010,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           (* We check the fee increase twice because we need to be sure the
              subtraction is safe. *)
           let%bind () =
-            let replace_fee = User_command.fee_exn to_drop in
+            let replace_fee = User_command.fee to_drop in
             Result.ok_if_true
               Currency.Fee.(fee >= replace_fee)
               ~error:(Insufficient_replace_fee (`Replace_fee replace_fee, fee))
@@ -1046,7 +1041,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           in
           let drop_head, drop_tail = Option.value_exn (Sequence.next dropped) in
           let increment =
-            Option.value_exn Currency.Fee.(fee - User_command.fee_exn to_drop)
+            Option.value_exn Currency.Fee.(fee - User_command.fee to_drop)
           in
           (* Re-add all of the transactions we dropped until there are none left,
              or until the fees from dropped transactions exceed the fee increase
@@ -1064,7 +1059,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
                     Transaction_hash.User_command_with_valid_signature.command
                       cmd
                   in
-                  let replace_fee = User_command.fee_exn cmd_unchecked in
+                  let replace_fee = User_command.fee cmd_unchecked in
                   match Currency.Fee.(increment - replace_fee) with
                   | Some increment ->
                       go increment dropped dropped' current_nonce

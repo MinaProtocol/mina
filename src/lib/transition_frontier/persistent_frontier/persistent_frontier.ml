@@ -12,12 +12,11 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
     ~root_ledger ~root_transition ~root ~protocol_states ~logger =
   let open Deferred.Or_error.Let_syntax in
   let open Root_data.Minimal in
-  let snarked_registers =
+  let blockchain_state =
     External_transition.Validated.blockchain_state root_transition
-    |> Blockchain_state.registers
   in
+  let pending_coinbases = pending_coinbase root in
   let scan_state = scan_state root in
-  let pending_coinbase = pending_coinbase root in
   let protocol_states_map =
     List.fold protocol_states ~init:State_hash.Map.empty
       ~f:(fun acc protocol_state ->
@@ -40,38 +39,38 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
     | Some protocol_state ->
         Ok protocol_state
   in
-  let%bind transactions_with_protocol_state =
-    Deferred.return
-      (Staged_ledger.Scan_state.staged_transactions_with_protocol_states
-         scan_state ~get_state)
-  in
   let mask = Ledger.of_database root_ledger in
-  let%bind () =
-    Deferred.Or_error.List.iter transactions_with_protocol_state
-      ~f:(fun (txn, protocol_state) ->
-        Deferred.return
-        @@ let%bind.Or_error txn_with_info =
-             Ledger.apply_transaction
-               ~constraint_constants:precomputed_values.constraint_constants
-               mask
-               ~txn_state_view:(Protocol_state.Body.view protocol_state.body)
-               txn.data
-           in
-           let computed_status =
-             Ledger.Transaction_applied.user_command_status txn_with_info
-           in
-           if Transaction_status.equal txn.status computed_status then
-             Or_error.return ()
-           else
-             Or_error.errorf
-               !"Mismatched user command status. Expected: %{sexp: \
-                 Transaction_status.t} Got: %{sexp: Transaction_status.t}"
-               txn.status computed_status)
+  let local_state =
+    Blockchain_state.registers blockchain_state |> Registers.local_state
   in
-  Staged_ledger.of_scan_state_and_ledger_unchecked ~snarked_registers
-    ~ledger:mask ~scan_state
-    ~constraint_constants:precomputed_values.constraint_constants
-    ~pending_coinbase_collection:pending_coinbase
+  let staged_ledger_hash =
+    Blockchain_state.staged_ledger_hash blockchain_state
+  in
+  let%bind staged_ledger =
+    Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
+      ~snarked_local_state:local_state ~snarked_ledger:mask ~scan_state
+      ~constraint_constants:precomputed_values.constraint_constants
+      ~pending_coinbases
+      ~expected_merkle_root:(Staged_ledger_hash.ledger_hash staged_ledger_hash)
+      ~get_state
+  in
+  let is_genesis =
+    External_transition.Validated.consensus_state root_transition
+    |> Consensus.Data.Consensus_state.is_genesis_state
+  in
+  let constructed_staged_ledger_hash = Staged_ledger.hash staged_ledger in
+  if
+    is_genesis
+    || Staged_ledger_hash.equal staged_ledger_hash
+         constructed_staged_ledger_hash
+  then Deferred.return (Ok staged_ledger)
+  else
+    Deferred.return
+      (Or_error.errorf
+         !"Constructed staged ledger %{sexp: Staged_ledger_hash.t} did not \
+           match the staged ledger hash in the protocol state %{sexp: \
+           Staged_ledger_hash.t}"
+         constructed_staged_ledger_hash staged_ledger_hash)
 
 module rec Instance_type : sig
   type t =

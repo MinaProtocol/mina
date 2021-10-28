@@ -236,13 +236,65 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger =
             if succeed then return (Party.Predicate.Nonce nonce)
             else return (Party.Predicate.Nonce (Account.Nonce.succ nonce)) )
 
-let gen_party_body ?account_id ?balances_tbl ?(fee_payer = false)
-    ?(new_account = false) ?(snapp_account = false) ?available_public_keys
-    ~ledger () : Party.Body.t Quickcheck.Generator.t =
+let gen_fee (account : Account.t) =
+  Currency.Fee.gen_incl Mina_compile_config.minimum_user_command_fee
+    Currency.(Amount.to_fee (Balance.to_amount account.balance))
+
+let fee_to_amt fee = Currency.Amount.(Signed.of_unsigned (of_fee fee))
+
+let gen_delta ?balances_tbl (account : Account.t) =
+  let pk = account.public_key in
   let open Quickcheck.Let_syntax in
+  match%bind Quickcheck.Generator.of_list [ Sgn.Pos; Neg ] with
+  | Pos ->
+      (* if positive, the account balance does not impose a constraint on the magnitude; but
+         to avoid overflow over several Party.t, we'll limit the value
+      *)
+      let%map magnitude =
+        Currency.Amount.gen_incl Currency.Amount.zero
+          (Currency.Amount.of_int 100_000_000_000_000)
+      in
+      Currency.Signed_poly.{ magnitude; sgn = Sgn.Pos }
+  | Neg ->
+      (* if negative, magnitude constrained to balance in account
+         the effective balance is either what's in the balances table,
+         if provided, or what's in the ledger
+      *)
+      let effective_balance =
+        match balances_tbl with
+        | Some tbl -> (
+            match Signature_lib.Public_key.Compressed.Table.find tbl pk with
+            | None ->
+                account.balance
+            | Some balance ->
+                balance )
+        | None ->
+            account.balance
+      in
+      let%map magnitude =
+        Currency.Amount.gen_incl Currency.Amount.zero
+          (Currency.Balance.to_amount effective_balance)
+      in
+      Currency.Signed_poly.{ magnitude; sgn = Sgn.Neg }
+
+(* the type a is associated with the delta field, which is an unsigned fee for the fee payer,
+   and a signed amount for other parties
+*)
+let gen_party_body (type a) ?account_id ?balances_tbl ?(new_account = false)
+    ?(snapp_account = false) ?(is_fee_payer = false) ?available_public_keys
+    ~(gen_delta : Account.t -> a Quickcheck.Generator.t)
+    ~(f_delta : a -> Currency.Amount.Signed.t) ~ledger () :
+    (_, _, _, a, _, _, _) Party.Body.Poly.t Quickcheck.Generator.t =
+  let open Quickcheck.Let_syntax in
+  (* ledger may contain non-Snapp accounts, so if we want a Snapp account,
+     must generate a new one
+  *)
   if snapp_account && not new_account then
     failwith "gen_party_body: snapp_account but not new_account" ;
-  let%bind update = Party.Update.gen ~new_account ~snapp_account () in
+  (* fee payers have to be in the ledger *)
+  assert (not (is_fee_payer && new_account)) ;
+  (*  let%bind token_id = gen_a in *)
+  let%bind update = Party.Update.gen ~new_account () in
   let%bind account =
     if new_account then (
       if Option.is_some account_id then
@@ -343,55 +395,7 @@ let gen_party_body ?account_id ?balances_tbl ?(fee_payer = false)
   in
   let pk = account.public_key in
   let token_id = account.token_id in
-  let%bind delta =
-    (* fee payer must have negative delta, with sufficient magnitude to cover fees
-    *)
-    if fee_payer then
-      (* we start with a multiple of the minimum fee, because the deltas for other
-         parties will be subtracted from the amount we allot to the fee payer
-
-         the generator for accounts has a constrained balance, so the amount
-         here will be well less than that balance
-      *)
-      let min_fee =
-        Currency.Fee.to_int Mina_compile_config.minimum_user_command_fee
-      in
-      let magnitude = Currency.Amount.of_int (12 * min_fee) in
-      return @@ Currency.Signed_poly.{ magnitude; sgn = Sgn.Neg }
-    else
-      match%bind Quickcheck.Generator.of_list [ Sgn.Pos; Neg ] with
-      | Pos ->
-          (* if positive, the account balance does not impose a constraint on the magnitude;
-             the amount is subtracted from the fee payer's delta, used as the starting point
-             for the transaction fee, so we limit the amount to make sure there's a sufficient fee
-          *)
-          let%map magnitude =
-            Currency.Amount.gen_incl Currency.Amount.one
-              (Currency.Amount.of_int 100_000_000)
-          in
-          Currency.Signed_poly.{ magnitude; sgn = Sgn.Pos }
-      | Neg ->
-          (* if negative, magnitude constrained to balance in account
-             the effective balance is either what's in the balances table,
-             if provided, or what's in the ledger
-          *)
-          let effective_balance =
-            match balances_tbl with
-            | Some tbl -> (
-                match Signature_lib.Public_key.Compressed.Table.find tbl pk with
-                | None ->
-                    account.balance
-                | Some balance ->
-                    balance )
-            | None ->
-                account.balance
-          in
-          let%map magnitude =
-            Currency.Amount.gen_incl Currency.Amount.zero
-              (Currency.Balance.to_amount effective_balance)
-          in
-          Currency.Signed_poly.{ magnitude; sgn = Sgn.Neg }
-  in
+  let%bind delta = gen_delta account in
   (* update balances table, if provided, with generated delta *)
   ( match balances_tbl with
   | None ->
@@ -413,6 +417,7 @@ let gen_party_body ?account_id ?balances_tbl ?(fee_payer = false)
             | None ->
                 failwith "add_balance_and_delta: underflow for difference" )
       in
+      let delta = f_delta delta in
       Signature_lib.Public_key.Compressed.Table.change tbl pk ~f:(function
         | None ->
             (* new entry in table *)
@@ -455,7 +460,7 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false)
   let open Quickcheck.Let_syntax in
   let%bind body =
     gen_party_body ~new_account ~snapp_account ?available_public_keys ~ledger
-      ~balances_tbl ()
+      ~balances_tbl ~gen_delta:(gen_delta ~balances_tbl) ~f_delta:Fn.id ()
   in
   let account_id =
     Account_id.create body.Party.Body.Poly.pk body.Party.Body.Poly.token_id
@@ -484,11 +489,29 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
   in
   { Party.data; authorization }
 
-(* takes an optional public key, if we want to sign this data *)
+(* takes an optional account id, if we want to sign this data *)
 let gen_party_predicated_signed ?account_id ~ledger :
     Party.Predicated.Signed.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
-  let%map body = gen_party_body ?account_id ~fee_payer:true ~ledger () in
+  let%bind body =
+    gen_party_body ~gen_delta ~f_delta:Fn.id ?account_id ~ledger ()
+  in
+  let%map predicate = Account.Nonce.gen in
+  Party.Predicated.Poly.{ body; predicate }
+
+(* takes an account id, if we want to sign this data *)
+let gen_party_predicated_fee_payer ~account_id ~ledger :
+    Party.Predicated.Fee_payer.t Quickcheck.Generator.t =
+  let open Quickcheck.Let_syntax in
+  let%map body0 =
+    gen_party_body ~account_id ~is_fee_payer:true ~gen_delta:gen_fee
+      ~f_delta:fee_to_amt ~ledger ()
+  in
+  (* make sure the fee payer's token id is the default,
+     which is represented by the unit value in the body
+  *)
+  assert (Token_id.equal body0.token_id Token_id.default) ;
+  let body = { body0 with token_id = () } in
   let predicate = Account.Nonce.zero in
   Party.Predicated.Poly.{ body; predicate }
 
@@ -499,6 +522,14 @@ let gen_party_signed ?account_id ~ledger : Party.Signed.t Quickcheck.Generator.t
   (* real signature to be added when this data inserted into a Parties.t *)
   let authorization = Signature.dummy in
   Party.Signed.{ data; authorization }
+
+let gen_fee_payer ~account_id ~ledger : Party.Fee_payer.t Quickcheck.Generator.t
+    =
+  let open Quickcheck.Let_syntax in
+  let%map data = gen_party_predicated_fee_payer ~account_id ~ledger in
+  (* real signature to be added when this data inserted into a Parties.t *)
+  let authorization = Signature.dummy in
+  Party.Fee_payer.{ data; authorization }
 
 let gen_parties_from ?(succeed = true)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
@@ -523,11 +554,9 @@ let gen_parties_from ?(succeed = true)
           Signature_lib.Public_key.Compressed.Table.add_exn tbl ~key:pk ~data:()) ;
     tbl
   in
-  let%bind fee_payer =
-    gen_party_signed ~account_id:fee_payer_account_id ~ledger
-  in
-  let gen_parties_with_dynamic_balance ~new_accounts num_parties =
-    (* table of public keys to balances, removing an entry when generating each party
+  let%bind fee_payer = gen_fee_payer ~account_id:fee_payer_account_id ~ledger in
+  let gen_parties_with_dynamic_balance ~new_parties num_parties =
+    (* table of public keys to balances, updated when generating each party
        a Map would be more principled, but threading that map through the code adds complexity
     *)
     let balances_tbl = Signature_lib.Public_key.Compressed.Table.create () in
@@ -535,7 +564,7 @@ let gen_parties_from ?(succeed = true)
       if n <= 0 then return (List.rev acc)
       else
         let%bind party =
-          gen_party_from ~new_account:new_accounts ~available_public_keys
+          gen_party_from ~new_account:new_parties ~available_public_keys
             ~succeed ~ledger ~balances_tbl
         in
         go (party :: acc) (n - 1)
@@ -547,14 +576,16 @@ let gen_parties_from ?(succeed = true)
   let%bind num_new_accounts = Int.gen_uniform_incl 0 num_parties in
   let num_old_parties = num_parties - num_new_accounts in
   let%bind old_parties =
-    gen_parties_with_dynamic_balance ~new_accounts:false num_old_parties
+    gen_parties_with_dynamic_balance ~new_parties:false num_old_parties
   in
   let%bind new_accounts =
-    gen_parties_with_dynamic_balance ~new_accounts:true num_new_accounts
+    gen_parties_with_dynamic_balance ~new_parties:true num_new_accounts
   in
   let other_parties = old_parties @ new_accounts in
+  let%bind memo = Signed_command_memo.gen in
+  let memo_hash = Signed_command_memo.hash memo in
   let parties_dummy_signatures : Parties.t =
-    { fee_payer; other_parties; protocol_state }
+    { fee_payer; other_parties; protocol_state; memo }
   in
   (* replace dummy signature in fee payer *)
   let fee_payer_signature =
@@ -564,7 +595,7 @@ let gen_parties_from ?(succeed = true)
          |> Parties.Transaction_commitment.with_fee_payer
               ~fee_payer_hash:
                 (Party.Predicated.digest
-                   (Party.Predicated.of_signed
+                   (Party.Predicated.of_fee_payer
                       parties_dummy_signatures.fee_payer.data)) ))
   in
   let fee_payer_with_valid_signature =
@@ -580,10 +611,11 @@ let gen_parties_from ?(succeed = true)
     Snapp_predicate.Protocol_state.digest
       parties_dummy_signatures.protocol_state
   in
+
   let sign_for_other_party sk =
     Signature_lib.Schnorr.sign sk
       (Random_oracle.Input.field
-         (Parties.Transaction_commitment.create ~other_parties_hash
+         (Parties.Transaction_commitment.create ~memo_hash ~other_parties_hash
             ~protocol_state_predicate_hash))
   in
   (* replace dummy signatures in other parties *)

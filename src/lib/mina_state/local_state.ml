@@ -16,7 +16,6 @@ let display
      ; excess
      ; ledger
      ; success
-     ; will_succeed
      } :
       t) : display =
   let f x =
@@ -32,7 +31,6 @@ let display
       Visualization.display_prefix_of_string
       @@ Frozen_ledger_hash.to_string ledger
   ; success
-  ; will_succeed
   }
 
 let dummy : t =
@@ -43,7 +41,6 @@ let dummy : t =
   ; excess = Amount.zero
   ; ledger = Frozen_ledger_hash.empty_hash
   ; success = true
-  ; will_succeed = true
   }
 
 let empty = dummy
@@ -56,8 +53,7 @@ let gen : t Quickcheck.Generator.t =
   and parties = Impl.Field.Constant.gen
   and call_stack = Impl.Field.Constant.gen
   and token_id = Token_id.gen
-  and success = Bool.quickcheck_generator
-  and will_succeed = Bool.quickcheck_generator in
+  and success = Bool.quickcheck_generator in
   { Parties_logic.Local_state.parties
   ; call_stack
   ; transaction_commitment
@@ -65,7 +61,6 @@ let gen : t Quickcheck.Generator.t =
   ; ledger
   ; excess
   ; success
-  ; will_succeed
   }
 
 let to_input
@@ -76,7 +71,6 @@ let to_input
      ; excess
      ; ledger
      ; success
-     ; will_succeed
      } :
       t) =
   let open Random_oracle.Input in
@@ -88,7 +82,6 @@ let to_input
      ; Amount.to_input excess
      ; Ledger_hash.to_input ledger
      ; bitstring [ success ]
-     ; bitstring [ will_succeed ]
     |]
 
 module Checked = struct
@@ -97,7 +90,10 @@ module Checked = struct
 
   let assert_equal (t1 : t) (t2 : t) =
     let ( ! ) f x y = Impl.run_checked (f x y) in
-    let f eq f = Core_kernel.Field.(eq (get f t1) (get f t2)) in
+    let f eq f =
+      Impl.with_label (Core_kernel.Field.name f) (fun () ->
+          Core_kernel.Field.(eq (get f t1) (get f t2)))
+    in
     Parties_logic.Local_state.Fields.iter ~parties:(f Field.Assert.equal)
       ~call_stack:(f Field.Assert.equal)
       ~transaction_commitment:(f Field.Assert.equal)
@@ -105,7 +101,6 @@ module Checked = struct
       ~excess:(f !Currency.Amount.Checked.assert_equal)
       ~ledger:(f !Ledger_hash.assert_equal)
       ~success:(f Impl.Boolean.Assert.( = ))
-      ~will_succeed:(f Impl.Boolean.Assert.( = ))
 
   let equal' (t1 : t) (t2 : t) =
     let ( ! ) f x y = Impl.run_checked (f x y) in
@@ -115,7 +110,6 @@ module Checked = struct
       ~token_id:(f !Token_id.Checked.equal)
       ~excess:(f !Currency.Amount.Checked.equal)
       ~ledger:(f !Ledger_hash.equal_var) ~success:(f Impl.Boolean.equal)
-      ~will_succeed:(f Impl.Boolean.equal)
 
   let to_input
       ({ parties
@@ -125,7 +119,6 @@ module Checked = struct
        ; excess
        ; ledger
        ; success
-       ; will_succeed
        } :
         t) =
     let open Random_oracle.Input in
@@ -137,7 +130,6 @@ module Checked = struct
        ; Amount.var_to_input excess
        ; Ledger_hash.var_to_input ledger
        ; bitstring [ success ]
-       ; bitstring [ will_succeed ]
       |]
 end
 
@@ -151,7 +143,6 @@ let typ : (Checked.t, t) Impl.Typ.t =
     ; Token_id.typ
     ; Amount.typ
     ; Ledger_hash.typ
-    ; Boolean.typ
     ; Boolean.typ
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist

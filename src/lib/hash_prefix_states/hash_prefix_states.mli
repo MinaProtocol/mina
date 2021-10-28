@@ -94,3 +94,5 @@ val snapp_event : Field.t State.t
 val snapp_events : Field.t State.t
 
 val snapp_rollup_events : Field.t State.t
+
+val snapp_memo : Field.t State.t
