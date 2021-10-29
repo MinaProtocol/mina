@@ -439,7 +439,7 @@ let gen_party_body (type a) ?account_id ?balances_tbl ?(new_account = false)
   in
   (* TODO: are these lengths reasonable? *)
   let%bind events = field_array_list_gen ~max_array_len:8 ~max_list_len:12 in
-  let%bind rollup_events =
+  let%bind sequence_events =
     field_array_list_gen ~max_array_len:4 ~max_list_len:6
   in
   let%map call_data = Snark_params.Tick.Field.gen in
@@ -450,7 +450,7 @@ let gen_party_body (type a) ?account_id ?balances_tbl ?(new_account = false)
   ; token_id
   ; delta
   ; events
-  ; rollup_events
+  ; sequence_events
   ; call_data
   ; depth
   }

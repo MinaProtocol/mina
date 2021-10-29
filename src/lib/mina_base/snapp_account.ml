@@ -103,7 +103,7 @@ module Rollup_events = struct
   let empty_hash = lazy Random_oracle.(salt "MinaSnappRollupEmpty" |> digest)
 
   let push_hash acc hash =
-    Random_oracle.hash ~init:Hash_prefix_states.snapp_rollup_events
+    Random_oracle.hash ~init:Hash_prefix_states.snapp_sequence_events
       [| acc; hash |]
 
   let push_events acc events = push_hash acc (Events.hash events)
@@ -111,7 +111,7 @@ module Rollup_events = struct
   [%%ifdef consensus_mechanism]
 
   let push_events_checked x (e : Events.var) =
-    Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_rollup_events
+    Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_sequence_events
       [| x; Data_as_hash.hash e |]
 
   [%%endif]

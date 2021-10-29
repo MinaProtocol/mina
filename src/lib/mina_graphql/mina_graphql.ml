@@ -1563,7 +1563,7 @@ module Types = struct
               ~typ:(non_null (list (non_null (list (non_null string)))))
               ~args:Arg.[]
               ~resolve:(fun _ (party : Party.t) ->
-                mk_field_lists party.data.body.rollup_events)
+                mk_field_lists party.data.body.sequence_events)
           ])
 
     let snapp_command =
@@ -2436,8 +2436,8 @@ module Types = struct
       let snapp_party_body : (Party.Body.t, string) Result.t option arg_typ =
         obj "PartyBody" ~doc:"Body component of a Snapp Party"
           ~coerce:
-            (fun pk update_result token_id delta events rollup_events call_data
-                 depth ->
+            (fun pk update_result token_id delta events sequence_events
+                 call_data depth ->
             try
               let open Result.Let_syntax in
               let%bind pk =
@@ -2454,7 +2454,7 @@ module Types = struct
               let%bind update = update_result in
               let%map delta = delta in
               let events = mk_field_arrays events in
-              let rollup_events = mk_field_arrays rollup_events in
+              let sequence_events = mk_field_arrays sequence_events in
               let call_data = Snark_params.Tick.Field.of_string call_data in
               let depth = Int.of_string depth in
               Party.Body.Poly.
@@ -2463,7 +2463,7 @@ module Types = struct
                 ; token_id
                 ; delta
                 ; events
-                ; rollup_events
+                ; sequence_events
                 ; call_data
                 ; depth
                 }
@@ -2488,7 +2488,7 @@ module Types = struct
       let snapp_fee_payer_party_body =
         obj "FeePayerPartyBody" ~doc:"Body component of a Snapp Fee Payer Party"
           ~coerce:
-            (fun pk update_result fee events rollup_events call_data depth ->
+            (fun pk update_result fee events sequence_events call_data depth ->
             try
               let open Result.Let_syntax in
               let%bind pk =
@@ -2505,7 +2505,7 @@ module Types = struct
               let%map update = update_result in
               let delta = fee in
               let events = mk_field_arrays events in
-              let rollup_events = mk_field_arrays rollup_events in
+              let sequence_events = mk_field_arrays sequence_events in
               let call_data = Snark_params.Tick.Field.of_string call_data in
               let depth = Int.of_string depth in
               { Party.Body.Poly.pk
@@ -2513,7 +2513,7 @@ module Types = struct
               ; token_id
               ; delta
               ; events
-              ; rollup_events
+              ; sequence_events
               ; call_data
               ; depth
               }

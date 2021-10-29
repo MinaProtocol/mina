@@ -1256,7 +1256,7 @@ module Base = struct
              ; events = _ (* This is for the snapp to use, we don't need it. *)
              ; call_data =
                  _ (* This is for the snapp to use, we don't need it. *)
-             ; rollup_events
+             ; sequence_events
              ; depth = _ (* This is used to build the 'stack of stacks'. *)
              }
          ; predicate
@@ -1404,10 +1404,11 @@ module Base = struct
                 last_rollup_slot)
           in
           (* Push events to s1 *)
-          let is_empty = !(Party.Events.is_empty_var rollup_events) in
+          let is_empty = !(Party.Events.is_empty_var sequence_events) in
           let s1 =
             Field.if_ is_empty ~then_:s1'
-              ~else_:(Party.Rollup_events.push_events_checked s1' rollup_events)
+              ~else_:
+                (Party.Rollup_events.push_events_checked s1' sequence_events)
           in
           (* Shift along if last update wasn't this slot *)
           let is_full_and_different_slot =
@@ -4453,7 +4454,7 @@ let%test_module "transaction_snark" =
                   ; token_id = ()
                   ; delta = Fee.of_int full_amount
                   ; events = []
-                  ; rollup_events = []
+                  ; sequence_events = []
                   ; call_data = Field.zero
                   ; depth = 0
                   }
@@ -4469,7 +4470,7 @@ let%test_module "transaction_snark" =
                     ; token_id = Token_id.default
                     ; delta = Amount.Signed.(of_unsigned receiver_amount)
                     ; events = []
-                    ; rollup_events = []
+                    ; sequence_events = []
                     ; call_data = Field.zero
                     ; depth = 0
                     }
@@ -4878,7 +4879,7 @@ let%test_module "transaction_snark" =
                             ; token_id = ()
                             ; delta = fee
                             ; events = []
-                            ; rollup_events = []
+                            ; sequence_events = []
                             ; call_data = Field.zero
                             ; depth = 0
                             }
@@ -4895,7 +4896,7 @@ let%test_module "transaction_snark" =
                         ; token_id = Token_id.default
                         ; delta = Amount.(Signed.(negate (of_unsigned amount)))
                         ; events = []
-                        ; rollup_events = []
+                        ; sequence_events = []
                         ; call_data = Field.zero
                         ; depth = 0
                         }
@@ -4909,7 +4910,7 @@ let%test_module "transaction_snark" =
                         ; token_id = Token_id.default
                         ; delta = Amount.Signed.(of_unsigned amount)
                         ; events = []
-                        ; rollup_events = []
+                        ; sequence_events = []
                         ; call_data = Field.zero
                         ; depth = 0
                         }
@@ -5190,7 +5191,7 @@ let%test_module "transaction_snark" =
                             ; token_id = ()
                             ; delta = fee
                             ; events = []
-                            ; rollup_events = []
+                            ; sequence_events = []
                             ; call_data = Field.zero
                             ; depth = 0
                             }
@@ -5207,7 +5208,7 @@ let%test_module "transaction_snark" =
                         ; token_id = Token_id.default
                         ; delta = Amount.(Signed.(negate (of_unsigned amount)))
                         ; events = []
-                        ; rollup_events = []
+                        ; sequence_events = []
                         ; call_data = Field.zero
                         ; depth = 0
                         }
@@ -5221,7 +5222,7 @@ let%test_module "transaction_snark" =
                         ; token_id = Token_id.default
                         ; delta = Amount.Signed.(of_unsigned amount)
                         ; events = []
-                        ; rollup_events = []
+                        ; sequence_events = []
                         ; call_data = Field.zero
                         ; depth = 0
                         }

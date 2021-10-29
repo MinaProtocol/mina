@@ -103,7 +103,7 @@ CREATE TABLE snapp_events
 , PRIMARY KEY (list_id,list_index)
 );
 
-/* events_list_id and rollup_events_list_id indicate a list_id in snapp_events, which
+/* events_list_id and sequence_events_list_id indicate a list_id in snapp_events, which
    is not a key, since it appears as many times as there are list elements
 */
 CREATE TABLE snapp_party_body
@@ -113,7 +113,7 @@ CREATE TABLE snapp_party_body
 , token_id                 bigint           NOT NULL
 , delta                    bigint           NOT NULL
 , events_list_id           int              NOT NULL
-, rollup_events_list_id    int              NOT NULL
+, sequence_events_list_id    int              NOT NULL
 , call_data_id             int              NOT NULL REFERENCES snapp_state_data(id)
 , depth                    int              NOT NULL
 );
