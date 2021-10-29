@@ -1,5 +1,5 @@
-import type { Party_authRequired as $$Party_authRequired } from './TSTypes';
 import type { Undefined_t as Js_Undefined_t } from './Js.gen';
+import type { authRequired as $$authRequired } from './TSTypes';
 import type { field as $$field } from './TSTypes';
 import type { int64 as $$int64 } from './TSTypes';
 import type { list } from './ReasonPervasives.gen';
@@ -44,7 +44,7 @@ export declare type payment = {
     readonly validUntil?: uint32;
 };
 export declare type sign = $$sign;
-export declare type Party_authRequired = $$Party_authRequired;
+export declare type authRequired = $$authRequired;
 export declare type Party_timing = {
     readonly initialMinimumBalance: string;
     readonly cliffTime: string;
@@ -54,15 +54,15 @@ export declare type Party_timing = {
 };
 export declare type Party_permissions = {
     readonly stake: boolean;
-    readonly editState: Party_authRequired;
-    readonly send: Party_authRequired;
-    readonly receive: Party_authRequired;
-    readonly setDelegate: Party_authRequired;
-    readonly setPermissions: Party_authRequired;
-    readonly setVerificationKey: Party_authRequired;
-    readonly setSnappUri: Party_authRequired;
-    readonly editRollupState: Party_authRequired;
-    readonly setTokenSymbol: Party_authRequired;
+    readonly editState: authRequired;
+    readonly send: authRequired;
+    readonly receive: authRequired;
+    readonly setDelegate: authRequired;
+    readonly setPermissions: authRequired;
+    readonly setVerificationKey: authRequired;
+    readonly setSnappUri: authRequired;
+    readonly editRollupState: authRequired;
+    readonly setTokenSymbol: authRequired;
 };
 export declare type Party_verificationKeyWithHash = {
     readonly verificationKey: string;
