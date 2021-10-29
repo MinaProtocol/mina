@@ -856,7 +856,7 @@ let%test_unit "payment_round_trip" =
     }
   in
   let ops = to_operations' start in
-  match of_operations ?valid_until:start.valid_until ops with
+  match of_operations ?valid_until:start.valid_until ?memo:start.memo ops with
   | Ok partial ->
       [%test_eq: Partial.t] partial (forget start)
   | Error e ->
@@ -875,12 +875,12 @@ let%test_unit "delegation_round_trip" =
     ; amount = None
     ; failure_status = None
     ; hash = "TXN_2_HASH"
-    ; valid_until = None
+    ; valid_until = Some (Unsigned.UInt32.of_int 867888)
     ; memo = Some "hello"
     }
   in
   let ops = to_operations' start in
-  match of_operations ops with
+  match of_operations ops ?valid_until:start.valid_until ?memo:start.memo with
   | Ok partial ->
       [%test_eq: Partial.t] partial (forget start)
   | Error e ->
