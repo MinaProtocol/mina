@@ -1408,7 +1408,7 @@ module Base = struct
           let s1 =
             Field.if_ is_empty ~then_:s1'
               ~else_:
-                (Party.Rollup_events.push_events_checked s1' sequence_events)
+                (Party.Sequence_events.push_events_checked s1' sequence_events)
           in
           (* Shift along if last update wasn't this slot *)
           let is_full_and_different_slot =

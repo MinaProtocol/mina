@@ -99,7 +99,7 @@ module Events = struct
   [%%endif]
 end
 
-module Rollup_events = struct
+module Sequence_events = struct
   let empty_hash = lazy Random_oracle.(salt "MinaSnappRollupEmpty" |> digest)
 
   let push_hash acc hash =
@@ -184,7 +184,7 @@ module Stable = struct
       ; verification_key
       ; snapp_version = Mina_numbers.Snapp_version.zero
       ; rollup_state =
-          (let empty = Lazy.force Rollup_events.empty_hash in
+          (let empty = Lazy.force Sequence_events.empty_hash in
            [ empty; empty; empty; empty; empty ])
       ; last_rollup_slot = Mina_numbers.Global_slot.zero
       ; proved_state = false
@@ -297,7 +297,7 @@ let default : _ Poly.t =
   ; verification_key = None
   ; snapp_version = Mina_numbers.Snapp_version.zero
   ; rollup_state =
-      (let empty = Lazy.force Rollup_events.empty_hash in
+      (let empty = Lazy.force Sequence_events.empty_hash in
        [ empty; empty; empty; empty; empty ])
   ; last_rollup_slot = Mina_numbers.Global_slot.zero
   ; proved_state = false

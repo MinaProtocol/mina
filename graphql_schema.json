@@ -3572,7 +3572,7 @@
               "deprecationReason": null
             },
             {
-              "name": "rollupEvents",
+              "name": "sequenceEvents",
               "description": "A list of list of fields in Base58Check",
               "args": [],
               "type": {
@@ -3730,7 +3730,7 @@
               "defaultValue": null
             },
             {
-              "name": "rollupEvents",
+              "name": "sequenceEvents",
               "description": "A list of list of fields in Base58Check",
               "type": {
                 "kind": "NON_NULL",
@@ -5384,7 +5384,7 @@
               "deprecationReason": null
             },
             {
-              "name": "rollupEvents",
+              "name": "sequenceEvents",
               "description": "A list of list of fields in Base58Check",
               "args": [],
               "type": {
@@ -5526,7 +5526,7 @@
               "defaultValue": null
             },
             {
-              "name": "rollupEvents",
+              "name": "sequenceEvents",
               "description": "A list of list of fields in Base58Check",
               "type": {
                 "kind": "NON_NULL",
@@ -9740,8 +9740,8 @@
               "deprecationReason": null
             },
             {
-              "name": "rollupEvents",
-              "description": "Rollup events associated with the party (fields in Base58Check)",
+              "name": "sequenceEvents",
+              "description": "Sequence events associated with the party (fields in Base58Check)",
               "args": [],
               "type": {
                 "kind": "NON_NULL",

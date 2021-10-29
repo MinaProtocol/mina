@@ -1380,7 +1380,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         let is_empty = List.is_empty sequence_events in
         let s1 =
           if is_empty then s1
-          else Party.Rollup_events.push_events s1 sequence_events
+          else Party.Sequence_events.push_events s1 sequence_events
         in
         let new_rollup_state =
           if is_empty then Set_or_keep.Keep

@@ -357,7 +357,7 @@ module Update = struct
 end
 
 module Events = Snapp_account.Events
-module Rollup_events = Snapp_account.Rollup_events
+module Sequence_events = Snapp_account.Sequence_events
 
 module Body = struct
   module Poly = struct

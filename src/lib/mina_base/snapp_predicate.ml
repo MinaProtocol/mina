@@ -239,7 +239,7 @@ module Eq_data = struct
           { typ
           ; equal
           ; equal_checked = run Checked.equal
-          ; default = Lazy.force Snapp_account.Rollup_events.empty_hash
+          ; default = Lazy.force Snapp_account.Sequence_events.empty_hash
           ; to_input = field
           ; to_input_checked = field
           }
@@ -632,7 +632,7 @@ module Account = struct
       ; public_key ()
       ; Snapp_state.typ (Or_ignore.typ_explicit Field.typ ~ignore:Field.zero)
       ; Or_ignore.typ_implicit Field.typ ~equal:Field.equal
-          ~ignore:(Lazy.force Snapp_account.Rollup_events.empty_hash)
+          ~ignore:(Lazy.force Snapp_account.Sequence_events.empty_hash)
       ; Or_ignore.typ_explicit Boolean.typ ~ignore:false
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist

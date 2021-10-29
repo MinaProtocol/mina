@@ -1556,9 +1556,9 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ (party : Party.t) ->
                 mk_field_lists party.data.body.events)
-          ; field "rollupEvents"
+          ; field "sequenceEvents"
               ~doc:
-                "Rollup events associated with the party (fields in \
+                "Sequence events associated with the party (fields in \
                  Base58Check)"
               ~typ:(non_null (list (non_null (list (non_null string)))))
               ~args:Arg.[]
@@ -2477,7 +2477,8 @@ module Types = struct
             ; arg "delta" ~doc:"Signed amount" ~typ:(non_null snapp_delta)
             ; arg "events" ~doc:"A list of list of fields in Base58Check"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
-            ; arg "rollupEvents" ~doc:"A list of list of fields in Base58Check"
+            ; arg "sequenceEvents"
+                ~doc:"A list of list of fields in Base58Check"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
             ; arg "callData" ~doc:"A field in Base58Check"
                 ~typ:(non_null string)
@@ -2526,7 +2527,8 @@ module Types = struct
             ; arg "fee" ~doc:"Transaction fee" ~typ:(non_null fee)
             ; arg "events" ~doc:"A list of list of fields in Base58Check"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
-            ; arg "rollupEvents" ~doc:"A list of list of fields in Base58Check"
+            ; arg "sequenceEvents"
+                ~doc:"A list of list of fields in Base58Check"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
             ; arg "callData" ~doc:"A field in Base58Check"
                 ~typ:(non_null string)
