@@ -74,7 +74,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
         let proof = ProverProof::create::<
             DefaultFqSponge<VestaParameters, PlonkSpongeConstants15W>,
             DefaultFrSponge<Fp, PlonkSpongeConstants15W>,
-        >(&group_map, &witness, index, prev)
+        >(&group_map, witness, index, prev)
         .unwrap();
         proof.into()
     })

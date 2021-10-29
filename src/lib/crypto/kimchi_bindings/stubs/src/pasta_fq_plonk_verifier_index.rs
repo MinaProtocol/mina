@@ -52,6 +52,7 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
                 complete_add_comm: vi.complete_add_comm.into(),
                 mul_comm: vi.mul_comm.into(),
                 emul_comm: vi.emul_comm.into(),
+                endomul_scalar_comm: vi.endomul_scalar_comm.into(),
                 chacha_comm: vi
                     .chacha_comm
                     .map(|x| x.to_vec().iter().map(Into::into).collect()),
@@ -102,6 +103,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
             complete_add_comm: evals.complete_add_comm.into(),
             mul_comm: evals.mul_comm.into(),
             emul_comm: evals.emul_comm.into(),
+            endomul_scalar_comm: evals.endomul_scalar_comm.into(),
 
             chacha_comm,
 
@@ -229,6 +231,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
             psm_comm: comm(),
             complete_add_comm: comm(),
             mul_comm: comm(),
+            endomul_scalar_comm: comm(),
             emul_comm: comm(),
             chacha_comm: None,
         },
