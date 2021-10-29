@@ -3084,7 +3084,7 @@
               "deprecationReason": null
             },
             {
-              "name": "rollupState",
+              "name": "sequenceState",
               "description": null,
               "args": [],
               "type": {
@@ -3212,7 +3212,7 @@
               "defaultValue": null
             },
             {
-              "name": "rollupState",
+              "name": "sequenceState",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -4457,7 +4457,7 @@
               "deprecationReason": null
             },
             {
-              "name": "editRollupState",
+              "name": "editSequenceState",
               "description": null,
               "args": [],
               "type": {
@@ -4617,7 +4617,7 @@
               "defaultValue": null
             },
             {
-              "name": "editRollupState",
+              "name": "editSequenceState",
               "description": null,
               "type": {
                 "kind": "NON_NULL",

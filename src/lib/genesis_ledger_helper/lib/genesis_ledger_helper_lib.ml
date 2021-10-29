@@ -56,7 +56,7 @@ module Accounts = struct
             ; set_permissions
             ; set_verification_key
             ; set_snapp_uri
-            ; edit_rollup_state
+            ; edit_sequence_state
             ; set_token_symbol
             } ->
             let auth_required a =
@@ -82,7 +82,7 @@ module Accounts = struct
             ; set_permissions = auth_required set_permissions
             ; set_verification_key = auth_required set_verification_key
             ; set_snapp_uri = auth_required set_snapp_uri
-            ; edit_rollup_state = auth_required edit_rollup_state
+            ; edit_sequence_state = auth_required edit_sequence_state
             ; set_token_symbol = auth_required set_token_symbol
             }
       in
@@ -114,8 +114,8 @@ module Accounts = struct
             { state
             ; verification_key
             ; snapp_version
-            ; rollup_state
-            ; last_rollup_slot
+            ; sequence_state
+            ; last_sequence_slot
             ; proved_state
             } ->
             let%bind app_state =
@@ -133,26 +133,27 @@ module Accounts = struct
               Option.map verification_key
                 ~f:(With_hash.of_data ~hash_data:Snapp_account.digest_vk)
             in
-            let%map rollup_state =
+            let%map sequence_state =
               if
                 Pickles_types.Vector.Nat.to_int Pickles_types.Nat.N5.n
-                <> List.length rollup_state
+                <> List.length sequence_state
               then
                 Or_error.errorf
-                  !"Snap account rollup_state has invalid length %{sexp: \
+                  !"Snap account sequence_state has invalid length %{sexp: \
                     Runtime_config.Accounts.Single.t} length: %d"
-                  t (List.length rollup_state)
-              else Ok (Pickles_types.Vector.Vector_5.of_list_exn rollup_state)
+                  t
+                  (List.length sequence_state)
+              else Ok (Pickles_types.Vector.Vector_5.of_list_exn sequence_state)
             in
-            let last_rollup_slot =
-              Mina_numbers.Global_slot.of_int last_rollup_slot
+            let last_sequence_slot =
+              Mina_numbers.Global_slot.of_int last_sequence_slot
             in
             Some
               { Snapp_account.verification_key
               ; app_state
               ; snapp_version
-              ; rollup_state
-              ; last_rollup_slot
+              ; sequence_state
+              ; last_sequence_slot
               ; proved_state
               }
       in
@@ -237,7 +238,7 @@ module Accounts = struct
             ; set_permissions
             ; set_verification_key
             ; set_snapp_uri
-            ; edit_rollup_state
+            ; edit_sequence_state
             ; set_token_symbol
             } =
           account.permissions
@@ -251,7 +252,7 @@ module Accounts = struct
           ; set_permissions = auth_required set_permissions
           ; set_verification_key = auth_required set_verification_key
           ; set_snapp_uri = auth_required set_snapp_uri
-          ; edit_rollup_state = auth_required edit_rollup_state
+          ; edit_sequence_state = auth_required edit_sequence_state
           ; set_token_symbol = auth_required set_token_symbol
           }
       in
@@ -261,8 +262,8 @@ module Accounts = struct
                { app_state
                ; verification_key
                ; snapp_version
-               ; rollup_state
-               ; last_rollup_slot
+               ; sequence_state
+               ; last_sequence_slot
                ; proved_state
                }
              ->
@@ -270,15 +271,15 @@ module Accounts = struct
             let verification_key =
               Option.map verification_key ~f:With_hash.data
             in
-            let rollup_state = Pickles_types.Vector.to_list rollup_state in
-            let last_rollup_slot =
-              Mina_numbers.Global_slot.to_int last_rollup_slot
+            let sequence_state = Pickles_types.Vector.to_list sequence_state in
+            let last_sequence_slot =
+              Mina_numbers.Global_slot.to_int last_sequence_slot
             in
             { Runtime_config.Accounts.Single.Snapp_account.state
             ; verification_key
             ; snapp_version
-            ; rollup_state
-            ; last_rollup_slot
+            ; sequence_state
+            ; last_sequence_slot
             ; proved_state
             })
       in

@@ -100,7 +100,7 @@ module Events = struct
 end
 
 module Sequence_events = struct
-  let empty_hash = lazy Random_oracle.(salt "MinaSnappRollupEmpty" |> digest)
+  let empty_hash = lazy Random_oracle.(salt "MinaSnappSequenceEmpty" |> digest)
 
   let push_hash acc hash =
     Random_oracle.hash ~init:Hash_prefix_states.snapp_sequence_events
@@ -125,8 +125,8 @@ module Poly = struct
         { app_state : 'app_state
         ; verification_key : 'vk
         ; snapp_version : 'snapp_version
-        ; rollup_state : 'field Pickles_types.Vector.Vector_5.Stable.V1.t
-        ; last_rollup_slot : 'slot
+        ; sequence_state : 'field Pickles_types.Vector.Vector_5.Stable.V1.t
+        ; last_sequence_slot : 'slot
         ; proved_state : 'bool
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
@@ -145,8 +145,8 @@ type ('app_state, 'vk, 'snapp_version, 'field, 'slot, 'bool) t_ =
   { app_state : 'app_state
   ; verification_key : 'vk
   ; snapp_version : 'snapp_version
-  ; rollup_state : 'field Pickles_types.Vector.Vector_5.t
-  ; last_rollup_slot : 'slot
+  ; sequence_state : 'field Pickles_types.Vector.Vector_5.t
+  ; last_sequence_slot : 'slot
   ; proved_state : 'bool
   }
 
@@ -183,10 +183,10 @@ module Stable = struct
       { app_state
       ; verification_key
       ; snapp_version = Mina_numbers.Snapp_version.zero
-      ; rollup_state =
+      ; sequence_state =
           (let empty = Lazy.force Sequence_events.empty_hash in
            [ empty; empty; empty; empty; empty ])
-      ; last_rollup_slot = Mina_numbers.Global_slot.zero
+      ; last_sequence_slot = Mina_numbers.Global_slot.zero
       ; proved_state = false
       }
   end
@@ -222,8 +222,8 @@ module Checked = struct
       ~snapp_version:
         (f (fun x ->
              Run.run_checked (Mina_numbers.Snapp_version.Checked.to_input x)))
-      ~rollup_state:(f app_state)
-      ~last_rollup_slot:
+      ~sequence_state:(f app_state)
+      ~last_sequence_slot:
         (f (fun x ->
              Run.run_checked (Mina_numbers.Global_slot.Checked.to_input x)))
       ~proved_state:(f (fun b -> bitstring [ b ]))
@@ -286,8 +286,8 @@ let to_input (t : t) =
          (Fn.compose field
             (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash)))
     ~snapp_version:(f Mina_numbers.Snapp_version.to_input)
-    ~rollup_state:(f app_state)
-    ~last_rollup_slot:(f Mina_numbers.Global_slot.to_input)
+    ~sequence_state:(f app_state)
+    ~last_sequence_slot:(f Mina_numbers.Global_slot.to_input)
     ~proved_state:(f (fun b -> bitstring [ b ]))
   |> List.reduce_exn ~f:append
 
@@ -296,10 +296,10 @@ let default : _ Poly.t =
   { app_state = Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> F.zero)
   ; verification_key = None
   ; snapp_version = Mina_numbers.Snapp_version.zero
-  ; rollup_state =
+  ; sequence_state =
       (let empty = Lazy.force Sequence_events.empty_hash in
        [ empty; empty; empty; empty; empty ])
-  ; last_rollup_slot = Mina_numbers.Global_slot.zero
+  ; last_sequence_slot = Mina_numbers.Global_slot.zero
   ; proved_state = false
   }
 

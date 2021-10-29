@@ -1396,12 +1396,12 @@ module Base = struct
                 (Set_or_keep.Checked.set_or_keep ~if_:Field.if_ verification_key
                    (Lazy.force a.snapp.verification_key.hash)))
         in
-        let rollup_state, last_rollup_slot =
-          let [ s1'; s2'; s3'; s4'; s5' ] = a.snapp.rollup_state in
-          let last_rollup_slot = a.snapp.last_rollup_slot in
+        let sequence_state, last_sequence_slot =
+          let [ s1'; s2'; s3'; s4'; s5' ] = a.snapp.sequence_state in
+          let last_sequence_slot = a.snapp.last_sequence_slot in
           let is_this_slot =
             !(Mina_numbers.Global_slot.Checked.equal txn_global_slot
-                last_rollup_slot)
+                last_sequence_slot)
           in
           (* Push events to s1 *)
           let is_empty = !(Party.Events.is_empty_var sequence_events) in
@@ -1420,14 +1420,14 @@ module Base = struct
           let s2 = Field.if_ is_full_and_different_slot ~then_:s2' ~else_:s1' in
           let new_global_slot =
             !(Mina_numbers.Global_slot.Checked.if_ is_empty
-                ~then_:last_rollup_slot ~else_:txn_global_slot)
+                ~then_:last_sequence_slot ~else_:txn_global_slot)
           in
-          let new_rollup_state =
+          let new_sequence_state =
             ( ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
             , new_global_slot )
           in
-          update_authorized a.permissions.edit_rollup_state ~is_keep:is_empty
-            ~updated:(`Ok new_rollup_state)
+          update_authorized a.permissions.edit_sequence_state ~is_keep:is_empty
+            ~updated:(`Ok new_sequence_state)
         in
         let snapp_version =
           (* Current snapp version. Upgrade mechanism should live here. *)
@@ -1442,8 +1442,8 @@ module Base = struct
             }
         ; app_state
         ; snapp_version
-        ; rollup_state
-        ; last_rollup_slot
+        ; sequence_state
+        ; last_sequence_slot
         ; proved_state
         }
       in

@@ -2302,7 +2302,7 @@ module Types = struct
         obj "Permissions"
           ~coerce:
             (fun stake edit_state send receive set_delegate set_permissions
-                 set_verification_key set_snapp_uri edit_rollup_state
+                 set_verification_key set_snapp_uri edit_sequence_state
                  set_token_symbol ->
             Ok
               { Permissions.Poly.stake
@@ -2313,7 +2313,7 @@ module Types = struct
               ; set_permissions
               ; set_verification_key
               ; set_snapp_uri
-              ; edit_rollup_state
+              ; edit_sequence_state
               ; set_token_symbol
               })
           ~fields:
@@ -2325,7 +2325,7 @@ module Types = struct
             ; arg "setPermissions" ~typ:(non_null snapp_auth_required)
             ; arg "setVerificationKey" ~typ:(non_null snapp_auth_required)
             ; arg "setSnappUri" ~typ:(non_null snapp_auth_required)
-            ; arg "editRollupState" ~typ:(non_null snapp_auth_required)
+            ; arg "editSequenceState" ~typ:(non_null snapp_auth_required)
             ; arg "setTokenSymbol" ~typ:(non_null snapp_auth_required)
             ]
 
@@ -2720,7 +2720,7 @@ module Types = struct
           ~coerce:
             (fun balance_result nonce_result receipt_chain_hash_result
                  public_key_result delegate_result state_result
-                 rollup_state_result proved_state_result ->
+                 sequence_state_result proved_state_result ->
             let open Result.Let_syntax in
             let%bind balance = balance_result in
             let%bind nonce = nonce_result in
@@ -2728,7 +2728,7 @@ module Types = struct
             let%bind public_key = public_key_result in
             let%bind delegate = delegate_result in
             let%bind state = state_result in
-            let%bind rollup_state = rollup_state_result in
+            let%bind sequence_state = sequence_state_result in
             let%bind proved_state = proved_state_result in
             return
               ( Snapp_predicate.Account.Poly.
@@ -2738,7 +2738,7 @@ module Types = struct
                   ; public_key
                   ; delegate
                   ; state
-                  ; rollup_state
+                  ; sequence_state
                   ; proved_state
                   }
                 : Snapp_predicate.Account.t ))
@@ -2750,7 +2750,7 @@ module Types = struct
             ; arg "publicKey" ~typ:(non_null snapp_pk_or_ignore)
             ; arg "delegate" ~typ:(non_null snapp_pk_or_ignore)
             ; arg "state" ~typ:(non_null snapp_state)
-            ; arg "rollupState" ~typ:(non_null snapp_field_or_ignore)
+            ; arg "sequenceState" ~typ:(non_null snapp_field_or_ignore)
             ; arg "provedState" ~typ:(non_null snapp_bool_or_ignore)
             ]
 
