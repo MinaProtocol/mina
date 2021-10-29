@@ -1,6 +1,7 @@
 //! [impl_shared_rwlock] implements an OCaml custom type that wraps
 //! around a shared reference to RwLock to a Rust object.
 
+#[allow(unused_macros)]
 macro_rules! impl_shared_rwlock {
     ($name: ident => $typ: ty) => {
         #[derive(Debug, ::ocaml_gen::CustomType)]

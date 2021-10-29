@@ -3,6 +3,7 @@ use ark_poly::EvaluationDomain;
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 use plonk_15_wires_circuits::{gate::CircuitGate, nolookup::constraints::ConstraintSystem};
 use plonk_15_wires_protocol_dlog::index::Index as DlogIndex;
+use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
@@ -134,7 +135,7 @@ pub fn caml_pasta_fq_plonk_index_read(
     }
 
     // deserialize the index
-    let mut t: DlogIndex<GAffine> = bincode::deserialize_from(&mut r)?;
+    let mut t = DlogIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
     t.cs.fr_sponge_params = oracle::pasta::fq::params();
     t.srs = srs.clone();
     t.fq_sponge_params = oracle::pasta::fp::params();
@@ -158,6 +159,10 @@ pub fn caml_pasta_fq_plonk_index_write(
                 .err()
                 .unwrap()
         })?;
-    let mut w = BufWriter::new(file);
-    bincode::serialize_into(&mut w, &index.as_ref().0).map_err(|e| e.into())
+    let w = BufWriter::new(file);
+    index
+        .as_ref()
+        .0
+        .serialize(&mut rmp_serde::Serializer::new(w))
+        .map_err(|e| e.into())
 }
