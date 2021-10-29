@@ -19,7 +19,8 @@ module State : sig
 end
 
 val get_status :
-     frontier_broadcast_pipe:
+     signature_kind:Mina_signature_kind.t
+  -> frontier_broadcast_pipe:
        Transition_frontier.t Option.t Broadcast_pipe.Reader.t
   -> transaction_pool:Network_pool.Transaction_pool.t
   -> Signed_command.t

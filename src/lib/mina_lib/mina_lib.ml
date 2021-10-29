@@ -1192,6 +1192,8 @@ let start t =
     ~transition_frontier:t.components.transition_frontier
     ~time_controller:t.config.time_controller
     ~block_produced_bvar:t.components.block_produced_bvar
+    ~signature_kind:
+      t.config.precomputed_values.constraint_constants.signature_kind
     ~uptime_submitter_keypair:t.config.uptime_submitter_keypair
     ~get_next_producer_timing:(fun () -> t.next_producer_timing)
     ~get_snark_work_fee:(fun () -> snark_work_fee t)

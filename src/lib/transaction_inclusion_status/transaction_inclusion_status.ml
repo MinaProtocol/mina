@@ -23,10 +23,11 @@ module State = struct
 end
 
 (* TODO: this is extremely expensive as implemented and needs to be replaced with an extension *)
-let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
+let get_status ~signature_kind ~frontier_broadcast_pipe ~transaction_pool cmd =
   let open Or_error.Let_syntax in
   let%map check_cmd =
-    Result.of_option (Signed_command.check cmd)
+    Result.of_option
+      (Signed_command.check ~signature_kind cmd)
       ~error:(Error.of_string "Invalid signature")
     |> Result.map ~f:(fun x ->
            Transaction_hash.User_command_with_valid_signature.create
@@ -78,6 +79,8 @@ let%test_module "transaction_status" =
     let proof_level = precomputed_values.proof_level
 
     let constraint_constants = precomputed_values.constraint_constants
+
+    let signature_kind = constraint_constants.signature_kind
 
     module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
@@ -160,8 +163,8 @@ let%test_module "transaction_status" =
               [%log info] "Checking status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
                 ( Or_error.ok_exn
-                @@ get_status ~frontier_broadcast_pipe ~transaction_pool
-                     user_command )))
+                @@ get_status ~signature_kind ~frontier_broadcast_pipe
+                     ~transaction_pool user_command )))
 
     let%test_unit "A pending transaction is either in the transition frontier \
                    or transaction pool, but not in the best path of the \
@@ -183,8 +186,8 @@ let%test_module "transaction_status" =
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               let status =
                 Or_error.ok_exn
-                @@ get_status ~frontier_broadcast_pipe ~transaction_pool
-                     user_command
+                @@ get_status ~signature_kind ~frontier_broadcast_pipe
+                     ~transaction_pool user_command
               in
               [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Pending status))
@@ -223,6 +226,6 @@ let%test_module "transaction_status" =
               [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
                 ( Or_error.ok_exn
-                @@ get_status ~frontier_broadcast_pipe ~transaction_pool
-                     unknown_user_command )))
+                @@ get_status ~signature_kind ~frontier_broadcast_pipe
+                     ~transaction_pool unknown_user_command )))
   end )

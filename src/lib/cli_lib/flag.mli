@@ -95,3 +95,5 @@ module Signed_command : sig
 
   val memo : string option Command.Param.t
 end
+
+val signature_kind : Mina_signature_kind.t Command.Param.t

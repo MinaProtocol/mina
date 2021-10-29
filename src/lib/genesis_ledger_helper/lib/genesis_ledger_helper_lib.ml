@@ -438,6 +438,8 @@ let make_constraint_constants
             ; previous_global_slot =
                 Mina_numbers.Global_slot.of_int previous_global_slot
             } )
+  ; signature_kind =
+      Option.value ~default:default.signature_kind config.signature_kind
   }
 
 let runtime_config_of_constraint_constants
@@ -473,6 +475,7 @@ let runtime_config_of_constraint_constants
           ; previous_global_slot =
               Mina_numbers.Global_slot.to_int previous_global_slot
           })
+  ; signature_kind = Some constraint_constants.signature_kind
   }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)

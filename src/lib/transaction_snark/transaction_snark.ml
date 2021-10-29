@@ -987,11 +987,11 @@ module Base = struct
                 (Scalar_challenge [ b ])
               : Field.t * Field.t ))
 
-  let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
-      ~signature =
+  let%snarkydef check_signature ~signature_kind shifted ~payload
+      ~is_user_command ~signer ~signature =
     let%bind input = Transaction_union_payload.Checked.to_input payload in
     let%bind verifies =
-      Schnorr.Checked.verifies shifted signature signer input
+      Schnorr.Checked.verifies ~signature_kind shifted signature signer input
     in
     Boolean.Assert.any [ Boolean.not is_user_command; verifies ]
 
@@ -1355,7 +1355,7 @@ module Base = struct
       | `No ->
           Assert.is_true account_there
 
-    let signature_verifies ~shifted ~payload_digest req pk =
+    let signature_verifies ~signature_kind ~shifted ~payload_digest req pk =
       let%bind signature =
         exists Schnorr.Signature.typ ~request:(As_prover.return req)
       in
@@ -1363,7 +1363,7 @@ module Base = struct
         Public_key.decompress_var pk
         (*           (Account_id.Checked.public_key fee_payer_id) *)
       in
-      Schnorr.Checked.verifies shifted signature pk
+      Schnorr.Checked.verifies ~signature_kind shifted signature pk
         (Random_oracle.Input.field payload_digest)
 
     let pay_fee
@@ -1373,7 +1373,8 @@ module Base = struct
       let open Tick in
       let actual_fee_payer_nonce_and_rch = Set_once.create () in
       let%bind signature_verifies =
-        signature_verifies Fee_payer_signature
+        signature_verifies ~signature_kind:constraint_constants.signature_kind
+          Fee_payer_signature
           (Account_id.Checked.public_key fee_payer_id)
           ~payload_digest ~shifted
       in
@@ -1523,8 +1524,9 @@ module Base = struct
       let root =
         run_checked
           (let%bind signature_verifies =
-             signature_verifies (Account_signature which) public_key
-               ~payload_digest ~shifted
+             signature_verifies
+               ~signature_kind:constraint_constants.signature_kind
+               (Account_signature which) public_key ~payload_digest ~shifted
            in
            Frozen_ledger_hash.modify_account root
              (Account_id.Checked.create public_key token_id)
@@ -2071,7 +2073,8 @@ module Base = struct
     let is_user_command = Transaction_union.Tag.Unpacked.is_user_command tag in
     let%bind () =
       [%with_label "Check transaction signature"]
-        (check_signature shifted ~payload ~is_user_command ~signer ~signature)
+        (check_signature ~signature_kind:constraint_constants.signature_kind
+           shifted ~payload ~is_user_command ~signer ~signature)
     in
     let%bind signer_pk = Public_key.compress_var signer in
     let%bind () =
@@ -3601,6 +3604,8 @@ let%test_module "transaction_snark" =
       Consensus.Constants.create ~constraint_constants
         ~protocol_constants:genesis_constants.protocol
 
+    let signature_kind = constraint_constants.signature_kind
+
     (* For tests let's just monkey patch ledger and sparse ledger to freeze their
      * ledger_hashes. The nominal type is just so we don't mix this up in our
      * real code. *)
@@ -3664,9 +3669,10 @@ let%test_module "transaction_snark" =
                })
       in
       let signature =
-        Signed_command.sign_payload fee_payer.private_key payload
+        Signed_command.sign_payload ~signature_kind fee_payer.private_key
+          payload
       in
-      Signed_command.check
+      Signed_command.check ~signature_kind
         Signed_command.Poly.Stable.Latest.
           { payload
           ; signer = Public_key.of_private_key_exn fee_payer.private_key
@@ -3934,7 +3940,7 @@ let%test_module "transaction_snark" =
             }
         }
       in
-      Snapp_command.signed_signed ~token_id:Token_id.default
+      Snapp_command.signed_signed ~signature_kind ~token_id:Token_id.default
         (acct1.private_key, data1) (acct2.private_key, data2)
 
     let%test_unit "merkle_root_after_snapp_command_exn_immutable" =
@@ -4497,7 +4503,7 @@ let%test_module "transaction_snark" =
           ~valid_until ~memo ~body
       in
       let signer = Signature_lib.Keypair.of_private_key_exn signer in
-      let user_command = Signed_command.sign signer payload in
+      let user_command = Signed_command.sign ~signature_kind signer payload in
       let next_available_token = Ledger.next_available_token ledger in
       test_transaction ~constraint_constants ledger
         (Command (Signed_command user_command)) ;
@@ -6197,6 +6203,8 @@ let%test_module "transaction_undos" =
       Consensus.Constants.create ~constraint_constants
         ~protocol_constants:genesis_constants.protocol
 
+    let signature_kind = constraint_constants.signature_kind
+
     let state_body =
       let compile_time_genesis =
         Mina_state.Genesis_protocol_state.t
@@ -6259,7 +6267,7 @@ let%test_module "transaction_undos" =
                      ; amount
                      })
             in
-            let c = Signed_command.sign s payload in
+            let c = Signed_command.sign ~signature_kind s payload in
             User_command.Signed_command (Signed_command.forget_check c))
       in
       List.map ~f:(fun c -> Transaction.Command c) (cmds @ new_cmds)

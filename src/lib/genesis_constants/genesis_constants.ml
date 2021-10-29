@@ -52,6 +52,7 @@ module Constraint_constants = struct
     ; supercharged_coinbase_factor : int
     ; account_creation_fee : Currency.Fee.Stable.Latest.t
     ; fork : Fork_constants.t option
+    ; signature_kind : Mina_signature_kind.t
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 
@@ -77,6 +78,7 @@ module Constraint_constants = struct
               }
         | None ->
             None )
+    ; signature_kind = t.signature_kind
     }
 
   (* Generate the compile-time constraint constants, using a signature to hide
@@ -190,6 +192,7 @@ module Constraint_constants = struct
         ; account_creation_fee =
             Currency.Fee.of_formatted_string account_creation_fee_string
         ; fork
+        ; signature_kind = Testnet
         }
     end :
       sig

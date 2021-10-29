@@ -39,7 +39,7 @@ let create_ledger_and_transactions num_transitions =
              ; amount
              })
     in
-    Signed_command.sign from_kp payload
+    Signed_command.sign ~signature_kind:Testnet from_kp payload
   in
   let nonces =
     Public_key.Compressed.Table.of_alist_exn

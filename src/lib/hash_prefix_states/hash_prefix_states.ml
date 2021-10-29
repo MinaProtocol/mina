@@ -68,13 +68,6 @@ let signature_for_mainnet = salt signature_mainnet
 
 let signature_for_testnet = salt signature_testnet
 
-let signature =
-  match Mina_signature_kind.t with
-  | Mainnet ->
-      signature_for_mainnet
-  | Testnet ->
-      signature_for_testnet
-
 let vrf_output = salt vrf_output
 
 let vrf_evaluation = salt vrf_evaluation

@@ -138,14 +138,14 @@ let check_tokens ({ payload = { common = { fee_token; _ }; body }; _ } : t) =
       (not (Token_id.(equal invalid) token_id))
       && not (Token_id.(equal default) token_id)
 
-let sign_payload (private_key : Signature_lib.Private_key.t)
+let sign_payload ~signature_kind (private_key : Signature_lib.Private_key.t)
     (payload : Payload.t) : Signature.t =
-  Signature_lib.Schnorr.sign private_key (to_input payload)
+  Signature_lib.Schnorr.sign ~signature_kind private_key (to_input payload)
 
-let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
+let sign ~signature_kind (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload
   ; signer = kp.public_key
-  ; signature = sign_payload kp.private_key payload
+  ; signature = sign_payload ~signature_kind kp.private_key payload
   }
 
 module For_tests = struct
@@ -194,18 +194,19 @@ module Gen = struct
         ; amount
         }
 
-    let gen ?(sign_type = `Fake) =
+    let gen ?(signature_kind = Mina_signature_kind.Testnet) ?(sign_type = `Fake)
+        =
       match sign_type with
       | `Fake ->
           gen_inner For_tests.fake_sign
       | `Real ->
-          gen_inner sign
+          gen_inner (sign ~signature_kind)
 
-    let gen_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-        ?fee_token ?payment_token ~fee_range =
+    let gen_with_random_participants ?signature_kind ?sign_type ~keys ?nonce
+        ~max_amount ?fee_token ?payment_token ~fee_range =
       with_random_participants ~keys ~gen:(fun ~key_gen ->
-          gen ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
-            ~fee_range)
+          gen ?signature_kind ?sign_type ~key_gen ?nonce ~max_amount ?fee_token
+            ?payment_token ~fee_range)
   end
 
   module Stake_delegation = struct
@@ -233,7 +234,8 @@ module Gen = struct
     Stake_delegation.gen_with_random_participants
 
   let sequence :
-         ?length:int
+         ?signature_kind:Mina_signature_kind.t
+      -> ?length:int
       -> ?sign_type:[ `Fake | `Real ]
       -> ( Signature_lib.Keypair.t
          * Currency.Amount.t
@@ -241,7 +243,8 @@ module Gen = struct
          * Account_timing.t )
          array
       -> t list Quickcheck.Generator.t =
-   fun ?length ?(sign_type = `Fake) account_info ->
+   fun ?(signature_kind = Mina_signature_kind.Testnet) ?length
+       ?(sign_type = `Fake) account_info ->
     let open Quickcheck.Generator in
     let open Quickcheck.Generator.Let_syntax in
     let%bind n_commands =
@@ -336,7 +339,11 @@ module Gen = struct
                    })
           in
           let sign' =
-            match sign_type with `Fake -> For_tests.fake_sign | `Real -> sign
+            match sign_type with
+            | `Fake ->
+                For_tests.fake_sign
+            | `Real ->
+                sign ~signature_kind
           in
           return @@ sign' sender_pk payload)
 end
@@ -373,15 +380,15 @@ Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
 
 [%%ifdef consensus_mechanism]
 
-let check_signature ?signature_kind ({ payload; signer; signature } : t) =
-  Signature_lib.Schnorr.verify ?signature_kind signature
+let check_signature ~signature_kind ({ payload; signer; signature } : t) =
+  Signature_lib.Schnorr.verify ~signature_kind signature
     (Snark_params.Tick.Inner_curve.of_affine signer)
     (to_input payload)
 
 [%%else]
 
-let check_signature ?signature_kind ({ payload; signer; signature } : t) =
-  Signature_lib_nonconsensus.Schnorr.verify ?signature_kind signature
+let check_signature ~signature_kind ({ payload; signer; signature } : t) =
+  Signature_lib_nonconsensus.Schnorr.verify ~signature_kind signature
     (Snark_params_nonconsensus.Inner_curve.of_affine signer)
     (to_input payload)
 
@@ -394,11 +401,11 @@ let check_valid_keys t =
   List.for_all [ fee_payer; source; receiver ] ~f:(fun pk ->
       Option.is_some (Public_key.decompress pk))
 
-let create_with_signature_checked ?signature_kind signature signer payload =
+let create_with_signature_checked ~signature_kind signature signer payload =
   let open Option.Let_syntax in
   let%bind signer = Public_key.decompress signer in
   let t = Poly.{ payload; signature; signer } in
-  Option.some_if (check_signature ?signature_kind t && check_valid_keys t) t
+  Option.some_if (check_signature ~signature_kind t && check_valid_keys t) t
 
 let gen_test =
   let open Quickcheck.Let_syntax in
@@ -409,13 +416,15 @@ let gen_test =
     ~keys:(Array.of_list keys) ~max_amount:10000 ~fee_range:1000 ()
 
 let%test_unit "completeness" =
-  Quickcheck.test ~trials:20 gen_test ~f:(fun t -> assert (check_signature t))
+  Quickcheck.test ~trials:20 gen_test ~f:(fun t ->
+      assert (check_signature ~signature_kind:Testnet t))
 
 let%test_unit "json" =
   Quickcheck.test ~trials:20 ~sexp_of:sexp_of_t gen_test ~f:(fun t ->
       assert (Codable.For_tests.check_encoding (module Stable.Latest) ~equal t))
 
-let check t = Option.some_if (check_signature t && check_valid_keys t) t
+let check ~signature_kind t =
+  Option.some_if (check_signature ~signature_kind t && check_valid_keys t) t
 
 let forget_check t = t
 

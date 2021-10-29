@@ -12,13 +12,19 @@ module type Message_intf = sig
 
   type curve_scalar
 
-  val derive : t -> private_key:curve_scalar -> public_key:curve -> curve_scalar
+  val derive :
+       signature_kind:Mina_signature_kind.t
+    -> t
+    -> private_key:curve_scalar
+    -> public_key:curve
+    -> curve_scalar
 
-  val hash : t -> public_key:curve -> r:field -> curve_scalar
-
-  val hash_for_mainnet : t -> public_key:curve -> r:field -> curve_scalar
-
-  val hash_for_testnet : t -> public_key:curve -> r:field -> curve_scalar
+  val hash :
+       signature_kind:Mina_signature_kind.t
+    -> t
+    -> public_key:curve
+    -> r:field
+    -> curve_scalar
 
   [%%ifdef consensus_mechanism]
 
@@ -35,7 +41,11 @@ module type Message_intf = sig
   type (_, _) checked
 
   val hash_checked :
-    var -> public_key:curve_var -> r:field_var -> (curve_scalar_var, _) checked
+       signature_kind:Mina_signature_kind.t
+    -> var
+    -> public_key:curve_var
+    -> r:field_var
+    -> (curve_scalar_var, _) checked
 
   [%%endif]
 end
@@ -96,14 +106,16 @@ module type S = sig
     val compress : curve_var -> (Boolean.var list, _) Checked.t
 
     val verifies :
-         (module Shifted.S with type t = 't)
+         signature_kind:Mina_signature_kind.t
+      -> (module Shifted.S with type t = 't)
       -> Signature.var
       -> Public_key.var
       -> Message.var
       -> (Boolean.var, _) Checked.t
 
     val assert_verifies :
-         (module Shifted.S with type t = 't)
+         signature_kind:Mina_signature_kind.t
+      -> (module Shifted.S with type t = 't)
       -> Signature.var
       -> Public_key.var
       -> Message.var
@@ -112,10 +124,14 @@ module type S = sig
 
   val compress : curve -> bool list
 
-  val sign : Private_key.t -> Message.t -> Signature.t
+  val sign :
+       signature_kind:Mina_signature_kind.t
+    -> Private_key.t
+    -> Message.t
+    -> Signature.t
 
   val verify :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t
     -> Signature.t
     -> Public_key.t
     -> Message.t
@@ -210,33 +226,23 @@ module Make
 
   let is_even (t : Field.t) = not (Bigint.test_bit (Bigint.of_field t) 0)
 
-  let sign (d_prime : Private_key.t) m =
+  let sign ~signature_kind (d_prime : Private_key.t) m =
     let public_key =
       (* TODO: Don't recompute this. *) Curve.scale Curve.one d_prime
     in
     (* TODO: Once we switch to implicit sign-bit we'll have to conditionally negate d_prime. *)
     let d = d_prime in
-    let k_prime = Message.derive m ~public_key ~private_key:d in
+    let k_prime = Message.derive ~signature_kind m ~public_key ~private_key:d in
     assert (not Curve.Scalar.(equal k_prime zero)) ;
     let r, ry = Curve.(to_affine_exn (scale Curve.one k_prime)) in
     let k = if is_even ry then k_prime else Curve.Scalar.negate k_prime in
-    let e = Message.hash m ~public_key ~r in
+    let e = Message.hash ~signature_kind ~public_key ~r m in
     let s = Curve.Scalar.(k + (e * d)) in
     (r, s)
 
-  let verify ?signature_kind ((r, s) : Signature.t) (pk : Public_key.t)
+  let verify ~signature_kind ((r, s) : Signature.t) (pk : Public_key.t)
       (m : Message.t) =
-    let hash =
-      let open Mina_signature_kind in
-      match signature_kind with
-      | None ->
-          Message.hash
-      | Some Mainnet ->
-          Message.hash_for_mainnet
-      | Some Testnet ->
-          Message.hash_for_testnet
-    in
-    let e = hash ~public_key:pk ~r m in
+    let e = Message.hash ~signature_kind ~public_key:pk ~r m in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
     match Curve.to_affine_exn r_pt with
     | rx, ry ->
@@ -268,12 +274,12 @@ module Make
     (* returning r_point as a representable point ensures it is nonzero so the nonzero
      * check does not have to explicitly be performed *)
 
-    let%snarkydef verifier (type s) ~equal ~final_check
+    let%snarkydef verifier (type s) ~signature_kind ~equal ~final_check
         ((module Shifted) as shifted :
           (module Curve.Checked.Shifted.S with type t = s))
         ((r, s) : Signature.var) (public_key : Public_key.var) (m : Message.var)
         =
-      let%bind e = Message.hash_checked m ~public_key ~r in
+      let%bind e = Message.hash_checked ~signature_kind m ~public_key ~r in
       (* s * g - e * public_key *)
       let%bind e_pk =
         Curve.Checked.scale shifted
@@ -291,11 +297,12 @@ module Make
       let%bind r_correct = equal r rx in
       final_check r_correct y_even
 
-    let verifies s =
-      verifier ~equal:Field.Checked.equal ~final_check:Boolean.( && ) s
+    let verifies ~signature_kind s =
+      verifier ~signature_kind ~equal:Field.Checked.equal
+        ~final_check:Boolean.( && ) s
 
-    let assert_verifies s =
-      verifier ~equal:Field.Checked.Assert.equal
+    let assert_verifies ~signature_kind s =
+      verifier ~signature_kind ~equal:Field.Checked.Assert.equal
         ~final_check:(fun () ry_even -> Boolean.Assert.is_true ry_even)
         s
   end
@@ -334,10 +341,14 @@ module type S = sig
     type t = curve [@@deriving sexp]
   end
 
-  val sign : Private_key.t -> Message.t -> Signature.t
+  val sign :
+       signature_kind:Mina_signature_kind.t
+    -> Private_key.t
+    -> Message.t
+    -> Signature.t
 
   val verify :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t
     -> Signature.t
     -> Public_key.t
     -> Message.t
@@ -395,36 +406,26 @@ module Make
 
   let is_even (t : Impl.Field.t) = not @@ Impl.Field.parity t
 
-  let sign (d_prime : Private_key.t) m =
+  let sign ~signature_kind (d_prime : Private_key.t) m =
     let public_key =
       (* TODO: Don't recompute this. *)
       Curve.scale Curve.one d_prime
     in
     (* TODO: Once we switch to implicit sign-bit we'll have to conditionally negate d_prime. *)
     let d = d_prime in
-    let k_prime = Message.derive m ~public_key ~private_key:d in
+    let k_prime = Message.derive ~signature_kind m ~public_key ~private_key:d in
     assert (not Curve.Scalar.(equal k_prime zero)) ;
     let r, (ry : Impl.Field.t) =
       Curve.(to_affine_exn (scale Curve.one k_prime))
     in
     let k = if is_even ry then k_prime else Curve.Scalar.negate k_prime in
-    let e = Message.hash m ~public_key ~r in
+    let e = Message.hash ~signature_kind m ~public_key ~r in
     let s = Curve.Scalar.(k + (e * d)) in
     (r, s)
 
-  let verify ?signature_kind ((r, s) : Signature.t) (pk : Public_key.t)
+  let verify ~signature_kind ((r, s) : Signature.t) (pk : Public_key.t)
       (m : Message.t) =
-    let hash =
-      let open Mina_signature_kind in
-      match signature_kind with
-      | None ->
-          Message.hash
-      | Some Mainnet ->
-          Message.hash_for_mainnet
-      | Some Testnet ->
-          Message.hash_for_testnet
-    in
-    let e = hash ~public_key:pk ~r m in
+    let e = Message.hash ~signature_kind ~public_key:pk ~r m in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
     match Curve.to_affine_exn r_pt with
     | rx, ry ->
@@ -444,21 +445,22 @@ module Message = struct
 
   type t = (Field.t, bool) Random_oracle.Input.t [@@deriving sexp]
 
-  let network_id =
-    match Mina_signature_kind.t with
-    | Mainnet ->
+  let network_id = function
+    | Mina_signature_kind.Mainnet ->
         Char.of_int_exn 1
-    | Testnet ->
+    | Mina_signature_kind.Testnet ->
         Char.of_int_exn 0
 
-  let derive t ~private_key ~public_key =
+  let derive ~signature_kind t ~private_key ~public_key =
     let input =
       let x, y = Tick.Inner_curve.to_affine_exn public_key in
       Random_oracle.Input.append t
         { field_elements = [| x; y |]
         ; bitstrings =
             [| Tock.Field.unpack private_key
-             ; Fold_lib.Fold.(to_list (string_bits (String.of_char network_id)))
+             ; Fold_lib.Fold.(
+                 to_list
+                   (string_bits (String.of_char (network_id signature_kind))))
             |]
         }
     in
@@ -468,7 +470,14 @@ module Message = struct
     |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
     |> Tock.Field.project
 
-  let make_hash ~init t ~public_key ~r =
+  let hash ~signature_kind t ~public_key ~r =
+    let init =
+      match signature_kind with
+      | Mina_signature_kind.Mainnet ->
+          Hash_prefix_states.signature_for_mainnet
+      | Mina_signature_kind.Testnet ->
+          Hash_prefix_states.signature_for_testnet
+    in
     let input =
       let px, py = Inner_curve.to_affine_exn public_key in
       Random_oracle.Input.append t
@@ -479,27 +488,26 @@ module Message = struct
     |> Digest.to_bits ~length:Field.size_in_bits
     |> Inner_curve.Scalar.of_bits
 
-  let hash = make_hash ~init:Hash_prefix_states.signature
-
-  let hash_for_mainnet =
-    make_hash ~init:Hash_prefix_states.signature_for_mainnet
-
-  let hash_for_testnet =
-    make_hash ~init:Hash_prefix_states.signature_for_testnet
-
   [%%ifdef consensus_mechanism]
 
   type var = (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
-  let%snarkydef hash_checked t ~public_key ~r =
+  let%snarkydef hash_checked ~signature_kind t ~public_key ~r =
     let input =
       let px, py = public_key in
       Random_oracle.Input.append t
         { field_elements = [| px; py; r |]; bitstrings = [||] }
     in
+    let init =
+      match signature_kind with
+      | Mina_signature_kind.Mainnet ->
+          Hash_prefix_states.signature_for_mainnet
+      | Mina_signature_kind.Testnet ->
+          Hash_prefix_states.signature_for_testnet
+    in
     make_checked (fun () ->
         let open Random_oracle.Checked in
-        hash ~init:Hash_prefix_states.signature (pack_input input)
+        hash ~init (pack_input input)
         |> Digest.to_bits ~length:Field.size_in_bits
         |> Bitstring_lib.Bitstring.Lsb_first.of_list)
 
@@ -554,9 +562,10 @@ let message_typ () : (Message.var, Message.t) Tick.Typ.t =
 
 let%test_unit "schnorr checked + unchecked" =
   Quickcheck.test ~trials:5 gen ~f:(fun (pk, msg) ->
-      let s = S.sign pk msg in
+      let signature_kind = Mina_signature_kind.Testnet in
+      let s = S.sign ~signature_kind pk msg in
       let pubkey = Tick.Inner_curve.(scale one pk) in
-      assert (S.verify s pubkey msg) ;
+      assert (S.verify ~signature_kind s pubkey msg) ;
       (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
          Tick.Typ.(tuple3 Tick.Inner_curve.typ (message_typ ()) S.Signature.typ)
          Tick.Boolean.typ
@@ -565,7 +574,7 @@ let%test_unit "schnorr checked + unchecked" =
            let%bind (module Shifted) =
              Tick.Inner_curve.Checked.Shifted.create ()
            in
-           S.Checked.verifies (module Shifted) s public_key msg)
+           S.Checked.verifies ~signature_kind (module Shifted) s public_key msg)
          (fun _ -> true))
         (pubkey, msg, s))
 

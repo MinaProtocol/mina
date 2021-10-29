@@ -28,6 +28,7 @@ module Inputs = struct
       { m : (module S) option
       ; cache : Cache.t
       ; proof_level : Genesis_constants.Proof_level.t
+      ; signature_kind : Mina_signature_kind.t
       }
 
     let create ~constraint_constants ~proof_level () =
@@ -43,7 +44,12 @@ module Inputs = struct
         | Check | None ->
             None
       in
-      Deferred.return { m; cache = Cache.create (); proof_level }
+      Deferred.return
+        { m
+        ; cache = Cache.create ()
+        ; proof_level
+        ; signature_kind = constraint_constants.signature_kind
+        }
 
     let worker_wait_time = 5.
   end
@@ -56,7 +62,8 @@ module Inputs = struct
     Snark_work_lib.Work.Single.Spec.Stable.Latest.t
   [@@deriving bin_io_unversioned, sexp]
 
-  let perform_single ({ m; cache; proof_level } : Worker_state.t) ~message =
+  let perform_single
+      ({ m; cache; proof_level; signature_kind } : Worker_state.t) ~message =
     let open Deferred.Or_error.Let_syntax in
     let open Snark_work_lib in
     let sok_digest = Mina_base.Sok_message.digest message in
@@ -99,7 +106,7 @@ module Inputs = struct
                         (* Validate the received transaction *)
                         match t with
                         | Command (Signed_command cmd) -> (
-                            match Signed_command.check cmd with
+                            match Signed_command.check ~signature_kind cmd with
                             | Some cmd ->
                                 ( Ok (Command (Signed_command cmd))
                                   : Transaction.Valid.t Or_error.t )

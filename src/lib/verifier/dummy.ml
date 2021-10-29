@@ -26,7 +26,7 @@ let verify_commands _ (cs : User_command.Verifiable.t list) :
     list
     Deferred.Or_error.t =
   List.map cs ~f:(fun c ->
-      match Common.check c with
+      match Common.check ~signature_kind:Testnet c with
       | `Valid c ->
           `Valid c
       | `Invalid ->

@@ -218,6 +218,7 @@ module Verification_key = struct
             ; supercharged_coinbase_factor = 0
             ; account_creation_fee = Unsigned.UInt64.of_int 0
             ; fork = None
+            ; signature_kind = Mina_signature_kind.Testnet
             }
         ; commits = { mina = ""; marlin = "" }
         ; length = 0
@@ -1022,6 +1023,7 @@ let%test_module "test no side-loaded" =
                 ; supercharged_coinbase_factor = 0
                 ; account_creation_fee = Unsigned.UInt64.of_int 0
                 ; fork = None
+                ; signature_kind = Testnet
                 }
               ~choices:(fun ~self ->
                 [ { identifier = "main"

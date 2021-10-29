@@ -14,8 +14,6 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 open Random_oracle
 
-val signature : Field.t State.t
-
 val signature_for_mainnet : Field.t State.t
 
 val signature_for_testnet : Field.t State.t

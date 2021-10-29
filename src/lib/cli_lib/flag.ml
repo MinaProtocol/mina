@@ -427,3 +427,16 @@ module Signed_command = struct
            Mina_base.Signed_command_memo.max_input_length)
       (optional string)
 end
+
+let signature_kind =
+  Command.Param.flag "--signature-kind" ~aliases:[ "signature-kind" ]
+    ~doc:"testnet|mainnet The signature scheme to use. Default: testnet"
+    (Command.Param.optional_with_default Mina_signature_kind.Testnet
+       (Command.Arg_type.map Command.Param.string ~f:(fun s ->
+            match String.lowercase s with
+            | "testnet" ->
+                Mina_signature_kind.Testnet
+            | "mainnet" ->
+                Mina_signature_kind.Mainnet
+            | _ ->
+                failwith "Invalid signature kind")))

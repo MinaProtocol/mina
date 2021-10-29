@@ -3593,6 +3593,9 @@ module Queries = struct
         let transaction_pool = Mina_lib.transaction_pool coda in
         Result.map_error
           (Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
+             ~signature_kind:
+               (Mina_lib.config coda).precomputed_values.constraint_constants
+                 .signature_kind
              ~transaction_pool payment.data)
           ~f:Error.to_string_hum)
 
@@ -3902,17 +3905,20 @@ module Queries = struct
           Mutations.make_signed_user_command ~nonce_opt ~signer:from ~memo ~fee
             ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
         in
+        let constraint_constants =
+          (Mina_lib.config mina).precomputed_values.constraint_constants
+        in
         let%map user_command, _ =
           User_command_input.to_user_command
             ~get_current_nonce:(Mina_lib.get_current_nonce mina)
             ~get_account:(Mina_lib.get_account mina)
-            ~constraint_constants:
-              (Mina_lib.config mina).precomputed_values.constraint_constants
+            ~constraint_constants
             ~logger:(Mina_lib.top_level_logger mina)
             user_command_input
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
-        Signed_command.check_signature user_command)
+        Signed_command.check_signature
+          ~signature_kind:constraint_constants.signature_kind user_command)
 
   let runtime_config =
     field "runtimeConfig"

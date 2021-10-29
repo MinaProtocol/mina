@@ -63,7 +63,12 @@ module Worker_state = struct
 
              let verify_commands (cs : User_command.Verifiable.t list) :
                  _ list Deferred.t =
-               let cs = List.map cs ~f:Common.check in
+               let cs =
+                 List.map cs
+                   ~f:
+                     (Common.check
+                        ~signature_kind:constraint_constants.signature_kind)
+               in
                let to_verify =
                  List.concat_map cs ~f:(function
                    | `Valid _ ->
@@ -105,7 +110,10 @@ module Worker_state = struct
         @@ ( module struct
              let verify_commands cs =
                List.map cs ~f:(fun c ->
-                   match Common.check c with
+                   match
+                     Common.check
+                       ~signature_kind:constraint_constants.signature_kind c
+                   with
                    | `Valid c ->
                        `Valid c
                    | `Invalid ->

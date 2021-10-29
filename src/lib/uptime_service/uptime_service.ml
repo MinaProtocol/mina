@@ -47,7 +47,7 @@ let get_rfc3339_time () =
   | Some ptime ->
       Ptime.to_rfc3339 ~tz_offset_s:0 ptime
 
-let sign_blake2_hash ~private_key s =
+let sign_blake2_hash ~signature_kind ~private_key s =
   let module Field = Snark_params.Tick.Field in
   let blake2 = Blake2.digest_string s in
   let field_elements = [||] in
@@ -57,16 +57,16 @@ let sign_blake2_hash ~private_key s =
   let input : (Field.t, bool) Random_oracle.Input.t =
     { field_elements; bitstrings }
   in
-  Schnorr.sign private_key input
+  Schnorr.sign ~signature_kind private_key input
 
-let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
-    ~state_hash ~produced block_data =
+let send_uptime_data ~logger ~signature_kind ~interruptor
+    ~(submitter_keypair : Keypair.t) ~url ~state_hash ~produced block_data =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
   let block_data_json = block_data_to_yojson block_data in
   let block_data_string = Yojson.Safe.to_string block_data_json in
   let signature =
-    sign_blake2_hash ~private_key:submitter_keypair.private_key
+    sign_blake2_hash ~signature_kind ~private_key:submitter_keypair.private_key
       block_data_string
   in
   let json =
@@ -159,7 +159,7 @@ let block_base64_of_breadcrumb breadcrumb =
   (* raises only on errors from invalid optional arguments *)
   Base64.encode_exn block_string
 
-let send_produced_block_at ~logger ~interruptor ~url ~peer_id
+let send_produced_block_at ~logger ~interruptor ~url ~peer_id ~signature_kind
     ~(submitter_keypair : Keypair.t) ~block_produced_bvar tm =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
@@ -187,12 +187,12 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
         ; snark_work = None
         }
       in
-      send_uptime_data ~logger ~interruptor ~submitter_keypair ~url ~state_hash
-        ~produced:true block_data
+      send_uptime_data ~logger ~interruptor ~signature_kind ~submitter_keypair
+        ~url ~state_hash ~produced:true block_data
 
 let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
-    ~transition_frontier ~peer_id ~(submitter_keypair : Keypair.t)
-    ~snark_work_fee =
+    ~transition_frontier ~peer_id ~signature_kind
+    ~(submitter_keypair : Keypair.t) ~snark_work_fee =
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       (* expected during daemon boot, so not logging as error *)
@@ -231,8 +231,8 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
           ; snark_work = None
           }
         in
-        send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
-          ~state_hash ~produced:false block_data )
+        send_uptime_data ~logger ~interruptor ~signature_kind ~submitter_keypair
+          ~url ~state_hash ~produced:false block_data )
       else
         let best_tip_staged_ledger =
           Transition_frontier.Breadcrumb.staged_ledger best_tip
@@ -270,8 +270,8 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
               ; snark_work = None
               }
             in
-            send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
-              ~state_hash ~produced:false block_data
+            send_uptime_data ~logger ~interruptor ~signature_kind
+              ~submitter_keypair ~url ~state_hash ~produced:false block_data
         | Ok job_one_or_twos -> (
             let transitions =
               List.concat_map job_one_or_twos ~f:One_or_two.to_list
@@ -310,8 +310,8 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                   ; snark_work = None
                   }
                 in
-                send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
-                  ~state_hash ~produced:false block_data
+                send_uptime_data ~logger ~interruptor ~signature_kind
+                  ~submitter_keypair ~url ~state_hash ~produced:false block_data
             | Some single_spec -> (
                 match%bind
                   make_interruptible
@@ -349,12 +349,14 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                       ; snark_work = Some snark_work_base64
                       }
                     in
-                    send_uptime_data ~logger ~interruptor ~submitter_keypair
-                      ~url ~state_hash ~produced:false block_data ) ) )
+                    send_uptime_data ~logger ~interruptor ~signature_kind
+                      ~submitter_keypair ~url ~state_hash ~produced:false
+                      block_data ) ) )
 
 let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
-    ~time_controller ~block_produced_bvar ~uptime_submitter_keypair
-    ~get_next_producer_timing ~get_snark_work_fee ~get_peer =
+    ~time_controller ~block_produced_bvar ~signature_kind
+    ~uptime_submitter_keypair ~get_next_producer_timing ~get_snark_work_fee
+    ~get_peer =
   match uptime_url with
   | None ->
       [%log info] "Not running uptime service, no URL given" ;
@@ -437,14 +439,15 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                     "Uptime service will attempt to send the next produced \
                      block" ;
                   send_produced_block_at ~logger ~interruptor ~url ~peer_id
-                    ~submitter_keypair ~block_produced_bvar next_producer_time
+                    ~signature_kind ~submitter_keypair ~block_produced_bvar
+                    next_producer_time
                 in
                 let send_block_and_snark_work () =
                   [%log info]
                     "Uptime service will attempt to send a block and SNARK work" ;
                   let snark_work_fee = get_snark_work_fee () in
                   send_block_and_transaction_snark ~logger ~interruptor ~url
-                    ~snark_worker ~transition_frontier ~peer_id
+                    ~snark_worker ~transition_frontier ~peer_id ~signature_kind
                     ~submitter_keypair ~snark_work_fee
                 in
                 match get_next_producer_time_opt () with

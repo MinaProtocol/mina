@@ -271,6 +271,7 @@ struct
       ; batcher : Batcher.t
       ; mutable best_tip_diff_relay : (unit Deferred.t[@sexp.opaque]) Option.t
       ; mutable best_tip_ledger : (Base_ledger.t[@sexp.opaque]) Option.t
+      ; signature_kind : Mina_signature_kind.t
       }
     [@@deriving sexp_of]
 
@@ -409,12 +410,13 @@ struct
                   ~initial_minimum_balance))
           |> Option.value ~default:Currency.Balance.zero
 
-    let check_command (t : User_command.t) : User_command.Valid.t option =
+    let check_command ~signature_kind (t : User_command.t) :
+        User_command.Valid.t option =
       match t with
       | Snapp_command _ ->
           None
       | Signed_command t ->
-          Option.map (Signed_command.check t) ~f:(fun x ->
+          Option.map (Signed_command.check ~signature_kind t) ~f:(fun x ->
               User_command.Signed_command x)
 
     let handle_transition_frontier_diff
@@ -645,7 +647,8 @@ struct
               | Some acct -> (
                   match
                     Indexed_pool.add_from_gossip_exn t.pool (`Checked cmd)
-                      acct.nonce ~verify:check_command
+                      acct.nonce
+                      ~verify:(check_command ~signature_kind:t.signature_kind)
                       ( balance_of_account ~global_slot acct
                       |> Currency.Balance.to_amount )
                   with
@@ -713,6 +716,7 @@ struct
         ; best_tip_diff_relay = None
         ; recently_seen = Lru_cache.Q.create ()
         ; best_tip_ledger = None
+        ; signature_kind = constraint_constants.signature_kind
         }
       in
       don't_wait_for
@@ -1018,7 +1022,9 @@ struct
                       [%log' info t.logger]
                         "Rebroadcasting $cmd already present in the pool"
                         ~metadata:[ ("cmd", User_command.to_yojson tx) ] ;
-                      Option.iter (check_command tx) ~f:(fun cmd ->
+                      Option.iter
+                        (check_command ~signature_kind:t.signature_kind tx)
+                        ~f:(fun cmd ->
                           (* Re-register to reset the rebroadcast
                              timer.
                           *)
@@ -1062,7 +1068,8 @@ struct
                           let add_res =
                             Indexed_pool.add_from_gossip_exn pool
                               (`Unchecked tx') sender_account.nonce
-                              ~verify:check_command
+                              ~verify:
+                                (check_command ~signature_kind:t.signature_kind)
                             @@ Currency.Balance.to_amount
                             @@ balance_of_account ~global_slot sender_account
                           in
@@ -1452,6 +1459,8 @@ let%test_module _ =
 
     let proof_level = precomputed_values.proof_level
 
+    let signature_kind = constraint_constants.signature_kind
+
     let logger = Logger.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
@@ -1745,7 +1754,7 @@ let%test_module _ =
 
     let mk_payment' ?valid_until sender_idx fee nonce receiver_idx amount =
       let get_pk idx = Public_key.compress test_keys.(idx).public_key in
-      Signed_command.sign test_keys.(sender_idx)
+      Signed_command.sign ~signature_kind test_keys.(sender_idx)
         (Signed_command_payload.create ~fee:(Currency.Fee.of_int fee)
            ~fee_token:Token_id.default ~fee_payer_pk:(get_pk sender_idx)
            ~valid_until
@@ -2085,7 +2094,8 @@ let%test_module _ =
             } ->
               { common = { common with fee_payer_pk = sender_pk }; body }
         in
-        User_command.Signed_command (Signed_command.sign sender_kp payload)
+        User_command.Signed_command
+          (Signed_command.sign ~signature_kind sender_kp payload)
       in
       let txs0 =
         [ mk_payment' 0 1_000_000_000 0 9 20_000_000_000

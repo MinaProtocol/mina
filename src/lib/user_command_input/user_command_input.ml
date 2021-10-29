@@ -132,18 +132,19 @@ let create ?nonce ~fee ~fee_token ~fee_payer_pk ~valid_until ~memo ~body ~signer
   in
   { payload; signer; signature = sign_choice }
 
-let sign ~signer ~(user_command_payload : Signed_command_payload.t) = function
+let sign ~signature_kind ~signer
+    ~(user_command_payload : Signed_command_payload.t) = function
   | Sign_choice.Signature signature ->
       Option.value_map
         ~default:(Deferred.return (Error "Invalid_signature"))
-        (Signed_command.create_with_signature_checked signature signer
-           user_command_payload)
+        (Signed_command.create_with_signature_checked ~signature_kind signature
+           signer user_command_payload)
         ~f:Deferred.Result.return
   | Keypair signer_kp ->
       Deferred.Result.return
-        (Signed_command.sign signer_kp user_command_payload)
+        (Signed_command.sign ~signature_kind signer_kp user_command_payload)
   | Hd_index hd_index ->
-      Secrets.Hardware_wallets.sign ~hd_index
+      Secrets.Hardware_wallets.sign ~signature_kind ~hd_index
         ~public_key:(Public_key.decompress_exn signer)
         ~user_command_payload
 
@@ -218,8 +219,8 @@ let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
       ~constraint_constants ~logger user_command_payload
   in
   let%map signed_user_command =
-    sign ~signer:client_input.signer ~user_command_payload
-      client_input.signature
+    sign ~signature_kind:constraint_constants.signature_kind
+      ~signer:client_input.signer ~user_command_payload client_input.signature
   in
   (Signed_command.forget_check signed_user_command, updated_nonce_map)
 
