@@ -122,7 +122,7 @@ module Json_layout = struct
           ; set_permissions : Auth_required.t [@default None]
           ; set_verification_key : Auth_required.t [@default None]
           ; set_snapp_uri : Auth_required.t [@default None]
-          ; edit_rollup_state : Auth_required.t [@default None]
+          ; edit_sequence_state : Auth_required.t [@default None]
           ; set_token_symbol : Auth_required.t [@default None]
           }
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
@@ -136,7 +136,7 @@ module Json_layout = struct
            ; "set_permissions"
            ; "set_verification_key"
            ; "set_snapp_uri"
-           ; "edit_rollup_state"
+           ; "edit_sequence_state"
            ; "set_token_symbol"
           |]
 
@@ -211,8 +211,8 @@ module Json_layout = struct
           { state : Field.t list
           ; verification_key : Verification_key.t option
           ; snapp_version : Snapp_version.t
-          ; rollup_state : Field.t list
-          ; last_rollup_slot : int
+          ; sequence_state : Field.t list
+          ; last_sequence_slot : int
           ; proved_state : bool
           }
         [@@deriving sexp, dhall_type, yojson, bin_io_unversioned]
@@ -221,8 +221,8 @@ module Json_layout = struct
           [| "state"
            ; "verification_key"
            ; "snapp_version"
-           ; "rollup_state"
-           ; "last_rollup_slot"
+           ; "sequence_state"
+           ; "last_sequence_slot"
            ; "proved_state"
           |]
 

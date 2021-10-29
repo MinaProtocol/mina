@@ -357,7 +357,7 @@ module Update = struct
 end
 
 module Events = Snapp_account.Events
-module Rollup_events = Snapp_account.Rollup_events
+module Sequence_events = Snapp_account.Sequence_events
 
 module Body = struct
   module Poly = struct
@@ -370,7 +370,7 @@ module Body = struct
           ; token_id : 'token_id
           ; delta : 'amount
           ; events : 'events
-          ; rollup_events : 'events
+          ; sequence_events : 'events
           ; call_data : 'call_data
           ; depth : 'int
           }
@@ -428,7 +428,7 @@ module Body = struct
       ; token_id = ()
       ; delta = Fee.zero
       ; events = []
-      ; rollup_events = []
+      ; sequence_events = []
       ; call_data = Field.zero
       ; depth = 0
       }
@@ -457,7 +457,7 @@ module Body = struct
          ; token_id
          ; delta
          ; events
-         ; rollup_events
+         ; sequence_events
          ; call_data
          ; depth = _depth (* ignored *)
          } :
@@ -468,7 +468,7 @@ module Body = struct
         ; Impl.run_checked (Token_id.Checked.to_input token_id)
         ; Amount.Signed.Checked.to_input delta
         ; Events.var_to_input events
-        ; Events.var_to_input rollup_events
+        ; Events.var_to_input sequence_events
         ; Random_oracle_input.field call_data
         ]
 
@@ -498,7 +498,7 @@ module Body = struct
     ; token_id = Token_id.default
     ; delta = Amount.Signed.zero
     ; events = []
-    ; rollup_events = []
+    ; sequence_events = []
     ; call_data = Field.zero
     ; depth = 0
     }
@@ -509,7 +509,7 @@ module Body = struct
        ; token_id
        ; delta
        ; events
-       ; rollup_events
+       ; sequence_events
        ; call_data
        ; depth = _ (* ignored *)
        } :
@@ -520,7 +520,7 @@ module Body = struct
       ; Token_id.to_input token_id
       ; Amount.Signed.to_input delta
       ; Events.to_input events
-      ; Events.to_input rollup_events
+      ; Events.to_input sequence_events
       ; Random_oracle_input.field call_data
       ]
 

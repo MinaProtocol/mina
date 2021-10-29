@@ -103,7 +103,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger =
                 | Some pk ->
                     Or_ignore.gen (return pk)
               in
-              let%bind state, rollup_state, proved_state =
+              let%bind state, sequence_state, proved_state =
                 match snapp with
                 | None ->
                     (* won't raise, correct length given *)
@@ -111,18 +111,18 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger =
                       Snapp_state.V.of_list_exn
                         (List.init 8 ~f:(fun _ -> Or_ignore.Ignore))
                     in
-                    let rollup_state = Or_ignore.Ignore in
+                    let sequence_state = Or_ignore.Ignore in
                     let proved_state = Or_ignore.Ignore in
-                    return (state, rollup_state, proved_state)
-                | Some { app_state; rollup_state; proved_state; _ } ->
+                    return (state, sequence_state, proved_state)
+                | Some { app_state; sequence_state; proved_state; _ } ->
                     let state =
                       Snapp_state.V.map app_state ~f:(fun field ->
                           Quickcheck.random_value (Or_ignore.gen (return field)))
                     in
-                    let%bind rollup_state =
-                      (* choose a value from account rollup state *)
+                    let%bind sequence_state =
+                      (* choose a value from account sequence state *)
                       let fields =
-                        Pickles_types.Vector.Vector_5.to_list rollup_state
+                        Pickles_types.Vector.Vector_5.to_list sequence_state
                       in
                       let%bind ndx =
                         Int.gen_uniform_incl 0 (List.length fields - 1)
@@ -130,7 +130,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger =
                       return (Or_ignore.Check (List.nth_exn fields ndx))
                     in
                     let proved_state = Or_ignore.Check proved_state in
-                    return (state, rollup_state, proved_state)
+                    return (state, sequence_state, proved_state)
               in
               return
                 { Snapp_predicate.Account.Poly.balance
@@ -139,7 +139,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger =
                 ; public_key
                 ; delegate
                 ; state
-                ; rollup_state
+                ; sequence_state
                 ; proved_state
                 }
             in
@@ -152,7 +152,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger =
                   | Receipt_chain_hash
                   | Delegate
                   | State
-                  | Rollup_state
+                  | Sequence_state
                   | Proved_state
               end in
               let%bind faulty_predicate_account =
@@ -163,7 +163,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger =
                   ; Receipt_chain_hash
                   ; Delegate
                   ; State
-                  ; Rollup_state
+                  ; Sequence_state
                   ; Proved_state
                   ]
                 in
@@ -215,10 +215,10 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger =
                       Snapp_state.V.of_list_exn (Array.to_list fields)
                     in
                     return { predicate_account with state }
-                | Rollup_state ->
+                | Sequence_state ->
                     let%bind field = Snark_params.Tick.Field.gen in
-                    let rollup_state = Or_ignore.Check field in
-                    return { predicate_account with rollup_state }
+                    let sequence_state = Or_ignore.Check field in
+                    return { predicate_account with sequence_state }
                 | Proved_state ->
                     let%bind proved_state =
                       match predicate_account.proved_state with
@@ -439,7 +439,7 @@ let gen_party_body (type a) ?account_id ?balances_tbl ?(new_account = false)
   in
   (* TODO: are these lengths reasonable? *)
   let%bind events = field_array_list_gen ~max_array_len:8 ~max_list_len:12 in
-  let%bind rollup_events =
+  let%bind sequence_events =
     field_array_list_gen ~max_array_len:4 ~max_list_len:6
   in
   let%map call_data = Snark_params.Tick.Field.gen in
@@ -450,7 +450,7 @@ let gen_party_body (type a) ?account_id ?balances_tbl ?(new_account = false)
   ; token_id
   ; delta
   ; events
-  ; rollup_events
+  ; sequence_events
   ; call_data
   ; depth
   }

@@ -1556,14 +1556,14 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ (party : Party.t) ->
                 mk_field_lists party.data.body.events)
-          ; field "rollupEvents"
+          ; field "sequenceEvents"
               ~doc:
-                "Rollup events associated with the party (fields in \
+                "Sequence events associated with the party (fields in \
                  Base58Check)"
               ~typ:(non_null (list (non_null (list (non_null string)))))
               ~args:Arg.[]
               ~resolve:(fun _ (party : Party.t) ->
-                mk_field_lists party.data.body.rollup_events)
+                mk_field_lists party.data.body.sequence_events)
           ])
 
     let snapp_command =
@@ -2302,7 +2302,7 @@ module Types = struct
         obj "Permissions"
           ~coerce:
             (fun stake edit_state send receive set_delegate set_permissions
-                 set_verification_key set_snapp_uri edit_rollup_state
+                 set_verification_key set_snapp_uri edit_sequence_state
                  set_token_symbol ->
             Ok
               { Permissions.Poly.stake
@@ -2313,7 +2313,7 @@ module Types = struct
               ; set_permissions
               ; set_verification_key
               ; set_snapp_uri
-              ; edit_rollup_state
+              ; edit_sequence_state
               ; set_token_symbol
               })
           ~fields:
@@ -2325,7 +2325,7 @@ module Types = struct
             ; arg "setPermissions" ~typ:(non_null snapp_auth_required)
             ; arg "setVerificationKey" ~typ:(non_null snapp_auth_required)
             ; arg "setSnappUri" ~typ:(non_null snapp_auth_required)
-            ; arg "editRollupState" ~typ:(non_null snapp_auth_required)
+            ; arg "editSequenceState" ~typ:(non_null snapp_auth_required)
             ; arg "setTokenSymbol" ~typ:(non_null snapp_auth_required)
             ]
 
@@ -2436,8 +2436,8 @@ module Types = struct
       let snapp_party_body : (Party.Body.t, string) Result.t option arg_typ =
         obj "PartyBody" ~doc:"Body component of a Snapp Party"
           ~coerce:
-            (fun pk update_result token_id delta events rollup_events call_data
-                 depth ->
+            (fun pk update_result token_id delta events sequence_events
+                 call_data depth ->
             try
               let open Result.Let_syntax in
               let%bind pk =
@@ -2454,7 +2454,7 @@ module Types = struct
               let%bind update = update_result in
               let%map delta = delta in
               let events = mk_field_arrays events in
-              let rollup_events = mk_field_arrays rollup_events in
+              let sequence_events = mk_field_arrays sequence_events in
               let call_data = Snark_params.Tick.Field.of_string call_data in
               let depth = Int.of_string depth in
               Party.Body.Poly.
@@ -2463,7 +2463,7 @@ module Types = struct
                 ; token_id
                 ; delta
                 ; events
-                ; rollup_events
+                ; sequence_events
                 ; call_data
                 ; depth
                 }
@@ -2477,7 +2477,8 @@ module Types = struct
             ; arg "delta" ~doc:"Signed amount" ~typ:(non_null snapp_delta)
             ; arg "events" ~doc:"A list of list of fields in Base58Check"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
-            ; arg "rollupEvents" ~doc:"A list of list of fields in Base58Check"
+            ; arg "sequenceEvents"
+                ~doc:"A list of list of fields in Base58Check"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
             ; arg "callData" ~doc:"A field in Base58Check"
                 ~typ:(non_null string)
@@ -2488,7 +2489,7 @@ module Types = struct
       let snapp_fee_payer_party_body =
         obj "FeePayerPartyBody" ~doc:"Body component of a Snapp Fee Payer Party"
           ~coerce:
-            (fun pk update_result fee events rollup_events call_data depth ->
+            (fun pk update_result fee events sequence_events call_data depth ->
             try
               let open Result.Let_syntax in
               let%bind pk =
@@ -2505,7 +2506,7 @@ module Types = struct
               let%map update = update_result in
               let delta = fee in
               let events = mk_field_arrays events in
-              let rollup_events = mk_field_arrays rollup_events in
+              let sequence_events = mk_field_arrays sequence_events in
               let call_data = Snark_params.Tick.Field.of_string call_data in
               let depth = Int.of_string depth in
               { Party.Body.Poly.pk
@@ -2513,7 +2514,7 @@ module Types = struct
               ; token_id
               ; delta
               ; events
-              ; rollup_events
+              ; sequence_events
               ; call_data
               ; depth
               }
@@ -2526,7 +2527,8 @@ module Types = struct
             ; arg "fee" ~doc:"Transaction fee" ~typ:(non_null fee)
             ; arg "events" ~doc:"A list of list of fields in Base58Check"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
-            ; arg "rollupEvents" ~doc:"A list of list of fields in Base58Check"
+            ; arg "sequenceEvents"
+                ~doc:"A list of list of fields in Base58Check"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
             ; arg "callData" ~doc:"A field in Base58Check"
                 ~typ:(non_null string)
@@ -2718,7 +2720,7 @@ module Types = struct
           ~coerce:
             (fun balance_result nonce_result receipt_chain_hash_result
                  public_key_result delegate_result state_result
-                 rollup_state_result proved_state_result ->
+                 sequence_state_result proved_state_result ->
             let open Result.Let_syntax in
             let%bind balance = balance_result in
             let%bind nonce = nonce_result in
@@ -2726,7 +2728,7 @@ module Types = struct
             let%bind public_key = public_key_result in
             let%bind delegate = delegate_result in
             let%bind state = state_result in
-            let%bind rollup_state = rollup_state_result in
+            let%bind sequence_state = sequence_state_result in
             let%bind proved_state = proved_state_result in
             return
               ( Snapp_predicate.Account.Poly.
@@ -2736,7 +2738,7 @@ module Types = struct
                   ; public_key
                   ; delegate
                   ; state
-                  ; rollup_state
+                  ; sequence_state
                   ; proved_state
                   }
                 : Snapp_predicate.Account.t ))
@@ -2748,7 +2750,7 @@ module Types = struct
             ; arg "publicKey" ~typ:(non_null snapp_pk_or_ignore)
             ; arg "delegate" ~typ:(non_null snapp_pk_or_ignore)
             ; arg "state" ~typ:(non_null snapp_state)
-            ; arg "rollupState" ~typ:(non_null snapp_field_or_ignore)
+            ; arg "sequenceState" ~typ:(non_null snapp_field_or_ignore)
             ; arg "provedState" ~typ:(non_null snapp_bool_or_ignore)
             ]
 
