@@ -113,7 +113,7 @@ CREATE TABLE snapp_party_body
 , token_id                 bigint           NOT NULL
 , delta                    bigint           NOT NULL
 , events_list_id           int              NOT NULL
-, sequence_events_list_id    int              NOT NULL
+, sequence_events_list_id  int              NOT NULL
 , call_data_id             int              NOT NULL REFERENCES snapp_state_data(id)
 , depth                    int              NOT NULL
 );
