@@ -1,0 +1,6 @@
+(library
+ (name ppx_dhall_type_runtime)
+ (public_name ppx_dhall_type.runtime)
+ (libraries ppxlib core_kernel)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppxlib.metaquot)))

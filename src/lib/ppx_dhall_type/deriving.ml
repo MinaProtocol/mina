@@ -35,17 +35,20 @@ let rec dhall_type_of_core_type core_type =
   let open Ast_builder in
   match core_type.ptyp_desc with
   | Ptyp_constr (lident, []) when is_bool_lident lident ->
-      [%expr Ppx_dhall_type.Dhall_type.Bool]
+      [%expr Ppx_dhall_type_runtime.Dhall_type.Bool]
   | Ptyp_constr (lident, []) when is_int_lident lident ->
-      [%expr Ppx_dhall_type.Dhall_type.Integer]
+      [%expr Ppx_dhall_type_runtime.Dhall_type.Integer]
   | Ptyp_constr (lident, []) when is_float_lident lident ->
-      [%expr Ppx_dhall_type.Dhall_type.Double]
+      [%expr Ppx_dhall_type_runtime.Dhall_type.Double]
   | Ptyp_constr (lident, []) when is_string_lident lident ->
-      [%expr Ppx_dhall_type.Dhall_type.Text]
+      [%expr Ppx_dhall_type_runtime.Dhall_type.Text]
   | Ptyp_constr (lident, [ ty ]) when is_option_lident lident ->
-      [%expr Ppx_dhall_type.Dhall_type.Optional [%e dhall_type_of_core_type ty]]
+      [%expr
+        Ppx_dhall_type_runtime.Dhall_type.Optional
+          [%e dhall_type_of_core_type ty]]
   | Ptyp_constr (lident, [ ty ]) when is_list_lident lident ->
-      [%expr Ppx_dhall_type.Dhall_type.List [%e dhall_type_of_core_type ty]]
+      [%expr
+        Ppx_dhall_type_runtime.Dhall_type.List [%e dhall_type_of_core_type ty]]
   | Ptyp_constr ({ txt = Lident id; _ }, []) ->
       evar (id ^ "_dhall_type")
   | Ptyp_constr ({ txt = Lident id; _ }, params) ->
@@ -112,14 +115,14 @@ let generate_dhall_type type_decl =
             dhall_type_of_core_type core_type )
     | Ptype_variant ctor_decls ->
         [%expr
-          Ppx_dhall_type.Dhall_type.Union
+          Ppx_dhall_type_runtime.Dhall_type.Union
             [%e
               elist
                 (List.map ctor_decls
                    ~f:dhall_variant_from_constructor_declaration)]]
     | Ptype_record label_decls ->
         [%expr
-          Ppx_dhall_type.Dhall_type.Record
+          Ppx_dhall_type_runtime.Dhall_type.Record
             [%e
               elist (List.map label_decls ~f:dhall_field_from_label_declaration)]]
     | Ptype_open ->
