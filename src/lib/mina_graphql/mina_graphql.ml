@@ -2984,46 +2984,18 @@ module Mutations = struct
           ~f:(Fn.compose Yojson.Safe.to_string Error_json.error_to_yojson) )
 
   let set_staking =
-    field "setStaking" ~doc:"Set keys you wish to stake with"
+    result_field "setStaking" ~doc:"Set keys you wish to stake with"
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_staking)]
       ~typ:(non_null Types.Payload.set_staking)
-      ~resolve:(fun {ctx= coda; _} () _pks ->
-        [%log' error (Mina_lib.top_level_logger coda)]
-          "setStaking is temorarily disabled in this build. Please restart \
-           the daemon with the new block producer key" ;
-        let old_block_production_keys =
-          Mina_lib.block_production_pubkeys coda
-          |> Public_key.Compressed.Set.to_list
-        in
-        (old_block_production_keys, [], old_block_production_keys)
-        (*TODO: uncomment this after key swaps are fixed for the new VRF evaluator implementation *)
-        (*let old_block_production_keys =
-          Mina_lib.block_production_pubkeys coda
-        in
-        let wallet = Mina_lib.wallets coda in
-        let unlocked, locked =
-          List.partition_map pks ~f:(fun pk ->
-              match Secrets.Wallets.find_unlocked ~needle:pk wallet with
-              | Some kp ->
-                  `Fst (kp, pk)
-              | None ->
-                  `Snd pk )
-        in
-        [%log' info (Mina_lib.top_level_logger coda)]
-          ~metadata:
-            [ ( "old"
-              , [%to_yojson: Public_key.Compressed.t list]
-                  (Public_key.Compressed.Set.to_list old_block_production_keys)
-              )
-            ; ("new", [%to_yojson: Public_key.Compressed.t list] pks) ]
-          !"Block production key replacement; old: $old, new: $new" ;
-        ignore
-        @@ Mina_lib.replace_block_production_keypairs coda
-             (Keypair.And_compressed_pk.Set.of_list unlocked) ;
-        ( Public_key.Compressed.Set.to_list old_block_production_keys
-        , locked
-        , List.map ~f:Tuple.T2.get2 unlocked )*)
-        )
+      ~deprecated:
+        (Deprecated
+           (Some
+              "Restart the daemon with the flag --block-producer-key instead"))
+      ~resolve:(fun {ctx= _coda; _} () _pks ->
+        Error
+          "The setStaking command is deprecated and no longer has any effect. \
+           To enable block production, instead restart the daemon with the \
+           flag --block-producer-key." )
 
   let set_coinbase_receiver =
     field "setCoinbaseReceiver" ~doc:"Set the key to receive coinbases"
