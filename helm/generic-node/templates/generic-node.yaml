@@ -24,7 +24,7 @@ spec:
         prometheus.io/path: '/metrics'
     spec:
       initContainers:
-      {{ if $config.libp2pSecret -}}
+      {{- if .Values.libp2p.enabled -}}
       - name: libp2p-init-my-service
         image: busybox:1.28
         command: [ 'bash', '-c', '/bin/cp /libp2p-keys/* /root/libp2p-keys && /bin/chmod -R 0700 /root/libp2p-keys/' ]
@@ -41,49 +41,68 @@ spec:
             memory: 32.0Gi
             cpu: 12.0
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag  }}"
-        {{- if .Values.features.customEntrypoint.enabled }}
+        {{- if .Values.features.customEntrypoint.enabled -}}
         command: [{{ .Values.features.customEntrypoint.command }}]
-        {{-- end }}
-        args: [ "daemon",
-          "-log-level", "Debug",
-          "-log-json",
-          "-log-snark-work-gossip", "true",
-          "-config-directory", "/root/.features-config",
-          "-client-port", "$(DAEMON_CLIENT_PORT)",
-          "-rest-port", "$(DAEMON_REST_PORT)",
-          "-external-port", "$(DAEMON_EXTERNAL_PORT)",
-          "-metrics-port", "$(DAEMON_METRICS_PORT)",
-          "-enable-peer-exchange", "true",
-          "--discovery-keypair", "/root/libp2p-keys/key"
+        {{- end }}
+        args: 
+        - daemon
+        - "--log-level"
+        - "Debug"
+        - "--log-json"
+        - "-log-snark-work-gossip" 
+        - "true"
+        - "-config-directory" 
+        - "/root/.features-config"
+        - "-client-port" 
+        - "$(DAEMON_CLIENT_PORT)"
+        - "-rest-port" 
+        - "$(DAEMON_REST_PORT)"
+        - "-external-port"
+        - "$(DAEMON_EXTERNAL_PORT)"
+        - "-metrics-port"
+        - "$(DAEMON_METRICS_PORT)"
+        - "-enable-peer-exchange" 
+        - "true"
+        - "--discovery-keypair" 
+        - "/root/libp2p-keys/key"
           {{- if .Values.libp2p.seed.enabled }}
-          "-seed","true",
+          - "-seed"
+          - "true"
           {{- end }}
-          {- if .Values.libp2p.loadBalancer.enabled }}
-          "-LoadBalancer", "true"
+          {{- if .Values.libp2p.loadBalancer.enabled }}
+          - "type = LoadBalancer"
           {{else}}
-          "type = ClusterIP"
+          - "type = ClusterIP"
+          {{- end }}
           {{- if .Values.features.runtimeConfig.enabled }}
-          "-config-file", "/config/daemon.json",
+          - "-config-file"
+          - "/config/daemon.json"
           {{- end }}
           {{- if .Values.features.logPrecomputedBlocks.enabled }}
-          "-log-precomputed-blocks", "true",
+          - "-log-precomputed-blocks"
+          - "true"
           {{- end -}}
           {{- if .Values.features.logTxnPoolGossip.enabled }}
-          "-log-txn-pool-gossip", "true",
+          - "-log-txn-pool-gossip"
+          - "true"
           {{- end -}}
           {{- if .Values.features.maxConnections }}
-          "--max-connections", {{ .Values.features.maxConnections | quote }},
+          - "--max-connections"
+          {{ .Values.features.maxConnections | quote }}
           {{- end -}}
           {{- range .Values.features.seedPeers }}
-          "-peer", {{ . | quote }},
+          - "-peer" 
+          {{ . | quote }}
           {{- end }}
-          "-generate-genesis-proof", {{ .Values.features.generateGenesisProof.enabled | quote }},
+          - "-generate-genesis-proof" 
+          {{ .Values.features.generateGenesisProof.enabled | quote }}
           {{-  if .Values.features.uploadBlocksToGCloud.enabled }}
-          "-upload-blocks-to-gcloud", "true",
+          - "-upload-blocks-to-gcloud"
+          - "true"
           {{- end }}
-        ]
+        
         env:
-        - name: "RAYON_NUM_THREADS"
+        - name: RAYON_NUM_THREADS
           value: "6"
         - name: DAEMON_REST_PORT
           value: {{ .Values.ports.graphql | quote }}
@@ -155,17 +174,16 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $.Values.name  }}-graphql
+  name: {{ .Values.name  }}-graphql
 spec:
   type: ClusterIP
   publishNotReadyAddresses: true
   selector:
-    app: {{ $.Values.name  }}
+    app: {{ .Values.name  }}
   ports:
   - name: http-graphql
     protocol: TCP
     port: 80
-    targetPort: {{ $.Values.features.ports.graphql }}
+    targetPort: {{ .Values.features.ports.graphql }}
 {{- end }}
 ---
-
