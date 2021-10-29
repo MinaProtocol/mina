@@ -655,11 +655,13 @@ struct
            - that these first 7 variables (that participate in the permutation argument) are not wired to anything that didn't participate in the permutation argument (hard to check as we don't have that information atm)
            - that the remaining columns (that don't participate in the permutation argument) do not have anything that's part of the permutation argument (easy to check as we have that hashtbl) *)
 
-        (* add to row and gates *)
+        (* add to gates *)
         let open Position in
         sys.gates <-
           `Unfinalized_rev ({ kind; row = (); wired_to = [||]; coeffs } :: gates) ;
+        (* increment row *)
         sys.next_row <- sys.next_row + 1 ;
+        (* add to row *)
         sys.rows_rev <- vars :: sys.rows_rev
 
   (** Adds a generic constraint to the constraint system. *)
@@ -952,36 +954,78 @@ struct
         in
         let state = reduce_state sys state in
         (* add_round_state adds a row that contains 5 rounds of permutation *)
-        let add_round_state state_i ind =
-          let row = Array.map state_i ~f:(fun x -> Some x) in
-          let coeffs = Params.params.round_constants.(ind + 1) in
-          add_row sys row Poseidon coeffs
+        let add_round_state ~round (s1, s2, s3, s4, s5) =
+          let vars =
+            [| Some s1.(0)
+             ; Some s1.(1)
+             ; Some s1.(2)
+             ; Some s5.(0) (* the last state is in 2nd position *)
+             ; Some s5.(1)
+             ; Some s5.(2)
+             ; Some s2.(0)
+             ; Some s2.(1)
+             ; Some s2.(2)
+             ; Some s3.(0)
+             ; Some s3.(1)
+             ; Some s3.(2)
+             ; Some s4.(0)
+             ; Some s4.(1)
+             ; Some s4.(2)
+            |]
+          in
+          let coeffs =
+            [| Params.params.round_constants.(round + 1).(0)
+             ; Params.params.round_constants.(round + 1).(1)
+             ; Params.params.round_constants.(round + 1).(2)
+             ; Params.params.round_constants.(round + 5).(0) (* same for rc *)
+             ; Params.params.round_constants.(round + 5).(1)
+             ; Params.params.round_constants.(round + 5).(2)
+             ; Params.params.round_constants.(round + 2).(0)
+             ; Params.params.round_constants.(round + 2).(1)
+             ; Params.params.round_constants.(round + 2).(2)
+             ; Params.params.round_constants.(round + 3).(0)
+             ; Params.params.round_constants.(round + 3).(1)
+             ; Params.params.round_constants.(round + 3).(2)
+             ; Params.params.round_constants.(round + 4).(0)
+             ; Params.params.round_constants.(round + 4).(1)
+             ; Params.params.round_constants.(round + 4).(2)
+            |]
+          in
+          add_row sys vars Poseidon coeffs
         in
-        (* [s1, s2, s3, s1', s2', s3', s1'', s2'', s3'', ...] *)
-        (* iterate through the state *)
-        let last_row = Array.length state - 1 in
-        Array.iteri state ~f:(fun i state_i ->
-            if i <> last_row then add_round_state state_i i
-            else
-              (* last row is zero gate, only the first three columns matter *)
-              let vars =
-                [| Some state_i.(0)
-                 ; Some state_i.(1)
-                 ; Some state_i.(2)
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                |]
-              in
-              add_row sys vars Zero [||])
+        (* add_last_row adds the last row containing the output *)
+        let add_last_row state =
+          let vars =
+            [| Some state.(0)
+             ; Some state.(1)
+             ; Some state.(2)
+             ; None
+             ; None
+             ; None
+             ; None
+             ; None
+             ; None
+             ; None
+             ; None
+             ; None
+             ; None
+             ; None
+            |]
+          in
+          add_row sys vars Zero [||]
+        in
+        (* go through the states row by row (a row contains 5 states) *)
+        let rec process_5_states_at_a_time ~round = function
+          | [ s1; s2; s3; s4; s5; last ] ->
+              add_round_state ~round (s1, s2, s3, s4, s5) ;
+              add_last_row last
+          | s1 :: s2 :: s3 :: s4 :: s5 :: tl ->
+              add_round_state ~round (s1, s2, s3, s4, s5) ;
+              process_5_states_at_a_time ~round:(round + 5) tl
+          | _ ->
+              failwith "incorrect number of states given"
+        in
+        process_5_states_at_a_time ~round:0 (Array.to_list state)
     | Plonk_constraint.T
         (EC_add_complete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv }) ->
         let reduce_curve_point (x, y) = (reduce_to_v x, reduce_to_v y) in
