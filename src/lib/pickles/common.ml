@@ -177,7 +177,7 @@ module Ipa = struct
             Or_infinity.Finite comm)
       in
       let urs = Backend.Tick.Keypair.load_urs () in
-      Async.In_thread.run (fun () ->
+      Run_in_thread.run_in_thread (fun () ->
           Marlin_plonk_bindings.Pasta_fp_urs.batch_accumulator_check urs comms
             chals)
   end
