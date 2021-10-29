@@ -470,6 +470,7 @@ module Balance = struct
                          Some
                            (`Assoc
                              [ ("locked_balance", `Intlit "0")
+                             ; ("liquid_balance", `Intlit "66000")
                              ; ("total_balance", `Intlit "66000") ]) } ]
                ; metadata= Some (`Assoc [("nonce", `Intlit "2")]) })
     end )
