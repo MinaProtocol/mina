@@ -1,57 +1,56 @@
-
 /CODEOWNERS @nholland94 @bkase @imeckler
-/buildkite @MinaProtocol/infra-eng-reviewers
-/frontend/ @MinaProtocol/product-eng-reviewers
-/dockerfiles/ @MinaProtocol/infra-eng-reviewers
-/scripts/ @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
-/Makefile @MinaProtocol/infra-eng-reviewers
-/src/config/dev.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
-/src/config/testnet_postake_medium_curves.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
+/buildkite @MiningbotProtocol/infra-eng-reviewers
+/frontend/ @MiningbotProtocol/product-eng-reviewers
+/dockerfiles/ @MiningbotProtocol/infra-eng-reviewers
+/scripts/ @MiningbotProtocol/infra-eng-reviewers @MiningbotProtocol/protocol-eng-reviewers
+/Makefile @MiningbotProtocol/infra-eng-reviewers
+/src/config/dev.mlh @MiningbotProtocol/infra-eng-reviewers @MiningbotProtocol/protocol-eng-reviewers
+/src/config/testnet_postake_medium_curves.mlh @MiningbotProtocol/infra-eng-reviewers @MiningbotProtocol/protocol-eng-reviewers
 /CODE_OF_CONDUCT.md @imeckler @emberian
-/CONTRIBUTING.md @MinaProtocol/product-eng-reviewers
+/CONTRIBUTING.md @MiningbotProtocol/product-eng-reviewers
 /LICENSE @imeckler
-/README.md @MinaProtocol/product-eng-reviewers
-/README-dev.md @MinaProtocol/protocol-eng-reviewers
+/README.md @MiningbotProtocol/product-eng-reviewers
+/README-dev.md @MiningbotProtocol/protocol-eng-reviewers
 
 /src/external/ @emberian @bkase @psteckler @imeckler @mrmr1993
 
-/src/app/archive @MinaProtocol/product-eng-reviewers
-/src/app/cli/src/tests @MinaProtocol/protocol-eng-reviewers
-/src/app/cli/src/mina.ml @MinaProtocol/protocol-eng-reviewers
-/src/app/cli/src/init @MinaProtocol/protocol-eng-reviewers
-/src/app/libp2p_helper @MinaProtocol/protocol-eng-reviewers
-/src/app/reformat/ @MinaProtocol/infra-eng-reviewers
-/src/app/trace-tool/ @MinaProtocol/protocol-eng-reviewers
-/src/app/runtime_genesis_ledger/ @MinaProtocol/protocol-eng-reviewers
-/src/app/archive_blocks/ @MinaProtocol/protocol-eng-reviewers
-/src/app/extract_blocks/ @MinaProtocol/protocol-eng-reviewers
-/src/app/patch_archive_test/ @MinaProtocol/protocol-eng-reviewers
+/src/app/archive @MiningbotProtocol/product-eng-reviewers
+/src/app/cli/src/tests @MiningbotProtocol/protocol-eng-reviewers
+/src/app/cli/src/mina.ml @MiningbotProtocol/protocol-eng-reviewers
+/src/app/cli/src/init @MiningbotProtocol/protocol-eng-reviewers
+/src/app/libp2p_helper @MiningbotProtocol/protocol-eng-reviewers
+/src/app/reformat/ @MiningbotProtocol/infra-eng-reviewers
+/src/app/trace-tool/ @MiningbotProtocol/protocol-eng-reviewers
+/src/app/runtime_genesis_ledger/ @MiningbotProtocol/protocol-eng-reviewers
+/src/app/archive_blocks/ @MiningbotProtocol/protocol-eng-reviewers
+/src/app/extract_blocks/ @MiningbotProtocol/protocol-eng-reviewers
+/src/app/patch_archive_test/ @MiningbotProtocol/protocol-eng-reviewers
 
-/src/lib/ @MinaProtocol/protocol-eng-reviewers
+/src/lib/ @MiningbotProtocol/protocol-eng-reviewers
 
-/src/lib/blake2/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/cli_lib/ @MinaProtocol/product-eng-reviewers
-/src/lib/mina_commands @MinaProtocol/product-eng-reviewers
-/src/lib/mina_graphql @MinaProtocol/product-eng-reviewers
-/src/lib/mina_numbers/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/crs/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/crypto_params/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/dummy_values/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/hash_prefixes/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/non_zero_curve_point/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/outside_hash_image/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/pokolog/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/precomputed_values/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/sha256_lib/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/signature_lib/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/snark_keys/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/snarky/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/snarky_blake2/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/snarky_curves/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/snarky_field_extensions/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/snarky_group_map/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/snarky_log/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/snarky_pairing/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/unsigned_extended/ @MinaProtocol/crypto-eng-reviewers
+/src/lib/blake2/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/cli_lib/ @MiningbotProtocol/product-eng-reviewers
+/src/lib/mina_commands @MiningbotProtocol/product-eng-reviewers
+/src/lib/mina_graphql @MiningbotProtocol/product-eng-reviewers
+/src/lib/mina_numbers/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/crs/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/crypto_params/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/dummy_values/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/hash_prefixes/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/non_zero_curve_point/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/outside_hash_image/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/pokolog/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/precomputed_values/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/sha256_lib/ @MiningbitProtocol/crypto-eng-reviewers
+/src/lib/signature_lib/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/snark_keys/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/snarky/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/snarky_blake2/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/snarky_curves/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/snarky_field_extensions/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/snarky_group_map/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/snarky_log/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/snarky_pairing/ @MiningbotProtocol/crypto-eng-reviewers
+/src/lib/unsigned_extended/ @MiningbotProtocol/crypto-eng-reviewers
 
-/src/nonconsensus @MinaProtocol/protocol-eng-reviewers
+/src/nonconsensus @MiningbotProtocol/protocol-eng-reviewers
