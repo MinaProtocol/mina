@@ -1,9 +1,8 @@
-
 # Code of Conduct
 
 ## 1. Purpose
 
-A primary goal of the Mina Protocol project is to be inclusive to the largest number of contributors, with the most varied and diverse backgrounds possible. As such, all contributors and maintainers of the project are expected to foster a friendly, safe, and welcoming environment for all, regardless of age, body size, disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
+A primary goal of the Miningbot Protocol project is to be inclusive to the largest number of contributors, with the most varied and diverse backgrounds possible. As such, all contributors and maintainers of the project are expected to foster a friendly, safe, and welcoming environment for all, regardless of age, body size, disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
 
 This Code of Conduct outlines the community's expectations for all participants.
 
@@ -43,7 +42,7 @@ Examples of unacceptable behavior include:
 
 ## 4. Weapons Policy
 
-No weapons will be allowed at Mina community events, spaces, or in other spaces covered by the scope of this Code of Conduct. Weapons include but are not limited to guns, explosives (including fireworks), and large knives such as those used for hunting or display, as well as any other item used for the purpose of causing injury or harm to others. Anyone seen in possession of one of these items will be asked to leave immediately, and will only be allowed to return without the weapon. Community members are further expected to comply with all state and local laws on this matter.
+No weapons will be allowed at Miningbot community events, spaces, or in other spaces covered by the scope of this Code of Conduct. Weapons include but are not limited to guns, explosives (including fireworks), and large knives such as those used for hunting or display, as well as any other item used for the purpose of causing injury or harm to others. Anyone seen in possession of one of these items will be asked to leave immediately, and will only be allowed to return without the weapon. Community members are further expected to comply with all state and local laws on this matter.
 
 ## 5. Consequences of Unacceptable Behavior
 
@@ -55,11 +54,11 @@ If a community member engages in unacceptable behavior, the community organizers
 
 ## 6. Reporting Guidelines
 
-If you are subject to or witness unacceptable behavior, or have any other concerns, please notify the Mina community as soon as possible by emailing contact@minaprotocol.org. Please see the [Reporting Guidelines](/docs/reporting-guidelines.md). You can also contact an admin in the [Discord server](https://bit.ly/MinaDiscord).
+If you are subject to or witness unacceptable behavior, or have any other concerns, please notify the Miningbot community as soon as possible by emailing contact@miningprotocol.org. Please see the [Reporting Guidelines](/docs/reporting-guidelines.md). You can also contact an admin in the [Discord server](https://bit.ly/MinaDiscord).
 
 Additionally, community organizers are available to help community members engage with local law enforcement or to otherwise help those experiencing unacceptable behavior feel safe. In the context of in-person events, organizers will also provide escorts as desired by the person experiencing distress.
 
-If you feel you have been falsely or unfairly accused of violating this Code of Conduct, please send an email to contact@minaprotocol.org with a concise description of your grievance. The project maintainers will review your email and take any appropriate actions.
+If you feel you have been falsely or unfairly accused of violating this Code of Conduct, please send an email to @miningbotprotocol.org with a concise description of your grievance. The project maintainers will review your email and take any appropriate actions.
 
 ## 7. Scope
 
@@ -70,5 +69,5 @@ This Code of Conduct and its related procedures also applies to unacceptable beh
 ## 8. License and attribution
 
 This Code of Conduct is adapted from the [Stumptown Syndicate](http://stumptownsyndicate.org) Code of Conduct under a [Creative Commons Attribution-ShareAlike license](http://creativecommons.org/licenses/by-sa/3.0/).
-
+1
 Portions of text derived from the [Django Code of Conduct](https://www.djangoproject.com/conduct/) and the [Geek Feminism Anti-Harassment Policy](http://geekfeminism.wikia.com/wiki/Conference_anti-harassment/Policy).
