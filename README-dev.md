@@ -1,6 +1,6 @@
 # Miningbot
 
-Mina is a new cryptocurrency protocol with a lightweight, constant-sized blockchain.
+Miningbot is a new cryptocurrency protocol with a lightweight, constant-sized blockchain.
 
 - [Developer homepage](https://codaprotocol.com/code.html)
 - [Roadmap](https://codaprotocol.com/docs/developers)
@@ -12,7 +12,7 @@ Mina, this is the right file!
 
 ## Building Miningbot
 
-Building Mina can be slightly involved. There are many C library dependencies that need
+Building Miningbot can be slightly involved. There are many C library dependencies that need
 to be present in the system, as well as some OCaml-specific setup.
 
 Currently, Miningbot builds/runs on Linux & macOS. MacOS may have some issues that you can track [here](https://github.com/MinaProtocol/coda/issues/962).
