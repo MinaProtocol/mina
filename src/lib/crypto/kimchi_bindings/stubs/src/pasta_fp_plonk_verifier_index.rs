@@ -115,8 +115,8 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
             lookup_selectors: vec![],
             linearization: Linearization::default(),
 
-            fr_sponge_params: oracle::pasta::fp::params(),
-            fq_sponge_params: oracle::pasta::fq::params(),
+            fr_sponge_params: oracle::pasta::fp_3::params(),
+            fq_sponge_params: oracle::pasta::fq_3::params(),
         }
     }
 }
@@ -132,8 +132,8 @@ pub fn read_raw(
 ) -> Result<VerifierIndex<GAffine>, ocaml::Error> {
     let path = Path::new(&path);
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
-    let fq_sponge_params = oracle::pasta::fq::params();
-    let fr_sponge_params = oracle::pasta::fp::params();
+    let fq_sponge_params = oracle::pasta::fq_3::params();
+    let fr_sponge_params = oracle::pasta::fp_3::params();
     VerifierIndex::<GAffine>::from_file(
         srs.0,
         path,

@@ -51,13 +51,21 @@ pub fn caml_pasta_fp_plonk_index_create(
             c: gate.c.clone(),
         })
         .collect();
+
+    for (i, g) in gates.iter().enumerate() {
+        let x : Vec<_> = g.c.iter().map(|x| format!("{}", x)).collect();
+        let s = x.join(", ");
+        println!("c[{}][{:?}]: {}", i, g.typ, s);
+    }
+
+
     println!("{}:{}", file!(), line!());
 
     // create constraint system
     let cs = match ConstraintSystem::<Fp>::create(
         gates,
         vec![],
-        oracle::pasta::fp::params(),
+        oracle::pasta::fp_3::params(),
         public as usize,
     ) {
         None => {
@@ -76,7 +84,7 @@ pub fn caml_pasta_fp_plonk_index_create(
 
     // create index
     Ok(CamlPastaFpPlonkIndex(Box::new(
-        DlogIndex::<GAffine>::create(cs, oracle::pasta::fq::params(), endo_q, srs.clone()),
+        DlogIndex::<GAffine>::create(cs, oracle::pasta::fq_3::params(), endo_q, srs.clone()),
     )))
 }
 
@@ -137,9 +145,9 @@ pub fn caml_pasta_fp_plonk_index_read(
 
     // deserialize the index
     let mut t: DlogIndex<GAffine> = bincode::deserialize_from(&mut r)?;
-    t.cs.fr_sponge_params = oracle::pasta::fp::params();
+    t.cs.fr_sponge_params = oracle::pasta::fp_3::params();
     t.srs = srs.clone();
-    t.fq_sponge_params = oracle::pasta::fq::params();
+    t.fq_sponge_params = oracle::pasta::fq_3::params();
 
     //
     Ok(CamlPastaFpPlonkIndex(Box::new(t)))
