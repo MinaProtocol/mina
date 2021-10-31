@@ -1,4 +1,3 @@
-
 ---
 name: Bug report
 about: Coda is behaving strangely? Report it so we can fix it!
