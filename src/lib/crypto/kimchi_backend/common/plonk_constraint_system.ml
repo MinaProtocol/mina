@@ -2,6 +2,8 @@
 open Sponge
 open Unsigned.Size_t
 
+let should_print = ref false
+
 (* TODO: open Core here instead of opening it multiple times below *)
 
 (** a gate interface, parameterized by a field *)
@@ -273,6 +275,11 @@ type ('a, 'f) t =
     public_input_size : int Core_kernel.Set_once.t
   ; (* whatever is not public input *)
     mutable auxiliary_input_size : int
+  ; (* V.t's corresponding to constant values. We reuse them so we don't need to
+       use a fresh generic constraint each time to create a constant. *)
+    cached_constants : ('f, V.t) Core_kernel.Hashtbl.t
+  ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
+  ; histogram : int Core_kernel.Int.Table.t
   }
 
 module Hash = Core.Md5
@@ -447,6 +454,9 @@ struct
     ; hash = Hash_state.empty
     ; constraints = 0
     ; auxiliary_input_size = 0
+    ; cached_constants = Hashtbl.create (module Fp)
+    ; union_finds = V.Table.create ()
+    ; histogram = Int.Table.create ()
     }
 
   (* TODO *)
@@ -468,11 +478,16 @@ struct
   (* TODO: remove this no? isn't that a no-op? *)
   let digest = digest
 
+  let union_find sys v =
+    Hashtbl.find_or_add sys.union_finds v ~default:(fun () ->
+        Union_find.create v)
+
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.
       The row must be given relative to the start of the circuit 
       (so at the start of the public-input rows). *)
   let wire' sys key row (col : int) =
+    ignore (union_find sys key : V.t Union_find.t) ;
     V.Table.add_multi sys.equivalence_classes ~key ~data:{ row; col }
 
   (* TODO: rename to wire_abs and wire_rel? or wire_public and wire_after_public? or force a single use function that takes a Row.t? *)
@@ -485,8 +500,7 @@ struct
       For example, if one of the equivalence class is [pos1, pos3, pos7],
       the function will return a hashtable that maps pos1 to pos3, 
       pos3 to pos7, and pos7 to pos1 *)
-  let equivalence_classes_to_hashtbl
-      ~(equivalence_classes : Row.t Position.t list V.Table.t) =
+  let equivalence_classes_to_hashtbl sys =
     let module Relative_position = struct
       module T = struct
         type t = Row.t Position.t [@@deriving hash, sexp, compare]
@@ -494,6 +508,14 @@ struct
 
       include Core_kernel.Hashable.Make (T)
     end in
+    let equivalence_classes = V.Table.create () in
+    Hashtbl.iteri sys.equivalence_classes ~f:(fun ~key ~data ->
+        let u = Hashtbl.find_exn sys.union_finds key in
+        Hashtbl.update equivalence_classes (Union_find.get u) ~f:(function
+          | None ->
+              data
+          | Some ps ->
+              List.rev_append data ps)) ;
     let res = Relative_position.Table.create () in
     Hashtbl.iter equivalence_classes ~f:(fun ps ->
         let rotate_right some_list =
@@ -531,10 +553,7 @@ struct
         done ;
 
         (* construct permutation hashmap *)
-        let pos_map =
-          equivalence_classes_to_hashtbl
-            ~equivalence_classes:sys.equivalence_classes
-        in
+        let pos_map = equivalence_classes_to_hashtbl sys in
         let permutation (pos : Row.t Position.t) : Row.t Position.t =
           Option.value (Hashtbl.find pos_map pos) ~default:pos
         in
@@ -584,8 +603,15 @@ struct
         in
         let all_gates = List.concat [ public_gates; gates ] in
         let all_gates = List.map all_gates ~f:to_absolute_row in
+        printf "num gaets %d\n%!" (List.length all_gates) ;
+        printf "histogram\n" ;
+        List.iter
+          (List.sort (Hashtbl.to_alist sys.histogram)
+             ~compare:(fun (x, _) (y, _) -> compare x y))
+          ~f:(fun (k, n) ->
+            printf "%03d: %s\n" k (String.init (n / 100) ~f:(fun _ -> '#'))) ;
 
-        printf !"%{sexp: (int, Fp.t) Gate_spec.t list}\n" all_gates ;
+        (*         printf !"%{sexp: (int, Fp.t) Gate_spec.t list}\n" all_gates ; *)
 
         (* convert all the gates into our Gates.t Rust vector type *)
         List.iter all_gates ~f:(fun g ->
@@ -644,6 +670,14 @@ struct
     | `Finalized ->
         failwith "add_row called on finalized constraint system"
     | `Unfinalized_rev gates ->
+        ( match kind with
+        | Kimchi.Protocol.Generic ->
+            if true then
+              printf "gnrc %d: %s\n%!" sys.next_row
+                (String.concat_array ~sep:", "
+                   (Array.map coeffs ~f:Fp.to_string))
+        | _ ->
+            () ) ;
         (* as we're adding a row, we're adding new cells.
            If these cells (the first 7) contain variables, make sure that they are wired *)
         let num_vars = min Constants.permutation_cols (Array.length vars) in
@@ -724,6 +758,15 @@ struct
           let acc, i, ts, _ = accumulate_sorted_terms t0 terms in
           List.rev ((acc, i) :: ts)
         in
+        (let n = List.length terms in
+         if n > 1 then Int.Table.incr sys.histogram n ~by:(n - 1) ;
+         if n > 4 then
+           printf
+             !"large lincom %d:\n\
+              \  c=%{sexp:Fp.t option}\n\
+              \  %{sexp:(Fp.t * int) list}\n\
+               %!"
+             n constant terms) ;
         match terms with
         | [] ->
             assert false
@@ -760,11 +803,13 @@ struct
             (Fp.one, `Var res) )
 
   (** Adds a constraint to the constraint system. *)
-  let add_constraint ?label:_ sys
+  let add_constraint ?label sys
       (constr :
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )
         Snarky_backendless.Constraint.basic) =
+    if true then
+      Option.iter label ~f:(printf "constraint %d: %s\n%!" sys.next_row) ;
     sys.hash <- feed_constraint sys.hash constr ;
     let red = reduce_lincom sys in
     (* reduce any [Cvar.t] to a single internal variable *)
@@ -779,12 +824,17 @@ struct
               [| s; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero |]
               sys ;
             sx
-      | s, `Constant ->
-          let x = create_internal sys ~constant:s [] in
-          add_generic_constraint ~l:x
-            [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.negate s |]
-            sys ;
-          x
+      | s, `Constant -> (
+          match Hashtbl.find sys.cached_constants s with
+          | Some x ->
+              x
+          | None ->
+              let x = create_internal sys ~constant:s [] in
+              add_generic_constraint ~l:x
+                [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.negate s |]
+                sys ;
+              Hashtbl.set sys.cached_constants ~key:s ~data:x ;
+              x )
     in
     match constr with
     | Snarky_backendless.Constraint.Square (v1, v2) -> (
@@ -859,25 +909,42 @@ struct
         let (s1, x1), (s2, x2) = (red v1, red v2) in
         match (x1, x2) with
         | `Var x1, `Var x2 ->
-            (* s1 x1 - s2 x2 = 0
+            if Fp.(equal one) s1 && Fp.(equal one) s2 then
+              (* optimize by not adding generic constraint but rather unifying the equivalence
+                 classes of the variables *)
+              Union_find.union (union_find sys x1) (union_find sys x2)
+            else if (* s1 x1 - s2 x2 = 0
           *)
-            if not (Fp.equal s1 s2) then
+                    not (Fp.equal s1 s2) then
               add_generic_constraint ~l:x1 ~r:x2
                 [| s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero |]
                 sys
-              (* TODO: optimize by not adding generic costraint but rather permuting the vars *)
             else
               add_generic_constraint ~l:x1 ~r:x2
                 [| s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero |]
                 sys
-        | `Var x1, `Constant ->
-            add_generic_constraint ~l:x1
-              [| s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2 |]
-              sys
-        | `Constant, `Var x2 ->
-            add_generic_constraint ~r:x2
-              [| Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1 |]
-              sys
+        | `Var x1, `Constant -> (
+            (* s1 * x1 = s2
+               x1 = s2 / s1
+            *)
+            match Hashtbl.find sys.cached_constants Fp.(s2 / s1) with
+            | Some x2 ->
+                Union_find.union (union_find sys x1) (union_find sys x2)
+            | None ->
+                add_generic_constraint ~l:x1
+                  [| s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2 |]
+                  sys )
+        | `Constant, `Var x2 -> (
+            (* s1 = s2 * x2
+               x2 = s1 / s2
+            *)
+            match Hashtbl.find sys.cached_constants Fp.(s1 / s2) with
+            | Some x1 ->
+                Union_find.union (union_find sys x1) (union_find sys x2)
+            | None ->
+                add_generic_constraint ~r:x2
+                  [| Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1 |]
+                  sys )
         | `Constant, `Constant ->
             assert (Fp.(equal s1 s2)) )
     | Plonk_constraint.T (Basic { l; r; o; m; c }) ->
@@ -951,37 +1018,47 @@ struct
           Array.map ~f:(Array.map ~f:reduce_to_v) s
         in
         let state = reduce_state sys state in
+        let state, remaining_state =
+          let n = Array.length state in
+          let full_rows = n / 5 in
+          let excess = n mod 5 in
+          assert (excess = 1) ;
+          ( Array.init full_rows ~f:(fun i ->
+                Array.concat (List.init 5 ~f:(fun j -> state.((5 * i) + j))))
+          , state.(n - 1) )
+        in
         (* add_round_state adds a row that contains 5 rounds of permutation *)
         let add_round_state state_i ind =
           let row = Array.map state_i ~f:(fun x -> Some x) in
-          let coeffs = Params.params.round_constants.(ind + 1) in
+          let coeffs =
+            Array.concat
+              (List.init 5 ~f:(fun i ->
+                   Params.params.round_constants.((5 * ind) + i)))
+          in
           add_row sys row Poseidon coeffs
         in
         (* [s1, s2, s3, s1', s2', s3', s1'', s2'', s3'', ...] *)
         (* iterate through the state *)
-        let last_row = Array.length state - 1 in
-        Array.iteri state ~f:(fun i state_i ->
-            if i <> last_row then add_round_state state_i i
-            else
-              (* last row is zero gate, only the first three columns matter *)
-              let vars =
-                [| Some state_i.(0)
-                 ; Some state_i.(1)
-                 ; Some state_i.(2)
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                 ; None
-                |]
-              in
-              add_row sys vars Zero [||])
+        Array.iteri state ~f:(fun i state_i -> add_round_state state_i i) ;
+        (* last row is zero gate, only the first three columns matter *)
+        let vars =
+          [| Some remaining_state.(0)
+           ; Some remaining_state.(1)
+           ; Some remaining_state.(2)
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+          |]
+        in
+        add_row sys vars Zero [||]
     | Plonk_constraint.T
         (EC_add_complete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv }) ->
         let reduce_curve_point (x, y) = (reduce_to_v x, reduce_to_v y) in
@@ -1061,6 +1138,33 @@ struct
           add_row sys curr_row Vbmul [||] ;
           add_row sys next_row Zero [||]
         in
+
+        Array.iteri state ~f:(fun i round ->
+            let p f x =
+              match x with
+              | Snarky_backendless.Cvar.Var _ ->
+                  ()
+              | Constant _ ->
+                  ()
+              | _ ->
+                  failwithf "bad %s" (Field.name f) ()
+            in
+            Scale_round.Fields.iter
+              ~accs:(fun f ->
+                Array.iter (Field.get f round)
+                  ~f:(Tuple_lib.Double.iter ~f:(p f)))
+              ~bits:(fun f -> Array.iter (Field.get f round) ~f:(p f))
+              ~ss:(fun f -> Array.iter (Field.get f round) ~f:(p f))
+              ~base:(fun f ->
+                Tuple_lib.Double.iter (Field.get f round) ~f:(p f))
+              ~n_prev:(fun f ->
+                match Field.get f round with
+                | Snarky_backendless.Cvar.Constant c ->
+                    if Fp.equal Fp.zero c then () else failwith "baaad"
+                | _ ->
+                    p f (Field.get f round))
+              ~n_next:(fun f -> p f (Field.get f round))) ;
+
         Array.iter
           ~f:(fun round -> add_ecscale_round round ; incr i)
           (Array.map state ~f:(Scale_round.map ~f:reduce_to_v)) ;
