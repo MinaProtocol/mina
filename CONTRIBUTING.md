@@ -1,3 +1,4 @@
+
 # Contributing to Coda
 
 Thank you for your interest in contributing to Coda 😁. This file outlines
