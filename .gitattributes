@@ -1,4 +1,3 @@
-
 # Ignore vendored code when calculating repo code %s
 # libsnark is lots of c++
 src/lib/snarky/src/camlsnark_c/libsnark-caml/* linguist-vendored
