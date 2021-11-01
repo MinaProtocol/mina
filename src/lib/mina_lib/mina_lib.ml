@@ -605,7 +605,7 @@ let get_snarked_ledger t state_hash_opt =
                        (sprintf
                           "No transactions corresponding to the emitted proof \
                            for state_hash:%s"
-                          (State_hash.to_string
+                          (State_hash.to_base58_check
                              (Transition_frontier.Breadcrumb.state_hash b))))
               | Some txns -> (
                   match
@@ -637,7 +637,7 @@ let get_snarked_ledger t state_hash_opt =
                             Stop
                               (Or_error.errorf
                                  !"Coudln't find protocol state with hash %s"
-                                 (State_hash.to_string state_hash)))
+                                 (State_hash.to_base58_check state_hash)))
                       ~finish:Fn.id
                   with
                   | Ok _ ->
@@ -659,9 +659,9 @@ let get_snarked_ledger t state_hash_opt =
       else
         Or_error.errorf
           "Expected snarked ledger hash %s but got %s for state hash %s"
-          (Frozen_ledger_hash.to_string snarked_ledger_hash)
-          (Frozen_ledger_hash.to_string merkle_root)
-          (State_hash.to_string state_hash)
+          (Frozen_ledger_hash.to_base58_check snarked_ledger_hash)
+          (Frozen_ledger_hash.to_base58_check merkle_root)
+          (State_hash.to_base58_check state_hash)
   | None ->
       Or_error.error_string
         "get_snarked_ledger: state hash not found in transition frontier"

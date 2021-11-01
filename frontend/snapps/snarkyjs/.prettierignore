@@ -1,7 +1,0 @@
-# Ignore artifacts:
-dist
-node_modules
-
-#Ignore these directories currently as the project is not completed yet
-src/bindings
-src/examples

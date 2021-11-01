@@ -218,6 +218,9 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
            , `Overflow
                (Drop_head
                   (fun head ->
+                    Mina_metrics.(
+                      Counter.inc_one
+                        Pipe.Drop_on_overflow.bootstrap_sync_ledger) ;
                     External_transition.Initial_validated
                     .handle_dropped_transition
                       (Envelope.Incoming.data head)

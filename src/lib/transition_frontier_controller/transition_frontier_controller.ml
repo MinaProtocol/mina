@@ -19,7 +19,14 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
     Strict_pipe.create ~name
       (Buffered
          ( `Capacity valid_transition_pipe_capacity
-         , `Overflow (Drop_head (f_drop_head name)) ))
+         , `Overflow
+             (Drop_head
+                (fun head ->
+                  Mina_metrics.(
+                    Counter.inc_one
+                      Pipe.Drop_on_overflow
+                      .transition_frontier_valid_transitions) ;
+                  f_drop_head name head)) ))
   in
   let primary_transition_pipe_capacity =
     valid_transition_pipe_capacity + List.length collected_transitions
@@ -30,7 +37,14 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
     Strict_pipe.create ~name
       (Buffered
          ( `Capacity primary_transition_pipe_capacity
-         , `Overflow (Drop_head (f_drop_head name)) ))
+         , `Overflow
+             (Drop_head
+                (fun head ->
+                  Mina_metrics.(
+                    Counter.inc_one
+                      Pipe.Drop_on_overflow
+                      .transition_frontier_primary_transitions) ;
+                  f_drop_head name head)) ))
   in
   let processed_transition_reader, processed_transition_writer =
     Strict_pipe.create ~name:"processed transitions"
