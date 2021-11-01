@@ -547,7 +547,7 @@ module Parties_segment = struct
 
     let opt_signed = opt_signed ~is_start:`Compute_in_circuit
 
-    let to_single_list : t -> Spec.single list =
+    let _to_single_list : t -> Spec.single list =
      fun t ->
       match t with
       | Opt_signed_unsigned ->
@@ -2295,6 +2295,7 @@ module Base = struct
       let prev_should_verify =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
+            Core.printf "Full proof_level\n%!" ;
             true
         | _ ->
             false
@@ -3402,12 +3403,14 @@ module type S = sig
   val of_parties_segment_exn :
        statement:Statement.With_sok.t
     -> witness:Parties_segment.Witness.t
+    -> spec:Parties_segment.Basic.t
     -> t Async.Deferred.t
 
   val merge :
     t -> t -> sok_digest:Sok_message.Digest.t -> t Async.Deferred.Or_error.t
+end
 
-  val group_by_parties_rev :
+(*  val group_by_parties_rev :
        Party.t list list
     -> 'a list list
     -> ([ `Same | `New | `Two_new ] * Parties_segment.Basic.t * 'a * 'a) list
@@ -3423,8 +3426,7 @@ module type S = sig
        * Parties_segment.Basic.t
        * Statement.With_sok.t
        * (int * Snapp_statement.t) list )
-       list
-end
+       list*)
 
 let check_transaction_union ?(preeval = false) ~constraint_constants sok_message
     source target init_stack pending_coinbase_stack_state
@@ -3594,7 +3596,7 @@ let constraint_system_digests ~constraint_constants () =
     will need to be passed as part of the snark witness while applying that
     pair.
 *)
-let group_by_parties_rev' partiess stmtss =
+let group_by_parties_rev partiess stmtss =
   let rec group_by_parties_rev partiess stmtss acc =
     match (partiess, stmtss) with
     | ([] | [ [] ]), [ _ ] ->
@@ -3763,7 +3765,7 @@ let group_by_parties_rev' partiess stmtss =
   in
   group_by_parties_rev partiess stmtss []
 
-let parties_witnesses_exn' ~constraint_constants ~state_body ~fee_excess
+let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
     ~pending_coinbase_init_stack ledger partiess =
   let sparse_ledger =
     match ledger with
@@ -3788,7 +3790,7 @@ let parties_witnesses_exn' ~constraint_constants ~state_body ~fee_excess
   in
   let states = List.rev states_rev in
   let states_rev =
-    group_by_parties_rev'
+    group_by_parties_rev
       ([] :: List.map ~f:Parties.parties partiess)
       ([ List.hd_exn (List.hd_exn states) ] :: states)
   in
@@ -3978,38 +3980,17 @@ struct
         (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
     else Async.return false
 
-  let of_parties_segment_exn ~statement ~witness : t Async.Deferred.t =
+  let of_parties_segment_exn ~statement ~witness
+      ~(spec : Parties_segment.Basic.t) : t Async.Deferred.t =
     Base.Parties_snark.witness := Some witness ;
-    let types =
-      List.map
-        (Parties.Party_or_stack.to_parties_list
-           witness.local_state_init.parties) ~f:(fun (p, _) ->
-          Control.tag p.authorization)
-      @ List.concat_map witness.start_parties ~f:(fun s ->
-            Control.Tag.Signature
-            :: List.map s.parties.other_parties ~f:(fun p ->
-                   Control.tag p.authorization))
-    in
-    let type_ : Parties_segment.Basic.t =
-      match types with
-      | [ Signature ] ->
-          Opt_signed
-      | [ None_given ] ->
-          Opt_signed
-      | [ Proof ] ->
-          Proved
-      | [ Signature; None_given ] | [ None_given; None_given ] ->
-          Opt_signed_unsigned
-      | [ Signature; Signature ] | [ None_given; Signature ] ->
-          Opt_signed_opt_signed
-      | _ ->
-          failwithf
-            !"Sequence of control types not supported as a basic sequence: \
-              %{sexp: Control.Tag.t list}"
-            types ()
-    in
+    Core.printf
+      !"of_parties_Segment statement: %{sexp: Statement.With_sok.t} witness: \
+        %{sexp:Parties_segment.Witness.t} spec: %{sexp: \
+        Parties_segment.Basic.t}\n\
+        %!"
+      statement witness spec ;
     let res =
-      match type_ with
+      match spec with
       | Opt_signed ->
           opt_signed [] statement
       | Opt_signed_unsigned ->
@@ -4031,11 +4012,24 @@ struct
                  witness.local_state_init.parties)
               ~f:(fun ((p, ()), at_party) ->
                 let%map pi = party_proof p in
+                let vk =
+                  let account_id =
+                    Account_id.create p.data.body.pk p.data.body.token_id
+                  in
+                  let account : Account.t =
+                    Sparse_ledger.(
+                      get_exn witness.local_state_init.ledger
+                        (find_index_exn witness.local_state_init.ledger
+                           account_id))
+                  in
+                  (Option.value_exn account.snapp).verification_key
+                in
                 ( { Snapp_statement.Poly.transaction =
                       witness.local_state_init.transaction_commitment
                   ; at_party
                   }
-                , pi ))
+                , pi
+                , vk ))
             @ List.concat_map witness.start_parties ~f:(fun s ->
                   (* TODO: This is unnecessary re-computation of the statements which are also computed in
                      the circuit. It would be better to use the values computed inside the circuit, but it
@@ -4058,20 +4052,23 @@ struct
                     (Parties.Party_or_stack.to_parties_with_hashes_list
                        other_parties) ~f:(fun ((p, ()), at_party) ->
                       let%map pi = party_proof p in
-                      ({ Snapp_statement.Poly.transaction; at_party }, pi)))
+                      ({ Snapp_statement.Poly.transaction; at_party }, pi, None)))
           in
           proved
             ( match proofs with
-            | [ p ] ->
+            | [ (s, p, v) ] ->
+                Pickles.Side_loaded.in_prover (Base.side_loaded 0)
+                  (Option.value_exn v).data ;
+                Core.printf !"SNapp statement: %{sexp: Snapp_statement.t}\n%!" s ;
                 (* TODO: We should not have to pass the statement in here. *)
-                [ p ]
+                [ (s, p) ]
             | [] | _ :: _ :: _ ->
                 failwith "of_parties_segment: Expected exactly one proof" )
             statement
     in
-    Base.Parties_snark.witness := None ;
     let open Async in
     let%map proof = res in
+    Base.Parties_snark.witness := None ;
     { proof; statement }
 
   let of_transaction_union ~statement ~init_stack transaction state_body handler
@@ -4135,19 +4132,14 @@ struct
 
   let constraint_system_digests =
     lazy (constraint_system_digests ~constraint_constants ())
-
-  let parties_witnesses_exn = parties_witnesses_exn'
-
-  let group_by_parties_rev = group_by_parties_rev'
 end
 
 module For_tests = struct
-  let constraint_constants =
-    Genesis_constants.Constraint_constants.for_unit_tests
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
-  let genesis_constants = Genesis_constants.for_unit_tests
+  let genesis_constants = Genesis_constants.compiled
 
-  let proof_level = Genesis_constants.Proof_level.for_unit_tests
+  let proof_level = Genesis_constants.Proof_level.compiled
 
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
@@ -4159,7 +4151,119 @@ module For_tests = struct
     let proof_level = proof_level
   end)
 
-  let create_trivial_predicate_snapp spec _ledger =
+  (*let of_parties ~witness ~(spec : Parties_segment.Basic.t) ~statement =
+    Base.Parties_snark.witness := Some witness ;
+    (*let types =
+        List.map
+          (Parties.Party_or_stack.to_parties_list
+             witness.local_state_init.parties) ~f:(fun (p, _) ->
+            Control.tag p.authorization)
+        @ List.concat_map witness.start_parties ~f:(fun s ->
+              Control.Tag.Signature
+              :: List.map s.parties.other_parties ~f:(fun p ->
+                     Control.tag p.authorization))
+      in
+      let type_ : Parties_segment.Basic.t =
+        match spec with
+        | [ Signature ] ->
+            Opt_signed
+        | [ None_given ] ->
+            Opt_signed
+        | [ Proof ] ->
+            Proved
+        | [ Signature; None_given ] | [ None_given; None_given ] ->
+            Opt_signed_unsigned
+        | [ Signature; Signature ] | [ None_given; Signature ] ->
+            Opt_signed_opt_signed
+        | _ ->
+            failwithf
+              !"Sequence of control types not supported as a basic sequence: \
+                %{sexp: Control.Tag.t list}"
+              types ()
+      in*)
+    let res =
+      match spec with
+      | Opt_signed ->
+          opt_signed [] statement
+      | Opt_signed_unsigned ->
+          opt_signed_unsigned [] statement
+      | Opt_signed_opt_signed ->
+          opt_signed_opt_signed [] statement
+      | Proved ->
+          let proofs =
+            let party_proof (p : Party.t) =
+              match p.authorization with
+              | Proof p ->
+                  Some p
+              | Signature _ | None_given ->
+                  None
+            in
+            let open Option.Let_syntax in
+            List.filter_map
+              (Parties.Party_or_stack.to_parties_with_hashes_list
+                 witness.local_state_init.parties)
+              ~f:(fun ((p, ()), at_party) ->
+                let%map pi = party_proof p in
+                let vk =
+                  let account_id =
+                    Account_id.create p.data.body.pk p.data.body.token_id
+                  in
+                  let account : Account.t =
+                    Sparse_ledger.(
+                      get_exn witness.local_state_init.ledger
+                        (find_index_exn witness.local_state_init.ledger
+                           account_id))
+                  in
+                  (Option.value_exn account.snapp).verification_key
+                in
+                ( { Snapp_statement.Poly.transaction =
+                      witness.local_state_init.transaction_commitment
+                  ; at_party
+                  }
+                , pi
+                , vk ))
+            @ List.concat_map witness.start_parties ~f:(fun s ->
+                  (* TODO: This is unnecessary re-computation of the statements which are also computed in
+                     the circuit. It would be better to use the values computed inside the circuit, but it
+                     was involved to change the pickles API to allow it. *)
+                  let other_parties, transaction =
+                    let ps =
+                      Parties.Party_or_stack.With_hashes.of_parties_list
+                        (List.map ~f:(fun p -> (p, ())) s.parties.other_parties)
+                    in
+                    ( ps
+                    , Parties.Transaction_commitment.create
+                        ~other_parties_hash:
+                          (Parties.Party_or_stack.stack_hash ps)
+                        ~protocol_state_predicate_hash:
+                          (Snapp_predicate.Protocol_state.digest
+                             s.protocol_state_predicate)
+                        ~memo_hash:s.memo_hash )
+                  in
+                  List.filter_map
+                    (Parties.Party_or_stack.to_parties_with_hashes_list
+                       other_parties) ~f:(fun ((p, ()), at_party) ->
+                      let%map pi = party_proof p in
+                      ({ Snapp_statement.Poly.transaction; at_party }, pi, None)))
+          in
+          proved
+            ( match proofs with
+            | [ (s, p, v) ] ->
+                Pickles.Side_loaded.in_prover (Base.side_loaded 0)
+                  (Option.value_exn v).data ;
+                Core.printf !"SNapp statement: %{sexp: Snapp_statement.t}\n%!" s ;
+                (* TODO: We should not have to pass the statement in here. *)
+                [ (s, p) ]
+            | [] | _ :: _ :: _ ->
+                failwith "of_parties_segment: Expected exactly one proof" )
+            statement
+    in
+    let open Async in
+    let%map proof = res in
+    Base.Parties_snark.witness := None ;
+    { proof; statement }*)
+
+  let create_trivial_predicate_snapp ~constraint_constants spec ledger =
     let local_dummy_constraints () =
       let open Run in
       let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
@@ -4241,41 +4345,36 @@ module For_tests = struct
       spec
     in
     let vk = With_hash.of_data ~hash_data:Snapp_account.digest_vk vk in
-    Core.printf "vk: %s\n hash: %s%!"
+    Core.printf
+      !"vk: %s\n hash: %{sexp: State_hash.t}%!"
       (Side_loaded_verification_key.to_yojson vk.data |> Yojson.Safe.to_string)
-      (Field.to_string vk.hash) ;
-    (*let _is_new, _loc =
-        let id =
-          Public_key.compress sender.public_key
-          |> fun pk -> Account_id.create pk Token_id.default
-        in
-        Ledger.get_or_create_account ledger id
-          (Account.create id Balance.(of_int 888_888))
-        |> Or_error.ok_exn
+      vk.hash ;
+    let _is_new, _loc =
+      let id =
+        Public_key.compress sender.public_key
+        |> fun pk -> Account_id.create pk Token_id.default
       in
-      let _is_new, _loc =
-        let id = Account_id.create trivial_account_pk Token_id.default in
-        let account : Account.t =
-          { (Account.create id Balance.(of_int 0)) with
-            permissions =
-              { Permissions.user_default with set_permissions = Proof }
-          ; snapp = Some { Snapp_account.default with verification_key = Some vk }
-          }
-        in
-        Ledger.get_or_create_account ledger id account |> Or_error.ok_exn
-      in*)
+      Ledger.get_or_create_account ledger id
+        (Account.create id Balance.(of_int 888_888))
+      |> Or_error.ok_exn
+    in
+    let _is_new, _loc =
+      let id = Account_id.create trivial_account_pk Token_id.default in
+      let account : Account.t =
+        { (Account.create id Balance.(of_int 0)) with
+          permissions =
+            { Permissions.user_default with set_permissions = Proof }
+        ; snapp = Some { Snapp_account.default with verification_key = Some vk }
+        }
+      in
+      Ledger.get_or_create_account ledger id account |> Or_error.ok_exn
+    in
     let update_empty_permissions =
       let permissions =
-        { Permissions.user_default with
-          send = Permissions.Auth_required.Proof
-        ; set_verification_key = Permissions.Auth_required.Proof
-        }
+        { Permissions.user_default with send = Permissions.Auth_required.Proof }
         |> Snapp_basic.Set_or_keep.Set
       in
-      { Party.Update.dummy with
-        permissions
-      ; verification_key = Snapp_basic.Set_or_keep.Set vk
-      }
+      { Party.Update.dummy with permissions }
     in
     let sender_pk = sender.public_key |> Public_key.compress in
     let fee_payer =
@@ -4406,11 +4505,21 @@ module For_tests = struct
     let parties : Parties.t =
       { fee_payer; other_parties; protocol_state; memo }
     in
-    Binable.to_string
-      (module Side_loaded_verification_key.Stable.Latest)
-      vk.data
-    |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
-    |> printf "vk:\n%s\n\n" ;
+    let vk_encoded =
+      Binable.to_string
+        (module Side_loaded_verification_key.Stable.Latest)
+        vk.data
+      |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
+    in
+    printf "vk:\n%s\n\n" vk_encoded ;
+    let () =
+      let vk_decoded =
+        Binable.of_string
+          (module Side_loaded_verification_key.Stable.Latest)
+          (Base64.decode_exn ~alphabet:Base64.uri_safe_alphabet vk_encoded)
+      in
+      assert (Side_loaded_verification_key.equal vk_decoded vk.data)
+    in
     (* print fee payer *)
     Party.Fee_payer.to_yojson fee_payer
     |> Yojson.Safe.pretty_to_string
@@ -4820,42 +4929,45 @@ let%test_module "transaction_snark" =
           ~fee_excess:Amount.Signed.zero ~pending_coinbase_init_stack:init_stack
           (`Ledger ledger) parties
       in
-      let open Impl in
-      List.fold ~init:((), ()) witnesses
-        ~f:(fun _ (witness, spec, statement, snapp_stmts) ->
-          run_and_check
-            (fun () ->
-              let s =
-                exists Statement.With_sok.typ ~compute:(fun () -> statement)
-              in
-              let snapp_stmts =
-                List.map snapp_stmts ~f:(fun (i, stmt) ->
-                    (i, exists Snapp_statement.typ ~compute:(fun () -> stmt)))
-              in
-              Base.Parties_snark.main ~constraint_constants
-                (Parties_segment.Basic.to_single_list spec)
-                snapp_stmts s ~witness ;
-              fun () -> ())
-            ()
-          |> Or_error.ok_exn)
+      let open Async.Deferred.Let_syntax in
+      Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
+        ~f:(fun _ (witness, spec, statement, _snapp_stmts) ->
+          let%map _ = of_parties_segment_exn ~statement ~witness ~spec in
+          ((), ()))
 
-    let%test_unit "snapps-based payment" =
-      let open Transaction_logic.For_tests in
-      Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun { init_ledger; specs } ->
-          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-              let parties = party_send (List.hd_exn specs) in
-              Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              apply_parties ledger [ parties ])
-          |> fun ((), ()) -> ())
+    (*run_and_check
+        (fun () ->
+          let s =
+            exists Statement.With_sok.typ ~compute:(fun () -> statement)
+          in
+          let snapp_stmts =
+            List.map snapp_stmts ~f:(fun (i, stmt) ->
+                (i, exists Snapp_statement.typ ~compute:(fun () -> stmt)))
+          in
+          Base.Parties_snark.main ~constraint_constants
+            (Parties_segment.Basic.to_single_list spec)
+            snapp_stmts s ~witness ;
+          fun () -> ())
+        ()
+      |> Or_error.ok_exn)*)
 
-    let%test_unit "Consecutive snapps-based payments" =
-      let open Transaction_logic.For_tests in
-      Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun { init_ledger; specs } ->
-          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-              let partiess = List.map ~f:party_send specs in
-              Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              apply_parties ledger partiess)
-          |> fun ((), ()) -> ())
+    (*let%test_unit "snapps-based payment" =
+        let open Transaction_logic.For_tests in
+        Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+            Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+                let parties = party_send (List.hd_exn specs) in
+                Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
+                (fun () -> apply_parties ledger [ parties ]) |> Async.Thread_safe.block_on_async_exn)
+            |> fun ((), ()) -> ())
+
+      let%test_unit "Consecutive snapps-based payments" =
+        let open Transaction_logic.For_tests in
+        Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+            Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+                let partiess = List.map ~f:party_send specs in
+                Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
+                (fun () -> apply_parties ledger partiess) |> Async.Thread_safe.block_on_async_exn)
+            |> fun ((), ()) -> ())*)
 
     (* Disabling until new-style snapp transactions are fully implemented.
 
@@ -4911,122 +5023,122 @@ let%test_module "transaction_snark" =
 
     let%test_module "multisig_account" =
       ( module struct
-        module M_of_n_predicate = struct
-          type _witness = (Schnorr.Signature.t * Public_key.t) list
+        (* module M_of_n_predicate = struct
+             type _witness = (Schnorr.Signature.t * Public_key.t) list
 
-          (* check that two public keys are equal *)
-          let eq_pk ((x0, y0) : Public_key.var) ((x1, y1) : Public_key.var) :
-              (Boolean.var, _) Checked.t =
-            [ Field.Checked.equal x0 x1; Field.Checked.equal y0 y1 ]
-            |> Checked.List.all >>= Boolean.all
+             (* check that two public keys are equal *)
+             let eq_pk ((x0, y0) : Public_key.var) ((x1, y1) : Public_key.var) :
+                 (Boolean.var, _) Checked.t =
+               [ Field.Checked.equal x0 x1; Field.Checked.equal y0 y1 ]
+               |> Checked.List.all >>= Boolean.all
 
-          (* check that two public keys are not equal *)
-          let neq_pk (pk0 : Public_key.var) (pk1 : Public_key.var) :
-              (Boolean.var, _) Checked.t =
-            eq_pk pk0 pk1 >>| Boolean.not
+             (* check that two public keys are not equal *)
+             let neq_pk (pk0 : Public_key.var) (pk1 : Public_key.var) :
+                 (Boolean.var, _) Checked.t =
+               eq_pk pk0 pk1 >>| Boolean.not
 
-          (* check that the witness has distinct public keys for each signature *)
-          let rec distinct_public_keys = function
-            | (_, pk) :: xs ->
-                Checked.List.map ~f:(fun (_, pk') -> neq_pk pk pk') xs
-                >>= Boolean.Assert.all
-                >>= fun () -> distinct_public_keys xs
-            | [] ->
-                Checked.return ()
+             (* check that the witness has distinct public keys for each signature *)
+             let rec distinct_public_keys = function
+               | (_, pk) :: xs ->
+                   Checked.List.map ~f:(fun (_, pk') -> neq_pk pk pk') xs
+                   >>= Boolean.Assert.all
+                   >>= fun () -> distinct_public_keys xs
+               | [] ->
+                   Checked.return ()
 
-          let%snarkydef distinct_public_keys x = distinct_public_keys x
+             let%snarkydef distinct_public_keys x = distinct_public_keys x
 
-          (* check a signature on msg against a public key *)
-          let check_sig pk msg sigma : (Boolean.var, _) Checked.t =
-            let%bind (module S) = Inner_curve.Checked.Shifted.create () in
-            Schnorr.Checked.verifies (module S) sigma pk msg
+             (* check a signature on msg against a public key *)
+             let check_sig pk msg sigma : (Boolean.var, _) Checked.t =
+               let%bind (module S) = Inner_curve.Checked.Shifted.create () in
+               Schnorr.Checked.verifies (module S) sigma pk msg
 
-          (* verify witness signatures against public keys *)
-          let%snarkydef verify_sigs pubkeys commitment witness =
-            let%bind pubkeys =
-              exists
-                (Typ.list ~length:(List.length pubkeys) Inner_curve.typ)
-                ~compute:(As_prover.return pubkeys)
-            in
-            let verify_sig (sigma, pk) : (Boolean.var, _) Checked.t =
-              Checked.List.exists pubkeys ~f:(fun pk' ->
-                  [ eq_pk pk pk'; check_sig pk' commitment sigma ]
-                  |> Checked.List.all >>= Boolean.all)
-            in
-            Checked.List.map witness ~f:verify_sig >>= Boolean.Assert.all
+             (* verify witness signatures against public keys *)
+             let%snarkydef verify_sigs pubkeys commitment witness =
+               let%bind pubkeys =
+                 exists
+                   (Typ.list ~length:(List.length pubkeys) Inner_curve.typ)
+                   ~compute:(As_prover.return pubkeys)
+               in
+               let verify_sig (sigma, pk) : (Boolean.var, _) Checked.t =
+                 Checked.List.exists pubkeys ~f:(fun pk' ->
+                     [ eq_pk pk pk'; check_sig pk' commitment sigma ]
+                     |> Checked.List.all >>= Boolean.all)
+               in
+               Checked.List.map witness ~f:verify_sig >>= Boolean.Assert.all
 
-          let check_witness m pubkeys commitment witness =
-            if List.length witness <> m then
-              failwith @@ "witness length must be exactly " ^ Int.to_string m
-            else
-              dummy_constraints ()
-              >>= fun () ->
-              distinct_public_keys witness
-              >>= fun () -> verify_sigs pubkeys commitment witness
+             let _check_witness m pubkeys commitment witness =
+               if List.length witness <> m then
+                 failwith @@ "witness length must be exactly " ^ Int.to_string m
+               else
+                 dummy_constraints ()
+                 >>= fun () ->
+                 distinct_public_keys witness
+                 >>= fun () -> verify_sigs pubkeys commitment witness
 
-          let%test_unit "1-of-1" =
-            let gen =
-              let open Quickcheck.Generator.Let_syntax in
-              let%map sk = Private_key.gen and msg = Field.gen_uniform in
-              (sk, Random_oracle.Input.field_elements [| msg |])
-            in
-            Quickcheck.test ~trials:1 gen ~f:(fun (sk, msg) ->
-                let pk = Inner_curve.(scale one sk) in
-                (let%bind pk_var =
-                   exists Inner_curve.typ ~compute:(As_prover.return pk)
-                 in
-                 let sigma = Schnorr.sign sk msg in
-                 let%bind sigma_var =
-                   exists Schnorr.Signature.typ
-                     ~compute:(As_prover.return sigma)
-                 in
-                 let%bind msg_var =
-                   exists (Schnorr.message_typ ())
-                     ~compute:(As_prover.return msg)
-                 in
-                 let witness = [ (sigma_var, pk_var) ] in
-                 check_witness 1 [ pk ] msg_var witness)
-                |> Checked.map ~f:As_prover.return
-                |> Fn.flip run_and_check () |> Or_error.ok_exn |> snd)
+             let%test_unit "1-of-1" =
+               let gen =
+                 let open Quickcheck.Generator.Let_syntax in
+                 let%map sk = Private_key.gen and msg = Field.gen_uniform in
+                 (sk, Random_oracle.Input.field_elements [| msg |])
+               in
+               Quickcheck.test ~trials:1 gen ~f:(fun (sk, msg) ->
+                   let pk = Inner_curve.(scale one sk) in
+                   (let%bind pk_var =
+                      exists Inner_curve.typ ~compute:(As_prover.return pk)
+                    in
+                    let sigma = Schnorr.sign sk msg in
+                    let%bind sigma_var =
+                      exists Schnorr.Signature.typ
+                        ~compute:(As_prover.return sigma)
+                    in
+                    let%bind msg_var =
+                      exists (Schnorr.message_typ ())
+                        ~compute:(As_prover.return msg)
+                    in
+                    let witness = [ (sigma_var, pk_var) ] in
+                    check_witness 1 [ pk ] msg_var witness)
+                   |> Checked.map ~f:As_prover.return
+                   |> Fn.flip run_and_check () |> Or_error.ok_exn |> snd)
 
-          let%test_unit "2-of-2" =
-            let gen =
-              let open Quickcheck.Generator.Let_syntax in
-              let%map sk0 = Private_key.gen
-              and sk1 = Private_key.gen
-              and msg = Field.gen_uniform in
-              (sk0, sk1, Random_oracle.Input.field_elements [| msg |])
-            in
-            Quickcheck.test ~trials:1 gen ~f:(fun (sk0, sk1, msg) ->
-                let pk0 = Inner_curve.(scale one sk0) in
-                let pk1 = Inner_curve.(scale one sk1) in
-                (let%bind pk0_var =
-                   exists Inner_curve.typ ~compute:(As_prover.return pk0)
-                 in
-                 let%bind pk1_var =
-                   exists Inner_curve.typ ~compute:(As_prover.return pk1)
-                 in
-                 let sigma0 = Schnorr.sign sk0 msg in
-                 let sigma1 = Schnorr.sign sk1 msg in
-                 let%bind sigma0_var =
-                   exists Schnorr.Signature.typ
-                     ~compute:(As_prover.return sigma0)
-                 in
-                 let%bind sigma1_var =
-                   exists Schnorr.Signature.typ
-                     ~compute:(As_prover.return sigma1)
-                 in
-                 let%bind msg_var =
-                   exists (Schnorr.message_typ ())
-                     ~compute:(As_prover.return msg)
-                 in
-                 let witness =
-                   [ (sigma0_var, pk0_var); (sigma1_var, pk1_var) ]
-                 in
-                 check_witness 2 [ pk0; pk1 ] msg_var witness)
-                |> Checked.map ~f:As_prover.return
-                |> Fn.flip run_and_check () |> Or_error.ok_exn |> snd)
-        end
+             let%test_unit "2-of-2" =
+               let gen =
+                 let open Quickcheck.Generator.Let_syntax in
+                 let%map sk0 = Private_key.gen
+                 and sk1 = Private_key.gen
+                 and msg = Field.gen_uniform in
+                 (sk0, sk1, Random_oracle.Input.field_elements [| msg |])
+               in
+               Quickcheck.test ~trials:1 gen ~f:(fun (sk0, sk1, msg) ->
+                   let pk0 = Inner_curve.(scale one sk0) in
+                   let pk1 = Inner_curve.(scale one sk1) in
+                   (let%bind pk0_var =
+                      exists Inner_curve.typ ~compute:(As_prover.return pk0)
+                    in
+                    let%bind pk1_var =
+                      exists Inner_curve.typ ~compute:(As_prover.return pk1)
+                    in
+                    let sigma0 = Schnorr.sign sk0 msg in
+                    let sigma1 = Schnorr.sign sk1 msg in
+                    let%bind sigma0_var =
+                      exists Schnorr.Signature.typ
+                        ~compute:(As_prover.return sigma0)
+                    in
+                    let%bind sigma1_var =
+                      exists Schnorr.Signature.typ
+                        ~compute:(As_prover.return sigma1)
+                    in
+                    let%bind msg_var =
+                      exists (Schnorr.message_typ ())
+                        ~compute:(As_prover.return msg)
+                    in
+                    let witness =
+                      [ (sigma0_var, pk0_var); (sigma1_var, pk1_var) ]
+                    in
+                    check_witness 2 [ pk0; pk1 ] msg_var witness)
+                   |> Checked.map ~f:As_prover.return
+                   |> Fn.flip run_and_check () |> Or_error.ok_exn |> snd)
+           end*)
 
         (* test with a trivial predicate *)
         let%test_unit "trivial snapp predicate" =
@@ -5041,15 +5153,34 @@ let%test_module "transaction_snark" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
+                  Core.printf
+                    !"ledger merkle root 0 %{sexp: Ledger_hash.t}\n%!"
+                    (Ledger.merkle_root ledger) ;
                   let parties =
                     (fun () ->
-                      create_trivial_predicate_snapp (List.hd_exn specs) ledger)
+                      create_trivial_predicate_snapp ~constraint_constants
+                        (List.hd_exn specs) ledger)
                     |> Async.Thread_safe.block_on_async_exn
                   in
+                  Core.printf
+                    !"ledger merkle root 1 %{sexp: Ledger_hash.t}\n%!"
+                    (Ledger.merkle_root ledger) ;
+                  Core.printf "Snapp transaction: %s\n%!"
+                    (Parties.to_yojson parties |> Yojson.Safe.to_string) ;
+                  List.iter (Ledger.to_list ledger) ~f:(fun acc ->
+                      Core.printf "Account: %s\n%!"
+                        (Account.to_yojson acc |> Yojson.Safe.to_string)) ;
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  apply_parties ledger [ parties ])
+                  Core.printf
+                    !"ledger merkle root 2 %{sexp: Ledger_hash.t}\n%!"
+                    (Ledger.merkle_root ledger) ;
+                  List.iter (Ledger.to_list ledger) ~f:(fun acc ->
+                      Core.printf "Account: %s\n%!"
+                        (Account.to_yojson acc |> Yojson.Safe.to_string)) ;
+                  (fun () -> apply_parties ledger [ parties ])
+                  |> Async.Thread_safe.block_on_async_exn)
               |> fun ((), ()) -> ())
 
         (*type _ Snarky_backendless.Request.t +=

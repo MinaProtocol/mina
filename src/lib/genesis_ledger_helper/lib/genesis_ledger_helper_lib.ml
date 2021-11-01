@@ -151,6 +151,9 @@ module Accounts = struct
                                        .Stable
                                        .Latest ))
                   in
+                  Core.printf
+                    !"vk digest %{sexp: State_hash.t}\n%!"
+                    (Snapp_account.digest_vk vk) ;
                   Some (With_hash.of_data ~hash_data:Snapp_account.digest_vk vk))
             in
             let%map rollup_state =

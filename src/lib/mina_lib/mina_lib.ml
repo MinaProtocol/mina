@@ -261,15 +261,29 @@ module Snark_worker = struct
     [%log trace]
       !"Created snark worker with pid: %i"
       (Pid.to_int @@ Process.pid snark_worker_process) ;
+    don't_wait_for
+    @@ Pipe.iter
+         (Process.stdout snark_worker_process |> Async.Reader.pipe)
+         ~f:(fun stdout ->
+           return
+           @@ [%log debug] "Snark_worker stdout: $stdout"
+                ~metadata:[ ("stdout", `String stdout) ]) ;
+    don't_wait_for
+    @@ Pipe.iter
+         (Process.stderr snark_worker_process |> Async.Reader.pipe)
+         ~f:(fun stderr ->
+           return
+           @@ [%log error] "Snark_worker stderr: $stderr"
+                ~metadata:[ ("stderr", `String stderr) ]) ;
     (* We want these to be printfs so we don't double encode our logs here *)
-    Pipe.iter_without_pushback
-      (Async.Reader.pipe (Process.stdout snark_worker_process))
-      ~f:(fun s -> printf "%s" s)
-    |> don't_wait_for ;
-    Pipe.iter_without_pushback
-      (Async.Reader.pipe (Process.stderr snark_worker_process))
-      ~f:(fun s -> printf "%s" s)
-    |> don't_wait_for ;
+    (*Pipe.iter_without_pushback
+        (Async.Reader.pipe (Process.stdout snark_worker_process))
+        ~f:(fun s -> printf "%s" s)
+      |> don't_wait_for ;
+      Pipe.iter_without_pushback
+        (Async.Reader.pipe (Process.stderr snark_worker_process))
+        ~f:(fun s -> printf "%s" s)
+      |> don't_wait_for ;*)
     snark_worker_process
 
   let start t =

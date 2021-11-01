@@ -151,6 +151,12 @@ let a =
     |}
 in*)
 
+module T = Transaction_snark.Make (struct
+  let constraint_constants = constraint_constants
+
+  let proof_level = proof_level
+end)
+
 let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t) =
   let open Deferred.Let_syntax in
   let receiver =
@@ -164,11 +170,52 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t) =
     ; amount = Currency.Amount.of_int 10000000000 (*10 Mina*)
     }
   in
-  let%map parties =
-    Transaction_snark.For_tests.create_trivial_predicate_snapp spec ledger
+  let%bind parties =
+    Transaction_snark.For_tests.create_trivial_predicate_snapp
+      ~constraint_constants spec ledger
   in
   Core.printf "Snapp transaction: %s\n%!"
-    (Parties.to_yojson parties |> Yojson.Safe.to_string)
+    (Parties.to_yojson parties |> Yojson.Safe.to_string) ;
+  List.iter (Ledger.to_list ledger) ~f:(fun acc ->
+      Core.printf "Account: %s\n%!"
+        (Account.to_yojson acc |> Yojson.Safe.to_string)) ;
+  (*Array.iter init_ledger ~f:(fun (kp, amount) ->
+      let _tag, account, loc =
+        L.get_or_create l
+          (Account_id.create
+             (Public_key.compress kp.public_key)
+             Token_id.default)
+        |> Or_error.ok_exn
+      in
+      L.set l loc { account with balance = Currency.Balance.of_int amount }) ;*)
+  let consensus_constants =
+    Consensus.Constants.create ~constraint_constants
+      ~protocol_constants:Genesis_constants.compiled.protocol
+  in
+  let state_body =
+    let compile_time_genesis =
+      (*not using Precomputed_values.for_unit_test because of dependency cycle*)
+      Mina_state.Genesis_protocol_state.t
+        ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+        ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+        ~constraint_constants ~consensus_constants
+    in
+    compile_time_genesis.data |> Mina_state.Protocol_state.body
+  in
+  let witnesses =
+    Transaction_snark.parties_witnesses_exn ~constraint_constants ~state_body
+      ~fee_excess:Currency.Amount.Signed.zero
+      ~pending_coinbase_init_stack:Pending_coinbase.Stack.empty (`Ledger ledger)
+      [ parties ]
+  in
+  let open Async.Deferred.Let_syntax in
+  let%map _ =
+    Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
+      ~f:(fun _ (witness, spec, statement, _snapp_stmts) ->
+        let%map _ = T.of_parties_segment_exn ~statement ~witness ~spec in
+        ((), ()))
+  in
+  ()
 
 (*;
   let a  = graphql_snapp_command parties

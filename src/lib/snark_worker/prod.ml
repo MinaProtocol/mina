@@ -59,6 +59,7 @@ module Inputs = struct
     let open Deferred.Or_error.Let_syntax in
     let open Snark_work_lib in
     let sok_digest = Mina_base.Sok_message.digest message in
+    let logger = Logger.create () in
     fun (single : single_spec) ->
       match proof_level with
       | Genesis_constants.Proof_level.Full -> (
@@ -68,7 +69,6 @@ module Inputs = struct
             let start = Time.now () in
             match%map.Async.Deferred k () with
             | Error e ->
-                let logger = Logger.create () in
                 [%log error] "SNARK worker failed: $error"
                   ~metadata:
                     [ ("error", Error_json.error_to_yojson e)
@@ -95,7 +95,7 @@ module Inputs = struct
                       match w.transaction with
                       | Command (Parties parties) ->
                           let witnesses_specs_stmts =
-                            M.parties_witnesses_exn
+                            Transaction_snark.parties_witnesses_exn
                               ~constraint_constants:M.constraint_constants
                               ~state_body:w.protocol_state_body
                               ~fee_excess:Currency.Amount.Signed.zero
@@ -105,30 +105,61 @@ module Inputs = struct
                           let deferred_or_error d =
                             Deferred.map d ~f:(fun p -> Ok p)
                           in
+                          Core.printf
+                            !"witnesses %{sexp: \
+                              (Transaction_witness.Parties_segment_witness.t *\n\
+                             \ Transaction_snark.Parties_segment.Basic.t *\n\
+                             \ Transaction_snark.Statement.With_sok.t * (int * \
+                              Snapp_statement.t) list)\n\
+                              list}\n\
+                              %!"
+                            witnesses_specs_stmts ;
                           Deferred.Or_error.try_with_join ~here:[%here]
                             (fun () ->
-                              match witnesses_specs_stmts with
+                              match List.rev witnesses_specs_stmts with
                               | [] ->
                                   failwith "no witnesses generated"
-                              | (witness, _spec, stmt, _) :: rest ->
+                              | ((witness, spec, stmt, _) as w) :: rest ->
+                                  Core.printf
+                                    !"current witness \
+                                      %{sexp:(Transaction_witness.Parties_segment_witness.t*Transaction_snark.Parties_segment.Basic.t*Transaction_snark.Statement.With_sok.t* \
+                                      (int * Snapp_statement.t) list)}\n\n\
+                                     \                                      %!"
+                                    w ;
                                   let%bind (p1 : Ledger_proof.t) =
                                     M.of_parties_segment_exn
                                       ~statement:{ stmt with sok_digest }
-                                      ~witness
+                                      ~witness ~spec
                                     |> deferred_or_error
                                   in
                                   let%map (p : Ledger_proof.t) =
                                     Deferred.List.fold ~init:(Ok p1) rest
-                                      ~f:(fun acc (witness, _spec, stmt, _) ->
+                                      ~f:(fun acc ((witness, spec, stmt, _) as w)
+                                         ->
+                                        Core.printf
+                                          !"current witness \
+                                            %{sexp:(Transaction_witness.Parties_segment_witness.t*Transaction_snark.Parties_segment.Basic.t*Transaction_snark.Statement.With_sok.t* \
+                                            (int * Snapp_statement.t) list)}\n\n\
+                                           \                                      \
+                                            %!"
+                                          w ;
                                         let%bind (prev : Ledger_proof.t) =
                                           Deferred.return acc
                                         in
                                         let%bind (curr : Ledger_proof.t) =
                                           M.of_parties_segment_exn
                                             ~statement:{ stmt with sok_digest }
-                                            ~witness
+                                            ~witness ~spec
                                           |> deferred_or_error
                                         in
+                                        Core.printf
+                                          !"Merge left %{sexp: \
+                                            Transaction_snark.Statement.t} \
+                                            right %{sexp: \
+                                            Transaction_snark.Statement.t}\n\
+                                            %!"
+                                          (Ledger_proof.statement prev)
+                                          (Ledger_proof.statement curr) ;
                                         M.merge ~sok_digest prev curr)
                                   in
                                   assert (

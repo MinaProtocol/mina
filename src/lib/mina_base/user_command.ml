@@ -178,14 +178,10 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
     let ( ! ) x = Option.value_exn x in
     let id = Party.account_id p in
     Option.try_with (fun () ->
-        match p.data.body.update.verification_key with
-        | Set vk_with_hash ->
-            With_hash.data vk_with_hash
-        | Keep ->
-            let account : Account.t =
-              !(get ledger !(location_of_account ledger id))
-            in
-            !(!(account.snapp).verification_key).data)
+        let account : Account.t =
+          !(get ledger !(location_of_account ledger id))
+        in
+        !(!(account.snapp).verification_key).data)
   in
   match t with
   | Signed_command c ->
