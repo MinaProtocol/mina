@@ -122,6 +122,8 @@ module type S = sig
 
   val receiver : next_available_token:Token_id.t -> t -> Account_id.t
 
+  val public_keys : t -> Public_key.Compressed.t list
+
   val amount : t -> Currency.Amount.t option
 
   val memo : t -> Signed_command_memo.t

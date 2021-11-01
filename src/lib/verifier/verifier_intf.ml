@@ -7,6 +7,15 @@ module Base = struct
 
     type ledger_proof
 
+    type invalid =
+      [ `Invalid_keys of Signature_lib.Public_key.Compressed.t list
+      | `Invalid_signature
+      | `Invalid_proof
+      | `Missing_verification_key ]
+    [@@deriving bin_io]
+
+    val invalid_to_string : invalid -> string
+
     val verify_commands :
          t
       -> Mina_base.User_command.Verifiable.t list
@@ -18,9 +27,7 @@ module Base = struct
            * Mina_base.Snapp_statement.t
            * Pickles.Side_loaded.Proof.t )
            list
-         | `Invalid_keys
-         | `Invalid_signature
-         | `Invalid_proof ]
+         | invalid ]
          list
          Deferred.Or_error.t
 

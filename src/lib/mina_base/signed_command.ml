@@ -387,11 +387,14 @@ let check_signature ?signature_kind ({ payload; signer; signature } : t) =
 
 [%%endif]
 
-let check_valid_keys t =
+let public_keys t =
   let fee_payer = fee_payer_pk t in
   let source = source_pk t in
   let receiver = receiver_pk t in
-  List.for_all [ fee_payer; source; receiver ] ~f:(fun pk ->
+  [ fee_payer; source; receiver ]
+
+let check_valid_keys t =
+  List.for_all (public_keys t) ~f:(fun pk ->
       Option.is_some (Public_key.decompress pk))
 
 let create_with_signature_checked ?signature_kind signature signer payload =

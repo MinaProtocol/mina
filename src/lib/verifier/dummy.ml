@@ -4,6 +4,10 @@ open Mina_base
 
 type t = unit
 
+type invalid = Common.invalid [@@deriving bin_io_unversioned]
+
+let invalid_to_string = Common.invalid_to_string
+
 type ledger_proof = Ledger_proof.t
 
 let create ~logger:_ ~proof_level ~constraint_constants:_ ~pids:_ ~conf_dir:_ =
@@ -25,9 +29,7 @@ let verify_commands _ (cs : User_command.Verifiable.t list) :
       * Mina_base.Snapp_statement.t
       * Pickles.Side_loaded.Proof.t )
       list
-    | `Invalid_keys
-    | `Invalid_signature
-    | `Invalid_proof ]
+    | Common.invalid ]
     list
     Deferred.Or_error.t =
   List.map cs ~f:(fun c ->
@@ -36,12 +38,14 @@ let verify_commands _ (cs : User_command.Verifiable.t list) :
           `Valid c
       | `Valid_assuming (c, _) ->
           `Valid c
-      | `Invalid_keys ->
-          `Invalid_keys
+      | `Invalid_keys keys ->
+          `Invalid_keys keys
       | `Invalid_signature ->
           `Invalid_signature
       | `Invalid_proof ->
-          `Invalid_proof)
+          `Invalid_proof
+      | `Missing_verification_key ->
+          `Missing_verification_key)
   |> Deferred.Or_error.return
 
 let verify_transaction_snarks _ ts =

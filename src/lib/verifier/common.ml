@@ -1,15 +1,35 @@
 open Core_kernel
 open Mina_base
 
+type invalid =
+  [ `Invalid_keys of Signature_lib.Public_key.Compressed.Stable.Latest.t list
+  | `Invalid_signature
+  | `Invalid_proof
+  | `Missing_verification_key ]
+[@@deriving bin_io_unversioned]
+
+let invalid_to_string (invalid : invalid) =
+  match invalid with
+  | `Invalid_keys keys ->
+      sprintf "Invalid_keys: [%s]"
+        ( List.map keys ~f:(fun key ->
+              Signature_lib.Public_key.Compressed.to_base58_check key)
+        |> String.concat ~sep:";" )
+  | `Invalid_signature ->
+      "Invalid_signature"
+  | `Invalid_proof ->
+      "Invalid_proof"
+  | `Missing_verification_key ->
+      "Missing_verification_key"
+
 let check :
        User_command.Verifiable.t
     -> [ `Valid of User_command.Valid.t
        | `Valid_assuming of User_command.Valid.t * _ list
-       | `Invalid_signature
-       | `Invalid_keys
-       | `Invalid_proof ] = function
+       | invalid ] = function
   | User_command.Signed_command c -> (
-      if not (Signed_command.check_valid_keys c) then `Invalid_keys
+      if not (Signed_command.check_valid_keys c) then
+        `Invalid_keys (Signed_command.public_keys c)
       else
         match Signed_command.check_only_for_signature c with
         | Some c ->
@@ -30,7 +50,7 @@ let check :
           let check_signature s pk msg =
             match Signature_lib.Public_key.decompress pk with
             | None ->
-                return `Invalid_keys
+                return (`Invalid_keys [ pk ])
             | Some pk ->
                 if
                   not
@@ -61,7 +81,7 @@ let check :
                 | Proof pi -> (
                     match vk_opt with
                     | None ->
-                        return `Invalid_proof
+                        return `Missing_verification_key
                     | Some vk ->
                         Some
                           ( vk

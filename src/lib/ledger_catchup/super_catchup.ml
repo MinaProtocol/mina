@@ -563,9 +563,12 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
     match%bind Initial_validate_batcher.verify batcher transition with
     | Ok (Ok tv) ->
         return (Ok { transition with data = tv })
-    | Ok (Error `Invalid_proof) ->
+    | Ok (Error invalid) ->
         let s = "initial_validate: block failed to verify, invalid proof" in
-        [%log warn] ~metadata:[ ("state_hash", state_hash) ] "%s" s ;
+        [%log warn]
+          ~metadata:[ ("state_hash", state_hash) ]
+          "%s, %s" s
+          (Verifier.invalid_to_string invalid) ;
         let%map () =
           match transition.sender with
           | Local ->
@@ -576,9 +579,6 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
                   Actions.(Sent_invalid_proof, None))
         in
         Error (`Error (Error.of_string s))
-    | Ok (Error _err) ->
-        (* _err could be `Invalid_keys or `Invalid_proof *)
-        failwith "initial_validate: Unexpected verification error"
     | Error e ->
         [%log warn]
           ~metadata:
@@ -919,8 +919,9 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
               Gauge.set Catchup.verification_time
                 Time.(Span.to_ms @@ diff (now ()) start_time)) ;
             match result with
-            | Error _ ->
-                [%log' warn t.logger] "verification failed! redownloading"
+            | Error err ->
+                [%log' warn t.logger] "verification failed: %s! redownloading"
+                  (Verifier.invalid_to_string err)
                   ~metadata:
                     [ ("state_hash", State_hash.to_yojson node.state_hash) ] ;
                 ( match iv.sender with

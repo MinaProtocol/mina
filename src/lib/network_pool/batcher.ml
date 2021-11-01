@@ -4,13 +4,11 @@ open Network_peer
 
 module Id = Unique_id.Int ()
 
-type invalid = [ `Invalid_keys | `Invalid_signature | `Invalid_proof ]
-
 type ('init, 'result) elt =
   { id : Id.t
   ; data : 'init
   ; weight : int
-  ; res : (('result, invalid) Result.t Or_error.t Ivar.t[@sexp.opaque])
+  ; res : (('result, Verifier.invalid) Result.t Or_error.t Ivar.t[@sexp.opaque])
   }
 [@@deriving sexp]
 
@@ -35,9 +33,7 @@ type ('init, 'partially_validated, 'result) t =
             fails to verify. *)
          [ `Init of 'init | `Partially_validated of 'partially_validated ] list
       -> [ `Valid of 'result
-         | `Invalid_keys
-         | `Invalid_signature
-         | `Invalid_proof
+         | Verifier.invalid
          | `Potentially_invalid of 'partially_validated ]
          list
          Deferred.Or_error.t
@@ -66,7 +62,7 @@ let call_verifier t (ps : 'proof list) = t.verifier ps
 let rec determine_outcome :
     type p r partial.
        (p, r) elt list
-    -> [ `Valid of r | `Potentially_invalid of partial | invalid ] list
+    -> [ `Valid of r | `Potentially_invalid of partial | Verifier.invalid ] list
     -> (p, partial, r) t
     -> unit Deferred.Or_error.t =
  fun ps res v ->
@@ -80,10 +76,10 @@ let rec determine_outcome :
               [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
             Ivar.fill elt.res (Ok (Ok r)) ;
             None
-        | `Invalid_keys ->
+        | `Invalid_keys keys ->
             if Ivar.is_full elt.res then
               [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-            Ivar.fill elt.res (Ok (Error `Invalid_keys)) ;
+            Ivar.fill elt.res (Ok (Error (`Invalid_keys keys))) ;
             None
         | `Invalid_signature ->
             if Ivar.is_full elt.res then
@@ -94,6 +90,11 @@ let rec determine_outcome :
             if Ivar.is_full elt.res then
               [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
             Ivar.fill elt.res (Ok (Error `Invalid_proof)) ;
+            None
+        | `Missing_verification_key ->
+            if Ivar.is_full elt.res then
+              [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+            Ivar.fill elt.res (Ok (Error `Missing_verification_key)) ;
             None
         | `Potentially_invalid new_hint ->
             Some (elt, new_hint))
@@ -198,7 +199,7 @@ let rec start_verifier : type proof partial r. (proof, partial, r) t -> unit =
         start_verifier t) )
 
 let verify (type p r partial) (t : (p, partial, r) t) (proof : p) :
-    (r, invalid) Result.t Deferred.Or_error.t =
+    (r, Verifier.invalid) Result.t Deferred.Or_error.t =
   let elt =
     { id = Id.create ()
     ; data = proof
@@ -307,19 +308,25 @@ module Transaction_pool = struct
            the verification result of the diff that it belongs to. *)
         List.iter2_exn unknowns res ~f:(fun ((i, j), v) r ->
             match r with
-            | `Invalid_keys ->
+            | `Invalid_keys keys ->
                 (* A diff is invalid is any of the transactions it contains are invalid.
                    Invalidate the whole diff that this transaction comes from. *)
-                result.(i) <- `Invalid_keys
+                result.(i) <- `Invalid_keys keys
             | `Invalid_signature ->
                 (* Invalidate the whole diff *)
                 result.(i) <- `Invalid_signature
             | `Invalid_proof ->
                 (* Invalidate the whole diff *)
                 result.(i) <- `Invalid_proof
+            | `Missing_verification_key ->
+                (* Invalidate the whole diff *)
+                result.(i) <- `Missing_verification_key
             | `Valid_assuming xs -> (
                 match result.(i) with
-                | `Invalid_keys | `Invalid_signature | `Invalid_proof ->
+                | `Invalid_keys _
+                | `Invalid_signature
+                | `Invalid_proof
+                | `Missing_verification_key ->
                     (* If this diff has already been declared invalid, knowing that one of its
                        transactions is partially valid is not useful. *)
                     ()
@@ -329,17 +336,22 @@ module Transaction_pool = struct
             | `Valid c -> (
                 (* Similar to the above. *)
                 match result.(i) with
-                | `Invalid_keys | `Invalid_signature | `Invalid_proof ->
+                | `Invalid_keys _
+                | `Invalid_signature
+                | `Invalid_proof
+                | `Missing_verification_key ->
                     ()
                 | `In_progress a ->
                     a.(j) <- `Valid c )) ;
         list_of_array_map result ~f:(function
-          | `Invalid_keys ->
-              `Invalid_keys
+          | `Invalid_keys keys ->
+              `Invalid_keys keys
           | `Invalid_signature ->
               `Invalid_signature
           | `Invalid_proof ->
               `Invalid_proof
+          | `Missing_verification_key ->
+              `Missing_verification_key
           | `In_progress a -> (
               (* If the diff is all valid, we're done. If not, we return a partial
                    result. *)

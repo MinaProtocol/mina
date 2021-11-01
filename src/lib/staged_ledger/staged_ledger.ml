@@ -1037,12 +1037,6 @@ module T = struct
   [%%if feature_snapps]
 
   let check_commands ledger ~verifier (cs : User_command.t list) =
-    let mk_invalid_error s =
-      Error
-        (Verifier.Failure.Verification_failed
-           (Error.of_string
-              (sprintf "verification failed on command, invalid %s" s)))
-    in
     let cs =
       List.map cs
         ~f:
@@ -1055,12 +1049,15 @@ module T = struct
       (List.map xs ~f:(function
         | `Valid x ->
             Ok x
-        | `Invalid_keys ->
-            mk_invalid_error "keys"
-        | `Invalid_signature ->
-            mk_invalid_error "signature"
-        | `Invalid_proof ->
-            mk_invalid_error "proof"
+        | ( `Invalid_keys _
+          | `Invalid_signature
+          | `Invalid_proof
+          | `Missing_verification_key ) as invalid ->
+            Error
+              (Verifier.Failure.Verification_failed
+                 (Error.of_string
+                    (sprintf "verification failed on command, %s"
+                       (Verifier.invalid_to_string invalid))))
         | `Valid_assuming _ ->
             Error
               (Verifier.Failure.Verification_failed
