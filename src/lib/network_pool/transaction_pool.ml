@@ -4,7 +4,7 @@
 *)
 
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
+(* open Inline_test_quiet_logs *)
 open Core
 open Async
 open Mina_base
@@ -1576,7 +1576,7 @@ let%test_module _ =
 
     let proof_level = precomputed_values.proof_level
 
-    let logger = Logger.null ()
+    let logger = Logger.create ~id:"default logger" ~metadata:[] ()
 
     let time_controller = Block_time.Controller.basic ~logger
 
@@ -1808,6 +1808,7 @@ let%test_module _ =
 
     let verify_and_apply (pool : Test.Resource_pool.t) cs =
       let logger = Logger.create ~id:"verify_and_apply" ~metadata:[] () in
+      Format.eprintf "STARTING VERIFICATION@." ;
       let tm0 = Time.now () in
       let%bind verified =
         Test.Resource_pool.Diff.verify' ~allow_failures_for_tests:true pool

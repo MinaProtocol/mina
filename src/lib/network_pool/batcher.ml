@@ -66,8 +66,9 @@ let rec determine_outcome :
     -> (p, partial, r) t
     -> unit Deferred.Or_error.t =
  fun ps res v ->
+  let tm0 = Unix.gettimeofday () in
   (* First separate out all the known results. That information will definitely be included
-     in the outcome. *)
+      in the outcome. *)
   let potentially_invalid =
     List.filter_map (List.zip_exn ps res) ~f:(fun (elt, r) ->
         match r with
@@ -85,30 +86,35 @@ let rec determine_outcome :
             Some (elt, new_hint))
   in
   let open Deferred.Or_error.Let_syntax in
-  match potentially_invalid with
-  | [] ->
-      (* All results are known *)
-      return ()
-  | [ ({ res; _ }, _) ] ->
-      if Ivar.is_full res then
-        [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-      Ivar.fill res (Ok (Error ())) ;
-      (* If there is a potentially invalid proof in this batch of size 1, then
-         that proof is itself invalid. *)
-      return ()
-  | _ ->
-      let outcome xs =
-        let%bind res_xs =
-          call_verifier v
-            (List.map xs ~f:(fun (_e, new_hint) ->
-                 `Partially_validated new_hint))
+  let result =
+    match potentially_invalid with
+    | [] ->
+        (* All results are known *)
+        return ()
+    | [ ({ res; _ }, _) ] ->
+        if Ivar.is_full res then
+          [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+        Ivar.fill res (Ok (Error ())) ;
+        (* If there is a potentially invalid proof in this batch of size 1, then
+           that proof is itself invalid. *)
+        return ()
+    | _ ->
+        let outcome xs =
+          let%bind res_xs =
+            call_verifier v
+              (List.map xs ~f:(fun (_e, new_hint) ->
+                   `Partially_validated new_hint))
+          in
+          determine_outcome (List.map xs ~f:fst) res_xs v
         in
-        determine_outcome (List.map xs ~f:fst) res_xs v
-      in
-      let length = List.length potentially_invalid in
-      let left, right = List.split_n potentially_invalid (length / 2) in
-      let%bind () = outcome left in
-      outcome right
+        let length = List.length potentially_invalid in
+        let left, right = List.split_n potentially_invalid (length / 2) in
+        let%bind () = outcome left in
+        outcome right
+  in
+  let tm1 = Unix.gettimeofday () in
+  Format.eprintf "TM DETERMINE: %0.04f@." (tm1 -. tm0) ;
+  result
 
 let compare_elt ~compare t1 t2 =
   match compare t1.data t2.data with 0 -> Id.compare t1.id t2.id | x -> x
@@ -163,7 +169,15 @@ let rec start_verifier : type proof partial r. (proof, partial, r) t -> unit =
                  ~f:(fun { id; _ } -> `Int (Id.to_int_exn id))
                  out_for_verification) )
         ] ;
+    Format.eprintf "PENDING JOBS BEFORE BATCH: %d@."
+      (Async.Scheduler.num_pending_jobs ()) ;
+    let tm0' = ref 0.0 in
     let res =
+      let tm0 = Unix.gettimeofday () in
+      let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
+      let tm1 = Unix.gettimeofday () in
+      Format.eprintf "TM YIELD: %0.04f@." (tm1 -. tm0) ;
+      tm0' := Unix.gettimeofday () ;
       match%bind
         call_verifier t
           (List.map out_for_verification ~f:(fun { data = p; _ } -> `Init p))
@@ -177,10 +191,15 @@ let rec start_verifier : type proof partial r. (proof, partial, r) t -> unit =
     upon res (fun r ->
         ( match r with
         | Ok () ->
-            ()
+            Format.eprintf "GOT OK@." ; ()
         | Error e ->
+            Format.eprintf "GOT ERROR@." ;
             List.iter out_for_verification ~f:(fun x ->
                 Ivar.fill_if_empty x.res (Error e)) ) ;
+        let tm1 = Unix.gettimeofday () in
+        Format.eprintf "TM FOR BATCH: %0.04f@." (tm1 -. !tm0') ;
+        Format.eprintf "PENDING JOBS AFTER BATCH: %d@."
+          (Async.Scheduler.num_pending_jobs ()) ;
         start_verifier t) )
 
 let verify (type p r partial) (t : (p, partial, r) t) (proof : p) :
@@ -285,10 +304,27 @@ module Transaction_pool = struct
                           (* TODO: This rechecks the signatures on snapp transactions... oh well for now *)
                           Some ((i, j), v)))
         in
+        let tm0 = Unix.gettimeofday () in
+        let%bind _res =
+          (* Verify the unknowns *)
+          Verifier.verify_commands verifier (List.map unknowns ~f:snd)
+        in
+        let tm1 = Unix.gettimeofday () in
+        Format.eprintf "TM VERIFY CMDS: %0.04f@." (tm1 -. tm0) ;
+        let tm0 = Unix.gettimeofday () in
+        let%bind _res =
+          (* Verify the unknowns *)
+          Verifier.verify_commands verifier (List.map unknowns ~f:snd)
+        in
+        let tm1 = Unix.gettimeofday () in
+        Format.eprintf "TM VERIFY CMDS: %0.04f@." (tm1 -. tm0) ;
+        let tm0 = Unix.gettimeofday () in
         let%map res =
           (* Verify the unknowns *)
           Verifier.verify_commands verifier (List.map unknowns ~f:snd)
         in
+        let tm1 = Unix.gettimeofday () in
+        Format.eprintf "TM VERIFY CMDS: %0.04f@." (tm1 -. tm0) ;
         (* We now iterate over the results of the unknown transactions and appropriately modify
            the verification result of the diff that it belongs to. *)
         List.iter2_exn unknowns res ~f:(fun ((i, j), v) r ->

@@ -25,6 +25,7 @@ let verify_commands _ (cs : User_command.Verifiable.t list) :
       list ]
     list
     Deferred.Or_error.t =
+  Format.eprintf "CHECK ON LIST OF LEN: %d@." (List.length cs) ;
   List.map cs ~f:(fun c ->
       match Common.check c with
       | `Valid c ->
