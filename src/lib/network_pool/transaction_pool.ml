@@ -1215,7 +1215,7 @@ struct
                                       with
                                       | Error _ ->
                                           None
-                                      | Ok (Error ()) ->
+                                      | Ok (Error _) ->
                                           None
                                       | Ok (Ok [ c ]) ->
                                           Some c

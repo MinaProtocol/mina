@@ -13,12 +13,14 @@ module Base = struct
          (* The first level of error represents failure to verify, the second a failure in
             communicating with the verifier. *)
       -> [ `Valid of Mina_base.User_command.Valid.t
-         | `Invalid
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
            * Mina_base.Snapp_statement.t
            * Pickles.Side_loaded.Proof.t )
-           list ]
+           list
+         | `Invalid_keys
+         | `Invalid_signature
+         | `Invalid_proof ]
          list
          Deferred.Or_error.t
 

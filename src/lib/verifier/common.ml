@@ -4,14 +4,18 @@ open Mina_base
 let check :
        User_command.Verifiable.t
     -> [ `Valid of User_command.Valid.t
-       | `Invalid
-       | `Valid_assuming of User_command.Valid.t * _ list ] = function
+       | `Valid_assuming of User_command.Valid.t * _ list
+       | `Invalid_signature
+       | `Invalid_keys
+       | `Invalid_proof ] = function
   | User_command.Signed_command c -> (
-      match Signed_command.check c with
-      | None ->
-          `Invalid
-      | Some c ->
-          `Valid (User_command.Signed_command c) )
+      if not (Signed_command.check_valid_keys c) then `Invalid_keys
+      else
+        match Signed_command.check_only_for_signature c with
+        | Some c ->
+            `Valid (User_command.Signed_command c)
+        | None ->
+            `Invalid_signature )
   | Parties { fee_payer; other_parties; protocol_state; memo } ->
       with_return (fun { return } ->
           let commitment =
@@ -26,14 +30,14 @@ let check :
           let check_signature s pk msg =
             match Signature_lib.Public_key.decompress pk with
             | None ->
-                return `Invalid
+                return `Invalid_keys
             | Some pk ->
                 if
                   not
                     (Signature_lib.Schnorr.verify s
                        (Backend.Tick.Inner_curve.of_affine pk)
                        (Random_oracle_input.field msg))
-                then return `Invalid
+                then return `Invalid_signature
                 else ()
           in
           check_signature fee_payer.authorization fee_payer.data.body.pk
@@ -57,7 +61,7 @@ let check :
                 | Proof pi -> (
                     match vk_opt with
                     | None ->
-                        return `Invalid
+                        return `Invalid_proof
                     | Some vk ->
                         Some
                           ( vk

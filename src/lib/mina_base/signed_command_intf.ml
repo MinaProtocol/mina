@@ -183,12 +183,17 @@ module type S = sig
     -> Signed_command_payload.t
     -> With_valid_signature.t option
 
+  val check_valid_keys : t -> bool
+
   module For_tests : sig
     val fake_sign :
       Signature_keypair.t -> Signed_command_payload.t -> With_valid_signature.t
   end
 
+  (** checks signature and keys *)
   val check : t -> With_valid_signature.t option
+
+  val check_only_for_signature : t -> With_valid_signature.t option
 
   val to_valid_unsafe :
        t

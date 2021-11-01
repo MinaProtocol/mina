@@ -415,7 +415,11 @@ let%test_unit "json" =
   Quickcheck.test ~trials:20 ~sexp_of:sexp_of_t gen_test ~f:(fun t ->
       assert (Codable.For_tests.check_encoding (module Stable.Latest) ~equal t))
 
+(* return type is `t option` here, interface coerces that to `With_valid_signature.t option` *)
 let check t = Option.some_if (check_signature t && check_valid_keys t) t
+
+(* return type is `t option` here, interface coerces that to `With_valid_signature.t option` *)
+let check_only_for_signature t = Option.some_if (check_signature t) t
 
 let forget_check t = t
 

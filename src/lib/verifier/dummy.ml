@@ -15,24 +15,33 @@ let create ~logger:_ ~proof_level ~constraint_constants:_ ~pids:_ ~conf_dir:_ =
 
 let verify_blockchain_snarks _ _ = Deferred.Or_error.return true
 
+(* N.B.: Valid_assuming is never returned, in fact; we assert a return type
+   containing Valid_assuming to match the expected type
+*)
 let verify_commands _ (cs : User_command.Verifiable.t list) :
     [ `Valid of Mina_base.User_command.Valid.t
-    | `Invalid
     | `Valid_assuming of
       ( Pickles.Side_loaded.Verification_key.t
       * Mina_base.Snapp_statement.t
       * Pickles.Side_loaded.Proof.t )
-      list ]
+      list
+    | `Invalid_keys
+    | `Invalid_signature
+    | `Invalid_proof ]
     list
     Deferred.Or_error.t =
   List.map cs ~f:(fun c ->
       match Common.check c with
       | `Valid c ->
           `Valid c
-      | `Invalid ->
-          `Invalid
       | `Valid_assuming (c, _) ->
-          `Valid c)
+          `Valid c
+      | `Invalid_keys ->
+          `Invalid_keys
+      | `Invalid_signature ->
+          `Invalid_signature
+      | `Invalid_proof ->
+          `Invalid_proof)
   |> Deferred.Or_error.return
 
 let verify_transaction_snarks _ ts =

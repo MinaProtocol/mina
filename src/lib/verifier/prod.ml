@@ -17,12 +17,14 @@ module Worker_state = struct
     val verify_commands :
          Mina_base.User_command.Verifiable.t list
       -> [ `Valid of Mina_base.User_command.Valid.t
-         | `Invalid
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
            * Mina_base.Snapp_statement.t
            * Pickles.Side_loaded.Proof.t )
-           list ]
+           list
+         | `Invalid_keys
+         | `Invalid_signature
+         | `Invalid_proof ]
          list
          Deferred.t
 
@@ -68,10 +70,10 @@ module Worker_state = struct
                  List.concat_map cs ~f:(function
                    | `Valid _ ->
                        []
-                   | `Invalid ->
-                       []
                    | `Valid_assuming (_, xs) ->
-                       xs)
+                       xs
+                   | `Invalid_keys | `Invalid_signature | `Invalid_proof ->
+                       [])
                in
                let%map all_verified =
                  Pickles.Side_loaded.verify
@@ -81,10 +83,14 @@ module Worker_state = struct
                List.map cs ~f:(function
                  | `Valid c ->
                      `Valid c
-                 | `Invalid ->
-                     `Invalid
                  | `Valid_assuming (c, xs) ->
-                     if all_verified then `Valid c else `Valid_assuming xs)
+                     if all_verified then `Valid c else `Valid_assuming xs
+                 | `Invalid_keys ->
+                     `Invalid_keys
+                 | `Invalid_signature ->
+                     `Invalid_signature
+                 | `Invalid_proof ->
+                     `Invalid_proof)
 
              let verify_blockchain_snarks = B.Proof.verify
 
@@ -108,10 +114,14 @@ module Worker_state = struct
                    match Common.check c with
                    | `Valid c ->
                        `Valid c
-                   | `Invalid ->
-                       `Invalid
                    | `Valid_assuming (c, _) ->
-                       `Valid c)
+                       `Valid c
+                   | `Invalid_keys ->
+                       `Invalid_keys
+                   | `Invalid_signature ->
+                       `Invalid_signature
+                   | `Invalid_proof ->
+                       `Invalid_proof)
                |> Deferred.return
 
              let verify_blockchain_snarks _ = Deferred.return true
@@ -134,12 +144,14 @@ module Worker = struct
           ( 'w
           , User_command.Verifiable.t list
           , [ `Valid of User_command.Valid.t
-            | `Invalid
             | `Valid_assuming of
               ( Pickles.Side_loaded.Verification_key.t
               * Mina_base.Snapp_statement.t
               * Pickles.Side_loaded.Proof.t )
-              list ]
+              list
+            | `Invalid_keys
+            | `Invalid_signature
+            | `Invalid_proof ]
             list )
           F.t
       }
@@ -197,12 +209,14 @@ module Worker = struct
               ( [%bin_type_class: User_command.Verifiable.Stable.Latest.t list]
               , [%bin_type_class:
                   [ `Valid of User_command.Valid.Stable.Latest.t
-                  | `Invalid
                   | `Valid_assuming of
                     ( Pickles.Side_loaded.Verification_key.Stable.Latest.t
                     * Mina_base.Snapp_statement.Stable.Latest.t
                     * Pickles.Side_loaded.Proof.Stable.Latest.t )
-                    list ]
+                    list
+                  | `Invalid_keys
+                  | `Invalid_signature
+                  | `Invalid_proof ]
                   list]
               , verify_commands )
         }
