@@ -9,6 +9,8 @@ module Counter : sig
   val inc_one : t -> unit
 
   val inc : t -> float -> unit
+
+  val value : t -> float
 end
 
 module Gauge : sig
@@ -23,6 +25,8 @@ module Gauge : sig
   val dec : t -> float -> unit
 
   val set : t -> float -> unit
+
+  val value : t -> float
 end
 
 module type Histogram = sig

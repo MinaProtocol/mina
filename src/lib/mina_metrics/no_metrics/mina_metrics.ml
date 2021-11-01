@@ -9,6 +9,9 @@ module Counter = struct
   let inc_one : t -> unit = fun _ -> ()
 
   let inc : t -> float -> unit = fun _ _ -> ()
+
+  let value : t -> float =
+   fun _ -> failwith "no_metrics doesn't store any value"
 end
 
 module Gauge = struct
@@ -23,6 +26,9 @@ module Gauge = struct
   let dec : t -> float -> unit = fun _ _ -> ()
 
   let set : t -> float -> unit = fun _ _ -> ()
+
+  let value : t -> float =
+   fun _ -> failwith "no_metrics doesn't store any value"
 end
 
 module type Histogram = sig
