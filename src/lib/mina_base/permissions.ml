@@ -302,7 +302,7 @@ module Poly = struct
         ; set_permissions : 'controller
         ; set_verification_key : 'controller
         ; set_snapp_uri : 'controller
-        ; edit_rollup_state : 'controller
+        ; edit_sequence_state : 'controller
         ; set_token_symbol : 'controller
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
@@ -316,7 +316,7 @@ module Poly = struct
       ~edit_state:(f controller) ~send:(f controller)
       ~set_delegate:(f controller) ~set_permissions:(f controller)
       ~set_verification_key:(f controller) ~receive:(f controller)
-      ~set_snapp_uri:(f controller) ~edit_rollup_state:(f controller)
+      ~set_snapp_uri:(f controller) ~edit_sequence_state:(f controller)
       ~set_token_symbol:(f controller)
     |> List.reduce_exn ~f:Random_oracle.Input.append
 end
@@ -341,7 +341,7 @@ let gen : t Quickcheck.Generator.t =
   let%bind set_permissions = Auth_required.gen in
   let%bind set_verification_key = Auth_required.gen in
   let%bind set_snapp_uri = Auth_required.gen in
-  let%bind edit_rollup_state = Auth_required.gen in
+  let%bind edit_sequence_state = Auth_required.gen in
   let%bind set_token_symbol = Auth_required.gen in
   return
     { Poly.stake
@@ -352,7 +352,7 @@ let gen : t Quickcheck.Generator.t =
     ; set_permissions
     ; set_verification_key
     ; set_snapp_uri
-    ; edit_rollup_state
+    ; edit_sequence_state
     ; set_token_symbol
     }
 
@@ -374,7 +374,7 @@ module Checked = struct
     let c = g Auth_required.Checked.if_ in
     Poly.Fields.map ~stake:(g Boolean.if_) ~edit_state:c ~send:c ~receive:c
       ~set_delegate:c ~set_permissions:c ~set_verification_key:c
-      ~set_snapp_uri:c ~edit_rollup_state:c ~set_token_symbol:c
+      ~set_snapp_uri:c ~edit_sequence_state:c ~set_token_symbol:c
 
   let constant (t : Stable.Latest.t) : t =
     let open Core_kernel.Field in
@@ -382,7 +382,7 @@ module Checked = struct
     Poly.Fields.map
       ~stake:(fun f -> Boolean.var_of_value (get f t))
       ~edit_state:a ~send:a ~receive:a ~set_delegate:a ~set_permissions:a
-      ~set_verification_key:a ~set_snapp_uri:a ~edit_rollup_state:a
+      ~set_verification_key:a ~set_snapp_uri:a ~edit_sequence_state:a
       ~set_token_symbol:a
 end
 
@@ -416,7 +416,7 @@ let user_default : t =
   ; set_permissions = Signature
   ; set_verification_key = Signature
   ; set_snapp_uri = Signature
-  ; edit_rollup_state = Signature
+  ; edit_sequence_state = Signature
   ; set_token_symbol = Signature
   }
 
@@ -429,6 +429,6 @@ let empty : t =
   ; set_permissions = None
   ; set_verification_key = None
   ; set_snapp_uri = None
-  ; edit_rollup_state = None
+  ; edit_sequence_state = None
   ; set_token_symbol = None
   }

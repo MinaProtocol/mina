@@ -717,19 +717,19 @@ module Types = struct
              unknown with the invariant unknown <= total, as well as the \
              currently liquid and locked balances." ~fields:(fun _ ->
             [ field "total" ~typ:(non_null uint64)
-                ~doc:"The amount of mina owned by the account"
+                ~doc:"The amount of MINA owned by the account"
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.total)
             ; field "unknown" ~typ:(non_null uint64)
                 ~doc:
-                  "The amount of mina owned by the account whose origin is \
+                  "The amount of MINA owned by the account whose origin is \
                    currently unknown"
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.unknown)
             ; field "liquid" ~typ:uint64
                 ~doc:
-                  "The amount of mina owned by the account which is currently \
+                  "The amount of MINA owned by the account which is currently \
                    available. Can be null if bootstrapping."
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
@@ -744,7 +744,7 @@ module Types = struct
                       else Unsigned.UInt64.zero))
             ; field "locked" ~typ:uint64
                 ~doc:
-                  "The amount of mina owned by the account which is currently \
+                  "The amount of MINA owned by the account which is currently \
                    locked. Can be null if bootstrapping."
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
@@ -968,7 +968,7 @@ module Types = struct
                  ~resolve:(fun _ { account; _ } -> account.Account.Poly.timing)
              ; field "balance"
                  ~typ:(non_null AnnotatedBalance.obj)
-                 ~doc:"The amount of mina owned by the account"
+                 ~doc:"The amount of MINA owned by the account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } -> account.Account.Poly.balance)
              ; field "nonce" ~typ:string
@@ -1195,7 +1195,14 @@ module Types = struct
     let account = Lazy.force account
   end
 
-  module UserCommand = struct
+  module Command_status = struct
+    type t =
+      | Applied
+      | Enqueued
+      | Included_but_failed of Transaction_status.Failure.t
+  end
+
+  module User_command = struct
     let kind :
         ( 'context
         , [< `Payment
@@ -1291,15 +1298,8 @@ module Types = struct
               ~doc:"null is no failure, reason for failure otherwise."
           ])
 
-    module Status = struct
-      type t =
-        | Applied
-        | Included_but_failed of Transaction_status.Failure.t
-        | Unknown
-    end
-
     module With_status = struct
-      type 'a t = { data : 'a; status : Status.t }
+      type 'a t = { data : 'a; status : Command_status.t }
 
       let map t ~f = { t with data = f t.data }
     end
@@ -1416,7 +1416,7 @@ module Types = struct
             "null is no failure or status unknown, reason for failure \
              otherwise." ~resolve:(fun _ uc ->
             match uc.With_status.status with
-            | Applied | Unknown ->
+            | Applied | Enqueued ->
                 None
             | Included_but_failed failure ->
                 Some (Transaction_status.Failure.to_string failure))
@@ -1488,7 +1488,8 @@ module Types = struct
                  | _ ->
                      (* We cannot exclude this at the type level. *)
                      failwith
-                       "Type error: Expected a Create_new_token user command")
+                       "Type error: Expected a Create_token_account user \
+                        command")
           :: user_command_shared_fields)
 
     let mk_create_token_account =
@@ -1522,20 +1523,13 @@ module Types = struct
           mk_create_token_account cmd
       | Mint_tokens _ ->
           mk_mint_tokens cmd
+
+    let user_command = user_command_interface
   end
 
-  let user_command = UserCommand.user_command_interface
-
-  module SnappCommand = struct
-    module Status = struct
-      type t =
-        | Applied
-        | Included_but_failed of Transaction_status.Failure.t
-        | Unknown
-    end
-
+  module Snapp_command = struct
     module With_status = struct
-      type 'a t = { data : 'a; status : Status.t }
+      type 'a t = { data : 'a; status : Command_status.t }
 
       let map t ~f = { t with data = f t.data }
     end
@@ -1543,6 +1537,34 @@ module Types = struct
     let field_no_status ?doc ?deprecated lab ~typ ~args ~resolve =
       field ?doc ?deprecated lab ~typ ~args ~resolve:(fun c cmd ->
           resolve c cmd.With_status.data)
+
+    let mk_field_lists evs =
+      List.map evs ~f:(fun fields ->
+          Array.map fields ~f:Snark_params.Tick.Field.to_string |> Array.to_list)
+
+    let party_display =
+      obj "Party" ~doc:"Party in a snapp transaction" ~fields:(fun _ ->
+          [ field "publicKey"
+              ~doc:"Public key of the party as a Base58Check string"
+              ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ (party : Party.t) ->
+                Public_key.Compressed.to_base58_check party.data.body.pk)
+          ; field "events"
+              ~doc:"Events associated with the party (fields in Base58Check)"
+              ~typ:(non_null (list (non_null (list (non_null string)))))
+              ~args:Arg.[]
+              ~resolve:(fun _ (party : Party.t) ->
+                mk_field_lists party.data.body.events)
+          ; field "sequenceEvents"
+              ~doc:
+                "Sequence events associated with the party (fields in \
+                 Base58Check)"
+              ~typ:(non_null (list (non_null (list (non_null string)))))
+              ~args:Arg.[]
+              ~resolve:(fun _ (party : Party.t) ->
+                mk_field_lists party.data.body.sequence_events)
+          ])
 
     let snapp_command =
       obj "SnappCommand" ~fields:(fun _ ->
@@ -1575,14 +1597,13 @@ module Types = struct
                 in
                 List.map account_ids ~f:(fun acct_id ->
                     AccountObj.get_best_ledger_account coda acct_id))
-          ; field_no_status "feeLowerBound" ~typ:uint64 ~args:[]
+          ; field_no_status "fee" ~typ:uint64 ~args:[]
               ~doc:
-                "Lower bound on the fee paid by the fee-payer for the Snapp \
-                 transaction, or null if it can't be calculated"
-              ~resolve:(fun _ parties ->
+                "Transaction fee paid by the fee-payer for the Snapp \
+                 transaction" ~resolve:(fun _ parties ->
                 try
                   Some
-                    ( Parties.fee_lower_bound_exn parties.With_hash.data
+                    ( Parties.fee parties.With_hash.data
                     |> Currency.Fee.to_uint64 )
                 with _ -> None)
           ; field_no_status "feeToken" ~typ:(non_null token_id) ~args:[]
@@ -1593,10 +1614,14 @@ module Types = struct
                 "The reason for the Snapp transaction failure; null means \
                  success or the status is unknown" ~resolve:(fun _ cmd ->
                 match cmd.With_status.status with
-                | Applied | Unknown ->
+                | Applied | Enqueued ->
                     None
                 | Included_but_failed failure ->
                     Some (Transaction_status.Failure.to_string failure))
+          ; field_no_status "parties"
+              ~typ:(non_null (list (non_null party_display)))
+              ~args:[] ~doc:"Parties involved in the snapp transaction"
+              ~resolve:(fun _ cmd -> Parties.parties cmd.With_hash.data)
           ])
   end
 
@@ -1608,7 +1633,7 @@ module Types = struct
             ~doc:
               "List of user commands (payments and stake delegations) included \
                in this block"
-            ~typ:(non_null @@ list @@ non_null user_command)
+            ~typ:(non_null @@ list @@ non_null User_command.user_command)
             ~args:Arg.[]
             ~resolve:(fun _ { commands; _ } ->
               List.filter_map commands ~f:(fun t ->
@@ -1617,27 +1642,43 @@ module Types = struct
                       let status =
                         match t.status with
                         | Applied _ ->
-                            UserCommand.Status.Applied
+                            Command_status.Applied
                         | Failed (e, _) ->
-                            UserCommand.Status.Included_but_failed e
+                            Command_status.Included_but_failed e
                       in
                       Some
-                        (UserCommand.mk_user_command
+                        (User_command.mk_user_command
                            { status; data = { t.data with data = c } })
                   | Parties _ ->
-                      let `Needs_some_work_for_snapps_on_mainnet =
-                        Mina_base.Util.todo_snapps
-                      in
-                      (* TODO: This should be supported in some graph QL query *)
                       None))
-          (* TODO: add Snapp commands *)
+        ; field "snappCommands"
+            ~doc:"List of Snapp commands included in this block"
+            ~typ:(non_null @@ list @@ non_null Snapp_command.snapp_command)
+            ~args:Arg.[]
+            ~resolve:(fun _ { commands; _ } ->
+              List.filter_map commands ~f:(fun t ->
+                  match t.data.data with
+                  | Signed_command _ ->
+                      None
+                  | Parties parties ->
+                      let status =
+                        match t.status with
+                        | Applied _ ->
+                            Command_status.Applied
+                        | Failed (e, _) ->
+                            Command_status.Included_but_failed e
+                      in
+                      Some
+                        { Snapp_command.With_status.status
+                        ; data = { t.data with data = parties }
+                        }))
         ; field "feeTransfer"
             ~doc:"List of fee transfers included in this block"
             ~typ:(non_null @@ list @@ non_null fee_transfer)
             ~args:Arg.[]
             ~resolve:(fun _ { fee_transfers; _ } -> fee_transfers)
         ; field "coinbase" ~typ:(non_null uint64)
-            ~doc:"Amount of mina granted to the producer of this block"
+            ~doc:"Amount of MINA granted to the producer of this block"
             ~args:Arg.[]
             ~resolve:(fun _ { coinbase; _ } ->
               Currency.Amount.to_uint64 coinbase)
@@ -1852,7 +1893,8 @@ module Types = struct
 
     let send_payment =
       obj "SendPaymentPayload" ~fields:(fun _ ->
-          [ field "payment" ~typ:(non_null user_command)
+          [ field "payment"
+              ~typ:(non_null User_command.user_command)
               ~doc:"Payment that was sent"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id)
@@ -1860,7 +1902,8 @@ module Types = struct
 
     let send_delegation =
       obj "SendDelegationPayload" ~fields:(fun _ ->
-          [ field "delegation" ~typ:(non_null user_command)
+          [ field "delegation"
+              ~typ:(non_null User_command.user_command)
               ~doc:"Delegation change that was sent"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id)
@@ -1869,7 +1912,7 @@ module Types = struct
     let create_token =
       obj "SendCreateTokenPayload" ~fields:(fun _ ->
           [ field "createNewToken"
-              ~typ:(non_null UserCommand.create_new_token)
+              ~typ:(non_null User_command.create_new_token)
               ~doc:"Token creation command that was sent"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id)
@@ -1878,7 +1921,7 @@ module Types = struct
     let create_token_account =
       obj "SendCreateTokenAccountPayload" ~fields:(fun _ ->
           [ field "createNewTokenAccount"
-              ~typ:(non_null UserCommand.create_token_account)
+              ~typ:(non_null User_command.create_token_account)
               ~doc:"Token account creation command that was sent"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id)
@@ -1887,7 +1930,7 @@ module Types = struct
     let mint_tokens =
       obj "SendMintTokensPayload" ~fields:(fun _ ->
           [ field "mintTokens"
-              ~typ:(non_null UserCommand.mint_tokens)
+              ~typ:(non_null User_command.mint_tokens)
               ~doc:"Token minting command that was sent"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id)
@@ -1896,7 +1939,7 @@ module Types = struct
     let send_snapp =
       obj "SendSnappPayload" ~fields:(fun _ ->
           [ field "snapp"
-              ~typ:(non_null SnappCommand.snapp_command)
+              ~typ:(non_null Snapp_command.snapp_command)
               ~doc:"Snapp transaction that was sent"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id)
@@ -1905,7 +1948,7 @@ module Types = struct
     let send_rosetta_transaction =
       obj "SendRosettaTransactionPayload" ~fields:(fun _ ->
           [ field "userCommand"
-              ~typ:(non_null UserCommand.user_command_interface)
+              ~typ:(non_null User_command.user_command_interface)
               ~doc:"Command that was sent"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id)
@@ -1927,7 +1970,8 @@ module Types = struct
 
     let add_payment_receipt =
       obj "AddPaymentReceiptPayload" ~fields:(fun _ ->
-          [ field "payment" ~typ:(non_null user_command)
+          [ field "payment"
+              ~typ:(non_null User_command.user_command)
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id)
           ])
@@ -2130,6 +2174,15 @@ module Types = struct
           | _ ->
               Error "Expected string for currency amount")
 
+    let fee =
+      scalar "Fee" ~coerce:(fun fee ->
+          match fee with
+          | `String s -> (
+              try Ok (Currency.Fee.of_string s)
+              with exn -> Error (Exn.to_string exn) )
+          | _ ->
+              Error "Expected string for fee")
+
     module Snapp_inputs = struct
       (* inputs particular to Snapps *)
 
@@ -2140,7 +2193,7 @@ module Types = struct
             try Ok Currency.Signed_poly.{ magnitude; sgn }
             with exn -> Error (Exn.to_string exn))
           ~fields:
-            [ arg "magnitude" ~doc:"An amount of Mina"
+            [ arg "magnitude" ~doc:"An amount of MINA"
                 ~typ:(non_null currency_amount)
             ; arg "sgn" ~doc:"The sign of the amount" ~typ:(non_null sign)
             ]
@@ -2203,7 +2256,10 @@ module Types = struct
           ~coerce:(fun vk hash ->
             let open Result.Let_syntax in
             let%bind data =
-              Pickles.Side_loaded.Verification_key.of_yojson (`String vk)
+              let vk_or_err =
+                Pickles.Side_loaded.Verification_key.of_base58_check vk
+              in
+              Result.map_error vk_or_err ~f:Error.to_string_hum
             in
             let%map hash =
               Pickles.Backend.Tick.Field.of_yojson (`String hash)
@@ -2246,7 +2302,7 @@ module Types = struct
         obj "Permissions"
           ~coerce:
             (fun stake edit_state send receive set_delegate set_permissions
-                 set_verification_key set_snapp_uri edit_rollup_state
+                 set_verification_key set_snapp_uri edit_sequence_state
                  set_token_symbol ->
             Ok
               { Permissions.Poly.stake
@@ -2257,7 +2313,7 @@ module Types = struct
               ; set_permissions
               ; set_verification_key
               ; set_snapp_uri
-              ; edit_rollup_state
+              ; edit_sequence_state
               ; set_token_symbol
               })
           ~fields:
@@ -2269,7 +2325,7 @@ module Types = struct
             ; arg "setPermissions" ~typ:(non_null snapp_auth_required)
             ; arg "setVerificationKey" ~typ:(non_null snapp_auth_required)
             ; arg "setSnappUri" ~typ:(non_null snapp_auth_required)
-            ; arg "editRollupState" ~typ:(non_null snapp_auth_required)
+            ; arg "editSequenceState" ~typ:(non_null snapp_auth_required)
             ; arg "setTokenSymbol" ~typ:(non_null snapp_auth_required)
             ]
 
@@ -2380,8 +2436,8 @@ module Types = struct
       let snapp_party_body : (Party.Body.t, string) Result.t option arg_typ =
         obj "PartyBody" ~doc:"Body component of a Snapp Party"
           ~coerce:
-            (fun pk update_result token_id delta events rollup_events call_data
-                 depth ->
+            (fun pk update_result token_id delta events sequence_events
+                 call_data depth ->
             try
               let open Result.Let_syntax in
               let%bind pk =
@@ -2398,7 +2454,7 @@ module Types = struct
               let%bind update = update_result in
               let%map delta = delta in
               let events = mk_field_arrays events in
-              let rollup_events = mk_field_arrays rollup_events in
+              let sequence_events = mk_field_arrays sequence_events in
               let call_data = Snark_params.Tick.Field.of_string call_data in
               let depth = Int.of_string depth in
               Party.Body.Poly.
@@ -2407,7 +2463,7 @@ module Types = struct
                 ; token_id
                 ; delta
                 ; events
-                ; rollup_events
+                ; sequence_events
                 ; call_data
                 ; depth
                 }
@@ -2421,7 +2477,8 @@ module Types = struct
             ; arg "delta" ~doc:"Signed amount" ~typ:(non_null snapp_delta)
             ; arg "events" ~doc:"A list of list of fields in Base58Check"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
-            ; arg "rollupEvents" ~doc:"A list of list of fields in Base58Check"
+            ; arg "sequenceEvents"
+                ~doc:"A list of list of fields in Base58Check"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
             ; arg "callData" ~doc:"A field in Base58Check"
                 ~typ:(non_null string)
@@ -2429,9 +2486,59 @@ module Types = struct
                 ~typ:(non_null string)
             ]
 
-      let snapp_party_predicated_signed :
-          (Party.Predicated.Signed.t, string) Result.t option arg_typ =
-        obj "SnappPartyPredicatedSigned"
+      let snapp_fee_payer_party_body =
+        obj "FeePayerPartyBody" ~doc:"Body component of a Snapp Fee Payer Party"
+          ~coerce:
+            (fun pk update_result fee events sequence_events call_data depth ->
+            try
+              let open Result.Let_syntax in
+              let%bind pk =
+                Result.map_error
+                  (Public_key.Compressed.of_base58_check pk)
+                  ~f:Error.to_string_hum
+              in
+              let token_id = () in
+              let mk_field_arrays evs =
+                List.map evs ~f:(fun fields ->
+                    List.map fields ~f:Snark_params.Tick.Field.of_string
+                    |> Array.of_list)
+              in
+              let%map update = update_result in
+              let delta = fee in
+              let events = mk_field_arrays events in
+              let sequence_events = mk_field_arrays sequence_events in
+              let call_data = Snark_params.Tick.Field.of_string call_data in
+              let depth = Int.of_string depth in
+              { Party.Body.Poly.pk
+              ; update
+              ; token_id
+              ; delta
+              ; events
+              ; sequence_events
+              ; call_data
+              ; depth
+              }
+            with exn -> Error (Exn.to_string exn))
+          ~fields:
+            [ arg "pk" ~doc:"Public key as a Base58Check string"
+                ~typ:(non_null string)
+            ; arg "update" ~doc:"Update part of the body"
+                ~typ:(non_null snapp_update)
+            ; arg "fee" ~doc:"Transaction fee" ~typ:(non_null fee)
+            ; arg "events" ~doc:"A list of list of fields in Base58Check"
+                ~typ:(non_null (list (non_null (list (non_null string)))))
+            ; arg "sequenceEvents"
+                ~doc:"A list of list of fields in Base58Check"
+                ~typ:(non_null (list (non_null (list (non_null string)))))
+            ; arg "callData" ~doc:"A field in Base58Check"
+                ~typ:(non_null string)
+            ; arg "depth" ~doc:"An integer in string format"
+                ~typ:(non_null string)
+            ]
+
+      let snapp_party_predicated_fee_payer :
+          (Party.Predicated.Fee_payer.t, string) Result.t option arg_typ =
+        obj "SnappPartyPredicatedFeePayer"
           ~doc:"A party to a Snapp transaction with a nonce predicate"
           ~coerce:(fun body nonce ->
             let open Result.Let_syntax in
@@ -2439,8 +2546,8 @@ module Types = struct
             let predicate = nonce in
             Party.Predicated.Poly.{ body; predicate })
           ~fields:
-            [ arg "body" ~doc:"signed predicated party"
-                ~typ:(non_null snapp_party_body)
+            [ arg "body" ~doc:"fee payer party"
+                ~typ:(non_null snapp_fee_payer_party_body)
             ; arg "predicate" ~doc:"nonce" ~typ:(non_null nonce)
             ]
 
@@ -2454,19 +2561,19 @@ module Types = struct
             | _ ->
                 Error "Expected signature as a string in Base58Check format")
 
-      (* TODO: define a type otherwise identical to Party.Signed.t, but
+      (* TODO: define a type otherwise identical to Party.Fee_party.t, but
          which makes the nonce optional
       *)
-      let snapp_party_signed =
-        obj "SnappPartySigned"
+      let snapp_party_fee_payer =
+        obj "SnappPartyFeePayer"
           ~doc:"A party to a Snapp transaction with a signature authorization"
           ~coerce:(fun data authorization ->
             let open Result.Let_syntax in
             let%bind data = data in
-            Ok Party.Signed.{ data; authorization })
+            Ok Party.Fee_payer.{ data; authorization })
           ~fields:
             [ arg "data" ~doc:"party with a signature and nonce predicate"
-                ~typ:(non_null snapp_party_predicated_signed)
+                ~typ:(non_null snapp_party_predicated_fee_payer)
             ; arg "authorization" ~doc:"signature"
                 ~typ:(non_null snapp_signature)
             ]
@@ -2613,7 +2720,7 @@ module Types = struct
           ~coerce:
             (fun balance_result nonce_result receipt_chain_hash_result
                  public_key_result delegate_result state_result
-                 rollup_state_result proved_state_result ->
+                 sequence_state_result proved_state_result ->
             let open Result.Let_syntax in
             let%bind balance = balance_result in
             let%bind nonce = nonce_result in
@@ -2621,7 +2728,7 @@ module Types = struct
             let%bind public_key = public_key_result in
             let%bind delegate = delegate_result in
             let%bind state = state_result in
-            let%bind rollup_state = rollup_state_result in
+            let%bind sequence_state = sequence_state_result in
             let%bind proved_state = proved_state_result in
             return
               ( Snapp_predicate.Account.Poly.
@@ -2631,7 +2738,7 @@ module Types = struct
                   ; public_key
                   ; delegate
                   ; state
-                  ; rollup_state
+                  ; sequence_state
                   ; proved_state
                   }
                 : Snapp_predicate.Account.t ))
@@ -2643,7 +2750,7 @@ module Types = struct
             ; arg "publicKey" ~typ:(non_null snapp_pk_or_ignore)
             ; arg "delegate" ~typ:(non_null snapp_pk_or_ignore)
             ; arg "state" ~typ:(non_null snapp_state)
-            ; arg "rollupState" ~typ:(non_null snapp_field_or_ignore)
+            ; arg "sequenceState" ~typ:(non_null snapp_field_or_ignore)
             ; arg "provedState" ~typ:(non_null snapp_bool_or_ignore)
             ]
 
@@ -3132,7 +3239,7 @@ module Types = struct
 
       let snapp_fee_payer =
         arg "snappFeePayer"
-          ~typ:(non_null Snapp_inputs.snapp_party_signed)
+          ~typ:(non_null Snapp_inputs.snapp_party_fee_payer)
           ~doc:"The fee payer party to a Snapp transaction"
 
       let snapp_other_parties =
@@ -3155,7 +3262,7 @@ module Types = struct
           [ from ~doc:"Public key of sender of payment"
           ; to_ ~doc:"Public key of recipient of payment"
           ; token_opt ~doc:"Token to send"
-          ; arg "amount" ~doc:"Amount of mina to send to receiver"
+          ; arg "amount" ~doc:"Amount of MINA to send to receiver"
               ~typ:(non_null uint64_arg)
           ; fee ~doc:"Fee amount in order to send payment"
           ; valid_until
@@ -3166,9 +3273,10 @@ module Types = struct
     let send_snapp =
       let open Fields in
       obj "SendSnappInput"
-        ~coerce:(fun fee_payer other_parties protocol_state ->
-          (fee_payer, other_parties, protocol_state))
-        ~fields:[ snapp_fee_payer; snapp_other_parties; snapp_protocol_state ]
+        ~coerce:(fun fee_payer other_parties protocol_state memo ->
+          (fee_payer, other_parties, protocol_state, memo))
+        ~fields:
+          [ snapp_fee_payer; snapp_other_parties; snapp_protocol_state; memo ]
 
     let send_delegation =
       let open Fields in
@@ -3250,7 +3358,7 @@ module Types = struct
 
     let rosetta_transaction =
       Schema.Arg.scalar "RosettaTransaction"
-        ~doc:"A transaction encoded in the rosetta format"
+        ~doc:"A transaction encoded in the Rosetta format"
         ~coerce:(fun graphql_json ->
           Rosetta_lib.Transaction.to_mina_signed (to_yojson graphql_json)
           |> Result.map_error ~f:Error.to_string_hum)
@@ -3759,8 +3867,8 @@ module Mutations = struct
         match%map f with
         | Ok user_command ->
             Ok
-              { Types.UserCommand.With_status.data = user_command
-              ; status = Unknown
+              { Types.User_command.With_status.data = user_command
+              ; status = Enqueued
               }
         | Error e ->
             Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
@@ -3773,12 +3881,12 @@ module Mutations = struct
         match%map f with
         | Ok parties ->
             let cmd =
-              { Types.SnappCommand.With_status.data = parties
-              ; status = Unknown
+              { Types.Snapp_command.With_status.data = parties
+              ; status = Enqueued
               }
             in
             let cmd_with_hash =
-              Types.SnappCommand.With_status.map cmd ~f:(fun cmd ->
+              Types.Snapp_command.With_status.map cmd ~f:(fun cmd ->
                   { With_hash.data = cmd
                   ; hash = Transaction_hash.hash_command (Parties cmd)
                   })
@@ -3846,7 +3954,7 @@ module Mutations = struct
         ~fee_token ~fee_payer_pk ~valid_until ~body
     in
     let%map cmd = send_user_command coda user_command_input in
-    Types.UserCommand.With_status.map cmd ~f:(fun cmd ->
+    Types.User_command.With_status.map cmd ~f:(fun cmd ->
         { With_hash.data = cmd
         ; hash = Transaction_hash.hash_command (Signed_command cmd)
         })
@@ -3868,7 +3976,7 @@ module Mutations = struct
       |> Deferred.return
     in
     let%map cmd = send_user_command coda user_command_input in
-    Types.UserCommand.With_status.map cmd ~f:(fun cmd ->
+    Types.User_command.With_status.map cmd ~f:(fun cmd ->
         { With_hash.data = cmd
         ; hash = Transaction_hash.hash_command (Signed_command cmd)
         })
@@ -3899,12 +4007,12 @@ module Mutations = struct
         | None ->
             send_unsigned_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
               ~fee_token ~fee_payer_pk:from ~valid_until ~body
-            |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command
+            |> Deferred.Result.map ~f:Types.User_command.mk_user_command
         | Some signature ->
             let%bind signature = signature |> Deferred.return in
             send_signed_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
               ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
-            |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command)
+            |> Deferred.Result.map ~f:Types.User_command.mk_user_command)
 
   let send_payment =
     io_field "sendPayment" ~doc:"Send a payment"
@@ -3931,11 +4039,11 @@ module Mutations = struct
         | None ->
             send_unsigned_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
               ~fee_token ~fee_payer_pk:from ~valid_until ~body
-            |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command
+            |> Deferred.Result.map ~f:Types.User_command.mk_user_command
         | Some signature ->
             send_signed_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
               ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
-            |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command)
+            |> Deferred.Result.map ~f:Types.User_command.mk_user_command)
 
   let send_snapp =
     io_field "sendSnapp" ~doc:"Send a Snapp transaction"
@@ -3943,14 +4051,23 @@ module Mutations = struct
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.send_snapp) ]
       ~resolve:
         (fun { ctx = coda; _ } ()
-             (fee_payer_result, other_parties_results, protocol_state_result) ->
+             ( fee_payer_result
+             , other_parties_results
+             , protocol_state_result
+             , memo ) ->
         let parties_result =
           let open Result.Let_syntax in
           let other_parties_result = Result.all other_parties_results in
           let%bind fee_payer = fee_payer_result in
           let%bind other_parties = other_parties_result in
-          let%map protocol_state = protocol_state_result in
-          { Parties.fee_payer; other_parties; protocol_state }
+          let%bind protocol_state = protocol_state_result in
+          let%map memo =
+            Option.value_map memo ~default:(Ok Signed_command_memo.empty)
+              ~f:(fun memo ->
+                result_of_exn Signed_command_memo.create_from_string_exn memo
+                  ~error:"Invalid `memo` provided.")
+          in
+          { Parties.fee_payer; other_parties; protocol_state; memo }
         in
         match parties_result with
         | Ok parties ->
@@ -4064,7 +4181,7 @@ module Mutations = struct
 
   let send_rosetta_transaction =
     io_field "sendRosettaTransaction"
-      ~doc:"Send a transaction in rosetta format"
+      ~doc:"Send a transaction in Rosetta format"
       ~typ:(non_null Types.Payload.send_rosetta_transaction)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.rosetta_transaction) ]
       ~resolve:(fun { ctx = mina; _ } () signed_command ->
@@ -4075,8 +4192,8 @@ module Mutations = struct
         | Ok ([ (User_command.Signed_command signed_command as transaction) ], _)
           ->
             Ok
-              (Types.UserCommand.mk_user_command
-                 { status = Unknown
+              (Types.User_command.mk_user_command
+                 { status = Enqueued
                  ; data =
                      { With_hash.data = signed_command
                      ; hash = Transaction_hash.hash_command transaction
@@ -4228,12 +4345,12 @@ module Mutations = struct
           |> Deferred.return
         in
         let net = Mina_lib.net coda in
-        let seed = Option.value ~default:true seed in
+        let is_seed = Option.value ~default:true seed in
         let%bind.Async.Deferred maybe_failure =
           (* Add peers until we find an error *)
           Deferred.List.find_map peers ~f:(fun peer ->
               match%map.Async.Deferred
-                Mina_networking.add_peer net peer ~seed
+                Mina_networking.add_peer net peer ~is_seed
               with
               | Ok () ->
                   None
@@ -4346,100 +4463,141 @@ end
 module Queries = struct
   open Schema
 
+  (* helper for pooledUserCommands, pooledSnappCommands *)
+  let get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt =
+    match (pk_opt, hashes_opt, txns_opt) with
+    | None, None, None ->
+        Network_pool.Transaction_pool.Resource_pool.get_all resource_pool
+    | Some pk, None, None ->
+        let account_id = Account_id.create pk Token_id.default in
+        Network_pool.Transaction_pool.Resource_pool.all_from_account
+          resource_pool account_id
+    | _ -> (
+        let hashes_txns =
+          (* Transactions identified by hashes. *)
+          match hashes_opt with
+          | Some hashes ->
+              List.filter_map hashes ~f:(fun hash ->
+                  hash |> Transaction_hash.of_base58_check |> Result.ok
+                  |> Option.bind
+                       ~f:
+                         (Network_pool.Transaction_pool.Resource_pool
+                          .find_by_hash resource_pool))
+          | None ->
+              []
+        in
+        let txns =
+          (* Transactions as identified by IDs.
+             This is a little redundant, but it makes our API more
+             consistent.
+          *)
+          match txns_opt with
+          | Some txns ->
+              List.filter_map txns ~f:(fun serialized_txn ->
+                  Signed_command.of_base58_check serialized_txn
+                  |> Result.map ~f:(fun signed_command ->
+                         (* These commands get piped through [forget_check]
+                            below; this is just to make the types work
+                            without extra unnecessary mapping in the other
+                            branches above.
+                         *)
+                         let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                               cmd) =
+                           User_command.to_valid_unsafe
+                             (Signed_command signed_command)
+                         in
+                         Transaction_hash.User_command_with_valid_signature
+                         .create cmd)
+                  |> Result.ok)
+          | None ->
+              []
+        in
+        let all_txns = hashes_txns @ txns in
+        match pk_opt with
+        | None ->
+            all_txns
+        | Some pk ->
+            (* Only return commands paid for by the given public key. *)
+            List.filter all_txns ~f:(fun txn ->
+                txn
+                |> Transaction_hash.User_command_with_valid_signature.command
+                |> User_command.fee_payer |> Account_id.public_key
+                |> Public_key.Compressed.equal pk) )
+
   let pooled_user_commands =
     field "pooledUserCommands"
       ~doc:
         "Retrieve all the scheduled user commands for a specified sender that \
-         the current daemon sees in their transaction pool. All scheduled \
+         the current daemon sees in its transaction pool. All scheduled \
          commands are queried if no sender is specified"
-      ~typ:(non_null @@ list @@ non_null Types.user_command)
+      ~typ:(non_null @@ list @@ non_null Types.User_command.user_command)
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of sender of pooled user commands"
               ~typ:Types.Input.public_key_arg
           ; arg "hashes" ~doc:"Hashes of the commands to find in the pool"
               ~typ:(list (non_null string))
-          ; arg "ids" ~typ:(list (non_null guid)) ~doc:"Ids of UserCommands"
+          ; arg "ids" ~typ:(list (non_null guid)) ~doc:"Ids of User commands"
           ]
-      ~resolve:(fun { ctx = coda; _ } () opt_pk opt_hashes opt_txns ->
+      ~resolve:(fun { ctx = coda; _ } () pk_opt hashes_opt txns_opt ->
         let transaction_pool = Mina_lib.transaction_pool coda in
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
-        ( match (opt_pk, opt_hashes, opt_txns) with
-        | None, None, None ->
-            Network_pool.Transaction_pool.Resource_pool.get_all resource_pool
-        | Some pk, None, None ->
-            let account_id = Account_id.create pk Token_id.default in
-            Network_pool.Transaction_pool.Resource_pool.all_from_account
-              resource_pool account_id
-        | _ -> (
-            let hashes_txns =
-              (* Transactions identified by hashes. *)
-              match opt_hashes with
-              | Some hashes ->
-                  List.filter_map hashes ~f:(fun hash ->
-                      hash |> Transaction_hash.of_base58_check |> Result.ok
-                      |> Option.bind
-                           ~f:
-                             (Network_pool.Transaction_pool.Resource_pool
-                              .find_by_hash resource_pool))
-              | None ->
-                  []
+        let signed_cmds =
+          get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
+        in
+        List.filter_map signed_cmds ~f:(fun txn ->
+            let cmd_with_hash =
+              Transaction_hash.User_command_with_valid_signature.forget_check
+                txn
             in
-            let txns =
-              (* Transactions as identified by IDs.
-                 This is a little redundant, but it makes our API more
-                 consistent.
-              *)
-              match opt_txns with
-              | Some txns ->
-                  List.filter_map txns ~f:(fun serialized_txn ->
-                      Signed_command.of_base58_check serialized_txn
-                      |> Result.map ~f:(fun signed_command ->
-                             (* These commands get piped through [forget_check]
-                                below; this is just to make the types work
-                                without extra unnecessary mapping in the other
-                                branches above.
-                             *)
-                             let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                                   cmd) =
-                               User_command.to_valid_unsafe
-                                 (Signed_command signed_command)
-                             in
-                             Transaction_hash.User_command_with_valid_signature
-                             .create cmd)
-                      |> Result.ok)
-              | None ->
-                  []
+            match cmd_with_hash.data with
+            | Signed_command user_cmd ->
+                Some
+                  (Types.User_command.mk_user_command
+                     { status = Enqueued
+                     ; data = { cmd_with_hash with data = user_cmd }
+                     })
+            | Parties _ ->
+                None))
+
+  let pooled_snapp_commands =
+    field "pooledSnappCommands"
+      ~doc:
+        "Retrieve all the scheduled Snapp commands for a specified sender that \
+         the current daemon sees in its transaction pool. All scheduled \
+         commands are queried if no sender is specified"
+      ~typ:(non_null @@ list @@ non_null Types.Snapp_command.snapp_command)
+      ~args:
+        Arg.
+          [ arg "publicKey" ~doc:"Public key of sender of pooled Snapp commands"
+              ~typ:Types.Input.public_key_arg
+          ; arg "hashes" ~doc:"Hashes of the Snapp commands to find in the pool"
+              ~typ:(list (non_null string))
+          ; arg "ids" ~typ:(list (non_null guid)) ~doc:"Ids of Snapp commands"
+          ]
+      ~resolve:(fun { ctx = coda; _ } () pk_opt hashes_opt txns_opt ->
+        let transaction_pool = Mina_lib.transaction_pool coda in
+        let resource_pool =
+          Network_pool.Transaction_pool.resource_pool transaction_pool
+        in
+        let signed_cmds =
+          get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
+        in
+        List.filter_map signed_cmds ~f:(fun txn ->
+            let cmd_with_hash =
+              Transaction_hash.User_command_with_valid_signature.forget_check
+                txn
             in
-            let all_txns = hashes_txns @ txns in
-            match opt_pk with
-            | None ->
-                all_txns
-            | Some pk ->
-                (* Only return commands paid for by the given public key. *)
-                List.filter all_txns ~f:(fun txn ->
-                    txn
-                    |> Transaction_hash.User_command_with_valid_signature
-                       .command |> User_command.fee_payer
-                    |> Account_id.public_key
-                    |> Public_key.Compressed.equal pk) ) )
-        |> List.filter_map ~f:(fun x ->
-               let x =
-                 Transaction_hash.User_command_with_valid_signature.forget_check
-                   x
-               in
-               match x.data with
-               | Signed_command data ->
-                   Some
-                     (Types.UserCommand.mk_user_command
-                        { status = Unknown; data = { x with data } })
-               | Parties _ ->
-                   let `Needs_some_work_for_snapps_on_mainnet =
-                     Mina_base.Util.todo_snapps
-                   in
-                   None))
+            match cmd_with_hash.data with
+            | Signed_command _ ->
+                None
+            | Parties snapp_cmd ->
+                Some
+                  { Types.Snapp_command.With_status.status = Enqueued
+                  ; data = { cmd_with_hash with data = snapp_cmd }
+                  }))
 
   let sync_status =
     io_field "syncStatus" ~doc:"Network sync status" ~args:[]
@@ -5050,6 +5208,7 @@ module Queries = struct
     ; initial_peers
     ; get_peers
     ; pooled_user_commands
+    ; pooled_snapp_commands
     ; transaction_status
     ; trust_status
     ; trust_status_all

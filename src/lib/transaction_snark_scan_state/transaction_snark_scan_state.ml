@@ -1,6 +1,8 @@
 open Core_kernel
+open Async
 open Mina_base
 open Currency
+open O1trace
 
 let map2_or_error xs ys ~f =
   let rec go xs ys acc =
@@ -363,22 +365,20 @@ module P = struct
   type t = Ledger_proof_with_sok_message.t
 end
 
-module Make_statement_scanner
-    (M : Monad_with_Or_error_intf) (Verifier : sig
-      type t
+module Make_statement_scanner (Verifier : sig
+  type t
 
-      val verify : verifier:t -> P.t list -> bool M.Or_error.t
-    end) =
+  val verify : verifier:t -> P.t list -> bool Deferred.Or_error.t
+end) =
 struct
-  module Fold = Parallel_scan.State.Make_foldable (Monad.Ident)
+  module Fold = Parallel_scan.State.Make_foldable (Deferred)
 
   let logger = lazy (Logger.create ())
 
   let time label f =
     let logger = Lazy.force logger in
-    let open M.Let_syntax in
     let start = Core.Time.now () in
-    let%map x = f () in
+    let%map x = trace_recurring label f in
     [%log debug]
       ~metadata:
         [ ("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))
@@ -438,9 +438,18 @@ struct
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
   let scan_statement ~constraint_constants tree ~verifier :
-      (Transaction_snark.Statement.t, [ `Error of Error.t | `Empty ]) Result.t
-      M.t =
+      ( Transaction_snark.Statement.t
+      , [ `Error of Error.t | `Empty ] )
+      Deferred.Result.t =
+    let open Deferred.Or_error.Let_syntax in
     let timer = Timer.create () in
+    let yield_occasionally =
+      let f = Staged.unstage (Async.Scheduler.yield_every ~n:50) in
+      fun () -> f () |> Deferred.map ~f:Or_error.return
+    in
+    let yield_always () =
+      Async.Scheduler.yield () |> Deferred.map ~f:Or_error.return
+    in
     let module Acc = struct
       type t = (Transaction_snark.Statement.t * P.t list) option
     end in
@@ -449,20 +458,20 @@ struct
     in
     let with_error ~f message =
       let result = f () in
-      Result.map_error result ~f:(fun e ->
+      Deferred.Result.map_error result ~f:(fun e ->
           Error.createf !"%s: %{sexp:Error.t}" (write_error message) e)
     in
-    let merge_acc ~proofs (acc : Acc.t) s2 : Acc.t Or_error.t =
-      let open Or_error.Let_syntax in
+    let merge_acc ~proofs (acc : Acc.t) s2 : Acc.t Deferred.Or_error.t =
       Timer.time timer (sprintf "merge_acc:%s" __LOC__) (fun () ->
           with_error "Bad merge proof" ~f:(fun () ->
               match acc with
               | None ->
-                  Ok (Some (s2, proofs))
+                  return (Some (s2, proofs))
               | Some (s1, ps) ->
-                  let%map merged_statement =
-                    Transaction_snark.Statement.merge s1 s2
+                  let%bind merged_statement =
+                    Deferred.return (Transaction_snark.Statement.merge s1 s2)
                   in
+                  let%map () = yield_occasionally () in
                   Some (merged_statement, proofs @ ps)))
     in
     let merge_pc (acc : Transaction_snark.Statement.t option) s2 :
@@ -489,7 +498,6 @@ struct
           Some s2
     in
     let fold_step_a (acc_statement, acc_pc) job =
-      let open Or_error.Let_syntax in
       match job with
       | Parallel_scan.Merge.Job.Part (proof, message) ->
           let statement = Ledger_proof.statement proof in
@@ -498,14 +506,13 @@ struct
           in
           (acc_stmt, acc_pc)
       | Empty | Full { status = Parallel_scan.Job_status.Done; _ } ->
-          Or_error.return (acc_statement, acc_pc)
+          return (acc_statement, acc_pc)
       | Full { left = proof_1, message_1; right = proof_2, message_2; _ } ->
-          let open Or_error.Let_syntax in
           let stmt1 = Ledger_proof.statement proof_1 in
           let stmt2 = Ledger_proof.statement proof_2 in
           let%bind merged_statement =
             Timer.time timer (sprintf "merge:%s" __LOC__) (fun () ->
-                Transaction_snark.Statement.merge stmt1 stmt2)
+                Deferred.return (Transaction_snark.Statement.merge stmt1 stmt2))
           in
           let%map acc_stmt =
             merge_acc acc_statement merged_statement
@@ -514,25 +521,28 @@ struct
           (acc_stmt, acc_pc)
     in
     let fold_step_d (acc_statement, acc_pc) job =
-      let open Or_error.Let_syntax in
       match job with
       | Parallel_scan.Base.Job.Empty ->
-          Or_error.return (acc_statement, acc_pc)
+          return (acc_statement, acc_pc)
       | Full
           { status = Parallel_scan.Job_status.Done
           ; job = (transaction : Transaction_with_witness.t)
           ; _
           } ->
-          let%map acc_pc = merge_pc acc_pc transaction.statement in
+          let%map acc_pc =
+            Deferred.return (merge_pc acc_pc transaction.statement)
+          in
           (acc_statement, acc_pc)
       | Full { job = transaction; _ } ->
           with_error "Bad base statement" ~f:(fun () ->
-              let open Or_error.Let_syntax in
               let%bind expected_statement =
                 Timer.time timer
                   (sprintf "create_expected_statement:%s" __LOC__) (fun () ->
-                    create_expected_statement ~constraint_constants transaction)
+                    Deferred.return
+                      (create_expected_statement ~constraint_constants
+                         transaction))
               in
+              let%bind () = yield_always () in
               if
                 Transaction_snark.Statement.equal transaction.statement
                   expected_statement
@@ -540,41 +550,42 @@ struct
                 let%bind acc_stmt =
                   merge_acc ~proofs:[] acc_statement transaction.statement
                 in
-                let%map acc_pc = merge_pc acc_pc transaction.statement in
+                let%map acc_pc =
+                  merge_pc acc_pc transaction.statement |> Deferred.return
+                in
                 (acc_stmt, acc_pc)
               else
-                Or_error.error_string
+                Deferred.Or_error.error_string
                   (sprintf
                      !"Bad base statement expected: \
                        %{sexp:Transaction_snark.Statement.t} got: \
                        %{sexp:Transaction_snark.Statement.t}"
                      transaction.statement expected_statement))
     in
-    let res =
+    let%bind.Deferred res =
       Fold.fold_chronological_until tree ~init:(None, None)
         ~f_merge:(fun acc (_weight, job) ->
           let open Container.Continue_or_stop in
-          match fold_step_a acc job with
+          match%map.Deferred fold_step_a acc job with
           | Ok next ->
               Continue next
           | e ->
               Stop e)
         ~f_base:(fun acc (_weight, job) ->
           let open Container.Continue_or_stop in
-          match fold_step_d acc job with
+          match%map.Deferred fold_step_d acc job with
           | Ok next ->
               Continue next
           | e ->
               Stop e)
-        ~finish:Result.return
+        ~finish:return
     in
     Timer.log "scan_statement" timer ;
     match res with
     | Ok (None, _) ->
-        M.return (Error `Empty)
+        Deferred.return (Error `Empty)
     | Ok (Some (res, proofs), _) -> (
-        let open M.Let_syntax in
-        match%map
+        match%map.Deferred
           ksprintf time "verify:%s" __LOC__ (fun () ->
               Verifier.verify ~verifier proofs)
         with
@@ -585,7 +596,7 @@ struct
         | Error e ->
             Error (`Error e) )
     | Error e ->
-        M.return (Error (`Error e))
+        Deferred.return (Error (`Error e))
 
   let check_invariants t ~constraint_constants ~verifier ~error_prefix
       ~(registers_begin :
@@ -604,7 +615,6 @@ struct
     let clarify_error cond err =
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
     in
-    let open M.Let_syntax in
     let check_registers (reg1 : _ Mina_state.Registers.t)
         (reg2 : _ Mina_state.Registers.t) =
       let open Or_error.Let_syntax in

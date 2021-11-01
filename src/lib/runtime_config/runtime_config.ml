@@ -122,7 +122,7 @@ module Json_layout = struct
           ; set_permissions : Auth_required.t [@default None]
           ; set_verification_key : Auth_required.t [@default None]
           ; set_snapp_uri : Auth_required.t [@default None]
-          ; edit_rollup_state : Auth_required.t [@default None]
+          ; edit_sequence_state : Auth_required.t [@default None]
           ; set_token_symbol : Auth_required.t [@default None]
           }
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
@@ -136,7 +136,7 @@ module Json_layout = struct
            ; "set_permissions"
            ; "set_verification_key"
            ; "set_snapp_uri"
-           ; "edit_rollup_state"
+           ; "edit_sequence_state"
            ; "set_token_symbol"
           |]
 
@@ -171,7 +171,31 @@ module Json_layout = struct
             | `String s ->
                 Ok (Snark_params.Tick.Field.of_string s)
             | _ ->
-                Error "Invalid Field.t runtime config Snapp_account.state"
+                Error
+                  "Invalid JSON in runtime config Snapp_account.state, \
+                   expected string"
+        end
+
+        module Verification_key = struct
+          type t = Pickles.Side_loaded.Verification_key.Stable.Latest.t
+          [@@deriving sexp, bin_io_unversioned]
+
+          (* can't be automatically derived *)
+          let dhall_type = Ppx_dhall_type.Dhall_type.Text
+
+          let to_yojson t =
+            `String (Pickles.Side_loaded.Verification_key.to_base58_check t)
+
+          let of_yojson = function
+            | `String s ->
+                let vk_or_err =
+                  Pickles.Side_loaded.Verification_key.of_base58_check s
+                in
+                Result.map_error vk_or_err ~f:Error.to_string_hum
+            | _ ->
+                Error
+                  "Invalid JSON in runtime config \
+                   Snapp_account.verification_key, expected string"
         end
 
         module Snapp_version = struct
@@ -185,10 +209,10 @@ module Json_layout = struct
 
         type t =
           { state : Field.t list
-          ; verification_key : string option
+          ; verification_key : Verification_key.t option
           ; snapp_version : Snapp_version.t
-          ; rollup_state : Field.t list
-          ; last_rollup_slot : int
+          ; sequence_state : Field.t list
+          ; last_sequence_slot : int
           ; proved_state : bool
           }
         [@@deriving sexp, dhall_type, yojson, bin_io_unversioned]
@@ -197,8 +221,8 @@ module Json_layout = struct
           [| "state"
            ; "verification_key"
            ; "snapp_version"
-           ; "rollup_state"
-           ; "last_rollup_slot"
+           ; "sequence_state"
+           ; "last_sequence_slot"
            ; "proved_state"
           |]
 

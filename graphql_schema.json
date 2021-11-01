@@ -101,7 +101,7 @@
         {
           "kind": "SCALAR",
           "name": "RosettaTransaction",
-          "description": "A transaction encoded in the rosetta format",
+          "description": "A transaction encoded in the Rosetta format",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -3084,7 +3084,7 @@
               "deprecationReason": null
             },
             {
-              "name": "rollupState",
+              "name": "sequenceState",
               "description": null,
               "args": [],
               "type": {
@@ -3212,7 +3212,7 @@
               "defaultValue": null
             },
             {
-              "name": "rollupState",
+              "name": "sequenceState",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -3430,6 +3430,427 @@
           "possibleTypes": null
         },
         {
+          "kind": "ENUM",
+          "name": "Sign",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": [
+            {
+              "name": "PLUS",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "MINUS",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "CurrencyAmount",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "Delta",
+          "description": "A signed amount",
+          "fields": [
+            {
+              "name": "sgn",
+              "description": "The sign of the amount",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "Sign",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "magnitude",
+              "description": "An amount of MINA",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "CurrencyAmount",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "sgn",
+              "description": "The sign of the amount",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "Sign",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "magnitude",
+              "description": "An amount of MINA",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "CurrencyAmount",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "PartyBody",
+          "description": "Body component of a Snapp Party",
+          "fields": [
+            {
+              "name": "depth",
+              "description": "An integer in string format",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "callData",
+              "description": "A field in Base58Check",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sequenceEvents",
+              "description": "A list of list of fields in Base58Check",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "String",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "events",
+              "description": "A list of list of fields in Base58Check",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "String",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "delta",
+              "description": "Signed amount",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "Delta",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "tokenId",
+              "description": "Token id",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "update",
+              "description": "Update part of the body",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "PartyUpdate",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "pk",
+              "description": "Public key as a Base58Check string",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "depth",
+              "description": "An integer in string format",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "callData",
+              "description": "A field in Base58Check",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "sequenceEvents",
+              "description": "A list of list of fields in Base58Check",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "String",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "events",
+              "description": "A list of list of fields in Base58Check",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "String",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "delta",
+              "description": "Signed amount",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "Delta",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "tokenId",
+              "description": "Token id",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "update",
+              "description": "Update part of the body",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "PartyUpdate",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "pk",
+              "description": "Public key as a Base58Check string",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "INPUT_OBJECT",
           "name": "SnappPartyPredicated",
           "description": null,
@@ -3594,106 +4015,11 @@
           "possibleTypes": null
         },
         {
-          "kind": "ENUM",
-          "name": "Sign",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": [
-            {
-              "name": "PLUS",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "MINUS",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "possibleTypes": null
-        },
-        {
           "kind": "SCALAR",
-          "name": "CurrencyAmount",
+          "name": "Fee",
           "description": null,
           "fields": null,
           "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "Delta",
-          "description": "A signed amount",
-          "fields": [
-            {
-              "name": "sgn",
-              "description": "The sign of the amount",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "Sign",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "magnitude",
-              "description": "An amount of Mina",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "CurrencyAmount",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "sgn",
-              "description": "The sign of the amount",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "Sign",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "magnitude",
-              "description": "An amount of Mina",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "CurrencyAmount",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
           "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
@@ -4131,7 +4457,7 @@
               "deprecationReason": null
             },
             {
-              "name": "editRollupState",
+              "name": "editSequenceState",
               "description": null,
               "args": [],
               "type": {
@@ -4291,7 +4617,7 @@
               "defaultValue": null
             },
             {
-              "name": "editRollupState",
+              "name": "editSequenceState",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -5022,8 +5348,8 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "PartyBody",
-          "description": "Body component of a Snapp Party",
+          "name": "FeePayerPartyBody",
+          "description": "Body component of a Snapp Fee Payer Party",
           "fields": [
             {
               "name": "depth",
@@ -5058,7 +5384,7 @@
               "deprecationReason": null
             },
             {
-              "name": "rollupEvents",
+              "name": "sequenceEvents",
               "description": "A list of list of fields in Base58Check",
               "args": [],
               "type": {
@@ -5122,31 +5448,15 @@
               "deprecationReason": null
             },
             {
-              "name": "delta",
-              "description": "Signed amount",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "Delta",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "tokenId",
-              "description": "Token id",
+              "name": "fee",
+              "description": "Transaction fee",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "Fee",
                   "ofType": null
                 }
               },
@@ -5216,7 +5526,7 @@
               "defaultValue": null
             },
             {
-              "name": "rollupEvents",
+              "name": "sequenceEvents",
               "description": "A list of list of fields in Base58Check",
               "type": {
                 "kind": "NON_NULL",
@@ -5276,28 +5586,14 @@
               "defaultValue": null
             },
             {
-              "name": "delta",
-              "description": "Signed amount",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "Delta",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "tokenId",
-              "description": "Token id",
+              "name": "fee",
+              "description": "Transaction fee",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "Fee",
                   "ofType": null
                 }
               },
@@ -5338,7 +5634,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "SnappPartyPredicatedSigned",
+          "name": "SnappPartyPredicatedFeePayer",
           "description": "A party to a Snapp transaction with a nonce predicate",
           "fields": [
             {
@@ -5359,14 +5655,14 @@
             },
             {
               "name": "body",
-              "description": "signed predicated party",
+              "description": "fee payer party",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "PartyBody",
+                  "name": "FeePayerPartyBody",
                   "ofType": null
                 }
               },
@@ -5391,13 +5687,13 @@
             },
             {
               "name": "body",
-              "description": "signed predicated party",
+              "description": "fee payer party",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "PartyBody",
+                  "name": "FeePayerPartyBody",
                   "ofType": null
                 }
               },
@@ -5410,7 +5706,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "SnappPartySigned",
+          "name": "SnappPartyFeePayer",
           "description": "A party to a Snapp transaction with a signature authorization",
           "fields": [
             {
@@ -5438,7 +5734,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyPredicatedSigned",
+                  "name": "SnappPartyPredicatedFeePayer",
                   "ofType": null
                 }
               },
@@ -5469,7 +5765,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyPredicatedSigned",
+                  "name": "SnappPartyPredicatedFeePayer",
                   "ofType": null
                 }
               },
@@ -5486,6 +5782,18 @@
           "description": null,
           "fields": [
             {
+              "name": "memo",
+              "description": "Short arbitrary message provided by the sender",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "snappProtocolState",
               "description": "The protocol state in a Snapp transaction",
               "args": [],
@@ -5534,7 +5842,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartySigned",
+                  "name": "SnappPartyFeePayer",
                   "ofType": null
                 }
               },
@@ -5544,6 +5852,16 @@
           ],
           "inputFields": [
             {
+              "name": "memo",
+              "description": "Short arbitrary message provided by the sender",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
               "name": "snappProtocolState",
               "description": "The protocol state in a Snapp transaction",
               "type": {
@@ -5587,7 +5905,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartySigned",
+                  "name": "SnappPartyFeePayer",
                   "ofType": null
                 }
               },
@@ -5595,145 +5913,6 @@
             }
           ],
           "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "SnappCommand",
-          "description": null,
-          "fields": [
-            {
-              "name": "id",
-              "description": "A Base58Check string representing the command",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "ID",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "hash",
-              "description": "A cryptographic hash of the Snapp command",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "nonce",
-              "description": "Sequence number of the Snapp transaction for the fee-payer's account",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feePayer",
-              "description": "Account that pays the fees for the Snapp transaction",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "accountsAccessed",
-              "description": "List of accounts accessed to complete the Snapp transaction",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "Account",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feeLowerBound",
-              "description": "Lower bound on the fee paid by the fee-payer for the Snapp transaction, or null if it can't be calculated",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "UInt64",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feeToken",
-              "description": "Token used to pay the fee",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "failureReason",
-              "description": "The reason for the Snapp transaction failure; null means success or the status is unknown",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
           "enumValues": null,
           "possibleTypes": null
         },
@@ -8049,7 +8228,7 @@
             },
             {
               "name": "sendRosettaTransaction",
-              "description": "Send a transaction in rosetta format",
+              "description": "Send a transaction in Rosetta format",
               "args": [
                 {
                   "name": "input",
@@ -8875,7 +9054,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount of mina to send to receiver",
+              "description": "Amount of MINA to send to receiver",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8981,7 +9160,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount of mina to send to receiver",
+              "description": "Amount of MINA to send to receiver",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -9496,6 +9675,260 @@
                   "kind": "SCALAR",
                   "name": "String",
                   "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "Party",
+          "description": "Party in a snapp transaction",
+          "fields": [
+            {
+              "name": "publicKey",
+              "description": "Public key of the party as a Base58Check string",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "events",
+              "description": "Events associated with the party (fields in Base58Check)",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "String",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sequenceEvents",
+              "description": "Sequence events associated with the party (fields in Base58Check)",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "String",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "SnappCommand",
+          "description": null,
+          "fields": [
+            {
+              "name": "id",
+              "description": "A Base58Check string representing the command",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "ID",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "hash",
+              "description": "A cryptographic hash of the Snapp command",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "nonce",
+              "description": "Sequence number of the Snapp transaction for the fee-payer's account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "feePayer",
+              "description": "Account that pays the fees for the Snapp transaction",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Account",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "accountsAccessed",
+              "description": "List of accounts accessed to complete the Snapp transaction",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "Account",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "fee",
+              "description": "Transaction fee paid by the fee-payer for the Snapp transaction",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "feeToken",
+              "description": "Token used to pay the fee",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "failureReason",
+              "description": "The reason for the Snapp transaction failure; null means success or the status is unknown",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "parties",
+              "description": "Parties involved in the snapp transaction",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "Party",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,
@@ -11495,6 +11928,30 @@
               "deprecationReason": null
             },
             {
+              "name": "snappCommands",
+              "description": "List of Snapp commands included in this block",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "SnappCommand",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "feeTransfer",
               "description": "List of fee transfers included in this block",
               "args": [],
@@ -11520,7 +11977,7 @@
             },
             {
               "name": "coinbase",
-              "description": "Amount of mina granted to the producer of this block",
+              "description": "Amount of MINA granted to the producer of this block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -12522,7 +12979,7 @@
           "fields": [
             {
               "name": "total",
-              "description": "The amount of mina owned by the account",
+              "description": "The amount of MINA owned by the account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -12538,7 +12995,7 @@
             },
             {
               "name": "unknown",
-              "description": "The amount of mina owned by the account whose origin is currently unknown",
+              "description": "The amount of MINA owned by the account whose origin is currently unknown",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -12554,7 +13011,7 @@
             },
             {
               "name": "liquid",
-              "description": "The amount of mina owned by the account which is currently available. Can be null if bootstrapping.",
+              "description": "The amount of MINA owned by the account which is currently available. Can be null if bootstrapping.",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -12566,7 +13023,7 @@
             },
             {
               "name": "locked",
-              "description": "The amount of mina owned by the account which is currently locked. Can be null if bootstrapping.",
+              "description": "The amount of MINA owned by the account which is currently locked. Can be null if bootstrapping.",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -12766,7 +13223,7 @@
             },
             {
               "name": "balance",
-              "description": "The amount of mina owned by the account",
+              "description": "The amount of MINA owned by the account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -14712,11 +15169,11 @@
             },
             {
               "name": "pooledUserCommands",
-              "description": "Retrieve all the scheduled user commands for a specified sender that the current daemon sees in their transaction pool. All scheduled commands are queried if no sender is specified",
+              "description": "Retrieve all the scheduled user commands for a specified sender that the current daemon sees in its transaction pool. All scheduled commands are queried if no sender is specified",
               "args": [
                 {
                   "name": "ids",
-                  "description": "Ids of UserCommands",
+                  "description": "Ids of User commands",
                   "type": {
                     "kind": "LIST",
                     "name": null,
@@ -14773,6 +15230,77 @@
                     "ofType": {
                       "kind": "INTERFACE",
                       "name": "UserCommand",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "pooledSnappCommands",
+              "description": "Retrieve all the scheduled Snapp commands for a specified sender that the current daemon sees in its transaction pool. All scheduled commands are queried if no sender is specified",
+              "args": [
+                {
+                  "name": "ids",
+                  "description": "Ids of Snapp commands",
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "SCALAR",
+                        "name": "ID",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "hashes",
+                  "description": "Hashes of the Snapp commands to find in the pool",
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "SCALAR",
+                        "name": "String",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "publicKey",
+                  "description": "Public key of sender of pooled Snapp commands",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "PublicKey",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "SnappCommand",
                       "ofType": null
                     }
                   }

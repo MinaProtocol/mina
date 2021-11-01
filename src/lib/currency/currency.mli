@@ -34,11 +34,18 @@ module Fee : sig
   [%%ifdef consensus_mechanism]
 
   module Signed :
-    Signed_intf with type magnitude := t and type magnitude_var := var
+    Signed_intf
+      with type magnitude := t
+       and type magnitude_var := var
+       and type signed_fee := (t, Sgn.t) Signed_poly.t
+       and type Checked.signed_fee_var := (var, Sgn.var) Signed_poly.t
 
   [%%else]
 
-  module Signed : Signed_intf with type magnitude := t
+  module Signed :
+    Signed_intf
+      with type magnitude := t
+       and type signed_fee := (t, Sgn.t) Signed_poly.t
 
   [%%endif]
 
@@ -78,11 +85,16 @@ module Amount : sig
   [%%ifdef consensus_mechanism]
 
   module Signed :
-    Signed_intf with type magnitude := t and type magnitude_var := var
+    Signed_intf
+      with type magnitude := t
+       and type magnitude_var := var
+       and type signed_fee := Fee.Signed.t
+       and type Checked.signed_fee_var := Fee.Signed.Checked.t
 
   [%%else]
 
-  module Signed : Signed_intf with type magnitude := t
+  module Signed :
+    Signed_intf with type magnitude := t and type signed_fee := Fee.Signed.t
 
   [%%endif]
 

@@ -241,7 +241,7 @@ type Helper struct {
 	BandwidthCounter  *metrics.BandwidthCounter
 	MsgStats          *MessageStats
 	Seeds             []peer.AddrInfo
-	NodeStatus        string
+	NodeStatus        []byte
 	pxDiscoveries     chan peer.AddrInfo
 }
 
@@ -574,11 +574,12 @@ func (h *Helper) handleNodeStatusStreams(s network.Stream) {
 		}
 	}()
 
-	n, err := s.Write([]byte(h.NodeStatus))
+	n, err := s.Write(h.NodeStatus)
 	if err != nil {
 		logger.Error("failed to write to stream", err)
 		return
 	} else if n != len(h.NodeStatus) {
+		// TODO repeat writing, not log error
 		logger.Error("failed to write all data to stream")
 		return
 	}

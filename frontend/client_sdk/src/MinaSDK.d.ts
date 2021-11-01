@@ -109,6 +109,20 @@ export declare const verifyPaymentSignature: (signedPayment: signed<payment>) =>
    */
 export declare const verifyStakeDelegationSignature: (signedStakeDelegation: signed<stakeDelegation>) => boolean;
 /**
+  * Compute the hash of a signed payment.
+  *
+  * @param signedPayment - A signed payment transaction
+  * @returns A transaction hash
+   */
+export declare const hashPayment: (signedPayment: signed<payment>) => string;
+/**
+  * Compute the hash of a signed stake delegation.
+  *
+  * @param signedStakeDelegation - A signed stake delegation
+  * @returns A transaction hash
+   */
+export declare const hashStakeDelegation: (signedStakeDelegation: signed<stakeDelegation>) => string;
+/**
   * Converts a Rosetta signed transaction to a JSON string that is
   * compatible with GraphQL. The JSON string is a representation of
   * a `Signed_command` which is what our GraphQL expects.

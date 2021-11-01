@@ -232,14 +232,14 @@ module Eq_data = struct
         ; to_input_checked = field
         }
 
-    let rollup_state =
+    let sequence_state =
       let open Random_oracle_input in
       lazy
         Field.
           { typ
           ; equal
           ; equal_checked = run Checked.equal
-          ; default = Lazy.force Snapp_account.Rollup_events.empty_hash
+          ; default = Lazy.force Snapp_account.Sequence_events.empty_hash
           ; to_input = field
           ; to_input_checked = field
           }
@@ -397,7 +397,7 @@ module Account = struct
           ; public_key : 'pk
           ; delegate : 'pk
           ; state : 'field Snapp_state.V.Stable.V1.t
-          ; rollup_state : 'field
+          ; sequence_state : 'field
           ; proved_state : 'bool
           }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
@@ -452,7 +452,7 @@ module Account = struct
         ; public_key
         ; delegate
         ; state
-        ; rollup_state = Ignore
+        ; sequence_state = Ignore
         ; proved_state = Ignore
         }
     end
@@ -473,7 +473,7 @@ module Account = struct
       (* won't raise because length is correct *)
       Quickcheck.Generator.return (Snapp_state.V.of_list_exn fields)
     in
-    let%bind rollup_state =
+    let%bind sequence_state =
       let%bind n = Int.gen_uniform_incl Int.min_value Int.max_value in
       let field_gen = Quickcheck.Generator.return (F.of_int n) in
       Or_ignore.gen field_gen
@@ -486,7 +486,7 @@ module Account = struct
       ; public_key
       ; delegate
       ; state
-      ; rollup_state
+      ; sequence_state
       ; proved_state
       }
 
@@ -498,7 +498,7 @@ module Account = struct
     ; delegate = Ignore
     ; state =
         Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> Or_ignore.Ignore)
-    ; rollup_state = Ignore
+    ; sequence_state = Ignore
     ; proved_state = Ignore
     }
 
@@ -509,7 +509,7 @@ module Account = struct
        ; public_key
        ; delegate
        ; state
-       ; rollup_state
+       ; sequence_state
        ; proved_state
        } :
         t) =
@@ -522,8 +522,8 @@ module Account = struct
       ; Eq_data.(to_input_explicit (Tc.public_key ()) delegate)
       ; Vector.reduce_exn ~f:append
           (Vector.map state ~f:Eq_data.(to_input_explicit Tc.field))
-      ; Eq_data.(to_input ~explicit:false (Lazy.force Tc.rollup_state))
-          rollup_state
+      ; Eq_data.(to_input ~explicit:false (Lazy.force Tc.sequence_state))
+          sequence_state
       ; Eq_data.(to_input_explicit Tc.boolean) proved_state
       ]
 
@@ -548,7 +548,7 @@ module Account = struct
          ; public_key
          ; delegate
          ; state
-         ; rollup_state
+         ; sequence_state
          ; proved_state
          } :
           t) =
@@ -561,7 +561,8 @@ module Account = struct
         ; Eq_data.(to_input_checked (Tc.public_key ()) delegate)
         ; Vector.reduce_exn ~f:append
             (Vector.map state ~f:Eq_data.(to_input_checked Tc.field))
-        ; Eq_data.(to_input_checked (Lazy.force Tc.rollup_state)) rollup_state
+        ; Eq_data.(to_input_checked (Lazy.force Tc.sequence_state))
+            sequence_state
         ; Eq_data.(to_input_checked Tc.boolean) proved_state
         ]
 
@@ -574,7 +575,7 @@ module Account = struct
          ; public_key
          ; delegate
          ; state = _
-         ; rollup_state = _
+         ; sequence_state = _
          ; proved_state = _
          } :
           t) (a : Account.Checked.Unhashed.t) =
@@ -596,17 +597,17 @@ module Account = struct
          ; public_key = _
          ; delegate = _
          ; state
-         ; rollup_state
+         ; sequence_state
          ; proved_state
          } :
           t) (snapp : Snapp_account.Checked.t) =
       Boolean.any
         Vector.(
           to_list
-            (map snapp.rollup_state
+            (map snapp.sequence_state
                ~f:
                  Eq_data.(
-                   check_checked (Lazy.force Tc.rollup_state) rollup_state)))
+                   check_checked (Lazy.force Tc.sequence_state) sequence_state)))
       :: Eq_data.(check_checked Tc.boolean proved_state snapp.proved_state)
       :: Vector.(
            to_list
@@ -632,7 +633,7 @@ module Account = struct
       ; public_key ()
       ; Snapp_state.typ (Or_ignore.typ_explicit Field.typ ~ignore:Field.zero)
       ; Or_ignore.typ_implicit Field.typ ~equal:Field.equal
-          ~ignore:(Lazy.force Snapp_account.Rollup_events.empty_hash)
+          ~ignore:(Lazy.force Snapp_account.Sequence_events.empty_hash)
       ; Or_ignore.typ_explicit Boolean.typ ~ignore:false
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
@@ -645,7 +646,7 @@ module Account = struct
        ; public_key
        ; delegate
        ; state
-       ; rollup_state
+       ; sequence_state
        ; proved_state
        } :
         t) (a : Account.t) =
@@ -690,14 +691,14 @@ module Account = struct
           in
           if
             Option.is_some
-            @@ List.find (Vector.to_list snapp.rollup_state) ~f:(fun state ->
+            @@ List.find (Vector.to_list snapp.sequence_state) ~f:(fun state ->
                    Eq_data.(
                      check
-                       (Lazy.force Tc.rollup_state)
-                       ~label:"" rollup_state state)
+                       (Lazy.force Tc.sequence_state)
+                       ~label:"" sequence_state state)
                    |> Or_error.is_ok)
           then Ok ()
-          else Or_error.errorf "Equality check failed: rollup_state"
+          else Or_error.errorf "Equality check failed: sequence_state"
     in
     return ()
 end
