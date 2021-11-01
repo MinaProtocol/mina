@@ -283,4 +283,10 @@ let checked (type t)
            ; endomul1
            ; endomul2
            ]
+      |> (fun bs ->
+        as_prover (fun () ->
+          let bs = As_prover.read (Typ.list ~length:(List.length bs) Boolean.typ) bs in
+          printf !"%s:\n%{sexp: bool list}\n" __LOC__ bs
+        );
+      bs)
       |> Boolean.all)

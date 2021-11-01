@@ -70,7 +70,7 @@ struct
           printf "\n%!")
 
   let print_bool lab x =
-    if debug then
+    if true then
       as_prover (fun () ->
           printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x))
 

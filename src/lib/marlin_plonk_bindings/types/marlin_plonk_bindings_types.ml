@@ -1,5 +1,6 @@
+open Base
 module Or_infinity = struct
-  type 'a t = Infinity | Finite of 'a
+  type 'a t = Infinity | Finite of 'a [@@deriving sexp]
 end
 
 module Scalar_challenge = struct
@@ -7,11 +8,11 @@ module Scalar_challenge = struct
 end
 
 module Poly_comm = struct
-  type 'a t = { unshifted : 'a array; shifted : 'a option }
+  type 'a t = { unshifted : 'a array; shifted : 'a option } [@@deriving sexp]
 end
 
 module Plonk_domain = struct
-  type 'field t = { log_size_of_group : int; group_gen : 'field }
+  type 'field t = { log_size_of_group : int; group_gen : 'field }[@@deriving sexp]
 end
 
 module Plonk_verification_evals = struct
@@ -34,11 +35,11 @@ module Plonk_verification_evals = struct
     ; emul1_comm : 'poly_comm
     ; emul2_comm : 'poly_comm
     ; emul3_comm : 'poly_comm
-    }
+    }[@@deriving sexp]
 end
 
 module Plonk_verification_shifts = struct
-  type 'field t = { r : 'field; o : 'field }
+  type 'field t = { r : 'field; o : 'field }[@@deriving sexp]
 end
 
 module Plonk_verifier_index = struct
@@ -49,7 +50,7 @@ module Plonk_verifier_index = struct
     ; urs : 'urs
     ; evals : 'poly_comm Plonk_verification_evals.t
     ; shifts : 'field Plonk_verification_shifts.t
-    }
+    } [@@deriving sexp]
 end
 
 module Plonk_gate = struct

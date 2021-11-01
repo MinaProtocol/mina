@@ -3,4 +3,4 @@
  (name marlin_plonk_bindings_types)
  (instrumentation (backend bisect_ppx))
  (inline_tests)
- (preprocess (pps ppx_version ppx_inline_test)))
+ (preprocess (pps ppx_version ppx_inline_test ppx_sexp_conv)))

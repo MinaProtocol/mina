@@ -245,8 +245,9 @@ let step_main :
                   , unfinalized :: unfinalizeds
                   , should_verify :: should_verifys
                   , S pi ) ->
+                    with_label __LOC__ (fun () ->
                     Boolean.Assert.( = ) unfinalized.should_finalize
-                      should_verify ;
+                      should_verify ) ;
                     let ( app_state
                         , state
                         , prev_evals
@@ -319,7 +320,7 @@ let step_main :
                             ~messages ~wrap_verification_key:d.wrap_key
                             statement unfinalized)
                     in
-                    if debug then
+                    if true then
                       as_prover
                         As_prover.(
                           fun () ->

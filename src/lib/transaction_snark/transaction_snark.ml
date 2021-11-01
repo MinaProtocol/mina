@@ -4060,6 +4060,7 @@ struct
                 Pickles.Side_loaded.in_prover (Base.side_loaded 0)
                   (Option.value_exn v).data ;
                 Core.printf !"SNapp statement: %{sexp: Snapp_statement.t}\n%!" s ;
+                Core.printf !"vk: %{sexp:       ( Side_loaded_verification_key.Stable.V1.t , Snapp_basic.F.Stable.V1.t ) With_hash.Stable.V1.t }!\n" (Option.value_exn v) ;
                 (* TODO: We should not have to pass the statement in here. *)
                 [ (s, p) ]
             | [] | _ :: _ :: _ ->
@@ -4346,9 +4347,7 @@ module For_tests = struct
     in
     let vk = With_hash.of_data ~hash_data:Snapp_account.digest_vk vk in
     Core.printf
-      !"vk: %s\n hash: %{sexp: State_hash.t}%!"
-      (Side_loaded_verification_key.to_yojson vk.data |> Yojson.Safe.to_string)
-      vk.hash ;
+      !"vk: %{sexp:       ( Side_loaded_verification_key.Stable.V1.t , Snapp_basic.F.Stable.V1.t ) With_hash.Stable.V1.t }!\n" vk ;
     let _is_new, _loc =
       let id =
         Public_key.compress sender.public_key
@@ -4459,10 +4458,14 @@ module For_tests = struct
     let handler (Snarky_backendless.Request.With { request; respond }) =
       match request with _ -> respond Unhandled
     in
-    let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
+    let%bind.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
       trivial_prover ~handler [] tx_statement
     in
     Core.printf "proof: %s\n%!" (Pickles.Side_loaded.Proof.to_base64 pi) ;
+    Core.printf "verifying...\n" ;
+    let%map.Async.Deferred b = P.verify [tx_statement, pi] in
+    Core.printf "verified? %b\n" b ;
+    assert b ;
     let fee_payer_signature_auth =
       let txn_comm =
         Parties.Transaction_commitment.with_fee_payer transaction

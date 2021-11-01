@@ -134,7 +134,21 @@ let max_domains_with_x =
   { Ds.h = conv max_domains.h; x }
 
 module Vk = struct
-  type t = (Impls.Wrap.Verification_key.t[@sexp.opaque]) [@@deriving sexp]
+  type t = Impls.Wrap.Verification_key.t
+
+  let sexp_of_t : t -> _ = [%sexp_of: 
+    (Impls.Wrap.Field.Constant.t, (Marlin_plonk_bindings_pasta_fq_urs.t[@sexp.opaque]),
+    (Impls.Step.Field.Constant.t * Impls.Step.Field.Constant.t)
+    Marlin_plonk_bindings_types.Or_infinity.t
+      Marlin_plonk_bindings_types.Poly_comm.t)
+    Marlin_plonk_bindings_types.Plonk_verifier_index.t]
+
+  let t_of_sexp : _ -> t = [%of_sexp: 
+    (Impls.Wrap.Field.Constant.t, (Marlin_plonk_bindings_pasta_fq_urs.t[@sexp.opaque]),
+    (Impls.Step.Field.Constant.t * Impls.Step.Field.Constant.t)
+    Marlin_plonk_bindings_types.Or_infinity.t
+      Marlin_plonk_bindings_types.Poly_comm.t)
+    Marlin_plonk_bindings_types.Plonk_verifier_index.t]
 
   let to_yojson _ = `String "opaque"
 
