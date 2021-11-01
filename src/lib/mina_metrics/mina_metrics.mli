@@ -214,6 +214,18 @@ module Network : sig
 
   val get_epoch_ledger_rpc_responses_failed : Counter.t
 
+  val new_state_received : Gauge.t
+
+  val new_state_broadcasted : Gauge.t
+
+  val snark_pool_diff_received : Gauge.t
+
+  val snark_pool_diff_broadcasted : Gauge.t
+
+  val transaction_pool_diff_received : Gauge.t
+
+  val transaction_pool_diff_broadcasted : Gauge.t
+
   val rpc_connections_failed : Counter.t
 
   module Ipc_latency_histogram : Histogram

@@ -220,6 +220,18 @@ module Network = struct
 
   let get_epoch_ledger_rpcs_received : Counter.t * Gauge.t = ((), ())
 
+  let new_state_received : Gauge.t = ()
+
+  let new_state_broadcasted : Gauge.t = ()
+
+  let snark_pool_diff_received : Gauge.t = ()
+
+  let snark_pool_diff_broadcasted : Gauge.t = ()
+
+  let transaction_pool_diff_received : Gauge.t = ()
+
+  let transaction_pool_diff_broadcasted : Gauge.t = ()
+
   let get_epoch_ledger_rpc_requests_failed : Counter.t = ()
 
   let get_epoch_ledger_rpc_responses_failed : Counter.t = ()
