@@ -537,13 +537,10 @@ module Parties_segment = struct
           failwith "Parties_segment.Basic.of_controls: Unsupported combination"
 
     let opt_signed ~is_start : Spec.single =
-      { predicate_type = `Nonce_or_accept; auth_type = Signature; is_start }
+      { predicate_type = `Full; auth_type = Signature; is_start }
 
     let unsigned : Spec.single =
-      { predicate_type = `Nonce_or_accept
-      ; auth_type = None_given
-      ; is_start = `No
-      }
+      { predicate_type = `Full; auth_type = None_given; is_start = `No }
 
     let opt_signed = opt_signed ~is_start:`Compute_in_circuit
 
