@@ -27,7 +27,7 @@ func makePath(req *nodeStatusRequest) (res string) {
 	ipAddress := req.Data.IpAddress
 	peerId := req.Data.PeerId
 	createdAt := req.Data.Timestamp.UTC().Format(time.RFC3339)
-	return strings.Join([]string{"submissions", ipAddress, peerId, createdAt + ".json"}, "/")
+	return strings.Join([]string{"submissions", peerId, ipAddress, createdAt + ".json"}, "/")
 }
 
 var nilTime time.Time
