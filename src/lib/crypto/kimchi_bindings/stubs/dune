@@ -48,4 +48,5 @@
    (progn
     (run rm -rf ./target)
     (run rm -f ./Cargo.lock)
-    (run cargo run ../kimchi.ml)))))
+    (run cargo run ../kimchi.ml)
+    (run ocamlformat -i ../kimchi.ml)))))
