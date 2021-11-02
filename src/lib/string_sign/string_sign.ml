@@ -2,6 +2,8 @@
 
 [%%import "/src/config.mlh"]
 
+open Core_kernel
+
 [%%ifdef consensus_mechanism]
 
 open Snark_params
@@ -74,7 +76,13 @@ module Message = struct
     let open Core_kernel in
     List.(concat_map (String.to_list s) ~f:char_bits)
 
-  let derive t ~private_key ~public_key:pk =
+  let network_id = function
+    | Mina_signature_kind.Mainnet ->
+        Char.of_int_exn 1
+    | Mina_signature_kind.Testnet ->
+        Char.of_int_exn 0
+
+  let derive ~signature_kind t ~private_key ~public_key:pk =
     let pk_bits { Public_key.Compressed.Poly.x; is_odd } =
       is_odd :: Field.unpack x
     in
@@ -82,13 +90,22 @@ module Message = struct
       [ Tock.Field.unpack private_key
       ; pk_bits (Public_key.compress (Inner_curve.to_affine_exn pk))
       ; string_bits t
+      ; Fold_lib.Fold.(
+          to_list (string_bits (String.of_char (network_id signature_kind))))
       ]
     |> Array.of_list |> Blake2.bits_to_string |> Blake2.digest_string
     |> Blake2.to_raw_string |> Blake2.string_to_bits |> Array.to_list
     |> Base.(Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1)))
     |> Tock.Field.project
 
-  let make_hash ~init t ~public_key ~r =
+  let hash ~signature_kind t ~public_key ~r =
+    let init =
+      match signature_kind with
+      | Mina_signature_kind.Mainnet ->
+          Hash_prefix.signature_for_mainnet
+      | Mina_signature_kind.Testnet ->
+          Hash_prefix.signature_for_testnet
+    in
     let string_to_input s =
       Random_oracle.Input.
         { field_elements = [||]
@@ -104,12 +121,6 @@ module Message = struct
     let open Random_oracle in
     hash ~init (pack_input input)
     |> Digest.to_bits |> Inner_curve.Scalar.of_bits
-
-  let hash = make_hash ~init:Hash_prefix.signature
-
-  let hash_for_mainnet = make_hash ~init:Hash_prefix.signature_for_mainnet
-
-  let hash_for_testnet = make_hash ~init:Hash_prefix.signature_for_testnet
 
   [%%ifdef consensus_mechanism]
 
