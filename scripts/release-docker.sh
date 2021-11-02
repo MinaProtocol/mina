@@ -16,10 +16,9 @@ function usage() {
   if [[ -n "$1" ]]; then
     echo -e "${RED}☞  $1${CLEAR}\n";
   fi
-  echo "Usage: $0 [-s service-to-release] [-v service-version] [-n network]"
+  echo "Usage: $0 [-s service-to-release] [-v service-version]"
   echo "  -s, --service             The Service being released to Dockerhub"
   echo "  -v, --version             The version to be used in the docker image tag"
-  echo "  -n, --network             The network configuration to use (devnet or mainnet). Default=devnet"
   echo "  -b, --branch              The branch of the mina repository to use for staged docker builds. Default=compatible"
   echo "      --deb-codename        The debian codename (stretch or buster) to build the docker image from. Default=stretch"
   echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
@@ -34,7 +33,6 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --no-upload) NOUPLOAD=1;;
   -s|--service) SERVICE="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
-  -n|--network) NETWORK="--build-arg network=$2"; shift;;
   -b|--branch) BRANCH="--build-arg MINA_BRANCH=$2"; shift;;
   -c|--cache-from) CACHE="--cache-from $2"; shift;;
   --deb-codename) DEB_CODENAME="--build-arg deb_codename=$2"; shift;;
@@ -103,9 +101,9 @@ TAG="gcr.io/o1labs-192920/$SERVICE:$VERSION"
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
-  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args -t "$TAG" -
+  cat $DOCKERFILE_PATH | docker build $CACHE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args -t "$TAG" -
 else
-  docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
+  docker build $CACHE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
 if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then

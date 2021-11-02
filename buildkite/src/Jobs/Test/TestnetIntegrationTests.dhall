@@ -7,7 +7,7 @@ let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
     { name = "TestnetIntegrationTests", key = "build-test-executive" },
-    { name = "MinaArtifactBuster", key = "daemon-devnet-buster-docker-image" },
+    { name = "MinaArtifactBuster", key = "daemon-buster-docker-image" },
     { name = "MinaArtifactBuster", key = "archive-buster-docker-image" }
 ]
 

@@ -1,4 +1,7 @@
 {
+  "proof": {
+    "signature_kind": "mainnet"
+  },
   "genesis": {
     "genesis_state_timestamp": "2021-03-17T00:00:00Z"
   },
