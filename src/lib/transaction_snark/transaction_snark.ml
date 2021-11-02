@@ -2295,7 +2295,6 @@ module Base = struct
       let prev_should_verify =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
-            Core.printf "Full proof_level\n%!" ;
             true
         | _ ->
             false
@@ -4059,7 +4058,11 @@ struct
             | [ (s, p, v) ] ->
                 Pickles.Side_loaded.in_prover (Base.side_loaded 0)
                   (Option.value_exn v).data ;
-                Core.printf !"SNapp statement: %{sexp: Snapp_statement.t}\n%!" s ;
+                Core.printf
+                  !"Snapp statement passed to the prover: %{sexp: \
+                    Snapp_statement.t}\n\
+                    %!"
+                  s ;
                 (* TODO: We should not have to pass the statement in here. *)
                 [ (s, p) ]
             | [] | _ :: _ :: _ ->
@@ -4150,118 +4153,6 @@ module For_tests = struct
 
     let proof_level = proof_level
   end)
-
-  (*let of_parties ~witness ~(spec : Parties_segment.Basic.t) ~statement =
-    Base.Parties_snark.witness := Some witness ;
-    (*let types =
-        List.map
-          (Parties.Party_or_stack.to_parties_list
-             witness.local_state_init.parties) ~f:(fun (p, _) ->
-            Control.tag p.authorization)
-        @ List.concat_map witness.start_parties ~f:(fun s ->
-              Control.Tag.Signature
-              :: List.map s.parties.other_parties ~f:(fun p ->
-                     Control.tag p.authorization))
-      in
-      let type_ : Parties_segment.Basic.t =
-        match spec with
-        | [ Signature ] ->
-            Opt_signed
-        | [ None_given ] ->
-            Opt_signed
-        | [ Proof ] ->
-            Proved
-        | [ Signature; None_given ] | [ None_given; None_given ] ->
-            Opt_signed_unsigned
-        | [ Signature; Signature ] | [ None_given; Signature ] ->
-            Opt_signed_opt_signed
-        | _ ->
-            failwithf
-              !"Sequence of control types not supported as a basic sequence: \
-                %{sexp: Control.Tag.t list}"
-              types ()
-      in*)
-    let res =
-      match spec with
-      | Opt_signed ->
-          opt_signed [] statement
-      | Opt_signed_unsigned ->
-          opt_signed_unsigned [] statement
-      | Opt_signed_opt_signed ->
-          opt_signed_opt_signed [] statement
-      | Proved ->
-          let proofs =
-            let party_proof (p : Party.t) =
-              match p.authorization with
-              | Proof p ->
-                  Some p
-              | Signature _ | None_given ->
-                  None
-            in
-            let open Option.Let_syntax in
-            List.filter_map
-              (Parties.Party_or_stack.to_parties_with_hashes_list
-                 witness.local_state_init.parties)
-              ~f:(fun ((p, ()), at_party) ->
-                let%map pi = party_proof p in
-                let vk =
-                  let account_id =
-                    Account_id.create p.data.body.pk p.data.body.token_id
-                  in
-                  let account : Account.t =
-                    Sparse_ledger.(
-                      get_exn witness.local_state_init.ledger
-                        (find_index_exn witness.local_state_init.ledger
-                           account_id))
-                  in
-                  (Option.value_exn account.snapp).verification_key
-                in
-                ( { Snapp_statement.Poly.transaction =
-                      witness.local_state_init.transaction_commitment
-                  ; at_party
-                  }
-                , pi
-                , vk ))
-            @ List.concat_map witness.start_parties ~f:(fun s ->
-                  (* TODO: This is unnecessary re-computation of the statements which are also computed in
-                     the circuit. It would be better to use the values computed inside the circuit, but it
-                     was involved to change the pickles API to allow it. *)
-                  let other_parties, transaction =
-                    let ps =
-                      Parties.Party_or_stack.With_hashes.of_parties_list
-                        (List.map ~f:(fun p -> (p, ())) s.parties.other_parties)
-                    in
-                    ( ps
-                    , Parties.Transaction_commitment.create
-                        ~other_parties_hash:
-                          (Parties.Party_or_stack.stack_hash ps)
-                        ~protocol_state_predicate_hash:
-                          (Snapp_predicate.Protocol_state.digest
-                             s.protocol_state_predicate)
-                        ~memo_hash:s.memo_hash )
-                  in
-                  List.filter_map
-                    (Parties.Party_or_stack.to_parties_with_hashes_list
-                       other_parties) ~f:(fun ((p, ()), at_party) ->
-                      let%map pi = party_proof p in
-                      ({ Snapp_statement.Poly.transaction; at_party }, pi, None)))
-          in
-          proved
-            ( match proofs with
-            | [ (s, p, v) ] ->
-                Pickles.Side_loaded.in_prover (Base.side_loaded 0)
-                  (Option.value_exn v).data ;
-                Core.printf !"SNapp statement: %{sexp: Snapp_statement.t}\n%!" s ;
-                (* TODO: We should not have to pass the statement in here. *)
-                [ (s, p) ]
-            | [] | _ :: _ :: _ ->
-                failwith "of_parties_segment: Expected exactly one proof" )
-            statement
-    in
-    let open Async in
-    let%map proof = res in
-    Base.Parties_snark.witness := None ;
-    { proof; statement }*)
 
   let create_trivial_predicate_snapp ~constraint_constants spec ledger =
     let local_dummy_constraints () =
@@ -4454,7 +4345,7 @@ module For_tests = struct
     let tx_statement : Snapp_statement.t =
       { transaction; at_party = proof_party }
     in
-    Core.printf "snapp statement: %s\n%!"
+    Core.printf "snapp statement generated: %s\n%!"
       (Snapp_statement.sexp_of_t tx_statement |> Sexp.to_string) ;
     let handler (Snarky_backendless.Request.With { request; respond }) =
       match request with _ -> respond Unhandled
@@ -5162,23 +5053,9 @@ let%test_module "transaction_snark" =
                         (List.hd_exn specs) ledger)
                     |> Async.Thread_safe.block_on_async_exn
                   in
-                  Core.printf
-                    !"ledger merkle root 1 %{sexp: Ledger_hash.t}\n%!"
-                    (Ledger.merkle_root ledger) ;
-                  Core.printf "Snapp transaction: %s\n%!"
-                    (Parties.to_yojson parties |> Yojson.Safe.to_string) ;
-                  List.iter (Ledger.to_list ledger) ~f:(fun acc ->
-                      Core.printf "Account: %s\n%!"
-                        (Account.to_yojson acc |> Yojson.Safe.to_string)) ;
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  Core.printf
-                    !"ledger merkle root 2 %{sexp: Ledger_hash.t}\n%!"
-                    (Ledger.merkle_root ledger) ;
-                  List.iter (Ledger.to_list ledger) ~f:(fun acc ->
-                      Core.printf "Account: %s\n%!"
-                        (Account.to_yojson acc |> Yojson.Safe.to_string)) ;
                   (fun () -> apply_parties ledger [ parties ])
                   |> Async.Thread_safe.block_on_async_exn)
               |> fun ((), ()) -> ())

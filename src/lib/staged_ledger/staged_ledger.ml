@@ -536,38 +536,6 @@ module T = struct
     in
     let empty_local_state = Mina_state.Local_state.empty in
     let%map applied_txn =
-      (*, target_local_state =
-        match s with
-        | Command (Parties p) ->
-            let%map applied_txn, local_state =
-              Or_error.map
-                (Ledger.apply_parties_unchecked ~state_view:txn_state_view
-                   ~constraint_constants ledger p)
-                ~f:(fun (applied, (local_state, _)) ->
-                  ( { Ledger.Transaction_applied.previous_hash = source_merkle_root
-                    ; varying =
-                        Ledger.Transaction_applied.Varying.Command
-                          (Parties applied)
-                    }
-                  , local_state ))
-              |> to_staged_ledger_or_error
-            in
-            let transaction_commitment = Parties.commitment p in
-            let hash_parties_stack ps =
-              ps |> Parties.Party_or_stack.accumulate_hashes'
-              |> List.map ~f:(Parties.Party_or_stack.map ~f:(fun p -> (p, ())))
-              |> Parties.Party_or_stack.stack_hash
-            in
-            ( applied_txn
-            , { local_state with
-                Parties_logic.Local_state.parties =
-                  hash_parties_stack local_state.parties
-              ; call_stack = hash_parties_stack local_state.call_stack
-              ; ledger = source_merkle_root (*updated later*)
-              ; transaction_commitment
-              } )
-        | _ ->
-      *)
       Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger s
       |> to_staged_ledger_or_error
     in

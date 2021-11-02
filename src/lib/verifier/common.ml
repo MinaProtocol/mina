@@ -12,10 +12,8 @@ let check :
           `Invalid
       | Some c ->
           `Valid (User_command.Signed_command c) )
-  | Parties ({ fee_payer; other_parties; protocol_state; memo } as p) ->
+  | Parties { fee_payer; other_parties; protocol_state; memo } ->
       with_return (fun { return } ->
-          Core.printf "parties txn: %s\n%!"
-            (Parties.Verifiable.to_yojson p |> Yojson.Safe.to_string) ;
           let other_parties_hash =
             Parties.Party_or_stack.With_hashes.stack_hash other_parties
           in
@@ -28,9 +26,6 @@ let check :
           let check_signature s pk msg =
             match Signature_lib.Public_key.decompress pk with
             | None ->
-                Core.printf "Invalid key %s\n%!"
-                  ( Signature_lib.Public_key.Compressed.to_yojson pk
-                  |> Yojson.Safe.to_string ) ;
                 return `Invalid
             | Some pk' ->
                 if
@@ -38,16 +33,12 @@ let check :
                     (Signature_lib.Schnorr.verify s
                        (Backend.Tick.Inner_curve.of_affine pk')
                        (Random_oracle_input.field msg))
-                then (
-                  Core.printf "Invalid signature %s msg %s\n%!"
-                    (Mina_base.Signature.to_base58_check s)
-                    (Pickles.Backend.Tick.Field.to_string msg) ;
-                  return `Invalid )
+                then return `Invalid
                 else ()
           in
           Core.printf
-            "otherparties hash: %s protocol hash: %s memo hash: %s fee_paer \
-             hash: %s\n\
+            "Common.check: otherparties hash: %s protocol hash: %s memo hash: \
+             %s fee_paer hash: %s\n\
              %!"
             (Pickles.Backend.Tick.Field.to_string other_parties_hash)
             (Pickles.Backend.Tick.Field.to_string
@@ -77,8 +68,6 @@ let check :
                 | Proof pi -> (
                     match vk_opt with
                     | None ->
-                        (*TODO: should this return None?*)
-                        Core.printf "No verification keys!\n%!" ;
                         return `Invalid
                     | Some vk ->
                         let stmt =
@@ -86,8 +75,6 @@ let check :
                           ; at_party
                           }
                         in
-                        Core.printf "snapp statement: %s\n%!"
-                          (Snapp_statement.sexp_of_t stmt |> Sexp.to_string) ;
                         Some (vk, stmt, pi) ))
           in
           let v =
