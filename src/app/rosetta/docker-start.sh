@@ -27,7 +27,6 @@ trap cleanup EXIT
 # Setup and export useful variables/defaults
 export MINA_LIBP2P_HELPER_PATH=/usr/local/bin/libp2p_helper
 export MINA_NETWORK=${MINA_NETWORK:=mainnet}
-export MINA_SUFFIX=${MINA_SUFFIX:=}
 export MINA_CONFIG_FILE=/genesis_ledgers/${MINA_NETWORK}.json
 export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=/data/.mina-config}"
 export MINA_CLIENT_TRUSTLIST=${MINA_CLIENT_TRUSTLIST:=}
@@ -55,7 +54,7 @@ echo "========================= INITIALIZING POSTGRESQL ========================
 
 # Rosetta
 echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
-mina-rosetta${MINA_SUFFIX} \
+mina-rosetta \
   --archive-uri "${PG_CONN}" \
   --graphql-uri http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
   --log-level ${LOG_LEVEL} \
@@ -82,7 +81,7 @@ echo "Removing daemon lockfile ${MINA_CONFIG_DIR}/.mina-lock"
 rm -f "${MINA_CONFIG_DIR}/.mina-lock"
 echo "========================= STARTING DAEMON connected to ${MINA_NETWORK^^} with GRAPQL on PORT ${MINA_GRAPHQL_PORT}==========================="
 echo "MINA Flags: $MINA_FLAGS -config-file ${MINA_CONFIG_FILE}"
-mina${MINA_SUFFIX} daemon \
+mina daemon \
   --config-file ${MINA_CONFIG_FILE} \
   ${MINA_FLAGS} $@ &
 MINA_DAEMON_PID=$!
