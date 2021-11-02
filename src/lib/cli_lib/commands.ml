@@ -115,13 +115,12 @@ let validate_transaction =
                       Mina_base.Signed_command.check_signature
                         ~signature_kind:Mainnet cmd
                     then
-                      Format.eprintf
-                        "Transaction was valid for use on mainnet@."
+                      Format.printf "Transaction was valid for use on mainnet@."
                     else if
                       Mina_base.Signed_command.check_signature
                         ~signature_kind:Testnet cmd
                     then
-                      Format.eprintf
+                      Format.printf
                         "Transaction was valid for use on testnets@."
                     else (
                       incr num_fails ;
