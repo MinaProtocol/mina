@@ -185,8 +185,11 @@ module Update = struct
     end
   end]
 
-  let gen ?(new_party = false) () : t Quickcheck.Generator.t =
+  let gen ?(new_account = false) ?(snapp_account = false) () :
+      t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
+    if snapp_account && not new_account then
+      failwith "Party.Update.gen: got snapp_account but not new_account" ;
     let%bind app_state =
       let%bind fields =
         let field_gen = Snark_params.Tick.Field.gen in
@@ -197,13 +200,18 @@ module Update = struct
     in
     let%bind delegate = Set_or_keep.gen Public_key.Compressed.gen in
     let%bind verification_key =
-      Set_or_keep.gen
-        (Quickcheck.Generator.return
-           (let data = Pickles.Side_loaded.Verification_key.dummy in
-            let hash = Snapp_account.digest_vk data in
-            { With_hash.data; hash }))
+      if snapp_account then
+        Set_or_keep.gen
+          (Quickcheck.Generator.return
+             (let data = Pickles.Side_loaded.Verification_key.dummy in
+              let hash = Snapp_account.digest_vk data in
+              { With_hash.data; hash }))
+      else return Set_or_keep.Keep
     in
-    let%bind permissions = Set_or_keep.gen Permissions.gen in
+    let%bind permissions =
+      if snapp_account then Set_or_keep.gen Permissions.gen
+      else return Set_or_keep.Keep
+    in
     let%bind snapp_uri =
       let uri_gen =
         Quickcheck.Generator.of_list
@@ -223,7 +231,7 @@ module Update = struct
       Set_or_keep.gen token_gen
     in
     let%map timing =
-      if new_party then Set_or_keep.gen Timing_info.gen
+      if new_account then Set_or_keep.gen Timing_info.gen
       else return Set_or_keep.Keep
     in
     Poly.
@@ -349,27 +357,20 @@ module Update = struct
 end
 
 module Events = Snapp_account.Events
-module Rollup_events = Snapp_account.Rollup_events
+module Sequence_events = Snapp_account.Sequence_events
 
 module Body = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ( 'pk
-             , 'update
-             , 'token_id
-             , 'signed_amount
-             , 'events
-             , 'call_data
-             , 'int )
-             t =
+        type ('pk, 'update, 'token_id, 'amount, 'events, 'call_data, 'int) t =
           { pk : 'pk
           ; update : 'update
           ; token_id : 'token_id
-          ; delta : 'signed_amount
+          ; delta : 'amount
           ; events : 'events
-          ; rollup_events : 'events
+          ; sequence_events : 'events
           ; call_data : 'call_data
           ; depth : 'int
           }
@@ -399,8 +400,9 @@ module Body = struct
     end
   end]
 
-  (* Delta for the fee payer is always going to be Neg and token id is always
-     going to be Mina and so represent it using an unsigned fee*)
+  (* Delta for the fee payer is always going to be Neg, so represent it using an unsigned fee,
+     token id is always going to be the default, so use unit value as a placeholder
+  *)
   module Fee_payer = struct
     [%%versioned
     module Stable = struct
@@ -426,7 +428,7 @@ module Body = struct
       ; token_id = ()
       ; delta = Fee.zero
       ; events = []
-      ; rollup_events = []
+      ; sequence_events = []
       ; call_data = Field.zero
       ; depth = 0
       }
@@ -455,7 +457,7 @@ module Body = struct
          ; token_id
          ; delta
          ; events
-         ; rollup_events
+         ; sequence_events
          ; call_data
          ; depth = _depth (* ignored *)
          } :
@@ -466,7 +468,7 @@ module Body = struct
         ; Impl.run_checked (Token_id.Checked.to_input token_id)
         ; Amount.Signed.Checked.to_input delta
         ; Events.var_to_input events
-        ; Events.var_to_input rollup_events
+        ; Events.var_to_input sequence_events
         ; Random_oracle_input.field call_data
         ]
 
@@ -496,7 +498,7 @@ module Body = struct
     ; token_id = Token_id.default
     ; delta = Amount.Signed.zero
     ; events = []
-    ; rollup_events = []
+    ; sequence_events = []
     ; call_data = Field.zero
     ; depth = 0
     }
@@ -507,7 +509,7 @@ module Body = struct
        ; token_id
        ; delta
        ; events
-       ; rollup_events
+       ; sequence_events
        ; call_data
        ; depth = _ (* ignored *)
        } :
@@ -518,7 +520,7 @@ module Body = struct
       ; Token_id.to_input token_id
       ; Amount.Signed.to_input delta
       ; Events.to_input events
-      ; Events.to_input rollup_events
+      ; Events.to_input sequence_events
       ; Random_oracle_input.field call_data
       ]
 

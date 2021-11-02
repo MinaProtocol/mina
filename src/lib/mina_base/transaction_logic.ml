@@ -1260,7 +1260,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            ; delta
            ; events = _ (* This is for the snapp to use, we don't need it. *)
            ; call_data = _ (* This is for the snapp to use, we don't need it. *)
-           ; rollup_events
+           ; sequence_events
            ; depth = _ (* This is used to build the 'stack of stacks'. *)
            }
        ; predicate
@@ -1364,12 +1364,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         update a.permissions.set_verification_key verification_key
           init.verification_key ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
             match (u, x) with Keep, _ -> x | Set x, _ -> Some x)
-      and rollup_state, last_rollup_slot =
-        let [ s1; s2; s3; s4; s5 ] = init.rollup_state in
-        let last_rollup_slot = init.last_rollup_slot in
+      and sequence_state, last_sequence_slot =
+        let [ s1; s2; s3; s4; s5 ] = init.sequence_state in
+        let last_sequence_slot = init.last_sequence_slot in
         let is_this_slot =
           Mina_numbers.Global_slot.equal global_slot_since_genesis
-            last_rollup_slot
+            last_sequence_slot
         in
         (* Shift along if last update wasn't this slot *)
         let s5 = if is_this_slot then s5 else s4 in
@@ -1377,20 +1377,20 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         let s3 = if is_this_slot then s3 else s2 in
         let s2 = if is_this_slot then s2 else s1 in
         (* Push events to s1 *)
-        let is_empty = List.is_empty rollup_events in
+        let is_empty = List.is_empty sequence_events in
         let s1 =
           if is_empty then s1
-          else Party.Rollup_events.push_events s1 rollup_events
+          else Party.Sequence_events.push_events s1 sequence_events
         in
-        let new_rollup_state =
+        let new_sequence_state =
           if is_empty then Set_or_keep.Keep
           else
             Set_or_keep.Set
               ( ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
               , global_slot_since_genesis )
         in
-        update a.permissions.edit_rollup_state new_rollup_state
-          (init.rollup_state, init.last_rollup_slot)
+        update a.permissions.edit_sequence_state new_sequence_state
+          (init.sequence_state, init.last_sequence_slot)
           ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
             match u with Keep -> x | Set x -> x)
       in
@@ -1402,8 +1402,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         { app_state
         ; verification_key
         ; snapp_version
-        ; rollup_state
-        ; last_rollup_slot
+        ; sequence_state
+        ; last_sequence_slot
         ; proved_state
         }
       in
@@ -1415,7 +1415,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           match u with Keep -> x | Set x -> x)
     in
     let%bind token_symbol =
-      update a.permissions.set_snapp_uri token_symbol a.token_symbol
+      update a.permissions.set_token_symbol token_symbol a.token_symbol
         ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
           match u with Keep -> x | Set x -> x)
     in
@@ -2528,7 +2528,7 @@ module For_tests = struct
                   ; token_id = ()
                   ; delta = fee
                   ; events = []
-                  ; rollup_events = []
+                  ; sequence_events = []
                   ; call_data = Snark_params.Tick.Field.zero
                   ; depth = 0
                   }
@@ -2545,7 +2545,7 @@ module For_tests = struct
                     ; token_id = Token_id.default
                     ; delta = Amount.Signed.(negate (of_unsigned amount))
                     ; events = []
-                    ; rollup_events = []
+                    ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; depth = 0
                     }
@@ -2560,7 +2560,7 @@ module For_tests = struct
                     ; token_id = Token_id.default
                     ; delta = Amount.Signed.(of_unsigned amount)
                     ; events = []
-                    ; rollup_events = []
+                    ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; depth = 0
                     }

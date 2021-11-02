@@ -214,11 +214,6 @@ let of_transition external_transition tracked_participants
           }
         , next_available_token )
       ~f:(fun (acc_transactions, next_available_token) -> function
-        | { data = Command (Parties _); _ } ->
-            let `Needs_some_work_for_snapps_on_mainnet =
-              Mina_base.Util.todo_snapps
-            in
-            (acc_transactions, next_available_token)
         | { data = Command command; status } -> (
             let command = (command :> User_command.t) in
             let should_include_transaction command participants =

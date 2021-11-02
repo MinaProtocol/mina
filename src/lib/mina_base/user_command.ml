@@ -257,6 +257,13 @@ let check_tokens (t : t) =
   | Parties _ ->
       true
 
+let check (t : t) : Valid.t option =
+  match t with
+  | Signed_command x ->
+      Option.map (Signed_command.check x) ~f:(fun c -> Signed_command c)
+  | Parties p ->
+      if Parties.check p then Some (Parties (p :> Parties.Valid.t)) else None
+
 let fee_token (t : t) =
   match t with
   | Signed_command x ->
