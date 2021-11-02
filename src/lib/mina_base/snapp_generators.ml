@@ -280,11 +280,11 @@ let gen_delta ?balances_tbl (account : Account.t) =
 (* the type a is associated with the delta field, which is an unsigned fee for the fee payer,
    and a signed amount for other parties
 *)
-let gen_party_body (type a) ?account_id ?balances_tbl ?(new_account = false)
+let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
     ?(snapp_account = false) ?(is_fee_payer = false) ?available_public_keys
     ~(gen_delta : Account.t -> a Quickcheck.Generator.t)
-    ~(f_delta : a -> Currency.Amount.Signed.t) ~ledger () :
-    (_, _, _, a, _, _, _) Party.Body.Poly.t Quickcheck.Generator.t =
+    ~(f_delta : a -> Currency.Amount.Signed.t) ~(increment_nonce : b) ~ledger ()
+    : (_, _, _, a, _, _, _, b) Party.Body.Poly.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   (* ledger may contain non-Snapp accounts, so if we want a Snapp account,
      must generate a new one
@@ -449,6 +449,7 @@ let gen_party_body (type a) ?account_id ?balances_tbl ?(new_account = false)
   ; update
   ; token_id
   ; delta
+  ; increment_nonce
   ; events
   ; sequence_events
   ; call_data
@@ -456,11 +457,13 @@ let gen_party_body (type a) ?account_id ?balances_tbl ?(new_account = false)
   }
 
 let gen_predicated_from ?(succeed = true) ?(new_account = false)
-    ?(snapp_account = false) ?available_public_keys ~ledger ~balances_tbl =
+    ?(snapp_account = false) ?(increment_nonce = false) ?available_public_keys
+    ~ledger ~balances_tbl =
   let open Quickcheck.Let_syntax in
   let%bind body =
-    gen_party_body ~new_account ~snapp_account ?available_public_keys ~ledger
-      ~balances_tbl ~gen_delta:(gen_delta ~balances_tbl) ~f_delta:Fn.id ()
+    gen_party_body ~new_account ~snapp_account ~increment_nonce
+      ?available_public_keys ~ledger ~balances_tbl
+      ~gen_delta:(gen_delta ~balances_tbl) ~f_delta:Fn.id ()
   in
   let account_id =
     Account_id.create body.Party.Body.Poly.pk body.Party.Body.Poly.token_id
@@ -483,8 +486,15 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
      ledger may not be Snapp accounts
   *)
   let new_account = new_account || snapp_account in
+  let increment_nonce =
+    match authorization with
+    | Signature _ ->
+        true
+    | Proof _ | None_given ->
+        false
+  in
   let%map data =
-    gen_predicated_from ~succeed ~new_account ~snapp_account
+    gen_predicated_from ~increment_nonce ~succeed ~new_account ~snapp_account
       ~available_public_keys ~ledger ~balances_tbl
   in
   { Party.data; authorization }
@@ -494,7 +504,9 @@ let gen_party_predicated_signed ?account_id ~ledger :
     Party.Predicated.Signed.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind body =
-    gen_party_body ~gen_delta ~f_delta:Fn.id ?account_id ~ledger ()
+    gen_party_body ~gen_delta ~f_delta:Fn.id
+      ~increment_nonce:(Option.is_some account_id)
+      ?account_id ~ledger ()
   in
   let%map predicate = Account.Nonce.gen in
   Party.Predicated.Poly.{ body; predicate }
@@ -504,8 +516,8 @@ let gen_party_predicated_fee_payer ~account_id ~ledger :
     Party.Predicated.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body0 =
-    gen_party_body ~account_id ~is_fee_payer:true ~gen_delta:gen_fee
-      ~f_delta:fee_to_amt ~ledger ()
+    gen_party_body ~account_id ~is_fee_payer:true ~increment_nonce:()
+      ~gen_delta:gen_fee ~f_delta:fee_to_amt ~ledger ()
   in
   (* make sure the fee payer's token id is the default,
      which is represented by the unit value in the body

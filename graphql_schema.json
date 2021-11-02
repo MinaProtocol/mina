@@ -15314,16 +15314,22 @@
               "description": "Get the status of a transaction",
               "args": [
                 {
-                  "name": "payment",
-                  "description": "Id of a UserCommand",
+                  "name": "snappTransaction",
+                  "description": "Id of a snapp transaction",
                   "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "ID",
-                      "ofType": null
-                    }
+                    "kind": "SCALAR",
+                    "name": "ID",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "payment",
+                  "description": "Id of a Payment",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "ID",
+                    "ofType": null
                   },
                   "defaultValue": null
                 }

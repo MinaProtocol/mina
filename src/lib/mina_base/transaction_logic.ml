@@ -1258,12 +1258,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                ; timing
                }
            ; delta
+           ; increment_nonce
            ; events = _ (* This is for the snapp to use, we don't need it. *)
            ; call_data = _ (* This is for the snapp to use, we don't need it. *)
            ; sequence_events
            ; depth = _ (* This is used to build the 'stack of stacks'. *)
            }
-       ; predicate
+       ; predicate = _
        } :
         Party.Predicated.t) (a : Account.t) : (Account.t, _) Result.t =
     let open Snapp_basic in
@@ -1411,25 +1412,23 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     let%bind snapp_uri =
       update a.permissions.set_snapp_uri snapp_uri a.snapp_uri
-        ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
-          match u with Keep -> x | Set x -> x)
+        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
     let%bind token_symbol =
-      update a.permissions.set_snapp_uri token_symbol a.token_symbol
-        ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
-          match u with Keep -> x | Set x -> x)
+      update a.permissions.set_token_symbol token_symbol a.token_symbol
+        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
     let%bind permissions =
       update a.permissions.set_permissions permissions a.permissions
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
-    let nonce : Account.Nonce.t =
-      (* TODO: Think about whether this is correct *)
-      match predicate with
-      | Accept ->
-          a.nonce
-      | Full _ | Nonce _ ->
-          Account.Nonce.succ a.nonce
+    let%bind nonce =
+      let update_nonce =
+        if increment_nonce then Set_or_keep.Set (Account.Nonce.succ a.nonce)
+        else Set_or_keep.Keep
+      in
+      update a.permissions.increment_nonce update_nonce a.nonce
+        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
     Ok
       { a with
@@ -1674,6 +1673,25 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           if (is_start : bool) then
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
           match
+            let%bind.Result () =
+              if is_start && not p.data.body.increment_nonce then
+                (* The fee-payer must increment their nonce. *)
+                Error Transaction_status.Failure.Update_not_permitted
+              else Ok ()
+            in
+            let%bind.Result () =
+              match
+                (Control.tag p.authorization, p.data.body.increment_nonce)
+              with
+              | Signature, false ->
+                  (* If there's a signature, it must increment the nonce. *)
+                  (* TODO(#9743): Relax this when this party uses a 'full'
+                     commitment.
+                  *)
+                  Error Transaction_status.Failure.Update_not_permitted
+              | _ ->
+                  Ok ()
+            in
             apply_body ~constraint_constants ~state_view
               ~check_auth:
                 (Fn.flip Permissions.Auth_required.check
@@ -2527,6 +2545,7 @@ module For_tests = struct
                   ; update = Party.Update.noop
                   ; token_id = ()
                   ; delta = fee
+                  ; increment_nonce = ()
                   ; events = []
                   ; sequence_events = []
                   ; call_data = Snark_params.Tick.Field.zero
@@ -2544,6 +2563,7 @@ module For_tests = struct
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
                     ; delta = Amount.Signed.(negate (of_unsigned amount))
+                    ; increment_nonce = true (* TODO(#9743) *)
                     ; events = []
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
@@ -2559,6 +2579,7 @@ module For_tests = struct
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
                     ; delta = Amount.Signed.(of_unsigned amount)
+                    ; increment_nonce = false
                     ; events = []
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
