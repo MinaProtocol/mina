@@ -3,24 +3,28 @@ open Mina_base
 
 type invalid =
   [ `Invalid_keys of Signature_lib.Public_key.Compressed.Stable.Latest.t list
-  | `Invalid_signature
-  | `Invalid_proof
-  | `Missing_verification_key ]
+  | `Invalid_signature of
+    Signature_lib.Public_key.Compressed.Stable.Latest.t list
+  | `Missing_verification_key of
+    Signature_lib.Public_key.Compressed.Stable.Latest.t list
+  | `Invalid_proof ]
 [@@deriving bin_io_unversioned]
 
 let invalid_to_string (invalid : invalid) =
+  let keys_to_string keys =
+    List.map keys ~f:(fun key ->
+        Signature_lib.Public_key.Compressed.to_base58_check key)
+    |> String.concat ~sep:";"
+  in
   match invalid with
   | `Invalid_keys keys ->
-      sprintf "Invalid_keys: [%s]"
-        ( List.map keys ~f:(fun key ->
-              Signature_lib.Public_key.Compressed.to_base58_check key)
-        |> String.concat ~sep:";" )
-  | `Invalid_signature ->
-      "Invalid_signature"
+      sprintf "Invalid_keys: [%s]" (keys_to_string keys)
+  | `Invalid_signature keys ->
+      sprintf "Invalid_signature: [%s]" (keys_to_string keys)
+  | `Missing_verification_key keys ->
+      sprintf "Missing_verification_key: [%s]" (keys_to_string keys)
   | `Invalid_proof ->
       "Invalid_proof"
-  | `Missing_verification_key ->
-      "Missing_verification_key"
 
 let check :
        User_command.Verifiable.t
@@ -35,7 +39,7 @@ let check :
         | Some c ->
             `Valid (User_command.Signed_command c)
         | None ->
-            `Invalid_signature )
+            `Invalid_signature (Signed_command.public_keys c) )
   | Parties { fee_payer; other_parties; protocol_state; memo } ->
       with_return (fun { return } ->
           let commitment =
@@ -57,7 +61,10 @@ let check :
                     (Signature_lib.Schnorr.verify s
                        (Backend.Tick.Inner_curve.of_affine pk)
                        (Random_oracle_input.field msg))
-                then return `Invalid_signature
+                then
+                  return
+                    (`Invalid_signature
+                      [ Signature_lib.Public_key.compress pk ])
                 else ()
           in
           check_signature fee_payer.authorization fee_payer.data.body.pk
@@ -81,7 +88,9 @@ let check :
                 | Proof pi -> (
                     match vk_opt with
                     | None ->
-                        return `Missing_verification_key
+                        return
+                          (`Missing_verification_key
+                            [ Account_id.public_key @@ Party.account_id p ])
                     | Some vk ->
                         Some
                           ( vk

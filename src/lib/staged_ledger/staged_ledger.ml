@@ -1050,9 +1050,9 @@ module T = struct
         | `Valid x ->
             Ok x
         | ( `Invalid_keys _
-          | `Invalid_signature
+          | `Invalid_signature _
           | `Invalid_proof
-          | `Missing_verification_key ) as invalid ->
+          | `Missing_verification_key _ ) as invalid ->
             Error
               (Verifier.Failure.Verification_failed
                  (Error.of_string

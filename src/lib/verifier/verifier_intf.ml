@@ -9,9 +9,9 @@ module Base = struct
 
     type invalid =
       [ `Invalid_keys of Signature_lib.Public_key.Compressed.t list
-      | `Invalid_signature
-      | `Invalid_proof
-      | `Missing_verification_key ]
+      | `Invalid_signature of Signature_lib.Public_key.Compressed.t list
+      | `Missing_verification_key of Signature_lib.Public_key.Compressed.t list
+      | `Invalid_proof ]
     [@@deriving bin_io]
 
     val invalid_to_string : invalid -> string

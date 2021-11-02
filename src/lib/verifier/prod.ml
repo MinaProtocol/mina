@@ -75,9 +75,9 @@ module Worker_state = struct
                    | `Valid_assuming (_, xs) ->
                        xs
                    | `Invalid_keys _
-                   | `Invalid_signature
+                   | `Invalid_signature _
                    | `Invalid_proof
-                   | `Missing_verification_key ->
+                   | `Missing_verification_key _ ->
                        [])
                in
                let%map all_verified =
@@ -92,12 +92,12 @@ module Worker_state = struct
                      if all_verified then `Valid c else `Valid_assuming xs
                  | `Invalid_keys keys ->
                      `Invalid_keys keys
-                 | `Invalid_signature ->
-                     `Invalid_signature
+                 | `Invalid_signature keys ->
+                     `Invalid_signature keys
                  | `Invalid_proof ->
                      `Invalid_proof
-                 | `Missing_verification_key ->
-                     `Missing_verification_key)
+                 | `Missing_verification_key keys ->
+                     `Missing_verification_key keys)
 
              let verify_blockchain_snarks = B.Proof.verify
 
@@ -125,12 +125,12 @@ module Worker_state = struct
                        `Valid c
                    | `Invalid_keys keys ->
                        `Invalid_keys keys
-                   | `Invalid_signature ->
-                       `Invalid_signature
+                   | `Invalid_signature keys ->
+                       `Invalid_signature keys
                    | `Invalid_proof ->
                        `Invalid_proof
-                   | `Missing_verification_key ->
-                       `Missing_verification_key)
+                   | `Missing_verification_key keys ->
+                       `Missing_verification_key keys)
                |> Deferred.return
 
              let verify_blockchain_snarks _ = Deferred.return true

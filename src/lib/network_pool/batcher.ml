@@ -81,20 +81,20 @@ let rec determine_outcome :
               [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
             Ivar.fill elt.res (Ok (Error (`Invalid_keys keys))) ;
             None
-        | `Invalid_signature ->
+        | `Invalid_signature keys ->
             if Ivar.is_full elt.res then
               [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-            Ivar.fill elt.res (Ok (Error `Invalid_signature)) ;
+            Ivar.fill elt.res (Ok (Error (`Invalid_signature keys))) ;
+            None
+        | `Missing_verification_key keys ->
+            if Ivar.is_full elt.res then
+              [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+            Ivar.fill elt.res (Ok (Error (`Missing_verification_key keys))) ;
             None
         | `Invalid_proof ->
             if Ivar.is_full elt.res then
               [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
             Ivar.fill elt.res (Ok (Error `Invalid_proof)) ;
-            None
-        | `Missing_verification_key ->
-            if Ivar.is_full elt.res then
-              [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-            Ivar.fill elt.res (Ok (Error `Missing_verification_key)) ;
             None
         | `Potentially_invalid new_hint ->
             Some (elt, new_hint))
@@ -312,21 +312,21 @@ module Transaction_pool = struct
                 (* A diff is invalid is any of the transactions it contains are invalid.
                    Invalidate the whole diff that this transaction comes from. *)
                 result.(i) <- `Invalid_keys keys
-            | `Invalid_signature ->
+            | `Invalid_signature keys ->
                 (* Invalidate the whole diff *)
-                result.(i) <- `Invalid_signature
+                result.(i) <- `Invalid_signature keys
+            | `Missing_verification_key keys ->
+                (* Invalidate the whole diff *)
+                result.(i) <- `Missing_verification_key keys
             | `Invalid_proof ->
                 (* Invalidate the whole diff *)
                 result.(i) <- `Invalid_proof
-            | `Missing_verification_key ->
-                (* Invalidate the whole diff *)
-                result.(i) <- `Missing_verification_key
             | `Valid_assuming xs -> (
                 match result.(i) with
                 | `Invalid_keys _
-                | `Invalid_signature
+                | `Invalid_signature _
                 | `Invalid_proof
-                | `Missing_verification_key ->
+                | `Missing_verification_key _ ->
                     (* If this diff has already been declared invalid, knowing that one of its
                        transactions is partially valid is not useful. *)
                     ()
@@ -337,21 +337,21 @@ module Transaction_pool = struct
                 (* Similar to the above. *)
                 match result.(i) with
                 | `Invalid_keys _
-                | `Invalid_signature
+                | `Invalid_signature _
                 | `Invalid_proof
-                | `Missing_verification_key ->
+                | `Missing_verification_key _ ->
                     ()
                 | `In_progress a ->
                     a.(j) <- `Valid c )) ;
         list_of_array_map result ~f:(function
           | `Invalid_keys keys ->
               `Invalid_keys keys
-          | `Invalid_signature ->
-              `Invalid_signature
+          | `Invalid_signature keys ->
+              `Invalid_signature keys
           | `Invalid_proof ->
               `Invalid_proof
-          | `Missing_verification_key ->
-              `Missing_verification_key
+          | `Missing_verification_key keys ->
+              `Missing_verification_key keys
           | `In_progress a -> (
               (* If the diff is all valid, we're done. If not, we return a partial
                    result. *)

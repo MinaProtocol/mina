@@ -1165,7 +1165,14 @@ struct
                       ~data:c)
                 |> Map.map ~f:List.rev |> Map.to_alist
               in
-              let failure = ref (Ok ()) in
+              let failures = ref (Ok ()) in
+              let add_failure err =
+                match !failures with
+                | Ok () ->
+                    failures := Error [ err ]
+                | Error errs ->
+                    failures := Error (err :: errs)
+              in
               let%map diffs' =
                 Deferred.List.map by_sender ~how:`Parallel
                   ~f:(fun (signer, cs) ->
@@ -1203,7 +1210,7 @@ struct
                                    , u_acc ))
                           | c :: cs ->
                               let uc = User_command.of_verifiable c in
-                              if Result.is_error !failure then (
+                              if Result.is_error !failures then (
                                 Mutex.release signer_lock ;
                                 return (Error `Other_command_failed) )
                               else if
@@ -1229,8 +1236,7 @@ struct
                                                     (Verifier.invalid_to_string
                                                        invalid) )
                                               ] ;
-                                          failure :=
-                                            Error (Invalid_failure invalid) ;
+                                          add_failure (Invalid_failure invalid) ;
                                           None
                                       | Ok (Ok [ c ]) ->
                                           Some c
@@ -1249,7 +1255,7 @@ struct
                                         ~is_sender_local uc e
                                     with
                                     | `Reject ->
-                                        failure := Error (Command_failure e) ;
+                                        add_failure (Command_failure e) ;
                                         Mutex.release signer_lock ;
                                         return (Error `Invalid_command)
                                     | `Ignore ->
@@ -1291,16 +1297,20 @@ struct
                           (Indexed_pool.get_sender_local_state t.pool signer)
                           Indexed_pool.Update.empty [] [] cs)
               in
-              match !failure with
-              | Error err when not allow_failures_for_tests -> (
-                  match err with
-                  | Command_failure cmd_err ->
-                      Or_error.errorf "Diff failed with command error %s"
-                        (Yojson.Safe.to_string
-                           (Indexed_pool.Command_error.to_yojson cmd_err))
-                  | Invalid_failure invalid ->
-                      Or_error.errorf "Diff failed with verification failure %s"
-                        (Verifier.invalid_to_string invalid) )
+              match !failures with
+              | Error errs when not allow_failures_for_tests ->
+                  let errs_string =
+                    List.map errs ~f:(fun err ->
+                        match err with
+                        | Command_failure cmd_err ->
+                            Yojson.Safe.to_string
+                              (Indexed_pool.Command_error.to_yojson cmd_err)
+                        | Invalid_failure invalid ->
+                            Verifier.invalid_to_string invalid)
+                    |> String.concat ~sep:", "
+                  in
+                  Or_error.errorf "Diff failed with verification failure(s): %s"
+                    errs_string
               | Error _ | Ok () ->
                   let data =
                     List.filter_map diffs' ~f:(function

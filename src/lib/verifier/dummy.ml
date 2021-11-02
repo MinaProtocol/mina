@@ -40,12 +40,12 @@ let verify_commands _ (cs : User_command.Verifiable.t list) :
           `Valid c
       | `Invalid_keys keys ->
           `Invalid_keys keys
-      | `Invalid_signature ->
-          `Invalid_signature
+      | `Invalid_signature keys ->
+          `Invalid_signature keys
       | `Invalid_proof ->
           `Invalid_proof
-      | `Missing_verification_key ->
-          `Missing_verification_key)
+      | `Missing_verification_key keys ->
+          `Missing_verification_key keys)
   |> Deferred.Or_error.return
 
 let verify_transaction_snarks _ ts =
