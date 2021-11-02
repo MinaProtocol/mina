@@ -435,7 +435,6 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
           ~directory_name:location
       in
       [%log' info t.logger]
-      
         ~metadata:[ ("potential_snarked_ledger_hash", Frozen_ledger_hash.to_yojson @@ Frozen_ledger_hash.of_ledger_hash @@ Ledger.Db.merkle_root t.persistent_root_instance.snarked_ledger)] "Enqueued a snarked ledger" ;
       Persistent_root.Instance.enqueue_snarked_ledger ~location
         t.persistent_root_instance ;
