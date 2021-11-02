@@ -52,11 +52,11 @@ module Worker = struct
         "old root transition not found"
     | `Not_found (`Parent_transition hash) ->
         Printf.sprintf "parent transition %s not found"
-          (State_hash.to_string hash)
+          (State_hash.to_base58_check hash)
     | `Not_found `Best_tip ->
         "best tip not found"
     | `Not_found (`Arcs hash) ->
-        Printf.sprintf "arcs not found for %s" (State_hash.to_string hash)
+        Printf.sprintf "arcs not found for %s" (State_hash.to_base58_check hash)
 
   let apply_diff (type mutant) (t : t) (diff : mutant Diff.Lite.t) :
       (mutant, apply_diff_error) Result.t =
