@@ -271,9 +271,9 @@ module Graph_node = struct
   let name (t : t) =
     match t.state with
     | Root s ->
-        State_hash.to_string s |> Fn.flip String.suffix 7
+        State_hash.to_base58_check s |> Fn.flip String.suffix 7
     | Node s ->
-        State_hash.to_string s.current |> Fn.flip String.suffix 7
+        State_hash.to_base58_check s.current |> Fn.flip String.suffix 7
 
   let display (t : t) =
     let state = name t in

@@ -19,9 +19,9 @@ module type S = sig
   val merge : height:int -> t -> t -> t
 
   (** string representation of hash is Base58Check of bin_io representation *)
-  val to_string : t -> string
+  val to_base58_check : t -> string
 
-  val of_string : string -> t
+  val of_base58_check : string -> t Base.Or_error.t
 
   val empty_hash : t
 

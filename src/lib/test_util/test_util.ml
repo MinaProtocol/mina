@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Fold_lib
 
 module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
