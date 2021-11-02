@@ -1,4 +1,5 @@
 (executable
  (name delegation_verify)
- (libraries uptime_service core_kernel async mina_transition)
+ (libraries uptime_service core_kernel async mina_transition parallel)
+ (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_custom_printf h_list.ppx)))
