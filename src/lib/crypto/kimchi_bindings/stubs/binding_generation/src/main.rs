@@ -259,7 +259,7 @@ fn generate_bindings(mut w: impl std::io::Write) {
                 });
                 decl_module!(w, env, "Fq", {
                     decl_type!(w, env, CamlPastaFqPlonkGateVector => "t");
-                    decl_type_alias!(w, env, "elt" => CamlCircuitGate<CamlFp>);
+                    decl_type_alias!(w, env, "elt" => CamlCircuitGate<CamlFq>);
 
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_create => "create");
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_add => "add");
