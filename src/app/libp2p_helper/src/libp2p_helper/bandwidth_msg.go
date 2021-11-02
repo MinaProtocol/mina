@@ -1,4 +1,4 @@
-package main 
+package main
 
 import (
 	ipc "libp2p_ipc"
