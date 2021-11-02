@@ -10,8 +10,11 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
   - Only query the archive database on historical queries
   - If a GraphQL request to the daemon fails, try again but via the archive
     database
-  - Breaking change: If an account is not found via a historical query, return
-    an Account_not_found error
+  - Any lookup that relies on historical data will include new information in
+    metadata: `{ "created_via_historical_lookup": true }`
+  - Breaking change: If a balance lookup falls back to the database,
+    Account_not_founds are unable to be detected. Instead use typical historical
+    query behavior. If you depend on these errors, just make the request again.
   - Breaking change: If a lookup is performed via the historical query, omit
     the nonce. If you depend on the nonce, just make the (non-block-identifier)
     request again.
