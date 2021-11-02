@@ -1389,7 +1389,7 @@ let%test_module "Ledger_catchup tests" =
           Thread_safe.block_on_async_exn (fun () ->
               test_successful_catchup ~my_net ~target_best_tip_path))
 
-    let%test_unit "catchup succeeds even if the parent transition is already \
+    let%test_unit "catchups succeeds even if the parent transition is already \
                    in the frontier" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
