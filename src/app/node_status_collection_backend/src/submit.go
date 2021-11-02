@@ -13,10 +13,10 @@ import (
 )
 
 type App struct {
-	Log  *logging.ZapEventLogger
+	Log           *logging.ZapEventLogger
 	SubmitCounter *counter.AttemptCounter
-	Save func(misc.ObjectsToSave)
-	Now  misc.NowFunc
+	Save          func(misc.ObjectsToSave)
+	Now           misc.NowFunc
 }
 
 type SubmitH struct {
@@ -64,7 +64,7 @@ func (h *SubmitH) ServerHTTP(w http.ResponseWriter, r *http.Request) {
 	if req.Data.Timestamp.Add(TIME_DIFF_DELTA).After(submittedAt) {
 		h.app.Log.Debugf("Field timestamp is in future: %v", submittedAt)
 		w.WriteHeader(400)
-		misc.WriteErrorResponse(h.app.Log	, &w, "Field timestamp is in future")
+		misc.WriteErrorResponse(h.app.Log, &w, "Field timestamp is in future")
 		return
 	}
 

@@ -59,7 +59,6 @@ func ValidateContentLength(w http.ResponseWriter, r *http.Request, log *logging.
 	}
 	body, err := io.ReadAll(io.LimitReader(r.Body, r.ContentLength))
 	if err != nil || int64(len(body)) != r.ContentLength {
-		log.Debugf("Error while readinng /submit request's body:  %v", err)
 		w.WriteHeader(400)
 		WriteErrorResponse(log, &w, "Error readinng  the body")
 		return nil

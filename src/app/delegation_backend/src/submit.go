@@ -1,6 +1,8 @@
 package delegation_backend
 
 import (
+	"backend_utilities/counter"
+	"backend_utilities/misc"
 	"bytes"
 	"cloud.google.com/go/storage"
 	"context"
@@ -12,8 +14,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"backend_utilities/misc"
-	"backend_utilities/counter"
 )
 
 type App struct {
@@ -47,7 +47,7 @@ func makeSignPayload(req *submitRequestData) ([]byte, error) {
 	createdAtStr := req.CreatedAt.UTC().Format(time.RFC3339)
 	createdAtJson, err2 := json.Marshal(createdAtStr)
 	if err2 != nil {
-		return nil, err2	
+		return nil, err2
 	}
 	signPayload := new(BufferOrError)
 	signPayload.WriteString("{\"block\":")
