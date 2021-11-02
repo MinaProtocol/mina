@@ -515,12 +515,12 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the source ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.source; _ } ->
-              Frozen_ledger_hash.to_string source)
+              Frozen_ledger_hash.to_base58_check source)
         ; field "targetLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the target ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.target; _ } ->
-              Frozen_ledger_hash.to_string target)
+              Frozen_ledger_hash.to_base58_check target)
         ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \
@@ -594,7 +594,7 @@ module Types = struct
               let snarked_ledger_hash =
                 Mina_state.Blockchain_state.snarked_ledger_hash blockchain_state
               in
-              Frozen_ledger_hash.to_string snarked_ledger_hash)
+              Frozen_ledger_hash.to_base58_check snarked_ledger_hash)
         ; field "stagedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the staged ledger"
             ~args:Arg.[]
@@ -603,7 +603,7 @@ module Types = struct
               let staged_ledger_hash =
                 Mina_state.Blockchain_state.staged_ledger_hash blockchain_state
               in
-              Mina_base.Ledger_hash.to_string
+              Mina_base.Ledger_hash.to_base58_check
               @@ Staged_ledger_hash.ledger_hash staged_ledger_hash)
         ; field "stagedLedgerProofEmitted" ~typ:bool
             ~doc:
@@ -1029,7 +1029,7 @@ module Types = struct
                  ~doc:"Top hash of the receipt chain merkle-list"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   Option.map ~f:Receipt.Chain_hash.to_string
+                   Option.map ~f:Receipt.Chain_hash.to_base58_check
                      account.Account.Poly.receipt_chain_hash)
              ; field "delegate" ~typ:public_key
                  ~doc:

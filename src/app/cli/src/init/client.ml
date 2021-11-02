@@ -1197,7 +1197,7 @@ let pending_snark_work =
                       Array.map bundle#workBundle ~f:(fun w ->
                           let f = w#fee_excess in
                           let hash_of_string =
-                            Mina_base.Frozen_ledger_hash.of_string
+                            Mina_base.Frozen_ledger_hash.of_base58_check_exn
                           in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id = w#work_id

@@ -54,10 +54,6 @@ module type Basic = sig
 
   [%%endif]
 
-  val to_string : t -> string
-
-  val of_string : string -> t
-
   val to_base58_check : t -> string
 
   val of_base58_check : string -> t Base.Or_error.t
