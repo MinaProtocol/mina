@@ -11,10 +11,10 @@ use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 
-use plonk_15_wires_circuits::expr::Linearization;
-use plonk_15_wires_circuits::nolookup::constraints::{zk_polynomial, zk_w3, Shifts};
-use plonk_15_wires_circuits::wires::{COLUMNS, PERMUTS};
-use plonk_15_wires_protocol_dlog::index::VerifierIndex;
+use kimchi::index::VerifierIndex;
+use kimchi_circuits::expr::Linearization;
+use kimchi_circuits::nolookup::constraints::{zk_polynomial, zk_w3, Shifts};
+use kimchi_circuits::wires::{COLUMNS, PERMUTS};
 use std::convert::TryInto;
 use std::path::Path;
 

@@ -1,6 +1,6 @@
 //! A GateVector: this is used to represent a list of gates.
 
-use plonk_15_wires_circuits::{
+use kimchi_circuits::{
     gate::{caml::CamlCircuitGate, CircuitGate},
     wires::caml::CamlWire,
 };
