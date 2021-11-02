@@ -116,7 +116,7 @@ RUN mkdir --mode=700 ~/.gnupg \
 # Ocaml install of a given OCAML_VERSION via opam switch
 # additionally initializes opam with sandboxing disabled, as we did not install bubblewrap above.
 RUN git clone \
-  ssh://git@github.com:ocaml/opam-repository \
+  ssh://git@github.com:ocaml/opam-repository.git \
   --depth 1 \
   /home/opam/opam-repository \
   && opam init --disable-sandboxing -k git -a ~/opam-repository --bare \
