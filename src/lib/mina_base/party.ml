@@ -364,11 +364,20 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('pk, 'update, 'token_id, 'amount, 'events, 'call_data, 'int) t =
+        type ( 'pk
+             , 'update
+             , 'token_id
+             , 'amount
+             , 'events
+             , 'call_data
+             , 'int
+             , 'bool )
+             t =
           { pk : 'pk
           ; update : 'update
           ; token_id : 'token_id
           ; delta : 'amount
+          ; increment_nonce : 'bool
           ; events : 'events
           ; sequence_events : 'events
           ; call_data : 'call_data
@@ -392,7 +401,8 @@ module Body = struct
         , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         , Pickles.Backend.Tick.Field.Stable.V1.t array list
         , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
-        , int )
+        , int
+        , bool )
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -400,8 +410,12 @@ module Body = struct
     end
   end]
 
-  (* Delta for the fee payer is always going to be Neg, so represent it using an unsigned fee,
-     token id is always going to be the default, so use unit value as a placeholder
+  (* * Delta for the fee payer is always going to be Neg, so represent it using
+       an unsigned fee,
+     * token id is always going to be the default, so use unit value as a
+       placeholder,
+     * increment nonce must always be true for a fee payer, so use unit as a
+       placeholder.
   *)
   module Fee_payer = struct
     [%%versioned
@@ -414,7 +428,8 @@ module Body = struct
           , Fee.Stable.V1.t
           , Pickles.Backend.Tick.Field.Stable.V1.t array list
           , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
-          , int )
+          , int
+          , unit )
           Poly.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -427,6 +442,7 @@ module Body = struct
       ; update = Update.dummy
       ; token_id = ()
       ; delta = Fee.zero
+      ; increment_nonce = ()
       ; events = []
       ; sequence_events = []
       ; call_data = Field.zero
@@ -438,6 +454,7 @@ module Body = struct
     { t with
       delta = { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.delta }
     ; token_id = Token_id.default
+    ; increment_nonce = true
     }
 
   module Checked = struct
@@ -448,7 +465,8 @@ module Body = struct
       , Amount.Signed.var
       , Events.var
       , Field.Var.t
-      , int As_prover.Ref.t )
+      , int As_prover.Ref.t
+      , Boolean.var )
       Poly.t
 
     let to_input
@@ -456,6 +474,7 @@ module Body = struct
          ; update
          ; token_id
          ; delta
+         ; increment_nonce
          ; events
          ; sequence_events
          ; call_data
@@ -467,6 +486,7 @@ module Body = struct
         ; Update.Checked.to_input update
         ; Impl.run_checked (Token_id.Checked.to_input token_id)
         ; Amount.Signed.Checked.to_input delta
+        ; Random_oracle_input.bitstring [ increment_nonce ]
         ; Events.var_to_input events
         ; Events.var_to_input sequence_events
         ; Random_oracle_input.field call_data
@@ -484,6 +504,7 @@ module Body = struct
       ; Update.typ ()
       ; Token_id.typ
       ; Amount.Signed.typ
+      ; Boolean.typ
       ; Events.typ
       ; Events.typ
       ; Field.typ
@@ -497,6 +518,7 @@ module Body = struct
     ; update = Update.dummy
     ; token_id = Token_id.default
     ; delta = Amount.Signed.zero
+    ; increment_nonce = false
     ; events = []
     ; sequence_events = []
     ; call_data = Field.zero
@@ -508,6 +530,7 @@ module Body = struct
        ; update
        ; token_id
        ; delta
+       ; increment_nonce
        ; events
        ; sequence_events
        ; call_data
@@ -519,6 +542,7 @@ module Body = struct
       ; Update.to_input update
       ; Token_id.to_input token_id
       ; Amount.Signed.to_input delta
+      ; Random_oracle_input.bitstring [ increment_nonce ]
       ; Events.to_input events
       ; Events.to_input sequence_events
       ; Random_oracle_input.field call_data
