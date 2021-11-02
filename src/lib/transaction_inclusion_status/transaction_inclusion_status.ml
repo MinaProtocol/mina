@@ -26,11 +26,10 @@ end
 let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
   let open Or_error.Let_syntax in
   let%map check_cmd =
-    Result.of_option (Signed_command.check cmd)
+    Result.of_option (User_command.check cmd)
       ~error:(Error.of_string "Invalid signature")
     |> Result.map ~f:(fun x ->
-           Transaction_hash.User_command_with_valid_signature.create
-             (Signed_command x))
+           Transaction_hash.User_command_with_valid_signature.create x)
   in
   let resource_pool = Transaction_pool.resource_pool transaction_pool in
   match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
@@ -44,14 +43,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
           let in_breadcrumb breadcrumb =
             List.exists (Transition_frontier.Breadcrumb.commands breadcrumb)
               ~f:(fun { data = cmd'; _ } ->
-                match cmd' with
-                | Parties _ ->
-                    let `Needs_some_work_for_snapps_on_mainnet =
-                      Mina_base.Util.todo_snapps
-                    in
-                    false
-                | Signed_command cmd' ->
-                    Signed_command.equal cmd (Signed_command.forget_check cmd'))
+                User_command.equal cmd (User_command.forget_check cmd'))
           in
           if List.exists ~f:in_breadcrumb best_tip_path then
             return State.Included ;
@@ -107,6 +99,7 @@ let%test_module "transaction_status" =
       Transition_frontier.For_tests.gen ~logger ~precomputed_values ~verifier
         ~trust_system ~max_length ~size:frontier_size ()
 
+    (*TODO: Generate snapp txns*)
     let gen_user_command =
       Signed_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~fee_range:10
         ~key_gen ~nonce:(Account_nonce.of_int 1) ()
@@ -164,7 +157,7 @@ let%test_module "transaction_status" =
               [%test_eq: State.t] ~equal:State.equal State.Unknown
                 ( Or_error.ok_exn
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool
-                     user_command )))
+                     (Signed_command user_command) )))
 
     let%test_unit "A pending transaction is either in the transition frontier \
                    or transaction pool, but not in the best path of the \
@@ -187,7 +180,7 @@ let%test_module "transaction_status" =
               let status =
                 Or_error.ok_exn
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool
-                     user_command
+                     (Signed_command user_command)
               in
               [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Pending status))
@@ -227,5 +220,5 @@ let%test_module "transaction_status" =
               [%test_eq: State.t] ~equal:State.equal State.Unknown
                 ( Or_error.ok_exn
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool
-                     unknown_user_command )))
+                     (Signed_command unknown_user_command) )))
   end )

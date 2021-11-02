@@ -1415,7 +1415,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           match u with Keep -> x | Set x -> x)
     in
     let%bind token_symbol =
-      update a.permissions.set_snapp_uri token_symbol a.token_symbol
+      update a.permissions.set_token_symbol token_symbol a.token_symbol
         ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
           match u with Keep -> x | Set x -> x)
     in

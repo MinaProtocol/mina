@@ -4760,27 +4760,50 @@ module Queries = struct
                Ledger.token_owner ledger token))
 
   let transaction_status =
-    result_field "transactionStatus" ~doc:"Get the status of a transaction"
+    result_field2 "transactionStatus" ~doc:"Get the status of a transaction"
       ~typ:(non_null Types.transaction_status)
       ~args:
-        Arg.[ arg "payment" ~typ:(non_null guid) ~doc:"Id of a UserCommand" ]
-      ~resolve:(fun { ctx = coda; _ } () serialized_payment ->
+        Arg.
+          [ arg "payment" ~typ:guid ~doc:"Id of a Payment"
+          ; arg "snappTransaction" ~typ:guid ~doc:"Id of a snapp transaction"
+          ]
+      ~resolve:
+        (fun { ctx = coda; _ } () (serialized_payment : string option)
+             (serialized_snapp : string option) ->
         let open Result.Let_syntax in
-        let deserialize_payment serialized_payment =
-          result_of_or_error
-            (Signed_command.of_base58_check serialized_payment)
-            ~error:"Invalid payment provided"
+        let deserialize_txn serialized_txn =
+          let res =
+            match serialized_txn with
+            | `Signed_command x ->
+                Or_error.(
+                  Signed_command.of_base58_check x
+                  >>| fun c -> User_command.Signed_command c)
+            | `Parties ps ->
+                Or_error.(
+                  Parties.of_base58_check ps >>| fun c -> User_command.Parties c)
+          in
+          result_of_or_error res ~error:"Invalid transaction provided"
           |> Result.map ~f:(fun cmd ->
                  { With_hash.data = cmd
-                 ; hash = Transaction_hash.hash_command (Signed_command cmd)
+                 ; hash = Transaction_hash.hash_command cmd
                  })
         in
-        let%bind payment = deserialize_payment serialized_payment in
+        let%bind txn =
+          match (serialized_payment, serialized_snapp) with
+          | None, None | Some _, Some _ ->
+              Error
+                "Invalid query: Specify either a payment ID or a snapp \
+                 transaction ID"
+          | Some payment, None ->
+              deserialize_txn (`Signed_command payment)
+          | None, Some snapp_txn ->
+              deserialize_txn (`Parties snapp_txn)
+        in
         let frontier_broadcast_pipe = Mina_lib.transition_frontier coda in
         let transaction_pool = Mina_lib.transaction_pool coda in
         Result.map_error
           (Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
-             ~transaction_pool payment.data)
+             ~transaction_pool txn.data)
           ~f:Error.to_string_hum)
 
   let current_snark_worker =
