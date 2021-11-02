@@ -255,32 +255,6 @@ let create_expected_statement ~constraint_constants
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
   let empty_local_state = Mina_state.Local_state.empty in
   let%bind after =
-    (*match transaction with
-      | Command (Parties p) ->
-          let%map _applied_txn, states =
-            Sparse_ledger.apply_parties_unchecked_with_states ~state_view
-              ~fee_excess:Amount.Signed.zero ~constraint_constants ledger_witness
-              p
-          in
-          (*should at least have fee payer party and therefore the state after applying it*)
-          let _global_state, local_state = List.last_exn states in
-          let after = local_state.ledger in
-          let transaction_commitment = Parties.commitment p in
-          let hash_parties_stack ps =
-            ps |> Parties.Party_or_stack.accumulate_hashes'
-            |> List.map ~f:(Parties.Party_or_stack.map ~f:(fun p -> (p, ())))
-            |> Parties.Party_or_stack.stack_hash
-          in
-          ( after
-          , { local_state with
-              Parties_logic.Local_state.parties =
-                hash_parties_stack local_state.parties
-            ; call_stack = hash_parties_stack local_state.call_stack
-            ; ledger = source_merkle_root (*updated later*)
-            ; transaction_commitment
-            } )
-      | _ ->
-    *)
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction_exn ~constraint_constants
           ~txn_state_view:state_view ledger_witness transaction)

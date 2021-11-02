@@ -101,26 +101,18 @@ module Inputs = struct
                               ~fee_excess:Currency.Amount.Signed.zero
                               ~pending_coinbase_init_stack:w.init_stack
                               (`Sparse_ledger w.ledger) [ parties ]
+                            |> List.rev
                           in
                           let deferred_or_error d =
                             Deferred.map d ~f:(fun p -> Ok p)
                           in
-                          Core.printf
-                            !"witnesses %{sexp: \
-                              (Transaction_witness.Parties_segment_witness.t *\n\
-                             \ Transaction_snark.Parties_segment.Basic.t *\n\
-                             \ Transaction_snark.Statement.With_sok.t * (int * \
-                              Snapp_statement.t) list)\n\
-                              list}\n\
-                              %!"
-                            witnesses_specs_stmts ;
                           Deferred.Or_error.try_with_join ~here:[%here]
                             (fun () ->
-                              match List.rev witnesses_specs_stmts with
+                              match witnesses_specs_stmts with
                               | [] ->
                                   failwith "no witnesses generated"
                               | ((witness, spec, stmt, _) as w) :: rest ->
-                                  Core.printf
+                                  [%log info]
                                     !"current witness \
                                       %{sexp:(Transaction_witness.Parties_segment_witness.t*Transaction_snark.Parties_segment.Basic.t*Transaction_snark.Statement.With_sok.t* \
                                       (int * Snapp_statement.t) list)}\n\n\
@@ -136,7 +128,7 @@ module Inputs = struct
                                     Deferred.List.fold ~init:(Ok p1) rest
                                       ~f:(fun acc ((witness, spec, stmt, _) as w)
                                          ->
-                                        Core.printf
+                                        [%log info]
                                           !"current witness \
                                             %{sexp:(Transaction_witness.Parties_segment_witness.t*Transaction_snark.Parties_segment.Basic.t*Transaction_snark.Statement.With_sok.t* \
                                             (int * Snapp_statement.t) list)}\n\n\
@@ -152,7 +144,7 @@ module Inputs = struct
                                             ~witness ~spec
                                           |> deferred_or_error
                                         in
-                                        Core.printf
+                                        [%log info]
                                           !"Merge left %{sexp: \
                                             Transaction_snark.Statement.t} \
                                             right %{sexp: \
