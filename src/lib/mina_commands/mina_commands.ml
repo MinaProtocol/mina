@@ -174,8 +174,6 @@ let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
       !"Merkle list proof does not contain payment %{sexp:User_command.t}"
       verifying_txn
 
-let start_time = Time_ns.now ()
-
 type active_state_fields =
   { num_accounts : int option
   ; blockchain_length : int option
@@ -195,7 +193,7 @@ let get_status ~flag t =
   let constraint_constants = precomputed_values.constraint_constants in
   let consensus_constants = precomputed_values.consensus_constants in
   let uptime_secs =
-    Time_ns.diff (Time_ns.now ()) start_time
+    Time_ns.diff (Time_ns.now ()) Mina_lib.daemon_start_time
     |> Time_ns.Span.to_sec |> Int.of_float
   in
   let commit_id = Mina_version.commit_id in
@@ -291,7 +289,7 @@ let get_status ~flag t =
     let open Participating_state.Let_syntax in
     let%bind ledger = Mina_lib.best_ledger t in
     let ledger_merkle_root =
-      Ledger.merkle_root ledger |> Ledger_hash.to_string
+      Ledger.merkle_root ledger |> Ledger_hash.to_base58_check
     in
     let num_accounts = Ledger.num_accounts ledger in
     let%bind state = Mina_lib.best_protocol_state t in

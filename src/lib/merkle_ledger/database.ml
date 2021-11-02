@@ -121,8 +121,16 @@ module Make (Inputs : Inputs_intf) :
   let get_raw { kvdb; depth; _ } location =
     Kvdb.get kvdb ~key:(Location.serialize ~ledger_depth:depth location)
 
+  let get_raw_batch { kvdb; depth; _ } locations =
+    let keys = List.map locations ~f:(Location.serialize ~ledger_depth:depth) in
+    Kvdb.get_batch kvdb ~keys
+
   let get_bin mdb location bin_read =
     get_raw mdb location |> Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0))
+
+  let get_bin_batch mdb locations bin_read =
+    get_raw_batch mdb locations
+    |> List.map ~f:(Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0)))
 
   let delete_raw { kvdb; depth; _ } location =
     Kvdb.remove kvdb ~key:(Location.serialize ~ledger_depth:depth location)
@@ -130,6 +138,10 @@ module Make (Inputs : Inputs_intf) :
   let get mdb location =
     assert (Location.is_account location) ;
     get_bin mdb location Account.bin_read_t
+
+  let get_batch mdb locations =
+    assert (List.for_all locations ~f:Location.is_account) ;
+    List.zip_exn locations (get_bin_batch mdb locations Account.bin_read_t)
 
   let get_hash mdb location =
     assert (Location.is_hash location) ;
@@ -199,6 +211,10 @@ module Make (Inputs : Inputs_intf) :
     assert (Location.is_generic location) ;
     get_raw mdb location
 
+  let get_generic_batch mdb locations =
+    assert (List.for_all locations ~f:Location.is_generic) ;
+    get_raw_batch mdb locations
+
   module Account_location = struct
     (** encodes a key, token_id pair as a location used as a database key, so
         we can find the account location associated with that key.
@@ -223,6 +239,18 @@ module Make (Inputs : Inputs_intf) :
       | Some location_bin ->
           Location.parse ~ledger_depth:mdb.depth location_bin
           |> Result.map_error ~f:(fun () -> Db_error.Malformed_database)
+
+    let get_batch mdb keys =
+      let parse_location bin =
+        match Location.parse ~ledger_depth:mdb.depth bin with
+        | Ok loc ->
+            Some loc
+        | Error () ->
+            None
+      in
+      List.map keys ~f:build_location
+      |> get_generic_batch mdb
+      |> List.map ~f:(Option.bind ~f:parse_location)
 
     let delete mdb key = delete_raw mdb (build_location key)
 
@@ -455,6 +483,9 @@ module Make (Inputs : Inputs_intf) :
         None
     | Ok location ->
         Some location
+
+  let location_of_account_batch t keys =
+    List.zip_exn keys (Account_location.get_batch t keys)
 
   let last_filled t = Account_location.last_location t
 

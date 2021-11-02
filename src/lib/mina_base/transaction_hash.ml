@@ -1,5 +1,7 @@
 open Core_kernel
 
+[%%import "/src/config.mlh"]
+
 module T = struct
   include Blake2.Make ()
 end
@@ -26,6 +28,11 @@ let of_yojson = function
            format")
   | _ ->
       Error "Transaction_hash.of_yojson: Expected a string"
+
+let hash_signed_command =
+  Fn.compose digest_string Signed_command.to_base58_check
+
+[%%ifdef consensus_mechanism]
 
 let hash_command = Fn.compose digest_string User_command.to_base58_check
 
@@ -118,3 +125,5 @@ module User_command = struct
 
   include Comparable.Make (Stable.Latest)
 end
+
+[%%endif]
