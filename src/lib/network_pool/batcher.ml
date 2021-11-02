@@ -86,15 +86,15 @@ let rec determine_outcome :
               [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
             Ivar.fill elt.res (Ok (Error (`Invalid_signature keys))) ;
             None
-        | `Missing_verification_key keys ->
-            if Ivar.is_full elt.res then
-              [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-            Ivar.fill elt.res (Ok (Error (`Missing_verification_key keys))) ;
-            None
         | `Invalid_proof ->
             if Ivar.is_full elt.res then
               [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
             Ivar.fill elt.res (Ok (Error `Invalid_proof)) ;
+            None
+        | `Missing_verification_key keys ->
+            if Ivar.is_full elt.res then
+              [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+            Ivar.fill elt.res (Ok (Error (`Missing_verification_key keys))) ;
             None
         | `Potentially_invalid new_hint ->
             Some (elt, new_hint))

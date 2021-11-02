@@ -5,9 +5,9 @@ type invalid =
   [ `Invalid_keys of Signature_lib.Public_key.Compressed.Stable.Latest.t list
   | `Invalid_signature of
     Signature_lib.Public_key.Compressed.Stable.Latest.t list
+  | `Invalid_proof
   | `Missing_verification_key of
-    Signature_lib.Public_key.Compressed.Stable.Latest.t list
-  | `Invalid_proof ]
+    Signature_lib.Public_key.Compressed.Stable.Latest.t list ]
 [@@deriving bin_io_unversioned]
 
 let invalid_to_string (invalid : invalid) =
