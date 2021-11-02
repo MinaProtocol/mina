@@ -4,6 +4,18 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2021/11/01:
+
+- Reorganize `/account/balance` for performance:
+  - Only query the archive database on historical queries
+  - If a GraphQL request to the daemon fails, try again but via the archive
+    database
+  - Breaking change: If an account is not found via a historical query, return
+    an Account_not_found error
+  - Breaking change: If a lookup is performed via the historical query, omit
+    the nonce. If you depend on the nonce, just make the (non-block-identifier)
+    request again.
+
 2021/10/27:
 
 - Adds memo to construction in the same way as `valid_until`. To use a memo, add the `memo` field to the metadata next to `valid_until` and give it a string, like `"memo": "hello"`. The string must be small -- it is limited to less than 32 bytes.
