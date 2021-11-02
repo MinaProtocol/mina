@@ -16,15 +16,15 @@ spec:
         testnet: {{ .Values.testnetName }}
         role: seed
         class: "generic-node"
-        version: {{ .Values.image.tag}}
+        version: {{ .Values.image.tag | quote }}
         syncStatus: INIT
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: {{ .Values.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      {{- if .Values.libp2p.staticKeypair.enabled }}
       initContainers:
-      {{- if .Values.libp2p.enabled -}}
       - name: libp2p-init-my-service
         image: busybox:1.28
         command: [ 'bash', '-c', '/bin/cp /libp2p-keys/* /root/libp2p-keys && /bin/chmod -R 0700 /root/libp2p-keys/' ]
@@ -32,75 +32,64 @@ spec:
       - name: source-libp2p-keys
         mountPath: /libp2p-keys
       - name: destination-libp2p
-        mountPath: /root/libp2p-keys       
+        mountPath: /root/libp2p-keys
+      {{- end }}
       containers:
-      - name: features
+      - name: daemon
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- if .Values.features.customEntrypoint.enabled }}
+        command: [ {{ .Values.features.customEntrypoint.command }} ]
+        {{- end }}
         resources:
           limits:
           requests:
-            memory: 32.0Gi
-            cpu: 12.0
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag  }}"
-        {{- if .Values.features.customEntrypoint.enabled -}}
-        command: [{{ .Values.features.customEntrypoint.command }}]
-        {{- end }}
-        args: 
-        - daemon
+            memory: "32Gi"
+            cpu: "12"
+        args:
+        - "daemon"
         - "--log-level"
         - "Debug"
         - "--log-json"
-        - "-log-snark-work-gossip" 
+        - "--log-snark-work-gossip"
         - "true"
-        - "-config-directory" 
+        - "--config-directory"
         - "/root/.features-config"
-        - "-client-port" 
+        - "--client-port"
         - "$(DAEMON_CLIENT_PORT)"
-        - "-rest-port" 
+        - "--rest-port"
         - "$(DAEMON_REST_PORT)"
-        - "-external-port"
+        - "--external-port"
         - "$(DAEMON_EXTERNAL_PORT)"
-        - "-metrics-port"
+        - "--metrics-port"
         - "$(DAEMON_METRICS_PORT)"
-        - "-enable-peer-exchange" 
+        - "--enable-peer-exchange"
         - "true"
-        - "--discovery-keypair" 
+        - "--discovery-keypair"
         - "/root/libp2p-keys/key"
-          {{- if .Values.libp2p.seed.enabled }}
-          - "-seed"
-          - "true"
-          {{- end }}
-          {{- if .Values.libp2p.loadBalancer.enabled }}
-          - "type = LoadBalancer"
-          {{else}}
-          - "type = ClusterIP"
-          {{- end }}
-          {{- if .Values.features.runtimeConfig.enabled }}
-          - "-config-file"
-          - "/config/daemon.json"
-          {{- end }}
-          {{- if .Values.features.logPrecomputedBlocks.enabled }}
-          - "-log-precomputed-blocks"
-          - "true"
-          {{- end -}}
-          {{- if .Values.features.logTxnPoolGossip.enabled }}
-          - "-log-txn-pool-gossip"
-          - "true"
-          {{- end -}}
-          {{- if .Values.features.maxConnections }}
-          - "--max-connections"
-          {{ .Values.features.maxConnections | quote }}
-          {{- end -}}
-          {{- range .Values.features.seedPeers }}
-          - "-peer" 
-          {{ . | quote }}
-          {{- end }}
-          - "-generate-genesis-proof" 
-          {{ .Values.features.generateGenesisProof.enabled | quote }}
-          {{-  if .Values.features.uploadBlocksToGCloud.enabled }}
-          - "-upload-blocks-to-gcloud"
-          - "true"
-          {{- end }}
-        
+        {{- if .Values.libp2p.seed.enabled }}
+        - "--seed"
+        {{- end }}
+        {{- if .Values.features.runtimeConfig.enabled }}
+        - "-config-file"
+        - "/config/daemon.json"
+        {{- end }}
+        {{- if .Values.features.logTxnPoolGossip.enabled }}
+        - "-log-txn-pool-gossip"
+        - "true"
+        {{- end }}
+        {{- if .Values.features.maxConnections }}
+        - "--max-connections"
+        - {{ .Values.features.maxConnections | quote }}
+        {{- end }}
+        {{- range .Values.features.seedPeers }}
+        - "-peer"
+        - {{ . | quote }}
+        {{- end }}
+        {{-  if .Values.features.uploadBlocksToGCloud.enabled }}
+        - "-upload-blocks-to-gcloud"
+        - "true"
+        {{- end }}
         env:
         - name: RAYON_NUM_THREADS
           value: "6"
@@ -138,10 +127,6 @@ spec:
           protocol: TCP
           containerPort: {{ .Values.ports.p2p }}
           hostPort: {{ .Values.ports.external }}
-
-{{$data := dict "name" .Values.name "healthcheck" .Values.healthcheck }}
-{{- include "healthcheck.seed.allChecks" $data | indent 8 }}
-        imagePullPolicy: Always
         volumeMounts:
         {{- if .Values.features.uploadBlocksToGCloud.enabled }}
         - name: gcloud-keyfile
@@ -176,7 +161,11 @@ kind: Service
 metadata:
   name: {{ .Values.name  }}-graphql
 spec:
+  {{- if .Values.libp2p.loadBalancer.enabled }}
+  type: LoadBalancer
+  {{- else}}
   type: ClusterIP
+  {{- end }}
   publishNotReadyAddresses: true
   selector:
     app: {{ .Values.name  }}
