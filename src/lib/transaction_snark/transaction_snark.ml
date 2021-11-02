@@ -499,8 +499,7 @@ let chain if_ b ~then_ ~else_ =
 module Parties_segment = struct
   module Spec = struct
     type single =
-      { predicate_type : [ `Full | `Nonce_or_accept ]
-      ; auth_type : Control.Tag.t
+      { auth_type : Control.Tag.t
       ; is_start : [ `Yes | `No | `Compute_in_circuit ]
       }
 
@@ -536,11 +535,9 @@ module Parties_segment = struct
       | _ ->
           failwith "Parties_segment.Basic.of_controls: Unsupported combination"
 
-    let opt_signed ~is_start : Spec.single =
-      { predicate_type = `Full; auth_type = Signature; is_start }
+    let opt_signed ~is_start : Spec.single = { auth_type = Signature; is_start }
 
-    let unsigned : Spec.single =
-      { predicate_type = `Full; auth_type = None_given; is_start = `No }
+    let unsigned : Spec.single = { auth_type = None_given; is_start = `No }
 
     let opt_signed = opt_signed ~is_start:`Compute_in_circuit
 
@@ -554,7 +551,7 @@ module Parties_segment = struct
       | Opt_signed ->
           [ opt_signed ]
       | Proved ->
-          [ { predicate_type = `Full; auth_type = Proof; is_start = `No } ]
+          [ { auth_type = Proof; is_start = `No } ]
 
     type (_, _, _, _) t_typed =
       (* Corresponds to payment *)
@@ -578,7 +575,7 @@ module Parties_segment = struct
       | Opt_signed ->
           [ opt_signed ]
       | Proved ->
-          [ { predicate_type = `Full; auth_type = Proof; is_start = `No } ]
+          [ { auth_type = Proof; is_start = `No } ]
   end
 
   module Witness = Transaction_witness.Parties_segment_witness
@@ -1534,7 +1531,7 @@ module Base = struct
     module Single (I : Single_inputs) = struct
       open I
 
-      let { predicate_type; auth_type; is_start } = spec
+      let { auth_type; is_start } = spec
 
       module V = Prover_value
       open Impl
@@ -1660,25 +1657,8 @@ module Base = struct
                   (p.data.body, h))
             in
             let predicate : Party.Predicate.Checked.t =
-              match predicate_type with
-              | `Nonce_or_accept ->
-                  let nonce, accept =
-                    exists (Typ.tuple2 Account.Nonce.typ Boolean.typ)
-                      ~compute:(fun () ->
-                        match (V.get first_party).data.predicate with
-                        | Nonce n ->
-                            (n, false)
-                        | Accept ->
-                            (Account.Nonce.zero, true)
-                        | Full _ ->
-                            failwith
-                              "first party should have nonce as predicate")
-                  in
-                  Nonce_or_accept { nonce; accept }
-              | `Full ->
-                  Full
-                    (exists (Party.Predicate.typ ()) ~compute:(fun () ->
-                         (V.get first_party).data.predicate))
+              exists (Party.Predicate.typ ()) ~compute:(fun () ->
+                  (V.get first_party).data.predicate)
             in
             let auth =
               V.(create (fun () -> (V.get first_party).authorization))
@@ -1892,14 +1872,9 @@ module Base = struct
           ->
             Snapp_predicate.Protocol_state.Checked.check
               protocol_state_predicate global_state.protocol_state
-        | Check_predicate (_is_start, { party; _ }, account, _global) -> (
-            match party.data.predicate with
-            | Nonce_or_accept { nonce; accept } ->
-                Boolean.( || ) accept
-                  (run_checked
-                     (Account.Nonce.Checked.equal nonce account.data.nonce))
-            | Full p ->
-                Snapp_predicate.Account.Checked.check p account.data )
+        | Check_predicate (_is_start, { party; _ }, account, _global) ->
+            Snapp_predicate.Account.Checked.check party.data.predicate
+              account.data
         | Set_account ((_root, ledger), a, incl) ->
             ( implied_root a incl |> Ledger_hash.var_of_hash_packed
             , V.map ledger
