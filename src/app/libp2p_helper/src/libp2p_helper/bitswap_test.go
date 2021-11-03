@@ -202,7 +202,7 @@ func confirmBlocksNotInStorage(bs *BitswapCtx, resource []byte) error {
 			return nil
 		})
 		if err == nil {
-			return fmt.Errorf("block %s wasn't deleted", codanet.BlockHashToCid(h))
+			return fmt.Errorf("block %s wasn't deleted", codanet.BlockHashToCidSuffix(h))
 		} else if err != blockstore.ErrNotFound {
 			return err
 		}
@@ -221,7 +221,7 @@ func confirmBlocksInStorage(bs *BitswapCtx, resource []byte) error {
 			if bytes.Equal(b, actualB) {
 				return nil
 			}
-			return fmt.Errorf("wrong block body for %s", codanet.BlockHashToCid(h))
+			return fmt.Errorf("wrong block body for %s", codanet.BlockHashToCidSuffix(h))
 		})
 		if err != nil {
 			return err

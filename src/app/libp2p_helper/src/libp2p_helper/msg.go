@@ -363,7 +363,7 @@ func mkStreamMessageReceivedUpcall(streamIdx uint64, data []byte) *capnp.Message
 	})
 }
 
-func mkResourceUpdatedUpcall(type_ ipc.ResourceUpdateType, rootIds []BitswapBlockLink) *capnp.Message {
+func mkResourceUpdatedUpcall(type_ ipc.ResourceUpdateType, rootIds []root) *capnp.Message {
 	return mkPushMsg(func(m ipc.DaemonInterface_PushMessage) {
 		im, err := m.NewResourceUpdated()
 		panicOnErr(err)
