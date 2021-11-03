@@ -216,7 +216,8 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t) =
   Core.printf "Updated accounts\n" ;
   List.iter (Ledger.to_list ledger) ~f:(fun acc ->
       Core.printf "Account: %s\n%!"
-        (Account.to_yojson acc |> Yojson.Safe.to_string)) ;
+        ( Genesis_ledger_helper_lib.Accounts.Single.of_account acc None
+        |> Runtime_config.Accounts.Single.to_yojson |> Yojson.Safe.to_string )) ;
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
       ~protocol_constants:Genesis_constants.compiled.protocol
