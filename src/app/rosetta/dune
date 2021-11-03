@@ -2,7 +2,6 @@
  (package rosetta)
  (name rosetta)
  (public_name rosetta)
- (modules rosetta)
  (modes native)
  (libraries lib)
  (instrumentation (backend bisect_ppx))

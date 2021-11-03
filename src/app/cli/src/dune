@@ -4,7 +4,6 @@
  (package cli)
  (name mina)
  (public_name mina)
- (modules mina)
  (modes native)
  (libraries mina_cli_entrypoint)
  (instrumentation (backend bisect_ppx))
