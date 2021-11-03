@@ -65,6 +65,8 @@ spec:
         - "$(DAEMON_METRICS_PORT)"
         - "--enable-peer-exchange"
         - "true"
+        - "--peer-list-url"
+        - "https://storage.googleapis.com/seed-lists/{{ .Values.testnetName }}_seeds.txt"
         - "--discovery-keypair"
         - "/root/libp2p-keys/key"
         {{- if .Values.libp2p.seed.enabled }}
