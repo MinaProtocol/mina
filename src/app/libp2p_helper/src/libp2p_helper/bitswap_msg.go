@@ -33,14 +33,14 @@ func fromDeleteResourcePush(m ipcPushMessage) (pushMessage, error) {
 	return DeleteResourcePush(i), err
 }
 
-func extractRootBlockList(l ipc.RootBlockId_List) ([]BitswapBlockLink, error) {
-	ids := make([]BitswapBlockLink, 0, l.Len())
+func extractRootBlockList(l ipc.RootBlockId_List) ([]root, error) {
+	ids := make([]root, 0, l.Len())
 	for i := 0; i < l.Len(); i++ {
 		id, err := l.At(i).Blake2bHash()
 		if err != nil {
 			return nil, err
 		}
-		var link BitswapBlockLink
+		var link root
 		if len(id) != BITSWAP_BLOCK_LINK_SIZE {
 			return nil, fmt.Errorf("bitswap block link of unexpected length %d: %v", len(id), id)
 		}
@@ -52,7 +52,7 @@ func extractRootBlockList(l ipc.RootBlockId_List) ([]BitswapBlockLink, error) {
 
 func (m DeleteResourcePush) handle(app *app) {
 	idsM, err := DeleteResourcePushT(m).Ids()
-	var links []BitswapBlockLink
+	var links []root
 	if err == nil {
 		links, err = extractRootBlockList(idsM)
 	}
@@ -73,7 +73,7 @@ func fromDownloadResourcePush(m ipcPushMessage) (pushMessage, error) {
 
 func (m DownloadResourcePush) handle(app *app) {
 	idsM, err := DownloadResourcePushT(m).Ids()
-	var links []BitswapBlockLink
+	var links []root
 	if err == nil {
 		links, err = extractRootBlockList(idsM)
 	}

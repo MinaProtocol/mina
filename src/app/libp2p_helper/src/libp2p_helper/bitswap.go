@@ -16,7 +16,7 @@ import (
 )
 
 type bitswapDeleteCmd struct {
-	rootIds []BitswapBlockLink
+	rootIds []root
 }
 
 type bitswapAddCmd struct {
@@ -26,7 +26,7 @@ type bitswapAddCmd struct {
 
 type bitswapDownloadCmd struct {
 	tag     BitswapDataTag
-	rootIds []BitswapBlockLink
+	rootIds []root
 }
 
 type BitswapCtx struct {
@@ -76,9 +76,8 @@ func announceNewRootBlock(engine *bitswap.Bitswap, statusStorage codanet.Bitswap
 	}
 
 	for h, b := range bs {
-		id := codanet.BlockHashToCid(h)
-		bitswapLogger.Debugf("Publishing block %s (%d bytes)", id, len(b))
-		block, _ := blocks.NewBlockWithCid(b, id)
+		bitswapLogger.Debugf("Publishing block %s (%d bytes)", codanet.BlockHashToCidSuffix(h), len(b))
+		block, _ := blocks.NewBlockWithCid(b, codanet.BlockHashToCid(h))
 		err = engine.HasBlock(block)
 		if err != nil {
 			return err
@@ -92,7 +91,7 @@ func (bs *BitswapCtx) deleteRoot(root BitswapBlockLink) error {
 	if err != nil {
 		return err
 	}
-	bs.FreeRoot(root)
+	FreeRoot(bs, root)
 	allDescedants := []BitswapBlockLink{root}
 	for i := 0; i < len(allDescedants); i++ {
 		block := allDescedants[i]
@@ -114,32 +113,20 @@ func (bs *BitswapCtx) deleteRoot(root BitswapBlockLink) error {
 	return bs.storage.DeleteBlocks(allDescedants)
 }
 
-func (bs *BitswapCtx) AsyncDownloadBlocks(ctx context.Context, session exchange.Fetcher, cids []cid.Cid) error {
-	ch, err := session.GetBlocks(ctx, cids)
-	if err != nil {
-		return err
-	}
-	go func() {
-		for v := range ch {
-			// bitswapLogger.Debugf("AsyncDownloadBlocks: received block %s (%d bytes)", v.Cid(), len(v.RawData()))
-			bs.blockSink <- v
-		}
-	}()
-	return nil
-}
-
-func (bs *BitswapCtx) FreeRoot(root root) {
-	state, has := bs.rootDownloadStates[root]
+func FreeRoot(bs BitswapState, root root) {
+	states := bs.RootDownloadStates()
+	nodeParams := bs.NodeDownloadParams()
+	state, has := states[root]
 	if !has {
 		return
 	}
-	delete(bs.rootDownloadStates, root)
+	delete(states, root)
 	state.allDescedants.ForEach(func(c cid.Cid) error {
-		np, hasNp := bs.nodeDownloadParams[c]
+		np, hasNp := nodeParams[c]
 		if hasNp {
 			delete(np, root)
 			if len(np) == 0 {
-				delete(bs.nodeDownloadParams, c)
+				delete(nodeParams, c)
 			}
 		}
 		return nil
@@ -147,7 +134,10 @@ func (bs *BitswapCtx) FreeRoot(root root) {
 	state.cancelF()
 }
 
-func (bs *BitswapCtx) SendResourceUpdate(type_ ipc.ResourceUpdateType, roots ...BitswapBlockLink) {
+func (bs *BitswapCtx) SendResourceUpdate(type_ ipc.ResourceUpdateType, root root) {
+	bs.SendResourceUpdates(type_, root)
+}
+func (bs *BitswapCtx) SendResourceUpdates(type_ ipc.ResourceUpdateType, roots ...root) {
 	// Non-blocking upcall sending
 	select {
 	case bs.outMsgChan <- mkResourceUpdatedUpcall(type_, roots):
@@ -155,11 +145,14 @@ func (bs *BitswapCtx) SendResourceUpdate(type_ ipc.ResourceUpdateType, roots ...
 		for _, root := range roots {
 			bitswapLogger.Errorf("Failed to send resource update of type %d"+
 				" for %s (message queue is full)",
-				type_, codanet.BlockHashToCid(root))
+				type_, codanet.BlockHashToCidSuffix(root))
 		}
 	}
 }
 
+func (bs *BitswapCtx) CheckInvariants() {
+	// No checking invariants in production
+}
 func (bs *BitswapCtx) NodeDownloadParams() map[cid.Cid]map[root][]NodeIndex {
 	return bs.nodeDownloadParams
 }
@@ -167,11 +160,23 @@ func (bs *BitswapCtx) RootDownloadStates() map[root]*RootDownloadState  { return
 func (bs *BitswapCtx) MaxBlockSize() int                                { return bs.maxBlockSize }
 func (bs *BitswapCtx) DataConfig() map[BitswapDataTag]BitswapDataConfig { return bs.dataConfig }
 func (bs *BitswapCtx) DepthIndices() DepthIndices                       { return bs.depthIndices }
-func (bs *BitswapCtx) Context() context.Context                         { return bs.ctx }
-func (bs *BitswapCtx) NewSession(ctx context.Context) exchange.Fetcher {
-	return bs.engine.NewSession(ctx)
+func (bs *BitswapCtx) NewSession(downloadTimeout time.Duration) (BlockRequester, context.CancelFunc) {
+	ctx, cancelF := context.WithTimeout(bs.ctx, downloadTimeout)
+	s := bs.engine.NewSession(ctx)
+	return &BitswapBlockRequester{
+		fetcher: s,
+		ctx:     ctx,
+		sink:    bs.blockSink,
+	}, cancelF
 }
-func (bs *BitswapCtx) DeadlineChan() chan<- root { return bs.deadlineChan }
+func (bs *BitswapCtx) RegisterDeadlineTracker(root_ root, downloadTimeout time.Duration) {
+	go func() {
+		<-time.After(downloadTimeout)
+		if _, has := bs.rootDownloadStates[root_]; has {
+			bs.deadlineChan <- root_
+		}
+	}()
+}
 func (bs *BitswapCtx) GetStatus(key [32]byte) (codanet.RootBlockStatus, error) {
 	return bs.storage.GetStatus(key)
 }
@@ -182,6 +187,25 @@ func (bs *BitswapCtx) DeleteStatus(key [32]byte) error    { return bs.storage.De
 func (bs *BitswapCtx) DeleteBlocks(keys [][32]byte) error { return bs.storage.DeleteBlocks(keys) }
 func (bs *BitswapCtx) ViewBlock(key [32]byte, callback func([]byte) error) error {
 	return bs.storage.ViewBlock(key, callback)
+}
+
+type BitswapBlockRequester struct {
+	fetcher exchange.Fetcher
+	ctx     context.Context
+	sink    chan<- blocks.Block
+}
+
+func (br *BitswapBlockRequester) RequestBlocks(ids []cid.Cid) error {
+	ch, err := br.fetcher.GetBlocks(br.ctx, ids)
+	if err != nil {
+		return err
+	}
+	go func() {
+		for v := range ch {
+			br.sink <- v
+		}
+	}()
+	return nil
 }
 
 // BitswapLoop: Bitswap processing loop
@@ -201,7 +225,7 @@ func (bs *BitswapCtx) Loop() {
 			return
 		case root := <-bs.deadlineChan:
 			configuredCheck()
-			bs.FreeRoot(root)
+			FreeRoot(bs, root)
 		case cmd := <-bs.addCmds:
 			configuredCheck()
 			blocks, root := SplitDataToBitswapBlocksLengthPrefixedWithTag(bs.maxBlockSize, cmd.data, BlockBodyTag)
@@ -209,11 +233,11 @@ func (bs *BitswapCtx) Loop() {
 			if err == nil {
 				bs.SendResourceUpdate(ipc.ResourceUpdateType_added, root)
 			} else {
-				bitswapLogger.Errorf("Failed to announce root cid %s (%w)", codanet.BlockHashToCid(root), err)
+				bitswapLogger.Errorf("Failed to announce root cid %s (%w)", codanet.BlockHashToCidSuffix(root), err)
 			}
 		case cmd := <-bs.deleteCmds:
 			configuredCheck()
-			success := []BitswapBlockLink{}
+			success := []root{}
 			for _, root := range cmd.rootIds {
 				err := bs.deleteRoot(root)
 				if err == nil {
@@ -222,10 +246,10 @@ func (bs *BitswapCtx) Loop() {
 				if err == nil {
 					success = append(success, root)
 				} else {
-					bitswapLogger.Errorf("Error processing delete request for %s: %w", codanet.BlockHashToCid(root), err)
+					bitswapLogger.Errorf("Error processing delete request for %s: %w", codanet.BlockHashToCidSuffix(root), err)
 				}
 			}
-			bs.SendResourceUpdate(ipc.ResourceUpdateType_removed, success...)
+			bs.SendResourceUpdates(ipc.ResourceUpdateType_removed, success...)
 		case cmd := <-bs.downloadCmds:
 			configuredCheck()
 			// We put all ids to map to avoid

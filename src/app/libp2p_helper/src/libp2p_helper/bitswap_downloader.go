@@ -11,7 +11,6 @@ import (
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	exchange "github.com/ipfs/go-ipfs-exchange-interface"
 	logging "github.com/ipfs/go-log"
 )
 
@@ -39,10 +38,13 @@ type BitswapDataConfig struct {
 	downloadTimeout time.Duration
 }
 
+type BlockRequester interface {
+	RequestBlocks(keys []cid.Cid) error
+}
+
 type RootDownloadState struct {
 	allDescedants        *cid.Set
-	session              exchange.Fetcher
-	ctx                  context.Context
+	session              BlockRequester
 	cancelF              context.CancelFunc
 	schema               *BitswapBlockSchema
 	tag                  BitswapDataTag
@@ -77,22 +79,21 @@ type BitswapState interface {
 	MaxBlockSize() int
 	DataConfig() map[BitswapDataTag]BitswapDataConfig
 	DepthIndices() DepthIndices
-	Context() context.Context
-	NewSession(ctx context.Context) exchange.Fetcher
-	DeadlineChan() chan<- root
-	FreeRoot(root)
-	SendResourceUpdate(type_ ipc.ResourceUpdateType, roots ...BitswapBlockLink)
-	AsyncDownloadBlocks(ctx context.Context, session exchange.Fetcher, cids []cid.Cid) error
+	NewSession(downloadTimeout time.Duration) (BlockRequester, context.CancelFunc)
+	RegisterDeadlineTracker(root, time.Duration)
+	SendResourceUpdate(type_ ipc.ResourceUpdateType, root root)
+	CheckInvariants()
 }
 
 // kickStartRootDownload initiates downloading of root block
 func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs BitswapState) {
+	bs.CheckInvariants()
 	rootCid := codanet.BlockHashToCid(root_)
 	nodeDownloadParams := bs.NodeDownloadParams()
 	rootDownloadStates := bs.RootDownloadStates()
 	_, has := nodeDownloadParams[rootCid]
 	if has {
-		bitswapLogger.Debugf("Skipping download request for %s (downloading already in progress)", codanet.BlockHashToCid(root_))
+		bitswapLogger.Debugf("Skipping download request for %s (downloading already in progress)", codanet.BlockHashToCidSuffix(root_))
 		return // downloading already in progress
 	}
 	dataConf, hasDC := bs.DataConfig()[tag]
@@ -101,7 +102,7 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 	}
 	err := bs.SetStatus(root_, codanet.Partial)
 	if err != nil {
-		bitswapLogger.Debugf("Skipping download request for %s due to status: %w", codanet.BlockHashToCid(root_), err)
+		bitswapLogger.Debugf("Skipping download request for %s due to status: %w", codanet.BlockHashToCidSuffix(root_), err)
 		status, err := bs.GetStatus(root_)
 		if err == nil && status == codanet.Full {
 			bs.SendResourceUpdate(ipc.ResourceUpdateType_added, root_)
@@ -111,8 +112,7 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 	s2 := cid.NewSet()
 	s2.Add(rootCid)
 	downloadTimeout := dataConf.downloadTimeout
-	ctx, cancelF := context.WithTimeout(bs.Context(), downloadTimeout)
-	session := bs.NewSession(ctx)
+	session, cancelF := bs.NewSession(downloadTimeout)
 	np, hasNP := nodeDownloadParams[rootCid]
 	if !hasNP {
 		np = map[root][]NodeIndex{}
@@ -121,7 +121,6 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 	np[root_] = append(np[root_], 0)
 	rootDownloadStates[root_] = &RootDownloadState{
 		allDescedants:        s2,
-		ctx:                  ctx,
 		session:              session,
 		cancelF:              cancelF,
 		tag:                  tag,
@@ -135,20 +134,14 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 	})
 	hasRootBlock := err == nil
 	if err == blockstore.ErrNotFound {
-		err = bs.AsyncDownloadBlocks(ctx, session, []cid.Cid{rootCid})
-		bitswapLogger.Debugf("Requested download of %s", codanet.BlockHashToCid(root_))
+		err = session.RequestBlocks([]cid.Cid{rootCid})
+		bitswapLogger.Debugf("Requested download of %s", codanet.BlockHashToCidSuffix(root_))
 	}
 	if err == nil {
-		go func() {
-			<-time.After(downloadTimeout)
-			_, has := bs.RootDownloadStates()[root_]
-			if has {
-				bs.DeadlineChan() <- root_
-			}
-		}()
+		bs.RegisterDeadlineTracker(root_, downloadTimeout)
 	} else {
 		bitswapLogger.Errorf("Error initializing block download: %w", err)
-		bs.FreeRoot(root_)
+		FreeRoot(bs, root_)
 	}
 	if hasRootBlock {
 		b, _ := blocks.NewBlockWithCid(rootBlock, rootCid)
@@ -176,7 +169,7 @@ func processDownloadedBlockImpl(params map[root][]NodeIndex, block blocks.Block,
 		rp, hasRp := rootParams[root_]
 		if !hasRp {
 			bitswapLogger.Errorf("processBlock: didn't find root state for %s (root %s)",
-				id, codanet.BlockHashToCid(root_))
+				id, codanet.BlockHashToCidSuffix(root_))
 			continue
 		}
 		schema := rp.getSchema()
@@ -217,18 +210,18 @@ func processDownloadedBlockImpl(params map[root][]NodeIndex, block blocks.Block,
 		}
 		if schema == nil {
 			bitswapLogger.Errorf("Invariant broken for %s (root %s): schema not set for non-root block",
-				id, codanet.BlockHashToCid(root_))
+				id, codanet.BlockHashToCidSuffix(root_))
 			continue
 		}
 		for _, ix := range ixs {
 			if len(block.RawData()) != schema.BlockSize(ix) {
 				malformed[root_] = fmt.Errorf("unexpected size for block #%d (%s) of root %s: %d != %d",
-					ix, id, codanet.BlockHashToCid(root_), len(block.RawData()), schema.BlockSize(ix))
+					ix, id, codanet.BlockHashToCidSuffix(root_), len(block.RawData()), schema.BlockSize(ix))
 				break
 			}
 			if len(links) != schema.LinkCount(ix) {
 				malformed[root_] = fmt.Errorf("unexpected link count for block %s of root %s: %d != %d (fullLinkBlocks: %d, ix: %d)",
-					id, codanet.BlockHashToCid(root_), len(links), schema.LinkCount(ix), schema.fullLinkBlocks, ix)
+					id, codanet.BlockHashToCidSuffix(root_), len(links), schema.LinkCount(ix), schema.fullLinkBlocks, ix)
 				break
 			}
 			fstChildId := di.FirstChildId(ix)
@@ -246,6 +239,7 @@ func processDownloadedBlockImpl(params map[root][]NodeIndex, block blocks.Block,
 // processDownloadedBlock is a big-step transition of root block retrieval state machine
 // It transits state for a single block
 func processDownloadedBlock(block blocks.Block, bs BitswapState) {
+	bs.CheckInvariants()
 	id := block.Cid()
 	nodeDownloadParams := bs.NodeDownloadParams()
 	rootDownloadStates := bs.RootDownloadStates()
@@ -263,7 +257,7 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 		rootState, hasRS := rootDownloadStates[root]
 		if !hasRS {
 			bitswapLogger.Errorf("processDownloadedBlock: didn't find root state for %s (root %s)",
-				id, codanet.BlockHashToCid(root))
+				id, codanet.BlockHashToCidSuffix(root))
 			continue
 		}
 		rootState.remainingNodeCounter = rootState.remainingNodeCounter - len(ixs)
@@ -271,8 +265,8 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 	}
 	newParams, malformed := processDownloadedBlockImpl(oldPs, block, rps, bs.MaxBlockSize(), depthIndices, bs.DataConfig())
 	for root, err := range malformed {
-		bitswapLogger.Warnf("Block %s of root %s is malformed: %s", id, codanet.BlockHashToCid(root), err)
-		bs.FreeRoot(root)
+		bitswapLogger.Warnf("Block %s of root %s is malformed: %s", id, codanet.BlockHashToCidSuffix(root), err)
+		FreeRoot(bs, root)
 		bs.SendResourceUpdate(ipc.ResourceUpdateType_broken, root)
 	}
 
@@ -291,7 +285,7 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 			rootState, hasRS := rootDownloadStates[root]
 			if !hasRS {
 				bitswapLogger.Errorf("processDownloadedBlock (2): didn't find root state for %s (root %s)",
-					id, codanet.BlockHashToCid(root))
+					id, codanet.BlockHashToCidSuffix(root))
 				continue
 			}
 			someRootState = rootState
@@ -319,7 +313,7 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 	if len(toDownload) > 0 {
 		// It's fine to use someRootState because all blocks from toDownload
 		// inevitably belong to each root, so any will do
-		bs.AsyncDownloadBlocks(someRootState.ctx, someRootState.session, toDownload)
+		someRootState.session.RequestBlocks(toDownload)
 	}
 	for root := range oldPs {
 		rootState, hasRS := rootDownloadStates[root]
@@ -329,7 +323,7 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 			if err != nil {
 				bitswapLogger.Warnf("Failed to update status of fully downloaded root %s: %s", root, err)
 			}
-			bs.FreeRoot(root)
+			FreeRoot(bs, root)
 			bs.SendResourceUpdate(ipc.ResourceUpdateType_added, root)
 		}
 	}
