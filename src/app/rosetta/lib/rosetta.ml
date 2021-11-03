@@ -126,7 +126,7 @@ let command =
           | Some archive_uri ->
               Deferred.Result.return archive_uri
         in
-        match Caqti_async.connect_pool ~max_size:128 archive_uri with
+        match Caqti_async.connect_pool ~max_size:16 archive_uri with
         | Error e ->
             [%log error]
               ~metadata:[("error", `String (Caqti_error.show e))]
