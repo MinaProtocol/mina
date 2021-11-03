@@ -591,7 +591,7 @@ module Data = struct
           [ field "hash" ~typ:(non_null string)
               ~args:Arg.[]
               ~resolve:(fun _ { Poly.hash; _ } ->
-                Mina_base.Frozen_ledger_hash.to_string hash)
+                Mina_base.Frozen_ledger_hash.to_base58_check hash)
           ; field "totalCurrency"
               ~typ:(non_null @@ Graphql_base_types.uint64 ())
               ~args:Arg.[]
