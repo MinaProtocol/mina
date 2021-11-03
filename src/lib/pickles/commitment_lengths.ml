@@ -12,7 +12,7 @@ let generic' ~h ~sub ~add:( + ) ~mul:( * ) ~of_int ~ceil_div_max_degree :
     ceil_div_max_degree (Common.max_quot_size ~of_int ~mul:( * ) ~sub n)
   in
   let h = ceil_div_max_degree n in
-  { l = n; r = n; o = n; z = n; t = t_bound; f = n; sigma1 = h; sigma2 = h }
+  { l = h; r = h; o = h; z = h; t = t_bound; f = h; sigma1 = h; sigma2 = h }
 
 let generic map ~h ~max_degree : _ Dlog_plonk_types.Evals.t =
   let t_bound = map h ~f:(fun h -> Common.max_quot_size_int h) in
