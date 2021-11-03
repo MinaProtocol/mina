@@ -4,6 +4,11 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2021/11/02:
+
+- Adds explicit transaction submit errors for all known invalid transaction
+  cases. Note: Fallback errors go through via GraphQL errors as before.
+
 2021/11/01:
 
 - Reorganize `/account/balance` for performance:
