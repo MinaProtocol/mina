@@ -103,7 +103,7 @@ let transactions = payments @ delegations
 type jsSignature = { privateKey : Field.t; publicKey : Inner_curve.Scalar.t }
 
 let get_signature payload =
-  ( Signed_command.sign ~signature_kind:Testnet keypair payload
+  ( Signed_command.sign ~signature_kind:Mainnet keypair payload
     :> Signed_command.With_valid_signature.t )
 
 (* output format matches signatures in client SDK *)
@@ -117,7 +117,7 @@ let main () =
   (* make sure signatures verify *)
   List.iteri signatures ~f:(fun i signature ->
       let signature = (signature :> Signed_command.t) in
-      if not (Signed_command.check_signature ~signature_kind:Testnet signature)
+      if not (Signed_command.check_signature ~signature_kind:Mainnet signature)
       then (
         eprintf
           !"Signature (%d) failed to verify: %{sexp: Signed_command.t}\n%!"
