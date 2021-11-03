@@ -891,6 +891,8 @@ let get_current_nonce t aid =
     |> Option.join
   with
   | None ->
+      (* IMPORTANT! Do not change the content of this error without
+       * updating Rosetta's construction API to handle the changes *)
       Error
         "Couldn't infer nonce for transaction from specified `sender` since \
          `sender` is not in the ledger or sent a transaction in transaction \

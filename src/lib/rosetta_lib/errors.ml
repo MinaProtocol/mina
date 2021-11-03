@@ -37,7 +37,15 @@ module Variant = struct
     | `Exception of string
     | `Signature_invalid
     | `Memo_invalid
-    | `Graphql_uri_not_set ]
+    | `Graphql_uri_not_set
+    | (* We want each of these to be an explicitly different error *)
+      `Transaction_submit_no_sender
+    | `Transaction_submit_duplicate
+    | `Transaction_submit_bad_nonce
+    | `Transaction_submit_fee_small
+    | `Transaction_submit_invalid_signature
+    | `Transaction_submit_insufficient_balance
+    | `Transaction_submit_expired ]
   [@@deriving yojson, show, equal, to_enum, to_representatives]
 end
 
@@ -107,6 +115,20 @@ end = struct
         "Invalid memo"
     | `Graphql_uri_not_set ->
         "No GraphQL URI set"
+    | `Transaction_submit_no_sender ->
+        "Can't send transaction: No sender found in ledger"
+    | `Transaction_submit_duplicate ->
+        "Can't send transaction: A duplicate is detected"
+    | `Transaction_submit_bad_nonce ->
+        "Can't send transaction: Nonce invalid"
+    | `Transaction_submit_fee_small ->
+        "Can't send transaction: Fee too small"
+    | `Transaction_submit_invalid_signature ->
+        "Can't send transaction: Invalid signature"
+    | `Transaction_submit_insufficient_balance ->
+        "Can't send transaction: Insufficient balance"
+    | `Transaction_submit_expired ->
+        "Can't send transaction: Expired"
 
   let context = function
     | `Sql msg ->
@@ -171,6 +193,20 @@ end = struct
         None
     | `Graphql_uri_not_set ->
         None
+    | `Transaction_submit_no_sender ->
+        None
+    | `Transaction_submit_duplicate ->
+        None
+    | `Transaction_submit_bad_nonce ->
+        None
+    | `Transaction_submit_fee_small ->
+        None
+    | `Transaction_submit_invalid_signature ->
+        None
+    | `Transaction_submit_insufficient_balance ->
+        None
+    | `Transaction_submit_expired ->
+        None
 
   let retriable = function
     | `Sql _ ->
@@ -210,6 +246,20 @@ end = struct
     | `Memo_invalid ->
         false
     | `Graphql_uri_not_set ->
+        false
+    | `Transaction_submit_no_sender ->
+        true
+    | `Transaction_submit_duplicate ->
+        false
+    | `Transaction_submit_bad_nonce ->
+        false
+    | `Transaction_submit_fee_small ->
+        false
+    | `Transaction_submit_invalid_signature ->
+        false
+    | `Transaction_submit_insufficient_balance ->
+        false
+    | `Transaction_submit_expired ->
         false
 
   (* Unlike message above, description can be updated whenever we see fit *)
@@ -256,6 +306,31 @@ end = struct
     | `Exception _ ->
         "We encountered an internal exception while processing your request. \
          (That means you found a bug!)"
+    | `Transaction_submit_no_sender ->
+        "This could occur because the node isn't fully synced or the account \
+         doesn't actually exist in the ledger yet."
+    | `Transaction_submit_duplicate ->
+        "This could occur if you've already sent this transaction. Please \
+         report a bug if you are confident you didn't already send this exact \
+         transaction."
+    | `Transaction_submit_bad_nonce ->
+        "You must use the current nonce in your account in the ledger or one \
+         that is inferred based on pending transactions in the transaction \
+         pool."
+    | `Transaction_submit_fee_small ->
+        sprintf
+          "The minimum fee on transactions is %s . Please increase your fee to \
+           at least this amount."
+          (Currency.Fee.to_formatted_string
+             Mina_compile_config.minimum_user_command_fee)
+    | `Transaction_submit_invalid_signature ->
+        "An invalid signature is attached to this transaction"
+    | `Transaction_submit_insufficient_balance ->
+        "This account do not have sufficient balance perform the requested \
+         transaction."
+    | `Transaction_submit_expired ->
+        "This transaction is expired. Please try again with a larger \
+         valid_until."
 
   let create ?context kind = { extra_context = context; kind }
 
@@ -322,3 +397,27 @@ end = struct
 end
 
 include T
+
+module Transaction_submit = struct
+  (* This is a very hacky error message check from GraphQL right now.
+   * We'll need to do some surgery on the daemon to properly pass errors through
+   * GraphQL more explicitly *)
+  let of_request_error s =
+    let variant =
+      let p pat = String.is_substring ~substring:pat s in
+      if p "infer nonce for transaction from specified" then
+        Some `Transaction_submit_no_sender
+      else if p "[\"Duplicate\"]" then Some `Transaction_submit_duplicate
+      else if p "either different from inferred nonce" then
+        Some `Transaction_submit_bad_nonce
+      else if p "is less than the minimum fee" then
+        Some `Transaction_submit_fee_small
+      else if p "Error: Invalid_signature" then
+        Some `Transaction_submit_invalid_signature
+      else if p "[\"Insufficient_funds\"]" then
+        Some `Transaction_submit_insufficient_balance
+      else if p "[\"Expired\"]" then Some `Transaction_submit_expired
+      else None
+    in
+    Option.map variant ~f:(fun v -> create v)
+end

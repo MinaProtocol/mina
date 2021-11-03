@@ -18,7 +18,12 @@ let sign_command =
   in
   let open Deferred.Let_syntax in
   fun () ->
-    let keys = Signer.Keys.of_private_key_bytes private_key in
+    let keys =
+      try
+        Signer.Keys.of_private_key_bytes private_key
+      with
+      | _ -> Signer.Keys.of_private_key_box private_key
+    in
     match
       Signer.sign ~keys ~unsigned_transaction_string:unsigned_transaction
     with

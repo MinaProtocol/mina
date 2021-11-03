@@ -66,9 +66,13 @@ let query query_obj uri =
         (Errors.create ~context:"Empty response from Mina Daemon"
            (`Graphql_mina_query "Empty response"))
   | error, `Null ->
-      Error
-        (Errors.create ~context:"Explicit error response from Mina Daemon"
-           (`Graphql_mina_query (graphql_error_to_string error)))
+      Errors.Transaction_submit.of_request_error (graphql_error_to_string error)
+        |> Option.value
+            ~default:(
+              Errors.create
+                ~context:"Explicit error response from Mina Daemon"
+                (`Graphql_mina_query (graphql_error_to_string error)))
+        |> Result.fail
   | _, raw_json ->
       Result.try_with (fun () -> query_obj#parse raw_json)
       |> Result.map_error ~f:(fun e ->

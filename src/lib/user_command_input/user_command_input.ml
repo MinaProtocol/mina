@@ -41,6 +41,8 @@ module Payload = struct
             if Account_nonce.(minimum_nonce <= nonce && nonce <= inferred_nonce)
             then Ok nonce
             else
+              (* IMPORTANT! Do not change the content of this error without
+               * updating Rosetta's construction API to handle the changes *)
               Error
                 (sprintf
                    !"Input nonce %s either different from inferred nonce %s or \
