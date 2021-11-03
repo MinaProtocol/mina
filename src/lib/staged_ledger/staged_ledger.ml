@@ -981,7 +981,8 @@ module T = struct
 
   [%%if feature_snapps]
 
-  let check_commands ledger ~verifier (cs : User_command.t list) =
+  let check_commands ~signature_kind ledger ~verifier (cs : User_command.t list)
+      =
     match
       Or_error.try_with (fun () ->
           List.map cs
@@ -1016,7 +1017,8 @@ module T = struct
      queue and 20 in the "already verified, to apply" queue. Those 20 would be
      processed very slowly because each one would have to call the verifier, which
      the other queue was trying to call as well. *)
-  let check_commands _ledger ~verifier:_ (cs : User_command.t list) :
+  let check_commands ~signature_kind _ledger ~verifier:_
+      (cs : User_command.t list) :
       (User_command.Valid.t list, _) result Deferred.Or_error.t =
     Result.all
       (List.map cs ~f:(function
@@ -1025,7 +1027,7 @@ module T = struct
               (Verifier.Failure.Verification_failed
                  (Error.of_string "check_commands: snapp commands disabled"))
         | Signed_command c -> (
-            match Signed_command.check c with
+            match Signed_command.check ~signature_kind c with
             | Some c ->
                 Ok (User_command.Signed_command c)
             | None ->
@@ -1036,7 +1038,8 @@ module T = struct
 
   [%%endif]
 
-  let apply ?skip_verification ~constraint_constants t
+  let apply ?skip_verification
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) t
       (witness : Staged_ledger_diff.t) ~logger ~verifier ~current_state_view
       ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase =
     let open Deferred.Result.Let_syntax in
@@ -1052,7 +1055,9 @@ module T = struct
     let%bind prediff =
       Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
         ~supercharge_coinbase
-        ~check:(check_commands t.ledger ~verifier)
+        ~check:
+          (check_commands ~signature_kind:constraint_constants.signature_kind
+             t.ledger ~verifier)
       |> Deferred.map
            ~f:
              (Result.map_error ~f:(fun error ->
