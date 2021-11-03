@@ -1,5 +1,13 @@
+[%%import "/src/config.mlh"]
+
 open Core_kernel
 open Async_kernel
+
+[%%ifndef consensus_mechanism]
+
+module Currency = Currency_nonconsensus.Currency
+
+[%%endif]
 
 module Partial_reason = struct
   type t =
