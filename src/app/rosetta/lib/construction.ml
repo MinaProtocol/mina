@@ -136,6 +136,7 @@ module Options = struct
     ; token_id : Unsigned.UInt64.t
     ; receiver : Public_key.Compressed.t
     ; valid_until : Unsigned_extended.UInt32.t option
+    ; memo : string option
     }
 
   module Raw = struct
@@ -144,6 +145,7 @@ module Options = struct
       ; token_id : string
       ; receiver : string
       ; valid_until : string option [@default None]
+      ; memo : string option [@default None]
       }
     [@@deriving yojson]
   end
@@ -154,6 +156,7 @@ module Options = struct
     ; receiver = Public_key.Compressed.to_base58_check t.receiver
     ; valid_until =
         Option.map ~f:Unsigned_extended.UInt32.to_string t.valid_until
+    ; memo = t.memo
     }
     |> Raw.to_yojson
 
@@ -168,7 +171,6 @@ module Options = struct
                 ~context:("Options of_json bad public key (" ^ which ^ ")")
                 (`Json_parse (Some (Core_kernel.Error.to_string_hum e)))
            in
-
            let%bind sender =
              Public_key.Compressed.of_base58_check r.sender
              |> Result.map_error ~f:(error "sender")
@@ -177,12 +179,12 @@ module Options = struct
              Public_key.Compressed.of_base58_check r.receiver
              |> Result.map_error ~f:(error "receiver")
            in
-
            { sender
            ; token_id = Unsigned.UInt64.of_string r.token_id
            ; receiver
            ; valid_until =
                Option.map ~f:Unsigned_extended.UInt32.of_string r.valid_until
+           ; memo = r.memo
            })
 end
 
@@ -195,17 +197,19 @@ module Metadata_data = struct
     ; receiver : string
     ; account_creation_fee : Unsigned_extended.UInt64.t option [@default None]
     ; valid_until : Unsigned_extended.UInt32.t option [@default None]
+    ; memo : string option [@default None]
     }
   [@@deriving yojson]
 
   let create ~nonce ~sender ~token_id ~receiver ~account_creation_fee
-      ~valid_until =
+      ~valid_until ~memo =
     { sender = Public_key.Compressed.to_base58_check sender
     ; nonce
     ; token_id
     ; receiver = Public_key.Compressed.to_base58_check receiver
     ; account_creation_fee
     ; valid_until
+    ; memo
     }
 
   let of_json r =
@@ -412,11 +416,8 @@ module Metadata = struct
                       Mina_compile_config.minimum_user_command_fee)) )
           ]
       in
-      (* GraphQL ppx thinks that res#receiver is an option, but it's really
-       * always Some, we have to peak at the nonce to really check if the
-       * account doesn't exist *)
       let receiver_exists =
-        Option.bind res#receiver ~f:(fun r -> r#nonce) |> Option.is_some
+        Option.is_some res#receiver
       in
       let constraint_constants =
         Genesis_constants.Constraint_constants.compiled
@@ -431,6 +432,7 @@ module Metadata = struct
                   (Mina_currency.Fee.to_uint64
                      constraint_constants.account_creation_fee) )
             ~valid_until:options.valid_until
+            ~memo:options.memo
           |> Metadata_data.to_yojson
       ; suggested_fee =
           [ { suggested_fee with metadata = Some amount_metadata } ]
@@ -443,7 +445,7 @@ end
 
 module Preprocess = struct
   module Metadata = struct
-    type t = { valid_until : Unsigned_extended.UInt32.t option }
+    type t = { valid_until : Unsigned_extended.UInt32.t option [@default None]; memo: string option [@default None] }
     [@@deriving yojson]
 
     let of_json r =
@@ -504,6 +506,7 @@ module Preprocess = struct
                ; token_id = partial_user_command.User_command_info.Partial.token
                ; receiver
                ; valid_until = Option.bind ~f:(fun m -> m.valid_until) metadata
+               ; memo = Option.bind ~f:(fun m -> m.memo) metadata
                })
       ; required_public_keys = []
       }
@@ -547,6 +550,7 @@ module Payloads = struct
       in
       let%bind partial_user_command =
         User_command_info.of_operations ?valid_until:metadata.valid_until
+        ?memo:metadata.memo
           req.operations
         |> lift_reason_validation_to_errors ~env
       in
@@ -673,6 +677,7 @@ module Parse = struct
     let real : Real.t =
       { verify_payment_signature =
           (fun ~network_identifier ~payment ~signature () ->
+            let open Deferred.Result in
             let open Deferred.Result.Let_syntax in
             let parse_pk ~which s =
               match Public_key.Compressed.of_base58_check s with
@@ -689,7 +694,7 @@ module Parse = struct
                        (`Json_parse (Some (Core_kernel.Error.to_string_hum e))))
             in
             let%bind source_pk = parse_pk ~which:"source" payment.from in
-            let%map receiver_pk = parse_pk ~which:"receiver" payment.to_ in
+            let%bind receiver_pk = parse_pk ~which:"receiver" payment.to_ in
             let body =
               Signed_command_payload.Body.Payment
                 { source_pk
@@ -707,10 +712,15 @@ module Parse = struct
                 ~f:Mina_numbers.Global_slot.of_uint32
             in
             let nonce = payment.nonce in
-            let memo =
-              Option.value_map payment.memo
-                ~default:User_command_info.Signed_command_memo.empty
-                ~f:User_command_info.Signed_command_memo.create_from_string_exn
+            let%map memo =
+              match payment.memo with
+              | None -> return User_command_info.Signed_command_memo.empty
+              | Some str ->
+                (match
+                  User_command_info.Signed_command_memo.create_from_string str
+                 with
+                 | Error _ -> fail (Errors.create `Memo_invalid )
+                 | Ok m -> return m)
             in
             let payload =
               Signed_command_payload.create ~fee ~fee_token ~fee_payer_pk ~nonce
@@ -748,7 +758,12 @@ module Parse = struct
         try M.return (Yojson.Safe.from_string req.transaction)
         with _ -> M.fail (Errors.create (`Json_parse None))
       in
-      let%map operations, account_identifier_signers =
+      let%map operations, account_identifier_signers, meta =
+        let meta_of_command (cmd : User_command_info.Partial.t) =
+          { Preprocess.Metadata.memo = cmd.memo
+          ; valid_until = cmd.valid_until
+          }
+        in
         match req.signed with
         | true ->
             let%bind signed_rendered_transaction =
@@ -779,7 +794,8 @@ module Parse = struct
                 signed_transaction.command
             , [ User_command_info.account_id signed_transaction.command.source
                   signed_transaction.command.token
-              ] )
+              ]
+            , meta_of_command signed_transaction.command)
         | false ->
             let%map unsigned_transaction =
               Transaction.Unsigned.Rendered.of_yojson json
@@ -790,12 +806,16 @@ module Parse = struct
             in
             ( User_command_info.to_operations ~failure_status:None
                 unsigned_transaction.command
-            , [] )
+            , []
+            , meta_of_command unsigned_transaction.command)
       in
       { Construction_parse_response.operations
       ; signers = []
       ; account_identifier_signers
-      ; metadata = None
+      ; metadata =
+        match (meta.memo, meta.valid_until) with
+        | None, None -> None
+        | _ -> Some (Preprocess.Metadata.to_yojson meta)
       }
   end
 
@@ -940,7 +960,8 @@ module Submit = struct
                    ~receiver:(`String delegation.new_delegate)
                    ~fee:
                      (uint64 delegation.fee)
-                     (*                   ?validUntil:(Option.map ~f:uint32 delegation.valid_until) *)
+                   (* TODO: Enable these when graphql supports sending validUntil for these transactions *)
+                   (* ?validUntil:(Option.map ~f:uint32 delegation.valid_until) *)
                    ?memo:delegation.memo ~nonce:(uint32 delegation.nonce)
                    ~signature ())
                 graphql_uri)
@@ -949,6 +970,7 @@ module Submit = struct
               Graphql.query
                 (Send_create_token.make
                    ~receiver:(`String create_token.receiver)
+                   (* ?validUntil:(Option.map ~f:uint32 create_token.valid_until) *)
                    ~fee:(uint64 create_token.fee) ?memo:create_token.memo
                    ~nonce:(uint32 create_token.nonce)
                    ~signature ())
@@ -958,6 +980,7 @@ module Submit = struct
               Graphql.query
                 (Send_create_token_account.make
                    ~tokenOwner:(`String create_token_account.token_owner)
+                   (* ?validUntil:(Option.map ~f:uint32 create_token_account.valid_until) *)
                    ~receiver:(`String create_token_account.receiver)
                    ~token:(token_id create_token_account.token)
                    ~fee:(uint64 create_token_account.fee)
@@ -969,6 +992,7 @@ module Submit = struct
             (fun ~mint_tokens ~signature () ->
               Graphql.query
                 (Send_mint_tokens.make ~sender:(`String mint_tokens.token_owner)
+                   (* ?validUntil:(Option.map ~f:uint32 mint_tokens.valid_until) *)
                    ~receiver:(`String mint_tokens.receiver)
                    ~token:(token_id mint_tokens.token)
                    ~amount:(uint64 mint_tokens.amount)
