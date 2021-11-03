@@ -981,8 +981,8 @@ module T = struct
 
   [%%if feature_snapps]
 
-  let check_commands ~signature_kind ledger ~verifier (cs : User_command.t list)
-      =
+  let check_commands ~signature_kind:_ ledger ~verifier
+      (cs : User_command.t list) =
     match
       Or_error.try_with (fun () ->
           List.map cs
