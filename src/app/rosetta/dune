@@ -8,25 +8,3 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
 )
-
-(executable
- (package rosetta)
- (name rosetta_testnet_signatures)
- (public_name rosetta-testnet)
- (modules rosetta_testnet_signatures)
- (modes native)
- (libraries lib mina_signature_kind.testnet)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
-)
-
-(executable
- (package rosetta)
- (name rosetta_mainnet_signatures)
- (public_name rosetta-mainnet)
- (modules rosetta_mainnet_signatures)
- (modes native)
- (libraries lib mina_signature_kind.mainnet)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
-)

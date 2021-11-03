@@ -99,11 +99,6 @@ build_rosetta: ocaml_checks
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/rosetta/rosetta.exe src/app/rosetta/ocaml-signer/signer.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-build_rosetta_all_sigs: ocaml_checks
-	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/archive/archive_testnet_signatures.exe src/app/archive/archive_mainnet_signatures.exe src/app/rosetta/rosetta.exe src/app/rosetta/rosetta_testnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe src/app/rosetta/ocaml-signer/signer.exe src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
-	$(info Build complete)
-
 build_intgtest: ocaml_checks
 	$(info Starting Build)
 	dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
