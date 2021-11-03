@@ -288,7 +288,7 @@ module Json_layout = struct
       ; supercharged_coinbase_factor : int option [@default None]
       ; account_creation_fee : Currency.Fee.t option [@default None]
       ; fork : Fork_config.t option [@default None]
-      ; signature_kind : Mina_signature_kind.t option
+      ; signature_kind : Mina_signature_kind.t option [@default None]
       }
     [@@deriving yojson, dhall_type]
 
