@@ -372,7 +372,7 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
       "Construction_parse : Expected $expected, after payloads+parse $actual" ;
     failwith "Operations are not equal before and after payloads+parse" ) ;
   let%bind signature =
-    Signer.sign ~keys
+    Signer.sign ~keys ~signature_kind:Testnet
       ~unsigned_transaction_string:payloads_res.unsigned_transaction
     |> Deferred.return
   in
@@ -401,7 +401,8 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
       ~signed_transaction:combine_res.signed_transaction
   in
   let%bind verified_bool =
-    Signer.verify ~public_key_hex_bytes:keys.public_key_hex_bytes
+    Signer.verify ~signature_kind:Testnet
+      ~public_key_hex_bytes:keys.public_key_hex_bytes
       ~signed_transaction_string:combine_res.signed_transaction
     |> Deferred.return
   in

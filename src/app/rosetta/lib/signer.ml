@@ -37,7 +37,7 @@ module Keys = struct
 end
 
 (* Returns signed_transaction_string *)
-let sign ~(keys : Keys.t) ~unsigned_transaction_string =
+let sign ~signature_kind ~(keys : Keys.t) ~unsigned_transaction_string =
   let open Result.Let_syntax in
   let%bind json =
     try return (Yojson.Safe.from_string unsigned_transaction_string)
@@ -58,16 +58,17 @@ let sign ~(keys : Keys.t) ~unsigned_transaction_string =
   (* TODO: Should we use the signer_input explicitly here to dogfood it? *)
   (* Should we just inline that here? *)
   let signature =
-    Schnorr.sign keys.keypair.private_key
+    Schnorr.sign ~signature_kind keys.keypair.private_key
       unsigned_transaction.random_oracle_input
   in
   let signature' =
-    Signed_command.sign_payload keys.keypair.private_key user_command_payload
+    Signed_command.sign_payload ~signature_kind keys.keypair.private_key
+      user_command_payload
   in
   [%test_eq: Signature.t] signature signature' ;
   signature |> Signature.Raw.encode
 
-let verify ~public_key_hex_bytes ~signed_transaction_string =
+let verify ~signature_kind ~public_key_hex_bytes ~signed_transaction_string =
   let open Result.Let_syntax in
   let%bind json =
     try return (Yojson.Safe.from_string signed_transaction_string)
@@ -93,6 +94,6 @@ let verify ~public_key_hex_bytes ~signed_transaction_string =
     |> Option.value_exn ~here:[%here] ?error:None ?message:None
   in
   let message = Signed_command.to_input user_command_payload in
-  Schnorr.verify signature
+  Schnorr.verify ~signature_kind signature
     (Snark_params.Tick.Inner_curve.of_affine public_key)
     message
