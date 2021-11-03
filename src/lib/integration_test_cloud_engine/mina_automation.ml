@@ -165,6 +165,7 @@ module Network_config = struct
       ; supercharged_coinbase_factor = None
       ; account_creation_fee = None
       ; fork = None
+      ; signature_kind = None
       }
     in
     let constraint_constants =
