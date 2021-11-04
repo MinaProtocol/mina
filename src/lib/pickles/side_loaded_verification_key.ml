@@ -152,8 +152,8 @@ end
 module R = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Backend.Tock.Curve.Affine.Stable.V1.t Repr.Stable.V1.t
+    module V2 = struct
+      type t = Backend.Tock.Curve.Affine.Stable.V1.t Repr.Stable.V2.t
 
       let to_latest = Fn.id
     end
@@ -162,14 +162,14 @@ end
 
 [%%versioned_binable
 module Stable = struct
-  module V1 = struct
-    type t = (Backend.Tock.Curve.Affine.t, Vk.t) Poly.Stable.V1.t
+  module V2 = struct
+    type t = (Backend.Tock.Curve.Affine.t, Vk.t) Poly.Stable.V2.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
     let to_latest = Fn.id
 
     include Binable.Of_binable
-              (R.Stable.V1)
+              (R.Stable.V2)
               (struct
                 type nonrec t = t
 
@@ -177,8 +177,8 @@ module Stable = struct
                   include Vk
 
                   let of_repr
-                      { Repr.Stable.V1.step_data; max_width; wrap_index = c } :
-                      Impls.Wrap.Verification_key.t =
+                      ({ Repr.Stable.V2.step_data; max_width; wrap_index = c } :
+                        R.Stable.V2.t) : Impls.Wrap.Verification_key.t =
                     let d = Common.wrap_domains.h in
                     let log2_size = Import.Domain.log2_size d in
                     let max_quot_size =
@@ -191,25 +191,38 @@ module Stable = struct
                         }
                     ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
                     ; max_quot_size
-                    ; urs = Backend.Tock.Keypair.load_urs ()
+                    ; srs = Backend.Tock.Keypair.load_urs ()
+                    ; linearization = failwith "TODO"
                     ; evals =
-                        Plonk_verification_key_evals.map c ~f:(fun unshifted ->
-                            { Marlin_plonk_bindings.Types.Poly_comm.shifted =
-                                None
-                            ; unshifted =
-                                Array.of_list_map unshifted ~f:(fun x ->
-                                    Or_infinity.Finite x)
-                            })
+                        (let g (x, y) =
+                           { Kimchi.Protocol.unshifted =
+                               [| Kimchi.Foundations.Finite (x, y) |]
+                           ; shifted = None
+                           }
+                         in
+                         { sigma_comm =
+                             Array.map ~f:g (Vector.to_array c.sigma_comm)
+                         ; coefficients_comm =
+                             Array.map ~f:g
+                               (Vector.to_array c.coefficients_comm)
+                         ; generic_comm = g c.generic_comm
+                         ; mul_comm = g c.mul_comm
+                         ; psm_comm = g c.psm_comm
+                         ; emul_comm = g c.emul_comm
+                         ; complete_add_comm = g c.complete_add_comm
+                         ; endomul_scalar_comm = g c.endomul_scalar_comm
+                         ; chacha_comm = None
+                         })
                     ; shifts = Common.tock_shifts ~log2_size
                     }
                 end
 
                 let to_binable
                     { Poly.step_data; max_width; wrap_index; wrap_vk = _ } =
-                  { Repr.Stable.V1.step_data; max_width; wrap_index }
+                  { Repr.Stable.V2.step_data; max_width; wrap_index }
 
                 let of_binable
-                    ( { Repr.Stable.V1.step_data; max_width; wrap_index = c } as
+                    ( { Repr.Stable.V2.step_data; max_width; wrap_index = c } as
                     t ) =
                   { Poly.step_data
                   ; max_width
@@ -224,25 +237,16 @@ let dummy : t =
   { step_data = At_most.[]
   ; max_width = Width.zero
   ; wrap_index =
-      (let g = [ Backend.Tock.Curve.(to_affine_exn one) ] in
-       { sigma_comm_0 = g
-       ; sigma_comm_1 = g
-       ; sigma_comm_2 = g
-       ; ql_comm = g
-       ; qr_comm = g
-       ; qo_comm = g
-       ; qm_comm = g
-       ; qc_comm = g
-       ; rcm_comm_0 = g
-       ; rcm_comm_1 = g
-       ; rcm_comm_2 = g
+      (let g = Backend.Tock.Curve.(to_affine_exn one) in
+       { sigma_comm = Vector.init Dlog_plonk_types.Permuts.n ~f:(fun _ -> g)
+       ; coefficients_comm =
+           Vector.init Dlog_plonk_types.Columns.n ~f:(fun _ -> g)
+       ; generic_comm = g
        ; psm_comm = g
-       ; add_comm = g
-       ; mul1_comm = g
-       ; mul2_comm = g
-       ; emul1_comm = g
-       ; emul2_comm = g
-       ; emul3_comm = g
+       ; complete_add_comm = g
+       ; mul_comm = g
+       ; emul_comm = g
+       ; endomul_scalar_comm = g
        })
   ; wrap_vk = None
   }
@@ -255,7 +259,7 @@ module Checked = struct
     { step_domains : (Field.t Domain.t Domains.t, Max_branches.n) Vector.t
     ; step_widths : (Width.Checked.t, Max_branches.n) Vector.t
     ; max_width : Width.Checked.t
-    ; wrap_index : Inner_curve.t array Plonk_verification_key_evals.t
+    ; wrap_index : Inner_curve.t Plonk_verification_key_evals.t
     ; num_branches : (Boolean.var, Max_branches.Log2.n) Vector.t
     }
   [@@deriving hlist, fields]
@@ -273,8 +277,7 @@ module Checked = struct
           |> bitstrings
         ; bitstring (Width.Checked.to_bits max_width)
         ; wrap_index_to_input
-            (Array.concat_map
-               ~f:(Fn.compose Array.of_list Inner_curve.to_field_elements))
+            (Fn.compose Array.of_list Inner_curve.to_field_elements)
             wrap_index
         ; bitstring (Vector.to_list num_branches)
         ]
@@ -299,11 +302,7 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
     [ Vector.typ Domains.typ Max_branches.n
     ; Vector.typ Width.typ Max_branches.n
     ; Width.typ
-    ; Plonk_verification_key_evals.typ
-        (Typ.array Inner_curve.typ
-           ~length:
-             (index_commitment_length ~max_degree:Max_degree.wrap
-                Common.wrap_domains.h))
+    ; Plonk_verification_key_evals.typ Inner_curve.typ
     ; Vector.typ Boolean.typ Max_branches.Log2.n
     ]
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
@@ -317,7 +316,7 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
           (At_most.map step_data ~f:snd)
           dummy_width Max_branches.n
       ; max_width
-      ; Plonk_verification_key_evals.map ~f:Array.of_list wrap_index
+      ; wrap_index
       ; (let n = At_most.length step_data in
          Vector.init Max_branches.Log2.n ~f:(fun i -> (n lsr i) land 1 = 1))
       ])

@@ -8,5 +8,5 @@ let create (type a) ~(of_int : int -> a) :
   let one = of_int 1 in
   { w = Vector.init Dlog_plonk_types.Columns.n ~f:(fun _ -> one)
   ; z = one
-  ; t = of_int 8
+  ; t = of_int 7
   }

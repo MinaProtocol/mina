@@ -10,8 +10,8 @@ let num_bits = 128
 
 (* Has the side effect of checking that [scalar] fits in 128 bits. *)
 let to_field_checked (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) ~zero
-    ~two ~endo (SC.Scalar_challenge (scalar : Impl.Field.t)) =
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) ~endo
+    { SC.inner = (scalar : Impl.Field.t) } =
   let open Impl in
   let neg_one = Field.Constant.(negate one) in
   let a_func = function
@@ -59,10 +59,12 @@ let to_field_checked (type f)
                let b1 = (Lazy.force bits_msb).(bit) in
                Bool.to_int b0 + (2 * Bool.to_int b1))))
   in
+  let two = Field.of_int 2 in
   let a = ref two in
   let b = ref two in
-  let n = ref zero in
+  let n = ref Field.zero in
   let mk f = exists Field.typ ~compute:f in
+  let state = ref [] in
   for i = 0 to rows - 1 do
     let n0 = !n in
     let a0 = !a in
@@ -93,144 +95,41 @@ let to_field_checked (type f)
             ~init:!!b0
             ~f:(fun acc x -> (acc |> double) + b_func x))
     in
+    state :=
+      { Kimchi_backend_common.Endoscale_scalar_round.a0
+      ; a8
+      ; b0
+      ; b8
+      ; n0
+      ; n8
+      ; x0 = xs.(0)
+      ; x1 = xs.(1)
+      ; x2 = xs.(2)
+      ; x3 = xs.(3)
+      ; x4 = xs.(4)
+      ; x5 = xs.(5)
+      ; x6 = xs.(6)
+      ; x7 = xs.(7)
+      }
+      :: !state ;
     n := n8 ;
     a := a8 ;
     b := b8 ;
     ()
   done ;
+  with_label __LOC__ (fun () ->
+      assert_
+        [ { annotation = Some __LOC__
+          ; basic =
+              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
+                T (EC_endoscalar { state = Array.of_list_rev !state }))
+          }
+        ]) ;
   Field.Assert.equal !n scalar ;
   Field.(scale !a endo + !b)
 
-(*
-let to_field_checked (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) ~endo
-    (SC.Scalar_challenge bits) =
-  let bits = Array.of_list bits in
-  let module F = Impl.Field in
-  let two =
-    (* Hack for plonk constraints *)
-    let x = Impl.exists F.typ ~compute:(fun () -> F.Constant.of_int 2) in
-    F.Assert.equal x (F.of_int 2) ;
-    x
-  in
-  let a = ref two in
-  let b = ref two in
-  let one = F.Constant.one in
-  let neg_one = F.Constant.(negate one) in
-  let zero = F.Constant.zero in
-  for i = (128 / 2) - 1 downto 0 do
-    (* s = -1 + 2 * r_2i
-       a_next =
-        if r_2i1
-        then 2 a_prev + s
-        else 2 a_prev
-       =
-       2 a_prev + r_2i1 * s
-       =
-       2 a_prev + r_2i1 * (-1 + 2 r_2i)
-       <->
-       0 = 2 a_prev + r_2i1 * (-1 + 2 r_2i) - a_next
-       <->
-       0 = 2 a_prev - r_2i1 + 2 r_2i1 r_2i - a_next
-       <->
-       two_a_prev_minus_a_next = 2 a_prev - a_next
-       &&
-       0 = - r_2i1 + 2 r_2i1 r_2i + two_a_prev_minus_a_next
-
-       b_next =
-        if r_2i1
-        then 2 b_prev
-        else 2 b_prev + s
-       =
-       2 b_prev + (1 - r_2i1) * s
-       =
-       2 b_prev + (1 - r_2i1) * (2 * r_2i - 1)
-       =
-       2 b_prev - 1 + 2 r_2i + r_2i1 - 2 r_2i1 r_2i
-       <->
-       0 = 2 b_prev - 1 + 2 r_2i + r_2i1 - 2 r_2i1 r_2i - b_next
-       <->
-       0 = (2 b_prev - b_next) - 1 + 2 r_2i + r_2i1 - 2 r_2i1 r_2i
-       <->
-       two_b_prev_minus_b_next = 2 b_prev - b_next
-       &&
-       0
-       = two_b_prev_minus_b_next - 1 + 2 r_2i + r_2i1 - 2 r_2i1 r_2i
-       = 2 r_2i + r_2i1 - 2 r_2i1 r_2i + two_b_prev_minus_b_next + -1
-    *)
-    let open Impl in
-    let a_next =
-      exists Field.typ
-        ~compute:
-          As_prover.(
-            fun () ->
-              let s : F.Constant.t =
-                if read Boolean.typ bits.(Int.(2 * i)) then F.Constant.one
-                else F.Constant.(negate one)
-              in
-              let a_prev = read_var !a in
-              let two_a_prev = F.Constant.(a_prev + a_prev) in
-              if read Boolean.typ bits.(Int.((2 * i) + 1)) then
-                F.Constant.(two_a_prev + s)
-              else two_a_prev)
-    in
-    let b_next =
-      exists Field.typ
-        ~compute:
-          As_prover.(
-            fun () ->
-              let s : F.Constant.t =
-                if read Boolean.typ bits.(Int.(2 * i)) then F.Constant.one
-                else F.Constant.(negate one)
-              in
-              let b_prev = read_var !b in
-              let two_b_prev = F.Constant.(b_prev + b_prev) in
-              if read Boolean.typ bits.(Int.((2 * i) + 1)) then two_b_prev
-              else F.Constant.(two_b_prev + s))
-    in
-    let two_a_prev_minus_a_next =
-      exists Field.typ
-        ~compute:As_prover.(fun () -> read_var F.(!a + !a - a_next))
-    in
-    let two_b_prev_minus_b_next =
-      exists Field.typ
-        ~compute:As_prover.(fun () -> read_var F.(!b + !b - b_next))
-    in
-    let open Zexe_backend_common.Plonk_constraint_system.Plonk_constraint in
-    let p l r o m c =
-      [ { Snarky_backendless.Constraint.annotation = None
-        ; basic = T (Basic { l; r; o; m; c })
-        }
-      ]
-    in
-    let two = F.Constant.of_int 2 in
-    let r_2i = (bits.(2 * i) :> F.t) in
-    let r_2i1 = (bits.((2 * i) + 1) :> F.t) in
-    List.iter ~f:assert_
-      [ (* 0 = 2 a_prev - a_next - two_a_prev_minus_a_next  *)
-        p (two, !a) (neg_one, a_next)
-          (neg_one, two_a_prev_minus_a_next)
-          zero zero
-      ; (* 0 = 2 b_prev - b_next - two_b_prev_minus_b_next  *)
-        p (two, !b) (neg_one, b_next)
-          (neg_one, two_b_prev_minus_b_next)
-          zero zero
-        (* 0 = - r_2i1 + 2 r_2i1 r_2i + two_a_prev_minus_a_next *)
-      ; p (neg_one, r_2i1) (zero, r_2i) (one, two_a_prev_minus_a_next) two zero
-        (* 2 r_2i + r_2i1 - 2 r_2i1 r_2i + two_b_prev_minus_b_next + -1  *)
-      ; p (two, r_2i) (one, r_2i1)
-          (one, two_b_prev_minus_b_next)
-          (F.Constant.negate two) neg_one
-      ] ;
-    a := a_next ;
-    b := b_next
-  done ;
-  F.(scale !a endo + !b)
-   *)
-
 let to_field_constant (type f) ~endo
-    (module F : Plonk_checks.Field_intf with type t = f) (SC.Scalar_challenge c)
-    =
+    (module F : Plonk_checks.Field_intf with type t = f) { SC.inner = c } =
   let bits = Array.of_list (Challenge.Constant.to_bits c) in
   let a = ref (F.of_int 2) in
   let b = ref (F.of_int 2) in
@@ -244,6 +143,11 @@ let to_field_constant (type f) ~endo
     if r_2i1 then a := F.(!a + s) else b := F.(!b + s)
   done ;
   F.((!a * endo) + !b)
+
+let bitstring bs =
+  List.map bs ~f:(fun b -> if b then '1' else '0')
+  |> String.of_char_list |> String.rev
+  |> fun s -> "0b" ^ s
 
 let test (type f)
     (module Impl : Snarky_backendless.Snark_intf.Run
@@ -264,16 +168,16 @@ let test (type f)
             make_checked (fun () ->
                 to_field_checked
                   (module Impl)
-                  ~zero:Field.zero ~two:(Field.of_int 2) ~endo
-                  (SC.Scalar_challenge (Impl.Field.pack s))))
+                  ~endo
+                  (SC.create (Impl.Field.pack s))))
           (fun s ->
             to_field_constant
               (module Field.Constant)
               ~endo
-              (Scalar_challenge (Challenge.Constant.of_bits s)))
+              (SC.create (Challenge.Constant.of_bits s)))
           xs
       with e ->
-        Core.eprintf !"Input %{sexp: bool list}\n%!" xs ;
+        Core.eprintf !"Input %s\n%!" (bitstring xs) ;
         raise e)
 
 module Make
@@ -298,17 +202,11 @@ struct
 
   let typ : (t, Constant.t) Typ.t = SC.typ Challenge.typ
 
-  let zero =
-    lazy
-      (let x = exists Field.typ ~compute:(fun () -> Field.Constant.zero) in
-       Field.Assert.equal Field.zero x ;
-       x)
-
   let num_bits = 128
 
   let seal = Util.seal (module Impl)
 
-  let endo t (SC.Scalar_challenge (scalar : Field.t)) =
+  let endo t { SC.inner = (scalar : Field.t) } =
     let ( !! ) = As_prover.read_var in
     (* MSB bits *)
     let bits =
@@ -322,12 +220,21 @@ struct
     let bits_per_row = 4 in
     let rows = num_bits / bits_per_row in
     let acc =
-      let p = G.( + ) t (seal (Field.scale xt Endo.base), yt) in
-      ref G.(p + p)
+      with_label __LOC__ (fun () ->
+          let p = G.( + ) t (seal (Field.scale xt Endo.base), yt) in
+          ref G.(p + p))
     in
-    let n_acc = ref (Lazy.force zero) in
+    let n_acc = ref Field.zero in
+    (*
+    let check_zero () =
+      as_prover (fun () -> 
+          if not (Field.Constant.(equal zero) (As_prover.read_var (Lazy.force zero)))
+          s_prover.read_var
+    *)
     let mk f = exists Field.typ ~compute:f in
+    let rounds_rev = ref [] in
     for i = 0 to rows - 1 do
+      let n_acc_prev = !n_acc in
       let b1 = mk (fun () -> (bits ()).(i * bits_per_row)) in
       let b2 = mk (fun () -> (bits ()).((i * bits_per_row) + 1)) in
       let b3 = mk (fun () -> (bits ()).((i * bits_per_row) + 2)) in
@@ -362,12 +269,44 @@ struct
       acc := (xs, ys) ;
       n_acc :=
         mk (fun () ->
-            !!(!n_acc) |> double |> ( + ) !!b1 |> double |> ( + ) !!b2 |> double
-            |> ( + ) !!b3 |> double |> ( + ) !!b4) ;
-      ()
+            !!n_acc_prev |> double |> ( + ) !!b1 |> double |> ( + ) !!b2
+            |> double |> ( + ) !!b3 |> double |> ( + ) !!b4) ;
+      rounds_rev :=
+        { Kimchi_backend_common.Endoscale_round.xt
+        ; yt
+        ; xp
+        ; yp
+        ; n_acc = n_acc_prev
+        ; xr
+        ; yr
+        ; s1
+        ; s3
+        ; b1
+        ; b2
+        ; b3
+        ; b4
+        }
+        :: !rounds_rev
     done ;
-    Field.Assert.equal !n_acc scalar ;
+    let xs, ys = !acc in
+    with_label __LOC__ (fun () ->
+        assert_
+          [ { annotation = Some __LOC__
+            ; basic =
+                Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
+                  T
+                    (EC_endoscale
+                       { xs
+                       ; ys
+                       ; n_acc = !n_acc
+                       ; state = Array.of_list_rev !rounds_rev
+                       }))
+            }
+          ]) ;
+    with_label __LOC__ (fun () -> Field.Assert.equal !n_acc scalar) ;
     !acc
+
+  let endo t s = with_label "endo" (fun () -> endo t s)
 
   let%test_unit "endo" =
     let module T = Internal_Basic in
@@ -389,17 +328,15 @@ struct
             (Typ.tuple2 G.typ (Typ.list ~length:n Boolean.typ))
             G.typ
             (fun (g, s) ->
-              make_checked (fun () ->
-                  endo g (SC.Scalar_challenge (Field.pack s))))
+              make_checked (fun () -> endo g (SC.create (Field.pack s))))
             (fun (g, s) ->
               let x =
-                Constant.to_field
-                  (Scalar_challenge (Challenge.Constant.of_bits s))
+                Constant.to_field (SC.create (Challenge.Constant.of_bits s))
               in
               G.Constant.scale g x)
             (random_point, xs)
         with e ->
-          Core.eprintf !"Input %{sexp: bool list}\n%!" xs ;
+          Core.eprintf !"Endo input %s\n%!" (bitstring xs) ;
           raise e)
 
   let endo_inv ((gx, gy) as g) chal =

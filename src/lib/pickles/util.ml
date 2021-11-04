@@ -74,7 +74,6 @@ let boolean_constrain (type f)
   let open Impl in
   assert_all (List.map xs ~f:(fun x -> Constraint.boolean (x :> Field.t)))
 
-(* Should seal constants too *)
 let seal (type f)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
     (x : Impl.Field.t) : Impl.Field.t =
@@ -82,6 +81,8 @@ let seal (type f)
   match Field.to_constant_and_terms x with
   | None, [ (x, i) ] when Field.Constant.(equal x one) ->
       Snarky_backendless.Cvar.Var (Impl.Var.index i)
+  | Some c, [] ->
+      Field.constant c
   | _ ->
       let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
       Field.Assert.equal x y ; y

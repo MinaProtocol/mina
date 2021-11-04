@@ -57,7 +57,7 @@ let rec pack :
   | B spec ->
       p.pack spec t
   | Scalar chal ->
-      let (Scalar_challenge t) = t in
+      let { Scalar_challenge.inner = t } = t in
       p.pack chal t
   | Vector (spec, _) ->
       Array.concat_map (Vector.to_array t) ~f:(pack p spec)
@@ -205,7 +205,11 @@ let pack_basic (type field other_field other_field_var)
         let x = Vector.to_list x in
         [| `Packed_bits (Field.pack x, List.length x) |]
     | Bulletproof_challenge ->
-        let { Bulletproof_challenge.prechallenge = Scalar_challenge pre } = x in
+        let { Bulletproof_challenge.prechallenge =
+                { Scalar_challenge.inner = pre }
+            } =
+          x
+        in
         [| `Packed_bits (pre, Challenge.length) |]
     | _ ->
         failwith "unknown basic spec"
@@ -289,11 +293,15 @@ let packed_typ_basic (type field other_field other_field_var)
     | Bulletproof_challenge ->
         let typ =
           let there
-              { Bulletproof_challenge.prechallenge = Sc.Scalar_challenge pre } =
+              { Bulletproof_challenge.prechallenge =
+                  { Scalar_challenge.inner = pre }
+              } =
             pre
           in
           let back pre =
-            { Bulletproof_challenge.prechallenge = Sc.Scalar_challenge pre }
+            { Bulletproof_challenge.prechallenge =
+                { Scalar_challenge.inner = pre }
+            }
           in
           Typ.transport Challenge.typ ~there ~back
           |> Typ.transport_var ~there ~back

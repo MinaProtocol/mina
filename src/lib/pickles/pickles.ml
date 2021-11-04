@@ -6,6 +6,7 @@ module type Statement_var_intf = Intf.Statement_var
 
 module type Statement_value_intf = Intf.Statement_value
 
+module Common = Common
 open Tuple_lib
 module SC = Scalar_challenge
 open Core_kernel
@@ -144,7 +145,7 @@ let pad_local_max_branchings
   let module V = H2_1.To_vector (Vec) in
   V.f length (M.f local_max_branchings)
 
-open Zexe_backend
+open Kimchi_backend
 
 module Me_only = struct
   module Dlog_based = Types.Dlog_based.Proof_state.Me_only
@@ -338,7 +339,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
   module Lazy_keys = struct
     type t =
       (Impls.Step.Keypair.t * Dirty.t) Lazy.t
-      * (Marlin_plonk_bindings.Pasta_fp_verifier_index.t * Dirty.t) Lazy.t
+      * (Kimchi.Protocol.VerifierIndex.Fp.t * Dirty.t) Lazy.t
 
     (* TODO Think this is right.. *)
   end
@@ -550,7 +551,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                   (Impls.Step.with_label "conv" (fun () -> conv x))
                   ~step_domains
               in
-              let () = if debug then log_step main typ name b.index in
+              let () = if true then log_step main typ name b.index in
               let open Impls.Step in
               let k_p =
                 lazy
@@ -567,6 +568,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                    , Index.to_int b.index
                    , cs ))
               in
+              let () = printf "test %s\n%!" __LOC__ in
               let k_v =
                 match disk_keys with
                 | Some ks ->
@@ -574,7 +576,9 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                 | None ->
                     lazy
                       (let id, _header, index, cs = Lazy.force k_p in
+                       let () = printf "test %s\n%!" __LOC__ in
                        let digest = R1CS_constraint_system.digest cs in
+                       let () = printf "test %s\n%!" __LOC__ in
                        ( id
                        , snark_keys_header
                            { type_ = "step-verification-key"
@@ -586,10 +590,14 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               in
               let ((pk, vk) as res) =
                 Common.time "step read or generate" (fun () ->
+                    let () = printf "test %s\n%!" __LOC__ in
                     Cache.Step.read_or_generate cache k_p k_v typ main)
               in
+              let () = printf "test %s\n%!" __LOC__ in
               accum_dirty (Lazy.map pk ~f:snd) ;
+              let () = printf "test %s\n%!" __LOC__ in
               accum_dirty (Lazy.map vk ~f:snd) ;
+              let () = printf "test %s\n%!" __LOC__ in
               res
           end)
       in
@@ -600,6 +608,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let module V = H4.To_vector (Lazy_keys) in
       lazy
         (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
+             let () = printf "test %s\n%!" __LOC__ in
              Tick.Keypair.vk_commitments (fst (Lazy.force vk))))
     in
     Timer.clock __LOC__ ;
@@ -616,6 +625,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                      type a b c d.
                      (a, b, c, d) IR.t -> (a, b, c, d) H4.T(E04(Domains)).t =
                   fun rule ->
+                   let () = printf "test %s\n%!" __LOC__ in
                    let module M =
                      H4.Map
                        (Tag)
@@ -646,7 +656,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let open Impls.Wrap in
       let (T (typ, conv)) = input () in
       let main x () : unit = wrap_main (conv x) in
-      let () = if debug then log_wrap main typ name self.id in
+      let () = if true then log_wrap main typ name self.id in
       let self_id = Type_equal.Id.uid self.id in
       let disk_key_prover =
         lazy
@@ -701,18 +711,26 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           -> A_value.t
           -> (Max_branching.n, Max_branching.n) Proof.t Async.Deferred.t =
        fun (T b as branch_data) (step_pk, step_vk) ->
+        let () = printf "test %s\n%!" __LOC__ in
         let (module Requests) = b.requests in
+        let () = printf "test %s\n%!" __LOC__ in
         let _, prev_vars_length = b.branching in
+        let () = printf "test %s\n%!" __LOC__ in
         let step handler prevs next_state =
           let wrap_vk = Lazy.force wrap_vk in
+          let () = printf "test %s\n%!" __LOC__ in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
             ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
             (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
             wrap_vk.index prevs
         in
+        let () = printf "test %s\n%!" __LOC__ in
         let pairing_vk = fst (Lazy.force step_vk) in
+        let () = printf "test %s\n%!" __LOC__ in
         let wrap ?handler prevs next_state =
+          let () = printf "test %s\n%!" __LOC__ in
           let wrap_vk = Lazy.force wrap_vk in
+          let () = printf "test %s\n%!" __LOC__ in
           let prevs =
             let module M =
               H3.Map (Statement_with_proof) (P.With_data)
@@ -810,9 +828,7 @@ module Side_loaded = struct
     let of_compiled tag : t =
       let d = Types_map.lookup_compiled tag.Tag.id in
       { wrap_vk = Some (Lazy.force d.wrap_vk)
-      ; wrap_index =
-          Lazy.force d.wrap_key
-          |> Plonk_verification_key_evals.map ~f:Array.to_list
+      ; wrap_index = Lazy.force d.wrap_key
       ; max_width = Width.of_int_exn (Nat.to_int (Nat.Add.n d.max_branching))
       ; step_data =
           At_most.of_vector
@@ -858,9 +874,7 @@ module Side_loaded = struct
     with_return (fun { return } ->
         List.map ts ~f:(fun (vk, x, p) ->
             let vk : V.t =
-              { commitments =
-                  Plonk_verification_key_evals.map ~f:Array.of_list
-                    vk.wrap_index
+              { commitments = vk.wrap_index
               ; step_domains =
                   Array.map (At_most.to_array vk.step_data) ~f:(fun (d, w) ->
                       let input_size =
@@ -973,13 +987,17 @@ module Proof0 = Proof
 
 let%test_module "test no side-loaded" =
   ( module struct
-    let () =
-      Tock.Keypair.set_urs_info
-        [ On_disk { directory = "/tmp/"; should_write = true } ]
+    let () = Tock.Keypair.set_urs_info []
 
-    let () =
-      Tick.Keypair.set_urs_info
-        [ On_disk { directory = "/tmp/"; should_write = true } ]
+    (*         [ On_disk { directory = "/tmp/"; should_write = true } ] *)
+
+    let () = printf "test %s\n%!" __LOC__
+
+    let () = Tick.Keypair.set_urs_info []
+
+    (*         [ On_disk { directory = "/tmp/"; should_write = true } ] *)
+
+    let () = printf "test %s\n%!" __LOC__
 
     open Impls.Step
 
@@ -996,6 +1014,8 @@ let%test_module "test no side-loaded" =
         let to_field_elements x = [| x |]
       end
     end
+
+    let () = printf "test %s\n%!" __LOC__
 
     module Blockchain_snark = struct
       module Statement = Statement
@@ -1040,14 +1060,25 @@ let%test_module "test no side-loaded" =
                   }
                 ]))
 
+      let () = printf "test %s\n%!" __LOC__
+
       module Proof = (val p)
     end
 
+    let () = printf "test %s\n%!" __LOC__
+
     let xs =
+      let () = printf "test %s\n%!" __LOC__ in
       let s_neg_one = Field.Constant.(negate one) in
+      let () = printf "test %s\n%!" __LOC__ in
       let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
         Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n
       in
+      (let (T p) = b_neg_one in
+       printf
+         !"poseidon selector outside %{sexp:Impls.Wrap.Field.Constant.t}\n%!"
+         (fst Dummy.evals_combined.evals).evals.poseidon_selector) ;
+      let () = printf "test %s\n%!" __LOC__ in
       let b0 =
         Common.time "b0" (fun () ->
             Async.Thread_safe.block_on_async_exn (fun () ->
@@ -1055,6 +1086,10 @@ let%test_module "test no side-loaded" =
                   [ (s_neg_one, b_neg_one); (s_neg_one, b_neg_one) ]
                   Field.Constant.zero))
       in
+      assert (
+        Async.Thread_safe.block_on_async_exn (fun () ->
+            Blockchain_snark.Proof.verify [ (Field.Constant.zero, b0) ]) ) ;
+      let () = printf "test %s\n%!" __LOC__ in
       let b1 =
         Common.time "b1" (fun () ->
             Async.Thread_safe.block_on_async_exn (fun () ->
@@ -1062,7 +1097,10 @@ let%test_module "test no side-loaded" =
                   [ (Field.Constant.zero, b0); (Field.Constant.zero, b0) ]
                   Field.Constant.one))
       in
+      let () = printf "test %s\n%!" __LOC__ in
       [ (Field.Constant.zero, b0); (Field.Constant.one, b1) ]
+
+    let () = printf "test %s\n%!" __LOC__
 
     let%test_unit "verify" =
       assert (

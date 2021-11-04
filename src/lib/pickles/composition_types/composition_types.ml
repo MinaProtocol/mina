@@ -44,6 +44,7 @@ module Dlog_based = struct
             ; vbmul : 'fp
             ; complete_add : 'fp
             ; endomul : 'fp
+            ; endomul_scalar : 'fp
             ; perm : 'fp
             ; generic : 'fp Generic_coeffs_vec.t
             }
@@ -64,6 +65,7 @@ module Dlog_based = struct
             ; vbmul = f t.vbmul
             ; complete_add = f t.complete_add
             ; endomul = f t.endomul
+            ; endomul_scalar = f t.endomul_scalar
             ; perm = f t.perm
             ; generic = Vector.map ~f t.generic
             }
@@ -75,6 +77,7 @@ module Dlog_based = struct
               ; challenge
               ; challenge
               ; Scalar_challenge.typ scalar_challenge
+              ; fp
               ; fp
               ; fp
               ; fp
@@ -329,9 +332,7 @@ module Dlog_based = struct
   module Pass_through = struct
     type ('g, 's, 'sg, 'bulletproof_challenges) t =
       { app_state : 's
-      ; dlog_plonk_index :
-          'g Dlog_plonk_types.Poly_comm.Without_degree_bound.t
-          Plonk_verification_key_evals.t
+      ; dlog_plonk_index : 'g Plonk_verification_key_evals.t
       ; sg : 'sg
       ; old_bulletproof_challenges : 'bulletproof_challenges
       }
@@ -471,7 +472,7 @@ module Dlog_based = struct
       let spec =
         let open Spec in
         Struct
-          [ Vector (B Field, Nat.N13.n)
+          [ Vector (B Field, Nat.N14.n)
           ; Vector (B Challenge, Nat.N2.n)
           ; Vector (Scalar Challenge, Nat.N3.n)
           ; Vector (B Digest, Nat.N3.n)
@@ -497,6 +498,7 @@ module Dlog_based = struct
                        ; vbmul
                        ; complete_add
                        ; endomul
+                       ; endomul_scalar
                        ; perm
                        ; generic
                        }
@@ -510,7 +512,7 @@ module Dlog_based = struct
         let open Vector in
         let fp =
           combined_inner_product :: b :: zeta_n :: poseidon_selector :: vbmul
-          :: complete_add :: endomul :: perm :: generic
+          :: complete_add :: endomul :: endomul_scalar :: perm :: generic
         in
         let challenge = [ beta; gamma ] in
         let scalar_challenge = [ alpha; zeta; xi ] in
@@ -541,7 +543,9 @@ module Dlog_based = struct
             :: b
                :: zeta_n
                   :: poseidon_selector
-                     :: vbmul :: complete_add :: endomul :: perm :: generic) =
+                     :: vbmul
+                        :: complete_add
+                           :: endomul :: endomul_scalar :: perm :: generic) =
           fp
         in
         let [ beta; gamma ] = challenge in
@@ -567,6 +571,7 @@ module Dlog_based = struct
                     ; vbmul
                     ; complete_add
                     ; endomul
+                    ; endomul_scalar
                     ; perm
                     ; generic
                     }
@@ -714,7 +719,7 @@ module Pairing_based = struct
         let spec bp_log2 =
           let open Spec in
           Struct
-            [ Vector (B Field, Nat.N13.n)
+            [ Vector (B Field, Nat.N14.n)
             ; Vector (B Digest, Nat.N1.n)
             ; Vector (B Challenge, Nat.N2.n)
             ; Vector (Scalar Challenge, Nat.N3.n)
@@ -738,6 +743,7 @@ module Pairing_based = struct
                      ; vbmul
                      ; complete_add
                      ; endomul
+                     ; endomul_scalar
                      ; perm
                      ; generic
                      }
@@ -749,7 +755,7 @@ module Pairing_based = struct
           let open Vector in
           let fq =
             combined_inner_product :: b :: zeta_n :: poseidon_selector :: vbmul
-            :: complete_add :: endomul :: perm :: generic
+            :: complete_add :: endomul :: endomul_scalar :: perm :: generic
           in
           let challenge = [ beta; gamma ] in
           let scalar_challenge = [ alpha; zeta; xi ] in
@@ -772,7 +778,8 @@ module Pairing_based = struct
                      :: zeta_n
                         :: poseidon_selector
                            :: vbmul
-                              :: complete_add :: endomul :: perm :: generic)
+                              :: complete_add
+                                 :: endomul :: endomul_scalar :: perm :: generic)
               ; Vector.[ sponge_digest_before_evaluations ]
               ; Vector.[ beta; gamma ]
               ; Vector.[ alpha; zeta; xi ]
@@ -794,6 +801,7 @@ module Pairing_based = struct
                   ; vbmul
                   ; complete_add
                   ; endomul
+                  ; endomul_scalar
                   ; perm
                   ; generic
                   }

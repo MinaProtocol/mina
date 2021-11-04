@@ -16,7 +16,7 @@
  (libraries
   digestif
   mina_version
-  zexe_backend
+  kimchi_backend
   random_oracle_input
   pickles_base
   pickles.composition_types
