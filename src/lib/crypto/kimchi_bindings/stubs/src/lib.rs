@@ -51,7 +51,8 @@ pub use {
     commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
     oracle::sponge::caml::CamlScalarChallenge,
     plonk_15_wires_circuits::{
-        gate::{caml::CamlCircuitGate, GateType},
+        gate::{caml::CamlCircuitGate, GateType, CurrOrNext},
+        expr::{caml::{CamlColumn, CamlVariable, CamlPolishToken, CamlLinearization}},
         nolookup::scalars::caml::{CamlLookupEvaluations, CamlProofEvaluations, CamlRandomOracles},
         wires::caml::CamlWire,
     },

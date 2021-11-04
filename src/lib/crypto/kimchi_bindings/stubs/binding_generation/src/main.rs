@@ -15,6 +15,10 @@ use wires_15_stubs::{
     plonk_verifier_index::{CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex},
     projective::{pallas::*, vesta::*},
     srs::{fp::*, fq::*},
+    CamlColumn,
+    CamlVariable,
+    CamlPolishToken,
+    CamlLinearization,
     CamlCircuitGate,
     CamlLookupEvaluations,
     CamlOpeningProof,
@@ -26,6 +30,7 @@ use wires_15_stubs::{
     CamlScalarChallenge,
     CamlWire,
     GateType,
+    CurrOrNext,
 };
 
 fn main() {
@@ -244,6 +249,12 @@ fn generate_bindings(mut w: impl std::io::Write) {
         decl_type!(w, env, GateType => "gate_type");
         decl_type!(w, env, CamlCircuitGate<T1> => "circuit_gate");
 
+        decl_type!(w, env, CurrOrNext => "curr_or_next");
+        decl_type!(w, env, CamlColumn => "column");
+        decl_type!(w, env, CamlVariable => "variable");
+        decl_type!(w, env, CamlPolishToken<T1> => "polish_token");
+        decl_type!(w, env, CamlLinearization<T1> => "linearization");
+
         decl_type!(w, env, CamlOracles<T1> => "oracles");
 
         decl_module!(w, env, "Gates", {
@@ -259,7 +270,7 @@ fn generate_bindings(mut w: impl std::io::Write) {
                 });
                 decl_module!(w, env, "Fq", {
                     decl_type!(w, env, CamlPastaFqPlonkGateVector => "t");
-                    decl_type_alias!(w, env, "elt" => CamlCircuitGate<CamlFp>);
+                    decl_type_alias!(w, env, "elt" => CamlCircuitGate<CamlFq>);
 
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_create => "create");
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_add => "add");

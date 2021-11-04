@@ -11,7 +11,7 @@ use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 
-use plonk_15_wires_circuits::expr::Linearization;
+use plonk_15_wires_circuits::expr::{PolishToken, Linearization};
 use plonk_15_wires_circuits::nolookup::constraints::{zk_polynomial, zk_w3, Shifts};
 use plonk_15_wires_circuits::wires::{COLUMNS, PERMUTS};
 use plonk_15_wires_protocol_dlog::index::VerifierIndex;
@@ -58,6 +58,7 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
                     .map(|x| x.to_vec().iter().map(Into::into).collect()),
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
+            linearization: vi.linearization.into(),
         }
     }
 }
@@ -115,7 +116,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
             lookup_used: None,
             lookup_tables: vec![],
             lookup_selectors: vec![],
-            linearization: Linearization::default(),
+            linearization: index.linearization.into(),
 
             fr_sponge_params: oracle::pasta::fp_3::params(),
             fq_sponge_params: oracle::pasta::fq_3::params(),
@@ -235,6 +236,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
             chacha_comm: None,
         },
         shifts: (0..PERMUTS - 1).map(|_| Fp::one().into()).collect(),
+        linearization: Linearization::<Vec<PolishToken<Fp>>>::default().into(),
     }
 }
 
