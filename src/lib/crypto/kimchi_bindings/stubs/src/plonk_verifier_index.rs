@@ -1,4 +1,4 @@
-use plonk_15_wires_circuits::{
+use kimchi_circuits::{
     expr::caml::{CamlLinearization, CamlPolishToken},
 };
 
