@@ -7,7 +7,7 @@ module Scalar = struct
 
   type value = t
 
-  type var = Tick.Inner_curve.Scalar.var
+  type var = Tick.Inner_curve.Scalar.Checked.t
 
   let to_string = Tick.Inner_curve.Scalar.to_string
 
@@ -69,8 +69,7 @@ module Group = struct
   module Checked = struct
     include Inner_curve.Checked
 
-    let scale_generator shifted s ~init =
-      scale_known shifted Inner_curve.one s ~init
+    let scale_generator s = scale_known Inner_curve.one s
   end
 end
 
@@ -434,8 +433,6 @@ struct
             (struct
               include Message
 
-              let typ = typ ~constraint_constants
-
               let hash_to_group = hash_to_group ~constraint_constants
             end)
             (struct
@@ -451,14 +448,14 @@ struct
 end
 
 type evaluation =
-  ( Marlin_plonk_bindings_pasta_pallas.t
-  , Marlin_plonk_bindings_pasta_fq.t
+  ( Kimchi_pasta.Pasta.Pallas.t
+  , Kimchi_pasta.Pasta.Fq.t
     Vrf_lib.Standalone.Evaluation.Discrete_log_equality.Poly.t )
   Vrf_lib.Standalone.Evaluation.Poly.t
 
 type context =
-  ( (Unsigned.uint32, Marlin_plonk_bindings_pasta_fp.t, int) Message.t
-  , Marlin_plonk_bindings_pasta_pallas.t )
+  ( (Unsigned.uint32, Kimchi_pasta.Pasta.Fp.t, int) Message.t
+  , Kimchi_pasta.Pasta.Pallas.t )
   Vrf_lib.Standalone.Context.t
 
 module Layout = struct
