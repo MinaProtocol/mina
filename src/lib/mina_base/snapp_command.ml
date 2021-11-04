@@ -59,7 +59,7 @@ module Party = struct
         type t =
           ( F.Stable.V1.t Set_or_keep.Stable.V1.t
           , Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
-          , ( Pickles.Side_loaded.Verification_key.Stable.V1.t
+          , ( Pickles.Side_loaded.Verification_key.Stable.V2.t
             , F.Stable.V1.t )
             With_hash.Stable.V1.t
             Set_or_keep.Stable.V1.t
@@ -325,12 +325,12 @@ module Party = struct
         module V1 = struct
           type t =
             ( Predicated.Proved.Stable.V1.t
-            , Control.Stable.V1.t )
+            , Control.Stable.V2.t )
             Poly.Stable.V1.t
           [@@deriving sexp, equal, yojson, hash, compare]
 
           let to_latest ({ data; authorization } : t) : V2.t =
-            { data; authorization = Control.Stable.V1.to_latest authorization }
+            { data; authorization = Control.Stable.V2.to_latest authorization }
         end
       end]
     end

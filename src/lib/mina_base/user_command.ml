@@ -146,25 +146,12 @@ module Verifiable = struct
         ( Signed_command.Stable.V1.t
         , Snapp_predicate.Protocol_state.Stable.V1.t
           * ( Party.Stable.V1.t
-            * Pickles.Side_loaded.Verification_key.Stable.V1.t option )
+            * Pickles.Side_loaded.Verification_key.Stable.V2.t option )
             list )
         Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t =
-        ( Signed_command.Stable.V1.t
-        , Snapp_command.Stable.V1.t
-          * (* TODO: Should be Mina_base.Side_loaded_verification_key *)
-          Pickles.Side_loaded.Verification_key.Stable.V1.t
-          Zero_one_or_two.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      let to_latest = Poly.Stable.V1.to_latest
     end
   end]
 end

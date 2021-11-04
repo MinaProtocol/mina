@@ -154,7 +154,7 @@ module Virtual = struct
   end
 end
 
-module Digest = Zexe_backend.Pasta.Fp
+module Digest = Kimchi_pasta.Pasta.Fp
 
 module With_hashes = struct
   type 'a t = ('a * Random_oracle.Digest.t) list
@@ -194,7 +194,7 @@ let valid_interval (t : t) =
       i
 
 module Transaction_commitment = struct
-  module Stable = Zexe_backend.Pasta.Fp.Stable
+  module Stable = Kimchi_pasta.Pasta.Fp.Stable
 
   type t = Stable.Latest.t
 

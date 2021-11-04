@@ -81,7 +81,7 @@ end
 
 [%%ifdef consensus_mechanism]
 
-type var = Field.Var.t * Inner_curve.Scalar.var
+type var = Field.Var.t * Inner_curve.Scalar.Checked.t
 
 [%%endif]
 
