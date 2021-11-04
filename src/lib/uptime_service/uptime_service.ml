@@ -57,6 +57,8 @@ let sign_blake2_hash ~private_key s =
   in
   Schnorr.sign private_key input
 
+exception No_more_retries
+
 let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
     ~state_hash ~produced block_data =
   let open Interruptible.Let_syntax in
@@ -83,87 +85,82 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
     | `Empty | `Pipe _ ->
         []
   in
+  let max_attempts = 8 in
+  let attempt_pause_sec = 10.0 in
   (* TODO : merge inner interruptible with outer interruptible across monitor *)
-  match%map
-    make_interruptible
-      (Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
-           let max_attempts = 8 in
-           let attempt_pause_sec = 10.0 in
-           let rec run_attempt attempt : unit Deferred.t =
-             let interruptible : (unit, _) Interruptible.t =
-               match%bind
-                 make_interruptible
-                   (Cohttp_async.Client.post ~headers
-                      ~body:
-                        ( Yojson.Safe.to_string json
-                        |> Cohttp_async.Body.of_string )
-                      url)
-               with
-               | {status; _}, body ->
-                   if Cohttp.Code.code_of_status status = 200 then (
-                     [%log info]
-                       "Sent block with state hash $state_hash to uptime \
-                        service at URL $url"
-                       ~metadata:
-                         [ ("state_hash", State_hash.to_yojson state_hash)
-                         ; ( "includes_snark_work"
-                           , `Bool (Option.is_some block_data.snark_work) )
-                         ; ("is_produced_block", `Bool produced)
-                         ; ("url", `String (Uri.to_string url)) ] ;
-                     Interruptible.return () )
-                   else if attempt >= max_attempts then (
-                     let base_metadata =
-                       [ ("state_hash", State_hash.to_yojson state_hash)
-                       ; ("url", `String (Uri.to_string url))
-                       ; ("http_code", `Int (Cohttp.Code.code_of_status status))
-                       ; ( "http_error"
-                         , `String (Cohttp.Code.string_of_status status) )
-                       ; ("payload", json) ]
-                     in
-                     let extra_metadata = metadata_of_body body in
-                     let metadata = base_metadata @ extra_metadata in
-                     [%log error]
-                       "After %d attempts, failed to send block with state \
-                        hash $state_hash to uptime service at URL $url, no \
-                        more retries"
-                       max_attempts ~metadata ;
-                     Interruptible.return () )
-                   else
-                     let base_metadata =
-                       [ ("state_hash", State_hash.to_yojson state_hash)
-                       ; ("url", `String (Uri.to_string url))
-                       ; ("http_code", `Int (Cohttp.Code.code_of_status status))
-                       ; ( "http_error"
-                         , `String (Cohttp.Code.string_of_status status) ) ]
-                     in
-                     let extra_metadata = metadata_of_body body in
-                     let metadata = base_metadata @ extra_metadata in
-                     [%log info]
-                       "Failure when sending block with state hash \
-                        $state_hash to uptime service at URL $url, attempt %d \
-                        of %d, retrying"
-                       attempt max_attempts ~metadata ;
-                     let%bind () =
-                       make_interruptible
-                       @@ Async.after (Time.Span.of_sec attempt_pause_sec)
-                     in
-                     make_interruptible @@ run_attempt (attempt + 1)
-             in
-             match%map.Deferred.Let_syntax
-               Interruptible.force interruptible
-             with
-             | Ok () ->
-                 ()
-             | Error _ ->
-                 [%log error]
-                   "In uptime service, POST of block with state hash \
-                    $state_hash was interrupted"
-                   ~metadata:
-                     [ ("state_hash", State_hash.to_yojson state_hash)
-                     ; ("payload", json) ]
-           in
-           run_attempt 1 ))
-  with
+  let rec run_attempt attempt : (unit, exn) Deferred.Result.t =
+    Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
+        let interruptible : ((unit, exn) Result.t, _) Interruptible.t =
+          match%bind
+            make_interruptible
+              (Cohttp_async.Client.post ~headers
+                 ~body:
+                   (Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
+                 url)
+          with
+          | {status; _}, body ->
+              if Cohttp.Code.code_of_status status = 200 then (
+                [%log info]
+                  "Sent block with state hash $state_hash to uptime service \
+                   at URL $url"
+                  ~metadata:
+                    [ ("state_hash", State_hash.to_yojson state_hash)
+                    ; ( "includes_snark_work"
+                      , `Bool (Option.is_some block_data.snark_work) )
+                    ; ("is_produced_block", `Bool produced)
+                    ; ("url", `String (Uri.to_string url)) ] ;
+                Interruptible.return @@ Ok () )
+              else if attempt >= max_attempts then (
+                let base_metadata =
+                  [ ("state_hash", State_hash.to_yojson state_hash)
+                  ; ("url", `String (Uri.to_string url))
+                  ; ("http_code", `Int (Cohttp.Code.code_of_status status))
+                  ; ( "http_error"
+                    , `String (Cohttp.Code.string_of_status status) )
+                  ; ("payload", json) ]
+                in
+                let extra_metadata = metadata_of_body body in
+                let metadata = base_metadata @ extra_metadata in
+                [%log error]
+                  "After %d attempts, failed to send block with state hash \
+                   $state_hash to uptime service at URL $url, no more retries"
+                  max_attempts ~metadata ;
+                Interruptible.return @@ Error No_more_retries )
+              else
+                let base_metadata =
+                  [ ("state_hash", State_hash.to_yojson state_hash)
+                  ; ("url", `String (Uri.to_string url))
+                  ; ("http_code", `Int (Cohttp.Code.code_of_status status))
+                  ; ( "http_error"
+                    , `String (Cohttp.Code.string_of_status status) ) ]
+                in
+                let extra_metadata = metadata_of_body body in
+                let metadata = base_metadata @ extra_metadata in
+                [%log info]
+                  "Failure when sending block with state hash $state_hash to \
+                   uptime service at URL $url, attempt %d of %d, retrying"
+                  attempt max_attempts ~metadata ;
+                let%bind () =
+                  make_interruptible
+                  @@ Async.after (Time.Span.of_sec attempt_pause_sec)
+                in
+                make_interruptible (run_attempt (attempt + 1))
+        in
+        match%map.Deferred.Let_syntax Interruptible.force interruptible with
+        | Ok (Ok ()) ->
+            ()
+        | Ok (Error _) ->
+            (* we already logged any errors *)
+            ()
+        | Error _ ->
+            [%log error]
+              "In uptime service, POST of block with state hash $state_hash \
+               was interrupted"
+              ~metadata:
+                [ ("state_hash", State_hash.to_yojson state_hash)
+                ; ("payload", json) ] )
+  in
+  match%map make_interruptible @@ run_attempt 1 with
   | Ok () ->
       ()
   | Error exn ->
