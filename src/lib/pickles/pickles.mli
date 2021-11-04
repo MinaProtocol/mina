@@ -1,4 +1,5 @@
 open Core_kernel
+open Async_kernel
 open Pickles_types
 open Hlist
 module Tick_field_sponge = Tick_field_sponge
@@ -46,7 +47,7 @@ module Verification_key : sig
   val load :
        cache:Key_cache.Spec.t list
     -> Id.t
-    -> (t * [ `Cache_hit | `Locally_generated ]) Async.Deferred.Or_error.t
+    -> (t * [ `Cache_hit | `Locally_generated ]) Deferred.Or_error.t
 end
 
 module type Proof_intf = sig
@@ -58,7 +59,7 @@ module type Proof_intf = sig
 
   val id : Verification_key.Id.t Lazy.t
 
-  val verify : (statement * t) list -> bool Async.Deferred.t
+  val verify : (statement * t) list -> bool Deferred.t
 end
 
 module Proof : sig
@@ -90,7 +91,7 @@ val verify :
   -> (module Statement_value_intf with type t = 'a)
   -> Verification_key.t
   -> ('a * ('n, 'n) Proof.t) list
-  -> bool Async.Deferred.t
+  -> bool Deferred.t
 
 module Prover : sig
   type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
@@ -186,7 +187,7 @@ module Side_loaded : sig
   val verify :
        value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
     -> (Verification_key.t * 'value * Proof.t) list
-    -> bool Async.Deferred.t
+    -> bool Deferred.t
 
   (* Must be called in the inductive rule snarky function defining a
      rule for which this tag is used as a predecessor. *)
@@ -232,5 +233,5 @@ val compile :
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('max_branching, 'max_branching) Proof.t Async.Deferred.t )
+       , ('max_branching, 'max_branching) Proof.t Deferred.t )
        H3_2.T(Prover).t

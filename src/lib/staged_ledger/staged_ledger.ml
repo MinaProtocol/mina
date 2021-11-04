@@ -1049,10 +1049,15 @@ module T = struct
       (List.map xs ~f:(function
         | `Valid x ->
             Ok x
-        | `Invalid ->
+        | ( `Invalid_keys _
+          | `Invalid_signature _
+          | `Invalid_proof
+          | `Missing_verification_key _ ) as invalid ->
             Error
               (Verifier.Failure.Verification_failed
-                 (Error.of_string "verification failed on command"))
+                 (Error.of_string
+                    (sprintf "verification failed on command, %s"
+                       (Verifier.invalid_to_string invalid))))
         | `Valid_assuming _ ->
             Error
               (Verifier.Failure.Verification_failed

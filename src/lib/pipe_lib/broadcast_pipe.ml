@@ -149,7 +149,7 @@ let%test_unit "listeners properly receive updates" =
       ~message:"Expected the following values from the pipe" ~expect:expected
       got
   in
-  Async.Thread_safe.block_on_async_exn (fun () ->
+  Run_in_thread.block_on_async_exn (fun () ->
       let initial = 0 in
       let r, w = create initial in
       (*1*)
@@ -191,9 +191,8 @@ let%test_module _ =
       assert_deferred counts expected
 
     let%test "Writing is synchronous" =
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          Core.Backtrace.elide := false ;
-          Async.Scheduler.set_record_backtraces true ;
+      Run_in_thread.block_on_async_exn (fun () ->
+          Core_kernel.Backtrace.elide := false ;
           let pipe_r, pipe_w = create () in
           let counts1, counts2 = (zero_counts (), zero_counts ()) in
           let setup_reader counts =
@@ -201,7 +200,7 @@ let%test_module _ =
             @@ Reader.iter pipe_r ~f:(fun () ->
                    counts.immediate_iterations <-
                      counts.immediate_iterations + 1 ;
-                   let%map () = Async.after @@ Time.Span.of_sec 1. in
+                   let%map () = after @@ Time_ns.Span.of_sec 1. in
                    counts.deferred_iterations <- counts.deferred_iterations + 1)
           in
           setup_reader counts1 ;
@@ -209,12 +208,12 @@ let%test_module _ =
           assert_both counts1 0 ;
           (* Once we yield, the reader has run, but has returned to the
              scheduler before setting deferred_iterations. *)
-          let%bind () = Async.after @@ Time.Span.of_sec 0.1 in
+          let%bind () = after @@ Time_ns.Span.of_sec 0.1 in
           assert_immediate counts1 1 ;
           assert_deferred counts1 0 ;
           (* After we yield for long enough, deferred_iterations has been
              set. *)
-          let%bind () = Async.after @@ Time.Span.of_sec 1.1 in
+          let%bind () = after @@ Time_ns.Span.of_sec 1.1 in
           assert_both counts1 1 ;
           (* Writing to the pipe blocks until the reader is finished. *)
           let%bind () = Writer.write pipe_w () in
@@ -223,7 +222,7 @@ let%test_module _ =
              after its creation. *)
           setup_reader counts2 ;
           assert_both counts2 0 ;
-          let%bind () = Async.after @@ Time.Span.of_sec 0.1 in
+          let%bind () = after @@ Time_ns.Span.of_sec 0.1 in
           assert_immediate counts2 1 ;
           assert_deferred counts2 0 ;
           let%bind () = Writer.write pipe_w () in

@@ -173,7 +173,7 @@ let test (type f)
               (Scalar_challenge (Challenge.Constant.of_bits s)))
           xs
       with e ->
-        Core.eprintf !"Input %{sexp: bool list}\n%!" xs ;
+        eprintf !"Input %{sexp: bool list}\n%!" xs ;
         raise e)
 
 module Make
@@ -307,7 +307,7 @@ struct
               G.Constant.scale g x)
             (random_point, xs)
         with e ->
-          Core.eprintf !"Input %{sexp: bool list}\n%!" xs ;
+          eprintf !"Input %{sexp: bool list}\n%!" xs ;
           raise e)
 
   let endo_inv ((gx, gy) as g) chal =
