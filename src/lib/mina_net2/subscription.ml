@@ -80,6 +80,7 @@ let handle_and_validate sub ~validation_expiration ~(sender : Peer.t)
           ()
       | `Call f ->
           f (wrap_message raw_data) e ) ;
+      Mina_metrics.(Counter.inc_one Network.gossip_messages_failed_to_decode) ;
       return (`Decoding_error e)
 
 let publish_raw ~logger ~helper ~topic data =

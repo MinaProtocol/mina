@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 module type Bindings = sig
   type t

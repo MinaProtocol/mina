@@ -65,6 +65,9 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
     let name = "transition frontier controller pipe" in
     create_bufferred_pipe ~name
       ~f:(fun head ->
+        Mina_metrics.(
+          Counter.inc_one
+            Pipe.Drop_on_overflow.router_transition_frontier_controller) ;
         Mina_transition.External_transition.Initial_validated
         .handle_dropped_transition
           (Network_peer.Envelope.Incoming.data head)
@@ -105,6 +108,8 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
     let name = "bootstrap controller pipe" in
     create_bufferred_pipe ~name
       ~f:(fun head ->
+        Mina_metrics.(
+          Counter.inc_one Pipe.Drop_on_overflow.router_bootstrap_controller) ;
         Mina_transition.External_transition.Initial_validated
         .handle_dropped_transition
           (Network_peer.Envelope.Incoming.data head)
@@ -471,6 +476,8 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     let name = "verified transitions" in
     create_bufferred_pipe ~name
       ~f:(fun (`Transition head, _) ->
+        Mina_metrics.(
+          Counter.inc_one Pipe.Drop_on_overflow.router_verified_transitions) ;
         Mina_transition.External_transition.Validated.handle_dropped_transition
           head ~pipe_name:name ~logger)
       ()
@@ -479,6 +486,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     let name = "transition pipe" in
     create_bufferred_pipe ~name
       ~f:(fun head ->
+        Mina_metrics.(Counter.inc_one Pipe.Drop_on_overflow.router_transitions) ;
         Mina_transition.External_transition.Initial_validated
         .handle_dropped_transition
           (Network_peer.Envelope.Incoming.data head)
@@ -502,6 +510,8 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
         let name = "valid transitions" in
         create_bufferred_pipe ~name
           ~f:(fun head ->
+            Mina_metrics.(
+              Counter.inc_one Pipe.Drop_on_overflow.router_valid_transitions) ;
             Mina_transition.External_transition.Initial_validated
             .handle_dropped_transition
               (Network_peer.Envelope.Incoming.data head)

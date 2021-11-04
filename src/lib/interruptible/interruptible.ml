@@ -164,9 +164,9 @@ module Deferred_let_syntax = struct
 end
 
 let%test_unit "monad gets interrupted" =
-  Async.Thread_safe.block_on_async_exn (fun () ->
+  Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
-      let wait i = Async.after (Core.Time.Span.of_ms i) in
+      let wait i = after (Time_ns.Span.of_ms i) in
       let ivar = Ivar.create () in
       don't_wait_for
         (let open Let_syntax in
@@ -182,9 +182,9 @@ let%test_unit "monad gets interrupted" =
       assert (!r = 1))
 
 let%test_unit "monad gets interrupted within nested binds" =
-  Async.Thread_safe.block_on_async_exn (fun () ->
+  Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
-      let wait i = Async.after (Core.Time.Span.of_ms i) in
+      let wait i = after (Time_ns.Span.of_ms i) in
       let ivar = Ivar.create () in
       let rec go () =
         let open Let_syntax in
@@ -202,9 +202,9 @@ let%test_unit "monad gets interrupted within nested binds" =
       assert (!r = 1))
 
 let%test_unit "interruptions still run finally blocks" =
-  Async.Thread_safe.block_on_async_exn (fun () ->
+  Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
-      let wait i = Async.after (Core.Time.Span.of_ms i) in
+      let wait i = after (Time_ns.Span.of_ms i) in
       let ivar = Ivar.create () in
       let rec go () =
         let open Let_syntax in
@@ -222,10 +222,10 @@ let%test_unit "interruptions still run finally blocks" =
       assert (!r = 2))
 
 let%test_unit "interruptions branches do not cancel each other" =
-  Async.Thread_safe.block_on_async_exn (fun () ->
+  Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
       let s = ref 0 in
-      let wait i = Async.after (Core.Time.Span.of_ms i) in
+      let wait i = after (Time_ns.Span.of_ms i) in
       let ivar_r = Ivar.create () in
       let ivar_s = Ivar.create () in
       let rec go r =
