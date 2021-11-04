@@ -215,22 +215,16 @@ module Make (Inputs : Inputs_intf) = struct
     in
     { sigma_comm =
         Pickles_types.Vector.init Pickles_types.Dlog_plonk_types.Permuts.n
-          ~f:(fun i ->
-            g t.evals.sigma_comm.(i))
+          ~f:(fun i -> g t.evals.sigma_comm.(i))
     ; coefficients_comm =
         Pickles_types.Vector.init Pickles_types.Dlog_plonk_types.Columns.n
-          ~f:(fun i ->
-            g t.evals.coefficients_comm.(i))
-    ; generic_comm = (g t.evals.generic_comm)
-    ; psm_comm = (g t.evals.psm_comm)
-    ; complete_add_comm =
-        ( 
-          g t.evals.complete_add_comm )
-    ; mul_comm = (g t.evals.mul_comm)
-    ; emul_comm = ( g t.evals.emul_comm)
-    ; endomul_scalar_comm =
-        ( 
-          g t.evals.endomul_scalar_comm )
+          ~f:(fun i -> g t.evals.coefficients_comm.(i))
+    ; generic_comm = g t.evals.generic_comm
+    ; psm_comm = g t.evals.psm_comm
+    ; complete_add_comm = g t.evals.complete_add_comm
+    ; mul_comm = g t.evals.mul_comm
+    ; emul_comm = g t.evals.emul_comm
+    ; endomul_scalar_comm = g t.evals.endomul_scalar_comm
     }
 
   (*
