@@ -508,7 +508,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 if insecure_rest_server then All_addresses else Localhost)
             ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
             rest_server_port)) ;
-  (*Second graphql server with limited queries exopsed*)
+  (*Second graphql server with limited queries exposed*)
   Option.iter limited_graphql_port ~f:(fun rest_server_port ->
       trace_task "limited GraphQL server" (fun () ->
           create_graphql_server

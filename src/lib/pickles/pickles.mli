@@ -129,6 +129,12 @@ module Side_loaded : sig
       end
     end]
 
+    val to_base58_check : t -> string
+
+    val of_base58_check : string -> t Or_error.t
+
+    val of_base58_check_exn : string -> t
+
     val dummy : t
 
     open Impls.Step
@@ -143,9 +149,11 @@ module Side_loaded : sig
 
     val typ : (Checked.t, t) Impls.Step.Typ.t
 
+    val of_compiled : _ Tag.t -> t
+
     module Max_branches : Nat.Add.Intf
 
-    module Max_width : Nat.Add.Intf
+    module Max_width = Nat.N2
   end
 
   module Proof : sig
@@ -156,8 +164,16 @@ module Side_loaded : sig
         type t =
           (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
         [@@deriving sexp, equal, yojson, hash, compare]
+
+        val to_base64 : t -> string
+
+        val of_base64 : string -> (t, string) Result.t
       end
     end]
+
+    val to_base64 : t -> string
+
+    val of_base64 : string -> (t, string) Result.t
   end
 
   val create :

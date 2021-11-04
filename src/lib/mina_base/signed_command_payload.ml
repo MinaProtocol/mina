@@ -515,3 +515,33 @@ let gen =
   in
   let%map body = Body.gen ~source_pk:common.fee_payer_pk ~max_amount in
   Poly.{ common; body }
+
+(** This module defines a weight for each payload component *)
+module Weight = struct
+  let payment (_payment_payload : Payment_payload.t) : int = 1
+
+  let stake_delegation (_stake_delegation : Stake_delegation.t) : int = 1
+
+  let create_new_token (_new_token_payload : New_token_payload.t) : int = 1
+
+  let create_token_account (_new_account_payload : New_account_payload.t) : int
+      =
+    1
+
+  let mint_tokens (_minting_payload : Minting_payload.t) : int = 1
+
+  let of_body : Body.t -> int = function
+    | Payment payment_payload ->
+        payment payment_payload
+    | Stake_delegation stake_delegation_payload ->
+        stake_delegation stake_delegation_payload
+    | Create_new_token new_token_payload ->
+        create_new_token new_token_payload
+    | Create_token_account new_account_payload ->
+        create_token_account new_account_payload
+    | Mint_tokens minting_payload ->
+        mint_tokens minting_payload
+end
+
+let weight (signed_command_payload : t) : int =
+  body signed_command_payload |> Weight.of_body

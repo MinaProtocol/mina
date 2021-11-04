@@ -33,7 +33,13 @@ end) (M : sig
 end) : sig
   [%%ifdef consensus_mechanism]
 
-  include S with type t = Unsigned.t and type var = Boolean.var list
+  include
+    S
+      with type t = Unsigned.t
+       and type var = Boolean.var list
+       and type Signed.signed_fee := (Unsigned.t, Sgn.t) Signed_poly.t
+       and type Signed.Checked.signed_fee_var :=
+            (Boolean.var list, Sgn.var) Signed_poly.t
 
   val var_of_bits : Boolean.var Bitstring.Lsb_first.t -> var
 
@@ -43,7 +49,10 @@ end) : sig
 
   [%%else]
 
-  include S with type t = Unsigned.t
+  include
+    S
+      with type t = Unsigned.t
+       and type Signed.signed_fee := (Unsigned.t, Sgn.t) Signed_poly.t
 
   [%%endif]
 
@@ -174,6 +183,10 @@ end = struct
     let z = Unsigned.add x y in
     if z < x then None else Some z
 
+  let add_flagged x y =
+    let z = Unsigned.add x y in
+    (z, `Overflow (z < x))
+
   let scale u64 i =
     let i = Unsigned.of_int i in
     let max_val = Unsigned.(div max_int i) in
@@ -261,6 +274,22 @@ end = struct
                 ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
             else zero )
 
+    let add_flagged (x : t) (y : t) : t * [ `Overflow of bool ] =
+      match (x.sgn, y.sgn) with
+      | Neg, (Neg as sgn) | Pos, (Pos as sgn) ->
+          let magnitude, `Overflow b = add_flagged x.magnitude y.magnitude in
+          (create ~sgn ~magnitude, `Overflow b)
+      | Pos, Neg | Neg, Pos ->
+          let c = compare_magnitude x.magnitude y.magnitude in
+          ( ( if Int.( < ) c 0 then
+              create ~sgn:y.sgn
+                ~magnitude:Unsigned.Infix.(y.magnitude - x.magnitude)
+            else if Int.( > ) c 0 then
+              create ~sgn:x.sgn
+                ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
+            else zero )
+          , `Overflow false )
+
     let negate t =
       if Unsigned.(equal zero t.magnitude) then zero
       else { t with sgn = Sgn.negate t.sgn }
@@ -268,6 +297,10 @@ end = struct
     let of_unsigned magnitude = create ~magnitude ~sgn:Sgn.Pos
 
     let ( + ) = add
+
+    let to_fee = Fn.id
+
+    let of_fee = Fn.id
 
     [%%ifdef consensus_mechanism]
 
@@ -303,6 +336,23 @@ end = struct
 
       let to_field_var ({ magnitude; sgn } : var) =
         Field.Checked.mul (pack_var magnitude) (sgn :> Field.Var.t)
+
+      let add_flagged (x : var) (y : var) =
+        let%bind xv = to_field_var x and yv = to_field_var y in
+        let%bind sgn =
+          exists Sgn.typ
+            ~compute:
+              (let open As_prover in
+              let%map x = read typ x and y = read typ y in
+              (Option.value_exn (add x y)).sgn)
+        in
+        let%bind res =
+          Tick.Field.Checked.mul (sgn :> Field.Var.t) (Field.Var.add xv yv)
+        in
+        let%map magnitude, `Success no_overflow =
+          Field.Checked.unpack_flagged res ~length:length_in_bits
+        in
+        ({ magnitude; sgn }, `Overflow (Boolean.not no_overflow))
 
       let add (x : var) (y : var) =
         let%bind xv = to_field_var x and yv = to_field_var y in
@@ -362,6 +412,10 @@ end = struct
         let%bind x = Field.Checked.mul (pack_var t.magnitude) f in
         let%map x = unpack_var x in
         { sgn = t.sgn; magnitude = x }
+
+      let to_fee = Fn.id
+
+      let of_fee = Fn.id
     end
 
     [%%endif]
@@ -697,6 +751,8 @@ module Balance = struct
   module Checked = struct
     include Amount.Checked
 
+    let to_amount = Fn.id
+
     let add_signed_amount = add_signed
 
     let add_amount = add
@@ -715,6 +771,85 @@ module Balance = struct
   end
 
   [%%endif]
+end
+
+module Fee_rate = struct
+  type t = Q.t
+
+  let uint64_to_z u64 = Z.of_string @@ Unsigned.UInt64.to_string u64
+
+  let uint64_of_z z = Unsigned.UInt64.of_string @@ Z.to_string z
+
+  let max_uint64_z = uint64_to_z Unsigned.UInt64.max_int
+
+  let fits_uint64 z =
+    let open Z in
+    leq zero z && leq z max_uint64_z
+
+  (** check if a Q.t is in range *)
+  let check_q Q.{ num; den } : bool =
+    let open Z in
+    fits_uint64 num && fits_int32 den
+    && if equal zero den then equal zero num else true
+
+  let of_q q = if check_q q then Some q else None
+
+  let of_q_exn q = Option.value_exn (of_q q)
+
+  let to_q = ident
+
+  let make fee weight = of_q @@ Q.make (uint64_to_z fee) (Z.of_int weight)
+
+  let make_exn fee weight = Option.value_exn (make fee weight)
+
+  let to_uint64 Q.{ num; den } =
+    if Z.(equal den Z.one) then Some (uint64_of_z num) else None
+
+  let to_uint64_exn fr = Option.value_exn (to_uint64 fr)
+
+  let add x y = of_q @@ Q.add x y
+
+  let add_flagged x y =
+    let z = Q.add x y in
+    (z, `Overflow (check_q z))
+
+  let sub x y = of_q @@ Q.sub x y
+
+  let mul x y = of_q @@ Q.mul x y
+
+  let div x y = of_q @@ Q.div x y
+
+  let ( + ) = add
+
+  let ( - ) = sub
+
+  let ( * ) = mul
+
+  let scale fr s = fr * Q.of_int s
+
+  let scale_exn fr s = Option.value_exn (scale fr s)
+
+  let compare = Q.compare
+
+  let t_of_sexp sexp =
+    let open Ppx_sexp_conv_lib.Conv in
+    pair_of_sexp Fee.t_of_sexp int_of_sexp sexp
+    |> fun (fee, weight) -> make_exn fee weight
+
+  let sexp_of_t Q.{ num = fee; den = weight } =
+    let sexp_of_fee fee = Fee.sexp_of_t @@ uint64_of_z fee in
+    let sexp_of_weight weight = sexp_of_int @@ Z.to_int weight in
+    sexp_of_pair sexp_of_fee sexp_of_weight (fee, weight)
+
+  include Comparable.Make (struct
+    type nonrec t = t
+
+    let compare = compare
+
+    let t_of_sexp = t_of_sexp
+
+    let sexp_of_t = sexp_of_t
+  end)
 end
 
 let%test_module "sub_flagged module" =

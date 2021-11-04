@@ -53,6 +53,9 @@ module Poly : sig
         ; set_delegate : 'controller
         ; set_permissions : 'controller
         ; set_verification_key : 'controller
+        ; set_snapp_uri : 'controller
+        ; edit_sequence_state : 'controller
+        ; set_token_symbol : 'controller
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
@@ -66,6 +69,8 @@ module Stable : sig
     [@@deriving sexp, equal, compare, hash, yojson]
   end
 end]
+
+val gen : t Core_kernel.Quickcheck.Generator.t
 
 val to_input : t -> (_, bool) Random_oracle_input.t
 
