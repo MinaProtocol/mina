@@ -202,10 +202,9 @@ LIMIT 1
       match (last_relevant_command_info_opt, timing_info_opt) with
       | None, None ->
         (* We've never heard of this account, at least as of the block_identifier provided *)
-        (* This means they requested a block from before account creation;
-         * this is ambiguous in the spec but Coinbase confirmed we can return 0.
-         * https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
-        Deferred.Result.return 0L
+        (* We will fail with Account_not_found -- this handles the case where
+         * this is run at the best tip as well *)
+        Deferred.Result.fail (Errors.create (`Account_not_found address))
       | Some (_, last_relevant_command_balance), None ->
         (* This account has no special vesting, so just use its last known balance *)
           Deferred.Result.return last_relevant_command_balance
@@ -248,8 +247,9 @@ LIMIT 1
       match (last_relevant_command_info_opt, timing_info_opt) with
       | None, None ->
           (* We've never heard of this account, at least as of the block_identifier provided *)
-          (* TODO: This means they requested a block from before account creation. Should it error instead? Need to clarify with Coinbase team. *)
-          Deferred.Result.return 0L
+          (* We will fail with Account_not_found -- this handles the case where
+           * this is run at the best tip as well *)
+        Deferred.Result.fail (Errors.create (`Account_not_found address))
       | Some (_, last_relevant_command_balance), _ ->
           (* This account was involved in a command and we don't care about its vesting, so just use the last known
          * balance from the command *)
@@ -396,7 +396,7 @@ module Balance = struct
               [ make_balance_amount
                   ~liquid_balance:(Unsigned.UInt64.of_int64 liquid_balance)
                   ~total_balance:(Unsigned.UInt64.of_int64 total_balance) ]
-          ; metadata=Some (`Assoc [ ("created_via_historical_lookup", `Bool true ) ]) }
+          ; metadata=None }
       in
       match req.block_identifier with
       | None ->
