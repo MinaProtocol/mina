@@ -43,6 +43,7 @@ macro_rules! impl_vector_old {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! impl_vector {
     ($name: ident, $CamlF: ty, $F: ty) => {
 

@@ -152,6 +152,12 @@ module Plonk_constraint = struct
       | EC_scale of { state : 'v Scale_round.t array }
       | EC_endoscale of
           { state : 'v Endoscale_round.t array; xs : 'v; ys : 'v; n_acc : 'v }
+      | EC_endoscalar of
+          { state : 'v Endoscale_scalar_round.t array
+          ; n8 : 'v
+          ; a8 : 'v
+          ; b8 : 'v
+          }
     [@@deriving sexp]
 
     (** map t *)
@@ -183,6 +189,14 @@ module Plonk_constraint = struct
             ; xs = f xs
             ; ys = f ys
             ; n_acc = f n_acc
+            }
+      | EC_endoscalar { state; n8; a8; b8 } ->
+          EC_endoscalar
+            { state =
+                Array.map ~f:(fun x -> Endoscale_scalar_round.map ~f x) state
+            ; n8 = f n8
+            ; a8 = f a8
+            ; b8 = f b8
             }
 
     (* TODO: this seems to be a "double check" type of function? It just checks that the basic gate is equal to 0? what is eval_one? what is v and f? *)
@@ -370,14 +384,30 @@ struct
                 Scale_round.fold a ~init:acc ~f:cvars)
         | EC_endoscale { state; xs; ys; n_acc } ->
             let t = H.feed_string t "ec_endoscale" in
-            Array.fold state ~init:t
-              ~f:(fun
-                   acc
-                   { xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4 }
-                 ->
-                cvars
-                  [ xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4 ]
-                  acc) )
+            let t =
+              Array.fold state ~init:t
+                ~f:(fun
+                     acc
+                     { xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4 }
+                   ->
+                  cvars
+                    [ xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4 ]
+                    acc)
+            in
+            cvars [ xs; ys; n_acc ] t
+        | EC_endoscalar { state; n8; a8; b8 } ->
+            let t = H.feed_string t "ec_endoscale_scalar" in
+            let t =
+              Array.fold state ~init:t
+                ~f:(fun
+                     acc
+                     { n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 }
+                   ->
+                  cvars
+                    [ n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 ]
+                    acc)
+            in
+            cvars [ n8; a8; b8 ] t )
     | _ ->
         failwith "Unsupported constraint"
 
@@ -689,11 +719,13 @@ struct
            - that these first 7 variables (that participate in the permutation argument) are not wired to anything that didn't participate in the permutation argument (hard to check as we don't have that information atm)
            - that the remaining columns (that don't participate in the permutation argument) do not have anything that's part of the permutation argument (easy to check as we have that hashtbl) *)
 
-        (* add to row and gates *)
+        (* add to gates *)
         let open Position in
         sys.gates <-
           `Unfinalized_rev ({ kind; row = (); wired_to = [||]; coeffs } :: gates) ;
+        (* increment row *)
         sys.next_row <- sys.next_row + 1 ;
+        (* add to row *)
         sys.rows_rev <- vars :: sys.rows_rev
 
   (** Adds a generic constraint to the constraint system. *)
@@ -1028,37 +1060,78 @@ struct
           , state.(n - 1) )
         in
         (* add_round_state adds a row that contains 5 rounds of permutation *)
-        let add_round_state state_i ind =
-          let row = Array.map state_i ~f:(fun x -> Some x) in
-          let coeffs =
-            Array.concat
-              (List.init 5 ~f:(fun i ->
-                   Params.params.round_constants.((5 * ind) + i)))
+        let add_round_state ~round (s1, s2, s3, s4, s5) =
+          let vars =
+            [| Some s1.(0)
+             ; Some s1.(1)
+             ; Some s1.(2)
+             ; Some s5.(0) (* the last state is in 2nd position *)
+             ; Some s5.(1)
+             ; Some s5.(2)
+             ; Some s2.(0)
+             ; Some s2.(1)
+             ; Some s2.(2)
+             ; Some s3.(0)
+             ; Some s3.(1)
+             ; Some s3.(2)
+             ; Some s4.(0)
+             ; Some s4.(1)
+             ; Some s4.(2)
+            |]
           in
-          add_row sys row Poseidon coeffs
+          let coeffs =
+            [| Params.params.round_constants.(round).(0)
+             ; Params.params.round_constants.(round).(1)
+             ; Params.params.round_constants.(round).(2)
+             ; Params.params.round_constants.(round + 4).(0) (* same for rc *)
+             ; Params.params.round_constants.(round + 4).(1)
+             ; Params.params.round_constants.(round + 4).(2)
+             ; Params.params.round_constants.(round + 1).(0)
+             ; Params.params.round_constants.(round + 1).(1)
+             ; Params.params.round_constants.(round + 1).(2)
+             ; Params.params.round_constants.(round + 2).(0)
+             ; Params.params.round_constants.(round + 2).(1)
+             ; Params.params.round_constants.(round + 2).(2)
+             ; Params.params.round_constants.(round + 3).(0)
+             ; Params.params.round_constants.(round + 3).(1)
+             ; Params.params.round_constants.(round + 3).(2)
+            |]
+          in
+          add_row sys vars Poseidon coeffs
         in
-        (* [s1, s2, s3, s1', s2', s3', s1'', s2'', s3'', ...] *)
-        (* iterate through the state *)
-        Array.iteri state ~f:(fun i state_i -> add_round_state state_i i) ;
-        (* last row is zero gate, only the first three columns matter *)
-        let vars =
-          [| Some remaining_state.(0)
-           ; Some remaining_state.(1)
-           ; Some remaining_state.(2)
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-          |]
+        (* add_last_row adds the last row containing the output *)
+        let add_last_row state =
+          let vars =
+            [| Some state.(0)
+             ; Some state.(1)
+             ; Some state.(2)
+             ; None
+             ; None
+             ; None
+             ; None
+             ; None
+             ; None
+             ; None
+             ; None
+             ; None
+             ; None
+             ; None
+            |]
+          in
+          add_row sys vars Zero [||]
         in
-        add_row sys vars Zero [||]
+        (* go through the states row by row (a row contains 5 states) *)
+        let rec process_5_states_at_a_time ~round = function
+          | [ s1; s2; s3; s4; s5; last ] ->
+              add_round_state ~round (s1, s2, s3, s4, s5) ;
+              add_last_row last
+          | s1 :: s2 :: s3 :: s4 :: s5 :: tl ->
+              add_round_state ~round (s1, s2, s3, s4, s5) ;
+              process_5_states_at_a_time ~round:(round + 5) tl
+          | _ ->
+              failwith "incorrect number of states given"
+        in
+        process_5_states_at_a_time ~round:0 (Array.to_list state)
     | Plonk_constraint.T
         (EC_add_complete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv }) ->
         let reduce_curve_point (x, y) = (reduce_to_v x, reduce_to_v y) in
@@ -1204,6 +1277,59 @@ struct
            ; Some (reduce_to_v xs)
            ; Some (reduce_to_v ys)
            ; Some (reduce_to_v n_acc)
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+          |]
+        in
+        add_row sys vars Zero [||]
+    | Plonk_constraint.T
+        (EC_endoscalar
+          { state : 'v Endoscale_scalar_round.t array
+          ; n8 : 'v
+          ; a8 : 'v
+          ; b8 : 'v
+          }) ->
+        (* reduce state *)
+        let state =
+          Array.map state ~f:(Endoscale_scalar_round.map ~f:reduce_to_v)
+        in
+        (* add round function *)
+        let add_endoscale_scalar_round (round : V.t Endoscale_scalar_round.t) =
+          let row =
+            [| Some round.n0
+             ; Some round.n8
+             ; Some round.a0
+             ; Some round.b0
+             ; Some round.a8
+             ; Some round.b8
+             ; Some round.x0
+             ; Some round.x1
+             ; Some round.x2
+             ; Some round.x3
+             ; Some round.x4
+             ; Some round.x5
+             ; Some round.x6
+             ; Some round.x7
+             ; None
+            |]
+          in
+          add_row sys row Kimchi.Protocol.EndomulScalar [||]
+        in
+        Array.iter state ~f:add_endoscale_scalar_round ;
+        (* last row *)
+        let vars =
+          [| None
+           ; Some (reduce_to_v n8)
+           ; None
+           ; None
+           ; Some (reduce_to_v a8)
+           ; Some (reduce_to_v b8)
+           ; None
            ; None
            ; None
            ; None

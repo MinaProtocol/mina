@@ -5,6 +5,7 @@ use commitment_dlog::{
     srs::{endos, SRS},
 };
 use paste::paste;
+use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
@@ -39,7 +40,8 @@ macro_rules! impl_srs {
                     })?;
                 let file = BufWriter::new(file);
 
-                bincode::serialize_into(file, &*srs.0).map_err(|e| e.into())
+                srs.0.serialize(&mut rmp_serde::Serializer::new(file))
+                .map_err(|e| e.into())
             }
 
             #[ocaml_gen::func]
@@ -60,10 +62,11 @@ macro_rules! impl_srs {
                 }
 
                 // TODO: shouldn't we just error instead of returning None?
-                let mut srs: SRS<$G> = match bincode::deserialize_from(reader) {
+                let mut srs = match SRS::<$G>::deserialize(&mut rmp_serde::Deserializer::new(reader)) {
                     Ok(srs) => srs,
                     Err(_) => return Ok(None),
                 };
+
                 let (endo_q, endo_r) = endos::<$G>();
                 srs.endo_q = endo_q;
                 srs.endo_r = endo_r;

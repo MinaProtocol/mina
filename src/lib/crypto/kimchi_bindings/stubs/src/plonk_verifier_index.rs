@@ -13,6 +13,7 @@ pub struct CamlPlonkVerificationEvals<PolyComm> {
     pub complete_add_comm: PolyComm,
     pub mul_comm: PolyComm,
     pub emul_comm: PolyComm,
+    pub endomul_scalar_comm: PolyComm,
     pub chacha_comm: Option<Vec<PolyComm>>,
 }
 
