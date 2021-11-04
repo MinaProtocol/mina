@@ -439,8 +439,8 @@ let parse_event (message : Logger.Message.t) =
         of_structured_event_id event_id
         |> Option.value ~default:(Event_type Log_error)
       in
-      let (module Type) = event_type_module event_type in
-      let%map data = Type.parse message in
+      let (module Ty) = event_type_module event_type in
+      let%map data = Ty.parse message in
       Event (event_type, data)
   | None ->
       (* TODO: check log level to ensure it matches error log level *)
