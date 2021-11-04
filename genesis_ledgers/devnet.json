@@ -1,6 +1,6 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2021-11-04 16:00:00-7:00"
+    "genesis_state_timestamp": "2021-11-04 17:30:00-7:00"
   },
   "ledger": {
     "name": "gossip-data",
