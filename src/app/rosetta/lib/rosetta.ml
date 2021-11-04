@@ -126,7 +126,14 @@ let command =
           | Some archive_uri ->
               Deferred.Result.return archive_uri
         in
-        match Caqti_async.connect_pool ~max_size:64 archive_uri with
+        let max_pool_size =
+          try
+            let v = Sys.getenv "MINA_ROSETTA_MAX_DB_POOL_SIZE" in
+            int_of_string (Option.value_exn v)
+          with _ ->
+            failwith "MINA_ROSETTA_MAX_DB_POOL_SIZE not set or invalid. Please set this to a number (try 64 or 128)"
+        in
+        match Caqti_async.connect_pool ~max_size:max_pool_size archive_uri with
         | Error e ->
             [%log error]
               ~metadata:[("error", `String (Caqti_error.show e))]
