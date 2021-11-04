@@ -4,6 +4,10 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2021/11/04:
+
+- Removes toolchain step from rosetta docker builds to save time
+
 2021/10/27:
 
 - Adds memo to construction in the same way as `valid_until`. To use a memo, add the `memo` field to the metadata next to `valid_until` and give it a string, like `"memo": "hello"`. The string must be small -- it is limited to less than 32 bytes.
@@ -101,7 +105,7 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 Checkout the "rosetta-v7" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
 
-`cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu | docker build -t mina-rosetta:v7 --build-arg "deb_codename=stretch" --build-arg "MINA_BRANCH=rosetta-v7" -`
+`cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-prod-ubuntu | docker build -t mina-rosetta:v7 --build-arg "deb_codename=stretch" --build-arg "MINA_BRANCH=rosetta-v7" -`
 
 This creates an image (mina-rosetta:v7) based on the most up-to-date changes that support rosetta. This image
 can be used as a drop-in replacement for `minaprotocol/mina-rosetta:v7` in any of the below commands for testing.
