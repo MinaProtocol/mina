@@ -83,14 +83,15 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
     | `Empty | `Pipe _ ->
         []
   in
+  (* TODO : merge inner interruptible with outer interruptible across monitor *)
   match%map
     make_interruptible
       (Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
            let max_attempts = 8 in
            let attempt_pause_sec = 10.0 in
-           let run_attempt attempt =
-             let interruptible =
-               match%map
+           let rec run_attempt attempt : unit Deferred.t =
+             let interruptible : (unit, _) Interruptible.t =
+               match%bind
                  make_interruptible
                    (Cohttp_async.Client.post ~headers
                       ~body:
@@ -99,8 +100,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                       url)
                with
                | {status; _}, body ->
-                   let succeeded = Cohttp.Code.code_of_status status = 200 in
-                   ( if succeeded then
+                   if Cohttp.Code.code_of_status status = 200 then (
                      [%log info]
                        "Sent block with state hash $state_hash to uptime \
                         service at URL $url"
@@ -109,8 +109,9 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                          ; ( "includes_snark_work"
                            , `Bool (Option.is_some block_data.snark_work) )
                          ; ("is_produced_block", `Bool produced)
-                         ; ("url", `String (Uri.to_string url)) ]
-                   else if attempt >= max_attempts then
+                         ; ("url", `String (Uri.to_string url)) ] ;
+                     Interruptible.return () )
+                   else if attempt >= max_attempts then (
                      let base_metadata =
                        [ ("state_hash", State_hash.to_yojson state_hash)
                        ; ("url", `String (Uri.to_string url))
@@ -125,7 +126,8 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                        "After %d attempts, failed to send block with state \
                         hash $state_hash to uptime service at URL $url, no \
                         more retries"
-                       max_attempts ~metadata
+                       max_attempts ~metadata ;
+                     Interruptible.return () )
                    else
                      let base_metadata =
                        [ ("state_hash", State_hash.to_yojson state_hash)
@@ -140,36 +142,27 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                        "Failure when sending block with state hash \
                         $state_hash to uptime service at URL $url, attempt %d \
                         of %d, retrying"
-                       attempt max_attempts ~metadata ) ;
-                   succeeded
+                       attempt max_attempts ~metadata ;
+                     let%bind () =
+                       make_interruptible
+                       @@ Async.after (Time.Span.of_sec attempt_pause_sec)
+                     in
+                     make_interruptible @@ run_attempt (attempt + 1)
              in
              match%map.Deferred.Let_syntax
                Interruptible.force interruptible
              with
-             | Ok succeeded ->
-                 succeeded
+             | Ok () ->
+                 ()
              | Error _ ->
                  [%log error]
                    "In uptime service, POST of block with state hash \
                     $state_hash was interrupted"
                    ~metadata:
                      [ ("state_hash", State_hash.to_yojson state_hash)
-                     ; ("payload", json) ] ;
-                 (* interrupted, don't want to retry, claim success *)
-                 true
+                     ; ("payload", json) ]
            in
-           let rec go attempt =
-             let open Deferred.Let_syntax in
-             let%bind succeeded = run_attempt attempt in
-             if succeeded then Deferred.return ()
-             else if attempt < max_attempts then
-               let%bind () =
-                 Async.after (Time.Span.of_sec attempt_pause_sec)
-               in
-               go (attempt + 1)
-             else Deferred.unit
-           in
-           go 1 ))
+           run_attempt 1 ))
   with
   | Ok () ->
       ()

@@ -24,7 +24,7 @@ val map_signal : ('a, 's) t -> f:('s -> 's1) -> ('a, 's1) t
 val don't_wait_for : (unit, 's) t -> unit
 
 (** [finally x ~f] schedules [f] to be run after [x] has finished, regardless
-    of whether [x] completed its computation was interrupted.
+    of whether [x] completed its computation or was interrupted.
 *)
 val finally : ('a, 's) t -> f:(unit -> unit) -> ('a, 's) t
 
