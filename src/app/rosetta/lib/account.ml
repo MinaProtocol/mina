@@ -202,9 +202,10 @@ LIMIT 1
       match (last_relevant_command_info_opt, timing_info_opt) with
       | None, None ->
         (* We've never heard of this account, at least as of the block_identifier provided *)
-        (* We will fail with Account_not_found -- this handles the case where
-         * this is run at the best tip as well *)
-        Deferred.Result.fail (Errors.create (`Account_not_found address))
+        (* This means they requested a block from before account creation;
+         * this is ambiguous in the spec but Coinbase confirmed we can return 0.
+         * https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
+        Deferred.Result.return 0L
       | Some (_, last_relevant_command_balance), None ->
         (* This account has no special vesting, so just use its last known balance *)
           Deferred.Result.return last_relevant_command_balance
@@ -247,9 +248,8 @@ LIMIT 1
       match (last_relevant_command_info_opt, timing_info_opt) with
       | None, None ->
           (* We've never heard of this account, at least as of the block_identifier provided *)
-          (* We will fail with Account_not_found -- this handles the case where
-           * this is run at the best tip as well *)
-        Deferred.Result.fail (Errors.create (`Account_not_found address))
+          (* TODO: This means they requested a block from before account creation. Should it error instead? Need to clarify with Coinbase team. *)
+          Deferred.Result.return 0L
       | Some (_, last_relevant_command_balance), _ ->
           (* This account was involved in a command and we don't care about its vesting, so just use the last known
          * balance from the command *)
@@ -268,11 +268,7 @@ module Balance = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
         { gql:
-            ?token_id:string
-          -> address:string
-          -> unit
-          -> ([`Successful of 'gql | `Failed of Errors.t], Errors.t) M.t
-        ; logger: Logger.t
+            ?token_id:string -> address:string -> unit -> ('gql, Errors.t) M.t
         ; db_block_identifier_and_balance_info:
                block_query:Block_query.t
             -> address:string
@@ -287,21 +283,17 @@ module Balance = struct
     module Mock = T (Result)
 
     let real :
-          db:(module Caqti_async.CONNECTION)
-       -> logger:Logger.t
-       -> graphql_uri:Uri.t
-       -> 'gql Real.t
-    =
-     fun ~db ~logger ~graphql_uri ->
+        db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t
+        =
+     fun ~db ~graphql_uri ->
       { gql=
           (fun ?token_id ~address () ->
-            Graphql.query_and_catch
+            Graphql.query
               (Get_balance.make ~public_key:(`String address)
                  ~token_id:
                    (match token_id with Some s -> `String s | None -> `Null)
                  ())
               graphql_uri )
-      ; logger
       ; db_block_identifier_and_balance_info=
           (fun ~block_query ~address ->
             let (module Conn : Caqti_async.CONNECTION) = db in
@@ -316,7 +308,7 @@ module Balance = struct
           (fun ?token_id:_ ~address:_ () ->
             (* TODO: Add variants to cover every branch *)
             Result.return
-            @@ `Successful (object
+            @@ object
                  method account =
                    Some
                      (object
@@ -334,8 +326,7 @@ module Balance = struct
 
                         method nonce = Some "2"
                      end)
-               end ))
-      ; logger = Logger.null ()
+               end )
       ; db_block_identifier_and_balance_info=
           (fun ~block_query ~address ->
             ignore ((block_query, address) : Block_query.t * string) ;
@@ -360,9 +351,21 @@ module Balance = struct
       let open M.Let_syntax in
       let address = req.account_identifier.address in
       let%bind token_id = Token_id.decode req.account_identifier.metadata in
+      let%bind res =
+        env.gql
+          ?token_id:(Option.map token_id ~f:Unsigned.UInt64.to_string)
+          ~address ()
+      in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~graphql_uri
+      in
+      let%bind account =
+        match res#account with
+        | None ->
+            M.fail (Errors.create (`Account_not_found address))
+        | Some account ->
+            M.return account
       in
       let make_balance_amount ~liquid_balance ~total_balance =
         let amount =
@@ -387,7 +390,49 @@ module Balance = struct
         in
         {amount with metadata= Some metadata}
       in
-      let find_via_db ~block_query ~address =
+      let metadata =
+        Option.map
+          ~f:(fun nonce -> `Assoc [("nonce", `Intlit nonce)])
+          account#nonce
+      in
+      match req.block_identifier with
+      | None ->
+          let%bind state_hash =
+            match (account#balance)#stateHash with
+            | None ->
+                M.fail
+                  (Errors.create
+                     ~context:
+                       "Failed accessing state hash from GraphQL \
+                        communication with the Mina Daemon."
+                     `Chain_info_missing)
+            | Some state_hash ->
+                M.return state_hash
+          in
+          let%map liquid_balance =
+            match (account#balance)#liquid with
+            | None ->
+                M.fail
+                  (Errors.create
+                     ~context:
+                       "Unable to access liquid balance since your Mina \
+                        daemon isn't fully bootstrapped."
+                     `Chain_info_missing)
+            | Some liquid_balance ->
+                M.return liquid_balance
+          in
+          let total_balance = (account#balance)#total in
+          { Account_balance_response.block_identifier=
+              { Block_identifier.index=
+                  Unsigned.UInt32.to_int64 (account#balance)#blockHeight
+              ; hash= state_hash }
+          ; balances= [make_balance_amount ~liquid_balance ~total_balance]
+          ; metadata }
+      | Some partial_identifier ->
+          (* TODO: Once multiple token_ids are possible we may need to add handling for that here *)
+          let%bind block_query =
+            Query.of_partial_identifier partial_identifier
+          in
           let%map block_identifier, {liquid_balance; total_balance} =
             env.db_block_identifier_and_balance_info ~block_query ~address
           in
@@ -396,70 +441,7 @@ module Balance = struct
               [ make_balance_amount
                   ~liquid_balance:(Unsigned.UInt64.of_int64 liquid_balance)
                   ~total_balance:(Unsigned.UInt64.of_int64 total_balance) ]
-          ; metadata=None }
-      in
-      match req.block_identifier with
-      | None ->
-          (* First try via GraphQL but fallback to archive database (and then
-           * omit the nonce!) if there was an issue *)
-          (match%bind
-            env.gql
-              ?token_id:(Option.map token_id ~f:Unsigned.UInt64.to_string)
-              ~address ()
-          with
-          | `Failed e ->
-              [%log' warn env.logger] "/account/balance : GraphQL request failed, trying again via the archive database" ~metadata:[("error", Errors.erase e |> Rosetta_models.Error.to_yojson)];
-              find_via_db ~block_query:None ~address
-          | `Successful res ->
-            let%bind account =
-              match res#account with
-              | None ->
-                  M.fail (Errors.create (`Account_not_found address))
-              | Some account ->
-                  M.return account
-            in
-            let%bind state_hash =
-              match (account#balance)#stateHash with
-              | None ->
-                  M.fail
-                    (Errors.create
-                       ~context:
-                         "Failed accessing state hash from GraphQL \
-                          communication with the Mina Daemon."
-                       `Chain_info_missing)
-              | Some state_hash ->
-                  M.return state_hash
-            in
-            let%map liquid_balance =
-              match (account#balance)#liquid with
-              | None ->
-                  M.fail
-                    (Errors.create
-                       ~context:
-                         "Unable to access liquid balance since your Mina \
-                          daemon isn't fully bootstrapped."
-                       `Chain_info_missing)
-              | Some liquid_balance ->
-                  M.return liquid_balance
-            in
-            let metadata =
-              Option.map
-                ~f:(fun nonce -> `Assoc [("nonce", `Intlit nonce)])
-                account#nonce
-            in
-            let total_balance = (account#balance)#total in
-            { Account_balance_response.block_identifier=
-                { Block_identifier.index=
-                    Unsigned.UInt32.to_int64 (account#balance)#blockHeight
-                ; hash= state_hash }
-            ; balances= [make_balance_amount ~liquid_balance ~total_balance]
-            ; metadata })
-      | Some partial_identifier ->
-          (* TODO: Once multiple token_ids are possible we may need to add handling for that here *)
-          let%bind block_query =
-            Query.of_partial_identifier partial_identifier
-          in
-          find_via_db ~block_query ~address
+          ; metadata }
   end
 
   module Real = Impl (Deferred.Result)
@@ -522,7 +504,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
             |> Errors.Lift.wrap
           in
           let%map res =
-            Balance.Real.handle ~graphql_uri ~env:(Balance.Env.real ~db ~logger ~graphql_uri) req
+            Balance.Real.handle ~graphql_uri ~env:(Balance.Env.real ~db ~graphql_uri) req
             |> Errors.Lift.wrap
           in
           Account_balance_response.to_yojson res)

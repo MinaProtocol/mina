@@ -83,13 +83,6 @@ let query query_obj uri =
                     (Exn.to_string e))) ) )
   |> Deferred.return
 
-let query_and_catch query_obj uri =
-  let open Deferred.Let_syntax in
-  let%map res = query query_obj uri in
-  match res with
-  | Ok r -> Ok (`Successful r)
-  | Error e -> Ok (`Failed e)
-
 module Decoders = struct
   let uint64 json =
     Yojson.Basic.Util.to_string json |> Unsigned.UInt64.of_string
