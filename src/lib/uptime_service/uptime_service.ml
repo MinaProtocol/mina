@@ -150,7 +150,11 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                  succeeded
              | Error _ ->
                  [%log error]
-                   "In uptime service, POST of uptime data was interrupted" ;
+                   "In uptime service, POST of block with state hash \
+                    $state_hash was interrupted"
+                   ~metadata:
+                     [ ("state_hash", State_hash.to_yojson state_hash)
+                     ; ("payload", json) ] ;
                  (* interrupted, don't want to retry, claim success *)
                  true
            in
