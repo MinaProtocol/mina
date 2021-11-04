@@ -203,27 +203,161 @@ module Tick = struct
                 let of_sexpable = of_affine
               end)
 
-    include Make_inner_curve_aux (Tick0) (Tock0)
+    module Scalar = struct
+      include Tock.Field
 
-    module Checked = struct
-      include Snarky_curves.Make_weierstrass_checked (Fq) (Scalar)
-                (Crypto_params.Tick.Inner_curve)
-                (Params)
-                (struct
-                  let add =
-                    Some
-                      (fun p1 p2 ->
-                        let c =
-                          Run.make_checked (fun () ->
-                              Pickles.Step_main_inputs.Ops.add_fast p1 p2)
-                        in
-                        Tick0.with_state (As_prover.return ()) c)
-                end)
+      module Checked = struct
+        type t =
+          | Arbitrary of (Field.Var.t * Boolean.var)
+          (* A random scalar field element (Fq element) fits in an
+             Fp element. *)
+          | Random of Field.Var.t
+      end
 
-      let add_known_unsafe t x = add_unsafe t (constant x)
+      let typ =
+        Typ.transport_var Pickles.Impls.Step.Other_field.typ
+          ~back:(fun x -> Checked.Arbitrary x)
+          ~there:(function
+            | Checked.Arbitrary x -> x | Random _ -> assert false)
     end
 
-    let typ = Checked.typ
+    type var = Field.Var.t * Field.Var.t
+
+    module Checked = struct
+      let typ = Pickles.Step_main_inputs.Inner_curve.typ
+
+      module Assert = struct
+        let equal (t1 : var) (t2 : var) =
+          Run.make_checked (fun () ->
+              Pickles.Step_main_inputs.Inner_curve.assert_equal t1 t2)
+          |> Tick0.with_state (As_prover.return ())
+
+        let on_curve (t : var) =
+          Run.make_checked (fun () ->
+              Pickles.Step_main_inputs.Inner_curve.assert_on_curve t)
+          |> Tick0.with_state (As_prover.return ())
+      end
+
+      let ( + ) p1 p2 =
+        Run.make_checked (fun () -> Pickles.Step_main_inputs.Ops.add_fast p1 p2)
+        |> Tick0.with_state (As_prover.return ())
+
+      (*
+         Let G be a group over Fp with scalar field Fq.
+
+         Using the fast constraints, in the Fp circuit, we can compute
+
+         scale_fast g s = Fq(2^n + s) * g
+
+         What we would like to do is compute s * g.
+
+         Given a random `s : Fq`, represented as an Fp element,
+         we can do this by simply subtracting off 2^n. Let's show that this
+         will give the same result whether we do it in Fq or Fp (with high probability).
+
+         Let r = 2*q - 2^n. We have r in [0, q), and r = -2^n in Fq.
+
+         Now, we claim that for a random s in [0, p), s + r < p. This would imply
+         that we can compute this sum in Fp, and get the same result as the result
+         in Fq. So let's show it.
+
+         s + r < p
+         iff
+         s is in the range [0, p - r)
+
+         The probability of this is (p - r) / p. So, the probability of this NOT happening is
+         1 - (p - r) / p = (p - (p - r)) / = r / p.
+
+         Now, with
+         q = 28948022309329048855892746252171976963363056481941647379679742748393362948097
+         n = 255,
+         we have
+         r = 2*q - 2^n = 91120631063012739630693492830161076226
+
+         which is a 127 bit number. p on the other hand is a 255 bit number.
+         So, the quotient r / p is less than 1 / 2^128, and thus the probability that
+         the addition is incorrect is less than 1 / 2^128, and can be discounted.
+
+         So, if we have s which is the output of a random oracle, we can compute
+
+         s * g
+
+         as
+
+         scale_fast g (s +_{Fp} 91120631063012739630693492830161076226)
+         = Fq(2^n + (s - 2^n)) g = s * g
+      *)
+
+      module F = struct
+        module Impl = Pickles.Impls.Step
+
+        type t = Impl.Field.t
+
+        let typ = Impl.Field.typ
+
+        module Constant = struct
+          include Field
+
+          let to_bigint : t -> Impl.Bigint.t = Impl.Bigint.of_field
+        end
+      end
+
+      let scale_random (g : var) (s : Scalar.Checked.t) : (var, _) Checked.t =
+        let neg_two_to_n =
+          Field.Var.constant
+            (Field.of_string "91120631063012739630693492830161076226")
+        in
+        Run.make_checked (fun () ->
+            let s' =
+              let s =
+                match s with
+                | Arbitrary (high, low) ->
+                    Field.Var.scale high (Field.of_int 2)
+                    |> Field.Checked.( + ) (low :> Field.Var.t)
+                | Random s ->
+                    s
+              in
+              Field.Checked.( + ) s neg_two_to_n
+            in
+            Pickles.Step_main_inputs.Ops.scale_fast2'
+              (module F)
+              ~num_bits:Field.size_in_bits g s')
+        |> Tick0.with_state (As_prover.return ())
+
+      let shift =
+        Pickles_types.Shifted_value.Type2.Shift.create (module Tock.Field)
+
+      let scale_known (g0 : t) (s : Scalar.Checked.t) : (var, _) Checked.t =
+        let const =
+          Fn.compose Pickles.Step_main_inputs.Inner_curve.constant to_affine_exn
+        in
+        let g = const g0 in
+        match s with
+        | Arbitrary s ->
+            let correction =
+              const
+                (negate
+                   (scale g0 (Pickles.Common.Shifts.tock2 :> Tock.Field.t)))
+            in
+            let c =
+              Run.make_checked (fun () ->
+                  Pickles.Step_main_inputs.Ops.scale_fast2 g
+                    ~num_bits:Field.size_in_bits (Shifted_value s)
+                  |> Pickles.Step_main_inputs.Ops.add_fast correction)
+            in
+            Tick0.with_state (As_prover.return ()) c
+        | Random _ ->
+            scale_random g s
+
+      let negate = Pickles.Step_main_inputs.Inner_curve.negate
+
+      type t = var
+    end
+
+    let typ : (var, t) Typ.t =
+      Typ.transport Checked.typ
+        ~there:Crypto_params.Tick.Inner_curve.to_affine_exn
+        ~back:Crypto_params.Tick.Inner_curve.of_affine
   end
 
   module Util = Snark_util.Make (Tick0)
