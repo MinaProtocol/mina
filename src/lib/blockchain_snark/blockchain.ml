@@ -8,9 +8,9 @@ module Raw_versioned__ = struct
 
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
-        { state : Protocol_state.Value.Stable.V1.t; proof : Proof.Stable.V1.t }
+        { state : Protocol_state.Value.Stable.V1.t; proof : Proof.Stable.V2.t }
       [@@deriving fields, sexp, yojson]
 
       let to_latest = Fn.id
@@ -24,7 +24,7 @@ module Raw_versioned__ = struct
   end]
 end
 
-include Allocation_functor.Make.Versioned_v1.Full (Raw_versioned__)
+include Allocation_functor.Make.Versioned_v2.Full (Raw_versioned__)
 
 [%%define_locally Raw_versioned__.(state, proof)]
 

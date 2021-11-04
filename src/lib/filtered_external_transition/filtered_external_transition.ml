@@ -89,30 +89,10 @@ module Stable = struct
       ; protocol_state : Protocol_state.Stable.V1.t
       ; transactions : Transactions.Stable.V2.t
       ; snark_jobs : Transaction_snark_work.Info.Stable.V1.t list
-      ; proof : Proof.Stable.V1.t
+      ; proof : Proof.Stable.V2.t
       }
 
     let to_latest = Fn.id
-  end
-
-  module V1 = struct
-    type t =
-      { creator : Public_key.Compressed.Stable.V1.t
-      ; winner : Public_key.Compressed.Stable.V1.t
-      ; protocol_state : Protocol_state.Stable.V1.t
-      ; transactions : Transactions.Stable.V1.t
-      ; snark_jobs : Transaction_snark_work.Info.Stable.V1.t list
-      ; proof : Proof.Stable.V1.t
-      }
-
-    let to_latest (t : t) : V2.t =
-      { creator = t.creator
-      ; winner = t.winner
-      ; protocol_state = t.protocol_state
-      ; transactions = Transactions.Stable.V1.to_latest t.transactions
-      ; snark_jobs = t.snark_jobs
-      ; proof = t.proof
-      }
   end
 end]
 

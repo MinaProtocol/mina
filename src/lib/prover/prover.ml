@@ -12,12 +12,12 @@ module Extend_blockchain_input = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
-        { chain : Blockchain.Stable.V1.t
+        { chain : Blockchain.Stable.V2.t
         ; next_state : Protocol_state.Value.Stable.V1.t
         ; block : Snark_transition.Value.Stable.V1.t
-        ; ledger_proof : Ledger_proof.Stable.V1.t option
+        ; ledger_proof : Ledger_proof.Stable.V2.t option
         ; prover_state : Consensus.Data.Prover_state.Stable.V1.t
         ; pending_coinbase : Pending_coinbase_witness.Stable.V1.t
         }

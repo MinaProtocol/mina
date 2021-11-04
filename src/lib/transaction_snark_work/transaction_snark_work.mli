@@ -61,11 +61,11 @@ val info : t -> Info.t
 val statement : t -> Statement.t
 
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t [@@deriving sexp, compare, bin_io, yojson, version]
   end
 end
-with type V1.t = t
+with type V2.t = t
 
 type unchecked = t
 

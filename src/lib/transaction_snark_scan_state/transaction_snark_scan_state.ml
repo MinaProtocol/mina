@@ -88,8 +88,8 @@ end
 module Ledger_proof_with_sok_message = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
+    module V2 = struct
+      type t = Ledger_proof.Stable.V2.t * Sok_message.Stable.V1.t
       [@@deriving sexp]
 
       let to_latest = Fn.id
@@ -178,7 +178,7 @@ type job = Available_job.t [@@deriving sexp]
 module Stable = struct
   module V2 = struct
     type t =
-      ( Ledger_proof_with_sok_message.Stable.V1.t
+      ( Ledger_proof_with_sok_message.Stable.V2.t
       , Transaction_with_witness.Stable.V2.t )
       Parallel_scan.State.Stable.V1.t
     [@@deriving sexp]
@@ -192,7 +192,7 @@ module Stable = struct
     let hash t =
       let state_hash =
         Parallel_scan.State.hash t
-          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V1))
+          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
           (Binable.to_string (module Transaction_with_witness.Stable.V2))
       in
       Staged_ledger_hash.Aux_hash.of_bytes
