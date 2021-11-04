@@ -152,12 +152,7 @@ module Plonk_constraint = struct
       | EC_scale of { state : 'v Scale_round.t array }
       | EC_endoscale of
           { state : 'v Endoscale_round.t array; xs : 'v; ys : 'v; n_acc : 'v }
-      | EC_endoscalar of
-          { state : 'v Endoscale_scalar_round.t array
-          ; n8 : 'v
-          ; a8 : 'v
-          ; b8 : 'v
-          }
+      | EC_endoscalar of { state : 'v Endoscale_scalar_round.t array }
     [@@deriving sexp]
 
     (** map t *)
@@ -190,13 +185,10 @@ module Plonk_constraint = struct
             ; ys = f ys
             ; n_acc = f n_acc
             }
-      | EC_endoscalar { state; n8; a8; b8 } ->
+      | EC_endoscalar { state } ->
           EC_endoscalar
             { state =
                 Array.map ~f:(fun x -> Endoscale_scalar_round.map ~f x) state
-            ; n8 = f n8
-            ; a8 = f a8
-            ; b8 = f b8
             }
 
     (* TODO: this seems to be a "double check" type of function? It just checks that the basic gate is equal to 0? what is eval_one? what is v and f? *)
@@ -395,21 +387,59 @@ struct
                     acc)
             in
             cvars [ xs; ys; n_acc ] t
-        | EC_endoscalar { state; n8; a8; b8 } ->
+        | EC_endoscalar { state } ->
             let t = H.feed_string t "ec_endoscale_scalar" in
-            let t =
-              Array.fold state ~init:t
-                ~f:(fun
-                     acc
-                     { n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 }
-                   ->
-                  cvars
-                    [ n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 ]
-                    acc)
-            in
-            cvars [ n8; a8; b8 ] t )
+            Array.fold state ~init:t
+              ~f:(fun
+                   acc
+                   { n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 }
+                 ->
+                cvars
+                  [ n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 ]
+                  acc) )
     | _ ->
         failwith "Unsupported constraint"
+
+  (** Converts the set of permutations (equivalence_classes) to 
+      a hash table that maps each position to the next one. 
+      For example, if one of the equivalence class is [pos1, pos3, pos7],
+      the function will return a hashtable that maps pos1 to pos3, 
+      pos3 to pos7, and pos7 to pos1 *)
+  let equivalence_classes_to_hashtbl sys =
+    let module Relative_position = struct
+      module T = struct
+        type t = Row.t Position.t [@@deriving hash, sexp, compare]
+      end
+
+      include T
+      include Core_kernel.Hashable.Make (T)
+    end in
+    let equivalence_classes = V.Table.create () in
+    Hashtbl.iteri sys.equivalence_classes ~f:(fun ~key ~data ->
+        let u = Hashtbl.find_exn sys.union_finds key in
+        Hashtbl.update equivalence_classes (Union_find.get u) ~f:(function
+          | None ->
+              Relative_position.Hash_set.of_list data
+          | Some ps ->
+              List.iter ~f:(Hash_set.add ps) data ;
+              ps)) ;
+    let res = Relative_position.Table.create () in
+    let outputs = Relative_position.Hash_set.create () in
+    Hashtbl.iter equivalence_classes ~f:(fun ps ->
+        let rotate_left = function [] -> [] | x :: xs -> xs @ [ x ] in
+        let ps = Hash_set.to_list ps in
+        List.iter2_exn ps (rotate_left ps) ~f:(fun input output ->
+            if Hash_set.mem outputs output then
+              failwithf !"Duplicate %{sexp: Relative_position.t}" output () ;
+            Hash_set.add outputs output ;
+
+            Hashtbl.add_exn res ~key:input ~data:output)) ;
+    printf
+      !"posmap\n\
+        %{sexp: (Relative_position.t, Relative_position.t) Hashtbl.t}\n\
+        %!"
+      res ;
+    res
 
   (** Compute the witness, given the constraint system `sys` and a function that converts the indexed secret inputs to their concrete values *)
   let compute_witness (sys : t) (external_values : int -> Fp.t) :
@@ -462,11 +492,37 @@ struct
                 res.(col_idx).(row_idx) <- value ;
                 Hashtbl.set internal_values ~key:var ~data:value)) ;
     (* return the witness *)
-    res
+    ((* construct permutation hashmap *)
+     let pos_map = equivalence_classes_to_hashtbl sys in
+     let permutation (pos : Row.t Position.t) : Row.t Position.t =
+       Option.value (Hashtbl.find pos_map pos) ~default:pos
+     in
+     for row = 0 to num_rows - 1 do
+       for col = 0 to 6 do
+         let permuted =
+           permutation
+             { col
+             ; row =
+                 ( if row < public_input_size then Public_input row
+                 else After_public_input (row - public_input_size) )
+             }
+         in
+         assert (permuted.col < 7) ;
+         [%test_eq: Fp.t]
+           res.(col).(row)
+           res.(permuted.col).(Row.to_absolute ~public_input_size permuted.row)
+       done
+     done) ;
+    print_endline "all good" ; res
+
+  let union_find sys v =
+    Hashtbl.find_or_add sys.union_finds v ~default:(fun () ->
+        Union_find.create v)
 
   (** Creates an internal variable and assigns it the value lc and constant *)
   let create_internal ?constant sys lc : V.t =
     let v = Internal_var.create () in
+    ignore (union_find sys (Internal v) : _ Union_find.t) ;
     Hashtbl.add_exn sys.internal_vars ~key:v ~data:(lc, constant) ;
     V.Internal v
 
@@ -508,10 +564,6 @@ struct
   (* TODO: remove this no? isn't that a no-op? *)
   let digest = digest
 
-  let union_find sys v =
-    Hashtbl.find_or_add sys.union_finds v ~default:(fun () ->
-        Union_find.create v)
-
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.
       The row must be given relative to the start of the circuit 
@@ -524,36 +576,6 @@ struct
 
   (** Same as wire', except that the row must be given relatively to the end of the public-input rows *)
   let wire sys key row col = wire' sys key (Row.After_public_input row) col
-
-  (** Converts the set of permutations (equivalence_classes) to 
-      a hash table that maps each position to the next one. 
-      For example, if one of the equivalence class is [pos1, pos3, pos7],
-      the function will return a hashtable that maps pos1 to pos3, 
-      pos3 to pos7, and pos7 to pos1 *)
-  let equivalence_classes_to_hashtbl sys =
-    let module Relative_position = struct
-      module T = struct
-        type t = Row.t Position.t [@@deriving hash, sexp, compare]
-      end
-
-      include Core_kernel.Hashable.Make (T)
-    end in
-    let equivalence_classes = V.Table.create () in
-    Hashtbl.iteri sys.equivalence_classes ~f:(fun ~key ~data ->
-        let u = Hashtbl.find_exn sys.union_finds key in
-        Hashtbl.update equivalence_classes (Union_find.get u) ~f:(function
-          | None ->
-              data
-          | Some ps ->
-              List.rev_append data ps)) ;
-    let res = Relative_position.Table.create () in
-    Hashtbl.iter equivalence_classes ~f:(fun ps ->
-        let rotate_right some_list =
-          List.last_exn some_list :: List.tl_exn some_list
-        in
-        List.iter2_exn ps (rotate_right ps) ~f:(fun input output ->
-            Hashtbl.add_exn res ~key:input ~data:output)) ;
-    res
 
   (** Adds zero-knowledgeness to the gates/rows, and convert into Rust type [Gates.t].
       This can only be called once *)
@@ -632,7 +654,12 @@ struct
           Gate_spec.map_rows ~f:(Row.to_absolute ~public_input_size)
         in
         let all_gates = List.concat [ public_gates; gates ] in
+        List.iteri all_gates ~f:(fun i x ->
+            printf !"gate %d: %{sexp: (Row.t, Fp.t) Gate_spec.t}\n%!" i x) ;
         let all_gates = List.map all_gates ~f:to_absolute_row in
+        List.iteri all_gates ~f:(fun i x ->
+            printf !"gate %d: %{sexp: (int, Fp.t) Gate_spec.t}\n%!" i x) ;
+
         printf "num gaets %d\n%!" (List.length all_gates) ;
         printf "histogram\n" ;
         List.iter
@@ -712,8 +739,8 @@ struct
            If these cells (the first 7) contain variables, make sure that they are wired *)
         let num_vars = min Constants.permutation_cols (Array.length vars) in
         let vars_for_perm = Array.slice vars 0 num_vars in
-        Array.iteri vars_for_perm ~f:(fun col some_x ->
-            Option.iter some_x ~f:(fun x -> wire sys x sys.next_row col)) ;
+        Array.iteri vars_for_perm ~f:(fun col x ->
+            Option.iter x ~f:(fun x -> wire sys x sys.next_row col)) ;
 
         (* TODO: I think there are two things we should check here (and possible panic on):
            - that these first 7 variables (that participate in the permutation argument) are not wired to anything that didn't participate in the permutation argument (hard to check as we don't have that information atm)
@@ -941,10 +968,9 @@ struct
         let (s1, x1), (s2, x2) = (red v1, red v2) in
         match (x1, x2) with
         | `Var x1, `Var x2 ->
-            if Fp.(equal one) s1 && Fp.(equal one) s2 then
-              (* optimize by not adding generic constraint but rather unifying the equivalence
-                 classes of the variables *)
-              Union_find.union (union_find sys x1) (union_find sys x2)
+            if Fp.equal s1 s2 then (
+              if not (Fp.equal s1 Fp.zero) then
+                Union_find.union (union_find sys x1) (union_find sys x2) )
             else if (* s1 x1 - s2 x2 = 0
           *)
                     not (Fp.equal s1 s2) then
@@ -1050,6 +1076,7 @@ struct
           Array.map ~f:(Array.map ~f:reduce_to_v) s
         in
         let state = reduce_state sys state in
+        (*
         let state, remaining_state =
           let n = Array.length state in
           let full_rows = n / 5 in
@@ -1058,7 +1085,7 @@ struct
           ( Array.init full_rows ~f:(fun i ->
                 Array.concat (List.init 5 ~f:(fun j -> state.((5 * i) + j))))
           , state.(n - 1) )
-        in
+        in *)
         (* add_round_state adds a row that contains 5 rounds of permutation *)
         let add_round_state ~round (s1, s2, s3, s4, s5) =
           let vars =
@@ -1083,9 +1110,6 @@ struct
             [| Params.params.round_constants.(round).(0)
              ; Params.params.round_constants.(round).(1)
              ; Params.params.round_constants.(round).(2)
-             ; Params.params.round_constants.(round + 4).(0) (* same for rc *)
-             ; Params.params.round_constants.(round + 4).(1)
-             ; Params.params.round_constants.(round + 4).(2)
              ; Params.params.round_constants.(round + 1).(0)
              ; Params.params.round_constants.(round + 1).(1)
              ; Params.params.round_constants.(round + 1).(2)
@@ -1095,6 +1119,9 @@ struct
              ; Params.params.round_constants.(round + 3).(0)
              ; Params.params.round_constants.(round + 3).(1)
              ; Params.params.round_constants.(round + 3).(2)
+             ; Params.params.round_constants.(round + 4).(0)
+             ; Params.params.round_constants.(round + 4).(1)
+             ; Params.params.round_constants.(round + 4).(2)
             |]
           in
           add_row sys vars Poseidon coeffs
@@ -1142,8 +1169,8 @@ struct
 
         *)
         let x1, y1 = reduce_curve_point p1 in
-        let x2, y2 = reduce_curve_point p1 in
-        let x3, y3 = reduce_curve_point p1 in
+        let x2, y2 = reduce_curve_point p2 in
+        let x3, y3 = reduce_curve_point p3 in
         let vars =
           [| Some x1
            ; Some y1
@@ -1212,32 +1239,6 @@ struct
           add_row sys next_row Zero [||]
         in
 
-        Array.iteri state ~f:(fun i round ->
-            let p f x =
-              match x with
-              | Snarky_backendless.Cvar.Var _ ->
-                  ()
-              | Constant _ ->
-                  ()
-              | _ ->
-                  failwithf "bad %s" (Field.name f) ()
-            in
-            Scale_round.Fields.iter
-              ~accs:(fun f ->
-                Array.iter (Field.get f round)
-                  ~f:(Tuple_lib.Double.iter ~f:(p f)))
-              ~bits:(fun f -> Array.iter (Field.get f round) ~f:(p f))
-              ~ss:(fun f -> Array.iter (Field.get f round) ~f:(p f))
-              ~base:(fun f ->
-                Tuple_lib.Double.iter (Field.get f round) ~f:(p f))
-              ~n_prev:(fun f ->
-                match Field.get f round with
-                | Snarky_backendless.Cvar.Constant c ->
-                    if Fp.equal Fp.zero c then () else failwith "baaad"
-                | _ ->
-                    p f (Field.get f round))
-              ~n_next:(fun f -> p f (Field.get f round))) ;
-
         Array.iter
           ~f:(fun round -> add_ecscale_round round ; incr i)
           (Array.map state ~f:(Scale_round.map ~f:reduce_to_v)) ;
@@ -1288,16 +1289,7 @@ struct
         in
         add_row sys vars Zero [||]
     | Plonk_constraint.T
-        (EC_endoscalar
-          { state : 'v Endoscale_scalar_round.t array
-          ; n8 : 'v
-          ; a8 : 'v
-          ; b8 : 'v
-          }) ->
-        (* reduce state *)
-        let state =
-          Array.map state ~f:(Endoscale_scalar_round.map ~f:reduce_to_v)
-        in
+        (EC_endoscalar { state : 'v Endoscale_scalar_round.t array }) ->
         (* add round function *)
         let add_endoscale_scalar_round (round : V.t Endoscale_scalar_round.t) =
           let row =
@@ -1320,26 +1312,10 @@ struct
           in
           add_row sys row Kimchi.Protocol.EndomulScalar [||]
         in
-        Array.iter state ~f:add_endoscale_scalar_round ;
-        (* last row *)
-        let vars =
-          [| None
-           ; Some (reduce_to_v n8)
-           ; None
-           ; None
-           ; Some (reduce_to_v a8)
-           ; Some (reduce_to_v b8)
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-          |]
-        in
-        add_row sys vars Zero [||]
+        Array.iter state
+          ~f:
+            (Fn.compose add_endoscale_scalar_round
+               (Endoscale_scalar_round.map ~f:reduce_to_v))
     | constr ->
         failwithf "Unhandled constraint %s"
           Obj.(Extension_constructor.name (Extension_constructor.of_val constr))
