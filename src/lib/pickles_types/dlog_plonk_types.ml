@@ -108,6 +108,10 @@ module All_evals = struct
       end
     end]
 
+    let map (type a1 a2 b1 b2) (t : (a1, a2) t) ~(f1 : a1 -> b1)
+        ~(f2 : a2 -> b2) : (b1, b2) t =
+      { public_input = f1 t.public_input; evals = Evals.map ~f:f2 t.evals }
+
     let typ lengths (elt : ('a, 'b, 'f) Snarky_backendless.Typ.t) ~default =
       let open Snarky_backendless.Typ in
       let evals = Evals.typ lengths elt ~default in
@@ -127,6 +131,12 @@ module All_evals = struct
       [@@deriving sexp, compare, yojson, hash, equal, hlist]
     end
   end]
+
+  let map (type a1 a2 b1 b2) (t : (a1, a2) t) ~(f1 : a1 -> b1) ~(f2 : a2 -> b2)
+      : (b1, b2) t =
+    { evals = Tuple_lib.Double.map t.evals ~f:(With_public_input.map ~f1 ~f2)
+    ; ft_eval1 = f1 t.ft_eval1
+    }
 
   let typ lengths (elt : ('a, 'b, 'f) Snarky_backendless.Typ.t) ~default =
     let open Snarky_backendless.Typ in

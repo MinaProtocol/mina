@@ -2,7 +2,7 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type 'f t = 'f Kimchi.Protocol.scalar_challenge = { inner : 'f }
     [@@deriving sexp, compare, equal, yojson, hash]
   end
