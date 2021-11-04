@@ -15,12 +15,14 @@ let sign_command =
   and private_key =
     flag "--private-key" ~aliases:["private-key"] ~doc:"Private key hex bytes"
       (required string)
+  and signature_kind = Cli_lib.Flag.signature_kind ~default:Mainnet ()
   in
   let open Deferred.Let_syntax in
   fun () ->
     let keys = Signer.Keys.of_private_key_bytes private_key in
     match
-      Signer.sign ~keys ~unsigned_transaction_string:unsigned_transaction
+      Signer.sign ~signature_kind ~keys
+        ~unsigned_transaction_string:unsigned_transaction
     with
     | Ok signature ->
         printf "%s\n" signature ; return ()
@@ -36,11 +38,12 @@ let verify_command =
   and public_key =
     flag "--public-key" ~aliases:["public-key"] ~doc:"Public key hex bytes"
       (required string)
+  and signature_kind = Cli_lib.Flag.signature_kind ~default:Mainnet ()
   in
   let open Deferred.Let_syntax in
   fun () ->
     match
-      Signer.verify ~public_key_hex_bytes:public_key
+      Signer.verify ~signature_kind ~public_key_hex_bytes:public_key
         ~signed_transaction_string:signed_transaction
     with
     | Ok b when b ->

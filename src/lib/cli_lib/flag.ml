@@ -428,10 +428,10 @@ module Signed_command = struct
       (optional string)
 end
 
-let signature_kind =
+let signature_kind ?(default = Mina_signature_kind.Testnet) () =
   Command.Param.flag "--signature-kind" ~aliases:[ "signature-kind" ]
     ~doc:"testnet|mainnet The signature scheme to use. Default: testnet"
-    (Command.Param.optional_with_default Mina_signature_kind.Testnet
+    (Command.Param.optional_with_default default
        (Command.Arg_type.map Command.Param.string ~f:(fun s ->
             match String.lowercase s with
             | "testnet" ->

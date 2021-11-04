@@ -6,6 +6,7 @@
    async
    async_ssl
    core_kernel
+   cli_lib
    logger
    rosetta_models
    lib
@@ -30,44 +31,6 @@
  (public_name signer)
  (modes native)
  (modules signer)
- (libraries signer_cli)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps
-               graphql_ppx
-               ppx_coda
-               ppx_deriving.show
-               ppx_deriving_yojson
-               ppx_jane
-               ppx_version
-               ppx_compare
- ))
-)
-
-(executable
- (package signer)
- (name signer_testnet_signatures)
- (public_name signer-testnet)
- (modes native)
- (modules signer_testnet_signatures)
- (libraries signer_cli)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps
-               graphql_ppx
-               ppx_coda
-               ppx_deriving.show
-               ppx_deriving_yojson
-               ppx_jane
-               ppx_version
-               ppx_compare
- ))
-)
-
-(executable
- (package signer)
- (name signer_mainnet_signatures)
- (public_name signer-mainnet)
- (modes native)
- (modules signer_mainnet_signatures)
  (libraries signer_cli)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
