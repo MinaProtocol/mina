@@ -1,8 +1,8 @@
 use crate::{gate_vector::fp::CamlPastaFpPlonkGateVectorPtr, srs::fp::CamlFpSrs};
 use ark_poly::EvaluationDomain;
+use kimchi::index::Index as DlogIndex;
+use kimchi_circuits::{gate::CircuitGate, nolookup::constraints::ConstraintSystem};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
-use plonk_15_wires_circuits::{gate::CircuitGate, nolookup::constraints::ConstraintSystem};
-use plonk_15_wires_protocol_dlog::index::Index as DlogIndex;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},

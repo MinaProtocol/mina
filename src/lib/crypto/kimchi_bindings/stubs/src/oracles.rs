@@ -1,5 +1,8 @@
 use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
 use commitment_dlog::commitment::{caml::CamlPolyComm, shift_scalar, PolyComm};
+use kimchi::prover::ProverProof;
+use kimchi::{index::VerifierIndex as DlogVerifierIndex, prover::caml::CamlProverProof};
+use kimchi_circuits::nolookup::scalars::{caml::CamlRandomOracles, RandomOracles};
 use oracle::{
     self,
     poseidon::PlonkSpongeConstants15W,
@@ -7,11 +10,6 @@ use oracle::{
     FqSponge,
 };
 use paste::paste;
-use plonk_15_wires_circuits::nolookup::scalars::{caml::CamlRandomOracles, RandomOracles};
-use plonk_15_wires_protocol_dlog::prover::ProverProof;
-use plonk_15_wires_protocol_dlog::{
-    index::VerifierIndex as DlogVerifierIndex, prover::caml::CamlProverProof,
-};
 
 //
 // CamlOracles

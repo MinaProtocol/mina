@@ -16,15 +16,15 @@ use mina_curves::pasta::{
     pallas::{Affine as GAffine, PallasParameters},
 };
 
+use kimchi::index::Index;
+use kimchi::prover::caml::CamlProverProof;
+use kimchi::prover::{ProverCommitments, ProverProof};
+use kimchi_circuits::nolookup::scalars::ProofEvaluations;
+use kimchi_circuits::polynomial::COLUMNS;
 use oracle::{
     poseidon::PlonkSpongeConstants15W,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
-use plonk_15_wires_circuits::nolookup::scalars::ProofEvaluations;
-use plonk_15_wires_circuits::polynomial::COLUMNS;
-use plonk_15_wires_protocol_dlog::index::Index;
-use plonk_15_wires_protocol_dlog::prover::caml::CamlProverProof;
-use plonk_15_wires_protocol_dlog::prover::{ProverCommitments, ProverProof};
 use std::convert::TryInto;
 
 #[ocaml_gen::func]

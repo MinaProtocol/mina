@@ -33,8 +33,8 @@ commitment_dlog = { git = "https://github.com/o1-labs/proof-systems", branch = "
 groupmap = { git = "https://github.com/o1-labs/proof-systems", branch = "mimoo/backend" }
 mina-curves = { git = "https://github.com/o1-labs/proof-systems", branch = "mimoo/backend" }
 oracle = { git = "https://github.com/o1-labs/proof-systems", branch = "mimoo/backend", features = ["ocaml_types"] }
-plonk_15_wires_circuits = { git = "https://github.com/o1-labs/proof-systems", branch = "mimoo/backend", features = ["ocaml_types"] }
-plonk_15_wires_protocol_dlog = { git = "https://github.com/o1-labs/proof-systems", branch = "mimoo/backend", features = ["ocaml_types"] }
+kimchi-circuits = { git = "https://github.com/o1-labs/proof-systems", branch = "mimoo/backend", features = ["ocaml_types"] }
+kimchi = { git = "https://github.com/o1-labs/proof-systems", branch = "mimoo/backend", features = ["ocaml_types"] }
 
 # ocaml-specific
 ocaml = { version = "0.22.2" }
