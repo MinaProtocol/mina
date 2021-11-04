@@ -10058,6 +10058,22 @@
               "deprecationReason": null
             },
             {
+              "name": "validUntil",
+              "description": "The global slot number after which this transaction cannot be applied",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "token",
               "description": "Token used for the transaction",
               "args": [],
@@ -10384,6 +10400,22 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "Account",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "validUntil",
+              "description": "The global slot number after which this transaction cannot be applied",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
                   "ofType": null
                 }
               },
@@ -10724,6 +10756,22 @@
               "deprecationReason": null
             },
             {
+              "name": "validUntil",
+              "description": "The global slot number after which this transaction cannot be applied",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "token",
               "description": "Token used for the transaction",
               "args": [],
@@ -11050,6 +11098,22 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "Account",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "validUntil",
+              "description": "The global slot number after which this transaction cannot be applied",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
                   "ofType": null
                 }
               },
@@ -11394,6 +11458,22 @@
               "deprecationReason": null
             },
             {
+              "name": "validUntil",
+              "description": "The global slot number after which this transaction cannot be applied",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "token",
               "description": "Token used for the transaction",
               "args": [],
@@ -11688,6 +11768,22 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "Account",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "validUntil",
+              "description": "The global slot number after which this transaction cannot be applied",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
                   "ofType": null
                 }
               },

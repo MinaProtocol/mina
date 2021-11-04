@@ -1,0 +1,6 @@
+(library
+ (public_name key_cache.sync)
+ (name key_cache_sync)
+ (libraries async core key_cache)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_coda ppx_version ppx_base ppx_here ppx_let)))

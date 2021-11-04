@@ -4,6 +4,37 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2021/10/27:
+
+- Adds memo to construction in the same way as `valid_until`. To use a memo, add the `memo` field to the metadata next to `valid_until` and give it a string, like `"memo": "hello"`. The string must be small -- it is limited to less than 32 bytes.
+- Adds valid_until and memo to the metadata of the `/construction/parse` response
+- Release of rosetta-v6 with all of the above
+- Make all lists in requests omittable
+- Release of rosetta-v7 with all of the above
+
+2021/10/26:
+
+- Fix /account/balance returns an Account-not-found error instead of a Chain-info-missing error when an account is missing.
+- Fix max_fee is now properly optional in the /construction/preprocess request.
+- Release of rosetta-v5 with all of the above
+
+2021/10/21:
+
+- New Construction API features
+  - Populate account_creation_fee in /construction/metadata response iff the receiver account does not exist in the ledger at the time this endpoint is called. Account_creation_fee is omitted from the JSON if the account does exist. If the account does not exist, then it is present and set to the account_creation_fee value (which is currently hardcoded to 1.0 MINA)
+  - Suggested_fee in the metadata response now dynamically adjusts based on recent activity. The algorithm for predicting fee is: Take all the user-generated transactions from the most recent five blocks and then find the median and interquartile range for the fee amounts. The suggested fee is `median + (interquartile-range/2)`
+  - Transactions can be set to expire using the newly exposed `valid_until` field. This is set during the /construction/preprocess step. Valid_until is a unsigned-32bit integer represented as a string in JSON. Example: `{ valid_until : "200000" }`. The unit for valid_until is a "global slot". To set a transaction's expiry date to 3 hours from the current time, you would take the current time, add 3 hours, subtract the genesis timestamp, and then divide the result by 3 to get the slot.
+    Example:
+      I want to expire a transaction in a few hours at UTC time x=1634767563.
+      Genesis time is: 2021-03-17 00:00:00.000000Z or g=1615939200
+
+      We can do 'x-g / 180' to get the slot number to give to valid_until.
+      In this case, "104602" -- so we send `{ valid_until : "104602" }`
+- New daemon stability fixes from 1.2.1 release (and new --stop-time flag to the daemon to configure the auto-shutdown behavior)
+- Add rosetta-999.conf for testing 99.9% reconciliation on mainnet
+- Update rosetta-dev.conf to use 99.9% reconciliation end condition
+- Release of rosetta-v4 with all of the above
+
 2021/10/15:
 
 - Use a more liberal postgres configuration
@@ -68,12 +99,12 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## How to build your own docker image
 
-Checkout the "rosetta-v3" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
+Checkout the "rosetta-v7" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
 
-`cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu | docker build -t mina-rosetta:v3 --build-arg "deb_codename=stretch" --build-arg "MINA_BRANCH=rosetta-v3" -`
+`cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu | docker build -t mina-rosetta:v7 --build-arg "deb_codename=stretch" --build-arg "MINA_BRANCH=rosetta-v7" -`
 
-This creates an image (mina-rosetta:v3) based on the most up-to-date changes that support rosetta. This image
-can be used as a drop-in replacement for `gcr.io/o1labs-192920/mina-rosetta:v3` in any of the below commands for testing.
+This creates an image (mina-rosetta:v7) based on the most up-to-date changes that support rosetta. This image
+can be used as a drop-in replacement for `minaprotocol/mina-rosetta:v7` in any of the below commands for testing.
 
 ## How to Run
 
@@ -81,13 +112,13 @@ The container includes 4 scripts in /rosetta which run a different set of servic
 - `docker-standalone-start.sh` is the most straightforward, it starts only the mina-rosetta API endpoint and any flags passed into the script go to mina-rosetta. Use this for the "offline" part of the Construction API.
 - `docker-demo-start.sh` launches a mina node with a very simple 1-address genesis ledger as a sandbox for developing and playing around in. This script starts the full suite of tools (a mina node, mina-archive, a postgresql DB, and mina-rosetta), but for a demo network with all operations occuring inside this container and no external network activity.
 - `docker-test-start.sh` launches the same demo network as in demo-start.sh but also launches the mina-rosetta-test-agent to run a suite of tests against the rosetta API.
-- The default, `docker-start.sh`, which connects the mina node to our [Mainnet](https://docs.minaprotocol.com/en/using-mina/connecting) network and initializes the archive database from publicly-availible nightly O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. The script also periodically checks for blocks that may be missing between the nightly backup and the tip of the chain and will fill in those gaps by walking back the linked list of blocks in the canonical chain and importing them one at a time. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/rosetta-v3/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
+- The default, `docker-start.sh`, which connects the mina node to our [Mainnet](https://docs.minaprotocol.com/en/using-mina/connecting) network and initializes the archive database from publicly-availible nightly O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. The script also periodically checks for blocks that may be missing between the nightly backup and the tip of the chain and will fill in those gaps by walking back the linked list of blocks in the canonical chain and importing them one at a time. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/rosetta-v7/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
 - Finally, the previous default, `docker-devnet-start.sh`, which connects the mina node to our [Devnet](https://docs.minaprotocol.com/en/advanced/connecting-devnet) network with the archive database initalized in a similar way to docker-start.sh. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. `docker-devnet-start.sh` is now just a special case of `docker-start.sh` so inspect the source there for more detailed configuration.
 
 For example, to run the `docker-devnet-start.sh` and connect to the live devnet:
 
 ```
-docker run -it --rm --name rosetta --entrypoint=./docker-devnet-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 gcr.io/o1labs-192920/mina-rosetta:v3
+docker run -it --rm --name rosetta --entrypoint=./docker-devnet-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 minaprotocol/mina-rosetta:v7
 ```
 
 Note: It will take 20min-1hr for your node to sync
@@ -185,13 +216,13 @@ The Construction API is _not_ validated using `rosetta-cli` as this would requir
 
 ### Reproduce agent and rosetta-cli validation
 
-`gcr.io/o1labs-192920/mina-rosetta:v3` and `rosetta-cli @ v0.5.12`
+`minaprotocol/mina-rosetta:v7` and `rosetta-cli @ v0.5.12`
 using this [`rosetta.conf`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/rosetta.conf) and the [`bootstrap_balances.json`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/bootstrap_balances.json) next to it.
 
 **Create one of each transaction type using the test-agent and exit**
 
 ```
-$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-test --entrypoint ./docker-test-start.sh -d gcr.io/o1labs-192920/mina-rosetta:v3
+$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-test --entrypoint ./docker-test-start.sh -d minaprotocol/mina-rosetta:v7
 
 $ docker logs --follow mina-rosetta-test
 ```
@@ -199,7 +230,7 @@ $ docker logs --follow mina-rosetta-test
 **Run a fast sandbox network forever and test with rosetta-cli**
 
 ```
-$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-demo --entrypoint ./docker-demo-start.sh -d gcr.io/o1labs-192920/mina-rosetta:v3
+$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-demo --entrypoint ./docker-demo-start.sh -d minaprotocol/mina-rosetta:v7
 
 $ docker logs --follow mina-rosetta-demo
 
@@ -243,3 +274,4 @@ cp -p src/models/* $MINA/src/lib/rosetta_models/
 In the generated files, the type `deriving` clauses will need to have `eq` added manually.
 Any record types with a field named `_type` will need annotate that field with `[@key "type"]`.
 In `lib/network.ml`, update the two instances of the version number.
+Check the diff after regeneration and be sure to add `[@default None]` and `[@default []]` to all relevant fields of the models

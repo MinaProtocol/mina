@@ -1,7 +1,7 @@
 (** Simple container of one of two values of a given type. *)
-open Core
+open Core_kernel
 
-open Async
+open Async_kernel
 
 module Stable : sig
   module V1 : sig

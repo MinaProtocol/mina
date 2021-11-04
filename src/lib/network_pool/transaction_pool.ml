@@ -256,6 +256,10 @@ module Make0
     (Transition_frontier : Transition_frontier_intf
                              with type staged_ledger := Staged_ledger.t) =
 struct
+  type verification_failure =
+    | Command_failure of Indexed_pool.Command_error.t
+    | Invalid_failure of Verifier.invalid
+
   module Breadcrumb = Transition_frontier.Breadcrumb
 
   module Resource_pool = struct
@@ -1161,7 +1165,14 @@ struct
                       ~data:c)
                 |> Map.map ~f:List.rev |> Map.to_alist
               in
-              let failure = ref (Ok ()) in
+              let failures = ref (Ok ()) in
+              let add_failure err =
+                match !failures with
+                | Ok () ->
+                    failures := Error [ err ]
+                | Error errs ->
+                    failures := Error (err :: errs)
+              in
               let%map diffs' =
                 Deferred.List.map by_sender ~how:`Parallel
                   ~f:(fun (signer, cs) ->
@@ -1199,7 +1210,7 @@ struct
                                    , u_acc ))
                           | c :: cs ->
                               let uc = User_command.of_verifiable c in
-                              if Result.is_error !failure then (
+                              if Result.is_error !failures then (
                                 Mutex.release signer_lock ;
                                 return (Error `Other_command_failed) )
                               else if
@@ -1215,7 +1226,17 @@ struct
                                       with
                                       | Error _ ->
                                           None
-                                      | Ok (Error ()) ->
+                                      | Ok (Error invalid) ->
+                                          [%log' error t.logger]
+                                            "Batch verification failed when \
+                                             adding from gossip"
+                                            ~metadata:
+                                              [ ( "error"
+                                                , `String
+                                                    (Verifier.invalid_to_string
+                                                       invalid) )
+                                              ] ;
+                                          add_failure (Invalid_failure invalid) ;
                                           None
                                       | Ok (Ok [ c ]) ->
                                           Some c
@@ -1234,7 +1255,7 @@ struct
                                         ~is_sender_local uc e
                                     with
                                     | `Reject ->
-                                        failure := Error e ;
+                                        add_failure (Command_failure e) ;
                                         Mutex.release signer_lock ;
                                         return (Error `Invalid_command)
                                     | `Ignore ->
@@ -1258,7 +1279,7 @@ struct
                                       (Indexed_pool.Update.merge u_acc u)
                                       (res :: acc) rejected cs
                               else
-                                let%bind _ =
+                                let%bind () =
                                   trust_record
                                     ( Trust_system.Actions.Sent_useless_gossip
                                     , Some
@@ -1276,11 +1297,20 @@ struct
                           (Indexed_pool.get_sender_local_state t.pool signer)
                           Indexed_pool.Update.empty [] [] cs)
               in
-              match !failure with
-              | Error e when not allow_failures_for_tests ->
-                  Or_error.errorf "Diff failed with error %s"
-                    (Yojson.Safe.to_string
-                       (Indexed_pool.Command_error.to_yojson e))
+              match !failures with
+              | Error errs when not allow_failures_for_tests ->
+                  let errs_string =
+                    List.map errs ~f:(fun err ->
+                        match err with
+                        | Command_failure cmd_err ->
+                            Yojson.Safe.to_string
+                              (Indexed_pool.Command_error.to_yojson cmd_err)
+                        | Invalid_failure invalid ->
+                            Verifier.invalid_to_string invalid)
+                    |> String.concat ~sep:", "
+                  in
+                  Or_error.errorf "Diff failed with verification failure(s): %s"
+                    errs_string
               | Error _ | Ok () ->
                   let data =
                     List.filter_map diffs' ~f:(function
@@ -1807,7 +1837,6 @@ let%test_module _ =
       }
 
     let verify_and_apply (pool : Test.Resource_pool.t) cs =
-      let logger = Logger.create ~id:"verify_and_apply" ~metadata:[] () in
       let tm0 = Time.now () in
       let%bind verified =
         Test.Resource_pool.Diff.verify' ~allow_failures_for_tests:true pool
@@ -1816,7 +1845,7 @@ let%test_module _ =
       in
       let result = Test.Resource_pool.Diff.unsafe_apply pool verified in
       let tm1 = Time.now () in
-      [%log info] "Time for verify_and_apply: %0.04f sec"
+      [%log' info pool.logger] "Time for verify_and_apply: %0.04f sec"
         (Time.diff tm1 tm0 |> Time.Span.to_sec) ;
       result
 

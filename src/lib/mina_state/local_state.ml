@@ -29,7 +29,7 @@ let display
   ; excess = Amount.to_string excess
   ; ledger =
       Visualization.display_prefix_of_string
-      @@ Frozen_ledger_hash.to_string ledger
+      @@ Frozen_ledger_hash.to_base58_check ledger
   ; success
   }
 

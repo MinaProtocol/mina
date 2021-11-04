@@ -2,6 +2,8 @@ open Core
 open Signature_lib
 open Mina_base
 
+let () = Key_cache_native.linkme (* Ensure that we use the native key cache. *)
+
 module Accounts = struct
   module Single = struct
     let to_account_with_pk :

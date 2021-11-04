@@ -19,3 +19,6 @@ val await_exn : t -> validation_result Deferred.t
 val await_timeout : t -> unit Deferred.t
 
 val fire_if_not_already_fired : t -> validation_result -> unit
+
+val set_message_type :
+  t -> [ `Unknown | `Block | `Snark_work | `Transaction ] -> unit
