@@ -67,3 +67,8 @@ let dumb_logrotate ~directory ~log_filename ~max_size ~num_rotate =
   Logger.Transport.create
     (module Dumb_logrotate)
     (Dumb_logrotate.create ~directory ~log_filename ~max_size ~num_rotate)
+
+let time_pretty_to_string timestamp =
+  Time.format timestamp "%Y-%m-%d %H:%M:%S UTC" ~zone:Time.Zone.utc
+
+let () = Logger.Time.set_pretty_to_string time_pretty_to_string

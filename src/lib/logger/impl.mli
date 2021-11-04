@@ -24,6 +24,10 @@ module Time : sig
   val to_yojson : t -> Yojson.Safe.t
 
   val of_yojson : Yojson.Safe.t -> (t, string) Result.t
+
+  val pretty_to_string : t -> string
+
+  val set_pretty_to_string : (t -> string) -> unit
 end
 
 module Source : sig

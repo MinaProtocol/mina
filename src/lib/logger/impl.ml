@@ -21,6 +21,33 @@ module Time = struct
 
   let of_yojson json =
     json |> Yojson.Safe.Util.to_string |> fun s -> Ok (Time.of_string s)
+
+  let pretty_to_string timestamp =
+    (* This used to be
+       [Core.Time.format timestamp "%Y-%m-%d %H:%M:%S UTC"
+        ~zone:Time.Zone.utc]
+       which uses the Unix string formatting under the hood, but we
+       don't want to load that just for the pretty printing. Instead,
+       we simulate it here.
+    *)
+    let zone = Time.Zone.utc in
+    let date, time = Time.to_date_ofday ~zone timestamp in
+    let time_parts = Time.Ofday.to_parts time in
+    let fmt_2_chars () i =
+      let s = string_of_int i in
+      if Int.(i < 10) then "0" ^ s else s
+    in
+    Stdlib.Format.sprintf "%i-%a-%a %a:%a:%a UTC" (Date.year date)
+      fmt_2_chars
+      (Date.month date |> Month.to_int)
+      fmt_2_chars (Date.day date) fmt_2_chars time_parts.hr
+      fmt_2_chars time_parts.min fmt_2_chars time_parts.sec
+
+  let pretty_to_string_ref = ref pretty_to_string
+
+  let set_pretty_to_string x = pretty_to_string_ref := x
+
+  let pretty_to_string x = !pretty_to_string_ref x
 end
 
 module Source = struct
@@ -161,27 +188,7 @@ module Processor = struct
               |> List.map ~f:(fun (k, v) -> "\n\t" ^ k ^ ": " ^ v)
               |> String.concat ~sep:""
             in
-            let time =
-              (* This used to be
-                 [Core.Time.format msg.timestamp "%Y-%m-%d %H:%M:%S UTC"
-                  ~zone:Time.Zone.utc]
-                 which uses the Unix string formatting under the hood, but we
-                 don't want to load that just for the pretty printing. Instead,
-                 we simulate it here.
-              *)
-              let zone = Time.Zone.utc in
-              let date, time = Time.to_date_ofday ~zone msg.timestamp in
-              let time_parts = Time.Ofday.to_parts time in
-              let fmt_2_chars () i =
-                let s = string_of_int i in
-                if i < 10 then "0" ^ s else s
-              in
-              Stdlib.Format.sprintf "%i-%a-%a %a:%a:%a UTC" (Date.year date)
-                fmt_2_chars
-                (Date.month date |> Month.to_int)
-                fmt_2_chars (Date.day date) fmt_2_chars time_parts.hr
-                fmt_2_chars time_parts.min fmt_2_chars time_parts.sec
-            in
+            let time = Time.pretty_to_string msg.timestamp in
             Some
               (time ^ " [" ^ Level.show msg.level ^ "] " ^ str ^ formatted_extra)
   end

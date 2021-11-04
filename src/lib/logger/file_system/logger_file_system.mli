@@ -10,3 +10,10 @@ val dumb_logrotate :
   -> max_size:int
   -> num_rotate:int
   -> Logger.Transport.t
+
+(** Pretty printer for time, in "%Y-%m-%d %H:%M:%S UTC" format.
+
+    On linking this library, this is used to override the JS-safe
+    implementation given in [Logger.Time.pretty_to_string].
+*)
+val time_pretty_to_string : Core.Time.t -> string
