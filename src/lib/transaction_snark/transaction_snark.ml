@@ -416,8 +416,8 @@ end
 module Proof = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Pickles.Proof.Branching_2.Stable.V1.t
+    module V2 = struct
+      type t = Pickles.Proof.Branching_2.Stable.V2.t
       [@@deriving
         version { asserted }, yojson, bin_io, compare, equal, sexp, hash]
 
@@ -428,9 +428,9 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      { statement : Statement.With_sok.Stable.V1.t; proof : Proof.Stable.V1.t }
+      { statement : Statement.With_sok.Stable.V1.t; proof : Proof.Stable.V2.t }
     [@@deriving compare, equal, fields, sexp, version, yojson, hash]
 
     let to_latest = Fn.id
@@ -976,23 +976,22 @@ module Base = struct
     make_checked
       Impl.(
         fun () ->
-          let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
+          let x =
+            exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3)
+          in
           let g = exists Inner_curve.typ ~compute:(fun _ -> Inner_curve.one) in
           ignore
-            ( Pickles.Step_main_inputs.Ops.scale_fast g
-                (`Plus_two_to_len [| b; b |])
+            ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5
+                (Shifted_value x)
               : Pickles.Step_main_inputs.Inner_curve.t ) ;
           ignore
             ( Pickles.Pairing_main.Scalar_challenge.endo g
-                (Scalar_challenge [ b ])
+                (Scalar_challenge.create x)
               : Field.t * Field.t ))
 
-  let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
-      ~signature =
+  let%snarkydef check_signature ~payload ~is_user_command ~signer ~signature =
     let%bind input = Transaction_union_payload.Checked.to_input payload in
-    let%bind verifies =
-      Schnorr.Checked.verifies shifted signature signer input
-    in
+    let%bind verifies = Schnorr.Checked.verifies signature signer input in
     Boolean.Assert.any [ Boolean.not is_user_command; verifies ]
 
   let check_timing ~balance_check ~timed_balance_check ~account ~txn_amount
@@ -1354,7 +1353,7 @@ module Base = struct
       | `No ->
           Assert.is_true account_there
 
-    let signature_verifies ~shifted ~payload_digest req pk =
+    let signature_verifies ~payload_digest req pk =
       let%bind signature =
         exists Schnorr.Signature.typ ~request:(As_prover.return req)
       in
@@ -1362,19 +1361,19 @@ module Base = struct
         Public_key.decompress_var pk
         (*           (Account_id.Checked.public_key fee_payer_id) *)
       in
-      Schnorr.Checked.verifies shifted signature pk
+      Schnorr.Checked.verifies signature pk
         (Random_oracle.Input.field payload_digest)
 
     let pay_fee
-        ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        ~shifted ~root ~fee ~fee_payer_is_other ~fee_payer_id ~fee_payer_nonce
-        ~payload_digest ~txn_global_slot =
+        ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~root
+        ~fee ~fee_payer_is_other ~fee_payer_id ~fee_payer_nonce ~payload_digest
+        ~txn_global_slot =
       let open Tick in
       let actual_fee_payer_nonce_and_rch = Set_once.create () in
       let%bind signature_verifies =
         signature_verifies Fee_payer_signature
           (Account_id.Checked.public_key fee_payer_id)
-          ~payload_digest ~shifted
+          ~payload_digest
       in
       let%map root =
         Frozen_ledger_hash.modify_account root fee_payer_id
@@ -1494,7 +1493,7 @@ module Base = struct
 
     let modify
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        ~shifted ~txn_global_slot ~add_check ~root ~fee ~fee_payer_nonce
+        ~txn_global_slot ~add_check ~root ~fee ~fee_payer_nonce
         ~fee_payer_receipt_chain_hash ~token_id ~payload_digest ~is_fee_payer
         ~is_new ~which ~tag ~(body : Snapp_command.Party.Body.Checked.t)
         ~self_predicate ~other_predicate
@@ -1523,7 +1522,7 @@ module Base = struct
         run_checked
           (let%bind signature_verifies =
              signature_verifies (Account_signature which) public_key
-               ~payload_digest ~shifted
+               ~payload_digest
            in
            Frozen_ledger_hash.modify_account root
              (Account_id.Checked.create public_key token_id)
@@ -1687,16 +1686,13 @@ module Base = struct
         let payload_digest =
           Snapp_command.Payload.Digested.Checked.digest payload
         in
-        let (module S) = !(Tick.Inner_curve.Checked.Shifted.create ()) in
         let txn_global_slot = curr_state.global_slot_since_genesis in
         let root = s.source in
         let ( (root as root_after_fee_payer)
             , (fee_payer_nonce, fee_payer_receipt_chain_hash) ) =
-          !(pay_fee ~constraint_constants
-              ~shifted:(module S)
-              ~root ~fee ~fee_payer_is_other ~fee_payer_id
-              ~fee_payer_nonce:other_fee_payer_opt.data.nonce ~payload_digest
-              ~txn_global_slot)
+          !(pay_fee ~constraint_constants ~root ~fee ~fee_payer_is_other
+              ~fee_payer_id ~fee_payer_nonce:other_fee_payer_opt.data.nonce
+              ~payload_digest ~txn_global_slot)
         in
         let add_check, checks_succeeded = create_checker () in
         add_check
@@ -1714,10 +1710,9 @@ module Base = struct
              s2.predicate.data.fee_payer
              (Account_id.Checked.public_key fee_payer_id)) ;
         let modify =
-          modify ~constraint_constants
-            ~shifted:(module S)
-            ~txn_global_slot ~add_check ~fee_payer_nonce
-            ~fee_payer_receipt_chain_hash ~token_id ~payload_digest ~is_new:`No
+          modify ~constraint_constants ~txn_global_slot ~add_check
+            ~fee_payer_nonce ~fee_payer_receipt_chain_hash ~token_id
+            ~payload_digest ~is_new:`No
             ~check_auth:Permissions.Auth_required.Checked.spec_eval
         in
         let self_pred = Check_predicate.snapp_self in
@@ -1816,13 +1811,11 @@ module Base = struct
         let payload_digest =
           Snapp_command.Payload.Digested.Checked.digest payload
         in
-        let (module S) = !(Tick.Inner_curve.Checked.Shifted.create ()) in
         let txn_global_slot = curr_state.global_slot_since_genesis in
         let root_after_fee_payer, (fee_payer_nonce, fee_payer_receipt_chain_hash)
             =
-          !(pay_fee ~constraint_constants
-              ~shifted:(module S)
-              ~root:s.source ~fee ~fee_payer_is_other ~fee_payer_id
+          !(pay_fee ~constraint_constants ~root:s.source ~fee
+              ~fee_payer_is_other ~fee_payer_id
               ~fee_payer_nonce:other_fee_payer_opt.data.nonce ~payload_digest
               ~txn_global_slot)
         in
@@ -1835,11 +1828,9 @@ module Base = struct
              s1.predicate.data.fee_payer
              (Account_id.Checked.public_key fee_payer_id)) ;
         let root_after_account1, proof1_must_verify =
-          modify ~constraint_constants ~fee
-            ~shifted:(module S)
-            ~txn_global_slot ~add_check:add_check1 ~root:root_after_fee_payer
-            ~fee_payer_nonce ~fee_payer_receipt_chain_hash ~token_id
-            ~payload_digest
+          modify ~constraint_constants ~fee ~txn_global_slot
+            ~add_check:add_check1 ~root:root_after_fee_payer ~fee_payer_nonce
+            ~fee_payer_receipt_chain_hash ~token_id ~payload_digest
             ~check_auth:Permissions.Auth_required.Checked.spec_eval ~is_new:`No
             ~is_fee_payer:account1_is_fee_payer ~which:`One ~tag:snapp1_tag
             ~body:s1.body1.data
@@ -1849,11 +1840,9 @@ module Base = struct
         in
         let add_check2, checks_succeeded2 = create_checker () in
         let root_after_account2, _ =
-          modify ~constraint_constants ~fee
-            ~shifted:(module S)
-            ~txn_global_slot ~add_check:add_check2 ~root:root_after_account1
-            ~fee_payer_nonce ~fee_payer_receipt_chain_hash ~token_id
-            ~payload_digest
+          modify ~constraint_constants ~fee ~txn_global_slot
+            ~add_check:add_check2 ~root:root_after_account1 ~fee_payer_nonce
+            ~fee_payer_receipt_chain_hash ~token_id ~payload_digest
             ~check_auth:(fun perm ~signature_verifies ->
               let res =
                 Permissions.Auth_required.Checked.eval_no_proof perm
@@ -1960,23 +1949,19 @@ module Base = struct
             Digested.Checked.digest
               (Zero_proved (Zero_proved.Checked.digested payload)))
         in
-        let (module S) = !(Tick.Inner_curve.Checked.Shifted.create ()) in
         let txn_global_slot = curr_state.global_slot_since_genesis in
         let root_after_fee_payer, (fee_payer_nonce, fee_payer_receipt_chain_hash)
             =
-          !(pay_fee ~constraint_constants
-              ~shifted:(module S)
-              ~root:s.source ~fee ~fee_payer_is_other ~fee_payer_id
+          !(pay_fee ~constraint_constants ~root:s.source ~fee
+              ~fee_payer_is_other ~fee_payer_id
               ~fee_payer_nonce:other_fee_payer_opt.data.nonce ~payload_digest
               ~txn_global_slot)
         in
         let add_check1, checks_succeeded1 = create_checker () in
         let root_after_account1, _ =
-          modify ~constraint_constants ~fee
-            ~shifted:(module S)
-            ~txn_global_slot ~add_check:add_check1 ~root:root_after_fee_payer
-            ~fee_payer_nonce ~fee_payer_receipt_chain_hash ~token_id
-            ~payload_digest
+          modify ~constraint_constants ~fee ~txn_global_slot
+            ~add_check:add_check1 ~root:root_after_fee_payer ~fee_payer_nonce
+            ~fee_payer_receipt_chain_hash ~token_id ~payload_digest
             ~check_auth:Permissions.Auth_required.Checked.spec_eval ~is_new:`No
             ~is_fee_payer:account1_is_fee_payer ~which:`One ~tag:snapp1_tag
             ~body:one.body
@@ -1991,11 +1976,9 @@ module Base = struct
         in
         let add_check2, checks_succeeded2 = create_checker () in
         let root_after_account2, _ =
-          modify ~constraint_constants ~fee
-            ~shifted:(module S)
-            ~txn_global_slot ~add_check:add_check2 ~root:root_after_account1
-            ~fee_payer_nonce ~fee_payer_receipt_chain_hash ~token_id
-            ~payload_digest
+          modify ~constraint_constants ~fee ~txn_global_slot
+            ~add_check:add_check2 ~root:root_after_account1 ~fee_payer_nonce
+            ~fee_payer_receipt_chain_hash ~token_id ~payload_digest
             ~check_auth:(fun perm ~signature_verifies ->
               let res =
                 Permissions.Auth_required.Checked.eval_no_proof perm
@@ -2060,17 +2043,15 @@ module Base = struct
     | Init_stack : Pending_coinbase.Stack.t Snarky_backendless.Request.t
 
   let%snarkydef apply_tagged_transaction
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      (type shifted)
-      (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
-      root pending_coinbase_stack_init pending_coinbase_stack_before
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) root
+      pending_coinbase_stack_init pending_coinbase_stack_before
       pending_coinbase_after next_available_token state_body
       ({ signer; signature; payload } as txn : Transaction_union.var) =
     let tag = payload.body.tag in
     let is_user_command = Transaction_union.Tag.Unpacked.is_user_command tag in
     let%bind () =
       [%with_label "Check transaction signature"]
-        (check_signature shifted ~payload ~is_user_command ~signer ~signature)
+        (check_signature ~payload ~is_user_command ~signer ~signature)
     in
     let%bind signer_pk = Public_key.compress_var signer in
     let%bind () =
@@ -2855,7 +2836,6 @@ module Base = struct
   let%snarkydef main ~constraint_constants
       (statement : Statement.With_sok.Checked.t) =
     let%bind () = dummy_constraints () in
-    let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
     let%bind t =
       with_label __LOC__
         (exists Transaction_union.typ ~request:(As_prover.return Transaction))
@@ -2871,9 +2851,8 @@ module Base = struct
     let pc = statement.pending_coinbase_stack_state in
     let%bind root_after, fee_excess, supply_increase, next_available_token_after
         =
-      apply_tagged_transaction ~constraint_constants
-        (module Shifted)
-        statement.source pending_coinbase_init pc.source pc.target
+      apply_tagged_transaction ~constraint_constants statement.source
+        pending_coinbase_init pc.source pc.target
         statement.next_available_token_before state_body t
     in
     let%bind fee_excess =
