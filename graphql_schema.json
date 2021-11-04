@@ -3614,6 +3614,22 @@
               "deprecationReason": null
             },
             {
+              "name": "incrementNonce",
+              "description": "Whether to increment the nonce",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "delta",
               "description": "Signed amount",
               "args": [],
@@ -3763,6 +3779,20 @@
                       }
                     }
                   }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "incrementNonce",
+              "description": "Whether to increment the nonce",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
                 }
               },
               "defaultValue": null
@@ -4411,6 +4441,22 @@
           "description": null,
           "fields": [
             {
+              "name": "incrementNonce",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "setTokenSymbol",
               "description": null,
               "args": [],
@@ -4572,6 +4618,20 @@
             }
           ],
           "inputFields": [
+            {
+              "name": "incrementNonce",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
             {
               "name": "setTokenSymbol",
               "description": null,
