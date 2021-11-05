@@ -19,5 +19,5 @@
    transition_frontier web_client_pipe
    web_request graphql_lib genesis_ledger_helper bash_colors)
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../../../config.mlh)
+ (preprocessor_deps ../../../../config.mlh ../../../../../graphql_schema.json)
  (preprocess (pps ppx_coda graphql_ppx ppx_version ppx_jane ppx_deriving_yojson)))
