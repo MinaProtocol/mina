@@ -27,7 +27,6 @@ ARG ROCKSDB_VERSION=v5.18.4
 # OS package dependencies
 # First add support for https and pkg-config for apt, then install everything else
 # TODO: make sure this is the minimum compile-time deps
-# Includes all of the dependencies from https://github.com/facebook/rocksdb/blob/main/INSTALL.md in the hopes to speed up rocksdb
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
@@ -43,7 +42,6 @@ RUN apt-get update \
     libjemalloc-dev \
     libpq-dev \
     libprocps-dev \
-    libsnappy-dev \
     libsodium-dev \
     libssl-dev \
     zlib1g-dev \
