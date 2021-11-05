@@ -208,10 +208,10 @@ let%test_module "Full_frontier tests" =
                   in
                   List.iter (State_hash.Set.to_list required_state_hashes)
                     ~f:(fun hash ->
-                      ignore (
-                      Full_frontier.For_tests.find_protocol_state_exn frontier
-                        hash
-                      ) : Mina_state.Protocol_state.value ) ) ;
+                      ignore
+                        ( Full_frontier.For_tests.find_protocol_state_exn
+                             frontier hash
+                          : Mina_state.Protocol_state.value ) ) ) ;
               clean_up_persistent_root ~frontier ) )
 
     let%test_unit "The length of the longest branch should never be greater \
