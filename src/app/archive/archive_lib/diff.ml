@@ -24,37 +24,6 @@ module Transition_frontier = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t =
-        | Breadcrumb_added of
-            { block :
-                ( External_transition.Stable.V1.t
-                , State_hash.Stable.V1.t )
-                With_hash.Stable.V1.t
-            ; sender_receipt_chains_from_parent_ledger :
-                (Account_id.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t) list
-            }
-        | Root_transitioned of
-            Transition_frontier.Diff.Root_transition.Lite.Stable.V1.t
-        | Bootstrap of { lost_blocks : State_hash.Stable.V1.t list }
-
-      let to_latest (t : t) : V2.t =
-        match t with
-        | Breadcrumb_added { block; sender_receipt_chains_from_parent_ledger }
-          ->
-            Breadcrumb_added
-              { block =
-                  With_hash.map block ~f:External_transition.Stable.V1.to_latest
-              ; sender_receipt_chains_from_parent_ledger
-              }
-        | Root_transitioned x ->
-            Root_transitioned
-              (Transition_frontier.Diff.Root_transition.Lite.Stable.V1.to_latest
-                 x)
-        | Bootstrap { lost_blocks } ->
-            Bootstrap { lost_blocks }
-    end
   end]
 end
 
@@ -92,19 +61,6 @@ module Stable = struct
       | Transaction_pool of Transaction_pool.Stable.V2.t
 
     let to_latest = Fn.id
-  end
-
-  module V1 = struct
-    type t =
-      | Transition_frontier of Transition_frontier.Stable.V1.t
-      | Transaction_pool of Transaction_pool.Stable.V1.t
-
-    let to_latest (t : t) : V2.t =
-      match t with
-      | Transition_frontier x ->
-          Transition_frontier (Transition_frontier.Stable.V1.to_latest x)
-      | Transaction_pool x ->
-          Transaction_pool (Transaction_pool.Stable.V1.to_latest x)
   end
 end]
 
