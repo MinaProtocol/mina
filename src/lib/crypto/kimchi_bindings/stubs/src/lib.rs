@@ -51,8 +51,8 @@ pub use {
     commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
     kimchi::prover::caml::{CamlProverCommitments, CamlProverProof},
     kimchi_circuits::{
-        gate::{caml::CamlCircuitGate, GateType, CurrOrNext},
-        expr::{caml::{CamlColumn, CamlVariable, CamlPolishToken, CamlLinearization}},
+        expr::caml::{CamlColumn, CamlLinearization, CamlPolishToken, CamlVariable},
+        gate::{caml::CamlCircuitGate, CurrOrNext, GateType},
         nolookup::scalars::caml::{CamlLookupEvaluations, CamlProofEvaluations, CamlRandomOracles},
         wires::caml::CamlWire,
     },

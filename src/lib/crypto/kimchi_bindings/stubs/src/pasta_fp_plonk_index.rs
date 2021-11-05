@@ -1,6 +1,6 @@
 use crate::{gate_vector::fp::CamlPastaFpPlonkGateVectorPtr, srs::fp::CamlFpSrs};
 use ark_poly::EvaluationDomain;
-use kimchi::index::Index as DlogIndex;
+use kimchi::index::{expr_linearization, Index as DlogIndex};
 use kimchi_circuits::{gate::CircuitGate, nolookup::constraints::ConstraintSystem};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 use serde::{Deserialize, Serialize};
@@ -53,12 +53,12 @@ pub fn caml_pasta_fp_plonk_index_create(
         })
         .collect();
 
+    /*
     for (i, g) in gates.iter().enumerate() {
         let x : Vec<_> = g.c.iter().map(|x| format!("{}", x)).collect();
         let s = x.join(", ");
         println!("c[{}][{:?}]: {}", i, g.typ, s);
-    }
-
+    } */
 
     // create constraint system
     let cs = match ConstraintSystem::<Fp>::create(
@@ -82,7 +82,8 @@ pub fn caml_pasta_fp_plonk_index_create(
 
     // Unsafe if we are in a multi-core ocaml
     {
-        let ptr: &mut commitment_dlog::srs::SRS<GAffine> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+        let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+            unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
         ptr.add_lagrange_basis(cs.domain.d1);
     }
 
@@ -152,6 +153,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     t.cs.fr_sponge_params = oracle::pasta::fp_3::params();
     t.srs = srs.clone();
     t.fq_sponge_params = oracle::pasta::fq_3::params();
+    t.linearization = expr_linearization(t.cs.domain.d1, false, false, None);
 
     //
     Ok(CamlPastaFpPlonkIndex(Box::new(t)))

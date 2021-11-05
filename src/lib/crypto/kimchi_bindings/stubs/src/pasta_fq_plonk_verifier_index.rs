@@ -11,8 +11,8 @@ use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 
-use kimchi::index::VerifierIndex;
-use kimchi_circuits::expr::{PolishToken, Linearization};
+use kimchi::index::{expr_linearization, VerifierIndex};
+use kimchi_circuits::expr::{Linearization, PolishToken};
 use kimchi_circuits::nolookup::constraints::{zk_polynomial, zk_w3, Shifts};
 use kimchi_circuits::wires::{COLUMNS, PERMUTS};
 use std::convert::TryInto;
@@ -165,7 +165,8 @@ pub fn caml_pasta_fq_plonk_verifier_index_read(
     srs: CamlFqSrs,
     path: String,
 ) -> Result<CamlPastaFqPlonkVerifierIndex, ocaml::Error> {
-    let vi = read_raw(offset, srs, path)?;
+    let mut vi = read_raw(offset, srs, path)?;
+    vi.linearization = expr_linearization(vi.domain, false, false, None);
     Ok(vi.into())
 }
 
@@ -191,6 +192,11 @@ pub fn caml_pasta_fq_plonk_verifier_index_write(
 pub fn caml_pasta_fq_plonk_verifier_index_create(
     index: CamlPastaFqPlonkIndexPtr,
 ) -> CamlPastaFqPlonkVerifierIndex {
+    {
+        let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+            unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
+        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
+    }
     let verifier_index = index.as_ref().0.verifier_index();
     verifier_index.into()
 }
