@@ -212,28 +212,19 @@ module Instance = struct
     in
     let%bind () = Deferred.return (assert_no_sync t) in
     (* read basic information from the database *)
-    let%bind root, root_transition, best_tip, best_tip_transition, protocol_states, root_hash =
+    let%bind root, root_transition, best_tip, protocol_states, root_hash =
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
       let root_hash = Root_data.Minimal.hash root in
       let%bind root_transition = Database.get_transition t.db root_hash in
       let%bind best_tip = Database.get_best_tip t.db in
-      let%bind best_tip_transition = Database.get_transition t.db best_tip in
       let%map protocol_states =
         Database.get_protocol_states_for_root_scan_state t.db
       in
-      (root, root_transition, best_tip, best_tip_transition, protocol_states, root_hash))
+      (root, root_transition, best_tip, protocol_states, root_hash))
       |> Result.map_error ~f:(fun err ->
              `Failure (Database.Error.not_found_message err) )
       |> Deferred.return
-    in
-    let%bind () = Deferred.return @@
-      let open Unsigned.UInt32 in 
-      let root_length = to_int @@ External_transition.Validated.blockchain_length root_transition in 
-      let best_tip_length = to_int @@ External_transition.Validated.blockchain_length best_tip_transition in 
-      if best_tip_length >= max_length && best_tip_length - root_length + 1 < max_length then  
-        Error (`Failure "frontier length less than expected")
-      else Ok ()
     in
     let root_genesis_state_hash =
       External_transition.Validated.protocol_state root_transition
