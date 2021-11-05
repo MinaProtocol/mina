@@ -128,7 +128,7 @@ func main() {
 	_ = logging.SetLogLevel("routing/record", "debug")
 	_ = logging.SetLogLevel("pubsub", "debug") // Spammy about blacklisted peers, maybe should be info?
 	_ = logging.SetLogLevel("badger", "debug")
-	_ = logging.SetLogLevel("relay", "info") // Log relayed byte counts spammily
+	_ = logging.SetLogLevel("relay", "error") // Disable verbose relay log at info level as below unhandled log messages keep crashing the libp2p_helper process during local testing: "libp2p_helper: accepted relay connection: ...""
 	_ = logging.SetLogLevel("routedhost", "debug")
 	_ = logging.SetLogLevel("swarm2", "info") // Logs a new stream to each peer when opended at debug
 	_ = logging.SetLogLevel("peerstore/ds", "debug")
