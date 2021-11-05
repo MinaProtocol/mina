@@ -15,7 +15,7 @@ spec:
   - name: tcp-p2p
     port: {{ .Values.ports.p2p }}
     targetPort: external-port
-    nodePort: 30007
+    nodePort: 30005
 
 ---
 

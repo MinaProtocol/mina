@@ -33,8 +33,8 @@ libp2p:
   seed:
     enabled: true
   staticKeypair:
-    enabled: false
-    secretName: some-libp2p-key
+    enabled: true
+    secretName: "some-libp2p-key"
   loadBalancer:
     enabled: true
 
@@ -47,7 +47,7 @@ ports:
 healthcheck:
   enabled: true
   failureThreshold: 60
-  periodSeconds: 5
+  periodSeconds: 10
   initialDelaySeconds: 30
   seed:
     healthcheck.seed.allChecks:
