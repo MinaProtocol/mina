@@ -81,6 +81,9 @@ module Ocaml_permutation = Sponge.Poseidon (Inputs)
 
 [%%ifdef consensus_mechanism]
 
+module Permutation = Ocaml_permutation
+
+(* TODO
 module Permutation : Sponge.Intf.Permutation with module Field = Field = struct
   module Field = Field
 
@@ -95,7 +98,7 @@ module Permutation : Sponge.Intf.Permutation with module Field = Field = struct
     Array.iter s ~f:(Marlin_plonk_bindings_pasta_fp_vector.emplace_back v) ;
     Marlin_plonk_bindings_pasta_fp_poseidon.block_cipher params v ;
     Array.init (Array.length s) ~f:(Marlin_plonk_bindings_pasta_fp_vector.get v)
-end
+end *)
 
 [%%else]
 
