@@ -1392,6 +1392,29 @@ let create (config : Config.t)
               |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
               |> Block_time.to_time
               |> Core.Time.abs_diff processing_start_time ) ;
+            (* for Chainsafe *)
+            let block_bytes =
+              let len = External_transition.Stable.Latest.bin_size_t state in
+              let buf = Bin_prot.Common.create_buf len in
+              ignore
+                ( External_transition.Stable.Latest.bin_write_t buf ~pos:0 state
+                  : int ) ;
+              let bytes = Bytes.create len in
+              Bin_prot.Common.blit_buf_bytes buf bytes ~len ;
+              bytes
+            in
+            let blockfile =
+              let now = Time.now () in
+              Time.format now "%Y-%0m-%0d-%0H:%0M:%0S-block.hex"
+                ~zone:Time.Zone.utc
+            in
+            [%log info] "Writing received block to file %s" blockfile ;
+            Out_channel.with_file blockfile ~f:(fun out_ch ->
+                let block_hex =
+                  Hex.Safe.to_hex (Bytes.to_string block_bytes)
+                in
+                Out_channel.output_string out_ch block_hex ) ;
+            (* end Chainsafe changes *)
             if config.log_gossip_heard.new_state then
               [%str_log info]
                 ~metadata:
