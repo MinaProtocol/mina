@@ -2,7 +2,7 @@ GossipQA testnet deployment Instructions
 
 0: Before starting, make sure that no pre-existing gossipqa deployment exists, and also make sure one is working within us-central-1 by running 
 
-`gcloud container clusters get-credentials --region us-central1 coda-infra-central1`
+`gcloud container clusters get-credentials --region northamerica-northeast1 mina-infra-canada`
 
 1: Firstly figure out how many unique and total fish, whales, plain nodes, snark coordinators, and how many snark workers per coordinator.  All these must be written out in `automation/terraform/testnets/gossipqa/main.tf`.  use the terraform for-loops to make this process less copy-pasty
 
@@ -56,7 +56,8 @@ kubectl label configmap simplified-mainnet-dashboard grafana_dashboard=1
 
 ```
 #install grafana
-helm install gossipqa-metrics-stack prometheus-community/kube-prometheus-stack -f automation/terraform/testnets/gossipqa/values-stack.yaml```
+helm install gossipqa-metrics-stack prometheus-community/kube-prometheus-stack -f automation/terraform/testnets/gossipqa/values-stack.yaml
+```
 
 3: In order access grafana
 
@@ -64,7 +65,7 @@ helm install gossipqa-metrics-stack prometheus-community/kube-prometheus-stack -
 kubectl get secret gossipqa-metrics-stack-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
 
 #run kubectl get pods and find the grafana pod, then do a port forward
-kubectl port-forward pod/gossipqa-metrics-stack-grafana-56d9c65796-s6dbw 3000:3000
+kubectl port-forward pod/gossipqa-metrics-stack-grafana-74ff849786-6ngcp 3000:3000
 
 3.1: you may have to manually configure graphana to use the datasource deployed in step 2.
 
