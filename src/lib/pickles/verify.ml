@@ -113,6 +113,7 @@ let verify_heterogenous (ts : Instance.t list) =
           Plonk_checks.scalars_env
             (module Tick.Field)
             ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
+            ~srs_length_log2:Common.Max_degree.step_log2
             ~field_of_hex:(fun s ->
               Kimchi_pasta.Pasta.Bigint256.of_hex_string s
               |> Kimchi_pasta.Pasta.Fp.of_bigint)

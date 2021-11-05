@@ -35,7 +35,7 @@ struct
   end
 
   let print_g lab (x, y) =
-    if true then
+    if debug then
       as_prover
         As_prover.(
           fun () ->
@@ -54,14 +54,14 @@ struct
               lab (read Challenge.typ chal))
 
   let print_fp lab x =
-    if true then
+    if debug then
       as_prover
         As_prover.(
           fun () ->
             printf !"%s: %{sexp:Backend.Tick.Field.t}\n%!" lab (read_var x))
 
   let print_bool lab x =
-    if true then
+    if debug then
       as_prover (fun () ->
           printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x))
 
@@ -74,22 +74,24 @@ struct
   let absorb sponge ty t =
     absorb
       ~absorb_field:(fun x ->
-        as_prover
-          As_prover.(
-            fun () ->
-              printf "absorb %s\n%!"
-                Backend.Tick.Bigint.R.(to_hex_string (of_field (read_var x)))) ;
+        if debug then
+          as_prover
+            As_prover.(
+              fun () ->
+                printf "absorb %s\n%!"
+                  Backend.Tick.Bigint.R.(to_hex_string (of_field (read_var x)))) ;
         Sponge.absorb sponge (`Field x))
       ~g1_to_field_elements:Inner_curve.to_field_elements
       ~absorb_scalar:(fun (x, (b : Boolean.var)) ->
-        as_prover
-          As_prover.(
-            fun () ->
-              printf "absorb %s\n%!"
-                Backend.Tick.Bigint.R.(to_hex_string (of_field (read_var x))) ;
-              printf "absorb %s\n%!"
-                Backend.Tick.Bigint.R.(
-                  to_hex_string (of_field (read_var (b :> Field.t))))) ;
+        if debug then
+          as_prover
+            As_prover.(
+              fun () ->
+                printf "absorb %s\n%!"
+                  Backend.Tick.Bigint.R.(to_hex_string (of_field (read_var x))) ;
+                printf "absorb %s\n%!"
+                  Backend.Tick.Bigint.R.(
+                    to_hex_string (of_field (read_var (b :> Field.t))))) ;
         Sponge.absorb sponge (`Field x) ;
         Sponge.absorb sponge (`Bits [ b ]))
       ~mask_g1_opt:(fun ((b : Boolean.var), (x, y)) ->
@@ -136,76 +138,30 @@ struct
         let to_bigint = Impl.Bigint.of_field
       end
     end in
-    printf "x_hat\n%!" ;
     with_label __LOC__ (fun () ->
         let correction, acc =
           Array.mapi ts ~f:(fun i (s, x) ->
-              let n =
+              let rr, n =
                 match s with
-                | `Field _ ->
-                    Field.size_in_bits
-                | `Packed_bits (_, n) ->
-                    n
+                | `Packed_bits (s, n) ->
+                    ( Ops.scale_fast2'
+                        (module F)
+                        (Inner_curve.constant x) s ~num_bits:n
+                    , n )
+                | `Field s ->
+                    ( Ops.scale_fast2'
+                        (module F)
+                        (Inner_curve.constant x) s ~num_bits:Field.size_in_bits
+                    , Field.size_in_bits )
               in
               let n =
                 Ops.bits_per_chunk * Ops.chunks_needed ~num_bits:(n - 1)
               in
               let cc = pow2pow x n in
-              let rr =
-                match s with
-                | `Packed_bits (s, n) ->
-                    Ops.scale_fast2'
-                      (module F)
-                      (Inner_curve.constant x) s ~num_bits:n
-                | `Field s ->
-                    Ops.scale_fast2'
-                      (module F)
-                      (Inner_curve.constant x) s ~num_bits:Field.size_in_bits
-              in
-              as_prover
-                As_prover.(
-                  fun () ->
-                    (let x, y = x |> Inner_curve.Constant.to_affine_exn in
-                     printf "%d: %s, %s\n%!" i
-                       (Backend.Tick.Bigint.R.to_hex_string
-                          (Impl.Bigint.of_field x))
-                       (Backend.Tick.Bigint.R.to_hex_string
-                          (Impl.Bigint.of_field y))) ;
-                    printf "%s\n%!"
-                      (let s =
-                         match s with `Field s | `Packed_bits (s, _) -> s
-                       in
-                       Backend.Tick.Bigint.R.to_hex_string
-                         (Impl.Bigint.of_field (read_var s))) ;
-
-                    let x, y =
-                      read Inner_curve.typ rr
-                      |> Inner_curve.Constant.to_affine_exn
-                    in
-                    printf "= %s, %s\n%!"
-                      (Backend.Tick.Bigint.R.to_hex_string
-                         (Impl.Bigint.of_field x))
-                      (Backend.Tick.Bigint.R.to_hex_string
-                         (Impl.Bigint.of_field y))) ;
               (cc, rr))
           |> Array.reduce_exn ~f:(fun (a1, b1) (a2, b2) ->
                  (Inner_curve.Constant.( + ) a1 a2, Inner_curve.( + ) b1 b2))
         in
-        (*
-        let acc =
-          Array.mapi ts ~f:(fun i (s, x) ->
-              match s with
-              | `Packed_bits (s, n) ->
-                  Ops.scale_fast2'
-                    (module F)
-                    (Inner_curve.constant x) s ~num_bits:n
-              | `Field s ->
-                  Ops.scale_fast2'
-                    (module F)
-                    (Inner_curve.constant x) s ~num_bits:Field.size_in_bits
-              )
-          |> Array.reduce_exn ~f:Inner_curve.( + )
-        in *)
         Inner_curve.(acc + constant (Constant.negate correction)))
 
   let squeeze_challenge sponge : Field.t =
@@ -216,10 +172,13 @@ struct
     let pre =
       lowest_128_bits ~constrain_low_bits:false (Sponge.squeeze sponge)
     in
-    as_prover
-      As_prover.(
-        fun () ->
-          printf !"prechallenge %{sexp:Backend.Tick.Field.t}\n%!" (read_var pre)) ;
+    if debug then
+      as_prover
+        As_prover.(
+          fun () ->
+            printf
+              !"prechallenge %{sexp:Backend.Tick.Field.t}\n%!"
+              (read_var pre)) ;
     SC.SC.create pre
 
   let bullet_reduce sponge gammas =
@@ -286,40 +245,10 @@ struct
           ( Inner_curve.t
           , Other_field.t Shifted_value.Type2.t )
           Openings.Bulletproof.t) =
-    let print lab (x, y) =
-      as_prover
-        As_prover.(
-          fun () ->
-            printf
-              !"%s: %{sexp:Backend.Tick.Field.t}, %{sexp:Backend.Tick.Field.t}\n\
-                %!"
-              lab (read_var x) (read_var y))
-    in
-    let print_field lab x =
-      as_prover
-        As_prover.(
-          fun () ->
-            printf !"%s: %{sexp:Backend.Tick.Field.t}\n%!" lab (read_var x))
-    in
     with_label "check_bulletproof" (fun () ->
-        as_prover
-          As_prover.(
-            fun () ->
-              printf "sponge state bulletproof:\n%!" ;
-              Array.iter sponge.state ~f:(fun x ->
-                  printf !"%{sexp:Backend.Tick.Field.t}\n%!" (read_var x))) ;
         absorb sponge Scalar
           ( match combined_inner_product with
           | Shifted_value.Type2.Shifted_value x ->
-              as_prover
-                As_prover.(
-                  fun () ->
-                    let x, b = x in
-                    printf
-                      !"combined_inner_product: %{sexp:Backend.Tick.Field.t}\n\
-                       \  %b\n\
-                        %!"
-                      (read_var x) (read Boolean.typ b)) ;
               x ) ;
         (* a_hat should be equal to
            sum_i < t, r^i pows(beta_i) >
@@ -375,45 +304,37 @@ struct
           |> function `Finite x -> x | `Maybe_finite _ -> assert false
         in
         let lr_prod, challenges = bullet_reduce sponge lr in
-        print "lr_prod" lr_prod ;
-        print "combined_polynomial" combined_polynomial ;
-        print "u" u ;
+        print_g "lr_prod" lr_prod ;
+        print_g "combined_polynomial" combined_polynomial ;
+        print_g "u" u ;
         let p_prime =
           let uc = scale_fast2 u combined_inner_product in
-          print "uc" uc ; combined_polynomial + uc
+          print_g "uc" uc ; combined_polynomial + uc
         in
-        print "p_prime" p_prime ;
+        print_g "p_prime" p_prime ;
         let q = p_prime + lr_prod in
-        print "q" q ;
+        print_g "q" q ;
         absorb sponge PC delta ;
         let c = squeeze_scalar sponge in
-        print_field "c" c.inner ;
+        print_fp "c" c.inner ;
         (* c Q + delta = z1 (G + b U) + z2 H *)
         let lhs =
           let cq = Scalar_challenge.endo q c in
-          print "cq" cq ; cq + delta
+          print_g "cq" cq ; cq + delta
         in
-        print "lhs" lhs ;
+        print_g "lhs" lhs ;
         let rhs =
           with_label __LOC__ (fun () ->
               let b_u = scale_fast2 u advice.b in
-              as_prover
-                As_prover.(
-                  fun () ->
-                    match advice.b with
-                    | Shifted_value (x, b) ->
-                        printf
-                          !"b = %{sexp:Backend.Tick.Field.t}\n   %b\n%!"
-                          (read_var x) (read Boolean.typ b)) ;
-              print "b_u" b_u ;
+              print_g "b_u" b_u ;
               let z_1_g_plus_b_u = scale_fast2 (sg + b_u) z_1 in
-              print "z_1_g_plus_b_u" z_1_g_plus_b_u ;
+              print_g "z_1_g_plus_b_u" z_1_g_plus_b_u ;
               let z2_h =
                 scale_fast2 (Inner_curve.constant (Lazy.force Generators.h)) z_2
               in
-              print "z2_h" z2_h ; z_1_g_plus_b_u + z2_h)
+              print_g "z2_h" z2_h ; z_1_g_plus_b_u + z2_h)
         in
-        print "rhs" rhs ;
+        print_g "rhs" rhs ;
         (`Success (equal_g lhs rhs), challenges))
 
   let assert_eq_deferred_values
@@ -441,7 +362,6 @@ struct
       Kimchi_pasta.Pasta.Precomputed.Lagrange_precomputations
       .index_of_domain_log2 (Domain.log2_size domain)
     in
-    printf "d, i = %d, %d\n%!" d i ;
     match Precomputed.Lagrange_precomputations.pallas.(d).(i) with
     | [| g |] ->
         Inner_curve.Constant.of_affine g
@@ -470,17 +390,6 @@ struct
         let sample_scalar () = squeeze_scalar sponge in
         let open Dlog_plonk_types.Messages in
         let x_hat =
-          as_prover
-            As_prover.(
-              fun () ->
-                printf "pairing_main public input:\n%!" ;
-                Array.iteri public_input ~f:(fun i x ->
-                    printf "%d: %s\n%!" i
-                      ( match x with
-                      | `Field x | `Packed_bits (x, _) ->
-                          Backend.Tick.Bigint.R.(
-                            to_hex_string (of_field (read_var x))) ))) ;
-
           with_label "x_hat" (fun () ->
               multiscale_known
                 (Array.mapi public_input ~f:(fun i x ->
@@ -492,7 +401,6 @@ struct
         absorb sponge PC x_hat ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
-        printf "squeezing beta\n%!" ;
         let beta = sample () in
         let gamma = sample () in
         let z_comm = receive without z_comm in
@@ -529,48 +437,38 @@ struct
                 |> Inner_curve.negate)
           in
           print_g "poseidon" poseidon ;
-          let ( * ) s x lab =
-            ksprintf print_g "base %s" lab x ;
-            let r = scale_fast2 x s in
-            print_g "f_term" r ; r
-          in
+          let ( * ) s x = scale_fast2 x s in
           let generic =
             let coeffs = Vector.to_array m.coefficients_comm in
             let (c0 :: cs) = plonk.generic in
             Vector.foldi cs
-              ~init:((c0 * coeffs.(0)) "generic 0")
-              ~f:(fun i acc c ->
-                acc
-                + (c * coeffs.(Int.(i + 1))) (sprintf "generic %d" Int.(i + 1)))
+              ~init:(c0 * coeffs.(0))
+              ~f:(fun i acc c -> acc + (c * coeffs.(Int.(i + 1))))
           in
           List.reduce_exn ~f:( + )
-            [ (plonk.perm * sigma_comm_last) "perm"
+            [ plonk.perm * sigma_comm_last
             ; generic
             ; poseidon
-            ; (plonk.vbmul * m.mul_comm) "vbmul"
-            ; (plonk.complete_add * m.complete_add_comm) "complete_add"
-            ; (plonk.endomul * m.emul_comm) "endomul"
-            ; (plonk.endomul_scalar * m.endomul_scalar_comm) "endomul scalar"
+            ; plonk.vbmul * m.mul_comm
+            ; plonk.complete_add * m.complete_add_comm
+            ; plonk.endomul * m.emul_comm
+            ; plonk.endomul_scalar * m.endomul_scalar_comm
             ]
         in
         let chunked_t_comm =
           let n = Array.length t_comm in
           let res = ref t_comm.(n - 1) in
-          print_g "chunk" t_comm.(n - 1) ;
-          print_g "acc" !res ;
           for i = n - 2 downto 0 do
             with_label __LOC__ (fun () ->
-                res := t_comm.(i) + scale_fast2 !res plonk.zeta_n ;
-                print_g "chunk" t_comm.(i) ;
-                print_g "acc" !res)
+                res := t_comm.(i) + scale_fast2 !res plonk.zeta_to_srs_length)
           done ;
           !res
         in
-        print_g "f_comm" f_comm ;
         let ft_comm =
           with_label __LOC__ (fun () ->
               f_comm + chunked_t_comm
-              + Inner_curve.negate (scale_fast2 chunked_t_comm plonk.zeta_n))
+              + Inner_curve.negate
+                  (scale_fast2 chunked_t_comm plonk.zeta_to_domain_size))
         in
         print_g "chunked_t_comm" chunked_t_comm ;
         print_g "ft_comm" ft_comm ;
@@ -847,11 +745,6 @@ struct
       Pcs_batch.combine_split_evaluations ~last
         ~mul:(fun (keep, x) (y : Field.t) -> (keep, Field.(y * x)))
         ~mul_and_add:(fun ~acc ~xi (keep, fx) ->
-          print_fp "mul_and_add acc" acc ;
-          print_fp "mul_and_add fx" fx ;
-          as_prover
-            As_prover.(
-              fun () -> printf "mul_and_add keep %b\n" (read Boolean.typ keep)) ;
           Field.if_ keep ~then_:Field.(fx + (xi * acc)) ~else_:acc)
         ~init:(fun (_, fx) -> fx)
         (Common.dlog_pcs_batch b_plus_26)
@@ -896,15 +789,6 @@ struct
         in
         go pt n)
 
-  (*
-    with_label "pt_n" (fun () ->
-        let max_degree_log2 = Int.ceil_log2 Max_degree.step in
-        let rec go acc i =
-          if i = 0 then acc else go (Field.square acc) (i - 1)
-        in
-        go pt max_degree_log2)
-     *)
-
   let actual_evaluation (e : (Boolean.var * Field.t) array) ~(pt_to_n : Field.t)
       : Field.t =
     with_label "actual_evaluation" (fun () ->
@@ -933,49 +817,7 @@ struct
 
     let squeeze_challenge sponge : Field.t =
       lowest_128_bits (squeeze sponge) ~constrain_low_bits:true
-
-    (*
-    include S.Bit_sponge.Make
-              (struct
-                type t = Boolean.var
-              end)
-              (struct
-                type t = Field.t
-
-                let to_bits t = Step_main_inputs.Unsafe.unpack_unboolean t
-
-                let finalize_discarded = Util.boolean_constrain (module Impl)
-
-                let high_entropy_bits = Step_main_inputs.high_entropy_bits
-              end)
-              (struct
-                type t = Boolean.var * Field.t
-              end)
-              (Underlying) *)
   end
-
-  (* TODO
-     let side_loaded_commitment_lengths ~h =
-       let max_lengths =
-         Commitment_lengths.of_domains ~max_degree:Max_degree.step
-           { h =
-               Pow_2_roots_of_unity
-                 Side_loaded_verification_key.(Domain.log2_size max_domains.h)
-           ; x = Pow_2_roots_of_unity 0
-           }
-       in
-       Commitment_lengths.generic' ~h ~add:Field.add ~mul:Field.mul ~sub:Field.sub
-         ~of_int:Field.of_int
-         ~ceil_div_max_degree:
-           (let k = Nat.to_int Backend.Tick.Rounds.n in
-            assert (Max_degree.step = 1 lsl k) ;
-            fun d ->
-              let open Number in
-              let d = of_bits (Field.unpack ~length:max_log2_degree d) in
-              to_var (Number.ceil_div_pow_2 d (`Two_to_the k)))
-       |> Evals.map2 max_lengths ~f:(fun max actual ->
-              Split_evaluations.mask' { actual; max })
-  *)
 
   let shift1 =
     Shifted_value.Type1.Shift.(
@@ -1054,14 +896,6 @@ struct
                        (Option.value_exn max_width)) ))
     in
     let actual_width = Pseudo.choose (which_branch, step_widths) ~f:Fn.id in
-    (*
-    let (evals1, x_hat1), (evals2, x_hat2) =
-      with_label __LOC__ (fun () ->
-          Tuple_lib.Double.map
-            ((evals1, x_hat1), (evals2, x_hat2))
-            ~f:(fun (e, x) ->
-              (Evals.map e ~f:(Array.map ~f:(fun a -> (Boolean.true_, a))), x)))
-    in *)
     let T = Branching.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let absorb_evals x_hat e =
@@ -1113,6 +947,7 @@ struct
       with_label "scalars_env" (fun () ->
           Plonk_checks.scalars_env
             (module Field)
+            ~srs_length_log2:Common.Max_degree.step_log2
             ~endo:(Impl.Field.constant Endo.Step_inner_curve.base)
             ~mds:sponge_params.mds
             ~field_of_hex:(fun s ->
@@ -1124,7 +959,7 @@ struct
     let combined_inner_product_correct =
       let ft_eval0 : Field.t =
         with_label "ft_eval0" (fun () ->
-            Plonk_checks.ft_eval0 ~print_field:print_fp
+            Plonk_checks.ft_eval0
               (module Field)
               ~env ~domain plonk_minimal combined_evals x_hat1)
       in
@@ -1192,9 +1027,6 @@ struct
       with_label "plonk_checks_passed" (fun () ->
           Plonk_checks.checked
             (module Impl)
-            (*
-           ~mds:sponge_params.mds
-                   ~endo:(Impl.Field.constant Endo.Step_inner_curve.base) *)
             ~env ~shift:shift1 plonk combined_evals)
     in
     print_bool "xi_correct" xi_correct ;
@@ -1342,11 +1174,6 @@ struct
             let { Pickles_types.Scalar_challenge.inner = c1 } =
               c1.Bulletproof_challenge.prechallenge
             in
-            as_prover
-              As_prover.(
-                fun () ->
-                  printf "is_base_case %d: %b\n%!" i
-                    (read Boolean.typ is_base_case)) ;
             let c2 =
               Field.if_ is_base_case ~then_:c1
                 ~else_:(match c2.prechallenge with { inner = c2 } -> c2)

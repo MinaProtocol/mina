@@ -44,13 +44,14 @@ type 'f field = (module Field_intf with type t = 'f)
 
 let map_reduce reduce xs map = List.reduce_exn (List.map xs ~f:map) ~f:reduce
 
+let pow2pow (type t) ((module F) : t field) (x : t) n : t =
+  let rec go acc i = if i = 0 then acc else go F.(acc * acc) (i - 1) in
+  go x n
+
 (* x^{2 ^ k} - 1 *)
 let vanishing_polynomial (type t) ((module F) : t field) domain x =
   let k = Domain.log2_size domain in
-  let rec pow2pow acc i =
-    if i = 0 then acc else pow2pow F.(acc * acc) (i - 1)
-  in
-  F.(pow2pow x k - one)
+  F.(pow2pow (module F) x k - one)
 
 let domain (type t) ((module F) : t field) ~shifts ~domain_generator
     (domain : Domain.t) : t plonk_domain =
@@ -91,7 +92,7 @@ let evals_of_split_evals field ~zeta ~zetaw
 open Composition_types.Dlog_based.Proof_state.Deferred_values.Plonk
 
 let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
-    ~field_of_hex ~domain
+    ~field_of_hex ~domain ~srs_length_log2
     ({ alpha; beta = _; gamma = _; zeta } : (c, _) Minimal.t)
     ((e0, e1) : _ Dlog_plonk_types.Evals.t Double.t) =
   let w0 = Vector.to_array e0.w in
@@ -166,54 +167,37 @@ let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
   ; zeta_to_n_minus_1 = domain#vanishing_polynomial zeta
   ; endo_coefficient = endo
   ; mds = (fun (row, col) -> mds.(row).(col))
+  ; srs_length_log2
   }
 
 let perm_alpha0 : int = 2 + 15
 
 module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
-  let ft_eval0 (type t) ?(print_field = fun (_ : string) (_ : t) -> ())
-      (module F : Field_intf with type t = t) ~domain ~(env : t Scalars.Env.t)
-      ({ alpha = _; beta; gamma; zeta } : _ Minimal.t)
+  let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
+      ~(env : t Scalars.Env.t) ({ alpha = _; beta; gamma; zeta } : _ Minimal.t)
       ((e0, e1) : _ Dlog_plonk_types.Evals.t Double.t) p_eval0 =
     let zkp = env.zk_polynomial in
-    print_field "zkp" zkp ;
     let alpha_pow = env.alpha_pow in
     let zeta1m1 = env.zeta_to_n_minus_1 in
-    print_field "zeta1m1" zeta1m1 ;
     let open F in
     let w0 = Vector.to_array e0.w in
-    print_field "gamma" gamma ;
-    print_field "beta" gamma ;
-    print_field "e1.z" e1.z ;
     let ft_eval0 =
       let a0 = alpha_pow perm_alpha0 in
-      print_field "a0" a0 ;
       let w_n = w0.(Nat.to_int Dlog_plonk_types.Permuts_minus_1.n) in
       let init = (w_n + gamma) * e1.z * a0 * zkp in
-      print_field "w_n" w_n ;
-      print_field "init" init ;
       (* TODO: This shares some computation with the permutation scalar in
          derive_plonk. Could share between them. *)
       Vector.foldi e0.s ~init ~f:(fun i acc s ->
-          ksprintf print_field "acc %d" i acc ;
           ((beta * s) + w0.(i) + gamma) * acc)
     in
-    print_field "ft_eval0 0" ft_eval0 ;
     let shifts = domain#shifts in
     let ft_eval0 = ft_eval0 - p_eval0 in
-    print_field "p_eval0" p_eval0 ;
-    print_field "ft_eval0 1" ft_eval0 ;
     let ft_eval0 =
       ft_eval0
       - Array.foldi shifts
           ~init:(alpha_pow perm_alpha0 * zkp * e0.z)
-          ~f:(fun i acc s ->
-            ksprintf print_field "acc' %d" i acc ;
-            ksprintf print_field "shift %d" i s ;
-            ksprintf print_field "w0 %d" i w0.(i) ;
-            acc * (gamma + (beta * zeta * s) + w0.(i)))
+          ~f:(fun i acc s -> acc * (gamma + (beta * zeta * s) + w0.(i)))
     in
-    print_field "ft_eval0 2" ft_eval0 ;
     let nominator =
       ( zeta1m1
         * alpha_pow Int.(perm_alpha0 + 1)
@@ -221,13 +205,9 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
       + (zeta1m1 * alpha_pow Int.(perm_alpha0 + 2) * (zeta - one)) )
       * (one - e0.z)
     in
-    print_field "nominator" nominator ;
     let denominator = (zeta - env.omega_to_minus_3) * (zeta - one) in
-    print_field "denominator" denominator ;
     let ft_eval0 = ft_eval0 + (nominator / denominator) in
-    print_field "ft_eval0 3" ft_eval0 ;
     let constant_term = Sc.constant_term env in
-    print_field "constant_term" constant_term ;
     ft_eval0 - constant_term
 
   let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
@@ -264,7 +244,8 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; beta
         ; gamma
         ; zeta
-        ; zeta_n = env.zeta_to_n_minus_1 + F.one
+        ; zeta_to_domain_size = env.zeta_to_n_minus_1 + F.one
+        ; zeta_to_srs_length = pow2pow (module F) zeta env.srs_length_log2
         ; poseidon_selector = e0.poseidon_selector
         ; vbmul = Lazy.force (Hashtbl.find_exn index_terms (Index Vbmul))
         ; complete_add =

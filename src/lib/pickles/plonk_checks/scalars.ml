@@ -42,6 +42,7 @@ module Env = struct
     ; double : 'a -> 'a
     ; endo_coefficient : 'a
     ; mds : int * int -> 'a
+    ; srs_length_log2 : int
     }
 end
 
@@ -69,6 +70,7 @@ module Tick : S = struct
        ; zk_polynomial = _
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
+       ; srs_length_log2 = _
        } :
         a Env.t) =
     let x_6 = pow (cell (var (Witness 9, Curr)), 7) in
@@ -149,6 +151,7 @@ module Tick : S = struct
        ; zeta_to_n_minus_1 = _
        ; mds = _
        ; endo_coefficient
+       ; srs_length_log2 = _
        } :
         a Env.t) =
     Column.Table.of_alist_exn
@@ -1058,6 +1061,7 @@ module Tock : S = struct
        ; zk_polynomial = _
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
+       ; srs_length_log2 = _
        } :
         a Env.t) =
     let x_12 = pow (cell (var (Witness 3, Curr)), 7) in
@@ -1137,6 +1141,7 @@ module Tock : S = struct
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; mds = _
+       ; srs_length_log2 = _
        ; endo_coefficient
        } :
         a Env.t) =

@@ -62,6 +62,7 @@ module Constant = struct
     let env =
       Plonk_checks.scalars_env
         (module Tock.Field)
+        ~srs_length_log2:Common.Max_degree.wrap_log2
         ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
         ~field_of_hex:
           (Core_kernel.Fn.compose Tock.Field.of_bigint

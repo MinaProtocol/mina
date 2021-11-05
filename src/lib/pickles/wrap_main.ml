@@ -106,15 +106,7 @@ module Old_bulletproof_chals = struct
         -> t
 end
 
-let pack_statement max_branching
-    (*
-  let pack_fq (Shifted_value.Shifted_value (x : Field.t)) =
-    with_label __LOC__ (fun () ->
-        let lo, hi = Util.split_last (Unsafe.unpack_unboolean x) in
-        [| lo; [ hi ] |])
-  in
-     *)
-      t =
+let pack_statement max_branching t =
   with_label __LOC__ (fun () ->
       Spec.pack
         (module Impl)
@@ -186,8 +178,6 @@ let wrap_main
           , _ )
           Types.Dlog_based.Statement.In_circuit.t
        -> unit) =
-  Kimchi_backend_common.Plonk_constraint_system.should_print := true ;
-  printf "starting wrap main\n%!" ;
   Timer.clock __LOC__ ;
   let wrap_domains =
     check_wrap_domains prev_wrap_domains ;
@@ -292,14 +282,6 @@ let wrap_main
           with_label __LOC__ (fun () ->
               pad_domains (module Max_branching) pi_branches prev_wrap_domains)
         in
-        (*
-    let eval_lengths =
-      with_label __LOC__ (fun () ->
-          Vector.map domainses ~f:(fun v ->
-              Commitment_lengths.generic Vector.map
-                ~h:(Vector.map v ~f:(fun { h; _ } -> Domain.size h))))
-    in
-       *)
         let new_bulletproof_challenges =
           with_label __LOC__ (fun () ->
               let evals =
@@ -457,14 +439,6 @@ let wrap_main
                         `Packed_bits (x, n)))
                 ~sg_old:prev_step_accs ~combined_inner_product ~advice:{ b }
                 ~messages ~which_branch ~openings_proof ~plonk)
-          (* TODO
-               (with_label __LOC__ (fun () ->
-                    Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit
-                    .map_fields
-                      plonk
-                      (* We don't use a boolean-constraining unpacking function. It's not
-                         necessary with PLONK. *)
-                      ~f:(Shifted_value.map ~f:Other_field.Packed.to_bits_unsafe)))) *)
         in
         with_label __LOC__ (fun () ->
             Boolean.Assert.is_true bulletproof_success) ;
@@ -484,7 +458,6 @@ let wrap_main
                ({ prechallenge = { inner = x2 } } :
                  _ SC.t Bulletproof_challenge.t)
              -> with_label __LOC__ (fun () -> Field.Assert.equal x1 x2)) ;
-        Kimchi_backend_common.Plonk_constraint_system.should_print := false ;
         ())
   in
   Timer.clock __LOC__ ;

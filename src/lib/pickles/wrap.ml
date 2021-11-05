@@ -43,13 +43,9 @@ let combined_inner_product (type actual_branching) ~env ~domain ~ft_eval1
   in
   let ft_eval0 : Tick.Field.t =
     Plonk_checks.Type1.ft_eval0
-      ~print_field:(fun lab x ->
-        printf !"wrap %s %{sexp:Backend.Tick.Field.t}\n%!" lab x)
       (module Tick.Field)
       ~env ~domain plonk combined_evals x_hat_1
   in
-  printf !"wrap ft_eval0 %{sexp:Backend.Tick.Field.t}\n%!" ft_eval0 ;
-  printf !"wrap ft_eval1 %{sexp:Backend.Tick.Field.t}\n%!" ft_eval1 ;
   let T = AB.eq in
   let b_polys =
     Vector.map
@@ -69,10 +65,7 @@ let combined_inner_product (type actual_branching) ~env ~domain ~ft_eval1
     Pcs_batch.combine_split_evaluations
       (Common.dlog_pcs_batch (AB.add Nat.N26.n))
       ~xi ~init:Fn.id ~mul
-      ~mul_and_add:(fun ~acc ~xi fx ->
-        printf !"wrap mul_and_add acc %{sexp:Backend.Tick.Field.t}\n%!" acc ;
-        printf !"wrap mul_and_add fx %{sexp:Backend.Tick.Field.t}\n%!" fx ;
-        fx + (xi * acc))
+      ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
       ~last:Array.last ~evaluation_point:pt
       ~shifted_pow:(fun deg x ->
         Pcs_batch.pow ~one ~mul x
@@ -213,7 +206,6 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
       let module V = H1.To_vector (Tick.Curve.Affine) in
       V.f Max_local_max_branchings.length (M.f prev_me_only)
     in
-    let () = printf "wrap %s\n%!" __LOC__ in
     O.create pairing_vk
       Vector.(
         map2 (Vector.trim sgs lte) prev_challenges ~f:(fun commitment cs ->
@@ -280,6 +272,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
       Plonk_checks.scalars_env
         (module Tick.Field)
         ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
+        ~srs_length_log2:Common.Max_degree.step_log2
         ~field_of_hex:(fun s ->
           Kimchi_pasta.Pasta.Bigint256.of_hex_string s
           |> Kimchi_pasta.Pasta.Fp.of_bigint)
@@ -295,9 +288,6 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
         ~domain:tick_domain ~ft_eval1:proof.openings.ft_eval1
         ~plonk:tick_plonk_minimal
     in
-    printf
-      !"wrap combined inner product %{sexp: Backend.Tick.Field.t}\n%!"
-      combined_inner_product ;
     let me_only : _ P.Base.Me_only.Dlog_based.t =
       { sg = proof.openings.proof.sg
       ; old_bulletproof_challenges =
@@ -314,32 +304,10 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
       let chals =
         Array.map prechals ~f:(fun x -> Ipa.Step.compute_challenge x)
       in
-      Array.iteri chals ~f:(fun i x ->
-          printf !"b_poly_chals %d %{sexp:Backend.Tick.Field.t}\n%!" i x) ;
       let b_poly = unstage (b_poly chals) in
       let open As_field in
       let b =
         let open Tick.Field in
-        printf
-          !"b_poly term %{sexp:Backend.Tick.Field.t} \
-            %{sexp:Backend.Tick.Field.t}\n\
-            %!"
-          zeta (b_poly zeta) ;
-        printf !"b_poly scale %{sexp:Backend.Tick.Field.t}\n%!" one ;
-        printf
-          !"b_poly term %{sexp:Backend.Tick.Field.t} \
-            %{sexp:Backend.Tick.Field.t}\n\
-            %!"
-          zetaw (b_poly zetaw) ;
-        printf !"b_poly scale %{sexp:Backend.Tick.Field.t}\n%!" r ;
-        printf
-          !"r b_poly zeta2 scale %{sexp:Backend.Tick.Field.t}\n%!"
-          (r * b_poly zetaw) ;
-
-        printf
-          !"bbb %{sexp:Backend.Tick.Field.t}\n%!"
-          (b_poly zeta + (r * b_poly zetaw)) ;
-
         b_poly zeta + (r * b_poly zetaw)
       in
       let prechals =
@@ -356,10 +324,6 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     let shift_value =
       Shifted_value.Type1.of_field (module Tick.Field) ~shift:Shifts.tick1
     in
-    printf !"b %{sexp:Backend.Tick.Field.t}\n%!" b ;
-    printf
-      !"b shifted %{sexp:Backend.Tick.Field.t}\n%!"
-      (match shift_value b with Shifted_value x -> x) ;
     { proof_state =
         { deferred_values =
             { xi

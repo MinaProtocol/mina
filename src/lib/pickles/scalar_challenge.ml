@@ -9,8 +9,8 @@ module SC = Pickles_types.Scalar_challenge
 let num_bits = 128
 
 (* Has the side effect of checking that [scalar] fits in 128 bits. *)
-let to_field_checked (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) ~endo
+let to_field_checked' (type f) ?(num_bits = num_bits)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
     { SC.inner = (scalar : Impl.Field.t) } =
   let open Impl in
   let neg_one = Field.Constant.(negate one) in
@@ -125,8 +125,15 @@ let to_field_checked (type f)
                 T (EC_endoscalar { state = Array.of_list_rev !state }))
           }
         ]) ;
-  Field.Assert.equal !n scalar ;
-  Field.(scale !a endo + !b)
+  (!a, !b, !n)
+
+let to_field_checked (type f) ?num_bits
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) ~endo
+    ({ SC.inner = (scalar : Impl.Field.t) } as s) =
+  let open Impl in
+  let a, b, n = to_field_checked' ?num_bits (module Impl) s in
+  Field.Assert.equal n scalar ;
+  Field.(scale a endo + b)
 
 let to_field_constant (type f) ~endo
     (module F : Plonk_checks.Field_intf with type t = f) { SC.inner = c } =
@@ -206,7 +213,7 @@ struct
 
   let seal = Util.seal (module Impl)
 
-  let endo t { SC.inner = (scalar : Field.t) } =
+  let endo ?(num_bits = num_bits) t { SC.inner = (scalar : Field.t) } =
     let ( !! ) = As_prover.read_var in
     (* MSB bits *)
     let bits =
@@ -306,7 +313,7 @@ struct
     with_label __LOC__ (fun () -> Field.Assert.equal !n_acc scalar) ;
     !acc
 
-  let endo t s = with_label "endo" (fun () -> endo t s)
+  let endo ?num_bits t s = with_label "endo" (fun () -> endo ?num_bits t s)
 
   let%test_unit "endo" =
     let module T = Internal_Basic in

@@ -226,10 +226,6 @@ struct
           let public_input =
             tock_public_input_of_statement prev_statement_with_hashes
           in
-          printf "step public input:\n%!" ;
-          List.iteri public_input ~f:(fun i x ->
-              printf "%d: %s\n%!" i
-                Backend.Tock.Bigint.R.(to_hex_string (of_field x))) ;
           O.create dlog_vk
             Vector.(
               map2
@@ -381,9 +377,6 @@ struct
           combine ~ft_eval:ft_eval0 x_hat_1 As_field.zeta e1
           + (r * combine ~ft_eval:t.proof.openings.ft_eval1 x_hat_2 zetaw e2)
         in
-        printf
-          !"combined inner product %{sexp:Backend.Tock.Field.t}\n%!"
-          combined_inner_product ;
         let chal = Challenge.Constant.of_tock_field in
         let plonk =
           Plonk_checks.Type2.derive_plonk
@@ -394,26 +387,6 @@ struct
         let shifted_value =
           Shifted_value.Type2.of_field (module Tock.Field) ~shift:Shifts.tock2
         in
-        printf
-          !"endomul_scalar = %{sexp:Backend.Tock.Field.t}\n%!"
-          (Shifted_value.Type2.to_field
-             (module Tock.Field)
-             ~shift:Shifts.tock2 plonk.endomul_scalar) ;
-        printf
-          !"perm = %{sexp:Backend.Tock.Field.t}\n%!"
-          (Shifted_value.Type2.to_field
-             (module Tock.Field)
-             ~shift:Shifts.tock2 plonk.perm) ;
-        printf
-          !"endomul = %{sexp:Backend.Tock.Field.t}\n%!"
-          (Shifted_value.Type2.to_field
-             (module Tock.Field)
-             ~shift:Shifts.tock2 plonk.endomul) ;
-        printf
-          !"vbmul = %{sexp:Backend.Tock.Field.t}\n%!"
-          (Shifted_value.Type2.to_field
-             (module Tock.Field)
-             ~shift:Shifts.tock2 plonk.vbmul) ;
         ( `Sg sg
         , { Types.Pairing_based.Proof_state.Per_proof.deferred_values =
               { plonk =
@@ -513,13 +486,11 @@ struct
       ; pass_through
       }
     in
-    let () = printf "test %s\n%!" __LOC__ in
     let next_me_only_prepared =
       Reduced_me_only.Pairing_based.prepare
         ~dlog_plonk_index:self_dlog_plonk_index
         next_statement.proof_state.me_only
     in
-    let () = printf "test %s\n%!" __LOC__ in
     let handler (Snarky_backendless.Request.With { request; respond } as r) =
       let k x = respond (Provide x) in
       match request with
@@ -585,7 +556,6 @@ struct
               let f (T t : _ P.With_data.t) = t.statement.proof_state.me_only.sg
             end)
         in
-        let () = printf "test %s\n%!" __LOC__ in
         let module V = H3.To_vector (Tick.Curve.Affine) in
         V.f prev_values_length (M.f prev_with_proofs)
       in
@@ -602,23 +572,17 @@ struct
       let (T (input, conv)) =
         Impls.Step.input ~branching:Max_branching.n ~wrap_rounds:Tock.Rounds.n
       in
-      let () = printf "test %s\n%!" __LOC__ in
-      let () = printf "test %s\n%!" __LOC__ in
       let { Domains.h; x } =
         List.nth_exn
           (Vector.to_list step_domains)
           (Index.to_int branch_data.index)
       in
-      let () = printf "test %s\n%!" __LOC__ in
-      let () = printf "test %s\n%!" __LOC__ in
       ksprintf Common.time "step-prover %d (%d, %d)"
         (Index.to_int branch_data.index) (Domain.size h) (Domain.size x)
         (fun () ->
-          let () = printf "test %s\n%!" __LOC__ in
           Impls.Step.generate_witness_conv
             ~f:
               (fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs } ->
-              let () = printf "test %s\n%!" __LOC__ in
               Backend.Tick.Proof.create_async ~primary:public_inputs
                 ~auxiliary:auxiliary_inputs ~message:prev_polynomials pk)
             [ input ]
@@ -628,7 +592,6 @@ struct
                 handler)
             () next_statement_hashed)
     in
-    let () = printf "test %s\n%!" __LOC__ in
     let prev_evals =
       let module M =
         H3.Map
@@ -642,7 +605,6 @@ struct
       let module V = H3.To_vector (E) in
       V.f prev_values_length (M.f prev_with_proofs)
     in
-    let () = printf "test %s\n%!" __LOC__ in
     assert (
       Backend.Tick.Proof.verify ~message:prev_polynomials next_proof
         (Backend.Tick.Keypair.vk pk)
@@ -652,7 +614,6 @@ struct
            (tick_public_input_of_statement ~max_branching:Max_branching.n
               next_statement_hashed) ;
          v) ) ;
-    let () = printf "test %s\n%!" __LOC__ in
     { P.Base.Pairing_based.proof = next_proof
     ; statement = next_statement
     ; index = branch_data.index

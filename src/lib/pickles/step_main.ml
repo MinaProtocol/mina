@@ -119,7 +119,6 @@ let step_main :
   let main (stmt : _ Types.Pairing_based.Statement.t) =
     let open Requests.Step in
     let open Impls.Step in
-    Kimchi_backend_common.Plonk_constraint_system.should_print := false ;
     with_label "step_main" (fun () ->
         let T = Max_branching.eq in
         let dlog_plonk_index =
@@ -128,18 +127,15 @@ let step_main :
                 ~request:(fun () -> Req.Wrap_index)
                 (Plonk_verification_key_evals.typ Inner_curve.typ))
         in
-        printf "checkpoint %s\n%!" __LOC__ ;
         let app_state =
           with_label "app_state" (fun () ->
               exists basic.typ ~request:(fun () -> Req.App_state))
         in
-        printf "checkpoint %s\n%!" __LOC__ ;
         let prevs =
           with_label "prevs" (fun () ->
               exists (Prev_typ.f prev_typs) ~request:(fun () ->
                   Req.Proof_with_datas))
         in
-        printf "checkpoint %s\n%!" __LOC__ ;
         let prev_statements =
           let module M =
             H3.Map1_to_H1 (Per_proof_witness) (Id)
@@ -150,11 +146,9 @@ let step_main :
           in
           M.f prevs
         in
-        printf "checkpoint %s\n%!" __LOC__ ;
         let proofs_should_verify =
           with_label "rule_main" (fun () -> rule.main prev_statements app_state)
         in
-        printf "checkpoint %s\n%!" __LOC__ ;
         let datas =
           let self_data :
               ( a_var
@@ -196,12 +190,10 @@ let step_main :
           in
           M.f rule.prevs
         in
-        printf "checkpoint %s\n%!" __LOC__ ;
         let unfinalized_proofs =
           let module H = H1.Of_vector (Unfinalized) in
           H.f branching (Vector.trim stmt.proof_state.unfinalized_proofs lte)
         in
-        printf "checkpoint %s\n%!" __LOC__ ;
         let module Packed_digest = Field in
         let module Proof = struct
           type t = Wrap_proof.var
@@ -212,7 +204,6 @@ let step_main :
               let module V = H1.Of_vector (Digest) in
               V.f branching (Vector.trim stmt.pass_through lte))
         in
-        printf "checkpoint %s\n%!" __LOC__ ;
         let sgs =
           let module M =
             H3.Map
@@ -227,7 +218,6 @@ let step_main :
           let module V = H3.To_vector (Inner_curve) in
           V.f branching (M.f prevs)
         in
-        printf "checkpoint %s\n%!" __LOC__ ;
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
               let rec go :
@@ -373,7 +363,6 @@ let step_main :
                        bulletproof_challenges
                    }))
         in
-        Kimchi_backend_common.Plonk_constraint_system.should_print := false ;
         ())
   in
   stage main

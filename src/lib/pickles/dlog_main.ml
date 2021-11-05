@@ -57,15 +57,7 @@ struct
       let to_bits_unsafe (x : t) = Wrap_main_inputs.Unsafe.unpack_unboolean x
 
       let absorb_shifted sponge (x : t Shifted_value.Type1.t) =
-        match x with
-        | Shifted_value x ->
-            as_prover
-              As_prover.(
-                fun () ->
-                  printf
-                    !"absorb_shifted %{sexp:Backend.Tock.Field.t}\n%!"
-                    (read_var x)) ;
-            Sponge.absorb sponge x
+        match x with Shifted_value x -> Sponge.absorb sponge x
     end
 
     module With_top_bit0 = struct
@@ -111,7 +103,7 @@ struct
   end
 
   let print_g lab (x, y) =
-    if true then
+    if debug then
       as_prover
         As_prover.(
           fun () ->
@@ -154,11 +146,12 @@ struct
     absorb
       ~mask_g1_opt:(fun () -> assert false)
       ~absorb_field:(fun x ->
-        as_prover
-          As_prover.(
-            fun () ->
-              printf "absorb %s\n%!"
-                Backend.Tock.Bigint.R.(to_hex_string (of_field (read_var x)))) ;
+        if debug then
+          as_prover
+            As_prover.(
+              fun () ->
+                printf "absorb %s\n%!"
+                  Backend.Tock.Bigint.R.(to_hex_string (of_field (read_var x)))) ;
         Sponge.absorb sponge x)
       ~g1_to_field_elements:Inner_curve.to_field_elements
       ~absorb_scalar:(Sponge.absorb sponge) ty t
@@ -183,10 +176,13 @@ struct
     let pre =
       lowest_128_bits ~constrain_low_bits:false (Sponge.squeeze sponge)
     in
-    as_prover
-      As_prover.(
-        fun () ->
-          printf !"prechallenge %{sexp:Backend.Tock.Field.t}\n%!" (read_var pre)) ;
+    if debug then
+      as_prover
+        As_prover.(
+          fun () ->
+            printf
+              !"prechallenge %{sexp:Backend.Tock.Field.t}\n%!"
+              (read_var pre)) ;
     SC.SC.create pre
 
   let bullet_reduce sponge gammas =
@@ -200,33 +196,9 @@ struct
       let left_term =
         with_label "left_term" (fun () -> Scalar_challenge.endo_inv l pre)
       in
-      as_prover
-        As_prover.(
-          fun () ->
-            let x0, y0 = l in
-            let x1, y1 = left_term in
-            printf
-              !"l_term %{sexp:Backend.Tock.Field.t}, \
-                %{sexp:Backend.Tock.Field.t} -> %{sexp:Backend.Tock.Field.t}, \
-                %{sexp:Backend.Tock.Field.t}\n\
-                %!"
-              (read_var x0) (read_var y0) (read_var x1) (read_var y1)) ;
-
       let right_term =
         with_label "right_term" (fun () -> Scalar_challenge.endo r pre)
       in
-      as_prover
-        As_prover.(
-          fun () ->
-            let x0, y0 = r in
-            let x1, y1 = right_term in
-            printf
-              !"r_term %{sexp:Backend.Tock.Field.t}, \
-                %{sexp:Backend.Tock.Field.t} -> %{sexp:Backend.Tock.Field.t}, \
-                %{sexp:Backend.Tock.Field.t}\n\
-                %!"
-              (read_var x0) (read_var y0) (read_var x1) (read_var y1)) ;
-
       ( Ops.add_fast left_term right_term
       , { Bulletproof_challenge.prechallenge = pre } )
     in
@@ -394,17 +366,6 @@ struct
                | false, true -> { point= p; non_zero= true }
                | true, true -> { point= p + xi * acc; non_zero= true }
             *)
-            as_prover
-              As_prover.(
-                fun () ->
-                  print_g "acc" acc.point ;
-                  printf "p finite %b\n%!"
-                    ( match p with
-                    | `Finite _ ->
-                        true
-                    | `Maybe_finite (b, _) ->
-                        read Boolean.typ b ) ;
-                  print_g "p" (Point.underlying p)) ;
             let point =
               Inner_curve.(
                 if_ keep
@@ -435,11 +396,6 @@ struct
 
   let scale_fast = Ops.scale_fast
 
-  (* TODO
-     let scale_fast p (Shifted_value.Shifted_value bits) =
-       Ops.scale_fast p (Shifted_value (Array.of_list bits))
-  *)
-
   let check_bulletproof ~pcs_batch ~(sponge : Sponge.t)
       ~(xi : Scalar_challenge.t)
       ~(combined_inner_product : Other_field.Packed.t Shifted_value.Type1.t)
@@ -452,28 +408,7 @@ struct
           ( Inner_curve.t
           , Other_field.Packed.t Shifted_value.Type1.t )
           Openings.Bulletproof.t) =
-    let print lab (x, y) =
-      as_prover
-        As_prover.(
-          fun () ->
-            printf
-              !"%s: %{sexp:Backend.Tock.Field.t}, %{sexp:Backend.Tock.Field.t}\n\
-                %!"
-              lab (read_var x) (read_var y))
-    in
-    let print_field lab x =
-      as_prover
-        As_prover.(
-          fun () ->
-            printf !"%s: %{sexp:Backend.Tock.Field.t}\n%!" lab (read_var x))
-    in
     with_label __LOC__ (fun () ->
-        as_prover
-          As_prover.(
-            fun () ->
-              printf "sponge state bulletproof:\n%!" ;
-              Array.iter sponge.state ~f:(fun x ->
-                  printf !"%{sexp:Backend.Tock.Field.t}\n%!" (read_var x))) ;
         Other_field.Packed.absorb_shifted sponge combined_inner_product ;
         (* a_hat should be equal to
            sum_i < t, r^i pows(beta_i) >
@@ -487,42 +422,30 @@ struct
           Split_commitments.combine pcs_batch ~xi without_degree_bound
             with_degree_bound
         in
-        print_field "xi" xi.inner ;
         let scale_fast =
           scale_fast ~num_bits:Other_field.Packed.Constant.size_in_bits
         in
         let lr_prod, challenges = bullet_reduce sponge lr in
-        print "lr_prod" lr_prod ;
-        print "combined_polynomial" combined_polynomial ;
-        print "u" u ;
         let p_prime =
           let uc = scale_fast u combined_inner_product in
-          print "uc" uc ; combined_polynomial + uc
+          combined_polynomial + uc
         in
-        print "p_prime" p_prime ;
         let q = p_prime + lr_prod in
-        print "q" q ;
         absorb sponge PC delta ;
         let c = squeeze_scalar sponge in
-        print_field "c" c.inner ;
         (* c Q + delta = z1 (G + b U) + z2 H *)
         let lhs =
           let cq = Scalar_challenge.endo q c in
-          print "cq" cq ; cq + delta
+          cq + delta
         in
-        print "lhs" lhs ;
         let rhs =
           let b_u = scale_fast u advice.b in
-          print_field "b" (match advice.b with Shifted_value x -> x) ;
-          print "b_u" b_u ;
           let z_1_g_plus_b_u = scale_fast (sg + b_u) z_1 in
-          print "z_1_g_plus_b_u" z_1_g_plus_b_u ;
           let z2_h =
             scale_fast (Inner_curve.constant (Lazy.force Generators.h)) z_2
           in
-          print "z2_h" z2_h ; z_1_g_plus_b_u + z2_h
+          z_1_g_plus_b_u + z2_h
         in
-        print "rhs" rhs ;
         (`Success (equal_g lhs rhs), challenges))
 
   module Opt = struct
@@ -536,35 +459,18 @@ struct
       SC.SC.create (lowest_128_bits (squeeze s) ~constrain_low_bits:false)
   end
 
-  (*
-  module Opt =
-    S.Bit_sponge.Make
-      (struct
-        type t = Boolean.var
-      end)
-      (struct
-        type t = Field.t
-
-        let to_bits t = Wrap_main_inputs.Unsafe.unpack_unboolean t
-
-        let finalize_discarded = Util.boolean_constrain (module Impl)
-
-        let high_entropy_bits = Wrap_main_inputs.high_entropy_bits
-      end)
-      (struct
-        type t = Boolean.var * Field.t
-      end) *)
-
   (* TODO: This doesn't need to be an opt sponge *)
   let absorb sponge ty t =
     Util.absorb
       ~absorb_field:(fun (b, x) ->
-        as_prover
-          As_prover.(
-            fun () ->
-              if read Boolean.typ b then
-                printf "absorb %s\n%!"
-                  Backend.Tock.Bigint.R.(to_hex_string (of_field (read_var x)))) ;
+        if debug then
+          as_prover
+            As_prover.(
+              fun () ->
+                if read Boolean.typ b then
+                  printf "absorb %s\n%!"
+                    Backend.Tock.Bigint.R.(
+                      to_hex_string (of_field (read_var x)))) ;
         Opt.absorb sponge (b, x))
       ~g1_to_field_elements:(fun (b, (x, y)) -> [ (b, x); (b, y) ])
       ~absorb_scalar:(fun x -> Opt.absorb sponge (Boolean.true_, x))
@@ -583,23 +489,6 @@ struct
     let length = Pseudo.choose (choice, lengths) ~f:Field.of_int in
     let (T max) = Nat.of_int max in
     Vector.to_array (ones_vector (module Impl) ~first_zero:length max)
-
-  (* TODO
-     let mask_messages (type n) ~(lengths : (int, n) Vector.t Evals.t)
-         (choice : n One_hot_vector.t) (m : _ Messages.t) =
-       let f lens = Array.zip_exn (mask lens choice) in
-       let g lg { Poly_comm.With_degree_bound.shifted; unshifted } =
-         { Poly_comm.With_degree_bound.shifted = (Boolean.true_, shifted)
-         ; unshifted = f lg unshifted
-         }
-       in
-       { Messages.l_comm = f lengths.l m.l_comm
-       ; r_comm = f lengths.r m.r_comm
-       ; o_comm = f lengths.o m.o_comm
-       ; z_comm = f lengths.z m.z_comm
-       ; t_comm = g lengths.t m.t_comm
-       }
-  *)
 
   module Plonk = Types.Dlog_based.Proof_state.Deferred_values.Plonk
 
@@ -654,18 +543,6 @@ struct
         | `Packed_bits (x, n) ->
             [| (x, n) |])
     in
-    (* TODO
-       let messages =
-         with_label __LOC__ (fun () ->
-             let open Vector in
-             let lengths =
-               let f field = map step_domains ~f:(Fn.compose Domain.size field) in
-               Commitment_lengths.generic map ~h:(f Domains.h)
-                 ~max_degree:Common.Max_degree.step
-             in
-             mask_messages ~lengths which_branch messages)
-       in
-    *)
     let sg_old =
       with_label __LOC__ (fun () ->
           let actual_width =
@@ -677,28 +554,12 @@ struct
             ~f:(fun keep sg -> [| (keep, sg) |]))
     in
     with_label __LOC__ (fun () ->
-        (* TODO
-           let receive ty f =
-             with_label __LOC__ (fun () ->
-                 let x = f messages in
-                 absorb sponge ty x ; x)
-           in
-        *)
         let sample () = Opt.challenge sponge in
         let sample_scalar () : Scalar_challenge.t =
           Opt.scalar_challenge sponge
         in
         let open Dlog_plonk_types.Messages in
         let x_hat =
-          as_prover
-            As_prover.(
-              fun () ->
-                printf "dlog_main public input:\n%!" ;
-                Array.iteri public_input ~f:(fun i (x, n) ->
-                    printf "%d: %s\n%!" i
-                      Backend.Tock.Bigint.R.(
-                        to_hex_string (of_field (read_var x))))) ;
-
           with_label __LOC__ (fun () ->
               let domain = (which_branch, step_domains) in
               let terms =
@@ -733,18 +594,6 @@ struct
                               Inner_curve.if_ b ~then_:(Ops.add_fast g acc)
                                 ~else_:acc)
                       | `Add_with_correction ((x, num_bits), (g, _)) ->
-                          as_prover
-                            As_prover.(
-                              fun () ->
-                                let x, y =
-                                  read Inner_curve.typ g
-                                  |> Inner_curve.Constant.to_affine_exn
-                                in
-                                printf "x_hat base %d: %s, %s\n%!" i
-                                  (Backend.Tock.Bigint.R.to_hex_string
-                                     (Impl.Bigint.of_field x))
-                                  (Backend.Tock.Bigint.R.to_hex_string
-                                     (Impl.Bigint.of_field y))) ;
                           Ops.add_fast acc
                             (Ops.scale_fast2'
                                (module Other_field.With_top_bit0)
@@ -769,7 +618,6 @@ struct
           messages.t_comm
         in
         absorb_g t_comm ;
-        printf "squeezing zeta\n%!" ;
         let zeta = sample_scalar () in
         (* At this point, we should use the previous "bulletproof_challenges" to
            compute to compute f(beta_1) outside the snark
@@ -811,49 +659,32 @@ struct
             |> Inner_curve.negate
           in
           print_g "poseidon" poseidon ;
-          let ( * ) s x lab =
-            ksprintf print_g "base %s" lab x ;
-            let r = scale_fast x s in
-            print_g "f_term" r ; r
-          in
+          let ( * ) s x = scale_fast x s in
           let generic =
             let coeffs = Vector.to_array m.coefficients_comm in
             let (c0 :: cs) = plonk.generic in
             Vector.foldi cs
-              ~init:((c0 * coeffs.(0)) "generic 0")
-              ~f:(fun i acc c ->
-                acc
-                + (c * coeffs.(Int.(i + 1))) (sprintf "generic %d" Int.(i + 1)))
+              ~init:(c0 * coeffs.(0))
+              ~f:(fun i acc c -> acc + (c * coeffs.(Int.(i + 1))))
           in
           List.reduce_exn ~f:( + )
-            [ (plonk.perm * sigma_comm_last) "perm"
+            [ plonk.perm * sigma_comm_last
             ; generic
             ; poseidon
-            ; (plonk.vbmul * m.mul_comm) "vbmul"
-            ; (plonk.complete_add * m.complete_add_comm) "complete_add"
-            ; (plonk.endomul * m.emul_comm) "endomul"
-            ; (plonk.endomul_scalar * m.endomul_scalar_comm) "endomul scalar"
+            ; plonk.vbmul * m.mul_comm
+            ; plonk.complete_add * m.complete_add_comm
+            ; plonk.endomul * m.emul_comm
+            ; plonk.endomul_scalar * m.endomul_scalar_comm
             ]
-          (*
-          let res = Array.map z_comm ~f:(fun (b, x) -> (b, plonk.perm0 * x)) in
-          res.(0) <-
-            (let b, r = res.(0) in
-             (Boolean.true_, Inner_curve.if_ b ~then_:(r + g) ~else_:g)) ;
-          res *)
         in
         let chunked_t_comm =
           let n = Array.length t_comm in
           let res = ref t_comm.(n - 1) in
-          print_g "chunk" t_comm.(n - 1) ;
-          print_g "acc" !res ;
           for i = n - 2 downto 0 do
-            res := t_comm.(i) + scale_fast !res plonk.zeta_to_srs_length ;
-            print_g "chunk" t_comm.(i) ;
-            print_g "acc" !res
+            res := t_comm.(i) + scale_fast !res plonk.zeta_to_srs_length
           done ;
           !res
         in
-        print_g "f_comm" f_comm ;
         let ft_comm =
           f_comm + chunked_t_comm
           + Inner_curve.negate
@@ -870,7 +701,6 @@ struct
              It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
              the combined inner product.
           *)
-          (* TODO: We don't actually use the degree bound for t commitment. *)
           let num_commitments_without_degree_bound = Nat.N26.n in
           let without_degree_bound =
             (* sg_old
@@ -949,14 +779,8 @@ struct
 
   let b_poly = Field.(b_poly ~add ~mul ~one)
 
-  (* TODO
-     let pack_scalar_challenge (Pickles_types.Scalar_challenge.Scalar_challenge t)
-         =
-       Field.pack (Challenge.to_bits t) *)
-
   let pow2pow (pt : Field.t) (n : int) : Field.t =
     with_label __LOC__ (fun () ->
-        (*         let max_degree_log2 = Int.ceil_log2 Common.Max_degree.wrap in *)
         let rec go acc i =
           if i = 0 then acc else go (Field.square acc) (i - 1)
         in
