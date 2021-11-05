@@ -8,6 +8,7 @@
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
  (libraries
+  run_in_thread
   kimchi
   kimchi_backend_common
   hex
