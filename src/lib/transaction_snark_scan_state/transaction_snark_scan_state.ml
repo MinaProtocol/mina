@@ -195,10 +195,9 @@ let create_expected_statement ~constraint_constants
   let { With_status.data = transaction; status = _ } =
     Ledger.Transaction_applied.transaction transaction_with_info
   in
-  let%bind after =
-    Or_error.try_with (fun () ->
-        Sparse_ledger.apply_transaction_exn ~constraint_constants
-          ~txn_state_view:state_view ledger_witness transaction)
+  let%bind after, _ =
+    Sparse_ledger.apply_transaction ~constraint_constants
+      ~txn_state_view:state_view ledger_witness transaction
   in
   let target =
     Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
