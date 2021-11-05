@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 module Step = struct
   module Key = struct

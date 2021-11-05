@@ -59,7 +59,8 @@ module Make (Inputs : Inputs_intf) = struct
       in
       let uuid = format_uuid mask in
       { hash =
-          Visualization.display_prefix_of_string @@ Hash.to_string root_hash
+          Visualization.display_prefix_of_string
+          @@ Hash.to_base58_check root_hash
       ; num_accounts
       ; total_currency
       ; uuid

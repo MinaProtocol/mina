@@ -185,8 +185,11 @@ module Update = struct
     end
   end]
 
-  let gen ?(new_party = false) () : t Quickcheck.Generator.t =
+  let gen ?(new_account = false) ?(snapp_account = false) () :
+      t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
+    if snapp_account && not new_account then
+      failwith "Party.Update.gen: got snapp_account but not new_account" ;
     let%bind app_state =
       let%bind fields =
         let field_gen = Snark_params.Tick.Field.gen in
@@ -197,13 +200,18 @@ module Update = struct
     in
     let%bind delegate = Set_or_keep.gen Public_key.Compressed.gen in
     let%bind verification_key =
-      Set_or_keep.gen
-        (Quickcheck.Generator.return
-           (let data = Pickles.Side_loaded.Verification_key.dummy in
-            let hash = Snapp_account.digest_vk data in
-            { With_hash.data; hash }))
+      if snapp_account then
+        Set_or_keep.gen
+          (Quickcheck.Generator.return
+             (let data = Pickles.Side_loaded.Verification_key.dummy in
+              let hash = Snapp_account.digest_vk data in
+              { With_hash.data; hash }))
+      else return Set_or_keep.Keep
     in
-    let%bind permissions = Set_or_keep.gen Permissions.gen in
+    let%bind permissions =
+      if snapp_account then Set_or_keep.gen Permissions.gen
+      else return Set_or_keep.Keep
+    in
     let%bind snapp_uri =
       let uri_gen =
         Quickcheck.Generator.of_list
@@ -223,7 +231,7 @@ module Update = struct
       Set_or_keep.gen token_gen
     in
     let%map timing =
-      if new_party then Set_or_keep.gen Timing_info.gen
+      if new_account then Set_or_keep.gen Timing_info.gen
       else return Set_or_keep.Keep
     in
     Poly.
@@ -349,27 +357,20 @@ module Update = struct
 end
 
 module Events = Snapp_account.Events
-module Rollup_events = Snapp_account.Rollup_events
+module Sequence_events = Snapp_account.Sequence_events
 
 module Body = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ( 'pk
-             , 'update
-             , 'token_id
-             , 'signed_amount
-             , 'events
-             , 'call_data
-             , 'int )
-             t =
+        type ('pk, 'update, 'token_id, 'amount, 'events, 'call_data, 'int) t =
           { pk : 'pk
           ; update : 'update
           ; token_id : 'token_id
-          ; delta : 'signed_amount
+          ; delta : 'amount
           ; events : 'events
-          ; rollup_events : 'events
+          ; sequence_events : 'events
           ; call_data : 'call_data
           ; depth : 'int
           }
@@ -399,6 +400,46 @@ module Body = struct
     end
   end]
 
+  (* Delta for the fee payer is always going to be Neg, so represent it using an unsigned fee,
+     token id is always going to be the default, so use unit value as a placeholder
+  *)
+  module Fee_payer = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Public_key.Compressed.Stable.V1.t
+          , Update.Stable.V1.t
+          , unit
+          , Fee.Stable.V1.t
+          , Pickles.Backend.Tick.Field.Stable.V1.t array list
+          , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
+          , int )
+          Poly.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let dummy : t =
+      { pk = Public_key.Compressed.empty
+      ; update = Update.dummy
+      ; token_id = ()
+      ; delta = Fee.zero
+      ; events = []
+      ; sequence_events = []
+      ; call_data = Field.zero
+      ; depth = 0
+      }
+  end
+
+  let of_fee_payer (t : Fee_payer.t) : t =
+    { t with
+      delta = { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.delta }
+    ; token_id = Token_id.default
+    }
+
   module Checked = struct
     type t =
       ( Public_key.Compressed.var
@@ -416,7 +457,7 @@ module Body = struct
          ; token_id
          ; delta
          ; events
-         ; rollup_events
+         ; sequence_events
          ; call_data
          ; depth = _depth (* ignored *)
          } :
@@ -427,7 +468,7 @@ module Body = struct
         ; Impl.run_checked (Token_id.Checked.to_input token_id)
         ; Amount.Signed.Checked.to_input delta
         ; Events.var_to_input events
-        ; Events.var_to_input rollup_events
+        ; Events.var_to_input sequence_events
         ; Random_oracle_input.field call_data
         ]
 
@@ -457,7 +498,7 @@ module Body = struct
     ; token_id = Token_id.default
     ; delta = Amount.Signed.zero
     ; events = []
-    ; rollup_events = []
+    ; sequence_events = []
     ; call_data = Field.zero
     ; depth = 0
     }
@@ -468,7 +509,7 @@ module Body = struct
        ; token_id
        ; delta
        ; events
-       ; rollup_events
+       ; sequence_events
        ; call_data
        ; depth = _ (* ignored *)
        } :
@@ -479,7 +520,7 @@ module Body = struct
       ; Token_id.to_input token_id
       ; Amount.Signed.to_input delta
       ; Events.to_input events
-      ; Events.to_input rollup_events
+      ; Events.to_input sequence_events
       ; Random_oracle_input.field call_data
       ]
 
@@ -658,6 +699,31 @@ module Predicated = struct
     let dummy : t = { body = Body.dummy; predicate = Account_nonce.zero }
   end
 
+  module Fee_payer = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Body.Fee_payer.Stable.V1.t
+          , Account_nonce.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    module Checked = struct
+      type t = (Body.Checked.t, Account_nonce.Checked.t) Poly.t
+    end
+
+    let dummy : t =
+      { body = Body.Fee_payer.dummy; predicate = Account_nonce.zero }
+
+    let to_signed (t : t) : Signed.t =
+      { body = Body.of_fee_payer t.body; predicate = t.predicate }
+  end
+
   module Empty = struct
     [%%versioned
     module Stable = struct
@@ -676,6 +742,9 @@ module Predicated = struct
 
   let of_signed ({ body; predicate } : Signed.t) : t =
     { body; predicate = Nonce predicate }
+
+  let of_fee_payer ({ body; predicate } : Fee_payer.t) : t =
+    { body = Body.of_fee_payer body; predicate = Nonce predicate }
 end
 
 module Poly (Data : Type) (Auth : Type) = struct
@@ -718,6 +787,29 @@ module Signed = struct
     Account_id.create t.data.body.pk t.data.body.token_id
 end
 
+module Fee_payer = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Poly(Predicated.Fee_payer.Stable.V1)(Signature.Stable.V1).t =
+        { data : Predicated.Fee_payer.Stable.V1.t
+        ; authorization : Signature.Stable.V1.t
+        }
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let account_id (t : t) : Account_id.t =
+    Account_id.create t.data.body.pk Token_id.default
+
+  let to_signed (t : t) : Signed.t =
+    { authorization = t.authorization
+    ; data = Predicated.Fee_payer.to_signed t.data
+    }
+end
+
 module Empty = struct
   [%%versioned
   module Stable = struct
@@ -747,6 +839,11 @@ let account_id (t : t) : Account_id.t =
 
 let of_signed ({ data; authorization } : Signed.t) : t =
   { authorization = Signature authorization; data = Predicated.of_signed data }
+
+let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
+  { authorization = Signature authorization
+  ; data = Predicated.of_fee_payer data
+  }
 
 (** The change in balance to apply to the target account of this party.
     When this is negative, the amount will be withdrawn from the account and

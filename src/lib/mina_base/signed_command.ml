@@ -369,8 +369,6 @@ module Base58_check = Codable.Make_base58_check (Stable.Latest)
 [%%define_locally
 Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
 
-[%%define_locally Base58_check.String_ops.(to_string, of_string)]
-
 [%%ifdef consensus_mechanism]
 
 let check_signature ?signature_kind ({ payload; signer; signature } : t) =
@@ -387,11 +385,14 @@ let check_signature ?signature_kind ({ payload; signer; signature } : t) =
 
 [%%endif]
 
-let check_valid_keys t =
+let public_keys t =
   let fee_payer = fee_payer_pk t in
   let source = source_pk t in
   let receiver = receiver_pk t in
-  List.for_all [ fee_payer; source; receiver ] ~f:(fun pk ->
+  [ fee_payer; source; receiver ]
+
+let check_valid_keys t =
+  List.for_all (public_keys t) ~f:(fun pk ->
       Option.is_some (Public_key.decompress pk))
 
 let create_with_signature_checked ?signature_kind signature signer payload =
@@ -415,7 +416,11 @@ let%test_unit "json" =
   Quickcheck.test ~trials:20 ~sexp_of:sexp_of_t gen_test ~f:(fun t ->
       assert (Codable.For_tests.check_encoding (module Stable.Latest) ~equal t))
 
+(* return type is `t option` here, interface coerces that to `With_valid_signature.t option` *)
 let check t = Option.some_if (check_signature t && check_valid_keys t) t
+
+(* return type is `t option` here, interface coerces that to `With_valid_signature.t option` *)
+let check_only_for_signature t = Option.some_if (check_signature t) t
 
 let forget_check t = t
 

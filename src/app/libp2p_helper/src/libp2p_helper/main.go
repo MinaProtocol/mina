@@ -63,9 +63,21 @@ var connectionCountMetric = prometheus.NewGauge(prometheus.GaugeOpts{
 	Help: "Number of active connections, according to the CodaConnectionManager.",
 })
 
+var validationTimeoutMetric = prometheus.NewCounter(prometheus.CounterOpts{
+	Name: "Mina_libp2p_validation_timeout_counter",
+	Help: "Number of message validation timeouts",
+})
+
+var validationTimeMetric = prometheus.NewGauge(prometheus.GaugeOpts{
+	Name: "Mina_libp2p_message_validation_time_ns",
+	Help: "Message validation time",
+})
+
 func init() {
 	// === Register metrics collectors here ===
 	prometheus.MustRegister(connectionCountMetric)
+	prometheus.MustRegister(validationTimeoutMetric)
+	prometheus.MustRegister(validationTimeMetric)
 	http.Handle("/metrics", promhttp.Handler())
 }
 

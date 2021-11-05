@@ -168,6 +168,10 @@ module Stable = struct
 
     let to_latest = Fn.id
 
+    let description = "Verification key"
+
+    let version_byte = Base58_check.Version_bytes.verification_key
+
     include Binable.Of_binable
               (R.Stable.V1)
               (struct
@@ -219,6 +223,8 @@ module Stable = struct
               end)
   end
 end]
+
+include Codable.Make_base58_check (Stable.Latest)
 
 let dummy : t =
   { step_data = At_most.[]

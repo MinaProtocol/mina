@@ -1,18 +1,46 @@
 open Core_kernel
 open Mina_base
 
+type invalid =
+  [ `Invalid_keys of Signature_lib.Public_key.Compressed.Stable.Latest.t list
+  | `Invalid_signature of
+    Signature_lib.Public_key.Compressed.Stable.Latest.t list
+  | `Invalid_proof
+  | `Missing_verification_key of
+    Signature_lib.Public_key.Compressed.Stable.Latest.t list ]
+[@@deriving bin_io_unversioned]
+
+let invalid_to_string (invalid : invalid) =
+  let keys_to_string keys =
+    List.map keys ~f:(fun key ->
+        Signature_lib.Public_key.Compressed.to_base58_check key)
+    |> String.concat ~sep:";"
+  in
+  match invalid with
+  | `Invalid_keys keys ->
+      sprintf "Invalid_keys: [%s]" (keys_to_string keys)
+  | `Invalid_signature keys ->
+      sprintf "Invalid_signature: [%s]" (keys_to_string keys)
+  | `Missing_verification_key keys ->
+      sprintf "Missing_verification_key: [%s]" (keys_to_string keys)
+  | `Invalid_proof ->
+      "Invalid_proof"
+
 let check :
        User_command.Verifiable.t
     -> [ `Valid of User_command.Valid.t
-       | `Invalid
-       | `Valid_assuming of User_command.Valid.t * _ list ] = function
+       | `Valid_assuming of User_command.Valid.t * _ list
+       | invalid ] = function
   | User_command.Signed_command c -> (
-      match Signed_command.check c with
-      | None ->
-          `Invalid
-      | Some c ->
-          `Valid (User_command.Signed_command c) )
-  | Parties { fee_payer; other_parties; protocol_state } ->
+      if not (Signed_command.check_valid_keys c) then
+        `Invalid_keys (Signed_command.public_keys c)
+      else
+        match Signed_command.check_only_for_signature c with
+        | Some c ->
+            `Valid (User_command.Signed_command c)
+        | None ->
+            `Invalid_signature (Signed_command.public_keys c) )
+  | Parties { fee_payer; other_parties; protocol_state; memo } ->
       with_return (fun { return } ->
           let commitment =
             let other_parties_hash =
@@ -21,25 +49,29 @@ let check :
             Parties.Transaction_commitment.create ~other_parties_hash
               ~protocol_state_predicate_hash:
                 (Snapp_predicate.Protocol_state.digest protocol_state)
+              ~memo_hash:(Signed_command_memo.hash memo)
           in
           let check_signature s pk msg =
             match Signature_lib.Public_key.decompress pk with
             | None ->
-                return `Invalid
+                return (`Invalid_keys [ pk ])
             | Some pk ->
                 if
                   not
                     (Signature_lib.Schnorr.verify s
                        (Backend.Tick.Inner_curve.of_affine pk)
                        (Random_oracle_input.field msg))
-                then return `Invalid
+                then
+                  return
+                    (`Invalid_signature
+                      [ Signature_lib.Public_key.compress pk ])
                 else ()
           in
           check_signature fee_payer.authorization fee_payer.data.body.pk
             (Parties.Transaction_commitment.with_fee_payer commitment
                ~fee_payer_hash:
                  (Party.Predicated.digest
-                    (Party.Predicated.of_signed fee_payer.data))) ;
+                    (Party.Predicated.of_fee_payer fee_payer.data))) ;
           let parties_with_hashes_list =
             Parties.Party_or_stack.With_hashes.to_parties_with_hashes_list
               other_parties
@@ -56,7 +88,9 @@ let check :
                 | Proof pi -> (
                     match vk_opt with
                     | None ->
-                        return `Invalid
+                        return
+                          (`Missing_verification_key
+                            [ Account_id.public_key @@ Party.account_id p ])
                     | Some vk ->
                         Some
                           ( vk
@@ -71,6 +105,7 @@ let check :
               ; other_parties =
                   List.map parties_with_hashes_list ~f:(fun ((p, _), _) -> p)
               ; protocol_state
+              ; memo
               }
           in
           match valid_assuming with

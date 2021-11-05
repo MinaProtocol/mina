@@ -225,15 +225,15 @@ let display
      } :
       Value.t) : display =
   { Poly.staged_ledger_hash =
-      Visualization.display_prefix_of_string @@ Ledger_hash.to_string
+      Visualization.display_prefix_of_string @@ Ledger_hash.to_base58_check
       @@ Staged_ledger_hash.ledger_hash staged_ledger_hash
   ; genesis_ledger_hash =
-      Visualization.display_prefix_of_string @@ Frozen_ledger_hash.to_string
-      @@ genesis_ledger_hash
+      Visualization.display_prefix_of_string
+      @@ Frozen_ledger_hash.to_base58_check @@ genesis_ledger_hash
   ; registers =
       { ledger =
           Visualization.display_prefix_of_string
-          @@ Frozen_ledger_hash.to_string ledger
+          @@ Frozen_ledger_hash.to_base58_check ledger
       ; pending_coinbase_stack = ()
       ; next_available_token = Token_id.to_string next_available_token
       ; local_state = Local_state.display local_state

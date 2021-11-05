@@ -219,7 +219,7 @@ module Ledger = struct
   let generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger =
     Ledger.commit ledger ;
     let dirname = Option.value_exn (Ledger.get_directory ledger) in
-    let root_hash = State_hash.to_string @@ Ledger.merkle_root ledger in
+    let root_hash = State_hash.to_base58_check @@ Ledger.merkle_root ledger in
     let%bind () = Unix.mkdir ~p:() genesis_dir in
     let tar_path = genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix in
     [%log trace]
@@ -385,7 +385,8 @@ module Ledger = struct
                 let config =
                   { config with
                     hash =
-                      Some (State_hash.to_string @@ Ledger.merkle_root ledger)
+                      Some
+                        (State_hash.to_base58_check @@ Ledger.merkle_root ledger)
                   }
                 in
                 let name, other_data =
@@ -427,7 +428,7 @@ module Ledger = struct
                     return (Ok (packed, config, tar_path))
                 | Error err, _ ->
                     let root_hash =
-                      State_hash.to_string @@ Ledger.merkle_root ledger
+                      State_hash.to_base58_check @@ Ledger.merkle_root ledger
                     in
                     let tar_path =
                       genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix
@@ -463,7 +464,7 @@ module Epoch_data = struct
             ~metadata:[ ("ledger_file", `String ledger_file) ] ;
           ( { Consensus.Genesis_epoch_data.Data.ledger =
                 Genesis_ledger.Packed.t staking_ledger
-            ; seed = Epoch_seed.of_string config.staking.seed
+            ; seed = Epoch_seed.of_base58_check_exn config.staking.seed
             }
           , { config.staking with ledger = config' } )
         in
@@ -481,7 +482,7 @@ module Epoch_data = struct
               ( Some
                   { Consensus.Genesis_epoch_data.Data.ledger =
                       Genesis_ledger.Packed.t next_ledger
-                  ; seed = Epoch_seed.of_string seed
+                  ; seed = Epoch_seed.of_base58_check_exn seed
                   }
               , Some { Runtime_config.Epoch_data.Data.ledger = config''; seed }
               )
@@ -511,7 +512,7 @@ end = struct
 
   let create ~id ~state_hash =
     Pickles.Verification_key.Id.to_string id
-    |> ( ^ ) (State_hash.to_string state_hash)
+    |> ( ^ ) (State_hash.to_base58_check state_hash)
     |> Blake2.digest_string |> Blake2.to_hex
 end
 

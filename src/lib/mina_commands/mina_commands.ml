@@ -329,7 +329,7 @@ let get_status ~flag t =
     let open Participating_state.Let_syntax in
     let%bind ledger = Mina_lib.best_ledger t in
     let ledger_merkle_root =
-      Ledger.merkle_root ledger |> Ledger_hash.to_string
+      Ledger.merkle_root ledger |> Ledger_hash.to_base58_check
     in
     let num_accounts = Ledger.num_accounts ledger in
     let%bind state = Mina_lib.best_protocol_state t in
