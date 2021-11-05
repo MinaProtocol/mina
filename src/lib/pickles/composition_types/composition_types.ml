@@ -39,7 +39,11 @@ module Dlog_based = struct
             ; beta : 'challenge
             ; gamma : 'challenge
             ; zeta : 'scalar_challenge
-            ; zeta_n : 'fp
+                  (* TODO: zeta_to_srs_length is kind of unnecessary.
+                     Try to get rid of it when you can.
+                  *)
+            ; zeta_to_srs_length : 'fp
+            ; zeta_to_domain_size : 'fp
             ; poseidon_selector : 'fp
             ; vbmul : 'fp
             ; complete_add : 'fp
@@ -61,7 +65,8 @@ module Dlog_based = struct
           let map_fields t ~f =
             { t with
               poseidon_selector = f t.poseidon_selector
-            ; zeta_n = f t.zeta_n
+            ; zeta_to_srs_length = f t.zeta_to_srs_length
+            ; zeta_to_domain_size = f t.zeta_to_domain_size
             ; vbmul = f t.vbmul
             ; complete_add = f t.complete_add
             ; endomul = f t.endomul
@@ -77,6 +82,7 @@ module Dlog_based = struct
               ; challenge
               ; challenge
               ; Scalar_challenge.typ scalar_challenge
+              ; fp
               ; fp
               ; fp
               ; fp
@@ -472,7 +478,7 @@ module Dlog_based = struct
       let spec =
         let open Spec in
         Struct
-          [ Vector (B Field, Nat.N14.n)
+          [ Vector (B Field, Nat.N15.n)
           ; Vector (B Challenge, Nat.N2.n)
           ; Vector (Scalar Challenge, Nat.N3.n)
           ; Vector (B Digest, Nat.N3.n)
@@ -493,7 +499,8 @@ module Dlog_based = struct
                        ; beta
                        ; gamma
                        ; zeta
-                       ; zeta_n
+                       ; zeta_to_srs_length
+                       ; zeta_to_domain_size
                        ; poseidon_selector
                        ; vbmul
                        ; complete_add
@@ -511,8 +518,9 @@ module Dlog_based = struct
             _ t) =
         let open Vector in
         let fp =
-          combined_inner_product :: b :: zeta_n :: poseidon_selector :: vbmul
-          :: complete_add :: endomul :: endomul_scalar :: perm :: generic
+          combined_inner_product :: b :: zeta_to_srs_length
+          :: zeta_to_domain_size :: poseidon_selector :: vbmul :: complete_add
+          :: endomul :: endomul_scalar :: perm :: generic
         in
         let challenge = [ beta; gamma ] in
         let scalar_challenge = [ alpha; zeta; xi ] in
@@ -541,11 +549,12 @@ module Dlog_based = struct
         let open Vector in
         let (combined_inner_product
             :: b
-               :: zeta_n
-                  :: poseidon_selector
-                     :: vbmul
-                        :: complete_add
-                           :: endomul :: endomul_scalar :: perm :: generic) =
+               :: zeta_to_srs_length
+                  :: zeta_to_domain_size
+                     :: poseidon_selector
+                        :: vbmul
+                           :: complete_add
+                              :: endomul :: endomul_scalar :: perm :: generic) =
           fp
         in
         let [ beta; gamma ] = challenge in
@@ -566,7 +575,8 @@ module Dlog_based = struct
                     ; beta
                     ; gamma
                     ; zeta
-                    ; zeta_n
+                    ; zeta_to_srs_length
+                    ; zeta_to_domain_size
                     ; poseidon_selector
                     ; vbmul
                     ; complete_add
@@ -719,7 +729,7 @@ module Pairing_based = struct
         let spec bp_log2 =
           let open Spec in
           Struct
-            [ Vector (B Field, Nat.N14.n)
+            [ Vector (B Field, Nat.N15.n)
             ; Vector (B Digest, Nat.N1.n)
             ; Vector (B Challenge, Nat.N2.n)
             ; Vector (Scalar Challenge, Nat.N3.n)
@@ -738,7 +748,8 @@ module Pairing_based = struct
                      ; beta
                      ; gamma
                      ; zeta
-                     ; zeta_n
+                     ; zeta_to_srs_length
+                     ; zeta_to_domain_size
                      ; poseidon_selector
                      ; vbmul
                      ; complete_add
@@ -754,8 +765,9 @@ module Pairing_based = struct
               _ t) =
           let open Vector in
           let fq =
-            combined_inner_product :: b :: zeta_n :: poseidon_selector :: vbmul
-            :: complete_add :: endomul :: endomul_scalar :: perm :: generic
+            combined_inner_product :: b :: zeta_to_srs_length
+            :: zeta_to_domain_size :: poseidon_selector :: vbmul :: complete_add
+            :: endomul :: endomul_scalar :: perm :: generic
           in
           let challenge = [ beta; gamma ] in
           let scalar_challenge = [ alpha; zeta; xi ] in
@@ -775,11 +787,13 @@ module Pairing_based = struct
               [ Vector.(
                   combined_inner_product
                   :: b
-                     :: zeta_n
-                        :: poseidon_selector
-                           :: vbmul
-                              :: complete_add
-                                 :: endomul :: endomul_scalar :: perm :: generic)
+                     :: zeta_to_srs_length
+                        :: zeta_to_domain_size
+                           :: poseidon_selector
+                              :: vbmul
+                                 :: complete_add
+                                    :: endomul
+                                       :: endomul_scalar :: perm :: generic)
               ; Vector.[ sponge_digest_before_evaluations ]
               ; Vector.[ beta; gamma ]
               ; Vector.[ alpha; zeta; xi ]
@@ -796,7 +810,8 @@ module Pairing_based = struct
                   ; beta
                   ; gamma
                   ; zeta
-                  ; zeta_n
+                  ; zeta_to_srs_length
+                  ; zeta_to_domain_size
                   ; poseidon_selector
                   ; vbmul
                   ; complete_add
