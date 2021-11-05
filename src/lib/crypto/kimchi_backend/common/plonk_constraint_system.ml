@@ -508,7 +508,7 @@ struct
            res.(permuted.col).(Row.to_absolute ~public_input_size permuted.row)
        done
      done) ;
-    print_endline "all good" ; res
+    res
 
   let union_find sys v =
     Hashtbl.find_or_add sys.union_finds v ~default:(fun () ->

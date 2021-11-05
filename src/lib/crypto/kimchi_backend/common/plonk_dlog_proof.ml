@@ -329,17 +329,14 @@ module Make (Inputs : Inputs_intf) = struct
     of_backend res
 
   let create_async ?message pk ~primary ~auxiliary =
-    let () = printf "test %s\n%!" __LOC__ in
     let chal_polys =
       match (message : message option) with Some s -> s | None -> []
     in
-    let () = printf "test %s\n%!" __LOC__ in
     let challenges =
       List.map chal_polys ~f:(fun { Challenge_polynomial.challenges; _ } ->
           challenges)
       |> Array.concat
     in
-    let () = printf "test %s\n%!" __LOC__ in
     let commitments =
       Array.of_list_map chal_polys
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
@@ -348,7 +345,6 @@ module Make (Inputs : Inputs_intf) = struct
     let%map.Deferred res =
       Backend.create_async pk primary auxiliary challenges commitments
     in
-    let () = printf "test %s\n%!" __LOC__ in
     of_backend res
 
   let batch_verify' (conv : 'a -> Fq.t array)
