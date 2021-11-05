@@ -21,7 +21,7 @@ end
 module Input = Random_oracle_input
 
 let params : Field.t Sponge.Params.t =
-  Sponge.Params.(map pasta_p ~f:Field.of_string)
+  Sponge.Params.(map pasta_p_3 ~f:Field.of_string)
 
 module Operations = struct
   let add_assign ~state i x = Field.(state.(i) <- state.(i) + x)
@@ -45,21 +45,16 @@ module Inputs = Pickles.Tick_field_sponge.Inputs
 module Inputs = struct
   module Field = Field
 
-  let rounds_full = 63
+  let rounds_full = 55
 
-  let initial_ark = true
+  let initial_ark = false
 
   let rounds_partial = 0
 
-  (* Computes x^5 *)
+  (* Computes x^7 *)
   let to_the_alpha x =
     let open Field in
-    let res = x in
-    let res = res * res in
-    (* x^2 *)
-    let res = res * res in
-    (* x^4 *)
-    res * x
+    square (square x * x) * x
 
   module Operations = Operations
 end
@@ -188,10 +183,10 @@ let%test_unit "check rust implementation of block-cipher" =
   let module T = Internal_Basic in
   Quickcheck.test (Quickcheck.Generator.list_with_length 3 T.Field.gen)
     ~f:(fun s ->
-      let s = Array.of_list s in
+      let s () = Array.of_list s in
       [%test_eq: T.Field.t array]
-        (Ocaml_permutation.block_cipher params s)
-        (Permutation.block_cipher params s))
+        (Ocaml_permutation.block_cipher params (s ()))
+        (Permutation.block_cipher params (s ())))
 
 [%%endif]
 
