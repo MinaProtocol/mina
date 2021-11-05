@@ -1404,9 +1404,9 @@ let create (config : Config.t)
               bytes
             in
             let blockfile =
-              let now = Time.now () in
-              Time.format now "%Y-%0m-%0d-%0H:%0M:%0S-block.hex"
-                ~zone:Time.Zone.utc
+              sprintf "%s.hex"
+                ( External_transition.state_hash state
+                |> State_hash.to_base58_check )
             in
             [%log info] "Writing received block to file %s" blockfile ;
             Out_channel.with_file blockfile ~f:(fun out_ch ->
