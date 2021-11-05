@@ -5,11 +5,11 @@ open Core_kernel
 module type Event_type_puppeteer_intf = sig
   type t [@@deriving to_yojson]
 
-  val name : string
-
   val puppeteer_event_type : string option
 
-  val parse : Puppeteer_message.t -> t Or_error.t
+  (* val parse : Puppeteer_message.t -> t Or_error.t *)
+
+  include Event_type.Event_type_intf with type t := t
 end
 
 module Log_error : sig

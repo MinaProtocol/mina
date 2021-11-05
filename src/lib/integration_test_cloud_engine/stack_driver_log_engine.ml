@@ -287,7 +287,7 @@ let parse_event_from_log_entry ~logger ~network log_entry =
       let%bind msg =
         parse (parser_from_of_yojson Logger.Message.of_yojson) payload
       in
-      Event_type.parse_event msg
+      Event_type_logger.parse_event msg
   in
   (node, event)
 

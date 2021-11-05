@@ -1,32 +1,26 @@
 open Core_kernel
 open Mina_base
 
-module type Event_type_intf = sig
+module type Event_type_logger_intf = sig
   type t [@@deriving to_yojson]
-
-  val name : string
 
   val structured_event_id : Structured_log_events.id option
 
-  val parse : Logger.Message.t -> t Or_error.t
+  (* val parse : Logger.Message.t -> t Or_error.t *)
+
+  include Event_type.Event_type_intf with type t := t
 end
 
 module Log_error : sig
   type t = Logger.Message.t
 
-  include Event_type_intf with type t := t
+  include Event_type_logger_intf with type t := t
 end
 
 module Node_initialization : sig
   type t = unit
 
-  include Event_type_intf with type t := t
-end
-
-module Node_offline : sig
-  type t = unit
-
-  include Event_type_intf with type t := t
+  include Event_type_logger_intf with type t := t
 end
 
 module Transition_frontier_diff_application : sig
@@ -39,7 +33,7 @@ module Transition_frontier_diff_application : sig
     ; root_transitioned : root_transitioned option
     }
 
-  include Event_type_intf with type t := t
+  include Event_type_logger_intf with type t := t
 end
 
 module Block_produced : sig
@@ -50,7 +44,7 @@ module Block_produced : sig
     ; snarked_ledger_generated : bool
     }
 
-  include Event_type_intf with type t := t
+  include Event_type_logger_intf with type t := t
 
   (*
   type aggregated =
@@ -68,7 +62,7 @@ end
 module Breadcrumb_added : sig
   type t = { user_commands : User_command.Valid.t With_status.t list }
 
-  include Event_type_intf with type t := t
+  include Event_type_logger_intf with type t := t
 end
 
 module Gossip : sig
@@ -85,7 +79,7 @@ module Gossip : sig
 
     type t = r With_direction.t
 
-    include Event_type_intf with type t := t
+    include Event_type_logger_intf with type t := t
   end
 
   module Snark_work : sig
@@ -94,7 +88,7 @@ module Gossip : sig
 
     type t = r With_direction.t
 
-    include Event_type_intf with type t := t
+    include Event_type_logger_intf with type t := t
   end
 
   module Transactions : sig
@@ -103,14 +97,13 @@ module Gossip : sig
 
     type t = r With_direction.t
 
-    include Event_type_intf with type t := t
+    include Event_type_logger_intf with type t := t
   end
 end
 
 type 'a t =
   | Log_error : Log_error.t t
   | Node_initialization : Node_initialization.t t
-  | Node_offline : Node_offline.t t
   | Transition_frontier_diff_application
       : Transition_frontier_diff_application.t t
   | Block_produced : Block_produced.t t
@@ -121,12 +114,12 @@ type 'a t =
 
 val to_string : 'a t -> string
 
-type existential = Event_type : 'a t -> existential
+type existential = Event_type_logger : 'a t -> existential
 [@@deriving sexp, to_yojson]
 
 val all_event_types : existential list
 
-val event_type_module : 'a t -> (module Event_type_intf with type t = 'a)
+val event_type_module : 'a t -> (module Event_type_logger_intf with type t = 'a)
 
 val existential_to_string : existential -> string
 
