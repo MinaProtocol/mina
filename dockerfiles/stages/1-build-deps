@@ -41,13 +41,11 @@ RUN apt-get update \
     libgmp-dev \
     libgmp3-dev \
     libjemalloc-dev \
-    liblz4-dev \
     libpq-dev \
     libprocps-dev \
     libsnappy-dev \
     libsodium-dev \
     libssl-dev \
-    libzstd-dev \
     zlib1g-dev \
     build-essential \
     capnproto \
