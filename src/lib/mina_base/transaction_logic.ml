@@ -375,7 +375,8 @@ module type S = sig
            , Amount.t
            , ledger
            , bool
-           , unit )
+           , unit
+           , Transaction_status.Failure.t option )
            Parties_logic.Local_state.t
          * Amount.Signed.t ) )
        Or_error.t
@@ -406,7 +407,8 @@ module type S = sig
                , Amount.t
                , ledger
                , bool
-               , unit )
+               , unit
+               , Transaction_status.Failure.t option )
                Parties_logic.Local_state.t
           -> 'acc)
     -> ?fee_excess:Amount.Signed.t
@@ -1618,11 +1620,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           , Amount.t
           , L.t
           , bool
-          , Transaction_commitment.t )
+          , Transaction_commitment.t
+          , Transaction_status.Failure.t option )
           Parties_logic.Local_state.t
       ; protocol_state_predicate : Snapp_predicate.Protocol_state.t
       ; transaction_commitment : unit
-      ; field : Snark_params.Tick.Field.t >
+      ; field : Snark_params.Tick.Field.t
+      ; failure : Transaction_status.Failure.t option >
 
     let perform ~constraint_constants ~state_view ledger (type r)
         (eff : (r, t) Parties_logic.Eff.t) : r =
@@ -1683,11 +1687,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               ~global_slot_since_genesis:
                 global_state.protocol_state.global_slot_since_genesis p.data a
           with
-          | Error _e ->
-              (* TODO: Use this in the failure reason. *)
-              (a, false)
+          | Error failure ->
+              (a, false, Some failure)
           | Ok a ->
-              (a, true) )
+              (a, true, None) )
   end
 
   module M = Parties_logic.Make (Inputs)
@@ -1710,15 +1713,19 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       Env.perform ~constraint_constants ~state_view ledger eff
     in
     let rec step_all user_acc
-        ((g : Inputs.Global_state.t), (l : _ Parties_logic.Local_state.t)) :
-        user_acc Or_error.t =
-      if List.is_empty l.parties then Ok user_acc
+        ( (g_state : Inputs.Global_state.t)
+        , (l_state : _ Parties_logic.Local_state.t) ) : user_acc Or_error.t =
+      if List.is_empty l_state.parties then Ok user_acc
       else
-        match M.step ~constraint_constants { perform } (g, l) with
-        | exception e ->
-            Error (Error.of_exn ~backtrace:`Get e)
-        | s ->
-            step_all (f user_acc s) s
+        match M.step ~constraint_constants { perform } (g_state, l_state) with
+        | exception exn ->
+            Error (Error.of_exn ~backtrace:`Get exn)
+        | ( _global_state
+          , { Parties_logic.Local_state.failure_status = Some failure; _ } ) ->
+            Error
+              (Error.of_string @@ Transaction_status.Failure.to_string failure)
+        | states ->
+            step_all (f user_acc states) states
     in
     let initial_state : Inputs.Global_state.t * _ Parties_logic.Local_state.t =
       ( { protocol_state = state_view; ledger; fee_excess }
@@ -1729,6 +1736,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ; excess = Currency.Amount.zero
         ; ledger
         ; success = true
+        ; failure_status = None
         } )
     in
     let user_acc = f init initial_state in

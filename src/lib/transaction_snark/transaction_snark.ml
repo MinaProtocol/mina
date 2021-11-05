@@ -1813,11 +1813,13 @@ module Base = struct
               , Amount.t
               , Ledger.t
               , Bool.t
-              , Transaction_commitment.t )
+              , Transaction_commitment.t
+              , unit )
               Parties_logic.Local_state.t
           ; protocol_state_predicate : Snapp_predicate.Protocol_state.Checked.t
           ; transaction_commitment : Transaction_commitment.t
-          ; field : Field.t >
+          ; field : Field.t
+          ; failure : Transaction_status.Failure.t option >
       end
 
       include Parties_logic.Make (Inputs)
@@ -2051,7 +2053,8 @@ module Base = struct
                   (* We always assert that the proof verifies. *)
                   checks_succeeded
             in
-            (account_with_hash account', success)
+            (* omit failure status here, unlike `Transaction_logic` *)
+            (account_with_hash account', success, None)
         | Balance account ->
             Balance.Checked.to_amount account.data.balance
     end
@@ -2126,6 +2129,7 @@ module Base = struct
               ( statement.source.local_state.ledger
               , V.create (fun () -> !witness.local_state_init.ledger) )
           ; success = statement.source.local_state.success
+          ; failure_status = ()
           }
         in
         (g, l)
@@ -2189,22 +2193,32 @@ module Base = struct
                             p.memo_hash)
                 }
               in
-              S.apply ~constraint_constants
-                ~is_start:
-                  ( match party_spec.is_start with
-                  | `No ->
-                      `No
-                  | `Yes ->
-                      `Yes start_data
-                  | `Compute_in_circuit ->
-                      `Compute start_data )
-                S.{ perform }
-                acc
+              let global_state, local_state =
+                S.apply ~constraint_constants
+                  ~is_start:
+                    ( match party_spec.is_start with
+                    | `No ->
+                        `No
+                    | `Yes ->
+                        `Yes start_data
+                    | `Compute_in_circuit ->
+                        `Compute start_data )
+                  S.{ perform }
+                  acc
+              in
+              (* replace any transaction failure with unit value *)
+              (global_state, { local_state with failure_status = () })
             in
             let acc' =
               match party_spec.is_start with
               | `No ->
-                  S.apply ~constraint_constants ~is_start:`No S.{ perform } acc
+                  let global_state, local_state =
+                    S.apply ~constraint_constants ~is_start:`No
+                      S.{ perform }
+                      acc
+                  in
+                  (* replace any transaction failure with unit value *)
+                  (global_state, { local_state with failure_status = () })
               | `Compute_in_circuit ->
                   V.create (fun () ->
                       match As_prover.Ref.get start_parties with
