@@ -54,7 +54,7 @@ type node_status_data =
   ; max_observed_block_height : int
   ; max_observed_unvalidated_block_height : int
   ; catchup_job_states : catchup_job_states option
-  ; sync_status : Sync_status.Stable.V1.t
+  ; sync_status : Sync_status.t
   ; libp2p_input_bandwidth : float
   ; libp2p_output_bandwidth : float
   ; libp2p_cpu_usage : float
