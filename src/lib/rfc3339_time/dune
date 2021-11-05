@@ -1,6 +1,5 @@
 (library
  (name rfc3339_time)
  (public_name rfc3339_time)
- (inline_tests)
  (instrumentation (backend bisect_ppx))
  (libraries core_kernel ptime))
