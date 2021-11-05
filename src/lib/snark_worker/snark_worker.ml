@@ -6,7 +6,6 @@ module Worker = struct
 
   module Rpcs_versioned = struct
     open Core_kernel
-    open Mina_base
     open Signature_lib
 
     module Work = struct
@@ -21,10 +20,9 @@ module Worker = struct
           type query = unit [@@deriving bin_io, version { rpc }]
 
           type response =
-            ( ( Transaction.Stable.V2.t
-              , Transaction_witness.Stable.V1.t
+            ( ( Transaction_witness.Stable.V2.t
               , Inputs.Ledger_proof.Stable.V2.t )
-              Snark_work_lib.Work.Single.Spec.Stable.V1.t
+              Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t
             * Public_key.Compressed.Stable.V1.t )
             option
@@ -34,7 +32,9 @@ module Worker = struct
 
           let callee_model_of_query = Fn.id
 
-          let response_of_callee_model = Fn.id
+          let response_of_callee_model :
+              Rpcs.Get_work.Master.Callee.response -> response =
+            Fn.id
 
           let caller_model_of_response = Fn.id
         end
@@ -50,10 +50,9 @@ module Worker = struct
       module V2 = struct
         module T = struct
           type query =
-            ( ( Transaction.Stable.V2.t
-              , Transaction_witness.Stable.V1.t
+            ( ( Transaction_witness.Stable.V2.t
               , Ledger_proof.Stable.V2.t )
-              Snark_work_lib.Work.Single.Spec.Stable.V1.t
+              Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t
             , Ledger_proof.Stable.V2.t )
             Snark_work_lib.Work.Result.Stable.V1.t

@@ -159,7 +159,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
              in
              match (gcloud_keyfile, network, bucket) with
              | Some _, Some network, Some bucket ->
-                 let hash_string = State_hash.to_string hash in
+                 let hash_string = State_hash.to_base58_check hash in
                  let height =
                    Mina_transition.External_transition.Validated
                    .blockchain_length new_block

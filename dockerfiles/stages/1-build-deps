@@ -116,7 +116,7 @@ RUN mkdir --mode=700 ~/.gnupg \
 # Ocaml install of a given OCAML_VERSION via opam switch
 # additionally initializes opam with sandboxing disabled, as we did not install bubblewrap above.
 RUN git clone \
-  git://github.com/ocaml/opam-repository \
+  https://github.com/ocaml/opam-repository.git \
   --depth 1 \
   /home/opam/opam-repository \
   && opam init --disable-sandboxing -k git -a ~/opam-repository --bare \
@@ -134,4 +134,4 @@ RUN mkdir go-tmp \
     && /usr/lib/go/bin/go build -o capnpc-go capnproto.org/go/capnp/v3/capnpc-go \
     && sudo mv capnpc-go /usr/local/bin \
     && cd - \
-    && sudo rm -rf go go-tmp
+    && sudo rm -rf go-tmp

@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Import
 open Types
 open Pickles_types

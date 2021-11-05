@@ -111,15 +111,13 @@ module type S = sig
       module V2 : sig
         type nonrec t = t =
           { scheduled_time : Block_time.Stable.V1.t
-          ; protocol_state : Protocol_state.Value.Stable.V1.t
+          ; protocol_state : Protocol_state.Value.Stable.V2.t
           ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
           ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
           ; delta_transition_chain_proof :
               Frozen_ledger_hash.Stable.V1.t
               * Frozen_ledger_hash.Stable.V1.t list
           }
-
-        val to_latest : t -> t
       end
     end]
 

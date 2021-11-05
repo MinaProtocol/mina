@@ -401,7 +401,7 @@ let net_return
       (commands t)
       ~f:(fun sum cmd ->
         let%bind sum = sum in
-        Fee.( + ) sum (User_command.fee_exn (With_status.data cmd)))
+        Fee.( + ) sum (User_command.fee (With_status.data cmd)))
   in
   let%bind completed_works_fees =
     List.fold ~init:(Some Fee.zero) (completed_works t) ~f:(fun sum work ->

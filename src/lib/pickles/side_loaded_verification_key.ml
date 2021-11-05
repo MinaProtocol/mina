@@ -54,7 +54,7 @@ module Width : sig
 
   val typ : (Checked.t, t) Typ.t
 
-  module Max : Nat.Add.Intf_transparent
+  module Max = Nat.N2
 
   module Max_vector : Vector.With_version(Max).S
 
@@ -168,6 +168,10 @@ module Stable = struct
 
     let to_latest = Fn.id
 
+    let description = "Verification key"
+
+    let version_byte = Base58_check.Version_bytes.verification_key
+
     include Binable.Of_binable
               (R.Stable.V2)
               (struct
@@ -232,6 +236,8 @@ module Stable = struct
               end)
   end
 end]
+
+include Codable.Make_base58_check (Stable.Latest)
 
 let dummy : t =
   { step_data = At_most.[]

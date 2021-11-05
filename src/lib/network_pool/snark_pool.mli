@@ -100,11 +100,17 @@ module Diff_versioned : sig
     module V2 : sig
       type t = Resource_pool.Diff.t =
         | Add_solved_work of
-            Transaction_snark_work.Statement.Stable.V1.t
+            Transaction_snark_work.Statement.Stable.V2.t
             * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
       [@@deriving compare, sexp, hash]
+    end
+
+    module V1 : sig
+      type t [@@deriving compare, sexp, hash]
+
+      val to_latest : t -> V2.t
     end
   end]
 end

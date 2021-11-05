@@ -517,6 +517,35 @@ module Vector_4 = struct
     ()
 end
 
+module Vector_5 = struct
+  module T = With_length (Nat.N5)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N5.n) vec
+
+      include Make.Binable (Nat.N5)
+
+      include (T : module type of T with type 'a t := 'a t)
+
+      module Tests = struct
+        (* TODO *)
+      end
+    end
+  end]
+
+  include T
+
+  let () =
+    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+end
+
 module Vector_6 = struct
   module T = With_length (Nat.N6)
 

@@ -177,7 +177,7 @@ let test (type f)
               (SC.create (Challenge.Constant.of_bits s)))
           xs
       with e ->
-        Core.eprintf !"Input %s\n%!" (bitstring xs) ;
+        Core_kernel.eprintf !"Input %s\n%!" (bitstring xs) ;
         raise e)
 
 module Make
@@ -336,7 +336,7 @@ struct
               G.Constant.scale g x)
             (random_point, xs)
         with e ->
-          Core.eprintf !"Endo input %s\n%!" (bitstring xs) ;
+          Core_kernel.eprintf !"Endo input %s\n%!" (bitstring xs) ;
           raise e)
 
   let endo_inv ((gx, gy) as g) chal =

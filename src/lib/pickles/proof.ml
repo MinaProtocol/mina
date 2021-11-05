@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Pickles_types
 open Import
 open Types
@@ -262,6 +262,20 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
 
               let of_sexpable = of_repr
             end)
+
+  let to_base64 t =
+    (* assume call to Nat.lte_exn does not raise with a valid instance of t *)
+    let sexp = sexp_of_t t in
+    (* raises only on invalid optional arguments *)
+    Base64.encode_exn (Sexp.to_string sexp)
+
+  let of_base64 b64 =
+    match Base64.decode b64 with
+    | Ok t -> (
+        try Ok (t_of_sexp (Sexp.of_string t))
+        with exn -> Error (Exn.to_string exn) )
+    | Error (`Msg s) ->
+        Error s
 
   let to_yojson x = Repr.to_yojson (to_repr x)
 

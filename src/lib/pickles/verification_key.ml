@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Pickles_types
 open Import
 open Kimchi_pasta.Pasta

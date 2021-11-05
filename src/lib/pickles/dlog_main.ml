@@ -124,7 +124,7 @@ struct
     if debug then
       Array.iteri gs ~f:(fun i (fin, g) ->
           as_prover
-            As_prover.(fun () -> Core.printf "fin=%b %!" (read Boolean.typ fin)) ;
+            As_prover.(fun () -> printf "fin=%b %!" (read Boolean.typ fin)) ;
           ksprintf print_g "%s[%d]" lab i g)
 
   let print_chal lab x =
@@ -132,10 +132,10 @@ struct
       as_prover
         As_prover.(
           fun () ->
-            Core.printf "in-snark %s:%!" lab ;
+            printf "in-snark %s:%!" lab ;
             Field.Constant.print
               (Field.Constant.project (List.map ~f:(read Boolean.typ) x)) ;
-            Core.printf "\n%!")
+            printf "\n%!")
 
   let print_bool lab x =
     if debug then
@@ -847,7 +847,7 @@ struct
           print_g "chunk" t_comm.(n - 1) ;
           print_g "acc" !res ;
           for i = n - 2 downto 0 do
-            res := t_comm.(i) + scale_fast !res plonk.zeta_n ;
+            res := t_comm.(i) + scale_fast !res plonk.zeta_to_srs_length ;
             print_g "chunk" t_comm.(i) ;
             print_g "acc" !res
           done ;
@@ -856,7 +856,8 @@ struct
         print_g "f_comm" f_comm ;
         let ft_comm =
           f_comm + chunked_t_comm
-          + Inner_curve.negate (scale_fast chunked_t_comm plonk.zeta_n)
+          + Inner_curve.negate
+              (scale_fast chunked_t_comm plonk.zeta_to_domain_size)
         in
         print_g "chunked_t_comm" chunked_t_comm ;
         print_g "ft_comm" ft_comm ;
@@ -1073,7 +1074,8 @@ struct
     let zetaw = Field.mul domain#generator plonk.zeta in
     let plonk_minimal = Plonk.to_minimal plonk in
     let combined_evals =
-      let n = Int.ceil_log2 Common.Max_degree.wrap in
+      let n = Common.Max_degree.wrap_log2 in
+      (* TODO: zeta_n is recomputed in [env] below *)
       let zeta_n = pow2pow plonk.zeta n in
       let zetaw_n = pow2pow zetaw n in
       ( Dlog_plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zeta_n) evals1
@@ -1084,6 +1086,7 @@ struct
     let env =
       Plonk_checks.scalars_env
         (module Field)
+        ~srs_length_log2:Common.Max_degree.wrap_log2
         ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
         ~mds:sponge_params.mds
         ~field_of_hex:(fun s ->

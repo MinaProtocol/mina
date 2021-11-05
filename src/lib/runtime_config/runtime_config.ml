@@ -121,6 +121,9 @@ module Json_layout = struct
           ; set_delegate : Auth_required.t [@default None]
           ; set_permissions : Auth_required.t [@default None]
           ; set_verification_key : Auth_required.t [@default None]
+          ; set_snapp_uri : Auth_required.t [@default None]
+          ; edit_sequence_state : Auth_required.t [@default None]
+          ; set_token_symbol : Auth_required.t [@default None]
           }
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
 
@@ -132,6 +135,9 @@ module Json_layout = struct
            ; "set_delegate"
            ; "set_permissions"
            ; "set_verification_key"
+           ; "set_snapp_uri"
+           ; "edit_sequence_state"
+           ; "set_token_symbol"
           |]
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
@@ -165,13 +171,60 @@ module Json_layout = struct
             | `String s ->
                 Ok (Snark_params.Tick.Field.of_string s)
             | _ ->
-                Error "Invalid Field.t runtime config Snapp_account.state"
+                Error
+                  "Invalid JSON in runtime config Snapp_account.state, \
+                   expected string"
         end
 
-        type t = { state : Field.t list; verification_key : string option }
+        module Verification_key = struct
+          type t = Pickles.Side_loaded.Verification_key.Stable.Latest.t
+          [@@deriving sexp, bin_io_unversioned]
+
+          (* can't be automatically derived *)
+          let dhall_type = Ppx_dhall_type.Dhall_type.Text
+
+          let to_yojson t =
+            `String (Pickles.Side_loaded.Verification_key.to_base58_check t)
+
+          let of_yojson = function
+            | `String s ->
+                let vk_or_err =
+                  Pickles.Side_loaded.Verification_key.of_base58_check s
+                in
+                Result.map_error vk_or_err ~f:Error.to_string_hum
+            | _ ->
+                Error
+                  "Invalid JSON in runtime config \
+                   Snapp_account.verification_key, expected string"
+        end
+
+        module Snapp_version = struct
+          type t = Mina_numbers.Snapp_version.Stable.Latest.t
+          [@@deriving bin_io_unversioned]
+
+          include (
+            Mina_numbers.Snapp_version :
+              module type of Mina_numbers.Snapp_version with type t := t )
+        end
+
+        type t =
+          { state : Field.t list
+          ; verification_key : Verification_key.t option
+          ; snapp_version : Snapp_version.t
+          ; sequence_state : Field.t list
+          ; last_sequence_slot : int
+          ; proved_state : bool
+          }
         [@@deriving sexp, dhall_type, yojson, bin_io_unversioned]
 
-        let fields = [| "state"; "verification_key" |]
+        let fields =
+          [| "state"
+           ; "verification_key"
+           ; "snapp_version"
+           ; "sequence_state"
+           ; "last_sequence_slot"
+           ; "proved_state"
+          |]
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
       end
@@ -190,6 +243,8 @@ module Json_layout = struct
         ; voting_for : string option [@default None]
         ; snapp : Snapp_account.t option [@default None]
         ; permissions : Permissions.t option [@default None]
+        ; token_symbol : string option [@default None]
+        ; snapp_uri : string option [@default None]
         }
       [@@deriving sexp, yojson, dhall_type]
 
@@ -206,6 +261,8 @@ module Json_layout = struct
          ; "voting_for"
          ; "snapp"
          ; "permissions"
+         ; "token_symbol"
+         ; "snapp_uri"
         |]
 
       let of_yojson json = of_yojson_generic ~fields of_yojson json
@@ -223,6 +280,8 @@ module Json_layout = struct
         ; voting_for = None
         ; snapp = None
         ; permissions = None
+        ; token_symbol = None
+        ; snapp_uri = None
         }
     end
 
@@ -442,6 +501,8 @@ module Accounts = struct
       ; voting_for : string option
       ; snapp : Snapp_account.t option
       ; permissions : Permissions.t option
+      ; token_symbol : string option
+      ; snapp_uri : string option
       }
     [@@deriving bin_io_unversioned, sexp]
 
@@ -471,6 +532,8 @@ module Accounts = struct
     ; voting_for : string option
     ; snapp : Single.Snapp_account.t option
     ; permissions : Single.Permissions.t option
+    ; token_symbol : string option
+    ; snapp_uri : string option
     }
 
   type t = Single.t list [@@deriving bin_io_unversioned]

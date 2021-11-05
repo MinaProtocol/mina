@@ -1,4 +1,5 @@
 open Core_kernel
+open Async_kernel
 
 let tuple15_to_vec
     (w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14) =
@@ -110,12 +111,11 @@ module type Inputs_intf = sig
       -> Scalar_field.Vector.t
       -> Scalar_field.t array
       -> Curve.Affine.Backend.t array
-      -> t Async.Deferred.t
+      -> t Deferred.t
 
     val verify : Verifier_index.t -> t -> bool
 
-    val batch_verify :
-      Verifier_index.t array -> t array -> bool Async.Deferred.t
+    val batch_verify : Verifier_index.t array -> t array -> bool Deferred.t
   end
 end
 
@@ -345,8 +345,7 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
           G.Affine.to_backend (Finite commitment))
     in
-    let () = printf "test %s\n%!" __LOC__ in
-    let%map.Async.Deferred res =
+    let%map.Deferred res =
       Backend.create_async pk primary auxiliary challenges commitments
     in
     let () = printf "test %s\n%!" __LOC__ in

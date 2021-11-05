@@ -4,9 +4,13 @@ open Import
 open Backend
 
 module Max_degree = struct
-  let step = 1 lsl Nat.to_int Backend.Tick.Rounds.n
+  let step_log2 = Nat.to_int Backend.Tick.Rounds.n
 
-  let wrap = 1 lsl Nat.to_int Backend.Tock.Rounds.n
+  let step = 1 lsl step_log2
+
+  let wrap_log2 = Nat.to_int Backend.Tock.Rounds.n
+
+  let wrap = 1 lsl wrap_log2
 end
 
 let tick_shifts, tock_shifts =
@@ -182,7 +186,7 @@ module Ipa = struct
             Or_infinity.Finite comm)
       in
       let urs = Backend.Tick.Keypair.load_urs () in
-      Async.In_thread.run (fun () ->
+      Run_in_thread.run_in_thread (fun () ->
           Kimchi.Protocol.SRS.Fp.batch_accumulator_check urs
             (Array.map comms ~f:or_infinite_conv)
             chals)

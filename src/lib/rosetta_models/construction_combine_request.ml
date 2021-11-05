@@ -9,7 +9,7 @@
 type t =
   { network_identifier : Network_identifier.t
   ; unsigned_transaction : string
-  ; signatures : Signature.t list
+  ; signatures : Signature.t list [@default []]
   }
 [@@deriving yojson { strict = false }, show, eq]
 

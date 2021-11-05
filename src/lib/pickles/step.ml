@@ -1,5 +1,6 @@
 module SC = Scalar_challenge
-open Core
+open Core_kernel
+open Async_kernel
 module P = Proof
 open Pickles_types
 open Poly_types
@@ -61,7 +62,7 @@ struct
       , _
       , (_, Max_branching.n) Vector.t )
       P.Base.Pairing_based.t
-      Async.Deferred.t =
+      Deferred.t =
     let _, prev_vars_length = branch_data.branching in
     let T = Length.contr prev_vars_length prevs_length in
     let (module Req) = branch_data.requests in
@@ -155,6 +156,7 @@ struct
           let env =
             Plonk_checks.scalars_env
               (module Tick.Field)
+              ~srs_length_log2:Common.Max_degree.step_log2
               ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
               ~field_of_hex:(fun s ->
                 Kimchi_pasta.Pasta.Bigint256.of_hex_string s
@@ -335,7 +337,7 @@ struct
         let tock_env =
           Plonk_checks.scalars_env
             (module Tock.Field)
-            ~domain:tock_domain
+            ~domain:tock_domain ~srs_length_log2:Common.Max_degree.wrap_log2
             ~field_of_hex:(fun s ->
               Kimchi_pasta.Pasta.Bigint256.of_hex_string s
               |> Kimchi_pasta.Pasta.Fq.of_bigint)
@@ -534,7 +536,6 @@ struct
           | None ->
               Snarky_backendless.Request.unhandled )
     in
-    let () = printf "test %s\n%!" __LOC__ in
     let next_statement_hashed : _ Types.Pairing_based.Statement.t =
       let rec pad :
           type n k maxes pvals lws lhs.
@@ -597,7 +598,7 @@ struct
             })
         |> to_list)
     in
-    let%map.Async.Deferred (next_proof : Tick.Proof.t) =
+    let%map.Async_kernel.Deferred (next_proof : Tick.Proof.t) =
       let (T (input, conv)) =
         Impls.Step.input ~branching:Max_branching.n ~wrap_rounds:Tock.Rounds.n
       in
@@ -641,6 +642,7 @@ struct
       let module V = H3.To_vector (E) in
       V.f prev_values_length (M.f prev_with_proofs)
     in
+    let () = printf "test %s\n%!" __LOC__ in
     assert (
       Backend.Tick.Proof.verify ~message:prev_polynomials next_proof
         (Backend.Tick.Keypair.vk pk)

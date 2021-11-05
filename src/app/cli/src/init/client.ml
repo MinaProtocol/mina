@@ -1197,7 +1197,7 @@ let pending_snark_work =
                       Array.map bundle#workBundle ~f:(fun w ->
                           let f = w#fee_excess in
                           let hash_of_string =
-                            Mina_base.Frozen_ledger_hash.of_string
+                            Mina_base.Frozen_ledger_hash.of_base58_check_exn
                           in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id = w#work_id
@@ -1764,11 +1764,10 @@ let generate_libp2p_keypair =
           match%bind
             Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
               ~pids:(Child_processes.Termination.create_pid_table ())
-              ~on_unexpected_termination:(fun () ->
-                raise Child_processes.Child_died)
+              ~on_peer_connected:ignore ~on_peer_disconnected:ignore
           with
           | Ok net ->
-              let%bind me = Mina_net2.Keypair.random net in
+              let%bind me = Mina_net2.generate_random_keypair net in
               let%bind () = Mina_net2.shutdown net in
               let%map () =
                 Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path me
@@ -1884,9 +1883,9 @@ let add_peers_graphql =
                    object
                      method host = peer.host
 
-                     method libp2p_port = peer.libp2p_port
+                     method libp2pPort = peer.libp2p_port
 
-                     method peer_id = peer.peer_id
+                     method peerId = peer.peer_id
                    end
                | None ->
                    eprintf
