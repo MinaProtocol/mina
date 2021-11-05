@@ -1,5 +1,6 @@
 open Core_kernel
-open Mina_base
+
+(* open Mina_base *)
 
 module type Event_type_puppeteer_intf = sig
   type t [@@deriving to_yojson]
@@ -39,9 +40,10 @@ val existential_to_string : existential -> string
 
 val existential_of_string_exn : string -> existential
 
+(* 
 val to_puppeteer_event_type : existential -> string option
 
-val of_puppeteer_event_type : string -> existential option
+val of_puppeteer_event_type : string -> existential option *)
 
 module Map : Map.S with type Key.t = existential
 

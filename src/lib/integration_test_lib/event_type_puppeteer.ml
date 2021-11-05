@@ -1,16 +1,17 @@
 open Core_kernel
-open Mina_base
+
+(* open Mina_base *)
 
 (* TODO: abstract stackdriver specific log details *)
 
 (* TODO: Monad_ext *)
-let or_error_list_fold ls ~init ~f =
+(* let or_error_list_fold ls ~init ~f =
   let open Or_error.Let_syntax in
   List.fold ls ~init:(return init) ~f:(fun acc_or_error el ->
       let%bind acc = acc_or_error in
       f acc el)
 
-let bad_parse = Or_error.error_string "bad parse"
+let bad_parse = Or_error.error_string "bad parse" *)
 
 module type Event_type_puppeteer_intf = sig
   type t [@@deriving to_yojson]
@@ -36,7 +37,7 @@ end
 module Node_offline = struct
   let name = "Node_offline"
 
-  let structured_event_id : Structured_log_events.id option = None
+  let puppeteer_event_type = Some "node_offline"
 
   type t = unit [@@deriving to_yojson]
 
@@ -45,7 +46,7 @@ end
 
 type 'a t = Log_error : Log_error.t t | Node_offline : Node_offline.t t
 
-type existential = Event_type : 'a t -> existential
+type existential = Event_type_puppeteer : 'a t -> existential
 
 let existential_to_string = function
   | Event_type_puppeteer Log_error ->
@@ -60,6 +61,8 @@ let existential_of_string_exn = function
       Event_type_puppeteer Log_error
   | "Node_offline" ->
       Event_type_puppeteer Node_offline
+  | _ ->
+      failwith "invalid puppeteer event type string"
 
 let existential_to_yojson t = `String (existential_to_string t)
 
@@ -85,7 +88,7 @@ module Map = Existentially_comparable.Map
 
 type event = Event : 'a t * 'a -> event
 
-let type_of_event (Event (t, _)) = Event_type t
+let type_of_event (Event (t, _)) = Event_type_puppeteer t
 
 (* needs to contain each type in event_types *)
 let all_event_types =
@@ -100,15 +103,15 @@ let event_type_puppeteer_module :
 
 let event_to_yojson event =
   let (Event (t, d)) = event in
-  let (module Type) = event_type_module t in
+  let (module Type) = event_type_puppeteer_module t in
   `Assoc [ (to_string t, Type.to_yojson d) ]
 
 let parse_event (message : Puppeteer_message.t) =
   let open Or_error.Let_syntax in
   match message.puppeteer_event_type with
-  | Some puppeteer_event_type ->
+  | Some puppeteer_ev_type ->
       let (Event_type_puppeteer ev_type) =
-        existential_of_string_exn puppeteer_event_type
+        existential_of_string_exn puppeteer_ev_type
       in
       let (module Ty) = event_type_puppeteer_module ev_type in
       let%map data = Ty.parse message in
@@ -123,22 +126,7 @@ let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
   match (t1, t2) with
   | Log_error, Log_error ->
       h e
-  | Node_initialization, Node_initialization ->
-      h e
   | Node_offline, Node_offline ->
-      h e
-  | Transition_frontier_diff_application, Transition_frontier_diff_application
-    ->
-      h e
-  | Block_produced, Block_produced ->
-      h e
-  | Breadcrumb_added, Breadcrumb_added ->
-      h e
-  | Block_gossip, Block_gossip ->
-      h e
-  | Snark_work_gossip, Snark_work_gossip ->
-      h e
-  | Transactions_gossip, Transactions_gossip ->
       h e
   | _ ->
       failwith "TODO: better error message :)"
