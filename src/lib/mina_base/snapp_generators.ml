@@ -542,15 +542,23 @@ let gen_parties_from ?(succeed = true)
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
   in
   let fee_payer_account_id = Account_id.create fee_payer_pk Token_id.default in
+  let ledger_accounts = Ledger.accounts ledger in
+  (* make sure all ledger keys are in the keymap *)
+  Account_id.Set.iter ledger_accounts ~f:(fun acct_id ->
+      let pk = Account_id.public_key acct_id in
+      if Option.is_none (Signature_lib.Public_key.Compressed.Map.find keymap pk)
+      then
+        failwithf "gen_parties_from: public key %s is in ledger, but not keymap"
+          (Signature_lib.Public_key.Compressed.to_base58_check pk)
+          ()) ;
   (* table of public keys not in the ledger, to be used for new parties
      we have the corresponding private keys, so we can create signatures for those new parties
   *)
   let available_public_keys =
     let tbl = Signature_lib.Public_key.Compressed.Table.create () in
-    let accounts = Ledger.accounts ledger in
     Signature_lib.Public_key.Compressed.Map.iter_keys keymap ~f:(fun pk ->
         let account_id = Account_id.create pk Token_id.default in
-        if not (Account_id.Set.mem accounts account_id) then
+        if not (Account_id.Set.mem ledger_accounts account_id) then
           Signature_lib.Public_key.Compressed.Table.add_exn tbl ~key:pk ~data:()) ;
     tbl
   in
