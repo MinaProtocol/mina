@@ -2,7 +2,7 @@
 open Sponge
 open Unsigned.Size_t
 
-let should_print = ref false
+let debug = false
 
 (* TODO: open Core here instead of opening it multiple times below *)
 
@@ -434,11 +434,6 @@ struct
             Hash_set.add outputs output ;
 
             Hashtbl.add_exn res ~key:input ~data:output)) ;
-    printf
-      !"posmap\n\
-        %{sexp: (Relative_position.t, Relative_position.t) Hashtbl.t}\n\
-        %!"
-      res ;
     res
 
   (** Compute the witness, given the constraint system `sys` and a function that converts the indexed secret inputs to their concrete values *)
@@ -609,20 +604,6 @@ struct
         let permutation (pos : Row.t Position.t) : Row.t Position.t =
           Option.value (Hashtbl.find pos_map pos) ~default:pos
         in
-
-        (*
-        let permutation ~equivalence_classes (pos : Row.t Position.t) :
-            Row.t Position.t =
-          let pos_map =
-            equivalence_classes_to_hashtbl
-              ~equivalence_classes:sys.equivalence_classes
-          in
-          Hashtbl.find_exn pos_map pos
-        in
-        let permutation =
-          permutation ~equivalence_classes:sys.equivalence_classes
-        in
-        *)
         let update_gate_with_permutation_info (row : Row.t)
             (gate : (unit, _) Gate_spec.t) : (Row.t, _) Gate_spec.t =
           { gate with
@@ -654,21 +635,15 @@ struct
           Gate_spec.map_rows ~f:(Row.to_absolute ~public_input_size)
         in
         let all_gates = List.concat [ public_gates; gates ] in
-        List.iteri all_gates ~f:(fun i x ->
-            printf !"gate %d: %{sexp: (Row.t, Fp.t) Gate_spec.t}\n%!" i x) ;
         let all_gates = List.map all_gates ~f:to_absolute_row in
-        List.iteri all_gates ~f:(fun i x ->
-            printf !"gate %d: %{sexp: (int, Fp.t) Gate_spec.t}\n%!" i x) ;
 
-        printf "num gaets %d\n%!" (List.length all_gates) ;
+        printf "num gates %d\n%!" (List.length all_gates) ;
         printf "histogram\n" ;
         List.iter
           (List.sort (Hashtbl.to_alist sys.histogram)
              ~compare:(fun (x, _) (y, _) -> compare x y))
           ~f:(fun (k, n) ->
             printf "%03d: %s\n" k (String.init (n / 100) ~f:(fun _ -> '#'))) ;
-
-        (*         printf !"%{sexp: (int, Fp.t) Gate_spec.t list}\n" all_gates ; *)
 
         (* convert all the gates into our Gates.t Rust vector type *)
         List.iter all_gates ~f:(fun g ->
@@ -729,7 +704,7 @@ struct
     | `Unfinalized_rev gates ->
         ( match kind with
         | Kimchi.Protocol.Generic ->
-            if true then
+            if debug then
               printf "gnrc %d: %s\n%!" sys.next_row
                 (String.concat_array ~sep:", "
                    (Array.map coeffs ~f:Fp.to_string))
@@ -817,15 +792,16 @@ struct
           let acc, i, ts, _ = accumulate_sorted_terms t0 terms in
           List.rev ((acc, i) :: ts)
         in
-        (let n = List.length terms in
-         if n > 1 then Int.Table.incr sys.histogram n ~by:(n - 1) ;
-         if n > 4 then
-           printf
-             !"large lincom %d:\n\
-              \  c=%{sexp:Fp.t option}\n\
-              \  %{sexp:(Fp.t * int) list}\n\
-               %!"
-             n constant terms) ;
+        if debug then (
+          let n = List.length terms in
+          if n > 1 then Int.Table.incr sys.histogram n ~by:(n - 1) ;
+          if n > 4 then
+            printf
+              !"large lincom %d:\n\
+               \  c=%{sexp:Fp.t option}\n\
+               \  %{sexp:(Fp.t * int) list}\n\
+                %!"
+              n constant terms ) ;
         match terms with
         | [] ->
             assert false
@@ -867,7 +843,7 @@ struct
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )
         Snarky_backendless.Constraint.basic) =
-    if true then
+    if debug then
       Option.iter label ~f:(printf "constraint %d: %s\n%!" sys.next_row) ;
     sys.hash <- feed_constraint sys.hash constr ;
     let red = reduce_lincom sys in
