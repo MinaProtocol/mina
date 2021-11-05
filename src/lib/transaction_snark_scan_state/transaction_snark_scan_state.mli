@@ -9,14 +9,6 @@ module Stable : sig
 
     val hash : t -> Staged_ledger_hash.Aux_hash.t
   end
-
-  module V1 : sig
-    type t [@@deriving sexp]
-
-    val to_latest : t -> V2.t
-
-    val hash : t -> Staged_ledger_hash.Aux_hash.t
-  end
 end]
 
 module Transaction_with_witness : sig

@@ -20,18 +20,6 @@ module Common = struct
             , Pending_coinbase.Stable.V1.to_yojson pending_coinbase )
           ]
     end
-
-    module V1 = struct
-      type t =
-        { scan_state : Staged_ledger.Scan_state.Stable.V1.t
-        ; pending_coinbase : Pending_coinbase.Stable.V1.t
-        }
-
-      let to_latest (t : t) : V2.t =
-        { scan_state = Staged_ledger.Scan_state.Stable.V1.to_latest t.scan_state
-        ; pending_coinbase = t.pending_coinbase
-        }
-    end
   end]
 
   let create ~scan_state ~pending_coinbase = { scan_state; pending_coinbase }
@@ -52,21 +40,6 @@ module Historical = struct
         }
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t =
-        { transition : External_transition.Validated.Stable.V1.t
-        ; common : Common.Stable.V1.t
-        ; staged_ledger_target_ledger_hash : Ledger_hash.Stable.V1.t
-        }
-
-      let to_latest (t : t) : V2.t =
-        { transition =
-            External_transition.Validated.Stable.V1.to_latest t.transition
-        ; common = Common.Stable.V1.to_latest t.common
-        ; staged_ledger_target_ledger_hash = t.staged_ledger_target_ledger_hash
-        }
     end
   end]
 
@@ -114,29 +87,6 @@ module Limited = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t =
-        { transition : External_transition.Validated.Stable.V1.t
-        ; protocol_states :
-            ( Mina_base.State_hash.Stable.V1.t
-            * Mina_state.Protocol_state.Value.Stable.V1.t )
-            list
-        ; common : Common.Stable.V1.t
-        }
-
-      (* TODO: Automatically generate when possible. *)
-      let to_latest (t : t) : V2.t =
-        { transition =
-            External_transition.Validated.Stable.V1.to_latest t.transition
-        ; protocol_states =
-            List.map t.protocol_states
-              ~f:
-                (Tuple2.map_snd
-                   ~f:Mina_state.Protocol_state.Value.Stable.V1.to_latest)
-        ; common = Common.Stable.V1.to_latest t.common
-        }
-    end
   end]
 
   [%%define_locally Stable.Latest.(to_yojson)]
@@ -166,14 +116,6 @@ module Minimal = struct
       [@@driving to_yojson]
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t = { hash : State_hash.Stable.V1.t; common : Common.Stable.V1.t }
-      [@@driving to_yojson]
-
-      let to_latest (t : t) : V2.t =
-        { hash = t.hash; common = Common.Stable.V1.to_latest t.common }
     end
   end]
 

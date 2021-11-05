@@ -68,12 +68,6 @@ module Root_transition : sig
       module V2 : sig
         type t = lite root_transition
       end
-
-      module V1 : sig
-        type t
-
-        val to_latest : t -> V2.t
-      end
     end]
   end
 end
@@ -134,10 +128,6 @@ module Lite : sig
     module Stable : sig
       module V2 : sig
         type t = E : (lite, 'mutant) diff -> t
-      end
-
-      module V1 : sig
-        type t
       end
     end]
   end
