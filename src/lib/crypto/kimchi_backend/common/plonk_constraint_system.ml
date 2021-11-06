@@ -267,6 +267,7 @@ module V = struct
   include Hashable.Make (T)
 end
 
+(* TODO: what is this type parameter 'a ? can we delete it? *)
 type ('a, 'f) t =
   { (* map of cells that share the same value (enforced by to the permutation) *)
     equivalence_classes : Row.t Position.t list V.Table.t
@@ -287,6 +288,9 @@ type ('a, 'f) t =
     public_input_size : int Core_kernel.Set_once.t
   ; (* whatever is not public input *)
     mutable auxiliary_input_size : int
+  ; (* queue (of size 1) of generic gate *)
+    mutable pending_generic_gate :
+      (V.t option * V.t option * V.t option * 'f array) option
   }
 
 module Hash = Core.Md5
@@ -468,15 +472,16 @@ struct
 
   (* initializes a constraint system *)
   let create () : t =
-    { public_input_size = Set_once.create ()
+    { equivalence_classes = V.Table.create ()
     ; internal_vars = Internal_var.Table.create ()
-    ; gates = `Unfinalized_rev [] (* Gates.create () *)
     ; rows_rev = []
+    ; gates = `Unfinalized_rev [] (* Gates.create () *)
     ; next_row = 0
-    ; equivalence_classes = V.Table.create ()
     ; hash = Hash_state.empty
     ; constraints = 0
+    ; public_input_size = Set_once.create ()
     ; auxiliary_input_size = 0
+    ; pending_generic_gate = None
     }
 
   (* TODO *)
@@ -533,6 +538,32 @@ struct
             Hashtbl.add_exn res ~key:input ~data:output)) ;
     res
 
+  (** Adds a row/gate/constraint to a constraint system `sys` *)
+  let add_row sys (vars : V.t option array) kind coeffs =
+    match sys.gates with
+    | `Finalized ->
+        failwith "add_row called on finalized constraint system"
+    | `Unfinalized_rev gates ->
+        (* as we're adding a row, we're adding new cells.
+           If these cells (the first 7) contain variables, make sure that they are wired *)
+        let num_vars = min Constants.permutation_cols (Array.length vars) in
+        let vars_for_perm = Array.slice vars 0 num_vars in
+        Array.iteri vars_for_perm ~f:(fun col some_x ->
+            Option.iter some_x ~f:(fun x -> wire sys x sys.next_row col)) ;
+
+        (* TODO: I think there are two things we should check here (and possible panic on):
+           - that these first 7 variables (that participate in the permutation argument) are not wired to anything that didn't participate in the permutation argument (hard to check as we don't have that information atm)
+           - that the remaining columns (that don't participate in the permutation argument) do not have anything that's part of the permutation argument (easy to check as we have that hashtbl) *)
+
+        (* add to gates *)
+        let open Position in
+        sys.gates <-
+          `Unfinalized_rev ({ kind; row = (); wired_to = [||]; coeffs } :: gates) ;
+        (* increment row *)
+        sys.next_row <- sys.next_row + 1 ;
+        (* add to row *)
+        sys.rows_rev <- vars :: sys.rows_rev
+
   (** Adds zero-knowledgeness to the gates/rows, and convert into Rust type [Gates.t].
       This can only be called once *)
   let finalize_and_get_gates sys =
@@ -542,7 +573,7 @@ struct
     | `Unfinalized_rev gates_rev ->
         let rust_gates = Gates.create () in
 
-        (* First, create gates for public input *)
+        (* create rows for public input *)
         let public_input_size =
           Set_once.get_exn sys.public_input_size [%here]
         in
@@ -559,6 +590,14 @@ struct
             }
             :: !pub_input_gate_specs_rev
         done ;
+
+        (* finalize any pending generic constraint *)
+        ( match sys.pending_generic_gate with
+        | None ->
+            ()
+        | Some (l, r, o, coeffs) ->
+            add_row sys [| l; r; o |] Generic coeffs ;
+            sys.pending_generic_gate <- None ) ;
 
         (* construct permutation hashmap *)
         let pos_map =
@@ -668,35 +707,26 @@ struct
         let acc, i, ts, n = accumulate_sorted_terms t0 terms in
         Some (List.rev ((acc, i) :: ts), n + 1, has_constant_term)
 
-  (** Adds a row/gate/constraint to a constraint system `sys` *)
-  let add_row sys (vars : V.t option array) kind coeffs =
-    match sys.gates with
-    | `Finalized ->
-        failwith "add_row called on finalized constraint system"
-    | `Unfinalized_rev gates ->
-        (* as we're adding a row, we're adding new cells.
-           If these cells (the first 7) contain variables, make sure that they are wired *)
-        let num_vars = min Constants.permutation_cols (Array.length vars) in
-        let vars_for_perm = Array.slice vars 0 num_vars in
-        Array.iteri vars_for_perm ~f:(fun col some_x ->
-            Option.iter some_x ~f:(fun x -> wire sys x sys.next_row col)) ;
-
-        (* TODO: I think there are two things we should check here (and possible panic on):
-           - that these first 7 variables (that participate in the permutation argument) are not wired to anything that didn't participate in the permutation argument (hard to check as we don't have that information atm)
-           - that the remaining columns (that don't participate in the permutation argument) do not have anything that's part of the permutation argument (easy to check as we have that hashtbl) *)
-
-        (* add to gates *)
-        let open Position in
-        sys.gates <-
-          `Unfinalized_rev ({ kind; row = (); wired_to = [||]; coeffs } :: gates) ;
-        (* increment row *)
-        sys.next_row <- sys.next_row + 1 ;
-        (* add to row *)
-        sys.rows_rev <- vars :: sys.rows_rev
-
-  (** Adds a generic constraint to the constraint system. *)
+  (** Adds a generic constraint to the constraint system. 
+      As there are two generic gates per row, we queue
+      every other generic gate.
+      *)
   let add_generic_constraint ?l ?r ?o coeffs sys : unit =
-    add_row sys [| l; r; o |] Generic coeffs
+    match sys.pending_generic_gate with
+    (* if the queue of generic gate is empty, queue this *)
+    | None ->
+        sys.pending_generic_gate <- Some (l, r, o, coeffs)
+    (* otherwise empty the queue and create the row  *)
+    | Some (l2, r2, o2, [| cl2; cr2; co2; cm2; cc2 |]) -> (
+        match coeffs with
+        | [| cl; cr; co; cm; cc |] ->
+            let coeffs = [| cl2; cr2; co2; cl; cr; co; cm2; cm; cc2; cc |] in
+            add_row sys [| l2; r2; o2; l; r; o |] Generic coeffs ;
+            sys.pending_generic_gate <- None
+        | _ ->
+            failwith "malformed generic gate" )
+    | _ ->
+        failwith "malformed generic gate"
 
   (** Converts a number of scaled additions \sum s_i * x_i 
       to as many constraints as needed, 
