@@ -260,6 +260,8 @@ struct
     | Command_failure of Indexed_pool.Command_error.t
     | Invalid_failure of Verifier.invalid
 
+  exception Verification_failure of verification_failure
+
   module Breadcrumb = Transition_frontier.Breadcrumb
 
   module Resource_pool = struct
@@ -1105,7 +1107,7 @@ struct
         if Indexed_pool.Command_error.grounds_for_diff_rejection e then `Reject
         else `Ignore
 
-      let verify' ~allow_failures_for_tests (t : pool)
+      let verify' ~allow_failure_for_tests (t : pool)
           (diffs : t Envelope.Incoming.t) :
           verified Envelope.Incoming.t Deferred.Or_error.t =
         let open Deferred.Let_syntax in
@@ -1134,14 +1136,14 @@ struct
         in
         let h = Lru_cache.T.hash diffs.data in
         let (`Already_mem already_mem) = Lru_cache.add t.recently_seen h in
-        if (not allow_failures_for_tests) && already_mem && not is_sender_local
+        if (not allow_failure_for_tests) && already_mem && not is_sender_local
         then
           (* We only reject here if the command was from the network: the user
              may want to re-issue a transaction if it is no longer being
              rebroadcast but also never made it into a block for some reason.
           *)
           Deferred.Or_error.error_string "already saw this"
-        else if (not allow_failures_for_tests) && not (diffs_are_valid ()) then
+        else if (not allow_failure_for_tests) && not (diffs_are_valid ()) then
           Deferred.Or_error.error_string
             "at least one user command had an insufficient fee"
         else
@@ -1165,157 +1167,153 @@ struct
                       ~data:c)
                 |> Map.map ~f:List.rev |> Map.to_alist
               in
-              let failures = ref (Ok ()) in
-              let add_failure err =
-                match !failures with
-                | Ok () ->
-                    failures := Error [ err ]
-                | Error errs ->
-                    failures := Error (err :: errs)
-              in
-              let%map diffs' =
-                Deferred.List.map by_sender ~how:`Parallel
-                  ~f:(fun (signer, cs) ->
-                    let signer_lock =
-                      Hashtbl.find_or_add t.sender_mutex signer
-                        ~default:Mutex.create
-                    in
-                    let account =
-                      Option.bind
-                        (Base_ledger.location_of_account ledger signer)
-                        ~f:(Base_ledger.get ledger)
-                    in
-                    match account with
-                    | None ->
-                        let%map _ =
-                          trust_record
-                            ( Trust_system.Actions.Sent_useless_gossip
-                            , Some
-                                ( "account does not exist for id: $account_id"
-                                , [ ("account_id", Account_id.to_yojson signer)
-                                  ] ) )
+              let%map new_diffs_result =
+                Monitor.try_with (fun () ->
+                    Deferred.List.map by_sender ~how:`Parallel
+                      ~f:(fun (signer, cs) ->
+                        let signer_lock =
+                          Hashtbl.find_or_add t.sender_mutex signer
+                            ~default:Mutex.create
                         in
-                        Error `Account_not_found
-                    | Some account ->
-                        let%bind () = Mutex.acquire signer_lock in
-                        let rec go sender_local_state u_acc acc
-                            (rejected : Rejected.t) = function
-                          | [] ->
-                              (* We keep the signer lock until this verified diff is applied. *)
-                              return
-                                (Ok
-                                   ( List.rev acc
-                                   , List.rev rejected
-                                   , sender_local_state
-                                   , u_acc ))
-                          | c :: cs ->
-                              let uc = User_command.of_verifiable c in
-                              if Result.is_error !failures then (
-                                Mutex.release signer_lock ;
-                                return (Error `Other_command_failed) )
-                              else if
-                                has_sufficient_fee t.pool ~pool_max_size uc
-                              then
-                                match%bind
-                                  Indexed_pool.add_from_gossip_exn_async ~config
-                                    ~sender_local_state
-                                    ~verify:(fun c ->
-                                      match%map
-                                        Batcher.verify t.batcher
-                                          { diffs with data = [ c ] }
-                                      with
-                                      | Error _ ->
-                                          None
-                                      | Ok (Error invalid) ->
-                                          [%log' error t.logger]
-                                            "Batch verification failed when \
-                                             adding from gossip"
-                                            ~metadata:
-                                              [ ( "error"
-                                                , `String
-                                                    (Verifier.invalid_to_string
-                                                       invalid) )
-                                              ] ;
-                                          add_failure (Invalid_failure invalid) ;
-                                          None
-                                      | Ok (Ok [ c ]) ->
-                                          Some c
-                                      | Ok (Ok _) ->
-                                          assert false)
-                                    (`Unchecked
-                                      ( Transaction_hash.User_command.create uc
-                                      , c ))
-                                    account.nonce
-                                    (Currency.Balance.to_amount
-                                       (balance_of_account ~global_slot account))
-                                with
-                                | Error e -> (
+                        let add_failure failure =
+                          if not allow_failure_for_tests then (
+                            Mutex.release signer_lock ;
+                            raise (Verification_failure failure) )
+                        in
+                        let account =
+                          Option.bind
+                            (Base_ledger.location_of_account ledger signer)
+                            ~f:(Base_ledger.get ledger)
+                        in
+                        match account with
+                        | None ->
+                            let%map _ =
+                              trust_record
+                                ( Trust_system.Actions.Sent_useless_gossip
+                                , Some
+                                    ( "account does not exist for id: \
+                                       $account_id"
+                                    , [ ( "account_id"
+                                        , Account_id.to_yojson signer )
+                                      ] ) )
+                            in
+                            Error `Account_not_found
+                        | Some account ->
+                            let%bind () = Mutex.acquire signer_lock in
+                            let rec go sender_local_state u_acc acc
+                                (rejected : Rejected.t) = function
+                              | [] ->
+                                  (* We keep the signer lock until this verified diff is applied. *)
+                                  return
+                                    (Ok
+                                       ( List.rev acc
+                                       , List.rev rejected
+                                       , sender_local_state
+                                       , u_acc ))
+                              | c :: cs ->
+                                  let uc = User_command.of_verifiable c in
+                                  if has_sufficient_fee t.pool ~pool_max_size uc
+                                  then
                                     match%bind
-                                      handle_command_error t ~trust_record
-                                        ~is_sender_local uc e
+                                      Indexed_pool.add_from_gossip_exn_async
+                                        ~config ~sender_local_state
+                                        ~verify:(fun c ->
+                                          match%map
+                                            Batcher.verify t.batcher
+                                              { diffs with data = [ c ] }
+                                          with
+                                          | Error _ ->
+                                              None
+                                          | Ok (Error invalid) ->
+                                              [%log' error t.logger]
+                                                "Batch verification failed \
+                                                 when adding from gossip"
+                                                ~metadata:
+                                                  [ ( "error"
+                                                    , `String
+                                                        (Verifier
+                                                         .invalid_to_string
+                                                           invalid) )
+                                                  ] ;
+                                              add_failure
+                                                (Invalid_failure invalid) ;
+                                              None
+                                          | Ok (Ok [ c ]) ->
+                                              Some c
+                                          | Ok (Ok _) ->
+                                              assert false)
+                                        (`Unchecked
+                                          ( Transaction_hash.User_command.create
+                                              uc
+                                          , c ))
+                                        account.nonce
+                                        (Currency.Balance.to_amount
+                                           (balance_of_account ~global_slot
+                                              account))
                                     with
-                                    | `Reject ->
-                                        add_failure (Command_failure e) ;
-                                        Mutex.release signer_lock ;
-                                        return (Error `Invalid_command)
-                                    | `Ignore ->
-                                        go sender_local_state u_acc acc
-                                          ( ( uc
-                                            , diff_error_of_indexed_pool_error e
-                                            )
-                                          :: rejected )
-                                          cs )
-                                | Ok (res, sender_local_state, u) ->
-                                    let%bind _ =
+                                    | Error e -> (
+                                        match%bind
+                                          handle_command_error t ~trust_record
+                                            ~is_sender_local uc e
+                                        with
+                                        | `Reject ->
+                                            add_failure (Command_failure e) ;
+                                            return (Error `Invalid_command)
+                                        | `Ignore ->
+                                            go sender_local_state u_acc acc
+                                              ( ( uc
+                                                , diff_error_of_indexed_pool_error
+                                                    e )
+                                              :: rejected )
+                                              cs )
+                                    | Ok (res, sender_local_state, u) ->
+                                        let%bind _ =
+                                          trust_record
+                                            ( Trust_system.Actions
+                                              .Sent_useful_gossip
+                                            , Some
+                                                ( "$cmd"
+                                                , [ ( "cmd"
+                                                    , User_command.to_yojson uc
+                                                    )
+                                                  ] ) )
+                                        in
+                                        go sender_local_state
+                                          (Indexed_pool.Update.merge u_acc u)
+                                          (res :: acc) rejected cs
+                                  else
+                                    let%bind () =
                                       trust_record
-                                        ( Trust_system.Actions.Sent_useful_gossip
+                                        ( Trust_system.Actions
+                                          .Sent_useless_gossip
                                         , Some
-                                            ( "$cmd"
+                                            ( sprintf
+                                                "rejecting command $cmd due to \
+                                                 insufficient fee."
                                             , [ ( "cmd"
                                                 , User_command.to_yojson uc )
                                               ] ) )
                                     in
-                                    go sender_local_state
-                                      (Indexed_pool.Update.merge u_acc u)
-                                      (res :: acc) rejected cs
-                              else
-                                let%bind () =
-                                  trust_record
-                                    ( Trust_system.Actions.Sent_useless_gossip
-                                    , Some
-                                        ( sprintf
-                                            "rejecting command $cmd due to \
-                                             insufficient fee."
-                                        , [ ("cmd", User_command.to_yojson uc) ]
-                                        ) )
-                                in
-                                go sender_local_state u_acc acc
-                                  ((uc, Insufficient_fee) :: rejected)
-                                  cs
-                        in
-                        go
-                          (Indexed_pool.get_sender_local_state t.pool signer)
-                          Indexed_pool.Update.empty [] [] cs)
+                                    go sender_local_state u_acc acc
+                                      ((uc, Insufficient_fee) :: rejected)
+                                      cs
+                            in
+                            go
+                              (Indexed_pool.get_sender_local_state t.pool
+                                 signer)
+                              Indexed_pool.Update.empty [] [] cs))
               in
-              match !failures with
-              | Error errs when not allow_failures_for_tests ->
-                  let errs_string =
-                    List.map errs ~f:(fun err ->
-                        match err with
-                        | Command_failure cmd_err ->
-                            Yojson.Safe.to_string
-                              (Indexed_pool.Command_error.to_yojson cmd_err)
-                        | Invalid_failure invalid ->
-                            Verifier.invalid_to_string invalid)
-                    |> String.concat ~sep:", "
-                  in
-                  Or_error.errorf "Diff failed with verification failure(s): %s"
-                    errs_string
-              | Error _ | Ok () ->
+              (* new_diffs_result is:
+                 - Ok if no raises inside monitor, the contents is a list of Result.t's
+                 - Error Verification_failure otherwise
+              *)
+              match new_diffs_result with
+              | Ok diffs' ->
+                  (* there was no raise inside the monitor *)
                   let data =
                     List.filter_map diffs' ~f:(function
-                      | Error (`Invalid_command | `Other_command_failed) ->
-                          (* If this happens, we should be in the Error branch for !failure above *)
+                      | Error `Invalid_command ->
+                          (* If this happens, we should be in the Error branch for !failures below *)
                           assert false
                       | Error `Account_not_found ->
                           (* We can just skip this set of commands *)
@@ -1331,11 +1329,27 @@ struct
                         List.concat_map data ~f:(fun (_, rej, _, _) -> rej)
                     }
                   in
-                  Ok { diffs with data } )
+                  Ok { diffs with data }
+              | Error (Verification_failure failure) ->
+                  (* there was a raise inside the monitor *)
+                  assert (not allow_failure_for_tests) ;
+                  let err_string =
+                    match failure with
+                    | Command_failure cmd_err ->
+                        Yojson.Safe.to_string
+                          (Indexed_pool.Command_error.to_yojson cmd_err)
+                    | Invalid_failure invalid ->
+                        Verifier.invalid_to_string invalid
+                  in
+                  Or_error.errorf "Diff failed with verification failure: %s"
+                    err_string
+              | Error _ ->
+                  (* unexpected exception *)
+                  assert false )
 
       let verify (t : pool) (diffs : t Envelope.Incoming.t) :
           verified Envelope.Incoming.t Deferred.Or_error.t =
-        verify' ~allow_failures_for_tests:false t diffs
+        verify' ~allow_failure_for_tests:false t diffs
 
       let register_locally_generated t txn =
         Hashtbl.update t.locally_generated_uncommitted txn ~f:(function
@@ -1839,7 +1853,7 @@ let%test_module _ =
     let verify_and_apply (pool : Test.Resource_pool.t) cs =
       let tm0 = Time.now () in
       let%bind verified =
-        Test.Resource_pool.Diff.verify' ~allow_failures_for_tests:true pool
+        Test.Resource_pool.Diff.verify' ~allow_failure_for_tests:true pool
           (Envelope.Incoming.local cs)
         >>| Or_error.ok_exn
       in
