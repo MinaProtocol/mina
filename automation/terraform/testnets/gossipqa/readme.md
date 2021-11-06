@@ -65,7 +65,7 @@ helm install gossipqa-metrics-stack prometheus-community/kube-prometheus-stack -
 kubectl get secret gossipqa-metrics-stack-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
 
 #run kubectl get pods and find the grafana pod, then do a port forward
-kubectl port-forward pod/gossipqa-metrics-stack-grafana-74ff849786-6ngcp 3000:3000
+kubectl port-forward pod/gossipqa-metrics-stack-grafana-7f6df7b44d-lcstl 3000:3000
 
 3.1: you may have to manually configure graphana to use the datasource deployed in step 2.
 
