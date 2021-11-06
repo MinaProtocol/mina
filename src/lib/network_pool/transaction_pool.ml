@@ -1167,18 +1167,22 @@ struct
                       ~data:c)
                 |> Map.map ~f:List.rev |> Map.to_alist
               in
+              let add_failure failure =
+                if not allow_failure_for_tests then (
+                  (* not applying any diffs, release all sender locks *)
+                  List.iter by_sender ~f:(fun (signer, _cs) ->
+                      Option.iter
+                        (Hashtbl.find t.sender_mutex signer)
+                        ~f:Mutex.release) ;
+                  raise (Verification_failure failure) )
+              in
               let%map new_diffs_result =
-                Monitor.try_with (fun () ->
+                Monitor.try_with ~here:[%here] (fun () ->
                     Deferred.List.map by_sender ~how:`Parallel
                       ~f:(fun (signer, cs) ->
                         let signer_lock =
                           Hashtbl.find_or_add t.sender_mutex signer
                             ~default:Mutex.create
-                        in
-                        let add_failure failure =
-                          if not allow_failure_for_tests then (
-                            Mutex.release signer_lock ;
-                            raise (Verification_failure failure) )
                         in
                         let account =
                           Option.bind
