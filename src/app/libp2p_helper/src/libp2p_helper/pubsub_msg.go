@@ -48,7 +48,7 @@ func (m ValidationPush) handle(app *app) {
 		case ipc.ValidationResult_ignore:
 			res = pubsub.ValidationIgnore
 		default:
-			app.P2p.Logger.Warningf("handleValidation: unknown validation result %d", ValidationPushT(m).Result())
+			app.P2p.Logger.Warnf("handleValidation: unknown validation result %d", ValidationPushT(m).Result())
 		}
 		st.Completion <- res
 		if st.TimedOutAt != nil {
@@ -56,7 +56,7 @@ func (m ValidationPush) handle(app *app) {
 		}
 		delete(app.Validators, seqno)
 	} else {
-		app.P2p.Logger.Warningf("handleValidation: validation seqno %d unknown", seqno)
+		app.P2p.Logger.Warnf("handleValidation: validation seqno %d unknown", seqno)
 	}
 }
 
@@ -138,6 +138,7 @@ func (m SubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
 	app.Topics[topicName] = topic
 
 	err = app.P2p.Pubsub.RegisterTopicValidator(topicName, func(ctx context.Context, id peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
+		app.P2p.Logger.Infof("Received gossip message: %v", msg.Data)
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
 			app.P2p.Logger.Info("would have validated but it's from us!")

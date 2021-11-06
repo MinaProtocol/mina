@@ -181,7 +181,7 @@ func TestConfigure(t *testing.T) {
 
 	resMsg := ConfigureReq(m).handle(testApp, 239)
 	require.NoError(t, err)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "configure")
 	require.Equal(t, seqno, uint64(239))
 	require.True(t, respSuccess.HasConfigure())
 	_, err = respSuccess.Configure()
@@ -197,7 +197,7 @@ func TestGenerateKeypair(t *testing.T) {
 	testApp, _ := newTestApp(t, nil, true)
 	resMsg := GenerateKeypairReq(m).handle(testApp, 7839)
 	require.NoError(t, err)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "generateKeypair")
 	require.Equal(t, seqno, uint64(7839))
 	require.True(t, respSuccess.HasGenerateKeypair())
 	res, err := respSuccess.GenerateKeypair()
@@ -229,7 +229,7 @@ func TestGetListeningAddrs(t *testing.T) {
 	require.NoError(t, err)
 	var mRpcSeqno uint64 = 1024
 	resMsg := GetListeningAddrsReq(m).handle(testApp, mRpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "getListeningAddrs")
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasGetListeningAddrs())
 	ls, err := respSuccess.GetListeningAddrs()
@@ -256,7 +256,7 @@ func TestListen(t *testing.T) {
 
 	resMsg := ListenReq(m).handle(testApp, 1239)
 	require.NoError(t, err)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "listen")
 	require.Equal(t, seqno, uint64(1239))
 	require.True(t, respSuccess.HasListen())
 	lresp, err := respSuccess.Listen()
@@ -308,7 +308,7 @@ func TestSetGatingConfig(t *testing.T) {
 
 	var mRpcSeqno uint64 = 2003
 	resMsg := SetGatingConfigReq(m).handle(testApp, mRpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "setGatingConfig")
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasSetGatingConfig())
 	_, err = respSuccess.SetGatingConfig()
@@ -348,7 +348,7 @@ func TestSetNodeStatus(t *testing.T) {
 
 	resMsg := SetNodeStatusReq(m).handle(testApp, 11239)
 	require.NoError(t, err)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "setNodeStatus")
 	require.Equal(t, seqno, uint64(11239))
 	require.True(t, respSuccess.HasSetNodeStatus())
 	_, err = respSuccess.SetNodeStatus()

@@ -16,10 +16,10 @@ import (
 	lmdbbs "github.com/georgeee/go-bs-lmdb"
 	"github.com/ipfs/go-bitswap"
 	bitnet "github.com/ipfs/go-bitswap/network"
-	"github.com/ipfs/go-cid"
 	dsb "github.com/ipfs/go-ds-badger"
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 	p2p "github.com/libp2p/go-libp2p"
+
 	p2pconnmgr "github.com/libp2p/go-libp2p-connmgr"
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/control"
@@ -41,7 +41,6 @@ import (
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns_legacy"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
-	"github.com/multiformats/go-multihash"
 	"golang.org/x/crypto/blake2b"
 
 	libp2pmplex "github.com/libp2p/go-libp2p-mplex"
@@ -99,13 +98,19 @@ func isPrivateAddr(addr ma.Multiaddr) bool {
 }
 
 type CodaConnectionManager struct {
-	ctx              context.Context
-	host             host.Host
-	p2pManager       *p2pconnmgr.BasicConnMgr
+	ctx        context.Context
+	host       host.Host
+	p2pManager *p2pconnmgr.BasicConnMgr
+	// minaPeerExchange controls whether to send random peers to the other ndoe before trimming its
+	// recently opened connection
 	minaPeerExchange bool
 	getRandomPeers   getRandomPeersFunc
 	OnConnect        func(network.Network, network.Conn)
 	OnDisconnect     func(network.Network, network.Conn)
+	// protectedMirror is a map of protected peer ids/tags, mirroring the structure in
+	// BasicConnMgr which is not accesible from CodaConnectionManager
+	protectedMirror     map[peer.ID]map[string]interface{}
+	protectedMirrorLock sync.Mutex
 }
 
 func newCodaConnectionManager(minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration) *CodaConnectionManager {
@@ -116,6 +121,7 @@ func newCodaConnectionManager(minConnections, maxConnections int, minaPeerExchan
 		OnConnect:        noop,
 		OnDisconnect:     noop,
 		minaPeerExchange: minaPeerExchange,
+		protectedMirror:  make(map[peer.ID]map[string]interface{}),
 	}
 }
 
@@ -131,9 +137,33 @@ func (cm *CodaConnectionManager) GetTagInfo(p peer.ID) *connmgr.TagInfo {
 	return cm.p2pManager.GetTagInfo(p)
 }
 func (cm *CodaConnectionManager) TrimOpenConns(ctx context.Context) { cm.p2pManager.TrimOpenConns(ctx) }
-func (cm *CodaConnectionManager) Protect(p peer.ID, tag string)     { cm.p2pManager.Protect(p, tag) }
+func (cm *CodaConnectionManager) Protect(p peer.ID, tag string) {
+	cm.p2pManager.Protect(p, tag)
+	cm.protectedMirrorLock.Lock()
+	defer cm.protectedMirrorLock.Unlock()
+	pm := cm.protectedMirror
+	pm_, has := pm[p]
+	if !has {
+		pm_ = make(map[string]interface{})
+		pm[p] = pm_
+	}
+	pm_[tag] = nil
+}
 func (cm *CodaConnectionManager) Unprotect(p peer.ID, tag string) bool {
-	return cm.p2pManager.Unprotect(p, tag)
+	res := cm.p2pManager.Unprotect(p, tag)
+	cm.protectedMirrorLock.Lock()
+	defer cm.protectedMirrorLock.Unlock()
+	pm := cm.protectedMirror
+	pm_, has := pm[p]
+	if has {
+		delete(pm_, tag)
+	}
+	return res
+}
+func (cm *CodaConnectionManager) ViewProtected(f func(map[peer.ID]map[string]interface{})) {
+	cm.protectedMirrorLock.Lock()
+	defer cm.protectedMirrorLock.Unlock()
+	f(cm.protectedMirror)
 }
 func (cm *CodaConnectionManager) IsProtected(p peer.ID, tag string) bool {
 	return cm.p2pManager.IsProtected(p, tag)
@@ -176,11 +206,11 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 
 	cm.TrimOpenConns(context.Background())
 
-	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), info.HighWater, len(net.Peers()))
-
 	if !cm.minaPeerExchange {
 		return
 	}
+
+	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), info.HighWater, len(net.Peers()))
 
 	defer func() {
 		go func() {
@@ -240,7 +270,7 @@ type Helper struct {
 	Dht               *dual.DHT
 	Ctx               context.Context
 	Pubsub            *pubsub.PubSub
-	Logger            logging.EventLogger
+	Logger            logging.StandardLogger
 	Rendezvous        string
 	Discovery         *discovery.RoutingDiscovery
 	Me                peer.ID
@@ -251,139 +281,6 @@ type Helper struct {
 	Seeds             []peer.AddrInfo
 	NodeStatus        []byte
 	pxDiscoveries     chan peer.AddrInfo
-}
-
-type RootBlockStatus int
-
-const (
-	Partial RootBlockStatus = iota
-	Full
-	Deleting
-)
-
-type BitswapStorage interface {
-	GetStatus(key [32]byte) (RootBlockStatus, error)
-	SetStatus(key [32]byte, value RootBlockStatus) error
-	DeleteStatus(key [32]byte) error
-	DeleteBlocks(keys [][32]byte) error
-	ViewBlock(key [32]byte, callback func([]byte) error) error
-}
-
-type BitswapStorageLmdb lmdbbs.Blockstore
-
-func UnmarshalRootBlockStatus(r []byte) (res RootBlockStatus, err error) {
-	err = fmt.Errorf("wrong root block status retrieved: %v", r)
-	if len(r) != 1 {
-		return
-	}
-	res = RootBlockStatus(r[0])
-	if res == Partial || res == Full || res == Deleting {
-		err = nil
-	}
-	return
-}
-
-func statusKey(key [32]byte) []byte {
-	return append([]byte{BS_STATUS_PREFIX}, key[:]...)
-}
-
-func blockKey(key []byte) []byte {
-	return append([]byte{BS_BLOCK_PREFIX}, key...)
-}
-
-func (bs_ *BitswapStorageLmdb) ViewBlock(key [32]byte, callback func([]byte) error) error {
-	bs := (*lmdbbs.Blockstore)(bs_)
-	return bs.View(BlockHashToCid(key), callback)
-}
-
-func (bs_ *BitswapStorageLmdb) GetStatus(key [32]byte) (res RootBlockStatus, err error) {
-	bs := (*lmdbbs.Blockstore)(bs_)
-	r, err := bs.GetData(statusKey(key))
-	if err != nil {
-		return
-	}
-	res, err = UnmarshalRootBlockStatus(r)
-	return
-}
-
-func (bs_ *BitswapStorageLmdb) DeleteStatus(key [32]byte) error {
-	bs := (*lmdbbs.Blockstore)(bs_)
-	return bs.PutData(statusKey(key), func(prevVal []byte, exists bool) (newVal []byte, newExists bool, err error) {
-		prev, err := UnmarshalRootBlockStatus(prevVal)
-		if err != nil {
-			return
-		}
-		newExists = false
-		if exists && prev != Deleting {
-			err = fmt.Errorf("wrong status deletion from %d", prev)
-		}
-		return
-	})
-}
-
-func (bs_ *BitswapStorageLmdb) SetStatus(key [32]byte, newStatus RootBlockStatus) error {
-	bs := (*lmdbbs.Blockstore)(bs_)
-	return bs.PutData(statusKey(key), func(prevVal []byte, exists bool) (newVal []byte, newExists bool, err error) {
-		var prev RootBlockStatus
-		if exists {
-			prev, err = UnmarshalRootBlockStatus(prevVal)
-			if err != nil {
-				return
-			}
-		}
-		newVal = []byte{byte(newStatus)}
-		newExists = true
-		allowed := false
-		allowed = allowed || (newStatus == Partial && (!exists || prev == Partial))
-		allowed = allowed || (newStatus == Full && (!exists || prev <= Full))
-		allowed = allowed || (newStatus == Deleting && exists)
-		if !allowed {
-			err = fmt.Errorf("wrong status transition: from %d to %d", prev, newStatus)
-		}
-		return
-	})
-}
-func (bs_ *BitswapStorageLmdb) DeleteBlocks(keys [][32]byte) error {
-	bs := (*lmdbbs.Blockstore)(bs_)
-	cids := make([]cid.Cid, len(keys))
-	for i, key := range keys {
-		cids[i] = BlockHashToCid(key)
-	}
-	return bs.DeleteMany(cids)
-}
-
-const (
-	BS_BLOCK_PREFIX byte = iota
-	BS_STATUS_PREFIX
-)
-
-var MULTI_HASH_CODE = multihash.Names["blake2b-256"]
-
-func cidToKeyMapper(id cid.Cid) []byte {
-	mh, err := multihash.Decode(id.Hash())
-	if err == nil && mh.Code == MULTI_HASH_CODE && id.Prefix().Codec == cid.Raw {
-		return blockKey(mh.Digest)
-	}
-	return nil
-}
-
-// BlockHashToCidSuffix is a function useful for debug output
-func BlockHashToCidSuffix(h [32]byte) string {
-	s := BlockHashToCid(h).String()
-	return s[len(s)-6:]
-}
-
-func BlockHashToCid(h [32]byte) cid.Cid {
-	mh, _ := multihash.Encode(h[:], MULTI_HASH_CODE)
-	return cid.NewCidV1(cid.Raw, mh)
-}
-
-func keyToCidMapper(key []byte) (id cid.Cid) {
-	if len(key) == 33 && key[0] == BS_BLOCK_PREFIX {
-		mh, _ := multihash.Encode(key[1:], MULTI_HASH_CODE)
-		id = cid.NewCidV1(cid.Raw, mh)
-	}
-	return
 }
 
 type MessageStats struct {

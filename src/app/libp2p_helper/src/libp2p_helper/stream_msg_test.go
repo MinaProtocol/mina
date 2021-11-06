@@ -19,7 +19,7 @@ func testAddStreamHandlerDo(t *testing.T, protocol string, app *app, rpcSeqno ui
 	require.NoError(t, m.SetProtocol(protocol))
 
 	resMsg := AddStreamHandlerReq(m).handle(app, rpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "addStreamHandler")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasAddStreamHandler())
 	_, err = respSuccess.AddStreamHandler()
@@ -58,7 +58,7 @@ func testOpenStreamDo(t *testing.T, appA *app, appBHost host.Host, appBPort uint
 	require.NoError(t, err)
 
 	resMsg := OpenStreamReq(m).handle(appA, rpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "openStream")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasOpenStream())
 	res, err := respSuccess.OpenStream()
@@ -103,7 +103,7 @@ func testCloseStreamDo(t *testing.T, app *app, streamId uint64, rpcSeqno uint64)
 	sid.SetId(streamId)
 
 	resMsg := CloseStreamReq(m).handle(app, rpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "closeStream")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasCloseStream())
 	_, err = respSuccess.CloseStream()
@@ -134,7 +134,7 @@ func TestRemoveStreamHandler(t *testing.T) {
 	require.NoError(t, rsh.SetProtocol(newProtocol))
 	var rshRpcSeqno uint64 = 1023
 	resMsg := RemoveStreamHandlerReq(rsh).handle(appB, rshRpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "removeStreamHandler")
 	require.Equal(t, seqno, rshRpcSeqno)
 	require.True(t, respSuccess.HasRemoveStreamHandler())
 	_, err = respSuccess.RemoveStreamHandler()
@@ -166,7 +166,7 @@ func testResetStreamDo(t *testing.T, app *app, streamId uint64, rpcSeqno uint64)
 	sid.SetId(streamId)
 
 	resMsg := ResetStreamReq(m).handle(app, rpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "resetStream")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasResetStream())
 	_, err = respSuccess.ResetStream()
@@ -194,7 +194,7 @@ func testSendStreamDo(t *testing.T, app *app, streamId uint64, msgBytes []byte, 
 	require.NoError(t, msg.SetData(msgBytes))
 
 	resMsg := SendStreamReq(m).handle(app, rpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "sendStream")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasSendStream())
 	_, err = respSuccess.SendStream()

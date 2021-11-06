@@ -44,6 +44,20 @@ func newApp() *app {
 	}
 }
 
+func (app *app) SetConnectionHandlers() {
+	app.setConnectionHandlersOnce.Do(func() {
+		app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
+			app.updateConnectionMetrics()
+			app.writeMsg(mkPeerConnectedUpcall(peer.Encode(c.RemotePeer())))
+		}
+
+		app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
+			app.updateConnectionMetrics()
+			app.writeMsg(mkPeerDisconnectedUpcall(peer.Encode(c.RemotePeer())))
+		}
+	})
+}
+
 func (app *app) NextId() uint64 {
 	app.counterMutex.Lock()
 	defer app.counterMutex.Unlock()
@@ -329,7 +343,7 @@ func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 		app.writeMsg(mkStreamCompleteUpcall(idx))
 		err := stream.Close()
 		if err != nil {
-			app.P2p.Logger.Warning("Error while closing the stream: ", err.Error())
+			app.P2p.Logger.Warn("Error while closing the stream: ", err.Error())
 		}
 	}()
 }
