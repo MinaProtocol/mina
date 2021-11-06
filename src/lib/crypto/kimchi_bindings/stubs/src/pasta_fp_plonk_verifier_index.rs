@@ -3,7 +3,7 @@ use crate::pasta_fp_plonk_index::CamlPastaFpPlonkIndexPtr;
 use crate::plonk_verifier_index::{
     CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
 };
-use crate::srs::fp::CamlFpSrs;
+use crate::{srs::fp::CamlFpSrs};
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
@@ -11,7 +11,7 @@ use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 
-use kimchi::index::VerifierIndex;
+use kimchi::{index::VerifierIndex, alphas};
 use kimchi_circuits::expr::Linearization;
 use kimchi_circuits::nolookup::constraints::{zk_polynomial, zk_w3, Shifts};
 use kimchi_circuits::wires::{COLUMNS, PERMUTS};
@@ -38,6 +38,7 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
             },
             max_poly_size: vi.max_poly_size as isize,
             max_quot_size: vi.max_quot_size as isize,
+            powers_of_alpha: vi.powers_of_alpha,
             srs: CamlFpSrs(vi.srs),
             evals: CamlPlonkVerificationEvals {
                 sigma_comm: vi.sigma_comm.to_vec().iter().map(Into::into).collect(),
@@ -92,6 +93,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
             domain,
             max_poly_size: index.max_poly_size as usize,
             max_quot_size: index.max_quot_size as usize,
+            powers_of_alpha: index.powers_of_alpha,
             srs: index.srs.0,
 
             sigma_comm,
@@ -222,6 +224,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
         },
         max_poly_size: 0,
         max_quot_size: 0,
+        powers_of_alpha: alphas::Builder::default(),
         srs: CamlFpSrs::new(SRS::create(0)),
         evals: CamlPlonkVerificationEvals {
             sigma_comm: vec_comm(PERMUTS),

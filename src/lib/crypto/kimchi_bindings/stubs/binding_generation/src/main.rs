@@ -26,6 +26,7 @@ use wires_15_stubs::{
     CamlScalarChallenge,
     CamlWire,
     GateType,
+    alphas,
 };
 
 fn main() {
@@ -332,6 +333,7 @@ fn generate_bindings(mut w: impl std::io::Write) {
         decl_module!(w, env, "VerifierIndex", {
             decl_type!(w, env, CamlPlonkDomain<T1> => "domain");
             decl_type!(w, env, CamlPlonkVerificationEvals<T1> => "verification_evals");
+            decl_type!(w, env, alphas::Builder => "alphas_builder");
             decl_type!(w, env, CamlPlonkVerifierIndex<T1, T2, T3> => "verifier_index");
 
             decl_module!(w, env, "Fp", {

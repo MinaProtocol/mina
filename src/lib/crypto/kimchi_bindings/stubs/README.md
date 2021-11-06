@@ -117,3 +117,9 @@ To avoid large clones, we use shared references. See:
 * If a custom type is large, you can use a `Box` to only store a pointer (pointing to the Rust heap) in the OCaml heap. (TODO: why is this better?)
 * Since OCaml does not have fixed-sized arrays, we usually convert any arrays (`[T; N]`) into tuples (`(T, T, T, ...)`)
 * TODO: We do not have good conventions on returning errors or throwing exceptions.
+
+### Tips and tricks
+
+* If you're often updating the Rust code to test changes, there's two things you can do:
+  * either point all the proof-systems to your local copy
+  * or remove the Cargo.lock files present here (and in `binding_generation/`) (if you're building with dune, you'll have to delete them in the `_build` folder as well)

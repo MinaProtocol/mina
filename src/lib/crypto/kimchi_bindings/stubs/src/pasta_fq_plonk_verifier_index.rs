@@ -1,20 +1,25 @@
-use crate::arkworks::{CamlFq, CamlGPallas};
-use crate::pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr;
-use crate::plonk_verifier_index::{
-    CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
+use crate::{
+    alphas::Builder,
+    arkworks::{CamlFq, CamlGPallas},
+    pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr,
+    plonk_verifier_index::{CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex},
+    srs::fq::CamlFqSrs,
 };
-use crate::srs::fq::CamlFqSrs;
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use commitment_dlog::commitment::caml::CamlPolyComm;
-use commitment_dlog::{commitment::PolyComm, srs::SRS};
+use commitment_dlog::{
+    commitment::{caml::CamlPolyComm, PolyComm},
+    srs::SRS,
+};
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 
 use kimchi::index::VerifierIndex;
-use kimchi_circuits::expr::Linearization;
-use kimchi_circuits::nolookup::constraints::{zk_polynomial, zk_w3, Shifts};
-use kimchi_circuits::wires::{COLUMNS, PERMUTS};
+use kimchi_circuits::{
+    expr::Linearization,
+    nolookup::constraints::{zk_polynomial, zk_w3, Shifts},
+    wires::{COLUMNS, PERMUTS},
+};
 use std::convert::TryInto;
 use std::path::Path;
 
@@ -38,6 +43,7 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
             },
             max_poly_size: vi.max_poly_size as isize,
             max_quot_size: vi.max_quot_size as isize,
+            powers_of_alpha: vi.powers_of_alpha,
             srs: CamlFqSrs(vi.srs),
             evals: CamlPlonkVerificationEvals {
                 sigma_comm: vi.sigma_comm.to_vec().iter().map(Into::into).collect(),
@@ -92,6 +98,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
             domain,
             max_poly_size: index.max_poly_size as usize,
             max_quot_size: index.max_quot_size as usize,
+            powers_of_alpha: index.powers_of_alpha,
             srs: index.srs.0,
 
             sigma_comm,
@@ -223,6 +230,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
         },
         max_poly_size: 0,
         max_quot_size: 0,
+        powers_of_alpha: Builder::default(),
         srs: CamlFqSrs::new(SRS::create(0)),
         evals: CamlPlonkVerificationEvals {
             sigma_comm: vec_comm(PERMUTS),

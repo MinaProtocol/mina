@@ -22,6 +22,7 @@ pub struct CamlPlonkVerifierIndex<Fr, SRS, PolyComm> {
     pub domain: CamlPlonkDomain<Fr>,
     pub max_poly_size: ocaml::Int,
     pub max_quot_size: ocaml::Int,
+    pub powers_of_alpha: crate::alphas::Builder,
     pub srs: SRS,
     pub evals: CamlPlonkVerificationEvals<PolyComm>,
     pub shifts: Vec<Fr>,

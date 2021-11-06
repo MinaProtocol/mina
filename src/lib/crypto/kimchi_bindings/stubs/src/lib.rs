@@ -49,7 +49,10 @@ pub mod pasta_fq_plonk_proof;
 /// Handy re-exports
 pub use {
     commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
-    kimchi::prover::caml::{CamlProverCommitments, CamlProverProof},
+    kimchi::{
+        alphas,
+        prover::caml::{CamlProverCommitments, CamlProverProof},
+    },
     kimchi_circuits::{
         gate::{caml::CamlCircuitGate, GateType},
         nolookup::scalars::caml::{CamlLookupEvaluations, CamlProofEvaluations, CamlRandomOracles},
