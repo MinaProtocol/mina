@@ -15,8 +15,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 )
 
-func testAddPeerImplDo(t *testing.T, appB *app, info peer.AddrInfo, isSeed bool) {
-	addr := fmt.Sprintf("%s/p2p/%s", info.Addrs[0], info.ID)
+func testAddPeerImplDo(t *testing.T, node *app, peerAddr peer.AddrInfo, isSeed bool) {
+	addr := fmt.Sprintf("%s/p2p/%s", peerAddr.Addrs[0], peerAddr.ID)
 
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	require.NoError(t, err)
@@ -28,8 +28,8 @@ func testAddPeerImplDo(t *testing.T, appB *app, info peer.AddrInfo, isSeed bool)
 	m.SetIsSeed(isSeed)
 
 	var mRpcSeqno uint64 = 2000
-	resMsg := AddPeerReq(m).handle(appB, mRpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	resMsg := AddPeerReq(m).handle(node, mRpcSeqno)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "addPeer")
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasAddPeer())
 	_, err = respSuccess.AddPeer()
@@ -89,7 +89,7 @@ func TestGetPeerNodeStatus(t *testing.T) {
 
 	var mRpcSeqno uint64 = 18900
 	resMsg := GetPeerNodeStatusReq(m).handle(appB, mRpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "getPeerNodeStatus")
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasGetPeerNodeStatus())
 	resp, err := respSuccess.GetPeerNodeStatus()
@@ -109,7 +109,7 @@ func TestListPeers(t *testing.T) {
 
 	var mRpcSeqno uint64 = 2002
 	resMsg := ListPeersReq(m).handle(appB, mRpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "listPeers")
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasListPeers())
 	resp, err := respSuccess.ListPeers()

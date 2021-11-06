@@ -6,9 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	ipc "libp2p_ipc"
 	"math/rand"
 	"reflect"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/quick"
 	"time"
@@ -16,18 +20,23 @@ import (
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/peer"
+	kb "github.com/libp2p/go-libp2p-kbucket"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	multihash "github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 )
 
-const REQS_PER_NODE = 3
+const REQS_PER_NODE = 5
 
 // TODO use CONNS_LO = 2
-const CONNS_LO = 7
+const CONNS_LO = 2
 const CONNS_HI = CONNS_LO + REQS_PER_NODE
 
-const NUM_NODES = 10
+const NUM_NODES = 15
 
 type bitswapTestNodeParams struct {
 	resource  []byte
@@ -36,7 +45,7 @@ type bitswapTestNodeParams struct {
 }
 type bitswapTestAttempt [NUM_NODES]bitswapTestNodeParams
 type bitswapTestConfig []bitswapTestAttempt
-type bitswapTestNode struct {
+type testNode struct {
 	node *app
 	trap *upcallTrap
 }
@@ -80,7 +89,7 @@ func getRootIds(ids ipc.RootBlockId_List) ([]BitswapBlockLink, error) {
 	return links, nil
 }
 
-func removeOwn(nodes [NUM_NODES]bitswapTestNode, nodeRoots [NUM_NODES]BitswapBlockLink) error {
+func removeOwn(nodes [NUM_NODES]testNode, nodeRoots [NUM_NODES]BitswapBlockLink) error {
 	for ni, n := range nodes {
 		_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 		if err != nil {
@@ -103,7 +112,7 @@ func removeOwn(nodes [NUM_NODES]bitswapTestNode, nodeRoots [NUM_NODES]BitswapBlo
 	return nil
 }
 
-func awaitRemoval(nodes [NUM_NODES]bitswapTestNode, nodeRoots [NUM_NODES]BitswapBlockLink) (err error) {
+func awaitRemoval(nodes [NUM_NODES]testNode, nodeRoots [NUM_NODES]BitswapBlockLink) (err error) {
 	success := withCustomTimeout(func() {
 		setResUpdErr := func(s string, args ...interface{}) {
 			err = fmt.Errorf("Unexpected ResourceUpdate on remove: "+s, args...)
@@ -140,7 +149,7 @@ func awaitRemoval(nodes [NUM_NODES]bitswapTestNode, nodeRoots [NUM_NODES]Bitswap
 	return
 }
 
-func (at *bitswapTestAttempt) publish(nodes [NUM_NODES]bitswapTestNode) error {
+func (at *bitswapTestAttempt) publish(nodes [NUM_NODES]testNode) error {
 	for ni, nconf := range at {
 		_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 		if err != nil {
@@ -156,7 +165,7 @@ func (at *bitswapTestAttempt) publish(nodes [NUM_NODES]bitswapTestNode) error {
 	return nil
 }
 
-func (at *bitswapTestAttempt) awaitPublish(nodes [NUM_NODES]bitswapTestNode) (resIds [NUM_NODES]BitswapBlockLink, err error) {
+func (at *bitswapTestAttempt) awaitPublish(nodes [NUM_NODES]testNode) (resIds [NUM_NODES]BitswapBlockLink, err error) {
 	success := withCustomTimeout(func() {
 		resUpdErr := errors.New("Unexpected ResourceUpdate on publish")
 		for ni, nconf := range at {
@@ -229,7 +238,7 @@ func confirmBlocksInStorage(bs *BitswapCtx, resource []byte) error {
 	}
 	return nil
 }
-func (at *bitswapTestAttempt) requestResources(nodes [NUM_NODES]bitswapTestNode, roots [NUM_NODES]BitswapBlockLink, getRequests func(*bitswapTestNodeParams) [REQS_PER_NODE]int) (err error) {
+func (at *bitswapTestAttempt) requestResources(nodes [NUM_NODES]testNode, roots [NUM_NODES]BitswapBlockLink, getRequests func(*bitswapTestNodeParams) [REQS_PER_NODE]int) (err error) {
 	for ni, nconf := range at {
 		_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 		if err != nil {
@@ -255,7 +264,7 @@ func (at *bitswapTestAttempt) requestResources(nodes [NUM_NODES]bitswapTestNode,
 	}
 	return nil
 }
-func (at *bitswapTestAttempt) awaitResourceDownload(nodes [NUM_NODES]bitswapTestNode, roots [NUM_NODES]BitswapBlockLink, getRequests func(*bitswapTestNodeParams) [REQS_PER_NODE]int) (err error) {
+func (at *bitswapTestAttempt) awaitResourceDownload(nodes [NUM_NODES]testNode, roots [NUM_NODES]BitswapBlockLink, getRequests func(*bitswapTestNodeParams) [REQS_PER_NODE]int) (err error) {
 	success := withCustomTimeout(func() {
 		for ni, nconf := range at {
 			setResUpdErr := func(s string, args ...interface{}) {
@@ -305,7 +314,7 @@ func (at *bitswapTestAttempt) awaitResourceDownload(nodes [NUM_NODES]bitswapTest
 	}
 	return
 }
-func (at *bitswapTestAttempt) confirmResourceDownload(nodes [NUM_NODES]bitswapTestNode, getRequests func(*bitswapTestNodeParams) [REQS_PER_NODE]int) error {
+func (at *bitswapTestAttempt) confirmResourceDownload(nodes [NUM_NODES]testNode, getRequests func(*bitswapTestNodeParams) [REQS_PER_NODE]int) error {
 	for ni, nconf := range at {
 		bs := nodes[ni].node.bitswapCtx
 		for _, resId := range getRequests(&nconf) {
@@ -318,7 +327,7 @@ func (at *bitswapTestAttempt) confirmResourceDownload(nodes [NUM_NODES]bitswapTe
 	return nil
 }
 
-func (at *bitswapTestAttempt) downloadAndCheckResources(nodes [NUM_NODES]bitswapTestNode, roots [NUM_NODES]BitswapBlockLink, getRequests func(*bitswapTestNodeParams) [REQS_PER_NODE]int) (err error) {
+func (at *bitswapTestAttempt) downloadAndCheckResources(nodes [NUM_NODES]testNode, roots [NUM_NODES]BitswapBlockLink, getRequests func(*bitswapTestNodeParams) [REQS_PER_NODE]int) (err error) {
 	err = at.requestResources(nodes, roots, getRequests)
 	if err != nil {
 		return err
@@ -333,7 +342,7 @@ func (at *bitswapTestAttempt) downloadAndCheckResources(nodes [NUM_NODES]bitswap
 	}
 	return nil
 }
-func (conf bitswapTestConfig) execute(nodes [NUM_NODES]bitswapTestNode) error {
+func (conf bitswapTestConfig) execute(nodes [NUM_NODES]testNode) error {
 	for _, at := range conf {
 		err := at.publish(nodes)
 		if err != nil {
@@ -434,36 +443,57 @@ func TestBitswapRootBlockCid(t *testing.T) {
 	}
 }
 
-func testBitswapInitNodes(t *testing.T) (nodes [NUM_NODES]bitswapTestNode) {
-	firstNode := newTestAppWithMaxConns(t, nil, false, CONNS_LO, CONNS_HI, nextPort())
-	firstNode.NoDHT = true
-	// beginAdvertisingSendAndCheck(t, firstNode)
+func beginAdvertisingOnNodes(t *testing.T, nodes [NUM_NODES]testNode) {
+	resultChan := make(chan *capnp.Message)
+	_ = resultChan
+	var resMsgErr error
+	for ni := 0; ni < NUM_NODES; ni++ {
+		node := nodes[ni].node
+		// go func() {
+		var resMsg *capnp.Message
+		resMsg, err := beginAdvertisingSendAndCheckDo(node, 123)
+		if err != nil {
+			resMsgErr = err
+		}
+		node.P2p.Logger.Info("beginAdvertising: got response")
+		// 	resultChan <- resMsg
+		// 	// }()
+		// }
+		// for ni := 0; ni < NUM_NODES; ni++ {
+		// 	resMsg := <-resultChan
+		require.NoError(t, resMsgErr)
+		checkBeginAdvertisingResponse(t, 123, resMsg)
+	}
+}
 
-	infos, err := addrInfos(firstNode.P2p.Host)
-	require.NoError(t, err)
-
+func testBitswapInitNodes(t *testing.T, upcallMask uint32) (nodes [NUM_NODES]testNode) {
 	errChans := []chan error{}
-
-	// Launch a process to monitor number of open connections
-
+	// TODO consider launching a process to monitor number of open connections
 	done := make(chan interface{})
 	var cancels [NUM_NODES]context.CancelFunc
-
+	var keys [NUM_NODES]crypto.PrivKey
+	var ids [NUM_NODES]kb.ID
+	// We generate keys in such an awkward way to make dht not mark the peer ids as protected
+	for ni := 0; ni < NUM_NODES; {
+		keys[ni] = newTestKey(t)
+		pid, err := peer.IDFromPrivateKey(keys[ni])
+		require.NoError(t, err)
+		ids[ni] = kb.ConvertPeerID(pid)
+		if ni == 0 || kb.CommonPrefixLen(ids[ni], ids[0]) >= 2 {
+			ni++
+		}
+	}
 	for ni := 0; ni < NUM_NODES; ni++ {
-		trap := newUpcallTrap(fmt.Sprintf("node %d", ni), 64, upcallDropAllMask^(1<<ResourceUpdateChan))
+		trap := newUpcallTrap(fmt.Sprintf("node %d", ni), 64, upcallMask)
 		ctx, cancelF := context.WithCancel(context.Background())
 		cancels[ni] = cancelF
-		node := newTestAppWithMaxConnsAndCtx(t, infos, false, CONNS_LO, CONNS_HI, nextPort(), ctx)
+		node := newTestAppWithMaxConnsAndCtx(t, keys[ni], nil, false, CONNS_LO, CONNS_HI, false, nextPort(), ctx)
+		node.P2p.Logger = logging.Logger(fmt.Sprintf("node%d", ni))
+		node.SetConnectionHandlers()
 		errChan := launchFeedUpcallTrap(t, node.OutChan, trap, done)
 		errChans = append(errChans, errChan)
-		infos, err = addrInfos(node.P2p.Host)
-		// to ensure connectivity is not lost
-		// node.P2p.ConnectionManager.Protect(infos[0].ID, "seed")
-		require.NoError(t, err)
 		nodes[ni].node = node
 		nodes[ni].trap = trap
-		node.NoDHT = true
-		beginAdvertisingSendAndCheck(t, node)
 		go node.bitswapCtx.Loop()
 	}
 	t.Cleanup(func() {
@@ -480,13 +510,292 @@ func testBitswapInitNodes(t *testing.T) (nodes [NUM_NODES]bitswapTestNode) {
 	return nodes
 }
 
+func iteratePrevNextPeers(t *testing.T, nodes [NUM_NODES]testNode, f func(node testNode, prev, next peer.AddrInfo)) {
+	for ni, node := range nodes {
+		prevInfos, err := addrInfos(nodes[(ni-1+NUM_NODES)%NUM_NODES].node.P2p.Host)
+		require.NoError(t, err)
+		nextInfos, err := addrInfos(nodes[(ni+1)%NUM_NODES].node.P2p.Host)
+		require.NoError(t, err)
+		f(node, prevInfos[0], nextInfos[0])
+	}
+
+}
+
+func connectRingTopology(t *testing.T, nodes [NUM_NODES]testNode, protect bool) {
+	iteratePrevNextPeers(t, nodes, func(node testNode, prev, next peer.AddrInfo) {
+		testAddPeerImplDo(t, node.node, next, true)
+		// to ensure connectivity is not lost
+		if protect {
+			node.node.P2p.ConnectionManager.Protect(next.ID, "seed")
+			node.node.P2p.ConnectionManager.Protect(prev.ID, "seed")
+		}
+	})
+}
+
+func testBroadcast(t *testing.T, nodes [NUM_NODES]testNode, senderIx int, timeout time.Duration) {
+	nodes[senderIx].node.P2p.Logger.Infof("Sending broadcast message")
+	msg := []byte("bla")
+	testPublishDo(t, nodes[senderIx].node, "test", msg, 102)
+	ctx, cancelF := context.WithTimeout(context.Background(), timeout)
+	defer cancelF()
+	counter := int32(NUM_NODES - 1)
+	grError := make(chan error)
+	for i, n := range nodes {
+		if i == senderIx {
+			continue
+		}
+		go func(n testNode) {
+			select {
+			case <-ctx.Done():
+			case gr := <-n.trap.GossipReceived:
+				err := func() error {
+					bs, err := gr.Data()
+					if err != nil {
+						return err
+					}
+					if !bytes.Equal(bs, msg) {
+						return fmt.Errorf("Unexpected gossip: %v", bs)
+					}
+					vid, err := gr.ValidationId()
+					if err != nil {
+						return err
+					}
+					_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+					if err != nil {
+						return err
+					}
+					m, err := ipc.NewRootLibp2pHelperInterface_Validation(seg)
+					if err != nil {
+						return err
+					}
+					m.SetValidationId(vid)
+					m.SetResult(ipc.ValidationResult_accept)
+					ValidationPush(m).handle(n.node)
+					return nil
+				}()
+				if err != nil {
+					grError <- err
+					return
+				}
+				nc := atomic.AddInt32(&counter, -1)
+				if nc == 0 {
+					cancelF()
+				}
+			}
+		}(n)
+	}
+	select {
+	case <-ctx.Done():
+		require.Equal(t, context.Canceled, ctx.Err())
+	case err := <-grError:
+		t.Fatal(err)
+	}
+}
+
+type MessageWithPeerId interface {
+	PeerId() (ipc.PeerId, error)
+}
+
+func LogConnections(nodes [NUM_NODES]testNode, status map[int]map[int]bool, lock *sync.Mutex) context.CancelFunc {
+	ctx, cancelF := context.WithCancel(context.Background())
+	pidToIx := map[string]int{}
+	// seds := []string{}
+	for ni, n := range nodes {
+		pid := n.node.P2p.Me.String()
+		pidToIx[pid] = ni
+		// seds = append(seds, fmt.Sprintf("sed 's/%s/node%d/g'", pid, ni))
+	}
+	// fmt.Println(strings.Join(seds, " | "))
+	getIx := func(m MessageWithPeerId) (int, error) {
+		pid_, err := m.PeerId()
+		if err != nil {
+			return -1, err
+		}
+		pid, err := pid_.Id()
+		if err != nil {
+			return -1, err
+		}
+		ix, has := pidToIx[pid]
+		if !has {
+			return 100, fmt.Errorf("unknown peer %s", pid)
+		}
+		return ix, nil
+	}
+
+	updateStatus := func(x, y int, st bool) (bool, int, int) {
+		lock.Lock()
+		defer lock.Unlock()
+		if _, has := status[y]; !has {
+			status[y] = make(map[int]bool)
+		}
+		if _, has := status[x]; !has {
+			status[x] = make(map[int]bool)
+		}
+		st_, has := status[x][y]
+		status[x][y] = st
+		status[y][x] = st
+		return !has || st_ != st, x, y
+	}
+	for ni, node := range nodes {
+		ni_ := ni
+		n := node
+		go func() {
+			for {
+				select {
+				case m := <-n.trap.PeerConnected:
+					ix, err := getIx(m)
+					if ok, x, y := updateStatus(ni_, ix, true); ok {
+						n.node.P2p.Logger.Infof("%d ↔ %d %v", x, y, err)
+					}
+				case m := <-n.trap.PeerDisconnected:
+					ix, err := getIx(m)
+					if ok, x, y := updateStatus(ni_, ix, false); ok {
+						n.node.P2p.Logger.Infof("%d ⊝ %d %v", x, y, err)
+					}
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+	return cancelF
+}
+
+func printConnectionGraph(graph map[int]map[int]bool) {
+	file, err := ioutil.TempFile("", "connections-*.dot")
+	if err != nil {
+		fmt.Println("Failed to create a tmp dot file")
+		return
+	}
+	fmt.Printf("Writing to %s\n", file.Name())
+	defer file.Close()
+	file.WriteString(fmt.Sprintln("graph conns{"))
+	for i, st := range graph {
+		for j, has := range st {
+			if j < i || !has {
+				continue // print each edge only once, ignore false edges
+			}
+			file.WriteString(fmt.Sprintf("\tn%d -- n%d;\n", i, j))
+		}
+	}
+	file.WriteString(fmt.Sprintln("}"))
+}
+
+func printPeers(nodes [NUM_NODES]testNode) {
+	for _, n := range nodes {
+		cm := n.node.P2p.ConnectionManager
+		cm.ViewProtected(func(m map[peer.ID]map[string]interface{}) {
+			for _, peer := range n.node.P2p.Host.Network().Peers() {
+				pm, has := m[peer]
+				protectedTags := []string{}
+				if has {
+					for tag := range pm {
+						protectedTags = append(protectedTags, tag)
+					}
+				}
+				info := cm.GetTagInfo(peer)
+				n.node.P2p.Logger.Infof("%s protected:%s info:%v", peer, strings.Join(protectedTags, ","), info)
+			}
+		})
+	}
+}
+
+func trimConnections(nodes [NUM_NODES]testNode) {
+	for _, n := range nodes {
+		connMgr := n.node.P2p.ConnectionManager
+		n.node.P2p.Logger.Infof("connmgr status: %v", connMgr.GetInfo())
+		connMgr.TrimOpenConns(context.Background())
+		n.node.P2p.Logger.Infof("connmgr status after trimming: %v", connMgr.GetInfo())
+	}
+}
+
+func checkConnectionGraph(t *testing.T, connectionGraph map[int]map[int]bool, expectConnected bool) {
+	var visited [NUM_NODES]bool
+	// BFS traversal of connection graph
+	for nextIx := 0; nextIx < NUM_NODES; nextIx++ {
+		if visited[nextIx] {
+			continue
+		}
+		if nextIx > 0 && expectConnected {
+			t.Errorf("Disconnected graph: at leats two roots 0 and %d", nextIx)
+		}
+		q := []int{nextIx}
+		for ; len(q) > 0; q = q[1:] {
+			n := q[0]
+			if visited[n] {
+				continue
+			}
+			visited[n] = true
+			st, hasSt := connectionGraph[n]
+			if !hasSt {
+				continue
+			}
+			childCount := 0
+			for m, c := range st {
+				if !c {
+					continue
+				}
+				childCount++
+				q = append(q, m)
+			}
+			if childCount > CONNS_HI {
+				t.Errorf("Node %d: %d connections exceed highwater %d", n, childCount, CONNS_HI)
+			}
+		}
+	}
+}
+
+// TODO consider moving this function to other file
+func TestBroadcastInNotFullConnectedNetwork(t *testing.T) {
+	nodes := testBitswapInitNodes(t, upcallDropAllMask^(1<<GossipReceivedChan)^(1<<PeerConnectedChan)^(1<<PeerDisconnectedChan))
+	// Connection graph is represented by map from node x to node y mapped to boolean (false entries are to be discraded)
+	// invariant: connectionGraph[x][y] == connectionGraph[y][x]
+	connectionGraph := make(map[int]map[int]bool)
+	var lock sync.Mutex
+	logCancel := LogConnections(nodes, connectionGraph, &lock)
+	defer logCancel()
+	// Parameters for mesh
+	gossipSubp := pubsub.DefaultGossipSubParams()
+	gossipSubp.D = 2
+	gossipSubp.Dlo = 1
+	gossipSubp.Dhi = 3
+	iteratePrevNextPeers(t, nodes, func(n testNode, prev, next peer.AddrInfo) {
+		configurePubsub(n.node, 100, []peer.AddrInfo{next, prev},
+			pubsub.WithGossipSubParams(gossipSubp))
+		testSubscribeDo(t, n.node, "test", 0, 101)
+	})
+	connectRingTopology(t, nodes, true)
+	beginAdvertisingOnNodes(t, nodes)
+	time.Sleep(11 * time.Second) // wait for network topology to stabilize
+	trimConnections(nodes)
+	lock.Lock()
+	checkConnectionGraph(t, connectionGraph, true)
+	if t.Failed() {
+		printConnectionGraph(connectionGraph)
+		printPeers(nodes)
+	}
+	lock.Unlock()
+	r := rand.New(rand.NewSource(0))
+	for i := 0; i < 3; i++ {
+		time.Sleep(11 * time.Second)
+		trimConnections(nodes)
+		testBroadcast(t, nodes, r.Intn(len(nodes)), 2*time.Minute)
+	}
+}
+
+const resourceUpdateOnlyMask = upcallDropAllMask ^ (1 << ResourceUpdateChan)
+
 func TestBitswap(t *testing.T) {
-	nodes := testBitswapInitNodes(t)
+	nodes := testBitswapInitNodes(t, resourceUpdateOnlyMask)
+	connectRingTopology(t, nodes, true)
+	beginAdvertisingOnNodes(t, nodes)
 	conf := initBitswapTestConfig(rand.New(rand.NewSource(1)), 10, 1<<23)
 	require.NoError(t, conf.execute(nodes))
 }
 func TestBitswapQC(t *testing.T) {
-	nodes := testBitswapInitNodes(t)
+	nodes := testBitswapInitNodes(t, resourceUpdateOnlyMask)
+	connectRingTopology(t, nodes, true)
+	beginAdvertisingOnNodes(t, nodes)
 	f := func(c bitswapTestConfig) bool {
 		return c.execute(nodes) == nil
 	}
