@@ -43,6 +43,14 @@ ports:
   graphql: "3085"
   metrics: "10001"
   p2p: "10909"
+  nodePort: "30005"
+
+resources:
+  limits:
+  requests:
+    memory: "32Gi"
+    cpu: "12"
+    rayonThreads: "6"
 
 healthcheck:
   enabled: true

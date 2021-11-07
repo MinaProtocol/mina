@@ -42,21 +42,20 @@ spec:
         {{- if .Values.features.customEntrypoint.enabled}}
         command: [ {{ .Values.features.customEntrypoint.command}} ]
         {{- end }}
-
+        volumeMounts: 
+        - name: destination-libp2p
+          mountPath: /root/libp2p-keys
         resources:
           limits:
           requests:
-            memory: "32Gi"
-            cpu: "12"
+            memory: {{.Values.resources.requests.memory}}
+            cpu: {{.Values.resources.requests.cpu}}
+            rayonThreads: {{.Values.resources.requests.rayonThreads}}
         args:
         - "daemon"
         - "--log-level"
         - "Debug"
         - "--log-json"
-        - "--log-snark-work-gossip"
-        - "true"
-        - "--config-directory"
-        - "/root/.features-config"
         - "--client-port"
         - "$(DAEMON_CLIENT_PORT)"
         - "--rest-port"
@@ -67,6 +66,10 @@ spec:
         - "$(DAEMON_METRICS_PORT)"
         - "--enable-peer-exchange"
         - "true"
+        - name: CODA_LIBP2P_PASS
+          value: {{ .Values.libp2p.staticKeypair.secretName }}
+        - name: MINA_LIBP2P_PASS
+          value: {{ .Values.libp2p.staticKeypair.secretName }}
         - "--peer-list-url"
         - "https://storage.googleapis.com/seed-lists/{{.Values.testnetName}}_seeds.txt"
         {{- if .Values.libp2p.staticKeypair.enabled}}
@@ -97,8 +100,6 @@ spec:
         - "true"
         {{- end }}
         env:
-        - name: RAYON_NUM_THREADS
-          value: "6"
         - name: DAEMON_REST_PORT
           value: {{ .Values.ports.graphql | quote}}
         - name: DAEMON_CLIENT_PORT
@@ -175,25 +176,4 @@ spec:
       - name: destination-libp2p
         emptyDir: {}
 {{- include "nodeSelector.preemptible" .Values | indent 6 }}
----
-{{- if .Values.features.exposeGraphql.enabled}}
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ .Values.name}}-graphql
-spec:
-  {{- if .Values.libp2p.loadBalancer.enabled}}
-  type: LoadBalancer
-  {{- else}}
-  type: ClusterIP
-  {{- end }}
-  publishNotReadyAddresses: true
-  selector:
-    app: {{.Values.name}}
-  ports:
-  - name: http-graphql
-    protocol: TCP
-    port: 80
-    targetPort: {{.Values.features.ports.graphql}}
-{{- end }}
 ---

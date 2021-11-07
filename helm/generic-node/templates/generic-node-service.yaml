@@ -4,10 +4,14 @@ kind: Service
 metadata:
   name: {{ $.Values.name }}
 spec:
-  type: LoadBalancer
   # We want all pods to have their addresses published for the sake of the
   # other testnet pods even before they're ready, since they
   # have to be able to talk to each other in order to become ready.
+  {{- if .Values.libp2p.loadBalancer.enabled}}
+  type: LoadBalancer
+  {{- else}}
+  type: ClusterIP
+  {{- end }}
   publishNotReadyAddresses: true
   selector:
     app: {{ $.Values.name }}
@@ -15,7 +19,12 @@ spec:
   - name: tcp-p2p
     port: {{ .Values.ports.p2p }}
     targetPort: external-port
-    nodePort: 30005
-
+    nodePort: {{ .Values.ports.nodePort }}
 ---
+  # - name: http-graphql
+  #   protocol: TCP
+  #   port: 80
+  #   targetPort: {{.Values.features.ports.graphql}}
+
+
 
