@@ -64,7 +64,7 @@ func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool,
 	)
 	require.NoError(t, err)
 
-	helper.GatingState.TrustedAddrFilters = ma.NewFilters()
+	helper.ResetGatingConfigTrustedAddrFilters()
 	helper.Host.SetStreamHandler(testProtocol, testStreamHandler)
 
 	t.Cleanup(func() {
