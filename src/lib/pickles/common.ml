@@ -217,3 +217,48 @@ let max_quot_size ~of_int ~mul:( * ) ~sub:( - ) domain_size =
   of_int 5 * (domain_size - of_int 1)
 
 let max_quot_size_int = max_quot_size ~of_int:Fn.id ~mul:( * ) ~sub:( - )
+
+let ft_comm ~add:( + ) ~scale ~endoscale ~negate
+    ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha
+    ~(plonk : _ Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit.t)
+    ~t_comm =
+  let ( * ) x g = scale g x in
+  let _, [ sigma_comm_last ] =
+    Vector.split m.sigma_comm
+      (snd (Dlog_plonk_types.Permuts_minus_1.add Nat.N1.n))
+  in
+  let f_comm =
+    let poseidon =
+      let (pn :: ps) = Vector.rev m.coefficients_comm in
+      scale
+        (Vector.fold ~init:pn ps ~f:(fun acc c -> c + endoscale acc alpha))
+        plonk.poseidon_selector
+      |> negate
+    in
+    let generic =
+      let coeffs = Vector.to_array m.coefficients_comm in
+      let (c0 :: cs) = plonk.generic in
+      Vector.foldi cs
+        ~init:(c0 * coeffs.(0))
+        ~f:(fun i acc c -> acc + (c * coeffs.(Int.(i + 1))))
+    in
+    List.reduce_exn ~f:( + )
+      [ plonk.perm * sigma_comm_last
+      ; generic
+      ; poseidon
+      ; plonk.vbmul * m.mul_comm
+      ; plonk.complete_add * m.complete_add_comm
+      ; plonk.endomul * m.emul_comm
+      ; plonk.endomul_scalar * m.endomul_scalar_comm
+      ]
+  in
+  let chunked_t_comm =
+    let n = Array.length t_comm in
+    let res = ref t_comm.(n - 1) in
+    for i = n - 2 downto 0 do
+      res := t_comm.(i) + scale !res plonk.zeta_to_srs_length
+    done ;
+    !res
+  in
+  f_comm + chunked_t_comm
+  + negate (scale chunked_t_comm plonk.zeta_to_domain_size)
