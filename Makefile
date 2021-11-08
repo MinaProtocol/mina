@@ -209,9 +209,6 @@ reformat-diff:
 check-format: ocaml_checks
 	dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path . -check
 
-check-snarky-submodule:
-	./scripts/check-snarky-submodule.sh
-
 #######################################
 ## Environment setup
 
