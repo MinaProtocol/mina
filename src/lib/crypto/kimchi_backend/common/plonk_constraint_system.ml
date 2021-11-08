@@ -279,6 +279,9 @@ type ('a, 'f) t =
     public_input_size : int Core_kernel.Set_once.t
   ; (* whatever is not public input *)
     mutable auxiliary_input_size : int
+  ; (* V.t's corresponding to constant values. We reuse them so we don't need to
+       use a fresh generic constraint each time to create a constant. *)
+    cached_constants : ('f, V.t) Core_kernel.Hashtbl.t
         (* The [equivalence_classes] field keeps track of the positions which must be
            enforced to be equivalent due to the fact that they correspond to the same V.t value.
            I.e., positions that are different usages of the same [V.t].
@@ -512,6 +515,7 @@ struct
     ; hash = Hash_state.empty
     ; constraints = 0
     ; auxiliary_input_size = 0
+    ; cached_constants = Hashtbl.create (module Fp)
     ; union_finds = V.Table.create ()
     }
 
@@ -808,12 +812,17 @@ struct
               [| s; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero |]
               sys ;
             sx
-      | s, `Constant ->
-          let x = create_internal sys ~constant:s [] in
-          add_generic_constraint ~l:x
-            [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.negate s |]
-            sys ;
-          x
+      | s, `Constant -> (
+          match Hashtbl.find sys.cached_constants s with
+          | Some x ->
+              x
+          | None ->
+              let x = create_internal sys ~constant:s [] in
+              add_generic_constraint ~l:x
+                [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.negate s |]
+                sys ;
+              Hashtbl.set sys.cached_constants ~key:s ~data:x ;
+              x )
     in
     match constr with
     | Snarky_backendless.Constraint.Square (v1, v2) -> (
