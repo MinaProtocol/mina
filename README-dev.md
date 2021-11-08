@@ -42,7 +42,7 @@ Refer to [/dev](/dev).
 
 ### Developer Setup (Linux)
 
-#### Install or have Ubuntu 18
+#### Install or have Ubuntu 18 or higher
 
 - [VM Images](https://www.osboxes.org/ubuntu/)
 
@@ -62,6 +62,16 @@ These are also listed in the dockerfiles. Unlike most of the C libraries,
 which are installed using `apt` in the dockerfiles, the libraries for RocksDB are
 automatically installed when building Mina via a `dune` rule in the library
 ocaml-rocksdb.
+
+In summary, here are all the steps that were needed on a fresh Ubuntu 21.04 installation:
+
+- Download and install opam
+- Download and install go
+- `sudo apt install capnproto zlib1g-dev libbz2-dev`
+- Run `./scripts/setup-opam.sh`
+- Run `./scripts/pin-external-packages.sh`
+- `eval $(opam env)`
+- `make build`
 
 #### Setup Docker CE on Ubuntu
 
@@ -108,7 +118,7 @@ Emacs autocompletion packages; see [Emacs from scratch](https://github.com/ocaml
 ## Using the makefile
 
 The makefile contains phony targets for all the common tasks that need to be done.
-It also knows how to use Docker automatically. 
+It also knows how to use Docker automatically.
 
 These are the most important `make` targets:
 
