@@ -537,21 +537,23 @@ fn isShortRange(C1, C2) -> bool
     let S2 = cState(C2);
 
     let check = | S1, S2 | {
-      if S1.epoch_count == S2.epoch_count => {
-        // Blocks have same previous epoch, so compare previous epochs' lock_checkpoints
-        S1.staking_epoch_data.lock_checkpoint == S2.staking_epoch_data.lock_checkpoint
-      },
-      else if S1.epoch_count == S2.epoch_count + 1  && epochSlot(S2) >= 2/3*slots_per_epoch => {
+      if S1.epoch_count == S2.epoch_count + 1  && epochSlot(S2) >= 2/3*slots_per_epoch {
         // S1 is one epoch ahead of S2 and S2 is not in the seed update range
-        S1.staking_epoch_data.lock_checkpoint == S2.next_epoch_data.lock_checkpoint
-      },
+        return S1.staking_epoch_data.lock_checkpoint == S2.next_epoch_data.lock_checkpoint
+      }
       else {
-        false
+        return false
       }
     };
 
-    // Check both orientations
-    return check(S1, S2) || check(S2, S1)
+    if S1.epoch_count == S2.epoch_count {
+        // Simple case: blocks have same previous epoch, so compare previous epochs' lock_checkpoints
+        return S1.staking_epoch_data.lock_checkpoint == S2.staking_epoch_data.lock_checkpoint
+    }
+    else {
+        // Check for previous epoch case using both orientations
+        return check(S1, S2) || check(S2, S1)
+    }
 }
 ```
 
