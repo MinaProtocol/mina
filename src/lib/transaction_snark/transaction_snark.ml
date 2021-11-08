@@ -3325,36 +3325,29 @@ type tag =
   , Nat.N6.n )
   Pickles.Tag.t
 
-let time lab f =
-  let start = Time.now () in
-  let x = f () in
-  let stop = Time.now () in
-  printf "%s: %s\n%!" lab (Time.Span.to_string_hum (Time.diff stop start)) ;
-  x
-
+(*Reviewer: Removing the call to time because it's getting printed in graphql schema file*)
 let system ~proof_level ~constraint_constants =
-  time "Transaction_snark.system" (fun () ->
-      Pickles.compile ~cache:Cache_dir.cache
-        (module Statement.With_sok.Checked)
-        (module Statement.With_sok)
-        ~typ:Statement.With_sok.typ
-        ~branches:(module Nat.N6)
-        ~max_branching:(module Nat.N2)
-        ~name:"transaction-snark"
-        ~constraint_constants:
-          (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants)
-        ~choices:(fun ~self ->
-          let parties x =
-            Base.Parties_snark.rule ~constraint_constants ~proof_level x
-          in
-          [ Base.rule ~constraint_constants
-          ; Merge.rule ~proof_level self
-          ; parties Opt_signed_unsigned
-          ; parties Opt_signed_opt_signed
-          ; parties Opt_signed
-          ; parties Proved
-          ]))
+  Pickles.compile ~cache:Cache_dir.cache
+    (module Statement.With_sok.Checked)
+    (module Statement.With_sok)
+    ~typ:Statement.With_sok.typ
+    ~branches:(module Nat.N6)
+    ~max_branching:(module Nat.N2)
+    ~name:"transaction-snark"
+    ~constraint_constants:
+      (Genesis_constants.Constraint_constants.to_snark_keys_header
+         constraint_constants)
+    ~choices:(fun ~self ->
+      let parties x =
+        Base.Parties_snark.rule ~constraint_constants ~proof_level x
+      in
+      [ Base.rule ~constraint_constants
+      ; Merge.rule ~proof_level self
+      ; parties Opt_signed_unsigned
+      ; parties Opt_signed_opt_signed
+      ; parties Opt_signed
+      ; parties Proved
+      ])
 
 module Verification = struct
   module type S = sig
