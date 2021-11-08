@@ -1,6 +1,6 @@
 use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
 use ark_poly::EvaluationDomain;
-use kimchi::index::Index as DlogIndex;
+use kimchi::index::{expr_linearization, Index as DlogIndex};
 use kimchi_circuits::{gate::CircuitGate, nolookup::constraints::ConstraintSystem};
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 use serde::{Deserialize, Serialize};
@@ -57,7 +57,7 @@ pub fn caml_pasta_fq_plonk_index_create(
     let cs = match ConstraintSystem::<Fq>::create(
         gates,
         vec![],
-        oracle::pasta::fq::params(),
+        oracle::pasta::fq_3::params(),
         public as usize,
     ) {
         None => {
@@ -143,9 +143,10 @@ pub fn caml_pasta_fq_plonk_index_read(
 
     // deserialize the index
     let mut t = DlogIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
-    t.cs.fr_sponge_params = oracle::pasta::fq::params();
+    t.cs.fr_sponge_params = oracle::pasta::fq_3::params();
     t.srs = srs.clone();
-    t.fq_sponge_params = oracle::pasta::fp::params();
+    t.fq_sponge_params = oracle::pasta::fp_3::params();
+    t.linearization = expr_linearization(t.cs.domain.d1, false, false, None);
 
     //
     Ok(CamlPastaFqPlonkIndex(Box::new(t)))

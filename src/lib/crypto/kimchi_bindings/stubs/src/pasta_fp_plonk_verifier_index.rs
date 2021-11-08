@@ -11,8 +11,8 @@ use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 
-use kimchi::index::VerifierIndex;
-use kimchi_circuits::expr::Linearization;
+use kimchi::index::{expr_linearization, VerifierIndex};
+use kimchi_circuits::expr::{Linearization, PolishToken};
 use kimchi_circuits::nolookup::constraints::{zk_polynomial, zk_w3, Shifts};
 use kimchi_circuits::wires::{COLUMNS, PERMUTS};
 use std::convert::TryInto;
@@ -58,6 +58,7 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
                     .map(|x| x.to_vec().iter().map(Into::into).collect()),
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
+            linearization: vi.linearization.into(),
         }
     }
 }
@@ -115,10 +116,10 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
             lookup_used: None,
             lookup_tables: vec![],
             lookup_selectors: vec![],
-            linearization: Linearization::default(),
+            linearization: index.linearization.into(),
 
-            fr_sponge_params: oracle::pasta::fp::params(),
-            fq_sponge_params: oracle::pasta::fq::params(),
+            fr_sponge_params: oracle::pasta::fp_3::params(),
+            fq_sponge_params: oracle::pasta::fq_3::params(),
         }
     }
 }
@@ -134,8 +135,8 @@ pub fn read_raw(
 ) -> Result<VerifierIndex<GAffine>, ocaml::Error> {
     let path = Path::new(&path);
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
-    let fq_sponge_params = oracle::pasta::fq::params();
-    let fr_sponge_params = oracle::pasta::fp::params();
+    let fq_sponge_params = oracle::pasta::fq_3::params();
+    let fr_sponge_params = oracle::pasta::fp_3::params();
     VerifierIndex::<GAffine>::from_file(
         srs.0,
         path,
@@ -163,7 +164,8 @@ pub fn caml_pasta_fp_plonk_verifier_index_read(
     srs: CamlFpSrs,
     path: String,
 ) -> Result<CamlPastaFpPlonkVerifierIndex, ocaml::Error> {
-    let vi = read_raw(offset, srs, path)?;
+    let mut vi = read_raw(offset, srs, path)?;
+    vi.linearization = expr_linearization(vi.domain, false, false, None);
     Ok(vi.into())
 }
 
@@ -240,6 +242,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
             chacha_comm: None,
         },
         shifts: (0..PERMUTS - 1).map(|_| Fp::one().into()).collect(),
+        linearization: Linearization::<Vec<PolishToken<Fp>>>::default().into(),
     }
 }
 
