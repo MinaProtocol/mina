@@ -1,4 +1,5 @@
 open Core_kernel
+open Async_kernel
 
 let tuple15_to_vec
     (w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14) =
@@ -110,12 +111,11 @@ module type Inputs_intf = sig
       -> Scalar_field.Vector.t
       -> Scalar_field.t array
       -> Curve.Affine.Backend.t array
-      -> t Async.Deferred.t
+      -> t Deferred.t
 
     val verify : Verifier_index.t -> t -> bool
 
-    val batch_verify :
-      Verifier_index.t array -> t array -> bool Async.Deferred.t
+    val batch_verify : Verifier_index.t array -> t array -> bool Deferred.t
   end
 end
 
@@ -157,14 +157,14 @@ module Make (Inputs : Inputs_intf) = struct
 
   type message = Challenge_polynomial.t list
 
-  include Allocation_functor.Make.Versioned_v1.Full_compare_eq_hash (struct
+  include Allocation_functor.Make.Versioned_v2.Full_compare_eq_hash (struct
     let id = "plong_dlog_proof_" ^ Inputs.id
 
     let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
 
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
           ( G.Affine.Stable.V1.t
           , Fq.Stable.V1.t
@@ -288,7 +288,6 @@ module Make (Inputs : Inputs_intf) = struct
        } :
         t) : Backend.t =
     let g x = G.Affine.to_backend (Pickles_types.Or_infinity.Finite x) in
-    let pcw t = Poly_comm.to_backend (`With_degree_bound t) in
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
     let lr = Array.map lr ~f:(fun (x, y) -> (g x, g y)) in
     { commitments =
@@ -343,7 +342,7 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
           G.Affine.to_backend (Finite commitment))
     in
-    let%map.Async.Deferred res =
+    let%map.Deferred res =
       Backend.create_async pk primary auxiliary challenges commitments
     in
     of_backend res
