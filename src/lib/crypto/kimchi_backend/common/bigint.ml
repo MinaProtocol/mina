@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 module type Bindings = sig
   type t
@@ -39,7 +39,7 @@ module type Intf = sig
 
   val to_hex_string : t -> string
 
-  val of_hex_string : string -> t
+  val of_hex_string : ?reverse:bool -> string -> t
 
   val of_decimal_string : string -> t
 
@@ -62,15 +62,16 @@ module Make
 
   let to_hex_string t =
     let data = to_bytes t in
-    "0x" ^ Hex.encode (Bytes.to_string data)
+    "0x" ^ String.uppercase (Hex.encode ~reverse:true (Bytes.to_string data))
 
   let sexp_of_t t = to_hex_string t |> Sexp.of_string
 
-  let of_hex_string s =
+  let of_hex_string ?(reverse = true) s =
     assert (Char.equal s.[0] '0' && Char.equal s.[1] 'x') ;
-    String.drop_prefix s 2 |> Hex.Safe.of_hex
+    let s = String.drop_prefix s 2 in
+    Option.try_with (fun () -> Hex.decode ~init:Bytes.init ~reverse s)
     |> Option.value_exn ~here:[%here]
-    |> Bytes.of_string |> of_bytes
+    |> of_bytes
 
   let%test_unit "hex test" =
     let bytes =
