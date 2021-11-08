@@ -110,7 +110,8 @@ M.
   , find_index
   , find_index_exn
   , add_path
-  , merkle_root (* , data *)
+  , merkle_root
+  , data
   , iteri
   , depth
   , next_available_token
@@ -159,29 +160,55 @@ let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
         (Account.identifier account)
         (Option.value_exn (Ledger.Any_ledger.M.get ledger loc)))
 
-let of_ledger_subset_exn (oledger : Ledger.t) keys =
-  let ledger = Ledger.copy oledger in
-  let _, sparse =
-    List.fold keys
-      ~f:(fun (new_keys, sl) key ->
-        match Ledger.location_of_account ledger key with
-        | Some loc ->
-            ( new_keys
-            , add_path sl
-                (Ledger.merkle_path ledger loc)
-                key
-                (Ledger.get ledger loc |> Option.value_exn) )
-        | None ->
-            let path, acct = Ledger.create_empty_exn ledger key in
-            (key :: new_keys, add_path sl path key acct))
-      ~init:
-        ([], of_any_ledger_root (Ledger.Any_ledger.cast (module Ledger) ledger))
+let of_ledger_subset_exn' (ledger : Ledger.t) locs_and_ids =
+  let locs, ids = List.unzip locs_and_ids in
+  let paths =
+    Ledger.merkle_path_batch ledger locs |> List.map ~f:(fun (_, path) -> path)
+  in
+  let accts =
+    Ledger.get_batch ledger locs
+    |> List.map ~f:(fun (_, acct) -> Option.value_exn acct)
+  in
+  List.zip_exn paths (List.zip_exn ids accts)
+  |> List.fold_left
+       ~init:
+         (of_any_ledger_root (Ledger.Any_ledger.cast (module Ledger) ledger))
+       ~f:(fun sparse_ledger (path, (id, acct)) ->
+         add_path sparse_ledger path id acct)
+
+let of_ledger_subset_exn (ledger : Ledger.t) keys =
+  let existing_account_locs_and_ids, missing_account_ids =
+    keys
+    |> Ledger.location_of_account_batch ledger
+    |> List.partition_map ~f:(fun (key, loc_opt) ->
+           match loc_opt with Some loc -> `Fst (loc, key) | None -> `Snd key)
+  in
+  let sparse_ledger =
+    of_ledger_subset_exn' ledger existing_account_locs_and_ids
+  in
+  let new_accounts =
+    let l = Ledger.copy ledger in
+    missing_account_ids
+    |> List.map ~f:(fun id ->
+           let account : Account.t = Account.empty in
+           let loc =
+             Ledger.unsafe_create_account l id account |> Or_error.ok_exn
+           in
+           let path = Ledger.merkle_path l loc in
+           (path, account))
+    |> List.zip_exn missing_account_ids
+  in
+  let sparse_ledger =
+    List.fold new_accounts ~init:sparse_ledger
+      ~f:(fun sparse_ledger (key, (path, acct)) ->
+        add_path sparse_ledger path key acct)
   in
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)
-        ((merkle_root sparse :> Random_oracle.Digest.t) |> Ledger_hash.of_hash)) ;
-  sparse
+        ( (merkle_root sparse_ledger :> Random_oracle.Digest.t)
+        |> Ledger_hash.of_hash )) ;
+  sparse_ledger
 
 (* TODO: optimize this to batch as well (used during block production) *)
 let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =

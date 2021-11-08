@@ -83,7 +83,7 @@ module type S = sig
   val add_path :
     t -> [ `Left of hash | `Right of hash ] list -> account_id -> account -> t
 
-  val data : t -> (int * account_id * account) list
+  val data : t -> (int * account) list
 
   val iteri : t -> f:(int -> account -> unit) -> unit
 
@@ -334,7 +334,7 @@ end = struct
     go [] (depth - 1) tree
 
   let data (t : t) =
-    List.map t.indexes ~f:(fun (id, idx) -> (idx, id, get_exn t idx))
+    List.map t.indexes ~f:(fun (_, idx) -> (idx, get_exn t idx))
 end
 
 type ('hash, 'key, 'account, 'token_id) t =

@@ -63,7 +63,7 @@ let construct_staged_ledger_at_root
                txn.data
            in
            let computed_status =
-             Ledger.Transaction_applied.user_command_status txn_with_info
+             Transaction_logic.Transaction_applied.user_command_status txn_with_info
            in
            if Transaction_status.equal txn.status computed_status then
              Or_error.return ()

@@ -65,7 +65,10 @@ val of_ledger_subset_exn : Ledger.t -> Account_id.t list -> t
 
 val of_ledger_index_subset_exn : Ledger.Any_ledger.witness -> int list -> t
 
-(* val of_sparse_ledger_subset_exn : t -> Account_id.t list -> t *)
+val of_sparse_ledger_subset_exn : t -> Account_id.t list -> t
+
+(* TODO: erase Account_id.t from here (doesn't make sense to have it) *)
+val data : t -> (int * Account.t) list
 
 val iteri : t -> f:(Account.Index.t -> Account.t -> unit) -> unit
 
