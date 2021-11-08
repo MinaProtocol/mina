@@ -279,6 +279,16 @@ type ('a, 'f) t =
     public_input_size : int Core_kernel.Set_once.t
   ; (* whatever is not public input *)
     mutable auxiliary_input_size : int
+        (* The [equivalence_classes] field keeps track of the positions which must be
+           enforced to be equivalent due to the fact that they correspond to the same V.t value.
+           I.e., positions that are different usages of the same [V.t].
+
+           We use a union-find data structure to track equalities that a constraint system wants
+           enforced *between* [V.t] values. Then, at the end, for all [V.t]s that have been unioned
+           together, we combine their equivalence classes in the [equivalence_classes] table into
+           a single equivalence class, so that the permutation argument enforces these desired equalities
+           as well. *)
+  ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
   }
 
 module Hash = Core.Md5
@@ -393,6 +403,37 @@ struct
     | _ ->
         failwith "Unsupported constraint"
 
+  (** Converts the set of permutations (equivalence_classes) to
+      a hash table that maps each position to the next one.
+      For example, if one of the equivalence class is [pos1, pos3, pos7],
+      the function will return a hashtable that maps pos1 to pos3,
+      pos3 to pos7, and pos7 to pos1 *)
+  let equivalence_classes_to_hashtbl sys =
+    let module Relative_position = struct
+      module T = struct
+        type t = Row.t Position.t [@@deriving hash, sexp, compare]
+      end
+
+      include T
+      include Core_kernel.Hashable.Make (T)
+    end in
+    let equivalence_classes = V.Table.create () in
+    Hashtbl.iteri sys.equivalence_classes ~f:(fun ~key ~data ->
+        let u = Hashtbl.find_exn sys.union_finds key in
+        Hashtbl.update equivalence_classes (Union_find.get u) ~f:(function
+          | None ->
+              Relative_position.Hash_set.of_list data
+          | Some ps ->
+              List.iter ~f:(Hash_set.add ps) data ;
+              ps)) ;
+    let res = Relative_position.Table.create () in
+    Hashtbl.iter equivalence_classes ~f:(fun ps ->
+        let rotate_left = function [] -> [] | x :: xs -> xs @ [ x ] in
+        let ps = Hash_set.to_list ps in
+        List.iter2_exn ps (rotate_left ps) ~f:(fun input output ->
+            Hashtbl.add_exn res ~key:input ~data:output)) ;
+    res
+
   (** Compute the witness, given the constraint system `sys` and a function that converts the indexed secret inputs to their concrete values *)
   let compute_witness (sys : t) (external_values : int -> Fp.t) :
       Fp.t array array =
@@ -446,9 +487,14 @@ struct
     (* return the witness *)
     res
 
+  let union_find sys v =
+    Hashtbl.find_or_add sys.union_finds v ~default:(fun () ->
+        Union_find.create v)
+
   (** Creates an internal variable and assigns it the value lc and constant *)
   let create_internal ?constant sys lc : V.t =
     let v = Internal_var.create () in
+    ignore (union_find sys (Internal v) : _ Union_find.t) ;
     Hashtbl.add_exn sys.internal_vars ~key:v ~data:(lc, constant) ;
     V.Internal v
 
@@ -466,6 +512,7 @@ struct
     ; hash = Hash_state.empty
     ; constraints = 0
     ; auxiliary_input_size = 0
+    ; union_finds = V.Table.create ()
     }
 
   (* TODO *)
@@ -492,35 +539,13 @@ struct
       The row must be given relative to the start of the circuit 
       (so at the start of the public-input rows). *)
   let wire' sys key row (col : int) =
+    ignore (union_find sys key : V.t Union_find.t) ;
     V.Table.add_multi sys.equivalence_classes ~key ~data:{ row; col }
 
   (* TODO: rename to wire_abs and wire_rel? or wire_public and wire_after_public? or force a single use function that takes a Row.t? *)
 
   (** Same as wire', except that the row must be given relatively to the end of the public-input rows *)
   let wire sys key row col = wire' sys key (Row.After_public_input row) col
-
-  (** Converts the set of permutations (equivalence_classes) to 
-      a hash table that maps each position to the next one. 
-      For example, if one of the equivalence class is [pos1, pos3, pos7],
-      the function will return a hashtable that maps pos1 to pos3, 
-      pos3 to pos7, and pos7 to pos1 *)
-  let equivalence_classes_to_hashtbl
-      ~(equivalence_classes : Row.t Position.t list V.Table.t) =
-    let module Relative_position = struct
-      module T = struct
-        type t = Row.t Position.t [@@deriving hash, sexp, compare]
-      end
-
-      include Core_kernel.Hashable.Make (T)
-    end in
-    let res = Relative_position.Table.create () in
-    Hashtbl.iter equivalence_classes ~f:(fun ps ->
-        let rotate_right some_list =
-          List.last_exn some_list :: List.tl_exn some_list
-        in
-        List.iter2_exn ps (rotate_right ps) ~f:(fun input output ->
-            Hashtbl.add_exn res ~key:input ~data:output)) ;
-    res
 
   (** Adds zero-knowledgeness to the gates/rows, and convert into Rust type [Gates.t].
       This can only be called once *)
@@ -550,27 +575,10 @@ struct
         done ;
 
         (* construct permutation hashmap *)
-        let pos_map =
-          equivalence_classes_to_hashtbl
-            ~equivalence_classes:sys.equivalence_classes
-        in
+        let pos_map = equivalence_classes_to_hashtbl sys in
         let permutation (pos : Row.t Position.t) : Row.t Position.t =
           Option.value (Hashtbl.find pos_map pos) ~default:pos
         in
-
-        (*
-        let permutation ~equivalence_classes (pos : Row.t Position.t) :
-            Row.t Position.t =
-          let pos_map =
-            equivalence_classes_to_hashtbl
-              ~equivalence_classes:sys.equivalence_classes
-          in
-          Hashtbl.find_exn pos_map pos
-        in
-        let permutation =
-          permutation ~equivalence_classes:sys.equivalence_classes
-        in
-        *)
         let update_gate_with_permutation_info (row : Row.t)
             (gate : (unit, _) Gate_spec.t) : (Row.t, _) Gate_spec.t =
           { gate with
@@ -880,25 +888,41 @@ struct
         let (s1, x1), (s2, x2) = (red v1, red v2) in
         match (x1, x2) with
         | `Var x1, `Var x2 ->
-            (* s1 x1 - s2 x2 = 0
+            if Fp.equal s1 s2 then (
+              if not (Fp.equal s1 Fp.zero) then
+                Union_find.union (union_find sys x1) (union_find sys x2) )
+            else if (* s1 x1 - s2 x2 = 0
           *)
-            if not (Fp.equal s1 s2) then
+                    not (Fp.equal s1 s2) then
               add_generic_constraint ~l:x1 ~r:x2
                 [| s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero |]
                 sys
-              (* TODO: optimize by not adding generic costraint but rather permuting the vars *)
             else
               add_generic_constraint ~l:x1 ~r:x2
                 [| s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero |]
                 sys
-        | `Var x1, `Constant ->
-            add_generic_constraint ~l:x1
-              [| s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2 |]
-              sys
-        | `Constant, `Var x2 ->
-            add_generic_constraint ~r:x2
-              [| Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1 |]
-              sys
+        | `Var x1, `Constant -> (
+            (* s1 * x1 = s2
+               x1 = s2 / s1
+            *)
+            match Hashtbl.find sys.cached_constants Fp.(s2 / s1) with
+            | Some x2 ->
+                Union_find.union (union_find sys x1) (union_find sys x2)
+            | None ->
+                add_generic_constraint ~l:x1
+                  [| s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2 |]
+                  sys )
+        | `Constant, `Var x2 -> (
+            (* s1 = s2 * x2
+               x2 = s1 / s2
+            *)
+            match Hashtbl.find sys.cached_constants Fp.(s1 / s2) with
+            | Some x1 ->
+                Union_find.union (union_find sys x1) (union_find sys x2)
+            | None ->
+                add_generic_constraint ~r:x2
+                  [| Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1 |]
+                  sys )
         | `Constant, `Constant ->
             assert (Fp.(equal s1 s2)) )
     | Plonk_constraint.T (Basic { l; r; o; m; c }) ->
