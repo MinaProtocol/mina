@@ -12,6 +12,9 @@ path=$2
 
 source ~/.profile
 
+echo "--- Trying to update rustup"
+rustup uninstall stable && rustup update stable
+
 echo "--- Make build"
 export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go 
 time make build
