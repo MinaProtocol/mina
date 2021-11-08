@@ -6,6 +6,21 @@
     of the curve which is set here 
     https://github.com/MinaProtocol/mina/blob/3d16db598630d8865c04b189b9d41f24bbc73b18/src/lib/zexe_backend/pasta/basic.ml#L17
 *)
+
+(* TODO: Fix the strings *)
+let g s =
+  let num_bytes = 32 in
+  String.init (String.length s) (fun i ->
+      match i with
+      | 0 ->
+          '0'
+      | 1 ->
+          'x'
+      | i ->
+          let i = i - 2 in
+          let byte = i / 2 in
+          s.[2 + (2 * (num_bytes - 1 - byte)) + (i mod 2)])
+
 module Lagrange_precomputations = struct
   let index_of_domain_log2 d = d - 1
 
@@ -14,7 +29,7 @@ module Lagrange_precomputations = struct
   open Basic
 
   let vesta =
-    let f s = Fq.of_bigint (Bigint256.of_hex_string s) in
+    let f s = Fq.of_bigint (Bigint256.of_hex_string ~reverse:true (g s)) in
     [| [| [| ( f
                  "0x68fe06f08453cb5167c77c7420a9c361707aa89b4606f3ad395f757f2d55c33f"
              , f
@@ -10008,7 +10023,7 @@ module Lagrange_precomputations = struct
     |]
 
   let pallas =
-    let f s = Fp.of_bigint (Bigint256.of_hex_string s) in
+    let f s = Fp.of_bigint (Bigint256.of_hex_string ~reverse:true (g s)) in
     [| [| [| ( f
                  "0xf3ea7359f0d7b7ebc106234ed8dd59d753a344fe432d455c00bf9792c2fe1834"
              , f
