@@ -39,13 +39,15 @@ macro_rules! impl_oracles {
                 proof: CamlProverProof<$CamlG, $CamlF>, // the final proof (contains public elements at the beginning)
             ) -> CamlOracles<$CamlF> {
                 // conversions
+
                 let index: DlogVerifierIndex<$G> = index.into();
+
                 let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
                     .into_iter()
                     .take(proof.public.len())
                     .map(Into::into)
                     .collect();
-                let lgr_comm_refs = lgr_comm.iter().collect();
+                let lgr_comm_refs: Vec<_> = lgr_comm.iter().collect();
 
                 let p_comm = PolyComm::<$G>::multi_scalar_mul(
                     &lgr_comm_refs,
@@ -56,6 +58,7 @@ macro_rules! impl_oracles {
                         .map(|s| -s)
                         .collect(),
                 );
+
                 let proof: ProverProof<$G> = proof.into();
 
                 let oracles_result =
@@ -69,7 +72,7 @@ macro_rules! impl_oracles {
                     oracles_result.oracles,
                 );
 
-                sponge.absorb_fr(&[shift_scalar(combined_inner_product)]);
+                sponge.absorb_fr(&[shift_scalar::<$G>(combined_inner_product)]);
 
                 let opening_prechallenges = proof
                     .proof
