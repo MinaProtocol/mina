@@ -235,8 +235,8 @@ module T = struct
     in
     target
 
-  let verify_scan_state_after_apply ~constraint_constants ~next_available_token
-      ledger (scan_state : Scan_state.t) =
+  let verify_scan_state_after_apply ~next_available_token ledger
+      (scan_state : Scan_state.t) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
@@ -251,16 +251,13 @@ module T = struct
       |> Option.value_map ~default:(None, None) ~f:(fun proof ->
              (Some (get_target proof), Some (next_available_token_begin proof)))
     in
-    Statement_scanner.check_invariants ~constraint_constants scan_state
-      ~verifier:() ~error_prefix ~ledger_hash_end:ledger ~ledger_hash_begin
-      ~next_available_token_begin ~next_available_token_end:next_available_token
+    Statement_scanner.check_invariants scan_state ~verifier:() ~error_prefix
+      ~ledger_hash_end:ledger ~ledger_hash_begin ~next_available_token_begin
+      ~next_available_token_end:next_available_token
 
-  let statement_exn ~constraint_constants t =
+  let statement_exn t =
     let open Deferred.Let_syntax in
-    match%map
-      Statement_scanner.scan_statement ~constraint_constants t.scan_state
-        ~verifier:()
-    with
+    match%map Statement_scanner.scan_statement t.scan_state ~verifier:() with
     | Ok s ->
         `Non_empty s
     | Error `Empty ->
@@ -272,18 +269,16 @@ module T = struct
       ~constraint_constants ~pending_coinbase_collection =
     { ledger; scan_state; constraint_constants; pending_coinbase_collection }
 
-  let of_scan_state_and_ledger ~logger
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~verifier ~snarked_ledger_hash ~snarked_next_available_token ~ledger
-      ~scan_state ~pending_coinbase_collection =
+  let of_scan_state_and_ledger ~logger ~constraint_constants ~verifier
+      ~snarked_ledger_hash ~snarked_next_available_token ~ledger ~scan_state
+      ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
     let t =
       of_scan_state_and_ledger_unchecked ~ledger ~scan_state
         ~constraint_constants ~pending_coinbase_collection
     in
     let%bind () =
-      Statement_scanner_with_proofs.check_invariants ~constraint_constants
-        scan_state
+      Statement_scanner_with_proofs.check_invariants scan_state
         ~verifier:{ Statement_scanner_proof_verifier.logger; verifier }
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~ledger_hash_end:
@@ -294,8 +289,7 @@ module T = struct
     in
     return t
 
-  let of_scan_state_and_ledger_unchecked
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+  let of_scan_state_and_ledger_unchecked ~constraint_constants
       ~snarked_ledger_hash ~snarked_next_available_token ~ledger ~scan_state
       ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
@@ -303,8 +297,8 @@ module T = struct
       { ledger; scan_state; constraint_constants; pending_coinbase_collection }
     in
     let%bind () =
-      Statement_scanner.check_invariants ~constraint_constants scan_state
-        ~verifier:() ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
+      Statement_scanner.check_invariants scan_state ~verifier:()
+        ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~ledger_hash_end:
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
         ~ledger_hash_begin:(Some snarked_ledger_hash)
@@ -960,7 +954,7 @@ module T = struct
           if skip_verification then Deferred.return (Ok ())
           else
             Deferred.(
-              verify_scan_state_after_apply ~constraint_constants
+              verify_scan_state_after_apply
                 ~next_available_token:
                   (Sparse_ledger.next_available_token !local_ledger)
                 (Frozen_ledger_hash.of_ledger_hash

@@ -180,9 +180,7 @@ val can_apply_supercharged_coinbase_exn :
   -> bool
 
 val statement_exn :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> t
-  -> [ `Non_empty of Transaction_snark.Statement.t | `Empty ] Deferred.t
+  t -> [ `Non_empty of Transaction_snark.Statement.t | `Empty ] Deferred.t
 
 val of_scan_state_pending_coinbases_and_snarked_ledger :
      logger:Logger.t

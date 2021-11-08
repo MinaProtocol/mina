@@ -49,8 +49,7 @@ module Make_statement_scanner (Verifier : sig
     -> bool Deferred.Or_error.t
 end) : sig
   val scan_statement :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> t
+       t
     -> verifier:Verifier.t
     -> ( Transaction_snark.Statement.t
        , [ `Empty | `Error of Error.t ] )
@@ -58,7 +57,6 @@ end) : sig
 
   val check_invariants :
        t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> verifier:Verifier.t
     -> error_prefix:string
     -> ledger_hash_end:Frozen_ledger_hash.t
