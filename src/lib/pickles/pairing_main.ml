@@ -84,12 +84,23 @@ struct
     absorb
       ~absorb_field:(fun x -> Sponge.absorb sponge (`Field x))
       ~g1_to_field_elements:Inner_curve.to_field_elements
-      ~absorb_scalar:(fun (x, b) ->
+      ~absorb_scalar:(fun (x, (b : Boolean.var)) ->
         Sponge.absorb sponge (`Field x) ;
         Sponge.absorb sponge (`Bits [ b ]))
       ~mask_g1_opt:(fun ((b : Boolean.var), (x, y)) ->
         Field.((b :> t) * x, (b :> t) * y))
       ty t
+
+  let scalar_to_field s =
+    SC.to_field_checked (module Impl) s ~endo:Endo.Wrap_inner_curve.scalar
+
+  let lowest_128_bits ~constrain_low_bits x =
+    let assert_128_bits a =
+      (* Scalar_challenge.to_field_checked has the side effect of
+         checking that the input fits in 128 bits. *)
+      ignore (scalar_to_field (SC.SC.create a) : Field.t)
+    in
+    Util.lowest_128_bits ~constrain_low_bits ~assert_128_bits (module Impl) x
 
   module Scalar_challenge =
     SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Step_inner_curve)

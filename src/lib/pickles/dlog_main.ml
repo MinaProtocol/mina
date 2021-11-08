@@ -133,10 +133,25 @@ struct
       ~g1_to_field_elements:Inner_curve.to_field_elements
       ~absorb_scalar:(Sponge.absorb sponge) ty t
 
-  let squeeze_scalar sponge : Scalar_challenge.t * Field.t SC.SC.t =
+  let scalar_to_field s =
+    SC.to_field_checked (module Impl) s ~endo:Endo.Step_inner_curve.scalar
+
+  let lowest_128_bits ~constrain_low_bits x =
+    let assert_128_bits a =
+      (* Scalar_challenge.to_field_checked has the side effect of
+         checking that the input fits in 128 bits. *)
+      ignore (scalar_to_field (SC.SC.create a) : Field.t)
+    in
+    Util.lowest_128_bits ~constrain_low_bits ~assert_128_bits (module Impl) x
+
+  let squeeze_challenge sponge : Field.t =
+    lowest_128_bits (* I think you may not have to constrain these actually *)
+      ~constrain_low_bits:true (Sponge.squeeze sponge)
+
+  let squeeze_scalar sponge : Field.t SC.SC.t =
     (* No need to boolean constrain scalar challenges. *)
-    let bits, packed = Sponge.squeeze sponge ~length:Challenge.length in
-    (Scalar_challenge bits, Scalar_challenge packed)
+    SC.SC.create
+      (lowest_128_bits ~constrain_low_bits:false (Sponge.squeeze sponge))
 
   let bullet_reduce sponge gammas =
     let absorb t = absorb sponge t in
