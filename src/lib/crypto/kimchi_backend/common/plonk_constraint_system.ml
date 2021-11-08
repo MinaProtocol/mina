@@ -150,12 +150,7 @@ module Plonk_constraint = struct
       | EC_scale of { state : 'v Scale_round.t array }
       | EC_endoscale of
           { state : 'v Endoscale_round.t array; xs : 'v; ys : 'v; n_acc : 'v }
-      | EC_endoscalar of
-          { state : 'v Endoscale_scalar_round.t array
-          ; n8 : 'v
-          ; a8 : 'v
-          ; b8 : 'v
-          }
+      | EC_endoscalar of { state : 'v Endoscale_scalar_round.t array }
     [@@deriving sexp]
 
     (** map t *)
@@ -188,13 +183,10 @@ module Plonk_constraint = struct
             ; ys = f ys
             ; n_acc = f n_acc
             }
-      | EC_endoscalar { state; n8; a8; b8 } ->
+      | EC_endoscalar { state } ->
           EC_endoscalar
             { state =
                 Array.map ~f:(fun x -> Endoscale_scalar_round.map ~f x) state
-            ; n8 = f n8
-            ; a8 = f a8
-            ; b8 = f b8
             }
 
     (* TODO: this seems to be a "double check" type of function? It just checks that the basic gate is equal to 0? what is eval_one? what is v and f? *)
@@ -388,19 +380,16 @@ struct
                     acc)
             in
             cvars [ xs; ys; n_acc ] t
-        | EC_endoscalar { state; n8; a8; b8 } ->
+        | EC_endoscalar { state } ->
             let t = H.feed_string t "ec_endoscale_scalar" in
-            let t =
-              Array.fold state ~init:t
-                ~f:(fun
-                     acc
-                     { n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 }
-                   ->
-                  cvars
-                    [ n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 ]
-                    acc)
-            in
-            cvars [ n8; a8; b8 ] t )
+            Array.fold state ~init:t
+              ~f:(fun
+                   acc
+                   { n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 }
+                 ->
+                cvars
+                  [ n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 ]
+                  acc) )
     | _ ->
         failwith "Unsupported constraint"
 
@@ -1185,16 +1174,7 @@ struct
         in
         add_row sys vars Zero [||]
     | Plonk_constraint.T
-        (EC_endoscalar
-          { state : 'v Endoscale_scalar_round.t array
-          ; n8 : 'v
-          ; a8 : 'v
-          ; b8 : 'v
-          }) ->
-        (* reduce state *)
-        let state =
-          Array.map state ~f:(Endoscale_scalar_round.map ~f:reduce_to_v)
-        in
+        (EC_endoscalar { state : 'v Endoscale_scalar_round.t array }) ->
         (* add round function *)
         let add_endoscale_scalar_round (round : V.t Endoscale_scalar_round.t) =
           let row =
@@ -1217,26 +1197,10 @@ struct
           in
           add_row sys row Kimchi.Protocol.EndomulScalar [||]
         in
-        Array.iter state ~f:add_endoscale_scalar_round ;
-        (* last row *)
-        let vars =
-          [| None
-           ; Some (reduce_to_v n8)
-           ; None
-           ; None
-           ; Some (reduce_to_v a8)
-           ; Some (reduce_to_v b8)
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-          |]
-        in
-        add_row sys vars Zero [||]
+        Array.iter state
+          ~f:
+            (Fn.compose add_endoscale_scalar_round
+               (Endoscale_scalar_round.map ~f:reduce_to_v))
     | constr ->
         failwithf "Unhandled constraint %s"
           Obj.(Extension_constructor.name (Extension_constructor.of_val constr))
