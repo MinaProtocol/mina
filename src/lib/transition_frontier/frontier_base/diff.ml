@@ -79,7 +79,7 @@ module Root_transition = struct
     [%%versioned
     module Stable = struct
       [@@@no_toplevel_latest_type]
-      module V1 = struct
+      module V2 = struct
         type t =
           { new_root: Root_data.Limited.Stable.V1.t
           ; garbage: Node_list.Lite.Stable.V1.t
@@ -95,8 +95,8 @@ module Root_transition = struct
       [%%versioned
       module Stable = struct
         [@@@no_toplevel_latest_type]
-        module V1 = struct
-          type t = Lite_binable.Stable.V1.t
+        module V2 = struct
+          type t = Lite_binable.Stable.V2.t
 
           let to_latest = Fn.id
         end
@@ -105,23 +105,23 @@ module Root_transition = struct
 
     [%%versioned_binable
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t = lite root_transition
 
         module T_nonbinable = struct
           type nonrec t = t
 
           let to_binable ({new_root; garbage; just_emitted_a_proof} : t) :
-              Binable_arg.Stable.V1.t =
+              Binable_arg.Stable.V2.t =
             {new_root; garbage; just_emitted_a_proof}
 
           let of_binable
               ({new_root; garbage; just_emitted_a_proof} :
-                Binable_arg.Stable.V1.t) : t =
+                Binable_arg.Stable.V2.t) : t =
             {new_root; garbage; just_emitted_a_proof}
         end
 
-        include Binable.Of_binable (Binable_arg.Stable.V1) (T_nonbinable)
+        include Binable.Of_binable (Binable_arg.Stable.V2) (T_nonbinable)
 
         let to_latest = Fn.id
       end
@@ -189,7 +189,7 @@ module Lite_binable = struct
     module V1 = struct
       type t =
         | New_node of External_transition.Validated.Stable.V1.t
-        | Root_transitioned of Root_transition.Lite.Stable.V1.t
+        | Root_transitioned of Root_transition.Lite.Stable.V2.t
         | Best_tip_changed of State_hash.Stable.V1.t
 
       let to_latest = Fn.id

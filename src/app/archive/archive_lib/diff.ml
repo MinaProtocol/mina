@@ -19,7 +19,7 @@ module Transition_frontier = struct
                 (Account_id.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t) list
             }
         | Root_transitioned of
-            Transition_frontier.Diff.Root_transition.Lite.Stable.V1.t
+            Transition_frontier.Diff.Root_transition.Lite.Stable.V2.t
         | Bootstrap of {lost_blocks: State_hash.Stable.V1.t list}
 
       let to_latest = Fn.id
