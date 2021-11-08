@@ -153,9 +153,10 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         let next_available_token_before =
           Sparse_ledger.next_available_token sparse_ledger
         in
-        let sparse_ledger' =
-          Sparse_ledger.apply_transaction_exn ~constraint_constants
-            ~txn_state_view sparse_ledger (Transaction.forget t)
+        let sparse_ledger', _ =
+          Sparse_ledger.apply_transaction ~constraint_constants ~txn_state_view
+            sparse_ledger (Transaction.forget t)
+          |> Or_error.ok_exn
         in
         let next_available_token_after =
           Sparse_ledger.next_available_token sparse_ledger'
@@ -220,9 +221,10 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
           let next_available_token_before =
             Sparse_ledger.next_available_token sparse_ledger
           in
-          let sparse_ledger' =
-            Sparse_ledger.apply_transaction_exn ~constraint_constants
+          let sparse_ledger', _ =
+            Sparse_ledger.apply_transaction ~constraint_constants
               ~txn_state_view sparse_ledger (Transaction.forget t)
+            |> Or_error.ok_exn
           in
           let next_available_token_after =
             Sparse_ledger.next_available_token sparse_ledger'
@@ -267,9 +269,10 @@ let generate_base_snarks_witness sparse_ledger0
           let next_available_token_before =
             Sparse_ledger.next_available_token sparse_ledger
           in
-          let sparse_ledger' =
-            Sparse_ledger.apply_transaction_exn ~constraint_constants
+          let sparse_ledger', _ =
+            Sparse_ledger.apply_transaction ~constraint_constants
               ~txn_state_view sparse_ledger (Transaction.forget t)
+            |> Or_error.ok_exn
           in
           let next_available_token_after =
             Sparse_ledger.next_available_token sparse_ledger'
