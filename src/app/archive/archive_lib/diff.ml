@@ -8,7 +8,7 @@ module Breadcrumb = Transition_frontier.Breadcrumb
 module Transition_frontier = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         | Breadcrumb_added of
             { block:
@@ -42,9 +42,9 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      | Transition_frontier of Transition_frontier.Stable.V1.t
+      | Transition_frontier of Transition_frontier.Stable.V2.t
       | Transaction_pool of Transaction_pool.Stable.V1.t
 
     let to_latest = Fn.id
