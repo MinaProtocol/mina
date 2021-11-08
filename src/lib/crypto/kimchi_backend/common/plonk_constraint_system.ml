@@ -1029,9 +1029,6 @@ struct
             [| Params.params.round_constants.(round).(0)
              ; Params.params.round_constants.(round).(1)
              ; Params.params.round_constants.(round).(2)
-             ; Params.params.round_constants.(round + 4).(0) (* same for rc *)
-             ; Params.params.round_constants.(round + 4).(1)
-             ; Params.params.round_constants.(round + 4).(2)
              ; Params.params.round_constants.(round + 1).(0)
              ; Params.params.round_constants.(round + 1).(1)
              ; Params.params.round_constants.(round + 1).(2)
@@ -1041,6 +1038,9 @@ struct
              ; Params.params.round_constants.(round + 3).(0)
              ; Params.params.round_constants.(round + 3).(1)
              ; Params.params.round_constants.(round + 3).(2)
+             ; Params.params.round_constants.(round + 4).(0)
+             ; Params.params.round_constants.(round + 4).(1)
+             ; Params.params.round_constants.(round + 4).(2)
             |]
           in
           add_row sys vars Poseidon coeffs
