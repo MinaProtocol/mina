@@ -943,9 +943,7 @@ module Data = struct
           ]
 
       let genesis ~(genesis_epoch_data : Genesis_epoch_data.Data.t) =
-        { Poly.ledger =
-            Epoch_ledger.genesis ~ledger:genesis_epoch_data.ledger
-            (* TODO: epoch_seed needs to be non-determinable by o1-labs before mainnet launch *)
+        { Poly.ledger = Epoch_ledger.genesis ~ledger:genesis_epoch_data.ledger
         ; seed = genesis_epoch_data.seed
         ; start_checkpoint = Mina_base.State_hash.(of_hash zero)
         ; lock_checkpoint = Lock_checkpoint.null
