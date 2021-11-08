@@ -18,9 +18,6 @@ ARG GO_VERSION=1.16.5
 # Go Capnp Version (for capnpc dependency)
 ARG GO_CAPNP_VERSION=v3.0.0-alpha.1
 
-# Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
-ARG RUST_VERSION=1.52.1
-
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4
 
@@ -30,30 +27,30 @@ ARG ROCKSDB_VERSION=v5.18.4
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
   && apt-get install --yes \
-    build-essential \
-    libboost-dev \
-    libboost-program-options-dev \
-    libffi-dev \
-    libgmp-dev \
-    libgmp3-dev \
-    libjemalloc-dev \
-    libpq-dev \
-    libprocps-dev \
-    libsodium-dev \
-    libssl-dev \
-    zlib1g-dev \
-    libbz2-dev \
-    libcap-dev \
-    pkg-config \
-    cmake \
-    m4 \
-    git \
-    curl \
-    sudo \
-    rsync \
-    unzip \
-    file \
-    capnproto
+  build-essential \
+  libboost-dev \
+  libboost-program-options-dev \
+  libffi-dev \
+  libgmp-dev \
+  libgmp3-dev \
+  libjemalloc-dev \
+  libpq-dev \
+  libprocps-dev \
+  libsodium-dev \
+  libssl-dev \
+  zlib1g-dev \
+  libbz2-dev \
+  libcap-dev \
+  pkg-config \
+  cmake \
+  m4 \
+  git \
+  curl \
+  sudo \
+  rsync \
+  unzip \
+  file \
+  capnproto
 
 # Create opam user (for later) and give sudo to make opam happy
 RUN adduser --uid 65533 --disabled-password --gecos '' opam \
@@ -73,16 +70,9 @@ RUN curl -sL \
 # Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
 RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
 
-# Rust install via rustup-init to a given RUST_VERSION
+# Rust install
 USER opam
-RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
-  https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init \
-  && chmod +x /tmp/rustup-init \
-  && /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal \
-  && rm /tmp/rustup-init
-# For more about rustup-init see: https://github.com/rust-lang/rustup/blob/master/README.md
-# As opposed to introducing another shell script here (that mostly just determines the platform)
-# we just download the binary for the only platform we care about in this docker environment
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 USER root
 # This builds and installs just the rocksdb static lib for us, and cleans up after itself
@@ -128,10 +118,10 @@ RUN git clone \
 # This package was particularly tricky to get to install correctly because of how the package's source code is structured.
 # To work around this, we install it as a dependency for a local go module and build the binary from the GOPATH.
 RUN mkdir go-tmp \
-    && cd go-tmp \
-    && /usr/lib/go/bin/go mod init local/build \
-    && /usr/lib/go/bin/go get capnproto.org/go/capnp/v3@$GO_CAPNP_VERSION \
-    && /usr/lib/go/bin/go build -o capnpc-go capnproto.org/go/capnp/v3/capnpc-go \
-    && sudo mv capnpc-go /usr/local/bin \
-    && cd - \
-    && sudo rm -rf go-tmp
+  && cd go-tmp \
+  && /usr/lib/go/bin/go mod init local/build \
+  && /usr/lib/go/bin/go get capnproto.org/go/capnp/v3@$GO_CAPNP_VERSION \
+  && /usr/lib/go/bin/go build -o capnpc-go capnproto.org/go/capnp/v3/capnpc-go \
+  && sudo mv capnpc-go /usr/local/bin \
+  && cd - \
+  && sudo rm -rf go-tmp
