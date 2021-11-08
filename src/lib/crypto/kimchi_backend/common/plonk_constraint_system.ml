@@ -1088,8 +1088,8 @@ struct
 
         *)
         let x1, y1 = reduce_curve_point p1 in
-        let x2, y2 = reduce_curve_point p1 in
-        let x3, y3 = reduce_curve_point p1 in
+        let x2, y2 = reduce_curve_point p2 in
+        let x3, y3 = reduce_curve_point p3 in
         let vars =
           [| Some x1
            ; Some y1
