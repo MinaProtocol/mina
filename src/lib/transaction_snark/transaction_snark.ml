@@ -4811,11 +4811,39 @@ let%test_module "transaction_snark" =
           ~fee_excess:Amount.Signed.zero ~pending_coinbase_init_stack:init_stack
           (`Ledger ledger) parties
       in
+      let deferred_or_error d = Async.Deferred.map d ~f:(fun p -> Ok p) in
       let open Async.Deferred.Let_syntax in
-      Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
-        ~f:(fun _ (witness, spec, statement, _snapp_stmts) ->
-          let%map _ = of_parties_segment_exn ~statement ~witness ~spec in
-          ((), ()))
+      let%map p =
+        match List.rev witnesses with
+        | [] ->
+            failwith "no witnesses generated"
+        | (witness, spec, stmt, _) :: rest ->
+            let open Async.Deferred.Or_error.Let_syntax in
+            let%bind p1 =
+              of_parties_segment_exn ~statement:stmt ~witness ~spec
+              |> deferred_or_error
+            in
+            let%map _ =
+              Async.Deferred.List.fold ~init:(Ok p1) rest
+                ~f:(fun acc (witness, spec, stmt, _) ->
+                  let%bind prev = Async.Deferred.return acc in
+                  let%bind curr =
+                    of_parties_segment_exn ~statement:stmt ~witness ~spec
+                    |> deferred_or_error
+                  in
+                  let sok_digest =
+                    Sok_message.create ~fee:Fee.zero
+                      ~prover:
+                        (Quickcheck.random_value
+                           Signature_lib.Public_key.Compressed.gen)
+                    |> Sok_message.digest
+                  in
+                  merge ~sok_digest prev curr)
+            in
+            p
+      in
+      let _p = Or_error.ok_exn p in
+      ((), ())
 
     let apply_parties ledger parties =
       let witnesses =
