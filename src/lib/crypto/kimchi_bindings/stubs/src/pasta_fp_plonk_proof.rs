@@ -34,6 +34,11 @@ pub fn caml_pasta_fp_plonk_proof_create(
     prev_challenges: Vec<CamlFp>,
     prev_sgs: Vec<CamlGVesta>,
 ) -> CamlProverProof<CamlGVesta, CamlFp> {
+    {
+        let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+            unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
+        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
+    }
     let prev: Vec<(Vec<Fp>, PolyComm<GAffine>)> = {
         if prev_challenges.is_empty() {
             Vec::new()

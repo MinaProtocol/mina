@@ -70,14 +70,20 @@ pub fn caml_pasta_fp_plonk_index_create(
         }
         Some(cs) => cs,
     };
-    println!("{}:{}", file!(), line!());
 
     // endo
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
 
+    // Unsafe if we are in a multi-core ocaml
+    {
+        let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+            unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+        ptr.add_lagrange_basis(cs.domain.d1);
+    }
+
     // create index
     Ok(CamlPastaFpPlonkIndex(Box::new(
-        DlogIndex::<GAffine>::create(cs, oracle::pasta::fq::params(), endo_q, srs.clone()),
+        DlogIndex::<GAffine>::create(cs, oracle::pasta::fq_3::params(), endo_q, srs.clone()),
     )))
 }
 
