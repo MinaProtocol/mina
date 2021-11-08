@@ -49,6 +49,7 @@
     (run rm -rf ./target)
     (run rm -f ./Cargo.lock)
     (setenv
-     RUST_BACKTRACE "1"
+     RUST_BACKTRACE
+     "1"
      (run cargo run ../kimchi.ml))
-    (run ocamlformat -i ../kimchi.ml)))))
+    (run ocamlformat --enable-outside-detected-project -i ../kimchi.ml)))))
