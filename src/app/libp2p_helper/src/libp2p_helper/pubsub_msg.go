@@ -175,6 +175,8 @@ func (m SubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
 			// coda process gets around to it.
 			app.P2p.Logger.Error("validation timed out :(")
 
+			validationTimeoutMetric.Inc()
+
 			app.ValidatorMutex.Lock()
 
 			now := time.Now()
@@ -189,6 +191,8 @@ func (m SubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
 			app.P2p.Logger.Info("unvalidated :(")
 			return pubsub.ValidationReject
 		case res := <-ch:
+			validationTime := time.Since(deadline)
+			validationTimeMetric.Set(float64(validationTime.Nanoseconds()))
 			switch res {
 			case pubsub.ValidationReject:
 				app.P2p.Logger.Info("why u fail to validate :(")

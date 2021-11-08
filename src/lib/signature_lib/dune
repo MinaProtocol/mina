@@ -5,7 +5,7 @@
  (inline_tests)
  (libraries
    blake2
-   core
+   core_kernel
    hash_prefix_states
    mina_signature_kind
    non_zero_curve_point

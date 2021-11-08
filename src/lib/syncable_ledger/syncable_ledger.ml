@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Async_kernel
 open Pipe_lib
 open Network_peer

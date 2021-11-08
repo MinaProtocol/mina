@@ -579,7 +579,7 @@ module For_tests = struct
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?(gen_root_breadcrumb =
         gen_genesis_breadcrumb_with_protocol_states ~logger ~verifier
-          ~precomputed_values ()) ~max_length ~size () =
+          ~precomputed_values ()) ~max_length ~size ?(use_super_catchup: bool option) () =
     let open Quickcheck.Generator.Let_syntax in
     let trust_system =
       Option.value trust_system ~default:(Trust_system.null ())
@@ -641,7 +641,7 @@ module For_tests = struct
       Async.Thread_safe.block_on_async_exn (fun () ->
           load_with_max_length ~max_length ~retry_with_fresh_db:false ~logger
             ~verifier ~consensus_local_state ~persistent_root
-            ~catchup_mode:`Normal ~persistent_frontier ~precomputed_values ()
+            ~catchup_mode:(match use_super_catchup with Some true -> `Super | Some false -> `Normal | None -> `Normal) ~persistent_frontier ~precomputed_values ()
       )
     in
     let frontier =
@@ -675,10 +675,10 @@ module For_tests = struct
         ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?gen_root_breadcrumb ?(get_branch_root = root) ~max_length ~frontier_size
-      ~branch_size () =
+      ~branch_size ?(use_super_catchup: bool option) () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
-      gen ?logger ~verifier ?trust_system ?consensus_local_state
+      gen ?logger ~verifier ?trust_system ?use_super_catchup ?consensus_local_state
         ~precomputed_values ?gen_root_breadcrumb ~root_ledger_and_accounts
         ~max_length ~size:frontier_size ()
     in

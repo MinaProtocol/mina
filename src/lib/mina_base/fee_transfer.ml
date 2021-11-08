@@ -26,8 +26,6 @@ module Single = struct
   [%%define_locally
   Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
 
-  [%%define_locally Base58_check.String_ops.(to_string, of_string)]
-
   let create ~receiver_pk ~fee ~fee_token = { receiver_pk; fee; fee_token }
 
   let receiver_pk { receiver_pk; _ } = receiver_pk
