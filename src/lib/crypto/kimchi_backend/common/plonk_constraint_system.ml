@@ -616,8 +616,6 @@ struct
         let all_gates = List.concat [ public_gates; gates ] in
         let all_gates = List.map all_gates ~f:to_absolute_row in
 
-        printf !"%{sexp: (int, Fp.t) Gate_spec.t list}\n" all_gates ;
-
         (* convert all the gates into our Gates.t Rust vector type *)
         List.iter all_gates ~f:(fun g ->
             Gates.add rust_gates (Gate_spec.to_rust_gate g)) ;
@@ -679,8 +677,8 @@ struct
            If these cells (the first 7) contain variables, make sure that they are wired *)
         let num_vars = min Constants.permutation_cols (Array.length vars) in
         let vars_for_perm = Array.slice vars 0 num_vars in
-        Array.iteri vars_for_perm ~f:(fun col some_x ->
-            Option.iter some_x ~f:(fun x -> wire sys x sys.next_row col)) ;
+        Array.iteri vars_for_perm ~f:(fun col x ->
+            Option.iter x ~f:(fun x -> wire sys x sys.next_row col)) ;
 
         (* TODO: I think there are two things we should check here (and possible panic on):
            - that these first 7 variables (that participate in the permutation argument) are not wired to anything that didn't participate in the permutation argument (hard to check as we don't have that information atm)
@@ -1157,6 +1155,7 @@ struct
           add_row sys curr_row Vbmul [||] ;
           add_row sys next_row Zero [||]
         in
+
         Array.iter
           ~f:(fun round -> add_ecscale_round round ; incr i)
           (Array.map state ~f:(Scale_round.map ~f:reduce_to_v)) ;
