@@ -216,7 +216,7 @@ module Lite = struct
     [%%versioned_binable
     module Stable = struct
       [@@@no_toplevel_latest_type]
-      module V1 = struct
+      module V2 = struct
         type t = E : (lite, 'mutant) diff -> t
         module T_nonbinable = struct
           type nonrec t = t
