@@ -547,7 +547,7 @@ module Parties_segment = struct
 
     let opt_signed = opt_signed ~is_start:`Compute_in_circuit
 
-    let _to_single_list : t -> Spec.single list =
+    let to_single_list : t -> Spec.single list =
      fun t ->
       match t with
       | Opt_signed_unsigned ->
@@ -4805,7 +4805,7 @@ let%test_module "transaction_snark" =
               let hash_post = Ledger.merkle_root ledger in
               [%test_eq: Field.t] hash_pre hash_post))
 
-    let apply_parties ledger parties =
+    let apply_parties_with_proof ledger parties =
       let witnesses =
         parties_witnesses_exn ~constraint_constants ~state_body
           ~fee_excess:Amount.Signed.zero ~pending_coinbase_init_stack:init_stack
@@ -4817,14 +4817,38 @@ let%test_module "transaction_snark" =
           let%map _ = of_parties_segment_exn ~statement ~witness ~spec in
           ((), ()))
 
+    let apply_parties ledger parties =
+      let witnesses =
+        parties_witnesses_exn ~constraint_constants ~state_body
+          ~fee_excess:Amount.Signed.zero ~pending_coinbase_init_stack:init_stack
+          (`Ledger ledger) parties
+      in
+      let open Impl in
+      List.fold ~init:((), ()) witnesses
+        ~f:(fun _ (witness, spec, statement, snapp_stmts) ->
+          run_and_check
+            (fun () ->
+              let s =
+                exists Statement.With_sok.typ ~compute:(fun () -> statement)
+              in
+              let snapp_stmts =
+                List.map snapp_stmts ~f:(fun (i, stmt) ->
+                    (i, exists Snapp_statement.typ ~compute:(fun () -> stmt)))
+              in
+              Base.Parties_snark.main ~constraint_constants
+                (Parties_segment.Basic.to_single_list spec)
+                snapp_stmts s ~witness ;
+              fun () -> ())
+            ()
+          |> Or_error.ok_exn)
+
     let%test_unit "snapps-based payment" =
       let open Transaction_logic.For_tests in
       Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let parties = party_send (List.hd_exn specs) in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              (fun () -> apply_parties ledger [ parties ])
-              |> Async.Thread_safe.block_on_async_exn)
+              apply_parties ledger [ parties ])
           |> fun ((), ()) -> ())
 
     let%test_unit "Consecutive snapps-based payments" =
@@ -4833,8 +4857,7 @@ let%test_module "transaction_snark" =
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let partiess = List.map ~f:party_send specs in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              (fun () -> apply_parties ledger partiess)
-              |> Async.Thread_safe.block_on_async_exn)
+              apply_parties ledger partiess)
           |> fun ((), ()) -> ())
 
     (* Disabling until new-style snapp transactions are fully implemented.
@@ -5030,7 +5053,7 @@ let%test_module "transaction_snark" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  (fun () -> apply_parties ledger [ parties ])
+                  (fun () -> apply_parties_with_proof ledger [ parties ])
                   |> Async.Thread_safe.block_on_async_exn)
               |> fun ((), ()) -> ())
 
@@ -5366,8 +5389,7 @@ let%test_module "transaction_snark" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  (fun () -> apply_parties ledger [ parties ])
-                  |> Async.Thread_safe.block_on_async_exn)
+                  apply_parties ledger [ parties ])
               |> fun ((), ()) -> ())
       end )
 
