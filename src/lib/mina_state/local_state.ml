@@ -88,7 +88,7 @@ let to_input
      ; excess
      ; ledger
      ; success
-     ; failure_status
+     ; failure_status = _
      } :
       t) =
   let open Random_oracle.Input in
@@ -100,7 +100,6 @@ let to_input
      ; Amount.to_input excess
      ; Ledger_hash.to_input ledger
      ; bitstring [ success ]
-     ; Transaction_status.Failure.option_to_input failure_status
     |]
 
 module Checked = struct
