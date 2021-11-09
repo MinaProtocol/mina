@@ -52,36 +52,21 @@ struct
 
       let to_bits_unsafe (x : t) = Wrap_main_inputs.Unsafe.unpack_unboolean x
 
-      let absorb_shifted sponge (x : t Shifted_value.t) =
+      let absorb_shifted sponge (x : t Shifted_value.Type1.t) =
         match x with Shifted_value x -> Sponge.absorb sponge x
     end
 
-    module Unpacked = struct
-      type t = Boolean.var list
+    module With_top_bit0 = struct
+      (* When the top bit is 0, there is no need to check that this is not
+         equal to one of the forbidden values. The scaling is safe. *)
+      module Constant = Other_field
 
-      type constant = bool list
+      type t = Impls.Wrap.Other_field.t
 
-      let typ : (t, constant) Typ.t =
-        let typ = Typ.list ~length:Field.size_in_bits Boolean.typ in
-        let p_msb =
-          let test_bit x i = B.(shift_right x i land one = one) in
-          List.init Other_field.size_in_bits ~f:(test_bit Other_field.size)
-          |> List.rev
-        in
-        let check xs_lsb =
-          let open Bitstring_lib.Bitstring in
-          Snarky_backendless.Checked.all_unit
-            [ typ.check xs_lsb
-            ; make_checked (fun () ->
-                  Bitstring_checked.lt_value
-                    (Msb_first.of_list (List.rev xs_lsb))
-                    (Msb_first.of_list p_msb)
-                  |> Boolean.Assert.is_true)
-            ]
-        in
-        { typ with check }
+      let typ = Impls.Wrap.Other_field.typ_unchecked
 
-      let assert_equal t1 t2 = Field.(Assert.equal (project t1) (project t2))
+      let absorb_shifted sponge (x : t Shifted_value.Type1.t) =
+        match x with Shifted_value x -> Sponge.absorb sponge x
     end
   end
 
@@ -159,11 +144,11 @@ struct
           absorb (PC :: PC) gammas_i ;
           squeeze_scalar sponge)
     in
-    let term_and_challenge (l, r) (pre, pre_packed) =
+    let term_and_challenge (l, r) pre =
       let left_term = Scalar_challenge.endo_inv l pre in
       let right_term = Scalar_challenge.endo r pre in
       ( Ops.add_fast left_term right_term
-      , { Bulletproof_challenge.prechallenge = pre_packed } )
+      , { Bulletproof_challenge.prechallenge = pre } )
     in
     let terms, challenges =
       Array.map2_exn gammas prechallenges ~f:term_and_challenge |> Array.unzip
@@ -374,7 +359,7 @@ struct
         in
         let q = p_prime + lr_prod in
         absorb sponge PC delta ;
-        let c, _c_packed = squeeze_scalar sponge in
+        let c = squeeze_scalar sponge in
         (* c Q + delta = z1 (G + b U) + z2 H *)
         let lhs =
           let cq = Scalar_challenge.endo q c in
@@ -390,24 +375,16 @@ struct
         in
         (`Success (equal_g lhs rhs), challenges))
 
-  module Opt =
-    S.Bit_sponge.Make
-      (struct
-        type t = Boolean.var
-      end)
-      (struct
-        type t = Field.t
+  module Opt = struct
+    include Opt_sponge.Make (Impl) (Wrap_main_inputs.Sponge.Permutation)
 
-        let to_bits t = Wrap_main_inputs.Unsafe.unpack_unboolean t
+    let challenge (s : t) : Field.t =
+      lowest_128_bits (squeeze s) ~constrain_low_bits:true
 
-        let finalize_discarded = Util.boolean_constrain (module Impl)
-
-        let high_entropy_bits = Wrap_main_inputs.high_entropy_bits
-      end)
-      (struct
-        type t = Boolean.var * Field.t
-      end)
-      (Opt_sponge.Make (Impl) (Wrap_main_inputs.Sponge.Permutation))
+    (* No need to boolean constrain scalar challenges. *)
+    let scalar_challenge (s : t) : Scalar_challenge.t =
+      SC.SC.create (lowest_128_bits (squeeze s) ~constrain_low_bits:false)
+  end
 
   let absorb sponge ty t =
     Util.absorb ~absorb_field:(Opt.absorb sponge)
@@ -443,16 +420,16 @@ struct
       ; gamma = gamma_1
       ; zeta = zeta_1
       } =
-    scalar_chal alpha_0 alpha_1 ;
     chal beta_0 beta_1 ;
     chal gamma_0 gamma_1 ;
+    scalar_chal alpha_0 alpha_1 ;
     scalar_chal zeta_0 zeta_1
 
   let assert_eq_marlin
       (m1 : (_, Field.t Pickles_types.Scalar_challenge.t) Plonk.Minimal.t)
       (m2 : (_, Scalar_challenge.t) Plonk.Minimal.t) =
     iter2 m1 m2
-      ~chal:(fun c1 c2 -> Field.Assert.equal c1 (Field.project c2))
+      ~chal:(fun c1 c2 -> Field.Assert.equal c1 c2)
       ~scalar_chal:
         (fun ({ inner = t1 } : _ Pickles_types.Scalar_challenge.t)
              ({ inner = t2 } : Scalar_challenge.t) -> Field.Assert.equal t1 t2)
@@ -756,35 +733,20 @@ struct
     (* A lot of hashing. *)
     absorb_evals x_hat1 evals1 ;
     absorb_evals x_hat2 evals2 ;
-    let squeeze () =
-      with_label __LOC__ (fun () ->
-          let x, x_packed = Sponge.squeeze sponge ~length:Challenge.length in
-          Util.boolean_constrain (module Impl) x ;
-          (x, x_packed))
-    in
-    let _, xi_actual = squeeze () in
-    let r_actual, _ = squeeze () in
+    Sponge.absorb sponge ft_eval1 ;
+    let xi_actual = squeeze_scalar sponge in
+    let r_actual = squeeze_challenge sponge in
     let xi_correct =
       with_label __LOC__ (fun () ->
+          let { SC.SC.inner = xi_actual } = xi_actual in
+          let { SC.SC.inner = xi } = xi in
           (* Sample new sg challenge point here *)
-          Field.equal xi_actual (pack_scalar_challenge xi))
+          Field.equal xi_actual xi)
     in
-    let scalar =
-      SC.to_field_checked (module Impl) ~endo:Endo.Step_inner_curve.scalar
-    in
-    let plonk =
-      with_label __LOC__ (fun () ->
-          Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
-          .map_challenges
-            ~f:(Fn.compose (Util.seal (module Impl)) Field.pack)
-            ~scalar plonk
-          |> Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
-             .map_fields
-               ~f:(Shifted_value.map ~f:(Util.seal (module Impl))))
-    in
-    let xi = scalar xi in
+    let xi = scalar_to_field xi in
     (* TODO: r actually does not need to be a scalar challenge. *)
-    let r = scalar (Scalar_challenge r_actual) in
+    let r = scalar_to_field (SC.SC.create r_actual) in
+    let plonk = map_plonk_to_field plonk in
     let zetaw = Field.mul domain#generator plonk.zeta in
     let combined_inner_product_correct =
       with_label __LOC__ (fun () ->
