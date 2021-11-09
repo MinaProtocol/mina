@@ -13,6 +13,7 @@ module Make
     (Inputs : Intf.Pairing_main_inputs.S
                 with type Impl.field = Backend.Tick.Field.t
                  and type Impl.prover_state = unit
+                 and type Impl.Bigint.t = Backend.Tick.Bigint.R.t
                  and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
 struct
   open Inputs
@@ -233,7 +234,7 @@ struct
         in
         let open Inner_curve in
         let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
-          with_label __LOC__ (fun () ->
+          with_label "combined_polynomial" (fun () ->
               Pcs_batch.combine_split_commitments pcs_batch
                 ~scale_and_add:
                   (fun ~(acc :
@@ -324,7 +325,7 @@ struct
 
   let lagrange_commitment ~domain i =
     let d =
-      Zexe_backend.Pasta.Precomputed.Lagrange_precomputations
+      Kimchi_pasta.Pasta.Precomputed.Lagrange_precomputations
       .index_of_domain_log2 (Domain.log2_size domain)
     in
     match Precomputed.Lagrange_precomputations.pallas.(d).(i) with
@@ -453,19 +454,20 @@ struct
   end
 
   let vanishing_polynomial mask =
-    let mask = Vector.to_array mask in
-    let max = Array.length mask in
-    fun x ->
-      let rec go acc i =
-        if i >= max then acc
-        else
-          let should_square = mask.(i) in
-          let acc =
-            Field.if_ should_square ~then_:(Field.square acc) ~else_:acc
+    with_label "vanishing_polynomial" (fun () ->
+        let mask = Vector.to_array mask in
+        let max = Array.length mask in
+        fun x ->
+          let rec go acc i =
+            if i >= max then acc
+            else
+              let should_square = mask.(i) in
+              let acc =
+                Field.if_ should_square ~then_:(Field.square acc) ~else_:acc
+              in
+              go acc (i + 1)
           in
-          go acc (i + 1)
-      in
-      Field.sub (go x 0) Field.one
+          Field.sub (go x 0) Field.one)
 
   let shifts ~log2_size =
     Common.tick_shifts ~log2_size
@@ -501,14 +503,17 @@ struct
         in
         vanishing_polynomial mask
       in
+      let size =
+        lazy
+          (Pseudo.choose (mask, domain_log2s) ~f:(fun x ->
+               Field.of_int (1 lsl x)))
+      in
       object
         method shifts = Lazy.force shifts
 
         method generator = Lazy.force generator
 
-        method size =
-          Pseudo.choose (mask, domain_log2s) ~f:(fun x ->
-              Field.of_int (1 lsl x))
+        method size = Lazy.force size
 
         method vanishing_polynomial = vp
       end
@@ -643,16 +648,17 @@ struct
           (Boolean.(b_acc ||| b), Field.if_ b ~then_:x ~else_:x_acc))
 
     let rec pow x bits_lsb =
-      let rec go acc bs =
-        match bs with
-        | [] ->
-            acc
-        | b :: bs ->
-            let acc = Field.square acc in
-            let acc = Field.if_ b ~then_:Field.(x * acc) ~else_:acc in
-            go acc bs
-      in
-      go Field.one (List.rev bits_lsb)
+      with_label "pow" (fun () ->
+          let rec go acc bs =
+            match bs with
+            | [] ->
+                acc
+            | b :: bs ->
+                let acc = Field.square acc in
+                let acc = Field.if_ b ~then_:Field.(x * acc) ~else_:acc in
+                go acc bs
+          in
+          go Field.one (List.rev bits_lsb))
 
     let mod_max_degree =
       let k = Nat.to_int Backend.Tick.Rounds.n in
@@ -748,6 +754,13 @@ struct
 
   let%test_unit "endo scalar" =
     SC.test (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
+
+  module Plonk = Types.Dlog_based.Proof_state.Deferred_values.Plonk
+
+  module Plonk_checks = struct
+    include Plonk_checks
+    include Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
+  end
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
      It
@@ -981,12 +994,8 @@ struct
       let sponge = Sponge.create sponge_params in
       Array.iter
         (Types.index_to_field_elements
-           ~g:
-             (fun (z :
-                    Inputs.Inner_curve.t
-                    Dlog_plonk_types.Poly_comm.Without_degree_bound.t) ->
-             Array.concat_map z
-               ~f:(Fn.compose List.to_array Inner_curve.to_field_elements))
+           ~g:(fun (z : Inputs.Inner_curve.t) ->
+             List.to_array (Inner_curve.to_field_elements z))
            index)
         ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
       sponge
@@ -1043,20 +1052,27 @@ struct
       (unfinalized :
         ( _
         , _
-        , _ Shifted_value.t
+        , _ Shifted_value.Type2.t
         , _
         , _
         , _ )
         Types.Pairing_based.Proof_state.Per_proof.In_circuit.t) =
-    let public_input =
-      let fp (Shifted_value.Shifted_value x) =
-        [| Step_main_inputs.Unsafe.unpack_unboolean x |]
-      in
-      with_label __LOC__ (fun () ->
+    let public_input :
+        [ `Field of Field.t | `Packed_bits of Field.t * int ] array =
+      (*
+      let fp (Shifted_value.Shifted_value ((s_div_2, s_odd): Other_field.t)) =
+        [| (s_div_2, Field.size_in_bits - 1); ((s_odd :> Field.t), 1) |]
+      in *)
+      with_label "pack_statement" (fun () ->
           Spec.pack
             (module Impl)
-            fp Types.Dlog_based.Statement.In_circuit.spec
+            Types.Dlog_based.Statement.In_circuit.spec
             (Types.Dlog_based.Statement.In_circuit.to_data statement))
+      |> Array.map ~f:(function
+           | `Field (Shifted_value.Type1.Shifted_value x) ->
+               `Field x
+           | `Packed_bits (x, n) ->
+               `Packed_bits (x, n))
     in
     let sponge = Sponge.create sponge_params in
     let { Types.Pairing_based.Proof_state.Deferred_values.xi

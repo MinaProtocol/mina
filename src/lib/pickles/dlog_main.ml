@@ -7,7 +7,6 @@ open Util
 module SC = Scalar_challenge
 open Pickles_types
 open Dlog_plonk_types
-module Accumulator = Pairing_marlin_types.Accumulator
 open Tuple_lib
 open Import
 
@@ -37,6 +36,7 @@ let b_poly ~one ~add ~mul chals =
 module Make
     (Inputs : Inputs
                 with type Impl.field = Tock.Field.t
+                 and type Impl.Bigint.t = Tock.Bigint.R.t
                  and type Inner_curve.Constant.Scalar.t = Tick.Field.t) =
 struct
   open Inputs
@@ -404,12 +404,13 @@ struct
       SC.SC.create (lowest_128_bits (squeeze s) ~constrain_low_bits:false)
   end
 
+  (* TODO: This doesn't need to be an opt sponge *)
   let absorb sponge ty t =
     Util.absorb ~absorb_field:(Opt.absorb sponge)
       ~g1_to_field_elements:(fun (b, (x, y)) -> [ (b, x); (b, y) ])
       ~absorb_scalar:(fun x -> Opt.absorb sponge (Boolean.true_, x))
-      ~mask_g1_opt:(fun (keep, ((finite : Boolean.var), (x, y))) ->
-        (keep, Field.((finite :> t) * x, (finite :> t) * y)))
+      ~mask_g1_opt:(fun ((finite : Boolean.var), (x, y)) ->
+        (Boolean.true_, Field.((finite :> t) * x, (finite :> t) * y)))
       ty t
 
   module Pseudo = Pseudo.Make (Impl)
@@ -708,11 +709,30 @@ struct
         | [] ->
             failwith "empty list")
 
-  let shift =
-    Shifted_value.Shift.(map ~f:Field.constant (create (module Field.Constant)))
+  let shift1 =
+    Shifted_value.Type1.Shift.(
+      map ~f:Field.constant (create (module Field.Constant)))
+
+  let shift2 =
+    Shifted_value.Type2.Shift.(
+      map ~f:Field.constant (create (module Field.Constant)))
 
   let%test_unit "endo scalar" =
     SC.test (module Impl) ~endo:Endo.Step_inner_curve.scalar
+
+  let map_plonk_to_field plonk =
+    Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
+    .map_challenges
+      ~f:(Util.seal (module Impl))
+      ~scalar:scalar_to_field plonk
+    |> Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
+       .map_fields
+         ~f:(Shifted_value.Type2.map ~f:(Util.seal (module Impl)))
+
+  module Plonk_checks = struct
+    include Plonk_checks
+    include Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
+  end
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
      It
