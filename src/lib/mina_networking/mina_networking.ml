@@ -1379,6 +1379,34 @@ let create (config : Config.t) ~sinks
         Gossip_net.Any.create config.creatable_gossip_net rpc_handlers
           (Gossip_net.Message.Any_sinks ((module Sinks), sinks)))
   in
+  (* Initialize the ban loop. *)
+  don't_wait_for
+    (Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
+       ~f:(fun (banned_peer, expiration) ->
+         don't_wait_for
+           (let log_failure reason err =
+              [%log error]
+                "Failed to send ban_notify request to $peer we banned (%s)."
+                reason
+                ~metadata:
+                  [ ("peer", `String (Peer.Id.to_string banned_peer.peer_id))
+                  ; ("error", `String (Error.to_string_hum err))
+                  ]
+            in
+            match%map
+              Gossip_net.Any.query_peer gossip_net banned_peer.peer_id
+                Rpcs.Ban_notify expiration
+            with
+            | Failed_to_connect err ->
+                log_failure "failed to connect due to $error" err
+            | Connected { Envelope.Incoming.data = Error err; _ } ->
+                log_failure "peer responded with $error" err
+            | Connected { Envelope.Incoming.data = Ok (); _ } ->
+                ()) ;
+         let%map () = Gossip_net.Any.ban_peer gossip_net banned_peer in
+         don't_wait_for
+           (let%bind () = Clock.at expiration in
+            Gossip_net.Any.unban_peer gossip_net banned_peer))) ;
   (* The node status RPC is implemented directly in go, serving a string which
      is periodically updated. This is so that one can make this RPC on a node even
      if that node is at its connection limit. *)
@@ -1439,8 +1467,6 @@ include struct
   let add_peer = lift add_peer
 
   let initial_peers = lift initial_peers
-
-  let ban_notification_reader = lift ban_notification_reader
 
   let random_peers = lift random_peers
 
@@ -1537,10 +1563,6 @@ let get_transition_chain ?heartbeat_timeout ?timeout t =
 let get_best_tip ?heartbeat_timeout ?timeout t peer =
   make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_best_tip
     ~label:"best tip" t peer ()
-
-let ban_notify t peer banned_until =
-  query_peer t peer.Peer.peer_id Rpcs.Ban_notify banned_until
-  >>| Fn.const (Ok ())
 
 let try_non_preferred_peers (type b) t input peers ~rpc :
     b Envelope.Incoming.t Deferred.Or_error.t =

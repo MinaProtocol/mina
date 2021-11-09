@@ -48,6 +48,10 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
   let add_peer (Any ((module M), t)) xs = M.add_peer t xs
 
+  let ban_peer (Any ((module M), t)) peer = M.ban_peer t peer
+
+  let unban_peer (Any ((module M), t)) peer = M.unban_peer t peer
+
   let initial_peers (Any ((module M), t)) = M.initial_peers t
 
   let random_peers (Any ((module M), t)) = M.random_peers t
@@ -74,9 +78,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
   let on_first_high_connectivity (Any ((module M), t)) =
     M.on_first_high_connectivity t
-
-  let ban_notification_reader (Any ((module M), t)) =
-    M.ban_notification_reader t
 
   let connection_gating (Any ((module M), t)) = M.connection_gating t
 

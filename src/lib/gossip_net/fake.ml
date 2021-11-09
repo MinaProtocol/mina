@@ -1,6 +1,5 @@
 open Async_kernel
 open Core
-open Pipe_lib
 open Network_peer
 
 (* TODO: Implement RPC version translations (documented in Async_rpc_kernel).
@@ -23,7 +22,6 @@ end
 
 module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
-  open Intf
   open Rpc_intf
 
   module Network = struct
@@ -125,8 +123,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       ; peer_table : (Peer.Id.t, Peer.t) Hashtbl.t
       ; initial_peers : Peer.t list
       ; connection_gating : Mina_net2.connection_gating ref
-      ; ban_notification_reader : ban_notification Linear_pipe.Reader.t
-      ; ban_notification_writer : ban_notification Linear_pipe.Writer.t
       ; time_controller : Block_time.Controller.t
       }
 
@@ -167,9 +163,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       let peer_table = Hashtbl.create (module Peer.Id) in
       List.iter initial_peers ~f:(fun peer ->
           Hashtbl.add_exn peer_table ~key:peer.peer_id ~data:peer) ;
-      let ban_notification_reader, ban_notification_writer =
-        Linear_pipe.create ()
-      in
       let time_controller =
         Block_time.Controller.create
         @@ Block_time.Controller.basic ~logger:(Logger.create ())
@@ -184,8 +177,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
             ref
               Mina_net2.
                 { banned_peers = []; trusted_peers = []; isolate = false }
-        ; ban_notification_reader
-        ; ban_notification_writer
         ; time_controller
         }
       in
@@ -207,6 +198,10 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let add_peer _ (_p : Peer.t) ~is_seed:_ = Deferred.return (Ok ())
 
+    let ban_peer _ _ = Deferred.unit
+
+    let unban_peer _ _ = Deferred.unit
+
     let initial_peers t =
       Hashtbl.data t.peer_table
       |> List.map
@@ -227,9 +222,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
     let on_first_connect _ ~f = Deferred.return (f ())
 
     let on_first_high_connectivity _ ~f:_ = Deferred.never ()
-
-    let ban_notification_reader { ban_notification_reader; _ } =
-      ban_notification_reader
 
     let query_peer ?heartbeat_timeout:_ ?timeout:_ t peer rpc query =
       Network.call_rpc t.network t.peer_table ~sender_id:t.me.peer_id
