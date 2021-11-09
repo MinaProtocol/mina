@@ -21,7 +21,7 @@ pushd ../../../../..
     if [ -n "$(git diff --stat)" ]; then id="[DIRTY]$id"; fi
   fi
   commit_date=$(git show HEAD -s --format="%cI")
-  pushd src/lib/marlin_plonk_bindings/stubs
+  pushd src/lib/crypto/kimchi_bindings/stubs
     marlin_commit_id=$(cargo metadata | jq '.packages[] | select(.name == "commitment_dlog").id' | cut -d " " -f 3 | sed 's/"//')
   popd
 popd
