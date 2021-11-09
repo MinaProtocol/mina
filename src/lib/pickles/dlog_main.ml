@@ -339,11 +339,11 @@ struct
       point
   end
 
-  let scale_fast p (Shifted_value.Shifted_value bits) =
-    Ops.scale_fast p (`Plus_two_to_len (Array.of_list bits))
+  let scale_fast = Ops.scale_fast
 
-  let check_bulletproof ~pcs_batch ~sponge ~xi
-      ~(combined_inner_product : Other_field.Packed.t Shifted_value.t)
+  let check_bulletproof ~pcs_batch ~(sponge : Sponge.t)
+      ~(xi : Scalar_challenge.t)
+      ~(combined_inner_product : Other_field.Packed.t Shifted_value.Type1.t)
       ~(* Corresponds to y in figure 7 of WTS *)
        (* sum_i r^i sum_j xi^j f_j(beta_i) *)
       (advice : _ Types.Pairing_based.Openings.Bulletproof.Advice.t)
@@ -351,11 +351,8 @@ struct
       ~openings_proof:
         ({ lr; delta; z_1; z_2; sg } :
           ( Inner_curve.t
-          , Other_field.Packed.t Shifted_value.t )
+          , Other_field.Packed.t Shifted_value.Type1.t )
           Openings.Bulletproof.t) =
-    let scale_fast p s =
-      scale_fast p (Shifted_value.map ~f:Other_field.Packed.to_bits_unsafe s)
-    in
     with_label __LOC__ (fun () ->
         Other_field.Packed.absorb_shifted sponge combined_inner_product ;
         (* a_hat should be equal to
@@ -369,6 +366,9 @@ struct
         let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
           Split_commitments.combine pcs_batch ~xi without_degree_bound
             with_degree_bound
+        in
+        let scale_fast =
+          scale_fast ~num_bits:Other_field.Packed.Constant.size_in_bits
         in
         let lr_prod, challenges = bullet_reduce sponge lr in
         let p_prime =

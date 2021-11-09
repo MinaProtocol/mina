@@ -200,25 +200,29 @@ struct
     in
     fun x -> Lazy.force f x
 
-  let scale_fast p (Shifted_value.Shifted_value bits) =
-    Ops.scale_fast p (`Plus_two_to_len (Array.of_list bits))
+  let scale_fast p s =
+    with_label __LOC__ (fun () ->
+        Ops.scale_fast p s ~num_bits:Field.size_in_bits)
 
-  let check_bulletproof ~pcs_batch ~sponge ~xi ~combined_inner_product
+  let scale_fast2 p (s : Other_field.t Shifted_value.Type2.t) =
+    with_label __LOC__ (fun () ->
+        Ops.scale_fast2 p s ~num_bits:Field.size_in_bits)
+
+  let check_bulletproof ~pcs_batch ~(sponge : Sponge.t) ~xi
+      ~combined_inner_product
       ~(* Corresponds to y in figure 7 of WTS *)
        (* sum_i r^i sum_j xi^j f_j(beta_i) *)
       (advice : _ Openings.Bulletproof.Advice.t)
       ~polynomials:(without_degree_bound, with_degree_bound)
       ~openings_proof:
         ({ lr; delta; z_1; z_2; sg } :
-          (Inner_curve.t, Other_field.t Shifted_value.t) Openings.Bulletproof.t)
-      =
-    let scale_fast p s =
-      scale_fast p (Shifted_value.map ~f:Other_field.to_bits_unsafe s)
-    in
-    with_label __LOC__ (fun () ->
+          ( Inner_curve.t
+          , Other_field.t Shifted_value.Type2.t )
+          Openings.Bulletproof.t) =
+    with_label "check_bulletproof" (fun () ->
         absorb sponge Scalar
           ( match combined_inner_product with
-          | Shifted_value.Shifted_value x ->
+          | Shifted_value.Type2.Shifted_value x ->
               x ) ;
         (* a_hat should be equal to
            sum_i < t, r^i pows(beta_i) >
@@ -275,12 +279,13 @@ struct
         in
         let lr_prod, challenges = bullet_reduce sponge lr in
         let p_prime =
-          let uc = scale_fast u combined_inner_product in
+          let uc = scale_fast2 u combined_inner_product in
           combined_polynomial + uc
         in
         let q = p_prime + lr_prod in
         absorb sponge PC delta ;
-        let c, _c_packed = squeeze_scalar sponge in
+        let c = squeeze_scalar sponge in
+        print_fp "c" c.inner ;
         (* c Q + delta = z1 (G + b U) + z2 H *)
         let lhs =
           let cq = Scalar_challenge.endo q c in
@@ -288,16 +293,16 @@ struct
         in
         let rhs =
           with_label __LOC__ (fun () ->
-              let b_u = scale_fast u advice.b in
-              let z_1_g_plus_b_u = scale_fast (sg + b_u) z_1 in
+              let b_u = scale_fast2 u advice.b in
+              let z_1_g_plus_b_u = scale_fast2 (sg + b_u) z_1 in
               let z2_h =
-                scale_fast (Inner_curve.constant (Lazy.force Generators.h)) z_2
+                scale_fast2 (Inner_curve.constant (Lazy.force Generators.h)) z_2
               in
               z_1_g_plus_b_u + z2_h)
         in
         (`Success (equal_g lhs rhs), challenges))
 
-  let assert_eq_marlin
+  let assert_eq_deferred_values
       (m1 :
         ( 'a
         , Inputs.Impl.Field.t Pickles_types.Scalar_challenge.t )
@@ -308,8 +313,8 @@ struct
         Types.Pairing_based.Proof_state.Deferred_values.Plonk.Minimal.t) =
     let open Types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal in
     let chal c1 c2 = Field.Assert.equal c1 c2 in
-    let scalar_chal (Scalar_challenge t1 : _ Pickles_types.Scalar_challenge.t)
-        (Scalar_challenge t2 : _ Pickles_types.Scalar_challenge.t) =
+    let scalar_chal ({ SC.SC.inner = t1 } : _ Pickles_types.Scalar_challenge.t)
+        ({ SC.SC.inner = t2 } : _ Pickles_types.Scalar_challenge.t) =
       Field.Assert.equal t1 t2
     in
     with_label __LOC__ (fun () -> chal m1.beta m2.beta) ;
