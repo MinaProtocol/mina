@@ -1383,26 +1383,27 @@ let create (config : Config.t) ~sinks
   don't_wait_for
     (Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
        ~f:(fun (banned_peer, expiration) ->
-         don't_wait_for
-           (let log_failure reason err =
-              [%log error]
-                "Failed to send ban_notify request to $peer we banned (%s)."
-                reason
-                ~metadata:
-                  [ ("peer", `String (Peer.Id.to_string banned_peer.peer_id))
-                  ; ("error", `String (Error.to_string_hum err))
-                  ]
-            in
-            match%map
-              Gossip_net.Any.query_peer gossip_net banned_peer.peer_id
-                Rpcs.Ban_notify expiration
-            with
-            | Failed_to_connect err ->
-                log_failure "failed to connect due to $error" err
-            | Connected { Envelope.Incoming.data = Error err; _ } ->
-                log_failure "peer responded with $error" err
-            | Connected { Envelope.Incoming.data = Ok (); _ } ->
-                ()) ;
+         let%bind () =
+           let log_failure reason err =
+             [%log error]
+               "Failed to send ban_notify request to $peer we banned (%s)."
+               reason
+               ~metadata:
+                 [ ("peer", `String (Peer.Id.to_string banned_peer.peer_id))
+                 ; ("error", `String (Error.to_string_hum err))
+                 ]
+           in
+           match%map
+             Gossip_net.Any.query_peer gossip_net banned_peer.peer_id
+               Rpcs.Ban_notify expiration
+           with
+           | Failed_to_connect err ->
+               log_failure "failed to connect due to $error" err
+           | Connected { Envelope.Incoming.data = Error err; _ } ->
+               log_failure "peer responded with $error" err
+           | Connected { Envelope.Incoming.data = Ok (); _ } ->
+               ()
+         in
          let%map () = Gossip_net.Any.ban_peer gossip_net banned_peer in
          don't_wait_for
            (let%bind () = Clock.at expiration in
