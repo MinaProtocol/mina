@@ -304,58 +304,43 @@ struct
 
   let incrementally_verify_proof (type b)
       (module Branching : Nat.Add.Intf with type n = b) ~domain
-      ~verification_key:(m : _ array Plonk_verification_key_evals.t) ~xi ~sponge
-      ~public_input ~(sg_old : (_, Branching.n) Vector.t)
-      ~combined_inner_product ~advice
-      ~(messages : (_, Boolean.var * _) Dlog_plonk_types.Messages.t)
-      ~openings_proof
+      ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
+      ~(public_input :
+         [ `Field of Field.t | `Packed_bits of Field.t * int ] array)
+      ~(sg_old : (_, Branching.n) Vector.t) ~combined_inner_product ~advice
+      ~(messages : _ Dlog_plonk_types.Messages.t) ~openings_proof
       ~(plonk :
          ( _
          , _
-         , _ Shifted_value.t )
+         , _ Shifted_value.Type2.t )
          Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit.t) =
-    let m =
-      Plonk_verification_key_evals.map m ~f:(function
-        | [| g |] ->
-            g
-        | _ ->
-            assert false)
-    in
-    with_label __LOC__ (fun () ->
+    with_label "incrementally_verify_proof" (fun () ->
         let receive ty f =
-          with_label __LOC__ (fun () ->
+          with_label "receive" (fun () ->
               let x = f messages in
               absorb sponge ty x ; x)
         in
-        let sample () =
-          let bits, packed = Sponge.squeeze sponge ~length:Challenge.length in
-          Util.boolean_constrain (module Impl) bits ;
-          (bits, packed)
-        in
+        let sample () = squeeze_challenge sponge in
         let sample_scalar () = squeeze_scalar sponge in
         let open Dlog_plonk_types.Messages in
         let x_hat =
-          with_label __LOC__ (fun () ->
+          with_label "x_hat" (fun () ->
               multiscale_known
                 (Array.mapi public_input ~f:(fun i x ->
-                     (Array.of_list x, lagrange_commitment ~domain i)))
+                     (x, lagrange_commitment ~domain i)))
               |> Inner_curve.negate)
         in
         let without = Type.Without_degree_bound in
-        let with_ = Type.With_degree_bound in
+        let absorb_g gs = absorb sponge without gs in
         absorb sponge PC x_hat ;
-        let l_comm = receive without l_comm in
-        let r_comm = receive without r_comm in
-        let o_comm = receive without o_comm in
-        let beta, beta_packed = sample () in
-        let gamma, gamma_packed = sample () in
+        let w_comm = messages.w_comm in
+        Vector.iter ~f:absorb_g w_comm ;
+        let beta = sample () in
+        let gamma = sample () in
         let z_comm = receive without z_comm in
-        let alpha, alpha_packed = sample_scalar () in
-        let t_comm = receive with_ t_comm in
-        let zeta, zeta_packed = sample_scalar () in
-        Util.boolean_constrain
-          (module Impl)
-          (match zeta with Scalar_challenge x -> x) ;
+        let alpha = sample_scalar () in
+        let t_comm = receive without t_comm in
+        let zeta = sample_scalar () in
         (* At this point, we should use the previous "bulletproof_challenges" to
            compute to compute f(beta_1) outside the snark
            where f is the polynomial corresponding to sg_old
@@ -370,44 +355,15 @@ struct
 
            Then, in the other proof, we can witness the evaluations and check their correctness
            against "combined_inner_product" *)
-        let f_comm =
-          let ( + ) = Inner_curve.( + ) in
-          let ( * ) = Fn.flip scale_fast in
-          let generic =
-            plonk.gnrc_l
-            * ( with_label __LOC__ (fun () -> plonk.gnrc_r * m.qm_comm)
-              + m.ql_comm )
-            + with_label __LOC__ (fun () -> plonk.gnrc_r * m.qr_comm)
-            + with_label __LOC__ (fun () -> plonk.gnrc_o * m.qo_comm)
-            + m.qc_comm
-          in
-          let poseidon =
-            (* alpha^2 rcm_comm[0] + alpha^3 rcm_comm[1] + alpha^4 rcm_comm[2]
-                 =
-                 alpha^2 (rcm_comm[0] + alpha (rcm_comm[1] + alpha rcm_comm[2]))
-            *)
-            let a = alpha in
-            let ( * ) = Fn.flip Scalar_challenge.endo in
-            m.rcm_comm_0 + (a * (m.rcm_comm_1 + (a * m.rcm_comm_2)))
-            |> ( * ) a |> ( * ) a
-          in
-          let g =
-            List.reduce_exn ~f:( + )
-              [ with_label __LOC__ (fun () -> plonk.perm1 * m.sigma_comm_2)
-              ; generic
-              ; poseidon
-              ; with_label __LOC__ (fun () -> plonk.psdn0 * m.psm_comm)
-              ; with_label __LOC__ (fun () -> plonk.ecad0 * m.add_comm)
-              ; with_label __LOC__ (fun () -> plonk.vbmul0 * m.mul1_comm)
-              ; with_label __LOC__ (fun () -> plonk.vbmul1 * m.mul2_comm)
-              ; with_label __LOC__ (fun () -> plonk.endomul0 * m.emul1_comm)
-              ; with_label __LOC__ (fun () -> plonk.endomul1 * m.emul2_comm)
-              ; with_label __LOC__ (fun () -> plonk.endomul2 * m.emul3_comm)
-              ]
-          in
-          let res = Array.map z_comm ~f:(( * ) plonk.perm0) in
-          res.(0) <- res.(0) + g ;
-          res
+        let sigma_comm_init, [ _ ] =
+          Vector.split m.sigma_comm
+            (snd (Dlog_plonk_types.Permuts_minus_1.add Nat.N1.n))
+        in
+        let ft_comm =
+          with_label __LOC__ (fun () ->
+              Common.ft_comm ~add:Ops.add_fast ~scale:scale_fast2
+                ~negate:Inner_curve.negate ~endoscale:Scalar_challenge.endo
+                ~verification_key:m ~plonk ~alpha ~t_comm)
         in
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)
@@ -418,46 +374,37 @@ struct
              It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
              the combined inner product.
           *)
+          let num_commitments_without_degree_bound = Nat.N26.n in
           let without_degree_bound =
             let T = Branching.eq in
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [| g |]))
-              [ [| x_hat |]
-              ; l_comm
-              ; r_comm
-              ; o_comm
-              ; z_comm
-              ; f_comm
-              ; [| m.sigma_comm_0 |]
-              ; [| m.sigma_comm_1 |]
-              ]
-              (snd (Branching.add Nat.N8.n))
+              ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
+              :: [| m.psm_comm |]
+              :: Vector.append w_comm
+                   (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
+                   (snd Dlog_plonk_types.(Columns.add Permuts_minus_1.n)) )
+              (snd (Branching.add num_commitments_without_degree_bound))
           in
-          with_label __LOC__ (fun () ->
+          with_label "check_bulletproof" (fun () ->
               check_bulletproof
                 ~pcs_batch:
-                  (Common.dlog_pcs_batch (Branching.add Nat.N8.n)
-                     ~max_quot_size:
-                       (Common.max_quot_size_int (Domain.size domain)))
+                  (Common.dlog_pcs_batch
+                     (Branching.add num_commitments_without_degree_bound))
                 ~sponge:sponge_before_evaluations ~xi ~combined_inner_product
-                ~advice ~openings_proof
-                ~polynomials:(without_degree_bound, [ t_comm ]))
+                ~advice ~openings_proof ~polynomials:(without_degree_bound, []))
         in
-        assert_eq_marlin
+        assert_eq_deferred_values
           { alpha = plonk.alpha
           ; beta = plonk.beta
           ; gamma = plonk.gamma
           ; zeta = plonk.zeta
           }
-          { alpha = alpha_packed
-          ; beta = beta_packed
-          ; gamma = gamma_packed
-          ; zeta = zeta_packed
-          } ;
+          { alpha; beta; gamma; zeta } ;
         (sponge_digest_before_evaluations, bulletproof_challenges))
 
   let compute_challenges ~scalar chals =
-    with_label __LOC__ (fun () ->
+    with_label "compute_challenges" (fun () ->
         Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
             scalar prechallenge))
 
