@@ -7,6 +7,12 @@ terraform {
     bucket  = "o1labs-terraform-state"
     acl     = "bucket-owner-full-control"
   }
+  required_providers {
+    docker = {
+      source  = "kreuzwerker/docker"
+      version = "2.11.0"
+    }
+  }
 }
 
 module "o1testnet_alerts" {
@@ -25,4 +31,8 @@ output "testnet_alert_rules" {
 output "testnet_alert_receivers" {
   value     = module.o1testnet_alerts.rendered_receivers_config
   sensitive = true
+}
+
+provider "docker" {
+  host = "unix:///var/run/docker.sock"
 }

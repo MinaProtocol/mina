@@ -1,0 +1,4 @@
+backend:
+  image: gcr.io/mina-mainnet-303900/foundation-delegation-backend:prod-v3-1557e6c
+  port: 80
+  secret: foundation-delegation-creds

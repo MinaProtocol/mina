@@ -236,7 +236,7 @@ type Helper struct {
 	Rendezvous        string
 	Discovery         *discovery.RoutingDiscovery
 	Me                peer.ID
-	GatingState       *CodaGatingState
+	gatingState       *CodaGatingState
 	ConnectionManager *CodaConnectionManager
 	BandwidthCounter  *metrics.BandwidthCounter
 	MsgStats          *MessageStats
@@ -289,6 +289,10 @@ func (ms *MessageStats) GetStats() *safeStats {
 	}
 }
 
+func (h *Helper) ResetGatingConfigTrustedAddrFilters() {
+	h.gatingState.TrustedAddrFilters = ma.NewFilters()
+}
+
 // this type implements the ConnectionGating interface
 // https://godoc.org/github.com/libp2p/go-libp2p-core/connmgr#ConnectionGating
 // the comments of the functions below are taken from those docs.
@@ -332,6 +336,25 @@ func NewCodaGatingState(bannedAddrFilters *ma.Filters, trustedAddrFilters *ma.Fi
 		KnownPrivateAddrFilters: knownPrivateAddrFilters,
 		BannedPeers:             bannedPeers,
 		TrustedPeers:            trustedPeers,
+	}
+}
+
+func (h *Helper) GatingState() *CodaGatingState {
+	return h.gatingState
+}
+
+func (h *Helper) SetGatingState(gs *CodaGatingState) {
+	h.gatingState = gs
+	for _, c := range h.Host.Network().Conns() {
+		pid := c.RemotePeer()
+		maddr := c.RemoteMultiaddr()
+		if !gs.isAllowedPeerWithAddr(pid, maddr) {
+			go func() {
+				if err := h.Host.Network().ClosePeer(pid); err != nil {
+					gs.logger.Infof("failed to close banned peer %v: %v", pid, err)
+				}
+			}()
+		}
 	}
 }
 
@@ -695,7 +718,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		Rendezvous:        rendezvousString,
 		Discovery:         nil,
 		Me:                me,
-		GatingState:       gatingState,
+		gatingState:       gatingState,
 		ConnectionManager: connManager,
 		BandwidthCounter:  bandwidthCounter,
 		MsgStats:          &MessageStats{min: math.MaxUint64},
