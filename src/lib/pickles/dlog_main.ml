@@ -649,17 +649,19 @@ struct
     Evals.map2 lengths e ~f:(fun lengths e ->
         Array.zip_exn (mask lengths choice) e)
 
-  let combined_evaluation (type b b_plus_8) b_plus_8 ~xi ~evaluation_point
-      ((without_degree_bound : (_, b_plus_8) Vector.t), with_degree_bound)
+  let combined_evaluation (type b b_plus_26) b_plus_26 ~xi ~evaluation_point
+      ((without_degree_bound : (_, b_plus_26) Vector.t), with_degree_bound)
       ~max_quot_size =
     let open Field in
-    Pcs_batch.combine_split_evaluations ~mul ~last:Array.last
-      ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
-      ~shifted_pow:
-        (Pseudo.Degree_bound.shifted_pow ~crs_max_degree:Common.Max_degree.wrap)
-      ~init:Fn.id ~evaluation_point ~xi
-      (Common.dlog_pcs_batch b_plus_8 ~max_quot_size)
-      without_degree_bound with_degree_bound
+    with_label __LOC__ (fun () ->
+        Pcs_batch.combine_split_evaluations ~mul ~last:Array.last
+          ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
+          ~shifted_pow:
+            (Pseudo.Degree_bound.shifted_pow
+               ~crs_max_degree:Common.Max_degree.wrap)
+          ~init:Fn.id ~evaluation_point ~xi
+          (Common.dlog_pcs_batch b_plus_26)
+          without_degree_bound with_degree_bound)
 
   let compute_challenges ~scalar chals =
     Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
@@ -667,30 +669,25 @@ struct
 
   let b_poly = Field.(b_poly ~add ~mul ~one)
 
-  let pack_scalar_challenge (Pickles_types.Scalar_challenge.Scalar_challenge t)
-      =
-    Field.pack (Challenge.to_bits t)
+  let pow2pow (pt : Field.t) (n : int) : Field.t =
+    with_label __LOC__ (fun () ->
+        let rec go acc i =
+          if i = 0 then acc else go (Field.square acc) (i - 1)
+        in
+        go pt n)
 
-  let actual_evaluation (e : Field.t array) (pt : Field.t) : Field.t =
-    let pt_n =
-      with_label __LOC__ (fun () ->
-          let max_degree_log2 = Int.ceil_log2 Common.Max_degree.wrap in
-          let rec go acc i =
-            if i = 0 then acc else go (Field.square acc) (i - 1)
-          in
-          go pt max_degree_log2)
-    in
+  let actual_evaluation (e : Field.t array) ~(pt_to_n : Field.t) : Field.t =
     with_label __LOC__ (fun () ->
         match List.rev (Array.to_list e) with
         | e :: es ->
             List.fold ~init:e es ~f:(fun acc y ->
                 let acc' =
                   exists Field.typ ~compute:(fun () ->
-                      As_prover.read_var Field.(y + (pt_n * acc)))
+                      As_prover.read_var Field.(y + (pt_to_n * acc)))
                 in
                 (* acc' = y + pt_n * acc *)
-                let pt_n_acc = Field.(pt_n * acc) in
-                let open Zexe_backend_common.Plonk_constraint_system
+                let pt_n_acc = Field.(pt_to_n * acc) in
+                let open Kimchi_backend_common.Plonk_constraint_system
                          .Plonk_constraint in
                 (* 0 = - acc' + y + pt_n_acc *)
                 let open Field.Constant in
@@ -733,10 +730,14 @@ struct
       ({ xi; combined_inner_product; bulletproof_challenges; b; plonk } :
         ( _
         , _
-        , _ Shifted_value.t
+        , _ Shifted_value.Type2.t
         , _ )
         Types.Pairing_based.Proof_state.Deferred_values.In_circuit.t)
-      ((evals1, x_hat1), (evals2, x_hat2)) =
+      { Dlog_plonk_types.All_evals.ft_eval1
+      ; evals =
+          ( { evals = evals1; public_input = x_hat1 }
+          , { evals = evals2; public_input = x_hat2 } )
+      } =
     let T = Branching.eq in
     let open Vector in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
@@ -766,16 +767,44 @@ struct
     let r = scalar_to_field (SC.SC.create r_actual) in
     let plonk = map_plonk_to_field plonk in
     let zetaw = Field.mul domain#generator plonk.zeta in
+    let plonk_minimal = Plonk.to_minimal plonk in
+    let combined_evals =
+      let n = Common.Max_degree.wrap_log2 in
+      (* TODO: zeta_n is recomputed in [env] below *)
+      let zeta_n = pow2pow plonk.zeta n in
+      let zetaw_n = pow2pow zetaw n in
+      ( Dlog_plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zeta_n) evals1
+      , Dlog_plonk_types.Evals.map
+          ~f:(actual_evaluation ~pt_to_n:zetaw_n)
+          evals2 )
+    in
+    let env =
+      Plonk_checks.scalars_env
+        (module Field)
+        ~srs_length_log2:Common.Max_degree.wrap_log2
+        ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
+        ~mds:sponge_params.mds
+        ~field_of_hex:(fun s ->
+          Kimchi_pasta.Pasta.Bigint256.of_hex_string s
+          |> Kimchi_pasta.Pasta.Fq.of_bigint |> Field.constant)
+        ~domain (Plonk.to_minimal plonk) combined_evals
+    in
     let combined_inner_product_correct =
       with_label __LOC__ (fun () ->
+          let ft_eval0 : Field.t =
+            with_label __LOC__ (fun () ->
+                Plonk_checks.ft_eval0
+                  (module Field)
+                  ~env ~domain plonk_minimal combined_evals x_hat1)
+          in
           (* sum_i r^i sum_j xi^j f_j(beta_i) *)
           let actual_combined_inner_product =
             let sg_olds =
               Vector.map old_bulletproof_challenges ~f:(fun chals ->
                   unstage (b_poly (Vector.to_array chals)))
             in
-            let combine pt x_hat e =
-              let pi = Branching.add Nat.N8.n in
+            let combine ~ft pt x_hat e =
+              let pi = Branching.add Nat.N26.n in
               let a, b = Evals.to_vectors (e : Field.t array Evals.t) in
               let sg_evals =
                 match actual_branching with
@@ -787,24 +816,29 @@ struct
                         (module Impl)
                         ~first_zero:branching (Vector.length sg_olds)
                     in
-                    Vector.map2 mask sg_olds ~f:(fun b f ->
-                        [| Field.((b :> t) * f pt) |])
+                    with_label __LOC__ (fun () ->
+                        Vector.map2 mask sg_olds ~f:(fun b f ->
+                            [| Field.((b :> t) * f pt) |]))
               in
-              let v = Vector.append sg_evals ([| x_hat |] :: a) (snd pi) in
+              let v =
+                Vector.append sg_evals ([| x_hat |] :: [| ft |] :: a) (snd pi)
+              in
               combined_evaluation pi ~xi ~evaluation_point:pt (v, b)
                 ~max_quot_size
             in
-            combine plonk.zeta x_hat1 evals1 + (r * combine zetaw x_hat2 evals2)
+            combine ~ft:ft_eval0 plonk.zeta x_hat1 evals1
+            + (r * combine ~ft:ft_eval1 zetaw x_hat2 evals2)
           in
-          equal
-            (Shifted_value.to_field
-               (module Field)
-               ~shift combined_inner_product)
-            actual_combined_inner_product)
+          with_label __LOC__ (fun () ->
+              equal
+                (Shifted_value.Type2.to_field
+                   (module Field)
+                   ~shift:shift2 combined_inner_product)
+                actual_combined_inner_product))
     in
     let bulletproof_challenges =
       with_label __LOC__ (fun () ->
-          compute_challenges ~scalar bulletproof_challenges)
+          compute_challenges ~scalar:scalar_to_field bulletproof_challenges)
     in
     let b_correct =
       with_label __LOC__ (fun () ->
@@ -812,18 +846,15 @@ struct
             unstage (b_poly (Vector.to_array bulletproof_challenges))
           in
           let b_actual = b_poly plonk.zeta + (r * b_poly zetaw) in
-          equal (Shifted_value.to_field (module Field) ~shift b) b_actual)
+          equal
+            (Shifted_value.Type2.to_field (module Field) ~shift:shift2 b)
+            b_actual)
     in
     let plonk_checks_passed =
       with_label __LOC__ (fun () ->
-          let e = Fn.flip actual_evaluation in
           Plonk_checks.checked
             (module Impl)
-            ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
-            ~domain ~shift plonk ~mds:sponge_params.mds
-            ( Dlog_plonk_types.Evals.map ~f:(e plonk.zeta) evals1
-            , Dlog_plonk_types.Evals.map ~f:(e zetaw) evals2 )
-            x_hat1)
+            ~env ~shift:shift2 plonk combined_evals)
     in
     print_bool "xi_correct" xi_correct ;
     print_bool "combined_inner_product_correct" combined_inner_product_correct ;
