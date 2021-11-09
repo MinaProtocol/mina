@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Import
 open Pickles_types
 open Types
@@ -34,10 +34,10 @@ module Dlog_based = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V1 = struct
+      module V2 = struct
         type t =
           Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
-          Scalar_challenge.Stable.V1.t
+          Scalar_challenge.Stable.V2.t
           Bulletproof_challenge.Stable.V1.t
           Wrap_bp_vec.Stable.V1.t
         [@@deriving sexp, compare, yojson, hash, equal]
