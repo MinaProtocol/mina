@@ -37,20 +37,15 @@ struct
       @ [ b ]
   end
 
-  let print_g lab g =
+  let print_g lab (x, y) =
     if debug then
       as_prover
         As_prover.(
           fun () ->
-            match Inner_curve.to_field_elements g with
-            | [ x; y ] ->
-                printf !"%s: %!" lab ;
-                Field.Constant.print (read_var x) ;
-                printf ", %!" ;
-                Field.Constant.print (read_var y) ;
-                printf "\n%!"
-            | _ ->
-                assert false)
+            printf
+              !"%s: %{sexp:Backend.Tick.Field.t}, %{sexp:Backend.Tick.Field.t}\n\
+                %!"
+              lab (read_var x) (read_var y))
 
   let print_chal lab chal =
     if debug then
@@ -59,15 +54,14 @@ struct
           fun () ->
             printf
               !"%s: %{sexp:Challenge.Constant.t}\n%!"
-              lab
-              (read Challenge.typ_unchecked chal))
+              lab (read Challenge.typ chal))
 
   let print_fp lab x =
     if debug then
-      as_prover (fun () ->
-          printf "%s: %!" lab ;
-          Field.Constant.print (As_prover.read Field.typ x) ;
-          printf "\n%!")
+      as_prover
+        As_prover.(
+          fun () ->
+            printf !"%s: %{sexp:Backend.Tick.Field.t}\n%!" lab (read_var x))
 
   let print_bool lab x =
     if debug then
