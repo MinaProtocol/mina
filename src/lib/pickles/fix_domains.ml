@@ -1,14 +1,13 @@
 open Core_kernel
 open Import
 
-let domains (sys : _ Zexe_backend_common.Plonk_constraint_system.t) : Domains.t
-    =
+let zk_rows = 3
+
+let domains (sys : _ Kimchi_backend_common.Plonk_constraint_system.t) :
+    Domains.t =
   let open Domain in
   let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
-  let rows =
-    Zexe_backend_common.Plonk_constraint_system.zk_rows + public_input_size
-    + List.length sys.rows_rev
-  in
+  let rows = zk_rows + public_input_size + List.length sys.rows_rev in
   { h = Pow_2_roots_of_unity Int.(ceil_log2 rows)
   ; x = Pow_2_roots_of_unity (Int.ceil_log2 public_input_size)
   }
@@ -22,7 +21,7 @@ let domains (type field a)
       with type field = field
        and type R1CS_constraint_system.t = ( a
                                            , field )
-                                           Zexe_backend_common
+                                           Kimchi_backend_common
                                            .Plonk_constraint_system
                                            .t) (Spec.ETyp.T (typ, conv)) main =
   let main x () : unit = main (conv x) in
