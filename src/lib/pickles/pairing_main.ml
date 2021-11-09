@@ -102,21 +102,48 @@ struct
     let ( + ) = Ops.add_fast
   end
 
-  let multiscale_known ts =
+  let multiscale_known
+      (ts :
+        ( [ `Field of Field.t | `Packed_bits of Field.t * int ]
+        * Inner_curve.Constant.t )
+        array) =
     let rec pow2pow x i =
       if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
     in
+    let module F = struct
+      type t = Field.t
+
+      let typ = Field.typ
+
+      module Constant = struct
+        include Field.Constant
+
+        let to_bigint = Impl.Bigint.of_field
+      end
+    end in
     with_label __LOC__ (fun () ->
-        let correction =
+        let correction, acc =
           Array.mapi ts ~f:(fun i (s, x) ->
-              let n = Array.length s in
-              pow2pow x n)
-          |> Array.reduce_exn ~f:Inner_curve.Constant.( + )
-        in
-        let acc =
-          Array.mapi ts ~f:(fun i (s, x) ->
-              Ops.scale_fast (Inner_curve.constant x) (`Plus_two_to_len s))
-          |> Array.reduce_exn ~f:Inner_curve.( + )
+              let rr, n =
+                match s with
+                | `Packed_bits (s, n) ->
+                    ( Ops.scale_fast2'
+                        (module F)
+                        (Inner_curve.constant x) s ~num_bits:n
+                    , n )
+                | `Field s ->
+                    ( Ops.scale_fast2'
+                        (module F)
+                        (Inner_curve.constant x) s ~num_bits:Field.size_in_bits
+                    , Field.size_in_bits )
+              in
+              let n =
+                Ops.bits_per_chunk * Ops.chunks_needed ~num_bits:(n - 1)
+              in
+              let cc = pow2pow x n in
+              (cc, rr))
+          |> Array.reduce_exn ~f:(fun (a1, b1) (a2, b2) ->
+                 (Inner_curve.Constant.( + ) a1 a2, Inner_curve.( + ) b1 b2))
         in
         Inner_curve.(acc + constant (Constant.negate correction)))
 

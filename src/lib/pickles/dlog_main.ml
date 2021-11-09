@@ -208,29 +208,47 @@ struct
   let lagrange_with_correction (type n) ~input_length
       ~domain:
         ( (which_branch : n One_hot_vector.t)
-        , (domains : (Domains.t, n) Vector.t) ) i =
-    let rec pow2pow x i =
-      if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
-    in
-    Vector.map domains ~f:(fun d ->
-        let d =
-          Precomputed.Lagrange_precomputations.index_of_domain_log2
-            (Domain.log2_size d.h)
+        , (domains : (Domains.t, n) Vector.t) ) i : Inner_curve.t Double.t =
+    with_label __LOC__ (fun () ->
+        let actual_shift =
+          (* TODO: num_bits should maybe be input_length - 1. *)
+          Ops.bits_per_chunk * Ops.chunks_needed ~num_bits:input_length
         in
-        match Precomputed.Lagrange_precomputations.vesta.(d).(i) with
-        | [| g |] ->
-            let g = Inner_curve.Constant.of_affine g in
-            ( Inner_curve.constant g
-            , Inner_curve.constant
-                (Inner_curve.Constant.negate (pow2pow g input_length)) )
-        | xs ->
-            failwithf "expected commitment to have length 1. got %d"
-              (Array.length xs) ())
-    |> Vector.map2
-         (which_branch :> (Boolean.var, n) Vector.t)
-         ~f:(fun b pr ->
-           Double.map pr ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y)))
-    |> Vector.reduce_exn ~f:(Double.map2 ~f:(Double.map2 ~f:Field.( + )))
+        let rec pow2pow x i =
+          if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
+        in
+        let base_and_correction (h : Domain.t) =
+          let d =
+            Precomputed.Lagrange_precomputations.index_of_domain_log2
+              (Domain.log2_size h)
+          in
+          match Precomputed.Lagrange_precomputations.vesta.(d).(i) with
+          | [| g |] ->
+              let open Inner_curve.Constant in
+              let g = of_affine g in
+              ( Inner_curve.constant g
+              , Inner_curve.constant (negate (pow2pow g actual_shift)) )
+          | xs ->
+              failwithf "expected commitment to have length 1. got %d"
+                (Array.length xs) ()
+        in
+        match domains with
+        | [] ->
+            assert false
+        | d :: ds ->
+            if Vector.for_all ds ~f:(fun d' -> Domain.equal d.h d'.h) then
+              base_and_correction d.h
+            else
+              Vector.map domains ~f:(fun (ds : Domains.t) ->
+                  base_and_correction ds.h)
+              |> Vector.map2
+                   (which_branch :> (Boolean.var, n) Vector.t)
+                   ~f:(fun b pr ->
+                     Double.map pr ~f:(fun (x, y) ->
+                         Field.((b :> t) * x, (b :> t) * y)))
+              |> Vector.reduce_exn
+                   ~f:(Double.map2 ~f:(Double.map2 ~f:Field.( + )))
+              |> Double.map ~f:(Double.map ~f:(Util.seal (module Impl))))
 
   let h_precomp =
     Lazy.map ~f:Inner_curve.Scaling_precomputation.create Generators.h
