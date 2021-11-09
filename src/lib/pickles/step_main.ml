@@ -1,5 +1,5 @@
 module S = Sponge
-open Core
+open Core_kernel
 open Pickles_types
 open Common
 open Poly_types
@@ -122,18 +122,19 @@ let step_main :
     with_label "step_main" (fun () ->
         let T = Max_branching.eq in
         let dlog_plonk_index =
-          exists
-            ~request:(fun () -> Req.Wrap_index)
-            (Plonk_verification_key_evals.typ
-               (Typ.array Inner_curve.typ
-                  ~length:
-                    (index_commitment_length ~max_degree:Max_degree.wrap
-                       basic.wrap_domains.h)))
+          with_label "dlog_plonk_index" (fun () ->
+              exists
+                ~request:(fun () -> Req.Wrap_index)
+                (Plonk_verification_key_evals.typ Inner_curve.typ))
         in
-        let app_state = exists basic.typ ~request:(fun () -> Req.App_state) in
+        let app_state =
+          with_label "app_state" (fun () ->
+              exists basic.typ ~request:(fun () -> Req.App_state))
+        in
         let prevs =
-          exists (Prev_typ.f prev_typs) ~request:(fun () ->
-              Req.Proof_with_datas)
+          with_label "prevs" (fun () ->
+              exists (Prev_typ.f prev_typs) ~request:(fun () ->
+                  Req.Proof_with_datas))
         in
         let prev_statements =
           let module M =
@@ -264,8 +265,7 @@ let step_main :
                             let open Step_main_inputs in
                             let sponge = Sponge.create sponge_params in
                             Sponge.absorb sponge (`Field sponge_digest) ;
-                            sponge |> Opt_sponge.Underlying.of_sponge
-                            |> S.Bit_sponge.make
+                            sponge
                           in
                           finalize_other_proof d.max_branching
                             ~max_width:d.max_width ~step_widths:d.branchings
@@ -315,9 +315,10 @@ let step_main :
                       with_label __LOC__ (fun () ->
                           verify ~branching:d.max_branching
                             ~wrap_domain:d.wrap_domains.h
-                            ~is_base_case:should_verify ~sg_old ~opening
-                            ~messages ~wrap_verification_key:d.wrap_key
-                            statement unfinalized)
+                            ~is_base_case:(Boolean.not should_verify)
+                            ~sg_old ~opening ~messages
+                            ~wrap_verification_key:d.wrap_key statement
+                            unfinalized)
                     in
                     if debug then
                       as_prover
