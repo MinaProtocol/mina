@@ -57,7 +57,7 @@ in
         artifact_paths = [SelectFiles.exactly "." "${testName}.test.log"],
         label = "${testName} integration test",
         key = "integration-test-${testName}",
-        target = Size.Large,
+        target = Size.Medium,
         depends_on = dependsOn,
         if = Some "build.branch != 'develop' && build.branch != 'compatible' && build.branch != 'develop-next'"
       }

@@ -4122,22 +4122,6 @@ struct
 end
 
 module For_tests = struct
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled
-
-  let genesis_constants = Genesis_constants.compiled
-
-  let proof_level = Genesis_constants.Proof_level.compiled
-
-  let consensus_constants =
-    Consensus.Constants.create ~constraint_constants
-      ~protocol_constants:genesis_constants.protocol
-
-  include Make (struct
-    let constraint_constants = constraint_constants
-
-    let proof_level = proof_level
-  end)
-
   let create_trivial_predicate_snapp ~constraint_constants spec ledger =
     let local_dummy_constraints () =
       let open Run in
@@ -4428,6 +4412,22 @@ end
 
 let%test_module "transaction_snark" =
   ( module struct
+    let constraint_constants = Genesis_constants.Constraint_constants.compiled
+
+    let genesis_constants = Genesis_constants.compiled
+
+    let proof_level = Genesis_constants.Proof_level.compiled
+
+    let consensus_constants =
+      Consensus.Constants.create ~constraint_constants
+        ~protocol_constants:genesis_constants.protocol
+
+    include Make (struct
+      let constraint_constants = constraint_constants
+
+      let proof_level = proof_level
+    end)
+
     open For_tests
 
     (* For tests let's just monkey patch ledger and sparse ledger to freeze their
