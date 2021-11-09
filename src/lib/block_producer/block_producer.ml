@@ -474,6 +474,8 @@ module Vrf_evaluation_state = struct
   let finished t =
     match t.vrf_evaluator_status with Completed -> true | _ -> false
 
+  let evaluator_status t = t.vrf_evaluator_status
+
   let update_status t (vrf_status : Vrf_evaluator.Evaluator_status.t) =
     match vrf_status with
     | At global_slot ->
@@ -925,12 +927,9 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                      else Deferred.unit
                    in
                    match Core.Queue.dequeue vrf_evaluation_state.queue with
-                   | None ->
+                   | None -> (
                        (*Keep trying until we get some slots*)
-                       if
-                         not
-                           (Vrf_evaluation_state.finished vrf_evaluation_state)
-                       then
+                       let poll () =
                          let%bind () =
                            Async.after
                              (Core.Time.Span.of_ms
@@ -944,19 +943,32 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                          Singleton_scheduler.schedule scheduler
                            (Time.now time_controller)
                            ~f:(check_next_block_timing new_global_slot i')
-                       else
-                         let epoch_end_time =
-                           Consensus.Hooks.epoch_end_time
-                             ~constants:consensus_constants
-                             epoch_data_for_vrf.epoch
-                         in
-                         set_next_producer_timing (`Check_again epoch_end_time)
-                           consensus_state ;
-                         [%log info] "No more slots won in this epoch" ;
-                         return
-                           (Singleton_scheduler.schedule scheduler
-                              epoch_end_time
-                              ~f:(check_next_block_timing new_global_slot i'))
+                       in
+                       match
+                         Vrf_evaluation_state.evaluator_status
+                           vrf_evaluation_state
+                       with
+                       | Completed ->
+                           let epoch_end_time =
+                             Consensus.Hooks.epoch_end_time
+                               ~constants:consensus_constants
+                               epoch_data_for_vrf.epoch
+                           in
+                           set_next_producer_timing
+                             (`Check_again epoch_end_time) consensus_state ;
+                           [%log info] "No more slots won in this epoch" ;
+                           return
+                             (Singleton_scheduler.schedule scheduler
+                                epoch_end_time
+                                ~f:(check_next_block_timing new_global_slot i'))
+                       | At last_slot ->
+                           set_next_producer_timing (`Evaluating_vrf last_slot)
+                             consensus_state ;
+                           poll ()
+                       | Start ->
+                           set_next_producer_timing
+                             (`Evaluating_vrf new_global_slot) consensus_state ;
+                           poll () )
                    | Some slot_won -> (
                        let winning_global_slot = slot_won.global_slot in
                        let slot, epoch =

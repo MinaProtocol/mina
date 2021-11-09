@@ -244,6 +244,8 @@ module Types = struct
               match timing with
               | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
                   []
+              | Evaluating_vrf _last_checked_slot ->
+                  []
               | Produce info ->
                   [of_time info.time ~consensus_constants]
               | Produce_now info ->
@@ -256,6 +258,8 @@ module Types = struct
               (fun _ {Daemon_rpcs.Types.Status.Next_producer_timing.timing; _} ->
               match timing with
               | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
+                  []
+              | Evaluating_vrf _last_checked_slot ->
                   []
               | Produce info ->
                   [info.for_slot.global_slot_since_genesis]

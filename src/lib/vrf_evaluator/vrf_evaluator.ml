@@ -209,7 +209,9 @@ module Worker_state = struct
           let global_slot = Consensus_time.to_global_slot consensus_time in
           t.current_slot <- Some global_slot ;
           let epoch' = Consensus_time.epoch consensus_time in
-          if Epoch.(epoch' > epoch) then Interruptible.return ()
+          if Epoch.(epoch' > epoch) then (
+            t.current_slot <- None ;
+            Interruptible.return () )
           else
             let start = Time.now () in
             match%bind evaluate_vrf ~consensus_time with
