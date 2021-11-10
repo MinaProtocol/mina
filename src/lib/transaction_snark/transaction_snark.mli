@@ -462,6 +462,7 @@ module type S = sig
 
   val of_parties_segment_exn :
        statement:Statement.With_sok.t
+    -> snapp_statement:(int * Snapp_statement.t) option
     -> witness:Parties_segment.Witness.t
     -> spec:Parties_segment.Basic.t
     -> t Async.Deferred.t
@@ -527,7 +528,7 @@ val parties_witnesses_exn :
   -> ( Parties_segment.Witness.t
      * Parties_segment.Basic.t
      * Statement.With_sok.t
-     * (int * Snapp_statement.t) list )
+     * (int * Snapp_statement.t) option )
      list
 
 module Make (Inputs : sig

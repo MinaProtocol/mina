@@ -241,8 +241,10 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t) =
   let open Async.Deferred.Let_syntax in
   let%map _ =
     Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
-      ~f:(fun _ (witness, spec, statement, _snapp_stmts) ->
-        let%map _ = T.of_parties_segment_exn ~statement ~witness ~spec in
+      ~f:(fun _ (witness, spec, statement, snapp_statement) ->
+        let%map _ =
+          T.of_parties_segment_exn ~snapp_statement ~statement ~witness ~spec
+        in
         ((), ()))
   in
   ()

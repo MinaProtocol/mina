@@ -3325,12 +3325,11 @@ type tag =
   , Nat.N6.n )
   Pickles.Tag.t
 
-(*Reviewer: This is getting printed in the graphql schema file*)
-let time _lab f =
-  (*let start = Time.now () in*)
+let time lab f =
+  let start = Time.now () in
   let x = f () in
-  (*let stop = Time.now () in
-    printf "%s: %s\n%!" lab (Time.Span.to_string_hum (Time.diff stop start)) ;*)
+  let stop = Time.now () in
+  printf "%s: %s\n%!" lab (Time.Span.to_string_hum (Time.diff stop start)) ;
   x
 
 let system ~proof_level ~constraint_constants =
@@ -3403,6 +3402,7 @@ module type S = sig
 
   val of_parties_segment_exn :
        statement:Statement.With_sok.t
+    -> snapp_statement:(int * Snapp_statement.t) option
     -> witness:Parties_segment.Witness.t
     -> spec:Parties_segment.Basic.t
     -> t Async.Deferred.t
@@ -3805,15 +3805,15 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
          witnesses
        ->
       let current_commitment = !commitment in
-      let snapp_stmts =
+      let snapp_stmt =
         match spec with
         | Proved ->
             (* NB: This is only correct if we assume that a proved party will
                never appear first in a transaction.
             *)
-            [ (0, tx_statement current_commitment source_local.parties) ]
+            Some (0, tx_statement current_commitment source_local.parties)
         | _ ->
-            []
+            None
       in
       let start_parties, next_commitment =
         let empty_if_last mk =
@@ -3920,7 +3920,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
         ; sok_digest = Sok_message.Digest.default
         }
       in
-      (w, spec, statement, snapp_stmts) :: witnesses)
+      (w, spec, statement, snapp_stmt) :: witnesses)
 
 module Make (Inputs : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
@@ -3963,7 +3963,7 @@ struct
         (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
     else Async.return false
 
-  let of_parties_segment_exn ~statement ~witness
+  let of_parties_segment_exn ~statement ~snapp_statement ~witness
       ~(spec : Parties_segment.Basic.t) : t Async.Deferred.t =
     Base.Parties_snark.witness := Some witness ;
     (*Core.printf
@@ -3990,10 +3990,16 @@ struct
                   None
             in
             let open Option.Let_syntax in
-            List.filter_map
-              (Parties.Party_or_stack.to_parties_with_hashes_list
-                 witness.local_state_init.parties)
-              ~f:(fun ((p, ()), at_party) ->
+            let parties =
+              match witness.local_state_init.parties with
+              | [] ->
+                  List.concat_map witness.start_parties ~f:(fun s ->
+                      s.parties.other_parties)
+              | xs ->
+                  Parties.Party_or_stack.to_parties_list xs |> List.map ~f:fst
+            in
+            List.filter_map parties ~f:(fun p ->
+                let%bind tag, snapp_statement = snapp_statement in
                 let%map pi = party_proof p in
                 let vk =
                   let account_id =
@@ -4007,13 +4013,8 @@ struct
                   in
                   (Option.value_exn account.snapp).verification_key
                 in
-                ( { Snapp_statement.Poly.transaction =
-                      witness.local_state_init.transaction_commitment
-                  ; at_party
-                  }
-                , pi
-                , vk ))
-            @ List.concat_map witness.start_parties ~f:(fun s ->
+                (snapp_statement, pi, vk, tag))
+            (*@ List.concat_map witness.start_parties ~f:(fun s ->
                   (* TODO: This is unnecessary re-computation of the statements which are also computed in
                      the circuit. It would be better to use the values computed inside the circuit, but it
                      was involved to change the pickles API to allow it. *)
@@ -4035,12 +4036,12 @@ struct
                     (Parties.Party_or_stack.to_parties_with_hashes_list
                        other_parties) ~f:(fun ((p, ()), at_party) ->
                       let%map pi = party_proof p in
-                      ({ Snapp_statement.Poly.transaction; at_party }, pi, None)))
+                      ({ Snapp_statement.Poly.transaction; at_party }, pi, None)))*)
           in
           proved
             ( match proofs with
-            | [ (s, p, v) ] ->
-                Pickles.Side_loaded.in_prover (Base.side_loaded 0)
+            | [ (s, p, v, tag) ] ->
+                Pickles.Side_loaded.in_prover (Base.side_loaded tag)
                   (Option.value_exn v).data ;
                 (*Core.printf
                   !"Snapp statement passed to the prover: %{sexp: \
@@ -4818,18 +4819,20 @@ let%test_module "transaction_snark" =
         match List.rev witnesses with
         | [] ->
             failwith "no witnesses generated"
-        | (witness, spec, stmt, _) :: rest ->
+        | (witness, spec, stmt, snapp_statement) :: rest ->
             let open Async.Deferred.Or_error.Let_syntax in
             let%bind p1 =
               of_parties_segment_exn ~statement:stmt ~witness ~spec
+                ~snapp_statement
               |> deferred_or_error
             in
             let%map _ =
               Async.Deferred.List.fold ~init:(Ok p1) rest
-                ~f:(fun acc (witness, spec, stmt, _) ->
+                ~f:(fun acc (witness, spec, stmt, snapp_statement) ->
                   let%bind prev = Async.Deferred.return acc in
                   let%bind curr =
                     of_parties_segment_exn ~statement:stmt ~witness ~spec
+                      ~snapp_statement
                     |> deferred_or_error
                   in
                   let sok_digest =
@@ -4854,19 +4857,20 @@ let%test_module "transaction_snark" =
       in
       let open Impl in
       List.fold ~init:((), ()) witnesses
-        ~f:(fun _ (witness, spec, statement, snapp_stmts) ->
+        ~f:(fun _ (witness, spec, statement, snapp_stmt) ->
           run_and_check
             (fun () ->
               let s =
                 exists Statement.With_sok.typ ~compute:(fun () -> statement)
               in
-              let snapp_stmts =
-                List.map snapp_stmts ~f:(fun (i, stmt) ->
-                    (i, exists Snapp_statement.typ ~compute:(fun () -> stmt)))
+              let snapp_stmt =
+                Option.value_map ~default:[] snapp_stmt ~f:(fun (i, stmt) ->
+                    [ (i, exists Snapp_statement.typ ~compute:(fun () -> stmt))
+                    ])
               in
               Base.Parties_snark.main ~constraint_constants
                 (Parties_segment.Basic.to_single_list spec)
-                snapp_stmts s ~witness ;
+                snapp_stmt s ~witness ;
               fun () -> ())
             ()
           |> Or_error.ok_exn)

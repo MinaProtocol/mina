@@ -111,27 +111,34 @@ module Inputs = struct
                               match witnesses_specs_stmts with
                               | [] ->
                                   failwith "no witnesses generated"
-                              | ((witness, spec, stmt, _) as w) :: rest ->
+                              | ((witness, spec, stmt, snapp_statement) as w)
+                                :: rest ->
                                   [%log info]
                                     !"current witness \
                                       %{sexp:(Transaction_witness.Parties_segment_witness.t*Transaction_snark.Parties_segment.Basic.t*Transaction_snark.Statement.With_sok.t* \
-                                      (int * Snapp_statement.t) list)}\n\n\
+                                      (int * Snapp_statement.t) option)}\n\n\
                                      \                                      %!"
                                     w ;
                                   let%bind (p1 : Ledger_proof.t) =
-                                    M.of_parties_segment_exn
+                                    M.of_parties_segment_exn ~snapp_statement
                                       ~statement:{ stmt with sok_digest }
                                       ~witness ~spec
                                     |> deferred_or_error
                                   in
                                   let%map (p : Ledger_proof.t) =
                                     Deferred.List.fold ~init:(Ok p1) rest
-                                      ~f:(fun acc ((witness, spec, stmt, _) as w)
+                                      ~f:(fun
+                                           acc
+                                           ( ( witness
+                                             , spec
+                                             , stmt
+                                             , snapp_statement ) as w )
                                          ->
                                         [%log info]
                                           !"current witness \
                                             %{sexp:(Transaction_witness.Parties_segment_witness.t*Transaction_snark.Parties_segment.Basic.t*Transaction_snark.Statement.With_sok.t* \
-                                            (int * Snapp_statement.t) list)}\n\n\
+                                            (int * Snapp_statement.t) \
+                                            option)}\n\n\
                                            \                                      \
                                             %!"
                                           w ;
@@ -140,6 +147,7 @@ module Inputs = struct
                                         in
                                         let%bind (curr : Ledger_proof.t) =
                                           M.of_parties_segment_exn
+                                            ~snapp_statement
                                             ~statement:{ stmt with sok_digest }
                                             ~witness ~spec
                                           |> deferred_or_error
