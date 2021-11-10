@@ -75,20 +75,12 @@ CREATE TABLE internal_commands
 );
 
 /* import supporting Snapp-related tables */
-\i snapp_tables.sql
+\ir snapp_tables.sql
 
 CREATE TABLE snapp_fee_payers
 ( id                       serial           PRIMARY KEY
 , body_id                  int              NOT NULL REFERENCES snapp_party_body(id)
 , nonce                    bigint           NOT NULL
-);
-
-/* encode a list of party's: the list_id identifies the list, the list_index indicates the order */
-CREATE TABLE snapp_other_parties
-( list_id                  int              NOT NULL
-, list_index               int              NOT NULL
-, party_id                 int              NOT NULL REFERENCES snapp_party(id)
-, PRIMARY KEY (list_id,list_index)
 );
 
 /* NULL convention -- see comment at start of snapp_tables.sql */
@@ -107,11 +99,13 @@ CREATE TABLE snapp_predicate_protocol_states
 , next_epoch_data                  int                            REFERENCES snapp_epoch_data(id)
 );
 
-/* snapp_other_parties_list_id refers to list_id in snapp_other_parties, not a foreign key */
+/* snapp_other_parties_ids refers to a list of ids in snapp_party.
+   The values in snapp_other_parties_ids are unenforced foreign keys, and
+   not NULL. */
 CREATE TABLE snapp_commands
 ( id                                    serial         PRIMARY KEY
 , snapp_fee_payer_id                    int            NOT NULL REFERENCES snapp_fee_payers(id)
-, snapp_other_parties_list_id           int            NOT NULL
+, snapp_other_parties_ids               int[]          NOT NULL
 , snapp_predicate_protocol_state_id     int            NOT NULL REFERENCES snapp_predicate_protocol_states(id)
 , hash                                  text           NOT NULL UNIQUE
 );
