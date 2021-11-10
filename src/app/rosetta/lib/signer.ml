@@ -27,7 +27,7 @@ module Keys = struct
       |> Option.value_exn ~here:[%here] ?error:None ?message:None
     in
     let output : Bytes.t =
-      Secrets.Secret_box.decrypt ~password:(Bytes.of_string "") sb
+      Secrets.Secret_box.decrypt ~password:(Bytes.of_string "naughty blue worm") sb
       |> Result.ok
       |> Option.value_exn ~here:[%here] ?error:None ?message:None
     in

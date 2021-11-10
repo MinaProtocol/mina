@@ -66,6 +66,8 @@ module T : sig
 
   val erase : t -> Rosetta_models.Error.t
 
+  val kind : t -> Variant.t
+
   val all_errors : Rosetta_models.Error.t list lazy_t
 
   module Lift : sig
@@ -84,7 +86,9 @@ end = struct
   type t = { extra_context : string option; kind : Variant.t }
   [@@deriving yojson, show, equal]
 
-  let code = Fn.compose (fun x -> x + 1) Variant.to_enum
+  let code { extra_context = _; kind } = Variant.to_enum kind + 1
+
+  let kind { extra_context = _; kind } = kind
 
   let message = function
     | `Sql _ ->
@@ -345,7 +349,7 @@ end = struct
   let create ?context kind = { extra_context = context; kind }
 
   let erase (t : t) =
-    { Rosetta_models.Error.code = Int32.of_int_exn (code t.kind)
+    { Rosetta_models.Error.code = Int32.of_int_exn (code t)
     ; message = message t.kind
     ; retriable = retriable t.kind
     ; details =

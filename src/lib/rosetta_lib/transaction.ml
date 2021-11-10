@@ -404,6 +404,7 @@ module Signed = struct
     ; nonce : Unsigned_extended.UInt32.t
     ; signature : string
     }
+  [@@deriving equal]
 
   module Rendered = struct
     type t =

@@ -143,7 +143,7 @@ module Partial = struct
     ; valid_until : Unsigned_extended.UInt32.t option
     ; memo : string option
     }
-  [@@deriving to_yojson, sexp, compare]
+  [@@deriving to_yojson, sexp, compare, equal]
 
   module Reason = Errors.Partial_reason
 

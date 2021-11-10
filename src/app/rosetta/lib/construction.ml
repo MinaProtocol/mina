@@ -945,7 +945,7 @@ module Submit = struct
       fun ~graphql_uri ->
         { gql_payment =
             (fun ~payment ~signature () ->
-              Graphql.query
+              Graphql.query_and_catch
                 (Send_payment.make ~from:(`String payment.from)
                    ~to_:(`String payment.to_) ~token:(uint64 payment.token)
                    ~amount:(uint64 payment.amount) ~fee:(uint64 payment.fee)
@@ -1004,6 +1004,36 @@ module Submit = struct
   end
 
   module Impl (M : Monad_fail.S) = struct
+
+    (* HACK: Sometimes we get bad nonce submit errors but they're really
+     * duplicates. The daemon doesn't store enough information to tell the
+     * difference. In order to disambiguate, we'll keep a cache of recent 100
+     * successfully submitted transactions here. *)
+    module Cache = struct
+      (* Since size is just 100, we can just linearly scan an array to find
+       * hits. *)
+      let size = 100
+
+      type t = { buf : Transaction.Signed.t option array; mutable idx : int }
+
+      let create () =
+        { buf = Array.init size ~f:(fun _i -> None)
+        ; idx = 0
+        }
+
+      let add t txn =
+        t.buf.(t.idx) <- Some txn;
+        t.idx <- ((t.idx + 1) mod size)
+
+      let find t txn =
+        Array.find t.buf ~f:(fun x -> [%equal: Transaction.Signed.t option] (Some txn) x)
+
+      let mem t txn =
+        Option.is_some (find t txn)
+    end
+
+    let submitted_cache = lazy (Cache.create ())
+
     let handle
         ~(env :
            ( 'gql_payment
@@ -1022,7 +1052,10 @@ module Submit = struct
         |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
         |> env.lift
       in
-      let open M.Let_syntax in
+      let%bind txn =
+        Transaction.Signed.of_rendered signed_transaction
+        |> env.lift
+      in
       let%map hash =
         match
           ( signed_transaction.payment
@@ -1032,12 +1065,25 @@ module Submit = struct
           , signed_transaction.mint_tokens )
         with
         | Some payment, None, None, None, None ->
-            let%map res =
-              env.gql_payment ~payment ~signature:signed_transaction.signature
-                ()
-            in
-            let (`UserCommand payment) = res#sendPayment#payment in
-            payment#hash
+            (
+            match%bind
+            env.gql_payment ~payment ~signature:signed_transaction.signature
+              ()
+            with
+            | `Successful res ->
+               let cache = Lazy.force submitted_cache in
+               Cache.add cache txn;
+               let (`UserCommand payment) = res#sendPayment#payment in
+               M.return payment#hash
+            | `Failed e ->
+               let cache = Lazy.force submitted_cache in
+               if
+                 ([%equal: Errors.Variant.t] (Errors.kind e) `Transaction_submit_bad_nonce) &&
+                   Cache.mem cache txn
+               then
+                 M.fail (Errors.create `Transaction_submit_duplicate)
+               else
+                 M.fail e )
         | None, Some delegation, None, None, None ->
             let%map res =
               env.gql_delegation ~delegation
