@@ -81,7 +81,7 @@ if [ $CHAIN_LENGTH -eq $EXPECTED_LENGTH ]; then
 fi
 done < $TMPFILE_GREATEST
 
-if [ -z $FOUND_CHAIN ]; then
+if [ $FOUND_CHAIN = 0 ]; then
     echo "*** Did not find a subchain back to a canonical block starting from height" $GREATEST_HEIGHT
     echo "*** Try passing a lower height as the first argument to this script"
     exit 1
