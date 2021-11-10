@@ -31,25 +31,8 @@ end
 
 module Sql = struct
   module Balance_from_last_relevant_command = struct
-    let query =
-      Caqti_request.find_opt
-        Caqti_type.(tup2 string int64)
-        Caqti_type.(tup2 int64 int64)
-        {sql|
-WITH RECURSIVE chain AS (
-  (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp
-  FROM blocks b
-  WHERE height = (select MAX(height) from blocks)
-  ORDER BY timestamp ASC
-  LIMIT 1)
-
-  UNION ALL
-
-  SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp FROM blocks b
-  INNER JOIN chain
-  ON b.id = chain.parent_id AND chain.id <> chain.parent_id
-),
-
+    let common_sql =
+      {sql|
 relevant_internal_block_balances AS (
   SELECT
     block_internal_command.block_id,
@@ -114,6 +97,28 @@ relevant_block_balances AS (
   UNION
   (SELECT block_id, sequence_no, 0 AS secondary_sequence_no, balance FROM relevant_user_block_balances)
 )
+      |sql}
+
+    let query_recent =
+      Caqti_request.find_opt
+        Caqti_type.(tup2 string int64)
+        Caqti_type.(tup2 int64 int64)
+        (sprintf {sql|
+WITH RECURSIVE chain AS (
+  (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp
+  FROM blocks b
+  WHERE height = (select MAX(height) from blocks)
+  ORDER BY timestamp ASC
+  LIMIT 1)
+
+  UNION ALL
+
+  SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp FROM blocks b
+  INNER JOIN chain
+  ON b.id = chain.parent_id AND chain.id <> chain.parent_id
+),
+
+%s
 
 SELECT
   chain.global_slot_since_genesis AS block_global_slot_since_genesis,
@@ -124,11 +129,35 @@ JOIN relevant_block_balances rbb ON chain.id = rbb.block_id
 WHERE chain.height <= $2
 ORDER BY (chain.height, sequence_no, secondary_sequence_no) DESC
 LIMIT 1
-      |sql}
+      |sql} common_sql)
+
+    let query_old =
+      Caqti_request.find_opt
+        Caqti_type.(tup2 string int64)
+        Caqti_type.(tup2 int64 int64)
+(sprintf {sql|
+%s
+
+SELECT
+  b.global_slot_since_genesis AS block_global_slot_since_genesis,
+  balance
+FROM
+blocks b
+JOIN relevant_block_balances rbb ON b.id = rbb.block_id
+WHERE b.height <= $2 AND b.chain_status = 'canonical'
+ORDER BY (chain.height, sequence_no, secondary_sequence_no) DESC
+LIMIT 1
+      |sql} common_sql)
 
     let run (module Conn : Caqti_async.CONNECTION) requested_block_height
         address =
-      Conn.find_opt query (address, requested_block_height)
+      let open Deferred.Result.Let_syntax in
+      (* buffer an epsilon of 5 just in case archive node isn't caught up *)
+      let%bind is_old_height = Sql.Block.run_is_old_height (module Conn) ~height:requested_block_height in
+      if is_old_height then
+        Conn.find_opt query_old (address, requested_block_height)
+      else
+        Conn.find_opt query_recent (address, requested_block_height)
   end
 
   let run (module Conn : Caqti_async.CONNECTION) block_query address =
@@ -387,79 +416,18 @@ module Balance = struct
         in
         {amount with metadata= Some metadata}
       in
-      let find_via_db ~block_query ~address =
-          let%map block_identifier, {liquid_balance; total_balance} =
-            env.db_block_identifier_and_balance_info ~block_query ~address
-          in
-          { Account_balance_response.block_identifier
-          ; balances=
-              [ make_balance_amount
-                  ~liquid_balance:(Unsigned.UInt64.of_int64 liquid_balance)
-                  ~total_balance:(Unsigned.UInt64.of_int64 total_balance) ]
-          ; metadata=Some (`Assoc [ ("created_via_historical_lookup", `Bool true ) ]) }
+      let%bind block_query =
+        Query.of_partial_identifier' req.block_identifier
       in
-      match req.block_identifier with
-      | None ->
-          (* First try via GraphQL but fallback to archive database (and then
-           * omit the nonce!) if there was an issue *)
-          (match%bind
-            env.gql
-              ?token_id:(Option.map token_id ~f:Unsigned.UInt64.to_string)
-              ~address ()
-          with
-          | `Failed e ->
-              [%log' warn env.logger] "/account/balance : GraphQL request failed, trying again via the archive database" ~metadata:[("error", Errors.erase e |> Rosetta_models.Error.to_yojson)];
-              find_via_db ~block_query:None ~address
-          | `Successful res ->
-            let%bind account =
-              match res#account with
-              | None ->
-                  M.fail (Errors.create (`Account_not_found address))
-              | Some account ->
-                  M.return account
-            in
-            let%bind state_hash =
-              match (account#balance)#stateHash with
-              | None ->
-                  M.fail
-                    (Errors.create
-                       ~context:
-                         "Failed accessing state hash from GraphQL \
-                          communication with the Mina Daemon."
-                       `Chain_info_missing)
-              | Some state_hash ->
-                  M.return state_hash
-            in
-            let%map liquid_balance =
-              match (account#balance)#liquid with
-              | None ->
-                  M.fail
-                    (Errors.create
-                       ~context:
-                         "Unable to access liquid balance since your Mina \
-                          daemon isn't fully bootstrapped."
-                       `Chain_info_missing)
-              | Some liquid_balance ->
-                  M.return liquid_balance
-            in
-            let metadata =
-              Option.map
-                ~f:(fun nonce -> `Assoc [("nonce", `Intlit nonce)])
-                account#nonce
-            in
-            let total_balance = (account#balance)#total in
-            { Account_balance_response.block_identifier=
-                { Block_identifier.index=
-                    Unsigned.UInt32.to_int64 (account#balance)#blockHeight
-                ; hash= state_hash }
-            ; balances= [make_balance_amount ~liquid_balance ~total_balance]
-            ; metadata })
-      | Some partial_identifier ->
-          (* TODO: Once multiple token_ids are possible we may need to add handling for that here *)
-          let%bind block_query =
-            Query.of_partial_identifier partial_identifier
-          in
-          find_via_db ~block_query ~address
+      let%map block_identifier, {liquid_balance; total_balance} =
+        env.db_block_identifier_and_balance_info ~block_query ~address
+      in
+      { Account_balance_response.block_identifier
+      ; balances=
+          [ make_balance_amount
+              ~liquid_balance:(Unsigned.UInt64.of_int64 liquid_balance)
+              ~total_balance:(Unsigned.UInt64.of_int64 total_balance) ]
+      ; metadata=Some (`Assoc [ ("created_via_historical_lookup", `Bool true ) ]) }
   end
 
   module Real = Impl (Deferred.Result)
