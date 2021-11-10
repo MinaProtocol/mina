@@ -91,8 +91,7 @@ MINA_DAEMON_PID=$!
 sleep 30
 
 echo "========================= POPULATING MISSING BLOCKS ==========================="
-# Note: this script takes some time to fail even in the best case (~30 minutes) and we don't start waiting on the other daemons until it completes
-./download-missing-blocks.sh ${MINA_NETWORK} ${POSTGRES_DBNAME} ${POSTGRES_USERNAME}
+./download-missing-blocks.sh ${MINA_NETWORK} ${POSTGRES_DBNAME} ${POSTGRES_USERNAME} &
 
 
 if ! kill -0 "${MINA_DAEMON_PID}"; then
