@@ -4,14 +4,14 @@
 generic-node startup probe settings
 */}}
 {{- define "healthcheck.seed.startupProbe" -}}
-{{- include "healthchecks.daemon.startupProbe" . }}
+{{- include "healthcheck.daemon.startupProbe" . }}
 {{- end -}}
 
 {{/*
 generic-node liveness settings
 */}}
 {{- define "healthcheck.seed.livenessCheck" -}}
-{{- include "healthchecks.daemon.livenessCheck" . }}
+{{- include "healthcheck.daemon.livenessCheck" . }}
 {{- end -}}
 
 {{/*

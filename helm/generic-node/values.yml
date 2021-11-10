@@ -11,13 +11,6 @@ features:
   runtimeConfig:
     enabled: false
   maxConnections: 200
-  # daemon:
-  #   flags:
-  #   - "--log-precomputed-blocks"
-  #   - "true"
-  #   - "--log-json"
-  # logPrecomputedBlocks:
-  #   enabled: true
   logTxnPoolGossip:
     enabled: false
   exposeGraphql:
@@ -38,12 +31,19 @@ libp2p:
   loadBalancer:
     enabled: true
 
+servicekey:
+  secretName: "faucet-service-key"
+
+privateKeySecret:
+  secretName: "" 
+
 ports:
   client: "8301"
   graphql: "3085"
   metrics: "10001"
   p2p: "10909"
   nodePort: "30005"
+  postgres: "5432"
 
 resources:
   limits:
@@ -59,6 +59,8 @@ healthcheck:
   initialDelaySeconds: 30
   seed:
     healthcheck.seed.allChecks:
+  daemon:
+    healthcheck.daemon.allChecks:
 
 nodeSelector:
   preemptible: true
