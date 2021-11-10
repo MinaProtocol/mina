@@ -1121,7 +1121,8 @@ module Block = struct
                       snarked_ledger_hash_id, staking_epoch_data_id,
                       next_epoch_data_id, ledger_hash, height, global_slot,
                       global_slot_since_genesis, timestamp, chain_status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
+                     RETURNING id
                |sql})
             { state_hash= hash |> State_hash.to_string
             ; parent_id
@@ -1435,7 +1436,8 @@ module Block = struct
                       snarked_ledger_hash_id, staking_epoch_data_id,
                       next_epoch_data_id, ledger_hash, height, global_slot,
                       global_slot_since_genesis, timestamp, chain_status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
+                     RETURNING id
                |sql})
             { state_hash= block.state_hash |> State_hash.to_string
             ; parent_id
