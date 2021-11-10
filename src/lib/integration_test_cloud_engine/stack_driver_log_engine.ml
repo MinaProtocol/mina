@@ -276,7 +276,7 @@ let parse_event_from_log_entry ~logger ~network log_entry =
       let%map msg =
         parse (parser_from_of_yojson Puppeteer_message.of_yojson) payload
       in
-      Event_type_puppeteer.parse_event msg
+      Event_type.parse_event msg
       (* match msg.puppeteer_event_type with
          | "node_offline" ->
              [%log spam] "hitting node_offline event from puppeteer" ;
@@ -287,7 +287,7 @@ let parse_event_from_log_entry ~logger ~network log_entry =
       let%bind msg =
         parse (parser_from_of_yojson Logger.Message.of_yojson) payload
       in
-      Event_type_logger.parse_event msg
+      Event_type.parse_event msg
   in
   (node, event)
 
