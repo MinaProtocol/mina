@@ -31,6 +31,9 @@ end
 
 module Sql = struct
   module Balance_from_last_relevant_command = struct
+    (* This is SQL is the common chunk shared between the query_recent and
+     * query_old that retreives the relevant balance changes from transactions
+     * at a block. *)
     let common_sql =
       {sql|
 relevant_internal_block_balances AS (
