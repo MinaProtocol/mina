@@ -436,6 +436,11 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                   [%log trace]
                     "Next producer timing not available for uptime service" ;
                   None
+              | Evaluating_vrf _ ->
+                  [%log trace]
+                    "Evaluating VRF, wait for block production status for \
+                     uptime service" ;
+                  None
               | Produce prod_tm | Produce_now prod_tm ->
                   Some (Block_time.to_time prod_tm.time) )
         in
