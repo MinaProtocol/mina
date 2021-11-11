@@ -272,22 +272,24 @@ let parse_event_from_log_entry ~logger ~network log_entry =
     if
       Result.ok (find bool payload [ "puppeteer_script_event" ])
       |> Option.value ~default:false
-    then
-      let%map msg =
+    then (
+      let%bind msg =
         parse (parser_from_of_yojson Puppeteer_message.of_yojson) payload
       in
-      Event_type.parse_event msg
+      [%log spam] "parsing puppeteer event" ;
+      Event_type.parse_puppeteer_log msg
       (* match msg.puppeteer_event_type with
          | "node_offline" ->
              [%log spam] "hitting node_offline event from puppeteer" ;
              Event_type.Event (Event_type.Node_offline, ())
          | _ ->
-             failwith "Could not process a puppeteer message from the logs" *)
+             failwith "Could not process a puppeteer message from the logs" *) )
     else
       let%bind msg =
         parse (parser_from_of_yojson Logger.Message.of_yojson) payload
       in
-      Event_type.parse_event msg
+      [%log spam] "parsing daemon event" ;
+      Event_type.parse_daemon_log msg
   in
   (node, event)
 
