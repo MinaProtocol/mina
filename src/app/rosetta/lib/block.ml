@@ -287,7 +287,7 @@ WITH RECURSIVE chain AS (
 
   SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp FROM blocks b
   INNER JOIN chain
-  ON b.id = chain.parent_id AND chain.id <> chain.parent_id
+  ON b.id = chain.parent_id AND chain.id <> chain.parent_id AND chain.chain_status <> 'canonical'
 ) SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_winner_id, c.snarked_ledger_hash_id, c.staking_epoch_data_id, c.next_epoch_data_id, c.ledger_hash, c.height, c.global_slot, c.global_slot_since_genesis, c.timestamp, pk.value as creator, bw.value as winner FROM chain c
   INNER JOIN public_keys pk
   ON pk.id = c.creator_id
@@ -356,7 +356,12 @@ WITH RECURSIVE chain AS (
         if is_old_height then
           Conn.find_opt query_height_old h
         else
+          (
+          match%bind
           Conn.find_opt query_height_recent h
+          with
+          | None -> Conn.find_opt query_height_old h
+          | Some r -> return (Some r) )
       | Some (`That (`Hash h)) ->
         Conn.find_opt query_hash h
       | Some (`Those (`Height height, `Hash hash)) ->

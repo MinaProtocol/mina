@@ -118,7 +118,7 @@ WITH RECURSIVE chain AS (
 
   SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp FROM blocks b
   INNER JOIN chain
-  ON b.id = chain.parent_id AND chain.id <> chain.parent_id
+  ON b.id = chain.parent_id AND chain.id <> chain.parent_id AND chain.chain_status <> 'canonical'
 ),
 
 %s
@@ -160,7 +160,11 @@ LIMIT 1
       if is_old_height then
         Conn.find_opt query_old (address, requested_block_height)
       else
-        Conn.find_opt query_recent (address, requested_block_height)
+        match%bind
+          Conn.find_opt query_recent (address, requested_block_height)
+        with
+        | None -> Conn.find_opt query_old (address, requested_block_height)
+        | Some r -> return (Some r)
   end
 
   let run (module Conn : Caqti_async.CONNECTION) block_query address =
