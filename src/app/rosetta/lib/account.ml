@@ -108,7 +108,7 @@ relevant_block_balances AS (
         Caqti_type.(tup2 int64 int64)
         (sprintf {sql|
 WITH RECURSIVE chain AS (
-  (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp
+  (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
   FROM blocks b
   WHERE height = (select MAX(height) from blocks)
   ORDER BY timestamp ASC
@@ -116,9 +116,9 @@ WITH RECURSIVE chain AS (
 
   UNION ALL
 
-  SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp FROM blocks b
+  SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status FROM blocks b
   INNER JOIN chain
-  ON b.id = chain.parent_id AND chain.id <> chain.parent_id
+  ON b.id = chain.parent_id AND chain.id <> chain.parent_id AND (chain.chain_status = 'orphaned' OR chain.chain_status IS NULL)
 ),
 
 %s
@@ -160,7 +160,11 @@ LIMIT 1
       if is_old_height then
         Conn.find_opt query_old (address, requested_block_height)
       else
-        Conn.find_opt query_recent (address, requested_block_height)
+        match%bind
+          Conn.find_opt query_recent (address, requested_block_height)
+        with
+        | None -> Conn.find_opt query_old (address, requested_block_height)
+        | Some r -> return (Some r)
   end
 
   let run (module Conn : Caqti_async.CONNECTION) block_query address =
