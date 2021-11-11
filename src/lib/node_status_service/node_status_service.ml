@@ -146,7 +146,7 @@ let reset_gauges () =
 let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
     ~addrs_and_ports ~start_time ~slot_duration =
   [%log info] "Starting node status service using URL $url"
-    ~metadata:[ ("URL", `String node_status_url) ] ;
+    ~metadata:[ ("url", `String node_status_url) ] ;
   let five_slots = Time.Span.scale slot_duration 5. in
   reset_gauges () ;
   every ~start:(after five_slots) ~continue_on_error:true five_slots
