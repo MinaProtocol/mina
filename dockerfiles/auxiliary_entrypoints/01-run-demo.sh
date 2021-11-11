@@ -6,7 +6,7 @@ if [[ -n ${RUN_DEMO} ]]; then
     # Demo keys and config file
     echo "Running Mina demo..."
     MINA_CONFIG_DIR=${MINA_CONFIG_DIR:-/root/.mina-config}
-    MINA_CONFIG_FILE="${MINA_CONFIG_DIR}/daemon.json}"
+    MINA_CONFIG_FILE="${MINA_CONFIG_DIR}/daemon.json"
 
     export PK=${PK:-"B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p"}
     SNARK_PK=${SNARK_PK:-"B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL"}
