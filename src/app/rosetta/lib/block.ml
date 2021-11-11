@@ -263,7 +263,7 @@ SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_win
       |}
 
 
-    let query_height_recent =
+    let query_height_recent ~min_recent_height =
       Caqti_request.find_opt Caqti_type.int64 typ
         (* According to the clarification of the Rosetta spec here
          * https://community.rosetta-api.org/t/querying-block-by-just-its-index/84/3 ,
@@ -277,7 +277,7 @@ SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_win
          * + epsilon)
          * requests since recursive queries stress PostgreSQL.
          *)
-        {|
+        (sprintf {|
 WITH RECURSIVE chain AS (
   (SELECT id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, global_slot, global_slot_since_genesis, timestamp FROM blocks b WHERE height = (select MAX(height) from blocks)
   ORDER BY timestamp ASC
@@ -287,14 +287,14 @@ WITH RECURSIVE chain AS (
 
   SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp FROM blocks b
   INNER JOIN chain
-  ON b.id = chain.parent_id AND chain.id <> chain.parent_id
+  ON b.id = chain.parent_id AND chain.id <> chain.parent_id AND chain.height >= %d
 ) SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_winner_id, c.snarked_ledger_hash_id, c.staking_epoch_data_id, c.next_epoch_data_id, c.ledger_hash, c.height, c.global_slot, c.global_slot_since_genesis, c.timestamp, pk.value as creator, bw.value as winner FROM chain c
   INNER JOIN public_keys pk
   ON pk.id = c.creator_id
   INNER JOIN public_keys bw
   ON bw.id = c.block_winner_id
   WHERE c.height = ?
-      |}
+      |} (Int64.to_int_exn min_recent_height))
 
     let query_hash =
       Caqti_request.find_opt Caqti_type.string typ
@@ -339,24 +339,31 @@ WITH RECURSIVE chain AS (
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
       Conn.find_opt query_by_id id
 
-    let run_is_old_height (module Conn : Caqti_async.CONNECTION) ~height =
+    let run_min_recent_height (module Conn : Caqti_async.CONNECTION) =
       let open Deferred.Result.Let_syntax in
       let open Int64 in
       let%map max_height =
         Conn.find query_max_height ()
       in
-      (* buffer an epsilon of 5 just in case archive node isn't caught up *)
       let epsilon = of_int 5 in
-      height < (max_height - (of_int Genesis_constants.k)) - epsilon
+      max_height - (of_int Genesis_constants.k) - epsilon
 
     let run (module Conn : Caqti_async.CONNECTION) = function
-      | Some (`This (`Height h)) ->
+      | Some (`This (`Height height)) ->
         let open Deferred.Result.Let_syntax in
-        let%bind is_old_height = run_is_old_height (module Conn) ~height:h in
-        if is_old_height then
+        let%bind min_recent_height = run_min_recent_height (module Conn) in
+        let old_branch h =
           Conn.find_opt query_height_old h
+        in
+        if Int64.(height < min_recent_height) then
+          old_branch height
         else
-          Conn.find_opt query_height_recent h
+          (
+          match%bind
+            Conn.find_opt (query_height_recent ~min_recent_height) height
+          with
+          | None -> old_branch Int64.(min_recent_height - one)
+          | Some r -> return (Some r) )
       | Some (`That (`Hash h)) ->
         Conn.find_opt query_hash h
       | Some (`Those (`Height height, `Hash hash)) ->

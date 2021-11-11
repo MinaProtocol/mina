@@ -102,7 +102,7 @@ relevant_block_balances AS (
 )
       |sql}
 
-    let query_recent =
+    let query_recent ~min_recent_height =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         Caqti_type.(tup2 int64 int64)
@@ -118,7 +118,7 @@ WITH RECURSIVE chain AS (
 
   SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp FROM blocks b
   INNER JOIN chain
-  ON b.id = chain.parent_id AND chain.id <> chain.parent_id
+  ON b.id = chain.parent_id AND chain.id <> chain.parent_id AND chain.height >= %d
 ),
 
 %s
@@ -132,7 +132,7 @@ JOIN relevant_block_balances rbb ON chain.id = rbb.block_id
 WHERE chain.height <= $2
 ORDER BY (chain.height, sequence_no, secondary_sequence_no) DESC
 LIMIT 1
-      |sql} common_sql)
+      |sql} (Int64.to_int_exn min_recent_height) common_sql)
 
     let query_old =
       Caqti_request.find_opt
@@ -152,15 +152,22 @@ ORDER BY (chain.height, sequence_no, secondary_sequence_no) DESC
 LIMIT 1
       |sql} common_sql)
 
-    let run (module Conn : Caqti_async.CONNECTION) requested_block_height
-        address =
+    let run (module Conn : Caqti_async.CONNECTION) height address =
       let open Deferred.Result.Let_syntax in
-      (* buffer an epsilon of 5 just in case archive node isn't caught up *)
-      let%bind is_old_height = Sql.Block.run_is_old_height (module Conn) ~height:requested_block_height in
-      if is_old_height then
-        Conn.find_opt query_old (address, requested_block_height)
+      let%bind min_recent_height =
+        Sql.Block.run_min_recent_height (module Conn)
+      in
+      let old_branch h =
+        Conn.find_opt query_old (address, h)
+      in
+      if Int64.(height < min_recent_height) then
+        old_branch height
       else
-        Conn.find_opt query_recent (address, requested_block_height)
+        match%bind
+          Conn.find_opt (query_recent ~min_recent_height) (address, height)
+        with
+        | None -> old_branch Int64.(min_recent_height - one)
+        | Some r -> return (Some r)
   end
 
   let run (module Conn : Caqti_async.CONNECTION) block_query address =
