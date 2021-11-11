@@ -356,12 +356,7 @@ WITH RECURSIVE chain AS (
         if is_old_height then
           Conn.find_opt query_height_old h
         else
-          (
-          match%bind
           Conn.find_opt query_height_recent h
-          with
-          | None -> Conn.find_opt query_height_old h
-          | Some r -> return (Some r) )
       | Some (`That (`Hash h)) ->
         Conn.find_opt query_hash h
       | Some (`Those (`Height height, `Hash hash)) ->
