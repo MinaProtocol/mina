@@ -9,7 +9,10 @@ let dir_exists dir =
   else return false
 
 let remove_dir dir =
-  let%bind _ = Process.run_exn ~prog:"rm" ~args:[ "-rf"; dir ] () in
+  let%bind _ =
+    Monitor.try_with ~here:[%here] (fun () ->
+        Process.run_exn ~prog:"rm" ~args:[ "-rf"; dir ] ())
+  in
   Deferred.unit
 
 let rec rmrf path =

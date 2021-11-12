@@ -82,6 +82,18 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.get_some_initial_peers_rpcs_sent
+
+    let received_counter =
+      Mina_metrics.Network.get_some_initial_peers_rpcs_received
+
+    let failed_request_counter =
+      Mina_metrics.Network.get_some_initial_peers_rpc_requests_failed
+
+    let failed_response_counter =
+      Mina_metrics.Network.get_some_initial_peers_rpc_responses_failed
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -139,6 +151,23 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter =
+      Mina_metrics.Network
+      .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent
+
+    let received_counter =
+      Mina_metrics.Network
+      .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received
+
+    let failed_request_counter =
+      Mina_metrics.Network
+      .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_requests_failed
+
+    let failed_response_counter =
+      Mina_metrics.Network
+      .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_responses_failed
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -196,6 +225,18 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.answer_sync_ledger_query_rpcs_sent
+
+    let received_counter =
+      Mina_metrics.Network.answer_sync_ledger_query_rpcs_received
+
+    let failed_request_counter =
+      Mina_metrics.Network.answer_sync_ledger_query_rpc_requests_failed
+
+    let failed_response_counter =
+      Mina_metrics.Network.answer_sync_ledger_query_rpc_responses_failed
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -249,6 +290,18 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.get_transition_chain_rpcs_sent
+
+    let received_counter =
+      Mina_metrics.Network.get_transition_chain_rpcs_received
+
+    let failed_request_counter =
+      Mina_metrics.Network.get_transition_chain_rpc_requests_failed
+
+    let failed_response_counter =
+      Mina_metrics.Network.get_transition_chain_rpc_responses_failed
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -302,6 +355,18 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.get_transition_chain_proof_rpcs_sent
+
+    let received_counter =
+      Mina_metrics.Network.get_transition_chain_proof_rpcs_received
+
+    let failed_request_counter =
+      Mina_metrics.Network.get_transition_chain_proof_rpc_requests_failed
+
+    let failed_response_counter =
+      Mina_metrics.Network.get_transition_chain_proof_rpc_responses_failed
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -356,6 +421,18 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.get_transition_knowledge_rpcs_sent
+
+    let received_counter =
+      Mina_metrics.Network.get_transition_knowledge_rpcs_received
+
+    let failed_request_counter =
+      Mina_metrics.Network.get_transition_knowledge_rpc_requests_failed
+
+    let failed_response_counter =
+      Mina_metrics.Network.get_transition_knowledge_rpc_responses_failed
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -415,6 +492,17 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.get_ancestry_rpcs_sent
+
+    let received_counter = Mina_metrics.Network.get_ancestry_rpcs_received
+
+    let failed_request_counter =
+      Mina_metrics.Network.get_ancestry_rpc_requests_failed
+
+    let failed_response_counter =
+      Mina_metrics.Network.get_ancestry_rpc_responses_failed
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -477,6 +565,17 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.ban_notify_rpcs_sent
+
+    let received_counter = Mina_metrics.Network.ban_notify_rpcs_received
+
+    let failed_request_counter =
+      Mina_metrics.Network.ban_notify_rpc_requests_failed
+
+    let failed_response_counter =
+      Mina_metrics.Network.ban_notify_rpc_responses_failed
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -533,6 +632,17 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.get_best_tip_rpcs_sent
+
+    let received_counter = Mina_metrics.Network.get_best_tip_rpcs_received
+
+    let failed_request_counter =
+      Mina_metrics.Network.get_best_tip_rpc_requests_failed
+
+    let failed_response_counter =
+      Mina_metrics.Network.get_best_tip_rpc_responses_failed
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -677,6 +787,17 @@ module Rpcs = struct
     end
 
     include Master.T
+
+    let sent_counter = Mina_metrics.Network.get_node_status_rpcs_sent
+
+    let received_counter = Mina_metrics.Network.get_node_status_rpcs_received
+
+    let failed_request_counter =
+      Mina_metrics.Network.get_node_status_rpc_requests_failed
+
+    let failed_response_counter =
+      Mina_metrics.Network.get_node_status_rpc_responses_failed
+
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
@@ -790,6 +911,7 @@ module Rpcs = struct
         : ( Get_transition_chain_proof.query
           , Get_transition_chain_proof.response )
           rpc
+    | Get_node_status : (Get_node_status.query, Get_node_status.response) rpc
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
@@ -818,6 +940,8 @@ module Rpcs = struct
         (module Get_transition_knowledge)
     | Get_transition_chain_proof ->
         (module Get_transition_chain_proof)
+    | Get_node_status ->
+        (module Get_node_status)
     | Get_ancestry ->
         (module Get_ancestry)
     | Ban_notify ->
@@ -837,27 +961,50 @@ module Rpcs = struct
     match (rpc, impl_rpc) with
     | Get_some_initial_peers, Get_some_initial_peers ->
         Some (do_ f)
+    | Get_some_initial_peers, _ ->
+        None
     | ( Get_staged_ledger_aux_and_pending_coinbases_at_hash
       , Get_staged_ledger_aux_and_pending_coinbases_at_hash ) ->
         Some (do_ f)
+    | Get_staged_ledger_aux_and_pending_coinbases_at_hash, _ ->
+        None
     | Answer_sync_ledger_query, Answer_sync_ledger_query ->
         Some (do_ f)
+    | Answer_sync_ledger_query, _ ->
+        None
     | Get_transition_chain, Get_transition_chain ->
         Some (do_ f)
+    | Get_transition_chain, _ ->
+        None
+    | Get_transition_knowledge, Get_transition_knowledge ->
+        Some (do_ f)
+    | Get_transition_knowledge, _ ->
+        None
     | Get_transition_chain_proof, Get_transition_chain_proof ->
         Some (do_ f)
+    | Get_transition_chain_proof, _ ->
+        None
+    | Get_node_status, Get_node_status ->
+        Some (do_ f)
+    | Get_node_status, _ ->
+        None
     | Get_ancestry, Get_ancestry ->
         Some (do_ f)
+    | Get_ancestry, _ ->
+        None
     | Ban_notify, Ban_notify ->
         Some (do_ f)
+    | Ban_notify, _ ->
+        None
     | Get_best_tip, Get_best_tip ->
         Some (do_ f)
+    | Get_best_tip, _ ->
+        None
     | Consensus_rpc rpc_a, Consensus_rpc rpc_b ->
         Consensus.Hooks.Rpcs.match_handler
           (Rpc_handler { rpc = rpc_b; f; cost; budget })
           rpc_a ~do_
-    (* TODO: Why is there a catch-all here? *)
-    | _ ->
+    | Consensus_rpc _, _ ->
         None
 end
 
@@ -975,12 +1122,15 @@ let create (config : Config.t)
     let%bind result = f data_in_envelope in
     return (result, sender)
   in
-  let record_unknown_item result sender action_msg msg_args =
+  let incr_failed_response = Mina_metrics.Counter.inc_one in
+  let record_unknown_item result sender action_msg msg_args
+      failed_response_counter =
     let%map () =
-      if Option.is_none result then
+      if Option.is_none result then (
+        incr_failed_response failed_response_counter ;
         Trust_system.(
           record_envelope_sender config.trust_system config.logger sender
-            Actions.(Requested_unknown_item, Some (action_msg, msg_args)))
+            Actions.(Requested_unknown_item, Some (action_msg, msg_args))) )
       else return ()
     in
     result
@@ -1064,6 +1214,8 @@ let create (config : Config.t)
         msg_args
     in
     record_unknown_item result sender action_msg msg_args
+      Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash
+      .failed_response_counter
   in
   let answer_sync_ledger_query_rpc conn ~version:_ ((hash, query) as sync_query)
       =
@@ -1078,6 +1230,8 @@ let create (config : Config.t)
           return ()
       | Error err ->
           (* N.B.: to_string_mach double-quotes the string, don't want that *)
+          incr_failed_response
+            Rpcs.Answer_sync_ledger_query.failed_response_counter ;
           let err_msg = Error.to_string_hum err in
           if String.is_prefix err_msg ~prefix:refused_answer_query_string then
             Trust_system.(
@@ -1108,6 +1262,7 @@ let create (config : Config.t)
     match result with
     | None ->
         record_unknown_item result sender action_msg msg_args
+          Rpcs.Get_ancestry.failed_response_counter
     | Some { proof = _, ext_trans; _ } ->
         let%map valid_protocol_versions =
           validate_protocol_versions ~rpc_name:"Get_ancestry" sender ext_trans
@@ -1121,6 +1276,8 @@ let create (config : Config.t)
     let%map result, _sender =
       run_for_rpc_result conn () ~f:get_some_initial_peers action_msg msg_args
     in
+    if List.is_empty result then
+      incr_failed_response Rpcs.Get_some_initial_peers.failed_response_counter ;
     result
   in
   let get_best_tip_rpc conn ~version:_ (() : unit) =
@@ -1133,6 +1290,7 @@ let create (config : Config.t)
     match result with
     | None ->
         record_unknown_item result sender action_msg msg_args
+          Rpcs.Get_best_tip.failed_response_counter
     | Some { data = data_ext_trans; proof = _, proof_ext_trans } ->
         let%bind valid_data_protocol_versions =
           validate_protocol_versions ~rpc_name:"Get_best_tip (data)" sender
@@ -1157,6 +1315,7 @@ let create (config : Config.t)
         msg_args
     in
     record_unknown_item result sender action_msg msg_args
+      Rpcs.Get_transition_chain_proof.failed_response_counter
   in
   let get_transition_knowledge_rpc conn ~version:_ query =
     [%log info] "Sending transition_knowledge to $peer" ~metadata:(md conn) ;
@@ -1164,9 +1323,14 @@ let create (config : Config.t)
     let msg_args =
       [ ("query", Rpcs.Get_transition_knowledge.query_to_yojson query) ]
     in
-    run_for_rpc_result conn query ~f:get_transition_knowledge action_msg
-      msg_args
-    >>| fst
+    let%map result =
+      run_for_rpc_result conn query ~f:get_transition_knowledge action_msg
+        msg_args
+      >>| fst
+    in
+    if List.is_empty result then
+      incr_failed_response Rpcs.Get_transition_knowledge.failed_response_counter ;
+    result
   in
   let get_transition_chain_rpc conn ~version:_ query =
     [%log info] "Sending transition_chain to $peer" ~metadata:(md conn) ;
@@ -1180,6 +1344,7 @@ let create (config : Config.t)
     match result with
     | None ->
         record_unknown_item result sender action_msg msg_args
+          Rpcs.Get_transition_chain.failed_response_counter
     | Some ext_trans ->
         let%map valid_protocol_versions =
           Deferred.List.map ext_trans
@@ -1334,6 +1499,8 @@ let create (config : Config.t)
                    { state_hash = External_transition.state_hash state
                    ; sender = Envelope.Incoming.sender envelope
                    }) ;
+            Mina_net2.Validation_callback.set_message_type valid_cb `Block ;
+            Mina_metrics.(Counter.inc_one Network.Block.received) ;
             `Fst
               ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
               , Block_time.now config.time_controller
@@ -1345,14 +1512,16 @@ let create (config : Config.t)
                   [%str_log debug]
                     (Snark_work_received
                        { work; sender = Envelope.Incoming.sender envelope })) ;
-            Mina_metrics.(
-              Counter.inc_one Snark_work.completed_snark_work_received_gossip) ;
+            Mina_metrics.(Counter.inc_one Network.Snark_work.received) ;
+            Mina_net2.Validation_callback.set_message_type valid_cb `Snark_work ;
             `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
         | Transaction_pool_diff diff ->
             if config.log_gossip_heard.transaction_pool_diff then
               [%str_log debug]
                 (Transactions_received
                    { txns = diff; sender = Envelope.Incoming.sender envelope }) ;
+            Mina_net2.Validation_callback.set_message_type valid_cb `Transaction ;
+            Mina_metrics.(Counter.inc_one Network.Transaction.received) ;
             `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb))
   in
   { gossip_net
@@ -1406,9 +1575,6 @@ include struct
   let on_first_connect t = lift on_first_connect t
 
   let on_first_high_connectivity t = lift on_first_high_connectivity t
-
-  let ip_for_peer t peer_id =
-    (lift ip_for_peer) t peer_id >>| Option.map ~f:(fun peer -> peer.Peer.host)
 
   let connection_gating_config t = lift connection_gating t
 

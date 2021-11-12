@@ -6,7 +6,7 @@ data "local_file" "genesis_ledger" {
 }
 
 data "local_file" "libp2p_peers" {
-  for_each = toset(concat(local.whale_block_producer_names, local.fish_block_producer_names))
+  for_each = toset(concat(local.whale_block_producer_libp2p_names, local.fish_block_producer_libp2p_names))
   filename = "${path.module}/../../../keys/libp2p/${var.testnet_name}/${each.key}"
   depends_on = [
     null_resource.block_producer_key_generation

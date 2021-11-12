@@ -103,20 +103,21 @@ module Blocks_and_internal_commands = struct
     { internal_command_id : int
     ; sequence_no : int
     ; secondary_sequence_no : int
+    ; receiver_account_creation_fee_paid : int64 option
     ; receiver_balance_id : int
     }
   [@@deriving hlist]
 
   let typ =
     let open Archive_lib.Processor.Caqti_type_spec in
-    let spec = Caqti_type.[ int; int; int; int ] in
+    let spec = Caqti_type.[ int; int; int; option int64; int ] in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
 
   let query =
     Caqti_request.collect Caqti_type.int typ
-      {sql| SELECT internal_command_id, sequence_no, secondary_sequence_no, receiver_balance
+      {sql| SELECT internal_command_id, sequence_no, secondary_sequence_no, receiver_account_creation_fee_paid, receiver_balance
             FROM (blocks_internal_commands
               INNER JOIN blocks
               ON blocks.id = blocks_internal_commands.block_id)

@@ -16,7 +16,11 @@ module Base_ledger = struct
 
   let location_of_account _t k = Some k
 
+  let location_of_account_batch _t ks = List.map ks ~f:(fun k -> (k, Some k))
+
   let get t l = Map.find t l
+
+  let get_batch t ls = List.map ls ~f:(fun l -> (l, get t l))
 
   let detached_signal _ = Deferred.never ()
 end

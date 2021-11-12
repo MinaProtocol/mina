@@ -210,8 +210,21 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
   in
   let constraint_constants = precomputed_values.constraint_constants in
   let rec loop previous_cycles =
+    let sync_ledger_pipe = "sync ledger pipe" in
     let sync_ledger_reader, sync_ledger_writer =
-      create ~name:"sync ledger pipe" (Buffered (`Capacity 50, `Overflow Crash))
+      create ~name:sync_ledger_pipe
+        (Buffered
+           ( `Capacity 50
+           , `Overflow
+               (Drop_head
+                  (fun head ->
+                    Mina_metrics.(
+                      Counter.inc_one
+                        Pipe.Drop_on_overflow.bootstrap_sync_ledger) ;
+                    External_transition.Initial_validated
+                    .handle_dropped_transition
+                      (Envelope.Incoming.data head)
+                      ~pipe_name:sync_ledger_pipe ~logger)) ))
     in
     don't_wait_for
       (transfer_while_writer_alive transition_reader sync_ledger_writer
@@ -641,7 +654,7 @@ let%test_module "Bootstrap_controller tests" =
         let%bind fake_network =
           Fake_network.Generator.(
             gen ~precomputed_values ~verifier ~max_frontier_length
-              [ fresh_peer; fresh_peer ])
+              [ fresh_peer; fresh_peer ] ~use_super_catchup:false)
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq ~precomputed_values
@@ -775,6 +788,7 @@ let%test_module "Bootstrap_controller tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
+            ~use_super_catchup:false
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 2) + 2)
@@ -783,7 +797,7 @@ let%test_module "Bootstrap_controller tests" =
           let [ my_net; peer_net ] = fake_network.peer_networks in
           let transition_reader, transition_writer =
             Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
-              (Buffered (`Capacity 10, `Overflow Drop_head))
+              (Buffered (`Capacity 10, `Overflow (Drop_head ignore)))
           in
           Envelope.Incoming.wrap
             ~data:

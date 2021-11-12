@@ -12,13 +12,13 @@ module "kubernetes_testnet" {
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
 
-  coda_image         = var.coda_image
+  mina_image         = var.mina_image
   use_custom_entrypoint = true
   custom_entrypoint = "/mina_daemon_puppeteer.py"
-  coda_archive_image = var.coda_archive_image
-  coda_agent_image   = var.coda_agent_image
-  coda_bots_image    = var.coda_bots_image
-  coda_points_image  = var.coda_points_image
+  mina_archive_image = var.mina_archive_image
+  mina_agent_image   = var.mina_agent_image
+  mina_bots_image    = var.mina_bots_image
+  mina_points_image  = var.mina_points_image
 
   log_level             = "Trace"
   log_snark_work_gossip = true
@@ -38,10 +38,14 @@ module "kubernetes_testnet" {
   archive_node_count   = var.archive_node_count
   mina_archive_schema  = var.mina_archive_schema
 
-  snark_worker_replicas   = var.snark_worker_replicas
-  snark_worker_fee        = var.snark_worker_fee
-  snark_worker_public_key = var.snark_worker_public_key
-  snark_worker_host_port  = local.snark_worker_host_port
+  snark_coordinators = var.snark_worker_replicas <= 0 ? [] : [
+    {
+      snark_worker_replicas = var.snark_worker_replicas
+      snark_worker_fee      = var.snark_worker_fee
+      snark_worker_public_key = var.snark_worker_public_key
+      snark_coordinators_host_port = local.snark_worker_host_port
+    }
+  ]
 
   block_producer_key_pass = "naughty blue worm"
   block_producer_configs  = [
@@ -61,4 +65,7 @@ module "kubernetes_testnet" {
       archiveAddress         = element(local.archive_node_names, index)
     }
   ]
+
+  #we don't use plain nodes in the intg test
+  plain_node_configs = []
 }

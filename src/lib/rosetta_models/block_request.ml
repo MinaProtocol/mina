@@ -10,7 +10,7 @@ type t =
   { network_identifier : Network_identifier.t
   ; block_identifier : Partial_block_identifier.t
   }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** A BlockRequest is utilized to make a block request on the /block endpoint. *)
 let create (network_identifier : Network_identifier.t)

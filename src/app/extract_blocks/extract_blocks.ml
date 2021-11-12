@@ -28,7 +28,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let creator = Public_key.Compressed.of_base58_check_exn creator_str in
   let%bind block_winner_str =
     query_db
-      ~f:(fun db -> Sql.Public_key.run db block.creator_id)
+      ~f:(fun db -> Sql.Public_key.run db block.block_winner_id)
       ~item:"block winner public key"
   in
   let block_winner =
@@ -76,7 +76,9 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   in
   let ledger_hash = Ledger_hash.of_base58_check_exn block.ledger_hash in
   let height = Unsigned.UInt32.of_int64 block.height in
-  let global_slot = Unsigned.UInt32.of_int64 block.global_slot in
+  let global_slot_since_hard_fork =
+    Unsigned.UInt32.of_int64 block.global_slot_since_hard_fork
+  in
   let global_slot_since_genesis =
     Unsigned.UInt32.of_int64 block.global_slot_since_genesis
   in
@@ -94,7 +96,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; next_epoch_ledger_hash
     ; ledger_hash
     ; height
-    ; global_slot
+    ; global_slot_since_hard_fork
     ; global_slot_since_genesis
     ; timestamp
     ; user_cmds = []
@@ -246,6 +248,7 @@ let fill_in_internal_commands pool block_state_hash =
          { internal_command_id
          ; sequence_no
          ; secondary_sequence_no
+         ; receiver_account_creation_fee_paid
          ; receiver_balance_id
          }
        ->
@@ -271,11 +274,16 @@ let fill_in_internal_commands pool block_state_hash =
         internal_cmd.token |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64
       in
       let hash = internal_cmd.hash |> Transaction_hash.of_base58_check_exn in
+      let receiver_account_creation_fee_paid =
+        Option.map receiver_account_creation_fee_paid ~f:(fun fee ->
+            fee |> Unsigned.UInt64.of_int64 |> Currency.Amount.of_uint64)
+      in
       let cmd =
         { Extensional.Internal_command.sequence_no
         ; secondary_sequence_no
         ; typ
         ; receiver
+        ; receiver_account_creation_fee_paid
         ; receiver_balance
         ; fee
         ; token
@@ -422,7 +430,9 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
             [%log info] "Writing block with $state_hash"
               ~metadata:
                 [ ("state_hash", State_hash.to_yojson block.state_hash) ] ;
-            let output_file = State_hash.to_string block.state_hash ^ ".json" in
+            let output_file =
+              State_hash.to_base58_check block.state_hash ^ ".json"
+            in
             Async_unix.Writer.with_file output_file ~f:(fun writer ->
                 return
                   (Async.fprintf writer "%s\n%!"

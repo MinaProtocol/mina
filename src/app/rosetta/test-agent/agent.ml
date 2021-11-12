@@ -58,8 +58,8 @@ let get_last_block_index ~rosetta_uri ~network_response ~logger =
           `Failed
       | Ok index ->
           `Succeeded index )
-    ~retry_count:10 ~initial_delay:(Span.of_ms 0.0)
-    ~each_delay:(Span.of_ms 250.0)
+    ~retry_count:20 ~initial_delay:(Span.of_sec 1.0)
+    ~each_delay:(Span.of_sec 1.0)
     ~failure_reason:"Took too long for the last block to be fetched"
 
 let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
@@ -151,8 +151,8 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
             `Failed
         | Ok (Some block) ->
             `Succeeded block )
-      ~retry_count:20 ~initial_delay:(Span.of_ms 250.0)
-      ~each_delay:(Span.of_ms 500.0)
+      ~retry_count:20 ~initial_delay:(Span.of_sec 1.0)
+      ~each_delay:(Span.of_sec 2.0)
       ~failure_reason:"Took too long for a block to be created"
   in
   [%log debug]
@@ -246,7 +246,7 @@ let direct_graphql_no_account_fee_through_block ~logger ~rosetta_uri
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Ignore } ]
 
 let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
@@ -273,9 +273,11 @@ let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None } ]
 
+(* token creation disabled in daemon for now *)
+(*
 let direct_graphql_create_token_through_block ~logger ~rosetta_uri ~graphql_uri
     ~network_response =
   let open Deferred.Result.Let_syntax in
@@ -294,7 +296,7 @@ let direct_graphql_create_token_through_block ~logger ~rosetta_uri ~graphql_uri
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None }
         ; { amount= None
           ; account= None
@@ -320,8 +322,9 @@ let direct_graphql_create_token_account_through_block ~logger ~rosetta_uri
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None } ]
+*)
 
 let construction_api_transaction_through_mempool ~logger ~rosetta_uri
     ~graphql_uri ~network_response ~operation_expectations ~operations =
@@ -414,11 +417,11 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
       ~signed_transaction:combine_res.signed_transaction
   in
   assert (
-    String.equal hash_res.Construction_hash_response.transaction_hash
-      submit_res.transaction_identifier.hash ) ;
+    Transaction_identifier.equal hash_res.Transaction_identifier_response.transaction_identifier
+      submit_res.transaction_identifier ) ;
   [%log debug] "Construction_submit is finalized" ;
   verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
-    ~txn_hash:hash_res.transaction_hash ~network_response
+    ~txn_hash:hash_res.transaction_identifier.hash ~network_response
     ~operation_expectations
 
 let construction_api_payment_through_mempool =
@@ -446,7 +449,7 @@ let construction_api_payment_through_mempool =
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None } ]
 
 let construction_api_delegation_through_mempool =
@@ -467,9 +470,11 @@ let construction_api_delegation_through_mempool =
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None } ]
 
+(* token creation disabled in daemon for now *)
+(*
 let construction_api_create_token_through_mempool =
   construction_api_transaction_through_mempool
     ~operations:(fun account_id ->
@@ -481,7 +486,7 @@ let construction_api_create_token_through_mempool =
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None }
         ; { amount= None
           ; account= None
@@ -500,8 +505,9 @@ let construction_api_create_token_account_through_mempool =
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None } ]
+*)
 
 let get_consensus_constants ~logger :
     Consensus.Constants.t Or_error.t Deferred.t =
@@ -512,10 +518,16 @@ let get_consensus_constants ~logger :
     Filename.concat home ".coda-config"
   in
   let config_file =
-    match Sys.getenv "CODA_CONFIG_FILE" with
-    | Some config_file ->
+    let mina_config_file = "MINA_CONFIG_FILE" in
+    let coda_config_file = "CODA_CONFIG_FILE" in
+    match Sys.getenv mina_config_file,Sys.getenv coda_config_file with
+    | Some config_file,_ ->
         config_file
-    | None ->
+    | None,Some config_file ->
+      [%log warn] "Using deprecated environment variable %s, please use %s instead"
+        coda_config_file mina_config_file;
+      config_file
+    | None,None ->
         Filename.concat conf_dir "config.json"
   in
   let%bind config =
@@ -658,7 +670,7 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
         in
         let%map status_r = status_r_dr in
         if
-          [%equal: (string option, Error.t) result]
+          [%equal: (string option, Error.t) Result.t]
             (Result.map status_r ~f:(fun status ->
                  Option.bind status.Network_status_response.sync_status
                    ~f:(fun sync_status -> sync_status.stage) ))
@@ -710,8 +722,10 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
       ~graphql_uri ~network_response
   in
   [%log info] "Created construction delegation and waited" ;
+  (* token creation is disabled in daemon for now *)
+  (*
+   [%log info] "Starting create token check" ;
   (* Stop staking *)
-  [%log info] "Starting create token check" ;
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   let%bind () =
     direct_graphql_create_token_through_block ~logger ~rosetta_uri ~graphql_uri
@@ -742,8 +756,8 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
   let%bind _ =
     historical_balance_check ~logger ~rosetta_uri ~network_response
   in
+  *)
   [%log info] "Finished historical balance check" ;
-  (* Stop staking *)
   (* Success *)
   return ()
 
@@ -773,7 +787,7 @@ let command =
       ~doc:"URI of Rosetta endpoint to connect to" Cli.required_uri
   and graphql_uri =
     flag "--graphql-uri" ~aliases:["graphql-uri"]
-      ~doc:"URI of Coda GraphQL endpoint to connect to" Cli.required_uri
+      ~doc:"URI of Mina GraphQL endpoint to connect to" Cli.required_uri
   and log_json =
     flag "--log-json" ~aliases:["log-json"]
       ~doc:"Print log output as JSON (default: plain text)" no_arg

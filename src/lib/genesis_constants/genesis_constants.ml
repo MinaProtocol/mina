@@ -3,14 +3,7 @@
 open Core_kernel
 
 module Proof_level = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = Full | Check | None [@@deriving equal]
-
-      let to_latest = Fn.id
-    end
-  end]
+  type t = Full | Check | None [@@deriving bin_io_unversioned, equal]
 
   let to_string = function Full -> "full" | Check -> "check" | None -> "none"
 
@@ -32,19 +25,12 @@ module Proof_level = struct
 end
 
 module Fork_constants = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { previous_state_hash : Pickles.Backend.Tick.Field.Stable.V1.t
-        ; previous_length : Mina_numbers.Length.Stable.V1.t
-        ; previous_global_slot : Mina_numbers.Global_slot.Stable.V1.t
-        }
-      [@@deriving sexp, equal, compare, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
+  type t =
+    { previous_state_hash : Pickles.Backend.Tick.Field.Stable.Latest.t
+    ; previous_length : Mina_numbers.Length.Stable.Latest.t
+    ; previous_global_slot : Mina_numbers.Global_slot.Stable.Latest.t
+    }
+  [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 end
 
 (** Constants that affect the constraint systems for proofs (and thus also key
@@ -55,26 +41,19 @@ end
     be invalid.
 *)
 module Constraint_constants = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { sub_windows_per_window : int
-        ; ledger_depth : int
-        ; work_delay : int
-        ; block_window_duration_ms : int
-        ; transaction_capacity_log_2 : int
-        ; pending_coinbase_depth : int
-        ; coinbase_amount : Currency.Amount.Stable.V1.t
-        ; supercharged_coinbase_factor : int
-        ; account_creation_fee : Currency.Fee.Stable.V1.t
-        ; fork : Fork_constants.Stable.V1.t option
-        }
-      [@@deriving sexp, equal, compare, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
+  type t =
+    { sub_windows_per_window : int
+    ; ledger_depth : int
+    ; work_delay : int
+    ; block_window_duration_ms : int
+    ; transaction_capacity_log_2 : int
+    ; pending_coinbase_depth : int
+    ; coinbase_amount : Currency.Amount.Stable.Latest.t
+    ; supercharged_coinbase_factor : int
+    ; account_creation_fee : Currency.Fee.Stable.Latest.t
+    ; fork : Fork_constants.t option
+    }
+  [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 
   let to_snark_keys_header (t : t) : Snark_keys_header.Constraint_constants.t =
     { sub_windows_per_window = t.sub_windows_per_window
@@ -225,8 +204,11 @@ The types are defined such that this module doesn't depend on any of the coda li
 TODO: #4659 move key generation to runtime_genesis_ledger.exe to include scan_state constants, consensus constants (c and  block_window_duration) and ledger depth here*)
 
 let genesis_timestamp_of_string str =
-  let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
-  Core.Time.of_string_gen ~if_no_timezone:(`Use_this_one default_timezone) str
+  let default_zone = Time.Zone.of_utc_offset ~hours:(-8) in
+  Time.of_string_gen
+    ~find_zone:(fun _ -> assert false)
+    ~default_zone:(fun () -> default_zone)
+    str
 
 let of_time t = Time.to_span_since_epoch t |> Time.Span.to_ms |> Int64.of_float
 
@@ -246,8 +228,7 @@ let validate_time time_str =
 
 let genesis_timestamp_to_string time =
   Int64.to_float time |> Time.Span.of_ms |> Time.of_span_since_epoch
-  |> Core.Time.to_string_iso8601_basic
-       ~zone:(Core.Time.Zone.of_utc_offset ~hours:(-8))
+  |> Time.to_string_iso8601_basic ~zone:(Time.Zone.of_utc_offset ~hours:(-8))
 
 (*Protocol constants required for consensus and snarks. Consensus constants is generated using these*)
 module Protocol = struct
@@ -376,7 +357,7 @@ module T = struct
           ]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
-      ^ Core.Time.to_string_abs ~zone:Time.Zone.utc
+      ^ Time.to_string_abs ~zone:Time.Zone.utc
           (Time.of_span_since_epoch
              (Time.Span.of_ms
                 (Int64.to_float t.protocol.genesis_state_timestamp)))

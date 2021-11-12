@@ -118,7 +118,7 @@ def get_chain_id(v1, namespace):
       resp = util.exec_on_pod(v1, namespace, pod_name, container_name, 'mina client status --json')      
       resp = resp.strip()
       if resp[0] != '{':
-        #first line could be 'Using password from environment variable CODA_PRIVKEY_PASS'
+        #first line could be 'Using password from environment variable MINA_PRIVKEY_PASS'
         resp = resp.split("\n", 1)[1]
       resp_dict = ast.literal_eval(resp.strip())
       print("Chain ID: {}".format(resp_dict['chain_id']))

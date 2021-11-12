@@ -21,8 +21,7 @@ let main () =
     Lazy.force (Genesis_proof.Inputs.accounts precomputed_values)
   in
   let snark_work_public_keys ndx =
-    List.nth_exn accounts ndx
-    |> fun (_, acct) -> Some (Account.public_key acct)
+    List.nth_exn accounts ndx |> fun (_, acct) -> Some (Account.public_key acct)
   in
   let%bind testnet =
     Coda_worker_testnet.test ~name logger num_block_producers Option.some
@@ -49,7 +48,8 @@ let main () =
             , `String
                 ( Public_key.Compressed.to_base58_check
                 @@ Account.public_key acct ) )
-          ; ("balance", `Int (Currency.Balance.to_int acct.balance)) ] ) ;
+          ; ("balance", `Int (Currency.Balance.to_int acct.balance))
+          ]) ;
   (* second account is delegator; see genesis_ledger/test_delegation_ledger.ml *)
   let ((_, delegator_account) as delegator) = List.nth_exn accounts 2 in
   let delegator_pubkey = Account.public_key delegator_account in
@@ -74,20 +74,19 @@ let main () =
   let delegator_production_goal = 20 in
   Deferred.don't_wait_for
     (Pipe_lib.Linear_pipe.iter delegator_transition_reader
-       ~f:(fun {With_hash.data= transition; _} ->
-         if Public_key.Compressed.equal transition.creator delegator_pubkey
-         then (
+       ~f:(fun { With_hash.data = transition; _ } ->
+         if Public_key.Compressed.equal transition.creator delegator_pubkey then (
            [%log info] "Observed block produced by delegator $delegator"
              ~metadata:
                [ ( "delegator"
                  , `String
-                     (Public_key.Compressed.to_base58_check delegator_pubkey)
-                 ) ] ;
+                     (Public_key.Compressed.to_base58_check delegator_pubkey) )
+               ] ;
            assert (not !delegatee_has_produced) ;
            incr delegator_production_count ;
            if Int.equal !delegator_production_count delegator_production_goal
            then Ivar.fill delegator_ivar () ) ;
-         return () )) ;
+         return ())) ;
   [%log info] "Started delegator transition reader" ;
   let%bind delegatee_transition_reader =
     Coda_process.new_block_exn worker delegatee_pubkey
@@ -99,20 +98,19 @@ let main () =
   let delegatee_production_goal = 5 in
   Deferred.don't_wait_for
     (Pipe_lib.Linear_pipe.iter delegatee_transition_reader
-       ~f:(fun {With_hash.data= transition; _} ->
-         if Public_key.Compressed.equal transition.creator delegatee_pubkey
-         then (
+       ~f:(fun { With_hash.data = transition; _ } ->
+         if Public_key.Compressed.equal transition.creator delegatee_pubkey then (
            [%log info] "Observed block produced by delegatee $delegatee"
              ~metadata:
                [ ( "delegatee"
                  , `String
-                     (Public_key.Compressed.to_base58_check delegatee_pubkey)
-                 ) ] ;
+                     (Public_key.Compressed.to_base58_check delegatee_pubkey) )
+               ] ;
            delegatee_has_produced := true ;
            incr delegatee_production_count ;
            if Int.equal !delegatee_production_count delegatee_production_goal
            then Ivar.fill delegatee_ivar () ) ;
-         return () )) ;
+         return ())) ;
   [%log info] "Started delegatee transition reader" ;
   (* wait for delegator to produce some blocks *)
   let%bind () = Ivar.read delegator_ivar in
@@ -120,7 +118,8 @@ let main () =
   [%log info]
     "Before delegation, got $delegator_production_count blocks from delegator \
      (and none from delegatee)"
-    ~metadata:[("delegator_production_count", `Int !delegator_production_count)] ;
+    ~metadata:
+      [ ("delegator_production_count", `Int !delegator_production_count) ] ;
   let%bind () =
     Coda_worker_testnet.Delegation.delegate_stake testnet ~node:0
       ~delegator:delegator_keypair.private_key ~delegatee:delegatee_pubkey
@@ -129,7 +128,8 @@ let main () =
   (* wait for delegatee to produce a few blocks *)
   let%bind () = Ivar.read delegatee_ivar in
   [%log info] "Saw $delegatee_production_count blocks produced by delegatee"
-    ~metadata:[("delegatee_production_count", `Int !delegatee_production_count)] ;
+    ~metadata:
+      [ ("delegatee_production_count", `Int !delegatee_production_count) ] ;
   heartbeat_flag := false ;
   Coda_worker_testnet.Api.teardown testnet ~logger
 

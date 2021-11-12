@@ -6,7 +6,9 @@ open Keypair_common
 module T = struct
   type t = Mina_net2.Keypair.t
 
-  let env = "CODA_LIBP2P_PASS"
+  let env = "MINA_LIBP2P_PASS"
+
+  let env_deprecated = Some "CODA_LIBP2P_PASS"
 
   let which = "libp2p keypair"
 

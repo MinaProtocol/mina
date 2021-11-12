@@ -8,7 +8,7 @@
 
 type t =
   { network_identifier : Network_identifier.t; signed_transaction : string }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** The transaction submission request includes a signed transaction. *)
 let create (network_identifier : Network_identifier.t)

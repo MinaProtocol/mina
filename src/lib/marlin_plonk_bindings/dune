@@ -1,3 +1,5 @@
+(data_only_dirs wasm)
+
 (library
  (public_name marlin_plonk_bindings)
  (name marlin_plonk_bindings)
@@ -29,6 +31,9 @@
    marlin_plonk_bindings_pasta_fq_proof
    ;; Oracles
    marlin_plonk_bindings_pasta_fp_oracles
-   marlin_plonk_bindings_pasta_fq_oracles)
+   marlin_plonk_bindings_pasta_fq_oracles
+   ;; Poseidon
+   marlin_plonk_bindings_pasta_fp_poseidon
+   marlin_plonk_bindings_pasta_fq_poseidon )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version)))

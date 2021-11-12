@@ -8,7 +8,7 @@
 
 type t =
   { network_identifier : Network_identifier.t; signed_transaction : string }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** ConstructionHashRequest is the input to the `/construction/hash` endpoint. *)
 let create (network_identifier : Network_identifier.t)

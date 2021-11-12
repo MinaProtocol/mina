@@ -18,15 +18,20 @@ type t =
       [ `Always_raise
       | `Raise_on_failure
       | `Handler of
-        killed:bool -> Unix.Exit_or_signal.t Or_error.t -> unit Deferred.t
+           killed:bool
+        -> Process.t
+        -> Unix.Exit_or_signal.t Or_error.t
+        -> unit Deferred.t
       | `Ignore ]
   }
 
-let stdout_lines : t -> string Strict_pipe.Reader.t = fun t -> t.stdout_pipe
+let stdout : t -> string Strict_pipe.Reader.t = fun t -> t.stdout_pipe
 
-let stderr_lines : t -> string Strict_pipe.Reader.t = fun t -> t.stderr_pipe
+let stderr : t -> string Strict_pipe.Reader.t = fun t -> t.stderr_pipe
 
 let stdin : t -> Writer.t = fun t -> t.stdin
+
+let pid : t -> Pid.t = fun t -> Process.pid t.process
 
 let termination_status : t -> Unix.Exit_or_signal.t Or_error.t option =
  fun t -> Ivar.peek t.terminated_ivar
@@ -154,80 +159,30 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
       [%log debug] "No PID file for %s" name ;
       Deferred.unit
 
-type output_handling =
-  [ `Log of Logger.Level.t | `Don't_log ]
-  * [ `Pipe | `No_pipe ]
-  * [ `Keep_empty | `Filter_empty ]
-
-(* Given a Reader.t coming from a process output, optionally log the lines
-   coming from it and return a strict pipe that will get the lines if the
-   argument is `Pipe and be empty if it's `No_pipe.
-*)
-let reader_to_strict_pipe_with_logging :
-       Reader.t
-    -> string
-    -> output_handling
-    -> Logger.t
-    -> string Strict_pipe.Reader.t =
- fun reader name (log, pipe, filter_empty) logger ->
-  let master_r, master_w =
+(* Convert a Async.Reader.t into a Strict_pipe.Reader.t *)
+let reader_to_strict_pipe reader name output_type =
+  let r, w =
     Strict_pipe.create ~name
       (Strict_pipe.Buffered (`Capacity 100, `Overflow Crash))
   in
-  let lines_js_pipe = Reader.lines reader in
+  let pipe =
+    match output_type with
+    | `Chunks ->
+        Reader.pipe reader
+    | `Lines ->
+        Reader.lines reader
+  in
   don't_wait_for
-    ( Pipe.iter_without_pushback lines_js_pipe ~f:(fun line ->
-          match filter_empty with
-          | `Keep_empty ->
-              Strict_pipe.Writer.write master_w line
-          | `Filter_empty ->
-              if not (String.equal line "") then
-                Strict_pipe.Writer.write master_w line)
-    >>= fun () ->
-    Strict_pipe.Writer.close master_w ;
-    Deferred.unit ) ;
-  let logging_r, client_r = Strict_pipe.Reader.Fork.two master_r in
-  don't_wait_for
-    (Strict_pipe.Reader.iter_without_pushback logging_r ~f:(fun line ->
-         match log with
-         | `Log level -> (
-             let simple_log_msg =
-               lazy
-                 { Logger.Message.timestamp = Time.now ()
-                 ; level
-                 ; source =
-                     Some
-                       (Logger.Source.create ~module_:__MODULE__
-                          ~location:__LOC__)
-                 ; message = "Output from process $child_name: $line"
-                 ; metadata =
-                     String.Map.set ~key:"child_name" ~data:(`String name)
-                       (String.Map.set ~key:"line" ~data:(`String line)
-                          (Logger.metadata logger))
-                 ; event_id = None
-                 }
-             in
-             match Option.try_with (fun () -> Yojson.Safe.from_string line) with
-             | Some json -> (
-                 match Logger.Message.of_yojson json with
-                 | Ok msg ->
-                     Logger.raw logger msg
-                 | Error _err ->
-                     Logger.raw logger (Lazy.force simple_log_msg) )
-             | None ->
-                 Logger.raw logger (Lazy.force simple_log_msg) )
-         | `Don't_log ->
-             ())) ;
-  (* Ideally we'd close the pipe, but you can't do that with a reader, so we
-     iterate over it and drop everything. Since Strict_pipe enforces a single
-     reader this is safe. *)
-  don't_wait_for
-    ( match pipe with
-    | `No_pipe ->
-        Strict_pipe.Reader.iter client_r ~f:(Fn.const Deferred.unit)
-    | _ ->
-        Deferred.unit ) ;
-  client_r
+    (let%map () =
+       Pipe.iter_without_pushback pipe ~f:(fun msg ->
+           if not (Strict_pipe.Writer.is_closed w) then
+             try Strict_pipe.Writer.write w msg
+             with Strict_pipe.Overflow _ -> Strict_pipe.Writer.close w)
+     in
+     if not (Strict_pipe.Writer.is_closed w) then Strict_pipe.Writer.close w) ;
+  r
+
+type output_type = [ `Chunks | `Lines ]
 
 let start_custom :
        logger:Logger.t
@@ -235,13 +190,16 @@ let start_custom :
     -> git_root_relative_path:string
     -> conf_dir:string
     -> args:string list
-    -> stdout:output_handling
-    -> stderr:output_handling
+    -> stdout:output_type
+    -> stderr:output_type
     -> termination:
          [ `Always_raise
          | `Raise_on_failure
          | `Handler of
-           killed:bool -> Unix.Exit_or_signal.t Or_error.t -> unit Deferred.t
+              killed:bool
+           -> Process.t
+           -> Unix.Exit_or_signal.t Or_error.t
+           -> unit Deferred.t
          | `Ignore ]
     -> t Deferred.Or_error.t =
  fun ~logger ~name ~git_root_relative_path ~conf_dir ~args ~stdout ~stderr
@@ -273,8 +231,10 @@ let start_custom :
   in
   let%bind process =
     keep_trying
+      (* TODO: remove CODA...PATH and coda-, eventually *)
       (List.filter_opt
-         [ Unix.getenv @@ "CODA_" ^ String.uppercase name ^ "_PATH"
+         [ Unix.getenv @@ "MINA_" ^ String.uppercase name ^ "_PATH"
+         ; Unix.getenv @@ "CODA_" ^ String.uppercase name ^ "_PATH"
          ; relative_to_root
          ; Some (Filename.dirname mina_binary_path ^/ name)
          ; Some ("mina-" ^ name)
@@ -297,16 +257,10 @@ let start_custom :
   in
   let terminated_ivar = Ivar.create () in
   let stdout_pipe =
-    reader_to_strict_pipe_with_logging (Process.stdout process)
-      (name ^ "-stdout") stdout
-      (Logger.extend logger
-         [ ("process", `String name); ("handle", `String "stdout") ])
+    reader_to_strict_pipe (Process.stdout process) (name ^ "-stdout") stdout
   in
   let stderr_pipe =
-    reader_to_strict_pipe_with_logging (Process.stderr process)
-      (name ^ "-stderr") stderr
-      (Logger.extend logger
-         [ ("process", `String name); ("handle", `String "stderr") ])
+    reader_to_strict_pipe (Process.stderr process) (name ^ "-stderr") stderr
   in
   let t =
     { process
@@ -353,7 +307,7 @@ let start_custom :
     | `Raise_on_failure, Ok (Ok ()) ->
         Deferred.unit
     | `Handler f, _ ->
-        f ~killed:t.killing termination_status) ;
+        f ~killed:t.killing process termination_status) ;
   Deferred.Or_error.return t
 
 let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
@@ -382,10 +336,8 @@ let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
   | Some _ ->
       Deferred.Or_error.error_string "already terminated"
 
-let register_process ?termination_expected (termination : Termination.t)
-    (process : t) kind =
-  Termination.register_process ?termination_expected termination process.process
-    kind
+let register_process (termination : Termination.t) (process : t) kind =
+  Termination.register_process termination process.process kind
 
 let%test_module _ =
   ( module struct
@@ -408,15 +360,13 @@ let%test_module _ =
           let open Deferred.Let_syntax in
           let%bind process =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
-              ~args:[ "exit" ]
-              ~stdout:(`Log Logger.Level.Debug, `Pipe, `Keep_empty)
-              ~stderr:(`Log Logger.Level.Error, `No_pipe, `Keep_empty)
+              ~args:[ "exit" ] ~stdout:`Chunks ~stderr:`Chunks
               ~termination:`Raise_on_failure
             |> Deferred.map ~f:Or_error.ok_exn
           in
           let%bind () =
-            Strict_pipe.Reader.iter (stdout_lines process) ~f:(fun line ->
-                [%test_eq: string] "hello" line ;
+            Strict_pipe.Reader.iter (stdout process) ~f:(fun line ->
+                [%test_eq: string] "hello\n" line ;
                 Deferred.unit)
           in
           (* Pipe will be closed before the ivar is filled, so we need to wait a
@@ -432,9 +382,7 @@ let%test_module _ =
           let open Deferred.Let_syntax in
           let%bind process =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
-              ~args:[ "loop" ]
-              ~stdout:(`Don't_log, `Pipe, `Keep_empty)
-              ~stderr:(`Don't_log, `No_pipe, `Keep_empty)
+              ~args:[ "loop" ] ~stdout:`Lines ~stderr:`Lines
               ~termination:`Always_raise
             |> Deferred.map ~f:Or_error.ok_exn
           in
@@ -452,7 +400,7 @@ let%test_module _ =
           let%bind () = assert_lock_exists () in
           let output = ref [] in
           let rec go () =
-            match%bind Strict_pipe.Reader.read (stdout_lines process) with
+            match%bind Strict_pipe.Reader.read (stdout process) with
             | `Eof ->
                 failwith "pipe closed when process should've run forever"
             | `Ok line ->
@@ -476,9 +424,7 @@ let%test_module _ =
           let open Deferred.Let_syntax in
           let mk_process () =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
-              ~args:[ "loop" ]
-              ~stdout:(`Don't_log, `No_pipe, `Keep_empty)
-              ~stderr:(`Don't_log, `No_pipe, `Keep_empty)
+              ~args:[ "loop" ] ~stdout:`Chunks ~stderr:`Chunks
               ~termination:`Ignore
           in
           let%bind process1 =

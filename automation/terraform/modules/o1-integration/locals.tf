@@ -26,7 +26,7 @@ locals {
   snark_coordinator_name = "snark-coordinator-${lower(substr(var.snark_worker_public_key, length(var.snark_worker_public_key) - 6, 6))}"
 
   default_archive_node = {
-    image                   = var.coda_archive_image
+    image                   = var.mina_archive_image
     serverPort              = "3086"
     externalPort            = "11010"
     enableLocalDaemon       = true

@@ -104,6 +104,8 @@ module Unsigned = struct
 
     type t =
       { random_oracle_input : string (* hex *) [@key "randomOracleInput"]
+      ; signer_input : Random_oracle_input.Coding2.Rendered.t
+            [@key "signerInput"]
       ; payment : Payment.t option
       ; stake_delegation : Delegation.t option [@key "stakeDelegation"]
       ; create_token : Create_token.t option [@key "createToken"]
@@ -142,9 +144,9 @@ module Unsigned = struct
           ; fee = command.fee
           ; nonce
           ; token = command.token
-          ; memo = None
+          ; memo = command.memo
           ; amount
-          ; valid_until = None
+          ; valid_until = command.valid_until
           }
         in
         Result.return (`Payment payment)
@@ -154,8 +156,8 @@ module Unsigned = struct
           ; new_delegate = un_pk command.receiver
           ; fee = command.fee
           ; nonce
-          ; memo = None
-          ; valid_until = None
+          ; memo = command.memo
+          ; valid_until = command.valid_until
           }
         in
         Result.return (`Delegation delegation)
@@ -165,8 +167,8 @@ module Unsigned = struct
           ; disable_new_accounts = false
           ; fee = command.fee
           ; nonce
-          ; memo = None
-          ; valid_until = None
+          ; memo = command.memo
+          ; valid_until = command.valid_until
           }
         in
         Result.return (`Create_token create_token)
@@ -178,8 +180,8 @@ module Unsigned = struct
           ; account_disabled = false
           ; fee = command.fee
           ; nonce
-          ; memo = None
-          ; valid_until = None
+          ; memo = command.memo
+          ; valid_until = command.valid_until
           }
         in
         Result.return (`Create_token_account create_token_account)
@@ -198,8 +200,8 @@ module Unsigned = struct
           ; amount
           ; fee = command.fee
           ; nonce
-          ; memo = None
-          ; valid_until = None
+          ; memo = command.memo
+          ; valid_until = command.valid_until
           }
         in
         Result.return (`Mint_tokens mint_tokens)
@@ -211,9 +213,15 @@ module Unsigned = struct
         ~of_bool:Fn.id t.random_oracle_input
       |> Hex.Safe.to_hex
     in
+    let signer_input =
+      Random_oracle_input.Coding2.serialize ~string_of_field ~pack:Field.project
+        t.random_oracle_input
+      |> Random_oracle_input.Coding2.Rendered.map ~f:Hex.Safe.to_hex
+    in
     match%map render_command ~nonce:t.nonce t.command with
     | `Payment payment ->
         { Rendered.random_oracle_input
+        ; signer_input
         ; payment = Some payment
         ; stake_delegation = None
         ; create_token = None
@@ -222,6 +230,7 @@ module Unsigned = struct
         }
     | `Delegation delegation ->
         { Rendered.random_oracle_input
+        ; signer_input
         ; payment = None
         ; stake_delegation = Some delegation
         ; create_token = None
@@ -230,6 +239,7 @@ module Unsigned = struct
         }
     | `Create_token create_token ->
         { Rendered.random_oracle_input
+        ; signer_input
         ; payment = None
         ; stake_delegation = None
         ; create_token = Some create_token
@@ -238,6 +248,7 @@ module Unsigned = struct
         }
     | `Create_token_account create_token_account ->
         { Rendered.random_oracle_input
+        ; signer_input
         ; payment = None
         ; stake_delegation = None
         ; create_token = None
@@ -246,6 +257,7 @@ module Unsigned = struct
         }
     | `Mint_tokens mint_tokens ->
         { Rendered.random_oracle_input
+        ; signer_input
         ; payment = None
         ; stake_delegation = None
         ; create_token = None
@@ -263,6 +275,8 @@ module Unsigned = struct
     ; token = r.token
     ; fee = r.fee
     ; amount = Some r.amount
+    ; valid_until = r.valid_until
+    ; memo = r.memo
     }
 
   let of_rendered_delegation (r : Rendered.Delegation.t) :
@@ -275,6 +289,8 @@ module Unsigned = struct
     ; token = Mina_base.Token_id.(default |> to_uint64)
     ; fee = r.fee
     ; amount = None
+    ; valid_until = r.valid_until
+    ; memo = r.memo
     }
 
   let of_rendered_create_token (r : Rendered.Create_token.t) :
@@ -287,6 +303,8 @@ module Unsigned = struct
     ; token = Mina_base.Token_id.(default |> to_uint64)
     ; fee = r.fee
     ; amount = None
+    ; valid_until = r.valid_until
+    ; memo = r.memo
     }
 
   let of_rendered_create_token_account (r : Rendered.Create_token_account.t) :
@@ -299,6 +317,8 @@ module Unsigned = struct
     ; token = r.token |> Mina_base.Token_id.to_uint64
     ; fee = r.fee
     ; amount = None
+    ; valid_until = r.valid_until
+    ; memo = r.memo
     }
 
   let of_rendered_mint_tokens (r : Rendered.Mint_tokens.t) :
@@ -311,6 +331,8 @@ module Unsigned = struct
     ; token = r.token |> Mina_base.Token_id.to_uint64
     ; fee = r.fee
     ; amount = Some r.amount
+    ; valid_until = r.valid_until
+    ; memo = r.memo
     }
 
   let of_rendered (r : Rendered.t) : (t, Errors.t) Result.t =
@@ -495,44 +517,12 @@ let to_mina_signed transaction_json =
         Signed.of_rendered rosetta_transaction_rendered
         |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
       in
-      let valid_until, memo =
-        (* This is a hack..
-           TODO: Handle these properly in rosetta.
-        *)
-        match rosetta_transaction.command.kind with
-        | `Payment ->
-            ( Option.bind rosetta_transaction_rendered.payment
-                ~f:(fun { valid_until; _ } -> valid_until)
-            , Option.bind rosetta_transaction_rendered.payment
-                ~f:(fun { memo; _ } -> memo) )
-        | `Delegation ->
-            ( Option.bind rosetta_transaction_rendered.stake_delegation
-                ~f:(fun { valid_until; _ } -> valid_until)
-            , Option.bind rosetta_transaction_rendered.stake_delegation
-                ~f:(fun { memo; _ } -> memo) )
-        | `Create_token ->
-            ( Option.bind rosetta_transaction_rendered.create_token
-                ~f:(fun { valid_until; _ } -> valid_until)
-            , Option.bind rosetta_transaction_rendered.create_token
-                ~f:(fun { memo; _ } -> memo) )
-        | `Create_token_account ->
-            ( Option.bind rosetta_transaction_rendered.create_token_account
-                ~f:(fun { valid_until; _ } -> valid_until)
-            , Option.bind rosetta_transaction_rendered.create_token_account
-                ~f:(fun { memo; _ } -> memo) )
-        | `Mint_tokens ->
-            ( Option.bind rosetta_transaction_rendered.mint_tokens
-                ~f:(fun { valid_until; _ } -> valid_until)
-            , Option.bind rosetta_transaction_rendered.mint_tokens
-                ~f:(fun { memo; _ } -> memo) )
-      in
       let pk (`Pk x) =
         Signature_lib.Public_key.Compressed.of_base58_check_exn x
       in
       let%bind payload =
         User_command_info.Partial.to_user_command_payload
-          rosetta_transaction.command ~nonce:rosetta_transaction.nonce ?memo
-          ?valid_until
+          rosetta_transaction.command ~nonce:rosetta_transaction.nonce
         |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
       in
       let%map signature =

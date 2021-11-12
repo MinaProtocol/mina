@@ -57,9 +57,9 @@ module type External_transition_common_intf = sig
 
   val proposed_protocol_version_opt : t -> Protocol_version.t option
 
-  val broadcast : t -> unit
+  val accept : t -> unit
 
-  val don't_broadcast : t -> unit
+  val reject : t -> unit
 
   val poke_validation_callback : t -> Mina_net2.Validation_callback.t -> unit
 end
@@ -298,6 +298,9 @@ module type S = sig
       (external_transition, State_hash.t) With_hash.t * Validation.initial_valid
     [@@deriving compare]
 
+    val handle_dropped_transition :
+      ?pipe_name:string -> logger:Logger.t -> t -> unit
+
     include External_transition_common_intf with type t := t
   end
 
@@ -321,6 +324,9 @@ module type S = sig
 
     val create_unsafe :
       external_transition -> [ `I_swear_this_is_safe_see_my_comment of t ]
+
+    val handle_dropped_transition :
+      ?pipe_name:string -> logger:Logger.t -> t -> unit
 
     include External_transition_base_intf with type t := t
 

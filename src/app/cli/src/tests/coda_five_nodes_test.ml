@@ -27,5 +27,4 @@ let main () =
   Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
-  Command.async ~summary:"Test that five nodes work"
-    (Command.Param.return main)
+  Command.async ~summary:"Test that five nodes work" (Command.Param.return main)

@@ -32,17 +32,17 @@ let main () =
    Pipe_lib.Linear_pipe.iter (Option.value_exn sync_status_pipe_opt)
      ~f:(fun sync_status ->
        [%log trace]
-         ~metadata:[("status", Sync_status.to_yojson sync_status)]
+         ~metadata:[ ("status", Sync_status.to_yojson sync_status) ]
          "Bootstrap node received status: $status" ;
        Hash_set.add previous_status sync_status ;
-       Deferred.unit ))
+       Deferred.unit))
   |> don't_wait_for ;
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger
       ~node:bootstrapping_node
   in
   (* TODO: one of the previous_statuses should be `Bootstrap. The broadcast pip
-    coda.transition_frontier never gets set to None *)
+     coda.transition_frontier never gets set to None *)
   assert (Hash_set.mem previous_status `Synced) ;
   Coda_worker_testnet.Api.teardown testnet ~logger
 

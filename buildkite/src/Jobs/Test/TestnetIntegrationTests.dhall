@@ -7,8 +7,8 @@ let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
     { name = "TestnetIntegrationTests", key = "build-test-executive" },
-    { name = "MinaArtifact", key = "devnet-docker-image" },
-    { name = "ArchiveNodeArtifact", key = "archive-docker-image" }
+    { name = "MinaArtifactBuster", key = "daemon-devnet-buster-docker-image" },
+    { name = "MinaArtifactBuster", key = "archive-buster-docker-image" }
 ]
 
 in Pipeline.build Pipeline.Config::{
@@ -25,7 +25,10 @@ in Pipeline.build Pipeline.Config::{
   steps = [
     TestExecutive.build "integration_tests",
     TestExecutive.execute "reliability" dependsOn,
+    TestExecutive.execute "short-boot" dependsOn,
     TestExecutive.execute "payment" dependsOn,
-    TestExecutive.execute "gossip-consis" dependsOn
+    TestExecutive.execute "gossip-consis" dependsOn,
+    TestExecutive.execute "archive-node" dependsOn
+
   ]
 }

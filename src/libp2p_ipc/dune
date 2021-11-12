@@ -1,0 +1,13 @@
+(library
+ (name libp2p_ipc)
+ (public_name libp2p_ipc)
+ (flags -w -53)
+ (libraries async core capnp pipe_lib network_peer)
+ (preprocess (pps ppx_version ppx_let))
+ (instrumentation (backend bisect_ppx)))
+
+(rule
+ (targets libp2p_ipc_capnp.ml libp2p_ipc_capnp.mli)
+ (deps Makefile libp2p_ipc.capnp)
+ (action
+  (run make %{targets})))

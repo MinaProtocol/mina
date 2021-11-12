@@ -324,11 +324,13 @@ let payments t =
     | _ ->
         None)
 
-let broadcast t =
-  Mina_net2.Validation_callback.fire_exn (validation_callback t) `Accept
+let accept t =
+  Mina_net2.Validation_callback.fire_if_not_already_fired
+    (validation_callback t) `Accept
 
-let don't_broadcast t =
-  Mina_net2.Validation_callback.fire_exn (validation_callback t) `Reject
+let reject t =
+  Mina_net2.Validation_callback.fire_if_not_already_fired
+    (validation_callback t) `Reject
 
 let poke_validation_callback t cb = set_validation_callback t cb
 
@@ -909,11 +911,19 @@ module With_validation = struct
 
   let protocol_version_status t = lift protocol_version_status t
 
-  let broadcast t = lift broadcast t
+  let accept t = lift accept t
 
-  let don't_broadcast t = lift don't_broadcast t
+  let reject t = lift reject t
 
   let poke_validation_callback t = lift poke_validation_callback t
+
+  let handle_dropped_transition ?pipe_name ~logger t =
+    [%log warn] "Dropping state_hash $state_hash from $pipe transition pipe"
+      ~metadata:
+        [ ("state_hash", State_hash.to_yojson (state_hash t))
+        ; ("pipe", `String (Option.value pipe_name ~default:"an unknown"))
+        ] ;
+    reject t
 end
 
 module Initial_validated = struct
@@ -1046,8 +1056,8 @@ module Validated = struct
     , current_protocol_version
     , proposed_protocol_version_opt
     , protocol_version_status
-    , broadcast
-    , don't_broadcast
+    , accept
+    , reject
     , poke_validation_callback
     , protocol_state_proof
     , blockchain_state
@@ -1067,7 +1077,8 @@ module Validated = struct
     , payments
     , global_slot
     , erase
-    , to_yojson )]
+    , to_yojson
+    , handle_dropped_transition )]
 
   include Comparable.Make (Stable.Latest)
 
