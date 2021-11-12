@@ -378,7 +378,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (party, current_stack, call_stack)
 
-  let apply (type global_state)
+  let apply (type global_state failure_status)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start :
          [ `Yes of _ Start_data.t | `No | `Compute of _ Start_data.t ])
@@ -387,7 +387,7 @@ module Make (Inputs : Inputs_intf) = struct
          ; transaction_commitment : Transaction_commitment.t
          ; amount : Amount.t
          ; bool : Bool.t
-         ; failure : Transaction_status.Failure.t option
+         ; failure : failure_status
          ; .. >
          as
          'env)

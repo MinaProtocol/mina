@@ -114,31 +114,6 @@ module Failure = struct
     | _ ->
         Error "Signed_command_status.Failure.of_string: Unknown value"
 
-  let to_input, option_to_input =
-    let bits t =
-      (* the least value is encoded as 0 *)
-      let n = to_enum t - failure_min in
-      let rec go acc pos =
-        let bit = n land (1 lsl pos) <> 0 in
-        let acc' = bit :: acc in
-        if pos >= failure_num_bits - 1 then acc' else go acc' (pos + 1)
-      in
-      go [] 0
-    in
-    let to_input t = Random_oracle.Input.bitstring (bits t) in
-    let option_to_input t_opt =
-      match t_opt with
-      | None ->
-          (* least_t is encoded as 0s, of_enum always returns Some *)
-          let least_t = Option.value_exn (of_enum failure_min) in
-          (* prepend false to indicate None *)
-          Random_oracle.Input.bitstring (false :: bits least_t)
-      | Some t ->
-          (* prepend true to indicate Some *)
-          Random_oracle.Input.bitstring (true :: bits t)
-    in
-    (to_input, option_to_input)
-
   let%test_unit "of_string(to_string) roundtrip" =
     for i = failure_min to failure_max do
       let failure = Option.value_exn (of_enum i) in

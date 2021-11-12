@@ -157,7 +157,8 @@ end
 
 (* there: map any failure status to the unit value in Checked
    back: map the unit value in Checked to None in the value world
-   (an alternative would be to fail, since we intend never to do that)
+   (an alternative would be to fail, since we intend never to do that,
+   and it would make debugging difficult if we ever did that)
 *)
 let failure_status_typ : (unit, Transaction_status.Failure.t option) Impl.Typ.t
     =

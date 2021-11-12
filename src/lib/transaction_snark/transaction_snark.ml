@@ -1819,7 +1819,7 @@ module Base = struct
           ; protocol_state_predicate : Snapp_predicate.Protocol_state.Checked.t
           ; transaction_commitment : Transaction_commitment.t
           ; field : Field.t
-          ; failure : Transaction_status.Failure.t option >
+          ; failure : unit >
       end
 
       include Parties_logic.Make (Inputs)
@@ -2054,7 +2054,7 @@ module Base = struct
                   checks_succeeded
             in
             (* omit failure status here, unlike `Transaction_logic` *)
-            (account_with_hash account', success, None)
+            (account_with_hash account', success, ())
         | Balance account ->
             Balance.Checked.to_amount account.data.balance
     end
