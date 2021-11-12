@@ -13,7 +13,7 @@ module Get_status =
     genesisBlock {
       stateHash
     }
-    bestChain {
+    bestChain(maxLength: 1) {
       stateHash
       protocolState {
         blockchainState {
@@ -97,7 +97,7 @@ let mainnet_chain_id =
 
 (* TODO: Update this when we have a new chainId *)
 let devnet_chain_id =
-  "8af43cf261ea10c761ec540f92aafb76aec56d8d74f77c836f3ab1de5ce4eac5"
+  "b6ee40d336f4cc3f33c1cc04dee7618eb8e556664c2b2d82ad4676b512a82418"
 
 let network_tag_of_graphql res =
   let equal_chain_id id =
@@ -224,6 +224,8 @@ module Status = struct
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
+    let oldest_block_ref = ref None
+
     let real :
         db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t
         =
@@ -232,8 +234,15 @@ module Status = struct
       { gql= (fun () -> Graphql.query (Get_status.make ()) graphql_uri)
       ; db_oldest_block=
           (fun () ->
-            Errors.Lift.sql ~context:"Oldest block query"
-            @@ Db.find oldest_block_query () )
+            match !oldest_block_ref with
+            | Some oldest_block -> Deferred.Result.return oldest_block
+            | None ->
+                let%map result =
+                  Errors.Lift.sql ~context:"Oldest block query"
+                  @@ Db.find oldest_block_query ()
+                in
+                Result.iter result ~f:(fun oldest_block -> oldest_block_ref := Some oldest_block) ;
+                result )
       ; validate_network_choice= Validate_choice.Real.validate }
   end
 
@@ -366,7 +375,7 @@ module Status = struct
                      { Sync_status.current_index= Some (Int64.of_int_exn 4)
                      ; target_index= None
                      ; stage= Some "Synced"
-                     ; synced = Some true
+                     ; synced = None
                      } } )
 
       let oldest_block_is_different_env : 'gql Env.Mock.t =
@@ -399,7 +408,7 @@ module Status = struct
                      { Sync_status.current_index= Some (Int64.of_int_exn 4)
                      ; target_index= None
                      ; stage= Some "Synced"
-                     ; synced = Some true
+                     ; synced = None
                      } } )
     end )
 end

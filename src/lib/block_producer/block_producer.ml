@@ -237,19 +237,17 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               previous_protocol_state |> Protocol_state.blockchain_state
               |> Blockchain_state.snarked_ledger_hash
             in
-            let next_ledger_hash =
-              Option.value_map ledger_proof_opt
-                ~f:(fun (proof, _) ->
-                  Ledger_proof.statement proof |> Ledger_proof.statement_target)
-                ~default:previous_ledger_hash
-            in
-            let snarked_next_available_token =
+            let next_registers =
               match ledger_proof_opt with
               | Some (proof, _) ->
-                  (Ledger_proof.statement proof).next_available_token_after
+                  { ( Ledger_proof.statement proof
+                    |> Ledger_proof.statement_target )
+                    with
+                    pending_coinbase_stack = ()
+                  }
               | None ->
                   previous_protocol_state |> Protocol_state.blockchain_state
-                  |> Blockchain_state.snarked_next_available_token
+                  |> Blockchain_state.registers
             in
             let genesis_ledger_hash =
               previous_protocol_state |> Protocol_state.blockchain_state
@@ -271,8 +269,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                  has a different slot from the [scheduled_time]
               *)
               Blockchain_state.create_value ~timestamp:scheduled_time
-                ~snarked_ledger_hash:next_ledger_hash ~genesis_ledger_hash
-                ~snarked_next_available_token
+                ~registers:next_registers ~genesis_ledger_hash
                 ~staged_ledger_hash:next_staged_ledger_hash
             in
             let current_time =
@@ -454,7 +451,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs ~consensus_local_state
     ~coinbase_receiver ~frontier_reader ~transition_writer
     ~set_next_producer_timing ~log_block_creation
-    ~(precomputed_values : Precomputed_values.t) ~block_reward_threshold =
+    ~(precomputed_values : Precomputed_values.t) ~block_reward_threshold
+    ~block_produced_bvar =
   trace "block_producer" (fun () ->
       let constraint_constants = precomputed_values.constraint_constants in
       let consensus_constants = precomputed_values.consensus_constants in
@@ -692,14 +690,16 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       ~metadata:
                         [ ("breadcrumb", Breadcrumb.to_yojson breadcrumb) ]
                       Block_produced ;
-                    let metadata =
-                      [ ("state_hash", State_hash.to_yojson protocol_state_hash)
-                      ]
-                    in
+                    (* let uptime service (and any other waiters) know about breadcrumb *)
+                    Bvar.broadcast block_produced_bvar breadcrumb ;
                     Mina_metrics.(
                       Counter.inc_one Block_producer.blocks_produced) ;
                     let%bind.Async.Deferred () =
                       Strict_pipe.Writer.write transition_writer breadcrumb
+                    in
+                    let metadata =
+                      [ ("state_hash", State_hash.to_yojson protocol_state_hash)
+                      ]
                     in
                     [%log debug] ~metadata
                       "Waiting for block $state_hash to be inserted into \

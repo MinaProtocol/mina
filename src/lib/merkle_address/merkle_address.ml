@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Bitstring
 
 let depth = bitstring_length

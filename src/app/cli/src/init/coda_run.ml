@@ -501,16 +501,16 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
              server_description port)
   in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
-      trace_task "REST server" (fun () ->
+      trace_task "full GraphQL server" (fun () ->
           create_graphql_server
             ~bind_to_address:
               Tcp.Bind_to_address.(
                 if insecure_rest_server then All_addresses else Localhost)
             ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
             rest_server_port)) ;
-  (*Second graphql server with limited queries exopsed*)
+  (*Second graphql server with limited queries exposed*)
   Option.iter limited_graphql_port ~f:(fun rest_server_port ->
-      trace_task "Second REST server (with limited queries)" (fun () ->
+      trace_task "limited GraphQL server" (fun () ->
           create_graphql_server
             ~bind_to_address:
               Tcp.Bind_to_address.(
@@ -522,67 +522,65 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     Tcp.Where_to_listen.bind_to All_addresses
       (On_port (Mina_lib.client_port coda))
   in
-  don't_wait_for
-    (Deferred.ignore_m
-       (trace "client RPC handling" (fun () ->
-            Tcp.Server.create
-              ~on_handler_error:
-                (`Call
-                  (fun _net exn ->
-                    [%log error]
-                      "Exception while handling TCP server request: $error"
-                      ~metadata:
-                        [ ("error", `String (Exn.to_string_mach exn))
-                        ; ("context", `String "rpc_tcp_server")
-                        ]))
-              where_to_listen
-              (fun address reader writer ->
-                let address = Socket.Address.Inet.addr address in
-                if
-                  not
-                    (Set.exists !client_trustlist ~f:(fun cidr ->
-                         Unix.Cidr.does_match cidr address))
-                then (
-                  [%log error]
-                    !"Rejecting client connection from $address, it is not \
-                      present in the trustlist."
-                    ~metadata:
-                      [ ("$address", `String (Unix.Inet_addr.to_string address))
-                      ] ;
-                  Deferred.unit )
-                else
-                  Rpc.Connection.server_with_close
-                    ~handshake_timeout:
-                      (Time.Span.of_sec
-                         Mina_compile_config.rpc_handshake_timeout_sec)
-                    ~heartbeat_config:
-                      (Rpc.Connection.Heartbeat_config.create
-                         ~timeout:
-                           (Time_ns.Span.of_sec
-                              Mina_compile_config.rpc_heartbeat_timeout_sec)
-                         ~send_every:
-                           (Time_ns.Span.of_sec
-                              Mina_compile_config.rpc_heartbeat_send_every_sec)
-                         ())
-                    reader writer
-                    ~implementations:
-                      (Rpc.Implementations.create_exn
-                         ~implementations:(client_impls @ snark_worker_impls)
-                         ~on_unknown_rpc:`Raise)
-                    ~connection_state:(fun _ -> ())
-                    ~on_handshake_error:
-                      (`Call
-                        (fun exn ->
-                          [%log warn]
-                            "Handshake error while handling RPC server request \
-                             from $address"
-                            ~metadata:
-                              [ ("error", `String (Exn.to_string_mach exn))
-                              ; ("context", `String "rpc_server")
-                              ; ( "address"
-                                , `String (Unix.Inet_addr.to_string address) )
-                              ] ;
-                          Deferred.unit))))))
+  trace_task "client RPC server" (fun () ->
+      Deferred.ignore_m
+        (Tcp.Server.create
+           ~on_handler_error:
+             (`Call
+               (fun _net exn ->
+                 [%log error]
+                   "Exception while handling TCP server request: $error"
+                   ~metadata:
+                     [ ("error", `String (Exn.to_string_mach exn))
+                     ; ("context", `String "rpc_tcp_server")
+                     ]))
+           where_to_listen
+           (fun address reader writer ->
+             let address = Socket.Address.Inet.addr address in
+             if
+               not
+                 (Set.exists !client_trustlist ~f:(fun cidr ->
+                      Unix.Cidr.does_match cidr address))
+             then (
+               [%log error]
+                 !"Rejecting client connection from $address, it is not \
+                   present in the trustlist."
+                 ~metadata:
+                   [ ("$address", `String (Unix.Inet_addr.to_string address)) ] ;
+               Deferred.unit )
+             else
+               Rpc.Connection.server_with_close
+                 ~handshake_timeout:
+                   (Time.Span.of_sec
+                      Mina_compile_config.rpc_handshake_timeout_sec)
+                 ~heartbeat_config:
+                   (Rpc.Connection.Heartbeat_config.create
+                      ~timeout:
+                        (Time_ns.Span.of_sec
+                           Mina_compile_config.rpc_heartbeat_timeout_sec)
+                      ~send_every:
+                        (Time_ns.Span.of_sec
+                           Mina_compile_config.rpc_heartbeat_send_every_sec)
+                      ())
+                 reader writer
+                 ~implementations:
+                   (Rpc.Implementations.create_exn
+                      ~implementations:(client_impls @ snark_worker_impls)
+                      ~on_unknown_rpc:`Raise)
+                 ~connection_state:(fun _ -> ())
+                 ~on_handshake_error:
+                   (`Call
+                     (fun exn ->
+                       [%log warn]
+                         "Handshake error while handling RPC server request \
+                          from $address"
+                         ~metadata:
+                           [ ("error", `String (Exn.to_string_mach exn))
+                           ; ("context", `String "rpc_server")
+                           ; ( "address"
+                             , `String (Unix.Inet_addr.to_string address) )
+                           ] ;
+                       Deferred.unit)))))
 
 let coda_crash_message ~log_issue ~action ~error =
   let followup =
@@ -701,6 +699,13 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                    ~log_issue:false
                in
                Core.print_string message ; Deferred.unit
+           | Mina_lib.Offline_shutdown ->
+               Core.print_string
+                 "\n\
+                  [FATAL] *** Mina daemon has been offline for too long ***\n\
+                  *** Shutting down ***\n" ;
+               handle_crash Mina_lib.Offline_shutdown ~time_controller ~conf_dir
+                 ~child_pids ~top_logger coda_ref
            | _exn ->
                handle_crash exn ~time_controller ~conf_dir ~child_pids
                  ~top_logger coda_ref

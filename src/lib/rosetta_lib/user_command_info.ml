@@ -8,6 +8,7 @@ module Mina_base = Mina_base_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 module Signature_lib = Signature_lib_nonconsensus
 module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
+module Mina_numbers = Mina_numbers_nonconsensus
 
 [%%endif]
 
@@ -56,13 +57,10 @@ module Op = struct
               }
             in
             let related_operations =
-              match op.related_to with
-              | Some relate ->
-                  List.findi plan ~f:(fun _ a -> a_eq relate a.label)
-                  |> Option.map ~f:(fun (i, _) -> operation_identifier i)
-                  |> Option.to_list
-              | None ->
-                  []
+              op.related_to
+              |> Option.bind ~f:(fun relate ->
+                     List.findi plan ~f:(fun _ a -> a_eq relate a.label))
+              |> Option.map ~f:(fun (i, _) -> [ operation_identifier i ])
             in
             let%map a =
               f ~related_operations
@@ -125,6 +123,8 @@ type t =
   ; fee : Unsigned_extended.UInt64.t
   ; nonce : Unsigned_extended.UInt32.t
   ; amount : Unsigned_extended.UInt64.t option
+  ; valid_until : Unsigned_extended.UInt32.t option
+  ; memo : string option
   ; hash : string
   ; failure_status : Failure_status.t option
   }
@@ -140,24 +140,24 @@ module Partial = struct
     ; token : Unsigned_extended.UInt64.t
     ; fee : Unsigned_extended.UInt64.t
     ; amount : Unsigned_extended.UInt64.t option
+    ; valid_until : Unsigned_extended.UInt32.t option
+    ; memo : string option
     }
   [@@deriving to_yojson, sexp, compare]
 
   module Reason = Errors.Partial_reason
 
   let to_user_command_payload :
-         ?memo:string
-      -> ?valid_until:Unsigned_extended.UInt32.t
-      -> t
+         t
       -> nonce:Unsigned_extended.UInt32.t
       -> (Signed_command.Payload.t, Errors.t) Result.t =
-   fun ?memo ?valid_until t ~nonce ->
+   fun t ~nonce ->
     let open Result.Let_syntax in
     let%bind fee_payer_pk = pk_to_public_key ~context:"Fee payer" t.fee_payer in
     let%bind source_pk = pk_to_public_key ~context:"Source" t.source in
     let%bind receiver_pk = pk_to_public_key ~context:"Receiver" t.receiver in
     let%bind memo =
-      match memo with
+      match t.memo with
       | Some memo -> (
           try Ok (Signed_command_memo.create_from_string_exn memo)
           with _ -> Error (Errors.create `Memo_invalid) )
@@ -226,7 +226,9 @@ module Partial = struct
     Signed_command.Payload.create
       ~fee:(Fee_currency.of_uint64 t.fee)
       ~fee_token:(Token_id.of_uint64 t.fee_token)
-      ~fee_payer_pk ~nonce ~body ~memo ~valid_until
+      ~fee_payer_pk ~nonce ~body ~memo
+      ~valid_until:
+        (Option.map ~f:Mina_numbers.Global_slot.of_uint32 t.valid_until)
 end
 
 let forget (t : t) : Partial.t =
@@ -238,6 +240,8 @@ let forget (t : t) : Partial.t =
   ; token = t.token
   ; fee = t.fee
   ; amount = t.amount
+  ; valid_until = t.valid_until
+  ; memo = t.memo
   }
 
 let remember ~nonce ~hash t =
@@ -249,12 +253,14 @@ let remember ~nonce ~hash t =
   ; token = t.token
   ; fee = t.fee
   ; amount = t.amount
+  ; valid_until = t.valid_until
+  ; memo = t.memo
   ; hash
   ; nonce
   ; failure_status = None
   }
 
-let of_operations (ops : Operation.t list) :
+let of_operations ?memo ?valid_until (ops : Operation.t list) :
     (Partial.t, Partial.Reason.t) Validation.t =
   (* TODO: If we care about DoS attacks, break early if length too large *)
   (* Note: It's better to have nice errors with the validation than micro-optimize searching through a small list a minimal number of times. *)
@@ -271,7 +277,7 @@ let of_operations (ops : Operation.t list) :
      * ops = length exactly 3
      *
      * payment_source_dec with account 'a, some amount 'x, status="Pending"
-     * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+     * fee_payment with account 'a, some amount 'y, status="Pending"
      * payment_receiver_inc with account 'b, some amount 'x, status="Pending"
   *)
   let payment =
@@ -281,7 +287,7 @@ let of_operations (ops : Operation.t list) :
     and account_a =
       let open Result.Let_syntax in
       let%bind { account; _ } = find_kind `Payment_source_dec ops
-      and { account = account'; _ } = find_kind `Fee_payer_dec ops in
+      and { account = account'; _ } = find_kind `Fee_payment ops in
       match (account, account') with
       | Some x, Some y when Account_identifier.equal x y ->
           V.return x
@@ -303,7 +309,7 @@ let of_operations (ops : Operation.t list) :
           V.fail Account_not_some
     and fee_token =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       match account with
       | Some account -> (
           match token_id_of_account account with
@@ -336,7 +342,7 @@ let of_operations (ops : Operation.t list) :
           V.fail Amount_not_some
     and payment_amount_y =
       let open Result.Let_syntax in
-      let%bind { amount; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { amount; _ } = find_kind `Fee_payment ops in
       match amount with
       | Some x ->
           V.return (Amount_of.negated x)
@@ -351,13 +357,15 @@ let of_operations (ops : Operation.t list) :
     ; token (* TODO: Catch exception properly on these uint64 decodes *)
     ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount = Some (Unsigned.UInt64.of_string payment_amount_x.Amount.value)
+    ; valid_until
+    ; memo
     }
   in
   (* For a delegation we demand:
      *
      * ops = length exactly 2
      *
-     * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+     * fee_payment with account 'a, some amount 'y, status="Pending"
      * delegate_change with account 'a, metadata:{delegate_change_target:'b}, status="Pending"
   *)
   let delegation =
@@ -366,11 +374,11 @@ let of_operations (ops : Operation.t list) :
       else V.fail Length_mismatch
     and account_a =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
     and fee_token =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       match account with
       | Some account -> (
           match token_id_of_account account with
@@ -400,7 +408,7 @@ let of_operations (ops : Operation.t list) :
       else V.fail Status_not_pending
     and payment_amount_y =
       let open Result.Let_syntax in
-      let%bind { amount; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { amount; _ } = find_kind `Fee_payment ops in
       match amount with
       | Some x ->
           V.return (Amount_of.negated x)
@@ -417,13 +425,15 @@ let of_operations (ops : Operation.t list) :
         (* only default token can be delegated *)
     ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount = None
+    ; valid_until
+    ; memo
     }
   in
   (* For token creation, we demand:
      *
      * ops = length exactly 2
      *
-     * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+     * fee_payment with account 'a, some amount 'y, status="Pending"
      * create_token with account=None, status="Pending"
   *)
   let create_token =
@@ -432,11 +442,11 @@ let of_operations (ops : Operation.t list) :
       else V.fail Length_mismatch
     and account_a =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
     and fee_token =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       match account with
       | Some account -> (
           match token_id_of_account account with
@@ -454,7 +464,7 @@ let of_operations (ops : Operation.t list) :
       else V.fail Status_not_pending
     and payment_amount_y =
       let open Result.Let_syntax in
-      let%bind { amount; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { amount; _ } = find_kind `Fee_payment ops in
       match amount with
       | Some x ->
           V.return (Amount_of.negated x)
@@ -483,13 +493,15 @@ let of_operations (ops : Operation.t list) :
     ; token = Token_id.(default |> to_uint64)
     ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount = None
+    ; valid_until
+    ; memo
     }
   in
   (* For token account creation, we demand:
      *
      * ops = length exactly 1
      *
-     * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+     * fee_payment with account 'a, some amount 'y, status="Pending"
   *)
   let create_token_account =
     let%map () =
@@ -497,11 +509,11 @@ let of_operations (ops : Operation.t list) :
       else V.fail Length_mismatch
     and account_a =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
     and fee_token =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       match account with
       | Some account -> (
           match token_id_of_account account with
@@ -519,7 +531,7 @@ let of_operations (ops : Operation.t list) :
       else V.fail Status_not_pending
     and payment_amount_y =
       let open Result.Let_syntax in
-      let%bind { amount; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { amount; _ } = find_kind `Fee_payment ops in
       match amount with
       | Some x ->
           V.return (Amount_of.negated x)
@@ -534,13 +546,15 @@ let of_operations (ops : Operation.t list) :
     ; token = Token_id.(default |> to_uint64)
     ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount = None
+    ; valid_until
+    ; memo
     }
   in
   (* For token minting, we demand:
      *
      * ops = length exactly 2
      *
-     * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+     * fee_payment with account 'a, some amount 'y, status="Pending"
      * mint_tokens with account 'a, some amount 'y with the minted token id, metadata={token_owner_pk:'b}, status=Pending
   *)
   let mint_tokens =
@@ -549,11 +563,11 @@ let of_operations (ops : Operation.t list) :
       else V.fail Length_mismatch
     and account_a =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
     and fee_token =
       let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { account; _ } = find_kind `Fee_payment ops in
       match account with
       | Some account -> (
           match token_id_of_account account with
@@ -571,7 +585,7 @@ let of_operations (ops : Operation.t list) :
       else V.fail Status_not_pending
     and payment_amount_y =
       let open Result.Let_syntax in
-      let%bind { amount; _ } = find_kind `Fee_payer_dec ops in
+      let%bind { amount; _ } = find_kind `Fee_payment ops in
       match amount with
       | Some x ->
           V.return (Amount_of.negated x)
@@ -613,6 +627,8 @@ let of_operations (ops : Operation.t list) :
     ; token
     ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount = Some (amount_b.Amount.value |> Unsigned.UInt64.of_string)
+    ; valid_until
+    ; memo
     }
   in
   let partials =
@@ -641,7 +657,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
   *)
   let plan : 'a Op.t list =
     ( if not Unsigned.UInt64.(equal t.fee zero) then
-      [ { Op.label = `Fee_payer_dec; related_to = None } ]
+      [ { Op.label = `Fee_payment; related_to = None } ]
     else [] )
     @ ( match failure_status with
       | Some (`Applied (Account_creation_fees_paid.By_receiver amount)) ->
@@ -686,7 +702,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
   Op.build
     ~a_eq:
       [%eq:
-        [ `Fee_payer_dec
+        [ `Fee_payment
         | `Payment_source_dec of Unsigned.UInt64.t
         | `Payment_receiver_inc of Unsigned.UInt64.t ]] ~plan
     ~f:(fun ~related_operations ~operation_identifier op ->
@@ -718,13 +734,13 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
             failwith "Unexpected pattern"
       in
       match op.label with
-      | `Fee_payer_dec ->
+      | `Fee_payment ->
           { Operation.operation_identifier
           ; related_operations
           ; status =
               Some (status |> pending_or_success_only |> Operation_statuses.name)
           ; account = Some (account_id t.fee_payer t.fee_token)
-          ; _type = Operation_types.name `Fee_payer_dec
+          ; _type = Operation_types.name `Fee_payment
           ; amount = Some Amount_of.(negated @@ token t.fee_token t.fee)
           ; coin_change = None
           ; metadata
@@ -835,10 +851,12 @@ let%test_unit "payment_round_trip" =
     ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
     ; failure_status = None
     ; hash = "TXN_1_HASH"
+    ; valid_until = Some (Unsigned.UInt32.of_int 10_000)
+    ; memo = Some "hello"
     }
   in
   let ops = to_operations' start in
-  match of_operations ops with
+  match of_operations ?valid_until:start.valid_until ?memo:start.memo ops with
   | Ok partial ->
       [%test_eq: Partial.t] partial (forget start)
   | Error e ->
@@ -857,10 +875,12 @@ let%test_unit "delegation_round_trip" =
     ; amount = None
     ; failure_status = None
     ; hash = "TXN_2_HASH"
+    ; valid_until = Some (Unsigned.UInt32.of_int 867888)
+    ; memo = Some "hello"
     }
   in
   let ops = to_operations' start in
-  match of_operations ops with
+  match of_operations ops ?valid_until:start.valid_until ?memo:start.memo with
   | Ok partial ->
       [%test_eq: Partial.t] partial (forget start)
   | Error e ->
@@ -878,6 +898,8 @@ let dummies =
     ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
     ; hash = "TXN_1_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Payment (* new account created *)
     ; fee_payer = `Pk "Alice"
@@ -894,6 +916,8 @@ let dummies =
             (Account_creation_fees_paid.By_receiver
                (Unsigned.UInt64.of_int 1_000_000)))
     ; hash = "TXN_1new_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Payment (* failed payment *)
     ; fee_payer = `Pk "Alice"
@@ -906,6 +930,8 @@ let dummies =
     ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
     ; failure_status = Some (`Failed "Failure")
     ; hash = "TXN_1fail_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Payment (* custom token *)
     ; fee_payer = `Pk "Alice"
@@ -918,6 +944,8 @@ let dummies =
     ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
     ; hash = "TXN_1a_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Payment (* custom fee-token *)
     ; fee_payer = `Pk "Alice"
@@ -930,6 +958,8 @@ let dummies =
     ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
     ; hash = "TXN_1b_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Delegation
     ; fee_payer = `Pk "Alice"
@@ -942,6 +972,8 @@ let dummies =
     ; amount = None
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
     ; hash = "TXN_2_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Create_token (* no new account *)
     ; fee_payer = `Pk "Alice"
@@ -954,6 +986,8 @@ let dummies =
     ; amount = None
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
     ; hash = "TXN_3a_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Create_token (* new account fee *)
     ; fee_payer = `Pk "Alice"
@@ -970,6 +1004,8 @@ let dummies =
             (Account_creation_fees_paid.By_fee_payer
                (Unsigned.UInt64.of_int 3_000)))
     ; hash = "TXN_3b_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Create_token_account
     ; fee_payer = `Pk "Alice"
@@ -982,6 +1018,8 @@ let dummies =
     ; amount = None
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
     ; hash = "TXN_4_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ; { kind = `Mint_tokens
     ; fee_payer = `Pk "Alice"
@@ -994,5 +1032,7 @@ let dummies =
     ; amount = Some (Unsigned.UInt64.of_int 30_000)
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
     ; hash = "TXN_5_HASH"
+    ; valid_until = None
+    ; memo = Some "hello"
     }
   ]
