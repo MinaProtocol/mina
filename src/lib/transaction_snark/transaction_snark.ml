@@ -447,8 +447,8 @@ end
 module Proof = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Pickles.Proof.Branching_2.Stable.V1.t
+    module V2 = struct
+      type t = Pickles.Proof.Branching_2.Stable.V2.t
       [@@deriving
         version { asserted }, yojson, bin_io, compare, equal, sexp, hash]
 
@@ -461,21 +461,10 @@ end
 module Stable = struct
   module V2 = struct
     type t =
-      { statement : Statement.With_sok.Stable.V2.t; proof : Proof.Stable.V1.t }
+      { statement : Statement.With_sok.Stable.V2.t; proof : Proof.Stable.V2.t }
     [@@deriving compare, equal, fields, sexp, version, yojson, hash]
 
     let to_latest = Fn.id
-  end
-
-  module V1 = struct
-    type t =
-      { statement : Statement.With_sok.Stable.V1.t; proof : Proof.Stable.V1.t }
-    [@@deriving compare, equal, fields, sexp, version, yojson, hash]
-
-    let to_latest (t : t) : Latest.t =
-      { statement = Statement.With_sok.Stable.V1.to_latest t.statement
-      ; proof = t.proof
-      }
   end
 end]
 
@@ -592,14 +581,25 @@ let dummy_constraints () =
   make_checked
     Impl.(
       fun () ->
-        let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
+        let x = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3) in
         let g = exists Inner_curve.typ ~compute:(fun _ -> Inner_curve.one) in
         ignore
-          ( Pickles.Step_main_inputs.Ops.scale_fast g
-              (`Plus_two_to_len [| b; b |])
+          ( Pickles.Scalar_challenge.to_field_checked'
+              (module Impl)
+              ~num_bits:16
+              (Pickles_types.Scalar_challenge.create x)
+            : Field.t * Field.t * Field.t ) ;
+        ignore
+          ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5
+              (Shifted_value x)
             : Pickles.Step_main_inputs.Inner_curve.t ) ;
         ignore
-          ( Pickles.Pairing_main.Scalar_challenge.endo g (Scalar_challenge [ b ])
+          ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5
+              (Shifted_value x)
+            : Pickles.Step_main_inputs.Inner_curve.t ) ;
+        ignore
+          ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
+              (Scalar_challenge.create x)
             : Field.t * Field.t ))
 
 module Base = struct
@@ -1105,12 +1105,9 @@ module Base = struct
               ~receiver_account txn)
   end
 
-  let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
-      ~signature =
+  let%snarkydef check_signature ~payload ~is_user_command ~signer ~signature =
     let%bind input = Transaction_union_payload.Checked.to_input payload in
-    let%bind verifies =
-      Schnorr.Checked.verifies shifted signature signer input
-    in
+    let%bind verifies = Schnorr.Checked.verifies signature signer input in
     Boolean.Assert.any [ Boolean.not is_user_command; verifies ]
 
   let check_timing ~balance_check ~timed_balance_check ~account ~txn_amount
@@ -1181,12 +1178,12 @@ module Base = struct
           ~value_to_field_elements:to_field_elements
           ~var_to_field_elements:Checked.to_field_elements)
 
-  let signature_verifies ~shifted ~payload_digest signature pk =
+  let signature_verifies ~payload_digest signature pk =
     let%bind pk =
       Public_key.decompress_var pk
       (*           (Account_id.Checked.public_key fee_payer_id) *)
     in
-    Schnorr.Checked.verifies shifted signature pk
+    Schnorr.Checked.verifies signature pk
       (Random_oracle.Input.field payload_digest)
 
   module Parties_snark = struct
@@ -2020,13 +2017,8 @@ module Base = struct
                             assert false)
                   in
                   run_checked
-                    (let%bind (module S) =
-                       Tick.Inner_curve.Checked.Shifted.create ()
-                     in
-                     signature_verifies
-                       ~shifted:(module S)
-                       ~payload_digest:transaction_commitment signature
-                       party.data.body.pk)
+                    (signature_verifies ~payload_digest:transaction_commitment
+                       signature party.data.body.pk)
             in
             let account', `proof_must_verify proof_must_verify =
               let tag =
@@ -2349,17 +2341,15 @@ module Base = struct
     | Init_stack : Pending_coinbase.Stack.t Snarky_backendless.Request.t
 
   let%snarkydef apply_tagged_transaction
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      (type shifted)
-      (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
-      root pending_coinbase_stack_init pending_coinbase_stack_before
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) root
+      pending_coinbase_stack_init pending_coinbase_stack_before
       pending_coinbase_after next_available_token state_body
       ({ signer; signature; payload } as txn : Transaction_union.var) =
     let tag = payload.body.tag in
     let is_user_command = Transaction_union.Tag.Unpacked.is_user_command tag in
     let%bind () =
       [%with_label "Check transaction signature"]
-        (check_signature shifted ~payload ~is_user_command ~signer ~signature)
+        (check_signature ~payload ~is_user_command ~signer ~signature)
     in
     let%bind signer_pk = Public_key.compress_var signer in
     let%bind () =
@@ -3150,7 +3140,6 @@ module Base = struct
   let%snarkydef main ~constraint_constants
       (statement : Statement.With_sok.Checked.t) =
     let%bind () = dummy_constraints () in
-    let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
     let%bind t =
       with_label __LOC__
         (exists Transaction_union.typ ~request:(As_prover.return Transaction))
@@ -3165,10 +3154,8 @@ module Base = struct
     in
     let%bind root_after, fee_excess, supply_increase, next_available_token_after
         =
-      apply_tagged_transaction ~constraint_constants
-        (module Shifted)
-        statement.source.ledger pending_coinbase_init
-        statement.source.pending_coinbase_stack
+      apply_tagged_transaction ~constraint_constants statement.source.ledger
+        pending_coinbase_init statement.source.pending_coinbase_stack
         statement.target.pending_coinbase_stack
         statement.source.next_available_token state_body t
     in
@@ -4631,8 +4618,7 @@ let%test_module "transaction_snark" =
 
           (* check a signature on msg against a public key *)
           let check_sig pk msg sigma : (Boolean.var, _) Checked.t =
-            let%bind (module S) = Inner_curve.Checked.Shifted.create () in
-            Schnorr.Checked.verifies (module S) sigma pk msg
+            Schnorr.Checked.verifies sigma pk msg
 
           (* verify witness signatures against public keys *)
           let%snarkydef verify_sigs pubkeys commitment witness =
@@ -4736,20 +4722,21 @@ let%test_module "transaction_snark" =
                     init_ledger ledger ;
                   let local_dummy_constraints () =
                     let open Run in
-                    let b =
-                      exists Boolean.typ_unchecked ~compute:(fun _ -> true)
+                    let x =
+                      exists Field.typ ~compute:(fun _ ->
+                          Field.Constant.of_int 3)
                     in
                     let g =
                       exists Pickles.Step_main_inputs.Inner_curve.typ
                         ~compute:(fun _ -> Tick.Inner_curve.(to_affine_exn one))
                     in
                     let (_ : _) =
-                      Pickles.Step_main_inputs.Ops.scale_fast g
-                        (`Plus_two_to_len [| b; b |])
+                      Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5
+                        (Shifted_value x)
                     in
                     let (_ : _) =
-                      Pickles.Pairing_main.Scalar_challenge.endo g
-                        (Scalar_challenge [ b ])
+                      Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
+                        (Scalar_challenge.create x)
                     in
                     ()
                   in
@@ -5092,9 +5079,9 @@ let%test_module "transaction_snark" =
                               (fun [ _; _ ] _ ->
                                 let dummy_constraints () =
                                   let open Run in
-                                  let b =
-                                    exists Boolean.typ_unchecked
-                                      ~compute:(fun _ -> true)
+                                  let x =
+                                    exists Field.typ ~compute:(fun _ ->
+                                        Field.Constant.of_int 3)
                                   in
                                   let g =
                                     exists
@@ -5104,11 +5091,12 @@ let%test_module "transaction_snark" =
                                   in
                                   let (_ : _) =
                                     Pickles.Step_main_inputs.Ops.scale_fast g
-                                      (`Plus_two_to_len [| b; b |])
+                                      ~num_bits:5 (Shifted_value x)
                                   in
                                   let (_ : _) =
                                     Pickles.Pairing_main.Scalar_challenge.endo g
-                                      (Scalar_challenge [ b ])
+                                      ~num_bits:4
+                                      (Scalar_challenge.create x)
                                   in
                                   ()
                                 in

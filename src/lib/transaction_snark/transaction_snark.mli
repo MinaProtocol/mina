@@ -322,12 +322,6 @@ module Stable : sig
   module V2 : sig
     type t [@@deriving compare, equal, sexp, yojson, hash]
   end
-
-  module V1 : sig
-    type t [@@deriving compare, equal, sexp, yojson, hash]
-
-    val to_latest : t -> V2.t
-  end
 end]
 
 val create : statement:Statement.With_sok.t -> proof:Mina_base.Proof.t -> t
