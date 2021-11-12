@@ -273,7 +273,7 @@ let check_depths (t : t) =
     true
   with _ -> false
 
-let check (t : t) = check_depths t
+let check (t : t) : bool = check_depths t
 
 let parties (t : t) : Party.t list =
   let p = t.fee_payer in
