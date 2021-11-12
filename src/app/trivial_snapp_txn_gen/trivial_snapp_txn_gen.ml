@@ -15,42 +15,90 @@ let graphql_snapp_command (parties : Parties.t) =
           Pickles.Side_loaded.Proof.Stable.V1.sexp_of_t pi
           |> Sexp.to_string |> Base64.encode_exn
         in
-        sprintf "{ proofOrSignature: Proof, proof: \"%s\" }" p
+        sprintf "{ proof: \"%s\" }" p
     | Signature s ->
-        sprintf "{ proofOrSignature: Signature, signature: \"%s\" }"
-          (Signature.to_base58_check s)
+        sprintf "{  signature: \"%s\" }" (Signature.to_base58_check s)
     | None_given ->
-        "{ proofOrSignature: None_given }"
+        "null"
+  in
+  let permissions (p : Mina_base.Permissions.t Snapp_basic.Set_or_keep.t) =
+    match p with
+    | Keep ->
+        "null"
+    | Set
+        { stake
+        ; edit_state
+        ; send
+        ; receive
+        ; set_delegate
+        ; set_permissions
+        ; set_verification_key
+        ; set_snapp_uri
+        ; edit_sequence_state
+        ; set_token_symbol
+        } ->
+        let auth = function
+          | Mina_base.Permissions.Auth_required.None ->
+              "None"
+          | Either ->
+              "Either"
+          | Proof ->
+              "Proof"
+          | Signature ->
+              "Signature"
+          | Both ->
+              "Both"
+          | Impossible ->
+              "Impossible"
+        in
+        sprintf
+          {|
+      { stake: %s
+  , editState: %s
+  , send: %s
+  , receive: %s
+  , setDelegate: %s
+  , setPermissions: %s
+  , setVerificationKey: %s
+  , setSnappUri: %s
+  , editSequenceState: %s
+  , setTokenSymbol: %s
+      }
+    |}
+          (if stake then "true" else "false")
+          (auth edit_state) (auth send) (auth receive) (auth set_delegate)
+          (auth set_permissions)
+          (auth set_verification_key)
+          (auth set_snapp_uri) (auth edit_sequence_state)
+          (auth set_token_symbol)
   in
   let party (p : Party.t) =
     let authorization = authorization p.authorization in
     let predicate =
       match p.data.predicate with
       | Nonce n ->
-          sprintf "{ fullOrNonceOrAccept: Nonce, nonce: \"%s\" }"
-            (Account.Nonce.to_string n)
+          sprintf "{ nonce: \"%s\" }" (Account.Nonce.to_string n)
       | Full _a ->
           "{\n\
-          \          fullOrNonceOrAccept: Full, \n\
           \          account: {\n\
-          \            balance:{checkOrIgnore: Ignore},\n\
-          \            nonce:{checkOrIgnore: Ignore},\n\
-          \            receiptChainHash:{checkOrIgnore: Ignore},\n\
-          \            publicKey:{checkOrIgnore: Ignore},\n\
-          \            delegate:{checkOrIgnore: Ignore},\n\
+          \            balance:null,\n\
+          \            nonce:null,\n\
+          \            receiptChainHash:null,\n\
+          \            publicKey:null,\n\
+          \            delegate:null,\n\
           \            state:\n\
-          \              {elements: [{checkOrIgnore: Ignore},\n\
-          \              {checkOrIgnore: Ignore},\n\
-          \              {checkOrIgnore: Ignore},\n\
-          \              {checkOrIgnore: Ignore},\n\
-          \              {checkOrIgnore: Ignore},\n\
-          \              {checkOrIgnore: Ignore},\n\
-          \              {checkOrIgnore: Ignore},\n\
-          \             {checkOrIgnore: Ignore}]},\n\
-          \            rollupState:{checkOrIgnore: Ignore},\n\
-          \            provedState:{checkOrIgnore: Ignore}}}"
+          \              {elements: [null,\n\
+          \              null,\n\
+          \              null,\n\
+          \              null,\n\
+          \              null,\n\
+          \              null,\n\
+          \              null,\n\
+          \             null]},\n\
+          \            sequenceState:null,\n\
+          \            provedState:null}}"
       | Accept ->
-          "{ fullOrNonceOrAccept: Accept}"
+          ""
     in
     let delta =
       let sgn =
@@ -63,7 +111,7 @@ let graphql_snapp_command (parties : Parties.t) =
       let magnitude =
         Currency.Amount.(to_string (Signed.magnitude p.data.body.delta))
       in
-      sprintf "{sgn: %s, magnitude: \"%s\"}" sgn magnitude
+      sprintf "{sign: %s, magnitude: \"%s\"}" sgn magnitude
     in
     let pk = pk_string p.data.body.pk in
     sprintf
@@ -72,31 +120,33 @@ let graphql_snapp_command (parties : Parties.t) =
       data: {
         predicate: %s, 
         body: {
-          depth: "0", 
+          depth: 0, 
           callData: "0x0000000000000000000000000000000000000000000000000000000000000000", 
-          rollupEvents: [], 
+          sequenceEvents: [], 
           events: [], 
           delta: %s, 
           tokenId: "1", 
           update: {
-            timing: {setOrKeep: Keep}, 
-            tokenSymbol: {setOrKeep: Keep}, 
-            snappUri: {setOrKeep: Keep}, 
-            permissions: {setOrKeep: Keep}, 
-            verificationKey: {setOrKeep: Keep}, 
-            delegate: {setOrKeep: Keep}, 
+            timing: null, 
+            tokenSymbol: null, 
+            snappUri: null, 
+            permissions: %s, 
+            verificationKey: null, 
+            delegate: null, 
             appState: [
-          {setOrKeep: Keep} ,
-          {setOrKeep: Keep},
-          {setOrKeep: Keep},
-          {setOrKeep: Keep},
-          {setOrKeep: Keep},
-          {setOrKeep: Keep},
-          {setOrKeep: Keep},
-          {setOrKeep: Keep}]}, 
-          pk: "%s"}}
+          null ,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null]}, 
+          publicKey: "%s"}}
     |}
-      authorization predicate delta pk
+      authorization predicate delta
+      (permissions p.data.body.update.permissions)
+      pk
   in
   let fee_payer =
     let p = parties.fee_payer in
@@ -112,28 +162,30 @@ let graphql_snapp_command (parties : Parties.t) =
         body: {
           depth: "0", 
           callData: "0x0000000000000000000000000000000000000000000000000000000000000000", 
-          rollupEvents:[], 
+          sequenceEvents:[], 
           events: [], 
-          fee: "%s", 
+          fee: %s, 
           update: {
-            timing: {setOrKeep: Keep}, 
-            tokenSymbol: {setOrKeep: Keep}, 
-            snappUri: {setOrKeep: Keep}, 
-            permissions: {setOrKeep: Keep}, 
-            verificationKey: {setOrKeep: Keep}, 
-            delegate: {setOrKeep: Keep}, 
+            timing: null, 
+            tokenSymbol: null, 
+            snappUri: null, 
+            permissions: %s, 
+            verificationKey: null, 
+            delegate: null, 
             appState: [
-          {setOrKeep: Keep} ,
-          {setOrKeep: Keep},
-          {setOrKeep: Keep},
-          {setOrKeep: Keep},
-          {setOrKeep: Keep},
-          {setOrKeep: Keep},
-          {setOrKeep: Keep},
-          {setOrKeep: Keep}]}, 
+          null ,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null]}, 
           pk: "%s" }
         |}
-      authorization nonce fee pk
+      authorization nonce fee
+      (permissions p.data.body.update.permissions)
+      pk
   in
   let other_parties =
     let start = ref true in
@@ -155,33 +207,33 @@ let graphql_snapp_command (parties : Parties.t) =
 mutation MyMutation {
   __typename
   sendSnapp(input: {
-        snappProtocolState: {
+        protocolState: {
       nextEpochData: {
-        epochLength: {checkOrIgnore: Ignore}, 
-        lockCheckpoint: {checkOrIgnore: Ignore}, 
-        startCheckpoint: {checkOrIgnore: Ignore}, 
-        seed: {checkOrIgnore: Ignore}, 
+        epochLength: null, 
+        lockCheckpoint: null, 
+        startCheckpoint: null, 
+        seed: null, 
         ledger: {
-          totalCurrency: {checkOrIgnore: Ignore}, 
-          hash: {checkOrIgnore: Ignore}}}, 
+          totalCurrency: null, 
+          hash: null}}, 
       stakingEpochData: {
-        epochLength: {checkOrIgnore: Ignore}, 
-        lockCheckpoint: {checkOrIgnore: Ignore}, 
-        startCheckpoint: {checkOrIgnore: Ignore}, 
-        seed: {checkOrIgnore: Ignore}, 
+        epochLength: null, 
+        lockCheckpoint: null, 
+        startCheckpoint: null, 
+        seed: null, 
         ledger: {
-          totalCurrency: {checkOrIgnore: Ignore}, 
-          hash: {checkOrIgnore: Ignore}}}, 
-      globalSlotSinceGenesis: {checkOrIgnore: Ignore}, 
-      globalSlotSinceHardFork: {checkOrIgnore: Ignore}, 
-      totalCurrency: {checkOrIgnore: Ignore}, 
-      minWindowDensity: {checkOrIgnore: Ignore}, 
-      blockchainLength: {checkOrIgnore: Ignore}, 
-      timestamp: {checkOrIgnore: Ignore}, 
-      snarkedNextAvailableToken: {checkOrIgnore: Ignore}, 
-      snarkedLedgerHash: {checkOrIgnore: Ignore}}, 
-    snappOtherParties: %s, 
-    snappFeePayer: {%s} }})
+          totalCurrency: null, 
+          hash: null}}, 
+      globalSlotSinceGenesis: null, 
+      globalSlotSinceHardFork: null, 
+      totalCurrency: null, 
+      minWindowDensity: null, 
+      blockchainLength: null, 
+      timestamp: null, 
+      snarkedNextAvailableToken: null, 
+      snarkedLedgerHash: null}, 
+    otherParties: %s, 
+    feePayer: {%s} }})
 }
     |}
     other_parties fee_payer
@@ -241,7 +293,15 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t) =
   let open Async.Deferred.Let_syntax in
   let%map _ =
     Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
-      ~f:(fun _ (witness, spec, statement, snapp_statement) ->
+      ~f:(fun _ ((witness, spec, statement, snapp_statement) as w) ->
+        Core.printf "%s"
+          (sprintf
+             !"current witness \
+               %{sexp:(Transaction_witness.Parties_segment_witness.t * \
+               Transaction_snark.Parties_segment.Basic.t * \
+               Transaction_snark.Statement.With_sok.t * (int * \
+               Snapp_statement.t)option) }%!"
+             w) ;
         let%map _ =
           T.of_parties_segment_exn ~snapp_statement ~statement ~witness ~spec
         in

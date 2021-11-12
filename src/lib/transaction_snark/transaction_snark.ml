@@ -3880,6 +3880,14 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
         }
       in
       let statement : Statement.With_sok.t =
+        (* empty ledger hash in the local state at the beginning of each
+           transaction
+           `parties` in local state is empty for the first segment*)
+        let source_local_ledger =
+          if List.is_empty source_local.parties then
+            Frozen_ledger_hash.empty_hash
+          else Sparse_ledger.merkle_root source_local.ledger
+        in
         { source =
             { ledger = Sparse_ledger.merkle_root source_global.ledger
             ; next_available_token =
@@ -3891,7 +3899,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                     Parties.Party_or_stack.stack_hash source_local.parties
                 ; call_stack =
                     Parties.Party_or_stack.stack_hash source_local.call_stack
-                ; ledger = Sparse_ledger.merkle_root source_local.ledger
+                ; ledger = source_local_ledger
                 }
             }
         ; target =
@@ -4219,12 +4227,14 @@ module For_tests = struct
           in
           ()
     in
-    let () =
+    let _v =
       let id =
         Public_key.compress sender.public_key
         |> fun pk -> Account_id.create pk Token_id.default
       in
-      set_or_create ledger id (Account.create id Balance.(of_int 888_888))
+      Ledger.get_or_create_account ledger id
+        (Account.create id Balance.(of_int 888_888))
+      |> Or_error.ok_exn
     in
     let () =
       let id = Account_id.create trivial_account_pk Token_id.default in

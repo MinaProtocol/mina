@@ -542,9 +542,16 @@ module Make (Inputs : Inputs_intf) = struct
             ~else_:local_state.transaction_commitment
       }
     in
-    let update_local_excess = Bool.(is_start' ||| is_last_party) in
+    let update_local_excess =
+      is_last_party
+      (*Bool.(is_start' ||| is_last_party)*)
+    in
+    (*update the global slot fee excess in the last party so that when
+      combining fee excesses (Fee_excess.combine), it doesn't get added to
+      itself multiple times*)
     let update_global_state =
-      ref Bool.(update_local_excess &&& local_state.success)
+      ref is_last_party
+      (*Bool.(is_last_party &&& local_state.success)*)
     in
     let global_excess_update_failed = ref Bool.true_ in
     let global_state, local_state =
@@ -567,7 +574,7 @@ module Make (Inputs : Inputs_intf) = struct
               ~else_:local_state.excess
         } )
     in
-    Bool.(assert_ (not (is_start' &&& !global_excess_update_failed))) ;
+    Bool.(assert_ (not (is_last_party &&& !global_excess_update_failed))) ;
     let local_state =
       { local_state with
         success =

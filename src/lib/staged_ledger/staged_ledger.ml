@@ -520,6 +520,7 @@ module T = struct
       (pending_coinbase_stack_state : Stack_state_with_init_stack.t) s
       txn_state_view =
     let open Result.Let_syntax in
+    (*TODO: check fee_excess as a result of applying the txns matches with this*)
     let%bind fee_excess = Transaction.fee_excess s |> to_staged_ledger_or_error
     and supply_increase =
       Transaction.supply_increase s |> to_staged_ledger_or_error
