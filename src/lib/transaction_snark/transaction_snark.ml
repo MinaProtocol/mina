@@ -4213,10 +4213,6 @@ module For_tests = struct
       spec
     in
     let vk = With_hash.of_data ~hash_data:Snapp_account.digest_vk vk in
-    (*Core.printf
-      !"vk: %s\n hash: %{sexp: State_hash.t}%!"
-      (Side_loaded_verification_key.to_yojson vk.data |> Yojson.Safe.to_string)
-      vk.hash ;*)
     let set_or_create ledger id account =
       match Ledger.location_of_account ledger id with
       | Some loc ->
@@ -4332,46 +4328,28 @@ module For_tests = struct
     let tx_statement : Snapp_statement.t =
       { transaction; at_party = proof_party }
     in
-    (*Core.printf "snapp statement generated: %s\n%!"
-      (Snapp_statement.sexp_of_t tx_statement |> Sexp.to_string) ;*)
     let handler (Snarky_backendless.Request.With { request; respond }) =
       match request with _ -> respond Unhandled
     in
     let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
       trivial_prover ~handler [] tx_statement
     in
-    (*Core.printf "proof: %s\n%!" (Pickles.Side_loaded.Proof.to_base64 pi) ;*)
     let fee_payer_signature_auth =
       let txn_comm =
         Parties.Transaction_commitment.with_fee_payer transaction
           ~fee_payer_hash:
             Party.Predicated.(digest (of_fee_payer fee_payer.data))
       in
-      (*Core.printf
-        "fee payer commitment: %s otherparties hash: %s protocol hash: %s memo \
-         hash: %s fee_paer hash: %s\n\
-         %!"
-        (Tick.Field.to_string txn_comm)
-        (Tick.Field.to_string other_parties_hash)
-        (Tick.Field.to_string protocol_state_predicate_hash)
-        (Tick.Field.to_string (Signed_command_memo.hash memo))
-        (Tick.Field.to_string
-           Party.Predicated.(digest (of_fee_payer fee_payer.data))) ;*)
       Signature_lib.Schnorr.sign sender.private_key
         (Random_oracle.Input.field txn_comm)
     in
-    (*Core.printf "fee-payer signature: %s\n%!"
-      (Signature.to_base58_check fee_payer_signature_auth) ;*)
     let fee_payer =
       { fee_payer with authorization = fee_payer_signature_auth }
     in
-    (*Core.printf !"sender commitment: %s\n%!" (Tick.Field.to_string transaction) ;*)
     let sender_signature_auth =
       Signature_lib.Schnorr.sign sender.private_key
         (Random_oracle.Input.field transaction)
     in
-    (*Core.printf "sender signature: %s\n%!"
-      (Signature.to_base58_check sender_signature_auth) ;*)
     let sender =
       { Party.data = sender_party_data
       ; authorization = Signature sender_signature_auth
@@ -4383,41 +4361,6 @@ module For_tests = struct
     let parties : Parties.t =
       { fee_payer; other_parties; protocol_state; memo }
     in
-    (*let vk_encoded =
-        Binable.to_string
-          (module Side_loaded_verification_key.Stable.Latest)
-          vk.data
-        |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
-      in
-      printf "vk:\n%s\n\n" vk_encoded ;
-      let () =
-        let vk_decoded =
-          Binable.of_string
-            (module Side_loaded_verification_key.Stable.Latest)
-            (Base64.decode_exn ~alphabet:Base64.uri_safe_alphabet vk_encoded)
-        in
-        assert (Side_loaded_verification_key.equal vk_decoded vk.data)
-      in
-      (* print fee payer *)
-      Party.Fee_payer.to_yojson fee_payer
-      |> Yojson.Safe.pretty_to_string
-      |> printf "fee_payer:\n%s\n\n"
-      |> fun () ->
-      (* print other_party data *)
-      List.hd_exn parties.other_parties
-      |> (fun (p : Party.t) -> Party.Predicated.to_yojson p.data)
-      |> Yojson.Safe.pretty_to_string
-      |> printf "other_party_data:\n%s\n\n"
-      |> fun () ->
-      (* print other_party proof *)
-      Pickles.Side_loaded.Proof.Stable.V1.sexp_of_t pi
-      |> Sexp.to_string |> Base64.encode_exn
-      |> printf "other_party_proof:\n%s\n\n"
-      |> fun () ->
-      (* print protocol_state *)
-      Snapp_predicate.Protocol_state.to_yojson protocol_state
-      |> Yojson.Safe.pretty_to_string
-      |> printf "protocol_state:\n%s\n\n" ;*)
     parties
 end
 

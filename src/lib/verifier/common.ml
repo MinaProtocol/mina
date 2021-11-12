@@ -67,17 +67,6 @@ let check :
                       [ Signature_lib.Public_key.compress pk ])
                 else ()
           in
-          Core.printf
-            "Common.check: otherparties hash: %s protocol hash: %s memo hash: \
-             %s fee_paer hash: %s\n\
-             %!"
-            (Pickles.Backend.Tick.Field.to_string other_parties_hash)
-            (Pickles.Backend.Tick.Field.to_string
-               (Snapp_predicate.Protocol_state.digest protocol_state))
-            (Pickles.Backend.Tick.Field.to_string
-               (Signed_command_memo.hash memo))
-            (Pickles.Backend.Tick.Field.to_string
-               Party.Predicated.(digest (of_fee_payer fee_payer.data))) ;
           check_signature fee_payer.authorization fee_payer.data.body.pk
             (Parties.Transaction_commitment.with_fee_payer commitment
                ~fee_payer_hash:
