@@ -55,14 +55,6 @@ module type S = sig
 
   type curve_scalar_var
 
-  module Shifted : sig
-    module type S =
-      Snarky_curves.Shifted_intf
-        with type curve_var := curve_var
-         and type boolean_var := Boolean.var
-         and type ('a, 'b) checked := ('a, 'b) Checked.t
-  end
-
   module Message :
     Message_intf
       with type boolean_var := Boolean.var
@@ -96,18 +88,13 @@ module type S = sig
     val compress : curve_var -> (Boolean.var list, _) Checked.t
 
     val verifies :
-         (module Shifted.S with type t = 't)
-      -> Signature.var
+         Signature.var
       -> Public_key.var
       -> Message.var
       -> (Boolean.var, _) Checked.t
 
     val assert_verifies :
-         (module Shifted.S with type t = 't)
-      -> Signature.var
-      -> Public_key.var
-      -> Message.var
-      -> (unit, _) Checked.t
+      Signature.var -> Public_key.var -> Message.var -> (unit, _) Checked.t
   end
 
   val compress : curve -> bool list
@@ -129,9 +116,11 @@ module Make
       module Scalar : sig
         type t [@@deriving sexp, equal]
 
-        type var
+        module Checked : sig
+          type t
+        end
 
-        val typ : (var, t) Typ.t
+        val typ : (Checked.t, t) Typ.t
 
         val zero : t
 
@@ -140,21 +129,21 @@ module Make
         val ( + ) : t -> t -> t
 
         val negate : t -> t
-
-        module Checked : sig
-          val to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
-        end
       end
 
       type t [@@deriving sexp]
 
       type var = Field.Var.t * Field.Var.t
 
-      module Checked :
-        Snarky_curves.Weierstrass_checked_intf
-          with module Impl := Impl
-           and type t = var
-           and type unchecked := t
+      module Checked : sig
+        val ( + ) : var -> var -> (var, _) Checked.t
+
+        val scale_known : t -> Scalar.Checked.t -> (var, _) Checked.t
+
+        val scale_random : var -> Scalar.Checked.t -> (var, _) Checked.t
+
+        val negate : var -> var
+      end
 
       val one : t
 
@@ -168,7 +157,7 @@ module Make
     end)
     (Message : Message_intf
                  with type boolean_var := Impl.Boolean.var
-                  and type curve_scalar_var := Curve.Scalar.var
+                  and type curve_scalar_var := Curve.Scalar.Checked.t
                   and type curve_scalar := Curve.Scalar.t
                   and type curve := Curve.t
                   and type curve_var := Curve.var
@@ -180,15 +169,14 @@ module Make
      and type curve := Curve.t
      and type curve_var := Curve.var
      and type curve_scalar := Curve.Scalar.t
-     and type curve_scalar_var := Curve.Scalar.var
-     and module Shifted := Curve.Checked.Shifted
+     and type curve_scalar_var := Curve.Scalar.Checked.t
      and module Message := Message = struct
   open Impl
 
   module Signature = struct
     type t = Field.t * Curve.Scalar.t [@@deriving sexp]
 
-    type var = Field.Var.t * Curve.Scalar.var
+    type var = Field.Var.t * Curve.Scalar.Checked.t
 
     let typ : (var, t) Typ.t = Typ.tuple2 Field.typ Curve.Scalar.typ
   end
@@ -268,25 +256,16 @@ module Make
     (* returning r_point as a representable point ensures it is nonzero so the nonzero
      * check does not have to explicitly be performed *)
 
-    let%snarkydef verifier (type s) ~equal ~final_check
-        ((module Shifted) as shifted :
-          (module Curve.Checked.Shifted.S with type t = s))
-        ((r, s) : Signature.var) (public_key : Public_key.var) (m : Message.var)
-        =
+    let%snarkydef verifier ~equal ~final_check ((r, s) : Signature.var)
+        (public_key : Public_key.var) (m : Message.var) =
       let%bind e = Message.hash_checked m ~public_key ~r in
       (* s * g - e * public_key *)
       let%bind e_pk =
-        Curve.Checked.scale shifted
-          (Curve.Checked.negate public_key)
-          (Curve.Scalar.Checked.to_bits e)
-          ~init:Shifted.zero
+        Curve.Checked.scale_random (Curve.Checked.negate public_key) e
       in
-      let%bind s_g_e_pk =
-        Curve.Checked.scale_known shifted Curve.one
-          (Curve.Scalar.Checked.to_bits s)
-          ~init:e_pk
-      in
-      let%bind rx, ry = Shifted.unshift_nonzero s_g_e_pk in
+      let%bind s_g = Curve.Checked.scale_known Curve.one s in
+      let%bind s_g_e_pk = Curve.Checked.( + ) e_pk s_g in
+      let rx, ry = s_g_e_pk in
       let%bind y_even = is_even ry in
       let%bind r_correct = equal r rx in
       final_check r_correct y_even
@@ -442,7 +421,7 @@ open Hash_prefix_states_nonconsensus
 module Message = struct
   open Tick
 
-  type t = (Field.t, bool) Random_oracle.Input.t [@@deriving sexp]
+  type t = (Field.t, bool) Random_oracle_input.t [@@deriving sexp]
 
   let network_id =
     match Mina_signature_kind.t with
@@ -454,7 +433,7 @@ module Message = struct
   let derive t ~private_key ~public_key =
     let input =
       let x, y = Tick.Inner_curve.to_affine_exn public_key in
-      Random_oracle.Input.append t
+      Random_oracle_input.append t
         { field_elements = [| x; y |]
         ; bitstrings =
             [| Tock.Field.unpack private_key
@@ -462,7 +441,7 @@ module Message = struct
             |]
         }
     in
-    Random_oracle.Input.to_bits ~unpack:Field.unpack input
+    Random_oracle_input.to_bits ~unpack:Field.unpack input
     |> Array.of_list |> Blake2.bits_to_string |> Blake2.digest_string
     |> Blake2.to_raw_string |> Blake2.string_to_bits |> Array.to_list
     |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
@@ -471,13 +450,13 @@ module Message = struct
   let make_hash ~init t ~public_key ~r =
     let input =
       let px, py = Inner_curve.to_affine_exn public_key in
-      Random_oracle.Input.append t
+      Random_oracle_input.append t
         { field_elements = [| px; py; r |]; bitstrings = [||] }
     in
-    let open Random_oracle in
+    let open Random_oracle.Legacy in
     hash ~init (pack_input input)
     |> Digest.to_bits ~length:Field.size_in_bits
-    |> Inner_curve.Scalar.of_bits
+    |> Inner_curve.Scalar.project
 
   let hash = make_hash ~init:Hash_prefix_states.signature
 
@@ -489,19 +468,18 @@ module Message = struct
 
   [%%ifdef consensus_mechanism]
 
-  type var = (Field.Var.t, Boolean.var) Random_oracle.Input.t
+  type var = (Field.Var.t, Boolean.var) Random_oracle_input.t
 
   let%snarkydef hash_checked t ~public_key ~r =
     let input =
       let px, py = public_key in
-      Random_oracle.Input.append t
+      Random_oracle_input.append t
         { field_elements = [| px; py; r |]; bitstrings = [||] }
     in
     make_checked (fun () ->
-        let open Random_oracle.Checked in
-        hash ~init:Hash_prefix_states.signature (pack_input input)
-        |> Digest.to_bits ~length:Field.size_in_bits
-        |> Bitstring_lib.Bitstring.Lsb_first.of_list)
+        let open Random_oracle.Legacy.Checked in
+        Tick.Inner_curve.Scalar.Checked.Random
+          (hash ~init:Hash_prefix_states.signature (pack_input input)))
 
   [%%endif]
 end
@@ -513,15 +491,15 @@ module S = Make (Tick) (Tick.Inner_curve) (Message)
 let gen =
   let open Quickcheck.Let_syntax in
   let%map pk = Private_key.gen and msg = Tick.Field.gen in
-  (pk, Random_oracle.Input.field_elements [| msg |])
+  (pk, Random_oracle_input.field_elements [| msg |])
 
 (* Use for reading only. *)
 let message_typ () : (Message.var, Message.t) Tick.Typ.t =
   let open Tick.Typ in
-  { alloc = Alloc.return (Random_oracle.Input.field_elements [||])
+  { alloc = Alloc.return (Random_oracle_input.field_elements [||])
   ; store =
       Store.Let_syntax.(
-        fun { Random_oracle.Input.field_elements; bitstrings } ->
+        fun { Random_oracle_input.field_elements; bitstrings } ->
           let%bind field_elements =
             Store.all @@ Array.to_list
             @@ Array.map ~f:(store Tick.Field.typ) field_elements
@@ -531,12 +509,12 @@ let message_typ () : (Message.var, Message.t) Tick.Typ.t =
             @@ Array.map bitstrings ~f:(fun l ->
                    Store.all @@ List.map ~f:(store Tick.Boolean.typ) l)
           in
-          { Random_oracle.Input.field_elements = Array.of_list field_elements
+          { Random_oracle_input.field_elements = Array.of_list field_elements
           ; bitstrings = Array.of_list bitstrings
           })
   ; read =
       Read.Let_syntax.(
-        fun { Random_oracle.Input.field_elements; bitstrings } ->
+        fun { Random_oracle_input.field_elements; bitstrings } ->
           let%bind field_elements =
             Read.all @@ Array.to_list
             @@ Array.map ~f:(read Tick.Field.typ) field_elements
@@ -546,7 +524,7 @@ let message_typ () : (Message.var, Message.t) Tick.Typ.t =
             @@ Array.map bitstrings ~f:(fun l ->
                    Read.all @@ List.map ~f:(read Tick.Boolean.typ) l)
           in
-          { Random_oracle.Input.field_elements = Array.of_list field_elements
+          { Random_oracle_input.field_elements = Array.of_list field_elements
           ; bitstrings = Array.of_list bitstrings
           })
   ; check = (fun _ -> Tick.Checked.return ())
@@ -560,12 +538,7 @@ let%test_unit "schnorr checked + unchecked" =
       (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
          Tick.Typ.(tuple3 Tick.Inner_curve.typ (message_typ ()) S.Signature.typ)
          Tick.Boolean.typ
-         (fun (public_key, msg, s) ->
-           let open Tick.Checked in
-           let%bind (module Shifted) =
-             Tick.Inner_curve.Checked.Shifted.create ()
-           in
-           S.Checked.verifies (module Shifted) s public_key msg)
+         (fun (public_key, msg, s) -> S.Checked.verifies s public_key msg)
          (fun _ -> true))
         (pubkey, msg, s))
 
