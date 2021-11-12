@@ -20,7 +20,7 @@ let display
       t) : display =
   let f x =
     Visualization.display_prefix_of_string
-      Zexe_backend.Pasta.(Bigint256.to_hex_string (Fp.to_bigint x))
+      Kimchi_pasta.Pasta.(Bigint256.to_hex_string (Fp.to_bigint x))
   in
   { Parties_logic.Local_state.parties = f parties
   ; call_stack = f call_stack

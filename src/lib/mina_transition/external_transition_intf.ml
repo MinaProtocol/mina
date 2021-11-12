@@ -74,12 +74,6 @@ module type External_transition_base_intf = sig
     module V2 : sig
       type nonrec t = t [@@deriving sexp]
     end
-
-    module V1 : sig
-      type t [@@deriving sexp]
-
-      val to_latest : t -> V2.t
-    end
   end]
 
   include External_transition_common_intf with type t := t
@@ -118,28 +112,12 @@ module type S = sig
         type nonrec t = t =
           { scheduled_time : Block_time.Stable.V1.t
           ; protocol_state : Protocol_state.Value.Stable.V2.t
-          ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
+          ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
           ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
           ; delta_transition_chain_proof :
               Frozen_ledger_hash.Stable.V1.t
               * Frozen_ledger_hash.Stable.V1.t list
           }
-
-        (*         val to_latest : t -> t *)
-      end
-
-      module V1 : sig
-        type nonrec t =
-          { scheduled_time : Block_time.Stable.V1.t
-          ; protocol_state : Protocol_state.Value.Stable.V1.t
-          ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
-          ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
-          ; delta_transition_chain_proof :
-              Frozen_ledger_hash.Stable.V1.t
-              * Frozen_ledger_hash.Stable.V1.t list
-          }
-
-        val to_latest : t -> V2.t
       end
     end]
 

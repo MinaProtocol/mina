@@ -12,13 +12,6 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t = Transaction_snark.Stable.V1.t
-      [@@deriving compare, equal, sexp, yojson, hash]
-
-      let to_latest = Transaction_snark.Stable.V1.to_latest
-    end
   end]
 
   let statement (t : t) = Transaction_snark.statement t
