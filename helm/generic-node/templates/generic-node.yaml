@@ -39,16 +39,14 @@ spec:
         mountPath: /root/.mina-config
       - name: fix-perms
         image: busybox
-        command:
-        - sh
-        - -c
-        - for dir in keys echo-keys faucet-keys; do [ -d /$dir ] && /bin/cp /$dir/* /wallet-keys; done; /bin/chmod 0700 /wallet-keys
+        command: [ 'sh', '-c', 'for dir in keys echo-keys faucet-keys; do [ -d /$dir ] && /bin/cp /$dir/* /wallet-keys; done; /bin/chmod 0700 /wallet-keys']
         volumeMounts:
         - name: private-keys
           mountPath: "/keys/"
           readOnly: true
         - name: wallet-keys
           mountPath: /wallet-keys
+          readOnly: true
       containers:
       - name: daemon
         image: "{{.Values.image.repository }}:{{.Values.image.tag}}"
@@ -59,6 +57,7 @@ spec:
         volumeMounts: 
         - name: destination-libp2p
           mountPath: /root/libp2p-keys
+          readOnly: true
         resources:
           limits:
           requests:
@@ -136,6 +135,26 @@ spec:
           value: "features_network_block_data"
         - name: DAEMON_EXTERNAL_PORT
           value: {{.Values.ports.p2p | quote}}
+        - name: SECRET_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: source-libp2p-keys
+              key: key
+        - name: SECRET_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: source-libp2p-keys
+              key: {{ .Values.libp2p.staticKeypair.secretName }}
+         - name: SECRET_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: private-keys
+              key: key
+        - name: SECRET_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: private-keys
+              key: {{ .Values.privateKeySecret.secretName }}
         ports:
         - name: client-port
           protocol: TCP
@@ -198,7 +217,7 @@ spec:
           items:
           - key: key
             path: key
-          - key: pub
+          - key: pub 
             path: key.pub
       - name: destination-libp2p
         emptyDir: {}

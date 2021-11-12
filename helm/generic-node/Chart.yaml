@@ -28,6 +28,9 @@ keywords:
   - mina
   - testnet
   - generic-node
+  - block-producer
+  - stake
+  - delegate
 home: https://minaprotocol.com/
 sources:
   - https://github.com/MinaProtocol/mina/tree/compatib;e/helm/generic-node
