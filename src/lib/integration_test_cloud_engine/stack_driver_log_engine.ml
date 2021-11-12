@@ -269,27 +269,40 @@ let parse_event_from_log_entry ~logger ~network log_entry =
   in
   let%bind payload = find json log_entry [ "jsonPayload" ] in
   let%map event =
-    if
-      Result.ok (find bool payload [ "puppeteer_script_event" ])
-      |> Option.value ~default:false
-    then (
-      let%bind msg =
-        parse (parser_from_of_yojson Puppeteer_message.of_yojson) payload
-      in
-      [%log spam] "parsing puppeteer event" ;
-      Event_type.parse_puppeteer_log msg
-      (* match msg.puppeteer_event_type with
-         | "node_offline" ->
-             [%log spam] "hitting node_offline event from puppeteer" ;
-             Event_type.Event (Event_type.Node_offline, ())
-         | _ ->
-             failwith "Could not process a puppeteer message from the logs" *) )
-    else
-      let%bind msg =
-        parse (parser_from_of_yojson Logger.Message.of_yojson) payload
-      in
-      [%log spam] "parsing daemon event" ;
-      Event_type.parse_daemon_log msg
+    let%bind msg
+        (* : ([ `Daemon_origin of Logger.Message.t | `Puppeteer_origin of Puppeteer_message.t ]) *)
+        =
+      if
+        Result.ok (find bool payload [ "puppeteer_script_event" ])
+        |> Option.value ~default:false
+      then
+        let%map res =
+          parse (parser_from_of_yojson Puppeteer_message.of_yojson) payload
+        in
+        `Puppeteer_origin res
+      else
+        let%map res =
+          parse (parser_from_of_yojson Logger.Message.of_yojson) payload
+        in
+        `Daemon_origin res
+    in
+    [%log spam] "parsing event" ;
+    Event_type.parse_event msg
+    (* if
+         Result.ok (find bool payload [ "puppeteer_script_event" ])
+         |> Option.value ~default:false
+       then
+         let%bind msg =
+           parse (parser_from_of_yojson Puppeteer_message.of_yojson) payload
+         in
+         [%log spam] "parsing puppeteer event" ;
+         Event_type.parse_puppeteer_log msg
+       else
+         let%bind msg =
+           parse (parser_from_of_yojson Logger.Message.of_yojson) payload
+         in
+         [%log spam] "parsing daemon event" ;
+         Event_type.parse_daemon_log msg *)
   in
   (node, event)
 
