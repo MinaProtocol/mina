@@ -111,14 +111,8 @@ module Inputs = struct
                               match witnesses_specs_stmts with
                               | [] ->
                                   failwith "no witnesses generated"
-                              | ((witness, spec, stmt, snapp_statement) as w)
-                                :: rest ->
-                                  [%log info]
-                                    !"current witness \
-                                      %{sexp:(Transaction_witness.Parties_segment_witness.t*Transaction_snark.Parties_segment.Basic.t*Transaction_snark.Statement.With_sok.t* \
-                                      (int * Snapp_statement.t) option)}\n\n\
-                                     \                                      %!"
-                                    w ;
+                              | (witness, spec, stmt, snapp_statement) :: rest
+                                ->
                                   let%bind (p1 : Ledger_proof.t) =
                                     M.of_parties_segment_exn ~snapp_statement
                                       ~statement:{ stmt with sok_digest }
@@ -129,19 +123,8 @@ module Inputs = struct
                                     Deferred.List.fold ~init:(Ok p1) rest
                                       ~f:(fun
                                            acc
-                                           ( ( witness
-                                             , spec
-                                             , stmt
-                                             , snapp_statement ) as w )
+                                           (witness, spec, stmt, snapp_statement)
                                          ->
-                                        [%log info]
-                                          !"current witness \
-                                            %{sexp:(Transaction_witness.Parties_segment_witness.t*Transaction_snark.Parties_segment.Basic.t*Transaction_snark.Statement.With_sok.t* \
-                                            (int * Snapp_statement.t) \
-                                            option)}\n\n\
-                                           \                                      \
-                                            %!"
-                                          w ;
                                         let%bind (prev : Ledger_proof.t) =
                                           Deferred.return acc
                                         in

@@ -3974,12 +3974,6 @@ struct
   let of_parties_segment_exn ~statement ~snapp_statement ~witness
       ~(spec : Parties_segment.Basic.t) : t Async.Deferred.t =
     Base.Parties_snark.witness := Some witness ;
-    (*Core.printf
-      !"of_parties_Segment statement: %{sexp: Statement.With_sok.t} witness: \
-        %{sexp:Parties_segment.Witness.t} spec: %{sexp: \
-        Parties_segment.Basic.t}\n\
-        %!"
-      statement witness spec ;*)
     let res =
       match spec with
       | Opt_signed ->
@@ -4051,11 +4045,6 @@ struct
             | [ (s, p, v, tag) ] ->
                 Pickles.Side_loaded.in_prover (Base.side_loaded tag)
                   (Option.value_exn v).data ;
-                (*Core.printf
-                  !"Snapp statement passed to the prover: %{sexp: \
-                    Snapp_statement.t}\n\
-                    %!"
-                  s ;*)
                 (* TODO: We should not have to pass the statement in here. *)
                 [ (s, p) ]
             | [] | _ :: _ :: _ ->
