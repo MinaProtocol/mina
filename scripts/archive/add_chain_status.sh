@@ -13,8 +13,9 @@ ARCHIVE=archive
 
 echo "Creating the chain_status column, if it doesn't exist"
 psql $ARCHIVE <<EOF
-CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned');
-ALTER TABLE blocks ADD COLUMN chain_status chain_status_type
+CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending');
+ALTER TABLE blocks ADD COLUMN chain_status chain_status_type DEFAULT 'pending';
+CREATE INDEX idx_chain_status ON blocks(chain_status)
 EOF
 
 echo "Marking genesis block as canonical"

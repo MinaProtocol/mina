@@ -64,9 +64,8 @@ CREATE TABLE epoch_data
 , ledger_hash_id int    NOT NULL REFERENCES snarked_ledger_hashes(id)
 );
 
-CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned')
+CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending');
 
-/* we cannot be certain whether recent blocks are canonical, hence the column is nullable */
 CREATE TABLE blocks
 ( id                         serial PRIMARY KEY
 , state_hash                 text   NOT NULL UNIQUE
@@ -82,7 +81,7 @@ CREATE TABLE blocks
 , global_slot                bigint NOT NULL
 , global_slot_since_genesis  bigint NOT NULL
 , timestamp                  bigint NOT NULL
-, chain_status               chain_status_type
+, chain_status               chain_status_type NOT NULL
 );
 
 CREATE INDEX idx_blocks_id ON blocks(id);
