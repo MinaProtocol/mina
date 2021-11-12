@@ -320,8 +320,7 @@ module Node = struct
   let dump_archive_data ~logger:_ (_ : t) ~data_file:_ =
     failwith "dump_archive_data"
 
-  let dump_container_logs ~logger:_ (_ : t) ~log_file:_ =
-    Malleable_error.return ()
+  let dump_mina_logs ~logger:_ (_ : t) ~log_file:_ = Malleable_error.return ()
 
   let dump_precomputed_blocks ~logger:_ (_ : t) = Malleable_error.return ()
 end

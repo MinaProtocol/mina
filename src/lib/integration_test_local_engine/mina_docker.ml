@@ -313,7 +313,7 @@ module Network_config = struct
     ; docker =
         { docker_swarm_version
         ; stack_name
-        ; mina_image = images.coda
+        ; mina_image = images.mina
         ; mina_archive_image = images.archive_node
         ; docker_volume_configs
         ; runtime_config = Runtime_config.to_yojson runtime_config
