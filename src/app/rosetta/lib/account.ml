@@ -139,7 +139,7 @@ LIMIT 1
         Caqti_type.(tup2 string int64)
         Caqti_type.(tup2 int64 int64)
 (sprintf {sql|
-WITH %s
+WITH RECURSIVE %s
 
 SELECT
   b.global_slot_since_genesis AS block_global_slot_since_genesis,
@@ -148,7 +148,7 @@ FROM
 blocks b
 JOIN relevant_block_balances rbb ON b.id = rbb.block_id
 WHERE b.height <= $2 AND b.chain_status = 'canonical'
-ORDER BY (chain.height, sequence_no, secondary_sequence_no) DESC
+ORDER BY (b.height, sequence_no, secondary_sequence_no) DESC
 LIMIT 1
       |sql} common_sql)
 
