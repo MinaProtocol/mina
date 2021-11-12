@@ -450,7 +450,7 @@ let parse_daemon_log (message : Logger.Message.t) =
       in
       let (module Ty) = event_type_module ev_type in
       match Ty.parse with
-      | From_daemon_log (_, fnc) ->
+      | From_error_log fnc | From_daemon_log (_, fnc) ->
           let%map data = fnc message in
           Event (ev_type, data)
       | _ ->
