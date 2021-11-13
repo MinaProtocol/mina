@@ -1727,6 +1727,7 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
   let add () =
     Caqti_async.Pool.use
       (fun (module Conn : CONNECTION) ->
+         let tm0 = Time.now () in
         let%bind res =
           let open Deferred.Result.Let_syntax in
           let%bind () = Conn.start () in
@@ -1739,16 +1740,14 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
               (module Conn)
               ~parent_hash:(hash block) ~parent_id:block_id
           in
-          (* update chain status for existing blocks *)
           let%bind () =
-            Block.update_chain_status (module Conn)
-              ~block_id
-          in
-          match delete_older_than with
-          | Some num_blocks ->
+            match delete_older_than with
+            | Some num_blocks ->
               Block.delete_if_older_than ~num_blocks (module Conn)
-          | None ->
+            | None ->
               return ()
+          in
+          return block_id
         in
         match res with
         | Error e as err ->
@@ -1759,11 +1758,24 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
               ~metadata:[("error", `String (Caqti_error.show e))] ;
             let%map _ = Conn.rollback () in
             err
-        | Ok _ ->
-            [%log info] "Committing block data for $state_hash"
-              ~metadata:
-                [("state_hash", Mina_base.State_hash.to_yojson (hash block))] ;
-            Conn.commit () )
+        | Ok block_id -> (
+            let state_hash_json = Mina_base.State_hash.to_yojson (hash block) in
+            [%log info] "Committing data for block with state hash $state_hash"
+              ~metadata:[("state_hash", state_hash_json)];
+            match%bind Conn.commit () with
+            | Ok () ->
+              let tm1 = Time.now () in
+              [%log debug] "Succesfully committed block with state_hash $state_hash"
+                ~metadata:[("state_hash", state_hash_json)
+                          ;("transaction_time_sec", `Float (Time.diff tm1 tm0 |> Time.Span.to_sec))
+                          ];
+              (* update chain status for existing blocks
+                 not included in the Postgresql transaction
+                 if there's a failure, the chain statuses can be reconstructed
+              *)
+              Block.update_chain_status (module Conn) ~block_id
+            | Error err ->
+              Deferred.Result.fail err))
       pool
   in
   retry ~f:add ~logger ~error_str:"add_block_aux" retries
