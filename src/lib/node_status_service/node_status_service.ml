@@ -80,11 +80,12 @@ let send_node_status_data ~logger ~url node_status_data =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
   in
   match%map
-    Cohttp_async.Client.post ~headers
-      ~body:(Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
-      url
+    Async.try_with (fun () ->
+        Cohttp_async.Client.post ~headers
+          ~body:(Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
+          url)
   with
-  | { status; _ }, body ->
+  | Ok ({ status; _ }, body) ->
       let metadata =
         [ ("data", node_status_json); ("url", `String (Uri.to_string url)) ]
       in
@@ -102,6 +103,12 @@ let send_node_status_data ~logger ~url node_status_data =
         in
         [%log error] "Failed to send node status data to URL $url"
           ~metadata:(metadata @ extra_metadata)
+  | Error e ->
+      [%log error] "Failed to send node status data to URL $url"
+        ~metadata:
+          [ ("error", `String (Exn.to_string e))
+          ; ("url", `String (Uri.to_string url))
+          ]
 
 let reset_gauges () =
   Mina_metrics.(
