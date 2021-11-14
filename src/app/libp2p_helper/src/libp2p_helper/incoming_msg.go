@@ -25,6 +25,7 @@ var rpcRequestExtractors = map[ipc.Libp2pHelperInterface_RpcRequest_Which]extrac
 	ipc.Libp2pHelperInterface_RpcRequest_Which_beginAdvertising:    fromBeginAdvertisingReq,
 	ipc.Libp2pHelperInterface_RpcRequest_Which_addPeer:             fromAddPeerReq,
 	ipc.Libp2pHelperInterface_RpcRequest_Which_listPeers:           fromListPeersReq,
+	ipc.Libp2pHelperInterface_RpcRequest_Which_bandwidthInfo:       fromBandwidthInfoReq,
 	ipc.Libp2pHelperInterface_RpcRequest_Which_generateKeypair:     fromGenerateKeypairReq,
 	ipc.Libp2pHelperInterface_RpcRequest_Which_publish:             fromPublishReq,
 	ipc.Libp2pHelperInterface_RpcRequest_Which_subscribe:           fromSubscribeReq,
