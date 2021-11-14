@@ -206,6 +206,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
       let sync_status =
         sync_status |> Mina_incremental.Status.Observer.value_exn
       in
+      [%log info] "About to send bandwidth request to libp2p" ;
       match%bind Mina_networking.bandwidth_info network with
       | Ok
           ( `Input libp2p_input_bandwidth
