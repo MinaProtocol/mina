@@ -66,7 +66,7 @@ func newTestAppWithMaxConnsAndCtx(t *testing.T, privkey crypto.PrivKey, seeds []
 		minConns,
 		maxConns,
 		minaPeerExchange,
-		time.Second,
+		10 * time.Second,
 	)
 	require.NoError(t, err)
 

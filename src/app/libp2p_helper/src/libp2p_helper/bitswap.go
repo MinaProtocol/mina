@@ -219,7 +219,6 @@ func (bs *BitswapCtx) Loop() {
 		}
 	}
 	for {
-		// TODO condition to end the loop?
 		select {
 		case <-bs.ctx.Done():
 			return
