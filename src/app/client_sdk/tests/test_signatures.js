@@ -43,17 +43,27 @@ var delegations = [
     },
   ];
 
+var strings = [
+    'this is a test',
+    'this is only a test',
+    'if this had been an actual emergency...'
+    ]
+
 var printSignature = s => console.log(`  { field: '${s.field}'\n  , scalar: '${s.scalar}'\n  },`);
 
 var payment_signatures = payments.map (t => mina.signPayment(keypair.privateKey, t))
 
 var delegation_signatures = delegations.map (t => mina.signStakeDelegation(keypair.privateKey, t))
 
+var string_signatures = strings.map (t => mina.signString('testnet',keypair.privateKey, t))
+
 // verify signatures before printing them
 payment_signatures.forEach (t => { if (!mina.verifyPaymentSignature (t)) { console.error ("Payment signature did not verify"); process.exit (1) } })
 delegation_signatures.forEach (t => { if (!mina.verifyStakeDelegationSignature (t)) { console.error ("Delegation signature did not verify"); process.exit (1) } })
+string_signatures.forEach (t => {if (!mina.verifyStringSignature ('testnet',t)) { console.error ("String signature did not verify"); process.exit (1) } })
 
 console.log("[");
 payment_signatures.forEach(t => printSignature (t.signature))
 delegation_signatures.forEach(t => printSignature (t.signature))
+string_signatures.forEach(t => printSignature (t.signature))
 console.log("]");

@@ -64,7 +64,7 @@ CREATE TABLE epoch_data
 , ledger_hash_id int    NOT NULL REFERENCES snarked_ledger_hashes(id)
 );
 
-CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned')
+CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned');
 
 /* we cannot be certain whether recent blocks are canonical, hence the column is nullable */
 CREATE TABLE blocks
