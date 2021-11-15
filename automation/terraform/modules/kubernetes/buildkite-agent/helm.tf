@@ -344,7 +344,7 @@ locals {
 
         # Install mina debian package tools
         echo "deb [trusted=yes] http://packages.o1test.net stretch stable" > /etc/apt/sources.list.d/o1.list
-        apt-get update && apt-get install -y "mina-devnet"
+        apt-get update && apt-get install -y tzdata mina-devnet
       EOF
     }
   }
