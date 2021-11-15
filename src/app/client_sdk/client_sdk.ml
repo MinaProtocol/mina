@@ -133,13 +133,18 @@ let _ =
          else Js._false
 
        (** sign payment transaction payload with private key *)
-       method signPayment (sk_base58_check_js : string_js)
-           (payment_js : payment_js) : signed_payment =
+       method signPayment (network_js : string_js)
+           (sk_base58_check_js : string_js) (payment_js : payment_js)
+           : signed_payment =
+         let signature_kind =
+           signature_kind_of_string_js network_js "signPayment"
+         in
          let sk_base58_check = Js.to_string sk_base58_check_js in
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let payload = payload_of_payment_js payment_js in
          let signature =
-           Signed_command.sign_payload sk payload |> signature_to_js_object
+           Signed_command.sign_payload ~signature_kind sk payload
+           |> signature_to_js_object
          in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
@@ -151,8 +156,11 @@ let _ =
          end
 
        (** verify signed payments *)
-       method verifyPaymentSignature (signed_payment : signed_payment)
-           : bool Js.t =
+       method verifyPaymentSignature (network_js : string_js)
+           (signed_payment : signed_payment) : bool Js.t =
+         let signature_kind =
+           signature_kind_of_string_js network_js "verifyPaymentSignature"
+         in
          let payload : Signed_command_payload.t =
            payload_of_payment_js signed_payment##.payment
          in
@@ -163,7 +171,8 @@ let _ =
          in
          let signature = signature_of_js_object signed_payment##.signature in
          let signed = Signed_command.Poly.{ payload; signer; signature } in
-         if Signed_command.check_signature signed then Js._true else Js._false
+         if Signed_command.check_signature ~signature_kind signed then Js._true
+         else Js._false
 
        method hashPayment (signed_payment : signed_payment) : Js.js_string Js.t
            =
@@ -180,14 +189,19 @@ let _ =
          |> Transaction_hash.to_base58_check |> Js.string
 
        (** sign payment transaction payload with private key *)
-       method signStakeDelegation (sk_base58_check_js : string_js)
+       method signStakeDelegation (network_js : string_js)
+           (sk_base58_check_js : string_js)
            (stake_delegation_js : stake_delegation_js) : signed_stake_delegation
            =
+         let signature_kind =
+           signature_kind_of_string_js network_js "signStakeDelegation"
+         in
          let sk_base58_check = Js.to_string sk_base58_check_js in
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let payload = payload_of_stake_delegation_js stake_delegation_js in
          let signature =
-           Signed_command.sign_payload sk payload |> signature_to_js_object
+           Signed_command.sign_payload ~signature_kind sk payload
+           |> signature_to_js_object
          in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
@@ -199,8 +213,12 @@ let _ =
          end
 
        (** verify signed delegations *)
-       method verifyStakeDelegationSignature
+       method verifyStakeDelegationSignature (network_js : string_js)
            (signed_stake_delegation : signed_stake_delegation) : bool Js.t =
+         let signature_kind =
+           signature_kind_of_string_js network_js
+             "verifyStakeDelegationSignature"
+         in
          let payload : Signed_command_payload.t =
            payload_of_stake_delegation_js
              signed_stake_delegation##.stakeDelegation
@@ -214,7 +232,8 @@ let _ =
            signature_of_js_object signed_stake_delegation##.signature
          in
          let signed = Signed_command.Poly.{ payload; signer; signature } in
-         if Signed_command.check_signature signed then Js._true else Js._false
+         if Signed_command.check_signature ~signature_kind signed then Js._true
+         else Js._false
 
        method hashStakeDelegation
            (signed_stake_delegation : signed_stake_delegation)

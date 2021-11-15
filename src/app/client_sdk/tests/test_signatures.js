@@ -51,19 +51,24 @@ var strings = [
 
 var printSignature = s => console.log(`  { field: '${s.field}'\n  , scalar: '${s.scalar}'\n  },`);
 
-var payment_signatures = payments.map (t => mina.signPayment(keypair.privateKey, t))
+var networks = ["testnet","mainnet"]
 
-var delegation_signatures = delegations.map (t => mina.signStakeDelegation(keypair.privateKey, t))
+for (let i = 0; i < networks.length; i++) {
 
-var string_signatures = strings.map (t => mina.signString('testnet',keypair.privateKey, t))
+    var payment_signatures = payments.map (t => mina.signPayment(networks[i],keypair.privateKey, t))
 
-// verify signatures before printing them
-payment_signatures.forEach (t => { if (!mina.verifyPaymentSignature (t)) { console.error ("Payment signature did not verify"); process.exit (1) } })
-delegation_signatures.forEach (t => { if (!mina.verifyStakeDelegationSignature (t)) { console.error ("Delegation signature did not verify"); process.exit (1) } })
-string_signatures.forEach (t => {if (!mina.verifyStringSignature ('testnet',t)) { console.error ("String signature did not verify"); process.exit (1) } })
+    var delegation_signatures = delegations.map (t => mina.signStakeDelegation(networks[i],keypair.privateKey, t))
 
-console.log("[");
-payment_signatures.forEach(t => printSignature (t.signature))
-delegation_signatures.forEach(t => printSignature (t.signature))
-string_signatures.forEach(t => printSignature (t.signature))
-console.log("]");
+    var string_signatures = strings.map (t => mina.signString(networks[i],keypair.privateKey, t))
+
+    // verify signatures before printing them
+    payment_signatures.forEach (t => { if (!mina.verifyPaymentSignature (networks[i],t)) { console.error ("Payment signature did not verify"); process.exit (1) } })
+    delegation_signatures.forEach (t => { if (!mina.verifyStakeDelegationSignature (networks[i],t)) { console.error ("Delegation signature did not verify"); process.exit (1) } })
+    string_signatures.forEach (t => {if (!mina.verifyStringSignature (networks[i],t)) { console.error ("String signature did not verify"); process.exit (1) } })
+
+    console.log("[");
+    payment_signatures.forEach(t => printSignature (t.signature))
+    delegation_signatures.forEach(t => printSignature (t.signature))
+    string_signatures.forEach(t => printSignature (t.signature))
+    console.log("]")
+}

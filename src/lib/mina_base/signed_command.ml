@@ -138,19 +138,20 @@ let check_tokens ({ payload = { common = { fee_token; _ }; body }; _ } : t) =
       (not (Token_id.(equal invalid) token_id))
       && not (Token_id.(equal default) token_id)
 
-let sign_payload (private_key : Signature_lib.Private_key.t)
+let sign_payload ?signature_kind (private_key : Signature_lib.Private_key.t)
     (payload : Payload.t) : Signature.t =
-  Signature_lib.Schnorr.sign private_key (to_input payload)
+  Signature_lib.Schnorr.sign ?signature_kind private_key (to_input payload)
 
-let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
+let sign ?signature_kind (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload
   ; signer = kp.public_key
-  ; signature = sign_payload kp.private_key payload
+  ; signature = sign_payload ?signature_kind kp.private_key payload
   }
 
 module For_tests = struct
   (* Pretend to sign a command. Much faster than actually signing. *)
-  let fake_sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
+  let fake_sign ?signature_kind:_ (kp : Signature_keypair.t)
+      (payload : Payload.t) : t =
     { payload; signer = kp.public_key; signature = Signature.dummy }
 end
 
