@@ -65,6 +65,11 @@ variable "mina_points_image" {
   default = ""
 }
 
+variable "use_embedded_runtime_config" {
+  type    = bool
+  default = false
+}
+
 variable "watchdog_image" {
   type    = string
   default = "gcr.io/o1labs-192920/watchdog:latest"
@@ -121,6 +126,11 @@ variable "whales" {
 variable "fishes" {
   description = "individual fish block producer node deployment configurations"
   default = null
+}
+
+variable "nodes_with_user_agent" {
+  type = list(string)
+  default = []
 }
 
 variable "seed_count" {

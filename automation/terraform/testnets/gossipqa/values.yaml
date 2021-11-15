@@ -83,7 +83,7 @@ pushgateway:
 kubeStateMetrics:
   enabled: false
 
-forceNamespace: gossipqa-prometheus
+forceNamespace: gossipqa-metrics
 
 server:
   enabled: true
