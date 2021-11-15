@@ -31,12 +31,14 @@ func TestMain(m *testing.M) {
 	for i := 0; i < 100; i++ {
 		logging.Logger(fmt.Sprintf("node%d", i))
 	}
-	_ = logging.SetLogLevel("mina.helper.bitswap", "WARN")
-	_ = logging.SetLogLevel("codanet.Helper", "WARN")
-	_ = logging.SetLogLevel("codanet.CodaGatingState", "WARN")
-	for i := 0; i < 100; i++ {
-		logging.SetLogLevel(fmt.Sprintf("node%d", i), "WARN")
-	}
+  // Uncomment for more logging (ERROR by default)
+	// _ = logging.SetLogLevel("mina.helper.bitswap", "WARN")
+	// _ = logging.SetLogLevel("engine", "DEBUG")
+	// _ = logging.SetLogLevel("codanet.Helper", "WARN")
+	// _ = logging.SetLogLevel("codanet.CodaGatingState", "WARN")
+	// for i := 0; i < 100; i++ {
+	// 	logging.SetLogLevel(fmt.Sprintf("node%d", i), "WARN")
+	// }
 	// _ = logging.SetLogLevel("dht", "debug")
 	// _ = logging.SetLogLevel("connmgr", "debug")
 	// _ = logging.SetLogLevel("*", "debug")
