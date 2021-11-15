@@ -79,6 +79,7 @@ module "kubernetes_testnet" {
       libp2p_secret          = "online-${bp.class}-libp2p-${bp.total_node_index}-key"
       enable_gossip_flooding = false
       run_with_user_agent    = bp.class =="whale" ? false : ( var.nodes_with_user_agent == [] ? true : contains(var.nodes_with_user_agent, bp.name) )
+      # run_with_user_agent = bp.class =="whale" ? false : true
       run_with_bots          = false
       enable_peer_exchange   = true
       isolated               = false
