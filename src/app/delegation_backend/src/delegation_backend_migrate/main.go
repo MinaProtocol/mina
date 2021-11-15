@@ -7,6 +7,7 @@ import (
 	dg "delegation_backend"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -43,6 +44,12 @@ type oldMeta struct {
 }
 
 func main() {
+	if len(os.Args) != 3 {
+		fmt.Printf("usage: %s <src bucket> <dst bucket>\n", os.Args[0])
+		os.Exit(1)
+	}
+	srcBucketName := os.Args[1]
+	dstBucketName := os.Args[2]
 	logging.SetupLogging(logging.Config{
 		Format: logging.JSONOutput,
 		Stderr: true,
@@ -60,11 +67,12 @@ func main() {
 		log.Fatalf("Error creating Cloud client: %v", err1)
 		return
 	}
-	gctx := dg.GoogleContext{Bucket: client.Bucket(dg.CloudBucketName()), Context: ctx, Log: log}
+	srcGctx := dg.GoogleContext{Bucket: client.Bucket(srcBucketName), Context: ctx, Log: log}
+	dstGctx := dg.GoogleContext{Bucket: client.Bucket(dstBucketName), Context: ctx, Log: log}
 	prefix := "submissions/"
 	suffix := ".json"
 	q := storage.Query{Prefix: prefix}
-	lst := gctx.Bucket.Objects(ctx, &q)
+	lst := srcGctx.Bucket.Objects(ctx, &q)
 	objAttrs, err := lst.Next()
 	for ; err == nil; objAttrs, err = lst.Next() {
 		fullName := objAttrs.Name
@@ -83,7 +91,7 @@ func main() {
 		createdAtStr := parts[2]
 		var oldMeta oldMeta
 		{
-			reader, err := gctx.Bucket.Object(fullName).NewReader(ctx)
+			reader, err := srcGctx.Bucket.Object(fullName).NewReader(ctx)
 			if err == nil {
 				decoder := json.NewDecoder(reader)
 				err = decoder.Decode(&oldMeta)
@@ -114,7 +122,7 @@ func main() {
 			log.Errorf("Error while marshaling JSON for %s: %v", fullName, err)
 			continue
 		}
-		gctx.GoogleStorageSave(dg.ObjectsToSave{newMetaPath: newMetaBytes})
+		dstGctx.GoogleStorageSave(dg.ObjectsToSave{newMetaPath: newMetaBytes})
 	}
 	if err != iterator.Done {
 		log.Fatalf("Error while iteration through objects: %v", err)
