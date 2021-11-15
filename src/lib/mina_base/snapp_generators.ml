@@ -493,10 +493,24 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
 let gen_party_predicated_signed ?account_id ~ledger :
     Party.Predicated.Signed.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
-  let%bind body =
+  let%map body =
     gen_party_body ~gen_delta ~f_delta:Fn.id ?account_id ~ledger ()
   in
-  let%map predicate = Account.Nonce.gen in
+  (* use nonce from account in ledger *)
+  let pk = body.pk in
+  let account_id = Account_id.create pk body.token_id in
+  let account =
+    match Ledger.location_of_account ledger account_id with
+    | None ->
+        failwith "gen_party_predicated_signed: expected account to be in ledger"
+    | Some loc -> (
+        match Ledger.get ledger loc with
+        | None ->
+            failwith "gen_party_predicated_signed: no account at location"
+        | Some account ->
+            account )
+  in
+  let predicate = account.nonce in
   Party.Predicated.Poly.{ body; predicate }
 
 (* takes an account id, if we want to sign this data *)
@@ -512,7 +526,22 @@ let gen_party_predicated_fee_payer ~account_id ~ledger :
   *)
   assert (Token_id.equal body0.token_id Token_id.default) ;
   let body = { body0 with token_id = () } in
-  let predicate = Account.Nonce.zero in
+  (* use nonce from account in ledger *)
+  let pk = body.pk in
+  let account_id = Account_id.create pk Token_id.default in
+  let account =
+    match Ledger.location_of_account ledger account_id with
+    | None ->
+        failwith
+          "gen_party_predicated_fee_payer: expected account to be in ledger"
+    | Some loc -> (
+        match Ledger.get ledger loc with
+        | None ->
+            failwith "gen_party_predicated_fee_payer: no account at location"
+        | Some account ->
+            account )
+  in
+  let predicate = account.nonce in
   Party.Predicated.Poly.{ body; predicate }
 
 let gen_party_signed ?account_id ~ledger : Party.Signed.t Quickcheck.Generator.t
