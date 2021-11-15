@@ -39,7 +39,7 @@ variable "whale_count" {
   type = number
 
   description = "Number of unique online whales for the network to run"
-  default     = 24
+  default     = 18
 }
 
 variable "fish_count" {
@@ -50,18 +50,17 @@ variable "fish_count" {
 }
 
 variable "seed_count" {
-  default     = 2
+  default     = 3
 }
 
 variable "plain_node_count" {
-  # default     = 2
-  default     = 10
+  default     = 1
 }
 
 locals {
   testnet_name = "gossipqa"
-  mina_image = "gcr.io/o1labs-192920/mina-daemon-baked:1.2.0beta1-compatible-863cd44-stretch-devnet-gossipqa"
-  mina_archive_image = "minaprotocol/mina-archive:1.2.0beta1-compatible-6230872-stretch-devnet"
+  mina_image = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta5-feature-gossip-qa-ledger-8e15537-buster-devnet"
+  mina_archive_image = "minaprotocol/mina-archive:1.2.0beta5-feature-gossip-qa-ledger-8e15537-buster-devnet"
   seed_region = "us-central1"
   seed_zone = "us-central1-c"
 
@@ -127,8 +126,8 @@ module "gossipqa" {
 
   agent_min_fee = "0.05"
   agent_max_fee = "0.1"
-  agent_min_tx = "0.0015"
-  agent_max_tx = "0.0015"
+  agent_min_tx = "1"
+  agent_max_tx = "1"
   agent_send_every_mins = "1"
 
   seed_zone   = local.seed_zone
@@ -146,63 +145,61 @@ module "gossipqa" {
     {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qrqcDbsBpbWq8bCVA7xBa7Wp32CKVwZM6tkbRDxbEECbiy5epJo5"
+      snark_worker_public_key = "B62qjXQcUtWGb2YPnnP7YE9DxgXhAXgWTLdTjuYhXuXegEhXY6LQCj7"
       snark_coordinators_host_port = 10401
     },
-    {
+        {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_worker_public_key = "B62qqfus8oqhNEAXdT9FhDXNfFW6SPJgfSSdbNTDaC8YbMmavD7V8z8"
       snark_coordinators_host_port = 10402
-    }
-    ,
-    {
+    },
+        {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_worker_public_key = "B62qntfBJjRwhvTfvjXu3CDk4LUVqqGRhEs4qGQgwsFvmvcpnzBobBH"
       snark_coordinators_host_port = 10403
     },
-    {
+        {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_worker_public_key = "B62qkJzX8LAfahyXKR3zZs9tiXy6aRCdz8yYKf1qyjV5VXV4kFfSazo"
       snark_coordinators_host_port = 10404
     },
-    {
+        {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_worker_public_key = "B62qqe4rmDc3BCHmvDyt1bfPWabgu52Sr5xzq6KxZSFGSjdYb8YPcPW"
       snark_coordinators_host_port = 10405
     },
-    {
+        {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_worker_public_key = "B62qnk8Ev9cVwtLASqDNmwqpjWsdyyCktkGXU6zTidxvYaddhJhoaXd"
       snark_coordinators_host_port = 10406
-    }
-    ,
-    {
+    },
+        {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_worker_public_key = "B62qmNay4xNME4JYrb6r58rViE5FJkNkm681WWGau8ybbRuX37WAMXs"
       snark_coordinators_host_port = 10407
     },
-    {
+        {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_worker_public_key = "B62qpd3VrJCoeK2Fh9CGYTLyjKJBaEHbSgTKzE5z3KnxRakU9b6mCKx"
       snark_coordinators_host_port = 10408
     },
-    {
+        {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_worker_public_key = "B62qqrF37sCNCwwSdJnMxCfiDifKWnE8dxV7nqoaNYzB2furmbEWqo7"
       snark_coordinators_host_port = 10409
     },
-    {
+        {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qnzeVPJMgeWJpk13kRNoPzMLmTF1ZycLnEM6oZrAEu5VW2V9hftq"
+      snark_worker_public_key = "B62qrD6iWkaUjP3yGLLLTLoV41zeUBEap6GrparAYNV8SuKnYaTLvqC"
       snark_coordinators_host_port = 10410
     }
   ]
@@ -230,30 +227,30 @@ module "gossipqa" {
   # ]
 
   whales= concat( 
-    [for i in range(var.whale_count)/3:{
+    [for i in range(var.whale_count/3):{
         duplicates = 3
         class  = "whale"
       }], 
-    [for i in range(var.whale_count)/3:{
+    [for i in range(var.whale_count/3):{
         duplicates = 2
         class  = "whale"
       }], 
-    [for i in range(var.whale_count)/3:{
+    [for i in range(var.whale_count/3):{
         duplicates = 1
         class  = "whale"
       }]
   )
   
   fishes=concat( 
-    [for i in range(var.fish_count)/3:{
+    [for i in range(var.fish_count/3):{
         duplicates = 3
         class  = "fish"
       }], 
-    [for i in range(var.fish_count)/3:{
+    [for i in range(var.fish_count/3):{
         duplicates = 2
         class  = "fish"
       }], 
-    [for i in range(var.fish_count)/3:{
+    [for i in range(var.fish_count/3):{
         duplicates = 1
         class  = "fish"
       }]

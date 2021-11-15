@@ -1,4 +1,0 @@
-/dns4/seed-1.gossip-data.o1test.net/tcp/10000/p2p/12D3KooWNG8JcntzQsRmLWK29oyG8nEVMBjT3VLd3FHjTm78u8ZG
-/dns4/seed-2.gossip-data.o1test.net/tcp/10001/p2p/12D3KooWT1hnGjh2g6v5idFR6SpP7j17tGTocjYt7r8f362Hm1cp
-/dns4/seed-3.gossip-data.o1test.net/tcp/10002/p2p/12D3KooWAaXC7hehirMKYdQYRG1hqPBBZdZLsMhgQ38MmPEx8Hw6
-

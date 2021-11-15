@@ -28,7 +28,7 @@ module "kubernetes_testnet" {
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
 
-  use_local_charts   = true
+  use_local_charts   = false
   mina_image         = var.mina_image
   mina_archive_image = var.mina_archive_image
   mina_agent_image   = var.mina_agent_image
@@ -51,10 +51,7 @@ module "kubernetes_testnet" {
 
   additional_peers = [for peer in local.static_peers : peer.full_peer]
   runtime_config   = var.use_embedded_runtime_config ? "" : data.local_file.genesis_ledger.content
-  #jsonencode ({
-  #"genesis": {
-  #  "genesis_state_timestamp": "2021-10-25 11:00:00-7:00"},"ledger": {"name": "gossip-data-dummy","num_accounts": 0,"accounts": []}})
-
+  
   seed_zone   = var.seed_zone
   seed_region = var.seed_region
 
@@ -63,10 +60,6 @@ module "kubernetes_testnet" {
   mina_archive_schema = var.mina_archive_schema
 
   snark_coordinators = var.snark_coordinators
-
-  #fishes_with_agents = ["fish-1-1","fish-2-1"]
-  
-  #, "fish-3-1", "fish-4-1", "fish-5-1", "fish-6-1", "fish-7-1", "fish-8-1", "fish-9-1", "fish-10-1"]
 
   block_producer_key_pass = var.block_producer_key_pass
   block_producer_configs = [for i, bp in local.block_producer_configs:
