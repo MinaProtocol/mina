@@ -889,6 +889,20 @@ module Hash = struct
 end
 
 module Submit = struct
+  module Sql = struct
+    module Transaction_hash_exists = struct
+      let query =
+        Caqti_request.find_opt
+          Caqti_type.string
+          Caqti_type.string
+        {sql| SELECT hash FROM user_commands WHERE hash = $1 |sql}
+
+      let run (module Conn : Caqti_async.CONNECTION) hash =
+        Conn.find_opt query hash |> Deferred.Result.map ~f:Option.is_some
+    end
+  end
+
+
   module Env = struct
     module T (M : Monad_fail.S) = struct
       type ( 'gql_payment
@@ -924,6 +938,7 @@ module Submit = struct
             -> signature:string
             -> unit
             -> ('gql_mint_tokens, Errors.t) M.t
+        ; db_transaction_hash_exists: hash:string -> (bool, Errors.t) M.t
         ; lift : 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t
         }
     end
@@ -932,7 +947,8 @@ module Submit = struct
     module Mock = T (Result)
 
     let real :
-           graphql_uri:Uri.t
+           db:(module Caqti_async.CONNECTION)
+        -> graphql_uri:Uri.t
         -> ( 'gql_payment
            , 'gql_delegation
            , 'gql_create_token
@@ -942,7 +958,7 @@ module Submit = struct
       let uint64 x = `String (Unsigned.UInt64.to_string x) in
       let uint32 x = `String (Unsigned.UInt32.to_string x) in
       let token_id x = `String (Mina_base.Token_id.to_string x) in
-      fun ~graphql_uri ->
+      fun ~db ~graphql_uri ->
         { gql_payment =
             (fun ~payment ~signature () ->
               Graphql.query_and_catch
@@ -999,6 +1015,8 @@ module Submit = struct
                    ~fee:(uint64 mint_tokens.fee) ?memo:mint_tokens.memo
                    ~nonce:(uint32 mint_tokens.nonce) ~signature ())
                 graphql_uri)
+        ; db_transaction_hash_exists = (fun ~hash ->
+          Sql.Transaction_hash_exists.run db hash |> Errors.Lift.sql )
         ; lift = Deferred.return
         }
   end
@@ -1083,7 +1101,16 @@ module Submit = struct
                then
                  M.fail (Errors.create `Transaction_submit_duplicate)
                else
-                 M.fail e )
+                 (
+                 let%bind signed_command = Transaction.Signed.to_mina_signed txn |> Result.map_error ~f:(fun e -> Errors.create (`Exception (Core_kernel.Error.to_string_hum e))) |> env.lift in
+                 let hash = Transaction_hash.hash_signed_command signed_command in
+                 match%bind
+                   env.db_transaction_hash_exists ~hash:(Transaction_hash.to_base58_check hash)
+                 with
+                 | true ->
+                   M.fail (Errors.create `Transaction_submit_duplicate)
+                 | false ->
+                   M.fail e ) )
         | None, Some delegation, None, None, None ->
             let%map res =
               env.gql_delegation ~delegation
@@ -1125,7 +1152,9 @@ module Submit = struct
   module Mock = Impl (Result)
 end
 
-let router ~get_graphql_uri_or_error ~logger (route : string list) body =
+let router
+  ~get_graphql_uri_or_error ~with_db ~logger
+  (route : string list) body =
   [%log debug] "Handling /construction/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
   let open Deferred.Result.Let_syntax in
@@ -1205,16 +1234,17 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
       in
       Transaction_identifier_response.to_yojson res
   | [ "submit" ] ->
-      let%bind req =
-        Errors.Lift.parse ~context:"Request"
-        @@ Construction_submit_request.of_yojson body
-        |> Errors.Lift.wrap
-      in
-      let%bind graphql_uri = get_graphql_uri_or_error () in
-      let%map res =
-        Submit.Real.handle ~env:(Submit.Env.real ~graphql_uri) req
-        |> Errors.Lift.wrap
-      in
-      Transaction_identifier_response.to_yojson res
+      with_db (fun ~db ->
+        let%bind req =
+          Errors.Lift.parse ~context:"Request"
+          @@ Construction_submit_request.of_yojson body
+          |> Errors.Lift.wrap
+        in
+        let%bind graphql_uri = get_graphql_uri_or_error () in
+        let%map res =
+          Submit.Real.handle ~env:(Submit.Env.real ~db ~graphql_uri) req
+          |> Errors.Lift.wrap
+        in
+        Transaction_identifier_response.to_yojson res)
   | _ ->
       Deferred.Result.fail `Page_not_found
