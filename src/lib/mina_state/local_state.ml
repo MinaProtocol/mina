@@ -5,7 +5,14 @@ module Impl = Pickles.Impls.Step
 include Parties_logic.Local_state.Value
 
 type display =
-  (string, string, string, string, bool, string) Parties_logic.Local_state.t
+  ( string
+  , string
+  , string
+  , string
+  , bool
+  , string
+  , string )
+  Parties_logic.Local_state.t
 [@@deriving yojson]
 
 let display
@@ -16,6 +23,7 @@ let display
      ; excess
      ; ledger
      ; success
+     ; failure_status
      } :
       t) : display =
   let f x =
@@ -31,6 +39,9 @@ let display
       Visualization.display_prefix_of_string
       @@ Frozen_ledger_hash.to_base58_check ledger
   ; success
+  ; failure_status =
+      Option.value_map failure_status ~default:"<no failure>"
+        ~f:Transaction_status.Failure.to_string
   }
 
 let dummy : t =
@@ -41,6 +52,7 @@ let dummy : t =
   ; excess = Amount.zero
   ; ledger = Frozen_ledger_hash.empty_hash
   ; success = true
+  ; failure_status = None
   }
 
 let empty = dummy
@@ -53,7 +65,11 @@ let gen : t Quickcheck.Generator.t =
   and parties = Impl.Field.Constant.gen
   and call_stack = Impl.Field.Constant.gen
   and token_id = Token_id.gen
-  and success = Bool.quickcheck_generator in
+  and success = Bool.quickcheck_generator
+  and failure_status =
+    let%bind failure = Transaction_status.Failure.gen in
+    Quickcheck.Generator.of_list [ None; Some failure ]
+  in
   { Parties_logic.Local_state.parties
   ; call_stack
   ; transaction_commitment
@@ -61,6 +77,7 @@ let gen : t Quickcheck.Generator.t =
   ; ledger
   ; excess
   ; success
+  ; failure_status
   }
 
 let to_input
@@ -71,6 +88,7 @@ let to_input
      ; excess
      ; ledger
      ; success
+     ; failure_status = _
      } :
       t) =
   let open Random_oracle.Input in
@@ -101,6 +119,7 @@ module Checked = struct
       ~excess:(f !Currency.Amount.Checked.assert_equal)
       ~ledger:(f !Ledger_hash.assert_equal)
       ~success:(f Impl.Boolean.Assert.( = ))
+      ~failure_status:(f (fun () () -> ()))
 
   let equal' (t1 : t) (t2 : t) =
     let ( ! ) f x y = Impl.run_checked (f x y) in
@@ -110,6 +129,7 @@ module Checked = struct
       ~token_id:(f !Token_id.Checked.equal)
       ~excess:(f !Currency.Amount.Checked.equal)
       ~ledger:(f !Ledger_hash.equal_var) ~success:(f Impl.Boolean.equal)
+      ~failure_status:(f (fun () () -> Impl.Boolean.true_))
 
   let to_input
       ({ parties
@@ -119,8 +139,10 @@ module Checked = struct
        ; excess
        ; ledger
        ; success
+       ; failure_status = _
        } :
         t) =
+    (* failure_status is the unit value, no need to represent it *)
     let open Random_oracle.Input in
     Array.reduce_exn ~f:append
       [| field parties
@@ -133,6 +155,17 @@ module Checked = struct
       |]
 end
 
+(* there: map any failure status to the unit value in Checked
+   back: map the unit value in Checked to None in the value world
+   (an alternative would be to fail, since we intend never to do that,
+   and it would make debugging difficult if we ever did that)
+*)
+let failure_status_typ : (unit, Transaction_status.Failure.t option) Impl.Typ.t
+    =
+  Impl.Typ.transport Impl.Typ.unit
+    ~there:(fun _failure_status -> ())
+    ~back:(fun () -> None)
+
 let typ : (Checked.t, t) Impl.Typ.t =
   let open Parties_logic.Local_state in
   let open Impl in
@@ -144,6 +177,7 @@ let typ : (Checked.t, t) Impl.Typ.t =
     ; Amount.typ
     ; Ledger_hash.typ
     ; Boolean.typ
+    ; failure_status_typ
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
