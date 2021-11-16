@@ -41,8 +41,6 @@ import (
 
 	libp2pmplex "github.com/libp2p/go-libp2p-mplex"
 	mplex "github.com/libp2p/go-mplex"
-
-	relay "github.com/libp2p/go-libp2p-circuit"
 )
 
 const NodeStatusTimeout = 10 * time.Second
@@ -674,7 +672,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.Muxer("/coda/mplex/1.0.0", libp2pmplex.DefaultTransport),
 		p2p.Identity(pk),
 		p2p.Peerstore(ps),
-		p2p.EnableRelay(relay.OptHop),
+		p2p.EnableRelay(),
 		p2p.ConnectionGater(gatingState),
 		p2p.ConnectionManager(connManager),
 		p2p.ListenAddrs(listenOn...),
