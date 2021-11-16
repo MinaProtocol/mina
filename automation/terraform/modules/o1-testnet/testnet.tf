@@ -50,8 +50,8 @@ module "kubernetes_testnet" {
   agent_send_every_mins = var.agent_send_every_mins
 
   additional_peers = [for peer in local.static_peers : peer.full_peer]
-  runtime_config   = data.local_file.genesis_ledger.content
-
+  runtime_config   = var.use_embedded_runtime_config ? "" : data.local_file.genesis_ledger.content
+  
   seed_zone   = var.seed_zone
   seed_region = var.seed_region
 
@@ -71,7 +71,8 @@ module "kubernetes_testnet" {
       private_key_secret     = "online-${bp.class}-account-${bp.unique_node_index}-key"
       libp2p_secret          = "online-${bp.class}-libp2p-${bp.total_node_index}-key"
       enable_gossip_flooding = false
-      run_with_user_agent    = bp.class =="whale" ? false : true
+      run_with_user_agent    = bp.class =="whale" ? false : ( var.nodes_with_user_agent == [] ? true : contains(var.nodes_with_user_agent, bp.name) )
+      # run_with_user_agent = bp.class =="whale" ? false : true
       run_with_bots          = false
       enable_peer_exchange   = true
       isolated               = false
