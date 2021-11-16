@@ -309,6 +309,7 @@ module Balance = struct
           -> unit
           -> ([`Successful of 'gql | `Failed of Errors.t], Errors.t) M.t
         ; logger: Logger.t
+        ; random_sleep: lo:float -> hi:float -> (unit, Errors.t) M.t
         ; db_block_identifier_and_balance_info:
                block_query:Block_query.t
             -> address:string
@@ -338,6 +339,9 @@ module Balance = struct
                  ())
               graphql_uri )
       ; logger
+      ; random_sleep = (fun ~lo ~hi ->
+        let x = (Random.float (hi -. lo)) +. lo in
+        Async.after (Time.Span.of_sec x) |> Deferred.map ~f:Result.return)
       ; db_block_identifier_and_balance_info=
           (fun ~block_query ~address ->
             let (module Conn : Caqti_async.CONNECTION) = db in
@@ -372,6 +376,7 @@ module Balance = struct
                      end)
                end ))
       ; logger = Logger.null ()
+      ; random_sleep = (fun ~lo:_ ~hi:_ -> Result.return ())
       ; db_block_identifier_and_balance_info=
           (fun ~block_query ~address ->
             ignore ((block_query, address) : Block_query.t * string) ;
@@ -399,6 +404,11 @@ module Balance = struct
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~graphql_uri
+      in
+      (* Sleep for between 1 and 5 seconds randomly. We do this to reduce load
+         on Postgres *)
+      let%bind () =
+        env.random_sleep ~lo:1.0 ~hi:5.0
       in
       let make_balance_amount ~liquid_balance ~total_balance =
         let amount =
