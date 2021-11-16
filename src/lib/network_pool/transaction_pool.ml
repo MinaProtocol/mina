@@ -1207,7 +1207,13 @@ struct
                             let rec go sender_local_state u_acc acc
                                 (rejected : Rejected.t) = function
                               | [] ->
-                                  (* We keep the signer lock until this verified diff is applied. *)
+                                  (* If there are accepted commands, we keep the signer lock until this verified diff is applied.
+                                     Otherwise, we release the lock now.
+                                  *)
+                                  if List.is_empty acc then
+                                    Option.iter
+                                      (Hashtbl.find t.sender_mutex signer)
+                                      ~f:Mutex.release ;
                                   return
                                     (Ok
                                        ( List.rev acc
