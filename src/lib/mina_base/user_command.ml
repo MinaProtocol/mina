@@ -27,30 +27,31 @@ type ('u, 's) t_ = ('u, 's) Poly.Stable.Latest.t =
   | Signed_command of 'u
   | Parties of 's
 
-(* TODO: For now, we don't generate snapp transactions. *)
 module Gen_make (C : Signed_command_intf.Gen_intf) = struct
-  let f g = Quickcheck.Generator.map g ~f:(fun c -> Signed_command c)
+  let to_signed_command f =
+    Quickcheck.Generator.map f ~f:(fun c -> Signed_command c)
 
   open C.Gen
 
   let payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
       ~fee_range () =
-    f
+    to_signed_command
       (payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
          ~fee_range ())
 
   let payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
       ?fee_token ?payment_token ~fee_range () =
-    f
+    to_signed_command
       (payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
          ?fee_token ?payment_token ~fee_range ())
 
   let stake_delegation ~key_gen ?nonce ?fee_token ~fee_range () =
-    f (stake_delegation ~key_gen ?nonce ?fee_token ~fee_range ())
+    to_signed_command
+      (stake_delegation ~key_gen ?nonce ?fee_token ~fee_range ())
 
   let stake_delegation_with_random_participants ~keys ?nonce ?fee_token
       ~fee_range () =
-    f
+    to_signed_command
       (stake_delegation_with_random_participants ~keys ?nonce ?fee_token
          ~fee_range ())
 

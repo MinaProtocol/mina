@@ -47,8 +47,8 @@ let%test_module "Archive node unit tests" =
     let keys = Array.init 5 ~f:(fun _ -> Keypair.create ())
 
     let user_command_signed_gen =
-      User_command.Gen.payment_with_random_participants ~keys ~max_amount:1000
-        ~fee_range:10 ()
+      User_command_generators.payment_with_random_participants ~keys
+        ~max_amount:1000 ~fee_range:10 ()
 
     let user_command_snapp_gen :
         ('a, Parties.t) User_command.t_ Base_quickcheck.Generator.t =
@@ -78,8 +78,8 @@ let%test_module "Archive node unit tests" =
       |> fun _ ->
       let protocol_state = Snapp_predicate.Protocol_state.accept in
       let%map (parties : Parties.t) =
-        Snapp_generators.gen_parties_from ~succeed:false ~fee_payer_keypair
-          ~keymap ~ledger ~protocol_state
+        Snapp_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger
+          ~protocol_state ()
       in
       User_command.Parties parties
 
