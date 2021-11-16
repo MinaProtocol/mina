@@ -542,13 +542,14 @@ let gen_fee_payer ~account_id ~ledger : Party.Fee_payer.t Quickcheck.Generator.t
   let authorization = Signature.dummy in
   Party.Fee_payer.{ data; authorization }
 
+let max_other_parties = 5
+
 let gen_parties_from ?(succeed = true)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t)
     ~ledger ~protocol_state () =
   let open Quickcheck.Let_syntax in
-  let max_parties = 5 in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
   in
@@ -591,7 +592,7 @@ let gen_parties_from ?(succeed = true)
     go [] num_parties
   in
   (* at least 1 party, so that `succeed` affects at least one predicate *)
-  let%bind num_parties = Int.gen_uniform_incl 1 max_parties in
+  let%bind num_parties = Int.gen_uniform_incl 1 max_other_parties in
   let%bind num_new_accounts = Int.gen_uniform_incl 0 num_parties in
   let num_old_parties = num_parties - num_new_accounts in
   let%bind old_parties =
@@ -630,7 +631,6 @@ let gen_parties_from ?(succeed = true)
     Snapp_predicate.Protocol_state.digest
       parties_dummy_signatures.protocol_state
   in
-
   let sign_for_other_party sk =
     Signature_lib.Schnorr.sign sk
       (Random_oracle.Input.field

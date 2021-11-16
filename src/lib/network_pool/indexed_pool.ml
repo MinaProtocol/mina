@@ -1439,7 +1439,7 @@ let%test_module _ =
                 Quickcheck.Generator.tuple2 (return sender)
                   (Quickcheck_lib.of_array test_keys)
               in
-              User_command.Gen.payment ~sign_type:`Fake ~key_gen
+              User_command_generators.payment ~sign_type:`Fake ~key_gen
                 ~nonce:current_nonce ~max_amount:1 ~fee_range:0 ()
             in
             let cmd_currency = amounts.(n - 1) in
@@ -1477,7 +1477,7 @@ let%test_module _ =
             Quickcheck.Generator.tuple2 (return sender)
               (Quickcheck_lib.of_array test_keys)
           in
-          User_command.Gen.payment ~sign_type:`Fake ~key_gen
+          User_command_generators.payment ~sign_type:`Fake ~key_gen
             ~nonce:(Account_nonce.of_int replaced_nonce)
             ~max_amount:(Currency.Amount.to_int init_balance)
             ~fee_range:0 ()
