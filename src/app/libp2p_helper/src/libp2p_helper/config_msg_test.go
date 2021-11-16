@@ -318,19 +318,19 @@ func TestSetGatingConfig(t *testing.T) {
 	bannedPid, err := peer.Decode(bannedID)
 	require.NoError(t, err)
 
-	ok := testApp.P2p.GatingState.InterceptPeerDial(bannedPid)
+	ok := testApp.P2p.GatingState().InterceptPeerDial(bannedPid)
 	require.False(t, ok)
 
-	ok = testApp.P2p.GatingState.InterceptPeerDial(allowedPid)
+	ok = testApp.P2p.GatingState().InterceptPeerDial(allowedPid)
 	require.True(t, ok)
 
-	ok = testApp.P2p.GatingState.InterceptAddrDial(bannedPid, bannedMultiaddr)
+	ok = testApp.P2p.GatingState().InterceptAddrDial(bannedPid, bannedMultiaddr)
 	require.False(t, ok)
 
-	ok = testApp.P2p.GatingState.InterceptAddrDial(bannedPid, allowedMultiaddr)
+	ok = testApp.P2p.GatingState().InterceptAddrDial(bannedPid, allowedMultiaddr)
 	require.False(t, ok)
 
-	ok = testApp.P2p.GatingState.InterceptAddrDial(allowedPid, allowedMultiaddr)
+	ok = testApp.P2p.GatingState().InterceptAddrDial(allowedPid, allowedMultiaddr)
 	require.True(t, ok)
 }
 

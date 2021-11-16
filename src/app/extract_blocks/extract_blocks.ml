@@ -83,6 +83,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     Unsigned.UInt32.of_int64 block.global_slot_since_genesis
   in
   let timestamp = Block_time.of_int64 block.timestamp in
+  let chain_status = Option.map block.chain_status ~f:Chain_status.of_string in
   (* commands to be filled in later *)
   return
     { Extensional.Block.state_hash
@@ -101,6 +102,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; timestamp
     ; user_cmds = []
     ; internal_cmds = []
+    ; chain_status
     }
 
 let fill_in_user_commands pool block_state_hash =

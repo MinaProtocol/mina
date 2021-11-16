@@ -326,15 +326,19 @@ let%test_module "all-ipc test" =
         set_connection_gating_config a (mk_banning_gating_config ad.c_peerid)
       in
 
-      (* TODO uncomment after fixing the issue. *)
       (* Wait for Carol to disconnect. This will deadlock Alice and Carol
          unless new gating config is put into effect and Carol becomes banned. *)
-      (* let%bind () = pcIter (fun () ->
-         match !carolStatus with
-           | Connected -> false
-           | Disconnected -> true
-           | _ -> raise UnexpectedState
-         ) |> or_timeout ~msg:"Alice: wait for Carol to disconnect" in *)
+      let%bind () =
+        pcIter (fun () ->
+            match !carolStatus with
+            | Connected ->
+                false
+            | Disconnected ->
+                true
+            | _ ->
+                raise UnexpectedState)
+        |> or_timeout ~msg:"Alice: wait for Carol to disconnect"
+      in
 
       (* Await Bob to terminate. This statement ensures that Alice doesn't finishes
          before Bob received all of the messages on topic "a" *)

@@ -65,7 +65,7 @@ func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) *capnp.Message {
 
 				if discovery.source == PEER_DISCOVERY_SOURCE_MDNS {
 					for _, addr := range discovery.info.Addrs {
-						app.P2p.GatingState.MarkPrivateAddrAsKnown(addr)
+						app.P2p.GatingState().MarkPrivateAddrAsKnown(addr)
 					}
 				}
 
@@ -406,7 +406,7 @@ func (m SetGatingConfigReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	app.P2p.GatingState = newState
+	app.P2p.SetGatingState(newState)
 
 	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
 		_, err := m.NewSetGatingConfig()
