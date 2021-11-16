@@ -6,7 +6,7 @@
 
 open Core_kernel
 
-let gen_predicate_from ?(succeed = true) ~account_id ~ledger =
+let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
   (* construct predicate using pk and ledger
      don't return Accept, which would ignore those inputs
   *)
@@ -293,7 +293,6 @@ let gen_party_body (type a) ?account_id ?balances_tbl ?(new_account = false)
     failwith "gen_party_body: snapp_account but not new_account" ;
   (* fee payers have to be in the ledger *)
   assert (not (is_fee_payer && new_account)) ;
-  (*  let%bind token_id = gen_a in *)
   let%bind update = Party.Update.gen ~new_account () in
   let%bind account =
     if new_account then (
@@ -456,7 +455,7 @@ let gen_party_body (type a) ?account_id ?balances_tbl ?(new_account = false)
   }
 
 let gen_predicated_from ?(succeed = true) ?(new_account = false)
-    ?(snapp_account = false) ?available_public_keys ~ledger ~balances_tbl =
+    ?(snapp_account = false) ?available_public_keys ~ledger ~balances_tbl () =
   let open Quickcheck.Let_syntax in
   let%bind body =
     gen_party_body ~new_account ~snapp_account ?available_public_keys ~ledger
@@ -465,11 +464,11 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false)
   let account_id =
     Account_id.create body.Party.Body.Poly.pk body.Party.Body.Poly.token_id
   in
-  let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger in
+  let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger () in
   Party.Predicated.Poly.{ body; predicate }
 
 let gen_party_from ?(succeed = true) ?(new_account = false)
-    ~available_public_keys ~ledger ~balances_tbl =
+    ~available_public_keys ~ledger ~balances_tbl () =
   let open Quickcheck.Let_syntax in
   let%bind authorization = Lazy.force Control.gen_with_dummies in
   let snapp_account =
@@ -485,7 +484,7 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
   let new_account = new_account || snapp_account in
   let%map data =
     gen_predicated_from ~succeed ~new_account ~snapp_account
-      ~available_public_keys ~ledger ~balances_tbl
+      ~available_public_keys ~ledger ~balances_tbl ()
   in
   { Party.data; authorization }
 
@@ -535,7 +534,7 @@ let gen_parties_from ?(succeed = true)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t)
-    ~ledger ~protocol_state =
+    ~ledger ~protocol_state () =
   let open Quickcheck.Let_syntax in
   let max_parties = 5 in
   let fee_payer_pk =
@@ -573,7 +572,7 @@ let gen_parties_from ?(succeed = true)
       else
         let%bind party =
           gen_party_from ~new_account:new_parties ~available_public_keys
-            ~succeed ~ledger ~balances_tbl
+            ~succeed ~ledger ~balances_tbl ()
         in
         go (party :: acc) (n - 1)
     in

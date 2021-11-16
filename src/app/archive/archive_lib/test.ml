@@ -78,8 +78,8 @@ let%test_module "Archive node unit tests" =
       |> fun _ ->
       let protocol_state = Snapp_predicate.Protocol_state.accept in
       let%map (parties : Parties.t) =
-        Snapp_generators.gen_parties_from ~succeed:false ~fee_payer_keypair
-          ~keymap ~ledger ~protocol_state
+        Snapp_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger
+          ~protocol_state ()
       in
       User_command.Parties parties
 
