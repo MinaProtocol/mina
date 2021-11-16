@@ -54,7 +54,7 @@ RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && echo "$POSTGRES_VERSION" "$(psql -V)" \
     && echo "data_directory = '/data/postgresql'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
     && echo "listen_addresses='*'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
-    && echo "max_locks_per_transaction=1024" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
+    && echo "max_locks_per_transaction=65536" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
     && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf
 
 USER root
