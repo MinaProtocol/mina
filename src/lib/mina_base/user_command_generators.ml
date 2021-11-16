@@ -40,8 +40,9 @@ let parties () =
         Account.create account_id balance)
   in
   let fee_payer_keypair = List.hd_exn keypairs in
-  (* using Precomputed_values depth introduces a cyclic dependency *)
-  let depth = 20 in
+  let depth =
+    Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
+  in
   let ledger = Ledger.create ~depth () in
   List.iter2_exn account_ids accounts ~f:(fun acct_id acct ->
       match Ledger.get_or_create_account ledger acct_id acct with
