@@ -65,10 +65,16 @@ module Time : sig
        and type Packed.value = t
        and type Packed.var = private Tick.Field.Var.t
 
+  val to_input : t -> Tick.Field.t Random_oracle_input.t
+
   module Checked : sig
     open Snark_params.Tick
 
-    type t = Unpacked.var
+    type t
+
+    val typ : (t, Stable.Latest.t) Typ.t
+
+    val to_input : t -> Field.Var.t Random_oracle_input.t
 
     val ( = ) : t -> t -> (Boolean.var, _) Checked.t
 
@@ -79,6 +85,12 @@ module Time : sig
     val ( <= ) : t -> t -> (Boolean.var, _) Checked.t
 
     val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
+
+    val to_field : t -> Field.Var.t
+
+    module Unsafe : sig
+      val of_field : Field.Var.t -> t
+    end
   end
 
   module Span : sig
@@ -129,6 +141,24 @@ module Time : sig
     val min : t -> t -> t
 
     val zero : t
+
+    val to_input : t -> Tick.Field.t Random_oracle_input.t
+
+    module rec Checked : sig
+      type t
+
+      val typ : (Checked.t, Stable.V1.t) Snark_params.Tick.Typ.t
+
+      open Snark_params.Tick
+
+      val to_input : t -> Tick.Field.Var.t Random_oracle_input.t
+
+      val to_field : t -> Field.Var.t
+
+      module Unsafe : sig
+        val of_field : Field.Var.t -> t
+      end
+    end
   end
 
   val field_var_to_unpacked :

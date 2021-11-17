@@ -112,25 +112,33 @@ module Time = struct
   module B = Bits
   module Bits = Bits.UInt64
   include B.Snarkable.UInt64 (Tick)
+  module N = Mina_numbers.Nat.Make_checked (UInt64) (Bits)
+
+  let to_input (t : t) =
+    Random_oracle_input.packed (Tick.Field.project (Bits.to_bits t), 64)
 
   module Checked = struct
-    type t = Unpacked.var
+    type t = N.var
 
-    module N = Mina_numbers.Nat.Make_checked (UInt64) (Bits)
+    module Unsafe = N.Unsafe
 
-    let op f (x : t) (y : t) : (Boolean.var, 'a) Checked.t =
-      let g = Fn.compose N.of_bits Unpacked.var_to_bits in
-      f (g x) (g y)
+    let typ = N.typ
 
-    let ( = ) x = op N.( = ) x
+    let to_input (t : t) = N.to_input t
 
-    let ( <= ) x = op N.( <= ) x
+    let to_field = N.to_field
 
-    let ( >= ) x = op N.( >= ) x
+    open N
 
-    let ( < ) x = op N.( < ) x
+    let ( = ) = ( = )
 
-    let ( > ) x = op N.( > ) x
+    let ( <= ) = ( <= )
+
+    let ( >= ) = ( >= )
+
+    let ( < ) = ( < )
+
+    let ( > ) = ( > )
   end
 
   module Span = struct
@@ -179,6 +187,10 @@ module Time = struct
     let min = UInt64.min
 
     let zero = UInt64.zero
+
+    let to_input = to_input
+
+    module Checked = Checked
   end
 
   include Comparable.Make (Stable.Latest)
