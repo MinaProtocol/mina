@@ -75,7 +75,7 @@ include
           , Frozen_ledger_hash.var
           , Token_id.var
           , Local_state.Checked.t
-          , Block_time.Unpacked.var )
+          , Block_time.Checked.t )
           Poly.t
      and type value := Value.t
 
@@ -127,10 +127,9 @@ val set_timestamp :
   -> 'time
   -> ('staged_ledger_hash, 'lh, 'tok, 'ls, 'time) Poly.t
 
-val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
+val to_input : Value.t -> Field.t Random_oracle.Input.t
 
-val var_to_input :
-  var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+val var_to_input : var -> Field.Var.t Random_oracle.Input.t
 
 type display = (string, string, string, Local_state.display, string) Poly.t
 [@@deriving yojson]

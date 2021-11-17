@@ -71,7 +71,7 @@ module Checked = struct
     Array.reduce_exn ~f:Random_oracle.Input.append
       [| Frozen_ledger_hash.var_to_input ledger
        ; Pending_coinbase.Stack.var_to_input pending_coinbase_stack
-       ; Impl.run_checked (Token_id.Checked.to_input next_available_token)
+       ; Token_id.Checked.to_input next_available_token
        ; Local_state.Checked.to_input local_state
       |]
 

@@ -105,7 +105,7 @@ type var =
   , Frozen_ledger_hash.var
   , Token_id.var
   , Local_state.Checked.t
-  , Block_time.Unpacked.var )
+  , Block_time.Checked.t )
   Poly.t
 
 let create_value ~staged_ledger_hash ~genesis_ledger_hash ~registers ~timestamp
@@ -118,46 +118,41 @@ let typ : (var, Value.t) Typ.t =
     ; Frozen_ledger_hash.typ
     ; Registers.typ
         [ Frozen_ledger_hash.typ; Typ.unit; Token_id.typ; Local_state.typ ]
-    ; Block_time.Unpacked.typ
+    ; Block_time.Checked.typ
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
 
 module Impl = Pickles.Impls.Step
 
-let var_to_input (type s)
+let var_to_input
     ({ staged_ledger_hash; genesis_ledger_hash; registers; timestamp } : var) :
-    ((Field.Var.t, Boolean.var) Random_oracle.Input.t, s) Checked.t =
-  Impl.make_checked (fun () ->
-      let ( ! ) = Impl.run_checked in
-      let open Random_oracle.Input in
-      let registers =
-        (* TODO: If this were the actual Registers itself (without the unit arg)
-           then we could more efficiently deal with the transaction SNARK input
-           (as we could reuse the hash)
-        *)
-        let { ledger
-            ; pending_coinbase_stack = ()
-            ; next_available_token
-            ; local_state
-            } =
-          registers
-        in
-        Array.reduce_exn ~f:Random_oracle.Input.append
-          [| Frozen_ledger_hash.var_to_input ledger
-           ; !(Token_id.Checked.to_input next_available_token)
-           ; Local_state.Checked.to_input local_state
-          |]
-      in
-      List.reduce_exn ~f:append
-        [ Staged_ledger_hash.var_to_input staged_ledger_hash
-        ; Frozen_ledger_hash.var_to_input genesis_ledger_hash
-        ; registers
-        ; bitstring
-            (Bitstring_lib.Bitstring.Lsb_first.to_list
-               (Block_time.Unpacked.var_to_bits timestamp))
-        ])
-  |> Impl.Internal_Basic.(with_state (As_prover.return ()))
+    Field.Var.t Random_oracle.Input.t =
+  let open Random_oracle.Input in
+  let registers =
+    (* TODO: If this were the actual Registers itself (without the unit arg)
+       then we could more efficiently deal with the transaction SNARK input
+       (as we could reuse the hash)
+    *)
+    let { ledger
+        ; pending_coinbase_stack = ()
+        ; next_available_token
+        ; local_state
+        } =
+      registers
+    in
+    Array.reduce_exn ~f:Random_oracle.Input.append
+      [| Frozen_ledger_hash.var_to_input ledger
+       ; Token_id.Checked.to_input next_available_token
+       ; Local_state.Checked.to_input local_state
+      |]
+  in
+  List.reduce_exn ~f:append
+    [ Staged_ledger_hash.var_to_input staged_ledger_hash
+    ; Frozen_ledger_hash.var_to_input genesis_ledger_hash
+    ; registers
+    ; Block_time.Checked.to_input timestamp
+    ]
 
 let to_input
     ({ staged_ledger_hash; genesis_ledger_hash; registers; timestamp } :
@@ -185,7 +180,7 @@ let to_input
     [ Staged_ledger_hash.to_input staged_ledger_hash
     ; Frozen_ledger_hash.to_input genesis_ledger_hash
     ; registers
-    ; bitstring (Block_time.Bits.to_bits timestamp)
+    ; Block_time.to_input timestamp
     ]
 
 let set_timestamp t timestamp = { t with Poly.timestamp }
