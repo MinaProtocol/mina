@@ -1,7 +1,6 @@
-# How to Run Integration Tests
+# Running Integration Tests
 
-
-## Prerequisites Environment Setup
+### Prerequisites Environment Setup
 
 Note: this environment setup assumes that one is a member of o(1) labs and has access to organization infrastructure.  You will need an o(1) labs GCP account and AWS account.
 
@@ -35,9 +34,7 @@ alias test_executive=./_build/default/src/app/test_executive/test_executive.exe
 alias logproc=./_build/default/src/app/logproc/logproc.exe
 ```
 
-
-
-## Routine Test Run
+### Routine Test Run
 
 1) Go to dockerhub [minaprotocol/mina-daemon](https://hub.docker.com/r/minaprotocol/mina-daemon/tags?page=1&ordering=last_updated) and pick an image to run the tests with.  When choosing an image, keep in mind the following tips.
 - Usually, one should choose the most recent image from the branch one is currently working on.  
@@ -64,14 +61,9 @@ test_executive cloud $TEST --mina-image=$MINA_IMAGE --debug | tee test.log | log
 4) OPTIONAL: In the event that the automatic cleanup doesn't work properly, one needs to do it manually.  Firstly, destroy what's on GCP with `kubectl delete namespace <namespace of test>`.  Then, `rm -r` the local testnet directory, which is in `./automation/terraform/testnets/`
 
 ### Notes on GCP namespace name
-
-Running the integration test will of course create a testnet on GCP.  In order to differentiate different test runs, a unique testnet namespace is constructed for each testnet.  The namespace is constructed from appending together the first 5 chars of the local system username of the person running the test, the short 7 char git hash, the test name, and part of the timestamp.
-
-format is: `it-{username}-{gitHash}-{testname}`
-
-ex: `it-adalo-3a9f8ce-payments`; user is adalovelace, git commit 3a9f8ce, running payments integration test
-
-GCP namespaces are limited to 53 characters.    This format uses up a fixed minimum of 22 characters, the integration tests will need a further number of those characters when constructing release names, and the longest release name for any resource happens to be "-block-producers" which is another 16 characters. As such the name of an integration test including dashes cannot exceed 15 characters
+- Running the integration test will of course create a testnet on GCP.  In order to differentiate different test runs, a unique testnet namespace is constructed for each testnet.  The namespace is constructed from appending together the first 5 chars of the local system username of the person running the test, the short 7 char git hash, the test name, and part of the timestamp.
+- the namespace format is: `it-{username}-{gitHash}-{testname}`.  for example: `it-adalo-3a9f8ce-payments`; user is adalovelace, git commit 3a9f8ce, running payments integration test
+- GCP namespaces are limited to 53 characters.    This format uses up a fixed minimum of 22 characters, the integration tests will need a further number of those characters when constructing release names, and the longest release name for any resource happens to be "-block-producers" which is another 16 characters. As such the name of an integration test including dashes cannot exceed 15 characters
 
 
 # Architecture
@@ -93,7 +85,7 @@ Any Integration test first creates a whole new testnet from scratch, and then ru
         - k8s
         - graphql ingress
         - stackdriver log subscriptions
-    - (TODO) local engine: using the local engine will spin up nodes as VMs or containers on one's local machine.  this is not yet implemented
+    - local engine: using the local engine will spin up nodes as VMs or containers on one's local machine.  this is not yet implemented
     
 
 # Code Structure
@@ -128,24 +120,23 @@ Any Integration test first creates a whole new testnet from scratch, and then ru
             - payment included in blockchain frontier
         - **Checking network state**.  The integration test framework keeps a special struct representing network state, which can be obtained by calling `network_state t`.  The members of this struct contain useful information, for example `(network_state t).blocks_generated` is simply an integer that represents the number of blocks generated.
             - Note that each call to `network_state t` returns a fresh and full struct whose value is computed eagerly, it is NOT lazy and does NOT return a pointer.  For example, if one calls `let ns = network_state t in ...`  , the value of `ns` is guaranteed to remain the same for the rest of the program (unless explicitly reassigned) EVEN if the actual network state changes in the meantime.  To obtain a fresh network state, one must make another explicit call to `network_state t`.
-    
-- simple examples
+
 
 # Debugging Tests
 
-- how to process test executive logs
-    - logproc examples
-- how to check network deploy status on initialization failures
-    - use the `--debug` flag so that the testnet doesn't automatically self-teardown after the test run
-    - 
+<!-- - how to process test executive logs
+    - logproc examples -->
+- make sure to use the `--debug` flag so that the testnet doesn't automatically self-teardown after the test run
+- if you suspect there may be infrastructure failures, or failures of the testnet to initialize
+    - check the testnet status on the GCP console.  if there are errors about not enough CPU or something like that, then this is a problem of your GCP cluster not having enough resources, or there being too much resource contention
 - how to debug terraform errors
+    - terraform errors typically cause the integration test to fail quickly, without deploying anything to GCP.  
+    - check the `main.tf` that the integration test generates.  there could be misconfigurations that have been passed into this file.
+    - check the modules `o1-integration` and `o1-testnet`.  however unless you've changed these modules, or they have recently been changed by someone else, the error is unlikely to be here.
 - how to find node logs
-    - how to find them in kubectl
-    - In the gcloud UI, from the [workloads page](https://console.cloud.google.com/kubernetes/workload), find your test run's namespace, click into a node (such as `test-block-producer1` ), then click into "Container logs".  This will take you to stack driver.
-    - how to filter them (for kubectl, show logproc example, for gcloud ui, show stackdriver filter example)
+    - In the gcloud UI, from the [workloads page](https://console.cloud.google.com/kubernetes/workload), find your test run's namespace, click into a node (such as `test-block-producer1` ), then click into "Container logs".  This will take you to stack driver.  you can then peruse and search through the logs of the node.
+<!--     - how to filter them (for kubectl, show logproc example, for gcloud ui, show stackdriver filter example) -->
 - how to correlate expected structured events with logs.
     - structured log events are not an integration test construct, they are defined in various places around the protocol code.  For example, the  `Rejecting_command_for_reason` structured event is defined in `network_pool/transaction_pool.ml`.
     - The structured log events that matter to the integration test are in `src/lib/integration_test_lib/event_type.ml`.  The events integration-test-side will trigger based on logic defined in each event type's `parse` function, which parses messages from the logs, often trying to match for exact strings
 - Please bear in mind that the nodes on GCP run the image that you link in your argument, it does NOT run whatever code you have locally.  Only that which relates to the test executive is run from local.  If you make a change in the protocol code, first this needs to be pushed to CI, where CI will bake a fresh image, and that image can be obtained to run on one's nodes.
-
-# How the cloud engine works
