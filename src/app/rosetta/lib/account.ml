@@ -139,7 +139,7 @@ LIMIT 1
         Caqti_type.(tup2 string int64)
         Caqti_type.(tup2 int64 int64)
 (sprintf {sql|
-WITH RECURSIVE %s
+WITH %s
 
 SELECT
   b.global_slot_since_genesis AS block_global_slot_since_genesis,
