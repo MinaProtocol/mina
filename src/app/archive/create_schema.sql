@@ -3,6 +3,7 @@ CREATE TABLE public_keys
 , value text   NOT NULL UNIQUE
 );
 
+CREATE INDEX idx_public_keys_id ON public_keys(id);
 CREATE INDEX idx_public_keys_value ON public_keys(value);
 
 CREATE TABLE timing_info
@@ -97,6 +98,9 @@ CREATE TABLE balances
 , balance       bigint NOT NULL
 );
 
+CREATE INDEX idx_balances_id ON balances(id);
+CREATE INDEX idx_balances_public_key_id ON balances(public_key_id);
+
 CREATE TABLE blocks_user_commands
 ( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , user_command_id int NOT NULL REFERENCES user_commands(id) ON DELETE CASCADE
@@ -114,6 +118,9 @@ CREATE TABLE blocks_user_commands
 
 CREATE INDEX idx_blocks_user_commands_block_id ON blocks_user_commands(block_id);
 CREATE INDEX idx_blocks_user_commands_user_command_id ON blocks_user_commands(user_command_id);
+CREATE INDEX idx_blocks_user_commands_fee_payer_balance ON blocks_user_commands(fee_payer_balance);
+CREATE INDEX idx_blocks_user_commands_source_balance ON blocks_user_commands(source_balance);
+CREATE INDEX idx_blocks_user_commands_receiver_balance ON blocks_user_commands(receiver_balance);
 
 CREATE TABLE blocks_internal_commands
 ( block_id              int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
@@ -127,3 +134,4 @@ CREATE TABLE blocks_internal_commands
 
 CREATE INDEX idx_blocks_internal_commands_block_id ON blocks_internal_commands(block_id);
 CREATE INDEX idx_blocks_internal_commands_internal_command_id ON blocks_internal_commands(internal_command_id);
+CREATE INDEX idx_blocks_internal_commands_receiver_balance ON blocks_internal_commands(receiver_balance);
