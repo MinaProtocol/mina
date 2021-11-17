@@ -1,4 +1,5 @@
 module P = Proof
+module Endo = Endo
 
 module type Statement_intf = Intf.Statement
 
@@ -31,7 +32,7 @@ module Cache_handle = Cache_handle
 module Step_main_inputs = Step_main_inputs
 module Pairing_main = Pairing_main
 
-let profile_constraints = false
+let profile_constraints = true
 
 let verify = Verify.verify
 
@@ -813,6 +814,9 @@ module Side_loaded = struct
 
   module Verification_key = struct
     include Side_loaded_verification_key
+
+    let to_input (t : t) =
+      to_input ~field_of_int:Impls.Step.Field.Constant.of_int t
 
     let of_compiled tag : t =
       let d = Types_map.lookup_compiled tag.Tag.id in

@@ -194,6 +194,7 @@ struct
             , _ )
             Dlog_based.Statement.In_circuit.t =
           { pass_through =
+              (* TODO: Only do this hashing when necessary *)
               Common.hash_pairing_me_only
                 (Reduced_me_only.Pairing_based.prepare
                    ~dlog_plonk_index:dlog_index statement.pass_through)
