@@ -1153,7 +1153,10 @@ module Submit = struct
 end
 
 let router
-  ~get_graphql_uri_or_error ~with_db ~logger
+  ~graphql_uri ~(with_db:(db:(module Caqti_async.CONNECTION) ->
+ (Yojson.Safe.t, [> `App of Errors.t ]) Deferred.Result.t) ->
+('a, [> `Page_not_found ]) Deferred.Result.t)
+ ~logger
   (route : string list) body =
   [%log debug] "Handling /construction/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
@@ -1185,7 +1188,6 @@ let router
         @@ Construction_metadata_request.of_yojson body
         |> Errors.Lift.wrap
       in
-      let%bind graphql_uri = get_graphql_uri_or_error () in
       let%map res =
         Metadata.Real.handle ~graphql_uri
           ~env:(Metadata.Env.real ~graphql_uri)
@@ -1234,13 +1236,12 @@ let router
       in
       Transaction_identifier_response.to_yojson res
   | [ "submit" ] ->
-      with_db (fun ~db ->
+    with_db (fun ~db ->
         let%bind req =
           Errors.Lift.parse ~context:"Request"
           @@ Construction_submit_request.of_yojson body
           |> Errors.Lift.wrap
         in
-        let%bind graphql_uri = get_graphql_uri_or_error () in
         let%map res =
           Submit.Real.handle ~env:(Submit.Env.real ~db ~graphql_uri) req
           |> Errors.Lift.wrap
