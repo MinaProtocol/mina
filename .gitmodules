@@ -32,3 +32,6 @@
 [submodule "src/external/capnp-ocaml"]
 	path = src/external/capnp-ocaml
 	url = https://github.com/o1-labs/capnp-ocaml.git
+[submodule "src/external/wasm-bindgen-rayon"]
+	path = src/external/wasm-bindgen-rayon
+	url = git@github.com:o1-labs/wasm-bindgen-rayon.git
