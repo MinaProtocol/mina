@@ -66,6 +66,10 @@ module type Token_id_intf = sig
   val default : t
 end
 
+module type Protocol_state_predicate_intf = sig
+  type t
+end
+
 module Local_state = struct
   open Core_kernel
 
@@ -139,7 +143,11 @@ module type Party_intf = sig
 
   type signed_amount
 
+  type protocol_state_predicate
+
   val balance_change : t -> signed_amount
+
+  val protocol_state : t -> protocol_state_predicate
 end
 
 module type Parties_intf = sig
@@ -308,7 +316,12 @@ module type Inputs_intf = sig
 
   module Token_id : Token_id_intf with type bool := Bool.t
 
-  module Party : Party_intf with type signed_amount := Amount.Signed.t
+  module Protocol_state_predicate : Protocol_state_predicate_intf
+
+  module Party :
+    Party_intf
+      with type signed_amount := Amount.Signed.t
+       and type protocol_state_predicate := Protocol_state_predicate.t
 
   module Parties :
     Parties_intf with type bool := Bool.t and type party := Party.t
@@ -426,7 +439,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~else_:local_state.ledger
       }
     in
-    let protocol_state_predicate_satisfied =
+    let parties_protocol_state_predicate_satisfied =
       match is_start with
       | `Yes start_data | `Compute start_data ->
           h.perform
@@ -483,6 +496,11 @@ module Make (Inputs : Inputs_intf) = struct
     let predicate_satisfied : Bool.t =
       h.perform (Check_predicate (is_start', party, a, global_state))
     in
+    let party_protocol_state_predicate_satisfied : Bool.t =
+      h.perform
+        (Check_protocol_state_predicate
+           (Party.protocol_state party, global_state))
+    in
     let a', update_permitted, failure_status =
       h.perform
         (Check_auth_and_update_account
@@ -497,8 +515,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let party_succeeded =
       Bool.(
-        protocol_state_predicate_satisfied &&& predicate_satisfied
-        &&& update_permitted)
+        parties_protocol_state_predicate_satisfied &&& predicate_satisfied
+        &&& party_protocol_state_predicate_satisfied &&& update_permitted)
     in
     (* The first party must succeed. *)
     Bool.(assert_ ((not is_start') ||| party_succeeded)) ;
