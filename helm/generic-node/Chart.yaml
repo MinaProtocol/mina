@@ -1,3 +1,4 @@
+---
 apiVersion: v2
 name: generic-node
 description: A Helm chart for Mina Protocol's generic nodes
@@ -16,7 +17,6 @@ dependencies:
     version: "*"
     repository: "https://charts.bitnami.com/bitnami"
     condition: archive.enablePostgresDB
-    
   - name: common-utilities
     version: 0.0.9
     repository: "https://coda-charts.storage.googleapis.com"

@@ -7,14 +7,17 @@ lint:
 	helm lint . --debug --strict
 
 dry-run:
-	helm install $(name)-dry-run . --dry-run --namespace generic-node-test -f values.yml
+	helm install $(name)-dry-run . --dry-run --namespace generic-node-test 
 
 .SILENT:
 changelog:
 	touch $(changelog); echo "\n$(version):\n------" >> $(changelog) && echo $(changes) >> $(changelog)
 
 install: 
-	helm install $(name) . --namespace generic-node-test -f values.yml
+	helm install $(name) . --namespace generic-node-test 
 
 upgrade:
-	helm upgrade $(name) . --namespace generic-node-test -f values.yml
+	helm upgrade $(name) . --namespace generic-node-test
+
+template:
+	helm template $(name) . --namespace generic-node-test --debug

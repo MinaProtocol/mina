@@ -1,3 +1,4 @@
+---
 name: "generic-node"
 
 testnetName: "testnet"
@@ -15,7 +16,7 @@ features:
     enabled: false
   exposeGraphql:
     enabled: false
-  uploadBlocksToGCloud: # Added this
+  uploadBlocksToGCloud:   # Added this
     enabled: false
   customEntrypoint:
     enabled: false
