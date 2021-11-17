@@ -1,0 +1,31 @@
+(library
+ (name chrome_backend)
+ (js_of_ocaml
+  (flags (:include flags.sexp))
+  (javascript_files chrome_backend.js))
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version js_of_ocaml-ppx)))
+
+(rule
+ (targets
+   plonk_wasm_bg.wasm.d.ts
+   plonk_wasm_bg.wasm
+   plonk_wasm.d.ts
+   plonk_wasm.js
+   flags.sexp
+   snippets/)
+ (deps
+  (source_tree ../../wasm)
+  (source_tree ../../wasm/.cargo/config)
+  (source_tree ../../../../../external/wasm-bindgen-rayon) )
+;  (source_tree ../../../marlin)
+;  ../../Cargo.toml
+;  ../../.cargo/config)
+ (action
+  (progn
+   (run chmod -R +w ../../wasm)
+   (setenv
+     RUSTFLAGS
+     "-C target-feature=+atomics,+bulk-memory"
+    (run rustup run nightly-2021-10-31 wasm-pack build --target web --out-dir ../js/chrome ../../wasm))
+   (write-file flags.sexp "()"))))
