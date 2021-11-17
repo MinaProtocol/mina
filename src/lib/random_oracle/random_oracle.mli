@@ -26,6 +26,7 @@ include
      and type field_constant := Field.t
      and type bool := bool
      and module State := State
+     and type input := Field.t Random_oracle_input.t
 
 val salt : string -> Field.t State.t
 
@@ -37,16 +38,20 @@ module Checked :
      and type field_constant := Field.t
      and type bool := Boolean.var
      and module State := State
+     and type input := Field.Var.t Random_oracle_input.t
 
 [%%endif]
 
 module Legacy : sig
+  module Input = Random_oracle_input.Legacy
+
   include
     Intf.S
       with type field := Field.t
        and type field_constant := Field.t
        and type bool := bool
        and module State := State
+       and type input := (Field.t, bool) Random_oracle_input.Legacy.t
 
   val salt : string -> Field.t State.t
 
@@ -58,6 +63,7 @@ module Legacy : sig
        and type field_constant := Field.t
        and type bool := Boolean.var
        and module State := State
+       and type input := (Field.Var.t, Boolean.var) Random_oracle_input.Legacy.t
 
   [%%endif]
 end

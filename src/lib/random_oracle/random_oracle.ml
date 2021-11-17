@@ -109,6 +109,12 @@ let update ~state = update ~state params
 
 let hash ?init = hash ?init params
 
+let pow2 =
+  let rec pow2 acc n =
+    if n = 0 then acc else pow2 (Field.add acc acc) (n - 1)
+  in
+  Memo.general ~hashable:Int.hashable (fun n -> pow2 Field.one n)
+
 [%%ifdef consensus_mechanism]
 
 module Checked = struct
@@ -136,15 +142,16 @@ module Checked = struct
         hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs)
 
   let pack_input =
-    Input.pack_to_fields ~size_in_bits:Field.size_in_bits ~pack:Field.Var.pack
+    Input.pack_to_fields
+      ~pow2:(Fn.compose Field.Var.constant pow2)
+      (module Pickles.Impls.Step.Field)
 
   let digest xs = xs.(0)
 end
 
 [%%endif]
 
-let pack_input =
-  Input.pack_to_fields ~size_in_bits:Field.size_in_bits ~pack:Field.project
+let pack_input = Input.pack_to_fields ~pow2 (module Field)
 
 let prefix_to_field (s : string) =
   let bits_per_character = 8 in
@@ -191,6 +198,8 @@ let%test_unit "check rust implementation of block-cipher" =
 [%%endif]
 
 module Legacy = struct
+  module Input = Random_oracle_input.Legacy
+
   let params : Field.t Sponge.Params.t =
     Sponge.Params.(map pasta_p ~f:Field.of_string)
 
@@ -227,14 +236,16 @@ module Legacy = struct
 
   let salt (s : string) = update ~state:initial_state [| prefix_to_field s |]
 
-  let pack_input = pack_input
+  let pack_input =
+    Input.pack_to_fields ~size_in_bits:Field.size_in_bits ~pack:Field.project
 
   module Digest = Digest
 
   [%%ifdef consensus_mechanism]
 
   module Checked = struct
-    let pack_input = Checked.pack_input
+    let pack_input =
+      Input.pack_to_fields ~size_in_bits:Field.size_in_bits ~pack:Field.Var.pack
 
     module Digest = Checked.Digest
 
