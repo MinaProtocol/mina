@@ -140,11 +140,9 @@ module Update = struct
             t) =
         List.reduce_exn ~f:Random_oracle_input.append
           [ Balance.var_to_input initial_minimum_balance
-          ; Snark_params.Tick.Run.run_checked
-              (Global_slot.Checked.to_input cliff_time)
+          ; Global_slot.Checked.to_input cliff_time
           ; Amount.var_to_input cliff_amount
-          ; Snark_params.Tick.Run.run_checked
-              (Global_slot.Checked.to_input vesting_period)
+          ; Global_slot.Checked.to_input vesting_period
           ; Amount.var_to_input vesting_increment
           ]
     end
@@ -462,11 +460,12 @@ module Body = struct
          ; depth = _depth (* ignored *)
          } :
           t) =
+      let ( ! ) = Impl.run_checked in
       List.reduce_exn ~f:Random_oracle_input.append
         [ Public_key.Compressed.Checked.to_input pk
         ; Update.Checked.to_input update
-        ; Impl.run_checked (Token_id.Checked.to_input token_id)
-        ; Amount.Signed.Checked.to_input delta
+        ; Token_id.Checked.to_input token_id
+        ; !(Amount.Signed.Checked.to_input delta)
         ; Events.var_to_input events
         ; Events.var_to_input sequence_events
         ; Random_oracle_input.field call_data
@@ -584,8 +583,7 @@ module Predicate = struct
           Field.(
             if_ b
               ~then_:(constant (Lazy.force accept))
-              ~else_:
-                (digest (run_checked (Account.Nonce.Checked.to_input nonce))))
+              ~else_:(digest (Account.Nonce.Checked.to_input nonce)))
   end
 
   let typ () : (Snapp_predicate.Account.Checked.t, t) Typ.t =

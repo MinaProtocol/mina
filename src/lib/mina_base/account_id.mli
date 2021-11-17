@@ -28,7 +28,7 @@ val public_key : t -> Public_key.Compressed.t
 
 val token_id : t -> Token_id.t
 
-val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+val to_input : t -> Field.t Random_oracle.Input.t
 
 val gen : t Quickcheck.Generator.t
 
@@ -54,13 +54,7 @@ module Checked : sig
 
   val token_id : var -> Token_id.var
 
-  val to_input :
-       var
-    -> ( ( Snark_params.Tick.Field.Var.t
-         , Snark_params.Tick.Boolean.var )
-         Random_oracle.Input.t
-       , _ )
-       Checked.t
+  val to_input : var -> Snark_params.Tick.Field.Var.t Random_oracle.Input.t
 
   val equal : var -> var -> (Boolean.var, _) Checked.t
 

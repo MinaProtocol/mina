@@ -2500,7 +2500,8 @@ module For_tests = struct
     in
     let commitment = Parties.commitment parties in
     let other_parties_signature =
-      Schnorr.sign sender.private_key (Random_oracle.Input.field commitment)
+      Schnorr.Current.sign sender.private_key
+        (Random_oracle.Input.field commitment)
     in
     let other_parties =
       List.map parties.other_parties ~f:(fun party ->
@@ -2511,7 +2512,7 @@ module For_tests = struct
               party)
     in
     let signature =
-      Schnorr.sign sender.private_key
+      Schnorr.Current.sign sender.private_key
         (Random_oracle.Input.field
            ( Parties.commitment parties
            |> Parties.Transaction_commitment.with_fee_payer

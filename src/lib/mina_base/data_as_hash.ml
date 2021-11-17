@@ -22,6 +22,8 @@ let optional_typ ~hash ~non_preimage ~dummy_value =
 
 let to_input (x, _) = Random_oracle_input.field x
 
+let to_input_legacy (x, _) = Random_oracle_input.Legacy.field x
+
 let if_ b ~then_ ~else_ =
   let open Run in
   let hash = Field.if_ b ~then_:(fst then_) ~else_:(fst else_) in
