@@ -37,8 +37,8 @@ let typ =
     ~value_of_hlist:Poly.of_hlist
 
 let to_input (t : value) =
-  Random_oracle.Input.bitstrings
-    [| T.to_bits t.slot_number; Length.to_bits t.slots_per_epoch |]
+  Array.reduce_exn ~f:Random_oracle.Input.append
+    [| T.to_input t.slot_number; Length.to_input t.slots_per_epoch |]
 
 let gen ~(constants : Constants.t) =
   let open Quickcheck.Let_syntax in
@@ -60,9 +60,6 @@ let zero ~(constants : Constants.t) : t =
 let slot_number { Poly.slot_number; _ } = slot_number
 
 let slots_per_epoch { Poly.slots_per_epoch; _ } = slots_per_epoch
-
-let to_bits (t : t) =
-  List.concat_map ~f:T.to_bits [ t.slot_number; t.slots_per_epoch ]
 
 let epoch (t : t) = UInt32.Infix.(t.slot_number / t.slots_per_epoch)
 
@@ -121,30 +118,20 @@ module Checked = struct
   let of_slot_number ~(constants : Constants.var) slot_number : t =
     { slot_number; slots_per_epoch = constants.slots_per_epoch }
 
-  let to_bits (t : t) =
-    let open Bitstring_lib.Bitstring.Lsb_first in
-    let%map slot_number = T.Checked.to_bits t.slot_number
-    and slots_per_epoch = Length.Checked.to_bits t.slots_per_epoch in
-    List.concat_map ~f:to_list [ slot_number; slots_per_epoch ] |> of_list
-
   let to_input (var : t) =
-    let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
-    let%map slot_number = T.Checked.to_bits var.slot_number
-    and slots_per_epoch = Length.Checked.to_bits var.slots_per_epoch in
-    Random_oracle.Input.bitstrings
-      (Array.map ~f:s [| slot_number; slots_per_epoch |])
+    Array.reduce_exn ~f:Random_oracle.Input.append
+      [| T.Checked.to_input var.slot_number
+       ; Length.Checked.to_input var.slots_per_epoch
+      |]
 
   let to_epoch_and_slot (t : t) :
       (Epoch.Checked.t * Slot.Checked.t, _) Checked.t =
-    make_checked (fun () ->
-        let open Snarky_integer in
-        let epoch, slot =
-          Integer.div_mod ~m
-            (T.Checked.to_integer t.slot_number)
-            (Length.Checked.to_integer t.slots_per_epoch)
-        in
-        ( Epoch.Checked.Unsafe.of_integer epoch
-        , Slot.Checked.Unsafe.of_integer slot ))
+    let%map epoch, slot =
+      T.Checked.div_mod t.slot_number
+        (T.Checked.Unsafe.of_field (Length.Checked.to_field t.slots_per_epoch))
+    in
+    ( Epoch.Checked.Unsafe.of_field (T.Checked.to_field epoch)
+    , Slot.Checked.Unsafe.of_field (T.Checked.to_field slot) )
 
   let sub (t : t) (t' : t) = T.Checked.sub t.slot_number t'.slot_number
 end

@@ -93,13 +93,16 @@ module Message = struct
   let to_input
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ({ global_slot; seed; delegator } : value) =
-    { Random_oracle.Input.field_elements = [| (seed :> Tick.field) |]
-    ; bitstrings =
-        [| Global_slot.Bits.to_bits global_slot
-         ; Mina_base.Account.Index.to_bits
-             ~ledger_depth:constraint_constants.ledger_depth delegator
-        |]
-    }
+    let open Random_oracle.Input in
+    Array.reduce_exn ~f:append
+      [| field (seed :> Tick.field)
+       ; Global_slot.to_input global_slot
+       ; List.reduce_exn ~f:append
+           (List.map
+              (Mina_base.Account.Index.to_bits
+                 ~ledger_depth:constraint_constants.ledger_depth delegator)
+              ~f:(fun b -> packed (Mina_base.Util.field_of_bool b, 1)))
+      |]
 
   let data_spec
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
@@ -125,16 +128,17 @@ module Message = struct
     open Tick
 
     let to_input ({ global_slot; seed; delegator } : var) =
-      let open Tick.Checked.Let_syntax in
-      let%map global_slot = Global_slot.Checked.to_bits global_slot in
-      let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
-      { Random_oracle.Input.field_elements =
-          [| Mina_base.Epoch_seed.var_to_hash_packed seed |]
-      ; bitstrings = [| s global_slot; delegator |]
-      }
+      let global_slot = Global_slot.Checked.to_input global_slot in
+      let open Random_oracle.Input in
+      Array.reduce_exn ~f:append
+        [| field (Mina_base.Epoch_seed.var_to_hash_packed seed)
+         ; global_slot
+         ; List.reduce_exn ~f:append
+             (List.map delegator ~f:(fun b -> packed ((b :> Field.Var.t), 1)))
+        |]
 
     let hash_to_group msg =
-      let%bind input = to_input msg in
+      let input = to_input msg in
       Tick.make_checked (fun () ->
           Random_oracle.Checked.hash ~init:Mina_base.Hash_prefix.vrf_message
             (Random_oracle.Checked.pack_input input)
@@ -256,7 +260,7 @@ module Output = struct
           |> Array.of_list)
 
     let hash msg (x, y) =
-      let%bind msg = Message.Checked.to_input msg in
+      let msg = Message.Checked.to_input msg in
       let input =
         Random_oracle.Input.(append msg (field_elements [| x; y |]))
       in
@@ -329,7 +333,14 @@ module Threshold = struct
     Bignum.(lhs <= rhs)
 
   module Checked = struct
-    let is_satisfied ~my_stake ~total_stake (vrf_output : Output.Truncated.var)
+    let balance_upper_bound =
+      Bignum_bigint.(one lsl Currency.Balance.length_in_bits)
+
+    let amount_upper_bound =
+      Bignum_bigint.(one lsl Currency.Amount.length_in_bits)
+
+    let is_satisfied ~(my_stake : Currency.Balance.var)
+        ~(total_stake : Currency.Amount.var) (vrf_output : Output.Truncated.var)
         =
       let open Currency in
       let open Snark_params.Tick in
@@ -341,8 +352,14 @@ module Threshold = struct
             Exp.one_minus_exp ~m params
               (Floating_point.of_quotient ~m
                  ~precision:params.per_term_precision
-                 ~top:(Integer.of_bits ~m (Balance.var_to_bits my_stake))
-                 ~bottom:(Integer.of_bits ~m (Amount.var_to_bits total_stake))
+                 ~top:
+                   (Integer.create
+                      ~value:(Balance.pack_var my_stake)
+                      ~upper_bound:balance_upper_bound)
+                 ~bottom:
+                   (Integer.create
+                      ~value:(Amount.pack_var total_stake)
+                      ~upper_bound:amount_upper_bound)
                  ~top_is_less_than_bottom:())
           in
           let vrf_output = Array.to_list (vrf_output :> Boolean.var array) in
@@ -362,7 +379,7 @@ module Evaluation_hash = struct
         { field_elements =
             (let f1, f2 = Group.to_affine_exn g in
              [| f1; f2 |])
-        ; bitstrings = [||]
+        ; packeds = [||]
         }
       in
       Array.reduce_exn ~f:Random_oracle_input.append
@@ -382,12 +399,12 @@ module Evaluation_hash = struct
   module Checked = struct
     let hash_for_proof message public_key g1 g2 =
       let open Tick.Checked.Let_syntax in
-      let%bind input =
+      let input =
         let open Random_oracle_input in
         let g_to_input (f1, f2) =
-          { field_elements = [| f1; f2 |]; bitstrings = [||] }
+          { field_elements = [| f1; f2 |]; packeds = [||] }
         in
-        let%map message_input = Message.Checked.to_input message in
+        let message_input = Message.Checked.to_input message in
         Array.reduce_exn ~f:Random_oracle_input.append
           [| message_input
            ; g_to_input public_key

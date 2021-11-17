@@ -51,7 +51,7 @@ module type Blockchain_state = sig
     , Frozen_ledger_hash.var
     , Token_id.var
     , Parties_logic.Local_state.Checked.t
-    , Block_time.Unpacked.var )
+    , Block_time.Checked.t )
     Poly.t
 
   val staged_ledger_hash :
@@ -469,10 +469,9 @@ module type S = sig
 
       open Snark_params.Tick
 
-      val var_to_input :
-        var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+      val var_to_input : var -> Field.Var.t Random_oracle.Input.t
 
-      val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
+      val to_input : Value.t -> Field.t Random_oracle.Input.t
 
       val display : Value.t -> display
 
