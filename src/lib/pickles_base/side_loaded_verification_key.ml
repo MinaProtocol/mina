@@ -193,13 +193,16 @@ let index_to_field_elements (k : 'a Plonk_verification_key_evals.t) ~g =
 let wrap_index_to_input (type gs f) (g : gs -> f array) t =
   Random_oracle_input.field_elements (index_to_field_elements t ~g)
 
-let to_input : _ Poly.t -> _ =
+let width_size = Nat.to_int Width.Length.n
+
+let to_input (type a) ~(field_of_int : int -> a) :
+    (a * a, _) Poly.t -> a Random_oracle_input.t =
   let open Random_oracle_input in
   let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
   fun { step_data; max_width; wrap_index } : _ Random_oracle_input.t ->
-    let bits ~len n = bitstring (bits ~len n) in
     let num_branches =
-      bits ~len:(Nat.to_int Max_branches.Log2.n) (At_most.length step_data)
+      packed
+        (field_of_int (At_most.length step_data), Nat.to_int Max_branches.Log2.n)
     in
     let step_domains, step_widths =
       At_most.extend_to_vector step_data
@@ -207,12 +210,13 @@ let to_input : _ Poly.t -> _ =
         Max_branches.n
       |> Vector.unzip
     in
+    let width w = (field_of_int (Width.to_int w), width_size) in
     List.reduce_exn ~f:append
       [ map_reduce (Vector.to_array step_domains) ~f:(fun { Domains.h } ->
             map_reduce [| h |] ~f:(fun (Pow_2_roots_of_unity x) ->
-                bits ~len:max_log2_degree x))
-      ; Array.map (Vector.to_array step_widths) ~f:Width.to_bits |> bitstrings
-      ; bitstring (Width.to_bits max_width)
+                packed (field_of_int x, max_log2_degree)))
+      ; Array.map (Vector.to_array step_widths) ~f:width |> packeds
+      ; packed (width max_width)
       ; wrap_index_to_input
           (Fn.compose Array.of_list (fun (x, y) -> [ x; y ]))
           wrap_index

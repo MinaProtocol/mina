@@ -58,7 +58,7 @@ let check :
             | Some pk ->
                 if
                   not
-                    (Signature_lib.Schnorr.verify s
+                    (Signature_lib.Schnorr.Current.verify s
                        (Backend.Tick.Inner_curve.of_affine pk)
                        (Random_oracle_input.field msg))
                 then
