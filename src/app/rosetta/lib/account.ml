@@ -118,7 +118,7 @@ WITH RECURSIVE chain AS (
 
   SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status FROM blocks b
   INNER JOIN chain
-  ON b.id = chain.parent_id AND chain.id <> chain.parent_id AND (chain.chain_status = 'orphaned' OR chain.chain_status IS NULL)
+  ON b.id = chain.parent_id AND chain.id <> chain.parent_id AND chain.chain_status <> 'canonical'
 ),
 
 %s
