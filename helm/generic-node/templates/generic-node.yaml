@@ -35,6 +35,7 @@ spec:
         - mountPath: /root/libp2p-keys
           name: destination-libp2p
       {{- end }}
+      {{- if .Values.privateKeySecret.enabled}}
       - name: fix-perms
         image: busybox:1.28
         command: [ 'sh', '-c', 'for dir in keys echo-keys faucet-keys; do [ -d /$dir ] && /bin/cp /$dir/* /wallet-keys; done; /bin/chmod 0700 /wallet-keys']
@@ -44,6 +45,7 @@ spec:
           readOnly: true
         - mountPath: /wallet-keys
           name: wallet-keys
+      {{- end }}
       containers:
       - name: daemon
         image: "{{.Values.image.repository }}:{{.Values.image.tag}}"
@@ -101,8 +103,10 @@ spec:
         - "-peer"
         - {{ . | quote }}
         {{- end }}
+        {{- if .Values.privateKeySecret.enabled}}
         - "--block-producer-key"
         - "/root/wallet-keys/key"
+        {{- end }}
         {{-  if .Values.features.uploadBlocksToGCloud.enabled}}
         - "-upload-blocks-to-gcloud"
         - "true"
@@ -114,10 +118,6 @@ spec:
           value: {{.Values.ports.client  | quote}}
         - name: DAEMON_METRICS_PORT
           value: {{.Values.ports.metrics | quote}}
-        - name: CODA_LIBP2P_PASS
-          value: {{ .Values.libp2p.staticKeypair.secretName | quote }}
-        - name: MINA_LIBP2P_PASS
-          value: {{ .Values.libp2p.staticKeypair.secretName | quote }}
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CODA_CLIENT_TRUSTLIST
@@ -132,26 +132,30 @@ spec:
           value: "features_network_block_data"
         - name: DAEMON_EXTERNAL_PORT
           value: {{.Values.ports.p2p | quote}}
-        - name: SECRET_USERNAME
+        {{- if .Values.libp2p.staticKeypair.enabled}}
+        - name: CODA_LIBP2P_PASS
           valueFrom:
             secretKeyRef:
-              name: source-libp2p-keys
-              key: key
-        - name: SECRET_PASSWORD
+              name: {{ .Values.libp2p.staticKeypair.secretName | quote}}
+              key: password
+        - name: MINA_LIBP2P_PASS
           valueFrom:
             secretKeyRef:
-              name: source-libp2p-keys
-              key: {{ .Values.libp2p.staticKeypair.secretName | quote}}
-        - name: SECRET_USERNAME
+              name: {{ .Values.libp2p.staticKeypair.secretName | quote}}
+              key: password
+        {{- end }}
+        {{- if .Values.privateKeySecret.enabled}}
+        - name: CODA_PRIVKEY_PASS
           valueFrom:
             secretKeyRef:
-              name: private-keys
-              key: key
-        - name: SECRET_PASSWORD
+              name: {{ .Values.privateKeySecret.secretName | quote}}
+              key: password
+        - name: MINA_PRIVKEY_PASS
           valueFrom:
             secretKeyRef:
-              name: private-keys
-              key: {{ .Values.privateKeySecret.secretName | quote}}
+              name: {{ .Values.privateKeySecret.secretName | quote}}
+              key: password
+        {{- end }}
         ports:
         - name: client-port
           protocol: TCP
@@ -207,6 +211,7 @@ spec:
           - key: pub
             path: key.pub
       {{- end }}
+      {{- if .Values.privateKeySecret.enabled}}
       - name: private-keys
         secret:
           secretName: {{ .Values.privateKeySecret.secretName }}
@@ -216,6 +221,7 @@ spec:
             path: key
           - key: pub
             path: key.pub
+      {{- end }}
       - name: destination-libp2p
         emptyDir: {}
       - name: config-dir
