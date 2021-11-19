@@ -890,15 +890,48 @@ end
 
 module Submit = struct
   module Sql = struct
-    module Transaction_hash_exists = struct
+    module Transaction_exists = struct
+      type t =
+        { nonce: int64
+        ; source: string
+        ; receiver: string
+        ; amount: int64
+        ; fee: int64
+        }
+      [@@deriving hlist]
+
+      let typ =
+        let open Archive_lib.Processor.Caqti_type_spec in
+        let spec =
+          Caqti_type.[int64; string; string; int64; int64]
+        in
+        let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+        let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+        Caqti_type.custom ~encode ~decode (to_rep spec)
+
       let query =
         Caqti_request.find_opt
+          typ
           Caqti_type.string
-          Caqti_type.string
-        {sql| SELECT hash FROM user_commands WHERE hash = $1 |sql}
+          {sql| SELECT uc.id FROM user_commands uc
+                INNER JOIN public_keys AS pks ON pks.id = uc.source_id
+                INNER JOIN public_keys AS pkr ON pkr.id = uc.receiver_id
+                WHERE uc.nonce = $1
+                AND pks.value = $2
+                AND pkr.value = $3
+                AND uc.amount = $4
+                AND uc.fee = $5 |sql}
 
-      let run (module Conn : Caqti_async.CONNECTION) hash =
-        Conn.find_opt query hash |> Deferred.Result.map ~f:Option.is_some
+      let run (module Conn : Caqti_async.CONNECTION) ~nonce ~source ~receiver ~amount ~fee =
+        let open Unsigned_extended in
+        Conn.find_opt
+          query
+          { nonce = (UInt32.to_int64 nonce)
+          ; source
+          ; receiver
+          ; amount = (UInt64.to_int64 amount)
+          ; fee = (UInt64.to_int64 fee) }
+        |> Deferred.Result.map ~f:Option.is_some
     end
   end
 
@@ -938,7 +971,13 @@ module Submit = struct
             -> signature:string
             -> unit
             -> ('gql_mint_tokens, Errors.t) M.t
-        ; db_transaction_hash_exists: hash:string -> (bool, Errors.t) M.t
+        ; db_transaction_exists:
+               nonce:Unsigned_extended.UInt32.t
+            -> source:string
+            -> receiver:string
+            -> amount:Unsigned_extended.UInt64.t
+            -> fee:Unsigned_extended.UInt64.t
+            -> (bool, Errors.t) M.t
         ; lift : 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t
         }
     end
@@ -1015,8 +1054,8 @@ module Submit = struct
                    ~fee:(uint64 mint_tokens.fee) ?memo:mint_tokens.memo
                    ~nonce:(uint32 mint_tokens.nonce) ~signature ())
                 graphql_uri)
-        ; db_transaction_hash_exists = (fun ~hash ->
-          Sql.Transaction_hash_exists.run db hash |> Errors.Lift.sql )
+        ; db_transaction_exists = (fun ~nonce ~source ~receiver ~amount ~fee ->
+          Sql.Transaction_exists.run db ~nonce ~source ~receiver ~amount ~fee |> Errors.Lift.sql )
         ; lift = Deferred.return
         }
   end
@@ -1053,6 +1092,7 @@ module Submit = struct
     let submitted_cache = lazy (Cache.create ())
 
     let handle
+        ~logger
         ~(env :
            ( 'gql_payment
            , 'gql_delegation
@@ -1089,11 +1129,13 @@ module Submit = struct
               ()
             with
             | `Successful res ->
+               [%log info] "Gql payment succeful";
                let cache = Lazy.force submitted_cache in
                Cache.add cache txn;
                let (`UserCommand payment) = res#sendPayment#payment in
                M.return payment#hash
             | `Failed e ->
+               [%log info] "Gql payment failed";
                let cache = Lazy.force submitted_cache in
                if
                  ([%equal: Errors.Variant.t] (Errors.kind e) `Transaction_submit_bad_nonce) &&
@@ -1102,14 +1144,23 @@ module Submit = struct
                  M.fail (Errors.create `Transaction_submit_duplicate)
                else
                  (
-                 let%bind signed_command = Transaction.Signed.to_mina_signed txn |> Result.map_error ~f:(fun e -> Errors.create (`Exception (Core_kernel.Error.to_string_hum e))) |> env.lift in
-                 let hash = Transaction_hash.hash_signed_command signed_command in
+                 let cmd = txn.command in
+                 [%log info] "trying a signed command";
                  match%bind
-                   env.db_transaction_hash_exists ~hash:(Transaction_hash.to_base58_check hash)
+                   env.db_transaction_exists
+                     ~nonce:txn.nonce
+                     ~source:(let (`Pk s) = cmd.source in s)
+                     ~receiver:(let (`Pk r) = cmd.receiver in r)
+                     ~amount:
+                        (Option.value
+                          ~default:Unsigned_extended.UInt64.zero cmd.amount)
+                     ~fee:cmd.fee
                  with
                  | true ->
+                     [%log info] "it exists";
                    M.fail (Errors.create `Transaction_submit_duplicate)
                  | false ->
+                     [%log info] "it doesn't exist";
                    M.fail e ) )
         | None, Some delegation, None, None, None ->
             let%map res =
@@ -1237,6 +1288,7 @@ let router
       in
       Transaction_identifier_response.to_yojson res
   | [ "submit" ] ->
+      [%log info] "Submit";
     let%bind graphql_uri = get_graphql_uri_or_error () in
     with_db (fun ~db ->
         let%bind req =
@@ -1244,8 +1296,9 @@ let router
           @@ Construction_submit_request.of_yojson body
           |> Errors.Lift.wrap
         in
+      [%log info] "Req parsed";
         let%map res =
-          Submit.Real.handle ~env:(Submit.Env.real ~db ~graphql_uri) req
+          Submit.Real.handle ~logger ~env:(Submit.Env.real ~db ~graphql_uri) req
           |> Errors.Lift.wrap
         in
         Transaction_identifier_response.to_yojson res)
