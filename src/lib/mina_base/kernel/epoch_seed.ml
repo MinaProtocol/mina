@@ -20,7 +20,7 @@ module Stable = struct
 
     include T
 
-    let to_latest = Core.Fn.id
+    let to_latest = Fn.id
 
     [%%define_from_scope to_yojson, of_yojson]
 

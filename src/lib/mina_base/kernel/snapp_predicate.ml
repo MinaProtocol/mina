@@ -373,6 +373,61 @@ module Leaf_typs = struct
   let token_id = Numeric.typ token_id
 end
 
+(*
+    { 
+      balance= [123, Balance.max]
+    ; ...
+    ; state =
+          [ Check_equal (Field.of_int 2) // corresponds to some_var
+          ; Ignore
+          ; Ignore
+          ; Ignore
+          ; Ignore
+          ; Ignore
+          ; Ignore
+          ; Ignore
+          ]
+  }
+-> 
+
+
+  Statement:
+   { precondition: Precondition,
+     effects: Effects
+    }
+   where
+   type Precondition =
+   { protocol_state:
+      { global_slot: Range(UInt32),
+      ...
+      }
+   , account: Array<AccountPrecondition>
+   }
+   type AccountPrecondition =
+      { balance: Range(UInt64),
+        nonce: Range(UInt64),
+        state: [Option<Field>; 8] }
+
+   type Effects = Array<AccountEffects>
+   type AccountEffects =
+     { state: [Option<Field>; 8]
+     ; balance_change: Int64 // signed
+     ; ... }
+
+[ 123, Balance.max
+, ...
+, 1, 2
+, 0, 0
+, 0, 0
+, 0, 0
+, 0, 0
+, 0, 0
+, 0, 0
+, 0, 0
+]
+
+*)
+
 module Account = struct
   module Poly = struct
     [%%versioned

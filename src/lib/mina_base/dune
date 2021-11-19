@@ -4,6 +4,7 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries
+   mina_base_kernel
    allocation_functor
    async
    base58_check

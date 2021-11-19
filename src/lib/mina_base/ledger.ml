@@ -1,6 +1,7 @@
 open Core
 open Signature_lib
 open Merkle_ledger
+open Mina_base_kernel
 
 module Ledger_inner = struct
   module Location_at_depth : Merkle_ledger.Location_intf.S =

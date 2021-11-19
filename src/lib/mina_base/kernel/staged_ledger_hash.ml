@@ -1,6 +1,6 @@
-[%%import "../../config.mlh"]
+[%%import "/src/config.mlh"]
 
-open Core
+open Core_kernel
 open Util
 open Fold_lib
 open Snark_params.Tick
