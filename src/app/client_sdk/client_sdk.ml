@@ -9,7 +9,6 @@
 [%%endif]
 
 open Js_of_ocaml
-open Snark_params_nonconsensus
 open Signature_lib_nonconsensus
 open Mina_base_nonconsensus
 open Rosetta_lib_nonconsensus
@@ -96,38 +95,56 @@ let _ =
            else raise_js_error "Could not sign a transaction with private key"
 
        (** sign arbitrary string with private key *)
-       method signString (sk_base58_check_js : string_js) (str_js : string_js) =
+       method signString (network_js : string_js)
+           (sk_base58_check_js : string_js) (str_js : string_js) : signed_string
+           =
          let sk_base58_check = Js.to_string sk_base58_check_js in
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let str = Js.to_string str_js in
-         String_sign.Schnorr.sign sk str |> signature_to_js_object
+         let signature_kind =
+           signature_kind_of_string_js network_js "signString"
+         in
+         let signature =
+           String_sign.sign ~signature_kind sk str |> signature_to_js_object
+         in
+         let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
+         object%js
+           val string = str_js
+
+           val signer = publicKey
+
+           val signature = signature
+         end
 
        (** verify signature of arbitrary string signed with signString *)
-       method verifyStringSignature (signature_js : signature_js)
-           (public_key_js : string_js) (str_js : string_js) : bool Js.t =
-         let field = Js.to_string signature_js##.field |> Field.of_string in
-         let scalar =
-           Js.to_string signature_js##.scalar |> Inner_curve.Scalar.of_string
+       method verifyStringSignature (network_js : string_js)
+           (signed_string : signed_string) : bool Js.t =
+         let signature = signature_of_js_object signed_string##.signature in
+         let signature_kind =
+           signature_kind_of_string_js network_js "verify_StringSignature"
          in
-         let signature = (field, scalar) in
          let pk =
-           Js.to_string public_key_js
+           signed_string##.signer |> Js.to_string
            |> Public_key.Compressed.of_base58_check_exn
            |> Public_key.decompress_exn
          in
-         let inner_curve = Snark_params_nonconsensus.Inner_curve.of_affine pk in
-         let str = Js.to_string str_js in
-         if String_sign.Schnorr.verify signature inner_curve str then Js._true
+         let str = Js.to_string signed_string##.string in
+         if String_sign.verify ~signature_kind signature pk str then Js._true
          else Js._false
 
        (** sign payment transaction payload with private key *)
-       method signPayment (sk_base58_check_js : string_js)
-           (payment_js : payment_js) : signed_payment =
+       method signPayment (network_js : string_js)
+           (sk_base58_check_js : string_js) (payment_js : payment_js)
+           : signed_payment =
+         let signature_kind =
+           signature_kind_of_string_js network_js "signPayment"
+         in
          let sk_base58_check = Js.to_string sk_base58_check_js in
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let payload = payload_of_payment_js payment_js in
          let signature =
-           Signed_command.sign_payload sk payload |> signature_to_js_object
+           Signed_command.sign_payload ~signature_kind sk payload
+           |> signature_to_js_object
          in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
@@ -139,8 +156,11 @@ let _ =
          end
 
        (** verify signed payments *)
-       method verifyPaymentSignature (signed_payment : signed_payment)
-           : bool Js.t =
+       method verifyPaymentSignature (network_js : string_js)
+           (signed_payment : signed_payment) : bool Js.t =
+         let signature_kind =
+           signature_kind_of_string_js network_js "verifyPaymentSignature"
+         in
          let payload : Signed_command_payload.t =
            payload_of_payment_js signed_payment##.payment
          in
@@ -151,7 +171,8 @@ let _ =
          in
          let signature = signature_of_js_object signed_payment##.signature in
          let signed = Signed_command.Poly.{ payload; signer; signature } in
-         if Signed_command.check_signature signed then Js._true else Js._false
+         if Signed_command.check_signature ~signature_kind signed then Js._true
+         else Js._false
 
        method hashPayment (signed_payment : signed_payment) : Js.js_string Js.t
            =
@@ -168,14 +189,19 @@ let _ =
          |> Transaction_hash.to_base58_check |> Js.string
 
        (** sign payment transaction payload with private key *)
-       method signStakeDelegation (sk_base58_check_js : string_js)
+       method signStakeDelegation (network_js : string_js)
+           (sk_base58_check_js : string_js)
            (stake_delegation_js : stake_delegation_js) : signed_stake_delegation
            =
+         let signature_kind =
+           signature_kind_of_string_js network_js "signStakeDelegation"
+         in
          let sk_base58_check = Js.to_string sk_base58_check_js in
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let payload = payload_of_stake_delegation_js stake_delegation_js in
          let signature =
-           Signed_command.sign_payload sk payload |> signature_to_js_object
+           Signed_command.sign_payload ~signature_kind sk payload
+           |> signature_to_js_object
          in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
@@ -187,8 +213,12 @@ let _ =
          end
 
        (** verify signed delegations *)
-       method verifyStakeDelegationSignature
+       method verifyStakeDelegationSignature (network_js : string_js)
            (signed_stake_delegation : signed_stake_delegation) : bool Js.t =
+         let signature_kind =
+           signature_kind_of_string_js network_js
+             "verifyStakeDelegationSignature"
+         in
          let payload : Signed_command_payload.t =
            payload_of_stake_delegation_js
              signed_stake_delegation##.stakeDelegation
@@ -202,7 +232,8 @@ let _ =
            signature_of_js_object signed_stake_delegation##.signature
          in
          let signed = Signed_command.Poly.{ payload; signer; signature } in
-         if Signed_command.check_signature signed then Js._true else Js._false
+         if Signed_command.check_signature ~signature_kind signed then Js._true
+         else Js._false
 
        method hashStakeDelegation
            (signed_stake_delegation : signed_stake_delegation)

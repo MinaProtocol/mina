@@ -1,0 +1,25 @@
+# kubectl apply -f automation/terraform/testnets/gossipqa/gossipqa-prom-pvc.yaml
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  finalizers:
+  - kubernetes.io/pvc-protection
+  labels:
+    app: prometheus
+  name: gossipqa-prom-pvc
+  namespace: gossipqa-metrics
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1000Gi
+  storageClassName: ssd-retain
+  volumeMode: Filesystem
+status:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 1000Gi
+  phase: Bound
