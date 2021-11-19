@@ -21,6 +21,14 @@ features:
   customEntrypoint:
     enabled: false
     command: ""
+  prometheus:
+    enabled: true
+  persistence:
+    enabled: true
+    name: "generic-node-volume"
+    storageClass: standard-delete
+    mountPath: /data/
+    size: 100Gi
   seedPeers: []
 
 libp2p:

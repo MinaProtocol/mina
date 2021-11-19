@@ -1,6 +1,10 @@
 ---
 apiVersion: apps/v1
+{{if .Values.features.persistence.enabled}}
+kind: StatefulSet
+{{else}}
 kind: Deployment
+{{end}}
 metadata:
   name: {{.Values.name}}
   labels:
@@ -111,6 +115,10 @@ spec:
         - "-upload-blocks-to-gcloud"
         - "true"
         {{- end }}
+        {{-  if .Values.features.persistence.enabled}}
+        - "--config-directory"
+        - "{{.Values.features.persistence.mountPath}}/.mina-config"
+        {{- end }}
         env:
         - name: DAEMON_REST_PORT
           value: {{.Values.ports.graphql | quote}}
@@ -156,6 +164,19 @@ spec:
               name: {{ .Values.privateKeySecret.secretName | quote}}
               key: password
         {{- end }}
+      volumeClaimTemplates:
+      - apiVersion: v1
+        kind: PersistentVolumeClaim
+        metadata:
+          name: {{.Values.features.persistence.name}}
+        spec:
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: {{.Values.features.persistence.size}}
+          storageClassName: {{.Values.features.persistence.storageClass}}
+          volumeMode: Filesystem
         ports:
         - name: client-port
           protocol: TCP
@@ -172,7 +193,7 @@ spec:
           hostPort: {{.Values.ports.external}}
         volumeMounts:
         - name: config-dir
-          mountPath: /root/.mina-config
+          mountPath: "/root/.mina-config"
         {{- if .Values.features.uploadBlocksToGCloud.enabled}}
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
@@ -183,8 +204,12 @@ spec:
         {{- end }}
         {{- if .Values.libp2p.staticKeypair.enabled}}
         - name: destination-libp2p
-          mountPath: /root/libp2p-keys
+          mountPath: "/root/libp2p-keys"
         {{- end }}
+        {{-  if .Values.features.persistence.enabled}}
+        - name: {{.Values.features.persistence.name}}
+          mountPath: "{{.Values.features.persistence.mountPath}}"
+        {{- end }}  
       volumes:
       {{- if .Values.features.runtimeConfig.enabled}}
       - name: daemon-config
