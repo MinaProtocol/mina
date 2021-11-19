@@ -404,6 +404,7 @@ module Signed = struct
     ; nonce : Unsigned_extended.UInt32.t
     ; signature : string
     }
+  [@@deriving equal]
 
   module Rendered = struct
     type t =
@@ -504,40 +505,44 @@ module Signed = struct
         Result.fail
           (Errors.create ~context:"Signed transaction un-rendering"
              `Unsupported_operation_for_construction)
+
+  let to_mina_signed t =
+    Or_error.try_with_join (fun () ->
+        let open Or_error.Let_syntax in
+        let pk (`Pk x) =
+          Signature_lib.Public_key.Compressed.of_base58_check_exn x
+        in
+        let%bind payload =
+          User_command_info.Partial.to_user_command_payload t.command
+            ~nonce:t.nonce
+          |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
+        in
+        let%map signature =
+          match Mina_base.Signature.Raw.decode t.signature with
+          | Some signature ->
+              Ok signature
+          | None ->
+              Or_error.errorf "Could not decode signature"
+        in
+        let command : Mina_base.Signed_command.t =
+          { Mina_base.Signed_command.Poly.signature
+          ; signer =
+              pk t.command.fee_payer |> Signature_lib.Public_key.decompress_exn
+          ; payload
+          }
+        in
+        command)
 end
 
 let to_mina_signed transaction_json =
   Or_error.try_with_join (fun () ->
       let open Or_error.Let_syntax in
-      let%bind rosetta_transaction_rendered =
+      let%bind rendered =
         Signed.Rendered.of_yojson transaction_json
         |> Result.map_error ~f:Error.of_string
       in
-      let%bind rosetta_transaction =
-        Signed.of_rendered rosetta_transaction_rendered
+      let%bind t =
+        Signed.of_rendered rendered
         |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
       in
-      let pk (`Pk x) =
-        Signature_lib.Public_key.Compressed.of_base58_check_exn x
-      in
-      let%bind payload =
-        User_command_info.Partial.to_user_command_payload
-          rosetta_transaction.command ~nonce:rosetta_transaction.nonce
-        |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
-      in
-      let%map signature =
-        match Mina_base.Signature.Raw.decode rosetta_transaction.signature with
-        | Some signature ->
-            Ok signature
-        | None ->
-            Or_error.errorf "Could not decode signature"
-      in
-      let command : Mina_base.Signed_command.t =
-        { Mina_base.Signed_command.Poly.signature
-        ; signer =
-            pk rosetta_transaction.command.fee_payer
-            |> Signature_lib.Public_key.decompress_exn
-        ; payload
-        }
-      in
-      command)
+      Signed.to_mina_signed t)
