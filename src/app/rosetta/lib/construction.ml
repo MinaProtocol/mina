@@ -1092,7 +1092,6 @@ module Submit = struct
     let submitted_cache = lazy (Cache.create ())
 
     let handle
-        ~logger
         ~(env :
            ( 'gql_payment
            , 'gql_delegation
@@ -1129,13 +1128,11 @@ module Submit = struct
               ()
             with
             | `Successful res ->
-               [%log info] "Gql payment succeful";
                let cache = Lazy.force submitted_cache in
                Cache.add cache txn;
                let (`UserCommand payment) = res#sendPayment#payment in
                M.return payment#hash
             | `Failed e ->
-               [%log info] "Gql payment failed";
                let cache = Lazy.force submitted_cache in
                if
                  ([%equal: Errors.Variant.t] (Errors.kind e) `Transaction_submit_bad_nonce) &&
@@ -1145,7 +1142,6 @@ module Submit = struct
                else
                  (
                  let cmd = txn.command in
-                 [%log info] "trying a signed command";
                  match%bind
                    env.db_transaction_exists
                      ~nonce:txn.nonce
@@ -1157,10 +1153,8 @@ module Submit = struct
                      ~fee:cmd.fee
                  with
                  | true ->
-                     [%log info] "it exists";
                    M.fail (Errors.create `Transaction_submit_duplicate)
                  | false ->
-                     [%log info] "it doesn't exist";
                    M.fail e ) )
         | None, Some delegation, None, None, None ->
             let%map res =
@@ -1288,7 +1282,6 @@ let router
       in
       Transaction_identifier_response.to_yojson res
   | [ "submit" ] ->
-      [%log info] "Submit";
     let%bind graphql_uri = get_graphql_uri_or_error () in
     with_db (fun ~db ->
         let%bind req =
@@ -1296,9 +1289,8 @@ let router
           @@ Construction_submit_request.of_yojson body
           |> Errors.Lift.wrap
         in
-      [%log info] "Req parsed";
         let%map res =
-          Submit.Real.handle ~logger ~env:(Submit.Env.real ~db ~graphql_uri) req
+          Submit.Real.handle ~env:(Submit.Env.real ~db ~graphql_uri) req
           |> Errors.Lift.wrap
         in
         Transaction_identifier_response.to_yojson res)
