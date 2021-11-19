@@ -2764,7 +2764,8 @@
                 }
               },
               "isDeprecated": true,
-              "deprecationReason": "Restart the daemon with the flag --block-producer-key instead"
+              "deprecationReason":
+                "Restart the daemon with the flag --block-producer-key instead"
             },
             {
               "name": "setCoinbaseReceiver",

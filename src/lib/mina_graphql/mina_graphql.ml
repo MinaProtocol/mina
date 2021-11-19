@@ -3079,17 +3079,16 @@ module Mutations = struct
 
   let set_staking =
     result_field "setStaking" ~doc:"Set keys you wish to stake with"
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_staking)]
+      ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.set_staking) ]
       ~typ:(non_null Types.Payload.set_staking)
       ~deprecated:
         (Deprecated
-           (Some
-              "Restart the daemon with the flag --block-producer-key instead"))
-      ~resolve:(fun {ctx= _coda; _} () _pks ->
+           (Some "Restart the daemon with the flag --block-producer-key instead"))
+      ~resolve:(fun { ctx = _coda; _ } () _pks ->
         Error
           "The setStaking command is deprecated and no longer has any effect. \
            To enable block production, instead restart the daemon with the \
-           flag --block-producer-key." )
+           flag --block-producer-key.")
 
   let set_coinbase_receiver =
     field "setCoinbaseReceiver" ~doc:"Set the key to receive coinbases"

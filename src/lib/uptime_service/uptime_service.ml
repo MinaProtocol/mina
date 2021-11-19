@@ -80,12 +80,11 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
   let headers =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
   in
-  let headers = Cohttp.Header.of_list [("Content-Type", "application/json")] in
   let metadata_of_body = function
     | `String s ->
-        [("error", `String s)]
+        [ ("error", `String s) ]
     | `Strings ss ->
-        [("error", `List (List.map ss ~f:(fun s -> `String s)))]
+        [ ("error", `List (List.map ss ~f:(fun s -> `String s))) ]
     | `Empty | `Pipe _ ->
         []
   in
@@ -104,7 +103,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                         |> Cohttp_async.Body.of_string )
                       url)
                with
-               | {status; _}, body ->
+               | { status; _ }, body ->
                    let succeeded = Cohttp.Code.code_of_status status = 200 in
                    ( if succeeded then
                      [%log info]
@@ -115,7 +114,8 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                          ; ( "includes_snark_work"
                            , `Bool (Option.is_some block_data.snark_work) )
                          ; ("is_produced_block", `Bool produced)
-                         ; ("url", `String (Uri.to_string url)) ]
+                         ; ("url", `String (Uri.to_string url))
+                         ]
                    else if attempt >= max_attempts then
                      let base_metadata =
                        [ ("state_hash", State_hash.to_yojson state_hash)
@@ -123,7 +123,8 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                        ; ("http_code", `Int (Cohttp.Code.code_of_status status))
                        ; ( "http_error"
                          , `String (Cohttp.Code.string_of_status status) )
-                       ; ("payload", json) ]
+                       ; ("payload", json)
+                       ]
                      in
                      let extra_metadata = metadata_of_body body in
                      let metadata = base_metadata @ extra_metadata in
@@ -138,20 +139,19 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                        ; ("url", `String (Uri.to_string url))
                        ; ("http_code", `Int (Cohttp.Code.code_of_status status))
                        ; ( "http_error"
-                         , `String (Cohttp.Code.string_of_status status) ) ]
+                         , `String (Cohttp.Code.string_of_status status) )
+                       ]
                      in
                      let extra_metadata = metadata_of_body body in
                      let metadata = base_metadata @ extra_metadata in
                      [%log info]
-                       "Failure when sending block with state hash \
-                        $state_hash to uptime service at URL $url, attempt %d \
-                        of %d, retrying"
+                       "Failure when sending block with state hash $state_hash \
+                        to uptime service at URL $url, attempt %d of %d, \
+                        retrying"
                        attempt max_attempts ~metadata ) ;
                    succeeded
              in
-             match%map.Deferred.Let_syntax
-               Interruptible.force interruptible
-             with
+             match%map.Deferred Interruptible.force interruptible with
              | Ok succeeded ->
                  succeeded
              | Error _ ->
@@ -160,7 +160,8 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                     $state_hash was interrupted"
                    ~metadata:
                      [ ("state_hash", State_hash.to_yojson state_hash)
-                     ; ("payload", json) ] ;
+                     ; ("payload", json)
+                     ] ;
                  (* interrupted, don't want to retry, claim success *)
                  true
            in
@@ -169,13 +170,11 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
              let%bind succeeded = run_attempt attempt in
              if succeeded then Deferred.return ()
              else if attempt < max_attempts then
-               let%bind () =
-                 Async.after (Time.Span.of_sec attempt_pause_sec)
-               in
+               let%bind () = Async.after (Time.Span.of_sec attempt_pause_sec) in
                go (attempt + 1)
              else Deferred.unit
            in
-           go 1 ))
+           go 1))
   with
   | Ok () ->
       ()

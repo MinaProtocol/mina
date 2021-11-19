@@ -1068,26 +1068,26 @@ let check_and_stop_daemon t ~wait =
     | None ->
         `Now
     | Some timing -> (
-      match timing.timing with
-      | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again tm
-      | Produce {time= tm; _}
-      | Produce_now {time= tm; _} ->
-          let tm = Block_time.to_time tm in
-          (*Assuming it takes at most 1hr to bootstrap and catchup*)
-          let next_block =
-            Time.add tm
-              (Block_time.Span.to_time_span
-                 t.config.precomputed_values.consensus_constants
-                   .slot_duration_ms)
-          in
-          let wait_for = Time.(diff next_block (now ())) in
-          if Time.Span.(wait_for > max_catchup_time) then `Now
-          else `Check_in wait_for
-      | Evaluating_vrf _last_checked_slot ->
-          `Check_in
-            (Core.Time.Span.of_ms
-               (Mina_compile_config.vrf_poll_interval_ms * 2 |> Int.to_float))
-      )
+        match timing.timing with
+        | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again tm
+        | Produce { time = tm; _ }
+        | Produce_now { time = tm; _ } ->
+            let tm = Block_time.to_time tm in
+            (*Assuming it takes at most 1hr to bootstrap and catchup*)
+            let next_block =
+              Time.add tm
+                (Block_time.Span.to_time_span
+                   t.config.precomputed_values.consensus_constants
+                     .slot_duration_ms)
+            in
+            let wait_for = Time.(diff next_block (now ())) in
+            if Time.Span.(wait_for > max_catchup_time) then `Now
+            else `Check_in wait_for
+        | Evaluating_vrf _last_checked_slot ->
+            `Check_in
+              (Core.Time.Span.of_ms
+                 (Mina_compile_config.vrf_poll_interval_ms * 2 |> Int.to_float))
+        )
 
 let stop_long_running_daemon t =
   let wait_mins = (t.config.stop_time * 60) + (Random.int 10 * 60) in

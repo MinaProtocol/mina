@@ -295,7 +295,7 @@ module Status = struct
               sprintf "Evaluating VRF… Last checked global slot %s (%s)"
                 (Mina_numbers.Global_slot.to_string last_checked_slot)
                 generated_from
-          | Produce {time; for_slot} ->
+          | Produce { time; for_slot } ->
               sprintf "%s for %s (%s)" (str time) (slot_str for_slot)
                 generated_from
           | Produce_now { for_slot; _ } ->
