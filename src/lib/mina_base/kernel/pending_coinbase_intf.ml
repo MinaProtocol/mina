@@ -10,7 +10,7 @@
 
     Stack operations are done for transaction snarks and tree operations are done for the blockchain snark*)
 
-open Core
+open Core_kernel
 open Snark_params
 open Snarky_backendless
 open Tick

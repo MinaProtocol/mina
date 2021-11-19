@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Import
 module Fee_transfer = Coinbase_fee_transfer
 

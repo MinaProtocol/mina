@@ -1,6 +1,6 @@
 [%%import "/src/config.mlh"]
 
-open Core
+open Core_kernel
 
 [%%ifdef consensus_mechanism]
 

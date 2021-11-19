@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Snark_params.Tick
 
 [%%versioned:
@@ -98,11 +98,9 @@ val apply_parties_unchecked_with_states :
        list )
      Or_error.t
 
-val of_any_ledger : Ledger.Any_ledger.M.t -> t
-
-val of_ledger_subset_exn : Ledger.t -> Account_id.t list -> t
-
-val of_ledger_index_subset_exn : Ledger.Any_ledger.witness -> int list -> t
+val add_path : t ->
+  [ `Left of Field.t | `Right of Field.t ] list -> Account_id.t
+  -> Account.t -> t
 
 val iteri : t -> f:(Account.Index.t -> Account.t -> unit) -> unit
 
