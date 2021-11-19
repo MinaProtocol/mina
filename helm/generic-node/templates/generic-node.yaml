@@ -31,7 +31,7 @@ spec:
       initContainers:
       {{- if .Values.libp2p.staticKeypair.enabled}}
       - name: libp2p-init-my-service
-        image: busybox:1.28
+        image: busybox:latest
         command: ['sh', '-c', '/bin/cp /libp2p-keys/* /root/libp2p-keys && /bin/chmod -R 0700 /root/libp2p-keys/']
         volumeMounts:
         - mountPath: /libp2p-keys
@@ -41,7 +41,7 @@ spec:
       {{- end }}
       {{- if .Values.privateKeySecret.enabled}}
       - name: fix-perms
-        image: busybox:1.28
+        image: busybox:latest
         command: [ 'sh', '-c', 'for dir in keys echo-keys faucet-keys; do [ -d /$dir ] && /bin/cp /$dir/* /wallet-keys; done; /bin/chmod 0700 /wallet-keys']
         volumeMounts:
         - mountPath: "/keys/"
