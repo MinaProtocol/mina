@@ -2,7 +2,7 @@
 
 NETWORK=${1:=mainnet}
 
-cat genesis_ledgers/${NETWORK}.json | jq '.ledger.accounts[] | { "account_identifier": { "address": .pk }, "currency": {"symbol":"MINA", "decimals":9 }, "value": ((.balance | tonumber) * 1000000000 | tostring) }' > ${NETWORK}_balances.json
+cat genesis_ledgers/${NETWORK}.json | jq '.ledger.accounts[] | select (.balance != "0") | { "account_identifier": { "address": .pk }, "currency": {"symbol":"MINA", "decimals":9 }, "value": ((.balance | tonumber) * 1000000000 | tostring) }' > ${NETWORK}_balances.json
 
 cat ${NETWORK}_balances.json | jq -s '.' > src/app/rosetta/${NETWORK}_balances.json
 
