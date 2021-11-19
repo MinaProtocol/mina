@@ -39,7 +39,6 @@
    snark_params
    snarky.backendless
    sparse_ledger_lib
-   storage
    syncable_ledger
    test_util
    trust_system
