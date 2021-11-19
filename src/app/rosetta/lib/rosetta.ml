@@ -43,8 +43,7 @@ let router ~graphql_uri ~pool ~logger route body =
         let%bind graphql_uri = get_graphql_uri_or_error () in
         Block.router tl body ~graphql_uri ~logger ~with_db
     | "construction" :: tl ->
-        let%bind graphql_uri = get_graphql_uri_or_error () in
-        Construction.router tl body ~graphql_uri ~logger ~with_db
+        Construction.router tl body ~get_graphql_uri_or_error ~logger ~with_db
     | _ ->
         Deferred.return (Error `Page_not_found)
   with exn -> Deferred.return (Error (`Exception exn))
