@@ -1,0 +1,50 @@
+(library
+ (name mina_base_kernel)
+ (public_name mina_base.kernel)
+ (inline_tests)
+ (library_flags -linkall)
+ (libraries
+   core_kernel
+   allocation_functor
+   base58_check
+   bignum_bigint
+   block_time
+   mina_compile_config
+   genesis_constants
+   digestif
+   mina_numbers
+   codable
+   crypto_params
+   currency
+   debug_assert
+   dummy_values
+   fold_lib
+   hash_prefix_states
+   hash_prefixes
+   linked_tree
+   one_or_two
+   o1trace
+   outside_hash_image
+   ppx_version.runtime
+   quickcheck_lib
+   random_oracle
+   rosetta_coding
+   sexp_diff_kernel
+   signature_lib
+   snark_bits
+   snark_params
+   snarky.backendless
+   sparse_ledger_lib
+   test_util
+   unsigned_extended
+   visualization
+   with_hash
+   yojson
+ )
+ (preprocessor_deps ../../../config.mlh)
+ (preprocess
+  (pps ppx_snarky ppx_here ppx_coda ppx_version ppx_compare ppx_deriving.enum ppx_deriving.ord
+       ppx_base ppx_bench ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_inline_test h_list.ppx
+ ))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "Snarks and friends necessary for keypair generation"))
