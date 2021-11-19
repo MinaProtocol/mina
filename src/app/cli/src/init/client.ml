@@ -1250,7 +1250,11 @@ let set_staking_graphql =
       ~doc:"PUBLICKEY Public key of account with which to produce blocks"
       (required public_key_compressed)
   in
-  Command.async ~summary:"Start producing blocks"
+  Command.async
+    ~summary:
+      "The set-staking command is deprecated and no longer has any effect.To \
+       enable block production, instead restart the daemon with the flag \
+       --block-producer-key"
     (Cli_lib.Background_daemon.graphql_init pk_flag
        ~f:(fun graphql_endpoint public_key ->
          let print_message msg arr =
