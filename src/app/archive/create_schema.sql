@@ -94,7 +94,11 @@ CREATE INDEX idx_chain_status      ON blocks(chain_status);
 
 /* the block_* columns refer to the block containing a user command or internal command that
     results in a balance
-   for a user command, the secondary sequence no is always 0
+   for a balance resulting from a user command, the secondary sequence no is always 0
+   these columns duplicate information available in the
+    blocks_user_commands and blocks_internal_commands tables
+   they are included here to allow Rosetta account queries to consume
+    fewer Postgresql resources
 */
 CREATE TABLE balances
 ( id                           serial PRIMARY KEY
