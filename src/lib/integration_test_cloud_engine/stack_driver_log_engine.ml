@@ -30,31 +30,26 @@ let or_error_list_map ls ~f =
       let%map h = f el in
       h :: t)
 
-let log_filter_of_event_type =
+let log_filter_of_event_type ev_existential =
   let open Event_type in
-  function
-  | Event_type Log_error ->
+  let (Event_type ev_type) = ev_existential in
+  let (module Ty) = event_type_module ev_type in
+  match Ty.parse with
+  | From_error_log _ ->
       [ "jsonPayload.level=(\"Warn\" OR \"Error\" OR \"Faulty_peer\" OR \
          \"Fatal\")"
       ]
-      (* TODO change this condition to Event_type Framework t (ie events from the Puppeteer), and then the following condition is Event_type Daemon t (ie events from the mina daemon, which is most of them) *)
-  | Event_type Node_offline ->
-      [ "jsonPayload.puppeteer_script_event=true"
-      ; "jsonPayload.puppeteer_event_type=\"node_offline\""
-      ]
-  | Event_type t ->
-      let event_id =
-        to_structured_event_id (Event_type t)
-        |> Option.value_exn
-             ~message:
-               "could not convert event type into log filter; no structured \
-                event id configured"
-      in
+  | From_daemon_log (struct_id, _) ->
       let filter =
         Printf.sprintf "jsonPayload.event_id=\"%s\""
-          (Structured_log_events.string_of_id event_id)
+          (Structured_log_events.string_of_id struct_id)
       in
       [ filter ]
+  | From_puppeteer_log (id, _) ->
+      let filter =
+        Printf.sprintf "jsonPayload.puppeteer_event_type=\"%s\"" id
+      in
+      [ "jsonPayload.puppeteer_script_event=true"; filter ]
 
 let all_event_types_log_filter =
   let event_filters =
