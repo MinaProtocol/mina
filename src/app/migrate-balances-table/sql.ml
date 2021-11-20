@@ -108,7 +108,7 @@ let add_balances_foreign_key_constraint (module Conn : Caqti_async.CONNECTION)
       {sql| ALTER TABLE %s
             ADD CONSTRAINT %s
             FOREIGN KEY (%s)
-            REFERENCES balances(id)
+            REFERENCES balances(id) ON DELETE CASCADE
       |sql}
       table foreign_key col
   in
@@ -121,7 +121,7 @@ let add_blocks_foreign_key_constraint (module Conn : Caqti_async.CONNECTION)
       {sql| ALTER TABLE %s
             ADD CONSTRAINT %s
             FOREIGN KEY (%s)
-            REFERENCES blocks(id)
+            REFERENCES blocks(id) ON DELETE CASCADE
       |sql}
       table foreign_key col
   in
