@@ -92,14 +92,24 @@ CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
 CREATE INDEX idx_chain_status      ON blocks(chain_status);
 
+/* the block_* columns refer to the block containing a user command or internal command that
+    results in a balance
+   for a user command, the secondary sequence no is always 0
+*/
 CREATE TABLE balances
-( id            serial PRIMARY KEY
-, public_key_id int    NOT NULL REFERENCES public_keys(id)
-, balance       bigint NOT NULL
+( id                           serial PRIMARY KEY
+, public_key_id                int    NOT NULL REFERENCES public_keys(id)
+, balance                      bigint NOT NULL
+, block_id                     int    NOT NULL REFERENCES blocks(id)
+, block_height                 int    NOT NULL
+, block_sequence_no            int    NOT NULL
+, block_secondary_sequence_no  int    NOT NULL
+, UNIQUE (public_key_id,balance,block_id,block_height,block_sequence_no,block_secondary_sequence_no)
 );
 
 CREATE INDEX idx_balances_id ON balances(id);
 CREATE INDEX idx_balances_public_key_id ON balances(public_key_id);
+CREATE INDEX idx_balances_height_seq_nos ON balances(block_height,block_sequence_no,block_secondary_sequence_no);
 
 CREATE TABLE blocks_user_commands
 ( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE

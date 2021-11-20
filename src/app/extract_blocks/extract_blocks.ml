@@ -112,7 +112,7 @@ let fill_in_user_commands pool block_state_hash =
     Public_key.Compressed.of_base58_check_exn pk_str
   in
   let balance_of_id id ~item =
-    let%map _pk_id, balance =
+    let%map { balance; _ } =
       query_db ~f:(fun db -> Processor.Balance.load db ~id) ~item
     in
     balance |> Unsigned.UInt64.of_int64 |> Currency.Balance.of_uint64
@@ -254,7 +254,7 @@ let fill_in_internal_commands pool block_state_hash =
          ; receiver_balance_id
          }
        ->
-      let%bind _pubkey, receiver_balance_int64 =
+      let%bind { balance = receiver_balance_int64; _ } =
         query_db ~item:"receiver balance" ~f:(fun db ->
             Processor.Balance.load db ~id:receiver_balance_id)
       in
