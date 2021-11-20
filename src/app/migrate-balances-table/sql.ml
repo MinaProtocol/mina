@@ -101,14 +101,27 @@ let drop_foreign_key_constraint (module Conn : Caqti_async.CONNECTION) table
   in
   Conn.exec (Caqti_request.exec Caqti_type.unit sql)
 
-let add_foreign_key_constraint (module Conn : Caqti_async.CONNECTION) table col
-    foreign_key =
+let add_balances_foreign_key_constraint (module Conn : Caqti_async.CONNECTION)
+    table col foreign_key =
   let sql =
     sprintf
       {sql| ALTER TABLE %s
             ADD CONSTRAINT %s
             FOREIGN KEY (%s)
             REFERENCES balances(id)
+      |sql}
+      table foreign_key col
+  in
+  Conn.exec (Caqti_request.exec Caqti_type.unit sql)
+
+let add_blocks_foreign_key_constraint (module Conn : Caqti_async.CONNECTION)
+    table col foreign_key =
+  let sql =
+    sprintf
+      {sql| ALTER TABLE %s
+            ADD CONSTRAINT %s
+            FOREIGN KEY (%s)
+            REFERENCES blocks(id)
       |sql}
       table foreign_key col
   in

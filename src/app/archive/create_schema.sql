@@ -104,7 +104,7 @@ CREATE TABLE balances
 ( id                           serial PRIMARY KEY
 , public_key_id                int    NOT NULL REFERENCES public_keys(id)
 , balance                      bigint NOT NULL
-, block_id                     int    NOT NULL REFERENCES blocks(id)
+, block_id                     int    NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , block_height                 int    NOT NULL
 , block_sequence_no            int    NOT NULL
 , block_secondary_sequence_no  int    NOT NULL

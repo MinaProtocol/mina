@@ -353,8 +353,8 @@ let main ~archive_uri () =
       let%bind () =
         query_db pool
           ~f:(fun db ->
-            Sql.add_foreign_key_constraint db "blocks_internal_commands"
-              "receiver_balance"
+            Sql.add_balances_foreign_key_constraint db
+              "blocks_internal_commands" "receiver_balance"
               "blocks_internal_commands_receiver_balance_fkey" ())
           ~item:
             "Blocks_internal_commands receiver balance foreign key constraint"
@@ -362,7 +362,7 @@ let main ~archive_uri () =
       let%bind () =
         query_db pool
           ~f:(fun db ->
-            Sql.add_foreign_key_constraint db "blocks_user_commands"
+            Sql.add_balances_foreign_key_constraint db "blocks_user_commands"
               "fee_payer_balance" "blocks_user_commands_fee_payer_balance_fkey"
               ())
           ~item:"Blocks_user_commands fee payer balance foreign key constraint"
@@ -370,17 +370,39 @@ let main ~archive_uri () =
       let%bind () =
         query_db pool
           ~f:(fun db ->
-            Sql.add_foreign_key_constraint db "blocks_user_commands"
+            Sql.add_balances_foreign_key_constraint db "blocks_user_commands"
               "source_balance" "blocks_user_commands_source_balance_fkey" ())
           ~item:"Blocks_user_commands source balance foreign key constraint"
       in
       let%bind () =
         query_db pool
           ~f:(fun db ->
-            Sql.add_foreign_key_constraint db "blocks_user_commands"
+            Sql.add_balances_foreign_key_constraint db "blocks_user_commands"
               "receiver_balance" "blocks_user_commands_receiver_balance_fkey" ())
           ~item:"Blocks_user_commands receiver balance foreign key constraint"
       in
+      let%bind () =
+        query_db pool
+          ~f:(fun db ->
+            Sql.add_blocks_foreign_key_constraint db "blocks_internal_commands"
+              "block_id" "blocks_internal_commands_block_id_fkey" ())
+          ~item:"Blocks_internal_commands block id foreign key constraint"
+      in
+      let%bind () =
+        query_db pool
+          ~f:(fun db ->
+            Sql.add_blocks_foreign_key_constraint db "blocks_user_commands"
+              "block_id" "blocks_user_commands_block_id_fkey" ())
+          ~item:"Blocks_user_commands block id foreign key constraint"
+      in
+      let%bind () =
+        query_db pool
+          ~f:(fun db ->
+            Sql.add_blocks_foreign_key_constraint db "balances" "block_id"
+              "balances_block_id_fkey" ())
+          ~item:"Balances block id foreign key constraint"
+      in
+      [%log info] "Migration successful" ;
       return ()
 
 let () =
