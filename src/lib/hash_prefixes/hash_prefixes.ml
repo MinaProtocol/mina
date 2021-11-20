@@ -98,3 +98,5 @@ let snapp_events = create "MinaSnappEvents"
 let snapp_sequence_events = create "MinaSnappSeqEvents"
 
 let snapp_memo = create "MinaSnappMemo"
+
+let snapp_test = create "MinaSnappTest"

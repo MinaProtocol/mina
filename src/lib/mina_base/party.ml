@@ -551,7 +551,40 @@ module Predicate = struct
   end]
 
   module Tag = struct
-    type t = Full | Nonce | Accept [@@deriving equal, compare, sexp]
+    type t = Full | Nonce | Accept [@@deriving equal, compare, sexp, yojson]
+
+    type var = Boolean.var * Boolean.var
+
+    let to_bits = function
+      | Accept ->
+          (true, true)
+      | Nonce ->
+          (true, false)
+      | Full ->
+          (false, true)
+
+    let of_bits = function
+      | true, true ->
+          Accept
+      | true, false ->
+          Nonce
+      | false, true ->
+          Full
+      | false, false ->
+          failwith "invalid"
+
+    let typ =
+      Typ.transport Typ.(Boolean.typ * Boolean.typ) ~there:to_bits ~back:of_bits
+
+    let accept ((a, b) : var) = Impl.run_checked Boolean.(a &&& b)
+
+    let nonce_check ((a, b) : var) = Impl.run_checked Boolean.(a &&& not b)
+
+    let account_check ((a, b) : var) = Impl.run_checked Boolean.((not a) &&& b)
+
+    let var_of_t t =
+      let a, b = to_bits t in
+      (Boolean.var_of_value a, Boolean.var_of_value b)
   end
 
   let tag : t -> Tag.t = function
@@ -577,42 +610,54 @@ module Predicate = struct
     | Accept ->
         Lazy.force accept
 
+  type value =
+    { tag : Tag.t
+    ; nonce : Account.Nonce.t
+    ; account : Snapp_predicate.Account.t
+    }
+  [@@deriving hlist, sexp, equal, yojson, compare]
+
+  let value_of_t = function
+    | Accept ->
+        { tag = Accept
+        ; nonce = Account.Nonce.zero
+        ; account = Snapp_predicate.Account.accept
+        }
+    | Nonce nonce ->
+        { tag = Nonce; nonce; account = Snapp_predicate.Account.accept }
+    | Full account ->
+        { tag = Full; nonce = Account.Nonce.zero; account }
+
   module Checked = struct
     type t =
-      | Nonce_or_accept of
-          { nonce : Account.Nonce.Checked.t; accept : Boolean.var }
-      | Full of Snapp_predicate.Account.Checked.t
+      { tag : Tag.var
+      ; nonce : Account.Nonce.Checked.t
+      ; account : Snapp_predicate.Account.Checked.t
+      }
+    [@@deriving hlist]
 
     let digest (t : t) =
       let digest x =
         Random_oracle.Checked.(
           hash ~init:Hash_prefix_states.party_predicate (pack_input x))
       in
-      match t with
-      | Full a ->
-          Snapp_predicate.Account.Checked.to_input a |> digest
-      | Nonce_or_accept { nonce; accept = b } ->
-          let open Impl in
-          Field.(
-            if_ b
-              ~then_:(constant (Lazy.force accept))
-              ~else_:
-                (digest (run_checked (Account.Nonce.Checked.to_input nonce))))
+      let open Impl in
+      Field.(
+        if_ (Tag.accept t.tag)
+          ~then_:(constant (Lazy.force accept))
+          ~else_:
+            (if_ (Tag.nonce_check t.tag)
+               ~then_:
+                 (digest (run_checked (Account.Nonce.Checked.to_input t.nonce)))
+               ~else_:
+                 (Snapp_predicate.Account.Checked.to_input t.account |> digest)))
   end
 
-  let typ () : (Snapp_predicate.Account.Checked.t, t) Typ.t =
-    Typ.transport
-      (Snapp_predicate.Account.typ ())
-      ~there:(function
-        | Full s ->
-            s
-        | Nonce n ->
-            { Snapp_predicate.Account.accept with
-              nonce = Check { lower = n; upper = n }
-            }
-        | Accept ->
-            Snapp_predicate.Account.accept)
-      ~back:(fun s -> Full s)
+  let typ () : (Checked.t, _) Typ.t =
+    Typ.of_hlistable
+      [ Tag.typ; Account.Nonce.typ; Snapp_predicate.Account.typ () ]
+      ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
+      ~value_to_hlist ~value_of_hlist
 end
 
 module Predicated = struct
@@ -645,7 +690,10 @@ module Predicated = struct
   let digest (t : t) =
     Random_oracle.(hash ~init:Hash_prefix.party (pack_input (to_input t)))
 
-  let typ () : (_, t) Typ.t =
+  type value = (Body.t, Predicate.value) Poly.t
+  [@@deriving sexp, equal, yojson, compare]
+
+  let typ () : (_, value) Typ.t =
     let open Poly in
     Typ.of_hlistable
       [ Body.typ (); Predicate.typ () ]

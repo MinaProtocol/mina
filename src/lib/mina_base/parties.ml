@@ -414,7 +414,11 @@ let valid_interval (t : t) =
 module Transaction_commitment = struct
   module Stable = Zexe_backend.Pasta.Fp.Stable [@deriving sexp]
 
-  type t = Stable.Latest.t
+  type t = (Stable.Latest.t[@deriving sexp])
+
+  let sexp_of_t = Stable.Latest.sexp_of_t
+
+  let t_of_sexp = Stable.Latest.t_of_sexp
 
   let empty = Outside_hash_image.t
 

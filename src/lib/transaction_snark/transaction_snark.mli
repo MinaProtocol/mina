@@ -544,6 +544,33 @@ val constraint_system_digests :
   -> (string * Md5.t) list
 
 module For_tests : sig
+  module Spec : sig
+    type t =
+      { fee : Currency.Fee.t
+      ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; receivers :
+          (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
+      ; amount : Currency.Amount.t
+      ; snapp_account_keypair : Signature_lib.Keypair.t
+      ; memo : Signed_command_memo.t
+      ; new_snapp_account : bool
+      ; snapp_update : Party.Update.t
+      ; current_auth : Permissions.Auth_required.t
+      }
+    [@@deriving sexp]
+  end
+
+  val deploy_snapp :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Spec.t
+    -> Parties.t
+
+  val update_state :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Spec.t
+    -> (Parties.t * (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t)
+       Async.Deferred.t
+
   val create_trivial_predicate_snapp :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> Transaction_logic.For_tests.Transaction_spec.t
