@@ -42,7 +42,9 @@ module Log_error = struct
 
   type t = Logger.Message.t [@@deriving to_yojson]
 
-  let parse = From_error_log Or_error.return
+  let parse_func = Or_error.return
+
+  let parse = From_error_log parse_func
 end
 
 module Node_initialization = struct
@@ -440,6 +442,21 @@ let of_structured_event_id id =
   Structured_log_events.string_of_id id
   |> String.Table.find structured_events_table
 
+let to_puppeteer_event_string event_type =
+  let (Event_type t) = event_type in
+  let (module Ty) = event_type_module t in
+  match Ty.parse with From_puppeteer_log (id, _) -> Some id | _ -> None
+
+let puppeteer_events_table =
+  let open Option.Let_syntax in
+  all_event_types
+  |> List.filter_map ~f:(fun t ->
+         let%map event_id = to_puppeteer_event_string t in
+         (event_id, t))
+  |> String.Table.of_alist_exn
+
+let of_puppeteer_event_string id = String.Table.find puppeteer_events_table id
+
 let parse_daemon_log (message : Logger.Message.t) =
   let open Or_error.Let_syntax in
   match message.event_id with
@@ -470,21 +487,29 @@ let parse_daemon_log (message : Logger.Message.t) =
              was mis-programmed as something else. this is a progammer error" )
 
 let parse_puppeteer_log (message : Puppeteer_message.t) =
-  match message.puppeteer_event_type with
-  | Some "node_offline" ->
-      Or_error.return (Event (Node_offline, ()))
-  | _ ->
-      failwith "Could not process a puppeteer message from the logs"
-
-let parse_event
-    (message :
-      [ `Daemon_origin of Logger.Message.t
-      | `Puppeteer_origin of Puppeteer_message.t ]) =
-  match message with
-  | `Daemon_origin m ->
-      parse_daemon_log m
-  | `Puppeteer_origin m ->
-      parse_puppeteer_log m
+  let open Or_error.Let_syntax in
+  match
+    Option.( >>= ) message.puppeteer_event_type of_puppeteer_event_string
+  with
+  | Some exis -> (
+      let (Event_type ev_type) = exis in
+      let (module Ty) = event_type_module ev_type in
+      match Ty.parse with
+      | From_puppeteer_log (_, fnc) ->
+          let%map data = fnc message in
+          Event (ev_type, data)
+      | _ ->
+          failwith
+            "the 'parse' field of a puppeteer event should always be a \
+             `From_puppeteer_log variant, but was mis-programmed as something \
+             else. this is a progammer error" )
+  | None ->
+      failwith
+        (Printf.sprintf
+           "the events emitting from the puppeteer script are either not \
+            formatted correctly, or are trying to emit an event_type which is \
+            not actually recognized by the integration test framework.  this \
+            should not happen and is a programmer error")
 
 let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
  fun t1 e t2 h ->

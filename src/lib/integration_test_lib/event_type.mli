@@ -146,13 +146,8 @@ type event = Event : 'a t * 'a -> event [@@deriving to_yojson]
 
 val type_of_event : event -> existential
 
-(* val parse_daemon_log : Logger.Message.t -> (event, Error.t) result
+val parse_daemon_log : Logger.Message.t -> (event, Error.t) result
 
-val parse_puppeteer_log : Puppeteer_message.t -> (event, Error.t) result *)
-
-val parse_event :
-     [ `Daemon_origin of Logger.Message.t
-     | `Puppeteer_origin of Puppeteer_message.t ]
-  -> (event, Error.t) result
+val parse_puppeteer_log : Puppeteer_message.t -> (event, Error.t) result
 
 val dispatch_exn : 'a t -> 'a -> 'b t -> ('b -> 'c) -> 'c
