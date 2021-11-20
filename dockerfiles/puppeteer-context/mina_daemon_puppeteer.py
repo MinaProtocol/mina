@@ -38,7 +38,7 @@ def log(s):
   script_log_output_file.flush()
 
 def log_event(puppeteer_event_type, message):
-  line = '{"puppeteer_script_event": true, "puppeteer_event_type": "{ev}", "message":"{m}"}'.format(ev=puppeteer_event_type, m=message)
+  line = '{"puppeteer_script_event": true, "puppeteer_event_type": "' + puppeteer_event_type + '", "message":"'+ message+'"}'
   script_log_output_file.write("%s\n" % line)
   script_log_output_file.flush()
 

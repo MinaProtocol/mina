@@ -271,13 +271,17 @@ let parse_event_from_log_entry ~logger ~network log_entry =
       let%bind msg =
         parse (parser_from_of_yojson Puppeteer_message.of_yojson) payload
       in
-      [%log spam] "parsing puppeteer event" ;
+      [%log spam] "parsing puppeteer event, puppeteer_event_type = %s"
+        (Option.value msg.puppeteer_event_type ~default:"<NONE>") ;
       Event_type.parse_puppeteer_log msg )
     else
       let%bind msg =
         parse (parser_from_of_yojson Logger.Message.of_yojson) payload
       in
-      [%log spam] "parsing daemon event" ;
+      [%log spam] "parsing daemon structured event, event_id = %s"
+        (Option.value
+           (Option.( >>| ) msg.event_id Structured_log_events.string_of_id)
+           ~default:"<NONE>") ;
       Event_type.parse_daemon_log msg
   in
   (node, event)
