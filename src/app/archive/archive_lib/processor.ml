@@ -752,7 +752,10 @@ module Balance = struct
       (Caqti_request.find
          Caqti_type.(tup2 (tup2 int int64) (tup4 int int64 int int))
          Caqti_type.int
-         {sql| INSERT INTO balances (public_key_id, balance) VALUES (?, ?) RETURNING id |sql})
+         {sql| INSERT INTO balances (public_key_id, balance,
+                                     block_id, block_height, block_sequence_no, block_secondary_sequence_no)
+               VALUES (?, ?, ?, ?, ?, ?)
+               RETURNING id |sql})
       ((public_key_id, balance_to_int64 balance),
        (block_id, block_height, block_sequence_no, block_secondary_sequence_no))
 
@@ -1382,7 +1385,6 @@ module Block = struct
                     ~block_id ~block_height:height
                     ~block_sequence_no:sequence_no
                     ~block_secondary_sequence_no:0
-
                 in
                 let receiver_account_creation_fee_paid =
                   account_creation_fee_of_fees_and_balance ?additional_fee
