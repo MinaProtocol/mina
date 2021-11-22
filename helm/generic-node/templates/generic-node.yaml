@@ -29,6 +29,14 @@ spec:
         prometheus.io/port: {{.Values.ports.metrics | quote}}
         prometheus.io/path: '/metrics'
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: "cloud.google.com/gke-preemptible"
+                  operator: In
+                  values: ["true"]
       initContainers:
       {{- if .Values.libp2p.staticKeypair.enabled}}
       - name: libp2p-init-my-service
@@ -171,7 +179,6 @@ spec:
           protocol: TCP
           containerPort: {{.Values.ports.p2p}}
           hostPort: {{.Values.ports.external}}
-{{- include "nodeSelector.preemptible" .Values | indent 4 }}
         volumeMounts:
         - name: config-dir
           mountPath: "/root/.mina-config"
@@ -247,6 +254,4 @@ spec:
       resources:
         requests:
           storage: {{.Values.features.persistence.size}}
-          volumeMode: Filesystem
-
 ---
