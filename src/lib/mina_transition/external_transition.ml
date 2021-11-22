@@ -292,6 +292,24 @@ let to_yojson t =
              (proposed_protocol_version_opt t)
              ~default:"<None>" ~f:Protocol_version.to_string) ) ]
 
+(* for chainsafe *)
+let to_full_yojson t =
+  `Assoc
+    [ ("protocol_state", Protocol_state.value_to_yojson (protocol_state t))
+    ; ("protocol_state_proof", Proof.to_yojson (protocol_state_proof t))
+    ; ( "staged_ledger_diff"
+      , Staged_ledger_diff.to_yojson (staged_ledger_diff t) )
+    ; ( "delta_transition_chain_proof"
+      , [%to_yojson: State_hash.t * State_body_hash.t list]
+          (delta_transition_chain_proof t) )
+    ; ( "current_protocol_version"
+      , `String (Protocol_version.to_string (current_protocol_version t)) )
+    ; ( "proposed_protocol_version"
+      , `String
+          (Option.value_map
+             (proposed_protocol_version_opt t)
+             ~default:"<None>" ~f:Protocol_version.to_string) ) ]
+
 let equal =
   Comparable.lift Consensus.Data.Consensus_state.Value.equal ~f:consensus_state
 

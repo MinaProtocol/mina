@@ -1403,17 +1403,24 @@ let create (config : Config.t)
               Bin_prot.Common.blit_buf_bytes buf bytes ~len ;
               bytes
             in
-            let blockfile =
-              sprintf "%s.hex"
-                ( External_transition.state_hash state
-                |> State_hash.to_base58_check )
+            let state_hash_base58 =
+              External_transition.state_hash state
+              |> State_hash.to_base58_check
             in
-            [%log info] "Writing received block to file %s" blockfile ;
+            let blockfile = sprintf "%s.hex" state_hash_base58 in
+            [%log info] "Writing serialization of received block to file %s"
+              blockfile ;
             Out_channel.with_file blockfile ~f:(fun out_ch ->
                 let block_hex =
                   Hex.Safe.to_hex (Bytes.to_string block_bytes)
                 in
                 Out_channel.output_string out_ch block_hex ) ;
+            let block_json = External_transition.to_full_yojson state in
+            let jsonfile = sprintf "%s.json" state_hash_base58 in
+            [%log info] "Writing JSON of received block to file %s" jsonfile ;
+            Out_channel.with_file jsonfile ~f:(fun out_ch ->
+                let json_string = Yojson.Safe.pretty_to_string block_json in
+                Out_channel.output_string out_ch json_string ) ;
             (* end Chainsafe changes *)
             if config.log_gossip_heard.new_state then
               [%str_log info]
