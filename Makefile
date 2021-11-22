@@ -165,6 +165,11 @@ archive_blocks :
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive_blocks/archive_blocks.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
+bin_prot_of_precomputed :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/bin_prot_of_precomputed/bin_prot_of_precomputed.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
 patch_archive_test :
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/patch_archive_test/patch_archive_test.exe --profile=testnet_postake_medium_curves

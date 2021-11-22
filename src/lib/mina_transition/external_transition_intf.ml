@@ -698,4 +698,6 @@ module type S = sig
   end
 
   val to_full_yojson : t -> Yojson.Safe.t
+
+  val precomputed_block_to_external_transition : Precomputed_block.t -> t
 end

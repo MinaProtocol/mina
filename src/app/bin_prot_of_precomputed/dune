@@ -1,0 +1,13 @@
+(executable
+ (package bin_prot_of_precomputed)
+ (name bin_prot_of_precomputed)
+ (public_name bin_prot_of_precomputed)
+ (libraries
+   async
+   core_kernel
+   mina_transition
+   logger
+ )
+ (preprocessor_deps ../../config.mlh)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_coda ppx_version ppx_let)))
