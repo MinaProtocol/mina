@@ -230,10 +230,10 @@ func TestDepthIndicesSequence(t *testing.T) {
 
 func TestDepth3(t *testing.T) {
 	di := MkDepthIndices(3, 100)
-	require.Equal(t, di.FirstChildId(0), 1)
-	require.Equal(t, di.FirstChildId(1), 4)
-	require.Equal(t, di.FirstChildId(2), 7)
-	require.Equal(t, di.FirstChildId(3), 10)
-	require.Equal(t, di.FirstChildId(4), 13)
-	require.Equal(t, di.FirstChildId(5), 16)
+	require.Equal(t, di.FirstChildId(0), NodeIndex(1))
+	require.Equal(t, di.FirstChildId(1), NodeIndex(4))
+	require.Equal(t, di.FirstChildId(2), NodeIndex(7))
+	require.Equal(t, di.FirstChildId(3), NodeIndex(10))
+	require.Equal(t, di.FirstChildId(4), NodeIndex(13))
+	require.Equal(t, di.FirstChildId(5), NodeIndex(16))
 }

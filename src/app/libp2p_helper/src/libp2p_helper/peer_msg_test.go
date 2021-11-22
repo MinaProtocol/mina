@@ -116,9 +116,14 @@ func TestListPeers(t *testing.T) {
 	require.NoError(t, err)
 	res, err := resp.Result()
 	require.NoError(t, err)
-	require.Equal(t, 1, res.Len())
-	actual, err := readPeerInfo(res.At(0))
-	require.NoError(t, err)
-
-	checkPeerInfo(t, actual, appA.P2p.Host, appAPort)
+	require.Greater(t, res.Len(), 0)
+	for i := 0; i < res.Len(); i++ {
+		pi, err := readPeerInfo(res.At(i))
+		if err == nil {
+			require.Equal(t, pi.Libp2pPort, appAPort)
+			require.Equal(t, pi.PeerID, appA.P2p.Host.ID().String())
+		} else {
+			t.Errorf("failed to read peer info %d: %v", i, err)
+		}
+	}
 }
