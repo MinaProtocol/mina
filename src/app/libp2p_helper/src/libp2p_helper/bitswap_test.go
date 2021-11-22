@@ -529,6 +529,10 @@ func testBitswap(t *testing.T, numNodes, numAttempts, numRequests, maxBlobSize i
 
 // Caution: this test requires up to 30GB of RAM and runs for 10-15 min
 func TestBitswapJumbo(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestBitswapJumbo in short mode")
+		return
+	}
 	testBitswap(t, 500, 1, 1, 1<<16, true)
 }
 
