@@ -1023,7 +1023,7 @@ module Block = struct
     ; global_slot_since_hard_fork: int64
     ; global_slot_since_genesis: int64
     ; timestamp: int64
-    ; chain_status: string option
+    ; chain_status: string
     }
   [@@deriving hlist]
 
@@ -1044,7 +1044,7 @@ module Block = struct
         ; int64
         ; int64
         ; int64
-        ; option string
+        ; string
         ]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
@@ -1153,7 +1153,7 @@ module Block = struct
                 Protocol_state.blockchain_state protocol_state
                 |> Blockchain_state.timestamp |> Block_time.to_int64
             (* we don't yet know the chain status for a block we're adding *)
-            ; chain_status=None
+            ; chain_status=Chain_status.(to_string Pending)
             }
         in
         let transactions =
@@ -1453,7 +1453,7 @@ module Block = struct
             ; global_slot_since_genesis=
                 block.global_slot_since_genesis |> Unsigned.UInt32.to_int64
             ; timestamp= block.timestamp |> Block_time.to_int64
-            ; chain_status= Option.map block.chain_status ~f:Chain_status.to_string
+            ; chain_status= Chain_status.to_string block.chain_status
             }
     in
     (* add user commands *)
@@ -1539,10 +1539,15 @@ module Block = struct
             balance_id_of_pk_and_balance internal_command.receiver
               internal_command.receiver_balance
           in
+          let receiver_account_creation_fee_paid = internal_command.receiver_account_creation_fee_paid
+                                                   |> Option.map ~f:(fun amount ->
+                                                       Currency.Amount.to_uint64 amount |>
+                                                       Unsigned.UInt64.to_int64)
+          in
           Block_and_internal_command.add_if_doesn't_exist
             (module Conn)
             ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
-            ~receiver_account_creation_fee_paid:None (* TEMP *)
+            ~receiver_account_creation_fee_paid
             ~receiver_balance_id )
     in
     return block_id
