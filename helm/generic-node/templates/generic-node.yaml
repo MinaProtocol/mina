@@ -1,10 +1,10 @@
 ---
 apiVersion: apps/v1
-{{if .Values.features.persistence.enabled}}
+{{- if .Values.features.persistence.enabled}}
 kind: StatefulSet
-{{else}}
+{{- else}}
 kind: Deployment
-{{end}}
+{{- end}}
 metadata:
   name: {{.Values.name}}
   labels:
@@ -14,6 +14,7 @@ spec:
   selector:
     matchLabels:
       app: {{.Values.name}}
+  serviceName: "nginx"
   template:
     metadata:
       labels:
@@ -39,7 +40,7 @@ spec:
         - mountPath: /root/libp2p-keys
           name: destination-libp2p
       {{- end }}
-      {{- if .Values.privateKeySecret.enabled}}
+      {{- if .Values.features.privateKeySecret.enabled}}
       - name: fix-perms
         image: busybox:latest
         command: [ 'sh', '-c', 'for dir in keys echo-keys faucet-keys; do [ -d /$dir ] && /bin/cp /$dir/* /wallet-keys; done; /bin/chmod 0700 /wallet-keys']
@@ -80,10 +81,6 @@ spec:
         - "$(DAEMON_EXTERNAL_PORT)"
         - "--metrics-port"
         - "$(DAEMON_METRICS_PORT)"
-        - "--enable-peer-exchange"
-        - "true"
-        - "--peer-list-url"
-        - "https://storage.googleapis.com/seed-lists/{{.Values.testnetName}}_seeds.txt"
         {{- if .Values.libp2p.staticKeypair.enabled}}
         - "--discovery-keypair"
         - "/root/libp2p-keys/key"
@@ -92,12 +89,8 @@ spec:
         - "--seed"
         {{- end }}
         {{- if .Values.features.runtimeConfig.enabled}}
-        - "-config-file"
+        - "--config-file"
         - "/config/daemon.json"
-        {{- end }}
-        {{- if .Values.features.logTxnPoolGossip.enabled}}
-        - "-log-txn-pool-gossip"
-        - "true"
         {{- end }}
         {{- if .Values.features.maxConnections}}
         - "--max-connections"
@@ -107,7 +100,7 @@ spec:
         - "-peer"
         - {{ . | quote }}
         {{- end }}
-        {{- if .Values.privateKeySecret.enabled}}
+        {{- if .Values.features.privateKeySecret.enabled}}
         - "--block-producer-key"
         - "/root/wallet-keys/key"
         {{- end }}
@@ -152,31 +145,18 @@ spec:
               name: {{ .Values.libp2p.staticKeypair.secretName | quote}}
               key: password
         {{- end }}
-        {{- if .Values.privateKeySecret.enabled}}
+        {{- if .Values.features.privateKeySecret.enabled}}
         - name: CODA_PRIVKEY_PASS
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.privateKeySecret.secretName | quote}}
+              name: {{ .Values.features.privateKeySecret.secretName | quote}}
               key: password
         - name: MINA_PRIVKEY_PASS
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.privateKeySecret.secretName | quote}}
+              name: {{ .Values.features.privateKeySecret.secretName | quote}}
               key: password
         {{- end }}
-      volumeClaimTemplates:
-      - apiVersion: v1
-        kind: PersistentVolumeClaim
-        metadata:
-          name: {{.Values.features.persistence.name}}
-        spec:
-          accessModes:
-          - ReadWriteOnce
-          resources:
-            requests:
-              storage: {{.Values.features.persistence.size}}
-          storageClassName: {{.Values.features.persistence.storageClass}}
-          volumeMode: Filesystem
         ports:
         - name: client-port
           protocol: TCP
@@ -191,6 +171,7 @@ spec:
           protocol: TCP
           containerPort: {{.Values.ports.p2p}}
           hostPort: {{.Values.ports.external}}
+{{- include "nodeSelector.preemptible" .Values | indent 4 }}
         volumeMounts:
         - name: config-dir
           mountPath: "/root/.mina-config"
@@ -236,10 +217,10 @@ spec:
           - key: pub
             path: key.pub
       {{- end }}
-      {{- if .Values.privateKeySecret.enabled}}
+      {{- if .Values.features.privateKeySecret.enabled}}
       - name: private-keys
         secret:
-          secretName: {{ .Values.privateKeySecret.secretName }}
+          secretName: {{ .Values.features.privateKeySecret.secretName }}
           defaultMode: 256
           items:
           - key: key
@@ -255,5 +236,17 @@ spec:
         emptyDir: {}
       - name: wallet-keys
         emptyDir: {}
-{{- include "nodeSelector.preemptible" .Values | indent 6 }}
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: {{.Values.features.persistence.name}}
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: {{.Values.features.persistence.storageClass}}
+      resources:
+        requests:
+          storage: {{.Values.features.persistence.size}}
+          volumeMode: Filesystem
+
 ---

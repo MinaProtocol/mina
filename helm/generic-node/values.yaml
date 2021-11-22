@@ -29,6 +29,19 @@ features:
     storageClass: standard-delete
     mountPath: /data/
     size: 100Gi
+  privateKeySecret:
+    enabled: true
+    secretName: "generic-node-devnet-bp-key"
+  daemon:
+    args:
+      - "--libp2p-metrics-port"
+      - "9000"
+      - "--log-txn-pool-gossip"
+      - "true"
+      - "--peer-list-url"
+      - "https://storage.googleapis.com/seed-lists/{{.Values.testnetName}}_seeds.txt"
+      - "--enable-peer-exchange"
+      - "true"
   seedPeers: []
 
 libp2p:
@@ -36,15 +49,12 @@ libp2p:
     enabled: true
   staticKeypair:
     enabled: true
-    secretName: "some-libp2p-key"
+    secretName: "generic-node-devnet-libp2p-key"
   loadBalancer:
     enabled: true
 
 servicekey:
   secretName: "faucet-service-key"
-
-privateKeySecret:
-  secretName: "" 
 
 ports:
   client: "8301"
