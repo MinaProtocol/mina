@@ -3,6 +3,7 @@ package main
 // This utility migrates from old bucket format to the new one
 
 import (
+	"bufio"
 	"context"
 	dg "delegation_backend"
 	"encoding/json"
@@ -44,12 +45,10 @@ type oldMeta struct {
 }
 
 func main() {
-	if len(os.Args) != 3 {
-		fmt.Printf("usage: %s <src bucket> <dst bucket>\n", os.Args[0])
+	if len(os.Args) != 4 {
+		fmt.Printf("usage: %s <src bucket> <dst bucket> <visited file>\n", os.Args[0])
 		os.Exit(1)
 	}
-	srcBucketName := os.Args[1]
-	dstBucketName := os.Args[2]
 	logging.SetupLogging(logging.Config{
 		Format: logging.JSONOutput,
 		Stderr: true,
@@ -59,7 +58,22 @@ func main() {
 	})
 	log := logging.Logger("delegation backend")
 	log.Infof("delegation backend has the following logging subsystems active: %v", logging.GetSubsystems())
-
+	srcBucketName := os.Args[1]
+	dstBucketName := os.Args[2]
+	visitedFilePath := os.Args[3]
+	visited := make(map[string]bool)
+	{
+		// Read file and insert lines into visited map
+		f, err := os.Open(visitedFilePath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			visited[scanner.Text()] = true
+		}
+	}
 	ctx := context.Background()
 
 	client, err1 := storage.NewClient(ctx)
@@ -76,6 +90,9 @@ func main() {
 	objAttrs, err := lst.Next()
 	for ; err == nil; objAttrs, err = lst.Next() {
 		fullName := objAttrs.Name
+		if visited[fullName] {
+			continue
+		}
 		var parts []string
 		if strings.HasSuffix(fullName, suffix) {
 			name := fullName[:len(fullName)-len(suffix)][len(prefix):]
