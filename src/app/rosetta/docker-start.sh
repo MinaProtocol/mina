@@ -44,7 +44,7 @@ DEFAULT_FLAGS="--config-dir ${MINA_CONFIG_DIR} --peer-list-url ${PEER_LIST_URL} 
 export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
 # Postgres database connection string and related variables
 POSTGRES_USERNAME=${POSTGRES_USERNAME:=pguser}
-POSTGRES_DBNAME=${POSTGRES_DBNAME:=archive}
+POSTGRES_DBNAME=${POSTGRES_DBNAME:=archive_balances_migrated}
 POSTGRES_DATA_DIR=${POSTGRES_DATA_DIR:=/data/postgresql}
 PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${POSTGRES_DBNAME}
 DUMP_TIME=${DUMP_TIME:=0000}
