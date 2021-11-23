@@ -32,73 +32,67 @@ end
 module Sql = struct
   module Balance_from_last_relevant_command = struct
     (* This is SQL is the common chunk shared between the query_recent and
-     * query_old that retreives the relevant balance changes from transactions
+     * query_old that retrieves the relevant balance changes from transactions
      * at a block. *)
     let common_sql =
       {sql|
 relevant_internal_block_balances AS (
   SELECT
-    block_internal_command.block_id,
-    block_internal_command.sequence_no,
-    block_internal_command.secondary_sequence_no,
+    receiver_balance.block_id,
+    receiver_balance.block_height,
+    receiver_balance.block_sequence_no,
+    receiver_balance.block_secondary_sequence_no,
     receiver_balance.balance
-  FROM blocks_internal_commands block_internal_command
-  INNER JOIN balances receiver_balance ON block_internal_command.receiver_balance = receiver_balance.id
+  FROM balances receiver_balance
   INNER JOIN public_keys receiver_pk ON receiver_pk.id = receiver_balance.public_key_id
   WHERE receiver_pk.value = $1
 ),
 
 relevant_user_block_fee_payer_balances AS (
   SELECT
-    block_user_command.block_id,
-    block_user_command.sequence_no,
+    fee_payer_balance.block_id,
+    fee_payer_balance.block_height,
+    fee_payer_balance.block_sequence_no,
     fee_payer_balance.balance
-  FROM blocks_user_commands block_user_command
-
-  INNER JOIN balances fee_payer_balance ON fee_payer_balance.id = block_user_command.fee_payer_balance
-
+  FROM balances fee_payer_balance
   INNER JOIN public_keys fee_payer_pk ON fee_payer_pk.id = fee_payer_balance.public_key_id
   WHERE fee_payer_pk.value = $1
 ),
 
 relevant_user_block_source_balances AS (
   SELECT
-    block_user_command.block_id,
-    block_user_command.sequence_no,
+    source_balance.block_id,
+    source_balance.block_height,
+    source_balance.block_sequence_no,
     source_balance.balance
-  FROM blocks_user_commands block_user_command
-
-  INNER JOIN balances source_balance ON source_balance.id = block_user_command.source_balance
-
+  FROM balances source_balance
   INNER JOIN public_keys source_pk ON source_pk.id = source_balance.public_key_id
   WHERE source_pk.value = $1
 ),
 
 relevant_user_block_receiver_balances AS (
   SELECT
-    block_user_command.block_id,
-    block_user_command.sequence_no,
+    receiver_balance.block_id,
+    receiver_balance.block_height,
+    receiver_balance.block_sequence_no,
     receiver_balance.balance
-  FROM blocks_user_commands block_user_command
-
-  INNER JOIN balances receiver_balance ON receiver_balance.id = block_user_command.receiver_balance
-
+  FROM balances receiver_balance
   INNER JOIN public_keys receiver_pk ON receiver_pk.id = receiver_balance.public_key_id
   WHERE receiver_pk.value = $1
 ),
 
 relevant_user_block_balances AS (
-  (SELECT block_id, sequence_no, balance FROM relevant_user_block_fee_payer_balances)
+  (SELECT block_id, block_height, block_sequence_no, balance FROM relevant_user_block_fee_payer_balances)
   UNION
-  (SELECT block_id, sequence_no, balance FROM relevant_user_block_source_balances)
+  (SELECT block_id, block_height, block_sequence_no, balance FROM relevant_user_block_source_balances)
   UNION
-  (SELECT block_id, sequence_no, balance FROM relevant_user_block_receiver_balances)
+  (SELECT block_id, block_height, block_sequence_no, balance FROM relevant_user_block_receiver_balances)
 ),
 
 relevant_block_balances AS (
-  (SELECT block_id, sequence_no, secondary_sequence_no, balance FROM relevant_internal_block_balances)
+  (SELECT block_id, block_height, block_sequence_no, block_secondary_sequence_no, balance FROM relevant_internal_block_balances)
   UNION
-  (SELECT block_id, sequence_no, 0 AS secondary_sequence_no, balance FROM relevant_user_block_balances)
+  (SELECT block_id, block_height, block_sequence_no, 0 AS block_secondary_sequence_no, balance FROM relevant_user_block_balances)
 )
       |sql}
 
@@ -130,9 +124,10 @@ FROM
 chain
 JOIN relevant_block_balances rbb ON chain.id = rbb.block_id
 WHERE chain.height <= $2
-ORDER BY (chain.height, sequence_no, secondary_sequence_no) DESC
+ORDER BY (rbb.block_height, rbb.block_sequence_no, rbb.block_secondary_sequence_no) DESC
 LIMIT 1
       |sql} common_sql)
+
 
     let query_old =
       Caqti_request.find_opt
@@ -148,7 +143,7 @@ FROM
 blocks b
 JOIN relevant_block_balances rbb ON b.id = rbb.block_id
 WHERE b.height <= $2 AND b.chain_status = 'canonical'
-ORDER BY (b.height, sequence_no, secondary_sequence_no) DESC
+ORDER BY (rbb.block_height, rbb.block_sequence_no, rbb.block_secondary_sequence_no) DESC
 LIMIT 1
       |sql} common_sql)
 
