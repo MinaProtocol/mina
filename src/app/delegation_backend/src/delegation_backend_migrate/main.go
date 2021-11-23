@@ -44,6 +44,38 @@ type oldMeta struct {
 	RemoteAddr  string     `json:"remote_addr"`
 }
 
+func process(srcGctx, dstGctx dg.GoogleContext, log logging.StandardLogger, ctx context.Context, fullName string, pk dg.Pk, blockHashStr, createdAtStr string) {
+	var oldMeta oldMeta
+	{
+		reader, err := srcGctx.Bucket.Object(fullName).NewReader(ctx)
+		if err == nil {
+			decoder := json.NewDecoder(reader)
+			err = decoder.Decode(&oldMeta)
+		}
+		if err != nil {
+			log.Warnf("Malformed submission file %s: %v", fullName, err)
+			return
+		}
+	}
+	submittedAt := oldMeta.SubmittedAt.UTC().Format(time.RFC3339)
+	pathsNew := dg.MakePathsImpl(submittedAt, blockHashStr, pk)
+	newMetaPath := pathsNew.Meta
+	newMeta := dg.MetaToBeSaved{
+		CreatedAt:  createdAtStr,
+		PeerId:     oldMeta.PeerId,
+		RemoteAddr: oldMeta.RemoteAddr,
+		SnarkWork:  oldMeta.SnarkWork,
+		Submitter:  pk,
+		BlockHash:  blockHashStr,
+	}
+	newMetaBytes, err := json.Marshal(newMeta)
+	if err != nil {
+		log.Errorf("Error while marshaling JSON for %s: %v", fullName, err)
+		return
+	}
+	dstGctx.GoogleStorageSave(dg.ObjectsToSave{newMetaPath: newMetaBytes})
+}
+
 func main() {
 	if len(os.Args) != 4 {
 		fmt.Printf("usage: %s <src bucket> <dst bucket> <visited file>\n", os.Args[0])
@@ -88,6 +120,7 @@ func main() {
 	q := storage.Query{Prefix: prefix}
 	lst := srcGctx.Bucket.Objects(ctx, &q)
 	objAttrs, err := lst.Next()
+	sem := make(chan interface{}, 100)
 	for ; err == nil; objAttrs, err = lst.Next() {
 		fullName := objAttrs.Name
 		if visited[fullName] {
@@ -104,42 +137,22 @@ func main() {
 		}
 		log.Debug("Processing ", fullName)
 		pkStr := parts[0]
-		blockHashStr := parts[1]
-		createdAtStr := parts[2]
-		var oldMeta oldMeta
-		{
-			reader, err := srcGctx.Bucket.Object(fullName).NewReader(ctx)
-			if err == nil {
-				decoder := json.NewDecoder(reader)
-				err = decoder.Decode(&oldMeta)
-			}
-			if err != nil {
-				log.Warnf("Malformed submission file %s: %v", fullName, err)
-				continue
-			}
-		}
 		pk, err := readOldPk(pkStr)
 		if err != nil {
 			log.Warnf("Malformed pk in %s: %v", fullName, err)
 			continue
 		}
-		submittedAt := oldMeta.SubmittedAt.UTC().Format(time.RFC3339)
-		pathsNew := dg.MakePathsImpl(submittedAt, blockHashStr, pk)
-		newMetaPath := pathsNew.Meta
-		newMeta := dg.MetaToBeSaved{
-			CreatedAt:  createdAtStr,
-			PeerId:     oldMeta.PeerId,
-			RemoteAddr: oldMeta.RemoteAddr,
-			SnarkWork:  oldMeta.SnarkWork,
-			Submitter:  pk,
-			BlockHash:  blockHashStr,
+		blockHashStr := parts[1]
+		createdAtStr := parts[2]
+		select {
+		case sem <- nil:
+			go func() {
+				process(srcGctx, dstGctx, log, ctx, fullName, pk, blockHashStr, createdAtStr)
+				<-sem
+			}()
+		default:
+			process(srcGctx, dstGctx, log, ctx, fullName, pk, blockHashStr, createdAtStr)
 		}
-		newMetaBytes, err1 := json.Marshal(newMeta)
-		if err1 != nil {
-			log.Errorf("Error while marshaling JSON for %s: %v", fullName, err)
-			continue
-		}
-		dstGctx.GoogleStorageSave(dg.ObjectsToSave{newMetaPath: newMetaBytes})
 	}
 	if err != iterator.Done {
 		log.Fatalf("Error while iteration through objects: %v", err)
