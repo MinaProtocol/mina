@@ -34,12 +34,8 @@ Parameter | Description | Default
 `mina.image` | container image to use for operating the archive node's Mina daemon | `minaprotocol/mina-daemon1.2.1alpha1-1f98b8b-devnet`
 `mina.runtimeConfig` | Mina daemon configuration to use at runtime | `undefined`
 
-## Generic-node launch examples
+### Generic-node launch examples
 
 ```console
-make install 
-
-make upgrade
+helm install generic-node
 ```
-
-## 
