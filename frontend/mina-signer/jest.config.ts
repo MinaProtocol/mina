@@ -3,9 +3,9 @@ import type { Config } from "@jest/types";
 const config: Config.InitialOptions = {
   verbose: true,
   preset: "ts-jest",
+  modulePathIgnorePatterns: ["<rootDir>/dist/"],
   globals: {
     "ts-jest": {
-      useESM: true,
       transform: {
         "^.+\\.ts?$": "ts-jest",
       },
