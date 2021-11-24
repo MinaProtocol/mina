@@ -52,7 +52,7 @@ class Client {
    * @param privateKey - The private key used to get the corresponding public key
    * @returns A public key
    */
-  public derivePublicKey(privateKey: publicKey): publicKey {
+  public derivePublicKey(privateKey: privateKey): publicKey {
     return minaSDK.publicKeyOfPrivateKey(privateKey);
   }
 
