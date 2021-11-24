@@ -1,4 +1,4 @@
-import Client from "../src/MinaSDK";
+import Client from "../src/MinaSigner";
 import { keypair } from "../src/TSTypes";
 
 describe("Stake Delegation", () => {

@@ -1,4 +1,4 @@
-import Client from "../src/MinaSDK";
+import Client from "../src/MinaSigner";
 
 describe("Rosetta", () => {
   let client: Client;

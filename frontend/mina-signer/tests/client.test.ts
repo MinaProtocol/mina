@@ -1,4 +1,4 @@
-import Client from "../src/MinaSDK";
+import Client from "../src/MinaSigner";
 
 describe("Client Class Initialization", () => {
   it("should accept `mainnet` as a valid network parameter", () => {
