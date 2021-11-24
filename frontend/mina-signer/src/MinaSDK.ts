@@ -104,7 +104,7 @@ class Client {
     payment: payment,
     privateKey: privateKey
   ): signed<payment> {
-    const memo = payment.memo ? payment.memo : "";
+    const memo = payment.memo ?? "";
     const fee = String(payment.fee);
     const nonce = String(payment.nonce);
     const amount = String(payment.amount);
@@ -146,7 +146,7 @@ class Client {
    */
   public verifyPayment(signedPayment: signed<payment>): boolean {
     const payload = signedPayment.data;
-    const memo = payload.memo ? payload.memo : "";
+    const memo = payload.memo ?? "";
     const fee = String(payload.fee);
     const amount = String(payload.amount);
     const nonce = String(payload.nonce);
@@ -189,7 +189,7 @@ class Client {
     stakeDelegation: stakeDelegation,
     privateKey: privateKey
   ): signed<stakeDelegation> {
-    const memo = stakeDelegation.memo ? stakeDelegation.memo : "";
+    const memo = stakeDelegation.memo ?? "";
     const fee = String(stakeDelegation.fee);
     const nonce = String(stakeDelegation.nonce);
     const validUntil = String(
@@ -232,7 +232,7 @@ class Client {
     signedStakeDelegation: signed<stakeDelegation>
   ): boolean {
     const payload = signedStakeDelegation.data;
-    const memo = payload.memo ? payload.memo : "";
+    const memo = payload.memo ?? "";
     const fee = String(payload.fee);
     const nonce = String(payload.nonce);
     const validUntil = String(
@@ -265,7 +265,7 @@ class Client {
    */
   public hashPayment(signedPayment: signed<payment>): string {
     const payload = signedPayment.data;
-    const memo = payload.memo ? payload.memo : "";
+    const memo = payload.memo ?? "";
     const fee = String(payload.fee);
     const amount = String(payload.amount);
     const nonce = String(payload.nonce);
@@ -302,7 +302,7 @@ class Client {
     signedStakeDelegation: signed<stakeDelegation>
   ): string {
     const payload = signedStakeDelegation.data;
-    const memo = payload.memo ? payload.memo : "";
+    const memo = payload.memo ?? "";
     const fee = String(payload.fee);
     const nonce = String(payload.nonce);
     const validUntil = String(
