@@ -55,6 +55,22 @@ describe("Payment", () => {
       const hashedPayment = client.hashPayment(payment);
       expect(hashedPayment).toBeDefined();
     });
+
+    it("does not verify a signed payment from `testnet`", () => {
+      const payment = client.signPayment(
+        {
+          to: keypair.publicKey,
+          from: keypair.publicKey,
+          amount: "1",
+          fee: "1",
+          nonce: "0",
+        },
+        keypair.privateKey
+      );
+      const testnetClient = new Client({ network: "testnet" });
+      const invalidPayment = testnetClient.verifyPayment(payment);
+      expect(invalidPayment).toBeFalsy();
+    });
   });
 
   describe("Testnet network", () => {
@@ -109,6 +125,22 @@ describe("Payment", () => {
       );
       const hashedPayment = client.hashPayment(payment);
       expect(hashedPayment).toBeDefined();
+    });
+
+    it("does not verify a signed payment from `mainnet`", () => {
+      const payment = client.signPayment(
+        {
+          to: keypair.publicKey,
+          from: keypair.publicKey,
+          amount: "1",
+          fee: "1",
+          nonce: "0",
+        },
+        keypair.privateKey
+      );
+      const mainnetClient = new Client({ network: "mainnet" });
+      const invalidPayment = mainnetClient.verifyPayment(payment);
+      expect(invalidPayment).toBeFalsy();
     });
   });
 });

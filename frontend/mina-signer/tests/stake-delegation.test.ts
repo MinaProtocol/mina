@@ -52,6 +52,21 @@ describe("Stake Delegation", () => {
       const hashedDelegation = client.hashStakeDelegation(delegation);
       expect(hashedDelegation).toBeDefined();
     });
+
+    it("does not verify a signed message from `testnet`", () => {
+      const delegation = client.signStakeDelegation(
+        {
+          to: keypair.publicKey,
+          from: keypair.publicKey,
+          fee: "1",
+          nonce: "0",
+        },
+        keypair.privateKey
+      );
+      const testnetClient = new Client({ network: "testnet" });
+      const invalidMessage = testnetClient.verifyStakeDelegation(delegation);
+      expect(invalidMessage).toBeFalsy();
+    });
   });
 
   describe("Testnet network", () => {
@@ -103,6 +118,21 @@ describe("Stake Delegation", () => {
       );
       const hashedDelegation = client.hashStakeDelegation(delegation);
       expect(hashedDelegation).toBeDefined();
+    });
+
+    it("does not verify a signed message from `mainnet`", () => {
+      const delegation = client.signStakeDelegation(
+        {
+          to: keypair.publicKey,
+          from: keypair.publicKey,
+          fee: "1",
+          nonce: "0",
+        },
+        keypair.privateKey
+      );
+      const mainnetClient = new Client({ network: "mainnet" });
+      const invalidMessage = mainnetClient.verifyStakeDelegation(delegation);
+      expect(invalidMessage).toBeFalsy();
     });
   });
 });

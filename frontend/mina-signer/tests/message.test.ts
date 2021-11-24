@@ -22,6 +22,13 @@ describe("Message", () => {
       const verifiedMessage = client.verifyMessage(message);
       expect(verifiedMessage).toBeTruthy();
     });
+
+    it("does not verify a signed message from `testnet`", () => {
+      const message = client.signMessage("hello", keypair);
+      const testnetClient = new Client({ network: "testnet" });
+      const invalidMessage = testnetClient.verifyMessage(message);
+      expect(invalidMessage).toBeFalsy();
+    });
   });
 
   describe("Testnet network", () => {
@@ -43,6 +50,13 @@ describe("Message", () => {
       const message = client.signMessage("hello", keypair);
       const verifiedMessage = client.verifyMessage(message);
       expect(verifiedMessage).toBeTruthy();
+    });
+
+    it("does not verify a signed message from `mainnet`", () => {
+      const message = client.signMessage("hello", keypair);
+      const mainnet = new Client({ network: "mainnet" });
+      const invalidMessage = mainnet.verifyMessage(message);
+      expect(invalidMessage).toBeFalsy();
     });
   });
 });
