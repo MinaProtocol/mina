@@ -17,7 +17,7 @@ features:
   exposeGraphql:
     enabled: false
   uploadBlocksToGCloud:   # Added this
-    enabled: false
+    enabled: true
   customEntrypoint:
     enabled: false
     command: ""
