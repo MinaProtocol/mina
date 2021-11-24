@@ -19,6 +19,9 @@ class Client {
   private network: network;
 
   constructor(options: { network: network }) {
+    if (!options?.network) {
+      throw "Invalid Specified Network";
+    }
     const specifiedNetwork = options.network.toLowerCase();
     if (specifiedNetwork !== "mainnet" && specifiedNetwork !== "testnet") {
       throw "Invalid Specified Network";
