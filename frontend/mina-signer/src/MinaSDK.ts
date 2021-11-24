@@ -1,5 +1,4 @@
 "use strict";
-
 const JSOfOCaml_SDK = require("./client_sdk.bc.js");
 const minaSDK = JSOfOCaml_SDK.minaSDK;
 
@@ -108,32 +107,30 @@ class Client {
     const fee = String(payment.fee);
     const nonce = String(payment.nonce);
     const amount = String(payment.amount);
-    const validUntil = String(
-      payment.validUntil ? payment.validUntil : defaultValidUntil
-    );
+    const validUntil = String(payment.validUntil ?? defaultValidUntil);
     return {
       signature: minaSDK.signPayment(this.network, privateKey, {
         common: {
-          fee: fee,
+          fee,
           feePayer: payment.from,
-          nonce: nonce,
-          validUntil: validUntil,
-          memo: memo,
+          nonce,
+          validUntil,
+          memo,
         },
         paymentPayload: {
           source: payment.from,
           receiver: payment.to,
-          amount: amount,
+          amount,
         },
       }).signature,
       data: {
         to: payment.to,
         from: payment.from,
-        fee: fee,
-        amount: amount,
-        nonce: nonce,
-        memo: memo,
-        validUntil: validUntil,
+        fee,
+        amount,
+        nonce,
+        memo,
+        validUntil,
       },
     };
   }
@@ -150,24 +147,22 @@ class Client {
     const fee = String(payload.fee);
     const amount = String(payload.amount);
     const nonce = String(payload.nonce);
-    const validUntil = String(
-      payload.validUntil ? payload.validUntil : defaultValidUntil
-    );
+    const validUntil = String(payload.validUntil ?? defaultValidUntil);
     return minaSDK.verifyPaymentSignature(this.network, {
       sender: signedPayment.data.from,
       signature: signedPayment.signature,
       payment: {
         common: {
-          fee: fee,
+          fee,
           feePayer: payload.from,
-          nonce: nonce,
-          validUntil: validUntil,
-          memo: memo,
+          nonce,
+          validUntil,
+          memo,
         },
         paymentPayload: {
           source: payload.from,
           receiver: payload.to,
-          amount: amount,
+          amount,
         },
       },
     });
@@ -192,19 +187,15 @@ class Client {
     const memo = stakeDelegation.memo ?? "";
     const fee = String(stakeDelegation.fee);
     const nonce = String(stakeDelegation.nonce);
-    const validUntil = String(
-      stakeDelegation.validUntil
-        ? stakeDelegation.validUntil
-        : defaultValidUntil
-    );
+    const validUntil = String(stakeDelegation.validUntil ?? defaultValidUntil);
     return {
       signature: minaSDK.signStakeDelegation(this.network, privateKey, {
         common: {
-          fee: fee,
+          fee,
           feePayer: stakeDelegation.from,
-          nonce: nonce,
-          validUntil: validUntil,
-          memo: memo,
+          nonce,
+          validUntil,
+          memo,
         },
         delegationPayload: {
           newDelegate: stakeDelegation.to,
@@ -214,10 +205,10 @@ class Client {
       data: {
         to: stakeDelegation.to,
         from: stakeDelegation.from,
-        fee: fee,
-        nonce: nonce,
-        memo: memo,
-        validUntil: validUntil,
+        fee,
+        nonce,
+        memo,
+        validUntil,
       },
     };
   }
@@ -235,19 +226,17 @@ class Client {
     const memo = payload.memo ?? "";
     const fee = String(payload.fee);
     const nonce = String(payload.nonce);
-    const validUntil = String(
-      payload.validUntil ? payload.validUntil : defaultValidUntil
-    );
+    const validUntil = String(payload.validUntil ?? defaultValidUntil);
     return minaSDK.verifyStakeDelegationSignature(this.network, {
       sender: signedStakeDelegation.data.from,
       signature: signedStakeDelegation.signature,
       stakeDelegation: {
         common: {
-          fee: fee,
+          fee,
           feePayer: payload.from,
-          nonce: nonce,
-          validUntil: validUntil,
-          memo: memo,
+          nonce,
+          validUntil,
+          memo,
         },
         delegationPayload: {
           newDelegate: payload.to,
@@ -269,9 +258,7 @@ class Client {
     const fee = String(payload.fee);
     const amount = String(payload.amount);
     const nonce = String(payload.nonce);
-    const validUntil = String(
-      payload.validUntil ? payload.validUntil : defaultValidUntil
-    );
+    const validUntil = String(payload.validUntil ?? defaultValidUntil);
     return minaSDK.hashPayment({
       sender: signedPayment.data.from,
       signature: signedPayment.signature,
@@ -279,14 +266,14 @@ class Client {
         common: {
           fee: fee,
           feePayer: payload.from,
-          nonce: nonce,
-          validUntil: validUntil,
-          memo: memo,
+          nonce,
+          validUntil,
+          memo,
         },
         paymentPayload: {
           source: payload.from,
           receiver: payload.to,
-          amount: amount,
+          amount,
         },
       },
     });
@@ -305,19 +292,17 @@ class Client {
     const memo = payload.memo ?? "";
     const fee = String(payload.fee);
     const nonce = String(payload.nonce);
-    const validUntil = String(
-      payload.validUntil ? payload.validUntil : defaultValidUntil
-    );
+    const validUntil = String(payload.validUntil ?? defaultValidUntil);
     return minaSDK.hashStakeDelegation({
       sender: signedStakeDelegation.data.from,
       signature: signedStakeDelegation.signature,
       stakeDelegation: {
         common: {
-          fee: fee,
+          fee,
           feePayer: payload.from,
-          nonce: nonce,
-          validUntil: validUntil,
-          memo: memo,
+          nonce,
+          validUntil,
+          memo,
         },
         delegationPayload: {
           newDelegate: payload.to,
