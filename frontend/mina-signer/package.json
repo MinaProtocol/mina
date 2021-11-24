@@ -3,9 +3,8 @@
   "description": "Node API for signing transactions on various networks for Mina Protocol",
   "version": "1.0.0",
   "scripts": {
-    "build": "tsc src/MinaSDK.ts -d",
-    "build:watch": "tsc src/MinaSDK.ts -w",
-    "clean": "tsc --clean",
+    "build": "tsc && cp src/client_sdk.bc.js dist/src",
+    "clean": "rm -rf dist",
     "make-jsoo": "make -C ../.. client_sdk && cp ../../_build/default/src/app/client_sdk/client_sdk.bc.js src && chmod 0666 src/client_sdk.bc.js",
     "test": "jest",
     "prepublishOnly": "yarn make-jsoo && yarn build && yarn test"
@@ -20,10 +19,10 @@
   "homepage": "https://minaprotocol.com/",
   "repository": "https://github.com/MinaProtocol/mina",
   "bugs": "https://github.com/MinaProtocol/mina/issues",
-  "main": "src/MinaSDK.js",
-  "types": "src/MinaSDK.d.ts",
+  "main": "dist/src/MinaSDK.js",
+  "types": "dist/src/MinaSDK.d.ts",
   "files": [
-    "src"
+    "dist"
   ],
   "devDependencies": {
     "@babel/core": "^7.16.0",
