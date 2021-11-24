@@ -7,18 +7,18 @@ describe("Keypair", () => {
     client = new Client({ network: "mainnet" });
   });
 
-  it("generates a valid keypair", () => {
+  it("generates a valid key pair", () => {
     const keypair = client.genKeys();
     expect(keypair.publicKey).toBeDefined();
     expect(keypair.privateKey).toBeDefined();
   });
 
-  it("can verify a valid keypair", () => {
+  it("can verify a valid key pair", () => {
     const keypair = client.genKeys();
     expect(client.verifyKeypair(keypair)).toBeTruthy();
   });
 
-  it("fails to derive an invalid keypair", () => {
+  it("fails to derive an invalid key pair", () => {
     try {
       client.verifyKeypair({ publicKey: "invalid", privateKey: "invalid" });
     } catch (error) {

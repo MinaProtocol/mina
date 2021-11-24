@@ -26,21 +26,21 @@ class Client {
   }
 
   /**
-   * Generates a public/private keypair
+   * Generates a public/private key pair
    *
-   * @returns A Mina keypair
+   * @returns A Mina key pair
    */
   public genKeys(): keypair {
     return minaSDK.genKeys();
   }
 
   /**
-   * Verifies if a keypair is valid by checking if the public key can be derived from
+   * Verifies if a key pair is valid by checking if the public key can be derived from
    * the private key and additionally checking if we can use the private key to
-   * sign a transaction. If the keypair is invalid, an exception is thrown.
+   * sign a transaction. If the key pair is invalid, an exception is thrown.
    *
-   * @param keypair - A keypair
-   * @returns True if the `keypair` is a verifiable keypair, otherwise throw an exception
+   * @param keypair A key pair
+   * @returns True if the `keypair` is a verifiable key pair, otherwise throw an exception
    */
   public verifyKeypair(keypair: keypair): boolean {
     return minaSDK.validKeypair(keypair);
@@ -49,7 +49,7 @@ class Client {
   /**
    * Derives the public key of the corresponding private key
    *
-   * @param privateKey - The private key used to get the corresponding public key
+   * @param privateKey The private key used to get the corresponding public key
    * @returns A public key
    */
   public derivePublicKey(privateKey: privateKey): publicKey {
@@ -59,8 +59,8 @@ class Client {
   /**
    * Signs an arbitrary message
    *
-   * @param message - An arbitrary string message to be signed
-   * @param key- The keypair used to sign the message
+   * @param message An arbitrary string message to be signed
+   * @param key The key pair used to sign the message
    * @returns A signed message
    */
   public signMessage(message: string, key: keypair): signed<message> {
@@ -76,7 +76,7 @@ class Client {
   /**
    * Verifies that a signature matches a message.
    *
-   * @param signedMessage - A signed message
+   * @param signedMessage A signed message
    * @returns True if the `signedMessage` contains a valid signature matching
    * the message and publicKey.
    */
@@ -95,8 +95,8 @@ class Client {
    * This type of transaction allows a user to transfer funds from one account
    * to another over the network.
    *
-   * @param payment - An object describing the payment
-   * @param privateKey- The private key used to sign the transaction
+   * @param payment An object describing the payment
+   * @param privateKey The private key used to sign the transaction
    * @returns A signed payment transaction
    */
   public signPayment(
@@ -138,7 +138,7 @@ class Client {
   /**
    * Verifies a signed payment.
    *
-   * @param signedPayment - A signed payment transaction
+   * @param signedPayment A signed payment transaction
    * @returns True if the `signed(payment)` is a verifiable payment
    */
   public verifyPayment(signedPayment: signed<payment>): boolean {
@@ -216,7 +216,7 @@ class Client {
   /**
    * Verifies a signed stake delegation.
    *
-   * @param signedStakeDelegation - A signed stake delegation
+   * @param signedStakeDelegation A signed stake delegation
    * @returns True if the `signed(stakeDelegation)` is a verifiable stake delegation
    */
   public verifyStakeDelegation(
@@ -249,7 +249,7 @@ class Client {
   /**
    * Compute the hash of a signed payment.
    *
-   * @param signedPayment - A signed payment transaction
+   * @param signedPayment A signed payment transaction
    * @returns A transaction hash
    */
   public hashPayment(signedPayment: signed<payment>): string {
@@ -282,7 +282,7 @@ class Client {
   /**
    * Compute the hash of a signed stake delegation.
    *
-   * @param signedStakeDelegation - A signed stake delegation
+   * @param signedStakeDelegation A signed stake delegation
    * @returns A transaction hash
    */
   public hashStakeDelegation(
@@ -317,7 +317,7 @@ class Client {
    * compatible with GraphQL. The JSON string is a representation of
    * a `Signed_command` which is what our GraphQL expects.
    *
-   * @param signedRosettaTxn - A signed Rosetta transaction
+   * @param signedRosettaTxn A signed Rosetta transaction
    * @returns A string that represents the JSON conversion of a signed Rosetta transaction`.
    */
   public signedRosettaTransactionToSignedCommand(
@@ -330,7 +330,7 @@ class Client {
    * Return the hex-encoded format of a valid public key. This will throw an exception if
    * the key is invalid or the conversion fails.
    *
-   * @param publicKey - A valid public key
+   * @param publicKey A valid public key
    * @returns A string that represents the hex encoding of a public key.
    */
   public publicKeyToRaw(publicKey: string): string {
