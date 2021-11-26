@@ -41,8 +41,8 @@ Given these constraints, [LMDB](http://www.lmdb.tech/doc/) is a good choice for 
 
 | Key                  | Value                | Key bytes                   |
 |----------------------|----------------------|-----------------------------|
-| `status/<root_cid>`  | integer: 0..2        | <1><32-byte blake2b digest> |
-| `block/<cid>`        | bitswap block bytes  | <0><32-byte blake2b digest> |
+| `status/<root_cid>`  | integer: 0..2        | `<1><32-byte blake2b digest>` |
+| `block/<cid>`        | bitswap block bytes  | `<0><32-byte blake2b digest>` |
 
 Status is an integer taking one of the values:
 
@@ -183,14 +183,39 @@ Releasing of Bitswap will happen in two stages:
 2. After most block producers adopt new version, change to default `--pubsub-v1=none`
 3. Launch a network of "pubsub relays" which will service both `--pubsub-v1=rw` and `--pubsub-v2=rw` until the next hardfork
 
+### New block topic
+
+New block topic presents a new message type comprising:
+
+1. Block header (as defined above)
+2. Block body certificate
+
+Block body certificate in turn is the data structure with the following fields:
+
+1. 32-byte block body root
+2. Signature
+
+Block body root is a hash of a root bitswap block containing bytes of block body.
+
+Signature is a digital signature of pair `(block body root hash, block header hash)` made with secret key corresponding to block producer's key specified in the block's header.
+
+Frontier absorbs block headers along with the corresponding block body roots and keeps them as 1:1 relation. Whenever the same block header is received with a different block body root (and a valid block producer signature), block producer is banned from producing a block for the given slot.
+
+Additionally, if bitswap block referenced by block body root is broken, block producer is banned from producing a block for the given slot.
+
+In case of ban for a slot, all of the corresponding data is cleaned out, ban is local.
+
 ## Hard-fork
 
 In the next hardfork old topic becomes entirely abandoned.
 
+Also, consider migrating to hash-based message ids as described in [issue #9876](https://github.com/MinaProtocol/mina/issues/9876).
+
 # Drawbacks
 [drawbacks]: #drawbacks
 
-This adds significant complexity to how the protocol gossips around information. The control flow for validating blocks is more complex than before, and there is new state to synchronize between the processes in the architecture. It also adds new delays to when the full block data will be available to each node (but the tradeoff here is that we are able to more consistently gossip block headers around the network within the same slot those blocks are produced).
+This adds significant complexity to how the protocol gossips around information. The control flow for validating blocks is more complex than before, and there is new state to synchronize between the processes in the architecture. It also adds new delays to when the full block data will be available to each node (but the tradeoff here is that we are able to more consistently gossip block 
+s around the network within the same slot those blocks are produced).
 
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
