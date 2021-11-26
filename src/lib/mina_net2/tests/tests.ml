@@ -191,4 +191,42 @@ let%test_module "coda network tests" =
         ()
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+
+    let%test_unit "blocking stream" =
+      let () = Core.Backtrace.elide := false in
+      let test_def =
+        let open Deferred.Let_syntax in
+        let%bind b, c, shutdown = setup_two_nodes "test_stream" in
+        let%bind b_peerid = me b >>| Keypair.to_peer_id in
+        let handler_finished = Ivar.create () in
+        let%bind () =
+          open_protocol b ~on_handler_error:`Raise ~protocol:"echo"
+            (fun stream ->
+              Pipe.set_size_budget stream 3  (* Only allow 3 bytes before pushback *)
+              let r, w = Libp2p_stream.pipes stream in
+              let%map () = Pipe.transfer r w ~f:Fn.id in
+              Pipe.close w ;
+              Ivar.fill_if_empty handler_finished ())
+          |> Deferred.Or_error.ok_exn
+        in
+        let%bind stream =
+          open_stream c ~protocol:"echo" ~peer:b_peerid >>| Or_error.ok_exn
+        in
+        let r, w = Libp2p_stream.pipes stream in
+        Pipe.set_size_budget stream 3 (* Only allow 3 bytes before pushback *)
+        Pipe.write_without_pushback w testmsg ;
+        Pipe.close w ;
+        (* HACK: let our messages send before we reset.
+           It would be more principled to add synchronization. *)
+        let%bind () = after (Time.Span.of_sec 1.) in
+        let%bind () = reset_stream c stream >>| Or_error.ok_exn in
+        let%bind msg = Pipe.read_all r in
+        let msg = Queue.to_list msg |> String.concat in
+        assert (String.equal msg testmsg) ;
+        let%bind () = Ivar.read handler_finished in
+        let%bind () = close_protocol b ~protocol:"echo" in
+        let%map () = shutdown () in
+        ()
+      in
+      Async.Thread_safe.block_on_async_exn (fun () -> test_def)
   end )
