@@ -175,8 +175,10 @@ Daemon runs message propagation for legacy topic as follows:
 2. If `--pubsub-v2=rw` or `--pubsub-v2=ro`, listen to `mina/block/1.0.0` and add headers to frontier
 3. For each new block in frontier, publish it to `coda/consensus-messages/0.0.1` if `--pubsub-v1=rw`
 4. If `--pubsub-v1=rw` or `--pubsub-v1=ro`, listen to `coda/consensus-messages/0.0.1`
-   1. For each valid message if `--pubsub-v2=rw` resend corresponding header to `mina/block/1.0.0`
-
+   1. For each valid block message if `--pubsub-v2=rw` resend corresponding header to `mina/block/1.0.0`
+   2. For each valid transaction message if `--pubsub-v2=rw` resend it to `mina/tx/1.0.0`
+   3. For each valid snark work message if `--pubsub-v2=rw` resend it to `mina/snark-work/1.0.0`
+ 
 Releasing of Bitswap will happen in two stages:
 
 1. Release with default parameters `--pubsub-v1=rw` and `--pubsub-v2=rw`
