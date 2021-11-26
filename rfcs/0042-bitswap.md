@@ -39,10 +39,10 @@ Given these constraints, [LMDB](http://www.lmdb.tech/doc/) is a good choice for 
 
 ### Database Schema
 
-| Key                  | Value                |
-|----------------------|----------------------|
-| `status/<root_cid>`  | integer: 0..2        |
-| `block/<cid>`        | bitswap block bytes  |
+| Key                  | Value                | Key bytes                   |
+|----------------------|----------------------|-----------------------------|
+| `status/<root_cid>`  | integer: 0..2        | <1><32-byte blake2b digest> |
+| `block/<cid>`        | bitswap block bytes  | <0><32-byte blake2b digest> |
 
 Status is an integer taking one of the values:
 
@@ -157,9 +157,31 @@ For soft-fork stage, here is the anticipated changeset:
     * `mina/snark-work/1.0.0`
 3. Engine to rebroadcast blocks from the new topics to old `coda/consensus-messages/0.0.1` and vice versa
 
+### Legacy topic management
+
 Most new nodes will support both old and new topics for broadcast. Nodes are able to filter subscriptions from other nodes based on what they subscribe to, configured using the [`WithSubscriptionFilter` option](https://github.com/libp2p/go-libp2p-pubsub/blob/55d412efa7f5a734d2f926e0c7c948f0ab4def21/subscription_filter.go#L36). Utilizing this, nodes that support the new topics can filter out the old topic from nodes that support both topics. By filtering the topics like this, nodes running the new version can broadcast new blocks over both topics while avoiding sending the old message format to other nodes which support the new topic.
 
-Over time, when most of the network participants adopt the newer version, we can release a flag to enable old topic on a node. Only a few specifically configured nodes (including some seeds) will continue servicing the old topic, while most of the network will live entirely on the new topic.
+Over time, when most of the network participants adopt the newer version, only a few specifically configured nodes (including some seeds) will continue servicing the old topic, while most of the network will live entirely on the new topic.
+
+Mina node will take two additional arguments:
+
+* `--pubsub-v1`: `rw`, `ro` or default `none`
+* `--pubsub-v2`: default `rw`, `ro` or `none`
+
+Daemon runs message propagation for legacy topic as follows:
+
+1. If `--pubsub-v2=rw` or `--pubsub-v2=ro`, listen to `mina/tx/1.0.0` and `mina/snark-work/1.0.0`
+   1. For each valid message if `--pubsub-v1=rw` resend it to `coda/consensus-messages/0.0.1`
+2. If `--pubsub-v2=rw` or `--pubsub-v2=ro`, listen to `mina/block/1.0.0` and add headers to frontier
+3. For each new block in frontier, publish it to `coda/consensus-messages/0.0.1` if `--pubsub-v1=rw`
+4. If `--pubsub-v1=rw` or `--pubsub-v1=ro`, listen to `coda/consensus-messages/0.0.1`
+   1. For each valid message if `--pubsub-v2=rw` resend corresponding header to `mina/block/1.0.0`
+
+Releasing of Bitswap will happen in two stages:
+
+1. Release with default parameters `--pubsub-v1=rw` and `--pubsub-v2=rw`
+2. After most block producers adopt new version, change to default `--pubsub-v1=none`
+3. Launch a network of "pubsub relays" which will service both `--pubsub-v1=rw` and `--pubsub-v2=rw` until the next hardfork
 
 ## Hard-fork
 
