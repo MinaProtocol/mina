@@ -161,6 +161,16 @@ For soft-fork stage, here is the anticipated changeset:
 
 Most new nodes will support both old and new topics for broadcast. Nodes are able to filter subscriptions from other nodes based on what they subscribe to, configured using the [`WithSubscriptionFilter` option](https://github.com/libp2p/go-libp2p-pubsub/blob/55d412efa7f5a734d2f926e0c7c948f0ab4def21/subscription_filter.go#L36). Utilizing this, nodes that support the new topics can filter out the old topic from nodes that support both topics. By filtering the topics like this, nodes running the new version can broadcast new blocks over both topics while avoiding sending the old message format to other nodes which support the new topic.
 
+In particular, following method of the filter is to be implemented:
+
+```
+type SubscriptionFilter interface {
+  ...
+  FilterIncomingSubscriptions(peer.ID, []*pb.RPC_SubOpts) ([]*pb.RPC_SubOpts, error)
+}
+```
+On receiving of these incoming subscription for the old topic, we check whether the same peer is already subscribed to all three new topics and if so, subscriptions is filtered out. Node configuration code shall be implemented accordingly, subscribing to the new topics first.
+
 Over time, when most of the network participants adopt the newer version, only a few specifically configured nodes (including some seeds) will continue servicing the old topic, while most of the network will live entirely on the new topic.
 
 Mina node will take two additional arguments:
