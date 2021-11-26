@@ -101,7 +101,7 @@ let Config =
       , retries : List Retry.Type
       , soft_fail : Optional B/SoftFail
       , skip: Optional B/Skip
-      , if : Optional B/If
+      , `if` : Optional B/If
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
@@ -113,7 +113,7 @@ let Config =
     , retries = [] : List Retry.Type
     , soft_fail = None B/SoftFail
     , skip = None B/Skip
-    , if = None B/If
+    , `if` = None B/If
     }
   }
 
@@ -189,7 +189,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
           },
     soft_fail = c.soft_fail,
     skip = c.skip,
-    if = c.if,
+    `if` = c.`if`,
     plugins =
       let dockerPart =
         Optional/toList
