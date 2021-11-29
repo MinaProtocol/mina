@@ -538,6 +538,10 @@ func TestBitswapJumbo(t *testing.T) {
 
 // Runs for 10 min
 func TestBitswapMedium(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestBitswapMedium in short mode")
+		return
+	}
 	testBitswap(t, 100, 10, 5, 1<<16, true)
 }
 
@@ -550,6 +554,10 @@ func TestBitswapSmall(t *testing.T) {
 }
 
 func TestBitswapQC(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestBitswapJumbo in short mode")
+		return
+	}
 	nodes, cancels := initNodes(t, 20, resourceUpdateOnlyMask)
 	for ni := range nodes {
 		go func(ni int) {
