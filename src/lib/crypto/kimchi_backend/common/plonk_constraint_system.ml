@@ -207,7 +207,7 @@ module Plonk_constraint = struct
               [ mul cl vl; mul cr vr; mul co vo; mul m (mul vl vr); c ]
           in
           if not (equal zero res) then (
-            Core.eprintf
+            Core_kernel.eprintf
               !"%{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t} * %{sexp:t}\n\
@@ -288,7 +288,7 @@ type 'f t =
   ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
   }
 
-module Hash = Core.Md5
+module Hash = Core_kernel.Md5
 
 (* the hash of the circuit *)
 let digest (t : _ t) = Hash_state.digest t.hash
@@ -308,7 +308,7 @@ module Make
       val params : Fp.t Params.t
     end) =
 struct
-  open Core
+  open Core_kernel
   open Pickles_types
 
   type nonrec t = Fp.t t

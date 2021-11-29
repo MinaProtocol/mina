@@ -3,19 +3,28 @@
 use wasm_bindgen::prelude::*;
 use kimchi_circuits::{gate::CircuitGate, wires::Wire, gate::GateType};
 use std::convert::TryInto;
+use crate::wasm_flat_vector::WasmFlatVector;
 
 use paste::paste;
 
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug)]
 pub struct WasmGateWires(
-    Wire,
-    Wire,
-    Wire,
-    Wire,
-    Wire,
-    Wire,
-    Wire);
+    pub Wire,
+    pub Wire,
+    pub Wire,
+    pub Wire,
+    pub Wire,
+    pub Wire,
+    pub Wire);
+
+#[wasm_bindgen]
+impl WasmGateWires {
+    #[wasm_bindgen(constructor)]
+    pub fn new(w0: Wire, w1: Wire, w2: Wire, w3: Wire, w4: Wire, w5: Wire, w6: Wire) -> Self {
+        WasmGateWires(w0, w1, w2, w3, w4, w5, w6)
+    }
+}
 
 macro_rules! impl_gate_vector {
     ($name: ident,
@@ -35,6 +44,23 @@ macro_rules! impl_gate_vector {
                 pub typ: GateType, // type of the gate
                 pub wires: WasmGateWires,  // gate wires
                 #[wasm_bindgen(skip)] pub c: Vec<$WasmF>,  // constraints vector
+            }
+
+            #[wasm_bindgen]
+            impl [<Wasm $field_name:camel Gate>] {
+                #[wasm_bindgen(constructor)]
+                pub fn new(
+                    row: u32,
+                    typ: GateType,
+                    wires: WasmGateWires,
+                    c: WasmFlatVector<$WasmF>) -> Self {
+                    Self {
+                        row,
+                        typ,
+                        wires,
+                        c: c.into(),
+                    }
+                }
             }
 
             impl From<CircuitGate<$F>> for [<Wasm $field_name:camel Gate>]

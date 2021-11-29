@@ -35,33 +35,52 @@ var wasm_ready = function(wasm) {
 };
 
 // Provides: startWorkers
-// Requires: worker_threads, _workers
-var startWorkers = function(worker_source, memory, builder) {
-    return joo_global_object.Promise.all(
-        Array.from({ length: builder.numThreads() }, function() {
-            // Self-spawn into a new Worker.
-            // The script is fetched as a blob so it works even if this script is
-            // hosted remotely (e.g. on a CDN). This avoids a cross-origin
-            // security error.
-            var worker = new worker_threads.Worker(worker_source, {
-                workerData: {memory: memory, receiver: builder.receiver()}
-            });
-            var target = worker;
-            var type = 'wasm_bindgen_worker_ready';
-            return new joo_global_object.Promise(function(resolve) {
-                var done = false;
-                target.on('message', function onMsg(data) {
-                    if (data == null || data.type !== type || done) return;
-                    done = true;
-                    resolve(worker);
+// Requires: worker_threads, _workers, caml_js_export_var
+var startWorkers = (function() {
+    var snarky_ready_resolve;
+    caml_js_export_var().snarky_ready =
+        new joo_global_object.Promise(function(resolve) {
+            snarky_ready_resolve = resolve;
+        });
+    return function(worker_source, memory, builder) {
+        joo_global_object.wasm_workers = [];
+        joo_global_object.wasm_rayon_poolbuilder = builder;
+        return joo_global_object.Promise.all(
+            Array.from({ length: builder.numThreads() }, function() {
+                // Self-spawn into a new Worker.
+                // The script is fetched as a blob so it works even if this script is
+                // hosted remotely (e.g. on a CDN). This avoids a cross-origin
+                // security error.
+                var worker = new worker_threads.Worker(worker_source, {
+                    workerData: {memory: memory, receiver: builder.receiver()}
                 });
-            });
-        })
-    ).then(function(data) {
-        _workers = data;
-        builder.build();
-    });
-};
+                joo_global_object.wasm_workers.push(worker);
+                var target = worker;
+                var type = 'wasm_bindgen_worker_ready';
+                return new joo_global_object.Promise(function(resolve) {
+                    var done = false;
+                    target.on('message', function onMsg(data) {
+                        if (data == null || data.type !== type || done) return;
+                        done = true;
+                        resolve(worker);
+                    });
+                });
+            })
+        ).then(function(data) {
+            snarky_ready_resolve();
+            _workers = data;
+            try { builder.build(); }
+            catch (_e) {
+                // We 'mute' this error here, since it can only ever throw when
+                // there is something wrong with the rayon subsystem in WASM, and
+                // we deliberately introduce such a problem by destroying builder
+                // when we want to shutdown the process (and thus need to kill the
+                // child threads). The error here won't be useful to developers
+                // using the library.
+            }
+        });
+    };
+})();
 
 /* node_backend.js */
 
