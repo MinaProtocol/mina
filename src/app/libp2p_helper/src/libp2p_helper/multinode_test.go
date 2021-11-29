@@ -73,6 +73,7 @@ func initNodes(t *testing.T, numNodes int, upcallMask uint32) ([]testNode, []con
 		ctx, cancelF := context.WithCancel(topCtx)
 		cancels[ni] = cancelF
 		node := newTestAppWithMaxConnsAndCtx(t, keys[ni], nil, false, CONNS_LO, CONNS_HI, false, nextPort(), ctx)
+		node.NoMDNS = true
 		node.P2p.Logger = logging.Logger(fmt.Sprintf("node%d", ni))
 		node.SetConnectionHandlers()
 		launchFeedUpcallTrap(node.P2p.Logger, node.OutChan, trap, errChan, ctx)

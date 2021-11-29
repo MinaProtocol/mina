@@ -12,7 +12,7 @@ libp2p_helper: ../../libp2p_ipc/libp2p_ipc.capnp.go
 	$(WRAPAPP) ../../../scripts/build-go-helper.sh libp2p_helper
 
 test: ../../libp2p_ipc/libp2p_ipc.capnp.go
-	cd src/libp2p_helper && $(GO) test -short -timeout 40m # && $(GO) test -timeout 40m -run "^TestBitswapJumbo$$"
+	cd src/libp2p_helper && $(GO) test -short -timeout 15m # && $(GO) test -timeout 40m -run "^TestBitswapJumbo$$"
 
 clean:
 	rm -rf result ../../libp2p_ipc/libp2p_ipc.capnp.go
