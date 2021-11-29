@@ -31,126 +31,61 @@ end
 
 module Sql = struct
   module Balance_from_last_relevant_command = struct
-    (* This is SQL is the common chunk shared between the query_recent and
-     * query_old that retreives the relevant balance changes from transactions
-     * at a block. *)
-    let common_sql =
-      {sql|
-relevant_internal_block_balances AS (
-  SELECT
-    block_internal_command.block_id,
-    block_internal_command.sequence_no,
-    block_internal_command.secondary_sequence_no,
-    receiver_balance.balance
-  FROM blocks_internal_commands block_internal_command
-  INNER JOIN balances receiver_balance ON block_internal_command.receiver_balance = receiver_balance.id
-  INNER JOIN public_keys receiver_pk ON receiver_pk.id = receiver_balance.public_key_id
-  WHERE receiver_pk.value = $1
-),
-
-relevant_user_block_fee_payer_balances AS (
-  SELECT
-    block_user_command.block_id,
-    block_user_command.sequence_no,
-    fee_payer_balance.balance
-  FROM blocks_user_commands block_user_command
-
-  INNER JOIN balances fee_payer_balance ON fee_payer_balance.id = block_user_command.fee_payer_balance
-
-  INNER JOIN public_keys fee_payer_pk ON fee_payer_pk.id = fee_payer_balance.public_key_id
-  WHERE fee_payer_pk.value = $1
-),
-
-relevant_user_block_source_balances AS (
-  SELECT
-    block_user_command.block_id,
-    block_user_command.sequence_no,
-    source_balance.balance
-  FROM blocks_user_commands block_user_command
-
-  INNER JOIN balances source_balance ON source_balance.id = block_user_command.source_balance
-
-  INNER JOIN public_keys source_pk ON source_pk.id = source_balance.public_key_id
-  WHERE source_pk.value = $1
-),
-
-relevant_user_block_receiver_balances AS (
-  SELECT
-    block_user_command.block_id,
-    block_user_command.sequence_no,
-    receiver_balance.balance
-  FROM blocks_user_commands block_user_command
-
-  INNER JOIN balances receiver_balance ON receiver_balance.id = block_user_command.receiver_balance
-
-  INNER JOIN public_keys receiver_pk ON receiver_pk.id = receiver_balance.public_key_id
-  WHERE receiver_pk.value = $1
-),
-
-relevant_user_block_balances AS (
-  (SELECT block_id, sequence_no, balance FROM relevant_user_block_fee_payer_balances)
-  UNION
-  (SELECT block_id, sequence_no, balance FROM relevant_user_block_source_balances)
-  UNION
-  (SELECT block_id, sequence_no, balance FROM relevant_user_block_receiver_balances)
-),
-
-relevant_block_balances AS (
-  (SELECT block_id, sequence_no, secondary_sequence_no, balance FROM relevant_internal_block_balances)
-  UNION
-  (SELECT block_id, sequence_no, 0 AS secondary_sequence_no, balance FROM relevant_user_block_balances)
-)
-      |sql}
 
     let query_recent =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         Caqti_type.(tup2 int64 int64)
-        (sprintf {sql|
-WITH RECURSIVE chain AS (
-  (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
-  FROM blocks b
-  WHERE height = (select MAX(height) from blocks)
-  ORDER BY timestamp ASC
-  LIMIT 1)
+        {sql| WITH RECURSIVE chain AS (
 
-  UNION ALL
+               (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
 
-  SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status FROM blocks b
-  INNER JOIN chain
-  ON b.id = chain.parent_id AND chain.id <> chain.parent_id AND chain.chain_status <> 'canonical'
-),
+                FROM blocks b
+                WHERE height = (select MAX(height) from blocks)
+                ORDER BY timestamp ASC
+                LIMIT 1)
 
-%s
+                UNION ALL
 
-SELECT
-  chain.global_slot_since_genesis AS block_global_slot_since_genesis,
-  balance
-FROM
-chain
-JOIN relevant_block_balances rbb ON chain.id = rbb.block_id
-WHERE chain.height <= $2
-ORDER BY (chain.height, sequence_no, secondary_sequence_no) DESC
-LIMIT 1
-      |sql} common_sql)
+                SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status
+
+                FROM blocks b
+                INNER JOIN chain
+                ON b.id = chain.parent_id AND chain.id <> chain.parent_id
+                AND chain.chain_status <> 'canonical'
+
+               )
+
+              SELECT chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance
+
+              FROM chain
+              INNER JOIN balances bal ON chain.id = bal.block_id
+              INNER JOIN public_keys pks ON bal.public_key_id = pks.id
+
+              WHERE pks.value = $1
+              AND chain.height <= $2
+
+              ORDER BY (bal.block_height, bal.block_sequence_no, bal.block_secondary_sequence_no) DESC
+              LIMIT 1
+      |sql}
 
     let query_old =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         Caqti_type.(tup2 int64 int64)
-(sprintf {sql|
-WITH %s
+        {sql| SELECT b.global_slot_since_genesis AS block_global_slot_since_genesis,balance
 
-SELECT
-  b.global_slot_since_genesis AS block_global_slot_since_genesis,
-  balance
-FROM
-blocks b
-JOIN relevant_block_balances rbb ON b.id = rbb.block_id
-WHERE b.height <= $2 AND b.chain_status = 'canonical'
-ORDER BY (b.height, sequence_no, secondary_sequence_no) DESC
-LIMIT 1
-      |sql} common_sql)
+              FROM blocks b
+              INNER JOIN balances bal ON b.id = bal.block_id
+              INNER JOIN public_keys pks ON bal.public_key_id = pks.id
+
+              WHERE pks.value = $1
+              AND b.height <= $2
+              AND b.chain_status = 'canonical'
+
+              ORDER BY (bal.block_height, bal.block_sequence_no, bal.block_secondary_sequence_no) DESC
+              LIMIT 1
+      |sql}
 
     let run (module Conn : Caqti_async.CONNECTION) requested_block_height
         address =
