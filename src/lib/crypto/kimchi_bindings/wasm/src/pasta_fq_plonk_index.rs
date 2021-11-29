@@ -29,7 +29,7 @@ pub struct WasmPastaFqPlonkIndex(
 #[wasm_bindgen]
 pub fn caml_pasta_fq_plonk_index_create(
     gates: &WasmGateVector,
-    public: i32,
+    public_: i32,
     srs: &WasmSrs,
 ) -> Result<WasmPastaFqPlonkIndex, JsValue> {
     // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
@@ -55,7 +55,7 @@ pub fn caml_pasta_fq_plonk_index_create(
         gates,
         vec![],
         oracle::pasta::fq_3::params(),
-        public as usize,
+        public_ as usize,
     ) {
         None => {
             return Err(JsValue::from_str(

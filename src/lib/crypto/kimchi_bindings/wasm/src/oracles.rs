@@ -54,8 +54,42 @@ macro_rules! impl_oracles {
                 pub v_chal: $WasmF,
                 pub u_chal: $WasmF,
             }
+            type WasmRandomOracles = [<Wasm $field_name:camel RandomOracles>];
 
-            impl From<RandomOracles<$F>> for [<Wasm $field_name:camel RandomOracles>]
+            #[wasm_bindgen]
+            impl [<Wasm $field_name:camel RandomOracles>] {
+                #[wasm_bindgen(constructor)]
+                pub fn new(
+                    joint_combiner_chal: $WasmF,
+                    joint_combiner: $WasmF,
+                    beta: $WasmF,
+                    gamma: $WasmF,
+                    alpha_chal: $WasmF,
+                    alpha: $WasmF,
+                    zeta: $WasmF,
+                    v: $WasmF,
+                    u: $WasmF,
+                    zeta_chal: $WasmF,
+                    v_chal: $WasmF,
+                    u_chal: $WasmF) -> Self  {
+                    Self {
+                        joint_combiner_chal,
+                        joint_combiner,
+                        beta,
+                        gamma,
+                        alpha_chal,
+                        alpha,
+                        zeta,
+                        v,
+                        u,
+                        zeta_chal,
+                        v_chal,
+                        u_chal,
+                    }
+                }
+            }
+
+            impl From<RandomOracles<$F>> for WasmRandomOracles
             {
                 fn from(ro: RandomOracles<$F>) -> Self {
                     Self {
@@ -75,7 +109,7 @@ macro_rules! impl_oracles {
                 }
             }
 
-            impl Into<RandomOracles<$F>> for [<Wasm $field_name:camel RandomOracles>]
+            impl Into<RandomOracles<$F>> for WasmRandomOracles
             {
                 fn into(self) -> RandomOracles<$F> {
                     RandomOracles {
@@ -103,6 +137,19 @@ macro_rules! impl_oracles {
                 #[wasm_bindgen(skip)]
                 pub opening_prechallenges: WasmFlatVector<$WasmF>,
                 pub digest_before_evaluations: $WasmF,
+            }
+
+            #[wasm_bindgen]
+            impl [<Wasm $field_name:camel Oracles>] {
+                #[wasm_bindgen(constructor)]
+                pub fn new(
+                    o: WasmRandomOracles,
+                    p_eval0: $WasmF,
+                    p_eval1: $WasmF,
+                    opening_prechallenges: WasmFlatVector<$WasmF>,
+                    digest_before_evaluations: $WasmF) -> Self {
+                    Self {o, p_eval0, p_eval1, opening_prechallenges, digest_before_evaluations}
+                }
             }
 
             #[wasm_bindgen]

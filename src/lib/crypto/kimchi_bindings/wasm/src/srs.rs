@@ -68,6 +68,7 @@ macro_rules! impl_srs {
                 }
             }
 
+            #[wasm_bindgen]
             pub fn [<$name:snake _create>](depth: i32) -> [<Wasm $field_name:camel Srs>] {
                 Arc::new(SRS::create(depth as usize)).into()
             }

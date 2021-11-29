@@ -426,7 +426,6 @@ macro_rules! impl_proof {
                 pub evals0: WasmProofEvaluations,
                 #[wasm_bindgen(skip)]
                 pub evals1: WasmProofEvaluations,
-                #[wasm_bindgen(skip)]
                 pub ft_eval1: $WasmF,
                 #[wasm_bindgen(skip)]
                 pub public: WasmFlatVector<$WasmF>,

@@ -33,9 +33,9 @@ pub enum WasmColumnTag {
 #[wasm_bindgen]
 #[derive(Clone, Copy)]
 pub struct WasmColumn {
-    tag: WasmColumnTag,
-    gate_type: GateType,
-    i: i32,
+    pub tag: WasmColumnTag,
+    pub gate_type: GateType,
+    pub i: i32,
 }
 
 impl From<Column> for WasmColumn {
@@ -168,6 +168,7 @@ macro_rules! impl_verification_key {
      ) => {
 
         paste! {
+            /*
             #[wasm_bindgen]
             #[derive(Clone, Copy)]
             pub enum WasmPolishTokenTag {
@@ -190,7 +191,6 @@ macro_rules! impl_verification_key {
                 Load,
             }
 
-            /*
             #[wasm_bindgen]
             #[derive(Clone, Copy)]
             pub struct WasmPolishToken {
@@ -373,16 +373,16 @@ macro_rules! impl_verification_key {
                 }
             }
 
-            #[wasm_bindgen]
             #[derive(Clone, Copy)]
+            #[wasm_bindgen]
             pub struct [<Wasm $field_name:camel Shifts>] {
-                s0: $WasmF,
-                s1: $WasmF,
-                s2: $WasmF,
-                s3: $WasmF,
-                s4: $WasmF,
-                s5: $WasmF,
-                s6: $WasmF,
+                pub s0: $WasmF,
+                pub s1: $WasmF,
+                pub s2: $WasmF,
+                pub s3: $WasmF,
+                pub s4: $WasmF,
+                pub s5: $WasmF,
+                pub s6: $WasmF,
             }
             type WasmShifts = [<Wasm $field_name:camel Shifts>];
 
@@ -403,7 +403,6 @@ macro_rules! impl_verification_key {
                 pub srs: $WasmSrs,
                 #[wasm_bindgen(skip)]
                 pub evals: WasmPlonkVerificationEvals,
-                #[wasm_bindgen(skip)]
                 pub shifts: WasmShifts,
                 #[wasm_bindgen(skip)]
                 pub linearization: WasmLinearization,

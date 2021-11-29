@@ -58,6 +58,18 @@ debug = true
 nodejs = ["wasm-bindgen-rayon/no-modules"]
 
 [package.metadata.wasm-pack.profile.release]
-#wasm-opt = false
-wasm-opt = ["-O4", "--detect-features", "--enable-mutable-globals" ]
+wasm-opt = false
+#wasm-opt = ["-O4", "--detect-features", "--enable-mutable-globals" ]
 #wasm-opt = ["-O4", "--enable-mutable-globals"]
+
+[build]
+rustflags = ["-C", "target-feature=+atomics,+bulk-memory", "-C", "link-arg=--no-check-features"]
+
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+atomics,+bulk-memory", "-C", "link-arg=--no-check-features"]
+
+[target.wasm32-wasi]
+rustflags = ["-C", "target-feature=+atomics,+bulk-memory", "-C", "link-arg=--no-check-features"]
+
+[target.wasm32-unknown-emscripten]
+rustflags = ["-C", "target-feature=+atomics,+bulk-memory", "-C", "link-arg=--no-check-features"]

@@ -207,7 +207,7 @@ module Plonk_constraint = struct
               [ mul cl vl; mul cr vr; mul co vo; mul m (mul vl vr); c ]
           in
           if not (equal zero res) then (
-            Core.eprintf
+            Core_kernel.eprintf
               !"%{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t} * %{sexp:t}\n\
@@ -288,7 +288,7 @@ type ('a, 'f) t =
   ; histogram : int Core_kernel.Int.Table.t
   }
 
-module Hash = Core.Md5
+module Hash = Core_kernel.Md5
 
 (* the hash of the circuit *)
 let digest (t : _ t) = Hash_state.digest t.hash
@@ -308,7 +308,7 @@ module Make
       val params : Fp.t Params.t
     end) =
 struct
-  open Core
+  open Core_kernel
   open Pickles_types
 
   type nonrec t = (Gates.t, Fp.t) t
@@ -637,6 +637,7 @@ struct
         let all_gates = List.concat [ public_gates; gates ] in
         let all_gates = List.map all_gates ~f:to_absolute_row in
 
+        (*
         printf "num gates %d\n%!" (List.length all_gates) ;
         printf "histogram\n" ;
         List.iter
@@ -644,6 +645,7 @@ struct
              ~compare:(fun (x, _) (y, _) -> compare x y))
           ~f:(fun (k, n) ->
             printf "%03d: %s\n" k (String.init (n / 100) ~f:(fun _ -> '#'))) ;
+           *)
 
         (* convert all the gates into our Gates.t Rust vector type *)
         List.iter all_gates ~f:(fun g ->

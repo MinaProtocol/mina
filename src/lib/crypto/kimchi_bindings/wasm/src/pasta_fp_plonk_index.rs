@@ -29,7 +29,7 @@ pub struct WasmPastaFpPlonkIndex(
 #[wasm_bindgen]
 pub fn caml_pasta_fp_plonk_index_create(
     gates: &WasmGateVector,
-    public: i32,
+    public_: i32,
     srs: &WasmSrs,
 ) -> Result<WasmPastaFpPlonkIndex, JsValue> {
     // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
@@ -43,6 +43,7 @@ pub fn caml_pasta_fp_plonk_index_create(
         })
         .collect();
 
+
     /*
     for (i, g) in gates.iter().enumerate() {
         let x : Vec<_> = g.c.iter().map(|x| format!("{}", x)).collect();
@@ -55,7 +56,7 @@ pub fn caml_pasta_fp_plonk_index_create(
         gates,
         vec![],
         oracle::pasta::fp_3::params(),
-        public as usize,
+        public_ as usize,
     ) {
         None => {
             return Err(JsValue::from_str(
