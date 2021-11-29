@@ -224,7 +224,7 @@ end = struct
 
   let retriable = function
     | `Sql _ ->
-        false
+        true
     | `Json_parse _ ->
         false
     | `Graphql_mina_query _ ->
