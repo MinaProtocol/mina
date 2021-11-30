@@ -86,6 +86,39 @@ let main ~archive_uri () =
             ; ( "num_pending_blocks_below"
               , `String (Int64.to_string pending_below) )
             ] ;
+      let%bind canonical_chain =
+        match%bind
+          Caqti_async.Pool.use
+            (fun db ->
+              Sql.Chain_status.run_canonical_chain db highest_canonical)
+            pool
+        with
+        | Ok chain ->
+            return chain
+        | Error msg ->
+            [%log error] "Error getting canonical chain"
+              ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
+            exit 1
+      in
+      [%log info] "Length of canonical chain is %d blocks"
+        (List.length canonical_chain) ;
+      let invalid_chain =
+        List.filter canonical_chain
+          ~f:(fun (_block_id, _state_hash, chain_status) ->
+            not (String.equal chain_status "canonical"))
+      in
+      if List.is_empty invalid_chain then
+        [%log info]
+          "All blocks along the canonical chain have a valid chain status"
+      else
+        List.iter invalid_chain ~f:(fun (block_id, state_hash, chain_status) ->
+            [%log info]
+              "Canonical block has a chain_status other than \"canonical\""
+              ~metadata:
+                [ ("block_id", `Int block_id)
+                ; ("state_hash", `String state_hash)
+                ; ("chain_status", `String chain_status)
+                ]) ;
       return ()
 
 let () =
