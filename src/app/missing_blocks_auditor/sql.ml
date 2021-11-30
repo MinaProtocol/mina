@@ -13,3 +13,24 @@ module Unparented_blocks = struct
 
   let run (module Conn : Caqti_async.CONNECTION) () = Conn.collect_list query ()
 end
+
+module Chain_status = struct
+  let query_highest_canonical =
+    Caqti_request.find Caqti_type.unit Caqti_type.int64
+      {sql| SELECT max(height) FROM blocks
+            WHERE chain_status = 'canonical'
+      |sql}
+
+  let run_highest_canonical (module Conn : Caqti_async.CONNECTION) () =
+    Conn.find query_highest_canonical ()
+
+  let query_count_pending_below =
+    Caqti_request.find Caqti_type.int64 Caqti_type.int64
+      {sql| SELECT count(*) FROM blocks
+            WHERE chain_status = 'pending'
+            AND height <= ?
+      |sql}
+
+  let run_count_pending_below (module Conn : Caqti_async.CONNECTION) height =
+    Conn.find query_count_pending_below height
+end
