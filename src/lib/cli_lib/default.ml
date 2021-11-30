@@ -11,3 +11,7 @@ let conf_dir_name = ".mina-config"
 
 (* 24*7 hours*)
 let stop_time = 168
+
+let pubsub_v1 = Gossip_net.Libp2p.RW
+
+let pubsub_v0 = Gossip_net.Libp2p.RW

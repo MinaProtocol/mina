@@ -15,6 +15,8 @@ module Connection_with_state = struct
     match t with Allowed c -> when_allowed c | _ -> when_banned
 end
 
+type pubsub_topic_mode_t = RO | RW | N
+
 module Config = struct
   type t =
     { timeout : Time.Span.t
@@ -35,6 +37,8 @@ module Config = struct
     ; time_controller : Block_time.Controller.t
     ; min_connections : int
     ; max_connections : int
+    ; pubsub_v1 : pubsub_topic_mode_t
+    ; pubsub_v0 : pubsub_topic_mode_t
     ; validation_queue_size : int
     ; mutable keypair : Mina_net2.Keypair.t option
     ; all_peers_seen_metric : bool

@@ -917,7 +917,7 @@ func (bs *testBitswapState) DataConfig() map[BitswapDataTag]BitswapDataConfig {
 }
 
 func TestBitswapDownload(t *testing.T) {
-	seed := time.Now().Unix()
+	seed := int64(1638194752) //time.Now().Unix()
 	t.Logf("Seed: %d", seed)
 	r := rand.New(rand.NewSource(seed))
 	empty := cid.NewSet()
