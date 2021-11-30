@@ -111,42 +111,41 @@ let send_node_status_data ~logger ~url node_status_data =
           ]
 
 let reset_gauges () =
-  Mina_metrics.(
-    Gauge.set (snd Network.get_some_initial_peers_rpcs_sent) 0. ;
-    Gauge.set (snd Network.get_some_initial_peers_rpcs_received) 0. ;
-    Gauge.set
-      (snd
-         Network.get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent)
-      0. ;
-    Gauge.set
-      (snd
-         Network
-         .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received)
-      0. ;
-    Gauge.set (snd Network.answer_sync_ledger_query_rpcs_sent) 0. ;
-    Gauge.set (snd Network.answer_sync_ledger_query_rpcs_received) 0. ;
-    Gauge.set (snd Network.get_transition_chain_rpcs_sent) 0. ;
-    Gauge.set (snd Network.get_transition_chain_rpcs_received) 0. ;
-    Gauge.set (snd Network.get_transition_knowledge_rpcs_sent) 0. ;
-    Gauge.set (snd Network.get_transition_knowledge_rpcs_received) 0. ;
-    Gauge.set (snd Network.get_transition_chain_proof_rpcs_sent) 0. ;
-    Gauge.set (snd Network.get_transition_chain_proof_rpcs_received) 0. ;
-    Gauge.set (snd Network.get_node_status_rpcs_sent) 0. ;
-    Gauge.set (snd Network.get_node_status_rpcs_received) 0. ;
-    Gauge.set (snd Network.get_ancestry_rpcs_sent) 0. ;
-    Gauge.set (snd Network.get_ancestry_rpcs_received) 0. ;
-    Gauge.set (snd Network.ban_notify_rpcs_sent) 0. ;
-    Gauge.set (snd Network.ban_notify_rpcs_received) 0. ;
-    Gauge.set (snd Network.get_best_tip_rpcs_sent) 0. ;
-    Gauge.set (snd Network.get_best_tip_rpcs_received) 0. ;
-    Gauge.set (snd Network.get_epoch_ledger_rpcs_sent) 0. ;
-    Gauge.set (snd Network.get_epoch_ledger_rpcs_received) 0. ;
-    Gauge.set Network.new_state_received 0. ;
-    Gauge.set Network.new_state_broadcasted 0. ;
-    Gauge.set Network.transaction_pool_diff_received 0. ;
-    Gauge.set Network.transaction_pool_diff_broadcasted 0. ;
-    Gauge.set Network.snark_pool_diff_received 0. ;
-    Gauge.set Network.snark_pool_diff_broadcasted 0.) ;
+  let gauges =
+    let open Mina_metrics.Network in
+    [ new_state_received
+    ; new_state_broadcasted
+    ; transaction_pool_diff_received
+    ; transaction_pool_diff_broadcasted
+    ; snark_pool_diff_received
+    ; snark_pool_diff_broadcasted
+    ]
+    @ List.map ~f:snd
+        [ get_some_initial_peers_rpcs_sent
+        ; get_some_initial_peers_rpcs_received
+        ; get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent
+        ; get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received
+        ; answer_sync_ledger_query_rpcs_sent
+        ; answer_sync_ledger_query_rpcs_received
+        ; get_transition_chain_rpcs_sent
+        ; get_transition_chain_rpcs_received
+        ; get_transition_knowledge_rpcs_sent
+        ; get_transition_knowledge_rpcs_received
+        ; get_transition_chain_proof_rpcs_sent
+        ; get_transition_chain_proof_rpcs_received
+        ; get_node_status_rpcs_sent
+        ; get_node_status_rpcs_received
+        ; get_ancestry_rpcs_sent
+        ; get_ancestry_rpcs_received
+        ; ban_notify_rpcs_sent
+        ; ban_notify_rpcs_received
+        ; get_best_tip_rpcs_sent
+        ; get_best_tip_rpcs_received
+        ; get_epoch_ledger_rpcs_sent
+        ; get_epoch_ledger_rpcs_received
+        ]
+  in
+  List.iter ~f:(fun gauge -> Mina_metrics.Gauge.set gauge 0.) gauges ;
   Queue.clear Transition_frontier.validated_blocks ;
   Queue.clear Transition_frontier.rejected_blocks
 
@@ -172,41 +171,36 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
               Transition_frontier.Full_catchup_tree.to_node_status_report
                 catchup_tree
             in
-            let finished = ref 0
-            and failed = ref 0
-            and to_download = ref 0
-            and to_initial_validate = ref 0
-            and to_verify = ref 0
-            and wait_for_parent = ref 0
-            and to_build_breadcrumb = ref 0 in
-            List.iter catchup_states ~f:(fun (state, n) ->
-                match state with
-                | Transition_frontier.Full_catchup_tree.Node.State.Enum.Finished
-                  ->
-                    finished := n
-                | Failed ->
-                    failed := n
-                | To_download ->
-                    to_download := n
-                | To_initial_validate ->
-                    to_initial_validate := n
-                | To_verify ->
-                    to_verify := n
-                | Wait_for_parent ->
-                    wait_for_parent := n
-                | To_build_breadcrumb ->
-                    to_build_breadcrumb := n
-                | Root ->
-                    ()) ;
-            Some
-              { finished = !finished
-              ; failed = !failed
-              ; to_download = !to_download
-              ; to_initial_validate = !to_initial_validate
-              ; to_verify = !to_verify
-              ; wait_for_parent = !wait_for_parent
-              ; to_build_breadcrumb = !to_build_breadcrumb
+            let init =
+              { finished = 0
+              ; failed = 0
+              ; to_download = 0
+              ; to_initial_validate = 0
+              ; to_verify = 0
+              ; wait_for_parent = 0
+              ; to_build_breadcrumb = 0
               }
+            in
+            Some
+              (List.fold catchup_states ~init ~f:(fun acc (state, n) ->
+                   match state with
+                   | Transition_frontier.Full_catchup_tree.Node.State.Enum
+                     .Finished ->
+                       { acc with finished = n }
+                   | Failed ->
+                       { acc with failed = n }
+                   | To_download ->
+                       { acc with to_download = n }
+                   | To_initial_validate ->
+                       { acc with to_initial_validate = n }
+                   | To_verify ->
+                       { acc with to_verify = n }
+                   | Wait_for_parent ->
+                       { acc with wait_for_parent = n }
+                   | To_build_breadcrumb ->
+                       { acc with to_build_breadcrumb = n }
+                   | Root ->
+                       acc))
         | _ ->
             None
       in

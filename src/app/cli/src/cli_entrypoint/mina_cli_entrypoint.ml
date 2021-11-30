@@ -716,7 +716,7 @@ let setup_daemon logger =
           ~default:Mina_compile_config.default_snark_worker_fee snark_work_fee
       in
       let node_status_url =
-        maybe_from_config YJ.Util.to_string_option "report-health-url"
+        maybe_from_config YJ.Util.to_string_option "node-status-url"
           node_status_url
       in
 
