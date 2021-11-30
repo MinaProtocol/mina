@@ -1,10 +1,10 @@
 import Client from "../src/MinaSigner";
-import { keypair } from "../src/TSTypes";
+import { Keypair } from "../src/TSTypes";
 
 describe("Stake Delegation", () => {
   describe("Mainnet network", () => {
     let client: Client;
-    let keypair: keypair;
+    let keypair: Keypair;
 
     beforeAll(async () => {
       client = new Client({ network: "mainnet" });
@@ -71,7 +71,7 @@ describe("Stake Delegation", () => {
 
   describe("Testnet network", () => {
     let client: Client;
-    let keypair: keypair;
+    let keypair: Keypair;
 
     beforeAll(async () => {
       client = new Client({ network: "testnet" });

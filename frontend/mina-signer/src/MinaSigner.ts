@@ -3,22 +3,22 @@ const JSOfOCaml_SDK = require("./client_sdk.bc.js");
 const minaSDK = JSOfOCaml_SDK.minaSDK;
 
 import {
-  network,
-  publicKey,
-  keypair,
-  privateKey,
-  signed,
-  payment,
-  stakeDelegation,
-  message,
+  Network,
+  PublicKey,
+  Keypair,
+  PrivateKey,
+  Signed,
+  Payment,
+  StakeDelegation,
+  Message,
 } from "./TSTypes";
 
 const defaultValidUntil = "4294967295";
 
 class Client {
-  private network: network;
+  private network: Network;
 
-  constructor(options: { network: network }) {
+  constructor(options: { network: Network }) {
     if (!options?.network) {
       throw "Invalid Specified Network";
     }
@@ -34,7 +34,7 @@ class Client {
    *
    * @returns A Mina key pair
    */
-  public genKeys(): keypair {
+  public genKeys(): Keypair {
     return minaSDK.genKeys();
   }
 
@@ -46,7 +46,7 @@ class Client {
    * @param keypair A key pair
    * @returns True if the `keypair` is a verifiable key pair, otherwise throw an exception
    */
-  public verifyKeypair(keypair: keypair): boolean {
+  public verifyKeypair(keypair: Keypair): boolean {
     return minaSDK.validKeypair(keypair);
   }
 
@@ -56,7 +56,7 @@ class Client {
    * @param privateKey The private key used to get the corresponding public key
    * @returns A public key
    */
-  public derivePublicKey(privateKey: privateKey): publicKey {
+  public derivePublicKey(privateKey: PrivateKey): PublicKey {
     return minaSDK.publicKeyOfPrivateKey(privateKey);
   }
 
@@ -67,7 +67,7 @@ class Client {
    * @param key The key pair used to sign the message
    * @returns A signed message
    */
-  public signMessage(message: string, key: keypair): signed<message> {
+  public signMessage(message: string, key: Keypair): Signed<Message> {
     return {
       signature: minaSDK.signString(this.network, key.privateKey, message),
       data: {
@@ -84,7 +84,7 @@ class Client {
    * @returns True if the `signedMessage` contains a valid signature matching
    * the message and publicKey.
    */
-  public verifyMessage(signedMessage: signed<message>): boolean {
+  public verifyMessage(signedMessage: Signed<Message>): boolean {
     return minaSDK.verifyStringSignature(
       this.network,
       signedMessage.signature,
@@ -104,9 +104,9 @@ class Client {
    * @returns A signed payment transaction
    */
   public signPayment(
-    payment: payment,
-    privateKey: privateKey
-  ): signed<payment> {
+    payment: Payment,
+    privateKey: PrivateKey
+  ): Signed<Payment> {
     const memo = payment.memo ?? "";
     const fee = String(payment.fee);
     const nonce = String(payment.nonce);
@@ -145,7 +145,7 @@ class Client {
    * @param signedPayment A signed payment transaction
    * @returns True if the `signed(payment)` is a verifiable payment
    */
-  public verifyPayment(signedPayment: signed<payment>): boolean {
+  public verifyPayment(signedPayment: Signed<Payment>): boolean {
     const payload = signedPayment.data;
     const memo = payload.memo ?? "";
     const fee = String(payload.fee);
@@ -185,9 +185,9 @@ class Client {
    * @returns A signed stake delegation
    */
   public signStakeDelegation(
-    stakeDelegation: stakeDelegation,
-    privateKey: privateKey
-  ): signed<stakeDelegation> {
+    stakeDelegation: StakeDelegation,
+    privateKey: PrivateKey
+  ): Signed<StakeDelegation> {
     const memo = stakeDelegation.memo ?? "";
     const fee = String(stakeDelegation.fee);
     const nonce = String(stakeDelegation.nonce);
@@ -224,7 +224,7 @@ class Client {
    * @returns True if the `signed(stakeDelegation)` is a verifiable stake delegation
    */
   public verifyStakeDelegation(
-    signedStakeDelegation: signed<stakeDelegation>
+    signedStakeDelegation: Signed<StakeDelegation>
   ): boolean {
     const payload = signedStakeDelegation.data;
     const memo = payload.memo ?? "";
@@ -256,7 +256,7 @@ class Client {
    * @param signedPayment A signed payment transaction
    * @returns A transaction hash
    */
-  public hashPayment(signedPayment: signed<payment>): string {
+  public hashPayment(signedPayment: Signed<Payment>): string {
     const payload = signedPayment.data;
     const memo = payload.memo ?? "";
     const fee = String(payload.fee);
@@ -290,7 +290,7 @@ class Client {
    * @returns A transaction hash
    */
   public hashStakeDelegation(
-    signedStakeDelegation: signed<stakeDelegation>
+    signedStakeDelegation: Signed<StakeDelegation>
   ): string {
     const payload = signedStakeDelegation.data;
     const memo = payload.memo ?? "";

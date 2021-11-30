@@ -1,46 +1,47 @@
-export type uint32 = number | bigint | string;
-export type uint64 = number | bigint | string;
+export type UInt32 = number | bigint | string;
+export type UInt64 = number | bigint | string;
 
-export type publicKey = string;
-export type privateKey = string;
-export type network = "mainnet" | "testnet";
-export type signableData = message | stakeDelegation | payment;
+export type PublicKey = string;
+export type PrivateKey = string;
+export type Network = "mainnet" | "testnet";
 
-export type keypair = {
-  readonly privateKey: privateKey;
-  readonly publicKey: publicKey;
+export type Keypair = {
+  readonly privateKey: PrivateKey;
+  readonly publicKey: PublicKey;
 };
 
-export type message = {
-  publicKey: publicKey;
+export type Message = {
+  publicKey: PublicKey;
   message: string;
 };
 
-export type signature = {
+export type Signature = {
   readonly field: string;
   readonly scalar: string;
 };
 
-export type signed<signableData> = {
-  readonly signature: signature;
-  readonly data: signableData;
+export type StakeDelegation = {
+  readonly to: PublicKey;
+  readonly from: PublicKey;
+  readonly fee: UInt64;
+  readonly nonce: UInt32;
+  readonly memo?: string;
+  readonly validUntil?: UInt32;
 };
 
-export type stakeDelegation = {
-  readonly to: publicKey;
-  readonly from: publicKey;
-  readonly fee: uint64;
-  readonly nonce: uint32;
+export type Payment = {
+  readonly to: PublicKey;
+  readonly from: PublicKey;
+  readonly fee: UInt64;
+  readonly amount: UInt64;
+  readonly nonce: UInt32;
   readonly memo?: string;
-  readonly validUntil?: uint32;
+  readonly validUntil?: UInt32;
 };
 
-export type payment = {
-  readonly to: publicKey;
-  readonly from: publicKey;
-  readonly fee: uint64;
-  readonly amount: uint64;
-  readonly nonce: uint32;
-  readonly memo?: string;
-  readonly validUntil?: uint32;
+export type SignableData = Message | StakeDelegation | Payment;
+
+export type Signed<SignableData> = {
+  readonly signature: Signature;
+  readonly data: SignableData;
 };
