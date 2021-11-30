@@ -1063,7 +1063,7 @@ let%test_module "test no side-loaded" =
                   Field.Constant.zero))
       in
       assert (
-        Async.Thread_safe.block_on_async_exn (fun () ->
+        Run_in_thread.block_on_async_exn (fun () ->
             Blockchain_snark.Proof.verify [ (Field.Constant.zero, b0) ]) ) ;
       let b1 =
         Common.time "b1" (fun () ->
