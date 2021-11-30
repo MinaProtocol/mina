@@ -67,7 +67,7 @@ module Time = struct
 
     let create offset = offset
 
-    let basic ~logger () =
+    let basic ~logger:_ () =
       match !time_offset with
       | Some offset ->
           offset
@@ -75,11 +75,11 @@ module Time = struct
           let offset =
             let env = "MINA_TIME_OFFSET" in
             let env_offset =
-              match Core.Sys.getenv env with
+              match Core_kernel.Sys.getenv_opt env with
               | Some tm ->
                   Int.of_string tm
               | None ->
-                  [%log debug]
+                  eprintf
                     "Environment variable %s not found, using default of 0" env ;
                   0
             in
@@ -242,6 +242,8 @@ module Time = struct
   let to_int64 = Fn.compose Span.to_ms to_span_since_epoch
 
   let of_int64 = Fn.compose of_span_since_epoch Span.of_ms
+
+  let of_uint64 : UInt64.t -> t = of_span_since_epoch
 
   let to_string = Fn.compose Int64.to_string to_int64
 
