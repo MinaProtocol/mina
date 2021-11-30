@@ -1793,11 +1793,13 @@ module Base = struct
               , Amount.t
               , Ledger.t
               , Bool.t
-              , Transaction_commitment.t )
+              , Transaction_commitment.t
+              , unit )
               Parties_logic.Local_state.t
           ; protocol_state_predicate : Snapp_predicate.Protocol_state.Checked.t
           ; transaction_commitment : Transaction_commitment.t
-          ; field : Field.t >
+          ; field : Field.t
+          ; failure : unit >
       end
 
       include Parties_logic.Make (Inputs)
@@ -2037,7 +2039,8 @@ module Base = struct
                   (* We always assert that the proof verifies. *)
                   checks_succeeded
             in
-            (account_with_hash account', success)
+            (* omit failure status here, unlike `Transaction_logic` *)
+            (account_with_hash account', success, ())
         | Balance account ->
             Balance.Checked.to_amount account.data.balance
     end
@@ -2112,6 +2115,7 @@ module Base = struct
               ( statement.source.local_state.ledger
               , V.create (fun () -> !witness.local_state_init.ledger) )
           ; success = statement.source.local_state.success
+          ; failure_status = ()
           }
         in
         (g, l)
@@ -2175,22 +2179,32 @@ module Base = struct
                             p.memo_hash)
                 }
               in
-              S.apply ~constraint_constants
-                ~is_start:
-                  ( match party_spec.is_start with
-                  | `No ->
-                      `No
-                  | `Yes ->
-                      `Yes start_data
-                  | `Compute_in_circuit ->
-                      `Compute start_data )
-                S.{ perform }
-                acc
+              let global_state, local_state =
+                S.apply ~constraint_constants
+                  ~is_start:
+                    ( match party_spec.is_start with
+                    | `No ->
+                        `No
+                    | `Yes ->
+                        `Yes start_data
+                    | `Compute_in_circuit ->
+                        `Compute start_data )
+                  S.{ perform }
+                  acc
+              in
+              (* replace any transaction failure with unit value *)
+              (global_state, { local_state with failure_status = () })
             in
             let acc' =
               match party_spec.is_start with
               | `No ->
-                  S.apply ~constraint_constants ~is_start:`No S.{ perform } acc
+                  let global_state, local_state =
+                    S.apply ~constraint_constants ~is_start:`No
+                      S.{ perform }
+                      acc
+                  in
+                  (* replace any transaction failure with unit value *)
+                  (global_state, { local_state with failure_status = () })
               | `Compute_in_circuit ->
                   V.create (fun () ->
                       match As_prover.Ref.get start_parties with
@@ -4818,16 +4832,26 @@ let%test_module "transaction_snark" =
                   let vk =
                     With_hash.of_data ~hash_data:Snapp_account.digest_vk vk
                   in
-                  let _is_new, _loc =
+                  let set_or_create ledger id account =
+                    match Ledger.location_of_account ledger id with
+                    | Some loc ->
+                        Ledger.set ledger loc account
+                    | None ->
+                        let _loc, _new =
+                          Ledger.get_or_create_account ledger id account
+                          |> Or_error.ok_exn
+                        in
+                        ()
+                  in
+                  let () =
                     let id =
                       Public_key.compress sender.public_key
                       |> fun pk -> Account_id.create pk Token_id.default
                     in
-                    Ledger.get_or_create_account ledger id
+                    set_or_create ledger id
                       (Account.create id Balance.(of_int 888_888))
-                    |> Or_error.ok_exn
                   in
-                  let _is_new, _loc =
+                  let () =
                     let id =
                       Account_id.create trivial_account_pk Token_id.default
                     in
@@ -4844,8 +4868,7 @@ let%test_module "transaction_snark" =
                             }
                       }
                     in
-                    Ledger.get_or_create_account ledger id account
-                    |> Or_error.ok_exn
+                    set_or_create ledger id account
                   in
                   (*TODO: Add another signed party for the transfer*)
                   (*let total = Option.value_exn (Amount.add fee amount) in*)

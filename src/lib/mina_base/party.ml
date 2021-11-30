@@ -584,6 +584,18 @@ module Predicate = struct
     | Accept ->
         Snapp_predicate.Account.accept
 
+  module Tag = struct
+    type t = Full | Nonce | Accept [@@deriving equal, compare, sexp]
+  end
+
+  let tag : t -> Tag.t = function
+    | Full _ ->
+        Full
+    | Nonce _ ->
+        Nonce
+    | Accept ->
+        Accept
+
   let digest (t : t) =
     let digest x =
       Random_oracle.(
