@@ -1,0 +1,15 @@
+(library
+ (name snarky_js_bindings_lib)
+ (libraries
+   mina_base.kernel
+   snarky_curve
+   pickles
+   kimchi_backend
+   run_in_thread.fake
+   kimchi
+   js_of_ocaml
+   bindings_js
+   integers_stubs_js
+   zarith_stubs_js)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_custom_printf ppx_version js_of_ocaml-ppx)))
