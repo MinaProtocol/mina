@@ -68,7 +68,9 @@ let main ~archive_uri () =
         | Ok count ->
             return count
         | Error msg ->
-            [%log error] "Error getting greatest height of canonical blocks"
+            [%log error]
+              "Error getting number of pending blocks below highest canonical \
+               block"
               ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
             exit 1
       in
