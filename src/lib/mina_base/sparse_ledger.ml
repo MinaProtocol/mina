@@ -80,4 +80,3 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)
         ((merkle_root sl :> Random_oracle.Digest.t) |> Ledger_hash.of_hash))
-

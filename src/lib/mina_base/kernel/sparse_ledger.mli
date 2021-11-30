@@ -98,9 +98,12 @@ val apply_parties_unchecked_with_states :
        list )
      Or_error.t
 
-val add_path : t ->
-  [ `Left of Field.t | `Right of Field.t ] list -> Account_id.t
-  -> Account.t -> t
+val add_path :
+     t
+  -> [ `Left of Field.t | `Right of Field.t ] list
+  -> Account_id.t
+  -> Account.t
+  -> t
 
 val iteri : t -> f:(Account.Index.t -> Account.t -> unit) -> unit
 
@@ -108,3 +111,8 @@ val handler : t -> Handler.t Staged.t
 
 val has_locked_tokens_exn :
   global_slot:Mina_numbers.Global_slot.t -> account_id:Account_id.t -> t -> bool
+
+module L :
+  Transaction_logic.Ledger_intf
+    with type t = Stable.Latest.t ref
+     and type location = int

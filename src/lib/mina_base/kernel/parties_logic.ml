@@ -1,3 +1,5 @@
+let printf = Core_kernel.printf
+
 module type Iffable = sig
   type bool
 

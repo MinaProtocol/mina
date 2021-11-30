@@ -5,6 +5,19 @@ module Global_slot = Mina_numbers.Global_slot
 
 type account_state = [ `Added | `Existed ] [@@deriving equal]
 
+let loose_permissions : Permissions.t =
+  { stake = true
+  ; edit_state = None
+  ; send = None
+  ; receive = None
+  ; set_delegate = None
+  ; set_permissions = None
+  ; set_verification_key = None
+  ; set_snapp_uri = None
+  ; edit_sequence_state = None
+  ; set_token_symbol = None
+  }
+
 module type Ledger_intf = sig
   type t
 
@@ -493,9 +506,17 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             Ok (`Existing location, account)
         | None ->
             (* Needed to support sparse ledger. *)
-            Ok (`New, Account.create account_id Balance.zero) )
+            Ok
+              ( `New
+              , { (Account.create account_id Balance.zero) with
+                  permissions = loose_permissions
+                } ) )
     | None ->
-        Ok (`New, Account.create account_id Balance.zero)
+        Ok
+          ( `New
+          , { (Account.create account_id Balance.zero) with
+              permissions = loose_permissions
+            } )
 
   let set_with_location ledger location account =
     match location with
@@ -1381,29 +1402,52 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     module Global_state = Global_state
 
     module Bool = struct
-      type t = bool
+      type t = { value : bool; message : string Lazy.t }
 
-      let assert_ b = assert b
+      let assert_ (b : t) = if not b.value then failwith (Lazy.force b.message)
 
-      let if_ = Parties.value_if
+      let if_ (b : t) ~then_ ~else_ = Parties.value_if b.value ~then_ ~else_
 
-      let true_ = true
+      let true_ : t = { value = true; message = lazy "true" }
 
-      let false_ = false
+      let false_ : t = { value = false; message = lazy "false" }
 
-      let equal = Bool.equal
+      let ( ! ) = Lazy.force
 
-      let not = not
+      let of_or_error msg (r : unit Or_error.t) : t =
+        match r with
+        | Ok () ->
+            { value = true; message = lazy msg }
+        | Error e ->
+            { value = false
+            ; message = lazy (sprintf "%s(%s)" msg (Error.to_string_hum e))
+            }
 
-      let ( ||| ) = ( || )
+      let of_bool msg (b : bool) : t = { value = b; message = lazy msg }
 
-      let ( &&& ) = ( && )
+      let equal t1 t2 =
+        { value = Bool.equal t1.value t2.value
+        ; message = lazy (sprintf "equal(%s, %s)" !(t1.message) !(t2.message))
+        }
+
+      let not t =
+        { value = not t.value; message = lazy (sprintf "not(%s)" !(t.message)) }
+
+      let ( ||| ) t1 t2 =
+        { value = t1.value || t2.value
+        ; message = lazy (sprintf "or(%s, %s)" !(t1.message) !(t2.message))
+        }
+
+      let ( &&& ) t1 t2 =
+        { value = t1.value && t2.value
+        ; message = lazy (sprintf "and(%s, %s)" !(t1.message) !(t2.message))
+        }
     end
 
     module Ledger = struct
       type t = L.t
 
-      let if_ = Parties.value_if
+      let if_ = Bool.if_
 
       let empty = L.empty
     end
@@ -1413,7 +1457,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       let empty = ()
 
-      let if_ = Parties.value_if
+      let if_ = Bool.if_
     end
 
     module Account = struct
@@ -1427,22 +1471,32 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       type t = unsigned
 
-      let if_ = Parties.value_if
+      let if_ = Bool.if_
 
       module Signed = struct
         include Signed
 
-        let if_ = Parties.value_if
+        let if_ = Bool.if_
 
-        let is_pos (t : t) = Sgn.equal t.sgn Pos
+        let add_flagged x y =
+          let z, `Overflow _b = add_flagged x y in
+          (* TODO: overflow bit is wrong in js *)
+          let b = false in
+          (z, `Overflow (Bool.of_bool "Signed.add_flagged:overflow" b))
+
+        let is_pos (t : t) = Bool.of_bool "Sgn.is_pos" (Sgn.equal t.sgn Pos)
       end
 
       let zero = zero
 
-      let add_flagged = add_flagged
+      let add_flagged x y =
+        let z, `Overflow _b = add_flagged x y in
+        (* TODO: overflow bit is wrong in js *)
+        let b = false in
+        (z, `Overflow (Bool.of_bool "overflow" b))
 
-      let add_signed_flagged (x1 : t) (x2 : Signed.t) : t * [ `Overflow of bool ]
-          =
+      let add_signed_flagged (x1 : t) (x2 : Signed.t) :
+          t * [ `Overflow of Bool.t ] =
         let y, `Overflow b = Signed.(add_flagged (of_unsigned x1) x2) in
         match y.sgn with
         | Pos ->
@@ -1456,13 +1510,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               |> Unsigned.UInt64.(mul (sub zero one))
               |> Amount.of_uint64
             in
-            (magnitude, `Overflow true)
+            (magnitude, `Overflow (Bool.of_bool "overflow_signed" true))
     end
 
     module Token_id = struct
       include Token_id
 
-      let if_ = Parties.value_if
+      let equal x y = Bool.of_bool "Token_id.equal" (equal x y)
+
+      let if_ = Bool.if_
     end
 
     module Party = Party
@@ -1471,7 +1527,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       module Opt = struct
         type 'a t = 'a option
 
-        let is_some = Option.is_some
+        let is_some t = Bool.of_bool "Parties.Opt.is_some" (Option.is_some t)
 
         let map = Option.map
 
@@ -1489,11 +1545,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Parties.Party_or_stack.of_parties_list
           ~party_depth:(fun (p : Party.t) -> p.data.body.depth)
 
-      let if_ = Parties.value_if
+      let if_ = Bool.if_
 
       let empty = []
 
-      let is_empty = List.is_empty
+      let is_empty t = Bool.of_bool "Parties.is_empty" (List.is_empty t)
 
       let pop_exn : t -> party_or_stack * t = function
         | [] ->
@@ -1565,17 +1621,22 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           (acct, loc)
       | Check_inclusion (_ledger, _account, _loc) ->
           ()
-      | Check_protocol_state_predicate (pred, global_state) ->
+      | Check_protocol_state_predicate (_pred, _global_state) ->
+          Bool.of_bool "check_protocol_state_predicate" true
+          (* TODO: This is turned off because uint64 compare is broken in javascript *)
+          (*
           Snapp_predicate.Protocol_state.check pred global_state.protocol_state
-          |> Or_error.is_ok
+          |> Bool.of_or_error "check_protocol_state_predicate" *)
       | Check_predicate (_is_start, party, account, _global_state) -> (
           match party.data.predicate with
           | Accept ->
-              true
+              Bool.true_
           | Nonce n ->
-              Account.Nonce.equal account.nonce n
+              Bool.of_bool "check_predicate[nonce]"
+                (Account.Nonce.equal account.nonce n)
           | Full p ->
-              Or_error.is_ok (Snapp_predicate.Account.check p account) )
+              Bool.of_or_error "check_predicate[full]"
+                (Snapp_predicate.Account.check p account) )
       | Set_account (l, a, loc) ->
           Or_error.ok_exn (set_with_location l loc a) ;
           l
@@ -1583,7 +1644,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           { s with fee_excess = f s.fee_excess }
       | Modify_global_ledger { global_state; ledger; should_update } ->
           (* Commit, modifying the underlying ledger. *)
-          if should_update then L.apply_mask global_state.ledger ~masked:ledger ;
+          if should_update.value then
+            L.apply_mask global_state.ledger ~masked:ledger ;
           global_state
       | Party_token_id p ->
           p.data.body.token_id
@@ -1596,7 +1658,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ; transaction_commitment = ()
           ; inclusion_proof = loc
           } -> (
-          if (is_start : bool) then
+          if (is_start.value : bool) then
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
           match
             apply_body ~constraint_constants ~state_view
@@ -1608,11 +1670,17 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               ~global_slot_since_genesis:
                 global_state.protocol_state.global_slot_since_genesis p.data a
           with
-          | Error _e ->
+          | Error e ->
               (* TODO: Use this in the failure reason. *)
-              (a, false)
+              ( a
+              , { Bool.value = false
+                ; message =
+                    lazy
+                      (sprintf "applied(%s)"
+                         (Transaction_status.Failure.to_string e))
+                } )
           | Ok a ->
-              (a, true) )
+              (a, Bool.true_) )
   end
 
   module M = Parties_logic.Make (Inputs)
@@ -1653,7 +1721,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ; token_id = Token_id.invalid
         ; excess = Currency.Amount.zero
         ; ledger
-        ; success = true
+        ; success = Inputs.Bool.of_bool "init" true
         } )
     in
     let user_acc = f init initial_state in
@@ -1699,6 +1767,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 }
             }
           , s )
+
+  let apply_parties_unchecked_aux (type user_acc)
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~(state_view : Snapp_predicate.Protocol_state.View.t) ~(init : user_acc)
+      ~(f : user_acc -> _ -> user_acc) ?fee_excess (ledger : L.t)
+      (c : Parties.t) =
+    apply_parties_unchecked_aux ~constraint_constants ~state_view ~init
+      ~f:(fun acc (g, s) -> f acc (g, { s with success = s.success.value }))
+      ?fee_excess ledger c
 
   let apply_parties_unchecked ~constraint_constants ~state_view ledger c =
     apply_parties_unchecked_aux ~constraint_constants ~state_view ledger c
