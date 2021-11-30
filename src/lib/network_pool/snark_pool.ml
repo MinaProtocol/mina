@@ -746,6 +746,9 @@ module Diff_versioned = struct
   [@@deriving compare, sexp, to_yojson, hash]
 end
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
+
 let%test_module "random set test" =
   ( module struct
     open Mina_base
