@@ -18,8 +18,10 @@ mkdir -p ${POSTGRES_DATA_DIR}
 chown postgres ${POSTGRES_DATA_DIR}
 
 echo "[POPULATE] Initializing postgresql version $POSTGRES_VERSION"
-pg_dropcluster --stop ${POSTGRES_VERSION} main
-pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} main
+sudo -u postgres psql --command "SHOW config_file;"
+sudo -u postgres psql --command "SHOW hba_file;"
+# pg_dropcluster --stop ${POSTGRES_VERSION} main
+# pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} main
 
 /etc/init.d/postgresql start
 
