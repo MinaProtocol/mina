@@ -37,7 +37,7 @@ module Variant = struct
     | `Account_not_found of string
     | `Invariant_violation
     | `Transaction_not_found of string
-    | `Block_missing
+    | `Block_missing of string
     | `Malformed_public_key
     | `Operations_not_valid of Partial_reason.t list
     | `Unsupported_operation_for_construction
@@ -107,7 +107,7 @@ end = struct
         "Internal invariant violation (you found a bug)"
     | `Transaction_not_found _ ->
         "Transaction not found"
-    | `Block_missing ->
+    | `Block_missing _ ->
         "Block not found"
     | `Malformed_public_key ->
         "Malformed public key"
@@ -179,10 +179,12 @@ end = struct
               this transaction in a recent block. It also could be due to the \
               transaction being evicted from the mempool."
              hash)
-    | `Block_missing ->
+    | `Block_missing s ->
         Some
-          "We couldn't find the block you specified in the archive node. Ask a \
-           friend for the missing data."
+          (sprintf
+             "We couldn't find the block in the archive node, specified by %s. \
+              Ask a friend for the missing data."
+             s)
     | `Malformed_public_key ->
         None
     | `Operations_not_valid reasons ->
@@ -239,7 +241,7 @@ end = struct
         false
     | `Transaction_not_found _ ->
         true
-    | `Block_missing ->
+    | `Block_missing _ ->
         true
     | `Malformed_public_key ->
         false
@@ -295,9 +297,11 @@ end = struct
          bug!)"
     | `Transaction_not_found _ ->
         "That transaction could not be found."
-    | `Block_missing ->
-        "We couldn't find the block you specified in the archive node. Ask a \
-         friend for the missing data."
+    | `Block_missing s ->
+        sprintf
+          "We couldn't find the block in the archive node, specified by %s. \
+           Ask a friend for the missing data."
+          s
     | `Malformed_public_key ->
         "The public key you provided was malformed."
     | `Operations_not_valid _ ->
