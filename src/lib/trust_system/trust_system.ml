@@ -1,7 +1,7 @@
 (** The trust system, instantiated with Coda-specific stuff. *)
 open Core
 
-open Async
+open Async_kernel
 
 module Actions = struct
   type action =

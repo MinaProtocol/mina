@@ -1,5 +1,5 @@
 open Core
-open Async
+open Async_kernel
 open Pipe_lib
 
 let tmp_bans_are_disabled = false
@@ -299,7 +299,7 @@ let%test_module "peer_trust" =
     let%test "Insta-bans actually do so" =
       if tmp_bans_are_disabled then true
       else
-        Thread_safe.block_on_async_exn (fun () ->
+        Run_in_thread.block_on_async_exn (fun () ->
             let db = setup_mock_db () in
             let%map () = Peer_trust_test.record db nolog 0 Insta_ban in
             match Peer_trust_test.lookup_ip db peer0 with
