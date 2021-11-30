@@ -1545,6 +1545,13 @@ let export_key =
                     !"wrong password provided for account \
                       %{Public_key.Compressed.to_base58_check}"
                     pk)
+           | Error (`Key_read_error e) ->
+               Error
+                 (sprintf
+                    !"Error reading the secret key file for account \
+                      %{Public_key.Compressed.to_base58_check}: %s"
+                    pk
+                    (Secrets.Privkey_error.to_string e))
            | Error `Not_found ->
                Error
                  (sprintf
