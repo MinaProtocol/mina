@@ -22,6 +22,9 @@ open Core
 open Async
 open Mina_net2
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
+
 type status = NotMet | Connected | Disconnected [@@deriving sexp]
 
 type typed_msg = { a : int; b : string option }
