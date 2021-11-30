@@ -122,7 +122,7 @@ module Sql = struct
         |> Errors.Lift.sql ~context:"Finding specified block"
       with
       | None ->
-          Deferred.Result.fail (Errors.create `Block_missing)
+          Deferred.Result.fail (Errors.create @@ `Block_missing (Block_query.to_string block_query))
       | Some (_block_id, block_info, _) ->
           Deferred.Result.return
             ( block_info.height

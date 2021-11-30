@@ -59,6 +59,16 @@ module Block_query = struct
       | None ->
           false
   end
+
+  let to_string : t -> string = function
+    | Some (`This (`Height h)) ->
+      sprintf "height = %Ld" h
+    | Some (`That (`Hash h)) ->
+      sprintf "hash = %s" h
+    | Some (`Those (`Height height, `Hash hash)) ->
+      sprintf "height = %Ld, hash = %s" height hash
+    | None ->
+      sprintf "(no height or hash given)"
 end
 
 module Op = User_command_info.Op
@@ -244,9 +254,12 @@ module Sql = struct
 
     let typ = Caqti_type.(tup3 int Archive_lib.Processor.Block.typ Extras.typ)
 
-    let query_max_height =
-      Caqti_request.find Caqti_type.unit Caqti_type.int64
-        {| SELECT MAX(height) FROM blocks |}
+    let query_count_pending_at_height =
+      Caqti_request.find Caqti_type.int64 Caqti_type.int64
+        {sql| SELECT COUNT(*) FROM blocks
+              WHERE height = ?
+              AND chain_status = 'pending'
+        |sql}
 
     let query_height_old =
       Caqti_request.find_opt Caqti_type.int64 typ
@@ -342,12 +355,10 @@ WITH RECURSIVE chain AS (
     let run_is_old_height (module Conn : Caqti_async.CONNECTION) ~height =
       let open Deferred.Result.Let_syntax in
       let open Int64 in
-      let%map max_height =
-        Conn.find query_max_height ()
+      let%map num_pending_at_height =
+        Conn.find query_count_pending_at_height height
       in
-      (* buffer an epsilon of 5 just in case archive node isn't caught up *)
-      let epsilon = of_int 5 in
-      height < (max_height - (of_int Genesis_constants.k)) - epsilon
+      Int64.equal num_pending_at_height Int64.zero
 
     let run (module Conn : Caqti_async.CONNECTION) = function
       | Some (`This (`Height h)) ->
@@ -492,13 +503,13 @@ WITH RECURSIVE chain AS (
         |> Errors.Lift.sql ~context:"Finding block"
       with
       | None ->
-        M.fail (Errors.create `Block_missing)
+        M.fail (Errors.create @@ `Block_missing (Block_query.to_string input))
       | Some (block_id, raw_block, block_extras) ->
           M.return (block_id, raw_block, block_extras)
     in
     let%bind parent_id =
       Option.value_map raw_block.parent_id
-        ~default:(M.fail (Errors.create `Block_missing))
+        ~default:(M.fail (Errors.create @@ `Block_missing (sprintf "parent block of: %s" (Block_query.to_string input))))
         ~f:M.return
     in
     let%bind raw_parent_block, _parent_block_extras =
@@ -507,7 +518,7 @@ WITH RECURSIVE chain AS (
         |> Errors.Lift.sql ~context:"Finding parent block"
       with
       | None ->
-          M.fail (Errors.create ~context:"Parent block" `Block_missing)
+        M.fail (Errors.create ~context:"Parent block" @@ `Block_missing (sprintf "parent_id = %d" parent_id))
       | Some (_, raw_parent_block, parent_block_extras) ->
           M.return (raw_parent_block, parent_block_extras)
     in
