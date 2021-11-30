@@ -254,11 +254,11 @@ module Sql = struct
 
     let typ = Caqti_type.(tup3 int Archive_lib.Processor.Block.typ Extras.typ)
 
-    let query_count_pending_at_height =
+    let query_count_canonical_at_height =
       Caqti_request.find Caqti_type.int64 Caqti_type.int64
         {sql| SELECT COUNT(*) FROM blocks
               WHERE height = ?
-              AND chain_status = 'pending'
+              AND chain_status = 'canonical'
         |sql}
 
     let query_height_old =
@@ -355,10 +355,10 @@ WITH RECURSIVE chain AS (
     let run_is_old_height (module Conn : Caqti_async.CONNECTION) ~height =
       let open Deferred.Result.Let_syntax in
       let open Int64 in
-      let%map num_pending_at_height =
-        Conn.find query_count_pending_at_height height
+      let%map num_canonical_at_height =
+        Conn.find query_count_canonical_at_height height
       in
-      Int64.equal num_pending_at_height Int64.zero
+      Int64.(>) num_canonical_at_height Int64.zero
 
     let run (module Conn : Caqti_async.CONNECTION) = function
       | Some (`This (`Height h)) ->
