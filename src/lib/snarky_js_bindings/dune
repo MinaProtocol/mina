@@ -1,0 +1,49 @@
+(executable
+ (name snarky_js_node)
+ (modules snarky_js_node)
+ (modes js)
+ (js_of_ocaml (flags +toplevel.js +dynlink.js))
+ (libraries
+   digestif.ocaml
+   snarky_curve
+   pickles
+   kimchi_backend
+   cache_dir.fake
+   run_in_thread.fake
+   kimchi
+   js_of_ocaml
+   bindings_js
+   node_backend
+   integers_stubs_js
+   snarky_js_bindings_lib)
+ (link_deps
+ ../crypto/kimchi_bindings/js/node_js/plonk_wasm.js
+ ../crypto/kimchi_bindings/js/node_js/plonk_wasm.wasm)
+ (instrumentation (backend bisect_ppx))
+ (forbidden_libraries async core re2)
+ (preprocess (pps ppx_version js_of_ocaml-ppx)))
+
+(executable
+ (name snarky_js_chrome)
+ (modules snarky_js_chrome)
+ (modes js)
+ (js_of_ocaml (flags +toplevel.js +dynlink.js))
+ (libraries
+   digestif.ocaml
+   snarky_curve
+   pickles
+   kimchi_backend
+   cache_dir.fake
+   run_in_thread.fake
+   kimchi
+   js_of_ocaml
+   bindings_js
+   chrome_backend
+   integers_stubs_js
+   snarky_js_bindings_lib)
+ (link_deps
+ ../crypto/kimchi_bindings/js/chrome/plonk_wasm.js
+ ../crypto/kimchi_bindings/js/chrome/plonk_wasm.wasm)
+ (instrumentation (backend bisect_ppx))
+ (forbidden_libraries async core re2)
+ (preprocess (pps ppx_version js_of_ocaml-ppx)))
