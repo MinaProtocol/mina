@@ -1334,6 +1334,40 @@ let create ?wallets (config : Config.t) =
           Protocol_version.set_current config.initial_protocol_version ;
           Protocol_version.set_proposed_opt
             config.proposed_protocol_version_opt ;
+          (* for chainsafe *)
+          let _ =
+            let open External_transition in
+            let logger = config.logger in
+            let genesis_block_with_hash, _ =
+              genesis ~precomputed_values:config.precomputed_values
+            in
+            let genesis_block = With_hash.data genesis_block_with_hash in
+            let block_bytes =
+              let len = Stable.Latest.bin_size_t genesis_block in
+              let buf = Bin_prot.Common.create_buf len in
+              ignore (Stable.Latest.bin_write_t buf ~pos:0 genesis_block : int) ;
+              let bytes = Bytes.create len in
+              Bin_prot.Common.blit_buf_bytes buf bytes ~len ;
+              bytes
+            in
+            let state_hash_base58 =
+              state_hash genesis_block |> State_hash.to_base58_check
+            in
+            let blockfile = sprintf "genesis-%s.hex" state_hash_base58 in
+            [%log info] "Writing serialization of genesis block to file %s"
+              blockfile ;
+            Out_channel.with_file blockfile ~f:(fun out_ch ->
+                let block_hex =
+                  Hex.Safe.to_hex (Bytes.to_string block_bytes)
+                in
+                Out_channel.output_string out_ch block_hex ) ;
+            let block_json = to_full_yojson genesis_block in
+            let jsonfile = sprintf "genesis-%s.json" state_hash_base58 in
+            [%log info] "Writing JSON of genesis block to file %s" jsonfile ;
+            Out_channel.with_file jsonfile ~f:(fun out_ch ->
+                let json_string = Yojson.Safe.pretty_to_string block_json in
+                Out_channel.output_string out_ch json_string )
+          in
           let log_rate_limiter_occasionally rl ~label =
             let t = Time.Span.of_min 1. in
             every t (fun () ->
