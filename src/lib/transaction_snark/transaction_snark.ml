@@ -1253,13 +1253,14 @@ module Base = struct
                  ; timing
                  }
              ; delta
+             ; increment_nonce
              ; events = _ (* This is for the snapp to use, we don't need it. *)
              ; call_data =
                  _ (* This is for the snapp to use, we don't need it. *)
              ; sequence_events
              ; depth = _ (* This is used to build the 'stack of stacks'. *)
              }
-         ; predicate
+         ; predicate = _
          } :
           Party.Predicated.Checked.t) (a : Account.Checked.Unhashed.t) :
         Account.Checked.Unhashed.t * _ =
@@ -1487,11 +1488,13 @@ module Base = struct
                  permissions a.permissions))
       in
       let nonce =
-        !( match predicate with
-         | Full _ ->
-             Account.Nonce.Checked.succ a.nonce
-         | Nonce_or_accept { accept; _ } ->
-             Account.Nonce.Checked.succ_if a.nonce (Boolean.not accept) )
+        update_authorized a.permissions.increment_nonce
+          ~is_keep:(Boolean.not increment_nonce)
+          ~updated:
+            (`Ok
+              !(Account.Nonce.Checked.if_ increment_nonce
+                  ~then_:!(Account.Nonce.Checked.succ a.nonce)
+                  ~else_:a.nonce))
       in
       let a : Account.Checked.Unhashed.t =
         { a with
@@ -2030,6 +2033,17 @@ module Base = struct
                        ~payload_digest:transaction_commitment signature
                        party.data.body.pk)
             in
+            (* The fee-payer must increment their nonce. *)
+            add_check
+              Boolean.(
+                party.data.body.increment_nonce ||| not is_actually_start) ;
+            (* If there's a valid signature, it must increment the nonce. *)
+            (* TODO(#9743): Relax this when this party uses a 'full'
+               commitment.
+            *)
+            add_check
+              Boolean.(
+                party.data.body.increment_nonce ||| not signature_verifies) ;
             let account', `proof_must_verify proof_must_verify =
               let tag =
                 Option.map snapp_statement ~f:(fun (i, _) -> side_loaded i)
@@ -4467,6 +4481,7 @@ let%test_module "transaction_snark" =
                       }
                   ; token_id = ()
                   ; delta = Fee.of_int full_amount
+                  ; increment_nonce = ()
                   ; events = []
                   ; sequence_events = []
                   ; call_data = Field.zero
@@ -4483,6 +4498,7 @@ let%test_module "transaction_snark" =
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
                     ; delta = Amount.Signed.(of_unsigned receiver_amount)
+                    ; increment_nonce = false
                     ; events = []
                     ; sequence_events = []
                     ; call_data = Field.zero
@@ -4902,6 +4918,7 @@ let%test_module "transaction_snark" =
                             ; token_id = ()
                             ; delta = fee
                             ; events = []
+                            ; increment_nonce = ()
                             ; sequence_events = []
                             ; call_data = Field.zero
                             ; depth = 0
@@ -4918,6 +4935,7 @@ let%test_module "transaction_snark" =
                         ; update = Party.Update.noop
                         ; token_id = Token_id.default
                         ; delta = Amount.(Signed.(negate (of_unsigned amount)))
+                        ; increment_nonce = true
                         ; events = []
                         ; sequence_events = []
                         ; call_data = Field.zero
@@ -4932,6 +4950,7 @@ let%test_module "transaction_snark" =
                         ; update = update_empty_permissions
                         ; token_id = Token_id.default
                         ; delta = Amount.Signed.(of_unsigned amount)
+                        ; increment_nonce = false
                         ; events = []
                         ; sequence_events = []
                         ; call_data = Field.zero
@@ -5213,6 +5232,7 @@ let%test_module "transaction_snark" =
                             ; update = Party.Update.noop
                             ; token_id = ()
                             ; delta = fee
+                            ; increment_nonce = ()
                             ; events = []
                             ; sequence_events = []
                             ; call_data = Field.zero
@@ -5230,6 +5250,7 @@ let%test_module "transaction_snark" =
                         ; update = Party.Update.noop
                         ; token_id = Token_id.default
                         ; delta = Amount.(Signed.(negate (of_unsigned amount)))
+                        ; increment_nonce = true
                         ; events = []
                         ; sequence_events = []
                         ; call_data = Field.zero
@@ -5244,6 +5265,7 @@ let%test_module "transaction_snark" =
                         ; update = update_empty_permissions
                         ; token_id = Token_id.default
                         ; delta = Amount.Signed.(of_unsigned amount)
+                        ; increment_nonce = false
                         ; events = []
                         ; sequence_events = []
                         ; call_data = Field.zero
