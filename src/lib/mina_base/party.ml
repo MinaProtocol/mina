@@ -574,6 +574,18 @@ module Predicate = struct
     end
   end]
 
+  module Tag = struct
+    type t = Full | Nonce | Accept [@@deriving equal, compare, sexp]
+  end
+
+  let tag : t -> Tag.t = function
+    | Full _ ->
+        Full
+    | Nonce _ ->
+        Nonce
+    | Accept ->
+        Accept
+
   let accept = lazy Random_oracle.(digest (salt "MinaPartyAccept"))
 
   let digest (t : t) =

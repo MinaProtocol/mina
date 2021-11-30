@@ -93,7 +93,8 @@ val apply_parties_unchecked_with_states :
          , Currency.Amount.t
          , t
          , bool
-         , unit )
+         , unit
+         , Transaction_status.Failure.t option )
          Parties_logic.Local_state.t )
        list )
      Or_error.t
