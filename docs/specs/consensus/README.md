@@ -493,16 +493,20 @@ The checkpoints for genesis block `G` are initialized like this
 
 ```rust
 // Set staking epoch data
-cState(G).staking_epoch_data.seed = Epoch_seed::zero
-cState(G).staking_epoch_data.start_checkpoint = State_hash::zero
-cState(G).staking_epoch_data.lock_checkpoint = State_hash::zero
+cState(G).next_epoch_data.ledger.hash = Ledger_hash::from_b58("jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee")
+cState(G).next_epoch.ledger.total_currency = 805385692840039233
+cState(G).staking_epoch_data.seed = Epoch_seed::from_b58("2va9BGv9JrLTtrzZttiEMDYw1Zj6a6EHzXjmP9evHDTG3oEquURA") // Epoch_seed::zero
+cState(G).staking_epoch_data.start_checkpoint = State_hash::from_b58("3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x") // State_hash::zero
+cState(G).staking_epoch_data.lock_checkpoint = State_hash::from_b58("3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x") // State_hash::zero
 cState(G).staking_epoch_data.epoch_length = 1
 
 // Set next epoch data
-cState(G).next_epoch.data.seed = Epoch_seed::from_b58("2vaRh7FQ5wSzmpFReF9gcRKjv48CcJvHs25aqb3SSZiPgHQBy5Dt")
-cState(G).next_epoch_data.start_checkpoint = State_hash::zero
+cState(G).next_epoch_data.ledger.hash = Ledger_hash::from_b58("jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee")
+cState(G).next_epoch.ledger.total_currency = 805385692840039233
+cState(G).next_epoch_data.seed = Epoch_seed::from_b58("2vaRh7FQ5wSzmpFReF9gcRKjv48CcJvHs25aqb3SSZiPgHQBy5Dt")
+cState(G).next_epoch_data.start_checkpoint = State_hash::from_b58("3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x") // State_hash::zero
 cState(G).next_epoch_data.lock_checkpoint =  State_hash::from_b58("3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d")
-cState(G).staking_epoch_data.epoch_length = 2
+cState(G).next_epoch.epoch_length = 2
 ```
 
 The functions `Epoch_seed::from_b58` and `State_hash::from_b58` are provided by the `bin_prot` implementation.
@@ -948,107 +952,96 @@ Things a peer MUST do to initialize consensus includes
 | `blockchain_length`                      | `1`           |
 | `epoch_count`                            | `0`           |
 | `min_window_density`                     | `77 = slots_per_window` |
-| `sub_window_densities`                   | `u32[1; 1] ⌢ u32[7; 10]` (See [Section 5.4.10](#5410-genesis-window)) |
-| `last_vrf_output`                        | `0x0000000000000000000000000000000000000000000000000000000000000000`
-| `total_currency`                         | `805385692.840039233`
+| `sub_window_densities`                   | `u32[1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7]` (See [Section 5.4.10](#5410-genesis-window)) |
+| `last_vrf_output`                        | `VRF_output::from_b64("NfThG1r1GxQuhaGLSJWGxcpv24SudtXG4etB0TnGqwg=")`
+| `total_currency`                         | `805385692840039233` (= 805385692.840039233)
 | `curr_global_slot`                       | `0` |
 | `global_slot_since_genesis`              | `0` |
 | `staking_epoch_data`                     | See [Section 4.1.1.2](#4112-staking_epoch_data) |
 | `next_epoch_data`                        | See [Section 4.1.1.3](#4112-next_epoch_data) |
-| `has_ancestor_in_same_checkpoint_window` | `false` | |
-| `block_stake_winner`                     | `Public_key.Compressed.Stable.V1.t(B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)` |
-| `block_creator`                          | `Public_key.Compressed.Stable.V1.t(B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)` |
-| `coinbase_receiver`                      | `Public_key.Compressed.Stable.V1.t(B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)` |
-| `supercharge_coinbase`                   | `false` |
+| `has_ancestor_in_same_checkpoint_window` | `true` |
+| `block_stake_winner`                     | `Public_key::from_b58("B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg")` |
+| `block_creator`                          | `Public_key::from_b58("B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg")` |
+| `coinbase_receiver`                      | `Public_key::from_b58("B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg")` |
+| `supercharge_coinbase`                   | `true` |
 
 **JSON**
 
-**WIP**
-
-The following JSON specifies most of the genesis block (work in progress).
+The following JSON specifies the main data in the `mainnet` genesis block.
 
 ```json
 {
-  "data": {
-    "block": {
-      "blockHeight": 1,
-      "canonical": true,
-      "creator": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-      "creatorAccount": {
-        "publicKey": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"
-      },
-      "dateTime": "2021-03-17T00:00:00Z",
-      "protocolState": {
-        "blockchainState": {
-          "date": "1615939200000",
-          "snarkedLedgerHash": "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
-          "stagedLedgerHash": "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
-          "utcDate": "1615939200000"
-        },
-        "consensusState": {
-          "blockchainLength": 1,
-          "epochCount": 0,
-          "minWindowDensity": 77,
-		  "sub_window_densities": TODO: Missing
-		  "lastVrfOutput": "EiRs4sfLJRsfCoy92Bb2mR7zYLDXDAnSqnE2uXbhodfmGykDy8UdS", (TODO: Doesn't match)
-		  "totalCurrency": 805385692840039300, (TODO: Doesn't match 805385692840039233)
-		  "currGlobalSlot": 0,
-		  "slotSinceGenesis": 0,
-		  "stakingEpochData": {
-			"epochLength": 1,
-			"ledger": {
-			  "hash": "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
-			  "totalCurrency": 805385692840039300
-			},
-			"lockCheckpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
-			"seed": "2va9BGv9JrLTtrzZttiEMDYw1Zj6a6EHzXjmP9evHDTG3oEquURA",
-			"startCheckpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x"
-		  },
-          "nextEpochData": {
-            "epochLength": 2,
-            "ledger": {
-              "hash": "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
-              "totalCurrency": 805385692840039300
+   "data":{
+      "block":{
+         "blockHeight":1,
+         "canonical":true,
+         "creator":"B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
+         "creatorAccount":{
+            "publicKey":"B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"
+         },
+         "dateTime":"2021-03-17T00:00:00Z",
+         "protocolState":{
+            "blockchainState":{
+               "date":"1615939200000",
+               "snarkedLedgerHash":"jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
+               "stagedLedgerHash":"jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
+               "utcDate":"1615939200000"
             },
-            "lockCheckpoint": "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d",
-            "seed": "2vaRh7FQ5wSzmpFReF9gcRKjv48CcJvHs25aqb3SSZiPgHQBy5Dt",
-            "startCheckpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x"
-          }
-		  "hasAncestorInSameCheckpointWindow": true,
-		  "block_stake_winner": TODO: Missing,
-		  "block_creator": TODO: Missing,
-		  "coinbase_receiver": TODO: Missing,
-		  "supercharge_coinbase": TODO: Missing,
-        },
-        "previousStateHash": "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d"
-      },
-      "receivedTime": "2021-03-17T00:00:00Z",
-      "snarkFees": "0",
-      "snarkJobs": [],
-      "stateHash": "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ",
-      "stateHashField": "9884505309989150310604636992054488263310056292998048242928359357807664465744",
-      "transactions": {
-        "coinbase": "720000000000",
-        "coinbaseReceiverAccount": {
-          "publicKey": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"
-        },
-        "feeTransfer": [],
-        "userCommands": []
-      },
-      "txFees": "0",
-      "winnerAccount": {
-        "balance": {
-          "blockHeight": 0,
-          "liquid": 0,
-          "locked": "0",
-          "stateHash": "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ",
-          "total": "0",
-          "unknown": "0"
-        },
-        "publicKey": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"
+            "consensusState":{
+               "blockchainLength":1,
+               "epochCount":0,
+               "minWindowDensity":77,
+               "sub_window_densities":[
+                  1,
+                  7,
+                  7,
+                  7,
+                  7,
+                  7,
+                  7,
+                  7,
+                  7,
+                  7,
+                  7
+               ],
+               "lastVrfOutput":"NfThG1r1GxQuhaGLSJWGxcpv24SudtXG4etB0TnGqwg=",
+               "totalCurrency":805385692840039233,
+               "currGlobalSlot":0,
+               "slotSinceGenesis":0,
+               "stakingEpochData":{
+                  "epochLength":1,
+                  "ledger":{
+                     "hash":"jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
+                     "totalCurrency":805385692840039300
+                  },
+                  "lockCheckpoint":"3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                  "seed":"2va9BGv9JrLTtrzZttiEMDYw1Zj6a6EHzXjmP9evHDTG3oEquURA",
+                  "startCheckpoint":"3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x"
+               },
+               "nextEpochData":{
+                  "epochLength":2,
+                  "ledger":{
+                     "hash":"jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
+                     "totalCurrency":805385692840039300
+                  },
+                  "lockCheckpoint":"3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d",
+                  "seed":"2vaRh7FQ5wSzmpFReF9gcRKjv48CcJvHs25aqb3SSZiPgHQBy5Dt",
+                  "startCheckpoint":"3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x"
+               },
+               "hasAncestorInSameCheckpointWindow":true,
+               "block_stake_winner":"B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
+               "block_creator":"B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
+               "coinbase_receiver":"B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
+               "supercharge_coinbase":true,
+               "receivedTime":"2021-03-17T00:00:00Z",
+               "snarkFees":"0",
+               "stateHash":"3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ",
+               "stateHashField":"9884505309989150310604636992054488263310056292998048242928359357807664465744",
+               "txFees":"0"
+            }
+         }
       }
-    }
-  }
+   }
 }
 ```
 
