@@ -282,8 +282,7 @@ let gen_balance_change ?balances_tbl (account : Account.t) =
       Currency.Signed_poly.{ magnitude; sgn = Sgn.Neg }
 
 let gen_use_full_commitment : bool Base_quickcheck.Generator.t =
-  (* FIXME: generate true sometimes *)
-  Base_quickcheck.Generator.return false
+  Bool.quickcheck_generator
 
 (* The type `a` is associated with the `delta` field, which is an unsigned fee
    for the fee payer, and a signed amount for other parties.

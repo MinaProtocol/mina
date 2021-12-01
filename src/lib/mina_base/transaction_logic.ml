@@ -1443,13 +1443,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
          or the full commitment is used to avoid replays. *)
     let%map () =
       let predicate_is_accept =
-        match predicate with
-        | Accept ->
-            true
-        | Full p ->
-            Snapp_predicate.Account.(equal p accept)
-        | Nonce _ ->
-            false
+        Snapp_predicate.Account.is_accept @@ Party.Predicate.to_full predicate
       in
       List.exists ~f:Fn.id
         [ predicate_is_accept
