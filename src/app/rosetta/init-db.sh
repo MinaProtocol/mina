@@ -22,10 +22,10 @@ RETURN_CODE=$?
 
 echo "[POPULATE] Initializing postgresql version $POSTGRES_VERSION"
 echo "[POPULATE] postgresql.conf:"
-cat /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf | tee ./postgres-cluster-config.conf
+cat /rosetta/postgresql.conf
 
 pg_dropcluster --stop ${POSTGRES_VERSION} main
-pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} --createclusterconf ./postgres-cluster-config.conf main
+pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} --createclusterconf /rosetta/postgresql.conf main
 # pg_ctlcluster ${POSTGRES_VERSION} main start
 # /etc/init.d/postgresql start
 
