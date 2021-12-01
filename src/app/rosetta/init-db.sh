@@ -22,13 +22,12 @@ RETURN_CODE=$?
 
 echo "[POPULATE] Initializing postgresql version $POSTGRES_VERSION"
 echo "[POPULATE] postgresql.conf:"
-cat /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf | tee ./postgresql.conf
+cat /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf | tee ./postgres-cluster-config.conf
 
 pg_dropcluster --stop ${POSTGRES_VERSION} main
-sudo cp ./postgresql.conf /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf
-pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} main
-
-/etc/init.d/postgresql start
+pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} --createclusterconf ./postgres-cluster-config.conf main
+# pg_ctlcluster ${POSTGRES_VERSION} main start
+# /etc/init.d/postgresql start
 
 sudo -u postgres psql --command "SHOW config_file;"
 sudo -u postgres psql --command "SHOW hba_file;"
