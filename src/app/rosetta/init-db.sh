@@ -8,22 +8,30 @@ POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
 PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${POSTGRES_DBNAME}
 DUMP_TIME=${5:=0000}
 
+mkdir -p ${POSTGRES_DATA_DIR}
+chown postgres ${POSTGRES_DATA_DIR}
+
 pg_ctlcluster ${POSTGRES_VERSION} main start
 echo "[POPULATE] Top 10 blocks in ${POSTGRES_DATA_DIR} archiveDB:"
 psql "${PG_CONN}" -c "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
 RETURN_CODE=$?
 [[ "$RETURN_CODE" == "0" ]] && echo "[WARN] Database already initialized!" && exit ${RETURN_CODE}
 
-mkdir -p ${POSTGRES_DATA_DIR}
-chown postgres ${POSTGRES_DATA_DIR}
+# mkdir -p ${POSTGRES_DATA_DIR}
+# chown postgres ${POSTGRES_DATA_DIR}
 
 echo "[POPULATE] Initializing postgresql version $POSTGRES_VERSION"
-sudo -u postgres psql --command "SHOW config_file;"
-sudo -u postgres psql --command "SHOW hba_file;"
-# pg_dropcluster --stop ${POSTGRES_VERSION} main
-# pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} main
+echo "[POPULATE] postgresql.conf:"
+cat /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf | tee ./postgresql.conf
+
+pg_dropcluster --stop ${POSTGRES_VERSION} main
+sudo cp ./postgresql.conf /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf
+pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} main
 
 /etc/init.d/postgresql start
+
+sudo -u postgres psql --command "SHOW config_file;"
+sudo -u postgres psql --command "SHOW hba_file;"
 
 sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
 sudo -u postgres createdb -O ${POSTGRES_USERNAME} ${POSTGRES_DBNAME}
