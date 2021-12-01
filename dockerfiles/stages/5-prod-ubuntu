@@ -48,7 +48,7 @@ COPY --from=builder /home/opam/mina/src/app/rosetta/*.conf /rosetta/
 COPY --from=builder /home/opam/mina/src/app/rosetta/README.md /rosetta/
 COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
 
-USER postgres
+USER root
 
 RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && echo "$POSTGRES_VERSION" "$(psql -V)" \
@@ -58,7 +58,7 @@ RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && echo "max_pred_locks_per_relation=128" >> /rosetta/postgresql.conf \
     && echo "max_pred_locks_per_transaction=2500" >> /rosetta/postgresql.conf \
     && echo "max_connections=200" >> /rosetta/postgresql.conf \
-    && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf
+    && echo "host all  all    0.0.0.0/0  md5" >> /rosetta/pg_hba.conf
 
 USER root
 
