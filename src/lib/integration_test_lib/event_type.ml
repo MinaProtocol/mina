@@ -457,6 +457,17 @@ let puppeteer_events_table =
 
 let of_puppeteer_event_string id = String.Table.find puppeteer_events_table id
 
+let parse_error_log (message : Logger.Message.t) =
+  let open Or_error.Let_syntax in
+  match Log_error.parse with
+  | From_error_log fnc ->
+      let%map data = fnc message in
+      Event (Log_error, data)
+  | _ ->
+      failwith
+        "Log_error.parse should always be a `From_error_log variant, but was \
+         mis-programmed as something else. this is a progammer error"
+
 let parse_daemon_log (message : Logger.Message.t) =
   let open Or_error.Let_syntax in
   match message.event_id with
@@ -475,21 +486,14 @@ let parse_daemon_log (message : Logger.Message.t) =
             "the 'parse' field of a daemon event should always be a \
              `From_daemon_log variant, but was mis-programmed as something \
              else. this is a progammer error" )
-  | None -> (
+  | None ->
       (* TODO: check log level to ensure it matches error log level *)
-      match Log_error.parse with
-      | From_error_log fnc ->
-          let%map data = fnc message in
-          Event (Log_error, data)
-      | _ ->
-          failwith
-            "Log_error.parse should always be a `From_error_log variant, but \
-             was mis-programmed as something else. this is a progammer error" )
+      parse_error_log message
 
 let parse_puppeteer_log (message : Puppeteer_message.t) =
   let open Or_error.Let_syntax in
   match
-    Option.( >>= ) message.puppeteer_event_type of_puppeteer_event_string
+    Option.bind message.puppeteer_event_type ~f:of_puppeteer_event_string
   with
   | Some exis -> (
       let (Event_type ev_type) = exis in

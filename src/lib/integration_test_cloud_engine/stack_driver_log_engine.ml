@@ -283,6 +283,9 @@ let parse_event_from_log_entry ~logger ~network log_entry =
            (Option.( >>| ) msg.event_id Structured_log_events.string_of_id)
            ~default:"<NONE>") ;
       Event_type.parse_daemon_log msg
+    (* match msg.event_id with
+       | Some event_id -> Event_type.parse_daemon_log event_id
+       | None -> Event_type.parse_error_log msg *)
   in
   (node, event)
 
