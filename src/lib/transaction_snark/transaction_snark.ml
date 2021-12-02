@@ -499,8 +499,7 @@ let chain if_ b ~then_ ~else_ =
 module Parties_segment = struct
   module Spec = struct
     type single =
-      { predicate_type : [ `Full | `Nonce_or_accept ]
-      ; auth_type : Control.Tag.t
+      { auth_type : Control.Tag.t
       ; is_start : [ `Yes | `No | `Compute_in_circuit ]
       }
 
@@ -536,14 +535,9 @@ module Parties_segment = struct
       | _ ->
           failwith "Parties_segment.Basic.of_controls: Unsupported combination"
 
-    let opt_signed ~is_start : Spec.single =
-      { predicate_type = `Nonce_or_accept; auth_type = Signature; is_start }
+    let opt_signed ~is_start : Spec.single = { auth_type = Signature; is_start }
 
-    let unsigned : Spec.single =
-      { predicate_type = `Nonce_or_accept
-      ; auth_type = None_given
-      ; is_start = `No
-      }
+    let unsigned : Spec.single = { auth_type = None_given; is_start = `No }
 
     let opt_signed = opt_signed ~is_start:`Compute_in_circuit
 
@@ -557,7 +551,7 @@ module Parties_segment = struct
       | Opt_signed ->
           [ opt_signed ]
       | Proved ->
-          [ { predicate_type = `Full; auth_type = Proof; is_start = `No } ]
+          [ { auth_type = Proof; is_start = `No } ]
 
     type (_, _, _, _) t_typed =
       (* Corresponds to payment *)
@@ -581,7 +575,7 @@ module Parties_segment = struct
       | Opt_signed ->
           [ opt_signed ]
       | Proved ->
-          [ { predicate_type = `Full; auth_type = Proof; is_start = `No } ]
+          [ { auth_type = Proof; is_start = `No } ]
   end
 
   module Witness = Transaction_witness.Parties_segment_witness
@@ -1253,13 +1247,14 @@ module Base = struct
                  ; timing
                  }
              ; delta
+             ; increment_nonce
              ; events = _ (* This is for the snapp to use, we don't need it. *)
              ; call_data =
                  _ (* This is for the snapp to use, we don't need it. *)
              ; sequence_events
              ; depth = _ (* This is used to build the 'stack of stacks'. *)
              }
-         ; predicate
+         ; predicate = _
          } :
           Party.Predicated.Checked.t) (a : Account.Checked.Unhashed.t) :
         Account.Checked.Unhashed.t * _ =
@@ -1487,11 +1482,13 @@ module Base = struct
                  permissions a.permissions))
       in
       let nonce =
-        !( match predicate with
-         | Full _ ->
-             Account.Nonce.Checked.succ a.nonce
-         | Nonce_or_accept { accept; _ } ->
-             Account.Nonce.Checked.succ_if a.nonce (Boolean.not accept) )
+        update_authorized a.permissions.increment_nonce
+          ~is_keep:(Boolean.not increment_nonce)
+          ~updated:
+            (`Ok
+              !(Account.Nonce.Checked.if_ increment_nonce
+                  ~then_:!(Account.Nonce.Checked.succ a.nonce)
+                  ~else_:a.nonce))
       in
       let a : Account.Checked.Unhashed.t =
         { a with
@@ -1534,7 +1531,7 @@ module Base = struct
     module Single (I : Single_inputs) = struct
       open I
 
-      let { predicate_type; auth_type; is_start } = spec
+      let { auth_type; is_start } = spec
 
       module V = Prover_value
       open Impl
@@ -1660,25 +1657,8 @@ module Base = struct
                   (p.data.body, h))
             in
             let predicate : Party.Predicate.Checked.t =
-              match predicate_type with
-              | `Nonce_or_accept ->
-                  let nonce, accept =
-                    exists (Typ.tuple2 Account.Nonce.typ Boolean.typ)
-                      ~compute:(fun () ->
-                        match (V.get first_party).data.predicate with
-                        | Nonce n ->
-                            (n, false)
-                        | Accept ->
-                            (Account.Nonce.zero, true)
-                        | Full _ ->
-                            failwith
-                              "first party should have nonce as predicate")
-                  in
-                  Nonce_or_accept { nonce; accept }
-              | `Full ->
-                  Full
-                    (exists (Party.Predicate.typ ()) ~compute:(fun () ->
-                         (V.get first_party).data.predicate))
+              exists (Party.Predicate.typ ()) ~compute:(fun () ->
+                  (V.get first_party).data.predicate)
             in
             let auth =
               V.(create (fun () -> (V.get first_party).authorization))
@@ -1813,11 +1793,13 @@ module Base = struct
               , Amount.t
               , Ledger.t
               , Bool.t
-              , Transaction_commitment.t )
+              , Transaction_commitment.t
+              , unit )
               Parties_logic.Local_state.t
           ; protocol_state_predicate : Snapp_predicate.Protocol_state.Checked.t
           ; transaction_commitment : Transaction_commitment.t
-          ; field : Field.t >
+          ; field : Field.t
+          ; failure : unit >
       end
 
       include Parties_logic.Make (Inputs)
@@ -1892,14 +1874,9 @@ module Base = struct
           ->
             Snapp_predicate.Protocol_state.Checked.check
               protocol_state_predicate global_state.protocol_state
-        | Check_predicate (_is_start, { party; _ }, account, _global) -> (
-            match party.data.predicate with
-            | Nonce_or_accept { nonce; accept } ->
-                Boolean.( || ) accept
-                  (run_checked
-                     (Account.Nonce.Checked.equal nonce account.data.nonce))
-            | Full p ->
-                Snapp_predicate.Account.Checked.check p account.data )
+        | Check_predicate (_is_start, { party; _ }, account, _global) ->
+            Snapp_predicate.Account.Checked.check party.data.predicate
+              account.data
         | Set_account ((_root, ledger), a, incl) ->
             ( implied_root a incl |> Ledger_hash.var_of_hash_packed
             , V.map ledger
@@ -2028,6 +2005,17 @@ module Base = struct
                        ~payload_digest:transaction_commitment signature
                        party.data.body.pk)
             in
+            (* The fee-payer must increment their nonce. *)
+            add_check
+              Boolean.(
+                party.data.body.increment_nonce ||| not is_actually_start) ;
+            (* If there's a valid signature, it must increment the nonce. *)
+            (* TODO(#9743): Relax this when this party uses a 'full'
+               commitment.
+            *)
+            add_check
+              Boolean.(
+                party.data.body.increment_nonce ||| not signature_verifies) ;
             let account', `proof_must_verify proof_must_verify =
               let tag =
                 Option.map snapp_statement ~f:(fun (i, _) -> side_loaded i)
@@ -2051,7 +2039,8 @@ module Base = struct
                   (* We always assert that the proof verifies. *)
                   checks_succeeded
             in
-            (account_with_hash account', success)
+            (* omit failure status here, unlike `Transaction_logic` *)
+            (account_with_hash account', success, ())
         | Balance account ->
             Balance.Checked.to_amount account.data.balance
     end
@@ -2126,6 +2115,7 @@ module Base = struct
               ( statement.source.local_state.ledger
               , V.create (fun () -> !witness.local_state_init.ledger) )
           ; success = statement.source.local_state.success
+          ; failure_status = ()
           }
         in
         (g, l)
@@ -2189,22 +2179,32 @@ module Base = struct
                             p.memo_hash)
                 }
               in
-              S.apply ~constraint_constants
-                ~is_start:
-                  ( match party_spec.is_start with
-                  | `No ->
-                      `No
-                  | `Yes ->
-                      `Yes start_data
-                  | `Compute_in_circuit ->
-                      `Compute start_data )
-                S.{ perform }
-                acc
+              let global_state, local_state =
+                S.apply ~constraint_constants
+                  ~is_start:
+                    ( match party_spec.is_start with
+                    | `No ->
+                        `No
+                    | `Yes ->
+                        `Yes start_data
+                    | `Compute_in_circuit ->
+                        `Compute start_data )
+                  S.{ perform }
+                  acc
+              in
+              (* replace any transaction failure with unit value *)
+              (global_state, { local_state with failure_status = () })
             in
             let acc' =
               match party_spec.is_start with
               | `No ->
-                  S.apply ~constraint_constants ~is_start:`No S.{ perform } acc
+                  let global_state, local_state =
+                    S.apply ~constraint_constants ~is_start:`No
+                      S.{ perform }
+                      acc
+                  in
+                  (* replace any transaction failure with unit value *)
+                  (global_state, { local_state with failure_status = () })
               | `Compute_in_circuit ->
                   V.create (fun () ->
                       match As_prover.Ref.get start_parties with
@@ -4247,6 +4247,7 @@ module For_tests = struct
               ; update = Party.Update.noop
               ; token_id = ()
               ; delta = fee
+              ; increment_nonce = ()
               ; events = []
               ; sequence_events = []
               ; call_data = Field.zero
@@ -4264,6 +4265,7 @@ module For_tests = struct
           ; update = Party.Update.noop
           ; token_id = Token_id.default
           ; delta = Amount.(Signed.(negate (of_unsigned amount)))
+          ; increment_nonce = true
           ; events = []
           ; sequence_events = []
           ; call_data = Field.zero
@@ -4278,6 +4280,7 @@ module For_tests = struct
           ; update = update_empty_permissions
           ; token_id = Token_id.default
           ; delta = Amount.Signed.(of_unsigned amount)
+          ; increment_nonce = false
           ; events = []
           ; sequence_events = []
           ; call_data = Field.zero
@@ -4695,6 +4698,7 @@ let%test_module "transaction_snark" =
                       }
                   ; token_id = ()
                   ; delta = Fee.of_int full_amount
+                  ; increment_nonce = ()
                   ; events = []
                   ; sequence_events = []
                   ; call_data = Field.zero
@@ -4711,6 +4715,7 @@ let%test_module "transaction_snark" =
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
                     ; delta = Amount.Signed.(of_unsigned receiver_amount)
+                    ; increment_nonce = false
                     ; events = []
                     ; sequence_events = []
                     ; call_data = Field.zero
@@ -5236,6 +5241,7 @@ let%test_module "transaction_snark" =
                             ; update = Party.Update.noop
                             ; token_id = ()
                             ; delta = fee
+                            ; increment_nonce = ()
                             ; events = []
                             ; sequence_events = []
                             ; call_data = Field.zero
@@ -5253,6 +5259,7 @@ let%test_module "transaction_snark" =
                         ; update = Party.Update.noop
                         ; token_id = Token_id.default
                         ; delta = Amount.(Signed.(negate (of_unsigned amount)))
+                        ; increment_nonce = true
                         ; events = []
                         ; sequence_events = []
                         ; call_data = Field.zero
@@ -5267,6 +5274,7 @@ let%test_module "transaction_snark" =
                         ; update = update_empty_permissions
                         ; token_id = Token_id.default
                         ; delta = Amount.Signed.(of_unsigned amount)
+                        ; increment_nonce = false
                         ; events = []
                         ; sequence_events = []
                         ; call_data = Field.zero

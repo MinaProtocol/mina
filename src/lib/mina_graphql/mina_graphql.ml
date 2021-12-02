@@ -2262,7 +2262,7 @@ module Types = struct
           ~coerce:
             (fun stake edit_state send receive set_delegate set_permissions
                  set_verification_key set_snapp_uri edit_sequence_state
-                 set_token_symbol ->
+                 set_token_symbol increment_nonce ->
             Ok
               { Permissions.Poly.stake
               ; edit_state
@@ -2274,6 +2274,7 @@ module Types = struct
               ; set_snapp_uri
               ; edit_sequence_state
               ; set_token_symbol
+              ; increment_nonce
               })
           ~fields:
             [ arg "stake" ~typ:(non_null bool)
@@ -2286,6 +2287,7 @@ module Types = struct
             ; arg "setSnappUri" ~typ:(non_null snapp_auth_required)
             ; arg "editSequenceState" ~typ:(non_null snapp_auth_required)
             ; arg "setTokenSymbol" ~typ:(non_null snapp_auth_required)
+            ; arg "incrementNonce" ~typ:(non_null snapp_auth_required)
             ]
 
       let snapp_timing =
@@ -2379,8 +2381,8 @@ module Types = struct
       let snapp_party_body : (Party.Body.t, string) Result.t option arg_typ =
         obj "PartyBody" ~doc:"Body component of a Snapp Party"
           ~coerce:
-            (fun pk update_result token_id delta events sequence_events
-                 call_data depth ->
+            (fun pk update_result token_id delta increment_nonce events
+                 sequence_events call_data depth ->
             try
               let open Result.Let_syntax in
               let%bind pk =
@@ -2403,6 +2405,7 @@ module Types = struct
                 { pk
                 ; update
                 ; token_id
+                ; increment_nonce
                 ; delta
                 ; events
                 ; sequence_events
@@ -2421,6 +2424,8 @@ module Types = struct
                   "Signed amount representing the amount to change for this \
                    particular relevant party."
                 ~typ:(non_null snapp_delta)
+            ; arg "incrementNonce" ~doc:"Whether to increment the nonce"
+                ~typ:(non_null bool)
               (* TODO: Do we want fields in base58 in graphQL? Should we use a string of the base10 number like in other parts? Should we use a hex 32bytes -- that seems most natural to me? *)
             ; arg "events"
                 ~doc:
@@ -2462,6 +2467,7 @@ module Types = struct
                   ~f:Error.to_string_hum
               in
               let token_id = () in
+              let increment_nonce = () in
               let mk_field_arrays evs =
                 List.map evs ~f:(fun fields ->
                     List.map fields ~f:Snark_params.Tick.Field.of_string
@@ -2477,6 +2483,7 @@ module Types = struct
               ; update
               ; token_id
               ; delta
+              ; increment_nonce
               ; events
               ; sequence_events
               ; call_data

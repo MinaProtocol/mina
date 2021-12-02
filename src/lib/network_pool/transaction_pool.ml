@@ -1790,7 +1790,7 @@ let%test_module _ =
             let%bind protocol_state = Snapp_predicate.Protocol_state.gen in
             let%map (parties : Parties.t) =
               Mina_base.Snapp_generators.gen_parties_from ~succeed:true ~keymap
-                ~fee_payer_keypair ~ledger ~protocol_state
+                ~fee_payer_keypair ~ledger ~protocol_state ()
             in
             User_command.Parties parties
           in

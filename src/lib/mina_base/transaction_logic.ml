@@ -375,7 +375,8 @@ module type S = sig
            , Amount.t
            , ledger
            , bool
-           , unit )
+           , unit
+           , Transaction_status.Failure.t option )
            Parties_logic.Local_state.t
          * Amount.Signed.t ) )
        Or_error.t
@@ -406,7 +407,8 @@ module type S = sig
                , Amount.t
                , ledger
                , bool
-               , unit )
+               , unit
+               , Transaction_status.Failure.t option )
                Parties_logic.Local_state.t
           -> 'acc)
     -> ?fee_excess:Amount.Signed.t
@@ -1258,12 +1260,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                ; timing
                }
            ; delta
+           ; increment_nonce
            ; events = _ (* This is for the snapp to use, we don't need it. *)
            ; call_data = _ (* This is for the snapp to use, we don't need it. *)
            ; sequence_events
            ; depth = _ (* This is used to build the 'stack of stacks'. *)
            }
-       ; predicate
+       ; predicate = _
        } :
         Party.Predicated.t) (a : Account.t) : (Account.t, _) Result.t =
     let open Snapp_basic in
@@ -1411,25 +1414,23 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     let%bind snapp_uri =
       update a.permissions.set_snapp_uri snapp_uri a.snapp_uri
-        ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
-          match u with Keep -> x | Set x -> x)
+        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
     let%bind token_symbol =
       update a.permissions.set_token_symbol token_symbol a.token_symbol
-        ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
-          match u with Keep -> x | Set x -> x)
+        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
     let%bind permissions =
       update a.permissions.set_permissions permissions a.permissions
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
-    let nonce : Account.Nonce.t =
-      (* TODO: Think about whether this is correct *)
-      match predicate with
-      | Accept ->
-          a.nonce
-      | Full _ | Nonce _ ->
-          Account.Nonce.succ a.nonce
+    let%bind nonce =
+      let update_nonce =
+        if increment_nonce then Set_or_keep.Set (Account.Nonce.succ a.nonce)
+        else Set_or_keep.Keep
+      in
+      update a.permissions.increment_nonce update_nonce a.nonce
+        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
     Ok
       { a with
@@ -1618,11 +1619,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           , Amount.t
           , L.t
           , bool
-          , Transaction_commitment.t )
+          , Transaction_commitment.t
+          , Transaction_status.Failure.t option )
           Parties_logic.Local_state.t
       ; protocol_state_predicate : Snapp_predicate.Protocol_state.t
       ; transaction_commitment : unit
-      ; field : Snark_params.Tick.Field.t >
+      ; field : Snark_params.Tick.Field.t
+      ; failure : Transaction_status.Failure.t option >
 
     let perform ~constraint_constants ~state_view ledger (type r)
         (eff : (r, t) Parties_logic.Eff.t) : r =
@@ -1674,6 +1677,25 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           if (is_start : bool) then
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
           match
+            let%bind.Result () =
+              if is_start && not p.data.body.increment_nonce then
+                (* The fee-payer must increment their nonce. *)
+                Error Transaction_status.Failure.Update_not_permitted
+              else Ok ()
+            in
+            let%bind.Result () =
+              match
+                (Control.tag p.authorization, p.data.body.increment_nonce)
+              with
+              | Signature, false ->
+                  (* If there's a signature, it must increment the nonce. *)
+                  (* TODO(#9743): Relax this when this party uses a 'full'
+                     commitment.
+                  *)
+                  Error Transaction_status.Failure.Update_not_permitted
+              | _ ->
+                  Ok ()
+            in
             apply_body ~constraint_constants ~state_view
               ~check_auth:
                 (Fn.flip Permissions.Auth_required.check
@@ -1683,11 +1705,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               ~global_slot_since_genesis:
                 global_state.protocol_state.global_slot_since_genesis p.data a
           with
-          | Error _e ->
-              (* TODO: Use this in the failure reason. *)
-              (a, false)
+          | Error failure ->
+              (a, false, Some failure)
           | Ok a ->
-              (a, true) )
+              (a, true, None) )
   end
 
   module M = Parties_logic.Make (Inputs)
@@ -1710,15 +1731,19 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       Env.perform ~constraint_constants ~state_view ledger eff
     in
     let rec step_all user_acc
-        ((g : Inputs.Global_state.t), (l : _ Parties_logic.Local_state.t)) :
-        user_acc Or_error.t =
-      if List.is_empty l.parties then Ok user_acc
+        ( (g_state : Inputs.Global_state.t)
+        , (l_state : _ Parties_logic.Local_state.t) ) : user_acc Or_error.t =
+      if List.is_empty l_state.parties then Ok user_acc
       else
-        match M.step ~constraint_constants { perform } (g, l) with
-        | exception e ->
-            Error (Error.of_exn ~backtrace:`Get e)
-        | s ->
-            step_all (f user_acc s) s
+        match M.step ~constraint_constants { perform } (g_state, l_state) with
+        | exception exn ->
+            Error (Error.of_exn ~backtrace:`Get exn)
+        | ( _global_state
+          , { Parties_logic.Local_state.failure_status = Some failure; _ } ) ->
+            Error
+              (Error.of_string @@ Transaction_status.Failure.to_string failure)
+        | states ->
+            step_all (f user_acc states) states
     in
     let initial_state : Inputs.Global_state.t * _ Parties_logic.Local_state.t =
       ( { protocol_state = state_view; ledger; fee_excess }
@@ -1729,6 +1754,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ; excess = Currency.Amount.zero
         ; ledger
         ; success = true
+        ; failure_status = None
         } )
     in
     let user_acc = f init initial_state in
@@ -2527,6 +2553,7 @@ module For_tests = struct
                   ; update = Party.Update.noop
                   ; token_id = ()
                   ; delta = fee
+                  ; increment_nonce = ()
                   ; events = []
                   ; sequence_events = []
                   ; call_data = Snark_params.Tick.Field.zero
@@ -2544,6 +2571,7 @@ module For_tests = struct
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
                     ; delta = Amount.Signed.(negate (of_unsigned amount))
+                    ; increment_nonce = true (* TODO(#9743) *)
                     ; events = []
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
@@ -2559,6 +2587,7 @@ module For_tests = struct
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
                     ; delta = Amount.Signed.(of_unsigned amount)
+                    ; increment_nonce = false
                     ; events = []
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
