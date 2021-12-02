@@ -44,6 +44,14 @@ features:
       - "true"
   seedPeers: []
 
+archive:
+  enabled: false
+  image:
+    repository: minaprotocol/mina-archive
+    pullPolicy: IfNotPresent
+    tag: 1.2.1alpha1-1f98b8b-devnet
+  pg_conn: 'postgres://postgresql:5432'
+
 libp2p:
   seed:
     enabled: true
@@ -63,6 +71,7 @@ ports:
   p2p: "10909"
   nodePort: "30005"
   postgres: "5432"
+  archive: "3086"
 
 resources:
   limits:
