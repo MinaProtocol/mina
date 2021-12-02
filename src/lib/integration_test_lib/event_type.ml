@@ -468,7 +468,7 @@ let parse_error_log (message : Logger.Message.t) =
         "Log_error.parse should always be a `From_error_log variant, but was \
          mis-programmed as something else. this is a progammer error"
 
-let parse_daemon_log (message : Logger.Message.t) =
+let parse_daemon_event (message : Logger.Message.t) =
   let open Or_error.Let_syntax in
   match message.event_id with
   | Some event_id -> (
@@ -490,7 +490,7 @@ let parse_daemon_log (message : Logger.Message.t) =
       (* TODO: check log level to ensure it matches error log level *)
       parse_error_log message
 
-let parse_puppeteer_log (message : Puppeteer_message.t) =
+let parse_puppeteer_event (message : Puppeteer_message.t) =
   let open Or_error.Let_syntax in
   match
     Option.bind message.puppeteer_event_type ~f:of_puppeteer_event_string
