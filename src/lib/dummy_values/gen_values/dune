@@ -1,6 +1,8 @@
 (executable
  (name gen_values)
- (libraries async core crypto_params pickles ppxlib)
+ (libraries 
+   run_in_thread.native
+   async core crypto_params pickles ppxlib)
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot))
  (instrumentation (backend bisect_ppx))
