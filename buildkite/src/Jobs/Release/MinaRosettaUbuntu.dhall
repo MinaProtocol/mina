@@ -12,9 +12,6 @@ let DockerImage = ../../Command/DockerImage.dhall
 let DockerLogin = ../../Command/DockerLogin/Type.dhall
 
 
-let dependsOn = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
-let deployEnv = "export-git-env-vars.sh"
-
 in
 
 Pipeline.build
@@ -36,7 +33,6 @@ Pipeline.build
 
       -- mina-rosetta-ubuntu Ubuntu Rosetta image
       let rosettaUbuntuSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn,
         service="mina-rosetta-ubuntu",
         deb_codename="stretch",
         extra_args="--no-cache",
