@@ -105,6 +105,7 @@ let graphql_snapp_command (parties : Parties.t) =
       | Nonce n ->
           sprintf "{ nonce: \"%s\" }" (Account.Nonce.to_string n)
       | Full _a ->
+          (*TODO*)
           "{\n\
           \          account: {\n\
           \            balance:null,\n\

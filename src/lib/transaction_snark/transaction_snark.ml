@@ -557,7 +557,6 @@ module Parties_segment = struct
       | Opt_signed ->
           [ opt_signed ]
       | Proved ->
-          (*TODO: why does this have to have Full predicate?*)
           [ { predicate_type = `Full; auth_type = Proof; is_start = `No } ]
 
     type (_, _, _, _) t_typed =
@@ -1488,10 +1487,11 @@ module Base = struct
                  permissions a.permissions))
       in
       let nonce =
-        !(Account.Nonce.Checked.if_
-            (Party.Predicate.Tag.accept predicate.tag)
-            ~then_:a.nonce
-            ~else_:!(Account.Nonce.Checked.succ a.nonce))
+        !( match predicate with
+         | Full _ ->
+             Account.Nonce.Checked.succ a.nonce
+         | Nonce_or_accept { accept; _ } ->
+             Account.Nonce.Checked.succ_if a.nonce (Boolean.not accept) )
       in
       let a : Account.Checked.Unhashed.t =
         { a with
@@ -1534,7 +1534,7 @@ module Base = struct
     module Single (I : Single_inputs) = struct
       open I
 
-      let { predicate_type = _; auth_type; is_start } = spec
+      let { predicate_type; auth_type; is_start } = spec
 
       module V = Prover_value
       open Impl
@@ -1660,10 +1660,25 @@ module Base = struct
                   (p.data.body, h))
             in
             let predicate : Party.Predicate.Checked.t =
-              (*parties segments could have one starting with proof in the current world where there is always a fee payer party at the beginning of a parties txn*)
-              exists (Party.Predicate.typ ()) ~compute:(fun () ->
-                  (V.get first_party).data.predicate
-                  |> Party.Predicate.value_of_t)
+              match predicate_type with
+              | `Nonce_or_accept ->
+                  let nonce, accept =
+                    exists (Typ.tuple2 Account.Nonce.typ Boolean.typ)
+                      ~compute:(fun () ->
+                        match (V.get first_party).data.predicate with
+                        | Nonce n ->
+                            (n, false)
+                        | Accept ->
+                            (Account.Nonce.zero, true)
+                        | Full _ ->
+                            failwith
+                              "first party should have nonce as predicate")
+                  in
+                  Nonce_or_accept { nonce; accept }
+              | `Full ->
+                  Full
+                    (exists (Party.Predicate.typ ()) ~compute:(fun () ->
+                         (V.get first_party).data.predicate))
             in
 
             let auth =
@@ -1878,18 +1893,14 @@ module Base = struct
           ->
             Snapp_predicate.Protocol_state.Checked.check
               protocol_state_predicate global_state.protocol_state
-        | Check_predicate (_is_start, { party; _ }, account, _global) ->
-            let p = party.data.predicate in
-            Boolean.( || )
-              (Party.Predicate.Tag.accept p.tag)
-              (Boolean.if_
-                 (Party.Predicate.Tag.nonce_check p.tag)
-                 ~then_:
-                   (run_checked
-                      (Account.Nonce.Checked.equal p.nonce account.data.nonce))
-                 ~else_:
-                   (Snapp_predicate.Account.Checked.check p.account
-                      account.data))
+        | Check_predicate (_is_start, { party; _ }, account, _global) -> (
+            match party.data.predicate with
+            | Nonce_or_accept { nonce; accept } ->
+                Boolean.( || ) accept
+                  (run_checked
+                     (Account.Nonce.Checked.equal nonce account.data.nonce))
+            | Full p ->
+                Snapp_predicate.Account.Checked.check p account.data )
         | Set_account ((_root, ledger), a, incl) ->
             ( implied_root a incl |> Ledger_hash.var_of_hash_packed
             , V.map ledger
