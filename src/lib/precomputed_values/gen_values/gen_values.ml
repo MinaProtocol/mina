@@ -6,7 +6,6 @@ open Parsetree
 open Longident
 open Core
 open Async
-open Mina_state
 
 (* TODO: refactor to do compile time selection *)
 [%%if proof_level = "full"]
@@ -76,7 +75,7 @@ module Inputs = struct
       ~protocol_constants:genesis_constants.protocol
 
   let protocol_state_with_hash =
-    Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
+    Mina_state.Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
       ~genesis_epoch_data ~constraint_constants ~consensus_constants
 end
 
