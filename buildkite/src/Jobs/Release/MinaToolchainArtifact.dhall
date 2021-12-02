@@ -12,9 +12,6 @@ let DockerImage = ../../Command/DockerImage.dhall
 let DockerLogin = ../../Command/DockerLogin/Type.dhall
 
 
-let dependsOn = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
-let deployEnv = "export-git-env-vars.sh"
-
 in
 
 Pipeline.build
@@ -35,7 +32,6 @@ Pipeline.build
 
       -- mina-toolchain Debian Buster image
       let toolchainBusterSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn,
         service="mina-toolchain",
         deb_codename="buster",
         extra_args="--no-cache",
@@ -48,7 +44,6 @@ Pipeline.build
 
       -- mina-toolchain Debian Stretch image
       let toolchainStretchSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn,
         service="mina-toolchain",
         deb_codename="stretch",
         extra_args="--no-cache",
