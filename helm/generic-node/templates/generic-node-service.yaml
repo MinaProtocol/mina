@@ -26,4 +26,25 @@ spec:
     port: 80
     targetPort: {{.Values.ports.graphql}}
   {{- end }}
+  - name: tcp-archive
+    port: {{ .Values.ports.archive }}
+    targetPort: archive-port
 ---
+
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: {{ }}
+# spec:
+#   type: ClusterIP
+#   # We want all pods to have their addresses published for the sake of the
+#   # other testnet pods even before they're ready, since they
+#   # have to be able to talk to each other in order to become ready.
+#   publishNotReadyAddresses: true
+#   selector:
+#     app: {{ template "" . }}
+#   ports:
+
+#   - name: tcp-archive
+#     port: {{ .Values.ports.archive }}
+#     targetPort: archive-port
