@@ -177,6 +177,28 @@ let assert_equal_checked (t1 : var) (t2 : var) =
         (Fee.Signed.Checked.assert_equal t1.fee_excess_r t2.fee_excess_r)
     ]
 
+let assert_equal_field_checked
+    { fee_token_l = fee_token1_l
+    ; fee_excess_l = fee_excess1_l
+    ; fee_token_r = fee_token1_r
+    ; fee_excess_r = fee_excess1_r
+    }
+    { fee_token_l = fee_token2_l
+    ; fee_excess_l = fee_excess2_l
+    ; fee_token_r = fee_token2_r
+    ; fee_excess_r = fee_excess2_r
+    } =
+  Checked.all_unit
+    [ [%with_label "fee_token_l"]
+        (Token_id.Checked.Assert.equal fee_token1_l fee_token2_l)
+    ; [%with_label "fee_excess_l"]
+        (Field.Checked.Assert.equal fee_excess1_l fee_excess2_l)
+    ; [%with_label "fee_token_r"]
+        (Token_id.Checked.Assert.equal fee_token1_r fee_token2_r)
+    ; [%with_label "fee_excess_r"]
+        (Field.Checked.Assert.equal fee_excess1_r fee_excess2_r)
+    ]
+
 [%%endif]
 
 (** Eliminate a fee excess, either by combining it with one to the left/right,
@@ -388,6 +410,13 @@ let combine
     }
 
 [%%ifdef consensus_mechanism]
+
+let%snarkydef to_field_var t =
+  let open Checked.Let_syntax in
+  (* Represent amounts as field elements. *)
+  let%bind fee_excess_l = Fee.Signed.Checked.to_field_var t.fee_excess_l in
+  let%map fee_excess_r = Fee.Signed.Checked.to_field_var t.fee_excess_r in
+  { t with fee_excess_l; fee_excess_r }
 
 let%snarkydef combine_checked
     { fee_token_l = fee_token1_l

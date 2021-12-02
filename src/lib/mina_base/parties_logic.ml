@@ -34,6 +34,8 @@ module type Amount_intf = sig
   module Signed : sig
     include Iffable with type bool := bool
 
+    val equal : t -> t -> bool
+
     val is_pos : t -> bool
 
     val negate : t -> t
@@ -542,17 +544,15 @@ module Make (Inputs : Inputs_intf) = struct
             ~else_:local_state.transaction_commitment
       }
     in
-    let update_local_excess =
-      is_last_party
-      (*Bool.(is_start' ||| is_last_party)*)
-    in
-    (*update the global slot fee excess in the last party so that when
-      combining fee excesses (Fee_excess.combine), it doesn't get added to
-      itself multiple times*)
+    let update_local_excess = Bool.(is_start' ||| is_last_party) in
     let update_global_state =
-      ref is_last_party
-      (*Bool.(is_last_party &&& local_state.success)*)
+      ref Bool.(update_local_excess &&& local_state.success)
     in
+    (*let delta_settled = Amount.equal
+                         local_state.excess
+                         Amount.zero
+      in
+      Bool.(assert_ ((not is_last_party) ||| delta_settled)) ;*)
     let global_excess_update_failed = ref Bool.true_ in
     let global_state, local_state =
       ( h.perform
@@ -574,7 +574,7 @@ module Make (Inputs : Inputs_intf) = struct
               ~else_:local_state.excess
         } )
     in
-    Bool.(assert_ (not (is_last_party &&& !global_excess_update_failed))) ;
+    Bool.(assert_ (not (is_start' &&& !global_excess_update_failed))) ;
     let local_state =
       { local_state with
         success =
