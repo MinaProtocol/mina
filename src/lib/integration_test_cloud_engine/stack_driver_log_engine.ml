@@ -30,31 +30,26 @@ let or_error_list_map ls ~f =
       let%map h = f el in
       h :: t)
 
-let log_filter_of_event_type =
+let log_filter_of_event_type ev_existential =
   let open Event_type in
-  function
-  | Event_type Log_error ->
+  let (Event_type ev_type) = ev_existential in
+  let (module Ty) = event_type_module ev_type in
+  match Ty.parse with
+  | From_error_log _ ->
       [ "jsonPayload.level=(\"Warn\" OR \"Error\" OR \"Faulty_peer\" OR \
          \"Fatal\")"
       ]
-      (* TODO change this condition to Event_type Framework t (ie events from the Puppeteer), and then the following condition is Event_type Daemon t (ie events from the mina daemon, which is most of them) *)
-  | Event_type Node_offline ->
-      [ "jsonPayload.puppeteer_script_event=true"
-      ; "jsonPayload.event_type=\"node_offline\""
-      ]
-  | Event_type t ->
-      let event_id =
-        to_structured_event_id (Event_type t)
-        |> Option.value_exn
-             ~message:
-               "could not convert event type into log filter; no structured \
-                event id configured"
-      in
+  | From_daemon_log (struct_id, _) ->
       let filter =
         Printf.sprintf "jsonPayload.event_id=\"%s\""
-          (Structured_log_events.string_of_id event_id)
+          (Structured_log_events.string_of_id struct_id)
       in
       [ filter ]
+  | From_puppeteer_log (id, _) ->
+      let filter =
+        Printf.sprintf "jsonPayload.puppeteer_event_type=\"%s\"" id
+      in
+      [ "jsonPayload.puppeteer_script_event=true"; filter ]
 
 let all_event_types_log_filter =
   let event_filters =
@@ -257,12 +252,6 @@ type t =
 
 let event_reader { event_reader; _ } = event_reader
 
-module Puppeteer_message = struct
-  type t =
-    { puppeteer_script_event : bool; event_type : string; message : string }
-  [@@deriving yojson]
-end
-
 let parse_event_from_log_entry ~logger ~network log_entry =
   let open Or_error.Let_syntax in
   let open Json_parsing in
@@ -278,21 +267,26 @@ let parse_event_from_log_entry ~logger ~network log_entry =
     if
       Result.ok (find bool payload [ "puppeteer_script_event" ])
       |> Option.value ~default:false
-    then
-      let%map msg =
+    then (
+      let%bind msg =
         parse (parser_from_of_yojson Puppeteer_message.of_yojson) payload
       in
-      match msg.event_type with
-      | "node_offline" ->
-          [%log spam] "hitting node_offline event from puppeteer" ;
-          Event_type.Event (Event_type.Node_offline, ())
-      | _ ->
-          failwith "Could not process a puppeteer message from the logs"
+      [%log spam] "parsing puppeteer event, puppeteer_event_type = %s"
+        (Option.value msg.puppeteer_event_type ~default:"<NONE>") ;
+      Event_type.parse_puppeteer_event msg )
     else
       let%bind msg =
         parse (parser_from_of_yojson Logger.Message.of_yojson) payload
       in
-      Event_type.parse_event msg
+      [%log spam] "parsing daemon structured event, event_id = %s"
+        (Option.value
+           (Option.( >>| ) msg.event_id Structured_log_events.string_of_id)
+           ~default:"<NONE>") ;
+      match msg.event_id with
+      | Some _ ->
+          Event_type.parse_daemon_event msg
+      | None ->
+          Event_type.parse_error_log msg
   in
   (node, event)
 

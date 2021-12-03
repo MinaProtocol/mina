@@ -37,8 +37,9 @@ def log(s):
   script_log_output_file.write("%s\n" % line)
   script_log_output_file.flush()
 
-def log_plain(s):
-  script_log_output_file.write("%s\n" % s)
+def log_event(puppeteer_event_type, message):
+  line = '{"puppeteer_script_event": true, "puppeteer_event_type": "' + puppeteer_event_type + '", "message":"'+ message+'"}'
+  script_log_output_file.write("%s\n" % line)
   script_log_output_file.flush()
 
 class MockRequestHandler(BaseHTTPRequestHandler):
@@ -93,7 +94,7 @@ def start_daemon():
   log("touching /root/daemon-active" )
   Path('daemon-active').touch()
   log("daemon fully started" )
-  # log_plain('{"puppeteer_script_event": true, "event_type": "node_initialized"')
+  # log_event("node_initialized", "node has been initialized")
 
 def stop_daemon():
   log("stop_daemon called" )
@@ -111,7 +112,7 @@ def stop_daemon():
   Path('daemon-active').unlink()
   mina_process = None
   log("daemon fully stopped" )
-  log_plain('{"puppeteer_script_event": true, "event_type": "node_offline", "message":"daemon is being stopped by puppeteer script and is going offline"}')
+  log_event("node_offline", "daemon is being stopped by puppeteer script and is going offline")
 
 # technically, doing the loops like this will eventually result in a stack overflow
 # however, you would need to do a lot of starts and stops to hit this condition
