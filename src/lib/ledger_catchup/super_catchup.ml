@@ -1424,7 +1424,10 @@ let%test_module "Ledger_catchup tests" =
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
             ~use_super_catchup
-            [ fresh_peer; peer_with_branch ~frontier_branch_size:600 ])
+            [ fresh_peer
+            ; peer_with_branch
+                ~frontier_branch_size:((max_frontier_length * 3) + 1)
+            ])
         ~f:(fun network ->
           let open Fake_network in
           let [ my_net; peer_net ] = network.peer_networks in
@@ -1453,10 +1456,16 @@ let%test_module "Ledger_catchup tests" =
               (* let%bind _ = call_read ~test.breadcrumbs_reader ~target_best_tip_path ~my_peer:my_net [] 0 in *)
               (* let breadcrumbs_tree = Rose_tree.of_list_exn breadcrumb_list in *)
               let final = Cache_lib.Cached.final_state target_transition in
-              match%map Ivar.read final with
-              | `Failed ->
+              match%map
+                Deferred.any
+                  [ Ivar.read final >>| const `Catchup_failed
+                  ; Strict_pipe.Reader.read test.breadcrumbs_reader
+                    >>| const `Catchup_success
+                  ]
+              with
+              | `Catchup_failed ->
                   ()
-              | `Success _ ->
+              | `Catchup_success ->
                   failwith
                     "target transition should've been invalidated with a \
                      failure"))
