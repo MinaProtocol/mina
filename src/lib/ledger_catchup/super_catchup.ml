@@ -842,7 +842,9 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
         return ()
     | To_download download_job ->
         let start_time = Time.now () in
-        let%bind b, attempts = step (Downloader.Job.result download_job) in
+        let%bind external_block, attempts =
+          step (Downloader.Job.result download_job)
+        in
         [%log' debug t.logger]
           ~metadata:
             [ ("state_hash", State_hash.to_yojson state_hash)
@@ -868,22 +870,25 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
         Mina_metrics.(
           Gauge.set Catchup.download_time
             Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-        set_state t node (To_initial_validate b) ;
+        set_state t node (To_initial_validate external_block) ;
         run_node node
-    | To_initial_validate b -> (
+    | To_initial_validate external_block -> (
         let start_time = Time.now () in
         match%bind
           step
             ( initial_validate ~precomputed_values ~logger ~trust_system
                 ~batcher:initial_validation_batcher ~frontier
                 ~unprocessed_transition_cache
-                { b with data = { With_hash.data = b.data; hash = state_hash } }
+                { external_block with
+                  data =
+                    { With_hash.data = external_block.data; hash = state_hash }
+                }
             |> Deferred.map ~f:(fun x -> Ok x) )
         with
         | Error (`Error e) ->
             (* TODO: Log *)
             (* Validation failed. Record the failure and go back to download. *)
-            failed ~error:e ~sender:b.sender `Initial_validate
+            failed ~error:e ~sender:external_block.sender `Initial_validate
         | Error `Couldn't_reach_verifier ->
             retry ()
         | Ok result -> (
@@ -1269,7 +1274,7 @@ let%test_module "Ledger_catchup tests" =
           Strict_pipe.Reader.t
       }
 
-    let run_catchup ~network ~frontier =
+    let setup_catchup_pipes ~network ~frontier =
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
           (Buffered (`Capacity 10, `Overflow Crash))
@@ -1289,8 +1294,8 @@ let%test_module "Ledger_catchup tests" =
       ; breadcrumbs_reader = catchup_breadcrumbs_reader
       }
 
-    let run_catchup_with_target ~network ~frontier ~target_breadcrumb =
-      let test = run_catchup ~network ~frontier in
+    let setup_catchup_with_target ~network ~frontier ~target_breadcrumb =
+      let test = setup_catchup_pipes ~network ~frontier in
       let parent_hash =
         Transition_frontier.Breadcrumb.parent_hash target_breadcrumb
       in
@@ -1302,48 +1307,53 @@ let%test_module "Ledger_catchup tests" =
         (parent_hash, [ Rose_tree.T (target_transition, []) ]) ;
       (`Test test, `Cached_transition target_transition)
 
+    let rec call_read ~target_best_tip_path ~breadcrumbs_reader
+        ~(my_peer : Fake_network.peer_network) b_list n =
+      if n < List.length target_best_tip_path then
+        let%bind breadcrumb =
+          [%log info] "calling read, n=%d..." n ;
+          match%map
+            Strict_pipe.Reader.read breadcrumbs_reader
+            |> Async.with_timeout (Time.Span.create ~sec:30 ())
+          with
+          | `Timeout ->
+              failwith
+                (String.concat
+                   [ "read of breadcrumbs_reader pipe timed out, n= "
+                   ; string_of_int n
+                   ])
+          | `Result res -> (
+              match res with
+              | `Eof ->
+                  failwith "breadcrumb not found"
+              | `Ok (_, `Catchup_scheduler) ->
+                  failwith "breadcrumb not found"
+              | `Ok (breadcrumbs, `Ledger_catchup ivar) ->
+                  let breadcrumb : Breadcrumb.t =
+                    Rose_tree.root (List.hd_exn breadcrumbs)
+                    |> Cache_lib.Cached.invalidate_with_success
+                  in
+                  Ivar.fill ivar () ; breadcrumb )
+        in
+        let%bind () =
+          Transition_frontier.add_breadcrumb_exn my_peer.state.frontier
+            breadcrumb
+        in
+        call_read ~target_best_tip_path ~breadcrumbs_reader ~my_peer
+          (List.append b_list [ breadcrumb ])
+          (n + 1)
+      else Deferred.return b_list
+
     let test_successful_catchup ~my_net ~target_best_tip_path =
       let open Fake_network in
       let target_breadcrumb = List.last_exn target_best_tip_path in
       let `Test { breadcrumbs_reader; _ }, _ =
-        run_catchup_with_target ~network:my_net.network
+        setup_catchup_with_target ~network:my_net.network
           ~frontier:my_net.state.frontier ~target_breadcrumb
       in
-      let rec call_read b_list n =
-        if n < List.length target_best_tip_path then
-          let%bind breadcrumb =
-            [%log info] "calling read, n=%d..." n ;
-            match%map
-              Strict_pipe.Reader.read breadcrumbs_reader
-              |> Async.with_timeout (Time.Span.create ~sec:30 ())
-            with
-            | `Timeout ->
-                failwith
-                  (String.concat
-                     [ "read of breadcrumbs_reader pipe timed out, n= "
-                     ; string_of_int n
-                     ])
-            | `Result res -> (
-                match res with
-                | `Eof ->
-                    failwith "breadcrumb not found"
-                | `Ok (_, `Catchup_scheduler) ->
-                    failwith "breadcrumb not found"
-                | `Ok (breadcrumbs, `Ledger_catchup ivar) ->
-                    let breadcrumb : Breadcrumb.t =
-                      Rose_tree.root (List.hd_exn breadcrumbs)
-                      |> Cache_lib.Cached.invalidate_with_success
-                    in
-                    Ivar.fill ivar () ; breadcrumb )
-          in
-          let%bind () =
-            Transition_frontier.add_breadcrumb_exn my_net.state.frontier
-              breadcrumb
-          in
-          call_read (List.append b_list [ breadcrumb ]) (n + 1)
-        else Deferred.return b_list
+      let%map breadcrumb_list =
+        call_read ~breadcrumbs_reader ~target_best_tip_path ~my_peer:my_net [] 0
       in
-      let%map breadcrumb_list = call_read [] 0 in
       let breadcrumbs_tree = Rose_tree.of_list_exn breadcrumb_list in
       [%test_result: int]
         ~message:
@@ -1406,6 +1416,50 @@ let%test_module "Ledger_catchup tests" =
           in
           Thread_safe.block_on_async_exn (fun () ->
               test_successful_catchup ~my_net ~target_best_tip_path))
+
+    let%test_unit "when catchup fails to download state hashes, catchup will \
+                   properly clear the unprocessed_transition_cache of the \
+                   blocks that triggered catchup" =
+      Quickcheck.test ~trials:1
+        Fake_network.Generator.(
+          gen ~precomputed_values ~verifier ~max_frontier_length
+            ~use_super_catchup
+            [ fresh_peer; peer_with_branch ~frontier_branch_size:600 ])
+        ~f:(fun network ->
+          let open Fake_network in
+          let [ my_net; peer_net ] = network.peer_networks in
+          let target_best_tip_path =
+            [ Transition_frontier.best_tip peer_net.state.frontier ]
+          in
+          let open Fake_network in
+          let target_breadcrumb = List.last_exn target_best_tip_path in
+          let test =
+            setup_catchup_pipes ~network:my_net.network
+              ~frontier:my_net.state.frontier
+          in
+          (* let { breadcrumbs_reader; job_writer; cache } = test in *)
+          let parent_hash =
+            Transition_frontier.Breadcrumb.parent_hash target_breadcrumb
+          in
+          let target_transition =
+            Transition_handler.Unprocessed_transition_cache.register_exn
+              test.cache
+              (downcast_breadcrumb target_breadcrumb)
+          in
+          Strict_pipe.Writer.write test.job_writer
+            (parent_hash, [ Rose_tree.T (target_transition, []) ]) ;
+
+          Thread_safe.block_on_async_exn (fun () ->
+              (* let%bind _ = call_read ~test.breadcrumbs_reader ~target_best_tip_path ~my_peer:my_net [] 0 in *)
+              (* let breadcrumbs_tree = Rose_tree.of_list_exn breadcrumb_list in *)
+              let final = Cache_lib.Cached.final_state target_transition in
+              match%map Ivar.read final with
+              | `Failed ->
+                  ()
+              | `Success _ ->
+                  failwith
+                    "target transition should've been invalidated with a \
+                     failure"))
 
     (* let%test_unit "catchup fails if one of the parent transitions fail" =
        Quickcheck.test ~trials:1
