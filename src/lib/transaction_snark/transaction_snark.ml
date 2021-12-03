@@ -517,7 +517,7 @@ module Parties_segment = struct
           | Opt_signed_opt_signed
           | Opt_signed
           | Proved
-        [@@deriving sexp]
+        [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
       end
@@ -4016,29 +4016,6 @@ struct
                   (Option.value_exn account.snapp).verification_key
                 in
                 (snapp_statement, pi, vk, tag))
-            (*@ List.concat_map witness.start_parties ~f:(fun s ->
-                  (* TODO: This is unnecessary re-computation of the statements which are also computed in
-                     the circuit. It would be better to use the values computed inside the circuit, but it
-                     was involved to change the pickles API to allow it. *)
-                  let other_parties, transaction =
-                    let ps =
-                      Parties.Party_or_stack.With_hashes.of_parties_list
-                        (List.map ~f:(fun p -> (p, ())) s.parties.other_parties)
-                    in
-                    ( ps
-                    , Parties.Transaction_commitment.create
-                        ~other_parties_hash:
-                          (Parties.Party_or_stack.stack_hash ps)
-                        ~protocol_state_predicate_hash:
-                          (Snapp_predicate.Protocol_state.digest
-                             s.protocol_state_predicate)
-                        ~memo_hash:s.memo_hash )
-                  in
-                  List.filter_map
-                    (Parties.Party_or_stack.to_parties_with_hashes_list
-                       other_parties) ~f:(fun ((p, ()), at_party) ->
-                      let%map pi = party_proof p in
-                      ({ Snapp_statement.Poly.transaction; at_party }, pi, None)))*)
           in
           proved
             ( match proofs with

@@ -1300,8 +1300,10 @@ let create ?wallets (config : Config.t) =
                       ~conf_dir:config.conf_dir))
             >>| Result.ok_exn
           in
-          [%log' info config.logger] "Took %f ms to create prover process"
-            (Time.(diff (now ()) start) |> Time.Span.to_ms) ;
+          [%log' debug config.logger] "Took $time ms to create prover process"
+            ~metadata:
+              [ ("time", `Float (Time.(diff (now ()) start) |> Time.Span.to_ms))
+              ] ;
           let start = Time.now () in
           let%bind verifier =
             Monitor.try_with ~here:[%here]
