@@ -62,7 +62,7 @@ spec:
       containers:
       - name: mina-archive
         image:  "{{.Values.archive.image.repository }}:{{.Values.archive.image.tag}}"
-        imagePullPolicy: {{.Values.archuve.image.pullPolicy}}
+        imagePullPolicy: {{.Values.archive.image.pullPolicy}}
         {{- if .Values.features.customEntrypoint.enabled}}
         command: [ {{ .Values.features.customEntrypoint.command}} ]
         {{- end }}
