@@ -680,119 +680,9 @@ let forest_pick forest =
       List.iter forest ~f:(Rose_tree.iter ~f:return) ;
       assert false)
 
-(* TODO: In the future, this could take over scheduling bootstraps too. *)
-let run ~logger ~trust_system ~verifier ~network ~frontier
-    ~(catchup_job_reader :
-       ( State_hash.t
-       * ( External_transition.Initial_validated.t Envelope.Incoming.t
-         , State_hash.t )
-         Cached.t
-         Rose_tree.t
-         list )
-       Strict_pipe.Reader.t) ~precomputed_values ~unprocessed_transition_cache
-    ~(catchup_breadcrumbs_writer :
-       ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
-         list
-         * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
-       , Strict_pipe.crash Strict_pipe.buffered
-       , unit )
-       Strict_pipe.Writer.t) =
-  let t =
-    match Transition_frontier.catchup_tree frontier with
-    | Full t ->
-        t
-    | Hash _ ->
-        failwith
-          "If super catchup is running, the frontier should have a full \
-           catchup tree"
-  in
-  let stop = Transition_frontier.closed frontier in
-  upon stop (fun () -> tear_down t) ;
-  let combine =
-    Option.merge
-      ~f:
-        (pick
-           ~constants:precomputed_values.Precomputed_values.consensus_constants)
-  in
-  let pre_context
-      (trees :
-        ( External_transition.Initial_validated.t Envelope.Incoming.t
-        , _ )
-        Cached.t
-        Rose_tree.t
-        list) =
-    let f tree =
-      let best = ref None in
-      Rose_tree.iter tree
-        ~f:(fun
-             (x :
-               ( External_transition.Initial_validated.t Envelope.Incoming.t
-               , _ )
-               Cached.t)
-           ->
-          let x, _ = (Cached.peek x).data in
-          best :=
-            combine !best
-              (Some (With_hash.map ~f:External_transition.protocol_state x))) ;
-      !best
-    in
-    List.map trees ~f |> List.reduce ~f:combine |> Option.join
-  in
-  let best_tip_r, best_tip_w = Broadcast_pipe.create None in
-  let%bind downloader =
-    let knowledge h peer =
-      let heartbeat_timeout = Time_ns.Span.of_sec 30. in
-      match h with
-      | None ->
-          return `All
-      | Some (h, len) -> (
-          match%map
-            Mina_networking.get_transition_chain_proof
-              ~timeout:(Time.Span.of_sec 30.) ~heartbeat_timeout network peer h
-          with
-          | Error _ ->
-              `Some []
-          | Ok p -> (
-              match
-                Transition_chain_verifier.verify ~target_hash:h
-                  ~transition_chain_proof:p
-              with
-              | Some hs ->
-                  let ks = with_lengths hs ~target_length:len in
-                  `Some ks
-              | None ->
-                  `Some [] ) )
-    in
-    Downloader.create ~stop ~trust_system ~preferred:[] ~max_batch_size:5
-      ~get:(fun peer hs ->
-        let sec =
-          let sec_per_block =
-            Option.value_map
-              (Sys.getenv "MINA_EXPECTED_PER_BLOCK_DOWNLOAD_TIME")
-              ~default:15. ~f:Float.of_string
-          in
-          Float.of_int (List.length hs) *. sec_per_block
-        in
-        Mina_networking.get_transition_chain
-          ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
-          ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst))
-      ~peers:(fun () -> Mina_networking.peers network)
-      ~knowledge_context:
-        (Broadcast_pipe.map best_tip_r
-           ~f:
-             (Option.map ~f:(fun (x : _ With_hash.t) ->
-                  ( x.hash
-                  , Mina_state.Protocol_state.consensus_state x.data
-                    |> Consensus.Data.Consensus_state.blockchain_length ))))
-      ~knowledge
-  in
-  check_invariant ~downloader t ;
-  let () =
-    Downloader.set_check_invariant (fun downloader ->
-        check_invariant ~downloader t)
-  in
-  every ~stop (Time.Span.of_sec 10.) (fun () ->
-      [%log debug] ~metadata:[ ("states", to_yojson t) ] "Catchup states") ;
+let setup_state_machine_runner ~t ~verifier ~downloader ~logger
+    ~precomputed_values ~trust_system ~frontier ~unprocessed_transition_cache
+    ~catchup_breadcrumbs_writer =
   let initial_validation_batcher = Initial_validate_batcher.create ~verifier in
   let verify_work_batcher = Verify_work_batcher.create ~verifier in
   let set_state t node s =
@@ -909,7 +799,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
         match%bind
           step
             (* TODO: give the batch verifier a way to somehow throw away stuff if
-               this node gets removed from the tree. *)
+                this node gets removed from the tree. *)
             ( Verify_work_batcher.verify verify_work_batcher iv
             |> Deferred.map ~f:Result.return )
         with
@@ -1029,6 +919,126 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
             Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
             set_state t node Finished ;
             return () )
+  in
+  run_node
+
+(* TODO: In the future, this could take over scheduling bootstraps too. *)
+let run ~logger ~trust_system ~verifier ~network ~frontier
+    ~(catchup_job_reader :
+       ( State_hash.t
+       * ( External_transition.Initial_validated.t Envelope.Incoming.t
+         , State_hash.t )
+         Cached.t
+         Rose_tree.t
+         list )
+       Strict_pipe.Reader.t) ~precomputed_values ~unprocessed_transition_cache
+    ~(catchup_breadcrumbs_writer :
+       ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
+         list
+         * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
+       , Strict_pipe.crash Strict_pipe.buffered
+       , unit )
+       Strict_pipe.Writer.t) =
+  let t =
+    match Transition_frontier.catchup_tree frontier with
+    | Full t ->
+        t
+    | Hash _ ->
+        failwith
+          "If super catchup is running, the frontier should have a full \
+           catchup tree"
+  in
+  let stop = Transition_frontier.closed frontier in
+  upon stop (fun () -> tear_down t) ;
+  let combine =
+    Option.merge
+      ~f:
+        (pick
+           ~constants:precomputed_values.Precomputed_values.consensus_constants)
+  in
+  let pre_context
+      (trees :
+        ( External_transition.Initial_validated.t Envelope.Incoming.t
+        , _ )
+        Cached.t
+        Rose_tree.t
+        list) =
+    let f tree =
+      let best = ref None in
+      Rose_tree.iter tree
+        ~f:(fun
+             (x :
+               ( External_transition.Initial_validated.t Envelope.Incoming.t
+               , _ )
+               Cached.t)
+           ->
+          let x, _ = (Cached.peek x).data in
+          best :=
+            combine !best
+              (Some (With_hash.map ~f:External_transition.protocol_state x))) ;
+      !best
+    in
+    List.map trees ~f |> List.reduce ~f:combine |> Option.join
+  in
+  let best_tip_r, best_tip_w = Broadcast_pipe.create None in
+  let%bind downloader =
+    let knowledge h peer =
+      let heartbeat_timeout = Time_ns.Span.of_sec 30. in
+      match h with
+      | None ->
+          return `All
+      | Some (h, len) -> (
+          match%map
+            Mina_networking.get_transition_chain_proof
+              ~timeout:(Time.Span.of_sec 30.) ~heartbeat_timeout network peer h
+          with
+          | Error _ ->
+              `Some []
+          | Ok p -> (
+              match
+                Transition_chain_verifier.verify ~target_hash:h
+                  ~transition_chain_proof:p
+              with
+              | Some hs ->
+                  let ks = with_lengths hs ~target_length:len in
+                  `Some ks
+              | None ->
+                  `Some [] ) )
+    in
+    Downloader.create ~stop ~trust_system ~preferred:[] ~max_batch_size:5
+      ~get:(fun peer hs ->
+        let sec =
+          let sec_per_block =
+            Option.value_map
+              (Sys.getenv "MINA_EXPECTED_PER_BLOCK_DOWNLOAD_TIME")
+              ~default:15. ~f:Float.of_string
+          in
+          Float.of_int (List.length hs) *. sec_per_block
+        in
+        Mina_networking.get_transition_chain
+          ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
+          ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst))
+      ~peers:(fun () -> Mina_networking.peers network)
+      ~knowledge_context:
+        (Broadcast_pipe.map best_tip_r
+           ~f:
+             (Option.map ~f:(fun (x : _ With_hash.t) ->
+                  ( x.hash
+                  , Mina_state.Protocol_state.consensus_state x.data
+                    |> Consensus.Data.Consensus_state.blockchain_length ))))
+      ~knowledge
+  in
+  check_invariant ~downloader t ;
+  let () =
+    Downloader.set_check_invariant (fun downloader ->
+        check_invariant ~downloader t)
+  in
+  every ~stop (Time.Span.of_sec 10.) (fun () ->
+      [%log debug] ~metadata:[ ("states", to_yojson t) ] "Catchup states") ;
+  let run_state_machine =
+    setup_state_machine_runner ~t ~verifier ~downloader ~logger
+      ~precomputed_values ~trust_system ~frontier ~unprocessed_transition_cache
+      ~catchup_breadcrumbs_writer
   in
   (* TODO: Maybe add everything from transition frontier at the beginning? *)
   (* TODO: Print out the hashes you're adding *)
@@ -1191,7 +1201,8 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                         create_node ~downloader t (`Initial_validated c)
                       in
                       ignore
-                        (run_node node : (unit, [ `Finished ]) Deferred.Result.t))) ;
+                        ( run_state_machine node
+                          : (unit, [ `Finished ]) Deferred.Result.t ))) ;
              ignore
                ( List.fold state_hashes
                    ~init:(root.state_hash, root.blockchain_length)
@@ -1201,7 +1212,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                        let node =
                          create_node t ~downloader (`Hash (h, l, parent))
                        in
-                       don't_wait_for (run_node node >>| ignore) ) ;
+                       don't_wait_for (run_state_machine node >>| ignore) ) ;
                      (h, l))
                  : State_hash.t * Length.t )))
 
@@ -1458,13 +1469,19 @@ let%test_module "Ledger_catchup tests" =
               let final = Cache_lib.Cached.final_state target_transition in
               match%map
                 Deferred.any
-                  [ Ivar.read final >>| const `Catchup_failed
+                  [ (Ivar.read final >>| fun x -> `Catchup_failed x)
                   ; Strict_pipe.Reader.read test.breadcrumbs_reader
                     >>| const `Catchup_success
                   ]
               with
-              | `Catchup_failed ->
-                  ()
+              | `Catchup_failed fnl -> (
+                  match fnl with
+                  | `Failed ->
+                      ()
+                  | `Success _ ->
+                      failwith
+                        "target transition should've been invalidated with a \
+                         failure" )
               | `Catchup_success ->
                   failwith
                     "target transition should've been invalidated with a \
