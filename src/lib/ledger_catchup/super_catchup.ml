@@ -1462,7 +1462,6 @@ let%test_module "Ledger_catchup tests" =
           in
           Strict_pipe.Writer.write test.job_writer
             (parent_hash, [ Rose_tree.T (target_transition, []) ]) ;
-
           Thread_safe.block_on_async_exn (fun () ->
               (* let%bind _ = call_read ~test.breadcrumbs_reader ~target_best_tip_path ~my_peer:my_net [] 0 in *)
               (* let breadcrumbs_tree = Rose_tree.of_list_exn breadcrumb_list in *)
@@ -1486,6 +1485,56 @@ let%test_module "Ledger_catchup tests" =
                   failwith
                     "target transition should've been invalidated with a \
                      failure"))
+
+    let%test_unit "catchup succeeds even if the parent transition is already \
+                   in the frontier" =
+      Quickcheck.test ~trials:1
+        Fake_network.Generator.(
+          gen ~precomputed_values ~verifier ~max_frontier_length
+            ~use_super_catchup
+            [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
+        ~f:(fun network ->
+          let open Fake_network in
+          let [ my_net; peer_net ] = network.peer_networks in
+          let target_best_tip_path =
+            [ Transition_frontier.best_tip peer_net.state.frontier ]
+          in
+          Thread_safe.block_on_async_exn (fun () ->
+              test_successful_catchup ~my_net ~target_best_tip_path))
+
+    let%test_unit "when catchup fails to download a block, catchup will retry \
+                   and attempt again" =
+      Quickcheck.test ~trials:1
+        Fake_network.Generator.(
+          gen ~precomputed_values ~verifier ~max_frontier_length
+            ~use_super_catchup
+            [ fresh_peer
+            ; peer_with_branch
+                ~frontier_branch_size:((max_frontier_length * 3) + 1)
+            ])
+        ~f:(fun network ->
+          let open Fake_network in
+          let [ my_net; peer_net ] = network.peer_networks in
+          let target_best_tip_path =
+            [ Transition_frontier.best_tip peer_net.state.frontier ]
+          in
+          let open Fake_network in
+          let target_breadcrumb = List.last_exn target_best_tip_path in
+          let test =
+            setup_catchup_pipes ~network:my_net.network
+              ~frontier:my_net.state.frontier
+          in
+          let parent_hash =
+            Transition_frontier.Breadcrumb.parent_hash target_breadcrumb
+          in
+          let target_transition =
+            Transition_handler.Unprocessed_transition_cache.register_exn
+              test.cache
+              (downcast_breadcrumb target_breadcrumb)
+          in
+          Strict_pipe.Writer.write test.job_writer
+            (parent_hash, [ Rose_tree.T (target_transition, []) ]) ;
+          Thread_safe.block_on_async_exn (fun () -> Deferred.return ()))
 
     (* let%test_unit "catchup fails if one of the parent transitions fail" =
        Quickcheck.test ~trials:1
