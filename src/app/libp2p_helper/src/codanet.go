@@ -113,6 +113,22 @@ type CodaConnectionManager struct {
 	protectedMirrorLock sync.Mutex
 }
 
+func (cm *CodaConnectionManager) AddOnConnectHandler(f func(network.Network, network.Conn)) {
+	prevOnConnect := cm.OnConnect
+	cm.OnConnect = func(net network.Network, c network.Conn) {
+		f(net, c)
+		prevOnConnect(net, c)
+	}
+}
+
+func (cm *CodaConnectionManager) AddOnDisconnectHandler(f func(network.Network, network.Conn)) {
+	prevOnDisconnect := cm.OnDisconnect
+	cm.OnDisconnect = func(net network.Network, c network.Conn) {
+		f(net, c)
+		prevOnDisconnect(net, c)
+	}
+}
+
 func newCodaConnectionManager(minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration) *CodaConnectionManager {
 	noop := func(net network.Network, c network.Conn) {}
 
@@ -382,7 +398,11 @@ func (h *Helper) GatingState() *CodaGatingState {
 }
 
 func (h *Helper) SetGatingState(gs *CodaGatingState) {
-	h.gatingState = gs
+	h.gatingState.BannedAddrFilters = gs.BannedAddrFilters
+	h.gatingState.TrustedAddrFilters = gs.TrustedAddrFilters
+	h.gatingState.BannedPeers = gs.BannedPeers
+	h.gatingState.TrustedPeers = gs.TrustedPeers
+	h.gatingState.KnownPrivateAddrFilters = gs.KnownPrivateAddrFilters
 	for _, c := range h.Host.Network().Conns() {
 		pid := c.RemotePeer()
 		maddr := c.RemoteMultiaddr()

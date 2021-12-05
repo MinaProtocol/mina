@@ -274,6 +274,45 @@ func TestListen(t *testing.T) {
 	require.True(t, found)
 }
 
+func setGatingConfigImpl(t *testing.T, app *app, allowedIps, allowedIds, bannedIps, bannedIds []string) {
+	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+	require.NoError(t, err)
+	m, err := ipc.NewRootLibp2pHelperInterface_SetGatingConfig_Request(seg)
+	require.NoError(t, err)
+
+	gc, err := m.NewGatingConfig()
+	require.NoError(t, err)
+	bIps, err := gc.NewBannedIps(int32(len(bannedIps)))
+	require.NoError(t, err)
+	bPids, err := gc.NewBannedPeerIds(int32(len(bannedIds)))
+	require.NoError(t, err)
+	tIps, err := gc.NewTrustedIps(int32(len(allowedIps)))
+	require.NoError(t, err)
+	tPids, err := gc.NewTrustedPeerIds(int32(len(allowedIds)))
+	require.NoError(t, err)
+	for i, v := range bannedIps {
+		require.NoError(t, bIps.Set(i, v))
+	}
+	for i, v := range bannedIds {
+		require.NoError(t, bPids.At(i).SetId(v))
+	}
+	for i, v := range allowedIps {
+		require.NoError(t, tIps.Set(i, v))
+	}
+	for i, v := range allowedIds {
+		require.NoError(t, tPids.At(i).SetId(v))
+	}
+	gc.SetIsolate(false)
+
+	var mRpcSeqno uint64 = 2003
+	resMsg := SetGatingConfigReq(m).handle(app, mRpcSeqno)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "setGatingConfig")
+	require.Equal(t, seqno, mRpcSeqno)
+	require.True(t, respSuccess.HasSetGatingConfig())
+	_, err = respSuccess.SetGatingConfig()
+	require.NoError(t, err)
+}
+
 func TestSetGatingConfig(t *testing.T) {
 	testApp, _ := newTestApp(t, nil, true)
 
@@ -285,34 +324,7 @@ func TestSetGatingConfig(t *testing.T) {
 	bannedMultiaddr, err := ma.NewMultiaddr("/ip4/1.2.3.4/tcp/7000")
 	require.NoError(t, err)
 
-	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
-	require.NoError(t, err)
-	m, err := ipc.NewRootLibp2pHelperInterface_SetGatingConfig_Request(seg)
-	require.NoError(t, err)
-
-	gc, err := m.NewGatingConfig()
-	require.NoError(t, err)
-	bIps, err := gc.NewBannedIps(1)
-	require.NoError(t, err)
-	bPids, err := gc.NewBannedPeerIds(1)
-	require.NoError(t, err)
-	tIps, err := gc.NewTrustedIps(1)
-	require.NoError(t, err)
-	tPids, err := gc.NewTrustedPeerIds(1)
-	require.NoError(t, err)
-	require.NoError(t, bIps.Set(0, "1.2.3.4"))
-	require.NoError(t, bPids.At(0).SetId(bannedID))
-	require.NoError(t, tIps.Set(0, "7.8.9.0"))
-	require.NoError(t, tPids.At(0).SetId(allowedID))
-	gc.SetIsolate(false)
-
-	var mRpcSeqno uint64 = 2003
-	resMsg := SetGatingConfigReq(m).handle(testApp, mRpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "setGatingConfig")
-	require.Equal(t, seqno, mRpcSeqno)
-	require.True(t, respSuccess.HasSetGatingConfig())
-	_, err = respSuccess.SetGatingConfig()
-	require.NoError(t, err)
+	setGatingConfigImpl(t, testApp, []string{"1.2.3.4"}, []string{allowedID}, []string{"7.8.9.1"}, []string{bannedID})
 
 	allowedPid, err := peer.Decode(allowedID)
 	require.NoError(t, err)
