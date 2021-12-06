@@ -1490,6 +1490,7 @@ let create (config : Config.t)
                  ( External_transition.protocol_state state
                  |> Protocol_state.blockchain_state
                  |> Blockchain_state.timestamp |> Block_time.to_time )) ;
+            Mina_metrics.(Gauge.inc_one Network.new_state_received) ;
             if config.log_gossip_heard.new_state then
               [%str_log info]
                 ~metadata:
@@ -1506,6 +1507,7 @@ let create (config : Config.t)
               , Block_time.now config.time_controller
               , valid_cb )
         | Snark_pool_diff diff ->
+            Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_received) ;
             if config.log_gossip_heard.snark_pool_diff then
               Option.iter (Snark_pool.Resource_pool.Diff.to_compact diff)
                 ~f:(fun work ->
@@ -1516,6 +1518,7 @@ let create (config : Config.t)
             Mina_net2.Validation_callback.set_message_type valid_cb `Snark_work ;
             `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
         | Transaction_pool_diff diff ->
+            Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_received) ;
             if config.log_gossip_heard.transaction_pool_diff then
               [%str_log debug]
                 (Transactions_received
@@ -1541,6 +1544,8 @@ include struct
   let lift f { gossip_net; _ } = f gossip_net
 
   let peers = lift peers
+
+  let bandwidth_info = lift bandwidth_info
 
   let get_peer_node_status t peer =
     let open Deferred.Or_error.Let_syntax in
@@ -1600,13 +1605,16 @@ let broadcast_state t state =
   [%str_log' info t.logger]
     ~metadata:[ ("message", Gossip_net.Message.msg_to_yojson msg) ]
     (Gossip_new_state { state_hash = With_hash.hash state }) ;
+  Mina_metrics.(Gauge.inc_one Network.new_state_broadcasted) ;
   Gossip_net.Any.broadcast t.gossip_net msg
 
 let broadcast_transaction_pool_diff t diff =
+  Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_broadcasted) ;
   broadcast t (Gossip_net.Message.Transaction_pool_diff diff)
     ~log_msg:(Gossip_transaction_pool_diff { txns = diff })
 
 let broadcast_snark_pool_diff t diff =
+  Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_broadcasted) ;
   broadcast t (Gossip_net.Message.Snark_pool_diff diff)
     ~log_msg:
       (Gossip_snark_pool_diff

@@ -378,6 +378,9 @@ let setup_daemon logger =
       ~doc:
         "true|false whether to track the set of all peers ever seen for the \
          all_peers metric (default: false)"
+  and node_status_url =
+    flag "--node-status-url" ~aliases:[ "node-status-url" ] (optional string)
+      ~doc:"URL of the node status collection service"
   and uptime_url_string =
     flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
       ~doc:"URL URL of the uptime service of the Mina delegation program"
@@ -712,6 +715,11 @@ let setup_daemon logger =
         or_from_config json_to_currency_fee_option "snark-worker-fee"
           ~default:Mina_compile_config.default_snark_worker_fee snark_work_fee
       in
+      let node_status_url =
+        maybe_from_config YJ.Util.to_string_option "node-status-url"
+          node_status_url
+      in
+
       (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
       let _max_concurrent_connections =
         (*if
@@ -1149,7 +1157,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
              ~archive_process_location ~log_block_creation ~precomputed_values
              ~start_time ?precomputed_blocks_path ~log_precomputed_blocks
              ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-             ~uptime_submitter_keypair ())
+             ~uptime_submitter_keypair ~node_status_url ())
       in
       { Coda_initialization.coda
       ; client_trustlist

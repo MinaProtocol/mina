@@ -38,15 +38,6 @@ let external_transition_of_breadcrumb breadcrumb =
   in
   external_transition
 
-let get_rfc3339_time () =
-  let tm = Unix.gettimeofday () in
-  match Ptime.of_float_s tm with
-  | None ->
-      (* should never occur *)
-      failwith "In uptime service, could not convert current time to Ptime.t"
-  | Some ptime ->
-      Ptime.to_rfc3339 ~tz_offset_s:0 ptime
-
 let sign_blake2_hash ~private_key s =
   let module Field = Snark_params.Tick.Field in
   let blake2 = Blake2.digest_string s in
@@ -182,7 +173,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
       let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
       let block_data =
         { block = block_base64
-        ; created_at = get_rfc3339_time ()
+        ; created_at = Rfc3339_time.get_rfc3339_time ()
         ; peer_id
         ; snark_work = None
         }
@@ -226,7 +217,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
         let state_hash = Transition_frontier.Breadcrumb.state_hash best_tip in
         let block_data =
           { block = block_base64
-          ; created_at = get_rfc3339_time ()
+          ; created_at = Rfc3339_time.get_rfc3339_time ()
           ; peer_id
           ; snark_work = None
           }
@@ -265,7 +256,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
             in
             let block_data =
               { block = block_base64
-              ; created_at = get_rfc3339_time ()
+              ; created_at = Rfc3339_time.get_rfc3339_time ()
               ; peer_id
               ; snark_work = None
               }
@@ -305,7 +296,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                 in
                 let block_data =
                   { block = block_base64
-                  ; created_at = get_rfc3339_time ()
+                  ; created_at = Rfc3339_time.get_rfc3339_time ()
                   ; peer_id
                   ; snark_work = None
                   }
@@ -344,7 +335,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                     in
                     let block_data =
                       { block = block_base64
-                      ; created_at = get_rfc3339_time ()
+                      ; created_at = Rfc3339_time.get_rfc3339_time ()
                       ; peer_id
                       ; snark_work = Some snark_work_base64
                       }

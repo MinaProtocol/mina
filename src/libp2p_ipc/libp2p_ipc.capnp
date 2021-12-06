@@ -157,6 +157,16 @@ struct Libp2pHelperInterface {
     }
   }
 
+  struct BandwidthInfo {
+    struct Request {}
+
+    struct Response {
+      inputBandwidth @0 :Float64;
+      outputBandwidth @1 :Float64;
+      cpuUsage @2 :Float64;
+    }
+  }
+
   struct GenerateKeypair {
     struct Request {}
 
@@ -294,6 +304,7 @@ struct Libp2pHelperInterface {
       sendStream @17 :Libp2pHelperInterface.SendStream.Request;
       setNodeStatus @18 :Libp2pHelperInterface.SetNodeStatus.Request;
       getPeerNodeStatus @19 :Libp2pHelperInterface.GetPeerNodeStatus.Request;
+      bandwidthInfo @20 :Libp2pHelperInterface.BandwidthInfo.Request;
     }
   }
 
@@ -318,6 +329,7 @@ struct Libp2pHelperInterface {
       sendStream @16 :Libp2pHelperInterface.SendStream.Response;
       setNodeStatus @17 :Libp2pHelperInterface.SetNodeStatus.Response;
       getPeerNodeStatus @18 :Libp2pHelperInterface.GetPeerNodeStatus.Response;
+      bandwidthInfo @19 :Libp2pHelperInterface.BandwidthInfo.Response;
     }
   }
 

@@ -1187,6 +1187,21 @@ let start t =
     ~block_reward_threshold:t.config.block_reward_threshold
     ~block_produced_bvar:t.components.block_produced_bvar ;
   perform_compaction t ;
+  let () =
+    match t.config.node_status_url with
+    | Some node_status_url ->
+        Node_status_service.start ~logger:t.config.logger ~node_status_url
+          ~network:t.components.net
+          ~transition_frontier:t.components.transition_frontier
+          ~sync_status:t.sync_status
+          ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
+          ~start_time:t.config.start_time
+          ~slot_duration:
+            (Block_time.Span.to_time_span
+               t.config.precomputed_values.consensus_constants.slot_duration_ms)
+    | None ->
+        ()
+  in
   Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
     ~snark_worker_opt:t.processes.uptime_snark_worker_opt
     ~transition_frontier:t.components.transition_frontier

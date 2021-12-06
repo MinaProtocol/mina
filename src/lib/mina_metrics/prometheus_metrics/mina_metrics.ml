@@ -506,13 +506,19 @@ module Network = struct
     let help = "# of rpc requests sent" in
     Counter.v "rpc_requests_sent" ~help ~namespace ~subsystem
 
-  let get_some_initial_peers_rpcs_sent : Counter.t =
-    let help = "# of Get_some_initial_peers rpc requests sent" in
-    Counter.v "get_some_initial_peers_rpcs_sent" ~help ~namespace ~subsystem
+  let surfix = "_five_slots"
 
-  let get_some_initial_peers_rpcs_received : Counter.t =
+  let get_some_initial_peers_rpcs_sent =
+    let help = "# of Get_some_initial_peers rpc requests sent" in
+    let name = "get_some_initial_peers_rpcs_sent" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
+
+  let get_some_initial_peers_rpcs_received =
     let help = "# of Get_some_initial_peers rpc requests received" in
-    Counter.v "get_some_initial_peers_rpcs_received" ~help ~namespace ~subsystem
+    let name = "get_some_initial_peers_rpcs_received" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
   let get_some_initial_peers_rpc_requests_failed : Counter.t =
     let help = "# of Get_some_initial_peers rpc requests failed" in
@@ -524,24 +530,27 @@ module Network = struct
     Counter.v "get_some_initial_peers_rpc_responses_failed" ~help ~namespace
       ~subsystem
 
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent : Counter.t
-      =
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent =
     let help =
       "# of Get_staged_ledger_aux_and_pending_coinbases_at_hash rpc requests \
        sent"
     in
-    Counter.v "get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent"
-      ~help ~namespace ~subsystem
+    let name =
+      "get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent"
+    in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received :
-      Counter.t =
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received =
     let help =
       "# of Get_staged_ledger_aux_and_pending_coinbases_at_hash rpc requests \
        received"
     in
-    Counter.v
-      "get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received" ~help
-      ~namespace ~subsystem
+    let name =
+      "get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received"
+    in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
   let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_requests_failed :
       Counter.t =
@@ -563,14 +572,17 @@ module Network = struct
       "get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_responses_failed"
       ~help ~namespace ~subsystem
 
-  let answer_sync_ledger_query_rpcs_sent : Counter.t =
+  let answer_sync_ledger_query_rpcs_sent =
     let help = "# of Answer_sync_ledger_query rpc requests sent" in
-    Counter.v "answer_sync_ledger_query_rpcs_sent" ~help ~namespace ~subsystem
+    let name = "answer_sync_ledger_query_rpcs_sent" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
-  let answer_sync_ledger_query_rpcs_received : Counter.t =
+  let answer_sync_ledger_query_rpcs_received =
     let help = "# of Answer_synce_ledger_query rpc requests received" in
-    Counter.v "answer_sync_ledger_query_rpcs_received" ~help ~namespace
-      ~subsystem
+    let name = "answer_sync_ledger_query_rpcs_received" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
   let answer_sync_ledger_query_rpc_requests_failed : Counter.t =
     let help = "# of Answer_sync_ledger_query rpc requests failed" in
@@ -582,13 +594,17 @@ module Network = struct
     Counter.v "answer_sync_ledger_query_rpc_responses_failed" ~help ~namespace
       ~subsystem
 
-  let get_transition_chain_rpcs_sent : Counter.t =
+  let get_transition_chain_rpcs_sent =
     let help = "# of Get_transition_chain rpc requests sent" in
-    Counter.v "get_transition_chain_rpcs_sent" ~help ~namespace ~subsystem
+    let name = "get_transition_chain_rpcs_sent" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
-  let get_transition_chain_rpcs_received : Counter.t =
+  let get_transition_chain_rpcs_received =
     let help = "# of Get_transition_chain rpc requests received" in
-    Counter.v "get_transition_chain_rpcs_received" ~help ~namespace ~subsystem
+    let name = "get_transition_chain_rpcs_received" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
   let get_transition_chain_rpc_requests_failed : Counter.t =
     let help = "# of Get_some_initial_peers rpc requests failed" in
@@ -600,14 +616,17 @@ module Network = struct
     Counter.v "get_transition_chain_rpc_responses_failed" ~help ~namespace
       ~subsystem
 
-  let get_transition_knowledge_rpcs_sent : Counter.t =
+  let get_transition_knowledge_rpcs_sent =
     let help = "# of Get_transition_knowledge rpc requests sent" in
-    Counter.v "get_transition_knowledge_rpcs_sent" ~help ~namespace ~subsystem
+    let name = "get_transition_knowledge_rpcs_sent" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
-  let get_transition_knowledge_rpcs_received : Counter.t =
+  let get_transition_knowledge_rpcs_received =
     let help = "# of Get_transition_knowledge rpc requests received" in
-    Counter.v "get_transition_knowledge_rpcs_received" ~help ~namespace
-      ~subsystem
+    let name = "get_transition_knowledge_rpcs_received" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
   let get_transition_knowledge_rpc_requests_failed : Counter.t =
     let help = "# of Get_transition_knowledge rpc requests failed" in
@@ -619,14 +638,17 @@ module Network = struct
     Counter.v "get_transition_knowledge_rpc_responses_failed" ~help ~namespace
       ~subsystem
 
-  let get_transition_chain_proof_rpcs_sent : Counter.t =
+  let get_transition_chain_proof_rpcs_sent =
     let help = "# of Get_transition_chain_proof rpc requests sent" in
-    Counter.v "get_transition_chain_proof_rpcs_sent" ~help ~namespace ~subsystem
+    let name = "get_transition_chain_proof_rpcs_sent" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
-  let get_transition_chain_proof_rpcs_received : Counter.t =
+  let get_transition_chain_proof_rpcs_received =
     let help = "# of Get_transition_chain_proof rpc requests received" in
-    Counter.v "get_transition_chain_proof_rpcs_received" ~help ~namespace
-      ~subsystem
+    let name = "get_transition_chain_proof_rpcs_received" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
   let get_transition_chain_proof_rpc_requests_failed : Counter.t =
     let help = "# of Get_transition_chain_proof rpc requests failed" in
@@ -640,13 +662,17 @@ module Network = struct
     Counter.v "get_transition_chain_proof_rpc_responses_failed" ~help ~namespace
       ~subsystem
 
-  let get_node_status_rpcs_sent : Counter.t =
+  let get_node_status_rpcs_sent =
     let help = "# of Get_node_status rpc requests sent" in
-    Counter.v "get_node_status_rpcs_sent" ~help ~namespace ~subsystem
+    let name = "get_node_status_rpcs_sent" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
-  let get_node_status_rpcs_received : Counter.t =
+  let get_node_status_rpcs_received =
     let help = "# of Get_node_status rpc requests received" in
-    Counter.v "get_node_status_rpcs_received" ~help ~namespace ~subsystem
+    let name = "get_node_status_rpcs_received" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
   let get_node_status_rpc_requests_failed : Counter.t =
     let help = "# of Get_node_status rpc requests failed" in
@@ -656,13 +682,17 @@ module Network = struct
     let help = "# of Get_node_status rpc requests failed to respond" in
     Counter.v "get_node_status_rpc_responses_failed" ~help ~namespace ~subsystem
 
-  let get_ancestry_rpcs_sent : Counter.t =
+  let get_ancestry_rpcs_sent =
     let help = "# of Get_ancestry rpc requests sent" in
-    Counter.v "get_ancestry_rpcs_sent" ~help ~namespace ~subsystem
+    let name = "get_ancestry_rpcs_sent" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
-  let get_ancestry_rpcs_received : Counter.t =
+  let get_ancestry_rpcs_received =
     let help = "# of Get_ancestry rpc requests received" in
-    Counter.v "get_ancestry_rpcs_received" ~help ~namespace ~subsystem
+    let name = "get_ancestry_rpcs_received" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
   let get_ancestry_rpc_requests_failed : Counter.t =
     let help = "# of Get_ancestry rpc requests failed" in
@@ -672,13 +702,17 @@ module Network = struct
     let help = "# of Get_ancestry rpc requests failed to respond" in
     Counter.v "get_ancestry_rpc_responses_failed" ~help ~namespace ~subsystem
 
-  let ban_notify_rpcs_sent : Counter.t =
+  let ban_notify_rpcs_sent =
     let help = "# of Ban_notify rpc requests sent" in
-    Counter.v "ban_notify_rpcs_sent" ~help ~namespace ~subsystem
+    let name = "ban_notify_rpcs_sent" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
-  let ban_notify_rpcs_received : Counter.t =
+  let ban_notify_rpcs_received =
     let help = "# of Ban_notify rpc requests received" in
-    Counter.v "ban_notify_rpcs_received" ~help ~namespace ~subsystem
+    let name = "ban_notify_rpcs_received" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
   let ban_notify_rpc_requests_failed : Counter.t =
     let help = "# of Ban_notify rpc requests failed" in
@@ -688,13 +722,17 @@ module Network = struct
     let help = "# of Ban_notify rpc requests failed to respond" in
     Counter.v "ban_notify_rpc_responses_failed" ~help ~namespace ~subsystem
 
-  let get_best_tip_rpcs_sent : Counter.t =
+  let get_best_tip_rpcs_sent =
     let help = "# of Get_best_tip rpc requests sent" in
-    Counter.v "get_best_tip_rpcs_sent" ~help ~namespace ~subsystem
+    let name = "get_best_tip_rpcs_sent" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
-  let get_best_tip_rpcs_received : Counter.t =
+  let get_best_tip_rpcs_received =
     let help = "# of Get_best_tip rpc requests received" in
-    Counter.v "get_best_tip_rpcs_received" ~help ~namespace ~subsystem
+    let name = "get_best_tip_rpcs_received" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
   let get_best_tip_rpc_requests_failed : Counter.t =
     let help = "# of Get_best_tip rpc requests failed" in
@@ -704,13 +742,41 @@ module Network = struct
     let help = "# of Get_best_tip rpc requests failed to respond" in
     Counter.v "get_best_tip_rpc_responses_failed" ~help ~namespace ~subsystem
 
-  let get_epoch_ledger_rpcs_sent : Counter.t =
+  let get_epoch_ledger_rpcs_sent =
     let help = "# of Get_epoch_ledger rpc requests sent" in
-    Counter.v "get_epoch_ledger_rpcs_sent" ~help ~namespace ~subsystem
+    let name = "get_epoch_ledger_rpcs_sent" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
-  let get_epoch_ledger_rpcs_received : Counter.t =
+  let get_epoch_ledger_rpcs_received =
     let help = "# of Get_epoch_ledger rpc requests received" in
-    Counter.v "get_epoch_ledger_rpcs_received" ~help ~namespace ~subsystem
+    let name = "get_epoch_ledger_rpcs_received" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
+
+  let new_state_received =
+    let help = "# of blocks received" in
+    Gauge.v "new_state_received" ~help ~namespace ~subsystem
+
+  let new_state_broadcasted =
+    let help = "# of block broadcasted" in
+    Gauge.v "new_state_broadcasted" ~help ~namespace ~subsystem
+
+  let snark_pool_diff_received =
+    let help = "# of snark_pool_diff received" in
+    Gauge.v "snark_pool_diff_received" ~help ~namespace ~subsystem
+
+  let snark_pool_diff_broadcasted =
+    let help = "# of snark_pool_diff broadcasted" in
+    Gauge.v "snark_pool_diff_broadcasted" ~help ~namespace ~subsystem
+
+  let transaction_pool_diff_received =
+    let help = "# of txn_pool_diff received" in
+    Gauge.v "transaction_pool_diff_received" ~help ~namespace ~subsystem
+
+  let transaction_pool_diff_broadcasted =
+    let help = "# of txn_pool_diff broadcasted" in
+    Gauge.v "transaction_pool_diff_broadcasted" ~help ~namespace ~subsystem
 
   let get_epoch_ledger_rpc_requests_failed : Counter.t =
     let help = "# of Get_epoch_ledger rpc requests failed" in

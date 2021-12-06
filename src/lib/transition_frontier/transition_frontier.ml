@@ -21,6 +21,10 @@ let max_catchup_chunk_length = 20
 let global_max_length (genesis_constants : Genesis_constants.t) =
   genesis_constants.protocol.k
 
+let rejected_blocks = Queue.create () 
+
+let validated_blocks = Queue.create ()
+
 type t =
   { logger: Logger.t
   ; verifier: Verifier.t

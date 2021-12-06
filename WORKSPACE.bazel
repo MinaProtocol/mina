@@ -31,6 +31,7 @@ local_repository( name = "ocaml_extlib" , path = "src/external/ocaml_extlib")
 local_repository( name = "ppx_optcomp"  , path = "src/external/ppx_optcomp")
 local_repository( name = "ppx_version"  , path = "src/external/ppx_version")
 local_repository( name = "rpc_parallel" , path = "src/external/rpc_parallel")
+local_repository( name = "prometheus"   , path = "src/external/prometheus")
 
 ######################################
 ########    Golang Support    ########
