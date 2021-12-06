@@ -32,7 +32,7 @@ end
 module Sql = struct
   module Balance_from_last_relevant_command = struct
 
-    let query_recent =
+    let query_pending =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         Caqti_type.(tup2 int64 int64)
@@ -69,7 +69,7 @@ module Sql = struct
               LIMIT 1
       |sql}
 
-    let query_old =
+    let query_canonical =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         Caqti_type.(tup2 int64 int64)
@@ -90,16 +90,11 @@ module Sql = struct
     let run (module Conn : Caqti_async.CONNECTION) requested_block_height
         address =
       let open Deferred.Result.Let_syntax in
-      (* buffer an epsilon of 5 just in case archive node isn't caught up *)
-      let%bind is_old_height = Sql.Block.run_is_old_height (module Conn) ~height:requested_block_height in
-      if is_old_height then
-        Conn.find_opt query_old (address, requested_block_height)
-      else
-        match%bind
-          Conn.find_opt query_recent (address, requested_block_height)
-        with
-        | None -> Conn.find_opt query_old (address, requested_block_height)
-        | Some r -> return (Some r)
+      let%bind has_canonical_height = Sql.Block.run_has_canonical_height (module Conn) ~height:requested_block_height in
+      if has_canonical_height then (
+        Conn.find_opt query_canonical (address, requested_block_height))
+      else (
+        Conn.find_opt query_pending (address, requested_block_height))
   end
 
   let run (module Conn : Caqti_async.CONNECTION) block_query address =
