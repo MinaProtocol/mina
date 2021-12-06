@@ -1395,7 +1395,7 @@ let create (config : Config.t) ~sinks
            in
            match%map
              Gossip_net.Any.query_peer gossip_net banned_peer.peer_id
-               Rpcs.Ban_notify expiration
+               Rpcs.Ban_notify expiration ~timeout:(Time.Span.of_sec 15.0)
            with
            | Failed_to_connect err ->
                log_failure "failed to connect due to $error" err
