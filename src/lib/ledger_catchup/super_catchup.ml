@@ -1509,7 +1509,7 @@ let%test_module "Ledger_catchup tests" =
           gen ~precomputed_values ~verifier ~max_frontier_length
             ~use_super_catchup
             [ fresh_peer
-            ; peer_with_branch
+            ; broken_rpc_peer_branch
                 ~frontier_branch_size:((max_frontier_length * 3) + 1)
             ])
         ~f:(fun network ->

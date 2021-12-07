@@ -1,5 +1,7 @@
+open Async
 open Core
 open Gadt_lib
+open Network_peer
 
 (* There must be at least 2 peers to create a network *)
 type 'n num_peers = 'n Peano.gt_1
@@ -7,6 +9,10 @@ type 'n num_peers = 'n Peano.gt_1
 type peer_state =
   { frontier : Transition_frontier.t
   ; consensus_local_state : Consensus.Data.Local_state.t
+  ; get_transition_chain_impl :
+      (   Mina_networking.Rpcs.Get_transition_chain.query Envelope.Incoming.t
+       -> Mina_networking.Rpcs.Get_transition_chain.response Deferred.t)
+      option
   }
 
 type peer_network =
@@ -42,6 +48,8 @@ module Generator : sig
   val fresh_peer : peer_config
 
   val peer_with_branch : frontier_branch_size:int -> peer_config
+
+  val broken_rpc_peer_branch : frontier_branch_size:int -> peer_config
 
   val gen :
        precomputed_values:Precomputed_values.t

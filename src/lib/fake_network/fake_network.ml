@@ -13,6 +13,10 @@ type 'n num_peers = 'n Peano.gt_1
 type peer_state =
   { frontier : Transition_frontier.t
   ; consensus_local_state : Consensus.Data.Local_state.t
+  ; get_transition_chain_impl :
+      (   Mina_networking.Rpcs.Get_transition_chain.query Envelope.Incoming.t
+       -> Mina_networking.Rpcs.Get_transition_chain.response Deferred.t)
+      option
   }
 
 type peer_network =
@@ -146,10 +150,15 @@ let setup (type n) ?(logger = Logger.null ())
                   Deferred.return
                     (Transition_chain_prover.prove ~frontier
                        (Envelope.Incoming.data query_env)))
-                ~get_transition_chain:(fun query_env ->
-                  Deferred.return
-                    (Sync_handler.get_transition_chain ~frontier
-                       (Envelope.Incoming.data query_env))))
+                ~get_transition_chain:
+                  ( match state.get_transition_chain_impl with
+                  | None ->
+                      fun query_env ->
+                        Deferred.return
+                          (Sync_handler.get_transition_chain ~frontier
+                             (Envelope.Incoming.data query_env))
+                  | Some impl ->
+                      impl ))
         in
         { peer; state; network })
   in
@@ -187,7 +196,7 @@ module Generator = struct
         ~consensus_local_state ~max_length:max_frontier_length ~size:0
         ~use_super_catchup ()
     in
-    { frontier; consensus_local_state }
+    { frontier; consensus_local_state; get_transition_chain_impl = None }
 
   let peer_with_branch ~frontier_branch_size ~precomputed_values ~verifier
       ~max_frontier_length ~use_super_catchup =
@@ -214,7 +223,25 @@ module Generator = struct
     Async.Thread_safe.block_on_async_exn (fun () ->
         Deferred.List.iter branch
           ~f:(Transition_frontier.add_breadcrumb_exn frontier)) ;
-    { frontier; consensus_local_state }
+    { frontier; consensus_local_state; get_transition_chain_impl = None }
+
+  let broken_rpc_peer_branch ~frontier_branch_size ~precomputed_values ~verifier
+      ~max_frontier_length ~use_super_catchup =
+    let%map { frontier; consensus_local_state; _ } =
+      peer_with_branch ~frontier_branch_size ~precomputed_values ~verifier
+        ~max_frontier_length ~use_super_catchup
+    in
+    let get_transition_chain_impl :
+           Mina_networking.Rpcs.Get_transition_chain.query Envelope.Incoming.t
+        -> Mina_networking.Rpcs.Get_transition_chain.response Deferred.t =
+     fun _ -> Deferred.return (Some [])
+     (* (Sync_handler.get_transition_chain ~frontier
+        (Envelope.Incoming.data query_env)) *)
+    in
+    { frontier
+    ; consensus_local_state
+    ; get_transition_chain_impl = Some get_transition_chain_impl
+    }
 
   let gen ~precomputed_values ~verifier ~max_frontier_length ~use_super_catchup
       configs =
