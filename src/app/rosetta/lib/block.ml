@@ -812,6 +812,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /block/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
+  [%log info] "Block query" ~metadata:[("query",body)];
   match route with
   | [] | [""] ->
       with_db (fun ~db ->
