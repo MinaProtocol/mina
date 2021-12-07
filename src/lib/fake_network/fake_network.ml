@@ -234,7 +234,7 @@ module Generator = struct
     let get_transition_chain_impl :
            Mina_networking.Rpcs.Get_transition_chain.query Envelope.Incoming.t
         -> Mina_networking.Rpcs.Get_transition_chain.response Deferred.t =
-     fun _ -> Deferred.return (Some [])
+     fun _ -> Deferred.return None
      (* (Sync_handler.get_transition_chain ~frontier
         (Envelope.Incoming.data query_env)) *)
     in
