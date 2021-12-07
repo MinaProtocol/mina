@@ -1428,6 +1428,22 @@ let%test_module "Ledger_catchup tests" =
           Thread_safe.block_on_async_exn (fun () ->
               test_successful_catchup ~my_net ~target_best_tip_path))
 
+    let%test_unit "catchup succeeds even if the parent transition is already \
+                   in the frontier" =
+      Quickcheck.test ~trials:1
+        Fake_network.Generator.(
+          gen ~precomputed_values ~verifier ~max_frontier_length
+            ~use_super_catchup
+            [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
+        ~f:(fun network ->
+          let open Fake_network in
+          let [ my_net; peer_net ] = network.peer_networks in
+          let target_best_tip_path =
+            [ Transition_frontier.best_tip peer_net.state.frontier ]
+          in
+          Thread_safe.block_on_async_exn (fun () ->
+              test_successful_catchup ~my_net ~target_best_tip_path))
+
     let%test_unit "when catchup fails to download state hashes, catchup will \
                    properly clear the unprocessed_transition_cache of the \
                    blocks that triggered catchup" =
@@ -1486,22 +1502,6 @@ let%test_module "Ledger_catchup tests" =
                     "target transition should've been invalidated with a \
                      failure"))
 
-    let%test_unit "catchup succeeds even if the parent transition is already \
-                   in the frontier" =
-      Quickcheck.test ~trials:1
-        Fake_network.Generator.(
-          gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
-            [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
-        ~f:(fun network ->
-          let open Fake_network in
-          let [ my_net; peer_net ] = network.peer_networks in
-          let target_best_tip_path =
-            [ Transition_frontier.best_tip peer_net.state.frontier ]
-          in
-          Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path))
-
     let%test_unit "when catchup fails to download a block, catchup will retry \
                    and attempt again" =
       Quickcheck.test ~trials:1
@@ -1534,7 +1534,33 @@ let%test_module "Ledger_catchup tests" =
           in
           Strict_pipe.Writer.write test.job_writer
             (parent_hash, [ Rose_tree.T (target_transition, []) ]) ;
-          Thread_safe.block_on_async_exn (fun () -> Deferred.return ()))
+          Thread_safe.block_on_async_exn (fun () ->
+              let catchup_tree =
+                match
+                  Transition_frontier.catchup_tree my_net.state.frontier
+                with
+                | Full tr ->
+                    tr
+                | Hash _ ->
+                    failwith
+                      "in super catchup unit tests, the catchup tree should \
+                       always be Full_catchup_tree, but it is \
+                       Catchup_hash_tree for some reason"
+              in
+              let catchup_tree_node_list =
+                State_hash.Table.data catchup_tree.nodes
+              in
+              let catchup_tree_node = List.hd_exn catchup_tree_node_list in
+              let num_attempts = Peer.Map.length catchup_tree_node.attempts in
+              if num_attempts < 2 then
+                let failstring =
+                  Format.sprintf
+                    "UNIT TEST FAILED.  catchup should have made more attempts \
+                     after failing to download a block.  attempts= %d"
+                    num_attempts
+                in
+                failwith failstring
+              else Deferred.return ()))
 
     (* let%test_unit "catchup fails if one of the parent transitions fail" =
        Quickcheck.test ~trials:1
