@@ -1206,6 +1206,7 @@ let router
   [%log debug] "Handling /construction/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
   let open Deferred.Result.Let_syntax in
+  [%log info] "Construction query" ~metadata:[("query",body)];
   match route with
   | [ "derive" ] ->
       let%bind req =

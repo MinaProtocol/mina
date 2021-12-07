@@ -395,6 +395,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /account/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
+  [%log info] "Account query" ~metadata:[("query",body)];
   match route with
   | ["balance"] ->
       with_db (fun ~db ->
