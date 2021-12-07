@@ -50,10 +50,7 @@ let raise_error s =
   let s = Js.string s in
   Js.raise_js_error (new%js Js.error_constr s)
 
-let raise_errorf fmt =
-  Core_kernel.ksprintf
-    raise_error
-    fmt
+let raise_errorf fmt = Core_kernel.ksprintf raise_error fmt
 
 class type field_class =
   object
@@ -63,7 +60,7 @@ class type field_class =
 
     method toJSON : < .. > Js.t Js.meth
 
-    method toFieldElements : field_class Js.t Js.js_array Js.t Js.meth
+    method toFields : field_class Js.t Js.js_array Js.t Js.meth
   end
 
 and bool_class =
@@ -76,7 +73,7 @@ and bool_class =
 
     method toJSON : < .. > Js.t Js.meth
 
-    method toFieldElements : field_class Js.t Js.js_array Js.t Js.meth
+    method toFields : field_class Js.t Js.js_array Js.t Js.meth
   end
 
 module As_field = struct
@@ -125,7 +122,9 @@ module As_field = struct
             (Obj.magic value)##.value
             (fun () -> raise_error "Expected object with property \"value\"")
     | s ->
-        raise_error (Core_kernel.sprintf "Type \"%s\" cannot be converted to a field element" s)
+        raise_error
+          (Core_kernel.sprintf
+             "Type \"%s\" cannot be converted to a field element" s)
 
   let field_class : < .. > Js.t =
     let f =
@@ -197,7 +196,8 @@ module As_bool = struct
             (Obj.magic value)##.value
             (fun () -> raise_error "Expected object with property \"value\"")
     | s ->
-        raise_error (Core_kernel.sprintf "Type \"%s\" cannot be converted to a boolean" s)
+        raise_error
+          (Core_kernel.sprintf "Type \"%s\" cannot be converted to a boolean" s)
 end
 
 let bool_class : < .. > Js.t =
@@ -300,8 +300,8 @@ let () =
   add_op1 "square" Field.square ;
   add_op1 "sqrt" sqrt ;
   method_ "toString" (fun this : Js.js_string Js.t -> to_string this##.value) ;
-  method_ "sizeInFieldElements" (fun _this : int -> 1) ;
-  method_ "toFieldElements" (fun this : field_class Js.t Js.js_array Js.t ->
+  method_ "sizeInFields" (fun _this : int -> 1) ;
+  method_ "toFields" (fun this : field_class Js.t Js.js_array Js.t ->
       singleton_array this) ;
   ((* TODO: Make this work with arbitrary bit length *)
    let bit_length = Field.size_in_bits - 2 in
@@ -331,12 +331,12 @@ let () =
   method_ "assertEquals" (fun this (y : As_field.t) : unit ->
       try Field.Assert.equal this##.value (As_field.value y)
       with _ ->
-        let s = sprintf "assertEquals: %s != %s"
-          (Js.to_string this##toString)
-          (Js.to_string (As_field.to_field_obj y)##toString) 
-        in 
-        Js.raise_js_error (new%js Js.error_constr (Js.string s))
-    );
+        let s =
+          sprintf "assertEquals: %s != %s"
+            (Js.to_string this##toString)
+            (Js.to_string (As_field.to_field_obj y)##toString)
+        in
+        Js.raise_js_error (new%js Js.error_constr (Js.string s))) ;
 
   method_ "assertBoolean" (fun this : unit ->
       assert_ (Constraint.boolean this##.value)) ;
@@ -358,9 +358,10 @@ let () =
           let bits = Field.Constant.unpack x in
           let bits, high_bits = List.split_n bits length in
           if List.exists high_bits ~f:Fn.id then
-            raise_error (sprintf "Value %s did not fit in %d bits"
-              (Field.Constant.to_string x)
-              length );
+            raise_error
+              (sprintf "Value %s did not fit in %d bits"
+                 (Field.Constant.to_string x)
+                 length) ;
           k Boolean.var_of_value bits)
         this##.value) ;
   method_ "equals" (fun this (y : As_field.t) : bool_class Js.t ->
@@ -393,15 +394,15 @@ let () =
   field_class##.toString :=
     Js.wrap_callback (fun (x : As_field.t) : Js.js_string Js.t ->
         to_string (As_field.value x)) ;
-  field_class##.sizeInFieldElements := Js.wrap_callback (fun () : int -> 1) ;
-  field_class##.toFieldElements
-  := Js.wrap_callback
-       (fun (x : As_field.t) : field_class Js.t Js.js_array Js.t ->
-         (As_field.to_field_obj x)##toFieldElements) ;
-  field_class##.ofFieldElements
-  := Js.wrap_callback
-       (fun (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t ->
-         array_check_length xs 1 ; array_get_exn xs 0) ;
+  field_class##.sizeInFields := Js.wrap_callback (fun () : int -> 1) ;
+  field_class##.toFields :=
+    Js.wrap_callback
+      (fun (x : As_field.t) : field_class Js.t Js.js_array Js.t ->
+        (As_field.to_field_obj x)##toFields) ;
+  field_class##.ofFields :=
+    Js.wrap_callback
+      (fun (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t ->
+        array_check_length xs 1 ; array_get_exn xs 0) ;
   field_class##.assertEqual :=
     Js.wrap_callback (fun (x : As_field.t) (y : As_field.t) : unit ->
         Field.Assert.equal (As_field.value x) (As_field.value y)) ;
@@ -462,9 +463,9 @@ let () =
             if Bigint.test_bit n i then
               raise_error
                 (sprintf
-                !"rangeCheckHelper: Expected %{sexp:Field.Constant.t} to fit \
-                  in %d bits"
-                v num_bits)
+                   !"rangeCheckHelper: Expected %{sexp:Field.Constant.t} to \
+                     fit in %d bits"
+                   v num_bits)
           done ;
           this
       | v ->
@@ -475,11 +476,7 @@ let () =
           in
           mk n) ;
   method_ "isConstant" (fun (this : field_class Js.t) : bool Js.t ->
-      match this##.value with
-      | Constant _ ->
-          Js._true
-      | _ ->
-          Js.bool (Impl.in_prover ())) ;
+      match this##.value with Constant _ -> Js._true | _ -> Js._false) ;
   method_ "toConstant" (fun (this : field_class Js.t) : field_class Js.t ->
       let x =
         match this##.value with Constant x -> x | x -> As_prover.read_var x
@@ -557,7 +554,7 @@ let () =
           with _ ->
             raise_error
               "Bool.toBoolean can only be called on non-witness values." )) ;
-  method_ "sizeInFieldElements" (fun _this : int -> 1) ;
+  method_ "sizeInFields" (fun _this : int -> 1) ;
   method_ "toString" (fun this ->
       let x =
         match (this##.value :> Field.t) with
@@ -567,7 +564,7 @@ let () =
             As_prover.read_var x
       in
       if Field.Constant.(equal one) x then "true" else "false") ;
-  method_ "toFieldElements" (fun this : field_class Js.t Js.js_array Js.t ->
+  method_ "toFields" (fun this : field_class Js.t Js.js_array Js.t ->
       let arr = new%js Js.array_empty in
       arr##push this##toField |> ignore ;
       arr) ;
@@ -608,12 +605,12 @@ let () =
                        (fun () -> assert false)
                        As_bool.value
                      :> Field.t )))))) ;
-  static_method "sizeInFieldElements" (fun () : int -> 1) ;
-  static_method "toFieldElements"
+  static_method "sizeInFields" (fun () : int -> 1) ;
+  static_method "toFields"
     (fun (x : As_bool.t) : field_class Js.t Js.js_array Js.t ->
       singleton_array
         (new%js field_constr (As_field.of_field (As_bool.value x :> Field.t)))) ;
-  static_method "ofFieldElements"
+  static_method "ofFields"
     (fun (xs : field_class Js.t Js.js_array Js.t) : bool_class Js.t ->
       if xs##.length = 1 then
         Js.Optdef.case (Js.array_get xs 0)
@@ -708,7 +705,7 @@ module As_group = struct
 
       method toJSON : < .. > Js.t Js.meth
 
-      method toFieldElements : field_class Js.t Js.js_array Js.t Js.meth
+      method toFields : field_class Js.t Js.js_array Js.t Js.meth
     end
 
   let group_constr : (As_field.t -> As_field.t -> group_class Js.t) Js.constr =
@@ -791,7 +788,8 @@ let () =
   in
   let ( ! ) name x =
     Js.Optdef.get x (fun () ->
-        raise_error (sprintf "Scalar.%s can only be called on non-witness values." name))
+        raise_error
+          (sprintf "Scalar.%s can only be called on non-witness values." name))
   in
   let bits x =
     let (Shifted_value x) =
@@ -834,15 +832,15 @@ let () =
   constant_op2 "mul" Other_backend.Field.mul ;
   constant_op2 "sub" Other_backend.Field.sub ;
   constant_op2 "div" Other_backend.Field.div ;
-  method_ "toFieldElements" (fun x : field_class Js.t Js.js_array Js.t ->
+  method_ "toFields" (fun x : field_class Js.t Js.js_array Js.t ->
       Array.map x##.value ~f:(fun b ->
           new%js field_constr (As_field.of_field (b :> Field.t)))
       |> Js.array) ;
-  static_method "toFieldElements"
+  static_method "toFields"
     (fun (x : scalar_class Js.t) : field_class Js.t Js.js_array Js.t ->
-      (Js.Unsafe.coerce x)##toFieldElements) ;
-  static_method "sizeInFieldElements" (fun () : int -> num_bits) ;
-  static_method "ofFieldElements"
+      (Js.Unsafe.coerce x)##toFields) ;
+  static_method "sizeInFields" (fun () : int -> num_bits) ;
+  static_method "ofFields"
     (fun (xs : field_class Js.t Js.js_array Js.t) : scalar_class Js.t ->
       new%js scalar_constr
         (Array.map (Js.to_array xs) ~f:(fun x ->
@@ -975,20 +973,18 @@ let () =
   static_method "equal"
     (fun (p1 : As_group.t) (p2 : As_group.t) : bool_class Js.t ->
       (As_group.to_group_obj p1)##equals p2) ;
-  method_ "toFieldElements"
+  method_ "toFields"
     (fun (p1 : group_class Js.t) : field_class Js.t Js.js_array Js.t ->
       let arr = singleton_array p1##.x in
       arr##push p1##.y |> ignore ;
       arr) ;
-  static_method "toFieldElements" (fun (p1 : group_class Js.t) ->
-      p1##toFieldElements) ;
-  static_method "ofFieldElements"
-    (fun (xs : field_class Js.t Js.js_array Js.t) ->
+  static_method "toFields" (fun (p1 : group_class Js.t) -> p1##toFields) ;
+  static_method "ofFields" (fun (xs : field_class Js.t Js.js_array Js.t) ->
       array_check_length xs 2 ;
       new%js group_constr
         (As_field.of_field_obj (array_get_exn xs 0))
         (As_field.of_field_obj (array_get_exn xs 1))) ;
-  static_method "sizeInFieldElements" (fun () : int -> 2) ;
+  static_method "sizeInFields" (fun () : int -> 2) ;
   static_method "check" (fun (p : group_class Js.t) : unit ->
       let open Pickles.Step_main_inputs in
       Inner_curve.assert_on_curve
@@ -1015,11 +1011,11 @@ let () =
 
 class type ['a] as_field_elements =
   object
-    method toFieldElements : 'a -> field_class Js.t Js.js_array Js.t Js.meth
+    method toFields : 'a -> field_class Js.t Js.js_array Js.t Js.meth
 
-    method ofFieldElements : field_class Js.t Js.js_array Js.t -> 'a Js.meth
+    method ofFields : field_class Js.t Js.js_array Js.t -> 'a Js.meth
 
-    method sizeInFieldElements : int Js.meth
+    method sizeInFields : int Js.meth
   end
 
 let array_iter t1 ~f =
@@ -1104,8 +1100,9 @@ let proof_constr : (Backend.Proof.t -> proof_class Js.t) Js.constr =
 module Circuit = struct
   let check_lengths s t1 t2 =
     if t1##.length <> t2##.length then
-      raise_error (sprintf "%s: Got mismatched lengths, %d != %d" s t1##.length
-        t2##.length)
+      raise_error
+        (sprintf "%s: Got mismatched lengths, %d != %d" s t1##.length
+           t2##.length)
     else ()
 
   let wrap name ~pre_args ~post_args ~explicit ~implicit =
@@ -1180,13 +1177,15 @@ module Circuit = struct
           false
     in
     if ok then ()
-    else raise_error (sprintf "Type \"%s\" cannot be used with function \"%s\"" t name)
+    else
+      raise_error
+        (sprintf "Type \"%s\" cannot be used with function \"%s\"" t name)
 
   let rec to_field_elts_magic :
       type a. a Js.t -> field_class Js.t Js.js_array Js.t =
     fun (type a) (t1 : a Js.t) : field_class Js.t Js.js_array Js.t ->
      let t1_is_array = Js.Unsafe.global ##. Array##isArray t1 in
-     check_type "toFieldElements" (Js.typeof t1) ;
+     check_type "toFields" (Js.typeof t1) ;
      match t1_is_array with
      | true ->
          let arr = array_map (Obj.magic t1) ~f:to_field_elts_magic in
@@ -1195,11 +1194,11 @@ module Circuit = struct
          let ctor1 : _ Js.Optdef.t = (Obj.magic t1)##.constructor in
          let has_methods ctor =
            let has s = Js.to_bool (ctor##hasOwnProperty (Js.string s)) in
-           has "toFieldElements" && has "ofFieldElements"
+           has "toFields" && has "ofFields"
          in
          match Js.Optdef.(to_option ctor1) with
          | Some ctor1 when has_methods ctor1 ->
-             ctor1##toFieldElements t1
+             ctor1##toFields t1
          | Some _ ->
              let arr =
                array_map
@@ -1208,8 +1207,7 @@ module Circuit = struct
              in
              (Obj.magic arr)##flat
          | None ->
-             raise_error
-               "toFieldElements: Argument did not have a constructor." )
+             raise_error "toFields: Argument did not have a constructor." )
 
   let assert_equal =
     let f t1 t2 =
@@ -1224,16 +1222,15 @@ module Circuit = struct
     in
     let implicit
         (t1 :
-          < toFieldElements : field_class Js.t Js.js_array Js.t Js.meth > Js.t
-          as
-          'a) (t2 : 'a) : unit =
+          < toFields : field_class Js.t Js.js_array Js.t Js.meth > Js.t as 'a)
+        (t2 : 'a) : unit =
       f (to_field_elts_magic t1) (to_field_elts_magic t2)
     in
     let explicit
         (ctor :
-          < toFieldElements : 'a -> field_class Js.t Js.js_array Js.t Js.meth >
-          Js.t) (t1 : 'a) (t2 : 'a) : unit =
-      f (ctor##toFieldElements t1) (ctor##toFieldElements t2)
+          < toFields : 'a -> field_class Js.t Js.js_array Js.t Js.meth > Js.t)
+        (t1 : 'a) (t2 : 'a) : unit =
+      f (ctor##toFields t1) (ctor##toFields t2)
     in
     wrap "assertEqual" ~pre_args:0 ~post_args:2 ~explicit ~implicit
 
@@ -1252,17 +1249,16 @@ module Circuit = struct
     in
     let _implicit
         (t1 :
-          < toFieldElements : field_class Js.t Js.js_array Js.t Js.meth > Js.t
-          as
-          'a) (t2 : 'a) : bool_class Js.t =
-      f t1##toFieldElements t2##toFieldElements
+          < toFields : field_class Js.t Js.js_array Js.t Js.meth > Js.t as 'a)
+        (t2 : 'a) : bool_class Js.t =
+      f t1##toFields t2##toFields
     in
     let implicit t1 t2 = f (to_field_elts_magic t1) (to_field_elts_magic t2) in
     let explicit
         (ctor :
-          < toFieldElements : 'a -> field_class Js.t Js.js_array Js.t Js.meth >
-          Js.t) (t1 : 'a) (t2 : 'a) : bool_class Js.t =
-      f (ctor##toFieldElements t1) (ctor##toFieldElements t2)
+          < toFields : 'a -> field_class Js.t Js.js_array Js.t Js.meth > Js.t)
+        (t1 : 'a) (t2 : 'a) : bool_class Js.t =
+      f (ctor##toFields t1) (ctor##toFields t2)
     in
     wrap "equal" ~pre_args:0 ~post_args:2 ~explicit ~implicit
 
@@ -1273,10 +1269,10 @@ module Circuit = struct
     | Constant b ->
         if Field.Constant.(equal one b) then x1 else x2
     | _ ->
-        let t1 = ctor##toFieldElements x1 in
-        let t2 = ctor##toFieldElements x2 in
+        let t1 = ctor##toFields x1 in
+        let t2 = ctor##toFields x2 in
         let arr = if_array b t1 t2 in
-        ctor##ofFieldElements arr
+        ctor##ofFields arr
 
   let rec if_magic : type a. As_bool.t -> a Js.t -> a Js.t -> a Js.t =
     fun (type a) (b : As_bool.t) (t1 : a Js.t) (t2 : a Js.t) : a Js.t ->
@@ -1296,7 +1292,7 @@ module Circuit = struct
          let ctor2 : _ Js.Optdef.t = (Obj.magic t2)##.constructor in
          let has_methods ctor =
            let has s = Js.to_bool (ctor##hasOwnProperty (Js.string s)) in
-           has "toFieldElements" && has "ofFieldElements"
+           has "toFields" && has "ofFields"
          in
          if not (js_equal ctor1 ctor2) then
            raise_error "if: Mismatched argument types" ;
@@ -1330,17 +1326,16 @@ module Circuit = struct
 
   let typ_ (type a) (typ : a as_field_elements Js.t) : (a, a) Typ.t =
     let to_array conv a =
-      Js.to_array (typ##toFieldElements a)
-      |> Array.map ~f:(fun x -> conv x##.value)
+      Js.to_array (typ##toFields a) |> Array.map ~f:(fun x -> conv x##.value)
     in
     let of_array conv xs =
-      typ##ofFieldElements
+      typ##ofFields
         (Js.array
            (Array.map xs ~f:(fun x ->
                 new%js field_constr (As_field.of_field (conv x)))))
     in
     Typ.transport
-      (Typ.array ~length:typ##sizeInFieldElements Field.typ)
+      (Typ.array ~length:typ##sizeInFields Field.typ)
       ~there:(to_array (fun x -> Option.value_exn (Field.to_constant x)))
       ~back:(of_array Field.constant)
     |> Typ.transport_var ~there:(to_array Fn.id) ~back:(of_array Fn.id)
@@ -1416,22 +1411,22 @@ module Circuit = struct
   let () =
     let array (type a) (typ : a as_field_elements Js.t) (length : int) :
         a Js.js_array Js.t as_field_elements Js.t =
-      let elt_len = typ##sizeInFieldElements in
+      let elt_len = typ##sizeInFields in
       let len = length * elt_len in
       object%js
-        method sizeInFieldElements = len
+        method sizeInFields = len
 
-        method toFieldElements (xs : a Js.js_array Js.t) =
+        method toFields (xs : a Js.js_array Js.t) =
           let res = new%js Js.array_empty in
           for i = 0 to xs##.length - 1 do
-            let x = typ##toFieldElements (array_get_exn xs i) in
+            let x = typ##toFields (array_get_exn xs i) in
             for j = 0 to x##.length - 1 do
               res##push (array_get_exn x j) |> ignore
             done
           done ;
           res
 
-        method ofFieldElements (xs : field_class Js.t Js.js_array Js.t) =
+        method ofFields (xs : field_class Js.t Js.js_array Js.t) =
           let res = new%js Js.array_empty in
           for i = 0 to length - 1 do
             let a = new%js Js.array_empty in
@@ -1439,7 +1434,7 @@ module Circuit = struct
             for j = 0 to elt_len - 1 do
               a##push (array_get_exn xs (offset + j)) |> ignore
             done ;
-            res##push (typ##ofFieldElements a) |> ignore
+            res##push (typ##ofFields a) |> ignore
           done ;
           res
       end
@@ -1456,8 +1451,7 @@ module Circuit = struct
           Run_and_check_deferred.run_and_check
             (fun () ->
               let g : (unit -> a) Js.callback Promise.t = call f in
-              Promise.map g ~f:(fun (p : (unit -> a) Js.callback) ->
-                  fun () -> call p))
+              Promise.map g ~f:(fun (p : (unit -> a) Js.callback) () -> call p))
             ()
           |> Promise.map ~f:(fun r ->
                  let (), res = Or_error.ok_exn r in
@@ -1489,7 +1483,7 @@ module Circuit = struct
          vk##verify pub pi) ;
     circuit##.assertEqual := assert_equal ;
     circuit##.equal := equal ;
-    circuit##.toFieldElements := Js.wrap_callback to_field_elts_magic ;
+    circuit##.toFields := Js.wrap_callback to_field_elts_magic ;
     circuit##.inProver :=
       Js.wrap_callback (fun () : bool Js.t -> Js.bool (Impl.in_prover ())) ;
     circuit##.inCheckedComputation
@@ -1799,8 +1793,7 @@ type AccountPredicate =
     let x =
       x##uint64Value |> field |> Field.Constant.to_string
       |> Unsigned.UInt64.of_string
-      |> (fun x ->
-           x)
+      |> (fun x -> x)
       |> Unsigned.UInt64.to_int64
     in
     { Currency.Signed_poly.sgn =
@@ -1825,20 +1818,18 @@ type AccountPredicate =
         { hash = or_ignore field e##.ledger##.hash
         ; total_currency =
             Check
-              ( 
-                closed_interval
-                  (Currency.Amount.of_uint64 ^ uint64)
-                  e##.ledger##.totalCurrency )
+              (closed_interval
+                 (Currency.Amount.of_uint64 ^ uint64)
+                 e##.ledger##.totalCurrency)
         }
     ; seed = or_ignore field e##.seed
     ; start_checkpoint = or_ignore field e##.startCheckpoint
     ; lock_checkpoint = or_ignore field e##.lockCheckpoint
     ; epoch_length =
         Check
-          ( 
-            closed_interval
-              (Mina_numbers.Length.of_uint32 ^ uint32)
-              e##.epochLength )
+          (closed_interval
+             (Mina_numbers.Length.of_uint32 ^ uint32)
+             e##.epochLength)
     }
 
   let protocol_state (p : protocol_state_predicate) :
@@ -1847,50 +1838,43 @@ type AccountPredicate =
     { snarked_ledger_hash = or_ignore field p##.snarkedLedgerHash
     ; snarked_next_available_token =
         Check
-          ( 
-            closed_interval
-              (Token_id.of_uint64 ^ uint64)
-              p##.snarkedNextAvailableToken )
+          (closed_interval
+             (Token_id.of_uint64 ^ uint64)
+             p##.snarkedNextAvailableToken)
     ; timestamp =
         Check
-          ( 
-            closed_interval
-              (fun x ->
-                field x##.value
-                |> Field.Constant.to_string |> Unsigned.UInt64.of_string
-                |> Block_time.of_uint64)
-              p##.timestamp )
+          (closed_interval
+             (fun x ->
+               field x##.value
+               |> Field.Constant.to_string |> Unsigned.UInt64.of_string
+               |> Block_time.of_uint64)
+             p##.timestamp)
     ; blockchain_length =
         Check
-          ( 
-            closed_interval
-              (Mina_numbers.Length.of_uint32 ^ uint32)
-              p##.blockchainLength )
+          (closed_interval
+             (Mina_numbers.Length.of_uint32 ^ uint32)
+             p##.blockchainLength)
     ; min_window_density =
         Check
-          ( 
-            closed_interval
-              (Mina_numbers.Length.of_uint32 ^ uint32)
-              p##.minWindowDensity )
+          (closed_interval
+             (Mina_numbers.Length.of_uint32 ^ uint32)
+             p##.minWindowDensity)
     ; last_vrf_output = ()
     ; total_currency =
         Check
-          ( 
-            closed_interval
-              (Currency.Amount.of_uint64 ^ uint64)
-              p##.totalCurrency )
+          (closed_interval
+             (Currency.Amount.of_uint64 ^ uint64)
+             p##.totalCurrency)
     ; global_slot_since_hard_fork =
         Check
-          ( 
-            closed_interval
-              (Mina_numbers.Global_slot.of_uint32 ^ uint32)
-              p##.globalSlotSinceHardFork )
+          (closed_interval
+             (Mina_numbers.Global_slot.of_uint32 ^ uint32)
+             p##.globalSlotSinceHardFork)
     ; global_slot_since_genesis =
         Check
-          ( 
-            closed_interval
-              (Mina_numbers.Global_slot.of_uint32 ^ uint32)
-              p##.globalSlotSinceGenesis )
+          (closed_interval
+             (Mina_numbers.Global_slot.of_uint32 ^ uint32)
+             p##.globalSlotSinceGenesis)
     ; staking_epoch_data = epoch_data p##.stakingEpochData
     ; next_epoch_data = epoch_data p##.nextEpochData
     }
@@ -1901,11 +1885,9 @@ type AccountPredicate =
     else Keep
 
   let body (b : party_body) : Party.Body.t =
-    
     let update : Party.Update.t =
-      
       let u = b##.update in
-      
+
       { Party.Update.Poly.app_state =
           Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
               set_or_keep field (array_get_exn u##.appState i))
@@ -1918,7 +1900,7 @@ type AccountPredicate =
       ; timing = Keep
       }
     in
-    
+
     { pk = public_key b##.publicKey
     ; update
     ; token_id = Token_id.of_uint64 (uint64 b##.tokenId)
@@ -1938,7 +1920,6 @@ type AccountPredicate =
     }
 
   let fee_payer_party (party : fee_payer_party) : Party.Predicated.Fee_payer.t =
-    
     let b = body party##.body in
     { body =
         { b with
@@ -1984,12 +1965,9 @@ type AccountPredicate =
         failwithf "bad predicate type: %s" s ()
 
   let party (party : party) : Party.Predicated.t =
-    
-    
     { body = body party##.body; predicate = predicate party##.predicate }
 
   let parties (parties : parties) : Parties.t =
-    
     { fee_payer =
         { data = fee_payer_party parties##.feePayer
         ; authorization = Signature.dummy
@@ -1997,7 +1975,6 @@ type AccountPredicate =
     ; other_parties =
         Js.to_array parties##.otherParties
         |> Array.map ~f:(fun p : Party.t ->
-               
                { data = party p; authorization = None_given })
         |> Array.to_list
     ; protocol_state = protocol_state parties##.protocolState
@@ -2017,20 +1994,20 @@ type AccountPredicate =
     in
     let add_account_exn (l : L.t) pk balance =
       let account_id = account_id pk in
-      
+
       let bal_u64 =
         (* TODO: Why is this conversion necessary to make it work ? *)
         Unsigned.UInt64.of_string (Int.to_string balance)
       in
-      
+
       let balance = Currency.Balance.of_uint64 bal_u64 in
-      
+
       let a : Account.t =
         { (Account.create account_id balance) with
           permissions = loose_permissions
         }
       in
-      
+
       create_new_account_exn l account_id a
     in
     let create
@@ -2067,13 +2044,12 @@ type AccountPredicate =
             let mk x : field_class Js.t =
               new%js field_constr (As_field.of_field x)
             in
-            
+
             let uint64 n =
               object%js
                 val value =
                   Unsigned.UInt64.to_string n
-                  |> Field.Constant.of_string
-                  |> Field.constant |> mk
+                  |> Field.Constant.of_string |> Field.constant |> mk
               end
             in
             let uint32 n =
