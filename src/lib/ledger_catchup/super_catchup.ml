@@ -1535,32 +1535,58 @@ let%test_module "Ledger_catchup tests" =
           Strict_pipe.Writer.write test.job_writer
             (parent_hash, [ Rose_tree.T (target_transition, []) ]) ;
           Thread_safe.block_on_async_exn (fun () ->
-              let catchup_tree =
-                match
-                  Transition_frontier.catchup_tree my_net.state.frontier
-                with
-                | Full tr ->
-                    tr
-                | Hash _ ->
-                    failwith
-                      "in super catchup unit tests, the catchup tree should \
-                       always be Full_catchup_tree, but it is \
-                       Catchup_hash_tree for some reason"
-              in
-              let catchup_tree_node_list =
-                State_hash.Table.data catchup_tree.nodes
-              in
-              let catchup_tree_node = List.hd_exn catchup_tree_node_list in
-              let num_attempts = Peer.Map.length catchup_tree_node.attempts in
-              if num_attempts < 2 then
-                let failstring =
-                  Format.sprintf
-                    "UNIT TEST FAILED.  catchup should have made more attempts \
-                     after failing to download a block.  attempts= %d"
-                    num_attempts
-                in
-                failwith failstring
-              else Deferred.return ()))
+              let final = Cache_lib.Cached.final_state target_transition in
+              match%map
+                Deferred.any
+                  [ (Ivar.read final >>| fun x -> `Catchup_failed x)
+                  ; Strict_pipe.Reader.read test.breadcrumbs_reader
+                    >>| const `Catchup_success
+                  ]
+              with
+              | `Catchup_success ->
+                  failwith
+                    "target transition should've been invalidated with a \
+                     failure"
+              | `Catchup_failed fnl -> (
+                  match fnl with
+                  | `Success _ ->
+                      failwith
+                        "target transition should've been invalidated with a \
+                         failure"
+                  | `Failed ->
+                      let catchup_tree =
+                        match
+                          Transition_frontier.catchup_tree my_net.state.frontier
+                        with
+                        | Full tr ->
+                            tr
+                        | Hash _ ->
+                            failwith
+                              "in super catchup unit tests, the catchup tree \
+                               should always be Full_catchup_tree, but it is \
+                               Catchup_hash_tree for some reason"
+                      in
+                      let catchup_tree_node_list =
+                        State_hash.Table.data catchup_tree.nodes
+                      in
+                      let catchup_tree_node =
+                        List.hd_exn catchup_tree_node_list
+                      in
+                      let num_attempts =
+                        Peer.Map.length catchup_tree_node.attempts
+                      in
+                      if num_attempts < 2 then
+                        let failstring =
+                          Format.sprintf
+                            "UNIT TEST FAILED.  catchup should have made more \
+                             attempts after failing to download a block.  \
+                             attempts= %d.  length of catchup_tree_node_list= \
+                             %d"
+                            num_attempts
+                            (List.length catchup_tree_node_list)
+                        in
+                        failwith failstring
+                      else () )))
 
     (* let%test_unit "catchup fails if one of the parent transitions fail" =
        Quickcheck.test ~trials:1
