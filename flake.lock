@@ -15,23 +15,19 @@
         "type": "github"
       }
     },
-    "gitignore": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
+    "mix-to-nix": {
       "locked": {
-        "lastModified": 1635165013,
-        "narHash": "sha256-o/BdVjNwcB6jOmzZjOH703BesSkkS5O7ej3xhyO8hAY=",
-        "owner": "hercules-ci",
-        "repo": "gitignore.nix",
-        "rev": "5b9e0ff9d3b551234b4f3eb3983744fa354b17f1",
+        "lastModified": 1638979539,
+        "narHash": "sha256-B+VIFF8qDJhF5hVMc8PbY/WPzUtbGgjsV1eAxTt5GuQ=",
+        "owner": "serokell",
+        "repo": "mix-to-nix",
+        "rev": "e1ac539bc82cb2ee2558267023e8aaeccd77182d",
         "type": "github"
       },
       "original": {
-        "owner": "hercules-ci",
-        "repo": "gitignore.nix",
+        "owner": "serokell",
+        "ref": "yorickvp/deadlock",
+        "repo": "mix-to-nix",
         "type": "github"
       }
     },
@@ -53,7 +49,7 @@
     },
     "root": {
       "inputs": {
-        "gitignore": "gitignore",
+        "mix-to-nix": "mix-to-nix",
         "nixpkgs": "nixpkgs",
         "utils": "utils"
       }
