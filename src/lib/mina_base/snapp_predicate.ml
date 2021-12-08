@@ -863,10 +863,9 @@ module Protocol_state = struct
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
-    let%bind snarked_ledger_hash = Hash.gen Frozen_ledger_hash.gen in
-    let%bind snarked_next_available_token =
-      Numeric.gen Token_id.gen Token_id.compare
-    in
+    (* TODO: pass in ledger hash, next available token *)
+    let snarked_ledger_hash = Snapp_basic.Or_ignore.Ignore in
+    let snarked_next_available_token = Snapp_basic.Or_ignore.Ignore in
     let%bind timestamp = Numeric.gen Block_time.gen Block_time.compare in
     let%bind blockchain_length = Numeric.gen Length.gen Length.compare in
     let max_min_window_density =

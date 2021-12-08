@@ -1336,7 +1336,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let init =
       match a.snapp with None -> Snapp_account.default | Some a -> a
     in
-    let update perm u curr ~is_keep ~update =
+    let update _name perm u curr ~is_keep ~update =
+      (* we pass [name] for debugging *)
       match check_auth perm with
       | false ->
           let%map () = check Update_not_permitted (is_keep u) in
@@ -1346,7 +1347,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     let%bind delegate =
       if Token_id.(equal default) a.token_id then
-        update a.permissions.set_delegate delegate a.delegate
+        update "delegate" a.permissions.set_delegate delegate a.delegate
           ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
             match u with Keep -> x | Set y -> Some y)
       else return a.delegate
@@ -1360,12 +1361,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         else init.proved_state
       in
       let%map app_state =
-        update a.permissions.edit_state app_state init.app_state
+        update "app_state" a.permissions.edit_state app_state init.app_state
           ~is_keep:(Vector.for_all ~f:Set_or_keep.is_keep)
           ~update:(Vector.map2 ~f:Set_or_keep.set_or_keep)
       and verification_key =
-        update a.permissions.set_verification_key verification_key
-          init.verification_key ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
+        update "verification key" a.permissions.set_verification_key
+          verification_key init.verification_key ~is_keep:Set_or_keep.is_keep
+          ~update:(fun u x ->
             match (u, x) with Keep, _ -> x | Set x, _ -> Some x)
       and sequence_state, last_sequence_slot =
         let [ s1; s2; s3; s4; s5 ] = init.sequence_state in
@@ -1392,8 +1394,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               ( ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
               , global_slot_since_genesis )
         in
-        update a.permissions.edit_sequence_state new_sequence_state
-          (init.sequence_state, init.last_sequence_slot)
+        update "sequence state" a.permissions.edit_sequence_state
+          new_sequence_state (init.sequence_state, init.last_sequence_slot)
           ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
             match u with Keep -> x | Set x -> x)
       in
@@ -1413,23 +1415,25 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       if Snapp_account.(equal default t) then None else Some t
     in
     let%bind snapp_uri =
-      update a.permissions.set_snapp_uri snapp_uri a.snapp_uri
+      update "snapp URI" a.permissions.set_snapp_uri snapp_uri a.snapp_uri
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
     let%bind token_symbol =
-      update a.permissions.set_token_symbol token_symbol a.token_symbol
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
+      update "token symbol" a.permissions.set_token_symbol token_symbol
+        a.token_symbol ~is_keep:Set_or_keep.is_keep
+        ~update:Set_or_keep.set_or_keep
     in
     let%bind permissions =
-      update a.permissions.set_permissions permissions a.permissions
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
+      update "permissions" a.permissions.set_permissions permissions
+        a.permissions ~is_keep:Set_or_keep.is_keep
+        ~update:Set_or_keep.set_or_keep
     in
     let%bind nonce =
       let update_nonce =
         if increment_nonce then Set_or_keep.Set (Account.Nonce.succ a.nonce)
         else Set_or_keep.Keep
       in
-      update a.permissions.increment_nonce update_nonce a.nonce
+      update "nonce" a.permissions.increment_nonce update_nonce a.nonce
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
     Ok
@@ -1643,9 +1647,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           (acct, loc)
       | Check_inclusion (_ledger, _account, _loc) ->
           ()
-      | Check_protocol_state_predicate (pred, global_state) ->
+      | Check_protocol_state_predicate (pred, global_state) -> (
           Snapp_predicate.Protocol_state.check pred global_state.protocol_state
-          |> Or_error.is_ok
+          |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
       | Check_predicate (_is_start, party, account, _global_state) -> (
           match party.data.predicate with
           | Accept ->

@@ -237,22 +237,34 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
             else return (Party.Predicate.Nonce (Account.Nonce.succ nonce)) )
 
 let gen_fee (account : Account.t) =
-  Currency.Fee.gen_incl Mina_compile_config.minimum_user_command_fee
-    Currency.(Amount.to_fee (Balance.to_amount account.balance))
+  let lo_fee = Mina_compile_config.minimum_user_command_fee in
+  let hi_fee = Currency.(Amount.to_fee (Balance.to_amount account.balance)) in
+  Currency.Fee.gen_incl lo_fee hi_fee
 
 let fee_to_amt fee = Currency.Amount.(Signed.of_unsigned (of_fee fee))
 
 let gen_delta ?balances_tbl (account : Account.t) =
-  let pk = account.public_key in
   let open Quickcheck.Let_syntax in
-  match%bind Quickcheck.Generator.of_list [ Sgn.Pos; Neg ] with
+  let pk = account.public_key in
+  (* TODO: the authorization is Signature for new accounts only
+     this will change when we split party's into two
+  *)
+  let authorization = Control.Tag.Signature in
+  let%bind sgn =
+    match authorization with
+    | Control.Tag.None_given ->
+        return Sgn.Pos
+    | _ ->
+        Quickcheck.Generator.of_list [ Sgn.Pos; Neg ]
+  in
+  match sgn with
   | Pos ->
       (* if positive, the account balance does not impose a constraint on the magnitude; but
          to avoid overflow over several Party.t, we'll limit the value
       *)
       let%map magnitude =
         Currency.Amount.gen_incl Currency.Amount.zero
-          (Currency.Amount.of_int 100_000_000_000_000)
+          (Currency.Amount.of_int 100_000_000_000)
       in
       Currency.Signed_poly.{ magnitude; sgn = Sgn.Pos }
   | Neg ->
@@ -282,7 +294,7 @@ let gen_delta ?balances_tbl (account : Account.t) =
 *)
 let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
     ?(snapp_account = false) ?(is_fee_payer = false) ?available_public_keys
-    ~(gen_delta : Account.t -> a Quickcheck.Generator.t)
+    ?permissions_auth ~(gen_delta : Account.t -> a Quickcheck.Generator.t)
     ~(f_delta : a -> Currency.Amount.Signed.t) ~(increment_nonce : b) ~ledger ()
     : (_, _, _, a, _, _, _, b) Party.Body.Poly.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
@@ -293,7 +305,9 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
     failwith "gen_party_body: snapp_account but not new_account" ;
   (* fee payers have to be in the ledger *)
   assert (not (is_fee_payer && new_account)) ;
-  let%bind update = Party.Update.gen ~new_account () in
+  let%bind update =
+    Party.Update.gen ?permissions_auth ~snapp_account ~new_account ()
+  in
   let%bind account =
     if new_account then (
       if Option.is_some account_id then
@@ -457,12 +471,12 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
 
 let gen_predicated_from ?(succeed = true) ?(new_account = false)
     ?(snapp_account = false) ?(increment_nonce = false) ?available_public_keys
-    ~ledger ~balances_tbl () =
+    ?permissions_auth ~ledger ~balances_tbl =
   let open Quickcheck.Let_syntax in
   let%bind body =
-    gen_party_body ~new_account ~snapp_account ~increment_nonce
-      ?available_public_keys ~ledger ~balances_tbl
-      ~gen_delta:(gen_delta ~balances_tbl) ~f_delta:Fn.id ()
+    gen_party_body ~new_account ~snapp_account ?available_public_keys
+      ?permissions_auth ~ledger ~balances_tbl
+      ~gen_delta:(gen_delta ~balances_tbl) ~f_delta:Fn.id ~increment_nonce ()
   in
   let account_id =
     Account_id.create body.Party.Body.Poly.pk body.Party.Body.Poly.token_id
@@ -470,10 +484,13 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false)
   let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger () in
   Party.Predicated.Poly.{ body; predicate }
 
-let gen_party_from ?(succeed = true) ?(new_account = false)
+let gen_party_from ?(succeed = true) ?(new_account = false) ?permissions_auth
     ~available_public_keys ~ledger ~balances_tbl () =
   let open Quickcheck.Let_syntax in
-  let%bind authorization = Lazy.force Control.gen_with_dummies in
+  (* see TODO below about splitting a Party.t; we'll want to choose
+     an authorization
+  *)
+  let authorization = Control.Signature Signature.dummy in
   let snapp_account =
     match authorization with
     | Control.Proof _ ->
@@ -481,10 +498,6 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
     | Signature _ | None_given ->
         false
   in
-  (* if it's a Snapp account, generate a new account, since existing accounts in
-     ledger may not be Snapp accounts
-  *)
-  let new_account = new_account || snapp_account in
   let increment_nonce =
     match authorization with
     | Signature _ ->
@@ -492,31 +505,35 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
     | Proof _ | None_given ->
         false
   in
-  let%map data =
-    gen_predicated_from ~succeed ~new_account ~snapp_account ~increment_nonce
-      ~available_public_keys ~ledger ~balances_tbl ()
+  (* if it's a Snapp account, generate a new account, since existing accounts in
+     ledger may not be Snapp accounts
+  *)
+  let new_account = new_account || snapp_account in
+  let%bind data =
+    gen_predicated_from ?permissions_auth ~succeed ~new_account ~snapp_account
+      ~increment_nonce ~available_public_keys ~ledger ~balances_tbl
   in
-  { Party.data; authorization }
+  return { Party.data; authorization }
 
 (* takes an optional account id, if we want to sign this data *)
-let gen_party_predicated_signed ?account_id ~ledger :
+let gen_party_predicated_signed ?account_id ?permissions_auth ~ledger :
     Party.Predicated.Signed.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind body =
-    gen_party_body ~gen_delta ~f_delta:Fn.id
+    gen_party_body ~gen_delta ~f_delta:Fn.id ?account_id ?permissions_auth
       ~increment_nonce:(Option.is_some account_id)
-      ?account_id ~ledger ()
+      ~ledger ()
   in
   let%map predicate = Account.Nonce.gen in
   Party.Predicated.Poly.{ body; predicate }
 
 (* takes an account id, if we want to sign this data *)
-let gen_party_predicated_fee_payer ~account_id ~ledger :
+let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger :
     Party.Predicated.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body0 =
-    gen_party_body ~account_id ~is_fee_payer:true ~increment_nonce:()
-      ~gen_delta:gen_fee ~f_delta:fee_to_amt ~ledger ()
+    gen_party_body ?permissions_auth ~account_id ~is_fee_payer:true
+      ~increment_nonce:() ~gen_delta:gen_fee ~f_delta:fee_to_amt ~ledger ()
   in
   (* make sure the fee payer's token id is the default,
      which is represented by the unit value in the body
@@ -526,18 +543,22 @@ let gen_party_predicated_fee_payer ~account_id ~ledger :
   let predicate = Account.Nonce.zero in
   Party.Predicated.Poly.{ body; predicate }
 
-let gen_party_signed ?account_id ~ledger : Party.Signed.t Quickcheck.Generator.t
-    =
+let gen_party_signed ?permissions_auth ?account_id ~ledger :
+    Party.Signed.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
-  let%map data = gen_party_predicated_signed ?account_id ~ledger in
+  let%map data =
+    gen_party_predicated_signed ?permissions_auth ?account_id ~ledger
+  in
   (* real signature to be added when this data inserted into a Parties.t *)
   let authorization = Signature.dummy in
   Party.Signed.{ data; authorization }
 
-let gen_fee_payer ~account_id ~ledger : Party.Fee_payer.t Quickcheck.Generator.t
-    =
+let gen_fee_payer ?permissions_auth ~account_id ~ledger () :
+    Party.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
-  let%map data = gen_party_predicated_fee_payer ~account_id ~ledger in
+  let%map data =
+    gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
+  in
   (* real signature to be added when this data inserted into a Parties.t *)
   let authorization = Signature.dummy in
   Party.Fee_payer.{ data; authorization }
@@ -574,18 +595,53 @@ let gen_parties_from ?(succeed = true)
           Signature_lib.Public_key.Compressed.Table.add_exn tbl ~key:pk ~data:()) ;
     tbl
   in
-  let%bind fee_payer = gen_fee_payer ~account_id:fee_payer_account_id ~ledger in
+  let permissions_auth = Control.Tag.Signature in
+  (* permissions_auth is Signature, for now, because permissions on new accounts are compatible with it
+     TODO: split Party.ts into two:
+     - the first sets permissions and vk using Signature authorization,
+     - the second uses an authorization compatible with the new permissions
+     N.B.: the given authorization constrains the generated permissions for the
+      fee payer and other parties; those are not the permissions used
+      when applying those parties, the existing permissions are used;
+      instead, those generated permissions are used in later transactions
+  *)
+  let%bind fee_payer =
+    gen_fee_payer ~permissions_auth ~account_id:fee_payer_account_id ~ledger ()
+  in
   let gen_parties_with_dynamic_balance ~new_parties num_parties =
     (* table of public keys to balances, updated when generating each party
-       a Map would be more principled, but threading that map through the code adds complexity
+       a Map would be more principled, but threading that map through the code
+       adds complexity
     *)
     let balances_tbl = Signature_lib.Public_key.Compressed.Table.create () in
+    (* add fee payer account, in case same account used again *)
+    let fee_payer_pk = fee_payer.data.body.pk in
+    let fee_payer_balance =
+      (* if we've done things right, all the options here are Some *)
+      let fee =
+        fee_payer.data.body.delta |> Currency.Fee.to_uint64
+        |> Currency.Amount.of_uint64
+      in
+      let ledger_balance =
+        let account_id = Account_id.create fee_payer_pk Token_id.default in
+        let loc =
+          Option.value_exn (Ledger.location_of_account ledger account_id)
+        in
+        let fee_payer_account = Option.value_exn (Ledger.get ledger loc) in
+        fee_payer_account.balance
+      in
+      Option.value_exn (Currency.Balance.sub_amount ledger_balance fee)
+    in
+    ignore
+      ( Signature_lib.Public_key.Compressed.Table.add balances_tbl
+          ~key:fee_payer_pk ~data:fee_payer_balance
+        : [ `Duplicate | `Ok ] ) ;
     let rec go acc n =
       if n <= 0 then return (List.rev acc)
       else
         let%bind party =
-          gen_party_from ~new_account:new_parties ~available_public_keys
-            ~succeed ~ledger ~balances_tbl ()
+          gen_party_from ~permissions_auth ~new_account:new_parties
+            ~available_public_keys ~succeed ~ledger ~balances_tbl ()
         in
         go (party :: acc) (n - 1)
     in
@@ -598,10 +654,10 @@ let gen_parties_from ?(succeed = true)
   let%bind old_parties =
     gen_parties_with_dynamic_balance ~new_parties:false num_old_parties
   in
-  let%bind new_accounts =
+  let%bind new_parties =
     gen_parties_with_dynamic_balance ~new_parties:true num_new_accounts
   in
-  let other_parties = old_parties @ new_accounts in
+  let other_parties = old_parties @ new_parties in
   let%bind memo = Signed_command_memo.gen in
   let memo_hash = Signed_command_memo.hash memo in
   let parties_dummy_signatures : Parties.t =

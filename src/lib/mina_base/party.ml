@@ -185,7 +185,7 @@ module Update = struct
     end
   end]
 
-  let gen ?(new_account = false) ?(snapp_account = false) () :
+  let gen ?(new_account = false) ?(snapp_account = false) ?permissions_auth () :
       t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     if snapp_account && not new_account then
@@ -209,8 +209,12 @@ module Update = struct
       else return Set_or_keep.Keep
     in
     let%bind permissions =
-      if snapp_account then Set_or_keep.gen Permissions.gen
-      else return Set_or_keep.Keep
+      match permissions_auth with
+      | None ->
+          return Set_or_keep.Keep
+      | Some auth_tag ->
+          let%map permissions = Permissions.gen ~auth_tag in
+          Set_or_keep.Set permissions
     in
     let%bind snapp_uri =
       let uri_gen =
@@ -230,19 +234,20 @@ module Update = struct
       in
       Set_or_keep.gen token_gen
     in
-    let%map timing =
-      if new_account then Set_or_keep.gen Timing_info.gen
-      else return Set_or_keep.Keep
-    in
-    Poly.
-      { app_state
-      ; delegate
-      ; verification_key
-      ; permissions
-      ; snapp_uri
-      ; token_symbol
-      ; timing
-      }
+    (* a new account for the Party.t is in the ledger when we use
+       this generated update in tests, so the timing must be Keep
+    *)
+    let timing = Set_or_keep.Keep in
+    return
+      Poly.
+        { app_state
+        ; delegate
+        ; verification_key
+        ; permissions
+        ; snapp_uri
+        ; token_symbol
+        ; timing
+        }
 
   module Checked = struct
     open Pickles.Impls.Step

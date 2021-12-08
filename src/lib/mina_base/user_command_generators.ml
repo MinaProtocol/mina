@@ -7,7 +7,10 @@
 open Core_kernel
 include User_command.Gen
 
-let parties () =
+(* using Precomputed_values depth introduces a cyclic dependency *)
+let ledger_depth = 20
+
+let parties_with_ledger () =
   let open Quickcheck.Let_syntax in
   let open Signature_lib in
   (* Need a fee payer keypair, and max_other_parties * 2 keypairs, because
@@ -32,17 +35,31 @@ let parties () =
         Account_id.create (Public_key.compress public_key) Token_id.default)
   in
   let%bind balances =
+    let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
+    let min_balance =
+      Currency.Fee.to_int min_cmd_fee
+      |> Int.( + ) 500_000_000_000 |> Currency.Balance.of_int
+    in
+    (* max balance to avoid overflow when adding deltas *)
+    let max_balance =
+      match
+        Currency.Balance.add_amount min_balance
+          (Currency.Amount.of_int 20_000_000_000_000)
+      with
+      | None ->
+          failwith "parties_with_ledger: overflow for max_balance"
+      | Some bal ->
+          bal
+    in
     Quickcheck.Generator.list_with_length num_keypairs_in_ledger
-      Currency.Balance.gen
+      (Currency.Balance.gen_incl min_balance max_balance)
   in
   let accounts =
     List.map2_exn account_ids balances ~f:(fun account_id balance ->
         Account.create account_id balance)
   in
   let fee_payer_keypair = List.hd_exn keypairs in
-  (* using Precomputed_values depth introduces a cyclic dependency *)
-  let depth = 20 in
-  let ledger = Ledger.create ~depth () in
+  let ledger = Ledger.create ~depth:ledger_depth () in
   List.iter2_exn account_ids accounts ~f:(fun acct_id acct ->
       match Ledger.get_or_create_account ledger acct_id acct with
       | Error err ->
@@ -57,6 +74,46 @@ let parties () =
       | Ok (`Added, _) ->
           ()) ;
   let%bind protocol_state = Snapp_predicate.Protocol_state.gen in
-  Quickcheck.Generator.map
-    (Snapp_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger
-       ~protocol_state ()) ~f:(fun parties -> User_command.Parties parties)
+  let%bind parties =
+    Snapp_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger
+      ~protocol_state ()
+  in
+  (* include generated ledger in result *)
+  return (User_command.Parties parties, fee_payer_keypair, keymap, ledger)
+
+let sequence_parties_with_ledger ?length () =
+  let open Quickcheck.Let_syntax in
+  let%bind length =
+    match length with
+    | Some n ->
+        return n
+    | None ->
+        Quickcheck.Generator.small_non_negative_int
+  in
+  let merge_ledger source_ledger target_ledger =
+    (* add all accounts in source to target *)
+    Ledger.iteri source_ledger ~f:(fun _ndx acct ->
+        let acct_id = Account_id.create acct.public_key acct.token_id in
+        match Ledger.get_or_create_account target_ledger acct_id acct with
+        | Ok (`Added, _) ->
+            ()
+        | Ok (`Existed, _) ->
+            failwith "Account already existed in target ledger"
+        | Error err ->
+            failwithf "Could not add account to target ledger: %s"
+              (Error.to_string_hum err) ())
+  in
+  let init_ledger = Ledger.create ~depth:ledger_depth () in
+  let rec go parties_and_fee_payer_keypairs n =
+    if n <= 0 then return (List.rev parties_and_fee_payer_keypairs, init_ledger)
+    else
+      let%bind parties, fee_payer_keypair, keymap, ledger =
+        parties_with_ledger ()
+      in
+      let parties_and_fee_payer_keypairs' =
+        (parties, fee_payer_keypair, keymap) :: parties_and_fee_payer_keypairs
+      in
+      merge_ledger ledger init_ledger ;
+      go parties_and_fee_payer_keypairs' (n - 1)
+  in
+  go [] length
