@@ -18,9 +18,6 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let Size = ../../Command/Size.dhall
 
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
-let B/ExitStatus = B.definitions/commandStep/properties/soft_fail/union/properties/exit_status/Type
-
 let commands =
       [ Cmd.run "./scripts/lint_codeowners.sh"
       , Cmd.run "./scripts/lint_rfcs.sh"
@@ -59,9 +56,6 @@ in  Pipeline.build
             , key = "lint-optional-types"
             , target = Size.Medium
             , docker = None Docker.Type
-            , soft_fail = Some (B/SoftFail.ListSoft_fail/Type [{
-              , exit_status = Some (B/ExitStatus.Number 1)
-              }])
             }
         , Command.build
             Command.Config::{
