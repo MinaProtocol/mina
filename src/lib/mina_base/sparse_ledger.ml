@@ -5,6 +5,15 @@ open Core
 open Import
 open Snark_params.Tick
 
+let dedup_list ls ~comparator =
+  let ls', _ =
+    List.fold_right ls
+      ~init:([], Set.empty comparator)
+      ~f:(fun el (acc, seen) ->
+        if Set.mem seen el then (acc, seen) else (el :: acc, Set.add seen el))
+  in
+  ls'
+
 [%%versioned
 module Stable = struct
   module V1 = struct
@@ -177,6 +186,7 @@ let of_ledger_subset_exn' (ledger : Ledger.t) locs_and_ids =
          add_path sparse_ledger path id acct)
 
 let of_ledger_subset_exn (ledger : Ledger.t) keys =
+  let keys = dedup_list keys ~comparator:(module Account_id) in
   let existing_account_locs_and_ids, missing_account_ids =
     keys
     |> Ledger.location_of_account_batch ledger
@@ -310,6 +320,7 @@ let%test_unit "adding paths generated via derive_next_arm_exn does not \
   [%test_eq: Ledger_hash.t] (merkle_root ledger) root
 
 let of_sparse_ledger_subset_exn base_ledger account_ids =
+  let account_ids = dedup_list account_ids ~comparator:(module Account_id) in
   let add_existing_accounts l =
     List.fold_right account_ids ~init:(l, [])
       ~f:(fun id (l, missing_accounts) ->
