@@ -492,6 +492,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /network/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
+  [%log info] "Network query" ~metadata:[("query",body)];
   match route with
   | ["list"] ->
       let%bind _meta =

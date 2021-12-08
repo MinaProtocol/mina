@@ -261,7 +261,7 @@ module Sql = struct
               AND chain_status = 'canonical'
         |sql}
 
-    let query_height_old =
+    let query_height_canonical =
       Caqti_request.find_opt Caqti_type.int64 typ
         (* The archive database will only reconcile the canonical columns for
          * blocks older than k + epsilon
@@ -276,7 +276,7 @@ SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_win
       |}
 
 
-    let query_height_recent =
+    let query_height_pending =
       Caqti_request.find_opt Caqti_type.int64 typ
         (* According to the clarification of the Rosetta spec here
          * https://community.rosetta-api.org/t/querying-block-by-just-its-index/84/3 ,
@@ -352,9 +352,8 @@ WITH RECURSIVE chain AS (
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
       Conn.find_opt query_by_id id
 
-    let run_is_old_height (module Conn : Caqti_async.CONNECTION) ~height =
+    let run_has_canonical_height (module Conn : Caqti_async.CONNECTION) ~height =
       let open Deferred.Result.Let_syntax in
-      let open Int64 in
       let%map num_canonical_at_height =
         Conn.find query_count_canonical_at_height height
       in
@@ -363,11 +362,11 @@ WITH RECURSIVE chain AS (
     let run (module Conn : Caqti_async.CONNECTION) = function
       | Some (`This (`Height h)) ->
         let open Deferred.Result.Let_syntax in
-        let%bind is_old_height = run_is_old_height (module Conn) ~height:h in
-        if is_old_height then
-          Conn.find_opt query_height_old h
+        let%bind has_canonical_height = run_has_canonical_height (module Conn) ~height:h in
+        if has_canonical_height then
+          Conn.find_opt query_height_canonical h
         else
-          Conn.find_opt query_height_recent h
+          Conn.find_opt query_height_pending h
       | Some (`That (`Hash h)) ->
         Conn.find_opt query_hash h
       | Some (`Those (`Height height, `Hash hash)) ->
@@ -813,6 +812,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /block/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
+  [%log info] "Block query" ~metadata:[("query",body)];
   match route with
   | [] | [""] ->
       with_db (fun ~db ->

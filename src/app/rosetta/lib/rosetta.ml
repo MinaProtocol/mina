@@ -48,6 +48,38 @@ let router ~graphql_uri ~pool ~logger route body =
         Deferred.return (Error `Page_not_found)
   with exn -> Deferred.return (Error (`Exception exn))
 
+let pg_log_data ~logger ~pool : unit Deferred.t =
+  match%bind Lazy.force pool with
+  | Ok pool ->
+    let get_logs () : (unit,_) Deferred.Result.t =
+      Caqti_async.Pool.use (fun db ->
+          let open Deferred.Result.Let_syntax in
+          let%bind num_conns = Pg_data.run_connection_count db () in
+          let%map num_locks = Pg_data.run_lock_count db () in
+          [%log info] "Postgresql system data" ~metadata:[("num_pg_connections",`String (Int64.to_string num_conns))
+                                                  ;("num_pg_locks",`String (Int64.to_string num_locks))
+                                                  ]) pool
+    in
+    let pg_data_interval =
+      match Sys.getenv "MINA_ROSETTA_PG_DATA_INTERVAL" with
+      | Some n -> Float.of_string n
+      | None -> 30.0
+    in
+    let rec go pool =
+      let%bind () = match%map get_logs pool with
+        | Ok () -> ()
+        | Error err ->
+          [%log error] "Could not get Postgresql system data" ~metadata:[("error",`String (Caqti_error.show err))]
+      in
+      let%bind () = after (Time.Span.of_sec pg_data_interval) in
+      go ()
+    in
+    go ()
+  | Error (`App err) ->
+    [%log error] "Could not get Caqti pool for logging Postgresql system data"
+      ~metadata:[("error",`String (Errors.show err))];
+    Deferred.unit
+
 let server_handler ~pool ~graphql_uri ~logger ~body _sock req =
   let uri = Cohttp_async.Request.uri req in
   let%bind body = Cohttp_async.Body.to_string body in
@@ -142,6 +174,7 @@ let command =
         | Ok pool ->
             Deferred.Result.return pool)
     in
+    don't_wait_for (pg_log_data ~logger ~pool);
     let%bind server =
       Cohttp_async.Server.create_expert ~max_connections:128
         ~on_handler_error:
