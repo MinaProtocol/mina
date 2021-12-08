@@ -253,6 +253,15 @@ let next_index ~depth idx =
 let path_of_arm =
   List.map ~f:(function `Left, _, r -> `Left r | `Right, l, _ -> `Right l)
 
+let left_empty_arm depth =
+  let rec loop height =
+    if height < 0 then []
+    else
+      let h = empty_hash height in
+      (`Left, h, h) :: loop (height - 1)
+  in
+  List.rev (loop (depth - 1))
+
 (** Derives the next arm of a merkle tree from the previous arm. Assumes that
     all hashes to the right of the previous arm are derived from empty leaves
     (thus, the next arm is a new arm in the tree). *)
@@ -337,10 +346,10 @@ let of_sparse_ledger_subset_exn base_ledger account_ids =
       Option.value_exn (next_available_index l)
         ~message:"not enough space in ledger"
     in
-    (* TODO: handle empty ledgers here *)
-    assert (next_idx > 0) ;
-    let last_idx = next_idx - 1 in
-    let last_arm = arm_exn base_ledger last_idx in
+    let last_arm =
+      if next_idx > 0 then arm_exn base_ledger (next_idx - 1)
+      else left_empty_arm (depth l)
+    in
     let result, _, _ =
       (* TODO: we could just check the remaining available slots in the ledger upfront instead of folding over the index (which is otherwise unused here) *)
       List.fold_left missing_account_ids ~init:(l, last_arm, Some next_idx)
@@ -468,7 +477,7 @@ let%test_module "of_sparse_ledger_subset_exn" =
       let depth = 4 in
       let gen =
         let open Quickcheck.Let_syntax in
-        let%bind n = Int.gen_incl 1 (Int.pow 2 depth) in
+        let%bind n = Int.gen_incl 1 (Int.pow 2 depth - 1) in
         List.gen_with_length n Account_id.gen
       in
       Quickcheck.test gen ~trials:100 ~f:(fun account_ids ->
@@ -477,22 +486,6 @@ let%test_module "of_sparse_ledger_subset_exn" =
           [%test_result: Ledger_hash.t]
             ~expect:(Ledger.merkle_root ledger)
             (merkle_root @@ of_sparse_ledger_subset_exn sl account_ids))
-
-    let%test_unit "throws when missing accounts are not new" =
-      let depth = 4 in
-      Quickcheck.test
-        (gen_ledger_with_subset_selection ~min_subset_size:1 depth) ~trials:100
-        ~f:(fun (ledger, account_ids) ->
-          match List.permute account_ids with
-          | [] ->
-              failwith "shouldn't happen as ledger shouldn't be empty"
-          | _ :: subset_ids ->
-              let sl = of_ledger_subset_exn ledger subset_ids in
-              let result =
-                Or_error.try_with (fun () ->
-                    of_sparse_ledger_subset_exn sl account_ids)
-              in
-              [%test_pred: t Or_error.t] Or_error.is_error result)
   end )
 
 let get_or_initialize_exn account_id t idx =
