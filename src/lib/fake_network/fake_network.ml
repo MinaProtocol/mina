@@ -225,23 +225,30 @@ module Generator = struct
           ~f:(Transition_frontier.add_breadcrumb_exn frontier)) ;
     { frontier; consensus_local_state; get_transition_chain_impl = None }
 
-  let broken_rpc_peer_branch ~frontier_branch_size ~precomputed_values ~verifier
+  let broken_rpc_peer_branch ~frontier_branch_size
+      ~get_transition_chain_impl_option ~precomputed_values ~verifier
       ~max_frontier_length ~use_super_catchup =
     let%map { frontier; consensus_local_state; _ } =
       peer_with_branch ~frontier_branch_size ~precomputed_values ~verifier
         ~max_frontier_length ~use_super_catchup
     in
-    let get_transition_chain_impl :
-           Mina_networking.Rpcs.Get_transition_chain.query Envelope.Incoming.t
-        -> Mina_networking.Rpcs.Get_transition_chain.response Deferred.t =
-     fun _ -> Deferred.return None
-     (* (Sync_handler.get_transition_chain ~frontier
-        (Envelope.Incoming.data query_env)) *)
-    in
-    { frontier
-    ; consensus_local_state
-    ; get_transition_chain_impl = Some get_transition_chain_impl
-    }
+    match get_transition_chain_impl_option with
+    | Some impl ->
+        { frontier
+        ; consensus_local_state
+        ; get_transition_chain_impl = Some impl
+        }
+    | None ->
+        let get_transition_chain_impl :
+               Mina_networking.Rpcs.Get_transition_chain.query
+               Envelope.Incoming.t
+            -> Mina_networking.Rpcs.Get_transition_chain.response Deferred.t =
+         fun _ -> Deferred.return None
+        in
+        { frontier
+        ; consensus_local_state
+        ; get_transition_chain_impl = Some get_transition_chain_impl
+        }
 
   let gen ~precomputed_values ~verifier ~max_frontier_length ~use_super_catchup
       configs =

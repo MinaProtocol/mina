@@ -49,7 +49,13 @@ module Generator : sig
 
   val peer_with_branch : frontier_branch_size:int -> peer_config
 
-  val broken_rpc_peer_branch : frontier_branch_size:int -> peer_config
+  val broken_rpc_peer_branch :
+       frontier_branch_size:int
+    -> get_transition_chain_impl_option:
+         (   Mina_networking.Rpcs.Get_transition_chain.query Envelope.Incoming.t
+          -> Mina_networking.Rpcs.Get_transition_chain.response Deferred.t)
+         option
+    -> peer_config
 
   val gen :
        precomputed_values:Precomputed_values.t
