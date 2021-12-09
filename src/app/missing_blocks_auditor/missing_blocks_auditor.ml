@@ -3,6 +3,28 @@
 open Core_kernel
 open Async
 
+(* prime numbers; multiply by them to derive error exit code
+   check divisibility by any one of them to see if a particular error occurred
+*)
+let no_error = 1
+
+let missing_blocks_error = 2
+
+let pending_blocks_error = 3
+
+let chain_length_error = 5
+
+let chain_status_error = 7
+
+let add_error, get_error_exit =
+  let error_exit = ref no_error in
+  let add_error n =
+    (* multiply by n, if n not already a factor *)
+    if !error_exit mod n > 0 then error_exit := !error_exit * n
+  in
+  let get_error_exit () = !error_exit in
+  (add_error, get_error_exit)
+
 let main ~archive_uri () =
   let logger = Logger.create () in
   let archive_uri = Uri.of_string archive_uri in
@@ -32,7 +54,8 @@ let main ~archive_uri () =
       in
       if List.is_empty missing_blocks then
         [%log info] "There are no missing blocks in the archive db"
-      else
+      else (
+        add_error missing_blocks_error ;
         List.iter missing_blocks
           ~f:(fun (block_id, state_hash, height, parent_hash) ->
             if height > 1 then
@@ -43,7 +66,7 @@ let main ~archive_uri () =
                   ; ("height", `Int height)
                   ; ("parent_hash", `String parent_hash)
                   ; ("parent_height", `Int (height - 1))
-                  ]) ;
+                  ]) ) ;
       [%log info] "Querying for gaps in chain statuses" ;
       let%bind highest_canonical =
         match%bind
@@ -76,7 +99,8 @@ let main ~archive_uri () =
       in
       if Int64.equal pending_below Int64.zero then
         [%log info] "There are no gaps in the chain statuses"
-      else
+      else (
+        add_error pending_blocks_error ;
         [%log info]
           "There are $num_pending_blocks_below pending blocks lower than the \
            highest canonical block"
@@ -85,7 +109,7 @@ let main ~archive_uri () =
               , `String (Int64.to_string highest_canonical) )
             ; ( "num_pending_blocks_below"
               , `String (Int64.to_string pending_below) )
-            ] ;
+            ] ) ;
       let%bind canonical_chain =
         match%bind
           Caqti_async.Pool.use
@@ -100,8 +124,13 @@ let main ~archive_uri () =
               ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
             exit 1
       in
-      [%log info] "Length of canonical chain is %d blocks"
-        (List.length canonical_chain) ;
+      let chain_len = List.length canonical_chain |> Int64.of_int in
+      if Int64.equal chain_len highest_canonical then
+        [%log info] "Length of canonical chain is %Ld blocks" chain_len
+      else (
+        add_error chain_length_error ;
+        [%log info] "Length of canonical chain is %Ld blocks, expected: %Ld"
+          chain_len highest_canonical ) ;
       let invalid_chain =
         List.filter canonical_chain
           ~f:(fun (_block_id, _state_hash, chain_status) ->
@@ -110,16 +139,17 @@ let main ~archive_uri () =
       if List.is_empty invalid_chain then
         [%log info]
           "All blocks along the canonical chain have a valid chain status"
-      else
-        List.iter invalid_chain ~f:(fun (block_id, state_hash, chain_status) ->
-            [%log info]
-              "Canonical block has a chain_status other than \"canonical\""
-              ~metadata:
-                [ ("block_id", `Int block_id)
-                ; ("state_hash", `String state_hash)
-                ; ("chain_status", `String chain_status)
-                ]) ;
-      return ()
+      else add_error chain_status_error ;
+      List.iter invalid_chain ~f:(fun (block_id, state_hash, chain_status) ->
+          [%log info]
+            "Canonical block has a chain_status other than \"canonical\""
+            ~metadata:
+              [ ("block_id", `Int block_id)
+              ; ("state_hash", `String state_hash)
+              ; ("chain_status", `String chain_status)
+              ]) ;
+      let error_exit = get_error_exit () in
+      if error_exit <> no_error then Core.exit error_exit else Core.exit 0
 
 let () =
   Command.(
