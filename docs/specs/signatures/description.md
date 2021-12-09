@@ -252,7 +252,7 @@ from ordinary signatures, giving improved privacy and efficiency versus
 Further, by combining Schnorr signatures with [Pedersen Secret
 Sharing](https://link.springer.com/content/pdf/10.1007/3-540-46766-1_9.pdf),
 it is possible to obtain [an interactive threshold signature
-scheme](http://cacr.uwaterloo.ca/techreports/2001/corr2001-13.ps) that
+scheme](https://cacr.uwaterloo.ca/techreports/2001/corr2001-13.ps) that
 ensures that signatures can only be produced by arbitrary but
 predetermined sets of signers. For example, k-of-n threshold signatures
 can be realized this way. Furthermore, it is possible to replace the
@@ -261,8 +261,7 @@ security of that combination still needs analysis.
 
 ## Adaptor Signatures
 
-[Adaptor
-signatures](https://download.wpsoftware.net/bitcoin/wizardry/mw-slides/2018-05-18-l2/slides.pdf)
+[Adaptor signatures](https://web.archive.org/web/20211123033324/https://download.wpsoftware.net/bitcoin/wizardry/mw-slides/2018-05-18-l2/slides.pdf)
 can be produced by a signer by offsetting his public nonce with a known
 point *`T = tG`*, but not offsetting his secret nonce. A correct signature
 (or partial signature, as individual signers' contributions to a
@@ -377,7 +376,7 @@ Towns.
 
 [^5]: This matches the *compressed* encoding for elliptic curve points
     used in Bitcoin already, following section 2.3.3 of the [SEC
-    1](http://www.secg.org/sec1-v2.pdf) standard.
+    1](https://www.secg.org/sec1-v2.pdf) standard.
 
 [^6]: Given an X coordinate *x(P)*, there exist either exactly two or
     exactly zero valid Y coordinates. The valid Y coordinates are the

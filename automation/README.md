@@ -5,7 +5,7 @@
 
 # Repository Purpose
 
-This repository is designed to show an opinionated example on how to operate a network of Coda Daemons. It implements the entire node lifecycle using a modern Infrastructure as Code toolset. Community contributions are warmly encouraged, please see the [contribution guidelines](#to-do) for more details. The code is designed to be as modular as possible, allowing the end-user to "pick and choose" the parts they would like to incorporate into their own infrastructure stack.
+This repository is designed to show an opinionated example on how to operate a network of Mina Daemons. It implements the entire node lifecycle using a modern Infrastructure as Code toolset. Community contributions are warmly encouraged, please see the [contribution guidelines](../CONTRIBUTING.md) for more details. The code is designed to be as modular as possible, allowing the end-user to "pick and choose" the parts they would like to incorporate into their own infrastructure stack.
 
 If you have any issues setting up your testnet or have any other questions about this repository, join the public [Discord Server](https://discord.gg/ShKhA7J) and get help from the Coda community.
 
@@ -129,7 +129,7 @@ Next, you must create a new testnet in `terraform/testnets/`. For ease of use, y
 - Name of testnet
 - number of nodes to deploy
 - Location of the Genesis Ledger
-- Kubernetes [context](https://github.com/MinaProtocol/Mina-automation/commit/141db8821a133501d3d4ed9b739fcad1f9b88bef) for indicating which managed *k8s* cluster to deploy to
+- Kubernetes context for indicating which managed *k8s* cluster to deploy to
 
 ### Manage *k8s* Cluster for Deployment
 
@@ -156,7 +156,7 @@ Once decided on a cluster/context to deploy, use the following command to retrie
 
 #### Configure testnet module `k8s_context`
 
-There is a testnet module variable which determines the *Kubernetes* context to deploy to. Reference the module's [variable definitions](https://github.com/MinaProtocol/mina/automation/blob/master/terraform/modules/kubernetes/testnet/variables.tf) for more details on how to properly configure.
+There is a testnet module variable which determines the *Kubernetes* context to deploy to. Reference the module's [variable definitions](./terraform/modules/kubernetes/testnet/variables.tf) for more details on how to properly configure.
 
 ```variable "k8s_context" {
   type = string

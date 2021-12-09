@@ -77,9 +77,9 @@ Before the derivation step, we need to generate a keypair. We'll use the private
 
 [derivation]: #derivation
 
-Derivation demands that the public key expected as input be a hex-encoded byte-array value. So we'll [add functionality](#marshalkeys) to the [client-sdk](#marshalkeys), the [generate-keypair binary](#marshalkeys), and the offcial [Coda CLI](#marshalkeys) to marshall the `Fq.t * Fq.t` pair (the native representation of an uncompressed public key).
+Derivation demands that the public key expected as input be a hex-encoded byte-array value. So we'll [add functionality](#marshal-keys) to the [client-sdk](#marshal-keys), the [generate-keypair binary](#marshal-keys), and the offcial [Coda CLI](#marshal-keys) to marshall the `Fq.t * Fq.t` pair (the native representation of an uncompressed public key).
 
-The [derivation endpoint](#derivation-endpoint) would be responsible for reading in the uncompressed public key bytes which [requires adjusting the Rosetta spec](#addcurves), compressing the public key, and base58-encoding it inline with how we currently represent public keys in serialized form.
+The [derivation endpoint](#derivation-endpoint) would be responsible for reading in the uncompressed public key bytes which [requires adjusting the Rosetta spec](#add-curves), compressing the public key, and base58-encoding it inline with how we currently represent public keys in serialized form.
 
 #### Preprocess
 
@@ -97,13 +97,13 @@ The [metadata endpoint](#metadata-endpoint) takes the senders public key+token_i
 
 [payloads]: #payloads
 
-The [payloads endpoint](#payloads-endpoint) takes the metadata and the operations and returns an [encoded unsigned transaction](#encoded-unsigned-transaction).
+The [payloads endpoint](#payloads-endpoint) takes the metadata and the operations and returns an [encoded unsigned transaction](#unsigned-transaction-encoding).
 
 #### After Payloads
 
 [after-payloads]: #after-payloads
 
-After the payloads endpoint, folks must sign the transaction. In the future, we should build support for this natively, but for now our client-sdk's signing mechanism suffices. As such, we don't need to do much here other than [encode the signed transaction properly](#encoded-signed-transaction).
+After the payloads endpoint, folks must sign the transaction. In the future, we should build support for this natively, but for now our client-sdk's signing mechanism suffices. As such, we don't need to do much here other than [encode the signed transaction properly](#signed-transaction-encoding).
 
 #### Parse
 
@@ -115,7 +115,7 @@ The [parse endpoint](#parse-endpoint) takes a possibly signed transaction and pa
 
 [combine]: #combine
 
-The [combine endpoint](#combine-endpoint) takes an unsigned transaction and the signature and returns an [encoded signed transaction](#encoded-signed-transaction).
+The [combine endpoint](#combine-endpoint) takes an unsigned transaction and the signature and returns an [encoded signed transaction](#signed-transaction-encoding).
 
 #### Hash
 
@@ -143,7 +143,7 @@ Think of these as the tasks necessary to complete this project. Each item here w
 
 #### Marshal Keys
 
-[marshalkeys]: #marshalkeys
+[marshal-keys]: #marshal-keys
 
 Add support for creating/marshalling public keys ([via Derivation](#derivation))
 
@@ -267,7 +267,7 @@ This is a simple GraphQL query. This endpoint should be easy to implement.
 
 #### Unsigned transaction encoding
 
-[encoded-unsigned-transaction]: #encoded-unsigned-transaction
+[unsigned-transaction-encoding]: #unsigned-transaction-encoding
 
 [via Payloads](#payloads)
 
@@ -370,13 +370,13 @@ Additionally, we should expose a new method in the client-sdk to feed the raw `R
 
 [via Payloads](#payloads)
 
-First [convert the operations](#inverted-operations-map) embedding the correct sender nonce from the metadata. Return an [encoded unsigned transaction](#encoded-unsigned-transaction) as described above.
+First [convert the operations](#inverted-operations-map) embedding the correct sender nonce from the metadata. Return an [encoded unsigned transaction](#unsigned-transaction-encoding) as described above.
 
 This endpoint will also accept a query parameter `?plain_random_oracle`
 
 #### Signed transaction encoding
 
-[encoded-signed-transaction]: #encoded-signed-transaction
+[signed-transaction-encoding]: #signed-transaction-encoding
 
 [via After Payloads](#after-payloads)
 
@@ -416,7 +416,7 @@ Importantly, we've ensured that our unsigned and signed transaction serialized r
 
 [via Combine](#combine)
 
-The combine endpoint [encodes the signed transaction](#encoded-signed-transaction) according to the schema defined above.
+The combine endpoint [encodes the signed transaction](#signed-transaction-encoding) according to the schema defined above.
 
 #### Hash Endpoint
 
@@ -434,7 +434,7 @@ The hash endpoint takes the signed transaction and returns the hash. This can be
 
 Upon skimming our GraphQL implementation, it seems like it is already succeeding only if the transaction is successfully added to the mempool, but it important we more carefully audit the implementation to ensure this is the case as it's an explicit requirement in the spec.
 
-#### Submit
+#### Submit Endpoint
 
 [submit-endpoint]: #submit-endpoint
 
@@ -483,9 +483,9 @@ Decisions were made here to limit scope where possible to enable shipping an MVP
 
 Luckily Rosetta has a very clear specification, so our designs are mostly constrained by the decisions made in that API.
 
-In [marshal keys (c)](#marshalkeys), we could also change commands that accept public keys to also accept this new format. Additionally, we could change the GraphQL API to support this new format too. I think both of these changes are unnecessary to prioritize as the normal flows will still be fine and we'll still encourage folks to pass around the standard base58-encoded compressed public keys as they are shorter.
+In [marshal keys (c)](#marshal-keys), we could also change commands that accept public keys to also accept this new format. Additionally, we could change the GraphQL API to support this new format too. I think both of these changes are unnecessary to prioritize as the normal flows will still be fine and we'll still encourage folks to pass around the standard base58-encoded compressed public keys as they are shorter.
 
-In the sections about [encoding unsigned transactions](#encoded-unsigned-transaction) and [encoding signed transactions](#encoded-signed-transaction), we make an explicit decision to pick a format that supports arbitrary signers. There is minimal change involved with the client-sdk to make that supported; additionally, this was done to improve implementation velocity and because we did conciously choose that interface with usability in mind. JSON is chosen to pack products of data as using a readable JSON string makes it easy to audit, debug, and understand our implementation.
+In the sections about [encoding unsigned transactions](#unsigned-transaction-encoding) and [encoding signed transactions](#signed-transaction-encoding), we make an explicit decision to pick a format that supports arbitrary signers. There is minimal change involved with the client-sdk to make that supported; additionally, this was done to improve implementation velocity and because we did conciously choose that interface with usability in mind. JSON is chosen to pack products of data as using a readable JSON string makes it easy to audit, debug, and understand our implementation.
 
 ## Prior art
 
