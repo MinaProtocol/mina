@@ -14,6 +14,9 @@ PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${PO
 export MINA_CONFIG_FILE=/genesis_ledgers/${MINA_NETWORK}.json
 export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=/data/.mina-config}"
 
+MAP=$'map(select(.metadata.parent_hash != null and .metadata.parent_height != null))'
+JSON="$MAP | $'"mainnet-\(.[0].metadata.parent_height)-\(.[0].metadata.parent_hash).json"'"
+HASH="$MAP | $'.[0].metadata.parent_hash'"
 # Bootstrap finds every missing state hash in the database and imports them from the o1labs bucket of .json blocks
 function bootstrap() {
   echo "[BOOTSTRAP] Top 10 blocks before bootstrapping the archiveDB:"
@@ -21,12 +24,12 @@ function bootstrap() {
   echo "[BOOTSTRAP] Restoring blocks individually from ${BLOCKS_BUCKET}..."
 
   until [[ "$PARENT" == "null" ]] ; do
-    PARENT_FILE="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs '.[-1].metadata | "'${MINA_NETWORK}'-\(.parent_height)-\(.parent_hash).json"')"
+    PARENT_FILE="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs ${JSON})"
     echo "Downloading $PARENT_FILE block"
     curl -sO "${BLOCKS_BUCKET}/${PARENT_FILE}"
-    mina-archive-blocks --precomputed --archive-uri "$PG_CONN" "$PARENT_FILE" | jq -rs '"[BOOTSTRAP] Populated database with block: \(.[-1].message)"'
+    mina-archive-blocks --precomputed --archive-uri "$PG_CONN" "$PARENT_FILE" | jq -rs '"[BOOTSTRAP] Populated database with block: \(.[].message)"'
     rm "$PARENT_FILE"
-    PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
+    PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs ${HASH})"
   done
 
   echo "[BOOTSTRAP] Top 10 blocks in bootstrapped archiveDB:"
@@ -40,8 +43,8 @@ function bootstrap() {
 # Wait until there is a block missing
 PARENT=null
 while true; do # Test once every 10 minutes forever, take an hour off when bootstrap completes
-  PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].metadata.parent_hash)"
-  echo "[BOOTSTRAP] $(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[-1].message)"
+  PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs ${HASH})"
+  echo "[BOOTSTRAP] $(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq -rs .[].message)"
   [[ "$PARENT" != "null" ]] && echo "[BOOSTRAP] Some blocks are missing, moving to recovery logic..." && bootstrap
   sleep 600 # Wait for the daemon to catchup and start downloading new blocks
 done
