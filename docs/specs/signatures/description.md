@@ -124,7 +124,7 @@ The following convention is used, with constants as defined for Mina's version o
     -   *`pack(e)`* - convert base field element *`e`* into 255 bits little-endian order
     -   *`pack(E)`* - convert vector of base field elements *`E = [e1, ..., en]`* into bit string *`pack(e1) || ... || pack(en)`*
     -   *`pack(s)`* - convert scalar field element *`s`* into 255 bits little-endian order
-    -   *`unpack(bits)`* - convert bit string *`bits = b`<sub>`1`</sub>`b`<sub>`2`</sub>`...b`<sub>`255`</sub>`b`<sub>`256`</sub>`...b`<sub>`510`</sub>`...`* into vector of base field elements *`[e1, e2, ..., en]`* where *`e1 = b`<sub>`1`</sub>`...b`<sub>`255`</sub>`0`*, *`e2 = b`<sub>`256`</sub>`...b`<sub>`510`</sub>`0`* and so on, such that the last element is zero-padded to 255 bits if necessary.
+    -   *`unpack(bits)`* - convert bit string *bits = b<sub>1</sub>b<sub>2</sub>...b<sub>255</sub>b<sub>256</sub>...b<sub>510</sub>...* into vector of base field elements *`[e1, e2, ..., en]`* where *e1 = b<sub>1</sub>...b<sub>255</sub>0*, *e2 = b<sub>256</sub>...b<sub>510</sub>0* and so on, such that the last element is zero-padded to 255 bits if necessary.
     -   *`iv(id) `* - unique `poseidon_3w` initialization vector for blockchain instance identified with `id`:
         -   Testnet (*`id = 0x00`*)
             ```rust
