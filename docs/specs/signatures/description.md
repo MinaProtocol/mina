@@ -318,6 +318,7 @@ Implementations
 
 1. Rust - [O(1) Labs proof-systems - mina-signer crate](https://github.com/o1-labs/proof-systems/tree/master/signer)
 2. OCaml - [Mina Protocol - signature_lib module](https://github.com/MinaProtocol/mina/blob/develop/src/lib/signature_lib/schnorr.ml)
+3. C - [Ledger hardware wallet - ledger-app-mina](https://github.com/jspada/ledger-app-mina)
 
 Acknowledgements
 ----------------
