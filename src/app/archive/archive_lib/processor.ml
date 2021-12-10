@@ -1628,6 +1628,18 @@ module Block = struct
       (Caqti_request.find Caqti_type.unit Caqti_type.(tup2 int int64)
          "SELECT id,height FROM blocks WHERE chain_status='canonical' ORDER BY height DESC LIMIT 1")
 
+  let get_nearest_canonical_block_above (module Conn : CONNECTION) height =
+    Conn.find
+      (Caqti_request.find Caqti_type.int64 Caqti_type.(tup2 int int64)
+         "SELECT id,height FROM blocks WHERE chain_status='canonical' AND height > ? ORDER BY height ASC LIMIT 1")
+      height
+
+  let get_nearest_canonical_block_below (module Conn : CONNECTION) height =
+    Conn.find
+      (Caqti_request.find Caqti_type.int64 Caqti_type.(tup2 int int64)
+         "SELECT id,height FROM blocks WHERE chain_status='canonical' AND height < ? ORDER BY height DESC LIMIT 1")
+      height
+
   let mark_as_canonical (module Conn : CONNECTION) ~state_hash =
     Conn.exec
       (Caqti_request.exec Caqti_type.string
@@ -1651,19 +1663,28 @@ module Block = struct
      let%bind highest_canonical_block_id,greatest_canonical_height =
        get_highest_canonical_block (module Conn) () in
      if Int64.(>) block.height (Int64.(+) greatest_canonical_height k_int64) then
-         (* subchain between new block and highest canonical block *)
-         let%bind subchain_blocks = get_subchain (module Conn) ~start_block_id:highest_canonical_block_id ~end_block_id:block_id in
-         let block_height_less_k_int64 = Int64.(-) block.height k_int64 in
-         (* mark canonical, orphaned blocks in subchain at least k behind the new block *)
-         let canonical_blocks = List.filter subchain_blocks ~f:(fun subchain_block ->
-             Int64.(<=) subchain_block.height block_height_less_k_int64) in
-         let%map () = deferred_result_list_fold canonical_blocks ~init:() ~f:(fun () block ->
-             let%bind () = mark_as_canonical (module Conn) ~state_hash:block.state_hash in
-             mark_as_orphaned (module Conn) ~state_hash:block.state_hash ~height:block.height)
-         in
-         ()
-       else
-         Deferred.Result.return ()
+       (* a new block, allows marking some pending blocks as canonical *)
+       let%bind subchain_blocks = get_subchain (module Conn) ~start_block_id:highest_canonical_block_id ~end_block_id:block_id in
+       let block_height_less_k_int64 = Int64.(-) block.height k_int64 in
+       (* mark canonical, orphaned blocks in subchain at least k behind the new block *)
+       let canonical_blocks = List.filter subchain_blocks ~f:(fun subchain_block ->
+           Int64.(<=) subchain_block.height block_height_less_k_int64) in
+       deferred_result_list_fold canonical_blocks ~init:() ~f:(fun () block ->
+           let%bind () = mark_as_canonical (module Conn) ~state_hash:block.state_hash in
+           mark_as_orphaned (module Conn) ~state_hash:block.state_hash ~height:block.height)
+     else if Int64.(<) block.height greatest_canonical_height then
+       (* a missing block added in the middle of canonical chain *)
+       let%bind canonical_block_above_id,_above_height = get_nearest_canonical_block_above (module Conn) block.height in
+       let%bind canonical_block_below_id,_below_height = get_nearest_canonical_block_below (module Conn) block.height in
+       (* we can always find this chain: the genesis block should be marked as canonical, and we've found a
+          canonical block above this one *)
+       let%bind canonical_blocks = get_subchain (module Conn) ~start_block_id:canonical_block_below_id ~end_block_id:canonical_block_above_id in
+       deferred_result_list_fold canonical_blocks ~init:() ~f:(fun () block ->
+           let%bind () = mark_as_canonical (module Conn) ~state_hash:block.state_hash in
+           mark_as_orphaned (module Conn) ~state_hash:block.state_hash ~height:block.height)
+     else
+       (* a block at or above highest canonical block, not high enough to mark any blocks as canonical *)
+       Deferred.Result.return ()
 
   let delete_if_older_than ?height ?num_blocks ?timestamp
       (module Conn : CONNECTION) =
