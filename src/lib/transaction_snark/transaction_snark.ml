@@ -1735,6 +1735,8 @@ module Base = struct
           module Signed = struct
             type t = Amount.Signed.Checked.t
 
+            let equal t t' = run_checked (Amount.Signed.Checked.equal t t')
+
             let if_ b ~then_ ~else_ =
               run_checked (Amount.Signed.Checked.if_ b ~then_ ~else_)
 
@@ -2094,8 +2096,7 @@ module Base = struct
           { ledger =
               ( statement.source.ledger
               , V.create (fun () -> !witness.global_ledger) )
-          ; fee_excess =
-              Amount.Signed.Checked.of_fee statement.fee_excess.fee_excess_l
+          ; fee_excess = Amount.Signed.(Checked.constant zero)
           ; protocol_state =
               Mina_state.Protocol_state.Body.view_checked state_body
           }
@@ -2266,13 +2267,16 @@ module Base = struct
                Amount.(var_of_t zero))) ;
       with_label __LOC__ (fun () ->
           run_checked
-            (Fee_excess.assert_equal_checked statement.fee_excess
+            (let expected = statement.fee_excess in
+             let got =
                { fee_token_l = Token_id.(var_of_t default)
-               ; fee_excess_l =
+               ; fee_excess_l = Amount.Signed.Checked.to_fee global.fee_excess
+               ; Fee_excess.fee_token_r = Token_id.(var_of_t default)
+               ; fee_excess_r =
                    Amount.Signed.Checked.to_fee (fst init).fee_excess
-               ; fee_token_r = Token_id.(var_of_t default)
-               ; fee_excess_r = Amount.Signed.Checked.to_fee global.fee_excess
-               })) ;
+               }
+             in
+             Fee_excess.assert_equal_checked expected got)) ;
       let `Needs_some_work_for_snapps_on_mainnet = Mina_base.Util.todo_snapps in
       (* TODO: Check various consistency equalities between local and global and the statement *)
       ()
@@ -3879,6 +3883,28 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
         ; init_stack = pending_coinbase_init_stack
         }
       in
+      let fee_excess =
+        (*capture only the difference in the fee excess*)
+        let fee_excess =
+          match
+            Amount.Signed.(
+              add target_global.fee_excess (negate source_global.fee_excess))
+          with
+          | None ->
+              failwith
+                (sprintf
+                   !"unexpected fee excess. source %{sexp: Amount.Signed.t} \
+                     target %{sexp: Amount.Signed.t}"
+                   target_global.fee_excess source_global.fee_excess)
+          | Some delta ->
+              delta
+        in
+        { fee_token_l = Token_id.default
+        ; fee_excess_l = Amount.Signed.to_fee fee_excess
+        ; Mina_base.Fee_excess.fee_token_r = Token_id.default
+        ; fee_excess_r = Fee.Signed.zero
+        }
+      in
       let statement : Statement.With_sok.t =
         (* empty ledger hash in the local state at the beginning of each
            transaction
@@ -3919,12 +3945,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                 }
             }
         ; supply_increase = Amount.zero
-        ; fee_excess =
-            { fee_token_l = Token_id.default
-            ; fee_excess_l = Amount.Signed.to_fee source_global.fee_excess
-            ; fee_token_r = Token_id.default
-            ; fee_excess_r = Amount.Signed.to_fee target_global.fee_excess
-            }
+        ; fee_excess
         ; sok_digest = Sok_message.Digest.default
         }
       in
