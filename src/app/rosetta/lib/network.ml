@@ -42,8 +42,8 @@ module Sql = struct
   let latest_block_query =
     Caqti_request.find
       Caqti_type.unit
-      Caqti_type.(tup2 int64 string)
-      {sql| SELECT height, state_hash FROM blocks b
+      Caqti_type.(tup3 int64 string int64)
+      {sql| SELECT height, state_hash, timestamp FROM blocks b
             WHERE height = (select MAX(height) from blocks)
             ORDER BY timestamp ASC
             LIMIT 1
@@ -229,7 +229,7 @@ module Status = struct
       type 'gql t =
         { gql: unit -> ('gql, Errors.t) M.t
         ; db_oldest_block: unit -> (int64 * string, Errors.t) M.t
-        ; db_latest_block: unit -> (int64 * string, Errors.t) M.t
+        ; db_latest_block: unit -> (int64 * string * int64, Errors.t) M.t
         ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
     end
 
@@ -278,12 +278,11 @@ module Status = struct
             M.return (Array.last chain)
       in
       let genesis_block_state_hash = (res#genesisBlock)#stateHash in
-      let%bind (latest_db_block_height,latest_db_block_hash) = env.db_latest_block () in
+      let%bind (latest_db_block_height,latest_db_block_hash, latest_db_block_timestamp) = env.db_latest_block () in
       let%map (oldest_db_block_height,oldest_db_block_hash) = env.db_oldest_block () in
       { Network_status_response.current_block_identifier=
           Block_identifier.create latest_db_block_height latest_db_block_hash
-      ; current_block_timestamp=
-          ((latest_node_block#protocolState)#blockchainState)#utcDate
+      ; current_block_timestamp= latest_db_block_timestamp
       ; genesis_block_identifier=
           Block_identifier.create genesis_block_height genesis_block_state_hash
       ; oldest_block_identifier=
@@ -359,7 +358,7 @@ module Status = struct
         ; db_oldest_block=
             (fun () -> Result.return (Int64.of_int_exn 1, "GENESIS_HASH"))
         ; db_latest_block=
-            (fun () -> Result.return (Int64.max_value, "LATEST_BLOCK_HASH"))
+            (fun () -> Result.return (Int64.max_value, "LATEST_BLOCK_HASH", Int64.max_value))
         }
 
       let%test_unit "chain info missing" =
@@ -373,7 +372,7 @@ module Status = struct
         ; db_oldest_block=
             (fun () -> Result.return (Int64.of_int_exn 1, "GENESIS_HASH"))
         ; db_latest_block=
-            (fun () -> Result.return (Int64.max_value, "LATEST_BLOCK_HASH"))
+            (fun () -> Result.return (Int64.max_value, "LATEST_BLOCK_HASH", Int64.max_value))
         }
 
       let%test_unit "oldest block is genesis" =
@@ -405,7 +404,7 @@ module Status = struct
         ; db_oldest_block=
             (fun () -> Result.return (Int64.of_int_exn 3, "SOME_HASH"))
         ; db_latest_block=
-            (fun () -> Result.return (Int64.of_int_exn 10000, "ANOTHER_HASH"))
+            (fun () -> Result.return (Int64.of_int_exn 10000, "ANOTHER_HASH", Int64.of_int_exn 20000))
         }
 
       let%test_unit "oldest block is different" =
