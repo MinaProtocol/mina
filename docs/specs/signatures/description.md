@@ -118,7 +118,7 @@ The following convention is used, with constants as defined for Mina's version o
     -   *`x(σ)`* refers to base field component of signature *`σ`*
     -   *`odd(e)`* - true if base field element *`e`* is odd, false otherwise
     -   *`negate(s)`* - negation of scalar field element *`s`*
-    -   *`fields(m)`* - components of message *`m`* that are base field elements
+    -   *`fields(m)`* - vector containing components of message *`m`* that are base field elements
     -   *`bits(m)`* - all other parts of message *`m`* that are not in *`fields(m)`*
     -   *`pack(byte)`* - convert *`byte`* into 8 bits little-endian order
     -   *`pack(e)`* - convert base field element *`e`* into 255 bits little-endian order
