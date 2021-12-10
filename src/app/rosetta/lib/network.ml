@@ -33,6 +33,23 @@ module Get_status =
   }
 |}]
 
+module Sql = struct
+  let oldest_block_query =
+    Caqti_request.find Caqti_type.unit
+      Caqti_type.(tup2 int64 string)
+      "SELECT height, state_hash FROM blocks ORDER BY timestamp ASC LIMIT 1"
+
+  let latest_block_query =
+    Caqti_request.find
+      Caqti_type.unit
+      Caqti_type.(tup2 int64 string)
+      {sql| SELECT height, state_hash FROM blocks b
+            WHERE height = (select MAX(height) from blocks)
+            ORDER BY timestamp ASC
+            LIMIT 1
+      |sql}
+end
+
 let sync_status_to_string = function
   | `BOOTSTRAP ->
       "Bootstrap"
@@ -84,12 +101,6 @@ module Get_network_memoized = struct
        end
    end
 end
-
-
-let oldest_block_query =
-  Caqti_request.find Caqti_type.unit
-    (Caqti_type.tup2 Caqti_type.int64 Caqti_type.string)
-    "SELECT height, state_hash FROM blocks ORDER BY timestamp ASC LIMIT 1"
 
 (* TODO: Update this when we have a new chainId *)
 let mainnet_chain_id =
@@ -218,6 +229,7 @@ module Status = struct
       type 'gql t =
         { gql: unit -> ('gql, Errors.t) M.t
         ; db_oldest_block: unit -> (int64 * string, Errors.t) M.t
+        ; db_latest_block: unit -> (int64 * string, Errors.t) M.t
         ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
     end
 
@@ -239,10 +251,14 @@ module Status = struct
             | None ->
                 let%map result =
                   Errors.Lift.sql ~context:"Oldest block query"
-                  @@ Db.find oldest_block_query ()
+                  @@ Db.find Sql.oldest_block_query ()
                 in
                 Result.iter result ~f:(fun oldest_block -> oldest_block_ref := Some oldest_block) ;
                 result )
+      ; db_latest_block=
+          (fun () ->
+             Errors.Lift.sql ~context:"Latest db block query"
+             @@ Db.find Sql.latest_block_query ())
       ; validate_network_choice= Validate_choice.Real.validate }
   end
 
@@ -254,7 +270,7 @@ module Status = struct
         env.validate_network_choice ~graphql_uri
           ~network_identifier:network.network_identifier
       in
-      let%bind latest_block =
+      let%bind latest_node_block =
         match res#bestChain with
         | None | Some [||] ->
             M.fail (Errors.create `Chain_info_missing)
@@ -262,21 +278,20 @@ module Status = struct
             M.return (Array.last chain)
       in
       let genesis_block_state_hash = (res#genesisBlock)#stateHash in
-      let%map oldest_block = env.db_oldest_block () in
+      let%bind (latest_db_block_height,latest_db_block_hash) = env.db_latest_block () in
+      let%map (oldest_db_block_height,oldest_db_block_hash) = env.db_oldest_block () in
       { Network_status_response.current_block_identifier=
-          Block_identifier.create
-            ((latest_block#protocolState)#consensusState)#blockHeight
-            latest_block#stateHash
+          Block_identifier.create latest_db_block_height latest_db_block_hash
       ; current_block_timestamp=
-          ((latest_block#protocolState)#blockchainState)#utcDate
+          ((latest_node_block#protocolState)#blockchainState)#utcDate
       ; genesis_block_identifier=
           Block_identifier.create genesis_block_height genesis_block_state_hash
       ; oldest_block_identifier=
-          ( if String.equal (snd oldest_block) genesis_block_state_hash then
+          ( if String.equal oldest_db_block_hash genesis_block_state_hash then
             None
           else
             Some
-              (Block_identifier.create (fst oldest_block) (snd oldest_block))
+              (Block_identifier.create oldest_db_block_height oldest_db_block_hash)
           )
       ; peers=
           (let peer_objs = (res#daemonStatus)#peers |> Array.to_list in
@@ -284,7 +299,7 @@ module Status = struct
       ; sync_status=
           Some
             { Sync_status.current_index=
-                Some ((latest_block#protocolState)#consensusState)#blockHeight
+                Some ((latest_node_block#protocolState)#consensusState)#blockHeight
             ; target_index= None
             ; stage= Some (sync_status_to_string res#syncStatus)
             ; synced = None
@@ -342,7 +357,10 @@ module Status = struct
         { gql= (fun () -> Result.return @@ build ~best_chain_missing:true)
         ; validate_network_choice= Validate_choice.Mock.succeed
         ; db_oldest_block=
-            (fun () -> Result.return (Int64.of_int_exn 1, "GENESIS_HASH")) }
+            (fun () -> Result.return (Int64.of_int_exn 1, "GENESIS_HASH"))
+        ; db_latest_block=
+            (fun () -> Result.return (Int64.max_value, "LATEST_BLOCK_HASH"))
+        }
 
       let%test_unit "chain info missing" =
         Test.assert_ ~f:Network_status_response.to_yojson
@@ -353,7 +371,10 @@ module Status = struct
         { gql= (fun () -> Result.return @@ build ~best_chain_missing:false)
         ; validate_network_choice= Validate_choice.Mock.succeed
         ; db_oldest_block=
-            (fun () -> Result.return (Int64.of_int_exn 1, "GENESIS_HASH")) }
+            (fun () -> Result.return (Int64.of_int_exn 1, "GENESIS_HASH"))
+        ; db_latest_block=
+            (fun () -> Result.return (Int64.max_value, "LATEST_BLOCK_HASH"))
+        }
 
       let%test_unit "oldest block is genesis" =
         Test.assert_ ~f:Network_status_response.to_yojson
@@ -382,7 +403,10 @@ module Status = struct
         { gql= (fun () -> Result.return @@ build ~best_chain_missing:false)
         ; validate_network_choice= Validate_choice.Mock.succeed
         ; db_oldest_block=
-            (fun () -> Result.return (Int64.of_int_exn 3, "SOME_HASH")) }
+            (fun () -> Result.return (Int64.of_int_exn 3, "SOME_HASH"))
+        ; db_latest_block=
+            (fun () -> Result.return (Int64.of_int_exn 10000, "ANOTHER_HASH"))
+        }
 
       let%test_unit "oldest block is different" =
         Test.assert_ ~f:Network_status_response.to_yojson
