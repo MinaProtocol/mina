@@ -109,7 +109,7 @@ The following convention is used, with constants as defined for Mina's version o
         refers to the repeated application of the group operation
     - Base field and scalar field elements are represented in little-endian order
 -   Functions and operations:
-    -   `||` refers to array concatenation.
+    -   `||` refers to either array concatenation or bit string concatenation
     -   *`[s]G`* refers to elliptic curve scalar multiplication of *`s`* with generator *`G`*
     -   *`blake2b`* - [Blake2b](https://www.blake2.net/) cryptographic hash function with 32-byte output size
     -   *`poseidon_3w`* - [Poseidon cryptographic hash function for Mina](https://github.com/o1-labs/cryptography-rfcs/blob/master/mina/001-poseidon-sponge.md)
