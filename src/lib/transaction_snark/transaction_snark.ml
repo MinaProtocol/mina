@@ -2107,8 +2107,7 @@ module Base = struct
           { ledger =
               ( statement.source.ledger
               , V.create (fun () -> !witness.global_ledger) )
-          ; fee_excess =
-              Amount.Signed.Checked.of_fee statement.fee_excess.fee_excess_r
+          ; fee_excess = Amount.Signed.(Checked.constant zero)
           ; protocol_state =
               Mina_state.Protocol_state.Body.view_checked state_body
           }
@@ -2268,21 +2267,16 @@ module Base = struct
                Amount.(var_of_t zero))) ;
       with_label __LOC__ (fun () ->
           run_checked
-            (let rebalanced fee_excess =
-               let%bind f = Fee_excess.to_field_var fee_excess in
-               Fee_excess.rebalance_checked f
+            (let expected = statement.fee_excess in
+             let got =
+               { fee_token_l = Token_id.(var_of_t default)
+               ; fee_excess_l = Amount.Signed.Checked.to_fee global.fee_excess
+               ; Fee_excess.fee_token_r = Token_id.(var_of_t default)
+               ; fee_excess_r =
+                   Amount.Signed.Checked.to_fee (fst init).fee_excess
+               }
              in
-             let%bind expected = rebalanced statement.fee_excess in
-             let%bind got =
-               rebalanced
-                 { Fee_excess.fee_token_l = Token_id.(var_of_t default)
-                 ; fee_excess_l =
-                     Amount.Signed.Checked.to_fee (fst init).fee_excess
-                 ; fee_token_r = Token_id.(var_of_t default)
-                 ; fee_excess_r = Amount.Signed.Checked.to_fee global.fee_excess
-                 }
-             in
-             Fee_excess.assert_equal_field_checked expected got)) ;
+             Fee_excess.assert_equal_checked expected got)) ;
       let `Needs_some_work_for_snapps_on_mainnet = Mina_base.Util.todo_snapps in
       (* TODO: Check various consistency equalities between local and global and the statement *)
       ()
@@ -3905,13 +3899,11 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
           | Some delta ->
               delta
         in
-        Mina_base.Fee_excess.rebalance
-          { Mina_base.Fee_excess.fee_token_l = Token_id.default
-          ; fee_excess_l = Fee.Signed.zero
-          ; fee_token_r = Token_id.default
-          ; fee_excess_r = Amount.Signed.to_fee fee_excess
-          }
-        |> Or_error.ok_exn
+        { fee_token_l = Token_id.default
+        ; fee_excess_l = Amount.Signed.to_fee fee_excess
+        ; Mina_base.Fee_excess.fee_token_r = Token_id.default
+        ; fee_excess_r = Fee.Signed.zero
+        }
       in
       let statement : Statement.With_sok.t =
         (* empty ledger hash in the local state at the beginning of each
