@@ -15,7 +15,8 @@ module Parties_segment_witness = struct
             , Amount.Stable.V1.t
             , Sparse_ledger.Stable.V2.t
             , bool
-            , Zexe_backend.Pasta.Fp.Stable.V1.t )
+            , Zexe_backend.Pasta.Fp.Stable.V1.t
+            , Transaction_status.Failure.Stable.V1.t option )
             Parties_logic.Local_state.Stable.V1.t
         ; start_parties :
             ( Parties.Stable.V1.t

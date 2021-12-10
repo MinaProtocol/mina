@@ -426,7 +426,7 @@ module Parties_segment : sig
           | Opt_signed_opt_signed
           | Opt_signed
           | Proved
-        [@@deriving sexp]
+        [@@deriving sexp, yojson]
       end
     end]
   end
