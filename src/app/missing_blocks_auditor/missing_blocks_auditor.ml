@@ -3,27 +3,21 @@
 open Core_kernel
 open Async
 
-(* prime numbers; multiply by them to derive error exit code
-   check divisibility by any one of them to see if a particular error occurred
-*)
-let no_error = 1
+(* bits in error code *)
 
-let missing_blocks_error = 2
+let missing_blocks_error = 0
 
-let pending_blocks_error = 3
+let pending_blocks_error = 1
 
-let chain_length_error = 5
+let chain_length_error = 2
 
-let chain_status_error = 7
+let chain_status_error = 3
 
-let add_error, get_error_exit =
-  let error_exit = ref no_error in
-  let add_error n =
-    (* multiply by n, if n not already a factor *)
-    if !error_exit mod n > 0 then error_exit := !error_exit * n
-  in
-  let get_error_exit () = !error_exit in
-  (add_error, get_error_exit)
+let add_error, get_exit_code =
+  let exit_code = ref 0 in
+  let add_error n = exit_code := !exit_code lor (1 lsl n) in
+  let get_exit_code () = !exit_code in
+  (add_error, get_exit_code)
 
 let main ~archive_uri () =
   let logger = Logger.create () in
@@ -148,8 +142,7 @@ let main ~archive_uri () =
               ; ("state_hash", `String state_hash)
               ; ("chain_status", `String chain_status)
               ]) ;
-      let error_exit = get_error_exit () in
-      if error_exit <> no_error then Core.exit error_exit else Core.exit 0
+      Core.exit (get_exit_code ())
 
 let () =
   Command.(
