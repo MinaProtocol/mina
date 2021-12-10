@@ -78,8 +78,10 @@ let forget : Valid.t -> t = fun x -> (x :> t)
 let fee_excess : t -> Fee_excess.t Or_error.t = function
   | Command (Signed_command t) ->
       Ok (Signed_command.fee_excess t)
-  | Command (Parties ps) ->
-      Ok (Parties.fee_excess ps)
+  | Command (Parties _ps) ->
+      failwith
+        "Invalid for parties transaction. Apply parties transaction to obtain \
+         the fee excess"
   | Fee_transfer t ->
       Fee_transfer.fee_excess t
   | Coinbase t ->
