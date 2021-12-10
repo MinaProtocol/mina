@@ -36,7 +36,7 @@ module Sql = struct
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         Caqti_type.(tup2 int64 int64)
-        {sql| WITH RECURSIVE chain AS (
+        {sql| WITH RECURSIVE pending_chain AS (
 
                (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
 
@@ -50,24 +50,34 @@ module Sql = struct
                 SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status
 
                 FROM blocks b
-                INNER JOIN chain
-                ON b.id = chain.parent_id AND chain.id <> chain.parent_id
-                AND chain.chain_status <> 'canonical'
+                INNER JOIN pending_chain
+                ON b.id = pending_chain.parent_id AND pending_chain.id <> pending_chain.parent_id
+                AND pending_chain.chain_status <> 'canonical'
 
                )
 
-              SELECT chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance
+              SELECT full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance
 
-              FROM chain
-              INNER JOIN balances bal ON chain.id = bal.block_id
+              FROM (SELECT
+                    id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+                    FROM pending_chain
+
+                    UNION ALL
+
+                    SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+
+                    FROM blocks b
+                    WHERE chain_status = 'canonical') AS full_chain
+
+              INNER JOIN balances bal ON full_chain.id = bal.block_id
               INNER JOIN public_keys pks ON bal.public_key_id = pks.id
 
               WHERE pks.value = $1
-              AND chain.height <= $2
+              AND full_chain.height <= $2
 
               ORDER BY (bal.block_height, bal.block_sequence_no, bal.block_secondary_sequence_no) DESC
               LIMIT 1
-      |sql}
+        |sql}
 
     let query_canonical =
       Caqti_request.find_opt
