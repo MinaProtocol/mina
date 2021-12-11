@@ -298,7 +298,7 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
     ~(f_delta : a -> Currency.Amount.Signed.t) ~(increment_nonce : b) ~ledger ()
     : (_, _, _, a, _, _, _, b) Party.Body.Poly.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
-  (* ledger may contain non-Snapp accounts, so if we want a Snapp account,
+  (* ledger may contain non-Snapp accounts, so if we need a Snapp account,
      must generate a new one
   *)
   if snapp_account && not new_account then

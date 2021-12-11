@@ -54,9 +54,37 @@ let parties_with_ledger () =
     Quickcheck.Generator.list_with_length num_keypairs_in_ledger
       (Currency.Balance.gen_incl min_balance max_balance)
   in
+  let account_ids_and_balances = List.zip_exn account_ids balances in
+  let snappify_account (account : Account.t) : Account.t =
+    (* TODO: use real keys *)
+    let permissions =
+      { Permissions.user_default with
+        edit_state = Permissions.Auth_required.Either
+      ; send = Either
+      ; set_delegate = Either
+      ; set_permissions = Either
+      ; set_verification_key = Either
+      ; set_snapp_uri = Either
+      ; edit_sequence_state = Either
+      ; set_token_symbol = Either
+      ; increment_nonce = Either
+      }
+    in
+    let verification_key =
+      Some
+        With_hash.
+          { data = Side_loaded_verification_key.dummy
+          ; hash = Snapp_account.dummy_vk_hash ()
+          }
+    in
+    let snapp = Some { Snapp_account.default with verification_key } in
+    { account with permissions; snapp }
+  in
+  (* half Snapp accounts, half non-Snapp accounts *)
   let accounts =
-    List.map2_exn account_ids balances ~f:(fun account_id balance ->
-        Account.create account_id balance)
+    List.mapi account_ids_and_balances ~f:(fun ndx (account_id, balance) ->
+        let account = Account.create account_id balance in
+        if ndx mod 2 = 0 then account else snappify_account account)
   in
   let fee_payer_keypair = List.hd_exn keypairs in
   let ledger = Ledger.create ~depth:ledger_depth () in
