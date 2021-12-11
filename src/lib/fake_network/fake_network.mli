@@ -35,12 +35,49 @@ val setup :
   -> (peer_state, 'n num_peers) Vect.t
   -> 'n num_peers t
 
-module Generator : sig
+module Verifier_dummy_success = Verifier.Dummy
+
+module MakeGenerator (Test_verifier : sig
+  type t
+
+  type ledger_proof
+
+  val create :
+       logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> pids:Child_processes.Termination.t
+    -> conf_dir:string option
+    -> t Deferred.t
+
+  val verify_blockchain_snark :
+    t -> Blockchain_snark.Blockchain.t list -> bool Or_error.t Deferred.t
+
+  val verify_transaction_snarks :
+       t
+    -> (ledger_proof * Mina_base.Sok_message.t) list
+    -> bool Or_error.t Deferred.t
+
+  val verify_commands :
+       t
+    -> Mina_base.User_command.Verifiable.t list
+       (* The first level of error represents failure to verify, the second a failure in
+          communicating with the verifier. *)
+    -> [ `Valid of Mina_base.User_command.Valid.t
+       | `Invalid
+       | `Valid_assuming of
+         ( Pickles.Side_loaded.Verification_key.t
+         * Mina_base.Snapp_statement.t
+         * Pickles.Side_loaded.Proof.t )
+         list ]
+       list
+       Deferred.Or_error.t
+end) : sig
   open Quickcheck
 
   type peer_config =
        precomputed_values:Precomputed_values.t
-    -> verifier:Verifier.t
+    -> verifier:Test_verifier.t
     -> max_frontier_length:int
     -> use_super_catchup:bool
     -> peer_state Generator.t
@@ -59,7 +96,7 @@ module Generator : sig
 
   val gen :
        precomputed_values:Precomputed_values.t
-    -> verifier:Verifier.t
+    -> verifier:Test_verifier.t
     -> max_frontier_length:int
     -> use_super_catchup:bool
     -> (peer_config, 'n num_peers) Vect.t
