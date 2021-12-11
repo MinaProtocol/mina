@@ -38,15 +38,12 @@ end
 module Stable = struct
   module V2 = struct
     type t =
-      | Non_parties of
-          { transaction : Mina_base.Transaction.Stable.V2.t
-          ; ledger : Mina_base.Sparse_ledger.Stable.V2.t
-          ; protocol_state_body :
-              Mina_state.Protocol_state.Body.Value.Stable.V2.t
-          ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
-          ; status : Mina_base.Transaction_status.Stable.V1.t
-          }
-      | Parties_segment of Parties_segment_witness.Stable.V1.t
+      { transaction : Mina_base.Transaction.Stable.V2.t
+      ; ledger : Mina_base.Sparse_ledger.Stable.V2.t
+      ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
+      ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
+      ; status : Mina_base.Transaction_status.Stable.V1.t
+      }
     [@@deriving sexp, to_yojson]
 
     let to_latest = Fn.id

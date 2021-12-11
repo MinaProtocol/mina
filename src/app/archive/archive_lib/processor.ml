@@ -2377,19 +2377,23 @@ module Block = struct
                     (module Conn)
                     user_command.data
                 in
-                let%bind { fee_payer_id; source_id; receiver_id } =
-                  User_command.Signed_command
-                  .add_balance_public_keys_if_don't_exist
-                    (module Conn)
-                    (User_command.as_signed_command user_command.data)
-                in
                 let%map () =
-                  Block_and_signed_command.add_with_status
-                    (module Conn)
-                    ~block_id ~user_command_id:id ~sequence_no
-                    ~status:user_command.status ~fee_payer_id ~source_id
-                    ~receiver_id
-                  >>| ignore
+                  match command with
+                  | Signed_command c ->
+                      let%bind { fee_payer_id; source_id; receiver_id } =
+                        User_command.Signed_command
+                        .add_balance_public_keys_if_don't_exist
+                          (module Conn)
+                          c
+                      in
+                      Block_and_signed_command.add_with_status
+                        (module Conn)
+                        ~block_id ~user_command_id:id ~sequence_no
+                        ~status:user_command.status ~fee_payer_id ~source_id
+                        ~receiver_id
+                      >>| ignore
+                  | Parties _ ->
+                      Deferred.Result.return ()
                 in
                 sequence_no + 1
             | { data = Fee_transfer fee_transfer_bundled; status } ->

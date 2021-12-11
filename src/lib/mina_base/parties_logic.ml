@@ -36,6 +36,8 @@ module type Amount_intf = sig
   module Signed : sig
     include Iffable with type bool := bool
 
+    val equal : t -> t -> bool
+
     val is_pos : t -> bool
 
     val negate : t -> t
@@ -561,6 +563,11 @@ module Make (Inputs : Inputs_intf) = struct
     let update_global_state =
       ref Bool.(update_local_excess &&& local_state.success)
     in
+    (*let delta_settled = Amount.equal
+                         local_state.excess
+                         Amount.zero
+      in
+      Bool.(assert_ ((not is_last_party) ||| delta_settled)) ;*)
     let global_excess_update_failed = ref Bool.true_ in
     let global_state, local_state =
       ( h.perform

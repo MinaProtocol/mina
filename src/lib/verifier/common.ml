@@ -42,10 +42,10 @@ let check :
             `Invalid_signature (Signed_command.public_keys c) )
   | Parties { fee_payer; other_parties; protocol_state; memo } ->
       with_return (fun { return } ->
+          let other_parties_hash =
+            Parties.Party_or_stack.With_hashes.stack_hash other_parties
+          in
           let commitment =
-            let other_parties_hash =
-              Parties.Party_or_stack.With_hashes.stack_hash other_parties
-            in
             Parties.Transaction_commitment.create ~other_parties_hash
               ~protocol_state_predicate_hash:
                 (Snapp_predicate.Protocol_state.digest protocol_state)
@@ -92,12 +92,12 @@ let check :
                           (`Missing_verification_key
                             [ Account_id.public_key @@ Party.account_id p ])
                     | Some vk ->
-                        Some
-                          ( vk
-                          , { Snapp_statement.Poly.transaction = commitment
-                            ; at_party
-                            }
-                          , pi ) ))
+                        let stmt =
+                          { Snapp_statement.Poly.transaction = commitment
+                          ; at_party
+                          }
+                        in
+                        Some (vk, stmt, pi) ))
           in
           let v =
             User_command.Poly.Parties

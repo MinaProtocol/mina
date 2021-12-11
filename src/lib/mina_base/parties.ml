@@ -412,7 +412,7 @@ let valid_interval (t : t) =
       i
 
 module Transaction_commitment = struct
-  module Stable = Zexe_backend.Pasta.Fp.Stable
+  module Stable = Zexe_backend.Pasta.Fp.Stable [@deriving sexp]
 
   type t = Stable.Latest.t
 

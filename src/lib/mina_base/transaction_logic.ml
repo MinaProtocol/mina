@@ -1754,7 +1754,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       , { parties = []
         ; call_stack = []
         ; transaction_commitment = ()
-        ; token_id = Token_id.invalid
+        ; token_id = Token_id.default
         ; excess = Currency.Amount.zero
         ; ledger
         ; success = true
