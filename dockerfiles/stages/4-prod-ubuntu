@@ -28,7 +28,7 @@ RUN apt-get -y update \
     postgresql-contrib \
     tzdata \
     libjemalloc2 \
-    libprocps6 \
+    libprocps8 \
     libffi7 \
     jq \
     sudo
