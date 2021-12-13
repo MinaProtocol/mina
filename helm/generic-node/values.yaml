@@ -45,7 +45,7 @@ features:
   seedPeers: []
 
 archive:
-  enabled: false
+  enabled: true
   image:
     repository: minaprotocol/mina-archive
     pullPolicy: IfNotPresent
