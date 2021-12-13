@@ -76,6 +76,13 @@ val apply_transaction_exn :
   -> Transaction.t
   -> t
 
+val apply_transaction_with_fee_excess_exn :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
+  -> t
+  -> Transaction.t
+  -> t * Fee_excess.t
+
 (** Apply all parties within a parties transaction, accumulating the
     intermediate (global, local) state pairs, in order from first to last
     party.

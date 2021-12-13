@@ -153,9 +153,10 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         let next_available_token_before =
           Sparse_ledger.next_available_token sparse_ledger
         in
-        let sparse_ledger' =
-          Sparse_ledger.apply_transaction_exn ~constraint_constants
-            ~txn_state_view sparse_ledger (Transaction.forget t)
+        let transaction = Transaction.forget t in
+        let sparse_ledger', fee_excess =
+          Sparse_ledger.apply_transaction_with_fee_excess_exn
+            ~constraint_constants ~txn_state_view sparse_ledger transaction
         in
         let next_available_token_after =
           Sparse_ledger.next_available_token sparse_ledger'
@@ -184,9 +185,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                           }
                       ; supply_increase =
                           Transaction.supply_increase t |> Or_error.ok_exn
-                      ; fee_excess =
-                          Transaction.fee_excess (Transaction.forget t)
-                          |> Or_error.ok_exn
+                      ; fee_excess
                       }
                     ~init_stack:coinbase_stack_source
                     { Transaction_protocol_state.Poly.transaction = t

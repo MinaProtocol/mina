@@ -714,6 +714,21 @@ let apply_transaction_exn ~constraint_constants
   | Coinbase c ->
       apply_coinbase_exn ~constraint_constants ~txn_global_slot t c
 
+let apply_transaction_with_fee_excess_exn ~constraint_constants
+    ~(txn_state_view : Snapp_predicate.Protocol_state.View.t) t
+    (transition : Transaction.t) =
+  match transition with
+  | Command (Parties c) ->
+      let fee_excess = Currency.Amount.Signed.zero in
+      apply_parties_with_fee_excess_exn ~constraint_constants
+        ~state_view:txn_state_view ~fee_excess t c
+  | _ ->
+      let target =
+        apply_transaction_exn ~constraint_constants ~txn_state_view t transition
+      in
+      let fee_excess = Transaction.fee_excess transition |> Or_error.ok_exn in
+      (target, fee_excess)
+
 let has_locked_tokens_exn ~global_slot ~account_id t =
   let idx = find_index_exn t account_id in
   let _, account = get_or_initialize_exn account_id t idx in

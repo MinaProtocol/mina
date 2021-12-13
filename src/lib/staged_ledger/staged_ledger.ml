@@ -708,24 +708,10 @@ module T = struct
      to be enqueued on each of the partitions should be zero respectively *)
   let check_zero_fee_excess scan_state data =
     let partitions = Scan_state.partition_if_overflowing scan_state in
-    let txns_from_data data =
-      List.fold_right ~init:(Ok []) data
-        ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
-          let open Or_error.Let_syntax in
-          let%map acc = acc in
-          let t =
-            d.transaction_with_info |> Ledger.Transaction_applied.transaction
-          in
-          t :: acc)
-    in
-    let total_fee_excess txns =
-      List.fold_until txns ~init:Fee_excess.empty ~finish:Or_error.return
-        ~f:(fun acc (txn : Transaction.t With_status.t) ->
-          match
-            let open Or_error.Let_syntax in
-            let%bind fee_excess = Transaction.fee_excess txn.data in
-            Fee_excess.combine acc fee_excess
-          with
+    let total_fee_excess data =
+      List.fold_until data ~init:Fee_excess.empty ~finish:Or_error.return
+        ~f:(fun acc (d : Scan_state.Transaction_with_witness.t) ->
+          match Fee_excess.combine acc d.statement.fee_excess with
           | Ok fee_excess ->
               Continue fee_excess
           | Error _ as err ->
@@ -734,10 +720,17 @@ module T = struct
     in
     let open Result.Let_syntax in
     let check data slots =
-      let%bind txns = txns_from_data data |> to_staged_ledger_or_error in
-      let%bind fee_excess = total_fee_excess txns in
+      let%bind fee_excess = total_fee_excess data in
       if Fee_excess.is_zero fee_excess then Ok ()
-      else Error (Non_zero_fee_excess (slots, txns))
+      else
+        Error
+          (Non_zero_fee_excess
+             ( slots
+             , List.map
+                 ~f:(fun d ->
+                   Ledger.Transaction_applied.transaction
+                     d.transaction_with_info)
+                 data ))
     in
     let%bind () = check (List.take data (fst partitions.first)) partitions in
     Option.value_map ~default:(Result.return ())

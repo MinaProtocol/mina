@@ -252,24 +252,14 @@ let create_expected_statement ~constraint_constants
     Ledger.Transaction_applied.transaction transaction_with_info
   in
   let%bind protocol_state = get_state (fst state_hash) in
-  let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
+  let txn_state_view =
+    Mina_state.Protocol_state.Body.view protocol_state.body
+  in
   let empty_local_state = Mina_state.Local_state.empty in
   let%bind after, fee_excess =
     Or_error.try_with (fun () ->
-        match transaction with
-        | Command (Parties c) ->
-            let fee_excess = Amount.Signed.zero in
-            Sparse_ledger.apply_parties_with_fee_excess_exn
-              ~constraint_constants ~state_view ~fee_excess ledger_witness c
-        | _ ->
-            let target =
-              Sparse_ledger.apply_transaction_exn ~constraint_constants
-                ~txn_state_view:state_view ledger_witness transaction
-            in
-            let fee_excess =
-              Transaction.fee_excess transaction |> Or_error.ok_exn
-            in
-            (target, fee_excess))
+        Sparse_ledger.apply_transaction_with_fee_excess_exn
+          ~constraint_constants ~txn_state_view ledger_witness transaction)
   in
   let next_available_token_after = Sparse_ledger.next_available_token after in
   let target_merkle_root =
