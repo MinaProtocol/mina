@@ -21,7 +21,7 @@ ARG GO_CAPNP_VERSION=v3.0.0-alpha.1
 ARG RUST_VERSION=1.52.1
 
 # Rocksdb commit tag/branch to clone
-ARG ROCKSDB_VERSION=v5.11.3
+ARG ROCKSDB_VERSION=v5.18.4
 
 # OS package dependencies
 # First add support for https and pkg-config for apt, then install everything else
