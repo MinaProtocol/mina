@@ -2,7 +2,7 @@
 # The "toolchain" Stage
 # - installs optional tools that are required in our CI/CD but are not required to build mina
 #################################################################################################
-FROM build-deps AS toolchain
+FROM opam-deps AS toolchain
 
 ARG DOCKER_VERSION=19.03.4
 ARG TERRAFORM_VERSION=0.14.11
