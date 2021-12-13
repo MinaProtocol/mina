@@ -62,6 +62,7 @@ let graphql_snapp_command (parties : Parties.t) =
         ; set_snapp_uri
         ; edit_sequence_state
         ; set_token_symbol
+        ; increment_nonce
         } ->
         let auth = function
           | Mina_base.Permissions.Auth_required.None ->
@@ -89,6 +90,7 @@ let graphql_snapp_command (parties : Parties.t) =
   , setSnappUri: %s
   , editSequenceState: %s
   , setTokenSymbol: %s
+  , incrementNonce: %s
       }
     |}
           (if stake then "true" else "false")
@@ -96,7 +98,7 @@ let graphql_snapp_command (parties : Parties.t) =
           (auth set_permissions)
           (auth set_verification_key)
           (auth set_snapp_uri) (auth edit_sequence_state)
-          (auth set_token_symbol)
+          (auth set_token_symbol) (auth increment_nonce)
   in
   let party (p : Party.t) =
     let authorization = authorization p.authorization in
@@ -728,6 +730,9 @@ let update_permissions =
        and set_token_symbol =
          Param.flag "--set-token-symbol" ~doc:"Proof|Signature|Both|Either|None"
            Param.(required string)
+       and increment_nonce =
+         Param.flag "--increment-nonce" ~doc:"Proof|Signature|Both|Either|None"
+           Param.(required string)
        and current_auth =
          Param.flag "--current-auth"
            ~doc:
@@ -748,6 +753,7 @@ let update_permissions =
            ; set_snapp_uri = Util.auth_of_string set_snapp_uri
            ; edit_sequence_state = Util.auth_of_string edit_sequence_state
            ; set_token_symbol = Util.auth_of_string set_token_symbol
+           ; increment_nonce = Util.auth_of_string increment_nonce
            }
        in
        if Currency.Fee.(fee < Flags.min_fee) then
