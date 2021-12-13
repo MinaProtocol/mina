@@ -4239,6 +4239,7 @@ module For_tests = struct
               ; update = Party.Update.noop
               ; token_id = ()
               ; delta = fee
+              ; increment_nonce = ()
               ; events = []
               ; sequence_events = []
               ; call_data = Field.zero
@@ -4257,6 +4258,7 @@ module For_tests = struct
             ; update = Party.Update.noop
             ; token_id = Token_id.default
             ; delta = Amount.(Signed.(negate (of_unsigned amount)))
+            ; increment_nonce = true
             ; events = []
             ; sequence_events = []
             ; call_data = Field.zero
@@ -4286,6 +4288,7 @@ module For_tests = struct
               ; update
               ; token_id = Token_id.default
               ; delta
+              ; increment_nonce = false
               ; events = []
               ; sequence_events = []
               ; call_data = Field.zero
@@ -4305,6 +4308,7 @@ module For_tests = struct
                   ; update
                   ; token_id = Token_id.default
                   ; delta = Amount.Signed.of_unsigned amt
+                  ; increment_nonce = false
                   ; events = []
                   ; sequence_events = []
                   ; call_data = Field.zero
