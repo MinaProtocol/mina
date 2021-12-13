@@ -164,65 +164,19 @@ let setup (type n) ?(logger = Logger.null ())
   in
   { fake_gossip_network; peer_networks }
 
-module Verifier_dummy_success = Verifier.Dummy
-
-module Verifier_dummy_fail = struct
-  type t = unit
-
-  let create = ""
-
-  let verify_blockchain_snark = ""
-end
-
-module MakeGenerator (Test_verifier : sig
-  type t
-
-  type ledger_proof
-
-  val create :
-       logger:Logger.t
-    -> proof_level:Genesis_constants.Proof_level.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> pids:Child_processes.Termination.t
-    -> conf_dir:string option
-    -> t Deferred.t
-
-  val verify_blockchain_snark :
-    t -> Blockchain_snark.Blockchain.t list -> bool Or_error.t Deferred.t
-
-  val verify_transaction_snarks :
-       t
-    -> (ledger_proof * Mina_base.Sok_message.t) list
-    -> bool Or_error.t Deferred.t
-
-  val verify_commands :
-       t
-    -> Mina_base.User_command.Verifiable.t list
-       (* The first level of error represents failure to verify, the second a failure in
-          communicating with the verifier. *)
-    -> [ `Valid of Mina_base.User_command.Valid.t
-       | `Invalid
-       | `Valid_assuming of
-         ( Pickles.Side_loaded.Verification_key.t
-         * Mina_base.Snapp_statement.t
-         * Pickles.Side_loaded.Proof.t )
-         list ]
-       list
-       Deferred.Or_error.t
-end) =
-struct
+module Generator = struct
   open Quickcheck
   open Generator.Let_syntax
 
   type peer_config =
        precomputed_values:Precomputed_values.t
-    -> verifier:Test_verifier.t
+    -> verifier:Verifier.t
     -> max_frontier_length:int
     -> use_super_catchup:bool
     -> peer_state Generator.t
 
-  let fresh_peer ~precomputed_values ~(verifier : Test_verifier.t)
-      ~max_frontier_length ~use_super_catchup =
+  let fresh_peer ~precomputed_values ~verifier ~max_frontier_length
+      ~use_super_catchup =
     let epoch_ledger_location =
       Filename.temp_dir_name ^/ "epoch_ledger"
       ^ (Uuid_unix.create () |> Uuid.to_string)
