@@ -5,11 +5,8 @@
  (libraries
    async_kernel
    core
-   caqti
-   caqti-async
-   caqti-driver-postgresql
-   archive_lib
    mina_base
+   mina_caqti
    mina_state
    genesis_constants
    genesis_ledger_helper

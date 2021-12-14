@@ -11,6 +11,15 @@
 
 */
 
+/* the tables below named `blocks_xxx_commands`, where xxx is `user`, `internal`, or `snapps`,
+   contain columns `block_id` and `xxx_command_id`
+
+   this naming convention must be followed for `find_command_ids_query` in `Replayer.Sql`
+   to work properly
+
+   the comment "Blocks command convention" indicates the use of this convention
+*/
+
 CREATE TABLE public_keys
 ( id    serial PRIMARY KEY
 , value text   NOT NULL UNIQUE
@@ -150,6 +159,8 @@ CREATE TABLE balances
 
 /* a join table between blocks and user_commands, with some additional information
    sequence_no gives the order within all transactions in the block
+
+   Blocks command convention
 */
 CREATE TABLE blocks_user_commands
 ( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
@@ -171,6 +182,8 @@ CREATE INDEX idx_blocks_user_commands_user_command_id ON blocks_user_commands(us
 
 /* a join table between blocks and internal_commands, with some additional information
    the pair sequence_no, secondary_sequence_no gives the order within all transactions in the block
+
+   Blocks command convention
 */
 CREATE TABLE blocks_internal_commands
 ( block_id              int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
@@ -197,7 +210,10 @@ CREATE TABLE snapp_party_balances
 
    other_parties_list_id refers to a list of balances in the same order as the other parties in the
    snapps_command; that is, the list_index for the balances is the same as the list_index for other_parties
+
+   Blocks command convention
 */
+
 CREATE TABLE blocks_snapp_commands
 ( block_id                        int  NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , snapp_command_id                int  NOT NULL REFERENCES snapp_commands(id) ON DELETE CASCADE
@@ -209,3 +225,4 @@ CREATE TABLE blocks_snapp_commands
 
 CREATE INDEX idx_blocks_snapp_commands_block_id ON blocks_snapp_commands(block_id);
 CREATE INDEX idx_blocks_snapp_commands_snapp_command_id ON blocks_snapp_commands(snapp_command_id);
+CREATE INDEX idx_blocks_snapp_commands_sequence_no ON blocks_snapp_commands(sequence_no);

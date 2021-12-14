@@ -5,11 +5,9 @@
  (libraries
    async
    core_kernel
-   caqti
-   caqti-async
-   caqti-driver-postgresql
    archive_lib
    block_time
+   mina_caqti
    mina_numbers
    logger
    mina_base)
