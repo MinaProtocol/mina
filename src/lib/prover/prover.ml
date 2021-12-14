@@ -316,6 +316,7 @@ type t =
   { connection : Worker.Connection.t; process : Process.t; logger : Logger.t }
 
 let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
+  [%log info] "Starting a new prover process" ;
   let on_failure err =
     [%log error] "Prover process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
