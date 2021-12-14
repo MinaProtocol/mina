@@ -5,8 +5,9 @@
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable-small";
   # todo: upstream
   inputs.mix-to-nix.url = "github:serokell/mix-to-nix/yorickvp/deadlock";
+  inputs.nix-npm-buildPackage.url = "github:lumiguide/nix-npm-buildpackage"; # todo: upstream
 
-  outputs = inputs@{ self, nixpkgs, utils, mix-to-nix }:
+  outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage }:
     utils.lib.mkFlake {
       inherit self inputs;
       supportedSystems = [ "x86_64-linux" ];
@@ -16,6 +17,7 @@
         pkgs = channels.nixpkgs;
         inherit (pkgs) lib;
         mix-to-nix = pkgs.callPackage inputs.mix-to-nix {};
+        nix-npm-buildPackage = pkgs.callPackage inputs.nix-npm-buildPackage {};
         go-capnproto2 = pkgs.buildGoModule rec {
           pname = "capnpc-go";
           version = "v3.0.0-alpha.1";
@@ -139,6 +141,28 @@
           buildInputs = [(pkgs.python3.withPackages (p: [p.sexpdata]))];
           buildPhase = "python ./scripts/require-ppxs.py";
           installPhase = "echo ok > $out";
+        };
+
+        # Jobs/Release/LeaderboardArtifact
+        packages.leaderboard = nix-npm-buildPackage.buildYarnPackage {
+          src = ./frontend/leaderboard;
+          yarnBuildMore = "yarn build";
+          # fix reason
+          yarnPostLink = pkgs.writeScript "yarn-post-link" ''
+            #!${pkgs.stdenv.shell}
+            ls node_modules/bs-platform/lib/*.linux
+            patchelf \
+              --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
+              --set-rpath "${pkgs.stdenv.cc.cc.lib}/lib" \
+              ./node_modules/bs-platform/lib/*.linux ./node_modules/bs-platform/vendor/ninja/snapshot/*.linux
+           '';
+          # todo: external stdlib @rescript/std
+          preInstall = ''
+            shopt -s extglob
+            rm -rf node_modules/bs-platform/lib/!(js)
+            rm -rf node_modules/bs-platform/!(lib)
+            rm -rf yarn-cache
+          '';
         };
 
       };
