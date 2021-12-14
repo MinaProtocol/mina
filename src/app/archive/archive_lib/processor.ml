@@ -528,12 +528,12 @@ module Snapp_party_body = struct
     { public_key_id : int
     ; update_id : int
     ; token_id : int64
-    ; delta : int64
+    ; balance_change : int64
     ; increment_nonce : bool
     ; events_ids : int array
     ; sequence_events_ids : int array
     ; call_data_id : int
-    ; depth : int
+    ; call_depth : int
     }
   [@@deriving fields, hlist]
 
@@ -572,28 +572,28 @@ module Snapp_party_body = struct
     let token_id =
       Unsigned.UInt64.to_int64 @@ Token_id.to_uint64 body.token_id
     in
-    let delta =
+    let balance_change =
       let magnitude =
-        Currency.Amount.to_uint64 body.delta.magnitude
+        Currency.Amount.to_uint64 body.balance_change.magnitude
         |> Unsigned.UInt64.to_int64
       in
-      match body.delta.sgn with
+      match body.balance_change.sgn with
       | Sgn.Pos ->
           magnitude
       | Sgn.Neg ->
           Int64.neg magnitude
     in
-    let depth = body.depth in
+    let call_depth = body.call_depth in
     let value =
       { public_key_id
       ; update_id
       ; token_id
-      ; delta
+      ; balance_change
       ; increment_nonce
       ; events_ids
       ; sequence_events_ids
       ; call_data_id
-      ; depth
+      ; call_depth
       }
     in
     select_insert_into_cols ~select:("id", Caqti_type.int)

@@ -1259,12 +1259,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                ; token_symbol
                ; timing
                }
-           ; delta
+           ; balance_change
            ; increment_nonce
            ; events = _ (* This is for the snapp to use, we don't need it. *)
            ; call_data = _ (* This is for the snapp to use, we don't need it. *)
            ; sequence_events
-           ; depth = _ (* This is used to build the 'stack of stacks'. *)
+           ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
            }
        ; predicate = _
        } :
@@ -1272,7 +1272,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let open Snapp_basic in
     let open Result.Let_syntax in
     let%bind balance =
-      let%bind b = add_signed_amount a.balance delta in
+      let%bind b = add_signed_amount a.balance balance_change in
       let fee = constraint_constants.account_creation_fee in
       let%bind () =
         (* TODO: Fix when we want to enable tokens. The trickiness here is we need to subtract
@@ -1287,11 +1287,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     (* Check send/receive permissions *)
     let%bind () =
-      if Amount.(equal zero) delta.magnitude then Ok ()
+      if Amount.(equal zero) balance_change.magnitude then Ok ()
       else
         check Update_not_permitted
           (check_auth
-             ( match delta.sgn with
+             ( match balance_change.sgn with
              | Pos ->
                  a.permissions.receive
              | Neg ->
@@ -1321,12 +1321,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     (* Check timing. *)
     let%bind timing =
-      match delta.sgn with
+      match balance_change.sgn with
       | Pos when not is_new ->
           Ok timing
       | _ ->
           let txn_amount =
-            match delta.sgn with Pos -> Amount.zero | Neg -> delta.magnitude
+            match balance_change.sgn with
+            | Pos ->
+                Amount.zero
+            | Neg ->
+                balance_change.magnitude
           in
           validate_timing ~txn_amount
             ~txn_global_slot:state_view.global_slot_since_genesis
@@ -1563,7 +1567,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       let of_parties_list : Party.t list -> t =
         Parties.Party_or_stack.of_parties_list
-          ~party_depth:(fun (p : Party.t) -> p.data.body.depth)
+          ~party_depth:(fun (p : Party.t) -> p.data.body.call_depth)
 
       let if_ = Parties.value_if
 
@@ -2552,12 +2556,12 @@ module For_tests = struct
                   { pk = sender_pk
                   ; update = Party.Update.noop
                   ; token_id = ()
-                  ; delta = fee
+                  ; balance_change = fee
                   ; increment_nonce = ()
                   ; events = []
                   ; sequence_events = []
                   ; call_data = Snark_params.Tick.Field.zero
-                  ; depth = 0
+                  ; call_depth = 0
                   }
               ; predicate = actual_nonce
               }
@@ -2570,12 +2574,13 @@ module For_tests = struct
                     { pk = sender_pk
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
-                    ; delta = Amount.Signed.(negate (of_unsigned amount))
+                    ; balance_change =
+                        Amount.Signed.(negate (of_unsigned amount))
                     ; increment_nonce = true (* TODO(#9743) *)
                     ; events = []
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
-                    ; depth = 0
+                    ; call_depth = 0
                     }
                 ; predicate = Nonce (Account.Nonce.succ actual_nonce)
                 }
@@ -2586,12 +2591,12 @@ module For_tests = struct
                     { pk = receiver
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
-                    ; delta = Amount.Signed.(of_unsigned amount)
+                    ; balance_change = Amount.Signed.(of_unsigned amount)
                     ; increment_nonce = false
                     ; events = []
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
-                    ; depth = 0
+                    ; call_depth = 0
                     }
                 ; predicate = Accept
                 }
