@@ -4,6 +4,7 @@
  (public_name extract_blocks)
  (libraries
    async
+   caqti-driver-postgresql
    core_kernel
    archive_lib
    block_time

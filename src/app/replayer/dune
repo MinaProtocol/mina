@@ -4,6 +4,7 @@
  (public_name replayer)
  (libraries
    async_kernel
+   caqti-driver-postgresql
    core
    mina_base
    mina_caqti
