@@ -27,3 +27,10 @@ Grafana Loki functions as basically a log aggregation system for the logs. For l
 ### LogDNA
 
 LogDNA provides both data storage and data visualization and alerting functionality. Besides the usual log collecting agent like Loki, LogDNA also provides the option to sends logs directly to their API which could save us the work to implement a miniservice by ourselves (depending on whether we feel safe to give users the log-uploading keys). The alert service they provide is also handy in node error system.
+
+## Prices
+
+1. S3, $0.023 for 1GB/month, would be a little cheaper if we use more than 50GB
+2. OpenSearch, Free usage for the first 12 months for 750 hrs per month
+3. Loki, depending on the storage we choose. And we need to run the loki instance somewhere. We could choose to use the grafana cloud. But it seems to have 30 days of log retention. The prices $49/month for 100GB of logs. (I think we already use their service, so the log storage is already paid)
+4. LogDNA, $3/GB, logs also have 30 days of retention.
