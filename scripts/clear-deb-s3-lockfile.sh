@@ -1,7 +1,7 @@
 #!/bin/bash
 
 MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=unstable}
-MINA_DEB_RELEASE=${MINA_DEB_CODENAME:=main}
+MINA_DEB_RELEASE=${MINA_DEB_RELEASE:=main}
 
 S3_LOCKFILE_DATE="$(aws s3 ls s3://packages.o1test.net/dists/${MINA_DEB_CODENAME}/${MINA_DEB_RELEASE}/binary-/lockfile | awk '{print $1 " " $2}')"
 if [[ "$S3_LOCKFILE_DATE" == "" ]]; then
