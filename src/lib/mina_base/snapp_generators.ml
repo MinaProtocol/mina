@@ -522,7 +522,7 @@ let gen_party_predicated_signed ?account_id ~ledger :
             account )
   in
   let predicate = account.nonce in
-  Party.Predicated.Poly.{ body; predicate }
+  return Party.Predicated.Poly.{ body; predicate }
 
 (* takes an account id, if we want to sign this data *)
 let gen_party_predicated_fee_payer ~account_id ~ledger :
