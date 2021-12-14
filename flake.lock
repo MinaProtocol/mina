@@ -31,6 +31,21 @@
         "type": "github"
       }
     },
+    "nix-npm-buildPackage": {
+      "locked": {
+        "lastModified": 1624369261,
+        "narHash": "sha256-yeej9SblWlh5DQlLr/AGz8vVG0TrDZg38Yy2fv6wk7U=",
+        "owner": "lumiguide",
+        "repo": "nix-npm-buildpackage",
+        "rev": "fc785f1e8aa5d214c915415428264c690b7d83fd",
+        "type": "github"
+      },
+      "original": {
+        "owner": "lumiguide",
+        "repo": "nix-npm-buildpackage",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1638918949,
@@ -50,6 +65,7 @@
     "root": {
       "inputs": {
         "mix-to-nix": "mix-to-nix",
+        "nix-npm-buildPackage": "nix-npm-buildPackage",
         "nixpkgs": "nixpkgs",
         "utils": "utils"
       }
