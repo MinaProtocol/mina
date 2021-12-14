@@ -56,12 +56,12 @@ let%test "access elements" =
   let _x = unshifted.(0) in
   ( match shifted with
   | None ->
-      print_endline "none"
+      ()
   | Some x -> (
       match x with
       | Infinity ->
-          print_endline "infinity"
+          ()
       | Finite (x, y) ->
           let open Marlin_plonk_bindings_pasta_fp in
-          Format.printf "x,y: %s, %s\n" (to_string x) (to_string y) ) ) ;
+          ignore (to_string x, to_string y) ) ) ;
   true
