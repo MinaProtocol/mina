@@ -7,6 +7,14 @@ open Intf
 
 open Snark_params.Tick
 
+module Signed_var : sig
+  type 'mag repr = ('mag, Sgn.var) Signed_poly.t
+
+  (* Invariant: At least one of these is Some *)
+  type nonrec 'mag t =
+    { mutable repr : 'mag repr option; mutable value : Field.Var.t option }
+end
+
 [%%endif]
 
 type uint64 = Unsigned.uint64
@@ -108,8 +116,6 @@ module Amount : sig
     val of_fee : Fee.var -> var
 
     val to_fee : var -> Fee.var
-
-    val add_fee : var -> Fee.var -> (var, _) Checked.t
   end
 
   [%%endif]
@@ -144,6 +150,8 @@ module Balance : sig
   module Checked : sig
     type t = var
 
+    val to_amount : t -> Amount.var
+
     val add_signed_amount : var -> Amount.Signed.var -> (var, _) Checked.t
 
     val add_amount : var -> Amount.var -> (var, _) Checked.t
@@ -160,6 +168,8 @@ module Balance : sig
          var
       -> Amount.Signed.var
       -> (var * [ `Overflow of Boolean.var ], _) Checked.t
+
+    val sub_or_zero : var -> var -> (var, _) Checked.t
 
     val ( + ) : var -> Amount.var -> (var, _) Checked.t
 
@@ -178,6 +188,10 @@ module Balance : sig
     val ( >= ) : var -> var -> (Boolean.var, _) Checked.t
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
+    module Unsafe : sig
+      val of_field : Field.Var.t -> var
+    end
   end
 
   [%%endif]
