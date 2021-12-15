@@ -304,6 +304,7 @@ module Poly = struct
         ; set_snapp_uri : 'controller
         ; edit_sequence_state : 'controller
         ; set_token_symbol : 'controller
+        ; increment_nonce : 'controller
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
@@ -317,7 +318,7 @@ module Poly = struct
       ~set_delegate:(f controller) ~set_permissions:(f controller)
       ~set_verification_key:(f controller) ~receive:(f controller)
       ~set_snapp_uri:(f controller) ~edit_sequence_state:(f controller)
-      ~set_token_symbol:(f controller)
+      ~set_token_symbol:(f controller) ~increment_nonce:(f controller)
     |> List.reduce_exn ~f:Random_oracle.Input.append
 end
 
@@ -343,6 +344,7 @@ let gen : t Quickcheck.Generator.t =
   let%bind set_snapp_uri = Auth_required.gen in
   let%bind edit_sequence_state = Auth_required.gen in
   let%bind set_token_symbol = Auth_required.gen in
+  let%bind increment_nonce = Auth_required.gen in
   return
     { Poly.stake
     ; edit_state
@@ -354,6 +356,7 @@ let gen : t Quickcheck.Generator.t =
     ; set_snapp_uri
     ; edit_sequence_state
     ; set_token_symbol
+    ; increment_nonce
     }
 
 [%%ifdef consensus_mechanism]
@@ -375,6 +378,7 @@ module Checked = struct
     Poly.Fields.map ~stake:(g Boolean.if_) ~edit_state:c ~send:c ~receive:c
       ~set_delegate:c ~set_permissions:c ~set_verification_key:c
       ~set_snapp_uri:c ~edit_sequence_state:c ~set_token_symbol:c
+      ~increment_nonce:c
 
   let constant (t : Stable.Latest.t) : t =
     let open Core_kernel.Field in
@@ -383,13 +387,14 @@ module Checked = struct
       ~stake:(fun f -> Boolean.var_of_value (get f t))
       ~edit_state:a ~send:a ~receive:a ~set_delegate:a ~set_permissions:a
       ~set_verification_key:a ~set_snapp_uri:a ~edit_sequence_state:a
-      ~set_token_symbol:a
+      ~set_token_symbol:a ~increment_nonce:a
 end
 
 let typ =
   let open Poly.Stable.Latest in
   Typ.of_hlistable
     [ Boolean.typ
+    ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
@@ -418,6 +423,7 @@ let user_default : t =
   ; set_snapp_uri = Signature
   ; edit_sequence_state = Signature
   ; set_token_symbol = Signature
+  ; increment_nonce = Signature
   }
 
 let empty : t =
@@ -431,4 +437,5 @@ let empty : t =
   ; set_snapp_uri = None
   ; edit_sequence_state = None
   ; set_token_symbol = None
+  ; increment_nonce = None
   }

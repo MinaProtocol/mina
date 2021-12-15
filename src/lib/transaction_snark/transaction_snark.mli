@@ -420,7 +420,7 @@ module Parties_segment : sig
           | Opt_signed_opt_signed
           | Opt_signed
           | Proved
-        [@@deriving sexp]
+        [@@deriving sexp, yojson]
       end
     end]
   end
@@ -428,6 +428,8 @@ end
 
 module type S = sig
   include Verification.S
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val cache_handle : Pickles.Cache_handle.t
 
@@ -454,7 +456,9 @@ module type S = sig
 
   val of_parties_segment_exn :
        statement:Statement.With_sok.t
+    -> snapp_statement:(int * Snapp_statement.t) option
     -> witness:Parties_segment.Witness.t
+    -> spec:Parties_segment.Basic.t
     -> t Async.Deferred.t
 
   val merge :
@@ -487,7 +491,7 @@ val group_by_parties_rev :
   -> 'a list list
   -> ([ `Same | `New | `Two_new ] * Parties_segment.Basic.t * 'a * 'a) list
 
-(** [parties_witnesses ledger partiess] generates the parties segment witnesses
+(** [parties_witnesses_exn ledger partiess] generates the parties segment witnesses
     and corresponding statements needed to prove the application of each
     parties transaction in [partiess] on top of ledger. If multiple parties are
     given, they are applied in order and grouped together to minimise the
@@ -508,17 +512,17 @@ val group_by_parties_rev :
     should only be used on parties that are already known to pass transaction
     logic without an exception.
 *)
-val parties_witnesses :
+val parties_witnesses_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> state_body:Transaction_protocol_state.Block_data.t
   -> fee_excess:Currency.Amount.Signed.t
   -> pending_coinbase_init_stack:Pending_coinbase.Stack.t
-  -> Ledger.t
+  -> [ `Ledger of Ledger.t | `Sparse_ledger of Sparse_ledger.t ]
   -> Parties.t list
   -> ( Parties_segment.Witness.t
      * Parties_segment.Basic.t
      * Statement.With_sok.t
-     * (int * Snapp_statement.t) list )
+     * (int * Snapp_statement.t) option )
      list
 
 module Make (Inputs : sig
@@ -532,3 +536,11 @@ val constraint_system_digests :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> unit
   -> (string * Md5.t) list
+
+module For_tests : sig
+  val create_trivial_predicate_snapp :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Transaction_logic.For_tests.Transaction_spec.t
+    -> Ledger.t
+    -> Parties.t Async.Deferred.t
+end

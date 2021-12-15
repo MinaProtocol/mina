@@ -1198,6 +1198,17 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.snapp_uri)
+             ; field "snappState"
+                 ~typ:(list @@ non_null string)
+                 ~doc:
+                   "The 8 field elements comprising the snapp state associated \
+                    with this account encoded as bignum strings"
+                 ~args:Arg.[]
+                 ~resolve:(fun _ { account; _ } ->
+                   account.Account.Poly.snapp
+                   |> Option.map ~f:(fun snapp_account ->
+                          snapp_account.app_state |> Snapp_state.V.to_list
+                          |> List.map ~f:Snapp_basic.F.to_string))
              ; field "tokenSymbol" ~typ:string
                  ~doc:"The token symbol associated with this account"
                  ~args:Arg.[]
@@ -2208,9 +2219,9 @@ module Types = struct
     module Snapp_inputs = struct
       (* inputs particular to Snapps *)
 
-      let snapp_delta :
+      let snapp_balance_change :
           ((Amount.t, Sgn.t) Signed_poly.t, string) Result.t option arg_typ =
-        obj "Delta" ~doc:"A signed amount"
+        obj "BalanceChange" ~doc:"A signed amount"
           ~coerce:(fun magnitude sgn ->
             try Ok Currency.Signed_poly.{ magnitude; sgn }
             with exn -> Error (Exn.to_string exn))
@@ -2262,7 +2273,7 @@ module Types = struct
           ~coerce:
             (fun stake edit_state send receive set_delegate set_permissions
                  set_verification_key set_snapp_uri edit_sequence_state
-                 set_token_symbol ->
+                 set_token_symbol increment_nonce ->
             Ok
               { Permissions.Poly.stake
               ; edit_state
@@ -2274,6 +2285,7 @@ module Types = struct
               ; set_snapp_uri
               ; edit_sequence_state
               ; set_token_symbol
+              ; increment_nonce
               })
           ~fields:
             [ arg "stake" ~typ:(non_null bool)
@@ -2286,6 +2298,7 @@ module Types = struct
             ; arg "setSnappUri" ~typ:(non_null snapp_auth_required)
             ; arg "editSequenceState" ~typ:(non_null snapp_auth_required)
             ; arg "setTokenSymbol" ~typ:(non_null snapp_auth_required)
+            ; arg "incrementNonce" ~typ:(non_null snapp_auth_required)
             ]
 
       let snapp_timing =
@@ -2379,8 +2392,8 @@ module Types = struct
       let snapp_party_body : (Party.Body.t, string) Result.t option arg_typ =
         obj "PartyBody" ~doc:"Body component of a Snapp Party"
           ~coerce:
-            (fun pk update_result token_id delta events sequence_events
-                 call_data depth ->
+            (fun pk update_result token_id balance_change increment_nonce events
+                 sequence_events call_data call_depth ->
             try
               let open Result.Let_syntax in
               let%bind pk =
@@ -2395,7 +2408,7 @@ module Types = struct
                     |> Array.of_list)
               in
               let%bind update = update_result in
-              let%map delta = delta in
+              let%map balance_change = balance_change in
               let events = mk_field_arrays events in
               let sequence_events = mk_field_arrays sequence_events in
               let call_data = Snark_params.Tick.Field.of_string call_data in
@@ -2403,11 +2416,12 @@ module Types = struct
                 { pk
                 ; update
                 ; token_id
-                ; delta
+                ; increment_nonce
+                ; balance_change
                 ; events
                 ; sequence_events
                 ; call_data
-                ; depth
+                ; call_depth
                 }
             with exn -> Error (Exn.to_string exn))
           ~fields:
@@ -2416,11 +2430,13 @@ module Types = struct
             ; arg "update" ~doc:"Update part of the body"
                 ~typ:(non_null snapp_update)
             ; arg "tokenId" ~doc:"Token id" ~typ:(non_null string)
-            ; arg "delta"
+            ; arg "balance_change"
                 ~doc:
                   "Signed amount representing the amount to change for this \
                    particular relevant party."
-                ~typ:(non_null snapp_delta)
+                ~typ:(non_null snapp_balance_change)
+            ; arg "incrementNonce" ~doc:"Whether to increment the nonce"
+                ~typ:(non_null bool)
               (* TODO: Do we want fields in base58 in graphQL? Should we use a string of the base10 number like in other parts? Should we use a hex 32bytes -- that seems most natural to me? *)
             ; arg "events"
                 ~doc:
@@ -2443,7 +2459,7 @@ module Types = struct
                    commitment is opaque to ensure that private data can be \
                    passed between snapps without revealing it on chain."
                 ~typ:(non_null string)
-            ; arg "depth"
+            ; arg "callDepth"
                 ~doc:
                   "The number of nested snapp calls in the transaction before \
                    reaching this party."
@@ -2453,7 +2469,8 @@ module Types = struct
       let snapp_fee_payer_party_body =
         obj "FeePayerPartyBody" ~doc:"Body component of a Snapp Fee Payer Party"
           ~coerce:
-            (fun pk update_result fee events sequence_events call_data depth ->
+            (fun pk update_result fee events sequence_events call_data
+                 call_depth ->
             try
               let open Result.Let_syntax in
               let%bind pk =
@@ -2462,25 +2479,27 @@ module Types = struct
                   ~f:Error.to_string_hum
               in
               let token_id = () in
+              let increment_nonce = () in
               let mk_field_arrays evs =
                 List.map evs ~f:(fun fields ->
                     List.map fields ~f:Snark_params.Tick.Field.of_string
                     |> Array.of_list)
               in
               let%map update = update_result in
-              let delta = fee in
+              let balance_change = fee in
               let events = mk_field_arrays events in
               let sequence_events = mk_field_arrays sequence_events in
               let call_data = Snark_params.Tick.Field.of_string call_data in
-              let depth = Int.of_string depth in
+              let call_depth = Int.of_string call_depth in
               { Party.Body.Poly.pk
               ; update
               ; token_id
-              ; delta
+              ; balance_change
+              ; increment_nonce
               ; events
               ; sequence_events
               ; call_data
-              ; depth
+              ; call_depth
               }
             with exn -> Error (Exn.to_string exn))
           ~fields:
@@ -2496,7 +2515,7 @@ module Types = struct
                 ~typ:(non_null (list (non_null (list (non_null string)))))
             ; arg "callData" ~doc:"A field in Base58Check"
                 ~typ:(non_null string)
-            ; arg "depth" ~doc:"An integer in string format"
+            ; arg "callDepth" ~doc:"An integer in string format"
                 ~typ:(non_null string)
             ]
 

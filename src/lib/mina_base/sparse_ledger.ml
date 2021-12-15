@@ -191,6 +191,20 @@ let apply_parties_unchecked_with_states ~constraint_constants ~state_view
          *)
          (party_applied, List.rev states))
 
+let apply_parties_with_fee_excess_exn ~constraint_constants ~state_view
+    ~fee_excess ledger c =
+  let open T in
+  let t = ref ledger in
+  let _, fee_excess =
+    apply_parties_unchecked_aux ~constraint_constants ~state_view ~fee_excess t
+      c ~init:fee_excess ~f:(fun _ (global_state, _local_state) ->
+        global_state.fee_excess)
+    |> Or_error.ok_exn
+  in
+  ( !t
+  , Fee_excess.of_single
+      (Token_id.default, Currency.Amount.Signed.to_fee fee_excess) )
+
 let of_root ~depth ~next_available_token (h : Ledger_hash.t) =
   of_hash ~depth ~next_available_token
     (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))

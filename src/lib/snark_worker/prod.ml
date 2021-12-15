@@ -55,10 +55,19 @@ module Inputs = struct
     Snark_work_lib.Work.Single.Spec.Stable.Latest.t
   [@@deriving bin_io_unversioned, sexp]
 
+  type parties_inputs =
+    ( Transaction_witness.Parties_segment_witness.t
+    * Transaction_snark.Parties_segment.Basic.t
+    * Transaction_snark.Statement.With_sok.t
+    * (int * Snapp_statement.t) option )
+    list
+  [@@deriving sexp, to_yojson]
+
   let perform_single ({ m; cache; proof_level } : Worker_state.t) ~message =
     let open Deferred.Or_error.Let_syntax in
     let open Snark_work_lib in
     let sok_digest = Mina_base.Sok_message.digest message in
+    let logger = Logger.create () in
     fun (single : single_spec) ->
       match proof_level with
       | Genesis_constants.Proof_level.Full -> (
@@ -68,7 +77,6 @@ module Inputs = struct
             let start = Time.now () in
             match%map.Async.Deferred k () with
             | Error e ->
-                let logger = Logger.create () in
                 [%log error] "SNARK worker failed: $error"
                   ~metadata:
                     [ ("error", Error_json.error_to_yojson e)
@@ -92,12 +100,130 @@ module Inputs = struct
               | Work.Single.Spec.Transition (input, (w : Transaction_witness.t))
                 ->
                   process (fun () ->
-                      match w with
-                      | Parties_segment witness ->
-                          Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                              M.of_parties_segment_exn
-                                ~statement:{ input with sok_digest } ~witness)
-                      | Non_parties w ->
+                      match w.transaction with
+                      | Command (Parties parties) -> (
+                          let%bind witnesses_specs_stmts =
+                            Or_error.try_with (fun () ->
+                                Transaction_snark.parties_witnesses_exn
+                                  ~constraint_constants:M.constraint_constants
+                                  ~state_body:w.protocol_state_body
+                                  ~fee_excess:Currency.Amount.Signed.zero
+                                  ~pending_coinbase_init_stack:w.init_stack
+                                  (`Sparse_ledger w.ledger) [ parties ]
+                                |> List.rev)
+                            |> Result.map_error ~f:(fun e ->
+                                   Error.createf
+                                     !"Failed to generate inputs for parties : \
+                                       %s: %s"
+                                     ( Parties.to_yojson parties
+                                     |> Yojson.Safe.to_string )
+                                     (Error.to_string_hum e))
+                            |> Deferred.return
+                          in
+                          let log_base_snark f ~statement ~spec ~all_inputs =
+                            match%map.Deferred
+                              Deferred.Or_error.try_with (fun () ->
+                                  f ~statement ~spec)
+                            with
+                            | Ok p ->
+                                Ok p
+                            | Error e ->
+                                [%log fatal]
+                                  "Transaction snark failed for input $spec \
+                                   $statement. All inputs: $inputs. Error:  \
+                                   $error"
+                                  ~metadata:
+                                    [ ( "spec"
+                                      , Transaction_snark.Parties_segment.Basic
+                                        .to_yojson spec )
+                                    ; ( "statement"
+                                      , Transaction_snark.Statement.With_sok
+                                        .to_yojson statement )
+                                    ; ("error", `String (Error.to_string_hum e))
+                                    ; ( "inputs"
+                                      , parties_inputs_to_yojson all_inputs )
+                                    ] ;
+                                Error e
+                          in
+                          let log_merge_snark ~sok_digest prev curr ~all_inputs
+                              =
+                            match%map.Deferred
+                              M.merge ~sok_digest prev curr
+                            with
+                            | Ok p ->
+                                Ok p
+                            | Error e ->
+                                [%log fatal]
+                                  "Merge snark failed for $stmt1 $stmt2. All \
+                                   inputs: $inputs. Error:  $error"
+                                  ~metadata:
+                                    [ ( "stmt1"
+                                      , Transaction_snark.Statement.to_yojson
+                                          (Ledger_proof.statement prev) )
+                                    ; ( "stmt2"
+                                      , Transaction_snark.Statement.to_yojson
+                                          (Ledger_proof.statement curr) )
+                                    ; ("error", `String (Error.to_string_hum e))
+                                    ; ( "inputs"
+                                      , parties_inputs_to_yojson all_inputs )
+                                    ] ;
+                                Error e
+                          in
+                          match witnesses_specs_stmts with
+                          | [] ->
+                              Deferred.Or_error.error_string
+                                "no witnesses generated"
+                          | (witness, spec, stmt, snapp_statement) :: rest as
+                            inputs ->
+                              let%bind (p1 : Ledger_proof.t) =
+                                log_base_snark
+                                  ~statement:{ stmt with sok_digest } ~spec
+                                  ~all_inputs:inputs
+                                  (M.of_parties_segment_exn ~snapp_statement
+                                     ~witness)
+                              in
+
+                              let%map (p : Ledger_proof.t) =
+                                Deferred.List.fold ~init:(Ok p1) rest
+                                  ~f:(fun
+                                       acc
+                                       (witness, spec, stmt, snapp_statement)
+                                     ->
+                                    let%bind (prev : Ledger_proof.t) =
+                                      Deferred.return acc
+                                    in
+                                    let%bind (curr : Ledger_proof.t) =
+                                      log_base_snark
+                                        ~statement:{ stmt with sok_digest }
+                                        ~spec ~all_inputs:inputs
+                                        (M.of_parties_segment_exn
+                                           ~snapp_statement ~witness)
+                                    in
+                                    log_merge_snark ~sok_digest prev curr
+                                      ~all_inputs:inputs)
+                              in
+                              if
+                                Transaction_snark.Statement.equal
+                                  (Ledger_proof.statement p) input
+                              then p
+                              else (
+                                [%log fatal]
+                                  "Parties transaction final statement \
+                                   mismatch Expected $expected Got $got. All \
+                                   inputs: $inputs"
+                                  ~metadata:
+                                    [ ( "got"
+                                      , Transaction_snark.Statement.to_yojson
+                                          (Ledger_proof.statement p) )
+                                    ; ( "expected"
+                                      , Transaction_snark.Statement.to_yojson
+                                          input )
+                                    ; ("inputs", parties_inputs_to_yojson inputs)
+                                    ] ;
+                                failwith
+                                  "Parties transaction final statement mismatch"
+                                ) )
+                      | _ ->
                           let%bind t =
                             Deferred.return
                             @@
@@ -111,8 +237,8 @@ module Inputs = struct
                                 | None ->
                                     Or_error.errorf
                                       "Command has an invalid signature" )
-                            | Command (Parties cmd) ->
-                                Ok (Command (Parties cmd))
+                            | Command (Parties _) ->
+                                assert false
                             | Fee_transfer ft ->
                                 Ok (Fee_transfer ft)
                             | Coinbase cb ->

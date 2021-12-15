@@ -364,15 +364,24 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('pk, 'update, 'token_id, 'amount, 'events, 'call_data, 'int) t =
+        type ( 'pk
+             , 'update
+             , 'token_id
+             , 'amount
+             , 'events
+             , 'call_data
+             , 'int
+             , 'bool )
+             t =
           { pk : 'pk
           ; update : 'update
           ; token_id : 'token_id
-          ; delta : 'amount
+          ; balance_change : 'amount
+          ; increment_nonce : 'bool
           ; events : 'events
           ; sequence_events : 'events
           ; call_data : 'call_data
-          ; depth : 'int
+          ; call_depth : 'int
           }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
@@ -392,7 +401,8 @@ module Body = struct
         , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         , Pickles.Backend.Tick.Field.Stable.V1.t array list
         , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
-        , int )
+        , int
+        , bool )
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -400,8 +410,12 @@ module Body = struct
     end
   end]
 
-  (* Delta for the fee payer is always going to be Neg, so represent it using an unsigned fee,
-     token id is always going to be the default, so use unit value as a placeholder
+  (* * Delta for the fee payer is always going to be Neg, so represent it using
+       an unsigned fee,
+     * token id is always going to be the default, so use unit value as a
+       placeholder,
+     * increment nonce must always be true for a fee payer, so use unit as a
+       placeholder.
   *)
   module Fee_payer = struct
     [%%versioned
@@ -414,7 +428,8 @@ module Body = struct
           , Fee.Stable.V1.t
           , Pickles.Backend.Tick.Field.Stable.V1.t array list
           , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
-          , int )
+          , int
+          , unit )
           Poly.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -426,18 +441,23 @@ module Body = struct
       { pk = Public_key.Compressed.empty
       ; update = Update.dummy
       ; token_id = ()
-      ; delta = Fee.zero
+      ; balance_change = Fee.zero
+      ; increment_nonce = ()
       ; events = []
       ; sequence_events = []
       ; call_data = Field.zero
-      ; depth = 0
+      ; call_depth = 0
       }
   end
 
   let of_fee_payer (t : Fee_payer.t) : t =
     { t with
-      delta = { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.delta }
+      balance_change =
+        { Signed_poly.sgn = Sgn.Neg
+        ; magnitude = Amount.of_fee t.balance_change
+        }
     ; token_id = Token_id.default
+    ; increment_nonce = true
     }
 
   module Checked = struct
@@ -448,25 +468,28 @@ module Body = struct
       , Amount.Signed.var
       , Events.var
       , Field.Var.t
-      , int As_prover.Ref.t )
+      , int As_prover.Ref.t
+      , Boolean.var )
       Poly.t
 
     let to_input
         ({ pk
          ; update
          ; token_id
-         ; delta
+         ; balance_change
+         ; increment_nonce
          ; events
          ; sequence_events
          ; call_data
-         ; depth = _depth (* ignored *)
+         ; call_depth = _depth (* ignored *)
          } :
           t) =
       List.reduce_exn ~f:Random_oracle_input.append
         [ Public_key.Compressed.Checked.to_input pk
         ; Update.Checked.to_input update
         ; Impl.run_checked (Token_id.Checked.to_input token_id)
-        ; Amount.Signed.Checked.to_input delta
+        ; Amount.Signed.Checked.to_input balance_change
+        ; Random_oracle_input.bitstring [ increment_nonce ]
         ; Events.var_to_input events
         ; Events.var_to_input sequence_events
         ; Random_oracle_input.field call_data
@@ -484,6 +507,7 @@ module Body = struct
       ; Update.typ ()
       ; Token_id.typ
       ; Amount.Signed.typ
+      ; Boolean.typ
       ; Events.typ
       ; Events.typ
       ; Field.typ
@@ -496,29 +520,32 @@ module Body = struct
     { pk = Public_key.Compressed.empty
     ; update = Update.dummy
     ; token_id = Token_id.default
-    ; delta = Amount.Signed.zero
+    ; balance_change = Amount.Signed.zero
+    ; increment_nonce = false
     ; events = []
     ; sequence_events = []
     ; call_data = Field.zero
-    ; depth = 0
+    ; call_depth = 0
     }
 
   let to_input
       ({ pk
        ; update
        ; token_id
-       ; delta
+       ; balance_change
+       ; increment_nonce
        ; events
        ; sequence_events
        ; call_data
-       ; depth = _ (* ignored *)
+       ; call_depth = _ (* ignored *)
        } :
         t) =
     List.reduce_exn ~f:Random_oracle_input.append
       [ Public_key.Compressed.to_input pk
       ; Update.to_input update
       ; Token_id.to_input token_id
-      ; Amount.Signed.to_input delta
+      ; Amount.Signed.to_input balance_change
+      ; Random_oracle_input.bitstring [ increment_nonce ]
       ; Events.to_input events
       ; Events.to_input sequence_events
       ; Random_oracle_input.field call_data
@@ -550,56 +577,48 @@ module Predicate = struct
     end
   end]
 
-  let accept = lazy Random_oracle.(digest (salt "MinaPartyAccept"))
+  let to_full = function
+    | Full s ->
+        s
+    | Nonce n ->
+        { Snapp_predicate.Account.accept with
+          nonce = Check { lower = n; upper = n }
+        }
+    | Accept ->
+        Snapp_predicate.Account.accept
+
+  module Tag = struct
+    type t = Full | Nonce | Accept [@@deriving equal, compare, sexp]
+  end
+
+  let tag : t -> Tag.t = function
+    | Full _ ->
+        Full
+    | Nonce _ ->
+        Nonce
+    | Accept ->
+        Accept
 
   let digest (t : t) =
     let digest x =
       Random_oracle.(
         hash ~init:Hash_prefix_states.party_predicate (pack_input x))
     in
-    match t with
-    | Full a ->
-        Snapp_predicate.Account.to_input a |> digest
-    | Nonce n ->
-        Account.Nonce.to_input n |> digest
-    | Accept ->
-        Lazy.force accept
+    to_full t |> Snapp_predicate.Account.to_input |> digest
 
   module Checked = struct
-    type t =
-      | Nonce_or_accept of
-          { nonce : Account.Nonce.Checked.t; accept : Boolean.var }
-      | Full of Snapp_predicate.Account.Checked.t
+    type t = Snapp_predicate.Account.Checked.t
 
     let digest (t : t) =
       let digest x =
         Random_oracle.Checked.(
           hash ~init:Hash_prefix_states.party_predicate (pack_input x))
       in
-      match t with
-      | Full a ->
-          Snapp_predicate.Account.Checked.to_input a |> digest
-      | Nonce_or_accept { nonce; accept = b } ->
-          let open Impl in
-          Field.(
-            if_ b
-              ~then_:(constant (Lazy.force accept))
-              ~else_:
-                (digest (run_checked (Account.Nonce.Checked.to_input nonce))))
+      Snapp_predicate.Account.Checked.to_input t |> digest
   end
 
   let typ () : (Snapp_predicate.Account.Checked.t, t) Typ.t =
-    Typ.transport
-      (Snapp_predicate.Account.typ ())
-      ~there:(function
-        | Full s ->
-            s
-        | Nonce n ->
-            { Snapp_predicate.Account.accept with
-              nonce = Check { lower = n; upper = n }
-            }
-        | Accept ->
-            Snapp_predicate.Account.accept)
+    Typ.transport (Snapp_predicate.Account.typ ()) ~there:to_full
       ~back:(fun s -> Full s)
 end
 
@@ -851,4 +870,4 @@ let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
     When this is positive, the amount will be deposited into the account from
     the funds made available by previous parties in the same transaction.
 *)
-let delta (t : t) : Amount.Signed.t = t.data.body.delta
+let balance_change (t : t) : Amount.Signed.t = t.data.body.balance_change

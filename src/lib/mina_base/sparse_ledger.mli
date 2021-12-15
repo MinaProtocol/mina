@@ -93,10 +93,19 @@ val apply_parties_unchecked_with_states :
          , Currency.Amount.t
          , t
          , bool
-         , unit )
+         , unit
+         , Transaction_status.Failure.t option )
          Parties_logic.Local_state.t )
        list )
      Or_error.t
+
+val apply_parties_with_fee_excess_exn :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> state_view:Snapp_predicate.Protocol_state.View.t
+  -> fee_excess:Currency.Amount.Signed.t
+  -> t
+  -> Parties.t
+  -> t * Fee_excess.t
 
 val of_any_ledger : Ledger.Any_ledger.M.t -> t
 

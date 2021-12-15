@@ -506,14 +506,6 @@ struct
                   ~initial_minimum_balance))
           |> Option.value ~default:Currency.Balance.zero
 
-    let check_command (t : User_command.t) : User_command.Valid.t option =
-      match t with
-      | Parties _ ->
-          failwith "TODO"
-      | Signed_command t ->
-          Option.map (Signed_command.check t) ~f:(fun x ->
-              User_command.Signed_command x)
-
     let handle_transition_frontier_diff
         ( ({ new_commands; removed_commands; reorg_best_tip = _ } :
             Transition_frontier.best_tip_diff)
@@ -1224,7 +1216,15 @@ struct
                                         Batcher.verify t.batcher
                                           { diffs with data = [ c ] }
                                       with
-                                      | Error _ ->
+                                      | Error e ->
+                                          [%log' error t.logger]
+                                            "Transaction verification error: \
+                                             $error"
+                                            ~metadata:
+                                              [ ( "error"
+                                                , `String
+                                                    (Error.to_string_hum e) )
+                                              ] ;
                                           None
                                       | Ok (Error invalid) ->
                                           [%log' error t.logger]
@@ -1790,7 +1790,7 @@ let%test_module _ =
             let%bind protocol_state = Snapp_predicate.Protocol_state.gen in
             let%map (parties : Parties.t) =
               Mina_base.Snapp_generators.gen_parties_from ~succeed:true ~keymap
-                ~fee_payer_keypair ~ledger ~protocol_state
+                ~fee_payer_keypair ~ledger ~protocol_state ()
             in
             User_command.Parties parties
           in
