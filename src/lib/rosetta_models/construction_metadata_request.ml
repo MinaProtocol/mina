@@ -10,7 +10,7 @@ type t =
   { network_identifier : Network_identifier.t
   ; (* Some blockchains require different metadata for different types of transaction construction (ex: delegation versus a transfer). Instead of requiring a blockchain node to return all possible types of metadata for construction (which may require multiple node fetches), the client can populate an options object to limit the metadata returned to only the subset required. *)
     options : Yojson.Safe.t option [@default None]
-  ; public_keys : Public_key.t list
+  ; public_keys : Public_key.t list [@default []]
   }
 [@@deriving yojson { strict = false }, show, eq]
 

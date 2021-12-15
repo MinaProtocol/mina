@@ -35,7 +35,7 @@ locals {
 
   seed_vars = {
     testnetName = var.testnet_name
-    coda = {
+    mina = {
       runtimeConfig = local.daemon.runtimeConfig
       image         = var.mina_image
       useCustomEntrypoint  = var.use_custom_entrypoint
@@ -76,7 +76,7 @@ locals {
   block_producer_vars = {
     testnetName = var.testnet_name
 
-    coda = local.daemon
+    mina = local.daemon
 
     healthcheck = local.healthcheck_vars
 
@@ -119,7 +119,7 @@ locals {
 
   archive_vars = [for item in var.archive_configs : {
       testnetName = var.testnet_name
-      coda        = {
+      mina        = {
         image         = var.mina_image
         useCustomEntrypoint  = var.use_custom_entrypoint
         customEntrypoint     = var.custom_entrypoint
@@ -161,7 +161,7 @@ locals {
   snark_vars = [
     for i, snark in var.snark_coordinators: {
       testnetName = var.testnet_name
-      coda        = local.daemon
+      mina        = local.daemon
       healthcheck = local.healthcheck_vars
 
       coordinatorName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}"
@@ -179,7 +179,7 @@ locals {
   plain_node_vars = [
     for i, node in var.plain_node_configs: {
       testnetName = var.testnet_name
-      coda        = local.daemon
+      mina        = local.daemon
       healthcheck = local.healthcheck_vars
       name = node.name
     }
@@ -188,7 +188,7 @@ locals {
   watchdog_vars = {
     testnetName = var.testnet_name
     image       = var.watchdog_image
-    coda = {
+    mina = {
       image                = var.mina_image
       ports                = { metrics : 8000 }
       uploadBlocksToGCloud = var.upload_blocks_to_gcloud

@@ -1,0 +1,14 @@
+(library
+ (public_name cache_dir.native)
+ (name cache_dir_native)
+ (libraries
+   ; opam deps
+   async
+   core
+   ; libs
+   key_cache
+   blake2
+   logger)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_coda ppx_version ppx_here ppx_let ppx_custom_printf))
+ (implements cache_dir))

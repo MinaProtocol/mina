@@ -96,7 +96,7 @@ module Proof = Plonk_dlog_proof.Make (struct
 
     let batch_verify =
       with_lagranges (fun lgrs vks ts ->
-          Async.In_thread.run (fun () -> batch_verify lgrs vks ts))
+          Run_in_thread.run_in_thread (fun () -> batch_verify lgrs vks ts))
 
     let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
         prev_comms =
@@ -122,7 +122,7 @@ module Proof = Plonk_dlog_proof.Make (struct
     let create_async (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
       create_aux pk primary auxiliary prev_chals prev_comms
         ~f:(fun pk ~primary_input ~auxiliary_input ~prev_challenges ~prev_sgs ->
-          Async.In_thread.run (fun () ->
+          Run_in_thread.run_in_thread (fun () ->
               create pk ~primary_input ~auxiliary_input ~prev_challenges
                 ~prev_sgs))
 

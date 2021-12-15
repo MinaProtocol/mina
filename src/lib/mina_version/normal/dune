@@ -1,0 +1,12 @@
+(library
+ (name mina_version_normal)
+ (libraries core_kernel)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version))
+ (public_name mina_version.normal)
+ (implements mina_version))
+
+(rule
+ (targets mina_version.ml)
+ (deps (:< gen.sh) (universe))
+ (action (run %{<} %{targets})))
