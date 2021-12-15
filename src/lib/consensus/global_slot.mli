@@ -23,7 +23,7 @@ module Stable : sig
   end
 end]
 
-val to_input : t -> (_, bool) Random_oracle.Input.t
+val to_input : t -> Snark_params.Tick.Field.t Random_oracle.Input.t
 
 val of_slot_number : constants:Constants.t -> Mina_numbers.Global_slot.t -> t
 
@@ -45,8 +45,6 @@ val of_epoch_and_slot : constants:Constants.t -> Epoch.t * Slot.t -> t
 
 val zero : constants:Constants.t -> t
 
-val to_bits : t -> bool list
-
 val epoch : t -> Epoch.t
 
 val slot : t -> Slot.t
@@ -66,7 +64,6 @@ val diff : constants:Constants.t -> t -> Epoch.t * Slot.t -> t
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-open Bitstring_lib
 
 module Checked : sig
   open Snark_params.Tick
@@ -79,13 +76,7 @@ module Checked : sig
   val of_slot_number :
     constants:Constants.var -> Mina_numbers.Global_slot.Checked.t -> t
 
-  val to_bits : t -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
-
-  val to_input :
-       t
-    -> ( (Field.Var.t, Snark_params.Tick.Boolean.var) Random_oracle.Input.t
-       , _ )
-       Checked.t
+  val to_input : t -> Field.Var.t Random_oracle.Input.t
 
   val to_epoch_and_slot : t -> (Epoch.Checked.t * Slot.Checked.t, _) Checked.t
 
