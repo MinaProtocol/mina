@@ -329,7 +329,14 @@ module Threshold = struct
     Bignum.(lhs <= rhs)
 
   module Checked = struct
-    let is_satisfied ~my_stake ~total_stake (vrf_output : Output.Truncated.var)
+    let balance_upper_bound =
+      Bignum_bigint.(one lsl Currency.Balance.length_in_bits)
+
+    let amount_upper_bound =
+      Bignum_bigint.(one lsl Currency.Amount.length_in_bits)
+
+    let is_satisfied ~(my_stake : Currency.Balance.var)
+        ~(total_stake : Currency.Amount.var) (vrf_output : Output.Truncated.var)
         =
       let open Currency in
       let open Snark_params.Tick in
@@ -341,8 +348,14 @@ module Threshold = struct
             Exp.one_minus_exp ~m params
               (Floating_point.of_quotient ~m
                  ~precision:params.per_term_precision
-                 ~top:(Integer.of_bits ~m (Balance.var_to_bits my_stake))
-                 ~bottom:(Integer.of_bits ~m (Amount.var_to_bits total_stake))
+                 ~top:
+                   (Integer.create
+                      ~value:(Balance.pack_var my_stake)
+                      ~upper_bound:balance_upper_bound)
+                 ~bottom:
+                   (Integer.create
+                      ~value:(Amount.pack_var total_stake)
+                      ~upper_bound:amount_upper_bound)
                  ~top_is_less_than_bottom:())
           in
           let vrf_output = Array.to_list (vrf_output :> Boolean.var array) in
