@@ -14,18 +14,17 @@ psql "${PG_CONN}" -c "SELECT state_hash,height FROM blocks ORDER BY height DESC 
 RETURN_CODE=$?
 [[ "$RETURN_CODE" == "0" ]] && echo "[WARN] Database already initialized!" && exit ${RETURN_CODE}
 
-mkdir -p ${POSTGRES_DATA_DIR}
-chown postgres ${POSTGRES_DATA_DIR}
-
 echo "[POPULATE] Initializing postgresql version $POSTGRES_VERSION"
-pg_dropcluster --stop ${POSTGRES_VERSION} main
-pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} main
+echo "[POPULATE] postgresql.conf:"
+cat /rosetta/postgresql.conf
 
-/etc/init.d/postgresql start
+pg_dropcluster --stop ${POSTGRES_VERSION} main
+pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} --createclusterconf /rosetta/postgresql.conf main
+
+sudo -u postgres psql --command "SHOW ALL;"
 
 sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
 sudo -u postgres createdb -O ${POSTGRES_USERNAME} ${POSTGRES_DBNAME}
-sudo -u postgres psql --command "ALTER DATABASE ${POSTGRES_DBNAME} SET DEFAULT_TRANSACTION_ISOLATION TO REPEATABLE READ;"
 
 DATE="$(date -Idate)_${DUMP_TIME}"
 curl "https://storage.googleapis.com/mina-archive-dumps/${MINA_NETWORK}-archive-dump-${DATE}.sql.tar.gz" -o o1labs-archive-dump.tar.gz

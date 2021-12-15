@@ -50,6 +50,9 @@ RUN test "$deb_codename" = "stretch" \
 # Install rosetta-cli
 RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/master/scripts/install.sh | sh -s
 
+# Generate en_US.UTF-8 to allow use of O(1) Labs DB dumps
+RUN locale-gen en_US.UTF-8
+
 RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
   && echo "$PK" >  ${MINA_CONFIG_DIR}/wallets/store/$PK.pub \
   && echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"6pcvpWSLkMi393dT5VSLR6ft56AWKkCYRqJoYia","pwsalt":"ASoBkV3NsY7ZRuxztyPJdmJCiz3R","pwdiff":[134217728,6],"ciphertext":"Dmq1Qd8uNbZRT1NT7zVbn3eubpn9Myx9Je9ZQGTKDxUv4BoPNmZAGox18qVfbbEUSuhT4ZGDt"}' \
@@ -63,19 +66,13 @@ COPY --from=builder /home/opam/mina/src/app/rosetta/README.md /rosetta/
 COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
 
 USER postgres
-
 RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && echo "$POSTGRES_VERSION" "$(psql -V)" \
-    && echo "data_directory = '/data/postgresql'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
-    && echo "listen_addresses='*'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
     && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf
 
 USER root
 
 WORKDIR /rosetta
-
-# Generate en_US.UTF-8 to allow use of O(1) Labs DB dumps
-RUN locale-gen en_US.UTF-8
 
 EXPOSE 3087
 EXPOSE $MINA_DAEMON_PORT
