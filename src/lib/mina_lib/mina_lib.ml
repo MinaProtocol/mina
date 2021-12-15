@@ -76,11 +76,6 @@ type pipes =
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
-  ; external_transitions_writer :
-      ( External_transition.t Envelope.Incoming.t
-      * Block_time.t
-      * Mina_net2.Validation_callback.t )
-      Pipe.Writer.t
   ; user_command_input_writer :
       ( User_command_input.t list
         * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
@@ -95,24 +90,8 @@ type pipes =
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
-  ; user_command_writer :
-      ( User_command.t list
-        * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
-              * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
-              Or_error.t
-           -> unit)
-      , Strict_pipe.synchronous
-      , unit Deferred.t )
-      Strict_pipe.Writer.t
-  ; local_snark_work_writer :
-      ( Network_pool.Snark_pool.Resource_pool.Diff.t
-        * (   ( Network_pool.Snark_pool.Resource_pool.Diff.t
-              * Network_pool.Snark_pool.Resource_pool.Diff.rejected )
-              Or_error.t
-           -> unit)
-      , Strict_pipe.synchronous
-      , unit Deferred.t )
-      Strict_pipe.Writer.t
+  ; tx_local_sink : Network_pool.Transaction_pool.Local_sink.t
+  ; snark_local_sink : Network_pool.Snark_pool.Local_sink.t
   }
 
 type t =
@@ -880,7 +859,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     Work_selection_method.remove t.snark_job_state spec
   in
   ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
-  Strict_pipe.Writer.write t.pipes.local_snark_work_writer
+  Network_pool.Snark_pool.Local_sink.push t.pipes.snark_local_sink
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for
 
@@ -913,7 +892,7 @@ let add_transactions t (uc_inputs : User_command_input.t list) =
 
 let add_full_transactions t user_command =
   let result_ivar = Ivar.create () in
-  Strict_pipe.Writer.write t.pipes.user_command_writer
+  Network_pool.Transaction_pool.Local_sink.push t.pipes.tx_local_sink
     (user_command, Ivar.fill result_ivar)
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
@@ -1382,36 +1361,6 @@ let create ?wallets (config : Config.t) =
                     [ ("rate_limiter", Network_pool.Rate_limiter.summary rl) ]
                   !"%s $rate_limiter" label)
           in
-          let external_transitions_reader, external_transitions_writer =
-            let rl =
-              Network_pool.Rate_limiter.create
-                ~capacity:
-                  ( (* Max of 20 transitions per slot per peer. *)
-                    20
-                  , `Per
-                      (Block_time.Span.to_time_span
-                         consensus_constants.slot_duration_ms) )
-            in
-            log_rate_limiter_occasionally rl ~label:"new_block" ;
-            let r, w = Strict_pipe.create Synchronous in
-            ( Strict_pipe.Reader.filter_map r ~f:(fun ((e, _, cb) as x) ->
-                  let sender = Envelope.Incoming.sender e in
-                  match
-                    Network_pool.Rate_limiter.add rl sender ~now:(Time.now ())
-                      ~score:1
-                  with
-                  | `Capacity_exceeded ->
-                      [%log' warn config.logger]
-                        "$sender has sent many blocks. This is very unusual."
-                        ~metadata:
-                          [ ("sender", Envelope.Sender.to_yojson sender) ] ;
-                      Mina_net2.Validation_callback.fire_if_not_already_fired cb
-                        `Reject ;
-                      None
-                  | `Within_capacity ->
-                      Some x)
-            , w )
-          in
           let producer_transition_reader, producer_transition_writer =
             Strict_pipe.create Synchronous
           in
@@ -1585,8 +1534,47 @@ let create ?wallets (config : Config.t) =
                 | Some net ->
                     Mina_networking.peers net)
           in
+          let txn_pool_config =
+            Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
+              ~trust_system:config.trust_system
+              ~pool_max_size:
+                config.precomputed_values.genesis_constants.txpool_max_size
+          in
+          let transaction_pool, tx_remote_sink, tx_local_sink =
+            trace "transaction_pool" (fun () ->
+                (* make transaction pool return writer for local and incoming diffs *)
+                Network_pool.Transaction_pool.create ~config:txn_pool_config
+                  ~constraint_constants ~consensus_constants
+                  ~time_controller:config.time_controller ~logger:config.logger
+                  ~frontier_broadcast_pipe:frontier_broadcast_pipe_r)
+          in
+          let snark_pool_config =
+            Network_pool.Snark_pool.Resource_pool.make_config ~verifier
+              ~trust_system:config.trust_system
+              ~disk_location:config.snark_pool_disk_location
+          in
+          let%bind snark_pool, snark_remote_sink, snark_local_sink =
+            trace "snark_pool" (fun () ->
+                Network_pool.Snark_pool.load ~config:snark_pool_config
+                  ~constraint_constants ~consensus_constants
+                  ~time_controller:config.time_controller ~logger:config.logger
+                  ~frontier_broadcast_pipe:frontier_broadcast_pipe_r)
+          in
+          let block_reader, block_sink =
+            Network_pool.Block_sink.create ~logger:config.logger
+              ~slot_duration_ms:
+                config.precomputed_values.consensus_constants.slot_duration_ms
+              ~time_controller:config.time_controller
+          in
+          let sinks =
+            { Mina_networking.Sinks.Unwrapped.sink_block = block_sink
+            ; sink_tx = tx_remote_sink
+            ; sink_snark_work = snark_remote_sink
+            }
+          in
           let%bind net =
-            Mina_networking.create config.net_config ~get_some_initial_peers
+            Mina_networking.create config.net_config ~sinks
+              ~get_some_initial_peers
               ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                 (fun query_env ->
                 trace_recurring
@@ -1680,28 +1668,7 @@ let create ?wallets (config : Config.t) =
           let user_command_input_reader, user_command_input_writer =
             Strict_pipe.(create ~name:"local transactions" Synchronous)
           in
-          let local_txns_reader, local_txns_writer =
-            Strict_pipe.(create ~name:"local transactions" Synchronous)
-          in
-          let local_snark_work_reader, local_snark_work_writer =
-            Strict_pipe.(create ~name:"local snark work" Synchronous)
-          in
           let block_produced_bvar = Bvar.create () in
-          let txn_pool_config =
-            Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
-              ~trust_system:config.trust_system
-              ~pool_max_size:
-                config.precomputed_values.genesis_constants.txpool_max_size
-          in
-          let transaction_pool =
-            trace "transaction_pool" (fun () ->
-                Network_pool.Transaction_pool.create ~config:txn_pool_config
-                  ~constraint_constants ~consensus_constants
-                  ~time_controller:config.time_controller ~logger:config.logger
-                  ~incoming_diffs:(Mina_networking.transaction_pool_diffs net)
-                  ~local_diffs:local_txns_reader
-                  ~frontier_broadcast_pipe:frontier_broadcast_pipe_r)
-          in
           (*Read from user_command_input_reader that has the user command inputs from client, infer nonce, create user command, and write it to the pipe consumed by the network pool*)
           Strict_pipe.Reader.iter user_command_input_reader
             ~f:(fun (input_list, result_cb, get_current_nonce, get_account) ->
@@ -1716,8 +1683,8 @@ let create ?wallets (config : Config.t) =
                       (Error (Error.of_string "No user commands to send")) ;
                     Deferred.unit )
                   else
-                    (*callback for the result from transaction_pool.apply_diff*)
-                    Strict_pipe.Writer.write local_txns_writer
+                    Network_pool.Transaction_pool.Local_sink.push tx_local_sink
+                      (*callback for the result from transaction_pool.apply_diff*)
                       ( List.map user_commands ~f:(fun c ->
                             User_command.Signed_command c)
                       , result_cb )
@@ -1746,10 +1713,9 @@ let create ?wallets (config : Config.t) =
                     config.persistent_frontier_location
                   ~frontier_broadcast_pipe:
                     (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
-                  ~catchup_mode
+                  ~catchup_mode (* TODO Remove pipe map form here *)
                   ~network_transition_reader:
-                    (Strict_pipe.Reader.map external_transitions_reader
-                       ~f:(fun (tn, tm, cb) ->
+                    (Strict_pipe.Reader.map block_reader ~f:(fun (tn, tm, cb) ->
                          let lift_consensus_time =
                            Fn.compose UInt32.to_int
                              Consensus.Data.Consensus_time.to_uint32
@@ -1792,7 +1758,7 @@ let create ?wallets (config : Config.t) =
                            et validation_callback ;
                          don't_wait_for
                            (* this will never throw since the callback was created without expiration *)
-                           (let%map v =
+                           (let%bind v =
                               Mina_net2.Validation_callback.await_exn
                                 validation_callback
                             in
@@ -1802,7 +1768,8 @@ let create ?wallets (config : Config.t) =
                             then
                               Mina_networking.broadcast_state net
                                 (External_transition.Validation
-                                 .forget_validation_with_hash et)) ;
+                                 .forget_validation_with_hash et)
+                            else Deferred.unit) ;
                          breadcrumb))
                   ~most_recent_valid_block
                   ~precomputed_values:config.precomputed_values)
@@ -1833,8 +1800,7 @@ let create ?wallets (config : Config.t) =
                         Network_pool.Transaction_pool.Resource_pool.Diff
                         .max_per_15_seconds x
                   in
-                  Mina_networking.broadcast_transaction_pool_diff net x ;
-                  Deferred.unit)) ;
+                  Mina_networking.broadcast_transaction_pool_diff net x)) ;
           trace_task "valid_transitions_for_network broadcast loop" (fun () ->
               Strict_pipe.Reader.iter_without_pushback
                 valid_transitions_for_network
@@ -1902,10 +1868,6 @@ let create ?wallets (config : Config.t) =
                           [%log' warn config.logger] ~metadata
                             "Not rebroadcasting block $state_hash because it \
                              was received $timing" ))) ;
-          don't_wait_for
-            (Strict_pipe.transfer
-               (Mina_networking.states net)
-               external_transitions_writer ~f:ident) ;
           (* FIXME #4093: augment ban_notifications with a Peer.ID so we can implement ban_notify
              trace_task "ban notification loop" (fun () ->
               Linear_pipe.iter (Mina_networking.ban_notification_reader net)
@@ -1922,20 +1884,6 @@ let create ?wallets (config : Config.t) =
             (Linear_pipe.iter
                (Mina_networking.ban_notification_reader net)
                ~f:(Fn.const Deferred.unit)) ;
-          let snark_pool_config =
-            Network_pool.Snark_pool.Resource_pool.make_config ~verifier
-              ~trust_system:config.trust_system
-              ~disk_location:config.snark_pool_disk_location
-          in
-          let%bind snark_pool =
-            trace "snark_pool" (fun () ->
-                Network_pool.Snark_pool.load ~config:snark_pool_config
-                  ~constraint_constants ~consensus_constants
-                  ~time_controller:config.time_controller ~logger:config.logger
-                  ~incoming_diffs:(Mina_networking.snark_pool_diffs net)
-                  ~local_diffs:local_snark_work_reader
-                  ~frontier_broadcast_pipe:frontier_broadcast_pipe_r)
-          in
           let snark_jobs_state =
             Work_selector.State.init
               ~reassignment_wait:config.work_reassignment_wait
@@ -1963,8 +1911,7 @@ let create ?wallets (config : Config.t) =
                         Network_pool.Snark_pool.Resource_pool.Diff
                         .max_per_15_seconds x
                   in
-                  Mina_networking.broadcast_snark_pool_diff net x ;
-                  Deferred.unit)) ;
+                  Mina_networking.broadcast_snark_pool_diff net x)) ;
           Option.iter config.archive_process_location
             ~f:(fun archive_process_port ->
               [%log' info config.logger]
@@ -2048,12 +1995,9 @@ let create ?wallets (config : Config.t) =
             ; pipes =
                 { validated_transitions_reader = valid_transitions_for_api
                 ; producer_transition_writer
-                ; external_transitions_writer =
-                    Strict_pipe.Writer.to_linear_pipe
-                      external_transitions_writer
                 ; user_command_input_writer
-                ; user_command_writer = local_txns_writer
-                ; local_snark_work_writer
+                ; tx_local_sink
+                ; snark_local_sink
                 }
             ; wallets
             ; block_production_keypairs

@@ -131,6 +131,11 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
               (* TODO: merge implementations with mina_lib *)
               Mina_networking.create
                 (config peer state.consensus_local_state)
+                ~sinks:
+                  { sink_tx = Network_pool.Transaction_pool.Remote_sink.void
+                  ; sink_snark_work = Network_pool.Snark_pool.Remote_sink.void
+                  ; sink_block = Network_pool.Block_sink.void
+                  }
                 ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                   state.get_staged_ledger_aux_and_pending_coinbases_at_hash
                 ~get_some_initial_peers:state.get_some_initial_peers

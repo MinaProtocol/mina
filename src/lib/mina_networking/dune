@@ -5,7 +5,7 @@
  (libraries core o1trace async mina_intf
             gossip_net mina_base unix_timestamp perf_histograms proof_carrying_data
             consensus network_pool mina_transition transition_frontier staged_ledger
-            sync_status)
+            sync_status mina_net2)
  (inline_tests)
  (preprocess
   (pps ppx_coda ppx_compare ppx_hash ppx_version ppx_inline_test ppx_compare ppx_deriving.make ppx_deriving_yojson ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_fields_conv ppx_let ppx_register_event ppx_custom_printf))

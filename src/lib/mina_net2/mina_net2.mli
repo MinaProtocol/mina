@@ -108,6 +108,7 @@ module Keypair : sig
 end
 
 module Validation_callback = Validation_callback
+module Sink = Sink
 
 (** [create ~logger ~conf_dir] starts a new [net] storing its state in [conf_dir]
   *

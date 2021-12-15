@@ -1,6 +1,5 @@
 open Async_kernel
 open Pipe_lib
-open Network_peer
 open Core_kernel
 
 module type S = sig
@@ -45,18 +44,9 @@ module type S = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
-    -> incoming_diffs:
-         ( Resource_pool.Diff.t Envelope.Incoming.t
-         * Mina_net2.Validation_callback.t )
-         Strict_pipe.Reader.t
-    -> local_diffs:
-         ( Resource_pool.Diff.t
-         * (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected) Or_error.t
-            -> unit) )
-         Strict_pipe.Reader.t
     -> frontier_broadcast_pipe:
          transition_frontier option Broadcast_pipe.Reader.t
-    -> t Deferred.t
+    -> (t * Remote_sink.t * Local_sink.t) Deferred.t
 end
 
 module type Transition_frontier_intf = sig

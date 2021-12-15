@@ -43,10 +43,13 @@ end
 module type S = sig
   include Intf.Gossip_net_intf
 
+  type sinks
+
   val create :
        Config.t
     -> pids:Child_processes.Termination.t
     -> Rpc_intf.rpc_handler list
+    -> sinks
     -> t Deferred.t
 end
 
@@ -57,8 +60,46 @@ let download_seed_peer_list uri =
   let%map contents = Cohttp_async.Body.to_string body in
   Mina_net2.Multiaddr.of_file_contents contents
 
-module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
-  S with module Rpc_intf := Rpc_intf = struct
+type publish_functions = { publish_v0 : Message.msg -> unit Deferred.t }
+
+let empty_publish_functions =
+  let unit _ = Deferred.unit in
+  { publish_v0 = unit }
+
+let validate_gossip_base ~fn my_peer_id envelope validation_callback =
+  (* Messages from ourselves are valid. Don't try and reingest them. *)
+  match Envelope.Incoming.sender envelope with
+  | Local ->
+      Mina_net2.Validation_callback.fire_if_not_already_fired
+        validation_callback `Accept ;
+      Deferred.unit
+  | Remote sender ->
+      if not (Peer.Id.equal sender.peer_id my_peer_id) then
+        (* Match on different cases *)
+        fn (envelope, validation_callback)
+      else (
+        Mina_net2.Validation_callback.fire_if_not_already_fired
+          validation_callback `Accept ;
+        Deferred.unit )
+
+let on_gossip_decode_failure (config : Config.t) envelope (err : Error.t) =
+  let peer = Envelope.Incoming.sender envelope |> Envelope.Sender.remote_exn in
+  let metadata =
+    [ ("sender_peer_id", `String peer.peer_id)
+    ; ("error", Error_json.error_to_yojson err)
+    ]
+  in
+  Trust_system.(
+    record config.trust_system config.logger peer
+      Actions.
+        (Decoding_failed, Some ("failed to decode gossip message", metadata)))
+  |> don't_wait_for ;
+  ()
+
+module Make
+    (SinksImpl : Message.Sinks)
+    (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
+  S with module Rpc_intf := Rpc_intf with type sinks := SinksImpl.sinks = struct
   open Rpc_intf
 
   module T = struct
@@ -69,10 +110,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       ; first_peer_ivar : unit Ivar.t
       ; high_connectivity_ivar : unit Ivar.t
       ; ban_reader : Intf.ban_notification Linear_pipe.Reader.t
-      ; message_reader :
-          (Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t)
-          Strict_pipe.Reader.t
-      ; subscription : Message.msg Mina_net2.Pubsub.subscription Deferred.t ref
+      ; publish_functions : publish_functions ref
       ; restart_helper : unit -> unit
       }
 
@@ -138,7 +176,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
     (* Creates just the helper, making sure to register everything
        BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
-        high_connectivity_ivar ~added_seeds ~pids ~on_unexpected_termination =
+        high_connectivity_ivar ~added_seeds ~pids ~on_unexpected_termination
+        ~(sinks : SinksImpl.sinks) =
       let ctr = ref 0 in
       let record_peer_connection () =
         [%log' trace config.logger] "Fired peer_connected callback" ;
@@ -331,57 +370,34 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                       | Ok () ->
                           () ))
             in
-            let message_reader, message_writer =
-              Strict_pipe.(
-                create
-                  ~name:"Gossip_net.Libp2p messages with validation callbacks"
-                  Synchronous)
-            in
-            let%bind subscription =
+            let subscribe ~fn topic bin_prot =
               Mina_net2.Pubsub.subscribe_encode net2
-                "coda/consensus-messages/0.0.1"
+                topic
                 (* Fix for #4097: validation is tied into a lot of complex control flow.
                    Instead of refactoring it to have validation up-front and decoupled,
                    we pass along a validation callback with the message. This ends up
                    ignoring the actual subscription message pipe, so drain it separately. *)
                 ~handle_and_validate_incoming_message:
-                  (fun envelope validation_callback ->
-                  (* Messages from ourselves are valid. Don't try and reingest them. *)
-                  match Envelope.Incoming.sender envelope with
-                  | Local ->
-                      Mina_net2.Validation_callback.fire_if_not_already_fired
-                        validation_callback `Accept ;
-                      Deferred.unit
-                  | Remote sender ->
-                      if not (Peer.Id.equal sender.peer_id my_peer_id) then
-                        Strict_pipe.Writer.write message_writer
-                          (envelope, validation_callback)
-                      else (
-                        Mina_net2.Validation_callback.fire_if_not_already_fired
-                          validation_callback `Accept ;
-                        Deferred.unit ))
-                ~bin_prot:Message.Latest.T.bin_msg
-                ~on_decode_failure:
-                  (`Call
-                    (fun envelope (err : Error.t) ->
-                      let peer =
-                        Envelope.Incoming.sender envelope
-                        |> Envelope.Sender.remote_exn
-                      in
-                      let metadata =
-                        [ ("sender_peer_id", `String peer.peer_id)
-                        ; ("error", Error_json.error_to_yojson err)
-                        ]
-                      in
-                      Trust_system.(
-                        record config.trust_system config.logger peer
-                          Actions.
-                            ( Decoding_failed
-                            , Some ("failed to decode gossip message", metadata)
-                            ))
-                      |> don't_wait_for ;
-                      ()))
+                  (validate_gossip_base ~fn my_peer_id)
+                ~bin_prot
+                ~on_decode_failure:(`Call (on_gossip_decode_failure config))
             in
+            let subscribe_v0_impl =
+              subscribe
+                ~fn:(fun (env, vc) ->
+                  match Envelope.Incoming.data env with
+                  | Message.New_state state ->
+                      SinksImpl.Block_sink.push sinks.sink_block
+                        (Envelope.Incoming.map ~f:(fun _ -> state) env, vc)
+                  | Message.Transaction_pool_diff diff ->
+                      SinksImpl.Tx_sink.push sinks.sink_tx
+                        (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc)
+                  | Message.Snark_pool_diff diff ->
+                      SinksImpl.Snark_sink.push sinks.sink_snark_work
+                        (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc))
+                "coda/consensus-messages/0.0.1" Message.Latest.T.bin_msg
+            in
+            let%bind publish_v0 = subscribe_v0_impl >>| Pubsub.publish net2 in
             let%map _ =
               (* XXX: this ALWAYS needs to be AFTER handle_protocol/subscribe
                  or it is possible to miss connections! *)
@@ -420,11 +436,11 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                        [%log' warn config.logger]
                          "starting libp2p up failed: $error"
                          ~metadata:[ ("error", Error_json.error_to_yojson e) ])) ;
-            (subscription, message_reader)
+            { publish_v0 }
           in
           match%map initializing_libp2p_result with
-          | Ok (subscription, message_reader) ->
-              (net2, subscription, message_reader, me)
+          | Ok pfs ->
+              (net2, pfs, me)
           | Error e ->
               fail e )
       | Ok (Error e) ->
@@ -436,14 +452,12 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let bandwidth_info t = !(t.net2) >>= Mina_net2.bandwidth_info
 
-    let create (config : Config.t) ~pids rpc_handlers =
+    let create (config : Config.t) ~pids rpc_handlers (sinks : SinksImpl.sinks)
+        =
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
-      let message_reader, message_writer =
-        Strict_pipe.create ~name:"libp2p_messages" Synchronous
-      in
       let net2_ref = ref (Deferred.never ()) in
-      let subscription_ref = ref (Deferred.never ()) in
+      let pfs_ref = ref empty_publish_functions in
       let restarts_r, restarts_w =
         Strict_pipe.create ~name:"libp2p-restarts"
           (Strict_pipe.Buffered
@@ -453,7 +467,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       let%bind () =
         let rec on_libp2p_create res =
           net2_ref :=
-            Deferred.map res ~f:(fun (n, _, _, _) ->
+            Deferred.map res ~f:(fun (n, _, _) ->
                 ( match
                     Sys.getenv "MINA_LIBP2P_HELPER_RESTART_INTERVAL_BASE"
                   with
@@ -478,18 +492,21 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 | None ->
                     () ) ;
                 n) ;
-          subscription_ref := Deferred.map res ~f:(fun (_, s, _, _) -> s) ;
-          upon res (fun (_, _, m, me) ->
+          let pf_impl f msg =
+            let%bind _, pf, _ = res in
+            f pf msg
+          in
+          pfs_ref := { publish_v0 = pf_impl (fun pf -> pf.publish_v0) } ;
+          upon res (fun (_, _, me) ->
               (* This is a hack so that we keep the same keypair across restarts. *)
               config.keypair <- Some me ;
               let logger = config.logger in
-              [%log trace] ~metadata:[] "Successfully restarted libp2p" ;
-              don't_wait_for (Strict_pipe.transfer m message_writer ~f:Fn.id))
+              [%log trace] ~metadata:[] "Successfully restarted libp2p")
         and start_libp2p () =
           let libp2p =
             create_libp2p config rpc_handlers first_peer_ivar
               high_connectivity_ivar ~added_seeds ~pids
-              ~on_unexpected_termination:restart_libp2p
+              ~on_unexpected_termination:restart_libp2p ~sinks
           in
           on_libp2p_create libp2p ; Deferred.ignore_m libp2p
         and restart_libp2p () = don't_wait_for (start_libp2p ()) in
@@ -548,8 +565,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         ; net2 = net2_ref
         ; first_peer_ivar
         ; high_connectivity_ivar
-        ; subscription = subscription_ref
-        ; message_reader
+        ; publish_functions = pfs_ref
         ; ban_reader
         ; restart_helper = (fun () -> Strict_pipe.Writer.write restarts_w ())
         }
@@ -786,18 +802,22 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         (Peer.pretty_list peers) ;
       List.map peers ~f:(fun peer -> query_peer t peer.peer_id rpc query)
 
-    let broadcast t msg =
-      don't_wait_for
-        (let%bind net2 = !(t.net2) in
-         let%bind subscription = !(t.subscription) in
-         Mina_net2.Pubsub.publish net2 subscription msg)
+    let broadcast_state t state =
+      let pfs = !(t.publish_functions) in
+      pfs.publish_v0 (Message.New_state state)
+
+    let broadcast_transaction_pool_diff t diff =
+      let pfs = !(t.publish_functions) in
+      pfs.publish_v0 (Message.Transaction_pool_diff diff)
+
+    let broadcast_snark_pool_diff t diff =
+      let pfs = !(t.publish_functions) in
+      pfs.publish_v0 (Message.Snark_pool_diff diff)
 
     let on_first_connect t ~f = Deferred.map (Ivar.read t.first_peer_ivar) ~f
 
     let on_first_high_connectivity t ~f =
       Deferred.map (Ivar.read t.high_connectivity_ivar) ~f
-
-    let received_message_reader t = t.message_reader
 
     let ban_notification_reader t = t.ban_reader
 

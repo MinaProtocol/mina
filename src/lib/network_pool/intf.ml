@@ -113,6 +113,18 @@ module type Resource_pool_intf = sig
     t -> has_timed_out:(Time.t -> [ `Timed_out | `Ok ]) -> Diff.t list
 end
 
+module type Broadcast_callback = sig
+  type resource_pool_diff
+
+  type rejected_diff
+
+  type t =
+    | Local of ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+    | External of Mina_net2.Validation_callback.t
+
+  val drop : resource_pool_diff -> rejected_diff -> t -> unit Deferred.t
+end
+
 (** A [Network_pool_base_intf] is the core implementation of a
  *  network pool on top of a [Resource_pool_intf]. It wraps
  *  some [Resource_pool_intf] and provides a generic interface
@@ -138,44 +150,39 @@ module type Network_pool_base_intf = sig
 
   type transition_frontier
 
-  module Broadcast_callback : sig
-    type t =
-      | Local of ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
-      | External of Mina_net2.Validation_callback.t
-  end
+  module Local_sink :
+    Mina_net2.Sink.S_with_void
+      with type msg :=
+            resource_pool_diff
+            * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+
+  module Remote_sink :
+    Mina_net2.Sink.S_with_void
+      with type msg :=
+            resource_pool_diff Envelope.Incoming.t
+            * Mina_net2.Validation_callback.t
+
+  module Broadcast_callback :
+    Broadcast_callback
+      with type resource_pool_diff := resource_pool_diff
+       and type rejected_diff := rejected_diff
 
   val create :
        config:config
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
-    -> incoming_diffs:
-         ( resource_pool_diff Envelope.Incoming.t
-         * Mina_net2.Validation_callback.t )
-         Strict_pipe.Reader.t
-    -> local_diffs:
-         ( resource_pool_diff
-         * ((resource_pool_diff * rejected_diff) Or_error.t -> unit) )
-         Strict_pipe.Reader.t
     -> frontier_broadcast_pipe:
          transition_frontier Option.t Broadcast_pipe.Reader.t
     -> logger:Logger.t
-    -> t
+    -> t * Remote_sink.t * Local_sink.t
 
   val of_resource_pool_and_diffs :
        resource_pool
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> incoming_diffs:
-         ( resource_pool_diff Envelope.Incoming.t
-         * Mina_net2.Validation_callback.t )
-         Strict_pipe.Reader.t
-    -> local_diffs:
-         ( resource_pool_diff
-         * ((resource_pool_diff * rejected_diff) Or_error.t -> unit) )
-         Strict_pipe.Reader.t
     -> tf_diffs:transition_frontier_diff Strict_pipe.Reader.t
-    -> t
+    -> t * Remote_sink.t * Local_sink.t
 
   val resource_pool : t -> resource_pool
 

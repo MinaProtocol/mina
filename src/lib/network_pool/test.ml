@@ -38,12 +38,6 @@ let%test_module "network pool test" =
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
-      let pool_reader, _pool_writer =
-        Strict_pipe.(create ~name:"Network pool test" Synchronous)
-      in
-      let local_reader, _local_writer =
-        Strict_pipe.(create ~name:"Network pool test" Synchronous)
-      in
       let tf = Mocks.Transition_frontier.create [] in
       let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
       let work =
@@ -61,10 +55,9 @@ let%test_module "network pool test" =
         }
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let network_pool =
+          let network_pool, _, _ =
             Mock_snark_pool.create ~config ~logger ~constraint_constants
-              ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
-              ~local_diffs:local_reader
+              ~consensus_constants ~time_controller
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let%bind () =
@@ -114,32 +107,25 @@ let%test_module "network pool test" =
               } )
       in
       let verify_unsolved_work () =
-        let pool_reader, pool_writer =
-          Strict_pipe.(create ~name:"Network pool test" Synchronous)
-        in
-        let local_reader, local_writer =
-          Strict_pipe.(create ~name:"Network pool test" Synchronous)
+        let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
+        let tf = Mocks.Transition_frontier.create [] in
+        let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
+        let network_pool, remote_sink, local_sink =
+          Mock_snark_pool.create ~config ~logger ~constraint_constants
+            ~consensus_constants ~time_controller
+            ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
         List.map (List.take works per_reader) ~f:create_work
         |> List.map ~f:(fun work ->
                ( Envelope.Incoming.local work
                , Mina_net2.Validation_callback.create_without_expiration () ))
         |> List.iter ~f:(fun diff ->
-               Strict_pipe.Writer.write pool_writer diff
+               Mock_snark_pool.Remote_sink.push remote_sink diff
                |> Deferred.don't_wait_for) ;
         List.map (List.drop works per_reader) ~f:create_work
         |> List.iter ~f:(fun diff ->
-               Strict_pipe.Writer.write local_writer (diff, Fn.const ())
+               Mock_snark_pool.Local_sink.push local_sink (diff, Fn.const ())
                |> Deferred.don't_wait_for) ;
-        let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
-        let tf = Mocks.Transition_frontier.create [] in
-        let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
-        let network_pool =
-          Mock_snark_pool.create ~config ~logger ~constraint_constants
-            ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
-            ~local_diffs:local_reader
-            ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-        in
         let%bind () = Mocks.Transition_frontier.refer_statements tf works in
         don't_wait_for
         @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
