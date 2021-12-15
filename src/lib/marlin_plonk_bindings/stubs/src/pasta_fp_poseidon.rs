@@ -3,7 +3,7 @@ use mina_curves::pasta::{
 };
 use oracle::poseidon::{
     poseidon_block_cipher,
-    PlonkSpongeConstants3W,
+    PlonkSpongeConstantsBasic,
     ArithmeticSpongeParams};
 use crate::pasta_fp_vector::CamlPastaFpVector;
 
@@ -30,7 +30,7 @@ pub fn caml_pasta_fp_poseidon_params_create() -> CamlPastaFpPoseidonParams {
 pub fn caml_pasta_fp_poseidon_block_cipher(
     params: CamlPastaFpPoseidonParamsPtr,
     mut state: CamlPastaFpVector) {
-    poseidon_block_cipher::<Fp, PlonkSpongeConstants3W>(
+    poseidon_block_cipher::<Fp, PlonkSpongeConstantsBasic>(
         & params.as_ref().0,
         state.as_mut())
 }
