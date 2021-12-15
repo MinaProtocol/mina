@@ -1144,12 +1144,14 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; all_peers_seen_metric
               ; known_private_ip_nets =
                   Option.value ~default:[] client_trustlist
+              ; time_controller
               }
           in
           let net_config =
             { Mina_networking.Config.logger
             ; trust_system
             ; time_controller
+            ; consensus_constants = precomputed_values.consensus_constants
             ; consensus_local_state
             ; genesis_ledger_hash
             ; constraint_constants = precomputed_values.constraint_constants
