@@ -19,7 +19,7 @@ module Time : sig
 
     val create : t -> t
 
-    val basic : logger:Logger.t -> t
+    val basic : logger:Logger_type.t -> t
 
     (** Override the time offset set by the [MINA_TIME_OFFSET] environment
         variable for all block time controllers.
@@ -32,7 +32,7 @@ module Time : sig
     (** Get the current time offset, either from the [MINA_TIME_OFFSET]
         environment variable, or as last set by [set_time_offset].
     *)
-    val get_time_offset : logger:Logger.t -> Time.Span.t
+    val get_time_offset : logger:Logger_type.t -> Time.Span.t
 
     (** Disallow setting the time offset. This should be run at every
         entrypoint which does not explicitly need to update the time offset.
@@ -65,10 +65,16 @@ module Time : sig
        and type Packed.value = t
        and type Packed.var = private Tick.Field.Var.t
 
+  val to_input : t -> Tick.Field.t Random_oracle_input.t
+
   module Checked : sig
     open Snark_params.Tick
 
-    type t = Unpacked.var
+    type t
+
+    val typ : (t, Stable.Latest.t) Typ.t
+
+    val to_input : t -> Field.Var.t Random_oracle_input.t
 
     val ( = ) : t -> t -> (Boolean.var, _) Checked.t
 
@@ -79,6 +85,12 @@ module Time : sig
     val ( <= ) : t -> t -> (Boolean.var, _) Checked.t
 
     val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
+
+    val to_field : t -> Field.Var.t
+
+    module Unsafe : sig
+      val of_field : Field.Var.t -> t
+    end
   end
 
   module Span : sig
@@ -102,7 +114,7 @@ module Time : sig
         with type Unpacked.value = t
          and type Packed.value = t
 
-    val to_time_ns_span : t -> Core.Time_ns.Span.t
+    val to_time_ns_span : t -> Core_kernel.Time_ns.Span.t
 
     val to_string_hum : t -> string
 
@@ -129,6 +141,24 @@ module Time : sig
     val min : t -> t -> t
 
     val zero : t
+
+    val to_input : t -> Tick.Field.t Random_oracle_input.t
+
+    module rec Checked : sig
+      type t
+
+      val typ : (Checked.t, Stable.V1.t) Snark_params.Tick.Typ.t
+
+      open Snark_params.Tick
+
+      val to_input : t -> Tick.Field.Var.t Random_oracle_input.t
+
+      val to_field : t -> Field.Var.t
+
+      module Unsafe : sig
+        val of_field : Field.Var.t -> t
+      end
+    end
   end
 
   val field_var_to_unpacked :
@@ -160,6 +190,8 @@ module Time : sig
   val to_int64 : t -> Int64.t
 
   val of_int64 : Int64.t -> t
+
+  val of_uint64 : Unsigned.UInt64.t -> t
 
   val to_string : t -> string
 
