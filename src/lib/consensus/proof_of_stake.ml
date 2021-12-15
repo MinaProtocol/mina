@@ -1959,27 +1959,28 @@ module Data = struct
     let same_checkpoint_window ~(constants : Constants.var)
         ~prev:(slot1 : Global_slot.Checked.t)
         ~next:(slot2 : Global_slot.Checked.t) =
-      let open Snarky_integer in
-      let open Run in
       let module Slot = Mina_numbers.Global_slot in
-      let slot1 = Slot.Checked.to_integer (Global_slot.slot_number slot1) in
+      let slot1 : Slot.Checked.t = Global_slot.slot_number slot1 in
       let checkpoint_window_size_in_slots =
-        Length.Checked.to_integer constants.checkpoint_window_size_in_slots
+        constants.checkpoint_window_size_in_slots
       in
-      let _q1, r1 = Integer.div_mod ~m slot1 checkpoint_window_size_in_slots in
+      let%bind _q1, r1 =
+        Slot.Checked.div_mod slot1
+          (Slot.Checked.Unsafe.of_field
+             (Length.Checked.to_field checkpoint_window_size_in_slots))
+      in
       let next_window_start =
-        Field.(
-          Integer.to_field slot1 - Integer.to_field r1
-          + Integer.to_field checkpoint_window_size_in_slots)
+        Run.Field.(
+          Slot.Checked.to_field slot1
+          - Slot.Checked.to_field r1
+          + Length.Checked.to_field checkpoint_window_size_in_slots)
       in
-      (Field.compare ~bit_length:Slot.length_in_bits
-         ( Global_slot.slot_number slot2
-         |> Slot.Checked.to_integer |> Integer.to_field )
-         next_window_start)
-        .less
+      Slot.Checked.( < )
+        (Global_slot.slot_number slot2)
+        (Slot.Checked.Unsafe.of_field next_window_start)
 
     let same_checkpoint_window ~constants ~prev ~next =
-      make_checked (fun () -> same_checkpoint_window ~constants ~prev ~next)
+      same_checkpoint_window ~constants ~prev ~next
 
     let negative_one ~genesis_ledger
         ~(genesis_epoch_data : Genesis_epoch_data.t) ~(constants : Constants.t)
