@@ -100,6 +100,7 @@ CREATE TABLE snapp_party_body
 , update_id                int              NOT NULL REFERENCES snapp_updates(id)
 , token_id                 bigint           NOT NULL
 , delta                    bigint           NOT NULL
+, increment_nonce          boolean          NOT NULL
 , events_ids               int[]            NOT NULL
 , sequence_events_ids      int[]            NOT NULL
 , call_data_id             int              NOT NULL REFERENCES snapp_state_data(id)

@@ -6,7 +6,7 @@
 
 open Core_kernel
 
-let gen_predicate_from ?(succeed = true) ~account_id ~ledger =
+let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
   (* construct predicate using pk and ledger
      don't return Accept, which would ignore those inputs
   *)
@@ -280,11 +280,11 @@ let gen_delta ?balances_tbl (account : Account.t) =
 (* the type a is associated with the delta field, which is an unsigned fee for the fee payer,
    and a signed amount for other parties
 *)
-let gen_party_body (type a) ?account_id ?balances_tbl ?(new_account = false)
+let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
     ?(snapp_account = false) ?(is_fee_payer = false) ?available_public_keys
     ~(gen_delta : Account.t -> a Quickcheck.Generator.t)
-    ~(f_delta : a -> Currency.Amount.Signed.t) ~ledger () :
-    (_, _, _, a, _, _, _) Party.Body.Poly.t Quickcheck.Generator.t =
+    ~(f_delta : a -> Currency.Amount.Signed.t) ~(increment_nonce : b) ~ledger ()
+    : (_, _, _, a, _, _, _, b) Party.Body.Poly.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   (* ledger may contain non-Snapp accounts, so if we want a Snapp account,
      must generate a new one
@@ -293,7 +293,6 @@ let gen_party_body (type a) ?account_id ?balances_tbl ?(new_account = false)
     failwith "gen_party_body: snapp_account but not new_account" ;
   (* fee payers have to be in the ledger *)
   assert (not (is_fee_payer && new_account)) ;
-  (*  let%bind token_id = gen_a in *)
   let%bind update = Party.Update.gen ~new_account () in
   let%bind account =
     if new_account then (
@@ -449,6 +448,7 @@ let gen_party_body (type a) ?account_id ?balances_tbl ?(new_account = false)
   ; update
   ; token_id
   ; delta
+  ; increment_nonce
   ; events
   ; sequence_events
   ; call_data
@@ -456,20 +456,22 @@ let gen_party_body (type a) ?account_id ?balances_tbl ?(new_account = false)
   }
 
 let gen_predicated_from ?(succeed = true) ?(new_account = false)
-    ?(snapp_account = false) ?available_public_keys ~ledger ~balances_tbl =
+    ?(snapp_account = false) ?(increment_nonce = false) ?available_public_keys
+    ~ledger ~balances_tbl () =
   let open Quickcheck.Let_syntax in
   let%bind body =
-    gen_party_body ~new_account ~snapp_account ?available_public_keys ~ledger
-      ~balances_tbl ~gen_delta:(gen_delta ~balances_tbl) ~f_delta:Fn.id ()
+    gen_party_body ~new_account ~snapp_account ~increment_nonce
+      ?available_public_keys ~ledger ~balances_tbl
+      ~gen_delta:(gen_delta ~balances_tbl) ~f_delta:Fn.id ()
   in
   let account_id =
     Account_id.create body.Party.Body.Poly.pk body.Party.Body.Poly.token_id
   in
-  let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger in
+  let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger () in
   Party.Predicated.Poly.{ body; predicate }
 
 let gen_party_from ?(succeed = true) ?(new_account = false)
-    ~available_public_keys ~ledger ~balances_tbl =
+    ~available_public_keys ~ledger ~balances_tbl () =
   let open Quickcheck.Let_syntax in
   let%bind authorization = Lazy.force Control.gen_with_dummies in
   let snapp_account =
@@ -483,9 +485,16 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
      ledger may not be Snapp accounts
   *)
   let new_account = new_account || snapp_account in
+  let increment_nonce =
+    match authorization with
+    | Signature _ ->
+        true
+    | Proof _ | None_given ->
+        false
+  in
   let%map data =
-    gen_predicated_from ~succeed ~new_account ~snapp_account
-      ~available_public_keys ~ledger ~balances_tbl
+    gen_predicated_from ~succeed ~new_account ~snapp_account ~increment_nonce
+      ~available_public_keys ~ledger ~balances_tbl ()
   in
   { Party.data; authorization }
 
@@ -494,7 +503,9 @@ let gen_party_predicated_signed ?account_id ~ledger :
     Party.Predicated.Signed.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind body =
-    gen_party_body ~gen_delta ~f_delta:Fn.id ?account_id ~ledger ()
+    gen_party_body ~gen_delta ~f_delta:Fn.id
+      ~increment_nonce:(Option.is_some account_id)
+      ?account_id ~ledger ()
   in
   let%map predicate = Account.Nonce.gen in
   Party.Predicated.Poly.{ body; predicate }
@@ -504,8 +515,8 @@ let gen_party_predicated_fee_payer ~account_id ~ledger :
     Party.Predicated.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body0 =
-    gen_party_body ~account_id ~is_fee_payer:true ~gen_delta:gen_fee
-      ~f_delta:fee_to_amt ~ledger ()
+    gen_party_body ~account_id ~is_fee_payer:true ~increment_nonce:()
+      ~gen_delta:gen_fee ~f_delta:fee_to_amt ~ledger ()
   in
   (* make sure the fee payer's token id is the default,
      which is represented by the unit value in the body
@@ -535,22 +546,30 @@ let gen_parties_from ?(succeed = true)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t)
-    ~ledger ~protocol_state =
+    ~ledger ~protocol_state () =
   let open Quickcheck.Let_syntax in
   let max_parties = 5 in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
   in
   let fee_payer_account_id = Account_id.create fee_payer_pk Token_id.default in
+  let ledger_accounts = Ledger.accounts ledger in
+  (* make sure all ledger keys are in the keymap *)
+  Account_id.Set.iter ledger_accounts ~f:(fun acct_id ->
+      let pk = Account_id.public_key acct_id in
+      if Option.is_none (Signature_lib.Public_key.Compressed.Map.find keymap pk)
+      then
+        failwithf "gen_parties_from: public key %s is in ledger, but not keymap"
+          (Signature_lib.Public_key.Compressed.to_base58_check pk)
+          ()) ;
   (* table of public keys not in the ledger, to be used for new parties
      we have the corresponding private keys, so we can create signatures for those new parties
   *)
   let available_public_keys =
     let tbl = Signature_lib.Public_key.Compressed.Table.create () in
-    let accounts = Ledger.accounts ledger in
     Signature_lib.Public_key.Compressed.Map.iter_keys keymap ~f:(fun pk ->
         let account_id = Account_id.create pk Token_id.default in
-        if not (Account_id.Set.mem accounts account_id) then
+        if not (Account_id.Set.mem ledger_accounts account_id) then
           Signature_lib.Public_key.Compressed.Table.add_exn tbl ~key:pk ~data:()) ;
     tbl
   in
@@ -565,7 +584,7 @@ let gen_parties_from ?(succeed = true)
       else
         let%bind party =
           gen_party_from ~new_account:new_parties ~available_public_keys
-            ~succeed ~ledger ~balances_tbl
+            ~succeed ~ledger ~balances_tbl ()
         in
         go (party :: acc) (n - 1)
     in

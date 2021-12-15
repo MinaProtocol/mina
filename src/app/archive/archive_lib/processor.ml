@@ -529,6 +529,7 @@ module Snapp_party_body = struct
     ; update_id : int
     ; token_id : int64
     ; delta : int64
+    ; increment_nonce : bool
     ; events_ids : int array
     ; sequence_events_ids : int array
     ; call_data_id : int
@@ -540,7 +541,7 @@ module Snapp_party_body = struct
     let open Caqti_type_spec in
     let spec =
       Caqti_type.
-        [ int; int; int64; int64; array_int_typ; array_int_typ; int; int ]
+        [ int; int; int64; int64; bool; array_int_typ; array_int_typ; int; int ]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
@@ -554,6 +555,7 @@ module Snapp_party_body = struct
     let%bind update_id =
       Snapp_updates.add_if_doesn't_exist (module Conn) body.update
     in
+    let increment_nonce = body.increment_nonce in
     let%bind events_ids =
       deferred_result_list_map body.events
         ~f:(Snapp_state_data_array.add_if_doesn't_exist (module Conn))
@@ -587,6 +589,7 @@ module Snapp_party_body = struct
       ; update_id
       ; token_id
       ; delta
+      ; increment_nonce
       ; events_ids
       ; sequence_events_ids
       ; call_data_id
@@ -2377,19 +2380,23 @@ module Block = struct
                     (module Conn)
                     user_command.data
                 in
-                let%bind { fee_payer_id; source_id; receiver_id } =
-                  User_command.Signed_command
-                  .add_balance_public_keys_if_don't_exist
-                    (module Conn)
-                    (User_command.as_signed_command user_command.data)
-                in
                 let%map () =
-                  Block_and_signed_command.add_with_status
-                    (module Conn)
-                    ~block_id ~user_command_id:id ~sequence_no
-                    ~status:user_command.status ~fee_payer_id ~source_id
-                    ~receiver_id
-                  >>| ignore
+                  match command with
+                  | Signed_command c ->
+                      let%bind { fee_payer_id; source_id; receiver_id } =
+                        User_command.Signed_command
+                        .add_balance_public_keys_if_don't_exist
+                          (module Conn)
+                          c
+                      in
+                      Block_and_signed_command.add_with_status
+                        (module Conn)
+                        ~block_id ~user_command_id:id ~sequence_no
+                        ~status:user_command.status ~fee_payer_id ~source_id
+                        ~receiver_id
+                      >>| ignore
+                  | Parties _ ->
+                      Deferred.Result.return ()
                 in
                 sequence_no + 1
             | { data = Fee_transfer fee_transfer_bundled; status } ->

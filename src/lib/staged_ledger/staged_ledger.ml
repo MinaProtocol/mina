@@ -247,27 +247,16 @@ module T = struct
       ; pending_coinbase_stack
       }
     in
+    let statement_check = `Partial in
     match Scan_state.latest_ledger_proof scan_state with
     | None ->
         Statement_scanner.check_invariants ~constraint_constants scan_state
-          ~verifier:() ~error_prefix ~registers_end ~registers_begin:None
+          ~statement_check ~verifier:() ~error_prefix ~registers_end
+          ~registers_begin:None
     | Some proof ->
         Statement_scanner.check_invariants ~constraint_constants scan_state
-          ~verifier:() ~error_prefix ~registers_end
+          ~statement_check ~verifier:() ~error_prefix ~registers_end
           ~registers_begin:(Some (get_target proof))
-
-  let statement_exn ~constraint_constants t =
-    let open Deferred.Let_syntax in
-    match%map
-      Statement_scanner.scan_statement ~constraint_constants t.scan_state
-        ~verifier:()
-    with
-    | Ok s ->
-        `Non_empty s
-    | Error `Empty ->
-        `Empty
-    | Error (`Error e) ->
-        failwithf !"statement_exn: %{sexp:Error.t}" e ()
 
   let of_scan_state_and_ledger_unchecked ~ledger ~scan_state
       ~constraint_constants ~pending_coinbase_collection =
@@ -276,7 +265,7 @@ module T = struct
   let of_scan_state_and_ledger ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~verifier ~snarked_registers ~ledger ~scan_state
-      ~pending_coinbase_collection =
+      ~pending_coinbase_collection ~get_state =
     let open Deferred.Or_error.Let_syntax in
     let t =
       of_scan_state_and_ledger_unchecked ~ledger ~scan_state
@@ -289,7 +278,7 @@ module T = struct
     in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants ~constraint_constants
-        scan_state
+        scan_state ~statement_check:(`Full get_state)
         ~verifier:{ Statement_scanner_proof_verifier.logger; verifier }
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~registers_begin:(Some snarked_registers)
@@ -317,7 +306,8 @@ module T = struct
     in
     let%bind () =
       Statement_scanner.check_invariants ~constraint_constants scan_state
-        ~verifier:() ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
+        ~statement_check:`Partial ~verifier:()
+        ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~registers_begin:(Some snarked_registers)
         ~registers_end:
           { local_state = Mina_state.Local_state.empty
@@ -399,7 +389,7 @@ module T = struct
     of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
       ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state
       ~expected_merkle_root ~get_state
-      (of_scan_state_and_ledger ~logger ~verifier)
+      (of_scan_state_and_ledger ~logger ~get_state ~verifier)
 
   let of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
       ~constraint_constants ~scan_state ~snarked_ledger ~snarked_local_state
@@ -461,6 +451,16 @@ module T = struct
       (Ledger.merkle_root ledger) ;
     { t with ledger }
 
+  let time ~logger label f =
+    let start = Core.Time.now () in
+    let%map x = trace_recurring label f in
+    [%log debug]
+      ~metadata:
+        [ ("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))
+        ]
+      "%s took $time_elapsed" label ;
+    x
+
   let sum_fees xs ~f =
     with_return (fun { return } ->
         Ok
@@ -516,15 +516,40 @@ module T = struct
         ~f:(fun x -> Ok x)
     else Ok constraint_constants.coinbase_amount
 
+  let apply_transaction ~constraint_constants ~ledger ~txn_state_view
+      ~source_merkle_root (s : Transaction.t) =
+    let open Or_error.Let_syntax in
+    match s with
+    | Command (Parties c) ->
+        let fee_excess = Amount.Signed.zero in
+        let to_fee_excess fee =
+          Fee_excess.of_single (Token_id.default, Amount.Signed.to_fee fee)
+        in
+        let%map applied_parties, fee_excess =
+          Ledger.apply_parties_unchecked_aux ~constraint_constants
+            ~state_view:txn_state_view ~fee_excess ledger c ~init:fee_excess
+            ~f:(fun _ (global_state, _local_state) -> global_state.fee_excess)
+        in
+        ( { Ledger.Transaction_applied.previous_hash = source_merkle_root
+          ; varying = Command (Parties applied_parties)
+          }
+        , to_fee_excess fee_excess )
+    | _ ->
+        let%bind applied_txn =
+          Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger
+            s
+        in
+        let%map fee_excess = Transaction.fee_excess s in
+        (applied_txn, fee_excess)
+
   let apply_transaction_and_get_statement ~constraint_constants ledger
       (pending_coinbase_stack_state : Stack_state_with_init_stack.t) s
       txn_state_view =
     let open Result.Let_syntax in
-    let%bind fee_excess = Transaction.fee_excess s |> to_staged_ledger_or_error
-    and supply_increase =
+    let%bind supply_increase =
       Transaction.supply_increase s |> to_staged_ledger_or_error
     in
-    let source =
+    let source_merkle_root =
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
     let next_available_token_before = Ledger.next_available_token ledger in
@@ -534,24 +559,28 @@ module T = struct
     let new_init_stack =
       push_coinbase pending_coinbase_stack_state.init_stack s
     in
-    let%map applied_txn =
-      Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger s
+    let empty_local_state = Mina_state.Local_state.empty in
+    let%map applied_txn, fee_excess =
+      apply_transaction ~constraint_constants ~txn_state_view ~ledger
+        ~source_merkle_root s
       |> to_staged_ledger_or_error
     in
     let next_available_token_after = Ledger.next_available_token ledger in
+    let target_merkle_root =
+      Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
+    in
     ( applied_txn
     , { Transaction_snark.Statement.source =
-          { ledger = source
+          { ledger = source_merkle_root
           ; next_available_token = next_available_token_before
           ; pending_coinbase_stack = pending_coinbase_stack_state.pc.source
-          ; local_state = Mina_state.Local_state.empty
+          ; local_state = empty_local_state
           }
       ; target =
-          { ledger =
-              Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
+          { ledger = target_merkle_root
           ; next_available_token = next_available_token_after
           ; pending_coinbase_stack = pending_coinbase_target
-          ; local_state = Mina_state.Local_state.empty
+          ; local_state = empty_local_state
           }
       ; fee_excess
       ; supply_increase
@@ -608,7 +637,6 @@ module T = struct
     in
     ( { Scan_state.Transaction_with_witness.transaction_with_info = applied_txn
       ; state_hash = state_and_body_hash
-      ; state_view = txn_state_view
       ; ledger_witness
       ; init_stack = Base pending_coinbase_stack_state.init_stack
       ; statement
@@ -715,16 +743,6 @@ module T = struct
     Option.value_map ~default:(Result.return ())
       ~f:(fun _ -> check (List.drop data (fst partitions.first)) partitions)
       partitions.second
-
-  let time ~logger label f =
-    let start = Core.Time.now () in
-    let%map x = trace_recurring label f in
-    [%log debug]
-      ~metadata:
-        [ ("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))
-        ]
-      "%s took $time_elapsed" label ;
-    x
 
   let update_coinbase_stack_and_get_data ~constraint_constants scan_state ledger
       pending_coinbase_collection transactions current_state_view

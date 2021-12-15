@@ -1,3 +1,5 @@
+(* parties_logic.ml *)
+
 module type Iffable = sig
   type bool
 
@@ -34,6 +36,8 @@ module type Amount_intf = sig
   module Signed : sig
     include Iffable with type bool := bool
 
+    val equal : t -> t -> bool
+
     val is_pos : t -> bool
 
     val negate : t -> t
@@ -66,7 +70,14 @@ module Local_state = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('parties, 'token_id, 'excess, 'ledger, 'bool, 'comm) t =
+      type ( 'parties
+           , 'token_id
+           , 'excess
+           , 'ledger
+           , 'bool
+           , 'comm
+           , 'failure_status )
+           t =
         { parties : 'parties
         ; call_stack : 'parties
         ; transaction_commitment : 'comm
@@ -74,14 +85,15 @@ module Local_state = struct
         ; excess : 'excess
         ; ledger : 'ledger
         ; success : 'bool
+        ; failure_status : 'failure_status
         }
       [@@deriving compare, equal, hash, sexp, yojson, fields, hlist]
     end
   end]
 
-  let typ parties token_id excess ledger bool comm =
+  let typ parties token_id excess ledger bool comm failure_status =
     Pickles.Impls.Step.Typ.of_hlistable
-      [ parties; parties; comm; token_id; excess; ledger; bool ]
+      [ parties; parties; comm; token_id; excess; ledger; bool; failure_status ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
@@ -95,7 +107,8 @@ module Local_state = struct
           , Currency.Amount.Stable.V1.t
           , Ledger_hash.Stable.V1.t
           , bool
-          , Parties.Transaction_commitment.Stable.V1.t )
+          , Parties.Transaction_commitment.Stable.V1.t
+          , Transaction_status.Failure.Stable.V1.t option )
           Stable.V1.t
         [@@deriving compare, equal, hash, sexp, yojson]
 
@@ -113,7 +126,8 @@ module Local_state = struct
       , Currency.Amount.Checked.t
       , Ledger_hash.var
       , Boolean.var
-      , Parties.Transaction_commitment.Checked.t )
+      , Parties.Transaction_commitment.Checked.t
+      , unit )
       Stable.Latest.t
   end
 end
@@ -244,7 +258,7 @@ module Eff = struct
         ; global_state : 'global_state
         ; inclusion_proof : 'ip
         }
-        -> ( 'account * 'bool
+        -> ( 'account * 'bool * 'failure
            , < inclusion_proof : 'ip
              ; bool : 'bool
              ; party : 'party
@@ -252,6 +266,7 @@ module Eff = struct
              ; transaction_commitment : 'transaction_commitment
              ; account : 'account
              ; global_state : 'global_state
+             ; failure : 'failure
              ; .. > )
            t
     | Balance :
@@ -365,7 +380,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (party, current_stack, call_stack)
 
-  let apply (type global_state)
+  let apply (type global_state failure_status)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start :
          [ `Yes of _ Start_data.t | `No | `Compute of _ Start_data.t ])
@@ -374,6 +389,7 @@ module Make (Inputs : Inputs_intf) = struct
          ; transaction_commitment : Transaction_commitment.t
          ; amount : Amount.t
          ; bool : Bool.t
+         ; failure : failure_status
          ; .. >
          as
          'env)
@@ -462,7 +478,7 @@ module Make (Inputs : Inputs_intf) = struct
     let predicate_satisfied : Bool.t =
       h.perform (Check_predicate (is_start', party, a, global_state))
     in
-    let a', update_permitted =
+    let a', update_permitted, failure_status =
       h.perform
         (Check_auth_and_update_account
            { is_start = is_start'
@@ -517,6 +533,7 @@ module Make (Inputs : Inputs_intf) = struct
       { local_state with
         excess = new_local_fee_excess
       ; success = Bool.(local_state.success &&& not overflowed)
+      ; failure_status
       }
     in
 
@@ -546,6 +563,11 @@ module Make (Inputs : Inputs_intf) = struct
     let update_global_state =
       ref Bool.(update_local_excess &&& local_state.success)
     in
+    (*let delta_settled = Amount.equal
+                         local_state.excess
+                         Amount.zero
+      in
+      Bool.(assert_ ((not is_last_party) ||| delta_settled)) ;*)
     let global_excess_update_failed = ref Bool.true_ in
     let global_state, local_state =
       ( h.perform

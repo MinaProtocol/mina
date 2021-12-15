@@ -124,6 +124,7 @@ module Json_layout = struct
           ; set_snapp_uri : Auth_required.t [@default None]
           ; edit_sequence_state : Auth_required.t [@default None]
           ; set_token_symbol : Auth_required.t [@default None]
+          ; increment_nonce : Auth_required.t [@default None]
           }
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
 
@@ -138,6 +139,7 @@ module Json_layout = struct
            ; "set_snapp_uri"
            ; "edit_sequence_state"
            ; "set_token_symbol"
+           ; "increment_nonce"
           |]
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
