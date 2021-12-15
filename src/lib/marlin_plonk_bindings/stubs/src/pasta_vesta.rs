@@ -2,6 +2,7 @@ use crate::arkworks::{CamlFp, CamlFq, CamlGVesta, CamlGroupProjectiveVesta};
 use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::{One, UniformRand};
 use mina_curves::pasta::{
+    fp::Fp,
     fq::Fq,
     vesta::{Affine as GAffine, Projective},
 };
@@ -45,9 +46,9 @@ pub fn caml_pasta_vesta_double(
 #[ocaml::func]
 pub fn caml_pasta_vesta_scale(
     x: ocaml::Pointer<CamlGroupProjectiveVesta>,
-    y: CamlFp,
+    y: Fp,
 ) -> CamlGroupProjectiveVesta {
-    let y: ark_ff::BigInteger256 = y.0.into();
+    let y: ark_ff::BigInteger256 = y.into();
     x.as_ref().mul(&y).into()
 }
 
