@@ -1784,7 +1784,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       in
       M.start ~constraint_constants
         { parties = Inputs.Parties.of_parties_list parties
-        ; protocol_state_predicate = c.protocol_state
         ; memo_hash = Signed_command_memo.hash c.memo
         }
         { perform } initial_state
@@ -2617,7 +2616,6 @@ module For_tests = struct
             ; authorization = None_given
             }
           ]
-      ; protocol_state = Snapp_predicate.Protocol_state.accept
       ; memo = Signed_command_memo.empty
       }
     in

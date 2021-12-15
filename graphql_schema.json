@@ -4148,22 +4148,6 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolState",
-              "description": "The protocol state in a Snapp transaction",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappProtocolState",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "otherParties",
               "description":
                 "The parties other than the fee payer in a Snapp transaction",
@@ -4210,20 +4194,6 @@
               "name": "memo",
               "description": "Short arbitrary message provided by the sender",
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "protocolState",
-              "description": "The protocol state in a Snapp transaction",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappProtocolState",
-                  "ofType": null
-                }
-              },
               "defaultValue": null
             },
             {

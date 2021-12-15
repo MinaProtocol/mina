@@ -3141,10 +3141,9 @@ module Types = struct
     let send_snapp =
       let open Fields in
       obj "SendSnappInput"
-        ~coerce:(fun fee_payer other_parties protocol_state memo ->
-          (fee_payer, other_parties, protocol_state, memo))
-        ~fields:
-          [ snapp_fee_payer; snapp_other_parties; snapp_protocol_state; memo ]
+        ~coerce:(fun fee_payer other_parties memo ->
+          (fee_payer, other_parties, memo))
+        ~fields:[ snapp_fee_payer; snapp_other_parties; memo ]
 
     let send_delegation =
       let open Fields in
@@ -3919,23 +3918,19 @@ module Mutations = struct
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.send_snapp) ]
       ~resolve:
         (fun { ctx = coda; _ } ()
-             ( fee_payer_result
-             , other_parties_results
-             , protocol_state_result
-             , memo ) ->
+             (fee_payer_result, other_parties_results, memo) ->
         let parties_result =
           let open Result.Let_syntax in
           let other_parties_result = Result.all other_parties_results in
           let%bind fee_payer = fee_payer_result in
           let%bind other_parties = other_parties_result in
-          let%bind protocol_state = protocol_state_result in
           let%map memo =
             Option.value_map memo ~default:(Ok Signed_command_memo.empty)
               ~f:(fun memo ->
                 result_of_exn Signed_command_memo.create_from_string_exn memo
                   ~error:"Invalid `memo` provided.")
           in
-          { Parties.fee_payer; other_parties; protocol_state; memo }
+          { Parties.fee_payer; other_parties; memo }
         in
         match parties_result with
         | Ok parties ->

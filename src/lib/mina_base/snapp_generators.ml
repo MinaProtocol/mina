@@ -559,7 +559,7 @@ let gen_parties_from ?(succeed = true)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t)
-    ~ledger ~protocol_state () =
+    ~ledger () =
   let open Quickcheck.Let_syntax in
   let max_parties = 5 in
   let fee_payer_pk =
@@ -617,7 +617,7 @@ let gen_parties_from ?(succeed = true)
   let%bind memo = Signed_command_memo.gen in
   let memo_hash = Signed_command_memo.hash memo in
   let parties_dummy_signatures : Parties.t =
-    { fee_payer; other_parties; protocol_state; memo }
+    { fee_payer; other_parties; memo }
   in
   (* replace dummy signature in fee payer *)
   let fee_payer_signature =
@@ -641,9 +641,8 @@ let gen_parties_from ?(succeed = true)
   in
   let protocol_state_predicate_hash =
     Snapp_predicate.Protocol_state.digest
-      parties_dummy_signatures.protocol_state
+      parties_dummy_signatures.fee_payer.data.body.protocol_state
   in
-
   let sign_for_other_party sk =
     Signature_lib.Schnorr.sign sk
       (Random_oracle.Input.field
