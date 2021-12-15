@@ -12,7 +12,7 @@ module Transition_frontier = struct
       type t =
         | Breadcrumb_added of
             { block:
-                ( External_transition.Stable.V1.t
+                ( External_transition.Stable.V2.t
                 , State_hash.Stable.V1.t )
                 With_hash.Stable.V1.t
             ; sender_receipt_chains_from_parent_ledger:
@@ -30,12 +30,20 @@ end
 module Transaction_pool = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        { added: User_command.Stable.V2.t list
+        ; removed: User_command.Stable.V2.t list }
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         { added: User_command.Stable.V1.t list
         ; removed: User_command.Stable.V1.t list }
 
-      let to_latest = Fn.id
+      let to_latest (t : t) : V2.t = {added= List.map ~f:User_command.Stable.V1.to_latest t.added; removed= List.map ~f:User_command.Stable.V1.to_latest t.removed}
     end
   end]
 end
@@ -45,7 +53,7 @@ module Stable = struct
   module V2 = struct
     type t =
       | Transition_frontier of Transition_frontier.Stable.V2.t
-      | Transaction_pool of Transaction_pool.Stable.V1.t
+      | Transaction_pool of Transaction_pool.Stable.V2.t
 
     let to_latest = Fn.id
   end

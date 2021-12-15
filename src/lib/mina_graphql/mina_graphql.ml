@@ -1532,7 +1532,7 @@ module Types = struct
                       Some
                         (UserCommand.mk_user_command
                            { status; data = { t.data with data = c } })
-                  | Snapp_command _ ->
+                  | Parties _ ->
                       (* TODO: This should be supported in some graph QL query *)
                       None))
         ; field "feeTransfer"
@@ -3403,7 +3403,7 @@ module Queries = struct
                    Some
                      (Types.UserCommand.mk_user_command
                         { status = Unknown; data = { x with data } })
-               | Snapp_command _ ->
+               | Parties _ ->
                    None))
 
   let sync_status =
