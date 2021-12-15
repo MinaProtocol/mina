@@ -27,46 +27,34 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; num_snark_workers = 0
     }
 
-  let check_common_prefixes ~number_of_blocks:n ~logger chains =
-    let recent_chains =
-      List.map chains ~f:(fun chain ->
-          List.take (List.rev chain) n |> Hash_set.of_list (module String))
+  let check_common_prefixes ~tolerance ~logger chains =
+    assert (List.length chains > 1) ;
+    let hashset_chains =
+      List.map chains ~f:(Hash_set.of_list (module String))
+    in
+    let longest_chain_length =
+      chains |> List.map ~f:List.length
+      |> List.max_elt ~compare:Int.compare
+      |> Option.value_exn
     in
     let common_prefixes =
-      List.fold ~f:Hash_set.inter
-        ~init:(List.hd_exn recent_chains)
-        (List.tl_exn recent_chains)
+      List.reduce hashset_chains ~f:Hash_set.inter |> Option.value_exn
     in
-    let length = Hash_set.length common_prefixes in
-    if length = 0 then (
-      let result =
-        Malleable_error.soft_error ~value:()
-          (Error.of_string
-             (sprintf
-                "Chains don't have any common prefixes among their most recent \
-                 %d blocks"
-                n))
+    let common_prefixes_length = Hash_set.length common_prefixes in
+    let length_difference = longest_chain_length - common_prefixes_length in
+    if length_difference = 0 || length_difference <= tolerance then
+      Malleable_error.return ()
+    else
+      let error_str =
+        sprintf
+          "Chains have common prefix of %d blocks, longest absolute chain is \
+           %d blocks.  the difference is %d blocks, which is greater than \
+           allowed tolerance of %d blocks"
+          common_prefixes_length longest_chain_length length_difference
+          tolerance
       in
-      [%log error]
-        "common_prefix test: TEST FAILURE, Chains don't have any common \
-         prefixes among their most recent %d blocks"
-        n ;
-      result )
-    else if length < n then (
-      let result =
-        Malleable_error.soft_error ~value:()
-          (Error.of_string
-             (sprintf
-                !"Chains only have %d common prefixes, expected %d common \
-                  prefixes"
-                length n))
-      in
-      [%log error]
-        "common_prefix test: TEST FAILURE, Chains only have %d common \
-         prefixes, expected %d common prefixes"
-        length n ;
-      result )
-    else Malleable_error.return ()
+      [%log error] "%s" error_str ;
+      Malleable_error.soft_error ~value:() (Error.of_string error_str)
 
   let check_peer_connectivity ~nodes_by_peer_id ~peer_id ~connected_peers =
     let get_node_id p =
@@ -103,7 +91,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         check_peer_connectivity ~nodes_by_peer_id ~peer_id ~connected_peers)
 
   let run network t =
-    (* let open Network in *)
+    let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     (* TEMP: until we fix the seed graphql port, we will only check peers for block producers *)
@@ -125,30 +113,45 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "blocks are produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 2))
     in
-    (* let%bind () =
-         section "short bootstrap"
-           (let%bind () = Node.stop node_c in
-            let%bind _ = wait_for t (Wait_condition.blocks_to_be_produced 1) in
-            let%bind () = Node.start ~fresh_state:true node_c in
-            let%bind () = wait_for t (Wait_condition.node_to_initialize node_c) in
-            wait_for t
-              ( Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]
-              |> Wait_condition.with_timeouts
-                   ~hard_timeout:
-                     (Network_time_span.Literal
-                        (Time.Span.of_ms (15. *. 60. *. 1000.))) ))
-       in
-       let%bind () =
-         section "network is fully connected after one node is restarted"
-           (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 180.0)) in
-            check_peers ~logger all_nodes)
-       in*)
-    section "nodes share common prefix no greater than 2 block back"
-      (let%bind _ = wait_for t (Wait_condition.blocks_to_be_produced 2) in
-       (* the common prefix test relies on 4 blocks having been produced.  previous sections altogether have already produced 2.  if previous sections change, then this may need to be re-adjusted*)
-       let%bind chains =
-         Malleable_error.List.map all_nodes
-           ~f:(Network.Node.must_get_best_chain ~logger)
-       in
-       check_common_prefixes chains ~number_of_blocks:2 ~logger)
+    let%bind () =
+      section "short bootstrap"
+        (let%bind () = Node.stop node_c in
+         [%log info] "%s stopped, will now wait for blocks to be produced"
+           (Node.id node_c) ;
+         let%bind _ = wait_for t (Wait_condition.blocks_to_be_produced 2) in
+         let%bind () = Node.start ~fresh_state:true node_c in
+         [%log info]
+           "%s started again, will now wait for this node to initialize"
+           (Node.id node_c) ;
+         let%bind () = wait_for t (Wait_condition.node_to_initialize node_c) in
+         wait_for t
+           ( Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]
+           |> Wait_condition.with_timeouts
+                ~hard_timeout:
+                  (Network_time_span.Literal
+                     (Time.Span.of_ms (15. *. 60. *. 1000.))) ))
+    in
+    let print_chains (labeled_chain_list : (string * string list) list) =
+      List.iter labeled_chain_list ~f:(fun labeled_chain ->
+          let label, chain = labeled_chain in
+          let chain_str = String.concat ~sep:"\n" chain in
+          [%log info] "\nchain of %s:\n %s" label chain_str)
+    in
+    let%bind () =
+      section "common prefix of all nodes is no farther back than 1 block"
+        (* the common prefix test relies on at least 4 blocks having been produced.  previous sections altogether have already produced 4, so no further block production is needed.  if previous sections change, then this may need to be re-adjusted*)
+        (let%bind (labeled_chains : (string * string list) list) =
+           Malleable_error.List.map all_nodes ~f:(fun node ->
+               let%map chain = Network.Node.must_get_best_chain ~logger node in
+               (Node.id node, chain))
+         in
+         let (chains : string list list) =
+           List.map labeled_chains ~f:(fun (_, chain) -> chain)
+         in
+         print_chains labeled_chains ;
+         check_common_prefixes chains ~tolerance:1 ~logger)
+    in
+    section "network is fully connected after one node was restarted"
+      (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
+       check_peers ~logger all_nodes)
 end

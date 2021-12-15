@@ -9,6 +9,8 @@ module Counter : sig
   val inc_one : t -> unit
 
   val inc : t -> float -> unit
+
+  val value : t -> float
 end
 
 module Gauge : sig
@@ -23,6 +25,8 @@ module Gauge : sig
   val dec : t -> float -> unit
 
   val set : t -> float -> unit
+
+  val value : t -> float
 end
 
 module type Histogram = sig
@@ -122,18 +126,19 @@ module Network : sig
 
   val rpc_requests_sent : Counter.t
 
-  val get_some_initial_peers_rpcs_sent : Counter.t
+  val get_some_initial_peers_rpcs_sent : Counter.t * Gauge.t
 
-  val get_some_initial_peers_rpcs_received : Counter.t
+  val get_some_initial_peers_rpcs_received : Counter.t * Gauge.t
 
   val get_some_initial_peers_rpc_requests_failed : Counter.t
 
   val get_some_initial_peers_rpc_responses_failed : Counter.t
 
-  val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent : Counter.t
+  val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent :
+    Counter.t * Gauge.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received :
-    Counter.t
+    Counter.t * Gauge.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_requests_failed :
     Counter.t
@@ -141,77 +146,89 @@ module Network : sig
   val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_responses_failed :
     Counter.t
 
-  val answer_sync_ledger_query_rpcs_sent : Counter.t
+  val answer_sync_ledger_query_rpcs_sent : Counter.t * Gauge.t
 
-  val answer_sync_ledger_query_rpcs_received : Counter.t
+  val answer_sync_ledger_query_rpcs_received : Counter.t * Gauge.t
 
   val answer_sync_ledger_query_rpc_requests_failed : Counter.t
 
   val answer_sync_ledger_query_rpc_responses_failed : Counter.t
 
-  val get_transition_chain_rpcs_sent : Counter.t
+  val get_transition_chain_rpcs_sent : Counter.t * Gauge.t
 
-  val get_transition_chain_rpcs_received : Counter.t
+  val get_transition_chain_rpcs_received : Counter.t * Gauge.t
 
   val get_transition_chain_rpc_requests_failed : Counter.t
 
   val get_transition_chain_rpc_responses_failed : Counter.t
 
-  val get_transition_knowledge_rpcs_sent : Counter.t
+  val get_transition_knowledge_rpcs_sent : Counter.t * Gauge.t
 
-  val get_transition_knowledge_rpcs_received : Counter.t
+  val get_transition_knowledge_rpcs_received : Counter.t * Gauge.t
 
   val get_transition_knowledge_rpc_requests_failed : Counter.t
 
   val get_transition_knowledge_rpc_responses_failed : Counter.t
 
-  val get_transition_chain_proof_rpcs_sent : Counter.t
+  val get_transition_chain_proof_rpcs_sent : Counter.t * Gauge.t
 
-  val get_transition_chain_proof_rpcs_received : Counter.t
+  val get_transition_chain_proof_rpcs_received : Counter.t * Gauge.t
 
   val get_transition_chain_proof_rpc_requests_failed : Counter.t
 
   val get_transition_chain_proof_rpc_responses_failed : Counter.t
 
-  val get_node_status_rpcs_sent : Counter.t
+  val get_node_status_rpcs_sent : Counter.t * Gauge.t
 
-  val get_node_status_rpcs_received : Counter.t
+  val get_node_status_rpcs_received : Counter.t * Gauge.t
 
   val get_node_status_rpc_requests_failed : Counter.t
 
   val get_node_status_rpc_responses_failed : Counter.t
 
-  val get_ancestry_rpcs_sent : Counter.t
+  val get_ancestry_rpcs_sent : Counter.t * Gauge.t
 
-  val get_ancestry_rpcs_received : Counter.t
+  val get_ancestry_rpcs_received : Counter.t * Gauge.t
 
   val get_ancestry_rpc_requests_failed : Counter.t
 
   val get_ancestry_rpc_responses_failed : Counter.t
 
-  val ban_notify_rpcs_sent : Counter.t
+  val ban_notify_rpcs_sent : Counter.t * Gauge.t
 
-  val ban_notify_rpcs_received : Counter.t
+  val ban_notify_rpcs_received : Counter.t * Gauge.t
 
   val ban_notify_rpc_requests_failed : Counter.t
 
   val ban_notify_rpc_responses_failed : Counter.t
 
-  val get_best_tip_rpcs_sent : Counter.t
+  val get_best_tip_rpcs_sent : Counter.t * Gauge.t
 
-  val get_best_tip_rpcs_received : Counter.t
+  val get_best_tip_rpcs_received : Counter.t * Gauge.t
 
   val get_best_tip_rpc_requests_failed : Counter.t
 
   val get_best_tip_rpc_responses_failed : Counter.t
 
-  val get_epoch_ledger_rpcs_sent : Counter.t
+  val get_epoch_ledger_rpcs_sent : Counter.t * Gauge.t
 
-  val get_epoch_ledger_rpcs_received : Counter.t
+  val get_epoch_ledger_rpcs_received : Counter.t * Gauge.t
 
   val get_epoch_ledger_rpc_requests_failed : Counter.t
 
   val get_epoch_ledger_rpc_responses_failed : Counter.t
+
+  val new_state_received : Gauge.t
+
+  val new_state_broadcasted : Gauge.t
+
+  val snark_pool_diff_received : Gauge.t
+
+  val snark_pool_diff_broadcasted : Gauge.t
+
+  val transaction_pool_diff_received : Gauge.t
+
+  val transaction_pool_diff_broadcasted : Gauge.t
 
   val rpc_connections_failed : Counter.t
 

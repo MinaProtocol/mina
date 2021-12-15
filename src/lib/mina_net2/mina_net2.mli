@@ -170,6 +170,11 @@ val me : t -> Keypair.t Deferred.t
 (** List of all peers we know about. *)
 val peers : t -> Peer.t list Deferred.t
 
+val bandwidth_info :
+     t
+  -> ([ `Input of float ] * [ `Output of float ] * [ `Cpu_usage of float ])
+     Deferred.Or_error.t
+
 (** Set node status to be served to peers requesting node status. *)
 val set_node_status : t -> string -> unit Deferred.Or_error.t
 

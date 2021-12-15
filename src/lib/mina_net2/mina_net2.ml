@@ -177,6 +177,17 @@ let list_peers t =
         ~metadata:[ ("error", Error_json.error_to_yojson error) ] ;
       []
 
+let bandwidth_info t =
+  Deferred.Or_error.map ~f:(fun response ->
+      let open Libp2p_ipc.Reader.Libp2pHelperInterface.BandwidthInfo.Response in
+      let input_bandwidth = input_bandwidth_get response
+      and output_bandwidth = output_bandwidth_get response
+      and cpu_usage = cpu_usage_get response in
+      (`Input input_bandwidth, `Output output_bandwidth, `Cpu_usage cpu_usage))
+  @@ Libp2p_helper.do_rpc t.helper
+       (module Libp2p_ipc.Rpcs.BandwidthInfo)
+       (Libp2p_ipc.Rpcs.BandwidthInfo.create_request ())
+
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
     ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange
