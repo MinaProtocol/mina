@@ -4138,6 +4138,9 @@ module For_tests = struct
       ; snapp_update : Party.Update.t
       ; current_auth : Permissions.Auth_required.t
             (*Authorization for the update being performed*)
+      ; sequence_events : Tick.Field.t array list
+      ; events : Tick.Field.t array list
+      ; call_data : Tick.Field.t
       }
     [@@deriving sexp]
   end
@@ -4227,6 +4230,9 @@ module For_tests = struct
         ; new_snapp_account
         ; snapp_account_keypair
         ; memo
+        ; sequence_events
+        ; events
+        ; call_data
         ; _
         } =
       spec
@@ -4288,10 +4294,10 @@ module For_tests = struct
               ; update
               ; token_id = Token_id.default
               ; delta
-              ; increment_nonce = false
-              ; events = []
-              ; sequence_events = []
-              ; call_data = Field.zero
+              ; increment_nonce = true
+              ; events
+              ; sequence_events
+              ; call_data
               ; depth = 0
               }
           ; predicate

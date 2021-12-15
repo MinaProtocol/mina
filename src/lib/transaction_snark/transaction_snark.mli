@@ -556,6 +556,9 @@ module For_tests : sig
       ; new_snapp_account : bool
       ; snapp_update : Party.Update.t
       ; current_auth : Permissions.Auth_required.t
+      ; sequence_events : Tick.Field.t array list
+      ; events : Tick.Field.t array list
+      ; call_data : Tick.Field.t
       }
     [@@deriving sexp]
   end
