@@ -137,7 +137,7 @@ module type Party_intf = sig
 
   type signed_amount
 
-  val delta : t -> signed_amount
+  val balance_change : t -> signed_amount
 end
 
 module type Parties_intf = sig
@@ -511,7 +511,7 @@ module Make (Inputs : Inputs_intf) = struct
          will never be promoted to the global excess, so this amount is
          irrelevant.
       *)
-      Amount.Signed.negate (Party.delta party)
+      Amount.Signed.negate (Party.balance_change party)
     in
     let party_token = h.perform (Party_token_id party) in
     Bool.(assert_ (not (Token_id.(equal invalid) party_token))) ;
