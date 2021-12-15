@@ -11613,7 +11613,8 @@
             },
             {
               "name": "snappState",
-              "description": "The 8 field elements comprising the snapp state associated with this account encoded as bignum strings",
+              "description":
+                "The 8 field elements comprising the snapp state associated with this account encoded as bignum strings",
               "args": [],
               "type": {
                 "kind": "LIST",
