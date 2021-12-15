@@ -1246,13 +1246,13 @@ module Base = struct
                  ; token_symbol
                  ; timing
                  }
-             ; delta
+             ; balance_change
              ; increment_nonce
              ; events = _ (* This is for the snapp to use, we don't need it. *)
              ; call_data =
                  _ (* This is for the snapp to use, we don't need it. *)
              ; sequence_events
-             ; depth = _ (* This is used to build the 'stack of stacks'. *)
+             ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
              }
          ; predicate = _
          } :
@@ -1281,7 +1281,7 @@ module Base = struct
       in
       Boolean.Assert.any
         [ is_new; !(Public_key.Compressed.Checked.equal pk a.public_key) ] ;
-      let is_receiver = Sgn.Checked.is_pos delta.sgn in
+      let is_receiver = Sgn.Checked.is_pos balance_change.sgn in
       let timing =
         let open Snapp_basic in
         let new_timing =
@@ -1307,10 +1307,12 @@ module Base = struct
             update_authorized
               (Permissions.Auth_required.Checked.if_ is_receiver
                  ~then_:a.permissions.receive ~else_:a.permissions.send)
-              ~is_keep:!Amount.Signed.(Checked.(equal (constant zero) delta))
+              ~is_keep:
+                !Amount.Signed.(Checked.(equal (constant zero) balance_change))
               ~updated:
                 (let balance, `Overflow failed1 =
-                   !(Balance.Checked.add_signed_amount_flagged a.balance delta)
+                   !(Balance.Checked.add_signed_amount_flagged a.balance
+                       balance_change)
                  in
                  let fee =
                    Amount.Checked.of_fee
@@ -1720,7 +1722,7 @@ module Base = struct
         module Party = struct
           type t = party
 
-          let delta (t : t) = t.party.data.body.delta
+          let balance_change (t : t) = t.party.data.body.balance_change
         end
 
         module Account = struct
@@ -3896,8 +3898,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                    !"unexpected fee excess. source %{sexp: Amount.Signed.t} \
                      target %{sexp: Amount.Signed.t}"
                    target_global.fee_excess source_global.fee_excess)
-          | Some delta ->
-              delta
+          | Some balance_change ->
+              balance_change
         in
         { fee_token_l = Token_id.default
         ; fee_excess_l = Amount.Signed.to_fee fee_excess
@@ -4244,12 +4246,12 @@ module For_tests = struct
               { pk = sender_pk
               ; update = Party.Update.noop
               ; token_id = ()
-              ; delta = fee
+              ; balance_change = fee
               ; increment_nonce = ()
               ; events = []
               ; sequence_events = []
               ; call_data = Field.zero
-              ; depth = 0
+              ; call_depth = 0
               }
           ; predicate = sender_nonce
           }
@@ -4262,12 +4264,12 @@ module For_tests = struct
           { pk = sender_pk
           ; update = Party.Update.noop
           ; token_id = Token_id.default
-          ; delta = Amount.(Signed.(negate (of_unsigned amount)))
+          ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
           ; increment_nonce = true
           ; events = []
           ; sequence_events = []
           ; call_data = Field.zero
-          ; depth = 0
+          ; call_depth = 0
           }
       ; predicate = Nonce (Account.Nonce.succ sender_nonce)
       }
@@ -4277,12 +4279,12 @@ module For_tests = struct
           { pk = trivial_account_pk
           ; update = update_empty_permissions
           ; token_id = Token_id.default
-          ; delta = Amount.Signed.(of_unsigned amount)
+          ; balance_change = Amount.Signed.(of_unsigned amount)
           ; increment_nonce = false
           ; events = []
           ; sequence_events = []
           ; call_data = Field.zero
-          ; depth = 0
+          ; call_depth = 0
           }
       ; predicate = Full Snapp_predicate.Account.accept
       }
@@ -4291,7 +4293,7 @@ module For_tests = struct
     let memo = Signed_command_memo.empty in
     let ps =
       Parties.Party_or_stack.of_parties_list
-        ~party_depth:(fun (p : Party.Predicated.t) -> p.body.depth)
+        ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
         [ sender_party_data; snapp_party_data ]
       |> Parties.Party_or_stack.accumulate_hashes_predicated
     in
@@ -4309,7 +4311,7 @@ module For_tests = struct
     let proof_party =
       let ps =
         Parties.Party_or_stack.of_parties_list
-          ~party_depth:(fun (p : Party.Predicated.t) -> p.body.depth)
+          ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
           [ snapp_party_data ]
         |> Parties.Party_or_stack.accumulate_hashes_predicated
       in
@@ -4695,12 +4697,12 @@ let%test_module "transaction_snark" =
                       ; timing = Keep
                       }
                   ; token_id = ()
-                  ; delta = Fee.of_int full_amount
+                  ; balance_change = Fee.of_int full_amount
                   ; increment_nonce = ()
                   ; events = []
                   ; sequence_events = []
                   ; call_data = Field.zero
-                  ; depth = 0
+                  ; call_depth = 0
                   }
               ; predicate = acct1.account.nonce
               }
@@ -4712,12 +4714,13 @@ let%test_module "transaction_snark" =
                     { pk = acct2.account.public_key
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
-                    ; delta = Amount.Signed.(of_unsigned receiver_amount)
+                    ; balance_change =
+                        Amount.Signed.(of_unsigned receiver_amount)
                     ; increment_nonce = false
                     ; events = []
                     ; sequence_events = []
                     ; call_data = Field.zero
-                    ; depth = 0
+                    ; call_depth = 0
                     }
                 ; predicate = Accept
                 }
@@ -5238,12 +5241,12 @@ let%test_module "transaction_snark" =
                             { pk = sender_pk
                             ; update = Party.Update.noop
                             ; token_id = ()
-                            ; delta = fee
+                            ; balance_change = fee
                             ; increment_nonce = ()
                             ; events = []
                             ; sequence_events = []
                             ; call_data = Field.zero
-                            ; depth = 0
+                            ; call_depth = 0
                             }
                         ; predicate = sender_nonce
                         }
@@ -5256,12 +5259,13 @@ let%test_module "transaction_snark" =
                         { pk = sender_pk
                         ; update = Party.Update.noop
                         ; token_id = Token_id.default
-                        ; delta = Amount.(Signed.(negate (of_unsigned amount)))
+                        ; balance_change =
+                            Amount.(Signed.(negate (of_unsigned amount)))
                         ; increment_nonce = true
                         ; events = []
                         ; sequence_events = []
                         ; call_data = Field.zero
-                        ; depth = 0
+                        ; call_depth = 0
                         }
                     ; predicate = Nonce (Account.Nonce.succ sender_nonce)
                     }
@@ -5271,12 +5275,12 @@ let%test_module "transaction_snark" =
                         { pk = multisig_account_pk
                         ; update = update_empty_permissions
                         ; token_id = Token_id.default
-                        ; delta = Amount.Signed.(of_unsigned amount)
+                        ; balance_change = Amount.Signed.(of_unsigned amount)
                         ; increment_nonce = false
                         ; events = []
                         ; sequence_events = []
                         ; call_data = Field.zero
-                        ; depth = 0
+                        ; call_depth = 0
                         }
                     ; predicate = Full Snapp_predicate.Account.accept
                     }
@@ -5286,7 +5290,7 @@ let%test_module "transaction_snark" =
                   let ps =
                     Parties.Party_or_stack.of_parties_list
                       ~party_depth:(fun (p : Party.Predicated.t) ->
-                        p.body.depth)
+                        p.body.call_depth)
                       [ sender_party_data; snapp_party_data ]
                     |> Parties.Party_or_stack.accumulate_hashes_predicated
                   in
