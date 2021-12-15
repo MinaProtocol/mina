@@ -1319,8 +1319,10 @@ module Data = struct
         in
         let%bind overlapping_window =
           Global_sub_window.Checked.(
-            add prev_global_sub_window constants.sub_windows_per_window
-            >= next_global_sub_window)
+            let%bind x =
+              add prev_global_sub_window constants.sub_windows_per_window
+            in
+            x >= next_global_sub_window)
         in
         let if_ cond ~then_ ~else_ =
           let%bind cond = cond and then_ = then_ and else_ = else_ in
@@ -1364,8 +1366,8 @@ module Data = struct
           let%bind in_grace_period =
             Global_slot.Checked.( < ) next_global_slot
               (Global_slot.Checked.of_slot_number ~constants
-                 (Mina_numbers.Global_slot.Checked.Unsafe.of_integer
-                    (Length.Checked.to_integer constants.grace_period_end)))
+                 (Mina_numbers.Global_slot.Checked.Unsafe.of_field
+                    (Length.Checked.to_field constants.grace_period_end)))
           in
           if_
             Boolean.(same_sub_window || in_grace_period)

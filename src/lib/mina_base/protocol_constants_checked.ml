@@ -96,7 +96,7 @@ let data_spec =
     ; T.Checked.typ
     ; T.Checked.typ
     ; T.Checked.typ
-    ; Block_time.Unpacked.typ
+    ; Block_time.Checked.typ
     ]
 
 let typ =
