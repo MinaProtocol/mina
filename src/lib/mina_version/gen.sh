@@ -22,7 +22,7 @@ pushd ../../../../..
   fi
   commit_date=$(git show HEAD -s --format="%cI")
   pushd src/lib/marlin_plonk_bindings/stubs
-    marlin_commit_id=$(cargo metadata | jq '.packages[] | select(.name == "commitment_dlog").id' | cut -d " " -f 3 | sed 's/"//')
+    marlin_commit_id=$(cargo metadata | jq '.packages[] | select(.name == "commitment_dlog").id' | cut -d " " -f 3)
   popd
 popd
 
@@ -33,5 +33,4 @@ echo "let commit_date = \"$commit_date\"" >> "$1"
 
 echo "let marlin_commit_id = \"$marlin_commit_id\"" >> "$1"
 
-echo 'let print_version () = Core_kernel.printf "Commit %s on branch %s\n" commit_id branch' >> "$1"
-
+echo "let print_version () = Core_kernel.printf \"Commit %s on branch %s\n\" commit_id branch" >> "$1"
