@@ -15,7 +15,7 @@ const DELEGATION_WHITELIST_COLUMN = "E"
 
 // Production
 const PROD_WHITELIST_SPREADSHEET_ID = "1xiKppb0BFUo8IKM2itIx2EWIQbBzUlFxgtZlKdnrLCU"
-const PROD_CLOUD_BUCKET_NAME = "foundation-delegation-snark-work"
+const PROD_CLOUD_BUCKET_NAME = "foundation-delegation-uptime-data"
 
 const TEST_WHITELIST_SPREADSHEET_ID = "1NODwwcVxLNnCI4XnIrGdGBSjointN4MZ8QZ7wqgtSTQ"
 const TEST_CLOUD_BUCKET_NAME = "georgeee-delegation-test-1"
