@@ -105,14 +105,7 @@ Note that the generated bindings do not allow you to differentiate the same cust
 If you want to differentiate custom types, differentiate the Rust types first. 
 For example, if you have a generic custom type that must be converted to different OCaml types depending on the concrete parameter used, you will have to instead create non-generic custom types
 
-### Function arguments
-
-Functions that get exported to OCaml have the choice to be passed as pointer, or as value. 
-If passed as value, then a clone happens.
-
-TODO: guidelines on what to do with this information
-
-To avoid large clones, we use shared references. See:
+### Helper macros
 
 * the [impl_shared_ref!](src/caml/shared_reference.rs) macro for a thread-safe shared reference
 * the [impl_shared_rwlock!](src/caml/shared_rwlock.rs) macro for a thread-safe shared mutable object.
