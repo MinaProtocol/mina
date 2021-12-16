@@ -512,30 +512,9 @@ module Signed = struct
         let pk (`Pk x) =
           Signature_lib.Public_key.Compressed.of_base58_check_exn x
         in
-        let memo =
-          (* This is a hack..
-             TODO: Handle these properly in rosetta.
-          *)
-          match rosetta_transaction.command.kind with
-          | `Payment ->
-              Option.bind rosetta_transaction_rendered.payment
-                ~f:(fun { memo; _ } -> memo)
-          | `Delegation ->
-              Option.bind rosetta_transaction_rendered.stake_delegation
-                ~f:(fun { memo; _ } -> memo)
-          | `Create_token ->
-              Option.bind rosetta_transaction_rendered.create_token
-                ~f:(fun { memo; _ } -> memo)
-          | `Create_token_account ->
-              Option.bind rosetta_transaction_rendered.create_token_account
-                ~f:(fun { memo; _ } -> memo)
-          | `Mint_tokens ->
-              Option.bind rosetta_transaction_rendered.mint_tokens
-                ~f:(fun { memo; _ } -> memo)
-        in
         let%bind payload =
           User_command_info.Partial.to_user_command_payload t.command
-            ~nonce:t.nonce ?memo
+            ~nonce:t.nonce
           |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
         in
         let%map signature =
