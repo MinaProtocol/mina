@@ -94,7 +94,7 @@ end
 module type Hash = sig
   type t [@@deriving bin_io, compare, equal, sexp, yojson]
 
-  val to_string : t -> string
+  val to_base58_check : t -> string
 
   include Hashable.S_binable with type t := t
 

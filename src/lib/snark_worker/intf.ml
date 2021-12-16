@@ -85,7 +85,7 @@ module type Rpcs_versioned_S = sig
   module Work : Work_S
 
   module Get_work : sig
-    module V1 : sig
+    module V2 : sig
       type query = unit [@@deriving bin_io]
 
       type response =
@@ -95,11 +95,11 @@ module type Rpcs_versioned_S = sig
       val rpc : (query, response) Rpc.Rpc.t
     end
 
-    module Latest = V1
+    module Latest = V2
   end
 
   module Submit_work : sig
-    module V1 : sig
+    module V2 : sig
       type query = Work.Result.t [@@deriving bin_io]
 
       type response = unit [@@deriving bin_io]
@@ -107,7 +107,7 @@ module type Rpcs_versioned_S = sig
       val rpc : (query, response) Rpc.Rpc.t
     end
 
-    module Latest = V1
+    module Latest = V2
   end
 end
 

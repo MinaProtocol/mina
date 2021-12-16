@@ -15,7 +15,7 @@ open Snark_params_nonconsensus
 [%%versioned_asserted
 module Stable = struct
   module V1 = struct
-    type t = Inner_curve.Scalar.t
+    type t = Inner_curve.Scalar.t [@@deriving compare, sexp]
 
     (* deriver not working, apparently *)
     let sexp_of_t = [%sexp_of: Inner_curve.Scalar.t]
@@ -114,6 +114,8 @@ let create () : t =
             Char.of_int_exn (Js.Optdef.get (Js.array_get x i) byte_undefined))))
 
 [%%endif]
+
+include Comparable.Make_binable (Stable.Latest)
 
 let of_bigstring_exn = Binable.of_bigstring (module Stable.Latest)
 

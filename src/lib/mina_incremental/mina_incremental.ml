@@ -5,7 +5,7 @@
     different functors*)
 
 open Pipe_lib
-open Async
+open Async_kernel
 
 module Make
     (Incremental : Incremental.S) (Name : sig

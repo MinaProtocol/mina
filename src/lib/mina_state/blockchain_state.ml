@@ -144,14 +144,14 @@ let display
       ; timestamp
       } =
   { Poly.staged_ledger_hash =
-      Visualization.display_prefix_of_string @@ Ledger_hash.to_string
+      Visualization.display_prefix_of_string @@ Ledger_hash.to_base58_check
       @@ Staged_ledger_hash.ledger_hash staged_ledger_hash
   ; snarked_ledger_hash =
       Visualization.display_prefix_of_string
-      @@ Frozen_ledger_hash.to_string snarked_ledger_hash
+      @@ Frozen_ledger_hash.to_base58_check snarked_ledger_hash
   ; genesis_ledger_hash =
       Visualization.display_prefix_of_string
-      @@ Frozen_ledger_hash.to_string genesis_ledger_hash
+      @@ Frozen_ledger_hash.to_base58_check genesis_ledger_hash
   ; snarked_next_available_token =
       Token_id.to_string snarked_next_available_token
   ; timestamp =

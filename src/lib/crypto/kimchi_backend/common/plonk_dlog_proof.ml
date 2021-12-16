@@ -1,19 +1,21 @@
 open Core_kernel
+open Async_kernel
+open Pickles_types
 
 let tuple15_to_vec
     (w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14) =
-  Pickles_types.Vector.
+  Vector.
     [ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ]
 
 let tuple15_of_vec
-    Pickles_types.Vector.
+    Vector.
       [ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ] =
   (w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14)
 
 let tuple6_to_vec (w0, w1, w2, w3, w4, w5) =
-  Pickles_types.Vector.[ w0; w1; w2; w3; w4; w5 ]
+  Vector.[ w0; w1; w2; w3; w4; w5 ]
 
-let tuple6_of_vec Pickles_types.Vector.[ w0; w1; w2; w3; w4; w5 ] =
+let tuple6_of_vec Vector.[ w0; w1; w2; w3; w4; w5 ] =
   (w0, w1, w2, w3, w4, w5)
 
 module type Stable_v1 = sig
@@ -110,12 +112,11 @@ module type Inputs_intf = sig
       -> Scalar_field.Vector.t
       -> Scalar_field.t array
       -> Curve.Affine.Backend.t array
-      -> t Async.Deferred.t
+      -> t Deferred.t
 
     val verify : Verifier_index.t -> t -> bool
 
-    val batch_verify :
-      Verifier_index.t array -> t array -> bool Async.Deferred.t
+    val batch_verify : Verifier_index.t array -> t array -> bool Deferred.t
   end
 end
 
@@ -343,7 +344,7 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
           G.Affine.to_backend (Finite commitment))
     in
-    let%map.Async.Deferred res =
+    let%map.Deferred res =
       Backend.create_async pk primary auxiliary challenges commitments
     in
     of_backend res
