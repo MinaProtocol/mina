@@ -73,16 +73,14 @@ end
 module Gate_spec = struct
   open Core_kernel
 
+  (* TODO: split kind/coeffs from row/wired_to *)
+
   (** A gate/row/constraint consists of a type (kind), a row, the other cells its columns/cells are connected to (wired_to), and the selector polynomial associated with the gate *)
   type ('row, 'f) t =
-    { kind :
-        (Kimchi.Protocol.gate_type
-        [@sexp.opaque]
-        (* TODO: change row and wired_to to options? or create two different types (one without row and wired_to) *))
+    { kind : (Kimchi.Protocol.gate_type[@sexp.opaque])
     ; row : 'row
     ; wired_to : 'row Position.t array
     ; coeffs : 'f array
-          (* TODO: shouldn't the coeffs live in the gate type enum? *)
     }
   [@@deriving sexp_of]
 
