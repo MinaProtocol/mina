@@ -135,7 +135,7 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 Checkout the "rosetta-v12" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
 
-`cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu | docker build -t mina-rosetta:v11 --build-arg "deb_codename=stretch" --build-arg "MINA_BRANCH=rosetta-v12" -`
+`cat dockerfiles/stages/1-build-deps-ubuntu dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-prod-ubuntu | docker build -t mina-rosetta:v12 --build-arg "MINA_BRANCH=rosetta-v12" -`
 
 This creates an image (mina-rosetta:v11) based on the most up-to-date changes that support rosetta. This image
 can be used as a drop-in replacement for `minaprotocol/mina-rosetta:v11` in any of the below commands for testing.
