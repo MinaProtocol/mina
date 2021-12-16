@@ -32,7 +32,6 @@ pub fn caml_pasta_fp_plonk_index_create(
     public: ocaml::Int,
     srs: CamlFpSrs,
 ) -> Result<CamlPastaFpPlonkIndex, ocaml::Error> {
-    // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
     let gates: Vec<_> = gates
         .as_ref()
         .0
