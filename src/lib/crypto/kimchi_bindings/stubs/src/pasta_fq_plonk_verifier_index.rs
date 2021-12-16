@@ -62,6 +62,7 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
     }
 }
 
+// TODO: This should really be a TryFrom or TryInto
 impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
     fn from(index: CamlPastaFqPlonkVerifierIndex) -> Self {
         let evals = index.evals;
