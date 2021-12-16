@@ -210,8 +210,8 @@ module Make (Inputs : Inputs_intf) = struct
     Array.iter arr ~f:(fun fe -> Fq.Vector.emplace_back vec fe) ;
     vec
 
-  (** Note that this function will panic if some of the points are points at infinity *)
-  let opening_proof_of_backend (t : Opening_proof_backend.t) =
+  (** This function will panic if any of the points are the point at infinity *)
+  let opening_proof_of_backend_exn (t : Opening_proof_backend.t) =
     let g (x : G.Affine.Backend.t) : G.Affine.t =
       G.Affine.of_backend x |> Pickles_types.Or_infinity.finite_exn
     in
@@ -229,7 +229,7 @@ module Make (Inputs : Inputs_intf) = struct
     }
 
   let of_backend (t : Backend.t) : t =
-    let proof = opening_proof_of_backend t.proof in
+    let proof = opening_proof_of_backend_exn t.proof in
     let evals =
       (fst t.evals, snd t.evals)
       |> Tuple_lib.Double.map ~f:(fun e ->
