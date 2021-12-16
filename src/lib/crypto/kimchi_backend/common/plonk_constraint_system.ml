@@ -237,7 +237,6 @@ module Plonk_constraint = struct
   include Snarky_backendless.Constraint.Add_kind (T)
 end
 
-(* TODO: what is this? a counter? *)
 module Internal_var = Core_kernel.Unique_id.Int ()
 
 (** A hash table based on a type that represents external and internal variables. *)
