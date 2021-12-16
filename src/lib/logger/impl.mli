@@ -1,12 +1,5 @@
 open Core
-
-module Stable : sig
-  module V1 : sig
-    type t [@@deriving bin_io, version]
-  end
-
-  module Latest = V1
-end
+module Stable = Logger_type.Stable
 
 type t = Stable.V1.t
 
@@ -33,17 +26,7 @@ module Source : sig
   val create : module_:string -> location:string -> t
 end
 
-module Metadata : sig
-  module Stable : sig
-    module V1 : sig
-      type t = Yojson.Safe.t String.Map.t [@@deriving yojson, bin_io, version]
-    end
-
-    module Latest = V1
-  end
-
-  type t = Stable.V1.t
-end
+module Metadata = Logger_type.Metadata
 
 (** Used only when dealing with the raw logging function *)
 val metadata : t -> Metadata.t
