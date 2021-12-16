@@ -11,10 +11,6 @@ use oracle::{
 };
 use paste::paste;
 
-//
-// CamlOracles
-//
-
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlOracles<F> {
     pub o: CamlRandomOracles<F>,
@@ -22,10 +18,6 @@ pub struct CamlOracles<F> {
     pub opening_prechallenges: Vec<F>,
     pub digest_before_evaluations: F,
 }
-
-//
-// Implementation
-//
 
 macro_rules! impl_oracles {
     ($CamlF: ty, $F: ty, $CamlG: ty, $G: ty, $index: ty, $curve_params: ty) => {
@@ -102,10 +94,6 @@ macro_rules! impl_oracles {
         }
     }
 }
-
-//
-//
-//
 
 pub mod fp {
     use super::*;
