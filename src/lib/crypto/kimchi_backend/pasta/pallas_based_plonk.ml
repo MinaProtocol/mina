@@ -103,7 +103,6 @@ module Proof = Plonk_dlog_proof.Make (struct
       with_lagranges (fun lgrs vks ts ->
           Run_in_thread.run_in_thread (fun () -> batch_verify lgrs vks ts))
 
-    (** auxiliary is the witness, primary is not used *)
     let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
         prev_comms =
       (* external values contains [1, primary..., auxiliary ] *)
