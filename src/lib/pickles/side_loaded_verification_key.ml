@@ -270,22 +270,26 @@ module Checked = struct
     }
   [@@deriving hlist, fields]
 
+  let width_size = Nat.to_int Width.Length.n
+
   let to_input =
     let open Random_oracle_input in
     let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
     fun { step_domains; step_widths; max_width; wrap_index; num_branches } :
         _ Random_oracle_input.t ->
+      let width w = (Width.Checked.to_field w, width_size) in
       List.reduce_exn ~f:append
         [ map_reduce (Vector.to_array step_domains) ~f:(fun { Domains.h } ->
               map_reduce [| h |] ~f:(fun (Domain.Pow_2_roots_of_unity x) ->
-                  bitstring (Field.unpack x ~length:max_log2_degree)))
-        ; Array.map (Vector.to_array step_widths) ~f:Width.Checked.to_bits
-          |> bitstrings
-        ; bitstring (Width.Checked.to_bits max_width)
+                  packed (x, max_log2_degree)))
+        ; Array.map (Vector.to_array step_widths) ~f:width |> packeds
+        ; packed (width max_width)
         ; wrap_index_to_input
             (Fn.compose Array.of_list Inner_curve.to_field_elements)
             wrap_index
-        ; bitstring (Vector.to_list num_branches)
+        ; packed
+            ( Field.project (Vector.to_list num_branches)
+            , Nat.to_int Max_branches.Log2.n )
         ]
 end
 

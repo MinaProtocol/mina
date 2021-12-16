@@ -1,4 +1,5 @@
 module Scalar_challenge = Scalar_challenge
+module Endo = Endo
 open Core_kernel
 open Async_kernel
 open Pickles_types
@@ -141,12 +142,12 @@ module Side_loaded : sig
 
     open Impls.Step
 
-    val to_input : t -> (Field.Constant.t, bool) Random_oracle_input.t
+    val to_input : t -> Field.Constant.t Random_oracle_input.t
 
     module Checked : sig
       type t
 
-      val to_input : t -> (Field.t, Boolean.var) Random_oracle_input.t
+      val to_input : t -> Field.t Random_oracle_input.t
     end
 
     val typ : (Checked.t, t) Impls.Step.Typ.t
