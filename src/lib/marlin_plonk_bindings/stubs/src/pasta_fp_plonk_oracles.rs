@@ -8,7 +8,7 @@ use mina_curves::pasta::{
 };
 use oracle::{
     self,
-    poseidon::PlonkSpongeConstants,
+    poseidon::PlonkSpongeConstantsBasic,
     sponge::{DefaultFqSponge, DefaultFrSponge},
     FqSponge,
 };
@@ -17,7 +17,6 @@ use plonk_protocol_dlog::prover::ProverProof;
 use plonk_protocol_dlog::{
     index::VerifierIndex as DlogVerifierIndex, prover::caml::CamlProverProof,
 };
-
 
 #[derive(ocaml::IntoValue, ocaml::FromValue)]
 pub struct CamlPastaFpPlonkOracles {
@@ -52,7 +51,7 @@ pub fn caml_pasta_fp_plonk_oracles_create(
     );
     let proof: ProverProof<GAffine> = proof.into();
     let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =
-        proof.oracles::<DefaultFqSponge<VestaParameters, PlonkSpongeConstants>, DefaultFrSponge<Fp, PlonkSpongeConstants>>(&index, &p_comm);
+        proof.oracles::<DefaultFqSponge<VestaParameters, PlonkSpongeConstantsBasic>, DefaultFrSponge<Fp, PlonkSpongeConstantsBasic>>(&index, &p_comm);
 
     sponge.absorb_fr(&[shift_scalar(combined_inner_product)]);
 

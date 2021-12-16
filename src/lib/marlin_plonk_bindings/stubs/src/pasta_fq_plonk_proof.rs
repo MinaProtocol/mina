@@ -13,14 +13,13 @@ use mina_curves::pasta::{
     pallas::{Affine as GAffine, PallasParameters},
 };
 use oracle::{
-    poseidon::PlonkSpongeConstants,
+    poseidon::PlonkSpongeConstantsBasic,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
 use plonk_circuits::scalars::ProofEvaluations as DlogProofEvaluations;
 use plonk_protocol_dlog::index::{Index as DlogIndex, VerifierIndex as DlogVerifierIndex};
 use plonk_protocol_dlog::prover::caml::CamlProverProof;
 use plonk_protocol_dlog::prover::{ProverCommitments as DlogCommitments, ProverProof as DlogProof};
-
 
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_create(
@@ -67,8 +66,8 @@ pub fn caml_pasta_fq_plonk_proof_create(
     runtime.releasing_runtime(|| {
         let map = GroupMap::<Fp>::setup();
         let proof = DlogProof::create::<
-            DefaultFqSponge<PallasParameters, PlonkSpongeConstants>,
-            DefaultFrSponge<Fq, PlonkSpongeConstants>,
+            DefaultFqSponge<PallasParameters, PlonkSpongeConstantsBasic>,
+            DefaultFrSponge<Fq, PlonkSpongeConstantsBasic>,
         >(&map, auxiliary_input, index, prev)
         .unwrap();
         proof.into()
@@ -83,8 +82,8 @@ pub fn proof_verify(
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
 
     DlogProof::verify::<
-        DefaultFqSponge<PallasParameters, PlonkSpongeConstants>,
-        DefaultFrSponge<Fq, PlonkSpongeConstants>,
+        DefaultFqSponge<PallasParameters, PlonkSpongeConstantsBasic>,
+        DefaultFrSponge<Fq, PlonkSpongeConstantsBasic>,
     >(
         &group_map,
         &[(
@@ -123,8 +122,8 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
     let group_map = GroupMap::<Fp>::setup();
 
     DlogProof::<GAffine>::verify::<
-        DefaultFqSponge<PallasParameters, PlonkSpongeConstants>,
-        DefaultFrSponge<Fq, PlonkSpongeConstants>,
+        DefaultFqSponge<PallasParameters, PlonkSpongeConstantsBasic>,
+        DefaultFrSponge<Fq, PlonkSpongeConstantsBasic>,
     >(&group_map, &ts)
     .is_ok()
 }
