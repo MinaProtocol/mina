@@ -107,7 +107,7 @@ pub fn caml_pasta_fq_plonk_index_read(
     srs: CamlFqSrs,
     path: String,
 ) -> Result<CamlPastaFqPlonkIndex, ocaml::Error> {
-    // read from file
+    // open the file for reading
     let file = match File::open(path) {
         Err(_) => {
             return Err(
