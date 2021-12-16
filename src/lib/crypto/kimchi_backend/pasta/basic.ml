@@ -74,8 +74,6 @@ module Bigint256 =
       let length_in_bytes = 32
     end)
 
-(* the two pasta fields *)
-
 module Fp = Field.Make (struct
   module Bigint = Bigint256
   include Kimchi.Foundations.Fp
@@ -87,8 +85,6 @@ module Fq = Field.Make (struct
   include Kimchi.Foundations.Fq
   module Vector = Kimchi.FieldVectors.Fq
 end)
-
-(* the two pasta curves *)
 
 module Vesta = struct
   module Params = struct
