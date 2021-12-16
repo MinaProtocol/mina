@@ -28,7 +28,7 @@ macro_rules! impl_oracles {
             pub fn [<$F:snake _oracles_create>](
                 lgr_comm: Vec<CamlPolyComm<$CamlG>>, // the bases to commit polynomials
                 index: $index,
-                proof: CamlProverProof<$CamlG, $CamlF>, // the final proof (contains public elements at the beginning)
+                proof: CamlProverProof<$CamlG, $CamlF>, // the final proof
             ) -> CamlOracles<$CamlF> {
                 // conversions
                 let index: DlogVerifierIndex<$G> = index.into();
