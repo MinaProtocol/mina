@@ -1353,13 +1353,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       update a.permissions.set_permissions permissions a.permissions
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
-    let%bind nonce =
-      let update_nonce =
-        if increment_nonce then Set_or_keep.Set (Account.Nonce.succ a.nonce)
-        else Set_or_keep.Keep
-      in
-      update a.permissions.increment_nonce update_nonce a.nonce
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
+    let nonce =
+      if increment_nonce then Account.Nonce.succ a.nonce
+      else a.nonce
     in
     Ok
       { a with
@@ -2534,7 +2530,7 @@ module For_tests = struct
     in
     let commitment = Parties.commitment parties in
     let other_parties_signature =
-      Schnorr.sign sender.private_key (Random_oracle.Input.field commitment)
+      Schnorr.Current.sign sender.private_key (Random_oracle.Input.field commitment)
     in
     let other_parties =
       List.map parties.other_parties ~f:(fun party ->
@@ -2545,7 +2541,7 @@ module For_tests = struct
               party)
     in
     let signature =
-      Schnorr.sign sender.private_key
+      Schnorr.Current.sign sender.private_key
         (Random_oracle.Input.field
            ( Parties.commitment parties
            |> Parties.Transaction_commitment.with_fee_payer

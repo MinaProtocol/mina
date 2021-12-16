@@ -5,6 +5,7 @@
 *)
 
 open Core_kernel
+open Mina_base_kernel
 
 let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
   (* construct predicate using pk and ledger
@@ -611,7 +612,7 @@ let gen_parties_from ?(succeed = true)
   in
   (* replace dummy signature in fee payer *)
   let fee_payer_signature =
-    Signature_lib.Schnorr.sign fee_payer_keypair.private_key
+    Signature_lib.Schnorr.Current.sign fee_payer_keypair.private_key
       (Random_oracle.Input.field
          ( Parties.commitment parties_dummy_signatures
          |> Parties.Transaction_commitment.with_fee_payer
@@ -635,7 +636,7 @@ let gen_parties_from ?(succeed = true)
   in
 
   let sign_for_other_party sk =
-    Signature_lib.Schnorr.sign sk
+    Signature_lib.Schnorr.Current.sign sk
       (Random_oracle.Input.field
          (Parties.Transaction_commitment.create ~memo_hash ~other_parties_hash
             ~protocol_state_predicate_hash))

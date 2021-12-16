@@ -1,4 +1,5 @@
 open Base
+open Mina_base_kernel
 
 module Hashless_ledger = struct
   type t =

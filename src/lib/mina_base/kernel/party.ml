@@ -1,5 +1,6 @@
 [%%import "/src/config.mlh"]
 
+module U = Util
 open Core_kernel
 
 [%%ifdef consensus_mechanism]
@@ -140,11 +141,9 @@ module Update = struct
             t) =
         List.reduce_exn ~f:Random_oracle_input.append
           [ Balance.var_to_input initial_minimum_balance
-          ; Snark_params.Tick.Run.run_checked
-              (Global_slot.Checked.to_input cliff_time)
+          ; Global_slot.Checked.to_input cliff_time
           ; Amount.var_to_input cliff_amount
-          ; Snark_params.Tick.Run.run_checked
-              (Global_slot.Checked.to_input vesting_period)
+          ; Global_slot.Checked.to_input vesting_period
           ; Amount.var_to_input vesting_increment
           ]
     end
@@ -484,12 +483,13 @@ module Body = struct
          ; call_depth = _depth (* ignored *)
          } :
           t) =
+      let ( ! ) = Impl.run_checked in
       List.reduce_exn ~f:Random_oracle_input.append
         [ Public_key.Compressed.Checked.to_input pk
         ; Update.Checked.to_input update
-        ; Impl.run_checked (Token_id.Checked.to_input token_id)
-        ; Amount.Signed.Checked.to_input balance_change
-        ; Random_oracle_input.bitstring [ increment_nonce ]
+        ; Token_id.Checked.to_input token_id
+        ; !(Amount.Signed.Checked.to_input balance_change)
+        ; Random_oracle_input.packed ((increment_nonce :> Field.Var.t), 1)
         ; Events.var_to_input events
         ; Events.var_to_input sequence_events
         ; Random_oracle_input.field call_data
@@ -545,7 +545,7 @@ module Body = struct
       ; Update.to_input update
       ; Token_id.to_input token_id
       ; Amount.Signed.to_input balance_change
-      ; Random_oracle_input.bitstring [ increment_nonce ]
+      ; Random_oracle_input.packed (U.field_of_bool increment_nonce, 1)
       ; Events.to_input events
       ; Events.to_input sequence_events
       ; Random_oracle_input.field call_data

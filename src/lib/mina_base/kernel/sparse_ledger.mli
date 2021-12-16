@@ -107,11 +107,15 @@ val apply_parties_with_fee_excess_exn :
   -> Parties.t
   -> t * Fee_excess.t
 
+(*
 val of_any_ledger : Ledger.Any_ledger.M.t -> t
 
 val of_ledger_subset_exn : Ledger.t -> Account_id.t list -> t
 
 val of_ledger_index_subset_exn : Ledger.Any_ledger.witness -> int list -> t
+*)
+
+val add_path : t -> [ `Left of field | `Right of field ] list -> Account_id.t -> Account.t -> t
 
 val iteri : t -> f:(Account.Index.t -> Account.t -> unit) -> unit
 

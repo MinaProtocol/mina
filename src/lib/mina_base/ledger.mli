@@ -1,5 +1,6 @@
 open Core
 open Signature_lib
+open Mina_base_kernel
 
 module Location : Merkle_ledger.Location_intf.S
 

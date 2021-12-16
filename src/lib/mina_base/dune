@@ -13,6 +13,7 @@
    genesis_constants
    digestif
    mina_numbers
+   mina_base_kernel
    codable
    core
    crypto_params
