@@ -4250,12 +4250,12 @@ module For_tests = struct
               { pk = sender_pk
               ; update = Party.Update.noop
               ; token_id = ()
-              ; delta = fee
+              ; balance_change = fee
               ; increment_nonce = ()
               ; events = []
               ; sequence_events = []
               ; call_data = Field.zero
-              ; depth = 0
+              ; call_depth = 0
               }
           ; predicate = sender_nonce
           }
@@ -4269,12 +4269,12 @@ module For_tests = struct
             { pk = sender_pk
             ; update = Party.Update.noop
             ; token_id = Token_id.default
-            ; delta = Amount.(Signed.(negate (of_unsigned amount)))
+            ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
             ; increment_nonce = true
             ; events = []
             ; sequence_events = []
             ; call_data = Field.zero
-            ; depth = 0
+            ; call_depth = 0
             }
         ; predicate = Nonce (Account.Nonce.succ sender_nonce)
         }
@@ -4300,12 +4300,12 @@ module For_tests = struct
                   { pk
                   ; update
                   ; token_id = Token_id.default
-                  ; delta
+                  ; balance_change = delta
                   ; increment_nonce = true
                   ; events
                   ; sequence_events
                   ; call_data
-                  ; depth = 0
+                  ; call_depth = 0
                   }
               ; predicate
               }
@@ -4320,12 +4320,12 @@ module For_tests = struct
                   { pk = receiver
                   ; update
                   ; token_id = Token_id.default
-                  ; delta = Amount.Signed.of_unsigned amt
+                  ; balance_change = Amount.Signed.of_unsigned amt
                   ; increment_nonce = false
                   ; events = []
                   ; sequence_events = []
                   ; call_data = Field.zero
-                  ; depth = 0
+                  ; call_depth = 0
                   }
               ; predicate = Accept
               }
@@ -4344,7 +4344,7 @@ module For_tests = struct
     in
     let ps =
       Parties.Party_or_stack.of_parties_list
-        ~party_depth:(fun (p : Party.Predicated.t) -> p.body.depth)
+        ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
         other_parties_data
       |> Parties.Party_or_stack.accumulate_hashes_predicated
     in
@@ -4448,7 +4448,7 @@ module For_tests = struct
           let proof_party =
             let ps =
               Parties.Party_or_stack.of_parties_list
-                ~party_depth:(fun (p : Party.Predicated.t) -> p.body.depth)
+                ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
                 [ snapp_party.data ]
               |> Parties.Party_or_stack.accumulate_hashes_predicated
             in
@@ -5024,13 +5024,13 @@ let%test_module "transaction_snark" =
                     { pk = acct1.account.public_key
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
-                    ; delta =
+                    ; balance_change =
                         Amount.Signed.(of_unsigned receiver_amount |> negate)
                     ; increment_nonce = true
                     ; events = []
                     ; sequence_events = []
                     ; call_data = Field.zero
-                    ; depth = 0
+                    ; call_depth = 0
                     }
                 ; predicate = Accept
                 }
