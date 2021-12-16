@@ -27,7 +27,7 @@ macro_rules! impl_oracles {
             #[ocaml::func]
             pub fn [<$F:snake _oracles_create>](
                 lgr_comm: Vec<CamlPolyComm<$CamlG>>, // the bases to commit polynomials
-                index: $index,    // parameters
+                index: $index,
                 proof: CamlProverProof<$CamlG, $CamlF>, // the final proof (contains public elements at the beginning)
             ) -> CamlOracles<$CamlF> {
                 // conversions
