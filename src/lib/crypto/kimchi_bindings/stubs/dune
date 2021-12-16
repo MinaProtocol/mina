@@ -35,10 +35,12 @@
 ;; generate the OCaml bindings
 
 (rule
- (target kimchi.ml)
+ (target kimchi.ml.gen)
+ (mode promote)
  (deps
   Cargo.toml
   rust-toolchain.toml
+  ../../../../.ocamlformat
   (source_tree src)
   (source_tree binding_generation)
   (source_tree ../../proof-systems))
@@ -48,5 +50,5 @@
    (progn
     (run rm -rf ./target)
     (run rm -f ./Cargo.lock)
-    (run cargo run ../kimchi.ml)
-    (run ocamlformat -i ../kimchi.ml)))))
+    (run cargo run ../kimchi.ml.gen)
+    (run ocamlformat --impl -i ../kimchi.ml.gen)))))
