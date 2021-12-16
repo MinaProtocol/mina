@@ -1165,22 +1165,8 @@ module Block = struct
             ; ledger_hash=
                 Protocol_state.blockchain_state protocol_state
                 |> Blockchain_state.staged_ledger_hash
-<<<<<<< HEAD
                 |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_string
             ; height
-||||||| 038286053
-                |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_string
-            ; height=
-                consensus_state
-                |> Consensus.Data.Consensus_state.blockchain_length
-                |> Unsigned.UInt32.to_int64
-=======
-                |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_base58_check
-            ; height=
-                consensus_state
-                |> Consensus.Data.Consensus_state.blockchain_length
-                |> Unsigned.UInt32.to_int64
->>>>>>> origin/lk86/fix-conflicts-with-1.2.1
             ; global_slot_since_hard_fork=
                 Consensus.Data.Consensus_state.curr_global_slot consensus_state
                 |> Unsigned.UInt32.to_int64
@@ -1263,7 +1249,7 @@ module Block = struct
                 let%map () =
                   Block_and_signed_command.add_with_status
                     (module Conn)
-                    ~block_id ~block_height:height ~user_command_id:id ~sequence_no
+                      ~block_id ~block_height:height ~user_command_id:id ~sequence_no
                     ~status:user_command.status ~fee_payer_id ~source_id
                     ~receiver_id
                   >>| ignore
