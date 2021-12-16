@@ -1,9 +1,7 @@
 open Core_kernel
 open Kimchi_backend_common
 
-(** ? *)
 module Rounds : sig
-  (* TODO: remove open *)
   open Pickles_types
 
   module Wrap : Nat.Add.Intf_transparent
