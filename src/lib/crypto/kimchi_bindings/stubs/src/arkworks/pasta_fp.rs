@@ -181,8 +181,6 @@ pub fn caml_pasta_fp_to_string(x: ocaml::Pointer<CamlFp>) -> String {
     CamlBigInteger256(x.as_ref().into_repr()).to_string()
 }
 
-// external of_string : string -> t = "caml_pasta_fp_of_string"
-// according to ocaml-rs, it should be `bytes`, not `string`
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_of_string(s: &[u8]) -> Result<CamlFp, ocaml::Error> {

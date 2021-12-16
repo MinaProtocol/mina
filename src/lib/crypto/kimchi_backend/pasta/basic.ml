@@ -74,6 +74,8 @@ module Bigint256 =
       let length_in_bytes = 32
     end)
 
+(* the two pasta fields and curves *)
+
 module Fp = Field.Make (struct
   module Bigint = Bigint256
   include Kimchi.Foundations.Fp

@@ -26,14 +26,11 @@ There are two ways of dealing with types:
 1. let OCaml handle your types: use the `ocaml::ToValue` and `ocaml::FromValue` traits to let OCaml convert your types into OCaml types.
 2. Make it opaque to OCaml: use [custom types](https://ocaml.org/manual/intfc.html#s:c-custom) to store opaque blocks within the OCaml heap. There's the [`ocaml::custom!`](https://docs.rs/ocaml/0.22.0/ocaml/macro.custom.html) macro to help you with that.
 
-The first option is the easiest one, unless there are some foreign types in there. (Because of Rust's [*orphan rule*](https://github.com/Ixrec/rust-orphan-rules)) you can't implement the ToValue and FromValue traits on foreign types.)
+Simply put, use custom types unless you need to be able to access a certain type in OCaml. If you need to expose the internal of a struct/enum, use ocaml-gen to generate the matching struct/enum in OCaml. Exposing the internals of a struct/enum requires generating the matching struct/enum in OCaml (using ocaml-gen). If you don't need all of the fields, consider implementing and exposing getters on a custom type instead.
 
-You should use a custom type where OCaml doesn't need to access the internal
-fields of the type (or if it is itself a primitive, such as a field element or
-bigint); otherwise, you must create the desired OCaml structure/enum as a rust
-structure and perform a conversion between this new type and the original
-foreign rust type. In general, the choice of which to use should be governed by
-what's required in OCaml, **not** by limitations in the rust language.
+Note that because of Rust's [*orphan rule*](https://github.com/Ixrec/rust-orphan-rules), you can't implement the `ToValue` and `FromValue` traits on foreign types. This means that you'll have to use the second option anytime you're dealing with foreign types, by wrapping them into a local type and using `custom!`. 
+
+We also prefer to store values passed to OCaml on the OCaml heap wherever possible. That is, unless they are long-lived (think SRS, prover index) or would be very inefficient on the OCaml heap (think Vec<_> where we need to use emplace_back).
 
 ### The ToValue and FromValue traits
 
@@ -58,10 +55,7 @@ $ cargo expand -- some_filename_without_rs > expanded.rs
 
 The macro [custom!](https://github.com/zshipko/ocaml-rs/blob/f300f2f382a694a6cc51dc14a9b3f849191580f0/src/custom.rs) allows you to quickly create custom types.
 
-Values of custom types are opaque to OCaml, used to store the data of some rust
-value on the OCaml heap. When this data may contain pointers to the rust heap,
-or other data that requires a call to 'drop' in rust, you must provide a
-'finalizer' for OCaml to call into to correctly drop these values.
+Values of custom types are opaque to OCaml. They are used to store the data of some Rust value on the OCaml heap. When this data may contain pointers to the Rust heap, or other data that requires a call to 'drop' in rust, you must provide a 'finalizer' for OCaml to call into to correctly drop these values. Best practice is to always provide such a finalizer, even if it's a no-op.
 
 Here is how custom types are transformed into OCaml values:
 

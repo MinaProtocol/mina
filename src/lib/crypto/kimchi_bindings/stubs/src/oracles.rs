@@ -26,11 +26,10 @@ macro_rules! impl_oracles {
             #[ocaml_gen::func]
             #[ocaml::func]
             pub fn [<$F:snake _oracles_create>](
-                lgr_comm: Vec<CamlPolyComm<$CamlG>>, // the bases to commit polynomials
+                lgr_comm: Vec<CamlPolyComm<$CamlG>>,
                 index: $index,
-                proof: CamlProverProof<$CamlG, $CamlF>, // the final proof
+                proof: CamlProverProof<$CamlG, $CamlF>,
             ) -> CamlOracles<$CamlF> {
-                // conversions
                 let index: DlogVerifierIndex<$G> = index.into();
                 let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
                     .into_iter()
