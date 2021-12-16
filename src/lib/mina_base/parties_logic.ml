@@ -49,6 +49,8 @@ module type Amount_intf = sig
 
   val zero : t
 
+  val equal : t -> t -> bool
+
   val add_flagged : t -> t -> t * [ `Overflow of bool ]
 
   val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
@@ -137,7 +139,7 @@ module type Party_intf = sig
 
   type signed_amount
 
-  val delta : t -> signed_amount
+  val balance_change : t -> signed_amount
 end
 
 module type Parties_intf = sig
@@ -225,6 +227,9 @@ module Eff = struct
              ; account : 'account
              ; .. > )
            t
+    | Check_fee_excess :
+        'bool * 'failure
+        -> ('failure, < bool : 'bool ; failure : 'failure ; .. >) t
     | Get_global_ledger :
         'global_state
         -> ('ledger, < global_state : 'global_state ; ledger : 'ledger ; .. >) t
@@ -511,7 +516,7 @@ module Make (Inputs : Inputs_intf) = struct
          will never be promoted to the global excess, so this amount is
          irrelevant.
       *)
-      Amount.Signed.negate (Party.delta party)
+      Amount.Signed.negate (Party.balance_change party)
     in
     let party_token = h.perform (Party_token_id party) in
     Bool.(assert_ (not (Token_id.(equal invalid) party_token))) ;
@@ -563,11 +568,20 @@ module Make (Inputs : Inputs_intf) = struct
     let update_global_state =
       ref Bool.(update_local_excess &&& local_state.success)
     in
-    (*let delta_settled = Amount.equal
-                         local_state.excess
-                         Amount.zero
-      in
-      Bool.(assert_ ((not is_last_party) ||| delta_settled)) ;*)
+    let valid_fee_excess =
+      let delta_settled = Amount.equal local_state.excess Amount.zero in
+      Bool.((not is_last_party) ||| delta_settled)
+    in
+    let failure_status =
+      h.perform
+        (Check_fee_excess (valid_fee_excess, local_state.failure_status))
+    in
+    let local_state =
+      { local_state with
+        success = Bool.(local_state.success &&& valid_fee_excess)
+      ; failure_status
+      }
+    in
     let global_excess_update_failed = ref Bool.true_ in
     let global_state, local_state =
       ( h.perform

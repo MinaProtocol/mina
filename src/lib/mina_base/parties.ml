@@ -213,7 +213,7 @@ module Party_or_stack = struct
 
     let of_parties_list xs : _ t =
       of_parties_list
-        ~party_depth:(fun ((p : Party.t), _) -> p.data.body.depth)
+        ~party_depth:(fun ((p : Party.t), _) -> p.data.body.call_depth)
         xs
       |> accumulate_hashes
 
@@ -264,10 +264,10 @@ end
 
 let check_depths (t : t) =
   try
-    assert (t.fee_payer.data.body.depth = 0) ;
+    assert (t.fee_payer.data.body.call_depth = 0) ;
     let (_ : int) =
       List.fold ~init:0 t.other_parties ~f:(fun depth party ->
-          let new_depth = party.data.body.depth in
+          let new_depth = party.data.body.call_depth in
           if new_depth >= 0 && new_depth <= depth + 1 then new_depth
           else assert false)
     in
@@ -284,7 +284,7 @@ let parties (t : t) : Party.t list =
   }
   :: t.other_parties
 
-let fee (t : t) : Currency.Fee.t = t.fee_payer.data.body.delta
+let fee (t : t) : Currency.Fee.t = t.fee_payer.data.body.balance_change
 
 let fee_payer_party ({ fee_payer; _ } : t) = fee_payer
 
@@ -293,6 +293,9 @@ let fee_payer (t : t) = Party.Fee_payer.account_id (fee_payer_party t)
 let nonce (t : t) : Account.Nonce.t = (fee_payer_party t).data.predicate
 
 let fee_token (_t : t) = Token_id.default
+
+let fee_excess (t : t) =
+  Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
 let accounts_accessed (t : t) =
   List.map (parties t) ~f:(fun p ->

@@ -99,11 +99,12 @@ CREATE TABLE snapp_party_body
 , public_key_id            int              NOT NULL REFERENCES public_keys(id)
 , update_id                int              NOT NULL REFERENCES snapp_updates(id)
 , token_id                 bigint           NOT NULL
-, delta                    bigint           NOT NULL
+, balance_change           bigint           NOT NULL
+, increment_nonce          boolean          NOT NULL
 , events_ids               int[]            NOT NULL
 , sequence_events_ids      int[]            NOT NULL
 , call_data_id             int              NOT NULL REFERENCES snapp_state_data(id)
-, depth                    int              NOT NULL
+, call_depth               int              NOT NULL
 );
 
 CREATE TABLE snapp_balance_bounds

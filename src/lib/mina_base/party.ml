@@ -376,12 +376,12 @@ module Body = struct
           { pk : 'pk
           ; update : 'update
           ; token_id : 'token_id
-          ; delta : 'amount
+          ; balance_change : 'amount
           ; increment_nonce : 'bool
           ; events : 'events
           ; sequence_events : 'events
           ; call_data : 'call_data
-          ; depth : 'int
+          ; call_depth : 'int
           }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
@@ -441,18 +441,21 @@ module Body = struct
       { pk = Public_key.Compressed.empty
       ; update = Update.dummy
       ; token_id = ()
-      ; delta = Fee.zero
+      ; balance_change = Fee.zero
       ; increment_nonce = ()
       ; events = []
       ; sequence_events = []
       ; call_data = Field.zero
-      ; depth = 0
+      ; call_depth = 0
       }
   end
 
   let of_fee_payer (t : Fee_payer.t) : t =
     { t with
-      delta = { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.delta }
+      balance_change =
+        { Signed_poly.sgn = Sgn.Neg
+        ; magnitude = Amount.of_fee t.balance_change
+        }
     ; token_id = Token_id.default
     ; increment_nonce = true
     }
@@ -473,19 +476,19 @@ module Body = struct
         ({ pk
          ; update
          ; token_id
-         ; delta
+         ; balance_change
          ; increment_nonce
          ; events
          ; sequence_events
          ; call_data
-         ; depth = _depth (* ignored *)
+         ; call_depth = _depth (* ignored *)
          } :
           t) =
       List.reduce_exn ~f:Random_oracle_input.append
         [ Public_key.Compressed.Checked.to_input pk
         ; Update.Checked.to_input update
         ; Impl.run_checked (Token_id.Checked.to_input token_id)
-        ; Amount.Signed.Checked.to_input delta
+        ; Amount.Signed.Checked.to_input balance_change
         ; Random_oracle_input.bitstring [ increment_nonce ]
         ; Events.var_to_input events
         ; Events.var_to_input sequence_events
@@ -517,31 +520,31 @@ module Body = struct
     { pk = Public_key.Compressed.empty
     ; update = Update.dummy
     ; token_id = Token_id.default
-    ; delta = Amount.Signed.zero
+    ; balance_change = Amount.Signed.zero
     ; increment_nonce = false
     ; events = []
     ; sequence_events = []
     ; call_data = Field.zero
-    ; depth = 0
+    ; call_depth = 0
     }
 
   let to_input
       ({ pk
        ; update
        ; token_id
-       ; delta
+       ; balance_change
        ; increment_nonce
        ; events
        ; sequence_events
        ; call_data
-       ; depth = _ (* ignored *)
+       ; call_depth = _ (* ignored *)
        } :
         t) =
     List.reduce_exn ~f:Random_oracle_input.append
       [ Public_key.Compressed.to_input pk
       ; Update.to_input update
       ; Token_id.to_input token_id
-      ; Amount.Signed.to_input delta
+      ; Amount.Signed.to_input balance_change
       ; Random_oracle_input.bitstring [ increment_nonce ]
       ; Events.to_input events
       ; Events.to_input sequence_events
@@ -867,4 +870,4 @@ let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
     When this is positive, the amount will be deposited into the account from
     the funds made available by previous parties in the same transaction.
 *)
-let delta (t : t) : Amount.Signed.t = t.data.body.delta
+let balance_change (t : t) : Amount.Signed.t = t.data.body.balance_change
