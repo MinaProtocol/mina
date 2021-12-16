@@ -34,7 +34,7 @@ macro_rules! impl_vector_old {
             ) -> Result<$CamlF, ocaml::Error> {
                 match v.get(i as usize) {
                     Some(x) => Ok(x.into()),
-                    None => Err(ocaml::Error::invalid_argument("caml_pasta_fp_vector_get")
+                    None => Err(ocaml::Error::invalid_argument("vector_get")
                         .err()
                         .unwrap()),
                 }
