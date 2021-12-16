@@ -198,7 +198,10 @@ module Plonk_constraint = struct
             ; b8 = f b8
             }
 
-    (* TODO: this seems to be a "double check" type of function? It just checks that the basic gate is equal to 0? what is eval_one? what is v and f? *)
+    (** [eval (module F) get_variable gate] checks that [gate]'s polynomial is
+        satisfied by the assignments given by [get_variable].
+        Currently only implemented for the [Basic] gate.
+    *)
     let eval (type v f)
         (module F : Snarky_backendless.Field_intf.S with type t = f)
         (eval_one : v -> f) (t : (v, f) t) =
