@@ -4718,13 +4718,13 @@ let%test_module "transaction_snark" =
                     { pk = acct1.account.public_key
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
-                    ; delta =
+                    ; balance_change =
                         Amount.Signed.(of_unsigned receiver_amount |> negate)
                     ; increment_nonce = true
                     ; events = []
                     ; sequence_events = []
                     ; call_data = Field.zero
-                    ; depth = 0
+                    ; call_depth = 0
                     }
                 ; predicate = Accept
                 }

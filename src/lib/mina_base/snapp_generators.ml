@@ -248,7 +248,6 @@ let gen_fee (account : Account.t) =
 let fee_to_amt fee = Currency.Amount.(Signed.of_unsigned (of_fee fee))
 
 let gen_balance_change ?balances_tbl (account : Account.t) =
-  let pk = account.public_key in
   let open Quickcheck.Let_syntax in
   let pk = account.public_key in
   (* TODO: the authorization is Signature for new accounts only
@@ -299,7 +298,8 @@ let gen_balance_change ?balances_tbl (account : Account.t) =
 *)
 let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
     ?(snapp_account = false) ?(is_fee_payer = false) ?available_public_keys
-    ?permissions_auth ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
+    ?permissions_auth
+    ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
     ~(f_balance_change : a -> Currency.Amount.Signed.t) ~(increment_nonce : b)
     ~ledger () :
     (_, _, _, a, _, _, _, b) Party.Body.Poly.t Quickcheck.Generator.t =
@@ -532,7 +532,8 @@ let gen_party_predicated_signed ?account_id ?permissions_auth ~ledger :
     Party.Predicated.Signed.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind body =
-    gen_party_body ~gen_balance_change ~f_balance_change:Fn.id ?account_id ?permissions_auth
+    gen_party_body ~gen_balance_change ~f_balance_change:Fn.id ?account_id
+      ?permissions_auth
       ~increment_nonce:(Option.is_some account_id)
       ~ledger ()
   in
@@ -544,8 +545,9 @@ let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger :
     Party.Predicated.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body0 =
-    gen_party_body ?permissions_auth ~account_id ~is_fee_payer:true ~increment_nonce:()
-      ~gen_balance_change:gen_fee ~f_balance_change:fee_to_amt ~ledger ()
+    gen_party_body ?permissions_auth ~account_id ~is_fee_payer:true
+      ~increment_nonce:() ~gen_balance_change:gen_fee
+      ~f_balance_change:fee_to_amt ~ledger ()
   in
   (* make sure the fee payer's token id is the default,
      which is represented by the unit value in the body
@@ -631,7 +633,7 @@ let gen_parties_from ?(succeed = true)
     let fee_payer_balance =
       (* if we've done things right, all the options here are Some *)
       let fee =
-        fee_payer.data.body.delta |> Currency.Fee.to_uint64
+        fee_payer.data.body.balance_change |> Currency.Fee.to_uint64
         |> Currency.Amount.of_uint64
       in
       let ledger_balance =
