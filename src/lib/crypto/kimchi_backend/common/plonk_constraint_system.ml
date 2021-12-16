@@ -200,7 +200,7 @@ module Plonk_constraint = struct
 
     (** [eval (module F) get_variable gate] checks that [gate]'s polynomial is
         satisfied by the assignments given by [get_variable].
-        Currently only implemented for the [Basic] gate.
+        Warning: currently only implemented for the [Basic] gate.
     *)
     let eval (type v f)
         (module F : Snarky_backendless.Field_intf.S with type t = f)
@@ -228,7 +228,6 @@ module Plonk_constraint = struct
             false )
           else true
       | _ ->
-          (* TODO: this fails open for other gates than basic? *)
           true
   end
 
