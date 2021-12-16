@@ -17,13 +17,13 @@ module type Bindings = sig
 
   val to_string : t -> string
 
-  val of_numeral : bytes -> int -> int -> t
+  val of_numeral : string -> int -> int -> t
 
-  val of_decimal_string : bytes -> t
+  val of_decimal_string : string -> t
 
-  val to_bytes : t -> bytes
+  val to_bytes : t -> Bytes.t
 
-  val of_bytes : bytes -> t
+  val of_bytes : Bytes.t -> t
 end
 
 module type Intf = sig
@@ -41,8 +41,6 @@ module type Intf = sig
 
   val of_hex_string : string -> t
 
-  val of_decimal_string : string -> t
-
   val of_numeral : string -> base:int -> t
 end
 
@@ -57,8 +55,6 @@ module Make
   let bytes_per_limb = bytes_per_limb ()
 
   let length_in_bytes = num_limbs * bytes_per_limb
-
-  let of_decimal_string x = Bytes.of_string x |> of_decimal_string
 
   let to_hex_string t =
     let data = to_bytes t in
@@ -113,7 +109,5 @@ module Make
       of_bytes bytes
   end)
 
-  let of_numeral s ~base =
-    let s = Bytes.of_string s in
-    of_numeral s (Bytes.length s) base
+  let of_numeral s ~base = of_numeral s (String.length s) base
 end

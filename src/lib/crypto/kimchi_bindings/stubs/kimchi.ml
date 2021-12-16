@@ -4,10 +4,10 @@ module Foundations = struct
   module BigInt256 = struct
     type nonrec t
 
-    external of_numeral : bytes -> int -> int -> t
+    external of_numeral : string -> int -> int -> t
       = "caml_bigint_256_of_numeral"
 
-    external of_decimal_string : bytes -> t
+    external of_decimal_string : string -> t
       = "caml_bigint_256_of_decimal_string"
 
     external num_limbs : unit -> int = "caml_bigint_256_num_limbs"
@@ -60,17 +60,17 @@ module Foundations = struct
 
     external to_string : t -> string = "caml_pasta_fp_to_string"
 
-    external of_string : bytes -> t = "caml_pasta_fp_of_string"
+    external of_string : string -> t = "caml_pasta_fp_of_string"
 
     external print : t -> unit = "caml_pasta_fp_print"
 
-    external copy : t -> t -> unit = "caml_pasta_fp_copy"
+    external copy : over:t -> t -> unit = "caml_pasta_fp_copy"
 
-    external mut_add : t -> t -> unit = "caml_pasta_fp_mut_add"
+    external mut_add : t -> other:t -> unit = "caml_pasta_fp_mut_add"
 
-    external mut_sub : t -> t -> unit = "caml_pasta_fp_mut_sub"
+    external mut_sub : t -> other:t -> unit = "caml_pasta_fp_mut_sub"
 
-    external mut_mul : t -> t -> unit = "caml_pasta_fp_mut_mul"
+    external mut_mul : t -> other:t -> unit = "caml_pasta_fp_mut_mul"
 
     external mut_square : t -> unit = "caml_pasta_fp_mut_square"
 
@@ -127,17 +127,17 @@ module Foundations = struct
 
     external to_string : t -> string = "caml_pasta_fq_to_string"
 
-    external of_string : bytes -> t = "caml_pasta_fq_of_string"
+    external of_string : string -> t = "caml_pasta_fq_of_string"
 
     external print : t -> unit = "caml_pasta_fq_print"
 
-    external copy : t -> t -> unit = "caml_pasta_fq_copy"
+    external copy : over:t -> t -> unit = "caml_pasta_fq_copy"
 
-    external mut_add : t -> t -> unit = "caml_pasta_fq_mut_add"
+    external mut_add : t -> other:t -> unit = "caml_pasta_fq_mut_add"
 
-    external mut_sub : t -> t -> unit = "caml_pasta_fq_mut_sub"
+    external mut_sub : t -> other:t -> unit = "caml_pasta_fq_mut_sub"
 
-    external mut_mul : t -> t -> unit = "caml_pasta_fq_mut_mul"
+    external mut_mul : t -> other:t -> unit = "caml_pasta_fq_mut_mul"
 
     external mut_square : t -> unit = "caml_pasta_fq_mut_square"
 

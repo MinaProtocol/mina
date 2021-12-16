@@ -2,7 +2,6 @@ open Intf
 open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
-(** some interface *)
 module type Input_intf = sig
   type t
 
@@ -44,7 +43,7 @@ module type Input_intf = sig
 
   val to_string : t -> string
 
-  val of_string : bytes -> t
+  val of_string : string -> t
 
   val random : unit -> t
 
@@ -52,19 +51,19 @@ module type Input_intf = sig
 
   val two_adic_root_of_unity : unit -> t
 
-  val mut_add : t -> t -> unit
+  val mut_add : t -> other:t -> unit
 
-  val mut_mul : t -> t -> unit
+  val mut_mul : t -> other:t -> unit
 
   val mut_square : t -> unit
 
-  val mut_sub : t -> t -> unit
+  val mut_sub : t -> other:t -> unit
 
-  val copy : t -> t -> unit
+  val copy : over:t -> t -> unit
 
-  val to_bytes : t -> bytes
+  val to_bytes : t -> Bytes.t
 
-  val of_bytes : bytes -> t
+  val of_bytes : Bytes.t -> t
 
   val domain_generator : int -> t
 
@@ -247,15 +246,15 @@ module Make (F : Input_intf) :
   let ( / ) = div
 
   module Mutable = struct
-    let add t ~other = mut_add t other
+    let add = mut_add
 
-    let mul t ~other = mut_mul t other
+    let mul = mut_mul
 
     let square = mut_square
 
-    let sub t ~other = mut_sub t other
+    let sub = mut_sub
 
-    let copy ~over t = copy over t
+    let copy ~over t = F.copy over t
   end
 
   let op f t other = f t ~other
