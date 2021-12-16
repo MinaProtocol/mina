@@ -7,7 +7,7 @@ This package contains the glue between:
 
 As snarky expects specific "backend" modules, zexe-backend mostly contains functors that converts the ocaml-bindings found in [kimchi_bindings](../kimchi_bindings) into what snarky expects.
 
-There's three things to convert here:
+There are three things to convert here:
 
 1. fundamental (or non-generic) low-level types: arkwork types (BigInteger256) AND mina-curves types (Vesta, Pallas, Fp, Fq).
 2. common (or generic) low-level types: polynomial commitments (Poly_comm), gates (Gates), etc. that are instantiated separately for the two curves (Fq_poly_comm, Fp_poly_comm).
