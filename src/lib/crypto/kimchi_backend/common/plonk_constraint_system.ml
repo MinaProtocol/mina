@@ -255,7 +255,6 @@ module V = struct
    external variables and previously generated internal variables.
 *)
 
-  (* TODO: shouldn't this variant be defined outside of V? *)
   module T = struct
     type t = External of int | Internal of Internal_var.t
     [@@deriving compare, hash, sexp]
