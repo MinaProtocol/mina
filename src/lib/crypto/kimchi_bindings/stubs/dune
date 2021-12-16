@@ -9,7 +9,8 @@
  (deps
   Cargo.toml
   rust-toolchain.toml
-  (source_tree src))
+  (source_tree src)
+  (source_tree ../../proof-systems))
  (action
   (progn
    (run rm -rf ./target)
@@ -41,7 +42,8 @@
   Cargo.toml
   rust-toolchain.toml
   (source_tree src)
-  (source_tree binding_generation))
+  (source_tree binding_generation)
+  (source_tree ../../proof-systems))
  (action
   (chdir
    binding_generation
