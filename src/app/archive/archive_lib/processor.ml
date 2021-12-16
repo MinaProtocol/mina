@@ -218,7 +218,7 @@ end
 
 module Snarked_ledger_hash = struct
   let find (module Conn : CONNECTION) (t : Frozen_ledger_hash.t) =
-    let hash = Frozen_ledger_hash.to_base58_check t in
+    let hash = Frozen_ledger_hash.to_string t in
     Conn.find
       (Caqti_request.find Caqti_type.string Caqti_type.int
          "SELECT id FROM snarked_ledger_hashes WHERE value = ?")
@@ -227,7 +227,7 @@ module Snarked_ledger_hash = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (t : Frozen_ledger_hash.t) =
     let open Deferred.Result.Let_syntax in
-    let hash = Frozen_ledger_hash.to_base58_check t in
+    let hash = Frozen_ledger_hash.to_string t in
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt Caqti_type.string Caqti_type.int
@@ -256,7 +256,7 @@ module Epoch_data = struct
   let add_from_seed_and_ledger_hash_id (module Conn : CONNECTION) ~seed
       ~ledger_hash_id =
     let open Deferred.Result.Let_syntax in
-    let seed = Epoch_seed.to_base58_check seed in
+    let seed = Epoch_seed.to_string seed in
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt typ Caqti_type.int
@@ -1078,13 +1078,13 @@ module Block = struct
     Conn.find
       (Caqti_request.find Caqti_type.string Caqti_type.int
          "SELECT id FROM blocks WHERE state_hash = ?")
-      (State_hash.to_base58_check state_hash)
+      (State_hash.to_string state_hash)
 
   let find_opt (module Conn : CONNECTION) ~(state_hash : State_hash.t) =
     Conn.find_opt
       (Caqti_request.find_opt Caqti_type.string Caqti_type.int
          "SELECT id FROM blocks WHERE state_hash = ?")
-      (State_hash.to_base58_check state_hash)
+      (State_hash.to_string state_hash)
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
@@ -1152,11 +1152,11 @@ module Block = struct
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
                      RETURNING id
                |sql})
-            { state_hash= hash |> State_hash.to_base58_check
+            { state_hash= hash |> State_hash.to_string
             ; parent_id
             ; parent_hash=
                 Protocol_state.previous_state_hash protocol_state
-                |> State_hash.to_base58_check
+                |> State_hash.to_string
             ; creator_id
             ; block_winner_id
             ; snarked_ledger_hash_id
@@ -1249,7 +1249,7 @@ module Block = struct
                 let%map () =
                   Block_and_signed_command.add_with_status
                     (module Conn)
-                      ~block_id ~block_height:height ~user_command_id:id ~sequence_no
+                    ~block_id ~block_height:height ~user_command_id:id ~sequence_no
                     ~status:user_command.status ~fee_payer_id ~source_id
                     ~receiver_id
                   >>| ignore
@@ -1470,15 +1470,15 @@ module Block = struct
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
                      RETURNING id
                |sql})
-            { state_hash= block.state_hash |> State_hash.to_base58_check
+            { state_hash= block.state_hash |> State_hash.to_string
             ; parent_id
-            ; parent_hash= block.parent_hash |> State_hash.to_base58_check
+            ; parent_hash= block.parent_hash |> State_hash.to_string
             ; creator_id
             ; block_winner_id
             ; snarked_ledger_hash_id
             ; staking_epoch_data_id
             ; next_epoch_data_id
-            ; ledger_hash= block.ledger_hash |> Ledger_hash.to_base58_check
+            ; ledger_hash= block.ledger_hash |> Ledger_hash.to_string
             ; height= block.height |> Unsigned.UInt32.to_int64
             ; global_slot_since_hard_fork= block.global_slot_since_hard_fork |> Unsigned.UInt32.to_int64
             ; global_slot_since_genesis=
@@ -1578,15 +1578,10 @@ module Block = struct
               internal_command.receiver_balance
               ~block_sequence_no:internal_command.sequence_no ~block_secondary_sequence_no:internal_command.secondary_sequence_no
           in
-          let receiver_account_creation_fee_paid = internal_command.receiver_account_creation_fee_paid
-                                                   |> Option.map ~f:(fun amount ->
-                                                       Currency.Amount.to_uint64 amount |>
-                                                       Unsigned.UInt64.to_int64)
-          in
           Block_and_internal_command.add_if_doesn't_exist
             (module Conn)
             ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
-            ~receiver_account_creation_fee_paid
+            ~receiver_account_creation_fee_paid:None (* TEMP *)
             ~receiver_balance_id )
     in
     return block_id
@@ -1602,7 +1597,6 @@ module Block = struct
          |sql})
       (parent_id, State_hash.to_base58_check parent_hash)
 
-<<<<<<< HEAD
   let get_subchain (module Conn : CONNECTION) ~start_block_id ~end_block_id =
     Conn.collect_list
       (Caqti_request.collect Caqti_type.(tup2 int int) typ
@@ -1692,82 +1686,6 @@ module Block = struct
        (* a block at or above highest canonical block, not high enough to mark any blocks as canonical *)
        Deferred.Result.return ()
 
-||||||| 038286053
-=======
-  let get_subchain (module Conn : CONNECTION) ~start_block_id ~end_block_id =
-    Conn.collect_list
-      (Caqti_request.collect Caqti_type.(tup2 int int) typ
-      {sql| WITH RECURSIVE chain AS (
-              SELECT id,state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
-                     next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp, chain_status
-              FROM blocks b WHERE b.id = $1
-
-              UNION ALL
-
-              SELECT b.id,b.state_hash,b.parent_id,b.parent_hash,b.creator_id,b.block_winner_id,b.snarked_ledger_hash_id,b.staking_epoch_data_id,
-                     b.next_epoch_data_id,b.ledger_hash,b.height,b.global_slot,b.global_slot_since_genesis,b.timestamp,b.chain_status
-              FROM blocks b
-
-              INNER JOIN chain
-
-              ON b.id = chain.parent_id AND (chain.id <> $2 OR b.id = $2)
-
-           )
-
-           SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
-                  next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp,chain_status
-           FROM chain ORDER BY height ASC
-      |sql})
-      (end_block_id,start_block_id)
-
-  let get_highest_canonical_blocks (module Conn : CONNECTION) =
-    Conn.collect_list
-      (Caqti_request.collect Caqti_type.unit Caqti_type.(tup2 int int64)
-         "SELECT id,height FROM blocks WHERE chain_status='canonical' ORDER BY height DESC LIMIT 1")
-
-  let mark_as_canonical (module Conn : CONNECTION) ~state_hash =
-    Conn.exec
-      (Caqti_request.exec Caqti_type.string
-         "UPDATE blocks SET chain_status='canonical' WHERE state_hash = ?")
-      state_hash
-
-  let mark_as_orphaned (module Conn : CONNECTION) ~state_hash ~height =
-    Conn.exec
-      (Caqti_request.exec Caqti_type.(tup2 string int64)
-         {sql| UPDATE blocks SET chain_status='orphaned'
-               WHERE height = $2
-               AND state_hash <> $1
-         |sql})
-      (state_hash,height)
-
-  (* update chain_status for blocks now known to be canonical or orphaned *)
-   let update_chain_status (module Conn : CONNECTION) ~block_id =
-     let open Deferred.Result.Let_syntax in
-     match%bind get_highest_canonical_blocks (module Conn) () with
-     | [] ->
-       (* no canonical blocks in this database, don't update statuses
-          this can happen on a new database, such as a test database
-       *)
-       Deferred.Result.return ()
-     | [highest_canonical_block_id,greatest_canonical_height] ->
-       let%bind block = load (module Conn) ~id:block_id in
-       let k_int64 = Genesis_constants.k |> Int64.of_int in
-       let block_height_less_k_int64 = Int64.(-) block.height k_int64 in
-       if Int64.(>) block.height (Int64.(+) greatest_canonical_height k_int64) then
-         (* subchain between new block and highest canonical block *)
-         let%bind subchain_blocks = get_subchain (module Conn) ~start_block_id:highest_canonical_block_id ~end_block_id:block_id in
-         (* mark canonical, orphaned blocks in subchain at least k behind the new block *)
-         let canonical_blocks = List.filter subchain_blocks ~f:(fun subchain_block ->
-             Int64.(<=) subchain_block.height block_height_less_k_int64) in
-         deferred_result_list_fold canonical_blocks ~init:() ~f:(fun () block ->
-             let%bind () = mark_as_canonical (module Conn) ~state_hash:block.state_hash in
-             mark_as_orphaned (module Conn) ~state_hash:block.state_hash ~height:block.height)
-       else
-         Deferred.Result.return ()
-     | _ ->
-       failwith "update_chain_status: expected 0 or 1 results from get_highest_canonical_blocks"
-
->>>>>>> origin/lk86/fix-conflicts-with-1.2.1
   let delete_if_older_than ?height ?num_blocks ?timestamp
       (module Conn : CONNECTION) =
     let open Deferred.Result.Let_syntax in
