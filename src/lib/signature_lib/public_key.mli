@@ -79,7 +79,9 @@ module Compressed : sig
 
   include Hashable.S_binable with type t := t
 
-  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+  val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
+
+  val to_input : t -> Field.t Random_oracle.Input.t
 
   val to_string : t -> string
 
@@ -100,7 +102,10 @@ module Compressed : sig
   module Checked : sig
     val equal : var -> var -> (Boolean.var, _) Checked.t
 
-    val to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+    val to_input_legacy :
+      var -> (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
+
+    val to_input : var -> Field.Var.t Random_oracle.Input.t
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
