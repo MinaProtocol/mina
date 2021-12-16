@@ -115,6 +115,7 @@ For example, if you have a generic custom type that must be converted to differe
 * To ease eye'ing at FFI code, we use the `Caml` prefix whenever we're dealing with types that will be converted to OCaml. This allows to quickly read a function's signature and see that there are only types that support `ocaml::FromValue` and `ocaml::ToValue`. You can then implement the `From` trait to the non-ocaml types for facilitating back-and-forth conversions.
 * You must not include any value from the OCaml heap within a custom type, otherwise you are likely to cause OCaml heap corruption and an eventual segfault.
 * You should implement a `drop_in_place` finalizer for all custom types. Better be safe than sorry. (TODO: lint on this? or mandate this upstream)
-* If a custom type is large, you can use a `Box` to only store a pointer (pointing to the Rust heap) in the OCaml heap. (TODO: why is this better?)
+* If a custom type is large, you can use a `Box` to only store a pointer (pointing to the Rust heap) in the OCaml heap. The OCaml heap is not well-suited to handling large opaque data.
+* The priority is to keep small, potentially short-lived data on the heap so we don't fragment the rust heap and so that it gets free'd appropriately quickly.
 * Since OCaml does not have fixed-sized arrays, we usually convert any arrays (`[T; N]`) into tuples (`(T, T, T, ...)`)
 * TODO: We do not have good conventions on returning errors or throwing exceptions.
