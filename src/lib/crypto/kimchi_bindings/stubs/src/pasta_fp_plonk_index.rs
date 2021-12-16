@@ -9,10 +9,6 @@ use std::{
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
 };
 
-//
-// CamlPastaFpPlonkIndex (custom type)
-//
-
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
 #[derive(ocaml_gen::CustomType)]
 pub struct CamlPastaFpPlonkIndex(pub Box<DlogIndex<GAffine>>);
@@ -28,10 +24,6 @@ extern "C" fn caml_pasta_fp_plonk_index_finalize(v: ocaml::Raw) {
 ocaml::custom!(CamlPastaFpPlonkIndex {
     finalize: caml_pasta_fp_plonk_index_finalize,
 });
-
-//
-// CamlPastaFpPlonkIndex methods
-//
 
 #[ocaml_gen::func]
 #[ocaml::func]
@@ -142,7 +134,6 @@ pub fn caml_pasta_fp_plonk_index_read(
     t.srs = srs.clone();
     t.fq_sponge_params = oracle::pasta::fq::params();
 
-    //
     Ok(CamlPastaFpPlonkIndex(Box::new(t)))
 }
 
