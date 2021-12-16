@@ -637,6 +637,9 @@ struct
       List.sort terms ~compare:(fun (_, i) (_, j) -> Int.compare i j)
     in
     let has_constant_term = Option.is_some c in
+    (* Note: [(c, 0)] represents the field element [c] multiplied by the 0th
+       variable, which is held constant as [Field.one].
+    *)
     let terms = match c with None -> terms | Some c -> (c, 0) :: terms in
     match terms with
     | [] ->
