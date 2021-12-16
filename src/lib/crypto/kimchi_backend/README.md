@@ -2,7 +2,7 @@
 
 This package contains the glue between:
 
-* [snarky]()/[pickles](), TKTK
+* snarky/pickles
 * and [kimchi_bindings](../kimchi_bindings), the OCaml bindings to our proof system [kimchi](https://www.github.com/o1-labs/proof-systems) written in Rust.
 
 As snarky expects specific "backend" modules, zexe-backend mostly contains functors that converts the ocaml-bindings found in [kimchi_bindings](../kimchi_bindings) into what snarky expects.
