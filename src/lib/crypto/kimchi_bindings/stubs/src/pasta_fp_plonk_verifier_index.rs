@@ -145,7 +145,6 @@ pub fn read_raw(
         fr_sponge_params,
     )
     .map_err(|e| {
-        println!("{}", e);
         ocaml::Error::invalid_argument("caml_pasta_fp_plonk_verifier_index_raw_read")
             .err()
             .unwrap()
@@ -177,7 +176,6 @@ pub fn caml_pasta_fp_plonk_verifier_index_write(
     let index: VerifierIndex<GAffine> = index.into();
     let path = Path::new(&path);
     index.to_file(path, append).map_err(|e| {
-        println!("{}", e);
         ocaml::Error::invalid_argument("caml_pasta_fp_plonk_verifier_index_raw_read")
             .err()
             .unwrap()
