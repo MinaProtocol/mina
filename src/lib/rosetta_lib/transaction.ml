@@ -545,4 +545,77 @@ let to_mina_signed transaction_json =
         Signed.of_rendered rendered
         |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
       in
+<<<<<<< HEAD
       Signed.to_mina_signed t)
+||||||| 038286053
+      let memo =
+        (* This is a hack..
+           TODO: Handle these properly in rosetta.
+        *)
+        match rosetta_transaction.command.kind with
+        | `Payment ->
+            Option.bind rosetta_transaction_rendered.payment
+              ~f:(fun { memo; _ } -> memo)
+        | `Delegation ->
+            Option.bind rosetta_transaction_rendered.stake_delegation
+              ~f:(fun { memo; _ } -> memo)
+        | `Create_token ->
+            Option.bind rosetta_transaction_rendered.create_token
+              ~f:(fun { memo; _ } -> memo)
+        | `Create_token_account ->
+            Option.bind rosetta_transaction_rendered.create_token_account
+              ~f:(fun { memo; _ } -> memo)
+        | `Mint_tokens ->
+            Option.bind rosetta_transaction_rendered.mint_tokens
+              ~f:(fun { memo; _ } -> memo)
+      in
+      let pk (`Pk x) =
+        Signature_lib.Public_key.Compressed.of_base58_check_exn x
+      in
+      let%bind payload =
+        User_command_info.Partial.to_user_command_payload
+          rosetta_transaction.command ~nonce:rosetta_transaction.nonce ?memo
+        |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
+      in
+      let%map signature =
+        match Mina_base.Signature.Raw.decode rosetta_transaction.signature with
+        | Some signature ->
+            Ok signature
+        | None ->
+            Or_error.errorf "Could not decode signature"
+      in
+      let command : Mina_base.Signed_command.t =
+        { Mina_base.Signed_command.Poly.signature
+        ; signer =
+            pk rosetta_transaction.command.fee_payer
+            |> Signature_lib.Public_key.decompress_exn
+        ; payload
+        }
+      in
+      command)
+=======
+      let pk (`Pk x) =
+        Signature_lib.Public_key.Compressed.of_base58_check_exn x
+      in
+      let%bind payload =
+        User_command_info.Partial.to_user_command_payload
+          rosetta_transaction.command ~nonce:rosetta_transaction.nonce
+        |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
+      in
+      let%map signature =
+        match Mina_base.Signature.Raw.decode rosetta_transaction.signature with
+        | Some signature ->
+            Ok signature
+        | None ->
+            Or_error.errorf "Could not decode signature"
+      in
+      let command : Mina_base.Signed_command.t =
+        { Mina_base.Signed_command.Poly.signature
+        ; signer =
+            pk rosetta_transaction.command.fee_payer
+            |> Signature_lib.Public_key.decompress_exn
+        ; payload
+        }
+      in
+      command)
+>>>>>>> origin/lk86/fix-conflicts-with-1.2.1

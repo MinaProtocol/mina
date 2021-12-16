@@ -233,14 +233,14 @@ let process_block_infos_of_state_hash ~logger pool state_hash ~f =
       exit 1
 
 let update_epoch_ledger ~logger ~name ~ledger ~epoch_ledger epoch_ledger_hash =
-  let epoch_ledger_hash = Ledger_hash.of_string epoch_ledger_hash in
+  let epoch_ledger_hash = Ledger_hash.of_base58_check_exn epoch_ledger_hash in
   let curr_ledger_hash = Ledger.merkle_root ledger in
   if Frozen_ledger_hash.equal epoch_ledger_hash curr_ledger_hash then (
     [%log info]
       "Creating %s epoch ledger from ledger with Merkle root matching epoch \
        ledger hash %s"
       name
-      (Ledger_hash.to_string epoch_ledger_hash) ;
+      (Ledger_hash.to_base58_check epoch_ledger_hash) ;
     (* Ledger.copy doesn't actually copy, roll our own here *)
     let accounts = Ledger.to_list ledger in
     let epoch_ledger = Ledger.create ~depth:(Ledger.depth ledger) () in
@@ -893,7 +893,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
       in
       let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
       let epoch_ledgers_state_hash_opt =
-        Option.map input.target_epoch_ledgers_state_hash ~f:State_hash.to_string
+        Option.map input.target_epoch_ledgers_state_hash
+          ~f:State_hash.to_base58_check
       in
       let%bind target_state_hash =
         match epoch_ledgers_state_hash_opt with
@@ -928,8 +929,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                 Hashtbl.add_exn global_slot_hashes_tbl
                   ~key:global_slot_since_genesis
                   ~data:
-                    ( State_hash.of_string state_hash
-                    , Ledger_hash.of_string ledger_hash )) ;
+                    ( State_hash.of_base58_check_exn state_hash
+                    , Ledger_hash.of_base58_check_exn ledger_hash )) ;
             return (Int.Set.of_list ids))
       in
       (* check that genesis block is in chain to target hash
@@ -1223,7 +1224,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                 let output =
                   create_output ~target_epoch_ledgers_state_hash
                     ~target_fork_state_hash:
-                      (State_hash.of_string target_state_hash)
+                      (State_hash.of_base58_check_exn target_state_hash)
                     ~ledger ~staking_epoch_ledger ~staking_seed
                     ~next_epoch_ledger ~next_seed input.genesis_ledger
                   |> output_to_yojson |> Yojson.Safe.to_string

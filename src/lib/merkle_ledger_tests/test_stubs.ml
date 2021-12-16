@@ -41,19 +41,18 @@ module Receipt = Mina_base.Receipt
 module Hash = struct
   module T = struct
     type t = Md5.t [@@deriving sexp, hash, compare, bin_io_unversioned, equal]
-
-    let to_string = Md5.to_hex
-
-    let to_yojson t = `String (Md5.to_hex t)
-
-    let of_yojson = function
-      | `String s ->
-          Ok (Md5.of_hex_exn s)
-      | _ ->
-          Error "expected string"
   end
 
   include T
+
+  include Codable.Make_base58_check (struct
+    type t = T.t [@@deriving bin_io_unversioned]
+
+    let description = "Ledger test hash"
+
+    let version_byte = Base58_check.Version_bytes.ledger_test_hash
+  end)
+
   include Hashable.Make_binable (T)
 
   (* to prevent pre-image attack,
@@ -131,6 +130,8 @@ struct
         Bigstring_frozen.Table.remove t.table key)
 
   let remove t ~key = Bigstring_frozen.Table.remove t.table key
+
+  let make_checkpoint _ _ = ()
 end
 
 module Storage_locations : Intf.Storage_locations = struct

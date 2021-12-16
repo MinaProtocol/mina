@@ -605,7 +605,7 @@ let get_snarked_ledger t state_hash_opt =
                        (sprintf
                           "No transactions corresponding to the emitted proof \
                            for state_hash:%s"
-                          (State_hash.to_string
+                          (State_hash.to_base58_check
                              (Transition_frontier.Breadcrumb.state_hash b))))
               | Some txns -> (
                   match
@@ -637,7 +637,7 @@ let get_snarked_ledger t state_hash_opt =
                             Stop
                               (Or_error.errorf
                                  !"Coudln't find protocol state with hash %s"
-                                 (State_hash.to_string state_hash)))
+                                 (State_hash.to_base58_check state_hash)))
                       ~finish:Fn.id
                   with
                   | Ok _ ->
@@ -659,9 +659,9 @@ let get_snarked_ledger t state_hash_opt =
       else
         Or_error.errorf
           "Expected snarked ledger hash %s but got %s for state hash %s"
-          (Frozen_ledger_hash.to_string snarked_ledger_hash)
-          (Frozen_ledger_hash.to_string merkle_root)
-          (State_hash.to_string state_hash)
+          (Frozen_ledger_hash.to_base58_check snarked_ledger_hash)
+          (Frozen_ledger_hash.to_base58_check merkle_root)
+          (State_hash.to_base58_check state_hash)
   | None ->
       Or_error.error_string
         "get_snarked_ledger: state hash not found in transition frontier"
@@ -1069,23 +1069,27 @@ let check_and_stop_daemon t ~wait =
     match t.next_producer_timing with
     | None ->
         `Now
-    | Some timing ->
-        let tm =
-          match timing.timing with
-          | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again tm ->
-              Block_time.to_time tm
-          | Produce tm | Produce_now tm ->
-              Block_time.to_time tm.time
-        in
-        (*Assuming it takes at most 1hr to bootstrap and catchup*)
-        let next_block =
-          Time.add tm
-            (Block_time.Span.to_time_span
-               t.config.precomputed_values.consensus_constants.slot_duration_ms)
-        in
-        let wait_for = Time.(diff next_block (now ())) in
-        if Time.Span.(wait_for > max_catchup_time) then `Now
-        else `Check_in wait_for
+    | Some timing -> (
+        match timing.timing with
+        | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again tm
+        | Produce { time = tm; _ }
+        | Produce_now { time = tm; _ } ->
+            let tm = Block_time.to_time tm in
+            (*Assuming it takes at most 1hr to bootstrap and catchup*)
+            let next_block =
+              Time.add tm
+                (Block_time.Span.to_time_span
+                   t.config.precomputed_values.consensus_constants
+                     .slot_duration_ms)
+            in
+            let wait_for = Time.(diff next_block (now ())) in
+            if Time.Span.(wait_for > max_catchup_time) then `Now
+            else `Check_in wait_for
+        | Evaluating_vrf _last_checked_slot ->
+            `Check_in
+              (Core.Time.Span.of_ms
+                 (Mina_compile_config.vrf_poll_interval_ms * 2 |> Int.to_float))
+        )
 
 let stop_long_running_daemon t =
   let wait_mins = (t.config.stop_time * 60) + (Random.int 10 * 60) in
@@ -1141,6 +1145,9 @@ let start t =
             ( `Free
             , Daemon_rpcs.Types.Status.Next_producer_timing.Check_again
                 block_time )
+        | `Evaluating_vrf last_checked_slot ->
+            (* Vrf evaluation is still going on, so treating it as if a block is being produced*)
+            (`Producing, Evaluating_vrf last_checked_slot)
         | `Produce_now (block_data, _) ->
             let info :
                 Daemon_rpcs.Types.Status.Next_producer_timing.producing_time =
@@ -1190,6 +1197,21 @@ let start t =
     ~block_reward_threshold:t.config.block_reward_threshold
     ~block_produced_bvar:t.components.block_produced_bvar ;
   perform_compaction t ;
+  let () =
+    match t.config.node_status_url with
+    | Some node_status_url ->
+        Node_status_service.start ~logger:t.config.logger ~node_status_url
+          ~network:t.components.net
+          ~transition_frontier:t.components.transition_frontier
+          ~sync_status:t.sync_status
+          ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
+          ~start_time:t.config.start_time
+          ~slot_duration:
+            (Block_time.Span.to_time_span
+               t.config.precomputed_values.consensus_constants.slot_duration_ms)
+    | None ->
+        ()
+  in
   Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
     ~snark_worker_opt:t.processes.uptime_snark_worker_opt
     ~transition_frontier:t.components.transition_frontier

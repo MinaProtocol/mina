@@ -90,6 +90,7 @@ CREATE INDEX idx_blocks_parent_id ON blocks(parent_id);
 CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);
 CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
+<<<<<<< HEAD
 CREATE INDEX idx_chain_status      ON blocks(chain_status);
 
 /* the block_* columns refer to the block containing a user command or internal command that
@@ -100,6 +101,12 @@ CREATE INDEX idx_chain_status      ON blocks(chain_status);
    they are included here to allow Rosetta account queries to consume
     fewer Postgresql resources
 */
+||||||| 038286053
+
+=======
+CREATE INDEX idx_chain_status      ON blocks(chain_status);
+
+>>>>>>> origin/lk86/fix-conflicts-with-1.2.1
 CREATE TABLE balances
 ( id                           serial PRIMARY KEY
 , public_key_id                int    NOT NULL REFERENCES public_keys(id)

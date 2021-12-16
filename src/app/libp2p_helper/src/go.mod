@@ -33,7 +33,8 @@ require (
 	github.com/libp2p/go-yamux v1.3.8 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/prometheus/client_golang v1.6.0
-	github.com/stretchr/testify v1.6.1
+	github.com/shirou/gopsutil/v3 v3.21.8
+	github.com/stretchr/testify v1.7.0
 	go.opencensus.io v0.22.5 // indirect
 	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
 	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5 // indirect

@@ -119,6 +119,6 @@ struct
               G.Constant.scale g x)
             (random_point, xs)
         with e ->
-          Core.eprintf !"Input %{sexp: bool list}\n%!" xs ;
+          eprintf !"Input %{sexp: bool list}\n%!" xs ;
           raise e)
 end

@@ -2,6 +2,9 @@ open Core
 open Async
 open Mina_net2
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
+
 let%test_module "coda network tests" =
   ( module struct
     let logger = Logger.create ()

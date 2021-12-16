@@ -8,7 +8,7 @@ module Breadcrumb = Transition_frontier.Breadcrumb
 module Transition_frontier = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         | Breadcrumb_added of
             { block:
@@ -19,7 +19,7 @@ module Transition_frontier = struct
                 (Account_id.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t) list
             }
         | Root_transitioned of
-            Transition_frontier.Diff.Root_transition.Lite.Stable.V1.t
+            Transition_frontier.Diff.Root_transition.Lite.Stable.V2.t
         | Bootstrap of {lost_blocks: State_hash.Stable.V1.t list}
 
       let to_latest = Fn.id
@@ -42,9 +42,9 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      | Transition_frontier of Transition_frontier.Stable.V1.t
+      | Transition_frontier of Transition_frontier.Stable.V2.t
       | Transaction_pool of Transaction_pool.Stable.V1.t
 
     let to_latest = Fn.id

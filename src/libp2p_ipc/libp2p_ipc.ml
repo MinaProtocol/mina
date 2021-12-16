@@ -188,6 +188,8 @@ let rpc_request_body_set req body =
       ignore @@ add_peer_set_builder req b
   | ListPeers b ->
       ignore @@ list_peers_set_builder req b
+  | BandwidthInfo b ->
+      ignore @@ bandwidth_info_set_builder req b
   | GenerateKeypair b ->
       ignore @@ generate_keypair_set_builder req b
   | Publish b ->

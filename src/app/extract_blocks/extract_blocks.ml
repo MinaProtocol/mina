@@ -432,7 +432,9 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
             [%log info] "Writing block with $state_hash"
               ~metadata:
                 [ ("state_hash", State_hash.to_yojson block.state_hash) ] ;
-            let output_file = State_hash.to_string block.state_hash ^ ".json" in
+            let output_file =
+              State_hash.to_base58_check block.state_hash ^ ".json"
+            in
             Async_unix.Writer.with_file output_file ~f:(fun writer ->
                 return
                   (Async.fprintf writer "%s\n%!"

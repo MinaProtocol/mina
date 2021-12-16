@@ -2,8 +2,9 @@
  (name client_sdk)
  (modes js)
  (js_of_ocaml (flags +toplevel.js +dynlink.js))
- (libraries snark_params_nonconsensus rosetta_lib_nonconsensus mina_base_nonconsensus data_hash_lib_nonconsensus
-            random_oracle_nonconsensus signature_lib_nonconsensus string_sign_nonconsensus
+ (libraries core_kernel snark_params_nonconsensus rosetta_lib_nonconsensus mina_base_nonconsensus
+            data_hash_lib_nonconsensus random_oracle_nonconsensus signature_lib_nonconsensus
+            string_sign_nonconsensus mina_signature_kind
             zarith_stubs_js integers integers_stubs_js js_of_ocaml digestif.ocaml)
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

@@ -1,3 +1,5 @@
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Core
 open Async
 open Cache_lib
@@ -1001,7 +1003,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                   Error.tag
                     (Error.of_string
                        (sprintf "Parent breadcrumb with state_hash %s not found"
-                          (State_hash.to_string parent_hash)))
+                          (State_hash.to_base58_check parent_hash)))
                     ~tag:"parent breadcrumb not found"
             in
             failed ~error:e ~sender:av.sender `Build_breadcrumb

@@ -74,6 +74,7 @@ opam pin add src/external/async_kernel
 opam pin add src/external/coda_base58
 opam pin add src/external/graphql_ppx
 opam pin add src/external/ppx_deriving_yojson
+opam pin add src/external/prometheus
 eval $(opam config env)
 
 # show switch list at end

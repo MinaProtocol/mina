@@ -1197,7 +1197,7 @@ let pending_snark_work =
                       Array.map bundle#workBundle ~f:(fun w ->
                           let f = w#fee_excess in
                           let hash_of_string =
-                            Mina_base.Frozen_ledger_hash.of_string
+                            Mina_base.Frozen_ledger_hash.of_base58_check_exn
                           in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id = w#work_id
@@ -1250,7 +1250,11 @@ let set_staking_graphql =
       ~doc:"PUBLICKEY Public key of account with which to produce blocks"
       (required public_key_compressed)
   in
-  Command.async ~summary:"Start producing blocks"
+  Command.async
+    ~summary:
+      "The set-staking command is deprecated and no longer has any effect.To \
+       enable block production, instead restart the daemon with the flag \
+       --block-producer-key"
     (Cli_lib.Background_daemon.graphql_init pk_flag
        ~f:(fun graphql_endpoint public_key ->
          let print_message msg arr =
@@ -1545,6 +1549,13 @@ let export_key =
                     !"wrong password provided for account \
                       %{Public_key.Compressed.to_base58_check}"
                     pk)
+           | Error (`Key_read_error e) ->
+               Error
+                 (sprintf
+                    !"Error reading the secret key file for account \
+                      %{Public_key.Compressed.to_base58_check}: %s"
+                    pk
+                    (Secrets.Privkey_error.to_string e))
            | Error `Not_found ->
                Error
                  (sprintf

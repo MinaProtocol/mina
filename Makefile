@@ -195,8 +195,7 @@ macos-portable:
 	@echo Find coda-daemon-macos.zip inside _build/
 
 update-graphql:
-	@echo Make sure that the daemon is running with -rest-port 8080
-	python3 scripts/introspection_query.py > graphql_schema.json
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build --profile=$(DUNE_PROFILE) graphql_schema.json
 
 ########################################
 ## Lint

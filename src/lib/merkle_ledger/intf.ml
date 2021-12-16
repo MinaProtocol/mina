@@ -94,7 +94,7 @@ end
 module type Hash = sig
   type t [@@deriving bin_io, compare, equal, sexp, yojson]
 
-  val to_string : t -> string
+  val to_base58_check : t -> string
 
   include Hashable.S_binable with type t := t
 
@@ -124,6 +124,8 @@ module type Key_value_database = sig
        and type config := config
 
   val create_checkpoint : t -> string -> t
+
+  val make_checkpoint : t -> string -> unit
 
   val get_uuid : t -> Uuid.t
 

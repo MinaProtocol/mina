@@ -4,7 +4,9 @@
  (library_flags -linkall)
  (libraries
    ;; opam deps
+   async
    core
+   core.uuid
    extlib
    integers
    rocks
