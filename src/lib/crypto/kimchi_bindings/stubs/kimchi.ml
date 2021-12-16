@@ -765,9 +765,9 @@ module Protocol = struct
     module Fp = struct
       external create :
            Index.Fp.t
-        -> FieldVectors.Fp.t array
-        -> Foundations.Fp.t array
-        -> Foundations.Fq.t Foundations.or_infinity array
+        -> witness:FieldVectors.Fp.t array
+        -> prev_challenges:Foundations.Fp.t array
+        -> prev_sgs:Foundations.Fq.t Foundations.or_infinity array
         -> ( Foundations.Fq.t Foundations.or_infinity
            , Foundations.Fp.t )
            prover_proof = "caml_pasta_fp_plonk_proof_create"
@@ -814,9 +814,9 @@ module Protocol = struct
     module Fq = struct
       external create :
            Index.Fq.t
-        -> FieldVectors.Fq.t array
-        -> Foundations.Fq.t array
-        -> Foundations.Fp.t Foundations.or_infinity array
+        -> witness:FieldVectors.Fq.t array
+        -> prev_challenges:Foundations.Fq.t array
+        -> prev_sgs:Foundations.Fp.t Foundations.or_infinity array
         -> ( Foundations.Fp.t Foundations.or_infinity
            , Foundations.Fq.t )
            prover_proof = "caml_pasta_fq_plonk_proof_create"
