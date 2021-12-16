@@ -589,12 +589,15 @@ struct
         let to_absolute_row =
           Gate_spec.map_rows ~f:(Row.to_absolute ~public_input_size)
         in
-        let all_gates = List.concat [ public_gates; gates ] in
-        let all_gates = List.map all_gates ~f:to_absolute_row in
 
         (* convert all the gates into our Gates.t Rust vector type *)
-        List.iter all_gates ~f:(fun g ->
-            Gates.add rust_gates (Gate_spec.to_rust_gate g)) ;
+        let add_gates gates =
+          List.iter gates ~f:(fun g ->
+              let g = to_absolute_row g in
+              Gates.add rust_gates (Gate_spec.to_rust_gate g)) ;
+        in
+        add_gates public_gates;
+        add_gates gates;
 
         (* drop the gates, we don't need them anymore *)
         sys.gates <- `Finalized ;
