@@ -10,7 +10,7 @@ DUMP_TIME=${5:=0000}
 
 pg_ctlcluster ${POSTGRES_VERSION} main start
 echo "[POPULATE] Top 10 blocks in ${POSTGRES_DATA_DIR} archiveDB:"
-psql "${PG_CONN}" -c "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
+sudo -u postgres psql "${PG_CONN}" --command "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
 RETURN_CODE=$?
 [[ "$RETURN_CODE" == "0" ]] && echo "[WARN] Database already initialized!" && exit ${RETURN_CODE}
 
