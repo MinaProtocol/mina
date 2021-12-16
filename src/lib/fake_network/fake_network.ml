@@ -243,7 +243,10 @@ module Generator = struct
                Mina_networking.Rpcs.Get_transition_chain.query
                Envelope.Incoming.t
             -> Mina_networking.Rpcs.Get_transition_chain.response Deferred.t =
-         fun _ -> Deferred.return None
+         fun _ ->
+          (* let valid_result= (Sync_handler.get_transition_chain ~frontier
+             (Envelope.Incoming.data query_env)) in *)
+          Deferred.return (Some [])
         in
         { frontier
         ; consensus_local_state
