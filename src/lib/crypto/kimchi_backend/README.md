@@ -30,13 +30,13 @@ kimchi_backend/
 │   ├── dlog_urs.ml
 │   ├── endoscale_round.ml
 │   ├── field.ml
-│   ├── intf.ml # no freaking clue
+│   ├── intf.ml
 │   ├── plonk_constraint_system.ml # the functor to create a constraint system
 │   ├── plonk_dlog_oracles.ml
 │   ├── plonk_dlog_proof.ml
 │   ├── poly_comm.ml
 │   ├── scale_round.ml
-│   ├── var.ml # ?
-│   ├── version.ml # there's a gen_version script that prolly should be called from mina_version/gen.sh, or even live in the stubs directory, not there
-└── kimchi_backend.ml # ?
+│   ├── var.ml
+│   ├── version.ml
+└── kimchi_backend.ml
 ```
