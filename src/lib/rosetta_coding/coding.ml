@@ -71,8 +71,8 @@ end
 
 let of_unpackable (type t) (module M : Packed with type t = t) (packed : t) =
   let bits0 = M.unpack packed |> List.rev in
-  assert (Int.equal (List.length bits0) 255) ;
-  (* field elements are 255 bits, left-pad to get 32 bytes *)
+  assert (List.length bits0 = 255) ;
+  (* field elements, scalars are 255 bits, left-pad to get 32 bytes *)
   let bits = false :: bits0 in
   let bits_by_4s =
     let rec go bits acc =
@@ -114,6 +114,7 @@ let of_public_key pk =
   let field1, field2 = pk in
   of_field field1 ^ of_field field2
 
+(* differs from [encode_public_key_compressed], below, which does not convert to public key first *)
 let of_public_key_compressed pk = Public_key.decompress_exn pk |> of_public_key
 
 let to_public_key raw =
@@ -123,7 +124,53 @@ let to_public_key raw =
   let raw2 = String.sub raw ~pos:field_len ~len:field_len in
   (to_field raw1, to_field raw2)
 
-let to_public_key_compressed raw = to_public_key raw |> Public_key.compress
+module Public_key_compressed_direct = struct
+  (* direct hex encoding and decoding of bits in compressed public key
+     [encode] differs from [of_public_key_compressed], which converts to an uncompressed key first
+  *)
+  let encode (pk_compressed : Public_key.Compressed.t) =
+    (* don't use of_unpackable, which assumes a 255-bit value *)
+    let { Public_key.Compressed.Poly.x; is_odd } = pk_compressed in
+    let field_bits = Field.unpack x in
+    (* each nybble goes from high to low insert parity bit before last 7 bits
+    *)
+    let before_bits, after_bits = List.split_n field_bits 248 in
+    let bits = before_bits @ (is_odd :: after_bits) |> List.rev in
+    let bits_by_4s =
+      let rec go bits acc =
+        if List.is_empty bits then List.rev acc
+        else
+          let bits4, rest = List.split_n bits 4 in
+          go rest (bits4 :: acc)
+      in
+      go bits []
+    in
+    let cs = List.map bits_by_4s ~f:bits4_to_hex_char in
+    let result = String.of_char_list cs in
+    Format.eprintf "ENCODING: %s@." result ;
+    result
+
+  let decode raw : Public_key.Compressed.t =
+    Format.eprintf "RAW LEN: %d@." (String.length raw) ;
+    assert (String.length raw = 64) ;
+    let bits =
+      String.to_list raw |> List.map ~f:hex_char_to_bits4 |> List.concat
+    in
+    let rev_bits = List.rev bits in
+    let is_odd = List.hd_exn rev_bits in
+    Format.eprintf "ODD: %B@." is_odd ;
+    let field_bits = List.rev (List.tl_exn rev_bits) in
+    let x = Field.project field_bits in
+    { Public_key.Compressed.Poly.x; is_odd }
+end
+
+let to_public_key_compressed raw =
+  let len = String.length raw in
+  if len = 64 then
+    (* compressed encoding *)
+    Public_key_compressed_direct.decode raw
+  else (* uncompressed encoding *)
+    to_public_key raw |> Public_key.compress
 
 (* inline tests hard-to-impossible to setup with JS *)
 
@@ -149,11 +196,40 @@ let pk_roundtrip_test () =
   let field0', field1' = to_public_key hex in
   Public_key.equal (field0, field1) (field0', field1')
 
+let hex_key = "834f83195c9480aa1bde8e8b2e24a2cd9186a3825d6ca967ffecc9f9befe1c20"
+
+let test_pk =
+  Public_key.Compressed.of_base58_check
+    "B62qovbUAE4SAq8bT88PZUAyoZDFh65NELvgRf519pHPP3mu7rhrx3z"
+
+let pk_compressed_roundtrip_test () =
+  let field0 = Field.of_int 123123 in
+  let field1 = Field.of_int 234234 in
+  let pk_compressed = Public_key.compress (field0, field1) in
+  let hex = Public_key_compressed_direct.encode pk_compressed in
+  (* do not use of_public_key_compressed *)
+  let pk_compressed' = Public_key_compressed_direct.decode hex in
+  Format.eprintf "ORIG@." ;
+  Format.eprintf "IS_ODD: %B@." pk_compressed.is_odd ;
+  Format.eprintf "FIELD:@." ;
+  List.iter (Field.unpack pk_compressed.x) ~f:(fun b -> Format.eprintf "%B " b) ;
+  Format.eprintf "@." ;
+
+  Format.eprintf "NEW@." ;
+  Format.eprintf "IS_ODD: %B@." pk_compressed'.is_odd ;
+  Format.eprintf "FIELD:@." ;
+  List.iter (Field.unpack pk_compressed'.x) ~f:(fun b -> Format.eprintf "%B " b) ;
+  Format.eprintf "@." ;
+
+  Public_key.Compressed.equal pk_compressed pk_compressed'
+
 let%test "field_example" = field_example_test ()
 
 let%test "field_hex round-trip" = field_hex_roundtrip_test ()
 
 let%test "public key round-trip" = pk_roundtrip_test ()
+
+let%test "public key compressed roundtrip" = pk_compressed_roundtrip_test ()
 
 [%%ifndef consensus_mechanism]
 
@@ -163,6 +239,7 @@ let unit_tests =
   [ ("field example", field_example_test)
   ; ("field-hex round-trip", field_hex_roundtrip_test)
   ; ("public key round-trip", pk_roundtrip_test)
+  ; ("public key compressed round-trip", pk_compressed_roundtrip_test)
   ]
 
 let run_unit_tests () =

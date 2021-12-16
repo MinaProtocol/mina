@@ -237,9 +237,10 @@ module Derive = struct
 
     let handle ~(env : Env.T(M).t) (req : Construction_derive_request.t) =
       let open M.Let_syntax in
-      let%bind pk =
+      let hex_bytes = req.public_key.hex_bytes in
+      let%bind pk_compressed =
         let pk_or_error =
-          try Ok (Rosetta_coding.Coding.to_public_key req.public_key.hex_bytes)
+          try Ok (Rosetta_coding.Coding.to_public_key_compressed hex_bytes)
           with exn -> Error (Core_kernel.Error.of_exn exn)
         in
         env.lift
@@ -252,7 +253,7 @@ module Derive = struct
       ; account_identifier =
           Some
             (User_command_info.account_id
-               (`Pk Public_key.(compress pk |> Compressed.to_base58_check))
+               (`Pk (Public_key.Compressed.to_base58_check pk_compressed))
                (Option.value ~default:Amount_of.Token_id.default token_id))
       ; metadata = None
       }
@@ -634,7 +635,7 @@ module Combine = struct
       let%bind signature =
         match req.signatures with
         | s :: _ ->
-            M.return @@ s.hex_bytes
+            M.return s.hex_bytes
         | _ ->
             M.fail (Errors.create `Signature_missing)
       in
