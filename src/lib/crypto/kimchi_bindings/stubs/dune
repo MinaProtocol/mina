@@ -13,8 +13,6 @@
   (source_tree ../../proof-systems))
  (action
   (progn
-   (run rm -rf ./target)
-   (run rm -f ./Cargo.lock)
    (setenv
     RUSTFLAGS
     "-C target-feature=+bmi2,+adx"
