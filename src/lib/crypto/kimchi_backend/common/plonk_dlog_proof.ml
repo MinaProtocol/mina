@@ -4,19 +4,15 @@ open Pickles_types
 
 let tuple15_to_vec
     (w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14) =
-  Vector.
-    [ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ]
+  Vector.[ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ]
 
 let tuple15_of_vec
-    Vector.
-      [ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ] =
+    Vector.[ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ] =
   (w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14)
 
-let tuple6_to_vec (w0, w1, w2, w3, w4, w5) =
-  Vector.[ w0; w1; w2; w3; w4; w5 ]
+let tuple6_to_vec (w0, w1, w2, w3, w4, w5) = Vector.[ w0; w1; w2; w3; w4; w5 ]
 
-let tuple6_of_vec Vector.[ w0; w1; w2; w3; w4; w5 ] =
-  (w0, w1, w2, w3, w4, w5)
+let tuple6_of_vec Vector.[ w0; w1; w2; w3; w4; w5 ] = (w0, w1, w2, w3, w4, w5)
 
 module type Stable_v1 = sig
   module Stable : sig
