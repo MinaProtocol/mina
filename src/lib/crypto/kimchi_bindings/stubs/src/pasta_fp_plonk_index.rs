@@ -44,7 +44,6 @@ pub fn caml_pasta_fp_plonk_index_create(
             c: gate.c.clone(),
         })
         .collect();
-    println!("{}:{}", file!(), line!());
 
     // create constraint system
     let cs = match ConstraintSystem::<Fp>::create(
@@ -62,7 +61,6 @@ pub fn caml_pasta_fp_plonk_index_create(
         }
         Some(cs) => cs,
     };
-    println!("{}:{}", file!(), line!());
 
     // endo
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
