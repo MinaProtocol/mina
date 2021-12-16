@@ -5,5 +5,5 @@ edition = "2021"
 authors = ["opensource@o1labs.org"]
 
 [dependencies]
-ocaml-gen = { path = "../../../../marlin/ocaml/ocaml-gen" }
+ocaml-gen = { path = "../../../proof-systems/ocaml/ocaml-gen" }
 wires_15_stubs = { path = "../" }

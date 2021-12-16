@@ -15,7 +15,7 @@
    flags.sexp)
  (deps
   (source_tree ../../wasm)
-  (source_tree ../../../marlin))
+  (source_tree ../../../crypto/proof-systems))
  (action
   (progn
    (run chmod -R +w ../../wasm)

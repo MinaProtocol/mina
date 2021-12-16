@@ -10,7 +10,7 @@
   Cargo.toml
   rust-toolchain.toml
   (source_tree src)
-  (source_tree ../../marlin))
+  (source_tree ../../crypto/proof-systems))
  (action
   (progn
    (setenv

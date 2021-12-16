@@ -23,15 +23,15 @@ sprs = { version = "0.7.1" }
 rayon = { version = "1" }
 ocaml = { version = "0.22.0" }
 
-groupmap = { path = "../../marlin/groupmap" }
-mina-curves = { path = "../../marlin/curves" }
-oracle = { path = "../../marlin/oracle" }
-plonk_circuits = { path = "../../marlin/circuits/plonk", features = [ "ocaml_types" ] }
-commitment_dlog = { path = "../../marlin/dlog/commitment", features = [ "ocaml_types" ] }
-plonk_protocol_dlog = { path = "../../marlin/dlog/plonk", features = [ "ocaml_types" ] }
+groupmap = { path = "../../crypto/proof-systems/groupmap" }
+mina-curves = { path = "../../crypto/proof-systems/curves" }
+oracle = { path = "../../crypto/proof-systems/oracle" }
+plonk_circuits = { path = "../../crypto/proof-systems/circuits/plonk", features = [ "ocaml_types" ] }
+commitment_dlog = { path = "../../crypto/proof-systems/dlog/commitment", features = [ "ocaml_types" ] }
+plonk_protocol_dlog = { path = "../../crypto/proof-systems/dlog/plonk", features = [ "ocaml_types" ] }
 
 # ocaml-specific
-ocaml-gen = { path = "../../marlin/ocaml/ocaml-gen" }
+ocaml-gen = { path = "../../crypto/proof-systems/ocaml/ocaml-gen" }
 
 [profile.release]
 debug = true
