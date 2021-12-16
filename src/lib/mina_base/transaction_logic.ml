@@ -1519,6 +1519,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       let zero = zero
 
+      let equal = equal
+
       let add_flagged = add_flagged
 
       let add_signed_flagged (x1 : t) (x2 : Signed.t) : t * [ `Overflow of bool ]
@@ -1661,6 +1663,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Set_account (l, a, loc) ->
           Or_error.ok_exn (set_with_location l loc a) ;
           l
+      | Check_fee_excess (valid_fee_excess, prev_failure_status) ->
+          if not valid_fee_excess then
+            Some Transaction_status.Failure.Invalid_fee_excess
+          else prev_failure_status
       | Modify_global_excess (s, f) ->
           { s with fee_excess = f s.fee_excess }
       | Modify_global_ledger { global_state; ledger; should_update } ->

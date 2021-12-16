@@ -99,14 +99,6 @@ val apply_parties_unchecked_with_states :
        list )
      Or_error.t
 
-val apply_parties_with_fee_excess_exn :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> state_view:Snapp_predicate.Protocol_state.View.t
-  -> fee_excess:Currency.Amount.Signed.t
-  -> t
-  -> Parties.t
-  -> t * Fee_excess.t
-
 val of_any_ledger : Ledger.Any_ledger.M.t -> t
 
 val of_ledger_subset_exn : Ledger.t -> Account_id.t list -> t

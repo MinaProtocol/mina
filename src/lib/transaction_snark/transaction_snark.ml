@@ -1755,6 +1755,8 @@ module Base = struct
           let if_ b ~then_ ~else_ =
             run_checked (Amount.Checked.if_ b ~then_ ~else_)
 
+          let equal t t' = run_checked (Amount.Checked.equal t t')
+
           let zero = Amount.(var_of_t zero)
 
           let add_flagged x y = run_checked (Amount.Checked.add_flagged x y)
@@ -1939,6 +1941,8 @@ module Base = struct
                       let a : Account.t = read account_typ a.data in
                       let idx = idx ledger (Account.identifier a) in
                       Sparse_ledger.set_exn ledger idx a) )
+        | Check_fee_excess (valid_fee_excess, ()) ->
+            Boolean.Assert.is_true valid_fee_excess
         | Modify_global_excess (global, f) ->
             { global with fee_excess = f global.fee_excess }
         | Modify_global_ledger { global_state; ledger; should_update } ->
@@ -4710,6 +4714,23 @@ let%test_module "transaction_snark" =
           }
       ; other_parties =
           [ { data =
+                { body =
+                    { pk = acct1.account.public_key
+                    ; update = Party.Update.noop
+                    ; token_id = Token_id.default
+                    ; delta =
+                        Amount.Signed.(of_unsigned receiver_amount |> negate)
+                    ; increment_nonce = true
+                    ; events = []
+                    ; sequence_events = []
+                    ; call_data = Field.zero
+                    ; depth = 0
+                    }
+                ; predicate = Accept
+                }
+            ; authorization = Signature Signature.dummy
+            }
+          ; { data =
                 { body =
                     { pk = acct2.account.public_key
                     ; update = Party.Update.noop
