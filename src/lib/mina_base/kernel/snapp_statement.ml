@@ -13,7 +13,7 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type 'comm t = { transaction : 'comm; at_party : 'comm }
-      [@@deriving hlist, sexp, yojson]
+      [@@deriving hlist, sexp]
     end
   end]
 
@@ -26,7 +26,7 @@ end
 module Stable = struct
   module V1 = struct
     type t = Parties.Transaction_commitment.Stable.V1.t Poly.Stable.V1.t
-    [@@deriving sexp, yojson]
+    [@@deriving sexp]
 
     let to_latest = Fn.id
   end

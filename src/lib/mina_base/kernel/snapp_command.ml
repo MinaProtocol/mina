@@ -170,7 +170,7 @@ module Party = struct
         List.reduce_exn ~f:Random_oracle_input.append
           [ Public_key.Compressed.Checked.to_input pk
           ; Update.Checked.to_input update
-          ; Amount.Signed.Checked.to_input delta
+          ; Impl.run_checked (Amount.Signed.Checked.to_input delta)
           ]
 
       let digest (t : t) =
@@ -978,79 +978,14 @@ module Payload = struct
         , Two_proved.Digested.Checked.t )
         Poly.t
 
-      let to_input (t : t) =
-        let open Random_oracle_input in
-        let b = field in
-        let ( ! ) = Impl.run_checked in
-        let inner
-            ({ second_starts_empty
-             ; second_ends_empty
-             ; token_id
-             ; other_fee_payer_opt
-             ; one
-             ; two
-             } :
-              _ Inner.t) ~f1 ~f2 =
-          let p f { Party.Predicated.Poly.body; predicate } =
-            List.reduce_exn ~f:append [ b body; f predicate ]
-          in
-          List.reduce_exn ~f:append
-            [ bitstring [ second_starts_empty; second_ends_empty ]
-            ; !(Token_id.Checked.to_input token_id)
-            ; Snapp_basic.Flagged_option.(
-                to_input' ~f:Other_fee_payer.Payload.Checked.to_input
-                  other_fee_payer_opt)
-            ; p f1 one
-            ; p f2 two
-            ]
-        in
-        let nonce x = !(Account_nonce.Checked.to_input x) in
-        match t with
-        | Zero_proved r ->
-            inner r ~f1:nonce ~f2:nonce
-        | One_proved r ->
-            inner r ~f1:field ~f2:nonce
-        | Two_proved r ->
-            inner r ~f1:field ~f2:field
+      let to_input (_ : t) = failwith "unused"
 
       let digest (t : t) =
         Random_oracle.Checked.(
           hash ~init:Hash_prefix.snapp_payload (pack_input (to_input t)))
     end
 
-    let to_input (t : t) =
-      let open Random_oracle_input in
-      let b = field in
-      let inner
-          ({ second_starts_empty
-           ; second_ends_empty
-           ; token_id
-           ; other_fee_payer_opt
-           ; one
-           ; two
-           } :
-            _ Inner.t) ~f1 ~f2 =
-        let p f { Party.Predicated.Poly.body; predicate } =
-          List.reduce_exn ~f:append [ b body; f predicate ]
-        in
-        List.reduce_exn ~f:append
-          [ bitstring [ second_starts_empty; second_ends_empty ]
-          ; Token_id.to_input token_id
-          ; Snapp_basic.Flagged_option.(
-              to_input' ~f:Other_fee_payer.Payload.to_input
-                (of_option ~default:Other_fee_payer.Payload.dummy
-                   other_fee_payer_opt))
-          ; p f1 one
-          ; p f2 two
-          ]
-      in
-      match t with
-      | Zero_proved r ->
-          inner r ~f1:Account_nonce.to_input ~f2:Account_nonce.to_input
-      | One_proved r ->
-          inner r ~f1:field ~f2:Account_nonce.to_input
-      | Two_proved r ->
-          inner r ~f1:field ~f2:field
+    let to_input (_ : t) = failwith "unused"
 
     let digest (t : t) =
       Random_oracle.(
@@ -1322,7 +1257,7 @@ let signed_signed ?fee_payment ~token_id (signer1, data1) (signer2, data2) : t =
       |> Payload.digested |> Payload.Digested.digest
       |> Random_oracle_input.field
     in
-    fun sk -> Schnorr.sign sk msg
+    fun sk -> Schnorr.Current.sign sk msg
   in
   Signed_signed
     { r with
@@ -1352,7 +1287,7 @@ let signed_empty ?fee_payment ?data2 ~token_id (signer1, data1) : t =
       |> Payload.digested |> Payload.Digested.digest
       |> Random_oracle_input.field
     in
-    fun sk -> Schnorr.sign sk msg
+    fun sk -> Schnorr.Current.sign sk msg
   in
   Signed_empty
     { r with

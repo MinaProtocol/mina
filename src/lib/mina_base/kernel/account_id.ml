@@ -54,7 +54,7 @@ module Checked = struct
   let token_id (_key, tid) = tid
 
   let to_input (key, tid) =
-    let%map tid = Token_id.Checked.to_input tid in
+    let tid = Token_id.Checked.to_input tid in
     Random_oracle.Input.append (Public_key.Compressed.Checked.to_input key) tid
 
   let equal (pk1, tid1) (pk2, tid2) =

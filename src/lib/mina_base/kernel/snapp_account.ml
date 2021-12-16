@@ -220,13 +220,12 @@ module Checked = struct
     Poly.Fields.fold ~init:[] ~app_state:(f app_state)
       ~verification_key:(f (fun x -> field x))
       ~snapp_version:
-        (f (fun x ->
-             Run.run_checked (Mina_numbers.Snapp_version.Checked.to_input x)))
+        (f (fun x -> Mina_numbers.Snapp_version.Checked.to_input x))
       ~sequence_state:(f app_state)
       ~last_sequence_slot:
-        (f (fun x ->
-             Run.run_checked (Mina_numbers.Global_slot.Checked.to_input x)))
-      ~proved_state:(f (fun b -> bitstring [ b ]))
+        (f (fun x -> Mina_numbers.Global_slot.Checked.to_input x))
+      ~proved_state:
+        (f (fun (b : Boolean.var) -> packed ((b :> Field.Var.t), 1)))
     |> List.reduce_exn ~f:append
 
   let to_input (t : t) =
@@ -288,7 +287,8 @@ let to_input (t : t) =
     ~snapp_version:(f Mina_numbers.Snapp_version.to_input)
     ~sequence_state:(f app_state)
     ~last_sequence_slot:(f Mina_numbers.Global_slot.to_input)
-    ~proved_state:(f (fun b -> bitstring [ b ]))
+    ~proved_state:
+      (f (fun b -> packed ((if b then Field.one else Field.zero), 1)))
   |> List.reduce_exn ~f:append
 
 let default : _ Poly.t =

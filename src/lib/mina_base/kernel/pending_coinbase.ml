@@ -40,17 +40,14 @@ module Coinbase_data = struct
   let to_input (pk, amount) =
     let open Random_oracle.Input in
     List.reduce_exn ~f:append
-      [ Public_key.Compressed.to_input pk; bitstring (Amount.to_bits amount) ]
+      [ Public_key.Compressed.to_input pk; Amount.to_input amount ]
 
   module Checked = struct
     let to_input (public_key, amount) =
+      let amount = Amount.var_to_input amount in
       let open Random_oracle.Input in
       List.reduce_exn ~f:append
-        [ Public_key.Compressed.Checked.to_input public_key
-        ; bitstring
-            (Bitstring_lib.Bitstring.Lsb_first.to_list
-               (Amount.var_to_bits amount))
-        ]
+        [ Public_key.Compressed.Checked.to_input public_key; amount ]
   end
 
   let typ : (var, t) Typ.t =
@@ -156,7 +153,7 @@ module Coinbase_stack = struct
 
       include T
 
-      let to_latest = Core.Fn.id
+      let to_latest = Fn.id
 
       [%%define_from_scope to_yojson, of_yojson]
 
@@ -180,13 +177,11 @@ module Coinbase_stack = struct
     type t = var
 
     let push (h : t) (cb : Coinbase_data.var) =
+      let cb = Coinbase_data.Checked.to_input cb in
       let open Random_oracle.Checked in
       make_checked (fun () ->
           hash ~init:Hash_prefix.coinbase_stack
-            (pack_input
-               (Random_oracle.Input.append
-                  (Coinbase_data.Checked.to_input cb)
-                  (var_to_input h)))
+            (pack_input (Random_oracle.Input.append cb (var_to_input h)))
           |> var_of_hash_packed)
 
     let check_merge (_, t1) (s2, _) = equal_var t1 s2
@@ -215,7 +210,7 @@ module Stack_hash = struct
 
       include T
 
-      let to_latest = Core.Fn.id
+      let to_latest = Fn.id
 
       [%%define_from_scope to_yojson, of_yojson]
 
@@ -1276,7 +1271,7 @@ let%test_unit "add stack + remove stack = initial tree " =
   in
   let pending_coinbases = ref (create ~depth () |> Or_error.ok_exn) in
   Quickcheck.test coinbases_gen ~trials:50 ~f:(fun cbs ->
-      Async.Thread_safe.block_on_async_exn (fun () ->
+      Run_in_thread.block_on_async_exn (fun () ->
           let is_new_stack = ref true in
           let init = merkle_root !pending_coinbases in
           let after_adding =
@@ -1293,7 +1288,7 @@ let%test_unit "add stack + remove stack = initial tree " =
           in
           pending_coinbases := after_del ;
           assert (Hash.equal (merkle_root after_del) init) ;
-          Async.Deferred.return ()))
+          Async_kernel.Deferred.return ()))
 
 module type Pending_coinbase_intf = sig
   type t [@@deriving sexp]

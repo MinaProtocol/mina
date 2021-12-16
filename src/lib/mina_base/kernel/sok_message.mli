@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Snark_params
 open Tick
 open Import
@@ -39,10 +39,10 @@ module Digest : sig
   module Checked : sig
     type t
 
-    val to_input : t -> (_, Boolean.var) Random_oracle.Input.t
+    val to_input : t -> Field.Var.t Random_oracle.Input.t
   end
 
-  val to_input : t -> (_, bool) Random_oracle.Input.t
+  val to_input : t -> Field.t Random_oracle.Input.t
 
   val typ : (Checked.t, t) Typ.t
 

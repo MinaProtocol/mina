@@ -18,6 +18,10 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Frozen_ledger_hash = Frozen_ledger_hash0
 module Ledger_hash = Ledger_hash0
 
+let field_of_bool b =
+  let open Snark_params.Tick in
+  if b then Field.one else Field.zero
+
 (* Semantically this type represents a function
      { has_valid_signature: bool; has_valid_proof: bool } -> bool
 
@@ -119,9 +123,11 @@ module Auth_required = struct
       }
     [@@deriving hlist, fields]
 
-    let to_input t =
+    let to_input ~field_of_bool t =
       let [ x; y; z ] = to_hlist t in
-      Random_oracle.Input.bitstring [ x; y; z ]
+      let bs = [| x; y; z |] in
+      Random_oracle.Input.packeds
+        (Array.map bs ~f:(fun b -> (field_of_bool b, 1)))
 
     let map t ~f =
       { constant = f t.constant
@@ -218,7 +224,9 @@ module Auth_required = struct
 
     let if_ = Encoding.if_
 
-    let to_input : t -> _ = Encoding.to_input
+    let to_input : t -> _ =
+      Encoding.to_input ~field_of_bool:(fun (b : Boolean.var) ->
+          (b :> Field.Var.t))
 
     let constant t = Encoding.map (encode t) ~f:Boolean.var_of_value
 
@@ -264,7 +272,7 @@ module Auth_required = struct
 
   [%%endif]
 
-  let to_input x = Encoding.to_input (encode x)
+  let to_input x = Encoding.to_input (encode x) ~field_of_bool
 
   let check (t : t) (c : Control.Tag.t) =
     match (t, c) with
@@ -304,21 +312,20 @@ module Poly = struct
         ; set_snapp_uri : 'controller
         ; edit_sequence_state : 'controller
         ; set_token_symbol : 'controller
-        ; increment_nonce : 'controller
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 
-  let to_input controller t =
+  let to_input ~field_of_bool controller t =
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
     Stable.Latest.Fields.fold ~init:[]
-      ~stake:(f (fun x -> Random_oracle.Input.bitstring [ x ]))
+      ~stake:(f (fun x -> Random_oracle.Input.packed (field_of_bool x, 1)))
       ~edit_state:(f controller) ~send:(f controller)
       ~set_delegate:(f controller) ~set_permissions:(f controller)
       ~set_verification_key:(f controller) ~receive:(f controller)
       ~set_snapp_uri:(f controller) ~edit_sequence_state:(f controller)
-      ~set_token_symbol:(f controller) ~increment_nonce:(f controller)
+      ~set_token_symbol:(f controller)
     |> List.reduce_exn ~f:Random_oracle.Input.append
 end
 
@@ -344,7 +351,6 @@ let gen : t Quickcheck.Generator.t =
   let%bind set_snapp_uri = Auth_required.gen in
   let%bind edit_sequence_state = Auth_required.gen in
   let%bind set_token_symbol = Auth_required.gen in
-  let%bind increment_nonce = Auth_required.gen in
   return
     { Poly.stake
     ; edit_state
@@ -356,7 +362,6 @@ let gen : t Quickcheck.Generator.t =
     ; set_snapp_uri
     ; edit_sequence_state
     ; set_token_symbol
-    ; increment_nonce
     }
 
 [%%ifdef consensus_mechanism]
@@ -364,7 +369,9 @@ let gen : t Quickcheck.Generator.t =
 module Checked = struct
   type t = (Boolean.var, Auth_required.Checked.t) Poly.Stable.Latest.t
 
-  let to_input x = Poly.to_input Auth_required.Checked.to_input x
+  let to_input (x : t) =
+    Poly.to_input Auth_required.Checked.to_input x
+      ~field_of_bool:(fun (b : Boolean.var) -> (b :> Field.Var.t))
 
   open Pickles.Impls.Step
 
@@ -378,7 +385,6 @@ module Checked = struct
     Poly.Fields.map ~stake:(g Boolean.if_) ~edit_state:c ~send:c ~receive:c
       ~set_delegate:c ~set_permissions:c ~set_verification_key:c
       ~set_snapp_uri:c ~edit_sequence_state:c ~set_token_symbol:c
-      ~increment_nonce:c
 
   let constant (t : Stable.Latest.t) : t =
     let open Core_kernel.Field in
@@ -387,7 +393,7 @@ module Checked = struct
       ~stake:(fun f -> Boolean.var_of_value (get f t))
       ~edit_state:a ~send:a ~receive:a ~set_delegate:a ~set_permissions:a
       ~set_verification_key:a ~set_snapp_uri:a ~edit_sequence_state:a
-      ~set_token_symbol:a ~increment_nonce:a
+      ~set_token_symbol:a
 end
 
 let typ =
@@ -403,14 +409,13 @@ let typ =
     ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
-    ; Auth_required.typ
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
 
 [%%endif]
 
-let to_input x = Poly.to_input Auth_required.to_input x
+let to_input (x : t) = Poly.to_input ~field_of_bool Auth_required.to_input x
 
 let user_default : t =
   { stake = true
@@ -423,7 +428,6 @@ let user_default : t =
   ; set_snapp_uri = Signature
   ; edit_sequence_state = Signature
   ; set_token_symbol = Signature
-  ; increment_nonce = Signature
   }
 
 let empty : t =
@@ -437,5 +441,4 @@ let empty : t =
   ; set_snapp_uri = None
   ; edit_sequence_state = None
   ; set_token_symbol = None
-  ; increment_nonce = None
   }

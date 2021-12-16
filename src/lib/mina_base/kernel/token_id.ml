@@ -14,6 +14,8 @@ let default = T.of_uint64 Unsigned.UInt64.one
 
 let to_input = T.to_input
 
+let to_input_legacy = T.to_input_legacy
+
 let to_string = T.to_string
 
 let of_string = T.of_string
@@ -92,8 +94,6 @@ let typ = T.typ
 let var_of_t = T.Checked.constant
 
 module Checked = struct
-  open Snark_params.Tick
-
   type t = var
 
   let next = T.Checked.succ
@@ -102,15 +102,14 @@ module Checked = struct
 
   let to_input = T.Checked.to_input
 
+  let to_input_legacy = T.Checked.to_input_legacy
+
   let equal = T.Checked.equal
 
   let if_ = T.Checked.if_
 
   module Assert = struct
-    let equal x y =
-      let x = T.Checked.to_integer x |> Snarky_integer.Integer.to_field in
-      let y = T.Checked.to_integer y |> Snarky_integer.Integer.to_field in
-      Field.Checked.Assert.equal x y
+    let equal x y = T.Checked.Assert.equal x y
   end
 
   let ( = ) = T.Checked.( = )

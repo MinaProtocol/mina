@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 module Poly = struct
   [%%versioned
@@ -79,9 +79,7 @@ let fee_excess : t -> Fee_excess.t Or_error.t = function
   | Command (Signed_command t) ->
       Ok (Signed_command.fee_excess t)
   | Command (Parties _ps) ->
-      failwith
-        "Invalid for parties transaction. Apply parties transaction to obtain \
-         the fee excess"
+      failwith "TODO"
   | Fee_transfer t ->
       Fee_transfer.fee_excess t
   | Coinbase t ->

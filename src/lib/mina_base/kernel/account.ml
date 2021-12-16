@@ -134,12 +134,14 @@ module Token_symbol = struct
   (* 48 = max_length * 8 *)
   module Num_bits = Pickles_types.Nat.N48
 
+  let num_bits = Pickles_types.Nat.to_int Num_bits.n
+
   let to_bits (x : t) =
     Pickles_types.Vector.init Num_bits.n ~f:(fun i ->
-        try
+        if i / 8 < String.length x then
           let c = x.[i / 8] |> Char.to_int in
           c land (1 lsl (i mod 8)) <> 0
-        with _ -> false)
+        else false)
 
   let of_bits x : t =
     let c, j, chars =
@@ -172,27 +174,43 @@ module Token_symbol = struct
         (Char.gen_uniform_inclusive Char.min_value Char.max_value))
       ~f:(fun x -> assert (String.equal (of_bits (to_bits x)) x))
 
-  let to_input (x : t) =
-    Random_oracle_input.bitstrings
-      [| Pickles_types.Vector.to_list (to_bits x) |]
+  let to_field (x : t) : Field.t =
+    Field.project (Pickles_types.Vector.to_list (to_bits x))
+
+  let to_input (x : t) = Random_oracle_input.packed (to_field x, num_bits)
 
   [%%ifdef consensus_mechanism]
 
-  type var = (Boolean.var, Num_bits.n) Pickles_types.Vector.t
+  type var = Field.Var.t
+
+  let range_check (t : var) =
+    let%bind actual =
+      make_checked (fun () ->
+          let _, _, actual_packed =
+            Pickles.Scalar_challenge.to_field_checked' ~num_bits m
+              (Pickles_types.Scalar_challenge.create t)
+          in
+          actual_packed)
+    in
+    Field.Checked.Assert.equal t actual
 
   let var_of_value x =
     Pickles_types.Vector.map ~f:Boolean.var_of_value (to_bits x)
 
+  let of_field (x : Field.t) : t =
+    of_bits
+      (Pickles_types.Vector.of_list_and_length_exn
+         (List.take (Field.unpack x) num_bits)
+         Num_bits.n)
+
   let typ : (var, t) Typ.t =
-    Typ.transport ~there:to_bits ~back:of_bits
-    @@ Pickles_types.Vector.typ Boolean.typ Num_bits.n
+    Typ.transport
+      { Field.typ with check = range_check }
+      ~there:to_field ~back:of_field
 
-  let var_to_input (x : var) =
-    Random_oracle_input.bitstrings [| Pickles_types.Vector.to_list x |]
+  let var_to_input (x : var) = Random_oracle_input.packed (x, num_bits)
 
-  let if_ (b : Boolean.var) ~(then_ : var) ~(else_ : var) : var =
-    Pickles_types.Vector.map2 then_ else_ ~f:(fun then_ else_ ->
-        Snark_params.Tick.Run.Boolean.if_ b ~then_ ~else_)
+  let if_ = Tick.Run.Field.if_
 
   [%%endif]
 end
@@ -518,7 +536,10 @@ let hash_snapp_uri_opt (snapp_uri_opt : string option) =
               (* [Int.test_bit c j] *)
               bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
             done) ;
-        Random_oracle_input.bitstring (Array.to_list bits)
+        Array.reduce_exn ~f:Random_oracle_input.append
+          (Array.map bits ~f:(fun b ->
+               Random_oracle_input.packed
+                 ((if b then Field.one else Field.zero), 1)))
     | None ->
         Lazy.force snapp_uri_non_preimage
   in
@@ -532,15 +553,15 @@ let delegate_opt = Option.value ~default:Public_key.Compressed.empty
 let to_input (t : t) =
   let open Random_oracle.Input in
   let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-  let bits conv = f (Fn.compose bitstring conv) in
+  (*   let bits conv = f (Fn.compose bitstring conv) in *)
   Poly.Fields.fold ~init:[]
     ~public_key:(f Public_key.Compressed.to_input)
-    ~token_id:(f Token_id.to_input) ~balance:(bits Balance.to_bits)
+    ~token_id:(f Token_id.to_input) ~balance:(f Balance.to_input)
     ~token_permissions:(f Token_permissions.to_input)
-    ~token_symbol:(f Token_symbol.to_input) ~nonce:(bits Nonce.Bits.to_bits)
+    ~token_symbol:(f Token_symbol.to_input) ~nonce:(f Nonce.to_input)
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
     ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
-    ~voting_for:(f State_hash.to_input) ~timing:(bits Timing.to_bits)
+    ~voting_for:(f State_hash.to_input) ~timing:(f Timing.to_input)
     ~snapp:(f (Fn.compose field hash_snapp_account_opt))
     ~permissions:(f Permissions.to_input)
     ~snapp_uri:(f (Fn.compose field hash_snapp_uri))
@@ -681,13 +702,8 @@ module Checked = struct
   end
 
   let to_input (t : var) =
-    let ( ! ) f x = Run.run_checked (f x) in
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
     let open Random_oracle.Input in
-    let bits conv =
-      f (fun x ->
-          bitstring (Bitstring_lib.Bitstring.Lsb_first.to_list (conv x)))
-    in
     make_checked (fun () ->
         List.reduce_exn ~f:append
           (Poly.Fields.fold ~init:[]
@@ -698,15 +714,14 @@ module Checked = struct
                (* We use [run_checked] here to avoid routing the [Checked.t]
                   monad throughout this calculation.
                *)
-               (f (fun x -> Run.run_checked (Token_id.Checked.to_input x)))
+               (f Token_id.Checked.to_input)
              ~token_symbol:(f Token_symbol.var_to_input)
              ~token_permissions:(f Token_permissions.var_to_input)
-             ~balance:(bits Balance.var_to_bits)
-             ~nonce:(bits !Nonce.Checked.to_bits)
+             ~balance:(f Balance.var_to_input) ~nonce:(f Nonce.Checked.to_input)
              ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
              ~delegate:(f Public_key.Compressed.Checked.to_input)
              ~voting_for:(f State_hash.var_to_input)
-             ~timing:(bits Timing.var_to_bits)
+             ~timing:(f Timing.var_to_input)
              ~snapp_uri:(f Data_as_hash.to_input)))
 
   let digest t =
@@ -715,42 +730,43 @@ module Checked = struct
           hash ~init:crypto_hash_prefix
             (pack_input (Run.run_checked (to_input t)))))
 
+  let balance_upper_bound = Bignum_bigint.(one lsl Balance.length_in_bits)
+
+  let amount_upper_bound = Bignum_bigint.(one lsl Amount.length_in_bits)
+
   let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
       ~vesting_increment ~initial_minimum_balance =
     let%bind before_cliff = Global_slot.Checked.(global_slot < cliff_time) in
-    let balance_to_int balance =
-      Snarky_integer.Integer.of_bits ~m @@ Balance.var_to_bits balance
+    let%bind else_branch =
+      make_checked (fun () ->
+          let _, slot_diff =
+            Tick.Run.run_checked
+              (Global_slot.Checked.sub_or_zero global_slot cliff_time)
+          in
+          let cliff_decrement = cliff_amount in
+          let min_balance_less_cliff_decrement, _ =
+            Tick.Run.run_checked
+              (Balance.Checked.sub_amount_flagged initial_minimum_balance
+                 cliff_decrement)
+          in
+          let num_periods, _ =
+            Tick.Run.run_checked
+              (Global_slot.Checked.div_mod slot_diff vesting_period)
+          in
+          let vesting_decrement =
+            Tick.Run.Field.mul
+              (Global_slot.Checked.to_field num_periods)
+              (Amount.pack_var vesting_increment)
+          in
+          let min_balance_less_cliff_and_vesting_decrements =
+            Tick.Run.run_checked
+              (Balance.Checked.sub_or_zero min_balance_less_cliff_decrement
+                 (Balance.Checked.Unsafe.of_field vesting_decrement))
+          in
+          min_balance_less_cliff_and_vesting_decrements)
     in
-    let open Snarky_integer.Integer in
-    let initial_minimum_balance_int = balance_to_int initial_minimum_balance in
-    make_checked (fun () ->
-        if_ ~m before_cliff ~then_:initial_minimum_balance_int
-          ~else_:
-            (let global_slot_int = Global_slot.Checked.to_integer global_slot in
-             let cliff_time_int = Global_slot.Checked.to_integer cliff_time in
-             let _, slot_diff =
-               subtract_unpacking_or_zero ~m global_slot_int cliff_time_int
-             in
-             let cliff_decrement_int =
-               Amount.var_to_bits cliff_amount |> of_bits ~m
-             in
-             let _, min_balance_less_cliff_decrement =
-               subtract_unpacking_or_zero ~m initial_minimum_balance_int
-                 cliff_decrement_int
-             in
-             let vesting_period_int =
-               Global_slot.Checked.to_integer vesting_period
-             in
-             let num_periods, _ = div_mod ~m slot_diff vesting_period_int in
-             let vesting_increment_int =
-               Amount.var_to_bits vesting_increment |> of_bits ~m
-             in
-             let vesting_decrement = mul ~m num_periods vesting_increment_int in
-             let _, min_balance_less_cliff_and_vesting_decrements =
-               subtract_unpacking_or_zero ~m min_balance_less_cliff_decrement
-                 vesting_decrement
-             in
-             min_balance_less_cliff_and_vesting_decrements))
+    Balance.Checked.if_ before_cliff ~then_:initial_minimum_balance
+      ~else_:else_branch
 
   let has_locked_tokens ~global_slot (t : var) =
     let open Timing.As_record in
@@ -768,12 +784,7 @@ module Checked = struct
         ~cliff_amount ~vesting_period ~vesting_increment
     in
     let%map zero_min_balance =
-      let zero_int =
-        Snarky_integer.Integer.constant ~m
-          (Bigint.of_field Field.zero |> Bigint.to_bignum_bigint)
-      in
-      make_checked (fun () ->
-          Snarky_integer.Integer.equal ~m cur_min_balance zero_int)
+      Balance.equal_var Balance.(var_of_t zero) cur_min_balance
     in
     (*Note: Untimed accounts will always have zero min balance*)
     Boolean.not zero_min_balance
