@@ -28,7 +28,12 @@ There are two ways of dealing with types:
 
 The first option is the easiest one, unless there are some foreign types in there. (Because of Rust's [*orphan rule*](https://github.com/Ixrec/rust-orphan-rules)) you can't implement the ToValue and FromValue traits on foreign types.)
 
-This means that you'll have to use the second option anytime you're dealing with foreign types, by wrapping them into a local type and using `custom!`. 
+You should use a custom type where OCaml doesn't need to access the internal
+fields of the type (or if it is itself a primitive, such as a field element or
+bigint); otherwise, you must create the desired OCaml structure/enum as a rust
+structure and perform a conversion between this new type and the original
+foreign rust type. In general, the choice of which to use should be governed by
+what's required in OCaml, **not** by limitations in the rust language.
 
 ### The ToValue and FromValue traits
 
