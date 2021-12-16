@@ -37,7 +37,7 @@ what's required in OCaml, **not** by limitations in the rust language.
 
 ### The ToValue and FromValue traits
 
-In both methods, the [traits ToValue and FromValue](https://github.com/zshipko/ocaml-rs/blob/master/src/value.rs#L55:L73) are used:
+In both methods, the [traits ToValue and FromValue](https://github.com/zshipko/ocaml-rs/blob/f300f2f382a694a6cc51dc14a9b3f849191580f0/src/value.rs#L55:L73) are used:
 
 ```rust=
 pub unsafe trait IntoValue {
@@ -48,7 +48,7 @@ pub unsafe trait FromValue<'a> {
 }
 ```
 
-these traits are implemented for all primitive Rust types ([here](https://github.com/zshipko/ocaml-rs/blob/master/src/conv.rs)), and can be derived automatically via [derive macros](https://docs.rs/ocaml/0.22.0/ocaml/#derives). Don't forget that you can use [cargo expand](https://github.com/dtolnay/cargo-expand) to expand macros, which is really useful to understand what the ocaml-rs macros are doing.
+these traits are implemented for all primitive Rust types ([here](https://github.com/zshipko/ocaml-rs/blob/f300f2f382a694a6cc51dc14a9b3f849191580f0/src/conv.rs)), and can be derived automatically via [derive macros](https://docs.rs/ocaml/0.22.0/ocaml/#derives). Don't forget that you can use [cargo expand](https://github.com/dtolnay/cargo-expand) to expand macros, which is really useful to understand what the ocaml-rs macros are doing.
 
 ```
 $ cargo expand -- some_filename_without_rs > expanded.rs
@@ -56,7 +56,7 @@ $ cargo expand -- some_filename_without_rs > expanded.rs
 
 ### Custom types
 
-The macro [custom!](https://github.com/zshipko/ocaml-rs/blob/master/src/custom.rs) allows you to quickly create custom types.
+The macro [custom!](https://github.com/zshipko/ocaml-rs/blob/f300f2f382a694a6cc51dc14a9b3f849191580f0/src/custom.rs) allows you to quickly create custom types.
 
 Values of custom types are opaque to OCaml, used to store the data of some rust
 value on the OCaml heap. When this data may contain pointers to the rust heap,
@@ -89,7 +89,7 @@ pub unsafe fn alloc_custom<T: crate::Custom>() -> Value {
 }
 ```
 
-and the data of your type (probably a pointer to some Rust memory) is copied into the OCaml's heap ([source](https://github.com/zshipko/ocaml-rs/blob/master/src/types.rs#L80)):
+and the data of your type (probably a pointer to some Rust memory) is copied into the OCaml's heap ([source](https://github.com/zshipko/ocaml-rs/blob/f300f2f382a694a6cc51dc14a9b3f849191580f0/src/types.rs#L80)):
 
 ```rust=
 pub fn set(&mut self, x: T) {
