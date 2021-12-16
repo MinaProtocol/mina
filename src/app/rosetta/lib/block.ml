@@ -357,7 +357,7 @@ WITH RECURSIVE chain AS (
       let created_token t = t.created_token
 
       let typ =
-        let open Archive_lib.Processor.Caqti_type_spec in
+        let open Mina_caqti.Type_spec in
         let spec =
           Caqti_type.
             [ string

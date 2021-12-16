@@ -12,7 +12,7 @@ module Block_info = struct
   [@@deriving hlist]
 
   let typ =
-    let open Archive_lib.Processor.Caqti_type_spec in
+    let open Mina_caqti.Type_spec in
     let spec = Caqti_type.[ int; int64; string; string ] in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
@@ -162,7 +162,7 @@ module User_command = struct
   [@@deriving hlist]
 
   let typ =
-    let open Archive_lib.Processor.Caqti_type_spec in
+    let open Mina_caqti.Type_spec in
     let spec =
       Caqti_type.
         [ string
@@ -244,7 +244,7 @@ module Internal_command = struct
   [@@deriving hlist]
 
   let typ =
-    let open Archive_lib.Processor.Caqti_type_spec in
+    let open Mina_caqti.Type_spec in
     let spec =
       Caqti_type.
         [ string

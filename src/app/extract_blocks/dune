@@ -4,12 +4,11 @@
  (public_name extract_blocks)
  (libraries
    async
-   core_kernel
-   caqti
-   caqti-async
    caqti-driver-postgresql
+   core_kernel
    archive_lib
    block_time
+   mina_caqti
    mina_numbers
    logger
    mina_base)
