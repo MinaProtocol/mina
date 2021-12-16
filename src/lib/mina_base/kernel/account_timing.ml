@@ -170,30 +170,6 @@ let var_to_input
      ; Amount.var_to_input vesting_increment
     |]
 
-(* TODO
-let var_to_bits
-    As_record.
-      { is_timed
-      ; initial_minimum_balance
-      ; cliff_time
-      ; cliff_amount
-      ; vesting_period
-      ; vesting_increment
-      } =
-  let open Bitstring_lib.Bitstring.Lsb_first in
-  let ( @| ) f x = Checked.map x ~f in
-  let%map initial_minimum_balance =
-    to_list @| Balance.var_to_bits initial_minimum_balance
-  and cliff_amount = to_list @| Amount.var_to_bits cliff_amount
-  and vesting_increment = to_list @| Amount.var_to_bits vesting_increment in
-  let cliff_time = to_list @@ Global_slot.var_to_bits cliff_time in
-  let vesting_period = to_list @@ Global_slot.var_to_bits vesting_period in
-  of_list
-    ( is_timed
-    :: ( initial_minimum_balance @ cliff_time @ cliff_amount @ vesting_period
-       @ vesting_increment ) )
-*)
-
 let var_of_t (t : t) : var =
   let As_record.
         { is_timed

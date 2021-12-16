@@ -1,7 +1,6 @@
+open Core
 module Logger = Impl
 
-(* TODO
-open Core_kernel
 let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
   let max_size = 1024 * 2 (* 2KB *) in
   let num_rotate = 1 in
@@ -39,4 +38,3 @@ let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
   with exn ->
     ignore (Unix.system ("rm -rf " ^ directory) : Unix.Exit_or_signal.t) ;
     raise exn
-   *)
