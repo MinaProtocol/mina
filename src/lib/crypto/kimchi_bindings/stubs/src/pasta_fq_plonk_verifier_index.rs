@@ -18,16 +18,8 @@ use kimchi_circuits::wires::{COLUMNS, PERMUTS};
 use std::convert::TryInto;
 use std::path::Path;
 
-//
-// CamlPastaFqPlonkVerifierIndex
-//
-
 pub type CamlPastaFqPlonkVerifierIndex =
     CamlPlonkVerifierIndex<CamlFq, CamlFqSrs, CamlPolyComm<CamlGPallas>>;
-
-//
-// Handy conversion functions
-//
 
 impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
     fn from(vi: VerifierIndex<GAffine>) -> Self {
@@ -124,10 +116,6 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
     }
 }
 
-//
-// Serialization helpers
-//
-
 pub fn read_raw(
     offset: Option<ocaml::Int>,
     srs: CamlFqSrs,
@@ -153,7 +141,7 @@ pub fn read_raw(
 }
 
 //
-// Methods
+// OCaml methods
 //
 
 #[ocaml_gen::func]
