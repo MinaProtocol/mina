@@ -58,7 +58,10 @@ $ cargo expand -- some_filename_without_rs > expanded.rs
 
 The macro [custom!](https://github.com/zshipko/ocaml-rs/blob/master/src/custom.rs) allows you to quickly create custom types.
 
-The particularity of custom types is that OCaml has no idea what they are, they just contain an opaque pointer to some Rust structure that won't be followed when the GC frees that part of the memory. So it is your responsibility to free things using a `finalizer`.
+Values of custom types are opaque to OCaml, used to store the data of some rust
+value on the OCaml heap. When this data may contain pointers to the rust heap,
+or other data that requires a call to 'drop' in rust, you must provide a
+'finalizer' for OCaml to call into to correctly drop these values.
 
 Here is how custom types are transformed into OCaml values:
 
