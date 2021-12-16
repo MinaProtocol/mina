@@ -240,7 +240,7 @@ let%test_module "Archive node unit tests" =
           Strict_pipe.Writer.close writer ;
           let%bind () = processor_deferred_computation in
           match%map
-            Processor.deferred_result_list_fold breadcrumbs ~init:()
+            Mina_caqti.deferred_result_list_fold breadcrumbs ~init:()
               ~f:(fun () breadcrumb ->
                 Caqti_async.Pool.use
                   (fun conn ->
