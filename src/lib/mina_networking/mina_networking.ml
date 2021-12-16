@@ -1500,25 +1500,12 @@ let create (config : Config.t)
               | _ ->
                   () ) ;
             Perf_histograms.add_span ~name:"external_transition_latency"
-<<<<<<< HEAD
-              ( External_transition.protocol_state state
-              |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
-              |> Block_time.to_time
-              |> Core.Time.abs_diff processing_start_time ) ;
-||||||| 140b329e7
-              (Core.Time.abs_diff
-                 Block_time.(now config.time_controller |> to_time)
-                 ( External_transition.protocol_state state
-                 |> Protocol_state.blockchain_state
-                 |> Blockchain_state.timestamp |> Block_time.to_time )) ;
-=======
               (Core.Time.abs_diff
                  Block_time.(now config.time_controller |> to_time)
                  ( External_transition.protocol_state state
                  |> Protocol_state.blockchain_state
                  |> Blockchain_state.timestamp |> Block_time.to_time )) ;
             Mina_metrics.(Gauge.inc_one Network.new_state_received) ;
->>>>>>> origin/compatible
             if config.log_gossip_heard.new_state then
               [%str_log info]
                 ~metadata:
