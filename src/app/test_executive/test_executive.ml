@@ -40,8 +40,7 @@ let engines : engine list =
   [ ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S)) ]
 
 let tests : test list =
-  [ ("reliability", (module Reliability_test.Make : Intf.Test.Functor_intf))
-  ; ( "peers-reliability"
+  [ ( "peers-reliability"
     , (module Peers_reliability_test.Make : Intf.Test.Functor_intf) )
   ; ( "chain-reliability"
     , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
