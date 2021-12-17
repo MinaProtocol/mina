@@ -5,7 +5,7 @@
 FROM ubuntu:20.04 AS production
 
 ARG MINA_DAEMON_PORT=10101
-ARG MINA_CONFIG_DIR=/root/.mina-config
+ARG MINA_CONFIG_DIR=/data/.mina-config
 # Sample public key for use in dev profile / demo mode genesis block
 ARG PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
 
@@ -54,9 +54,14 @@ COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
 USER postgres
 RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && echo "$POSTGRES_VERSION" "$(psql -V)" \
-    && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf
+    && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf \
+    && pg_dropcluster --stop ${POSTGRES_VERSION} main
 
 USER root
+
+# Run as root so it can create /data/postgresql
+RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
+  && pg_createcluster --start -d /data/postgresql --createclusterconf /rosetta/postgresql.conf ${POSTGRES_VERSION} main
 
 WORKDIR /rosetta
 

@@ -4,16 +4,16 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
-2021/12/14:
+2021/12/15:
 
-- Release rosetta-v12 with new 4-stage ubuntu 20.04-based docker build
-- Update postgres configuration and docker-start.sh script to be more reliable and leverage the new `balances` DB schema
+- Mainnet check:data succeeds with 99% reconciliation
+- Ubuntu 20.04 support
+- Release of rosetta-v12 with all of the above (and below)
 
 2021/12/08:
 
 - Uses the migrated archive node and changes around some queries
 - Release of rosetta-v11 with all of the above (and below)
-
 
 2021/11/19:
 

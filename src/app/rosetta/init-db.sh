@@ -10,7 +10,7 @@ DUMP_TIME=${5:=0000}
 
 pg_ctlcluster ${POSTGRES_VERSION} main start
 echo "[POPULATE] Top 10 blocks in ${POSTGRES_DATA_DIR} archiveDB:"
-sudo -u postgres psql "${PG_CONN}" --command "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
+sudo -u postgres psql "${POSTGRES_DBNAME}" --command "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
 RETURN_CODE=$?
 [[ "$RETURN_CODE" == "0" ]] && echo "[WARN] Database already initialized!" && exit ${RETURN_CODE}
 
@@ -19,7 +19,7 @@ echo "[POPULATE] postgresql.conf:"
 cat /rosetta/postgresql.conf
 
 pg_dropcluster --stop ${POSTGRES_VERSION} main
-pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} --createclusterconf /rosetta/postgresql.conf main
+pg_createcluster --start -d ${POSTGRES_DATA_DIR} --createclusterconf /rosetta/postgresql.conf ${POSTGRES_VERSION} main
 
 sudo -u postgres psql --command "SHOW ALL;"
 

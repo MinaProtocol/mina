@@ -1,21 +1,17 @@
 #!/bin/bash
 
-set -eou pipefail
-
 BLOCKS_BUCKET="${BLOCKS_BUCKET:=https://storage.googleapis.com/mina_network_block_data}"
 
-export MINA_NETWORK=${1}
+set -u
+
+MINA_NETWORK=${1}
 # Postgres database connection string and related variables
 POSTGRES_DBNAME=${2}
 POSTGRES_USERNAME=${3}
 PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${POSTGRES_DBNAME}
 
-# Saved for future use with mina-replayer verification logic
-export MINA_CONFIG_FILE=/genesis_ledgers/${MINA_NETWORK}.json
-export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=/data/.mina-config}"
-
 function jq_parent_json() {
-   jq -rs 'map(select(.metadata.parent_hash != null and .metadata.parent_height != null)) | "mainnet-\(.[0].metadata.parent_height)-\(.[0].metadata.parent_hash).json"'
+   jq -rs 'map(select(.metadata.parent_hash != null and .metadata.parent_height != null)) | "\(.[0].metadata.parent_height)-\(.[0].metadata.parent_hash).json"'
 }
 
 function jq_parent_hash() {
@@ -40,7 +36,7 @@ function bootstrap() {
   echo "[BOOTSTRAP] Restoring blocks individually from ${BLOCKS_BUCKET}..."
 
   until [[ "$PARENT" == "null" ]] ; do
-    PARENT_FILE="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq_parent_json)"
+    PARENT_FILE="${MINA_NETWORK}-$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq_parent_json)"
     download_block "${PARENT_FILE}"
     populate_db "$PG_CONN" "$PARENT_FILE"
     PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq_parent_hash)"
