@@ -59,7 +59,9 @@ RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
 
 USER root
 
-RUN pg_createcluster --start ${POSTGRES_VERSION} -d /data/postgresql --createclusterconf /rosetta/postgresql.conf main
+# Run as root so it can create /data/postgresql
+RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
+  && pg_createcluster --start -d /data/postgresql --createclusterconf /rosetta/postgresql.conf ${POSTGRES_VERSION} main
 
 WORKDIR /rosetta
 

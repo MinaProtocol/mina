@@ -21,7 +21,7 @@ echo "[POPULATE] postgresql.conf:"
 cat /rosetta/postgresql.conf
 
 pg_dropcluster --stop ${POSTGRES_VERSION} main
-pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} --createclusterconf /rosetta/postgresql.conf main
+pg_createcluster --start -d ${POSTGRES_DATA_DIR} --createclusterconf /rosetta/postgresql.conf ${POSTGRES_VERSION} main
 
 sudo -u postgres psql --command "SHOW ALL;"
 
