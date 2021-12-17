@@ -8,9 +8,7 @@ POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
 PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${POSTGRES_DBNAME}
 DUMP_TIME=${5:=0000}
 
-pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} --createclusterconf /rosetta/postgresql.conf main
 pg_ctlcluster ${POSTGRES_VERSION} main start
-sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
 echo "[POPULATE] Top 10 blocks in ${POSTGRES_DATA_DIR} archiveDB:"
 sudo -u postgres psql "${POSTGRES_DBNAME}" --command "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
 RETURN_CODE=$?
