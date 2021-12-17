@@ -154,14 +154,12 @@ module Make (Inputs : Inputs_intf) = struct
 
   type message = Challenge_polynomial.t list
 
-  include Allocation_functor.Make.Versioned_v2.Full_compare_eq_hash (struct
-    let id = "plong_dlog_proof_" ^ Inputs.id
+  let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
 
-    let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
-
-    [%%versioned
-    module Stable = struct
-      module V2 = struct
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      module T = struct
         type t =
           ( G.Affine.Stable.V1.t
           , Fq.Stable.V1.t
@@ -169,7 +167,7 @@ module Make (Inputs : Inputs_intf) = struct
           Pickles_types.Dlog_plonk_types.Proof.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
-        let to_latest = Fn.id
+        let id = "plong_dlog_proof_" ^ Inputs.id
 
         type 'a creator =
              messages:
@@ -187,8 +185,19 @@ module Make (Inputs : Inputs_intf) = struct
           let open Pickles_types.Dlog_plonk_types.Proof in
           { messages; openings }
       end
-    end]
-  end)
+
+      include T
+
+      include (
+        Allocation_functor.Make.Full
+          (T) :
+            Allocation_functor.Intf.Output.Full_intf
+              with type t := t
+               and type 'a creator := 'a creator )
+
+      let to_latest = Fn.id
+    end
+  end]
 
   include (
     Stable.Latest :
