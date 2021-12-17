@@ -2,4 +2,3 @@ target
 release
 Cargo.lock
 .merlin
-kimchi.ml.gen

@@ -128,14 +128,13 @@ module Proof = Plonk_dlog_proof.Make (struct
             done ;
             witness)
       in
-      create pk.index ~witness:witness_cols ~prev_challenges:prev_chals
-        ~prev_sgs:prev_comms
+      create pk.index witness_cols prev_chals prev_comms
 
     let create_async (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
       create_aux pk primary auxiliary prev_chals prev_comms
-        ~f:(fun pk ~witness ~prev_challenges ~prev_sgs ->
+        ~f:(fun pk auxiliary_input prev_challenges prev_sgs ->
           Run_in_thread.run_in_thread (fun () ->
-              create pk ~witness ~prev_challenges ~prev_sgs))
+              create pk auxiliary_input prev_challenges prev_sgs))
 
     let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
       create_aux pk primary auxiliary prev_chals prev_comms ~f:create

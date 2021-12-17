@@ -51,19 +51,19 @@ module type Input_intf = sig
 
   val two_adic_root_of_unity : unit -> t
 
-  val mut_add : t -> other:t -> unit
+  val mut_add : t -> t -> unit
 
-  val mut_mul : t -> other:t -> unit
+  val mut_mul : t -> t -> unit
 
   val mut_square : t -> unit
 
-  val mut_sub : t -> other:t -> unit
+  val mut_sub : t -> t -> unit
 
-  val copy : over:t -> t -> unit
+  val copy : t -> t -> unit
 
-  val to_bytes : t -> Bytes.t
+  val to_bytes : t -> bytes
 
-  val of_bytes : Bytes.t -> t
+  val of_bytes : bytes -> t
 
   val domain_generator : int -> t
 
@@ -246,15 +246,15 @@ module Make (F : Input_intf) :
   let ( / ) = div
 
   module Mutable = struct
-    let add = mut_add
+    let add t ~other = mut_add t other
 
-    let mul = mut_mul
+    let mul t ~other = mut_mul t other
 
     let square = mut_square
 
-    let sub = mut_sub
+    let sub t ~other = mut_sub t other
 
-    let copy ~over t = F.copy over t
+    let copy ~over t = copy over t
   end
 
   let op f t other = f t ~other
