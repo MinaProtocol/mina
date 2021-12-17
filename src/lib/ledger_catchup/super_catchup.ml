@@ -1567,18 +1567,18 @@ let%test_module "Ledger_catchup tests" =
 
     let%test_unit "when catchup fails to download a block, catchup will retry \
                    and attempt again" =
-      let attempts_ivar = Ivar.create () in
-      let attempt_counter = ref 0 in
-      let impl_rpc :
-             Mina_networking.Rpcs.Get_transition_chain.query Envelope.Incoming.t
-          -> Mina_networking.Rpcs.Get_transition_chain.response Deferred.t =
-       fun _ ->
-        let () =
-          if !attempt_counter > 0 then Ivar.fill attempts_ivar true
-          else attempt_counter := !attempt_counter + 1
-        in
-        Deferred.return None
-      in
+      (* let attempts_ivar = Ivar.create () in
+         let attempt_counter = ref 0 in
+         let impl_rpc :
+                Mina_networking.Rpcs.Get_transition_chain.query Envelope.Incoming.t
+             -> Mina_networking.Rpcs.Get_transition_chain.response Deferred.t =
+          fun _ ->
+           let () =
+             attempt_counter := !attempt_counter + 1;
+             if !attempt_counter > 1 then Ivar.fill attempts_ivar true;
+           in
+           Deferred.return None
+         in *)
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
@@ -1587,7 +1587,7 @@ let%test_module "Ledger_catchup tests" =
               (* ; peer_with_branch ~frontier_branch_size:(max_frontier_length / 2) *)
             ; broken_rpc_peer_branch
                 ~frontier_branch_size:(max_frontier_length / 2)
-                ~get_transition_chain_impl_option:(Some impl_rpc)
+                ~get_transition_chain_impl_option:None
             ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1612,60 +1612,90 @@ let%test_module "Ledger_catchup tests" =
           Strict_pipe.Writer.write test.job_writer
             (parent_hash, [ Rose_tree.T (target_transition, []) ]) ;
           Thread_safe.block_on_async_exn (fun () ->
-              let final = Cache_lib.Cached.final_state target_transition in
+              let catchup_tree =
+                match
+                  Transition_frontier.catchup_tree my_net.state.frontier
+                with
+                | Full tr ->
+                    tr
+                | Hash _ ->
+                    failwith
+                      "in super catchup unit tests, the catchup tree should \
+                       always be Full_catchup_tree, but it is \
+                       Catchup_hash_tree for some reason"
+              in
+              let catchup_tree_node_list =
+                State_hash.Table.data catchup_tree.nodes
+              in
+              let catchup_tree_node = List.hd_exn catchup_tree_node_list in
 
-              match%map
-                Deferred.any
-                  [ (Ivar.read final >>| fun x -> `Catchup_failed x)
-                  ; (Ivar.read attempts_ivar >>| fun _ -> `Attempts_exceeded)
-                  ; Strict_pipe.Reader.read test.breadcrumbs_reader
-                    >>| const `Catchup_success
-                  ]
-              with
-              | `Attempts_exceeded ->
-                  ()
-              | `Catchup_success ->
-                  failwith
-                    "target transition should've been invalidated with a \
-                     failure"
-              | `Catchup_failed fnl -> (
-                  match fnl with
-                  | `Success _ ->
-                      failwith "final state should be at `Failed"
-                  | `Failed ->
-                      let catchup_tree =
-                        match
-                          Transition_frontier.catchup_tree my_net.state.frontier
-                        with
-                        | Full tr ->
-                            tr
-                        | Hash _ ->
-                            failwith
-                              "in super catchup unit tests, the catchup tree \
-                               should always be Full_catchup_tree, but it is \
-                               Catchup_hash_tree for some reason"
-                      in
-                      let catchup_tree_node_list =
-                        State_hash.Table.data catchup_tree.nodes
-                      in
-                      let catchup_tree_node =
-                        List.hd_exn catchup_tree_node_list
-                      in
-                      let num_attempts =
-                        Peer.Map.length catchup_tree_node.attempts
-                      in
-                      if num_attempts < 2 then
-                        let failstring =
-                          Format.sprintf
-                            "UNIT TEST FAILED.  catchup should have made more \
-                             attempts after failing to download a block.  \
-                             attempts= %d.  length of catchup_tree_node_list= \
-                             %d"
-                            num_attempts
-                            (List.length catchup_tree_node_list)
-                        in
-                        failwith failstring
-                      else () )))
+              let rec check ~start_time () =
+                let num_attempts = Peer.Map.length catchup_tree_node.attempts in
+                if num_attempts < 2 then
+                  let%bind () = Async.Scheduler.yield () in
+                  let elapsed_seconds =
+                    Time.Span.to_sec (Time.diff (Time.now ()) start_time)
+                  in
+                  if Float.compare elapsed_seconds 300.0 < 0 then
+                    check ~start_time ()
+                  else failwith "time limit exceeded"
+                else Deferred.return ()
+              in
+              let start_time = Time.now () in
+              check ~start_time ()
+              (* let final = Cache_lib.Cached.final_state target_transition in *)
+              (* match%map
+                   Deferred.any
+                     [ (Ivar.read final >>| fun x -> `Catchup_failed x)
+                     ; (Ivar.read attempts_ivar >>| fun _ -> `Attempts_exceeded)
+                     ; Strict_pipe.Reader.read test.breadcrumbs_reader
+                       >>| const `Catchup_success
+                     ]
+                 with
+                 | `Attempts_exceeded ->
+                     ()
+                 | `Catchup_success ->
+                     failwith
+                       "target transition should've been invalidated with a \
+                        failure"
+                 | `Catchup_failed fnl -> (
+                     match fnl with
+                     | `Success _ ->
+                         failwith "final state should be at `Failed"
+                     | `Failed ->
+                         let catchup_tree =
+                           match
+                             Transition_frontier.catchup_tree my_net.state.frontier
+                           with
+                           | Full tr ->
+                               tr
+                           | Hash _ ->
+                               failwith
+                                 "in super catchup unit tests, the catchup tree \
+                                  should always be Full_catchup_tree, but it is \
+                                  Catchup_hash_tree for some reason"
+                         in
+                         let catchup_tree_node_list =
+                           State_hash.Table.data catchup_tree.nodes
+                         in
+                         let catchup_tree_node =
+                           List.hd_exn catchup_tree_node_list
+                         in
+                         let num_attempts =
+                           Peer.Map.length catchup_tree_node.attempts
+                         in
+                         if num_attempts < 2 then
+                           let failstring =
+                             Format.sprintf
+                               "UNIT TEST FAILED.  catchup should have made more \
+                                attempts after failing to download a block.  \
+                                attempts= %d.  length of catchup_tree_node_list= \
+                                %d"
+                               num_attempts
+                               (List.length catchup_tree_node_list)
+                           in
+                           failwith failstring
+                         else () ) *)))
 
     (* let%test_unit "when initial validation of a blocks fails (except for the \
                     verifier_unreachable case), then catchup will cancel the \
