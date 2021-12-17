@@ -27,6 +27,12 @@ use oracle::{
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
 
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
+
 macro_rules! impl_proof {
     (
      $name: ident,
@@ -623,12 +629,17 @@ macro_rules! impl_proof {
 
                 // Release the runtime lock so that other threads can run using it while we generate the proof.
                 let group_map = GroupMap::<_>::setup();
-                let proof = ProverProof::create::<
+                let maybe_proof = ProverProof::create::<
                     DefaultFqSponge<_, PlonkSpongeConstants15W>,
                     DefaultFrSponge<_, PlonkSpongeConstants15W>,
-                >(&group_map, witness, index, prev)
-                .unwrap();
-                proof.into()
+                >(&group_map, witness, index, prev);
+                return match maybe_proof {
+                    Ok(proof) => proof.into(),
+                    Err(err) => {
+                        log(&err.to_string());
+                        panic!("thrown an error")
+                    }
+                }
             }
 
             #[wasm_bindgen]
