@@ -100,6 +100,7 @@ CREATE INDEX idx_chain_status      ON blocks(chain_status);
    they are included here to allow Rosetta account queries to consume
     fewer Postgresql resources
 */
+
 CREATE TABLE balances
 ( id                           serial PRIMARY KEY
 , public_key_id                int    NOT NULL REFERENCES public_keys(id)
