@@ -11,10 +11,6 @@ use oracle::{
 };
 use paste::paste;
 
-//
-// CamlOracles
-//
-
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlOracles<F> {
     pub o: CamlRandomOracles<F>,
@@ -23,10 +19,6 @@ pub struct CamlOracles<F> {
     pub digest_before_evaluations: F,
 }
 
-//
-// Implementation
-//
-
 macro_rules! impl_oracles {
     ($CamlF: ty, $F: ty, $CamlG: ty, $G: ty, $index: ty, $curve_params: ty) => {
 
@@ -34,12 +26,10 @@ macro_rules! impl_oracles {
             #[ocaml_gen::func]
             #[ocaml::func]
             pub fn [<$F:snake _oracles_create>](
-                lgr_comm: Vec<CamlPolyComm<$CamlG>>, // the bases to commit polynomials
-                index: $index,    // parameters
-                proof: CamlProverProof<$CamlG, $CamlF>, // the final proof (contains public elements at the beginning)
+                lgr_comm: Vec<CamlPolyComm<$CamlG>>,
+                index: $index,
+                proof: CamlProverProof<$CamlG, $CamlF>,
             ) -> CamlOracles<$CamlF> {
-                // conversions
-
                 let index: DlogVerifierIndex<$G> = index.into();
 
                 let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
@@ -105,10 +95,6 @@ macro_rules! impl_oracles {
         }
     }
 }
-
-//
-//
-//
 
 pub mod fp {
     use super::*;

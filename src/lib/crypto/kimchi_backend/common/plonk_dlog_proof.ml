@@ -1,21 +1,18 @@
 open Core_kernel
 open Async_kernel
+open Pickles_types
 
 let tuple15_to_vec
     (w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14) =
-  Pickles_types.Vector.
-    [ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ]
+  Vector.[ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ]
 
 let tuple15_of_vec
-    Pickles_types.Vector.
-      [ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ] =
+    Vector.[ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ] =
   (w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14)
 
-let tuple6_to_vec (w0, w1, w2, w3, w4, w5) =
-  Pickles_types.Vector.[ w0; w1; w2; w3; w4; w5 ]
+let tuple6_to_vec (w0, w1, w2, w3, w4, w5) = Vector.[ w0; w1; w2; w3; w4; w5 ]
 
-let tuple6_of_vec Pickles_types.Vector.[ w0; w1; w2; w3; w4; w5 ] =
-  (w0, w1, w2, w3, w4, w5)
+let tuple6_of_vec Vector.[ w0; w1; w2; w3; w4; w5 ] = (w0, w1, w2, w3, w4, w5)
 
 module type Stable_v1 = sig
   module Stable : sig
@@ -209,8 +206,8 @@ module Make (Inputs : Inputs_intf) = struct
     Array.iter arr ~f:(fun fe -> Fq.Vector.emplace_back vec fe) ;
     vec
 
-  (** Note that this function will panic if some of the points are points at infinity *)
-  let opening_proof_of_backend (t : Opening_proof_backend.t) =
+  (** Note that this function will panic if any of the points are points at infinity *)
+  let opening_proof_of_backend_exn (t : Opening_proof_backend.t) =
     let g (x : G.Affine.Backend.t) : G.Affine.t =
       G.Affine.of_backend x |> Pickles_types.Or_infinity.finite_exn
     in
@@ -228,7 +225,7 @@ module Make (Inputs : Inputs_intf) = struct
     }
 
   let of_backend (t : Backend.t) : t =
-    let proof = opening_proof_of_backend t.proof in
+    let proof = opening_proof_of_backend_exn t.proof in
     let evals =
       (fst t.evals, snd t.evals)
       |> Tuple_lib.Double.map ~f:(fun e ->

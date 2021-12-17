@@ -2,12 +2,13 @@
 
 This package contains the glue between:
 
-* [snarky]()/[pickles](), TKTK
+* [snarky](https://github.com/o1-labs/snarkyjs), a library to write circuits.
+* [pickles](https://github.com/MinaProtocol/mina/tree/develop/src/lib/pickles), the recursive layer of the protocol.
 * and [kimchi_bindings](../kimchi_bindings), the OCaml bindings to our proof system [kimchi](https://www.github.com/o1-labs/proof-systems) written in Rust.
 
 As snarky expects specific "backend" modules, zexe-backend mostly contains functors that converts the ocaml-bindings found in [kimchi_bindings](../kimchi_bindings) into what snarky expects.
 
-There's three things to convert here:
+There are three things to convert here:
 
 1. fundamental (or non-generic) low-level types: arkwork types (BigInteger256) AND mina-curves types (Vesta, Pallas, Fp, Fq).
 2. common (or generic) low-level types: polynomial commitments (Poly_comm), gates (Gates), etc. that are instantiated separately for the two curves (Fq_poly_comm, Fp_poly_comm).
@@ -22,7 +23,7 @@ kimchi_backend/
 ├── pasta/ # the instantiations of everything for both curves
 │   ├── basic.ml # instantiate a number of things
 │   ├── {pallas,vesta}_based_plonk.ml # instantiate the backend for the different curves
-│   ├── precomputed.ml # TODO: this should be documented
+│   ├── precomputed.ml
 ├── common/ # the stuff that both curves have in common
 │   ├── bigint.ml
 │   ├── curve.ml
@@ -30,13 +31,13 @@ kimchi_backend/
 │   ├── dlog_urs.ml
 │   ├── endoscale_round.ml
 │   ├── field.ml
-│   ├── intf.ml # no freaking clue
+│   ├── intf.ml
 │   ├── plonk_constraint_system.ml # the functor to create a constraint system
 │   ├── plonk_dlog_oracles.ml
 │   ├── plonk_dlog_proof.ml
 │   ├── poly_comm.ml
 │   ├── scale_round.ml
-│   ├── var.ml # ?
-│   ├── version.ml # there's a gen_version script that prolly should be called from mina_version/gen.sh, or even live in the stubs directory, not there
-└── kimchi_backend.ml # ?
+│   ├── var.ml
+│   ├── version.ml
+└── kimchi_backend.ml
 ```

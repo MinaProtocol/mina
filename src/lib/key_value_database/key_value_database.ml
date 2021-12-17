@@ -52,6 +52,8 @@ module Intf = struct
 
     val get : t -> key:key -> value option M.t
 
+    val get_batch : t -> keys:key list -> value option list M.t
+
     val set : t -> key:key -> data:value -> unit M.t
 
     val remove : t -> key:key -> unit M.t
@@ -94,6 +96,8 @@ module Make_mock
   let create _ = Key.Table.create ()
 
   let get t ~key = Key.Table.find t key
+
+  let get_batch t ~keys = List.map keys ~f:(Key.Table.find t)
 
   let set = Key.Table.set
 

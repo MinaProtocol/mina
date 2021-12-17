@@ -24,17 +24,19 @@ ark-serialize = "0.3.0"
 ark-ec = { version = "0.3.0", features = ["parallel"] }
 ark-poly = { version = "0.3.0", features = ["parallel"] }
 
-# proof-systems
-commitment_dlog = { git = "https://github.com/o1-labs/proof-systems/", branch = "master", features = ["ocaml_types"] }
-groupmap = { git = "https://github.com/o1-labs/proof-systems/", branch = "master" }
-mina-curves = { git = "https://github.com/o1-labs/proof-systems/", branch = "master" }
-oracle = { git = "https://github.com/o1-labs/proof-systems/", branch = "master", features = ["ocaml_types"] }
-plonk_circuits = { git = "https://github.com/o1-labs/proof-systems/", branch = "master", features = ["ocaml_types"] }
-plonk_protocol_dlog = { git = "https://github.com/o1-labs/proof-systems/", branch = "master", features = ["ocaml_types"] }
+groupmap = { path = "../../crypto/proof-systems/groupmap" }
+mina-curves = { path = "../../crypto/proof-systems/curves" }
+oracle = { path = "../../crypto/proof-systems/oracle" }
+plonk_circuits = { path = "../../crypto/proof-systems/circuits/plonk", features = [ "ocaml_types" ] }
+commitment_dlog = { path = "../../crypto/proof-systems/dlog/commitment", features = [ "ocaml_types" ] }
+plonk_protocol_dlog = { path = "../../crypto/proof-systems/dlog/plonk", features = [ "ocaml_types" ] }
+
+# ocaml-specific
+ocaml-gen = { path = "../../crypto/proof-systems/ocaml/ocaml-gen" }
 
 # ocaml-specific
 ocaml = { version = "0.22.1" }
-ocaml-gen = { git = "https://github.com/o1-labs/proof-systems/", branch = "master" }
+ocaml-gen = { path = "../../marlin/ocaml-gen" }
 
 [profile.release]
 debug = true

@@ -1,9 +1,7 @@
 open Core_kernel
 open Kimchi_backend_common
 
-(** ? *)
 module Rounds : sig
-  (* TODO: remove open *)
   open Pickles_types
 
   module Wrap : Nat.Add.Intf_transparent
@@ -76,7 +74,7 @@ module Bigint256 =
       let length_in_bytes = 32
     end)
 
-(* the two pasta fields *)
+(* the two pasta fields and curves *)
 
 module Fp = Field.Make (struct
   module Bigint = Bigint256
@@ -89,8 +87,6 @@ module Fq = Field.Make (struct
   include Kimchi.Foundations.Fq
   module Vector = Kimchi.FieldVectors.Fq
 end)
-
-(* the two pasta curves *)
 
 module Vesta = struct
   module Params = struct

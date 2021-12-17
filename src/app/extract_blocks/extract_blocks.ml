@@ -76,7 +76,9 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   in
   let ledger_hash = Ledger_hash.of_base58_check_exn block.ledger_hash in
   let height = Unsigned.UInt32.of_int64 block.height in
-  let global_slot = Unsigned.UInt32.of_int64 block.global_slot in
+  let global_slot_since_hard_fork =
+    Unsigned.UInt32.of_int64 block.global_slot_since_hard_fork
+  in
   let global_slot_since_genesis =
     Unsigned.UInt32.of_int64 block.global_slot_since_genesis
   in
@@ -94,7 +96,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; next_epoch_ledger_hash
     ; ledger_hash
     ; height
-    ; global_slot
+    ; global_slot_since_hard_fork
     ; global_slot_since_genesis
     ; timestamp
     ; user_cmds = []
@@ -428,7 +430,9 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
             [%log info] "Writing block with $state_hash"
               ~metadata:
                 [ ("state_hash", State_hash.to_yojson block.state_hash) ] ;
-            let output_file = State_hash.to_string block.state_hash ^ ".json" in
+            let output_file =
+              State_hash.to_base58_check block.state_hash ^ ".json"
+            in
             Async_unix.Writer.with_file output_file ~f:(fun writer ->
                 return
                   (Async.fprintf writer "%s\n%!"
