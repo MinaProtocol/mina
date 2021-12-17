@@ -165,44 +165,6 @@ module Make (Inputs : Inputs_intf) = struct
 
   let array_to_vector a = Pickles_types.Vector.of_list (Array.to_list a)
 
-  (*
-  let pickles_verification_evals_of_backend
-      (t :
-        Inputs.Poly_comm.Backend.t
-        Kimchi.Protocol.VerifierIndex.verification_evals) :
-      Inputs.Curve.Affine.t
-      Pickles_types.Dlog_plonk_types.Poly_comm.Without_degree_bound.t
-      Pickles_types.Plonk_verification_key_evals.t =
-    let array_to_vector7 a =
-      Pickles_types.Vector.of_array_and_length_exn a Pickles_types.Nat.N7.n
-    in
-    let array_to_vector15 a =
-      Pickles_types.Vector.of_array_and_length_exn a Pickles_types.Nat.N15.n
-    in
-    let inin : Inputs.Poly_comm.Backend.t array = t.sigma_comm in
-    let sigma_comm :
-        Inputs.Curve.Affine.t
-        Pickles_types.Dlog_plonk_types.Poly_comm.Without_degree_bound.t
-        Pickles_types.Dlog_plonk_types.Permuts_vec.Stable.V1.t =
-      Array.map inin ~f:Inputs.Poly_comm.of_backend_without_degree_bound
-      |> array_to_vector7
-    in
-    { sigma_comm
-    ; coefficients_comm =
-        Array.map t.coefficients_comm
-          ~f:Inputs.Poly_comm.of_backend_without_degree_bound
-        |> array_to_vector15
-    ; generic_comm =
-        Inputs.Poly_comm.of_backend_without_degree_bound t.generic_comm
-    ; psm_comm = Inputs.Poly_comm.of_backend_without_degree_bound t.psm_comm
-    ; complete_add_comm =
-        Inputs.Poly_comm.of_backend_without_degree_bound t.complete_add_comm
-    ; mul_comm = Inputs.Poly_comm.of_backend_without_degree_bound t.mul_comm
-    ; emul_comm = Inputs.Poly_comm.of_backend_without_degree_bound t.emul_comm
-    }
-
-    *)
-
   (** does this convert a backend.verifier_index to a pickles_types.verifier_index? *)
   let vk_commitments (t : Inputs.Verifier_index.t) :
       Inputs.Curve.Affine.t
