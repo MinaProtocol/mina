@@ -54,7 +54,9 @@ COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
 USER postgres
 RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && echo "$POSTGRES_VERSION" "$(psql -V)" \
+    && mkdir -p /data/postgresql \
     && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf \
+    && pg_dropcluster --stop ${POSTGRES_VERSION} main \
     && pg_createcluster --start ${POSTGRES_VERSION} -d /data/postgresql main \
     && cat /rosetta/postgresql.conf >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf
 
