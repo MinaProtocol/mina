@@ -43,8 +43,7 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
   && echo "$PK" >  ${MINA_CONFIG_DIR}/wallets/store/$PK.pub \
   && echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"6pcvpWSLkMi393dT5VSLR6ft56AWKkCYRqJoYia","pwsalt":"ASoBkV3NsY7ZRuxztyPJdmJCiz3R","pwdiff":[134217728,6],"ciphertext":"Dmq1Qd8uNbZRT1NT7zVbn3eubpn9Myx9Je9ZQGTKDxUv4BoPNmZAGox18qVfbbEUSuhT4ZGDt"}' \
   > ${MINA_CONFIG_DIR}/wallets/store/${PK} \
-  && chmod go-rwx ${MINA_CONFIG_DIR}/wallets/store/${PK} \
-  && mkdir -p /data/postgresql
+  && chmod go-rwx ${MINA_CONFIG_DIR}/wallets/store/${PK}
 
 COPY --from=builder /home/opam/app/* /usr/local/bin/
 COPY --from=builder /home/opam/mina/src/app/rosetta/*.sh /rosetta/
