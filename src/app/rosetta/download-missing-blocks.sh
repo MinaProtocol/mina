@@ -25,7 +25,7 @@ function populate_db() {
 
 function download_block() {
     echo "Downloading $1 block"
-    curl -sO "${BLOCKS_BUCKET}/${MINA_NETWORK}-${1}"
+    curl -sO "${BLOCKS_BUCKET}/${1}"
 }
 
 HASH='map(select(.metadata.parent_hash != null and .metadata.parent_height != null)) | .[0].metadata.parent_hash'
@@ -36,7 +36,7 @@ function bootstrap() {
   echo "[BOOTSTRAP] Restoring blocks individually from ${BLOCKS_BUCKET}..."
 
   until [[ "$PARENT" == "null" ]] ; do
-    PARENT_FILE="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq_parent_json)"
+    PARENT_FILE="${MINA_NETWORK}-$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq_parent_json)"
     download_block "${PARENT_FILE}"
     populate_db "$PG_CONN" "$PARENT_FILE"
     PARENT="$(mina-missing-blocks-auditor --archive-uri $PG_CONN | jq_parent_hash)"
