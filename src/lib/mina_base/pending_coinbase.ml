@@ -84,7 +84,7 @@ module Stack_id : sig
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, equal, to_yojson]
+  type t = Stable.Latest.t [@@deriving sexp, compare, equal, yojson]
 
   val of_int : int -> t
 
@@ -101,7 +101,7 @@ end = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = int [@@deriving sexp, to_yojson, compare]
+      type t = int [@@deriving sexp, yojson, compare]
 
       let to_latest = Fn.id
     end
@@ -724,7 +724,7 @@ module T = struct
         (Hash.t, Stack_id.t, Stack.t, unit) Sparse_ledger_lib.Sparse_ledger.T.t
 
     module Dummy_token = struct
-      type t = unit [@@deriving sexp, to_yojson]
+      type t = unit [@@deriving sexp, yojson]
 
       let max () () = ()
 

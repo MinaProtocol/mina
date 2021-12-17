@@ -109,10 +109,6 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
                     Actions.(Gossiped_invalid_transition, Some (message, [])))
           in
           Error (`Invalid_staged_ledger_hash (Error.of_string message))
-      | Error
-          (`Staged_ledger_application_failed
-            (Staged_ledger.Staged_ledger_error.Unexpected e)) ->
-          return (Error (`Fatal_error (Error.to_exn e)))
       | Error (`Staged_ledger_application_failed staged_ledger_error) ->
           let%map () =
             match sender with
@@ -145,12 +141,9 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
                       | Non_zero_fee_excess _
                       | Insufficient_work _
                       | Mismatched_statuses _
-                      | Invalid_public_key _ ->
-                          make_actions Gossiped_invalid_transition
+                      | Invalid_public_key _
                       | Unexpected _ ->
-                          failwith
-                            "build: Unexpected staged ledger error should \
-                             have been caught in another pattern"
+                          make_actions Gossiped_invalid_transition
                     in
                     Trust_system.record trust_system logger peer action )
           in

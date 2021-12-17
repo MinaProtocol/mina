@@ -1484,6 +1484,21 @@ let create (config : Config.t)
         Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
         match Envelope.Incoming.data envelope with
         | New_state state ->
+            let processing_start_time =
+              Block_time.(now config.time_controller |> to_time)
+            in
+            don't_wait_for
+              ( match%map Mina_net2.Validation_callback.await valid_cb with
+              | Some `Accept ->
+                  let processing_time_span =
+                    Time.diff
+                      Block_time.(now config.time_controller |> to_time)
+                      processing_start_time
+                  in
+                  Mina_metrics.Block_latency.(
+                    Validation_acceptance_time.update processing_time_span)
+              | _ ->
+                  () ) ;
             Perf_histograms.add_span ~name:"external_transition_latency"
               (Core.Time.abs_diff
                  Block_time.(now config.time_controller |> to_time)
