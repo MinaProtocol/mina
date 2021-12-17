@@ -5,7 +5,7 @@
 FROM ubuntu:20.04 AS production
 
 ARG MINA_DAEMON_PORT=10101
-ARG MINA_CONFIG_DIR=/root/.mina-config
+ARG MINA_CONFIG_DIR=/data/.mina-config
 # Sample public key for use in dev profile / demo mode genesis block
 ARG PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
 
@@ -43,7 +43,8 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
   && echo "$PK" >  ${MINA_CONFIG_DIR}/wallets/store/$PK.pub \
   && echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"6pcvpWSLkMi393dT5VSLR6ft56AWKkCYRqJoYia","pwsalt":"ASoBkV3NsY7ZRuxztyPJdmJCiz3R","pwdiff":[134217728,6],"ciphertext":"Dmq1Qd8uNbZRT1NT7zVbn3eubpn9Myx9Je9ZQGTKDxUv4BoPNmZAGox18qVfbbEUSuhT4ZGDt"}' \
   > ${MINA_CONFIG_DIR}/wallets/store/${PK} \
-  && chmod go-rwx ${MINA_CONFIG_DIR}/wallets/store/${PK}
+  && chmod go-rwx ${MINA_CONFIG_DIR}/wallets/store/${PK} \
+  && mkdir -p /data/postgresql
 
 COPY --from=builder /home/opam/app/* /usr/local/bin/
 COPY --from=builder /home/opam/mina/src/app/rosetta/*.sh /rosetta/
@@ -54,7 +55,6 @@ COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
 USER postgres
 RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && echo "$POSTGRES_VERSION" "$(psql -V)" \
-    && mkdir -p /data/postgresql \
     && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf \
     && pg_dropcluster --stop ${POSTGRES_VERSION} main \
     && pg_createcluster --start ${POSTGRES_VERSION} -d /data/postgresql main \
