@@ -1575,9 +1575,9 @@ let%test_module "Ledger_catchup tests" =
        fun _ ->
         let () =
           attempt_counter := !attempt_counter + 1 ;
-          if !attempt_counter > 1 then Ivar.fill attempts_ivar true
+          if !attempt_counter > 1 then Ivar.fill_if_empty attempts_ivar true
         in
-        Deferred.return None
+        Deferred.return (Some [])
       in
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
@@ -1588,12 +1588,18 @@ let%test_module "Ledger_catchup tests" =
             ; broken_rpc_peer_branch
                 ~frontier_branch_size:(max_frontier_length / 2)
                 ~get_transition_chain_impl_option:(Some impl_rpc)
+            ; broken_rpc_peer_branch
+                ~frontier_branch_size:(max_frontier_length / 2)
+                ~get_transition_chain_impl_option:(Some impl_rpc)
+            ; broken_rpc_peer_branch
+                ~frontier_branch_size:(max_frontier_length / 2)
+                ~get_transition_chain_impl_option:(Some impl_rpc)
             ])
         ~f:(fun network ->
           let open Fake_network in
-          let [ my_net; peer_net ] = network.peer_networks in
+          let [ my_net; peer1; _; _ ] = network.peer_networks in
           let target_best_tip_path =
-            [ Transition_frontier.best_tip peer_net.state.frontier ]
+            [ Transition_frontier.best_tip peer1.state.frontier ]
           in
           let open Fake_network in
           let target_breadcrumb = List.last_exn target_best_tip_path in
@@ -1612,37 +1618,6 @@ let%test_module "Ledger_catchup tests" =
           Strict_pipe.Writer.write test.job_writer
             (parent_hash, [ Rose_tree.T (target_transition, []) ]) ;
           Thread_safe.block_on_async_exn (fun () ->
-              (* let catchup_tree =
-                   match
-                     Transition_frontier.catchup_tree my_net.state.frontier
-                   with
-                   | Full tr ->
-                       tr
-                   | Hash _ ->
-                       failwith
-                         "in super catchup unit tests, the catchup tree should \
-                          always be Full_catchup_tree, but it is \
-                          Catchup_hash_tree for some reason"
-                 in
-                 let catchup_tree_node_list =
-                   State_hash.Table.data catchup_tree.nodes
-                 in
-                 let catchup_tree_node = List.hd_exn catchup_tree_node_list in
-
-                 let rec check ~start_time () =
-                   let num_attempts = Peer.Map.length catchup_tree_node.attempts in
-                   if num_attempts < 1 then
-                     let%bind () = Async.Scheduler.yield () in
-                     let elapsed_seconds =
-                       Time.Span.to_sec (Time.diff (Time.now ()) start_time)
-                     in
-                     if Float.compare elapsed_seconds 300.0 < 0 then
-                       check ~start_time ()
-                     else failwith "time limit exceeded"
-                   else Deferred.return ()
-                 in
-                 let start_time = Time.now () in
-                 check ~start_time () *)
               let final = Cache_lib.Cached.final_state target_transition in
               match%map
                 Deferred.any
