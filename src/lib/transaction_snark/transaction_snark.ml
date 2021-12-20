@@ -1253,6 +1253,7 @@ module Base = struct
                  _ (* This is for the snapp to use, we don't need it. *)
              ; sequence_events
              ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
+             ; protocol_state = _
              }
          ; predicate = _
          } :
@@ -1724,6 +1725,8 @@ module Base = struct
           type t = party
 
           let balance_change (t : t) = t.party.data.body.balance_change
+
+          let protocol_state (t : t) = t.party.data.body.protocol_state
         end
 
         module Account = struct
@@ -1777,6 +1780,10 @@ module Base = struct
           let default = Token_id.(var_of_t default)
 
           let invalid = Token_id.(var_of_t invalid)
+        end
+
+        module Protocol_state_predicate = struct
+          type t = Snapp_predicate.Protocol_state.Checked.t
         end
       end
 
@@ -2170,14 +2177,6 @@ module Base = struct
               in
               let start_data =
                 { Parties_logic.Start_data.parties = (h, ps)
-                ; protocol_state_predicate =
-                    exists Snapp_predicate.Protocol_state.typ
-                      ~compute:(fun () ->
-                        match V.get v with
-                        | `Skip ->
-                            Snapp_predicate.Protocol_state.accept
-                        | `Start p ->
-                            p.protocol_state_predicate)
                 ; memo_hash =
                     exists Field.typ ~compute:(fun () ->
                         match V.get v with
@@ -3800,10 +3799,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
   let remaining_parties =
     let partiess =
       List.map partiess ~f:(fun parties : _ Parties_logic.Start_data.t ->
-          { protocol_state_predicate = Snapp_predicate.Protocol_state.accept
-          ; parties
-          ; memo_hash = Signed_command_memo.hash parties.memo
-          })
+          { parties; memo_hash = Signed_command_memo.hash parties.memo })
     in
     ref partiess
   in
@@ -4256,6 +4252,7 @@ module For_tests = struct
               ; sequence_events = []
               ; call_data = Field.zero
               ; call_depth = 0
+              ; protocol_state = Snapp_predicate.Protocol_state.accept
               }
           ; predicate = sender_nonce
           }
@@ -4275,6 +4272,7 @@ module For_tests = struct
             ; sequence_events = []
             ; call_data = Field.zero
             ; call_depth = 0
+            ; protocol_state = Snapp_predicate.Protocol_state.accept
             }
         ; predicate = Nonce (Account.Nonce.succ sender_nonce)
         }
@@ -4306,6 +4304,7 @@ module For_tests = struct
                   ; sequence_events
                   ; call_data
                   ; call_depth = 0
+                  ; protocol_state = Snapp_predicate.Protocol_state.accept
                   }
               ; predicate
               }
@@ -4326,6 +4325,7 @@ module For_tests = struct
                   ; sequence_events = []
                   ; call_data = Field.zero
                   ; call_depth = 0
+                  ; protocol_state = Snapp_predicate.Protocol_state.accept
                   }
               ; predicate = Accept
               }
@@ -4376,12 +4376,7 @@ module For_tests = struct
           ; authorization = Signature sender_signature_auth
           })
     in
-    ( `Parties
-        { Parties.fee_payer
-        ; other_parties = other_receivers
-        ; protocol_state
-        ; memo
-        }
+    ( `Parties { Parties.fee_payer; other_parties = other_receivers; memo }
     , `Sender_party sender_party
     , `Proof_party snapp_party
     , `Txn_commitment transaction )
@@ -4402,7 +4397,7 @@ module For_tests = struct
             }
       }
     in
-    let ( `Parties { Parties.fee_payer; other_parties; protocol_state; memo }
+    let ( `Parties { Parties.fee_payer; other_parties; memo }
         , `Sender_party sender_party
         , `Proof_party snapp_party
         , `Txn_commitment transaction ) =
@@ -4422,16 +4417,14 @@ module For_tests = struct
           ])
     in
     let other_parties = [ Option.value_exn sender_party ] @ snapp_party in
-    let parties : Parties.t =
-      { fee_payer; other_parties; protocol_state; memo }
-    in
+    let parties : Parties.t = { fee_payer; other_parties; memo } in
     parties
 
   let update_state ~constraint_constants (spec : Spec.t) =
     let `VK vk, `Prover trivial_prover =
       create_trivial_snapp ~constraint_constants ()
     in
-    let ( `Parties { Parties.fee_payer; other_parties; protocol_state; memo }
+    let ( `Parties { Parties.fee_payer; other_parties; memo }
         , `Sender_party sender_party
         , `Proof_party snapp_party
         , `Txn_commitment transaction ) =
@@ -4481,9 +4474,7 @@ module For_tests = struct
           failwith "Current authorization not Proof or Signature or None_given"
     in
     let other_parties = [ snapp_party ] in
-    let parties : Parties.t =
-      { fee_payer; other_parties; protocol_state; memo }
-    in
+    let parties : Parties.t = { fee_payer; other_parties; memo } in
     (parties, vk)
 
   let multiple_transfers (spec : Spec.t) =
@@ -4562,6 +4553,7 @@ module For_tests = struct
               ; sequence_events = []
               ; call_data = Field.zero
               ; call_depth = 0
+              ; protocol_state = Snapp_predicate.Protocol_state.accept
               }
           ; predicate = sender_nonce
           }
@@ -4580,6 +4572,7 @@ module For_tests = struct
           ; sequence_events = []
           ; call_data = Field.zero
           ; call_depth = 0
+          ; protocol_state = Snapp_predicate.Protocol_state.accept
           }
       ; predicate = Nonce (Account.Nonce.succ sender_nonce)
       }
@@ -4595,6 +4588,7 @@ module For_tests = struct
           ; sequence_events = []
           ; call_data = Field.zero
           ; call_depth = 0
+          ; protocol_state = Snapp_predicate.Protocol_state.accept
           }
       ; predicate = Full Snapp_predicate.Account.accept
       }
@@ -4660,9 +4654,7 @@ module For_tests = struct
     let other_parties =
       [ sender; { data = snapp_party_data; authorization = Proof pi } ]
     in
-    let parties : Parties.t =
-      { fee_payer; other_parties; protocol_state; memo }
-    in
+    let parties : Parties.t = { fee_payer; other_parties; memo } in
     parties
 end
 
@@ -5013,6 +5005,7 @@ let%test_module "transaction_snark" =
                   ; sequence_events = []
                   ; call_data = Field.zero
                   ; call_depth = 0
+                  ; protocol_state = Snapp_predicate.Protocol_state.accept
                   }
               ; predicate = acct1.account.nonce
               }
@@ -5031,6 +5024,7 @@ let%test_module "transaction_snark" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
+                    ; protocol_state = Snapp_predicate.Protocol_state.accept
                     }
                 ; predicate = Accept
                 }
@@ -5048,13 +5042,13 @@ let%test_module "transaction_snark" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
+                    ; protocol_state = Snapp_predicate.Protocol_state.accept
                     }
                 ; predicate = Accept
                 }
             ; authorization = None_given
             }
           ]
-      ; protocol_state = Snapp_predicate.Protocol_state.accept
       ; memo = Signed_command_memo.empty
       }
 
@@ -5574,6 +5568,8 @@ let%test_module "transaction_snark" =
                             ; sequence_events = []
                             ; call_data = Field.zero
                             ; call_depth = 0
+                            ; protocol_state =
+                                Snapp_predicate.Protocol_state.accept
                             }
                         ; predicate = sender_nonce
                         }
@@ -5593,6 +5589,7 @@ let%test_module "transaction_snark" =
                         ; sequence_events = []
                         ; call_data = Field.zero
                         ; call_depth = 0
+                        ; protocol_state = Snapp_predicate.Protocol_state.accept
                         }
                     ; predicate = Nonce (Account.Nonce.succ sender_nonce)
                     }
@@ -5608,6 +5605,7 @@ let%test_module "transaction_snark" =
                         ; sequence_events = []
                         ; call_data = Field.zero
                         ; call_depth = 0
+                        ; protocol_state = Snapp_predicate.Protocol_state.accept
                         }
                     ; predicate = Full Snapp_predicate.Account.accept
                     }
@@ -5694,7 +5692,6 @@ let%test_module "transaction_snark" =
                         [ sender
                         ; { data = snapp_party_data; authorization = Proof pi }
                         ]
-                    ; protocol_state
                     ; memo
                     }
                   in

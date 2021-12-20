@@ -20,7 +20,6 @@ module Parties_segment_witness : sig
             Parties_logic.Local_state.Stable.V1.t
         ; start_parties :
             ( Parties.Stable.V1.t
-            , Snapp_predicate.Protocol_state.Stable.V1.t
             , Zexe_backend.Pasta.Fp.Stable.V1.t )
             Parties_logic.Start_data.Stable.V1.t
             list
