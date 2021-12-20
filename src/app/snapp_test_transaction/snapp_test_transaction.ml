@@ -196,6 +196,7 @@ let graphql_snapp_command (parties : Parties.t) =
                |> Array.to_list )))
       |> Yojson.Safe.to_string
     in
+    let full_commitment = Bool.to_string p.data.body.use_full_commitment in
     let pk = pk_string p.data.body.pk in
     sprintf
       {|
@@ -219,14 +220,15 @@ let graphql_snapp_command (parties : Parties.t) =
             delegate: null, 
             appState: [%s]}, 
           publicKey: "%s",
-          protocolState: %s}}
+          protocolState: %s,
+          use_full_commitment: %s}}
     |}
       authorization predicate call_data sequence_events events balance_change
       increment_nonce
       (permissions p.data.body.update.permissions)
       (verification_key p.data.body.update)
       (app_state p.data.body.update.app_state)
-      pk protocol_state
+      pk protocol_state full_commitment
   in
   let fee_payer =
     let p = parties.fee_payer in
@@ -254,7 +256,7 @@ let graphql_snapp_command (parties : Parties.t) =
             delegate: null, 
             appState: [%s]}, 
           pk: "%s",
-          protocolState: %s }}
+          protocolState: %s}}
         |}
       authorization nonce fee
       (permissions p.data.body.update.permissions)

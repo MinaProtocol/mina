@@ -4296,6 +4296,7 @@ module For_tests = struct
               ; call_data = Field.zero
               ; call_depth = 0
               ; protocol_state = Snapp_predicate.Protocol_state.accept
+              ; use_full_commitment = ()
               }
           ; predicate = sender_nonce
           }
@@ -4316,6 +4317,7 @@ module For_tests = struct
             ; call_data = Field.zero
             ; call_depth = 0
             ; protocol_state = Snapp_predicate.Protocol_state.accept
+            ; use_full_commitment = false
             }
         ; predicate = Nonce (Account.Nonce.succ sender_nonce)
         }
@@ -4342,12 +4344,13 @@ module For_tests = struct
                   ; update
                   ; token_id = Token_id.default
                   ; balance_change = delta
-                  ; increment_nonce = true
+                  ; increment_nonce = false
                   ; events
                   ; sequence_events
                   ; call_data
                   ; call_depth = 0
                   ; protocol_state = Snapp_predicate.Protocol_state.accept
+                  ; use_full_commitment = false
                   }
               ; predicate
               }
@@ -4369,6 +4372,7 @@ module For_tests = struct
                   ; call_data = Field.zero
                   ; call_depth = 0
                   ; protocol_state = Snapp_predicate.Protocol_state.accept
+                  ; use_full_commitment = false
                   }
               ; predicate = Accept
               }
