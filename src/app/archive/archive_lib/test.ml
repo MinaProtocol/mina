@@ -76,10 +76,8 @@ let%test_module "Archive node unit tests" =
       Ledger.get_or_create_account ledger fee_payer_account_id account
       |> Or_error.ok_exn
       |> fun _ ->
-      let protocol_state = Snapp_predicate.Protocol_state.accept in
       let%map (parties : Parties.t) =
-        Snapp_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger
-          ~protocol_state ()
+        Snapp_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger ()
       in
       User_command.Parties parties
 

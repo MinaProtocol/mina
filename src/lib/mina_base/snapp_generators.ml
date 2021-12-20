@@ -289,7 +289,7 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
     ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
     ~(f_balance_change : a -> Currency.Amount.Signed.t) ~(increment_nonce : b)
     ~ledger () :
-    (_, _, _, a, _, _, _, b) Party.Body.Poly.t Quickcheck.Generator.t =
+    (_, _, _, a, _, _, _, b, _) Party.Body.Poly.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   (* ledger may contain non-Snapp accounts, so if we want a Snapp account,
      must generate a new one
@@ -454,6 +454,7 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
   let%map call_data = Snark_params.Tick.Field.gen in
   (* update the depth when generating `other_parties` in Parties.t *)
   let call_depth = 0 in
+  let protocol_state = Snapp_predicate.Protocol_state.accept in
   { Party.Body.Poly.pk
   ; update
   ; token_id
@@ -463,6 +464,7 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
   ; sequence_events
   ; call_data
   ; call_depth
+  ; protocol_state
   }
 
 let gen_predicated_from ?(succeed = true) ?(new_account = false)
@@ -557,7 +559,7 @@ let gen_parties_from ?(succeed = true)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t)
-    ~ledger ~protocol_state () =
+    ~ledger () =
   let open Quickcheck.Let_syntax in
   let max_parties = 5 in
   let fee_payer_pk =
@@ -615,7 +617,7 @@ let gen_parties_from ?(succeed = true)
   let%bind memo = Signed_command_memo.gen in
   let memo_hash = Signed_command_memo.hash memo in
   let parties_dummy_signatures : Parties.t =
-    { fee_payer; other_parties; protocol_state; memo }
+    { fee_payer; other_parties; memo }
   in
   (* replace dummy signature in fee payer *)
   let fee_payer_signature =
@@ -639,9 +641,8 @@ let gen_parties_from ?(succeed = true)
   in
   let protocol_state_predicate_hash =
     Snapp_predicate.Protocol_state.digest
-      parties_dummy_signatures.protocol_state
+      parties_dummy_signatures.fee_payer.data.body.protocol_state
   in
-
   let sign_for_other_party sk =
     Signature_lib.Schnorr.sign sk
       (Random_oracle.Input.field
