@@ -1346,6 +1346,7 @@ var caml_plonk_verification_evals_of_rust = function(x, affine_klass) {
     //   };
 
     // should be inverse of the above ^
+    // TODO: make work for both Wasm..PolyComm types
     var convertArray = function(comms) {
         comms = js_class_vector_of_rust_vector(comms, plonk_wasm.WasmFqPolyComm);
         // comms = js_class_vector_of_rust_vector(comms, plonk_wasm.WasmFpPolyComm);
@@ -1426,30 +1427,30 @@ var caml_plonk_verification_shifts_to_rust = function(x, klass) {
 // Provides: caml_plonk_verifier_index_of_rust
 // Requires: caml_plonk_domain_of_rust, caml_plonk_verification_evals_of_rust, caml_plonk_verification_shifts_of_rust, free_on_finalize
 var caml_plonk_verifier_index_of_rust = function(x, affine_class) {
-  var domain = caml_plonk_domain_of_rust(x.domain);
-  var max_poly_size = x.max_poly_size;
-  var max_quot_size = x.max_quot_size;
-  var srs = free_on_finalize(x.srs);
-  var evals = caml_plonk_verification_evals_of_rust(x.evals, affine_class);
-  var shifts = caml_plonk_verification_shifts_of_rust(x.shifts);
-  var linearization = x.linearization;
-  x.free();
-  // TODO: Handle linearization correctly!
-  return [0, domain, max_poly_size, max_quot_size, srs, evals, shifts, linearization];
+    var domain = caml_plonk_domain_of_rust(x.domain);
+    var max_poly_size = x.max_poly_size;
+    var max_quot_size = x.max_quot_size;
+    var srs = free_on_finalize(x.srs);
+    var evals = caml_plonk_verification_evals_of_rust(x.evals, affine_class);
+    var shifts = caml_plonk_verification_shifts_of_rust(x.shifts);
+    var linearization = x.linearization;
+    x.free();
+    // TODO: Handle linearization correctly!
+    return [0, domain, max_poly_size, max_quot_size, srs, evals, shifts, linearization];
 };
 
 // Provides: caml_plonk_verifier_index_to_rust
 // Requires: caml_plonk_domain_to_rust, caml_plonk_verification_evals_to_rust, caml_plonk_verification_shifts_to_rust, free_finalization_registry
 var caml_plonk_verifier_index_to_rust = function(x, klass, domain_class, verification_evals_class, poly_comm_class, mk_affine, verification_shifts_class) {
-  var domain = caml_plonk_domain_to_rust(x[1], domain_class);
-  var max_poly_size = x[2];
-  var max_quot_size = x[3];
-  var srs = x[4];
-  var evals = caml_plonk_verification_evals_to_rust(x[5], verification_evals_class, poly_comm_class, mk_affine);
-  var shifts = caml_plonk_verification_shifts_to_rust(x[6], verification_shifts_class);
-  var linearization = x[7];
-  // TODO: Handle linearization correctly!
-  return new klass(domain, max_poly_size, max_quot_size, srs, evals, shifts, linearization);
+    var domain = caml_plonk_domain_to_rust(x[1], domain_class);
+    var max_poly_size = x[2];
+    var max_quot_size = x[3];
+    var srs = x[4];
+    var evals = caml_plonk_verification_evals_to_rust(x[5], verification_evals_class, poly_comm_class, mk_affine);
+    var shifts = caml_plonk_verification_shifts_to_rust(x[6], verification_shifts_class);
+    var linearization = x[7];
+    // TODO: Handle linearization correctly!
+    return new klass(domain, max_poly_size, max_quot_size, srs, evals, shifts, linearization);
 };
 
 
@@ -1609,16 +1610,16 @@ var caml_pasta_fp_proof_evaluations_to_rust = function(x) {
 // Requires: plonk_wasm, caml_fp_vector_of_rust
 var caml_pasta_fp_proof_evaluations_of_rust = function(x) {
     var convertArray = function(v, n) {
-      var res = [0];
-      for (var i = 0; i < n; ++i) {
-        res.push(caml_fp_vector_of_rust(v.get(i)));
-      }
-      return res;
+        var res = [0];
+        for (var i = 0; i < n; ++i) {
+            res.push(caml_fp_vector_of_rust(v.get(i)));
+        }
+        return res;
     };
 
-    var w = convertArray(x.w);
+    var w = convertArray(x.w, COLUMNS);
     var z = caml_fp_vector_of_rust(x.z);
-    var s = convertArray(x.s);
+    var s = convertArray(x.s, PERMUTS_MINUS_1);
     var generic_selector = caml_fp_vector_of_rust(x.generic_selector);
     var poseidon_selector = caml_fp_vector_of_rust(x.poseidon_selector);
 
@@ -1681,12 +1682,13 @@ var caml_pasta_fp_opening_proof_of_rust = function(x) {
 // Requires: plonk_wasm, caml_vesta_poly_comm_to_rust, js_class_vector_to_rust_vector
 var caml_pasta_fp_commitments_to_rust = function(x) {
     var convertArray = function(v) {
-      var n = v.length - 1;
-      var res = new Array(n);
-      for (var i = 0; i < n; ++i) {
-        res[i] = caml_vesta_poly_comm_to_rust(v[i + 1]);
-      }
-      return js_class_vector_to_rust_vector(res);
+        var n = v.length - 1;
+        var res = new Array(n);
+        for (var i = 0; i < n; ++i) {
+            res[i] = caml_vesta_poly_comm_to_rust(v[i + 1]);
+        }
+        // TODO need to do finalizer things?
+        return js_class_vector_to_rust_vector(res);
     };
 
     var w_comm = convertArray(x[1]);
@@ -1698,14 +1700,14 @@ var caml_pasta_fp_commitments_to_rust = function(x) {
 // Provides: caml_pasta_fp_commitments_of_rust
 // Requires: caml_vesta_poly_comm_of_rust, js_class_vector_of_rust_vector, plonk_wasm
 var caml_pasta_fp_commitments_of_rust = function(x) {
-    var convertArray = function(v, n) {
-      var a = js_class_vector_of_rust_vector(v, plonk_wasm.WasmFpPolyComm);
-      var res = [0];
-      for (var i = 0; i < n; ++i) {
-        // TODO Check this. Could be off by 1
-        res.push(caml_vesta_poly_comm_of_rust(a[i]))
-      }
-      return res;
+    var convertArray = function(v) {
+        var a = js_class_vector_of_rust_vector(v, plonk_wasm.WasmFpPolyComm);
+        var res = [0];
+        for (var i = 0; i < a.length; ++i) {
+            // TODO Check this. Could be off by 1
+            res.push(caml_vesta_poly_comm_of_rust(a[i]))
+        }
+        return res;
     };
 
     var w_comm = convertArray(x.w_comm);
@@ -1769,20 +1771,18 @@ var debug = function(line, arg1) {
 // Provides: caml_pasta_fp_plonk_proof_create
 // Requires: debug, plonk_wasm, caml_fp_vector_to_rust, caml_array_to_rust_vector, rust_affine_of_caml_affine, caml_pasta_fp_proof_of_rust
 var caml_pasta_fp_plonk_proof_create = function(index, witness_cols, prev_challenges, prev_sgs) {
-    // witness_cols.shift();
     var w = new plonk_wasm.WasmVecVecFp(witness_cols.length-1);
     for (var i = 1; i < witness_cols.length; i++) {
       w.push(caml_fp_vector_to_rust(witness_cols[i]));
     }
     witness_cols = w;
     
-    debug('1766', witness_cols);
     // auxiliary_input = caml_fp_vector_to_rust(auxiliary_input);
     prev_challenges = caml_fp_vector_to_rust(prev_challenges);
     prev_sgs = caml_array_to_rust_vector(prev_sgs, rust_affine_of_caml_affine, plonk_wasm.caml_vesta_affine_one);
     var res = plonk_wasm.caml_pasta_fp_plonk_proof_create(index, witness_cols, prev_challenges, prev_sgs);
-    debug('1766', res);
-    return caml_pasta_fp_proof_of_rust(res);
+    var proof = caml_pasta_fp_proof_of_rust(res);
+    return proof;
 };
 
 // OLD
@@ -1859,16 +1859,16 @@ var caml_pasta_fq_proof_evaluations_to_rust = function(x) {
 // Requires: plonk_wasm, caml_fq_vector_of_rust
 var caml_pasta_fq_proof_evaluations_of_rust = function(x) {
     var convertArray = function(v, n) {
-      var res = [0];
-      for (var i = 0; i < n; ++i) {
-        res.push(caml_fq_vector_of_rust(v.get(i)));
-      }
-      return res;
+        var res = [0];
+        for (var i = 0; i < n; ++i) {
+            res.push(caml_fq_vector_of_rust(v.get(i)));
+        }
+        return res;
     };
 
-    var w = convertArray(x.w);
+    var w = convertArray(x.w, COLUMNS);
     var z = caml_fq_vector_of_rust(x.z);
-    var s = convertArray(x.s);
+    var s = convertArray(x.s, PERMUTS_MINUS_1);
     var generic_selector = caml_fq_vector_of_rust(x.generic_selector);
     var poseidon_selector = caml_fq_vector_of_rust(x.poseidon_selector);
 
@@ -1948,10 +1948,10 @@ var caml_pasta_fq_commitments_to_rust = function(x) {
 // Provides: caml_pasta_fq_commitments_of_rust
 // Requires: caml_pallas_poly_comm_of_rust, js_class_vector_of_rust_vector, plonk_wasm
 var caml_pasta_fq_commitments_of_rust = function(x) {
-    var convertArray = function(v, n) {
+    var convertArray = function(v) {
       var a = js_class_vector_of_rust_vector(v, plonk_wasm.WasmFqPolyComm);
       var res = [0];
-      for (var i = 0; i < n; ++i) {
+      for (var i = 0; i < a.length; ++i) {
         // TODO Check this. Could be off by 1
         res.push(caml_pallas_poly_comm_of_rust(a[i]))
       }
