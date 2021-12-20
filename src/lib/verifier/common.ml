@@ -40,7 +40,7 @@ let check :
             `Valid (User_command.Signed_command c)
         | None ->
             `Invalid_signature (Signed_command.public_keys c) )
-  | Parties { fee_payer; other_parties; protocol_state; memo } ->
+  | Parties { fee_payer; other_parties; memo } ->
       with_return (fun { return } ->
           let other_parties_hash =
             Parties.Party_or_stack.With_hashes.stack_hash other_parties
@@ -48,7 +48,8 @@ let check :
           let commitment =
             Parties.Transaction_commitment.create ~other_parties_hash
               ~protocol_state_predicate_hash:
-                (Snapp_predicate.Protocol_state.digest protocol_state)
+                (Snapp_predicate.Protocol_state.digest
+                   fee_payer.data.body.protocol_state)
               ~memo_hash:(Signed_command_memo.hash memo)
           in
           let check_signature s pk msg =
@@ -104,7 +105,6 @@ let check :
               { Parties.fee_payer
               ; other_parties =
                   List.map parties_with_hashes_list ~f:(fun ((p, _), _) -> p)
-              ; protocol_state
               ; memo
               }
           in

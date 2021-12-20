@@ -1246,7 +1246,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let apply_body
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(state_view : Snapp_predicate.Protocol_state.View.t) ~check_auth
-      ~has_proof ~is_new ~global_slot_since_genesis
+      ~has_proof ~is_new ~global_slot_since_genesis ~is_start
       ({ body =
            { pk = _
            ; token_id
@@ -1265,8 +1265,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            ; call_data = _ (* This is for the snapp to use, we don't need it. *)
            ; sequence_events
            ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
+           ; protocol_state = _
+           ; use_full_commitment
            }
-       ; predicate = _
+       ; predicate
        } :
         Party.Predicated.t) (a : Account.t) : (Account.t, _) Result.t =
     let open Snapp_basic in
@@ -1436,17 +1438,31 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       update a.permissions.increment_nonce update_nonce a.nonce
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
-    Ok
-      { a with
-        balance
-      ; snapp
-      ; delegate
-      ; permissions
-      ; timing
-      ; nonce
-      ; snapp_uri
-      ; token_symbol
-      }
+    (* enforce that either the predicate is `Accept`,
+         the nonce is incremented,
+         or the full commitment is used to avoid replays. *)
+    let%map () =
+      let predicate_is_accept =
+        Snapp_predicate.Account.is_accept @@ Party.Predicate.to_full predicate
+      in
+      List.exists ~f:Fn.id
+        [ predicate_is_accept
+        ; increment_nonce
+        ; use_full_commitment && not is_start
+        ]
+      |> Result.ok_if_true
+           ~error:Transaction_status.Failure.Update_not_permitted
+    in
+    { a with
+      balance
+    ; snapp
+    ; delegate
+    ; permissions
+    ; timing
+    ; nonce
+    ; snapp_uri
+    ; token_symbol
+    }
 
   module Global_state = struct
     type t =
@@ -1547,6 +1563,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let if_ = Parties.value_if
     end
 
+    module Protocol_state_predicate = struct
+      include Snapp_predicate.Protocol_state
+    end
+
     module Party = Party
 
     module Parties = struct
@@ -1630,6 +1650,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           Parties_logic.Local_state.t
       ; protocol_state_predicate : Snapp_predicate.Protocol_state.t
       ; transaction_commitment : unit
+      ; full_transaction_commitment : unit
       ; field : Snark_params.Tick.Field.t
       ; failure : Transaction_status.Failure.t option >
 
@@ -1638,8 +1659,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       match eff with
       | Get_global_ledger _ ->
           L.create_masked ledger
-      | Transaction_commitment_on_start _ ->
-          ()
+      | Transaction_commitments_on_start _ ->
+          ((), ())
       | Balance a ->
           Balance.to_amount a.balance
       | Get_account (p, l) ->
@@ -1682,6 +1703,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ; party = p
           ; account = a
           ; transaction_commitment = ()
+          ; full_transaction_commitment = ()
           ; inclusion_proof = loc
           } -> (
           if (is_start : bool) then
@@ -1713,7 +1735,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               ~has_proof:(Control.Tag.equal (Control.tag p.authorization) Proof)
               ~is_new:(match loc with `Existing _ -> false | `New -> true)
               ~global_slot_since_genesis:
-                global_state.protocol_state.global_slot_since_genesis p.data a
+                global_state.protocol_state.global_slot_since_genesis ~is_start
+              p.data a
           with
           | Error failure ->
               (a, false, Some failure)
@@ -1760,6 +1783,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       , { parties = []
         ; call_stack = []
         ; transaction_commitment = ()
+        ; full_transaction_commitment = ()
         ; token_id = Token_id.default
         ; excess = Currency.Amount.zero
         ; ledger
@@ -1779,7 +1803,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       in
       M.start ~constraint_constants
         { parties = Inputs.Parties.of_parties_list parties
-        ; protocol_state_predicate = c.protocol_state
         ; memo_hash = Signed_command_memo.hash c.memo
         }
         { perform } initial_state
@@ -2568,6 +2591,8 @@ module For_tests = struct
                   ; sequence_events = []
                   ; call_data = Snark_params.Tick.Field.zero
                   ; call_depth = 0
+                  ; protocol_state = Snapp_predicate.Protocol_state.accept
+                  ; use_full_commitment = ()
                   }
               ; predicate = actual_nonce
               }
@@ -2587,6 +2612,8 @@ module For_tests = struct
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
+                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; use_full_commitment = false
                     }
                 ; predicate = Nonce (Account.Nonce.succ actual_nonce)
                 }
@@ -2603,13 +2630,14 @@ module For_tests = struct
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
+                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; use_full_commitment = false
                     }
                 ; predicate = Accept
                 }
             ; authorization = None_given
             }
           ]
-      ; protocol_state = Snapp_predicate.Protocol_state.accept
       ; memo = Signed_command_memo.empty
       }
     in
