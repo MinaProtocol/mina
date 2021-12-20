@@ -66,6 +66,10 @@ module type Token_id_intf = sig
   val default : t
 end
 
+module type Protocol_state_predicate_intf = sig
+  type t
+end
+
 module Local_state = struct
   open Core_kernel
 
@@ -139,7 +143,11 @@ module type Party_intf = sig
 
   type signed_amount
 
+  type protocol_state_predicate
+
   val balance_change : t -> signed_amount
+
+  val protocol_state : t -> protocol_state_predicate
 end
 
 module type Parties_intf = sig
@@ -308,7 +316,12 @@ module type Inputs_intf = sig
 
   module Token_id : Token_id_intf with type bool := Bool.t
 
-  module Party : Party_intf with type signed_amount := Amount.Signed.t
+  module Protocol_state_predicate : Protocol_state_predicate_intf
+
+  module Party :
+    Party_intf
+      with type signed_amount := Amount.Signed.t
+       and type protocol_state_predicate := Protocol_state_predicate.t
 
   module Parties :
     Parties_intf with type bool := Bool.t and type party := Party.t
@@ -326,11 +339,7 @@ module Start_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('parties, 'protocol_state_pred, 'field) t =
-        { parties : 'parties
-        ; protocol_state_predicate : 'protocol_state_pred
-        ; memo_hash : 'field
-        }
+      type ('parties, 'field) t = { parties : 'parties; memo_hash : 'field }
       [@@deriving sexp, yojson]
     end
   end]
@@ -426,15 +435,6 @@ module Make (Inputs : Inputs_intf) = struct
             ~else_:local_state.ledger
       }
     in
-    let protocol_state_predicate_satisfied =
-      match is_start with
-      | `Yes start_data | `Compute start_data ->
-          h.perform
-            (Check_protocol_state_predicate
-               (start_data.protocol_state_predicate, global_state))
-      | `No ->
-          Bool.true_
-    in
     let (party, remaining, call_stack), at_party, local_state =
       let to_pop, call_stack =
         match is_start with
@@ -456,8 +456,7 @@ module Make (Inputs : Inputs_intf) = struct
             let on_start =
               h.perform
                 (Transaction_commitment_on_start
-                   { protocol_state_predicate =
-                       start_data.protocol_state_predicate
+                   { protocol_state_predicate = Party.protocol_state party
                    ; other_parties = remaining
                    ; memo_hash = start_data.memo_hash
                    })
@@ -482,6 +481,11 @@ module Make (Inputs : Inputs_intf) = struct
     h.perform (Check_inclusion (local_state.ledger, a, inclusion_proof)) ;
     let predicate_satisfied : Bool.t =
       h.perform (Check_predicate (is_start', party, a, global_state))
+    in
+    let protocol_state_predicate_satisfied : Bool.t =
+      h.perform
+        (Check_protocol_state_predicate
+           (Party.protocol_state party, global_state))
     in
     let a', update_permitted, failure_status =
       h.perform

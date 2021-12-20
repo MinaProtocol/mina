@@ -1787,10 +1787,9 @@ let%test_module _ =
         if n < Array.length test_keys then
           let%bind cmd =
             let fee_payer_keypair = test_keys.(n) in
-            let%bind protocol_state = Snapp_predicate.Protocol_state.gen in
             let%map (parties : Parties.t) =
               Mina_base.Snapp_generators.gen_parties_from ~succeed:true ~keymap
-                ~fee_payer_keypair ~ledger ~protocol_state ()
+                ~fee_payer_keypair ~ledger ()
             in
             User_command.Parties parties
           in

@@ -317,96 +317,6 @@ module Snapp_updates = struct
       value
 end
 
-module Snapp_party_body = struct
-  type t =
-    { public_key_id : int
-    ; update_id : int
-    ; token_id : int64
-    ; balance_change : int64
-    ; increment_nonce : bool
-    ; events_ids : int array
-    ; sequence_events_ids : int array
-    ; call_data_id : int
-    ; call_depth : int
-    }
-  [@@deriving fields, hlist]
-
-  let typ =
-    let open Mina_caqti.Type_spec in
-    let spec =
-      Caqti_type.
-        [ int
-        ; int
-        ; int64
-        ; int64
-        ; bool
-        ; Mina_caqti.array_int_typ
-        ; Mina_caqti.array_int_typ
-        ; int
-        ; int
-        ]
-    in
-    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
-    Caqti_type.custom ~encode ~decode (to_rep spec)
-
-  let add_if_doesn't_exist (module Conn : CONNECTION) (body : Party.Body.t) =
-    let open Deferred.Result.Let_syntax in
-    let%bind public_key_id =
-      Public_key.add_if_doesn't_exist (module Conn) body.pk
-    in
-    let%bind update_id =
-      Snapp_updates.add_if_doesn't_exist (module Conn) body.update
-    in
-    let increment_nonce = body.increment_nonce in
-    let%bind events_ids =
-      Mina_caqti.deferred_result_list_map body.events
-        ~f:(Snapp_state_data_array.add_if_doesn't_exist (module Conn))
-      >>| Array.of_list
-    in
-    let%bind sequence_events_ids =
-      Mina_caqti.deferred_result_list_map body.sequence_events
-        ~f:(Snapp_state_data_array.add_if_doesn't_exist (module Conn))
-      >>| Array.of_list
-    in
-    let%bind call_data_id =
-      Snapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
-    in
-    let token_id =
-      Unsigned.UInt64.to_int64 @@ Token_id.to_uint64 body.token_id
-    in
-    let balance_change =
-      let magnitude =
-        Currency.Amount.to_uint64 body.balance_change.magnitude
-        |> Unsigned.UInt64.to_int64
-      in
-      match body.balance_change.sgn with
-      | Sgn.Pos ->
-          magnitude
-      | Sgn.Neg ->
-          Int64.neg magnitude
-    in
-    let call_depth = body.call_depth in
-    let value =
-      { public_key_id
-      ; update_id
-      ; token_id
-      ; balance_change
-      ; increment_nonce
-      ; events_ids
-      ; sequence_events_ids
-      ; call_data_id
-      ; call_depth
-      }
-    in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name:"snapp_party_body" ~cols:(Fields.names, typ)
-      ~tannot:(function
-        | "events_ids" | "sequence_events_ids" -> Some "int[]" | _ -> None)
-      (module Conn)
-      value
-end
-
 module Snapp_balance_bounds = struct
   type t = { balance_lower_bound : int64; balance_upper_bound : int64 }
   [@@deriving fields, hlist]
@@ -961,81 +871,6 @@ module Snapp_epoch_data = struct
       value
 end
 
-module Snapp_party = struct
-  type t =
-    { body_id : int; predicate_id : int; authorization_kind : Control.Tag.t }
-  [@@deriving fields, hlist]
-
-  let authorization_kind_typ =
-    let encode = function
-      | Control.Tag.Proof ->
-          "proof"
-      | Control.Tag.Signature ->
-          "signature"
-      | Control.Tag.None_given ->
-          "none_given"
-    in
-    let decode = function
-      | "proof" ->
-          Result.return Control.Tag.Proof
-      | "signature" ->
-          Result.return Control.Tag.Signature
-      | "none_given" ->
-          Result.return Control.Tag.None_given
-      | _ ->
-          Result.failf "Failed to decode authorization_kind_typ"
-    in
-    Caqti_type.enum "snapp_authorization_kind_type" ~encode ~decode
-
-  let typ =
-    let open Mina_caqti.Type_spec in
-    let spec = Caqti_type.[ int; int; authorization_kind_typ ] in
-    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
-    Caqti_type.custom ~encode ~decode (to_rep spec)
-
-  let add_if_doesn't_exist (module Conn : CONNECTION) (party : Party.t) =
-    let open Deferred.Result.Let_syntax in
-    let%bind body_id =
-      Snapp_party_body.add_if_doesn't_exist (module Conn) party.data.body
-    in
-    let%bind predicate_id =
-      Snapp_predicate.add_if_doesn't_exist (module Conn) party.data.predicate
-    in
-    let authorization_kind = Control.tag party.authorization in
-    let value = { body_id; predicate_id; authorization_kind } in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name:"snapp_party" ~cols:(Fields.names, typ)
-      (module Conn)
-      value
-end
-
-module Snapp_fee_payers = struct
-  type t = { body_id : int; nonce : int64 } [@@deriving fields, hlist]
-
-  let typ =
-    let open Mina_caqti.Type_spec in
-    let spec = Caqti_type.[ int; int64 ] in
-    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
-    Caqti_type.custom ~encode ~decode (to_rep spec)
-
-  let add_if_doesn't_exist (module Conn : CONNECTION)
-      (fp : Party.Predicated.Fee_payer.t) =
-    let open Deferred.Result.Let_syntax in
-    let%bind body_id =
-      Snapp_party_body.add_if_doesn't_exist
-        (module Conn)
-        (Party.Body.of_fee_payer fp.body)
-    in
-    let nonce = fp.predicate |> Unsigned.UInt32.to_int64 in
-    let value = { body_id; nonce } in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name:"snapp_fee_payers" ~cols:(Fields.names, typ)
-      (module Conn)
-      value
-end
-
 module Snapp_predicate_protocol_states = struct
   type t =
     { snarked_ledger_hash_id : int option
@@ -1135,6 +970,179 @@ module Snapp_predicate_protocol_states = struct
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name:"snapp_predicate_protocol_states" ~cols:(Fields.names, typ)
+      (module Conn)
+      value
+end
+
+module Snapp_party_body = struct
+  type t =
+    { public_key_id : int
+    ; update_id : int
+    ; token_id : int64
+    ; balance_change : int64
+    ; increment_nonce : bool
+    ; events_ids : int array
+    ; sequence_events_ids : int array
+    ; call_data_id : int
+    ; call_depth : int
+    ; snapp_predicate_protocol_state_id : int
+    }
+  [@@deriving fields, hlist]
+
+  let typ =
+    let open Mina_caqti.Type_spec in
+    let spec =
+      Caqti_type.
+        [ int
+        ; int
+        ; int64
+        ; int64
+        ; bool
+        ; Mina_caqti.array_int_typ
+        ; Mina_caqti.array_int_typ
+        ; int
+        ; int
+        ; int
+        ]
+    in
+    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+    Caqti_type.custom ~encode ~decode (to_rep spec)
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) (body : Party.Body.t) =
+    let open Deferred.Result.Let_syntax in
+    let%bind public_key_id =
+      Public_key.add_if_doesn't_exist (module Conn) body.pk
+    in
+    let%bind update_id =
+      Snapp_updates.add_if_doesn't_exist (module Conn) body.update
+    in
+    let increment_nonce = body.increment_nonce in
+    let%bind events_ids =
+      Mina_caqti.deferred_result_list_map body.events
+        ~f:(Snapp_state_data_array.add_if_doesn't_exist (module Conn))
+      >>| Array.of_list
+    in
+    let%bind sequence_events_ids =
+      Mina_caqti.deferred_result_list_map body.sequence_events
+        ~f:(Snapp_state_data_array.add_if_doesn't_exist (module Conn))
+      >>| Array.of_list
+    in
+    let%bind call_data_id =
+      Snapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
+    in
+    let%bind snapp_predicate_protocol_state_id =
+      Snapp_predicate_protocol_states.add_if_doesn't_exist
+        (module Conn)
+        body.protocol_state
+    in
+    let token_id =
+      Unsigned.UInt64.to_int64 @@ Token_id.to_uint64 body.token_id
+    in
+    let balance_change =
+      let magnitude =
+        Currency.Amount.to_uint64 body.balance_change.magnitude
+        |> Unsigned.UInt64.to_int64
+      in
+      match body.balance_change.sgn with
+      | Sgn.Pos ->
+          magnitude
+      | Sgn.Neg ->
+          Int64.neg magnitude
+    in
+    let call_depth = body.call_depth in
+    let value =
+      { public_key_id
+      ; update_id
+      ; token_id
+      ; balance_change
+      ; increment_nonce
+      ; events_ids
+      ; sequence_events_ids
+      ; call_data_id
+      ; call_depth
+      ; snapp_predicate_protocol_state_id
+      }
+    in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name:"snapp_party_body" ~cols:(Fields.names, typ)
+      ~tannot:(function
+        | "events_ids" | "sequence_events_ids" -> Some "int[]" | _ -> None)
+      (module Conn)
+      value
+end
+
+module Snapp_party = struct
+  type t =
+    { body_id : int; predicate_id : int; authorization_kind : Control.Tag.t }
+  [@@deriving fields, hlist]
+
+  let authorization_kind_typ =
+    let encode = function
+      | Control.Tag.Proof ->
+          "proof"
+      | Control.Tag.Signature ->
+          "signature"
+      | Control.Tag.None_given ->
+          "none_given"
+    in
+    let decode = function
+      | "proof" ->
+          Result.return Control.Tag.Proof
+      | "signature" ->
+          Result.return Control.Tag.Signature
+      | "none_given" ->
+          Result.return Control.Tag.None_given
+      | _ ->
+          Result.failf "Failed to decode authorization_kind_typ"
+    in
+    Caqti_type.enum "snapp_authorization_kind_type" ~encode ~decode
+
+  let typ =
+    let open Mina_caqti.Type_spec in
+    let spec = Caqti_type.[ int; int; authorization_kind_typ ] in
+    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+    Caqti_type.custom ~encode ~decode (to_rep spec)
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) (party : Party.t) =
+    let open Deferred.Result.Let_syntax in
+    let%bind body_id =
+      Snapp_party_body.add_if_doesn't_exist (module Conn) party.data.body
+    in
+    let%bind predicate_id =
+      Snapp_predicate.add_if_doesn't_exist (module Conn) party.data.predicate
+    in
+    let authorization_kind = Control.tag party.authorization in
+    let value = { body_id; predicate_id; authorization_kind } in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name:"snapp_party" ~cols:(Fields.names, typ)
+      (module Conn)
+      value
+end
+
+module Snapp_fee_payers = struct
+  type t = { body_id : int; nonce : int64 } [@@deriving fields, hlist]
+
+  let typ =
+    let open Mina_caqti.Type_spec in
+    let spec = Caqti_type.[ int; int64 ] in
+    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+    Caqti_type.custom ~encode ~decode (to_rep spec)
+
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (fp : Party.Predicated.Fee_payer.t) =
+    let open Deferred.Result.Let_syntax in
+    let%bind body_id =
+      Snapp_party_body.add_if_doesn't_exist
+        (module Conn)
+        (Party.Body.of_fee_payer fp.body)
+    in
+    let nonce = fp.predicate |> Unsigned.UInt32.to_int64 in
+    let value = { body_id; nonce } in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name:"snapp_fee_payers" ~cols:(Fields.names, typ)
       (module Conn)
       value
 end
@@ -1327,14 +1335,13 @@ module User_command = struct
     type t =
       { snapp_fee_payer_id : int
       ; snapp_other_parties_ids : int array
-      ; snapp_predicate_protocol_state_id : int
       ; hash : string
       }
     [@@deriving fields, hlist]
 
     let typ =
       let open Mina_caqti.Type_spec in
-      let spec = Caqti_type.[ int; Mina_caqti.array_int_typ; int; string ] in
+      let spec = Caqti_type.[ int; Mina_caqti.array_int_typ; string ] in
       let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
       let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
       Caqti_type.custom ~encode ~decode (to_rep spec)
@@ -1357,22 +1364,11 @@ module User_command = struct
           ~f:(Snapp_party.add_if_doesn't_exist (module Conn))
         >>| Array.of_list
       in
-      let%bind snapp_predicate_protocol_state_id =
-        Snapp_predicate_protocol_states.add_if_doesn't_exist
-          (module Conn)
-          ps.protocol_state
-      in
       let hash =
         Transaction_hash.hash_command (Parties ps)
         |> Transaction_hash.to_base58_check
       in
-      let value =
-        { snapp_fee_payer_id
-        ; snapp_other_parties_ids
-        ; snapp_predicate_protocol_state_id
-        ; hash
-        }
-      in
+      let value = { snapp_fee_payer_id; snapp_other_parties_ids; hash } in
       Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
         ~table_name:"snapp_commands" ~cols:(Fields.names, typ)
         ~tannot:(function

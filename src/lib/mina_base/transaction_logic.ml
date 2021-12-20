@@ -1265,6 +1265,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            ; call_data = _ (* This is for the snapp to use, we don't need it. *)
            ; sequence_events
            ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
+           ; protocol_state = _
            }
        ; predicate = _
        } :
@@ -1547,6 +1548,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let if_ = Parties.value_if
     end
 
+    module Protocol_state_predicate = struct
+      include Snapp_predicate.Protocol_state
+    end
+
     module Party = Party
 
     module Parties = struct
@@ -1779,7 +1784,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       in
       M.start ~constraint_constants
         { parties = Inputs.Parties.of_parties_list parties
-        ; protocol_state_predicate = c.protocol_state
         ; memo_hash = Signed_command_memo.hash c.memo
         }
         { perform } initial_state
@@ -2568,6 +2572,7 @@ module For_tests = struct
                   ; sequence_events = []
                   ; call_data = Snark_params.Tick.Field.zero
                   ; call_depth = 0
+                  ; protocol_state = Snapp_predicate.Protocol_state.accept
                   }
               ; predicate = actual_nonce
               }
@@ -2587,6 +2592,7 @@ module For_tests = struct
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
+                    ; protocol_state = Snapp_predicate.Protocol_state.accept
                     }
                 ; predicate = Nonce (Account.Nonce.succ actual_nonce)
                 }
@@ -2603,13 +2609,13 @@ module For_tests = struct
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
+                    ; protocol_state = Snapp_predicate.Protocol_state.accept
                     }
                 ; predicate = Accept
                 }
             ; authorization = None_given
             }
           ]
-      ; protocol_state = Snapp_predicate.Protocol_state.accept
       ; memo = Signed_command_memo.empty
       }
     in
