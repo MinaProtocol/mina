@@ -384,6 +384,7 @@ module Body = struct
           ; call_data : 'call_data
           ; call_depth : 'int
           ; protocol_state : 'protocol_state
+          ; use_full_commitment : 'bool
           }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
@@ -452,6 +453,7 @@ module Body = struct
       ; call_data = Field.zero
       ; call_depth = 0
       ; protocol_state = Snapp_predicate.Protocol_state.accept
+      ; use_full_commitment = ()
       }
   end
 
@@ -463,6 +465,7 @@ module Body = struct
         }
     ; token_id = Token_id.default
     ; increment_nonce = true
+    ; use_full_commitment = true
     }
 
   module Checked = struct
@@ -489,6 +492,7 @@ module Body = struct
          ; call_data
          ; call_depth = _depth (* ignored *)
          ; protocol_state
+         ; use_full_commitment
          } :
           t) =
       List.reduce_exn ~f:Random_oracle_input.append
@@ -501,6 +505,7 @@ module Body = struct
         ; Events.var_to_input sequence_events
         ; Random_oracle_input.field call_data
         ; Snapp_predicate.Protocol_state.Checked.to_input protocol_state
+        ; Random_oracle_input.bitstring [ use_full_commitment ]
         ]
 
     let digest (t : t) =
@@ -521,6 +526,7 @@ module Body = struct
       ; Field.typ
       ; Typ.Internal.ref ()
       ; Snapp_predicate.Protocol_state.typ
+      ; Impl.Boolean.typ
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -536,6 +542,7 @@ module Body = struct
     ; call_data = Field.zero
     ; call_depth = 0
     ; protocol_state = Snapp_predicate.Protocol_state.accept
+    ; use_full_commitment = false
     }
 
   let to_input
@@ -549,6 +556,7 @@ module Body = struct
        ; call_data
        ; call_depth = _ (* ignored *)
        ; protocol_state
+       ; use_full_commitment
        } :
         t) =
     List.reduce_exn ~f:Random_oracle_input.append
@@ -561,6 +569,7 @@ module Body = struct
       ; Events.to_input sequence_events
       ; Random_oracle_input.field call_data
       ; Snapp_predicate.Protocol_state.to_input protocol_state
+      ; Random_oracle_input.bitstring [ use_full_commitment ]
       ]
 
   let digest (t : t) =

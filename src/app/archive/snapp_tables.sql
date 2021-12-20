@@ -208,6 +208,7 @@ CREATE TABLE snapp_party_body
 , call_data_id                          int        NOT NULL REFERENCES snapp_state_data(id)
 , call_depth                            int        NOT NULL
 , snapp_predicate_protocol_state_id     int        NOT NULL REFERENCES snapp_predicate_protocol_states(id)
+, use_full_commitment                   boolean    NOT NULL
 );
 
 CREATE TABLE snapp_party

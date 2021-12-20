@@ -986,6 +986,7 @@ module Snapp_party_body = struct
     ; call_data_id : int
     ; call_depth : int
     ; snapp_predicate_protocol_state_id : int
+    ; use_full_commitment : bool
     }
   [@@deriving fields, hlist]
 
@@ -1003,6 +1004,7 @@ module Snapp_party_body = struct
         ; int
         ; int
         ; int
+        ; bool
         ]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
@@ -1051,6 +1053,7 @@ module Snapp_party_body = struct
           Int64.neg magnitude
     in
     let call_depth = body.call_depth in
+    let use_full_commitment = body.use_full_commitment in
     let value =
       { public_key_id
       ; update_id
@@ -1062,6 +1065,7 @@ module Snapp_party_body = struct
       ; call_data_id
       ; call_depth
       ; snapp_predicate_protocol_state_id
+      ; use_full_commitment
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
