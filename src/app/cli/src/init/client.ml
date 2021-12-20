@@ -1172,6 +1172,33 @@ let pooled_user_commands =
          in
          print_string (Yojson.Safe.to_string json_response)))
 
+let pooled_snapp_commands =
+  let public_key_flag =
+    Command.Param.(
+      anon @@ maybe @@ ("public-key" %: Cli_lib.Arg_type.public_key_compressed))
+  in
+  Command.async
+    ~summary:"Retrieve all the Snapp commands that are pending inclusion"
+    (Cli_lib.Background_daemon.graphql_init public_key_flag
+       ~f:(fun graphql_endpoint maybe_public_key ->
+         let public_key =
+           Yojson.Safe.to_basic
+           @@ [%to_yojson: Public_key.Compressed.t option] maybe_public_key
+         in
+         let graphql =
+           Graphql_queries.Pooled_snapp_commands.make ~public_key ()
+         in
+         let%map response = Graphql_client.query_exn graphql graphql_endpoint in
+         let json_response : Yojson.Safe.t =
+           `List
+             ( List.map
+                 ~f:
+                   (Fn.compose Graphql_client.Snapp_command.to_yojson
+                      Graphql_client.Snapp_command.of_obj)
+             @@ Array.to_list response#pooledSnappCommands )
+         in
+         print_string (Yojson.Safe.to_string json_response)))
+
 let to_signed_fee_exn sign magnitude =
   let sgn = match sign with `PLUS -> Sgn.Pos | `MINUS -> Neg in
   let magnitude = Currency.Fee.of_uint64 magnitude in
@@ -2432,6 +2459,7 @@ let advanced =
     ; ("stop-tracing", stop_tracing)
     ; ("snark-job-list", snark_job_list)
     ; ("pooled-user-commands", pooled_user_commands)
+    ; ("pooled-snapp-commands", pooled_snapp_commands)
     ; ("snark-pool-list", snark_pool_list)
     ; ("pending-snark-work", pending_snark_work)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)

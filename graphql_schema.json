@@ -2247,7 +2247,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "Delta",
+          "name": "BalanceChange",
           "description": "A signed amount",
           "fields": [
             {
@@ -2315,7 +2315,7 @@
           "description": "Body component of a Snapp Party",
           "fields": [
             {
-              "name": "depth",
+              "name": "callDepth",
               "description":
                 "The number of nested snapp calls in the transaction before reaching this party.",
               "args": [],
@@ -2427,7 +2427,7 @@
               "deprecationReason": null
             },
             {
-              "name": "delta",
+              "name": "balance_change",
               "description":
                 "Signed amount representing the amount to change for this particular relevant party.",
               "args": [],
@@ -2436,7 +2436,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "Delta",
+                  "name": "BalanceChange",
                   "ofType": null
                 }
               },
@@ -2494,7 +2494,7 @@
           ],
           "inputFields": [
             {
-              "name": "depth",
+              "name": "callDepth",
               "description":
                 "The number of nested snapp calls in the transaction before reaching this party.",
               "type": {
@@ -2596,7 +2596,7 @@
               "defaultValue": null
             },
             {
-              "name": "delta",
+              "name": "balance_change",
               "description":
                 "Signed amount representing the amount to change for this particular relevant party.",
               "type": {
@@ -2604,7 +2604,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "Delta",
+                  "name": "BalanceChange",
                   "ofType": null
                 }
               },
@@ -3656,7 +3656,7 @@
           "description": "Body component of a Snapp Fee Payer Party",
           "fields": [
             {
-              "name": "depth",
+              "name": "callDepth",
               "description": "An integer in string format",
               "args": [],
               "type": {
@@ -3798,7 +3798,7 @@
           ],
           "inputFields": [
             {
-              "name": "depth",
+              "name": "callDepth",
               "description": "An integer in string format",
               "type": {
                 "kind": "NON_NULL",
@@ -8048,7 +8048,15 @@
               "description":
                 "Transaction fee paid by the fee-payer for the Snapp transaction",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt64",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -11289,7 +11297,7 @@
           "description": null,
           "fields": [
             {
-              "name": "initialMininumBalance",
+              "name": "initialMinimumBalance",
               "description":
                 "The initial minimum balance for a time-locked account",
               "args": [],
@@ -11613,7 +11621,8 @@
             },
             {
               "name": "snappState",
-              "description": "The 8 field elements comprising the snapp state associated with this account encoded as bignum strings",
+              "description":
+                "The 8 field elements comprising the snapp state associated with this account encoded as bignum strings",
               "args": [],
               "type": {
                 "kind": "LIST",
