@@ -438,7 +438,7 @@ module Types = struct
 
   let account_timing : (Mina_lib.t, Account_timing.t option) typ =
     obj "AccountTiming" ~fields:(fun _ ->
-        [ field "initialMininumBalance" ~typ:uint64
+        [ field "initialMinimumBalance" ~typ:uint64
             ~doc:"The initial minimum balance for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -1630,15 +1630,11 @@ module Types = struct
                 in
                 List.map account_ids ~f:(fun acct_id ->
                     AccountObj.get_best_ledger_account coda acct_id))
-          ; field_no_status "fee" ~typ:uint64 ~args:[]
+          ; field_no_status "fee" ~typ:(non_null uint64) ~args:[]
               ~doc:
                 "Transaction fee paid by the fee-payer for the Snapp \
                  transaction" ~resolve:(fun _ parties ->
-                try
-                  Some
-                    ( Parties.fee parties.With_hash.data
-                    |> Currency.Fee.to_uint64 )
-                with _ -> None)
+                Parties.fee parties.With_hash.data |> Currency.Fee.to_uint64)
           ; field_no_status "feeToken" ~typ:(non_null token_id) ~args:[]
               ~doc:"Token used to pay the fee" ~resolve:(fun _ parties ->
                 Parties.fee_token parties.With_hash.data)
