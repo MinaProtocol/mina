@@ -183,14 +183,6 @@ module Transaction_applied : sig
   val user_command_status : t -> Transaction_status.t
 end
 
-module Global_state : sig
-  type nonrec t =
-    { ledger : t
-    ; fee_excess : Currency.Amount.Signed.t
-    ; protocol_state : Snapp_predicate.Protocol_state.View.t
-    }
-end
-
 (** Raises if the ledger is full, or if an account already exists for the given
     [Account_id.t].
 *)
@@ -240,27 +232,6 @@ val apply_parties_unchecked :
          Parties_logic.Local_state.t
        * Currency.Amount.Signed.t ) )
      Or_error.t
-
-val apply_parties_unchecked_aux :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> state_view:Snapp_predicate.Protocol_state.View.t
-  -> init:'acc
-  -> f:
-       (   'acc
-        -> Global_state.t
-           * ( (Party.t, unit) Parties.Party_or_stack.t list
-             , Token_id.t
-             , Currency.Amount.t
-             , t
-             , bool
-             , unit
-             , Transaction_status.Failure.t option )
-             Parties_logic.Local_state.t
-        -> 'acc)
-  -> ?fee_excess:Currency.Amount.Signed.t
-  -> t
-  -> Parties.t
-  -> (Transaction_applied.Parties_applied.t * 'acc) Or_error.t
 
 val undo :
      constraint_constants:Genesis_constants.Constraint_constants.t

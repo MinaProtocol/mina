@@ -371,17 +371,20 @@ module Body = struct
              , 'events
              , 'call_data
              , 'int
-             , 'bool )
+             , 'bool
+             , 'protocol_state )
              t =
           { pk : 'pk
           ; update : 'update
           ; token_id : 'token_id
-          ; delta : 'amount
+          ; balance_change : 'amount
           ; increment_nonce : 'bool
           ; events : 'events
           ; sequence_events : 'events
           ; call_data : 'call_data
-          ; depth : 'int
+          ; call_depth : 'int
+          ; protocol_state : 'protocol_state
+          ; use_full_commitment : 'bool
           }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
@@ -402,7 +405,8 @@ module Body = struct
         , Pickles.Backend.Tick.Field.Stable.V1.t array list
         , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
         , int
-        , bool )
+        , bool
+        , Snapp_predicate.Protocol_state.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -429,7 +433,8 @@ module Body = struct
           , Pickles.Backend.Tick.Field.Stable.V1.t array list
           , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
           , int
-          , unit )
+          , unit
+          , Snapp_predicate.Protocol_state.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -441,20 +446,26 @@ module Body = struct
       { pk = Public_key.Compressed.empty
       ; update = Update.dummy
       ; token_id = ()
-      ; delta = Fee.zero
+      ; balance_change = Fee.zero
       ; increment_nonce = ()
       ; events = []
       ; sequence_events = []
       ; call_data = Field.zero
-      ; depth = 0
+      ; call_depth = 0
+      ; protocol_state = Snapp_predicate.Protocol_state.accept
+      ; use_full_commitment = ()
       }
   end
 
   let of_fee_payer (t : Fee_payer.t) : t =
     { t with
-      delta = { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.delta }
+      balance_change =
+        { Signed_poly.sgn = Sgn.Neg
+        ; magnitude = Amount.of_fee t.balance_change
+        }
     ; token_id = Token_id.default
     ; increment_nonce = true
+    ; use_full_commitment = true
     }
 
   module Checked = struct
@@ -466,30 +477,35 @@ module Body = struct
       , Events.var
       , Field.Var.t
       , int As_prover.Ref.t
-      , Boolean.var )
+      , Boolean.var
+      , Snapp_predicate.Protocol_state.Checked.t )
       Poly.t
 
     let to_input
         ({ pk
          ; update
          ; token_id
-         ; delta
+         ; balance_change
          ; increment_nonce
          ; events
          ; sequence_events
          ; call_data
-         ; depth = _depth (* ignored *)
+         ; call_depth = _depth (* ignored *)
+         ; protocol_state
+         ; use_full_commitment
          } :
           t) =
       List.reduce_exn ~f:Random_oracle_input.append
         [ Public_key.Compressed.Checked.to_input pk
         ; Update.Checked.to_input update
         ; Impl.run_checked (Token_id.Checked.to_input token_id)
-        ; Amount.Signed.Checked.to_input delta
+        ; Amount.Signed.Checked.to_input balance_change
         ; Random_oracle_input.bitstring [ increment_nonce ]
         ; Events.var_to_input events
         ; Events.var_to_input sequence_events
         ; Random_oracle_input.field call_data
+        ; Snapp_predicate.Protocol_state.Checked.to_input protocol_state
+        ; Random_oracle_input.bitstring [ use_full_commitment ]
         ]
 
     let digest (t : t) =
@@ -509,6 +525,8 @@ module Body = struct
       ; Events.typ
       ; Field.typ
       ; Typ.Internal.ref ()
+      ; Snapp_predicate.Protocol_state.typ
+      ; Impl.Boolean.typ
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -517,35 +535,41 @@ module Body = struct
     { pk = Public_key.Compressed.empty
     ; update = Update.dummy
     ; token_id = Token_id.default
-    ; delta = Amount.Signed.zero
+    ; balance_change = Amount.Signed.zero
     ; increment_nonce = false
     ; events = []
     ; sequence_events = []
     ; call_data = Field.zero
-    ; depth = 0
+    ; call_depth = 0
+    ; protocol_state = Snapp_predicate.Protocol_state.accept
+    ; use_full_commitment = false
     }
 
   let to_input
       ({ pk
        ; update
        ; token_id
-       ; delta
+       ; balance_change
        ; increment_nonce
        ; events
        ; sequence_events
        ; call_data
-       ; depth = _ (* ignored *)
+       ; call_depth = _ (* ignored *)
+       ; protocol_state
+       ; use_full_commitment
        } :
         t) =
     List.reduce_exn ~f:Random_oracle_input.append
       [ Public_key.Compressed.to_input pk
       ; Update.to_input update
       ; Token_id.to_input token_id
-      ; Amount.Signed.to_input delta
+      ; Amount.Signed.to_input balance_change
       ; Random_oracle_input.bitstring [ increment_nonce ]
       ; Events.to_input events
       ; Events.to_input sequence_events
       ; Random_oracle_input.field call_data
+      ; Snapp_predicate.Protocol_state.to_input protocol_state
+      ; Random_oracle_input.bitstring [ use_full_commitment ]
       ]
 
   let digest (t : t) =
@@ -867,4 +891,7 @@ let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
     When this is positive, the amount will be deposited into the account from
     the funds made available by previous parties in the same transaction.
 *)
-let delta (t : t) : Amount.Signed.t = t.data.body.delta
+let balance_change (t : t) : Amount.Signed.t = t.data.body.balance_change
+
+let protocol_state (t : t) : Snapp_predicate.Protocol_state.t =
+  t.data.body.protocol_state

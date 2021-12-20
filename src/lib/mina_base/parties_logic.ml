@@ -49,6 +49,8 @@ module type Amount_intf = sig
 
   val zero : t
 
+  val equal : t -> t -> bool
+
   val add_flagged : t -> t -> t * [ `Overflow of bool ]
 
   val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
@@ -62,6 +64,10 @@ module type Token_id_intf = sig
   val invalid : t
 
   val default : t
+end
+
+module type Protocol_state_predicate_intf = sig
+  type t
 end
 
 module Local_state = struct
@@ -81,6 +87,7 @@ module Local_state = struct
         { parties : 'parties
         ; call_stack : 'parties
         ; transaction_commitment : 'comm
+        ; full_transaction_commitment : 'comm
         ; token_id : 'token_id
         ; excess : 'excess
         ; ledger : 'ledger
@@ -93,7 +100,16 @@ module Local_state = struct
 
   let typ parties token_id excess ledger bool comm failure_status =
     Pickles.Impls.Step.Typ.of_hlistable
-      [ parties; parties; comm; token_id; excess; ledger; bool; failure_status ]
+      [ parties
+      ; parties
+      ; comm
+      ; comm
+      ; token_id
+      ; excess
+      ; ledger
+      ; bool
+      ; failure_status
+      ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
@@ -137,7 +153,11 @@ module type Party_intf = sig
 
   type signed_amount
 
-  val delta : t -> signed_amount
+  type protocol_state_predicate
+
+  val balance_change : t -> signed_amount
+
+  val protocol_state : t -> protocol_state_predicate
 end
 
 module type Parties_intf = sig
@@ -225,6 +245,9 @@ module Eff = struct
              ; account : 'account
              ; .. > )
            t
+    | Check_fee_excess :
+        'bool * 'failure
+        -> ('failure, < bool : 'bool ; failure : 'failure ; .. >) t
     | Get_global_ledger :
         'global_state
         -> ('ledger, < global_state : 'global_state ; ledger : 'ledger ; .. >) t
@@ -254,6 +277,7 @@ module Eff = struct
         ; party : 'party
         ; account : 'account
         ; transaction_commitment : 'transaction_commitment
+        ; full_transaction_commitment : 'transaction_commitment
         ; at_party : 'parties
         ; global_state : 'global_state
         ; inclusion_proof : 'ip
@@ -264,6 +288,7 @@ module Eff = struct
              ; party : 'party
              ; parties : 'parties
              ; transaction_commitment : 'transaction_commitment
+             ; full_transaction_commitment : 'transaction_commitment
              ; account : 'account
              ; global_state : 'global_state
              ; failure : 'failure
@@ -272,17 +297,19 @@ module Eff = struct
     | Balance :
         'account
         -> ('amount, < account : 'account ; amount : 'amount ; .. >) t
-    | Transaction_commitment_on_start :
+    | Transaction_commitments_on_start :
         { protocol_state_predicate : 'protocol_state_pred
+        ; party : 'party
         ; other_parties : 'parties
         ; memo_hash : 'field
         }
-        -> ( 'transaction_commitment
+        -> ( 'transaction_commitment * 'transaction_commitment
            , < party : 'party
              ; parties : 'parties
              ; bool : 'bool
              ; protocol_state_predicate : 'protocol_state_pred
              ; transaction_commitment : 'transaction_commitment
+             ; full_transaction_commitment : 'transaction_commitment
              ; field : 'field
              ; .. > )
            t
@@ -303,7 +330,12 @@ module type Inputs_intf = sig
 
   module Token_id : Token_id_intf with type bool := Bool.t
 
-  module Party : Party_intf with type signed_amount := Amount.Signed.t
+  module Protocol_state_predicate : Protocol_state_predicate_intf
+
+  module Party :
+    Party_intf
+      with type signed_amount := Amount.Signed.t
+       and type protocol_state_predicate := Protocol_state_predicate.t
 
   module Parties :
     Parties_intf with type bool := Bool.t and type party := Party.t
@@ -321,11 +353,7 @@ module Start_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('parties, 'protocol_state_pred, 'field) t =
-        { parties : 'parties
-        ; protocol_state_predicate : 'protocol_state_pred
-        ; memo_hash : 'field
-        }
+      type ('parties, 'field) t = { parties : 'parties; memo_hash : 'field }
       [@@deriving sexp, yojson]
     end
   end]
@@ -387,6 +415,7 @@ module Make (Inputs : Inputs_intf) = struct
       (h :
         (< global_state : global_state
          ; transaction_commitment : Transaction_commitment.t
+         ; full_transaction_commitment : Transaction_commitment.t
          ; amount : Amount.t
          ; bool : Bool.t
          ; failure : failure_status
@@ -421,15 +450,6 @@ module Make (Inputs : Inputs_intf) = struct
             ~else_:local_state.ledger
       }
     in
-    let protocol_state_predicate_satisfied =
-      match is_start with
-      | `Yes start_data | `Compute start_data ->
-          h.perform
-            (Check_protocol_state_predicate
-               (start_data.protocol_state_predicate, global_state))
-      | `No ->
-          Bool.true_
-    in
     let (party, remaining, call_stack), at_party, local_state =
       let to_pop, call_stack =
         match is_start with
@@ -443,26 +463,36 @@ module Make (Inputs : Inputs_intf) = struct
             (local_state.parties, local_state.call_stack)
       in
       let party, remaining, call_stack = get_next_party to_pop call_stack in
-      let transaction_commitment =
+      let transaction_commitment, full_transaction_commitment =
         match is_start with
         | `No ->
-            local_state.transaction_commitment
+            ( local_state.transaction_commitment
+            , local_state.full_transaction_commitment )
         | `Yes start_data | `Compute start_data ->
-            let on_start =
+            let tx_commitment_on_start, full_tx_commitment_on_start =
               h.perform
-                (Transaction_commitment_on_start
-                   { protocol_state_predicate =
-                       start_data.protocol_state_predicate
+                (Transaction_commitments_on_start
+                   { protocol_state_predicate = Party.protocol_state party
                    ; other_parties = remaining
                    ; memo_hash = start_data.memo_hash
+                   ; party
                    })
             in
-            Transaction_commitment.if_ is_start' ~then_:on_start
-              ~else_:local_state.transaction_commitment
+            let tx_commitment =
+              Transaction_commitment.if_ is_start' ~then_:tx_commitment_on_start
+                ~else_:local_state.transaction_commitment
+            in
+            let full_tx_commitment =
+              Transaction_commitment.if_ is_start'
+                ~then_:full_tx_commitment_on_start
+                ~else_:local_state.full_transaction_commitment
+            in
+            (tx_commitment, full_tx_commitment)
       in
       let local_state =
         { local_state with
           transaction_commitment
+        ; full_transaction_commitment
         ; token_id =
             Token_id.if_ is_start' ~then_:Token_id.default
               ~else_:local_state.token_id
@@ -478,6 +508,11 @@ module Make (Inputs : Inputs_intf) = struct
     let predicate_satisfied : Bool.t =
       h.perform (Check_predicate (is_start', party, a, global_state))
     in
+    let protocol_state_predicate_satisfied : Bool.t =
+      h.perform
+        (Check_protocol_state_predicate
+           (Party.protocol_state party, global_state))
+    in
     let a', update_permitted, failure_status =
       h.perform
         (Check_auth_and_update_account
@@ -487,6 +522,8 @@ module Make (Inputs : Inputs_intf) = struct
            ; party
            ; account = a
            ; transaction_commitment = local_state.transaction_commitment
+           ; full_transaction_commitment =
+               local_state.full_transaction_commitment
            ; inclusion_proof
            })
     in
@@ -511,7 +548,7 @@ module Make (Inputs : Inputs_intf) = struct
          will never be promoted to the global excess, so this amount is
          irrelevant.
       *)
-      Amount.Signed.negate (Party.delta party)
+      Amount.Signed.negate (Party.balance_change party)
     in
     let party_token = h.perform (Party_token_id party) in
     Bool.(assert_ (not (Token_id.(equal invalid) party_token))) ;
@@ -557,17 +594,30 @@ module Make (Inputs : Inputs_intf) = struct
           Transaction_commitment.if_ is_last_party
             ~then_:Transaction_commitment.empty
             ~else_:local_state.transaction_commitment
+      ; full_transaction_commitment =
+          Transaction_commitment.if_ is_last_party
+            ~then_:Transaction_commitment.empty
+            ~else_:local_state.full_transaction_commitment
       }
     in
     let update_local_excess = Bool.(is_start' ||| is_last_party) in
     let update_global_state =
       ref Bool.(update_local_excess &&& local_state.success)
     in
-    (*let delta_settled = Amount.equal
-                         local_state.excess
-                         Amount.zero
-      in
-      Bool.(assert_ ((not is_last_party) ||| delta_settled)) ;*)
+    let valid_fee_excess =
+      let delta_settled = Amount.equal local_state.excess Amount.zero in
+      Bool.((not is_last_party) ||| delta_settled)
+    in
+    let failure_status =
+      h.perform
+        (Check_fee_excess (valid_fee_excess, local_state.failure_status))
+    in
+    let local_state =
+      { local_state with
+        success = Bool.(local_state.success &&& valid_fee_excess)
+      ; failure_status
+      }
+    in
     let global_excess_update_failed = ref Bool.true_ in
     let global_state, local_state =
       ( h.perform
@@ -609,6 +659,7 @@ module Make (Inputs : Inputs_intf) = struct
          The following fields are already reset
          - parties
          - transaction_commitment
+         - full_transaction_commitment
          - excess
          so we need to reset
          - token_id = Token_id.default

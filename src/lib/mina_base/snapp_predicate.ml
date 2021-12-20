@@ -502,6 +502,8 @@ module Account = struct
     ; proved_state = Ignore
     }
 
+  let is_accept : t -> bool = equal accept
+
   let to_input
       ({ balance
        ; nonce

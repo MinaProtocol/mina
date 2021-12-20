@@ -76,10 +76,8 @@ let%test_module "Archive node unit tests" =
       Ledger.get_or_create_account ledger fee_payer_account_id account
       |> Or_error.ok_exn
       |> fun _ ->
-      let protocol_state = Snapp_predicate.Protocol_state.accept in
       let%map (parties : Parties.t) =
-        Snapp_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger
-          ~protocol_state ()
+        Snapp_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger ()
       in
       User_command.Parties parties
 
@@ -240,7 +238,7 @@ let%test_module "Archive node unit tests" =
           Strict_pipe.Writer.close writer ;
           let%bind () = processor_deferred_computation in
           match%map
-            Processor.deferred_result_list_fold breadcrumbs ~init:()
+            Mina_caqti.deferred_result_list_fold breadcrumbs ~init:()
               ~f:(fun () breadcrumb ->
                 Caqti_async.Pool.use
                   (fun conn ->

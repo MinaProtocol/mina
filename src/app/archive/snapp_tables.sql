@@ -92,20 +92,6 @@ CREATE TABLE snapp_updates
 , timing_id                int              REFERENCES snapp_timing_info(id)
 );
 
-/* events_ids and sequence_events_ids indicate a list of ids in
-   snapp_state_data_array. */
-CREATE TABLE snapp_party_body
-( id                       serial           PRIMARY KEY
-, public_key_id            int              NOT NULL REFERENCES public_keys(id)
-, update_id                int              NOT NULL REFERENCES snapp_updates(id)
-, token_id                 bigint           NOT NULL
-, delta                    bigint           NOT NULL
-, events_ids               int[]            NOT NULL
-, sequence_events_ids      int[]            NOT NULL
-, call_data_id             int              NOT NULL REFERENCES snapp_state_data(id)
-, depth                    int              NOT NULL
-);
-
 CREATE TABLE snapp_balance_bounds
 ( id                       serial           PRIMARY KEY
 , balance_lower_bound      bigint           NOT NULL
@@ -190,6 +176,39 @@ CREATE TABLE snapp_epoch_data
 , start_checkpoint         text
 , lock_checkpoint          text
 , epoch_length_id          int             REFERENCES snapp_length_bounds(id)
+);
+
+/* NULL convention */
+CREATE TABLE snapp_predicate_protocol_states
+( id                               serial                         NOT NULL PRIMARY KEY
+, snarked_ledger_hash_id           int                            REFERENCES snarked_ledger_hashes(id)
+, snarked_next_available_token_id  int                            REFERENCES snapp_token_id_bounds(id)
+, timestamp_id                     int                            REFERENCES snapp_timestamp_bounds(id)
+, blockchain_length_id             int                            REFERENCES snapp_length_bounds(id)
+, min_window_density_id            int                            REFERENCES snapp_length_bounds(id)
+/* omitting 'last_vrf_output' for now, it's the unit value in OCaml */
+, total_currency_id                int                            REFERENCES snapp_amount_bounds(id)
+, curr_global_slot_since_hard_fork int                            REFERENCES snapp_global_slot_bounds(id)
+, global_slot_since_genesis        int                            REFERENCES snapp_global_slot_bounds(id)
+, staking_epoch_data_id            int                            REFERENCES snapp_epoch_data(id)
+, next_epoch_data                  int                            REFERENCES snapp_epoch_data(id)
+);
+
+/* events_ids and sequence_events_ids indicate a list of ids in
+   snapp_state_data_array. */
+CREATE TABLE snapp_party_body
+( id                                    serial     PRIMARY KEY
+, public_key_id                         int        NOT NULL REFERENCES public_keys(id)
+, update_id                             int        NOT NULL REFERENCES snapp_updates(id)
+, token_id                              bigint     NOT NULL
+, balance_change                        bigint     NOT NULL
+, increment_nonce                       boolean    NOT NULL
+, events_ids                            int[]      NOT NULL
+, sequence_events_ids                   int[]      NOT NULL
+, call_data_id                          int        NOT NULL REFERENCES snapp_state_data(id)
+, call_depth                            int        NOT NULL
+, snapp_predicate_protocol_state_id     int        NOT NULL REFERENCES snapp_predicate_protocol_states(id)
+, use_full_commitment                   boolean    NOT NULL
 );
 
 CREATE TABLE snapp_party

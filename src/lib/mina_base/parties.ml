@@ -213,7 +213,7 @@ module Party_or_stack = struct
 
     let of_parties_list xs : _ t =
       of_parties_list
-        ~party_depth:(fun ((p : Party.t), _) -> p.data.body.depth)
+        ~party_depth:(fun ((p : Party.t), _) -> p.data.body.call_depth)
         xs
       |> accumulate_hashes
 
@@ -238,7 +238,6 @@ module Stable = struct
     type t =
       { fee_payer : Party.Fee_payer.Stable.V1.t
       ; other_parties : Party.Stable.V1.t list
-      ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
       ; memo : Signed_command_memo.Stable.V1.t
       }
     [@@deriving sexp, compare, equal, hash, yojson]
@@ -264,17 +263,17 @@ end
 
 let check_depths (t : t) =
   try
-    assert (t.fee_payer.data.body.depth = 0) ;
+    assert (t.fee_payer.data.body.call_depth = 0) ;
     let (_ : int) =
       List.fold ~init:0 t.other_parties ~f:(fun depth party ->
-          let new_depth = party.data.body.depth in
+          let new_depth = party.data.body.call_depth in
           if new_depth >= 0 && new_depth <= depth + 1 then new_depth
           else assert false)
     in
     true
   with _ -> false
 
-let check (t : t) = check_depths t
+let check (t : t) : bool = check_depths t
 
 let parties (t : t) : Party.t list =
   let p = t.fee_payer in
@@ -284,7 +283,7 @@ let parties (t : t) : Party.t list =
   }
   :: t.other_parties
 
-let fee (t : t) : Currency.Fee.t = t.fee_payer.data.body.delta
+let fee (t : t) : Currency.Fee.t = t.fee_payer.data.body.balance_change
 
 let fee_payer_party ({ fee_payer; _ } : t) = fee_payer
 
@@ -293,6 +292,9 @@ let fee_payer (t : t) = Party.Fee_payer.account_id (fee_payer_party t)
 let nonce (t : t) : Account.Nonce.t = (fee_payer_party t).data.predicate
 
 let fee_token (_t : t) = Token_id.default
+
+let fee_excess (t : t) =
+  Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
 let accounts_accessed (t : t) =
   List.map (parties t) ~f:(fun p ->
@@ -382,7 +384,6 @@ module Verifiable = struct
         ; other_parties :
             Pickles.Side_loaded.Verification_key.Stable.V1.t option
             Party_or_stack.With_hashes.Stable.V1.t
-        ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
         ; memo : Signed_command_memo.Stable.V1.t
         }
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -396,17 +397,8 @@ let of_verifiable (t : Verifiable.t) : t =
   { fee_payer = t.fee_payer
   ; other_parties =
       List.map ~f:fst (Party_or_stack.to_parties_list t.other_parties)
-  ; protocol_state = t.protocol_state
   ; memo = t.memo
   }
-
-let valid_interval (t : t) =
-  let open Snapp_predicate.Closed_interval in
-  match t.protocol_state.global_slot_since_genesis with
-  | Ignore ->
-      Mina_numbers.Global_slot.{ lower = zero; upper = max_value }
-  | Check i ->
-      i
 
 module Transaction_commitment = struct
   module Stable = Zexe_backend.Pasta.Fp.Stable [@deriving sexp]
@@ -443,7 +435,8 @@ let commitment (t : t) : Transaction_commitment.t =
     ~other_parties_hash:
       (Party_or_stack.With_hashes.other_parties_hash t.other_parties)
     ~protocol_state_predicate_hash:
-      (Snapp_predicate.Protocol_state.digest t.protocol_state)
+      (Snapp_predicate.Protocol_state.digest
+         t.fee_payer.data.body.protocol_state)
     ~memo_hash:(Signed_command_memo.hash t.memo)
 
 (** This module defines weights for each component of a `Parties.t` element. *)
@@ -454,18 +447,15 @@ module Weight = struct
 
   let other_parties : Party.t list -> int = List.sum (module Int) ~f:party
 
-  let protocol_state : Snapp_predicate.Protocol_state.t -> int = fun _ -> 0
-
   let memo : Signed_command_memo.t -> int = fun _ -> 0
 end
 
 let weight (parties : t) : int =
-  let { fee_payer; other_parties; protocol_state; memo } = parties in
+  let { fee_payer; other_parties; memo } = parties in
   List.sum
     (module Int)
     ~f:Fn.id
     [ Weight.fee_payer fee_payer
     ; Weight.other_parties other_parties
-    ; Weight.protocol_state protocol_state
     ; Weight.memo memo
     ]

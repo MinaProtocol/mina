@@ -49,17 +49,21 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
             let open Snapp_basic in
             let%bind (predicate_account : Snapp_predicate.Account.t) =
               let%bind balance =
-                let%bind delta_int = Int.gen_uniform_incl 1 10_000_000 in
-                let delta = Currency.Amount.of_int delta_int in
+                let%bind balance_change_int =
+                  Int.gen_uniform_incl 1 10_000_000
+                in
+                let balance_change =
+                  Currency.Amount.of_int balance_change_int
+                in
                 let lower =
-                  match Currency.Balance.sub_amount balance delta with
+                  match Currency.Balance.sub_amount balance balance_change with
                   | None ->
                       Currency.Balance.zero
                   | Some bal ->
                       bal
                 in
                 let upper =
-                  match Currency.Balance.add_amount balance delta with
+                  match Currency.Balance.add_amount balance balance_change with
                   | None ->
                       Currency.Balance.max_int
                   | Some bal ->
@@ -69,10 +73,10 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                   (return { Snapp_predicate.Closed_interval.lower; upper })
               in
               let%bind nonce =
-                let%bind delta_int = Int.gen_uniform_incl 1 100 in
-                let delta = Account.Nonce.of_int delta_int in
+                let%bind balance_change_int = Int.gen_uniform_incl 1 100 in
+                let balance_change = Account.Nonce.of_int balance_change_int in
                 let lower =
-                  match Account.Nonce.sub nonce delta with
+                  match Account.Nonce.sub nonce balance_change with
                   | None ->
                       Account.Nonce.zero
                   | Some nonce ->
@@ -80,7 +84,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                 in
                 let upper =
                   (* Nonce.add doesn't check for overflow, so check here *)
-                  match Account.Nonce.(sub max_value) delta with
+                  match Account.Nonce.(sub max_value) balance_change with
                   | None ->
                       (* unreachable *)
                       failwith
@@ -89,7 +93,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                   | Some n ->
                       if Account.Nonce.( < ) n nonce then
                         Account.Nonce.max_value
-                      else Account.Nonce.add nonce delta
+                      else Account.Nonce.add nonce balance_change
                 in
                 Or_ignore.gen
                   (return { Snapp_predicate.Closed_interval.lower; upper })
@@ -242,7 +246,7 @@ let gen_fee (account : Account.t) =
 
 let fee_to_amt fee = Currency.Amount.(Signed.of_unsigned (of_fee fee))
 
-let gen_delta ?balances_tbl (account : Account.t) =
+let gen_balance_change ?balances_tbl (account : Account.t) =
   let pk = account.public_key in
   let open Quickcheck.Let_syntax in
   match%bind Quickcheck.Generator.of_list [ Sgn.Pos; Neg ] with
@@ -277,14 +281,21 @@ let gen_delta ?balances_tbl (account : Account.t) =
       in
       Currency.Signed_poly.{ magnitude; sgn = Sgn.Neg }
 
-(* the type a is associated with the delta field, which is an unsigned fee for the fee payer,
-   and a signed amount for other parties
+let gen_use_full_commitment : bool Base_quickcheck.Generator.t =
+  Bool.quickcheck_generator
+
+(* The type `a` is associated with the `delta` field, which is an unsigned fee
+   for the fee payer, and a signed amount for other parties.
+   The type `b` is associated with the `use_full_commitment` field, which is
+   `unit` for the fee payer, and `bool` for other parties.
 *)
 let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
     ?(snapp_account = false) ?(is_fee_payer = false) ?available_public_keys
-    ~(gen_delta : Account.t -> a Quickcheck.Generator.t)
-    ~(f_delta : a -> Currency.Amount.Signed.t) ~(increment_nonce : b) ~ledger ()
-    : (_, _, _, a, _, _, _, b) Party.Body.Poly.t Quickcheck.Generator.t =
+    ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
+    ~(gen_use_full_commitment : b Quickcheck.Generator.t)
+    ~(f_balance_change : a -> Currency.Amount.Signed.t) ~(increment_nonce : b)
+    ~ledger () :
+    (_, _, _, a, _, _, _, b, _) Party.Body.Poly.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   (* ledger may contain non-Snapp accounts, so if we want a Snapp account,
      must generate a new one
@@ -394,36 +405,41 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
   in
   let pk = account.public_key in
   let token_id = account.token_id in
-  let%bind delta = gen_delta account in
-  (* update balances table, if provided, with generated delta *)
+  let%bind balance_change = gen_balance_change account in
+  (* update balances table, if provided, with generated balance_change *)
   ( match balances_tbl with
   | None ->
       ()
   | Some tbl ->
-      let add_balance_and_delta balance
-          (delta : (Currency.Amount.t, Sgn.t) Currency.Signed_poly.t) =
-        match delta.sgn with
+      let add_balance_and_balance_change balance
+          (balance_change : (Currency.Amount.t, Sgn.t) Currency.Signed_poly.t) =
+        match balance_change.sgn with
         | Pos -> (
-            match Currency.Balance.add_amount balance delta.magnitude with
+            match
+              Currency.Balance.add_amount balance balance_change.magnitude
+            with
             | Some bal ->
                 bal
             | None ->
-                failwith "add_balance_and_delta: overflow for sum" )
+                failwith "add_balance_and_balance_change: overflow for sum" )
         | Neg -> (
-            match Currency.Balance.sub_amount balance delta.magnitude with
+            match
+              Currency.Balance.sub_amount balance balance_change.magnitude
+            with
             | Some bal ->
                 bal
             | None ->
-                failwith "add_balance_and_delta: underflow for difference" )
+                failwith
+                  "add_balance_and_balance_change: underflow for difference" )
       in
-      let delta = f_delta delta in
+      let balance_change = f_balance_change balance_change in
       Signature_lib.Public_key.Compressed.Table.change tbl pk ~f:(function
         | None ->
             (* new entry in table *)
-            Some (add_balance_and_delta account.balance delta)
+            Some (add_balance_and_balance_change account.balance balance_change)
         | Some balance ->
             (* update entry in table *)
-            Some (add_balance_and_delta balance delta)) ) ;
+            Some (add_balance_and_balance_change balance balance_change)) ) ;
   let field_array_list_gen ~max_array_len ~max_list_len =
     let array_gen =
       let%bind array_len = Int.gen_uniform_incl 0 max_array_len in
@@ -441,18 +457,23 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
   let%bind sequence_events =
     field_array_list_gen ~max_array_len:4 ~max_list_len:6
   in
-  let%map call_data = Snark_params.Tick.Field.gen in
+  let%bind call_data = Snark_params.Tick.Field.gen in
   (* update the depth when generating `other_parties` in Parties.t *)
-  let depth = 0 in
+  let call_depth = 0 in
+  let protocol_state = Snapp_predicate.Protocol_state.accept in
+
+  let%map use_full_commitment = gen_use_full_commitment in
   { Party.Body.Poly.pk
   ; update
   ; token_id
-  ; delta
+  ; balance_change
   ; increment_nonce
   ; events
   ; sequence_events
   ; call_data
-  ; depth
+  ; call_depth
+  ; protocol_state
+  ; use_full_commitment
   }
 
 let gen_predicated_from ?(succeed = true) ?(new_account = false)
@@ -462,7 +483,8 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false)
   let%bind body =
     gen_party_body ~new_account ~snapp_account ~increment_nonce
       ?available_public_keys ~ledger ~balances_tbl
-      ~gen_delta:(gen_delta ~balances_tbl) ~f_delta:Fn.id ()
+      ~gen_balance_change:(gen_balance_change ~balances_tbl)
+      ~f_balance_change:Fn.id () ~gen_use_full_commitment
   in
   let account_id =
     Account_id.create body.Party.Body.Poly.pk body.Party.Body.Poly.token_id
@@ -504,7 +526,8 @@ let gen_party_predicated_fee_payer ~account_id ~ledger :
   let open Quickcheck.Let_syntax in
   let%map body0 =
     gen_party_body ~account_id ~is_fee_payer:true ~increment_nonce:()
-      ~gen_delta:gen_fee ~f_delta:fee_to_amt ~ledger ()
+      ~gen_balance_change:gen_fee ~f_balance_change:fee_to_amt
+      ~gen_use_full_commitment:(return ()) ~ledger ()
   in
   (* make sure the fee payer's token id is the default,
      which is represented by the unit value in the body
@@ -541,7 +564,7 @@ let gen_parties_from ?(succeed = true)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t)
-    ~ledger ~protocol_state () =
+    ~ledger () =
   let open Quickcheck.Let_syntax in
   let max_parties = 5 in
   let fee_payer_pk =
@@ -599,7 +622,7 @@ let gen_parties_from ?(succeed = true)
   let%bind memo = Signed_command_memo.gen in
   let memo_hash = Signed_command_memo.hash memo in
   let parties_dummy_signatures : Parties.t =
-    { fee_payer; other_parties; protocol_state; memo }
+    { fee_payer; other_parties; memo }
   in
   (* replace dummy signature in fee payer *)
   let fee_payer_signature =
@@ -623,9 +646,8 @@ let gen_parties_from ?(succeed = true)
   in
   let protocol_state_predicate_hash =
     Snapp_predicate.Protocol_state.digest
-      parties_dummy_signatures.protocol_state
+      parties_dummy_signatures.fee_payer.data.body.protocol_state
   in
-
   let sign_for_other_party sk =
     Signature_lib.Schnorr.sign sk
       (Random_oracle.Input.field

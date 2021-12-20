@@ -1233,7 +1233,7 @@ module Base = struct
     let apply_body
         ~(constraint_constants : Genesis_constants.Constraint_constants.t) ?tag
         ~txn_global_slot ~(add_check : ?label:string -> Boolean.var -> unit)
-        ~check_auth
+        ~check_auth ~is_start
         ({ body =
              { pk
              ; token_id = _
@@ -1246,15 +1246,17 @@ module Base = struct
                  ; token_symbol
                  ; timing
                  }
-             ; delta
+             ; balance_change
              ; increment_nonce
              ; events = _ (* This is for the snapp to use, we don't need it. *)
              ; call_data =
                  _ (* This is for the snapp to use, we don't need it. *)
              ; sequence_events
-             ; depth = _ (* This is used to build the 'stack of stacks'. *)
+             ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
+             ; protocol_state = _
+             ; use_full_commitment
              }
-         ; predicate = _
+         ; predicate
          } :
           Party.Predicated.Checked.t) (a : Account.Checked.Unhashed.t) :
         Account.Checked.Unhashed.t * _ =
@@ -1281,7 +1283,7 @@ module Base = struct
       in
       Boolean.Assert.any
         [ is_new; !(Public_key.Compressed.Checked.equal pk a.public_key) ] ;
-      let is_receiver = Sgn.Checked.is_pos delta.sgn in
+      let is_receiver = Sgn.Checked.is_pos balance_change.sgn in
       let timing =
         let open Snapp_basic in
         let new_timing =
@@ -1307,10 +1309,12 @@ module Base = struct
             update_authorized
               (Permissions.Auth_required.Checked.if_ is_receiver
                  ~then_:a.permissions.receive ~else_:a.permissions.send)
-              ~is_keep:!Amount.Signed.(Checked.(equal (constant zero) delta))
+              ~is_keep:
+                !Amount.Signed.(Checked.(equal (constant zero) balance_change))
               ~updated:
                 (let balance, `Overflow failed1 =
-                   !(Balance.Checked.add_signed_amount_flagged a.balance delta)
+                   !(Balance.Checked.add_signed_amount_flagged a.balance
+                       balance_change)
                  in
                  let fee =
                    Amount.Checked.of_fee
@@ -1490,6 +1494,25 @@ module Base = struct
                   ~then_:!(Account.Nonce.Checked.succ a.nonce)
                   ~else_:a.nonce))
       in
+
+      (* enforce that either the predicate is `Accept`,
+         the nonce is incremented,
+         or the full commitment is used to avoid replays. *)
+      let predicate_is_accept =
+        let accept_digest =
+          Snapp_predicate.Account.digest Snapp_predicate.Account.accept
+          |> Field.constant
+        in
+        let predicate_digest =
+          Snapp_predicate.Account.Checked.digest predicate
+        in
+        Field.equal accept_digest predicate_digest
+      in
+      Boolean.Assert.any
+        [ predicate_is_accept
+        ; increment_nonce
+        ; Boolean.(use_full_commitment &&& not is_start)
+        ] ;
       let a : Account.Checked.Unhashed.t =
         { a with
           balance
@@ -1720,7 +1743,9 @@ module Base = struct
         module Party = struct
           type t = party
 
-          let delta (t : t) = t.party.data.body.delta
+          let balance_change (t : t) = t.party.data.body.balance_change
+
+          let protocol_state (t : t) = t.party.data.body.protocol_state
         end
 
         module Account = struct
@@ -1753,6 +1778,8 @@ module Base = struct
           let if_ b ~then_ ~else_ =
             run_checked (Amount.Checked.if_ b ~then_ ~else_)
 
+          let equal t t' = run_checked (Amount.Checked.equal t t')
+
           let zero = Amount.(var_of_t zero)
 
           let add_flagged x y = run_checked (Amount.Checked.add_flagged x y)
@@ -1772,6 +1799,10 @@ module Base = struct
           let default = Token_id.(var_of_t default)
 
           let invalid = Token_id.(var_of_t invalid)
+        end
+
+        module Protocol_state_predicate = struct
+          type t = Snapp_predicate.Protocol_state.Checked.t
         end
       end
 
@@ -1800,6 +1831,7 @@ module Base = struct
               Parties_logic.Local_state.t
           ; protocol_state_predicate : Snapp_predicate.Protocol_state.Checked.t
           ; transaction_commitment : Transaction_commitment.t
+          ; full_transaction_commitment : Transaction_commitment.t
           ; field : Field.t
           ; failure : unit >
       end
@@ -1828,21 +1860,29 @@ module Base = struct
         match eff with
         | Get_global_ledger g ->
             g.ledger
-        | Transaction_commitment_on_start
+        | Transaction_commitments_on_start
             { other_parties = other_parties, _
             ; protocol_state_predicate
             ; memo_hash
+            ; party = { party; _ }
             } -> (
             match is_start with
             | `No ->
                 assert false
             | `Yes | `Compute_in_circuit ->
-                Parties.Transaction_commitment.Checked.create
-                  ~other_parties_hash:other_parties
-                  ~protocol_state_predicate_hash:
-                    (Snapp_predicate.Protocol_state.Checked.digest
-                       protocol_state_predicate)
-                  ~memo_hash )
+                let transaction_commitment =
+                  Parties.Transaction_commitment.Checked.create
+                    ~other_parties_hash:other_parties
+                    ~protocol_state_predicate_hash:
+                      (Snapp_predicate.Protocol_state.Checked.digest
+                         protocol_state_predicate)
+                    ~memo_hash
+                in
+                let full_transaction_commitment =
+                  Parties.Transaction_commitment.Checked.with_fee_payer
+                    transaction_commitment ~fee_payer_hash:party.hash
+                in
+                (transaction_commitment, full_transaction_commitment) )
         | Get_account ({ party; _ }, (_root, ledger)) ->
             let idx =
               V.map ledger ~f:(fun l -> idx l (body_id party.data.body))
@@ -1937,6 +1977,8 @@ module Base = struct
                       let a : Account.t = read account_typ a.data in
                       let idx = idx ledger (Account.identifier a) in
                       Sparse_ledger.set_exn ledger idx a) )
+        | Check_fee_excess (valid_fee_excess, ()) ->
+            Boolean.Assert.is_true valid_fee_excess
         | Modify_global_excess (global, f) ->
             { global with fee_excess = f global.fee_excess }
         | Modify_global_ledger { global_state; ledger; should_update } ->
@@ -1948,39 +1990,31 @@ module Base = struct
         | Party_token_id { party; _ } ->
             party.data.body.token_id
         | Check_auth_and_update_account
-            { is_start = is_actually_start
+            { is_start
             ; at_party = at_party, _
             ; global_state
             ; party = { party; control; _ }
             ; account
             ; transaction_commitment
+            ; full_transaction_commitment
             ; inclusion_proof = _
             } ->
+            let commitment =
+              Inputs.Transaction_commitment.if_
+                party.data.body.use_full_commitment
+                ~then_:full_transaction_commitment ~else_:transaction_commitment
+            in
             ( match (auth_type, snapp_statement) with
             | Proof, Some (i, s) ->
                 Pickles.Side_loaded.in_circuit (side_loaded i)
                   (Lazy.force account.data.snapp.verification_key.data) ;
                 Snapp_statement.Checked.Assert.equal
-                  { transaction = transaction_commitment; at_party }
+                  { transaction = commitment; at_party }
                   s
             | (Signature | None_given), None ->
                 ()
             | Proof, None | (Signature | None_given), Some _ ->
                 assert false ) ;
-            let transaction_commitment =
-              let with_party () =
-                Parties.Transaction_commitment.Checked.with_fee_payer
-                  transaction_commitment ~fee_payer_hash:party.hash
-              in
-              match is_start with
-              | `No ->
-                  transaction_commitment
-              | `Yes ->
-                  with_party ()
-              | `Compute_in_circuit ->
-                  Inputs.Transaction_commitment.if_ is_actually_start
-                    ~then_:(with_party ()) ~else_:transaction_commitment
-            in
             let add_check, checks_succeeded = create_checker () in
             let signature_verifies =
               match auth_type with
@@ -2004,13 +2038,10 @@ module Base = struct
                      in
                      signature_verifies
                        ~shifted:(module S)
-                       ~payload_digest:transaction_commitment signature
-                       party.data.body.pk)
+                       ~payload_digest:commitment signature party.data.body.pk)
             in
             (* The fee-payer must increment their nonce. *)
-            add_check
-              Boolean.(
-                party.data.body.increment_nonce ||| not is_actually_start) ;
+            add_check Boolean.(party.data.body.increment_nonce ||| not is_start) ;
             (* If there's a valid signature, it must increment the nonce. *)
             (* TODO(#9743): Relax this when this party uses a 'full'
                commitment.
@@ -2029,7 +2060,7 @@ module Base = struct
                 ~check_auth:(fun t ->
                   Permissions.Auth_required.Checked.spec_eval
                     ~signature_verifies t)
-                party.data account.data
+                ~is_start party.data account.data
             in
             let proof_must_verify = proof_must_verify () in
             let checks_succeeded = checks_succeeded () in
@@ -2110,6 +2141,8 @@ module Base = struct
               , V.create (fun () -> !witness.local_state_init.call_stack) )
           ; transaction_commitment =
               statement.source.local_state.transaction_commitment
+          ; full_transaction_commitment =
+              statement.source.local_state.full_transaction_commitment
           ; token_id = statement.source.local_state.token_id
           ; excess = statement.source.local_state.excess
           ; ledger =
@@ -2163,14 +2196,6 @@ module Base = struct
               in
               let start_data =
                 { Parties_logic.Start_data.parties = (h, ps)
-                ; protocol_state_predicate =
-                    exists Snapp_predicate.Protocol_state.typ
-                      ~compute:(fun () ->
-                        match V.get v with
-                        | `Skip ->
-                            Snapp_predicate.Protocol_state.accept
-                        | `Start p ->
-                            p.protocol_state_predicate)
                 ; memo_hash =
                     exists Field.typ ~compute:(fun () ->
                         match V.get v with
@@ -3790,13 +3815,11 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
     { transaction; at_party }
   in
   let commitment = ref Local_state.dummy.transaction_commitment in
+  let full_commitment = ref Local_state.dummy.full_transaction_commitment in
   let remaining_parties =
     let partiess =
       List.map partiess ~f:(fun parties : _ Parties_logic.Start_data.t ->
-          { protocol_state_predicate = Snapp_predicate.Protocol_state.accept
-          ; parties
-          ; memo_hash = Signed_command_memo.hash parties.memo
-          })
+          { parties; memo_hash = Signed_command_memo.hash parties.memo })
     in
     ref partiess
   in
@@ -3809,6 +3832,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
          witnesses
        ->
       let current_commitment = !commitment in
+      let current_full_commitment = !full_commitment in
       let snapp_stmt =
         match spec with
         | Proved ->
@@ -3819,39 +3843,58 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
         | _ ->
             None
       in
-      let start_parties, next_commitment =
-        let empty_if_last mk =
+      let start_parties, next_commitment, next_full_commitment =
+        let empty_if_last (mk : unit -> field * field) : field * field =
           match (target_local.parties, target_local.call_stack) with
           | [], [] ->
               (* The commitment will be cleared, because this is the last
                  party.
               *)
-              Parties.Transaction_commitment.empty
+              Parties.Transaction_commitment.(empty, empty)
           | _ ->
               mk ()
         in
-        let mk_next_commitment (parties : Parties.t) =
-          empty_if_last (fun () -> Parties.commitment parties)
+        let mk_next_commitments (parties : Parties.t) =
+          empty_if_last (fun () ->
+              let next_commitment = Parties.commitment parties in
+              let fee_payer_hash =
+                Party.Predicated.(digest @@ of_fee_payer parties.fee_payer.data)
+              in
+              let next_full_commitment =
+                Parties.Transaction_commitment.with_fee_payer next_commitment
+                  ~fee_payer_hash
+              in
+              (next_commitment, next_full_commitment))
         in
         match kind with
         | `Same ->
-            ([], empty_if_last (fun () -> current_commitment))
+            let next_commitment, next_full_commitment =
+              empty_if_last (fun () ->
+                  (current_commitment, current_full_commitment))
+            in
+            ([], next_commitment, next_full_commitment)
         | `New -> (
             match !remaining_parties with
             | parties :: rest ->
-                let commitment' = mk_next_commitment parties.parties in
+                let commitment', full_commitment' =
+                  mk_next_commitments parties.parties
+                in
                 remaining_parties := rest ;
                 commitment := commitment' ;
-                ([ parties ], commitment')
+                full_commitment := full_commitment' ;
+                ([ parties ], commitment', full_commitment')
             | _ ->
                 failwith "Not enough remaining parties" )
         | `Two_new -> (
             match !remaining_parties with
             | parties1 :: parties2 :: rest ->
-                let commitment' = mk_next_commitment parties2.parties in
+                let commitment', full_commitment' =
+                  mk_next_commitments parties2.parties
+                in
                 remaining_parties := rest ;
                 commitment := commitment' ;
-                ([ parties1; parties2 ], commitment')
+                full_commitment := full_commitment' ;
+                ([ parties1; parties2 ], commitment', full_commitment')
             | _ ->
                 failwith "Not enough remaining parties" )
       in
@@ -3868,11 +3911,13 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
       let source_local =
         { (hash_local_state source_local) with
           transaction_commitment = current_commitment
+        ; full_transaction_commitment = current_full_commitment
         }
       in
       let target_local =
         { (hash_local_state target_local) with
           transaction_commitment = next_commitment
+        ; full_transaction_commitment = next_full_commitment
         }
       in
       let w : Parties_segment.Witness.t =
@@ -3896,8 +3941,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                    !"unexpected fee excess. source %{sexp: Amount.Signed.t} \
                      target %{sexp: Amount.Signed.t}"
                    target_global.fee_excess source_global.fee_excess)
-          | Some delta ->
-              delta
+          | Some balance_change ->
+              balance_change
         in
         { fee_token_l = Token_id.default
         ; fee_excess_l = Amount.Signed.to_fee fee_excess
@@ -4244,12 +4289,14 @@ module For_tests = struct
               { pk = sender_pk
               ; update = Party.Update.noop
               ; token_id = ()
-              ; delta = fee
+              ; balance_change = fee
               ; increment_nonce = ()
               ; events = []
               ; sequence_events = []
               ; call_data = Field.zero
-              ; depth = 0
+              ; call_depth = 0
+              ; protocol_state = Snapp_predicate.Protocol_state.accept
+              ; use_full_commitment = ()
               }
           ; predicate = sender_nonce
           }
@@ -4262,12 +4309,14 @@ module For_tests = struct
           { pk = sender_pk
           ; update = Party.Update.noop
           ; token_id = Token_id.default
-          ; delta = Amount.(Signed.(negate (of_unsigned amount)))
+          ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
           ; increment_nonce = true
           ; events = []
           ; sequence_events = []
           ; call_data = Field.zero
-          ; depth = 0
+          ; call_depth = 0
+          ; protocol_state = Snapp_predicate.Protocol_state.accept
+          ; use_full_commitment = false
           }
       ; predicate = Nonce (Account.Nonce.succ sender_nonce)
       }
@@ -4277,12 +4326,14 @@ module For_tests = struct
           { pk = trivial_account_pk
           ; update = update_empty_permissions
           ; token_id = Token_id.default
-          ; delta = Amount.Signed.(of_unsigned amount)
+          ; balance_change = Amount.Signed.(of_unsigned amount)
           ; increment_nonce = false
           ; events = []
           ; sequence_events = []
           ; call_data = Field.zero
-          ; depth = 0
+          ; call_depth = 0
+          ; protocol_state = Snapp_predicate.Protocol_state.accept
+          ; use_full_commitment = false
           }
       ; predicate = Full Snapp_predicate.Account.accept
       }
@@ -4291,7 +4342,7 @@ module For_tests = struct
     let memo = Signed_command_memo.empty in
     let ps =
       Parties.Party_or_stack.of_parties_list
-        ~party_depth:(fun (p : Party.Predicated.t) -> p.body.depth)
+        ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
         [ sender_party_data; snapp_party_data ]
       |> Parties.Party_or_stack.accumulate_hashes_predicated
     in
@@ -4309,7 +4360,7 @@ module For_tests = struct
     let proof_party =
       let ps =
         Parties.Party_or_stack.of_parties_list
-          ~party_depth:(fun (p : Party.Predicated.t) -> p.body.depth)
+          ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
           [ snapp_party_data ]
         |> Parties.Party_or_stack.accumulate_hashes_predicated
       in
@@ -4348,9 +4399,7 @@ module For_tests = struct
     let other_parties =
       [ sender; { data = snapp_party_data; authorization = Proof pi } ]
     in
-    let parties : Parties.t =
-      { fee_payer; other_parties; protocol_state; memo }
-    in
+    let parties : Parties.t = { fee_payer; other_parties; memo } in
     parties
 end
 
@@ -4695,12 +4744,14 @@ let%test_module "transaction_snark" =
                       ; timing = Keep
                       }
                   ; token_id = ()
-                  ; delta = Fee.of_int full_amount
+                  ; balance_change = Fee.of_int full_amount
                   ; increment_nonce = ()
                   ; events = []
                   ; sequence_events = []
                   ; call_data = Field.zero
-                  ; depth = 0
+                  ; call_depth = 0
+                  ; protocol_state = Snapp_predicate.Protocol_state.accept
+                  ; use_full_commitment = ()
                   }
               ; predicate = acct1.account.nonce
               }
@@ -4709,22 +4760,43 @@ let%test_module "transaction_snark" =
       ; other_parties =
           [ { data =
                 { body =
+                    { pk = acct1.account.public_key
+                    ; update = Party.Update.noop
+                    ; token_id = Token_id.default
+                    ; balance_change =
+                        Amount.Signed.(of_unsigned receiver_amount |> negate)
+                    ; increment_nonce = true
+                    ; events = []
+                    ; sequence_events = []
+                    ; call_data = Field.zero
+                    ; call_depth = 0
+                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; use_full_commitment = false
+                    }
+                ; predicate = Accept
+                }
+            ; authorization = Signature Signature.dummy
+            }
+          ; { data =
+                { body =
                     { pk = acct2.account.public_key
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
-                    ; delta = Amount.Signed.(of_unsigned receiver_amount)
+                    ; balance_change =
+                        Amount.Signed.(of_unsigned receiver_amount)
                     ; increment_nonce = false
                     ; events = []
                     ; sequence_events = []
                     ; call_data = Field.zero
-                    ; depth = 0
+                    ; call_depth = 0
+                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; use_full_commitment = false
                     }
                 ; predicate = Accept
                 }
             ; authorization = None_given
             }
           ]
-      ; protocol_state = Snapp_predicate.Protocol_state.accept
       ; memo = Signed_command_memo.empty
       }
 
@@ -5238,12 +5310,15 @@ let%test_module "transaction_snark" =
                             { pk = sender_pk
                             ; update = Party.Update.noop
                             ; token_id = ()
-                            ; delta = fee
+                            ; balance_change = fee
                             ; increment_nonce = ()
                             ; events = []
                             ; sequence_events = []
                             ; call_data = Field.zero
-                            ; depth = 0
+                            ; call_depth = 0
+                            ; protocol_state =
+                                Snapp_predicate.Protocol_state.accept
+                            ; use_full_commitment = ()
                             }
                         ; predicate = sender_nonce
                         }
@@ -5256,12 +5331,15 @@ let%test_module "transaction_snark" =
                         { pk = sender_pk
                         ; update = Party.Update.noop
                         ; token_id = Token_id.default
-                        ; delta = Amount.(Signed.(negate (of_unsigned amount)))
+                        ; balance_change =
+                            Amount.(Signed.(negate (of_unsigned amount)))
                         ; increment_nonce = true
                         ; events = []
                         ; sequence_events = []
                         ; call_data = Field.zero
-                        ; depth = 0
+                        ; call_depth = 0
+                        ; protocol_state = Snapp_predicate.Protocol_state.accept
+                        ; use_full_commitment = false
                         }
                     ; predicate = Nonce (Account.Nonce.succ sender_nonce)
                     }
@@ -5271,12 +5349,14 @@ let%test_module "transaction_snark" =
                         { pk = multisig_account_pk
                         ; update = update_empty_permissions
                         ; token_id = Token_id.default
-                        ; delta = Amount.Signed.(of_unsigned amount)
+                        ; balance_change = Amount.Signed.(of_unsigned amount)
                         ; increment_nonce = false
                         ; events = []
                         ; sequence_events = []
                         ; call_data = Field.zero
-                        ; depth = 0
+                        ; call_depth = 0
+                        ; protocol_state = Snapp_predicate.Protocol_state.accept
+                        ; use_full_commitment = false
                         }
                     ; predicate = Full Snapp_predicate.Account.accept
                     }
@@ -5286,7 +5366,7 @@ let%test_module "transaction_snark" =
                   let ps =
                     Parties.Party_or_stack.of_parties_list
                       ~party_depth:(fun (p : Party.Predicated.t) ->
-                        p.body.depth)
+                        p.body.call_depth)
                       [ sender_party_data; snapp_party_data ]
                     |> Parties.Party_or_stack.accumulate_hashes_predicated
                   in
@@ -5363,7 +5443,6 @@ let%test_module "transaction_snark" =
                         [ sender
                         ; { data = snapp_party_data; authorization = Proof pi }
                         ]
-                    ; protocol_state
                     ; memo
                     }
                   in
