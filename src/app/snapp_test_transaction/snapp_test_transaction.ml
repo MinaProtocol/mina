@@ -20,7 +20,7 @@ let graphql_snapp_command (parties : Parties.t) =
     | Signature s ->
         sprintf "{  signature: \"%s\" }" (Signature.to_base58_check s)
     | None_given ->
-        "null"
+        "{proof:null, signature:null}"
   in
   let app_state
       (state :
@@ -142,6 +142,29 @@ let graphql_snapp_command (parties : Parties.t) =
       in
       sprintf "{sign: %s, magnitude: \"%s\"}" sgn magnitude
     in
+    let increment_nonce = Bool.to_string p.data.body.increment_nonce in
+    let sequence_events =
+      `List
+        (List.map p.data.body.sequence_events ~f:(fun a ->
+             `List
+               ( Array.map a ~f:(fun s ->
+                     `String (Snark_params.Tick.Field.to_string s))
+               |> Array.to_list )))
+      |> Yojson.Safe.to_string
+    in
+    let call_data =
+      `String (Snark_params.Tick.Field.to_string p.data.body.call_data)
+      |> Yojson.Safe.to_string
+    in
+    let events =
+      `List
+        (List.map p.data.body.events ~f:(fun a ->
+             `List
+               ( Array.map a ~f:(fun s ->
+                     `String (Snark_params.Tick.Field.to_string s))
+               |> Array.to_list )))
+      |> Yojson.Safe.to_string
+    in
     let pk = pk_string p.data.body.pk in
     sprintf
       {|
@@ -150,11 +173,12 @@ let graphql_snapp_command (parties : Parties.t) =
         predicate: %s, 
         body: {
           depth: 0, 
-          callData: "0x0000000000000000000000000000000000000000000000000000000000000000", 
-          sequenceEvents: [], 
-          events: [], 
+          callData: %s, 
+          sequenceEvents: %s, 
+          events: %s, 
           delta: %s, 
-          tokenId: "1", 
+          tokenId: "1",
+          incrementNonce: %s 
           update: {
             timing: null, 
             tokenSymbol: null, 
@@ -165,7 +189,8 @@ let graphql_snapp_command (parties : Parties.t) =
             appState: [%s]}, 
           publicKey: "%s"}}
     |}
-      authorization predicate delta
+      authorization predicate call_data sequence_events events delta
+      increment_nonce
       (permissions p.data.body.update.permissions)
       (verification_key p.data.body.update)
       (app_state p.data.body.update.app_state)
@@ -469,6 +494,35 @@ module App_state = struct
                      (Error.to_string_hum e1) (Error.to_string_hum e2)) ) )
 end
 
+module Events = struct
+  type t = Snark_params.Tick.Field.t
+
+  let of_string_array (arr : string Array.t) =
+    Array.map arr ~f:(fun x ->
+        match x with
+        | "" ->
+            Snark_params.Tick.Field.zero
+        | _ -> (
+            match
+              Or_error.try_with (fun () -> Snark_params.Tick.Field.of_string x)
+            with
+            | Ok f ->
+                f
+            | Error e1 -> (
+                match Signed_command_memo.create_from_string x with
+                | Ok d ->
+                    Random_oracle.(
+                      hash ~init:Hash_prefix.snapp_test
+                        ( Signed_command_memo.to_bits d
+                        |> Random_oracle_input.bitstring |> pack_input ))
+                | Error e2 ->
+                    failwith
+                      (sprintf
+                         "Neither a field element nor limited length string \
+                          Errors (%s, %s)"
+                         (Error.to_string_hum e1) (Error.to_string_hum e2)) ) ))
+end
+
 module Util = struct
   let keypair_of_file =
     Secrets.Keypair.Terminal_stdin.read_exn ~should_prompt_user:false
@@ -487,6 +541,9 @@ module Util = struct
 
   let app_state_of_list lst =
     List.map ~f:App_state.of_string lst |> Snapp_state.V.of_list_exn
+
+  let sequence_state_of_list array_lst : Snark_params.Tick.Field.t array list =
+    List.map ~f:Events.of_string_array array_lst
 
   let auth_of_string s : Permissions.Auth_required.t =
     match String.lowercase s with
@@ -535,17 +592,20 @@ let create_snapp_account =
   let create_command ~keyfile ~fee ~snapp_keyfile ~amount ~nonce ~memo () =
     let open Deferred.Let_syntax in
     let%bind keypair = Util.keypair_of_file keyfile in
-    let%bind snapp_account_keypair = Util.keypair_of_file snapp_keyfile in
+    let%bind snapp_keypair = Util.keypair_of_file snapp_keyfile in
     let spec =
       { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
       ; fee
       ; receivers = []
       ; amount
-      ; snapp_account_keypair
+      ; snapp_account_keypair = Some snapp_keypair
       ; memo = Util.memo memo
       ; new_snapp_account = true
       ; snapp_update = Party.Update.dummy
       ; current_auth = Permissions.Auth_required.Signature
+      ; call_data = Snark_params.Tick.Field.zero
+      ; events = []
+      ; sequence_events = []
       }
     in
     let parties =
@@ -656,24 +716,117 @@ let upgrade_snapp =
          ~verification_key ~auth))
 
 let transfer_funds =
-  Command.(async ~summary:"" (Param.return (fun () -> Deferred.unit)))
+  let create_command ~keyfile ~fee ~nonce ~memo ~receivers () =
+    let open Deferred.Let_syntax in
+    let%bind receivers = receivers in
+    let amount =
+      List.fold ~init:Currency.Amount.zero receivers ~f:(fun acc (_, a) ->
+          Option.value_exn (Currency.Amount.add acc a))
+    in
+    let%bind keypair = Util.keypair_of_file keyfile in
+    let spec =
+      { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
+      ; fee
+      ; receivers
+      ; amount
+      ; snapp_account_keypair = None
+      ; memo = Util.memo memo
+      ; new_snapp_account = false
+      ; snapp_update = Party.Update.dummy
+      ; current_auth = Permissions.Auth_required.Proof
+      ; call_data = Snark_params.Tick.Field.zero
+      ; events = []
+      ; sequence_events = []
+      }
+    in
+    let parties = Transaction_snark.For_tests.multiple_transfers spec in
+    Util.print_snapp_transaction parties ;
+    let%map () = gen_proof parties ~snapp_account:None in
+    ()
+  in
+  let read_key_and_amount count =
+    let read () =
+      let open Deferred.Let_syntax in
+      Core.printf "Receiver Key:%!" ;
+      match%bind Reader.read_line (Lazy.force Reader.stdin) with
+      | `Ok key -> (
+          let pk =
+            Signature_lib.Public_key.Compressed.of_base58_check_exn key
+          in
+          Core.printf !"Amount:%!" ;
+          match%map Reader.read_line (Lazy.force Reader.stdin) with
+          | `Ok amt ->
+              let amount = Currency.Amount.of_formatted_string amt in
+              (pk, amount)
+          | `Eof ->
+              failwith "Invalid amount" )
+      | `Eof ->
+          failwith "Invalid key"
+    in
+    let rec go ?(prompt = true) count keys =
+      if count <= 0 then return keys
+      else if prompt then (
+        Core.printf "Continue?[y/n]\n%!" ;
+        match%bind Reader.read_line (Lazy.force Reader.stdin) with
+        | `Ok r ->
+            if String.(equal (lowercase r) "y") then
+              let%bind key = read () in
+              go (count - 1) (key :: keys)
+            else return keys
+        | `Eof ->
+            failwith "Invalid input" )
+      else
+        let%bind key = read () in
+        go (count - 1) (key :: keys)
+    in
+
+    Core.printf "Enter at most %d receivers (base58 encoding) and amounts\n%!"
+      count ;
+    let%bind ks = go ~prompt:false 1 [] in
+    go (count - 1) ks
+  in
+  Command.(
+    let open Let_syntax in
+    Command.async
+      ~summary:
+        "Generate a snapp transaction that makes multiple transfers from one \
+         account"
+      (let%map keyfile =
+         Param.flag "--fee-payer-key"
+           ~doc:
+             "KEYFILE Private key file for the fee payer of the transaction \
+              (should already be in the ledger)"
+           Param.(required string)
+       and fee = Flags.fee
+       and nonce = Flags.nonce
+       and memo = Flags.memo in
+       let fee = Option.value ~default:Flags.default_fee fee in
+       if Currency.Fee.(fee < Flags.min_fee) then
+         failwith
+           (sprintf "Fee must at least be %s"
+              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
+       let receivers = read_key_and_amount 10 in
+       create_command ~keyfile ~fee ~nonce ~memo ~receivers))
 
 let update_state =
   let create_command ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state () =
     let open Deferred.Let_syntax in
     let%bind keypair = Util.keypair_of_file keyfile in
-    let%bind snapp_account_keypair = Util.keypair_of_file snapp_keyfile in
+    let%bind snapp_keypair = Util.keypair_of_file snapp_keyfile in
     let app_state = Util.app_state_of_list app_state in
     let spec =
       { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
       ; fee
       ; receivers = []
       ; amount = Currency.Amount.zero
-      ; snapp_account_keypair
+      ; snapp_account_keypair = Some snapp_keypair
       ; memo = Util.memo memo
       ; new_snapp_account = false
       ; snapp_update = { Party.Update.dummy with app_state }
       ; current_auth = Permissions.Auth_required.Proof
+      ; call_data = Snark_params.Tick.Field.zero
+      ; events = []
+      ; sequence_events = []
       }
     in
     let%bind parties, vk =
@@ -683,9 +836,7 @@ let update_state =
     let%map () =
       gen_proof parties
         ~snapp_account:
-          (Some
-             ( Signature_lib.Public_key.compress snapp_account_keypair.public_key
-             , vk ))
+          (Some (Signature_lib.Public_key.compress snapp_keypair.public_key, vk))
     in
     ()
   in
@@ -789,7 +940,100 @@ let update_snapp_uri =
        create_command ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~snapp_uri ~auth))
 
 let update_sequence_state =
-  Command.(async ~summary:"" (Param.return (fun () -> Deferred.unit)))
+  let create_command ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~sequence_state
+      () =
+    let open Deferred.Let_syntax in
+    let%bind keypair = Util.keypair_of_file keyfile in
+    let%bind snapp_keypair = Util.keypair_of_file snapp_keyfile in
+    let sequence_events = Util.sequence_state_of_list sequence_state in
+    let spec =
+      { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
+      ; fee
+      ; receivers = []
+      ; amount = Currency.Amount.zero
+      ; snapp_account_keypair = Some snapp_keypair
+      ; memo = Util.memo memo
+      ; new_snapp_account = false
+      ; snapp_update = Party.Update.dummy
+      ; current_auth = Permissions.Auth_required.Proof
+      ; call_data = Snark_params.Tick.Field.zero
+      ; events = []
+      ; sequence_events
+      }
+    in
+    let%bind parties, vk =
+      Transaction_snark.For_tests.update_state ~constraint_constants spec
+    in
+    Util.print_snapp_transaction parties ;
+    let%map () =
+      gen_proof parties
+        ~snapp_account:
+          (Some (Signature_lib.Public_key.compress snapp_keypair.public_key, vk))
+    in
+    ()
+  in
+  Command.(
+    let open Let_syntax in
+    Command.async
+      ~summary:"Generate a snapp transaction that updates snapp state"
+      (let%map keyfile =
+         Param.flag "--fee-payer-key"
+           ~doc:
+             "KEYFILE Private key file for the fee payer of the transaction \
+              (should already be in the ledger)"
+           Param.(required string)
+       and fee = Flags.fee
+       and nonce = Flags.nonce
+       and snapp_keyfile =
+         Param.flag "--snapp-account-key"
+           ~doc:"KEYFILE Private key file to create a new snapp account"
+           Param.(required string)
+       and memo = Flags.memo
+       and sequence_state0 =
+         Param.flag "--sequence-state0"
+           ~doc:"String(hash)|Integer(field element) a list of elements"
+           Param.(
+             required
+               (Arg_type.comma_separated ~allow_empty:false
+                  ~strip_whitespace:true string))
+       and sequence_state1 =
+         Param.flag "--sequence-state1"
+           ~doc:"String(hash)|Integer(field element) a list of elements"
+           Param.(
+             optional_with_default []
+               (Arg_type.comma_separated ~allow_empty:false
+                  ~strip_whitespace:true string))
+       and sequence_state2 =
+         Param.flag "--sequence-state2"
+           ~doc:"String(hash)|Integer(field element) a list of elements"
+           Param.(
+             optional_with_default []
+               (Arg_type.comma_separated ~allow_empty:false
+                  ~strip_whitespace:true string))
+       and sequence_state3 =
+         Param.flag "--sequence-state3"
+           ~doc:"String(hash)|Integer(field element) a list of elements"
+           Param.(
+             optional_with_default []
+               (Arg_type.comma_separated ~allow_empty:false
+                  ~strip_whitespace:true string))
+       in
+       let fee = Option.value ~default:Flags.default_fee fee in
+       let sequence_state =
+         List.filter_map
+           ~f:(fun s ->
+             if List.is_empty s then None else Some (Array.of_list s))
+           [ sequence_state0
+           ; sequence_state1
+           ; sequence_state2
+           ; sequence_state3
+           ]
+       in
+       if Currency.Fee.(fee < Flags.min_fee) then
+         failwith
+           (sprintf "Fee must at least be %s"
+              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
+       create_command ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~sequence_state))
 
 let update_token_symbol =
   let create_command ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~token_symbol
@@ -865,17 +1109,20 @@ let update_permissions =
       ~current_auth () =
     let open Deferred.Let_syntax in
     let%bind keypair = Util.keypair_of_file keyfile in
-    let%bind snapp_account_keypair = Util.keypair_of_file snapp_keyfile in
+    let%bind snapp_keypair = Util.keypair_of_file snapp_keyfile in
     let spec =
       { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
       ; fee
       ; receivers = []
       ; amount = Currency.Amount.zero
-      ; snapp_account_keypair
+      ; snapp_account_keypair = Some snapp_keypair
       ; memo = Util.memo memo
       ; new_snapp_account = false
       ; snapp_update = { Party.Update.dummy with permissions }
       ; current_auth
+      ; call_data = Snark_params.Tick.Field.zero
+      ; events = []
+      ; sequence_events = []
       }
     in
     let%bind parties, vk =
@@ -885,9 +1132,7 @@ let update_permissions =
     let%map () =
       gen_proof parties
         ~snapp_account:
-          (Some
-             ( Signature_lib.Public_key.compress snapp_account_keypair.public_key
-             , vk ))
+          (Some (Signature_lib.Public_key.compress snapp_keypair.public_key, vk))
     in
     ()
   in
@@ -996,7 +1241,7 @@ let test_snapp_with_genesis_ledger =
 let txn_commands =
   [ ("create-snapp-account", create_snapp_account)
   ; ("upgrade-snapp", upgrade_snapp)
-  ; ("transfer-fund", transfer_funds)
+  ; ("transfer-funds", transfer_funds)
   ; ("update-state", update_state)
   ; ("update-snapp-uri", update_snapp_uri)
   ; ("update-sequence-state", update_sequence_state)

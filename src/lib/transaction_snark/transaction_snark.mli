@@ -551,11 +551,14 @@ module For_tests : sig
       ; receivers :
           (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
-      ; snapp_account_keypair : Signature_lib.Keypair.t
+      ; snapp_account_keypair : Signature_lib.Keypair.t option
       ; memo : Signed_command_memo.t
       ; new_snapp_account : bool
       ; snapp_update : Party.Update.t
       ; current_auth : Permissions.Auth_required.t
+      ; sequence_events : Tick.Field.t array list
+      ; events : Tick.Field.t array list
+      ; call_data : Tick.Field.t
       }
     [@@deriving sexp]
   end
@@ -576,4 +579,6 @@ module For_tests : sig
     -> Transaction_logic.For_tests.Transaction_spec.t
     -> Ledger.t
     -> Parties.t Async.Deferred.t
+
+  val multiple_transfers : Spec.t -> Parties.t
 end

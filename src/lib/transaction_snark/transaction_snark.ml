@@ -4138,12 +4138,15 @@ module For_tests = struct
       ; receivers :
           (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
-      ; snapp_account_keypair : Signature_lib.Keypair.t
+      ; snapp_account_keypair : Signature_lib.Keypair.t option
       ; memo : Signed_command_memo.t
       ; new_snapp_account : bool
       ; snapp_update : Party.Update.t
       ; current_auth : Permissions.Auth_required.t
             (*Authorization for the update being performed*)
+      ; sequence_events : Tick.Field.t array list
+      ; events : Tick.Field.t array list
+      ; call_data : Tick.Field.t
       }
     [@@deriving sexp]
   end
@@ -4233,6 +4236,9 @@ module For_tests = struct
         ; new_snapp_account
         ; snapp_account_keypair
         ; memo
+        ; sequence_events
+        ; events
+        ; call_data
         ; _
         } =
       spec
@@ -4280,31 +4286,32 @@ module For_tests = struct
             Control.Signature Signature.dummy (*To be updated later*)
         }
     in
-    let snapp_party : Party.t =
-      let pk =
-        Signature_lib.Public_key.compress snapp_account_keypair.public_key
-      in
-      let delta =
-        if new_snapp_account then Amount.Signed.(of_unsigned amount)
-        else Amount.Signed.zero
-      in
-      { Party.data =
-          { body =
-              { pk
-              ; update
-              ; token_id = Token_id.default
-              ; balance_change = delta
-              ; increment_nonce = false
-              ; events = []
-              ; sequence_events = []
-              ; call_data = Field.zero
-              ; call_depth = 0
+    let snapp_party : Party.t option =
+      Option.map snapp_account_keypair ~f:(fun snapp_account_keypair ->
+          let pk =
+            Signature_lib.Public_key.compress snapp_account_keypair.public_key
+          in
+          let delta =
+            if new_snapp_account then Amount.Signed.(of_unsigned amount)
+            else Amount.Signed.zero
+          in
+          { Party.data =
+              { body =
+                  { pk
+                  ; update
+                  ; token_id = Token_id.default
+                  ; balance_change = delta
+                  ; increment_nonce = true
+                  ; events
+                  ; sequence_events
+                  ; call_data
+                  ; call_depth = 0
+                  }
+              ; predicate
               }
-          ; predicate
-          }
-      ; authorization =
-          Control.Signature Signature.dummy (*To be updated later*)
-      }
+          ; authorization =
+              Control.Signature Signature.dummy (*To be updated later*)
+          })
     in
     let other_receivers =
       List.map receivers ~f:(fun (receiver, amt) ->
@@ -4328,7 +4335,8 @@ module For_tests = struct
     let protocol_state = Snapp_predicate.Protocol_state.accept in
     let other_parties_data =
       Option.value_map ~default:[] sender_party ~f:(fun p -> [ p.data ])
-      @ [ snapp_party.data ]
+      @ Option.value_map snapp_party ~default:[] ~f:(fun snapp_party ->
+            [ snapp_party.data ])
       @ List.map other_receivers ~f:(fun p -> p.data)
     in
     let protocol_state_predicate_hash =
@@ -4402,13 +4410,18 @@ module For_tests = struct
     in
     assert (List.is_empty other_parties) ;
     let snapp_party =
-      let signature =
-        Signature_lib.Schnorr.sign spec.snapp_account_keypair.private_key
-          (Random_oracle.Input.field transaction)
-      in
-      { Party.data = snapp_party.data; authorization = Signature signature }
+      Option.value_map ~default:[] snapp_party ~f:(fun snapp_party ->
+          let signature =
+            Signature_lib.Schnorr.sign
+              (Option.value_exn spec.snapp_account_keypair).private_key
+              (Random_oracle.Input.field transaction)
+          in
+          [ { Party.data = snapp_party.data
+            ; authorization = Signature signature
+            }
+          ])
     in
-    let other_parties = [ Option.value_exn sender_party; snapp_party ] in
+    let other_parties = [ Option.value_exn sender_party ] @ snapp_party in
     let parties : Parties.t =
       { fee_payer; other_parties; protocol_state; memo }
     in
@@ -4427,6 +4440,8 @@ module For_tests = struct
     in
     assert (List.is_empty other_parties) ;
     assert (Option.is_none sender_party) ;
+    assert (Option.is_some snapp_party) ;
+    let snapp_party = Option.value_exn snapp_party in
     let%map.Async.Deferred snapp_party =
       match spec.current_auth with
       | Permissions.Auth_required.Proof ->
@@ -4451,7 +4466,8 @@ module For_tests = struct
           { Party.data = snapp_party.data; authorization = Proof pi }
       | Signature ->
           let signature =
-            Signature_lib.Schnorr.sign spec.snapp_account_keypair.private_key
+            Signature_lib.Schnorr.sign
+              (Option.value_exn spec.snapp_account_keypair).private_key
               (Random_oracle.Input.field transaction)
           in
           Async.Deferred.return
@@ -4469,6 +4485,21 @@ module For_tests = struct
       { fee_payer; other_parties; protocol_state; memo }
     in
     (parties, vk)
+
+  let multiple_transfers (spec : Spec.t) =
+    let ( `Parties parties
+        , `Sender_party sender_party
+        , `Proof_party snapp_party
+        , `Txn_commitment _transaction ) =
+      create_parties spec ~update:spec.snapp_update
+        ~predicate:Party.Predicate.Accept
+    in
+    assert (Option.is_some sender_party) ;
+    assert (Option.is_none snapp_party) ;
+    let other_parties =
+      Option.value_exn sender_party :: parties.other_parties
+    in
+    { parties with other_parties }
 
   let create_trivial_predicate_snapp ~constraint_constants spec ledger =
     let { Transaction_logic.For_tests.Transaction_spec.fee
