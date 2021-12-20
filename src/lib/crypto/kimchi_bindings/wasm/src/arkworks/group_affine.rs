@@ -4,6 +4,10 @@ use crate::arkworks::pasta_fq::WasmPastaFq;
 use mina_curves::pasta::{
     pallas::Affine as AffinePallas,
     vesta::Affine as AffineVesta,
+    pallas::G_GENERATOR_X as GeneratorPallasX,
+    pallas::G_GENERATOR_Y as GeneratorPallasY,
+    vesta::G_GENERATOR_X as GeneratorVestaX,
+    vesta::G_GENERATOR_Y as GeneratorVestaY,
 };
 
 //
@@ -103,6 +107,24 @@ impl From<&WasmGPallas> for AffinePallas {
             point.x.into(),
             point.y.into(),
             point.infinity)
+    }
+}
+
+#[wasm_bindgen]
+pub fn caml_pallas_affine_one() -> WasmGPallas {
+    WasmGPallas {
+        x: WasmPastaFp::from(GeneratorPallasX),
+        y: WasmPastaFp::from(GeneratorPallasY),
+        infinity: false
+    }
+}
+
+#[wasm_bindgen]
+pub fn caml_vesta_affine_one() -> WasmGVesta {
+    WasmGVesta {
+        x: WasmPastaFq::from(GeneratorVestaX),
+        y: WasmPastaFq::from(GeneratorVestaY),
+        infinity: false
     }
 }
 
