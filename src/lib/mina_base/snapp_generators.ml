@@ -520,18 +520,6 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
   in
   { Party.data; authorization }
 
-(* takes an optional account id, if we want to sign this data *)
-let gen_party_predicated_signed ?account_id ~ledger :
-    Party.Predicated.Signed.t Quickcheck.Generator.t =
-  let open Quickcheck.Let_syntax in
-  let%bind body =
-    gen_party_body ~gen_balance_change ~f_balance_change:Fn.id
-      ~increment_nonce:(Option.is_some account_id)
-      ?account_id ~ledger () ~gen_use_full_commitment
-  in
-  let%map predicate = Account.Nonce.gen in
-  Party.Predicated.Poly.{ body; predicate }
-
 (* takes an account id, if we want to sign this data *)
 let gen_party_predicated_fee_payer ~account_id ~ledger :
     Party.Predicated.Fee_payer.t Quickcheck.Generator.t =
@@ -546,16 +534,23 @@ let gen_party_predicated_fee_payer ~account_id ~ledger :
   *)
   assert (Token_id.equal body0.token_id Token_id.default) ;
   let body = { body0 with token_id = () } in
-  let predicate = Account.Nonce.zero in
+  (* use nonce from account in ledger *)
+  let pk = body.pk in
+  let account_id = Account_id.create pk Token_id.default in
+  let account =
+    match Ledger.location_of_account ledger account_id with
+    | None ->
+        failwith
+          "gen_party_predicated_fee_payer: expected account to be in ledger"
+    | Some loc -> (
+        match Ledger.get ledger loc with
+        | None ->
+            failwith "gen_party_predicated_fee_payer: no account at location"
+        | Some account ->
+            account )
+  in
+  let predicate = account.nonce in
   Party.Predicated.Poly.{ body; predicate }
-
-let gen_party_signed ?account_id ~ledger : Party.Signed.t Quickcheck.Generator.t
-    =
-  let open Quickcheck.Let_syntax in
-  let%map data = gen_party_predicated_signed ?account_id ~ledger in
-  (* real signature to be added when this data inserted into a Parties.t *)
-  let authorization = Signature.dummy in
-  Party.Signed.{ data; authorization }
 
 let gen_fee_payer ~account_id ~ledger : Party.Fee_payer.t Quickcheck.Generator.t
     =
