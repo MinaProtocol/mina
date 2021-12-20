@@ -1419,6 +1419,23 @@
           "description": "Body component of a Snapp Party",
           "fields": [
             {
+              "name": "use_full_commitment",
+              "description":
+                "Use the full or partial commitment when checking the party predicate.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "protocolState",
               "description": "The protocol state in a Snapp transaction",
               "args": [],
@@ -1613,6 +1630,21 @@
             }
           ],
           "inputFields": [
+            {
+              "name": "use_full_commitment",
+              "description":
+                "Use the full or partial commitment when checking the party predicate.",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
             {
               "name": "protocolState",
               "description": "The protocol state in a Snapp transaction",
