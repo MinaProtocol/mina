@@ -2042,13 +2042,12 @@ module Base = struct
             in
             (* The fee-payer must increment their nonce. *)
             add_check Boolean.(party.data.body.increment_nonce ||| not is_start) ;
-            (* If there's a valid signature, it must increment the nonce. *)
-            (* TODO(#9743): Relax this when this party uses a 'full'
-               commitment.
-            *)
+            (* If there's a valid signature, it must increment the nonce or use full commitment *)
             add_check
               Boolean.(
-                party.data.body.increment_nonce ||| not signature_verifies) ;
+                party.data.body.increment_nonce
+                ||| party.data.body.use_full_commitment
+                ||| not signature_verifies) ;
             let account', `proof_must_verify proof_must_verify =
               let tag =
                 Option.map snapp_statement ~f:(fun (i, _) -> side_loaded i)

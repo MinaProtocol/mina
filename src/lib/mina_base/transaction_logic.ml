@@ -1717,13 +1717,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             in
             let%bind.Result () =
               match
-                (Control.tag p.authorization, p.data.body.increment_nonce)
+                ( Control.tag p.authorization
+                , p.data.body.increment_nonce
+                , p.data.body.use_full_commitment )
               with
-              | Signature, false ->
-                  (* If there's a signature, it must increment the nonce. *)
-                  (* TODO(#9743): Relax this when this party uses a 'full'
-                     commitment.
-                  *)
+              | Signature, false, false ->
+                  (* If there's a signature, it must increment the nonce or use
+                     full commitment to avoid replays *)
                   Error Transaction_status.Failure.Update_not_permitted
               | _ ->
                   Ok ()
@@ -2607,7 +2607,7 @@ module For_tests = struct
                     ; token_id = Token_id.default
                     ; balance_change =
                         Amount.Signed.(negate (of_unsigned amount))
-                    ; increment_nonce = true (* TODO(#9743) *)
+                    ; increment_nonce = true
                     ; events = []
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
