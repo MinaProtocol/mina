@@ -1579,21 +1579,54 @@ let%test_module "Ledger_catchup tests" =
         in
         Deferred.return (Some [])
       in
+
+      (* let broken_nodes_state =
+           Fake_network.Generator.peer_with_branch ~precomputed_values ~verifier ~max_frontier_length
+           ~use_super_catchup  ~frontier_branch_size:(max_frontier_length / 2) ~rpc_impl:None
+         in *)
+
+      (* let broken_nodes_states =
+             Fake_network.Generator.gen ~precomputed_values ~verifier ~max_frontier_length
+                 ~use_super_catchup
+                 [Fake_network.Generator.peer_with_branch ~frontier_branch_size:(max_frontier_length / 2) ~rpc_impl:None
+                 ; Fake_network.Generator.peer_with_branch ~frontier_branch_size:(max_frontier_length / 2) ~rpc_impl:None
+                 ]
+           in
+           let broken_nodes_state = List.hd_exn (Vect.to_list broken_nodes_states)
+         in *)
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
+          (* let open Quickcheck.Generator.Let_syntax in
+             let%bind broken_nodes_state =
+               peer_with_branch ~precomputed_values
+                 ~verifier ~max_frontier_length ~use_super_catchup
+                 ~frontier_branch_size:(max_frontier_length / 2) ~rpc_impl:None
+             in *)
           gen ~precomputed_values ~verifier ~max_frontier_length
             ~use_super_catchup
             [ fresh_peer
               (* ; peer_with_branch ~frontier_branch_size:(max_frontier_length / 2) *)
-            ; broken_rpc_peer_branch
+            ; peer_with_branch_custom_rpc
                 ~frontier_branch_size:(max_frontier_length / 2)
-                ~get_transition_chain_impl_option:(Some impl_rpc)
-            ; broken_rpc_peer_branch
+                ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
+                ?get_some_initial_peers:None ?answer_sync_ledger_query:None
+                ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
+                ?get_transition_knowledge:None ?get_transition_chain_proof:None
+                ?get_transition_chain:(Some impl_rpc)
+            ; peer_with_branch_custom_rpc
                 ~frontier_branch_size:(max_frontier_length / 2)
-                ~get_transition_chain_impl_option:(Some impl_rpc)
-            ; broken_rpc_peer_branch
+                ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
+                ?get_some_initial_peers:None ?answer_sync_ledger_query:None
+                ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
+                ?get_transition_knowledge:None ?get_transition_chain_proof:None
+                ?get_transition_chain:(Some impl_rpc)
+            ; peer_with_branch_custom_rpc
                 ~frontier_branch_size:(max_frontier_length / 2)
-                ~get_transition_chain_impl_option:(Some impl_rpc)
+                ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
+                ?get_some_initial_peers:None ?answer_sync_ledger_query:None
+                ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
+                ?get_transition_knowledge:None ?get_transition_chain_proof:None
+                ?get_transition_chain:(Some impl_rpc)
             ])
         ~f:(fun network ->
           let open Fake_network in
