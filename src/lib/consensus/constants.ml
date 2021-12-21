@@ -16,7 +16,6 @@ module Poly = struct
         ; sub_windows_per_window : 'length
         ; slots_per_epoch : 'length (* The first slot after the grace period. *)
         ; grace_period_end : 'length
-        ; epoch_size : 'length
         ; checkpoint_window_slots_per_year : 'length
         ; checkpoint_window_size_in_slots : 'length
         ; block_window_duration_ms : 'timespan
@@ -253,7 +252,6 @@ let create' (type a b c)
     ; slots_per_epoch = to_length slots_per_epoch
     ; grace_period_end = to_length grace_period_end
     ; slot_duration_ms = to_timespan Slot.duration_ms
-    ; epoch_size = to_length Epoch.size
     ; epoch_duration = to_timespan Epoch.duration
     ; checkpoint_window_slots_per_year = to_length zero
     ; checkpoint_window_size_in_slots = to_length zero
@@ -349,7 +347,6 @@ let to_input (t : t) =
             ; t.sub_windows_per_window
             ; t.slots_per_epoch
             ; t.grace_period_end
-            ; t.epoch_size
             ; t.checkpoint_window_slots_per_year
             ; t.checkpoint_window_size_in_slots
            |]
@@ -368,8 +365,8 @@ let gc_parameters (constants : t) =
   let delay = Block_time.Span.to_ms constants.delta_duration |> of_int64 in
   let gc_width = delay * of_int 2 in
   (* epoch, slot components of gc_width *)
-  let gc_width_epoch = gc_width / constants.epoch_size in
-  let gc_width_slot = gc_width mod constants.epoch_size in
+  let gc_width_epoch = gc_width / constants.slots_per_epoch in
+  let gc_width_slot = gc_width mod constants.slots_per_epoch in
   let gc_interval = gc_width in
   ( `Acceptable_network_delay delay
   , `Gc_width gc_width
@@ -389,7 +386,6 @@ module Checked = struct
     and sub_windows_per_window = u var.sub_windows_per_window
     and slots_per_epoch = u var.slots_per_epoch
     and grace_period_end = u var.grace_period_end
-    and epoch_size = u var.epoch_size
     and checkpoint_window_slots_per_year =
       u var.checkpoint_window_slots_per_year
     and checkpoint_window_size_in_slots =
@@ -411,7 +407,6 @@ module Checked = struct
           ; sub_windows_per_window
           ; slots_per_epoch
           ; grace_period_end
-          ; epoch_size
           ; checkpoint_window_slots_per_year
           ; checkpoint_window_size_in_slots
           ; block_window_duration_ms
