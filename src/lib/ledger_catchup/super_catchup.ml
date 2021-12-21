@@ -1518,7 +1518,6 @@ let%test_module "Ledger_catchup tests" =
             setup_catchup_pipes ~network:my_net.network
               ~frontier:my_net.state.frontier
           in
-          (* let { breadcrumbs_reader; job_writer; cache } = test in *)
           let parent_hash =
             Transition_frontier.Breadcrumb.parent_hash target_breadcrumb
           in
@@ -1531,8 +1530,6 @@ let%test_module "Ledger_catchup tests" =
           Strict_pipe.Writer.write test.job_writer
             (parent_hash, [ Rose_tree.T (target_transition, []) ]) ;
           Thread_safe.block_on_async_exn (fun () ->
-              (* let%bind _ = call_read ~test.breadcrumbs_reader ~target_best_tip_path ~my_peer:my_net [] 0 in *)
-              (* let breadcrumbs_tree = Rose_tree.of_list_exn breadcrumb_list in *)
               let final = Cache_lib.Cached.final_state target_transition in
               match%map
                 Deferred.any
@@ -1579,29 +1576,8 @@ let%test_module "Ledger_catchup tests" =
         in
         Deferred.return (Some [])
       in
-
-      (* let broken_nodes_state =
-           Fake_network.Generator.peer_with_branch ~precomputed_values ~verifier ~max_frontier_length
-           ~use_super_catchup  ~frontier_branch_size:(max_frontier_length / 2) ~rpc_impl:None
-         in *)
-
-      (* let broken_nodes_states =
-             Fake_network.Generator.gen ~precomputed_values ~verifier ~max_frontier_length
-                 ~use_super_catchup
-                 [Fake_network.Generator.peer_with_branch ~frontier_branch_size:(max_frontier_length / 2) ~rpc_impl:None
-                 ; Fake_network.Generator.peer_with_branch ~frontier_branch_size:(max_frontier_length / 2) ~rpc_impl:None
-                 ]
-           in
-           let broken_nodes_state = List.hd_exn (Vect.to_list broken_nodes_states)
-         in *)
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          (* let open Quickcheck.Generator.Let_syntax in
-             let%bind broken_nodes_state =
-               peer_with_branch ~precomputed_values
-                 ~verifier ~max_frontier_length ~use_super_catchup
-                 ~frontier_branch_size:(max_frontier_length / 2) ~rpc_impl:None
-             in *)
           gen ~precomputed_values ~verifier ~max_frontier_length
             ~use_super_catchup
             [ fresh_peer
