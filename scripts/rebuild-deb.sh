@@ -10,13 +10,14 @@ cd "${SCRIPTPATH}/../_build"
 GITHASH=$(git rev-parse --short=7 HEAD)
 GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 
-set +u
-BUILD_NUM=${BUILDKITE_BUILD_NUM}
-BUILD_URL=${BUILDKITE_BUILD_URL}
-set -u
-
 # Load in env vars for githash/branch/etc.
-source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
+if [[ "$1" == "local" ]]; then
+    source "${SCRIPTPATH}/export-local-git-env-vars.sh"
+else
+    source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
+fi
+
+MINA_DEB_CODENAME=stretch
 
 cd "${SCRIPTPATH}/../_build"
 
