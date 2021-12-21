@@ -108,6 +108,23 @@
         "balance": "2250000.000000000",
         "delegate": "B62qrMJjvLTz6XsE1Cge4yPAA9Y44SWeDtonH5LYN6ZYkwfsqukAf5D",
         "sk": null
+      },
+      {
+        "pk": "B62qjJwgq7kNXYHXQsMeyiMWL7fHsnPeuAiPfYd3yTor3eKpK8VV1gG",
+        "delegate": "B62qjJwgq7kNXYHXQsMeyiMWL7fHsnPeuAiPfYd3yTor3eKpK8VV1gG",
+        "balance": "2000000",
+        "nonce": "0",
+        "receipt_chain_hash":
+          "2mzhRazYextcWnQ81n5CGTrFD2Rx5dAS6rYjAeYCEyfhUjZUzYFy",
+        "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+        "permissions": {
+          "stake": true,
+          "edit_state": "signature",
+          "send": "signature",
+          "set_delegate": "signature",
+          "set_permissions": "signature",
+          "set_verification_key": "signature"
+        }
       }
     ]
   }
