@@ -126,18 +126,9 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
   in
   let peer_networks =
     Vect.map2 peers states ~f:(fun peer state ->
-        (* let frontier = state.frontier in *)
         let network =
           Thread_safe.block_on_async_exn (fun () ->
               (* TODO: merge implementations with mina_lib *)
-              (* let rpc =
-                   match state.rpc_impl with
-                   | Some impl ->
-                       impl
-                   | None ->
-                       rpc_implementations_default ~logger ~precomputed_values
-                         ~frontier
-                 in *)
               Mina_networking.create
                 (config peer state.consensus_local_state)
                 ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
