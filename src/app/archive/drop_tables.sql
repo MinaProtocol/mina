@@ -30,8 +30,6 @@ DROP TYPE user_command_status;
 
 DROP TABLE snapp_commands;
 
-DROP TABLE snapp_other_parties;
-
 DROP TABLE snapp_party;
 
 DROP TABLE snapp_fee_payers;
@@ -49,8 +47,6 @@ DROP TABLE snapp_account;
 DROP TABLE snapp_epoch_data;
 
 DROP TABLE snapp_epoch_ledger;
-
-DROP TABLE snapp_events;
 
 DROP TABLE snapp_permissions;
 
