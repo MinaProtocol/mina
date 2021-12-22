@@ -218,7 +218,7 @@ end
 
 module Snarked_ledger_hash = struct
   let find (module Conn : CONNECTION) (t : Frozen_ledger_hash.t) =
-    let hash = Frozen_ledger_hash.to_string t in
+    let hash = Frozen_ledger_hash.to_base58_check t in
     Conn.find
       (Caqti_request.find Caqti_type.string Caqti_type.int
          "SELECT id FROM snarked_ledger_hashes WHERE value = ?")
@@ -227,7 +227,7 @@ module Snarked_ledger_hash = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (t : Frozen_ledger_hash.t) =
     let open Deferred.Result.Let_syntax in
-    let hash = Frozen_ledger_hash.to_string t in
+    let hash = Frozen_ledger_hash.to_base58_check t in
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt Caqti_type.string Caqti_type.int
@@ -256,7 +256,7 @@ module Epoch_data = struct
   let add_from_seed_and_ledger_hash_id (module Conn : CONNECTION) ~seed
       ~ledger_hash_id =
     let open Deferred.Result.Let_syntax in
-    let seed = Epoch_seed.to_string seed in
+    let seed = Epoch_seed.to_base58_check seed in
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt typ Caqti_type.int
@@ -431,35 +431,13 @@ module User_command = struct
     match t with
     | Signed_command c ->
         c
-    | Snapp_command c ->
-        let module S = Mina_base.Snapp_command in
-        let ({source; receiver; amount} : S.transfer) = S.as_transfer c in
-        let fee_payer = S.fee_payer c in
-        { signature= Signature.dummy
-        ; signer= Snark_params.Tick.Field.(zero, zero)
-        ; payload=
-            { common=
-                { fee= S.fee_exn c
-                ; fee_token= Account_id.token_id fee_payer
-                ; fee_payer_pk= Account_id.public_key fee_payer
-                ; nonce=
-                    Option.value (S.nonce c)
-                      ~default:Mina_numbers.Account_nonce.zero
-                ; valid_until= Mina_numbers.Global_slot.max_value
-                ; memo= Signed_command_memo.create_from_string_exn "snapp" }
-            ; body=
-                Payment
-                  { source_pk= source
-                  ; receiver_pk= receiver
-                  ; token_id= S.token_id c
-                  ; amount } } }
+    | Parties _ -> failwith "TODO"
 
   let via (t : User_command.t) : [`Snapp_command | `Ident] =
     match t with
     | Signed_command _ ->
         `Ident
-    | Snapp_command _ ->
-        `Snapp_command
+    | Parties _ -> failwith "TODO"
 
   let add_if_doesn't_exist conn (t : User_command.t) =
     Signed_command.add_if_doesn't_exist conn ~via:(via t) (as_signed_command t)
@@ -1020,7 +998,7 @@ module Block = struct
     ; next_epoch_data_id: int
     ; ledger_hash: string
     ; height: int64
-    ; global_slot: int64
+    ; global_slot_since_hard_fork: int64
     ; global_slot_since_genesis: int64
     ; timestamp: int64 }
   [@@deriving hlist]
@@ -1051,13 +1029,13 @@ module Block = struct
     Conn.find
       (Caqti_request.find Caqti_type.string Caqti_type.int
          "SELECT id FROM blocks WHERE state_hash = ?")
-      (State_hash.to_string state_hash)
+      (State_hash.to_base58_check state_hash)
 
   let find_opt (module Conn : CONNECTION) ~(state_hash : State_hash.t) =
     Conn.find_opt
       (Caqti_request.find_opt Caqti_type.string Caqti_type.int
          "SELECT id FROM blocks WHERE state_hash = ?")
-      (State_hash.to_string state_hash)
+      (State_hash.to_base58_check state_hash)
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
@@ -1119,11 +1097,11 @@ module Block = struct
                       global_slot_since_genesis, timestamp)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
                |sql})
-            { state_hash= hash |> State_hash.to_string
+            { state_hash= hash |> State_hash.to_base58_check
             ; parent_id
             ; parent_hash=
                 Protocol_state.previous_state_hash protocol_state
-                |> State_hash.to_string
+                |> State_hash.to_base58_check
             ; creator_id
             ; block_winner_id
             ; snarked_ledger_hash_id
@@ -1132,12 +1110,12 @@ module Block = struct
             ; ledger_hash=
                 Protocol_state.blockchain_state protocol_state
                 |> Blockchain_state.staged_ledger_hash
-                |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_string
+                |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_base58_check
             ; height=
                 consensus_state
                 |> Consensus.Data.Consensus_state.blockchain_length
                 |> Unsigned.UInt32.to_int64
-            ; global_slot=
+            ; global_slot_since_hard_fork=
                 Consensus.Data.Consensus_state.curr_global_slot consensus_state
                 |> Unsigned.UInt32.to_int64
             ; global_slot_since_genesis=
@@ -1163,6 +1141,36 @@ module Block = struct
               transactions
           | Error e ->
               Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
+        in
+        let account_creation_fee_of_fees_and_balance ?additional_fee fee balance =
+          (* TODO: add transaction statuses to internal commands
+             the archive lib should not know the details of
+             account creation fees; the calculation below is
+             a temporizing hack
+          *)
+          let fee_uint64 = Currency.Fee.to_uint64 fee in
+          let balance_uint64 = Currency.Balance.to_uint64 balance in
+          let account_creation_fee_uint64 = Currency.Fee.to_uint64
+              constraint_constants.account_creation_fee
+          in
+          (* for coinbases, an associated fee transfer may reduce
+             the amount given to the coinbase receiver beyond
+             the account creation fee
+          *)
+          let creation_deduction_uint64 =
+            match additional_fee with
+            | None -> account_creation_fee_uint64
+            | Some fee' ->
+              Unsigned.UInt64.add (Currency.Fee.to_uint64 fee')
+                account_creation_fee_uint64
+          in
+          (* first compare guards against underflow in subtraction *)
+          if Unsigned.UInt64.compare fee_uint64 creation_deduction_uint64 >= 0 &&
+             Unsigned.UInt64.equal balance_uint64
+               (Unsigned.UInt64.sub fee_uint64 creation_deduction_uint64) then
+            Some (Unsigned.UInt64.to_int64 account_creation_fee_uint64)
+          else
+            None
         in
         let%bind (_ : int) =
           deferred_result_list_fold transactions ~init:0 ~f:(fun sequence_no ->
@@ -1246,22 +1254,8 @@ module Block = struct
                           (module Conn)
                           ~public_key_id:receiver_id ~balance
                       in
-                      (* TODO: add transaction statuses to internal commands
-                         the archive lib should not know the details of
-                         account creation fees; the calculation below is
-                         a temporizing hack
-                      *)
                       let receiver_account_creation_fee_paid =
-                        let fee_uint64 = Currency.Fee.to_uint64 fee in
-                        let balance_uint64 = Currency.Balance.to_uint64 balance in
-                        let account_creation_fee_uint64 = Currency.Fee.to_uint64
-                            constraint_constants.account_creation_fee
-                        in
-                        if Unsigned.UInt64.equal balance_uint64
-                            (Unsigned.UInt64.sub fee_uint64 account_creation_fee_uint64) then
-                          Some (Unsigned.UInt64.to_int64 account_creation_fee_uint64)
-                        else
-                          None
+                        account_creation_fee_of_fees_and_balance fee balance
                       in
                       Block_and_internal_command.add
                         (module Conn)
@@ -1277,10 +1271,10 @@ module Block = struct
                   Transaction_status.Coinbase_balance_data.of_balance_data_exn
                     (Transaction_status.balance_data status)
                 in
-                let%bind () =
+                let%bind additional_fee =
                   match Mina_base.Coinbase.fee_transfer coinbase with
                   | None ->
-                      return ()
+                      return None
                   | Some {receiver_pk; fee} ->
                       let fee_transfer =
                         Mina_base.Fee_transfer.Single.create ~receiver_pk ~fee
@@ -1305,30 +1299,17 @@ module Block = struct
                           ~public_key_id:fee_transfer_receiver_id
                           ~balance
                       in
-                      (* TODO: add transaction statuses to internal commands
-                         the archive lib should not know the details of
-                         account creation fees; the calculation below is
-                         a temporizing hack
-                      *)
                       let receiver_account_creation_fee_paid =
-                        let fee_uint64 = Currency.Fee.to_uint64 fee in
-                        let balance_uint64 = Currency.Balance.to_uint64 balance in
-                        let account_creation_fee_uint64 = Currency.Fee.to_uint64
-                            constraint_constants.account_creation_fee
-                        in
-                        if Unsigned.UInt64.equal balance_uint64
-                            (Unsigned.UInt64.sub fee_uint64 account_creation_fee_uint64) then
-                          Some (Unsigned.UInt64.to_int64 account_creation_fee_uint64)
-                        else
-                          None
+                        account_creation_fee_of_fees_and_balance fee balance
                       in
-                      Block_and_internal_command.add
+                      let%bind () = Block_and_internal_command.add
                         (module Conn)
                         ~block_id ~internal_command_id:id ~sequence_no
                         ~secondary_sequence_no:0
                         ~receiver_account_creation_fee_paid
                         ~receiver_balance_id
-                      >>| ignore
+                      in
+                      return (Some fee)
                 in
                 let%bind id =
                   Coinbase.add_if_doesn't_exist (module Conn) coinbase
@@ -1344,11 +1325,16 @@ module Block = struct
                     ~public_key_id:coinbase_receiver_id
                     ~balance:balances.coinbase_receiver_balance
                 in
+                let receiver_account_creation_fee_paid =
+                  account_creation_fee_of_fees_and_balance ?additional_fee
+                    (Currency.Amount.to_fee coinbase.amount)
+                    balances.coinbase_receiver_balance
+                in
                 let%map () =
                   Block_and_internal_command.add
                     (module Conn)
                     ~block_id ~internal_command_id:id ~sequence_no
-                    ~secondary_sequence_no:0 ~receiver_account_creation_fee_paid:None (* TEMP *)
+                    ~secondary_sequence_no:0 ~receiver_account_creation_fee_paid
                     ~receiver_balance_id
                   >>| ignore
                 in
@@ -1422,17 +1408,17 @@ module Block = struct
                       global_slot_since_genesis, timestamp)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
                |sql})
-            { state_hash= block.state_hash |> State_hash.to_string
+            { state_hash= block.state_hash |> State_hash.to_base58_check
             ; parent_id
-            ; parent_hash= block.parent_hash |> State_hash.to_string
+            ; parent_hash= block.parent_hash |> State_hash.to_base58_check
             ; creator_id
             ; block_winner_id
             ; snarked_ledger_hash_id
             ; staking_epoch_data_id
             ; next_epoch_data_id
-            ; ledger_hash= block.ledger_hash |> Ledger_hash.to_string
+            ; ledger_hash= block.ledger_hash |> Ledger_hash.to_base58_check
             ; height= block.height |> Unsigned.UInt32.to_int64
-            ; global_slot= block.global_slot |> Unsigned.UInt32.to_int64
+            ; global_slot_since_hard_fork= block.global_slot_since_hard_fork |> Unsigned.UInt32.to_int64
             ; global_slot_since_genesis=
                 block.global_slot_since_genesis |> Unsigned.UInt32.to_int64
             ; timestamp= block.timestamp |> Block_time.to_int64 }

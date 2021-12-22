@@ -1,4 +1,5 @@
 use crate::arkworks::CamlBigInteger256;
+use crate::caml::caml_bytes_string::CamlBytesString;
 use ark_ff::ToBytes;
 use ark_ff::{FftField, Field, FpParameters, One, PrimeField, SquareRootField, UniformRand, Zero};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
@@ -184,8 +185,8 @@ pub fn caml_pasta_fq_to_string(x: ocaml::Pointer<CamlFq>) -> String {
 
 #[ocaml_gen::func]
 #[ocaml::func]
-pub fn caml_pasta_fq_of_string(s: &[u8]) -> Result<CamlFq, ocaml::Error> {
-    let biguint = BigUint::parse_bytes(s, 10).ok_or(ocaml::Error::Message(
+pub fn caml_pasta_fq_of_string(s: CamlBytesString) -> Result<CamlFq, ocaml::Error> {
+    let biguint = BigUint::parse_bytes(s.0, 10).ok_or(ocaml::Error::Message(
         "caml_pasta_fq_of_string: couldn't parse input",
     ))?;
     let camlbigint: CamlBigInteger256 = biguint

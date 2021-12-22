@@ -109,49 +109,8 @@ let currency_consumed_unchecked :
             Currency.Amount.of_fee constraint_constants.account_creation_fee
         | Mint_tokens _ ->
             zero )
-    | Snapp_command c -> (
-        let open Snapp_command.Party in
-        let f (x1 : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t)
-            (x2 : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option)
-            token_id (fee_payment : Mina_base.Other_fee_payer.t option) =
-          let fee_payer =
-            match fee_payment with
-            | Some { payload = { pk; token_id; _ }; _ } ->
-                Some (Account_id.create pk token_id)
-            | None ->
-                None
-          in
-          let ps =
-            x1.data.body
-            :: Option.(to_list (map x2 ~f:(fun x2 -> x2.data.body)))
-          in
-          List.find_map ps ~f:(fun p ->
-              match fee_payer with
-              | Some fee_payer
-                when not
-                       (Account_id.equal fee_payer
-                          (Account_id.create p.pk token_id)) ->
-                  (* Fee payer is distinct from this account. *)
-                  None
-              | _ -> (
-                  match p.delta.sgn with
-                  | Pos ->
-                      None
-                  | Neg ->
-                      Some p.delta.magnitude ))
-          |> Option.value ~default:Currency.Amount.zero
-        in
-        match c with
-        | Proved_proved r ->
-            f r.one (Some r.two) r.token_id r.fee_payment
-        | Proved_signed r ->
-            f r.one (Some r.two) r.token_id r.fee_payment
-        | Signed_signed r ->
-            f r.one (Some r.two) r.token_id r.fee_payment
-        | Proved_empty r ->
-            f r.one r.two r.token_id r.fee_payment
-        | Signed_empty r ->
-            f r.one r.two r.token_id r.fee_payment )
+    | Parties _ ->
+        failwith "TODO"
   in
   fee_amt + amt
 

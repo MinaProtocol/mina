@@ -1,10 +1,10 @@
 //! The Marlin_plonk_stubs crate exports some functionalities
 //! and structures from the following the Rust crates to OCaml:
 //!
-//! * [Marlin](https://github.com/o1-labs/marlin),
+//! * [Proof-systems](https://github.com/o1-labs/proof-systems),
 //!   a PLONK implementation.
 //! * [Arkworks](http://arkworks.rs/),
-//!   a math library that Marlin builds on top of.
+//!   a math library that Proof-systems builds on top of.
 //!
 
 extern crate libc;

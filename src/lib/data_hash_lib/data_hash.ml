@@ -166,11 +166,8 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
   end)
 
   [%%define_locally
-  Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
-
-  [%%define_locally Base58_check.String_ops.(to_string, of_string)]
-
-  [%%define_locally Base58_check.(to_yojson, of_yojson)]
+  Base58_check.
+    (to_base58_check, of_base58_check, of_base58_check_exn, to_yojson, of_yojson)]
 
   module T = struct
     type t = Field.t [@@deriving sexp, compare, hash]

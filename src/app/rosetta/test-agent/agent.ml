@@ -246,7 +246,7 @@ let direct_graphql_no_account_fee_through_block ~logger ~rosetta_uri
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Ignore } ]
 
 let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
@@ -273,7 +273,7 @@ let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None } ]
 
 (* token creation disabled in daemon for now *)
@@ -296,7 +296,7 @@ let direct_graphql_create_token_through_block ~logger ~rosetta_uri ~graphql_uri
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None }
         ; { amount= None
           ; account= None
@@ -322,7 +322,7 @@ let direct_graphql_create_token_account_through_block ~logger ~rosetta_uri
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None } ]
 *)
 
@@ -449,7 +449,7 @@ let construction_api_payment_through_mempool =
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None } ]
 
 let construction_api_delegation_through_mempool =
@@ -470,7 +470,7 @@ let construction_api_delegation_through_mempool =
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None } ]
 
 (* token creation disabled in daemon for now *)
@@ -486,7 +486,7 @@ let construction_api_create_token_through_mempool =
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None }
         ; { amount= None
           ; account= None
@@ -505,7 +505,7 @@ let construction_api_create_token_account_through_mempool =
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
-          ; _type= "fee_payer_dec"
+          ; _type= "fee_payment"
           ; target= `Check None } ]
 *)
 
@@ -518,17 +518,10 @@ let get_consensus_constants ~logger :
     Filename.concat home ".coda-config"
   in
   let config_file =
-    let mina_config_file = "MINA_CONFIG_FILE" in
-    let coda_config_file = "CODA_CONFIG_FILE" in
-    match Sys.getenv mina_config_file,Sys.getenv coda_config_file with
-    | Some config_file,_ ->
+    match Sys.getenv "MINA_CONFIG_FILE" with
+    | Some config_file ->
         config_file
-    | None,Some config_file ->
-      [%log warn] "Using deprecated environment variable %s, please use %s instead"
-        coda_config_file mina_config_file;
-      config_file
-    | None,None ->
-        Filename.concat conf_dir "config.json"
+    | None -> Filename.concat conf_dir "config.json"
   in
   let%bind config =
     let%map config_json = Genesis_ledger_helper.load_config_json config_file in

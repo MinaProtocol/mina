@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Mina_numbers
 
 module type Key = Hashtbl.Key_plain

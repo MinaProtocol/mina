@@ -2,6 +2,7 @@ open Core_kernel
 open Async
 open Pipe_lib
 open Network_peer
+open O1trace
 module Statement_table = Transaction_snark_work.Statement.Table
 
 module Snark_tables = struct
@@ -168,6 +169,7 @@ struct
 
       type t =
         { snark_tables : Snark_tables.t
+        ; snark_table_lock : (unit Throttle.Sequencer.t[@sexp.opaque])
         ; best_tip_ledger : (unit -> Base_ledger.t option[@sexp.opaque])
         ; mutable ref_table : int Statement_table.t option
               (** Tracks the number of blocks that have each work statement in
@@ -212,6 +214,7 @@ struct
       let of_serializable tables ~constraint_constants ~frontier_broadcast_pipe
           ~config ~logger : t =
         { snark_tables = Snark_tables.of_serializable tables
+        ; snark_table_lock = Throttle.Sequencer.create ()
         ; best_tip_ledger = get_best_tip_ledger ~frontier_broadcast_pipe
         ; batcher = Batcher.Snark_pool.create config.verifier
         ; account_creation_fee =
@@ -264,43 +267,94 @@ struct
             | Some _ ->
                 true )
 
-      let fee_is_sufficient t ~fee ~prover ~best_tip_ledger =
-        let open Mina_base in
-        Currency.Fee.(fee >= t.account_creation_fee)
-        ||
-        match best_tip_ledger with
-        | Some l
-          when Option.is_none (Deferred.peek (Base_ledger.detached_signal l)) ->
-            Option.(
-              is_some
-                ( Base_ledger.location_of_account l
-                    (Account_id.create prover Token_id.default)
-                >>= Base_ledger.get l ))
-        | None | Some _ ->
-            false
+      let fee_is_sufficient t ~fee ~account_exists =
+        Currency.Fee.(fee >= t.account_creation_fee) || account_exists
 
-      let handle_transition_frontier_diff u t =
-        match u with
-        | `New_best_tip l ->
-            Statement_table.filteri_inplace t.snark_tables.all
-              ~f:(fun ~key ~data:{ fee = { fee; prover }; _ } ->
-                let keep =
-                  fee_is_sufficient t ~fee ~prover ~best_tip_ledger:(Some l)
+      let handle_new_best_tip_ledger t ledger =
+        let open Mina_base in
+        let open Signature_lib in
+        trace_recurring "handle_new_best_tip_ledger" (fun () ->
+            Throttle.enqueue t.snark_table_lock (fun () ->
+                let%map _ =
+                  let open Interruptible.Deferred_let_syntax in
+                  Interruptible.force
+                    (let%bind.Interruptible () =
+                       Interruptible.lift (Deferred.return ())
+                         (Base_ledger.detached_signal ledger)
+                     in
+                     let%bind prover_account_ids =
+                       trace_recurring
+                         "generate account ids of provers in snark table"
+                         (fun () ->
+                           let account_ids =
+                             t.snark_tables.all |> Statement_table.data
+                             |> List.map
+                                  ~f:(fun
+                                       { Priced_proof.fee = { prover; _ }; _ }
+                                     -> prover)
+                             |> List.dedup_and_sort
+                                  ~compare:Public_key.Compressed.compare
+                             |> List.map ~f:(fun prover ->
+                                    ( prover
+                                    , Account_id.create prover Token_id.default
+                                    ))
+                             |> Public_key.Compressed.Map.of_alist_exn
+                           in
+                           Deferred.map (Scheduler.yield ())
+                             ~f:(Fn.const account_ids))
+                     in
+                     (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
+                     let%bind prover_account_locations =
+                       trace_recurring
+                         "lookup prover account locations in best tip ledger"
+                         (fun () ->
+                           let account_locations =
+                             prover_account_ids |> Map.data
+                             |> Base_ledger.location_of_account_batch ledger
+                             |> Account_id.Map.of_alist_exn
+                           in
+                           Deferred.map (Scheduler.yield ())
+                             ~f:(Fn.const account_locations))
+                     in
+                     let yield = Staged.unstage (Scheduler.yield_every ~n:50) in
+                     let%map () =
+                       trace_recurring
+                         "filter snark table based on best tip ledger"
+                         (fun () ->
+                           let open Deferred.Let_syntax in
+                           Statement_table.fold ~init:Deferred.unit
+                             t.snark_tables.all
+                             ~f:(fun ~key ~data:{ fee = { fee; prover }; _ } acc
+                                ->
+                               let%bind () = acc in
+                               let%map () = yield () in
+                               let prover_account_exists =
+                                 prover
+                                 |> Map.find_exn prover_account_ids
+                                 |> Map.find_exn prover_account_locations
+                                 |> Option.is_some
+                               in
+                               let keep =
+                                 fee_is_sufficient t ~fee
+                                   ~account_exists:prover_account_exists
+                               in
+                               if not keep then (
+                                 Hashtbl.remove t.snark_tables.all key ;
+                                 Hashtbl.remove t.snark_tables.rebroadcastable
+                                   key )))
+                     in
+                     ())
                 in
-                if not keep then
-                  Hashtbl.remove t.snark_tables.rebroadcastable key ;
-                keep) ;
-            return ()
-        | `New_refcount_table
-            { Extensions.Snark_pool_refcount.removed
-            ; refcount_table
-            ; best_tip_table
-            } ->
+                ()))
+
+      let handle_new_refcount_table t
+          ({ removed; refcount_table; best_tip_table } :
+            Extensions.Snark_pool_refcount.view) =
+        trace_recurring "handle_new_refcount_table" (fun () ->
             t.ref_table <- Some refcount_table ;
             t.best_tip_table <- Some best_tip_table ;
             t.removed_counter <- t.removed_counter + removed ;
-            if t.removed_counter < removed_breadcrumb_wait then return ()
-            else (
+            if t.removed_counter >= removed_breadcrumb_wait then (
               t.removed_counter <- 0 ;
               Statement_table.filter_keys_inplace t.snark_tables.all
                 ~f:(fun k ->
@@ -308,11 +362,17 @@ struct
                   if not keep then
                     Hashtbl.remove t.snark_tables.rebroadcastable k ;
                   keep) ;
-              return
-                (*when snark works removed from the pool*)
-                Mina_metrics.(
-                  Gauge.set Snark_work.snark_pool_size
-                    (Float.of_int @@ Hashtbl.length t.snark_tables.all)) )
+              Mina_metrics.(
+                Gauge.set Snark_work.snark_pool_size
+                  (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ) ;
+            Deferred.unit)
+
+      let handle_transition_frontier_diff u t =
+        match u with
+        | `New_best_tip ledger ->
+            handle_new_best_tip_ledger t ledger
+        | `New_refcount_table refcount_table ->
+            handle_new_refcount_table t refcount_table
 
       (*TODO? add referenced statements from the transition frontier to ref_table here otherwise the work referenced in the root and not in any of the successor blocks will never be included. This may not be required because the chances of a new block from the root is very low (root's existing successor is 1 block away from finality)*)
       let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t)
@@ -354,6 +414,7 @@ struct
               { all = Statement_table.create ()
               ; rebroadcastable = Statement_table.create ()
               }
+          ; snark_table_lock = Throttle.Sequencer.create ()
           ; best_tip_ledger = get_best_tip_ledger ~frontier_broadcast_pipe
           ; batcher = Batcher.Snark_pool.create config.verifier
           ; logger
@@ -376,43 +437,47 @@ struct
 
       let add_snark ?(is_local = false) t ~work
           ~(proof : Ledger_proof.t One_or_two.t) ~fee =
-        if work_is_referenced t work then (
-          (*Note: fee against existing proofs and the new proofs are checked in
-            Diff.unsafe_apply which calls this function*)
-          Hashtbl.set t.snark_tables.all ~key:work ~data:{ proof; fee } ;
-          if is_local then
-            Hashtbl.set t.snark_tables.rebroadcastable ~key:work
-              ~data:({ proof; fee }, Time.now ())
-          else
-            (* Stop rebroadcasting locally generated snarks if they are
-               overwritten. No-op if there is no rebroadcastable SNARK with that
-               statement. *)
-            Hashtbl.remove t.snark_tables.rebroadcastable work ;
-          (*when snark work is added to the pool*)
-          Mina_metrics.(
-            Gauge.set Snark_work.useful_snark_work_received_time_sec
-              Time.(
-                let x = now () |> to_span_since_epoch |> Span.to_sec in
-                x -. Mina_metrics.time_offset_sec) ;
-            Gauge.set Snark_work.snark_pool_size
-              (Float.of_int @@ Hashtbl.length t.snark_tables.all) ;
-            Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
-              ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
-              |> Float.of_int )) ;
-          `Added )
-        else
-          let origin = if is_local then "locally generated" else "gossiped" in
-          [%log' warn t.logger]
-            "Rejecting %s snark work $stmt, statement not referenced" origin
-            ~metadata:
-              [ ( "stmt"
-                , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
-                    work )
-              ] ;
-          `Statement_not_referenced
+        Throttle.enqueue t.snark_table_lock (fun () ->
+            Deferred.return
+              ( if work_is_referenced t work then (
+                (*Note: fee against existing proofs and the new proofs are checked in
+                  Diff.unsafe_apply which calls this function*)
+                Hashtbl.set t.snark_tables.all ~key:work ~data:{ proof; fee } ;
+                if is_local then
+                  Hashtbl.set t.snark_tables.rebroadcastable ~key:work
+                    ~data:({ proof; fee }, Time.now ())
+                else
+                  (* Stop rebroadcasting locally generated snarks if they are
+                     overwritten. No-op if there is no rebroadcastable SNARK with that
+                     statement. *)
+                  Hashtbl.remove t.snark_tables.rebroadcastable work ;
+                (*when snark work is added to the pool*)
+                Mina_metrics.(
+                  Gauge.set Snark_work.useful_snark_work_received_time_sec
+                    Time.(
+                      let x = now () |> to_span_since_epoch |> Span.to_sec in
+                      x -. Mina_metrics.time_offset_sec) ;
+                  Gauge.set Snark_work.snark_pool_size
+                    (Float.of_int @@ Hashtbl.length t.snark_tables.all) ;
+                  Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
+                    ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
+                    |> Float.of_int )) ;
+                `Added )
+              else
+                let origin =
+                  if is_local then "locally generated" else "gossiped"
+                in
+                [%log' warn t.logger]
+                  "Rejecting %s snark work $stmt, statement not referenced"
+                  origin
+                  ~metadata:
+                    [ ( "stmt"
+                      , One_or_two.to_yojson
+                          Transaction_snark.Statement.to_yojson work )
+                    ] ;
+                `Statement_not_referenced ))
 
       let verify_and_act t ~work ~sender =
-        let best_tip_ledger = t.best_tip_ledger () in
         let statements, priced_proof = work in
         let { Priced_proof.proof = proofs; fee = { prover; fee } } =
           priced_proof
@@ -444,9 +509,6 @@ struct
           else Deferred.return ()
         in
         let message = Mina_base.Sok_message.create ~fee ~prover in
-        let prover_account_ok =
-          fee_is_sufficient t ~fee ~prover ~best_tip_ledger
-        in
         let verify proofs =
           let open Deferred.Let_syntax in
           let%bind statement_check =
@@ -466,7 +528,20 @@ struct
                   Error e)
           in
           let work = One_or_two.map proofs ~f:snd in
-          if not prover_account_ok then (
+          let prover_account_exists =
+            let open Mina_base in
+            let open Option.Let_syntax in
+            Option.is_some
+              (let%bind ledger = t.best_tip_ledger () in
+               if Deferred.is_determined (Base_ledger.detached_signal ledger)
+               then None
+               else
+                 Account_id.create prover Token_id.default
+                 |> Base_ledger.location_of_account ledger)
+          in
+          if
+            not (fee_is_sufficient t ~fee ~account_exists:prover_account_exists)
+          then (
             [%log' debug t.logger]
               "Prover $prover did not have sufficient balance" ~metadata ;
             return false )

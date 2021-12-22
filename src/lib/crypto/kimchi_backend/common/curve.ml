@@ -162,7 +162,6 @@ struct
       | Finite (x, y) ->
           Finite (x, y)
 
-    (* TODO: Rename to of_backend_exn *)
     let of_backend :
         Backend.t -> (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t =
       function

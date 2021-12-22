@@ -312,6 +312,16 @@ module Party = struct
     module Proved = struct
       [%%versioned
       module Stable = struct
+        module V2 = struct
+          type t =
+            ( Predicated.Proved.Stable.V1.t
+            , Control.Stable.V2.t )
+            Poly.Stable.V1.t
+          [@@deriving sexp, equal, yojson, hash, compare]
+
+          let to_latest = Fn.id
+        end
+
         module V1 = struct
           type t =
             ( Predicated.Proved.Stable.V1.t
@@ -319,7 +329,8 @@ module Party = struct
             Poly.Stable.V1.t
           [@@deriving sexp, equal, yojson, hash, compare]
 
-          let to_latest = Fn.id
+          let to_latest ({ data; authorization } : t) : V2.t =
+            { data; authorization = Control.Stable.V1.to_latest authorization }
         end
       end]
     end
@@ -364,6 +375,13 @@ module Inner = struct
         ; two : 'two
         }
       [@@deriving sexp, equal, yojson, hash, compare, fields, hlist]
+
+      let to_latest one_to_latest two_to_latest t =
+        { token_id = t.token_id
+        ; fee_payment = t.fee_payment
+        ; one = one_to_latest t.one
+        ; two = two_to_latest t.two
+        }
     end
   end]
 end
@@ -371,6 +389,37 @@ end
 module Binable_arg = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        | Proved_empty of
+            ( Party.Authorized.Proved.Stable.V2.t
+            , Party.Authorized.Empty.Stable.V1.t option )
+            Inner.Stable.V1.t
+        | Proved_signed of
+            ( Party.Authorized.Proved.Stable.V2.t
+            , Party.Authorized.Signed.Stable.V1.t )
+            Inner.Stable.V1.t
+        | Proved_proved of
+            ( Party.Authorized.Proved.Stable.V2.t
+            , Party.Authorized.Proved.Stable.V2.t )
+            Inner.Stable.V1.t
+        | Signed_signed of
+            ( Party.Authorized.Signed.Stable.V1.t
+            , Party.Authorized.Signed.Stable.V1.t )
+            Inner.Stable.V1.t
+        | Signed_empty of
+            ( Party.Authorized.Signed.Stable.V1.t
+            , Party.Authorized.Empty.Stable.V1.t option )
+            Inner.Stable.V1.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+
+      let description = "Snapp command"
+
+      let version_byte = Base58_check.Version_bytes.snapp_command
+    end
+
     module V1 = struct
       type t =
         | Proved_empty of
@@ -395,7 +444,26 @@ module Binable_arg = struct
             Inner.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
-      let to_latest = Fn.id
+      let to_latest : t -> V2.t = function
+        | Proved_empty inner ->
+            Proved_empty
+              (Inner.Stable.V1.to_latest
+                 Party.Authorized.Proved.Stable.V1.to_latest
+                 Party.Authorized.Empty.Stable.V1.to_latest inner)
+        | Proved_signed inner ->
+            Proved_signed
+              (Inner.Stable.V1.to_latest
+                 Party.Authorized.Proved.Stable.V1.to_latest
+                 Party.Authorized.Signed.Stable.V1.to_latest inner)
+        | Proved_proved inner ->
+            Proved_proved
+              (Inner.Stable.V1.to_latest
+                 Party.Authorized.Proved.Stable.V1.to_latest
+                 Party.Authorized.Proved.Stable.V1.to_latest inner)
+        | Signed_signed inner ->
+            Signed_signed inner
+        | Signed_empty inner ->
+            Signed_empty inner
 
       let description = "Snapp command"
 
@@ -412,6 +480,47 @@ include Binable_arg
 
 [%%versioned_binable
 module Stable = struct
+  module V2 = struct
+    type t = Binable_arg.Stable.V2.t =
+      | Proved_empty of
+          ( Party.Authorized.Proved.Stable.V2.t
+          , Party.Authorized.Empty.Stable.V1.t option )
+          Inner.Stable.V1.t
+      | Proved_signed of
+          ( Party.Authorized.Proved.Stable.V2.t
+          , Party.Authorized.Signed.Stable.V1.t )
+          Inner.Stable.V1.t
+      | Proved_proved of
+          ( Party.Authorized.Proved.Stable.V2.t
+          , Party.Authorized.Proved.Stable.V2.t )
+          Inner.Stable.V1.t
+      | Signed_signed of
+          ( Party.Authorized.Signed.Stable.V1.t
+          , Party.Authorized.Signed.Stable.V1.t )
+          Inner.Stable.V1.t
+      | Signed_empty of
+          ( Party.Authorized.Signed.Stable.V1.t
+          , Party.Authorized.Empty.Stable.V1.t option )
+          Inner.Stable.V1.t
+    [@@deriving sexp, equal, yojson, hash, compare]
+
+    include Binable.Of_binable
+              (Binable_arg.Stable.V2)
+              (struct
+                type nonrec t = t
+
+                let to_binable _ = failwith "Snapps disabled"
+
+                let of_binable _ = failwith "Snapps disabled"
+              end)
+
+    let to_latest = Fn.id
+
+    let description = "Snapp command"
+
+    let version_byte = Base58_check.Version_bytes.snapp_command
+  end
+
   module V1 = struct
     type t = Binable_arg.Stable.V1.t =
       | Proved_empty of
@@ -446,7 +555,7 @@ module Stable = struct
                 let of_binable _ = failwith "Snapps disabled"
               end)
 
-    let to_latest = Fn.id
+    let to_latest = Binable_arg.Stable.V1.to_latest
 
     let description = "Snapp command"
 

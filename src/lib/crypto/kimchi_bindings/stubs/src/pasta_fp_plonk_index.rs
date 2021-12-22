@@ -9,10 +9,6 @@ use std::{
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
 };
 
-//
-// CamlPastaFpPlonkIndex (custom type)
-//
-
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
 #[derive(ocaml_gen::CustomType)]
 pub struct CamlPastaFpPlonkIndex(pub Box<DlogIndex<GAffine>>);
@@ -29,10 +25,6 @@ ocaml::custom!(CamlPastaFpPlonkIndex {
     finalize: caml_pasta_fp_plonk_index_finalize,
 });
 
-//
-// CamlPastaFpPlonkIndex methods
-//
-
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_create(
@@ -40,7 +32,6 @@ pub fn caml_pasta_fp_plonk_index_create(
     public: ocaml::Int,
     srs: CamlFpSrs,
 ) -> Result<CamlPastaFpPlonkIndex, ocaml::Error> {
-    // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
     let gates: Vec<_> = gates
         .as_ref()
         .0
@@ -123,7 +114,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     srs: CamlFpSrs,
     path: String,
 ) -> Result<CamlPastaFpPlonkIndex, ocaml::Error> {
-    // read from file
+    // open the file for reading
     let file = match File::open(path) {
         Err(_) => {
             return Err(
@@ -148,7 +139,6 @@ pub fn caml_pasta_fp_plonk_index_read(
     t.fq_sponge_params = oracle::pasta::fq_3::params();
     t.linearization = expr_linearization(t.cs.domain.d1, false, false, None);
 
-    //
     Ok(CamlPastaFpPlonkIndex(Box::new(t)))
 }
 
