@@ -609,10 +609,10 @@ struct
         let add_gates gates =
           List.iter gates ~f:(fun g ->
               let g = to_absolute_row g in
-              Gates.add rust_gates (Gate_spec.to_rust_gate g)) ;
+              Gates.add rust_gates (Gate_spec.to_rust_gate g))
         in
-        add_gates public_gates;
-        add_gates gates;
+        add_gates public_gates ;
+        add_gates gates ;
 
         (* drop the gates, we don't need them anymore *)
         sys.gates <- `Finalized ;
@@ -632,11 +632,11 @@ struct
       Returns `(last_scalar, last_variable, terms, terms_length)`
       where terms does not contain the last scalar and last variable observed.
   *)
-  let accumulate_sorted_terms (c0, i0) terms =
-    Sequence.of_list terms
-    |> Sequence.fold ~init:(c0, i0, [], 0) ~f:(fun (acc, i, ts, n) (c, j) ->
-           if Int.equal i j then (Fp.add acc c, i, ts, n)
-           else (c, j, (acc, i) :: ts, n + 1))
+  let accumulate_terms terms =
+    List.fold terms ~init:Int.Map.empty ~f:(fun acc (x, i) ->
+        Map.change acc i ~f:(fun y ->
+            let res = match y with None -> x | Some y -> Fp.add x y in
+            if Fp.(equal zero res) then None else Some res))
 
   (** Converts a [Cvar.t] to a `(terms, terms_length, has_constant)`.
       if `has_constant` is set, then terms start with a constant term in the form of (c, 0).
@@ -648,20 +648,17 @@ struct
           ~equal ~one:(of_int 1))
         x
     in
-    let terms =
-      List.sort terms ~compare:(fun (_, i) (_, j) -> Int.compare i j)
-    in
-    let has_constant_term = Option.is_some c in
     (* Note: [(c, 0)] represents the field element [c] multiplied by the 0th
        variable, which is held constant as [Field.one].
     *)
     let terms = match c with None -> terms | Some c -> (c, 0) :: terms in
-    match terms with
-    | [] ->
-        Some ([], 0, false)
-    | t0 :: terms ->
-        let acc, i, ts, n = accumulate_sorted_terms t0 terms in
-        Some (List.rev ((acc, i) :: ts), n + 1, has_constant_term)
+    let has_constant_term = Option.is_some c in
+    let terms = accumulate_terms terms in
+    let terms_list =
+      Map.fold_right ~init:[] terms ~f:(fun ~key ~data acc ->
+          (data, key) :: acc)
+    in
+    Some (terms_list, Map.length terms, has_constant_term)
 
   (** Adds a row/gate/constraint to a constraint system `sys` *)
   let add_row sys (vars : V.t option array) kind coeffs =
@@ -738,20 +735,18 @@ struct
           ~equal ~one:(of_int 1))
         x
     in
-    let terms =
-      List.sort terms ~compare:(fun (_, i) (_, j) -> Int.compare i j)
+    let terms = accumulate_terms terms in
+    let terms_list =
+      Map.fold_right ~init:[] terms ~f:(fun ~key ~data acc ->
+          (data, key) :: acc)
     in
-    match (constant, terms) with
-    | Some c, [] ->
+    match (constant, Map.is_empty terms) with
+    | Some c, true ->
         (c, `Constant)
-    | None, [] ->
+    | None, true ->
         (Fp.zero, `Constant)
-    | _, t0 :: terms -> (
-        let terms =
-          let acc, i, ts, _ = accumulate_sorted_terms t0 terms in
-          List.rev ((acc, i) :: ts)
-        in
-        match terms with
+    | _ -> (
+        match terms_list with
         | [] ->
             assert false
         | [ (ls, lx) ] -> (
