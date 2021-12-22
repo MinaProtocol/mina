@@ -5,5 +5,5 @@ edition = "2021"
 authors = ["opensource@o1labs.org"]
 
 [dependencies]
-ocaml-gen = { git = "https://github.com/o1-labs/proof-systems", branch = "imeckler/backend" }
+ocaml-gen = { git = "https://github.com/o1-labs/proof-systems", rev = "aff6a79b81b3afa0c0594a210efd398383753ab5" }
 wires_15_stubs = { path = "../" }
