@@ -578,7 +578,10 @@ WITH RECURSIVE chain AS (
           ; amount= Option.map ~f:Unsigned.UInt64.of_int64 uc.amount
           ; fee= Unsigned.UInt64.of_int64 uc.fee
           ; hash= uc.hash
-          ; failure_status= Some failure_status } )
+          ; failure_status= Some failure_status
+          ; valid_until= Option.map ~f:Unsigned.UInt32.of_int64 uc.valid_until
+          ; memo = if String.equal uc.memo "" then None else Some uc.memo
+          } )
     in
     { Block_info.block_identifier=
         {Block_identifier.index= raw_block.height; hash= raw_block.state_hash}

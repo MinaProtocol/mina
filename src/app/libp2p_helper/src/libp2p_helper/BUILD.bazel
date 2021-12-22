@@ -4,7 +4,6 @@ go_library(
     name = "lib",
     srcs = [
         "main.go",
-        "methodidx_jsonenum.go",
     ],
     importpath = "//src/libp2p_helper",
     visibility = ["//visibility:private"],
@@ -36,7 +35,6 @@ go_library(
     name = "libp2p_helper_lib",
     srcs = [
         "main.go",
-        "methodidx_jsonenum.go",
     ],
     importpath = "libp2p_helper",
     visibility = ["//visibility:private"],

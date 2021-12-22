@@ -67,7 +67,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
               |> List.filter_map ~f:(function
                    | User_command.Signed_command c ->
                        Some c
-                   | Snapp_command _ ->
+                   | Parties _ ->
                        None)
               |> Fn.flip Signed_command.filter_by_participant participant
             in
@@ -159,7 +159,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
              in
              match (gcloud_keyfile, network, bucket) with
              | Some _, Some network, Some bucket ->
-                 let hash_string = State_hash.to_string hash in
+                 let hash_string = State_hash.to_base58_check hash in
                  let height =
                    Mina_transition.External_transition.Validated
                    .blockchain_length new_block

@@ -97,7 +97,7 @@ module Make (Inputs : Inputs_intf) = struct
     }
 
   let name =
-    sprintf "%s_%d_v3" Inputs.name (Pickles_types.Nat.to_int Inputs.Rounds.n)
+    sprintf "%s_%d_v4" Inputs.name (Pickles_types.Nat.to_int Inputs.Rounds.n)
 
   let set_urs_info, load_urs =
     let urs_info = Set_once.create () in
@@ -165,44 +165,6 @@ module Make (Inputs : Inputs_intf) = struct
 
   let array_to_vector a = Pickles_types.Vector.of_list (Array.to_list a)
 
-  (*
-  let pickles_verification_evals_of_backend
-      (t :
-        Inputs.Poly_comm.Backend.t
-        Kimchi.Protocol.VerifierIndex.verification_evals) :
-      Inputs.Curve.Affine.t
-      Pickles_types.Dlog_plonk_types.Poly_comm.Without_degree_bound.t
-      Pickles_types.Plonk_verification_key_evals.t =
-    let array_to_vector7 a =
-      Pickles_types.Vector.of_array_and_length_exn a Pickles_types.Nat.N7.n
-    in
-    let array_to_vector15 a =
-      Pickles_types.Vector.of_array_and_length_exn a Pickles_types.Nat.N15.n
-    in
-    let inin : Inputs.Poly_comm.Backend.t array = t.sigma_comm in
-    let sigma_comm :
-        Inputs.Curve.Affine.t
-        Pickles_types.Dlog_plonk_types.Poly_comm.Without_degree_bound.t
-        Pickles_types.Dlog_plonk_types.Permuts_vec.Stable.V1.t =
-      Array.map inin ~f:Inputs.Poly_comm.of_backend_without_degree_bound
-      |> array_to_vector7
-    in
-    { sigma_comm
-    ; coefficients_comm =
-        Array.map t.coefficients_comm
-          ~f:Inputs.Poly_comm.of_backend_without_degree_bound
-        |> array_to_vector15
-    ; generic_comm =
-        Inputs.Poly_comm.of_backend_without_degree_bound t.generic_comm
-    ; psm_comm = Inputs.Poly_comm.of_backend_without_degree_bound t.psm_comm
-    ; complete_add_comm =
-        Inputs.Poly_comm.of_backend_without_degree_bound t.complete_add_comm
-    ; mul_comm = Inputs.Poly_comm.of_backend_without_degree_bound t.mul_comm
-    ; emul_comm = Inputs.Poly_comm.of_backend_without_degree_bound t.emul_comm
-    }
-
-    *)
-
   (** does this convert a backend.verifier_index to a pickles_types.verifier_index? *)
   let vk_commitments (t : Inputs.Verifier_index.t) :
       Inputs.Curve.Affine.t Pickles_types.Plonk_verification_key_evals.t =
@@ -226,51 +188,4 @@ module Make (Inputs : Inputs_intf) = struct
     ; emul_comm = g t.evals.emul_comm
     ; endomul_scalar_comm = g t.evals.endomul_scalar_comm
     }
-
-  (*
-    let f (t : Inputs.Poly_comm.Backend.t) =
-      match Inputs.Poly_comm.of_backend_without_degree_bound t with
-      | `Without_degree_bound a ->
-          a
-      | _ ->
-          assert false
-    in
-    let evals = pickles_verification_evals_of_backend t.evals in
-    Pickles_types.Plonk_verification_key_evals.map ~f evals
-    *)
-
-  (*
-    let f (t : Inputs.Poly_comm.Backend.t) =
-      match Inputs.Poly_comm.of_backend_without_degree_bound t with
-      | `Without_degree_bound a ->
-          a
-      | _ ->
-          assert false
-    in
-    let pickles_types_evals :
-        Inputs.Curve.Affine.t
-        Pickles_types.Dlog_plonk_types.Poly_comm.Without_degree_bound.t
-        Pickles_types.Plonk_verification_key_evals.t =
-      Pickles_types.Plonk_verification_key_evals.
-        { sigma_comm = failwith "Hey" (* t.evals.sigma_comm *)
-        ; coefficients_comm = failwith "Hey" (* t.evals.coefficients_comm *)
-        ; generic_comm = failwith "Hey" (*t.evals.generic_comm*)
-        ; psm_comm = failwith "Hey" (*t.evals.psm_comm*)
-        ; complete_add_comm = failwith "Hey" (*t.evals.complete_add_comm*)
-        ; mul_comm = failwith "Hey" (*t.evals.mul_comm*)
-        ; emul_comm = failwith "Hey" (*t.evals.emul_comm*)
-        }
-    in
-    (*
-      { sigma_comm : 'comm Dlog_plonk_types.Permuts_vec.Stable.V1.t
-      ; coefficients_comm : 'comm Dlog_plonk_types.Columns_vec.Stable.V1.t
-      ; generic_comm : 'comm
-      ; psm_comm : 'comm
-      ; complete_add_comm : 'comm
-      ; mul_comm : 'comm
-      ; emul_comm : 'comm
-      }
-      *)
-    Pickles_types.Plonk_verification_key_evals.map ~f pickles_types_evals
-    *)
 end

@@ -15,6 +15,7 @@ open Mina_base_nonconsensus
 open Rosetta_lib_nonconsensus
 open Rosetta_coding_nonconsensus
 open Js_util
+module String_sign = String_sign_nonconsensus.String_sign
 
 let _ =
   Js.export "minaSDK"
@@ -152,6 +153,20 @@ let _ =
          let signed = Signed_command.Poly.{ payload; signer; signature } in
          if Signed_command.check_signature signed then Js._true else Js._false
 
+       method hashPayment (signed_payment : signed_payment) : Js.js_string Js.t
+           =
+         let payload : Signed_command_payload.t =
+           payload_of_payment_js signed_payment##.payment
+         in
+         let signer =
+           signed_payment##.sender |> Js.to_string
+           |> Public_key.Compressed.of_base58_check_exn
+           |> Public_key.decompress_exn
+         in
+         Transaction_hash.hash_signed_command
+           { payload; signer; signature = Signature.dummy }
+         |> Transaction_hash.to_base58_check |> Js.string
+
        (** sign payment transaction payload with private key *)
        method signStakeDelegation (sk_base58_check_js : string_js)
            (stake_delegation_js : stake_delegation_js) : signed_stake_delegation
@@ -188,6 +203,22 @@ let _ =
          in
          let signed = Signed_command.Poly.{ payload; signer; signature } in
          if Signed_command.check_signature signed then Js._true else Js._false
+
+       method hashStakeDelegation
+           (signed_stake_delegation : signed_stake_delegation)
+           : Js.js_string Js.t =
+         let payload : Signed_command_payload.t =
+           payload_of_stake_delegation_js
+             signed_stake_delegation##.stakeDelegation
+         in
+         let signer =
+           signed_stake_delegation##.sender
+           |> Js.to_string |> Public_key.Compressed.of_base58_check_exn
+           |> Public_key.decompress_exn
+         in
+         Transaction_hash.hash_signed_command
+           { payload; signer; signature = Signature.dummy }
+         |> Transaction_hash.to_base58_check |> Js.string
 
        (** sign a transaction in Rosetta rendered format *)
        method signRosettaTransaction (sk_base58_check_js : string_js)
@@ -277,6 +308,12 @@ let _ =
                `Assoc [ ("error", `String err_msg) ]
          in
          Js.string (Yojson.Safe.to_string result_json)
+
+       method hashBytearray = Poseidon_hash.hash_bytearray
+
+       method hashFieldElems = Poseidon_hash.hash_field_elems
+
+       val hashOrder = Poseidon_hash.Field.(Hex.encode @@ Nat.to_bytes order)
 
        method runUnitTests () : bool Js.t = Coding.run_unit_tests () ; Js._true
     end)

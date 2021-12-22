@@ -29,3 +29,7 @@
 ------
 - Log precomputed blocks by default
 - Add maxConnections value of 200
+
+1.0.7:
+------
+- All references to the crypto currency now say Mina

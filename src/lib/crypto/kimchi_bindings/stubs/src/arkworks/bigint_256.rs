@@ -1,3 +1,4 @@
+use crate::caml::caml_bytes_string::CamlBytesString;
 use ark_ff::{BigInteger as ark_BigInteger, BigInteger256};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use num_bigint::BigUint;
@@ -110,12 +111,12 @@ impl ToString for CamlBigInteger256 {
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_of_numeral(
-    s: &[u8],
+    s: CamlBytesString,
     _len: ocaml::Int,
     base: ocaml::Int,
 ) -> Result<CamlBigInteger256, ocaml::Error> {
     match BigUint::parse_bytes(
-        s,
+        s.0,
         base.try_into()
             .map_err(|_| ocaml::Error::Message("caml_bigint_256_of_numeral"))?,
     ) {
@@ -127,8 +128,10 @@ pub fn caml_bigint_256_of_numeral(
 
 #[ocaml_gen::func]
 #[ocaml::func]
-pub fn caml_bigint_256_of_decimal_string(s: &[u8]) -> Result<CamlBigInteger256, ocaml::Error> {
-    match BigUint::parse_bytes(s, 10) {
+pub fn caml_bigint_256_of_decimal_string(
+    s: CamlBytesString,
+) -> Result<CamlBigInteger256, ocaml::Error> {
+    match BigUint::parse_bytes(s.0, 10) {
         Some(data) => CamlBigInteger256::try_from(data)
             .map_err(|_| ocaml::Error::Message("caml_bigint_256_of_decimal_string")),
         None => Err(ocaml::Error::Message("caml_bigint_256_of_decimal_string")),

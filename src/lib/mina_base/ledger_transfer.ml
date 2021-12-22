@@ -27,8 +27,8 @@ end = struct
     if not (Ledger_hash.equal src_hash dest_hash) then
       Or_error.errorf
         "Merkle roots differ after transfer: expected %s, actual %s"
-        (Ledger_hash.to_string src_hash)
-        (Ledger_hash.to_string dest_hash)
+        (Ledger_hash.to_base58_check src_hash)
+        (Ledger_hash.to_base58_check dest_hash)
     else Ok dest
 end
 
@@ -52,8 +52,8 @@ end = struct
       if not (Ledger_hash.equal src_hash dest_hash) then
         Or_error.errorf
           "Merkle roots differ after transfer: expected %s, actual %s"
-          (Ledger_hash.to_string src_hash)
-          (Ledger_hash.to_string dest_hash)
+          (Ledger_hash.to_base58_check src_hash)
+          (Ledger_hash.to_base58_check dest_hash)
       else Ok dest
     else
       Or_error.errorf

@@ -41,10 +41,16 @@ module Diff_versioned = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V2 = struct
+      type t = User_command.Stable.V2.t list [@@deriving sexp, yojson, hash]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t = User_command.Stable.V1.t list [@@deriving sexp, yojson, hash]
 
-      let to_latest = Fn.id
+      let to_latest = List.map ~f:User_command.Stable.V1.to_latest
     end
   end]
 
@@ -137,11 +143,20 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
+      module V2 = struct
+        type t = (User_command.Stable.V2.t * Diff_error.Stable.V1.t) list
+        [@@deriving sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
         [@@deriving sexp, yojson]
 
-        let to_latest = Fn.id
+        let to_latest (t : t) : V2.t =
+          List.map t ~f:(fun (cmd, err) ->
+              (User_command.Stable.V1.to_latest cmd, err))
       end
     end]
 
@@ -411,8 +426,8 @@ struct
 
     let check_command (t : User_command.t) : User_command.Valid.t option =
       match t with
-      | Snapp_command _ ->
-          None
+      | Parties _ ->
+          failwith "TODO"
       | Signed_command t ->
           Option.map (Signed_command.check t) ~f:(fun x ->
               User_command.Signed_command x)
@@ -946,8 +961,8 @@ struct
               match
                 Option.all
                   (List.map diffs.data ~f:(function
-                    | Snapp_command _ ->
-                        None
+                    | Parties _ ->
+                        failwith "TODO"
                     | Signed_command x ->
                         Some x))
                 |> Option.map ~f:(fun data -> { diffs with data })

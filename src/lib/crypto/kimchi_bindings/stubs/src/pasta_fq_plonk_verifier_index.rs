@@ -18,16 +18,8 @@ use kimchi_circuits::wires::{COLUMNS, PERMUTS};
 use std::convert::TryInto;
 use std::path::Path;
 
-//
-// CamlPastaFqPlonkVerifierIndex
-//
-
 pub type CamlPastaFqPlonkVerifierIndex =
     CamlPlonkVerifierIndex<CamlFq, CamlFqSrs, CamlPolyComm<CamlGPallas>>;
-
-//
-// Handy conversion functions
-//
 
 impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
     fn from(vi: VerifierIndex<GAffine>) -> Self {
@@ -63,6 +55,7 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
     }
 }
 
+// TODO: This should really be a TryFrom or TryInto
 impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
     fn from(index: CamlPastaFqPlonkVerifierIndex) -> Self {
         let evals = index.evals;
@@ -124,10 +117,6 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
     }
 }
 
-//
-// Serialization helpers
-//
-
 pub fn read_raw(
     offset: Option<ocaml::Int>,
     srs: CamlFqSrs,
@@ -146,8 +135,6 @@ pub fn read_raw(
         fr_sponge_params,
     )
     .map_err(|e| {
-        println!("{}", e);
-
         ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
             .err()
             .unwrap()
@@ -155,7 +142,7 @@ pub fn read_raw(
 }
 
 //
-// Methods
+// OCaml methods
 //
 
 #[ocaml_gen::func]
@@ -180,7 +167,6 @@ pub fn caml_pasta_fq_plonk_verifier_index_write(
     let index: VerifierIndex<GAffine> = index.into();
     let path = Path::new(&path);
     index.to_file(path, append).map_err(|e| {
-        println!("{}", e);
         ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
             .err()
             .unwrap()
