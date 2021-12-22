@@ -903,24 +903,28 @@ struct
             (* s1 * x1 = s2
                x1 = s2 / s1
             *)
-            match Hashtbl.find sys.cached_constants Fp.(s2 / s1) with
+            let ratio = Fp.(s2 / s1) in
+            match Hashtbl.find sys.cached_constants ratio with
             | Some x2 ->
                 Union_find.union (union_find sys x1) (union_find sys x2)
             | None ->
                 add_generic_constraint ~l:x1
                   [| s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2 |]
-                  sys )
+                  sys ;
+                Hashtbl.set sys.cached_constants ratio x1 )
         | `Constant, `Var x2 -> (
             (* s1 = s2 * x2
                x2 = s1 / s2
             *)
-            match Hashtbl.find sys.cached_constants Fp.(s1 / s2) with
+            let ratio = Fp.(s1 / s2) in
+            match Hashtbl.find sys.cached_constants ratio with
             | Some x1 ->
                 Union_find.union (union_find sys x1) (union_find sys x2)
             | None ->
                 add_generic_constraint ~r:x2
                   [| Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1 |]
-                  sys )
+                  sys ;
+                Hashtbl.set sys.cached_constants ratio x2 )
         | `Constant, `Constant ->
             assert (Fp.(equal s1 s2)) )
     | Plonk_constraint.T (Basic { l; r; o; m; c }) ->
