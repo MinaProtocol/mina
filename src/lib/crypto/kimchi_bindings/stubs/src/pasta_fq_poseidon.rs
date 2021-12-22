@@ -5,7 +5,7 @@ use oracle::poseidon::{
     poseidon_block_cipher,
     PlonkSpongeConstantsBasic,
     ArithmeticSpongeParams};
-use crate::pasta_fq_vector::CamlPastaFqVector;
+use crate::field_vector::fq::CamlFqVector;
 
 pub struct CamlPastaFqPoseidonParams(ArithmeticSpongeParams<Fq>);
 pub type CamlPastaFqPoseidonParamsPtr<'a> = ocaml::Pointer<'a, CamlPastaFqPoseidonParams>;
@@ -29,7 +29,7 @@ pub fn caml_pasta_fq_poseidon_params_create() -> CamlPastaFqPoseidonParams {
 #[ocaml::func]
 pub fn caml_pasta_fq_poseidon_block_cipher(
     params: CamlPastaFqPoseidonParamsPtr,
-    mut state: CamlPastaFqVector) {
+    mut state: CamlFqVector) {
     poseidon_block_cipher::<Fq, PlonkSpongeConstantsBasic>(
         & params.as_ref().0,
         state.as_mut())
