@@ -11,4 +11,6 @@
    o1trace
    pickles
    snarky.backendless
-   sponge))
+   sponge
+   kimchi.pasta_fp_poseidon
+   kimchi.pasta_fq_poseidon))

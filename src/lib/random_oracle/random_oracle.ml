@@ -88,13 +88,13 @@ module Permutation : Sponge.Intf.Permutation with module Field = Field = struct
 
   let copy = Ocaml_permutation.copy
 
-  let params = Marlin_plonk_bindings_pasta_fp_poseidon.create ()
+  let params = Kimchi_pasta_fp_poseidon.create ()
 
   let block_cipher _params (s : Field.t array) =
-    let v = Marlin_plonk_bindings_pasta_fp_vector.create () in
-    Array.iter s ~f:(Marlin_plonk_bindings_pasta_fp_vector.emplace_back v) ;
-    Marlin_plonk_bindings_pasta_fp_poseidon.block_cipher params v ;
-    Array.init (Array.length s) ~f:(Marlin_plonk_bindings_pasta_fp_vector.get v)
+    let v = Kimchi.FieldVectors.Fp.create () in
+    Array.iter s ~f:(Kimchi.FieldVectors.Fp.emplace_back v) ;
+    Kimchi_pasta_fp_poseidon.block_cipher params v ;
+    Array.init (Array.length s) ~f:(Kimchi.FieldVectors.Fp.get v)
 end
 
 [%%else]
