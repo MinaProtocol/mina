@@ -61,7 +61,7 @@ pub fn wait_until_non_zero(ptr: *const u32) -> u32 {
     // The rust docs explicitly forbid using this for cross-thread syncronization. Oh well, we
     // don't have anything better. As long as it works in practice, we haven't upset the undefined
     // behavior dragons.
-    while true {
+    loop {
         let contents = unsafe { std::ptr::read_volatile(ptr) };
         if contents != 0 { return contents; }
     }

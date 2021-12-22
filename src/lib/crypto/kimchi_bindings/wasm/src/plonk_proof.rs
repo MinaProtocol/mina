@@ -1,23 +1,23 @@
-use kimchi_circuits::expr::{Linearization, PolishToken, Variable, Column};
-use kimchi_circuits::gate::{GateType, CurrOrNext};
+// use kimchi_circuits::expr::{Linearization, PolishToken, Variable, Column};
+// use kimchi_circuits::gate::{GateType, CurrOrNext};
 use paste::paste;
 use crate::wasm_vector::WasmVector;
 use crate::wasm_flat_vector::WasmFlatVector;
 use wasm_bindgen::prelude::*;
 use std::convert::TryInto;
-use std::sync::Arc;
-use commitment_dlog::srs::SRS;
-use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
-use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
+// use std::sync::Arc;
+// use commitment_dlog::srs::SRS;
+// use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
+// use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
 use kimchi_circuits::{
     nolookup::scalars::ProofEvaluations,
-    nolookup::constraints::{zk_polynomial, zk_w3, Shifts},
-    wires::{PERMUTS, COLUMNS},
+    // nolookup::constraints::{zk_polynomial, zk_w3, Shifts},
+    wires::{COLUMNS},
 };
-use std::path::Path;
+// use std::path::Path;
 use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
 use kimchi::prover::{ProverCommitments, ProverProof};
 use kimchi::index::Index;
@@ -273,7 +273,7 @@ macro_rules! impl_proof {
             impl From<ProverCommitments<GAffine>> for WasmProverCommitments {
                 fn from(x: ProverCommitments<GAffine>) -> Self {
                     WasmProverCommitments {
-                        w_comm: x.w_comm.into_iter().map(Into::into).collect(),
+                        w_comm: x.w_comm.iter().map(Into::into).collect(),
                         z_comm: x.z_comm.into(),
                         t_comm: x.t_comm.into(),
                     }
