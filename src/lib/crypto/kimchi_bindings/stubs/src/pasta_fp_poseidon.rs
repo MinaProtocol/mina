@@ -1,11 +1,6 @@
-use mina_curves::pasta::{
-    fp::Fp,
-};
-use oracle::poseidon::{
-    poseidon_block_cipher,
-    PlonkSpongeConstantsBasic,
-    ArithmeticSpongeParams};
 use crate::field_vector::fp::CamlFpVector;
+use mina_curves::pasta::fp::Fp;
+use oracle::poseidon::{poseidon_block_cipher, ArithmeticSpongeParams, PlonkSpongeConstantsBasic};
 
 pub struct CamlPastaFpPoseidonParams(ArithmeticSpongeParams<Fp>);
 pub type CamlPastaFpPoseidonParamsPtr<'a> = ocaml::Pointer<'a, CamlPastaFpPoseidonParams>;
@@ -29,8 +24,7 @@ pub fn caml_pasta_fp_poseidon_params_create() -> CamlPastaFpPoseidonParams {
 #[ocaml::func]
 pub fn caml_pasta_fp_poseidon_block_cipher(
     params: CamlPastaFpPoseidonParamsPtr,
-    mut state: CamlFpVector) {
-    poseidon_block_cipher::<Fp, PlonkSpongeConstantsBasic>(
-        & params.as_ref().0,
-        state.as_mut())
+    mut state: CamlFpVector,
+) {
+    poseidon_block_cipher::<Fp, PlonkSpongeConstantsBasic>(&params.as_ref().0, state.as_mut())
 }
