@@ -589,6 +589,20 @@ macro_rules! impl_verification_key {
                     }
                 }
 
+                #[wasm_bindgen]
+                pub fn partial_dummy(domain: &WasmDomain) -> Self {
+                    let dummy = [<$name:snake _dummy>]();
+                    WasmPlonkVerifierIndex {
+                        domain: domain.clone(),
+                        max_poly_size: dummy.max_poly_size,
+                        max_quot_size: dummy.max_quot_size,
+                        srs: dummy.srs.clone(),
+                        evals: dummy.evals.clone(),
+                        shifts: dummy.shifts.clone(),
+                        linearization: dummy.linearization.clone(),
+                    }
+                }
+
                 #[wasm_bindgen(getter)]
                 pub fn srs(&self) -> $WasmSrs {
                     self.srs.clone()

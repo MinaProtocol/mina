@@ -1517,9 +1517,9 @@ var caml_plonk_verifier_index_of_rust = function(x, affine_class) {
     var srs = free_on_finalize(x.srs);
     var evals = caml_plonk_verification_evals_of_rust(x.evals, affine_class);
     var shifts = caml_plonk_verification_shifts_of_rust(x.shifts);
-    var linearization = linearization_of_rust(x.linearization, affine_class);
     // TODO: Handle linearization correctly!
-    // var linearization = free_on_finalize(x.linearization);
+    // var linearization = linearization_of_rust(x.linearization, affine_class);
+    var linearization = free_on_finalize(x.linearization);
     x.free();
     return [0, domain, max_poly_size, max_quot_size, srs, evals, shifts, linearization];
 };
@@ -1537,9 +1537,11 @@ var caml_plonk_verifier_index_to_rust = function(x, klass, domain_class, verific
 
     // TODO: Handle linearization correctly!
     console.log('linearization:', x[7]);
-    srs = plonk_wasm.caml_fp_srs_create(10);
-    linearization = plonk_wasm.WasmFpLinearization.dummy();
-    return new klass(domain, max_poly_size, max_quot_size, srs, evals, shifts, linearization);
+    // srs = plonk_wasm.caml_fp_srs_create(10);
+    // linearization = plonk_wasm.WasmFpLinearization.dummy();
+    return klass.partial_dummy(domain);
+    // return new klass(domain, max_poly_size, max_quot_size, srs, evals, shifts, linearization);
+    // return plonk_wasm.caml_pasta_fp_plonk_verifier_index_dummy();
 };
 
 
@@ -1900,8 +1902,11 @@ var caml_pasta_fp_plonk_proof_create = function(index, witness_cols, prev_challe
 var caml_pasta_fp_plonk_proof_verify = function(lgr_comm, index, proof) {
     console.log('caml_pasta_fp_plonk_proof_verify');
     lgr_comm = caml_array_to_rust_vector(lgr_comm, caml_vesta_poly_comm_to_rust);
+    console.log('index to rust...');
     index = caml_pasta_fp_plonk_verifier_index_to_rust(index);
+    console.log('proof to rust...');
     proof = caml_pasta_fp_proof_to_rust(proof);
+    console.log('actual verify...');
     return plonk_wasm.caml_pasta_fp_plonk_proof_verify(lgr_comm, index, proof);
 };
 
