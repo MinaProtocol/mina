@@ -129,13 +129,12 @@ module Public_key_compressed_direct = struct
      [encode] differs from [of_public_key_compressed], which converts to an uncompressed key first
   *)
   let encode (pk_compressed : Public_key.Compressed.t) =
-    (* don't use of_unpackable, which assumes a 255-bit value *)
+    (* of_unpackable assumes a 255-bit value, but we want  *)
     let { Public_key.Compressed.Poly.x; is_odd } = pk_compressed in
-    let field_bits = Field.unpack x in
-    (* each nybble goes from high to low insert parity bit before last 7 bits
-    *)
+    let field_bits = Field.unpack x |> List.rev in
+    (* insert parity bit as high bit in last byte *)
     let before_bits, after_bits = List.split_n field_bits 248 in
-    let bits = before_bits @ (is_odd :: after_bits) |> List.rev in
+    let bits = before_bits @ (is_odd :: after_bits) in
     let bits_by_4s =
       let rec go bits acc =
         if List.is_empty bits then List.rev acc
@@ -147,19 +146,19 @@ module Public_key_compressed_direct = struct
     in
     let cs = List.map bits_by_4s ~f:bits4_to_hex_char in
     let result = String.of_char_list cs in
-    Format.eprintf "ENCODING: %s@." result ;
     result
 
   let decode raw : Public_key.Compressed.t =
-    Format.eprintf "RAW LEN: %d@." (String.length raw) ;
     assert (String.length raw = 64) ;
     let bits =
       String.to_list raw |> List.map ~f:hex_char_to_bits4 |> List.concat
     in
-    let rev_bits = List.rev bits in
-    let is_odd = List.hd_exn rev_bits in
-    Format.eprintf "ODD: %B@." is_odd ;
-    let field_bits = List.rev (List.tl_exn rev_bits) in
+    (* high bit of high byte *)
+    let is_odd = Bool.equal (List.nth_exn bits 248) true in
+    (* 0 parity bit, remove padding bit *)
+    let field_bits =
+      List.sub bits ~pos:1 ~len:248 @ (false :: List.sub bits ~pos:249 ~len:7)
+    in
     let x = Field.project field_bits in
     { Public_key.Compressed.Poly.x; is_odd }
 end
