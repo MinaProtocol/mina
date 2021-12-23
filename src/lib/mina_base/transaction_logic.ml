@@ -2560,7 +2560,7 @@ module For_tests = struct
       }
     |> Signed_command.forget_check
 
-  let party_send
+  let party_send ?(use_full_commitment = true)
       { Transaction_spec.fee; sender = sender, sender_nonce; receiver; amount }
       : Parties.t =
     let sender_pk = Public_key.compress sender.public_key in
@@ -2607,13 +2607,13 @@ module For_tests = struct
                     ; token_id = Token_id.default
                     ; balance_change =
                         Amount.Signed.(negate (of_unsigned amount))
-                    ; increment_nonce = true
+                    ; increment_nonce = not use_full_commitment
                     ; events = []
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
                     ; protocol_state = Snapp_predicate.Protocol_state.accept
-                    ; use_full_commitment = false
+                    ; use_full_commitment
                     }
                 ; predicate = Nonce (Account.Nonce.succ actual_nonce)
                 }
@@ -2642,8 +2642,15 @@ module For_tests = struct
       }
     in
     let commitment = Parties.commitment parties in
+    let full_commitment =
+      Parties.Transaction_commitment.with_fee_payer commitment
+        ~fee_payer_hash:
+          (Party.Predicated.digest
+             (Party.Predicated.of_fee_payer parties.fee_payer.data))
+    in
     let other_parties_signature =
-      Schnorr.sign sender.private_key (Random_oracle.Input.field commitment)
+      let c = if use_full_commitment then full_commitment else commitment in
+      Schnorr.sign sender.private_key (Random_oracle.Input.field c)
     in
     let other_parties =
       List.map parties.other_parties ~f:(fun party ->
@@ -2655,12 +2662,7 @@ module For_tests = struct
     in
     let signature =
       Schnorr.sign sender.private_key
-        (Random_oracle.Input.field
-           ( Parties.commitment parties
-           |> Parties.Transaction_commitment.with_fee_payer
-                ~fee_payer_hash:
-                  (Party.Predicated.digest
-                     (Party.Predicated.of_fee_payer parties.fee_payer.data)) ))
+        (Random_oracle.Input.field full_commitment)
     in
     { parties with
       fee_payer = { parties.fee_payer with authorization = signature }
@@ -2738,9 +2740,10 @@ module For_tests = struct
   (* Quickcheck generator for Parties.t, derived from Test_spec generator *)
   let gen_parties_from_test_spec =
     let open Quickcheck.Let_syntax in
+    let%bind use_full_commitment = Bool.quickcheck_generator in
     match%map Test_spec.mk_gen ~num_transactions:1 () with
     | { specs = [ spec ]; _ } ->
-        party_send spec
+        party_send ~use_full_commitment spec
     | { specs; _ } ->
         failwithf "gen_parties_from_test_spec: expected one spec, got %d"
           (List.length specs) ()

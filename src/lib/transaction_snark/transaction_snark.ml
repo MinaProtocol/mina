@@ -4904,7 +4904,15 @@ let%test_module "transaction_snark" =
       let open Transaction_logic.For_tests in
       Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-              let partiess = List.map ~f:party_send specs in
+              let partiess =
+                List.map
+                  ~f:(fun s ->
+                    let use_full_commitment =
+                      Quickcheck.random_value Bool.quickcheck_generator
+                    in
+                    party_send ~use_full_commitment s)
+                  specs
+              in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               apply_parties ledger partiess)
           |> fun ((), ()) -> ())
