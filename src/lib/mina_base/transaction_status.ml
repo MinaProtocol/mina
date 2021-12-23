@@ -212,27 +212,36 @@ module Failure = struct
     | Snapp_account_not_present ->
         "A snapp account does not exist"
     | Update_not_permitted_balance ->
-        "An account is not permitted to update its balance"
+        "The authentication for an account didn't allow the requested update \
+         to its balance"
     | Update_not_permitted_timing_existing_account ->
         "The timing of an existing account cannot be updated"
     | Update_not_permitted_token ->
-        "An account is not permitted to update its token id"
+        "The authentication for an account didn't allow the requested update \
+         to its token id"
     | Update_not_permitted_app_state ->
-        "An account is not permitted to update its app state"
+        "The authentication for an account didn't allow the requested update \
+         to its app state"
     | Update_not_permitted_verification_key ->
-        "An account is not permitted to update its verification given"
+        "The authentication for an account didn't allow the requested update \
+         to its verification key"
     | Update_not_permitted_sequence_state ->
-        "An account is not permitted to update its sequence state"
+        "The authentication for an account didn't allow the requested update \
+         to its sequence state"
     | Update_not_permitted_snapp_uri ->
-        "An account is not permitted to update its snapp uri"
+        "The authentication for an account didn't allow the requested update \
+         to its snapp URI"
     | Update_not_permitted_token_symbol ->
-        "An account is not permitted to update its token symbol"
+        "The authentication for an account didn't allow the requested update \
+         to its token symbol"
     | Update_not_permitted_permissions ->
-        "An account is not permitted to update its permissions"
+        "The authentication for an account didn't allow the requested update \
+         to its permissions"
     | Update_not_permitted_nonce ->
-        "An account is not permitted to update its nonce"
+        "The authentication for an account didn't allow the requested update \
+         to its nonce"
     | Parties_replay_check_failed ->
-        "Check to avoid replays failed. The party must icrement nonce or use \
+        "Check to avoid replays failed. The party must increment nonce or use \
          full commitment if the authorization is a signature"
     | Fee_payer_nonce_must_increase ->
         "Fee payer party must increment its nonce"
