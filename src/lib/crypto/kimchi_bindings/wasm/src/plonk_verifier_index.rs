@@ -350,6 +350,22 @@ macro_rules! impl_verification_key {
             }
             type WasmShifts = [<Wasm $field_name:camel Shifts>];
 
+            #[wasm_bindgen]
+            impl [<Wasm $field_name:camel Shifts>] {
+                #[wasm_bindgen(constructor)]
+                pub fn new(
+                    s0: $WasmF,
+                    s1: $WasmF,
+                    s2: $WasmF,
+                    s3: $WasmF,
+                    s4: $WasmF,
+                    s5: $WasmF,
+                    s6: $WasmF
+                ) -> Self {
+                    Self { s0, s1, s2, s3, s4, s5, s6}
+                }
+            }
+
             /* #[wasm_bindgen]
             #[derive(Clone)]
             pub struct [<Wasm $field_name:camel Linearization>](
@@ -573,35 +589,42 @@ macro_rules! impl_verification_key {
                     shifts: &WasmShifts,
                     linearization: &WasmLinearization,
                 ) -> Self {
-                    console_log!("cloning srs");
-                    let srs = srs.clone();
-                    console_log!("cloning lin");
-                    let linearization = linearization.clone();
-                    console_log!("finished");
                     WasmPlonkVerifierIndex {
                         domain: domain.clone(),
                         max_poly_size,
                         max_quot_size,
-                        srs: srs,
+                        srs: srs.clone(),
                         evals: evals.clone(),
                         shifts: shifts.clone(),
-                        linearization: linearization,
+                        linearization: linearization.clone(),
                     }
                 }
 
-                #[wasm_bindgen]
-                pub fn partial_dummy(domain: &WasmDomain) -> Self {
-                    let dummy = [<$name:snake _dummy>]();
-                    WasmPlonkVerifierIndex {
-                        domain: domain.clone(),
-                        max_poly_size: dummy.max_poly_size,
-                        max_quot_size: dummy.max_quot_size,
-                        srs: dummy.srs.clone(),
-                        evals: dummy.evals.clone(),
-                        shifts: dummy.shifts.clone(),
-                        linearization: dummy.linearization.clone(),
-                    }
-                }
+                // #[wasm_bindgen]
+                // pub fn partial_dummy(
+                //     domain: &WasmDomain,
+                //     max_poly_size: i32,
+                //     max_quot_size: i32,
+                //     srs: &$WasmSrs,
+                //     evals: &WasmPlonkVerificationEvals,
+                //     // shifts: &WasmShifts,
+                //     linearization: &WasmLinearization,
+                // ) -> Self {
+                //     let dummy = [<$name:snake _dummy>]();
+                //     WasmPlonkVerifierIndex {
+                //         domain: domain.clone(),
+                //         max_poly_size,
+                //         max_quot_size,
+                //         srs: srs.clone(),
+                //         // srs: dummy.srs.clone(),
+                //         evals: evals.clone(),
+                //         // evals: dummy.evals.clone(),
+                //         // shifts: shifts.clone(),
+                //         shifts: dummy.shifts.clone(),
+                //         // linearization: dummy.linearization.clone(),
+                //         linearization: linearization.clone(),
+                //     }
+                // }
 
                 #[wasm_bindgen(getter)]
                 pub fn srs(&self) -> $WasmSrs {
