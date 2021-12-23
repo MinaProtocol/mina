@@ -14,7 +14,7 @@ We need a backend for node staus/error systems. Candidates for the backend inclu
 
 [implementation]:#implementation
 
-A micro-service will be deployed at https://node-status.minaprotocol.com. The micro-service would just consists of a script that redirects the user input to kenesis firehose data stream. For now it won't do any check against the validity of the data for now. If such validity check is desired later, we can add those without change the interface of the system. This mini-service would be put in an AWS EC2 container to make the configuration minimal.
+Users would send their node status report to https://node-status.minaprotocol.com. Then a bash script would redirect the user input to AWS Kenesis firehose by using the AWS cli tool. And this script would be put in an AWS EC2 container to make the configuration minimal.
 
 For the AWS stack we need to setup
 1 Kenesis firehose data stream to receive the logs, and
