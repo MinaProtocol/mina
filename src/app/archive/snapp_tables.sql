@@ -70,12 +70,14 @@ CREATE TABLE snapp_permissions
 , set_snapp_uri            snapp_auth_required_type    NOT NULL
 , edit_sequence_state      snapp_auth_required_type    NOT NULL
 , set_token_symbol         snapp_auth_required_type    NOT NULL
+, increment_nonce          snapp_auth_required_type    NOT NULL
 );
 
 CREATE TABLE snapp_timing_info
 ( id                       serial  PRIMARY KEY
 , initial_minimum_balance  bigint  NOT NULL
 , cliff_time               bigint  NOT NULL
+, cliff_amount             bigint  NOT NULL
 , vesting_period           bigint  NOT NULL
 , vesting_increment        bigint  NOT NULL
 );

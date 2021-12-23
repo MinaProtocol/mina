@@ -414,7 +414,7 @@ module Body = struct
     end
   end]
 
-  (* * Delta for the fee payer is always going to be Neg, so represent it using
+  (* * Balance change for the fee payer is always going to be Neg, so represent it using
        an unsigned fee,
      * token id is always going to be the default, so use unit value as a
        placeholder,

@@ -103,9 +103,13 @@ CREATE TABLE snapp_commands
 );
 
 CREATE TABLE epoch_data
-( id             serial PRIMARY KEY
-, seed           text   NOT NULL
-, ledger_hash_id int    NOT NULL REFERENCES snarked_ledger_hashes(id)
+( id               serial PRIMARY KEY
+, seed             text   NOT NULL
+, ledger_hash_id   int    NOT NULL REFERENCES snarked_ledger_hashes(id)
+, total_currency   bigint NOT NULL
+, start_checkpoint text   NOT NULL
+, lock_checkpoint  text   NOT NULL
+, epoch_length     int    NOT NULL
 );
 
 CREATE TABLE blocks
@@ -118,6 +122,9 @@ CREATE TABLE blocks
 , snarked_ledger_hash_id  int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
 , staking_epoch_data_id   int    NOT NULL        REFERENCES epoch_data(id)
 , next_epoch_data_id      int    NOT NULL        REFERENCES epoch_data(id)
+, min_window_density      bigint NOT NULL
+, total_currency          bigint NOT NULL
+, next_available_token    bigint NOT NULL
 , ledger_hash             text   NOT NULL
 , height                  bigint NOT NULL
 , global_slot             bigint NOT NULL

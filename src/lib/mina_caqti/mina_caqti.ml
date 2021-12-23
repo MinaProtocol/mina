@@ -41,6 +41,11 @@ module Type_spec = struct
          ([] : (unit, hlist) H_list.t)
      | _ :: spec, (x, t) ->
          x :: tuple_to_hlist spec t
+
+  let custom_type ~to_hlist ~of_hlist tys =
+    let encode t = Ok (hlist_to_tuple tys (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist tys t)) in
+    Caqti_type.custom ~encode ~decode (to_rep tys)
 end
 
 (* register coding for nullable int arrays.
@@ -158,6 +163,14 @@ let select_cols ~(select : string) ~(table_name : string)
       sprintf "%s = ?%s" col annot)
   |> String.concat ~sep:" AND "
   |> sprintf "SELECT %s FROM %s WHERE %s" select table_name
+
+(* `select_cols_from_id ~table_name:"t0" ["col0", "col1", ...]`
+   creates the string
+   `"SELECT col0,col1,... FROM t0 WHERE id = ?"
+*)
+let select_cols_from_id ~(table_name : string) ~(cols : string list) : string =
+  let comma_cols = String.concat cols ~sep:"," in
+  sprintf "SELECT %s FROM %s WHERE id = ?" comma_cols table_name
 
 (* `insert_into_cols ~returning:ret0 ~table_name:t0 ["col0", "col1", ...]`
    creates the string
