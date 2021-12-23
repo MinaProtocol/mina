@@ -14,7 +14,9 @@ We need a backend for node staus/error systems. Candidates for the backend inclu
 
 [implementation]:#implementation
 
-We could setup a public Kenesis firehose data stream where the mina client can push to. And this Kenesis data stream would be connected to the S3 bucket, the OpenSearch and Kibana.
+![](res/aws_stack.png)
+
+Like the diagram shown above, We would setup a public Kenesis firehose data stream where the mina client can push to. And this Kenesis data stream would be connected to the S3 bucket, the OpenSearch and Kibana. We just won't use the Splunk and Redshift.
 
 This means we would modify the mina client to add the AWS SDK to do the push. There would no server maintained by us at the backend.
 
