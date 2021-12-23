@@ -1511,6 +1511,7 @@ function linearization_of_rust(linearization, affine_class) {
 // Provides: caml_plonk_verifier_index_of_rust
 // Requires: linearization_of_rust, caml_plonk_domain_of_rust, caml_plonk_verification_evals_of_rust, caml_plonk_verification_shifts_of_rust, free_on_finalize
 var caml_plonk_verifier_index_of_rust = function(x, affine_class) {
+    console.log('caml_plonk_verifier_index_of_rust', affine_class);
     var domain = caml_plonk_domain_of_rust(x.domain);
     var max_poly_size = x.max_poly_size;
     var max_quot_size = x.max_quot_size;
@@ -1526,7 +1527,7 @@ var caml_plonk_verifier_index_of_rust = function(x, affine_class) {
 // Provides: caml_plonk_verifier_index_to_rust
 // Requires: caml_plonk_domain_to_rust, caml_plonk_verification_evals_to_rust, caml_plonk_verification_shifts_to_rust, free_finalization_registry
 var caml_plonk_verifier_index_to_rust = function(x, klass, domain_class, verification_evals_class, poly_comm_class, mk_affine, verification_shifts_class) {
-    console.log('caml_plonk_verifier_index_to_rust');
+    console.log('caml_plonk_verifier_index_to_rust', klass);
     var domain = caml_plonk_domain_to_rust(x[1], domain_class);
     var max_poly_size = x[2];
     var max_quot_size = x[3];
@@ -1536,12 +1537,7 @@ var caml_plonk_verifier_index_to_rust = function(x, klass, domain_class, verific
     var linearization = x[7];
 
     // TODO: Handle linearization correctly!
-    console.log('linearization:', x[7]);
-    // srs = plonk_wasm.caml_fp_srs_create(10);
-    // linearization = plonk_wasm.WasmFpLinearization.dummy();
-    return klass.partial_dummy(domain);
-    // return new klass(domain, max_poly_size, max_quot_size, srs, evals, shifts, linearization);
-    // return plonk_wasm.caml_pasta_fp_plonk_verifier_index_dummy();
+    return new klass(domain, max_poly_size, max_quot_size, srs, evals, shifts, linearization);
 };
 
 
@@ -1564,7 +1560,6 @@ var caml_pasta_fp_plonk_verifier_index_to_rust = function(x) {
 // Requires: plonk_wasm, caml_pasta_fp_plonk_verifier_index_of_rust
 var caml_pasta_fp_plonk_verifier_index_create = function(x) {
     console.log('caml_pasta_fp_plonk_verifier_index_create');
-    console.log('index', x);
     var vk = plonk_wasm.caml_pasta_fp_plonk_verifier_index_create(x);
     console.log('verifier index (rust)', vk);
     var vk_caml = caml_pasta_fp_plonk_verifier_index_of_rust(vk);
