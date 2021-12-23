@@ -2,7 +2,7 @@
 
 [summary]: #summary
 
-This RFC proposes that we use AWS stack to be the backend of the node status/error system. To be specific by AWS stack, I mean we would use S3 as the storage backend; OpenSearch as the search engine; Kibana as the visualization and charting tool; we could also setup the miniservice that listening on the minaprotocol/node-status on AWS ES2.
+This RFC proposes that we use AWS stack to be the backend of the node status/error system. To be specific by AWS stack, I mean we would use S3 as the storage backend; OpenSearch as the search engine; Kibana as the visualization and charting tool.
 
 ## Motivation
 
@@ -14,9 +14,11 @@ We need a backend for node staus/error systems. Candidates for the backend inclu
 
 [implementation]:#implementation
 
-Users would send their node status report to https://node-status.minaprotocol.com. Then a bash script would redirect the user input to AWS Kenesis firehose by using the AWS cli tool. And this script would be put in an AWS EC2 container to make the configuration minimal.
+We could setup a public Kenesis firehose data stream where the mina client can push to. And this Kenesis data stream would be connected to the S3 bucket, the OpenSearch and Kibana.
 
-For the AWS stack we need to setup
+This means we would modify the mina client to add the AWS SDK to do the push. There would no server maintained by us at the backend.
+
+In summary, For the AWS stack we need to setup
 1 Kenesis firehose data stream to receive the logs, and
 1 S3 storage bucket to store the logs, and
 1 OpenSearch service that provides the search ability for the logs, and
@@ -30,11 +32,11 @@ The same setup also applies to the node error system backend.
 
 ### Grafana Loki
 
-Grafana Loki functions as basically a log aggregation system for the logs. For log storage, we could choose between different cloud storage backend like S3 or GCS. It uses an agent to send logs to the loki server. This means we need to setup a mini-service similar to the AWS one. They provide a query language called LogQL which is similar to the prometheus query language. Another upside of this choice is that it has good integration with Grafana which is already used and loved by us. One thing to notice is that loki is "label" based, if we want to get the most of it, we need to find a good way to label stuff.
+Grafana Loki functions as basically a log aggregation system for the logs. For log storage, we could choose between different cloud storage backend like S3 or GCS. It uses an agent to send logs to the loki server. This means we need to setup a micro-service that listening on https://node-status.minaprotocol.com and redirect the data to Loki. They provide a query language called LogQL which is similar to the prometheus query language. Another upside of this choice is that it has good integration with Grafana which is already used and loved by us. One thing to notice is that loki is "label" based, if we want to get the most of it, we need to find a good way to label stuff.
 
 ### LogDNA
 
-LogDNA provides both data storage and data visualization and alerting functionality. Besides the usual log collecting agent like Loki, LogDNA also provides the option to sends logs directly to their API which could save us the work to implement a miniservice by ourselves (depending on whether we feel safe to give users the log-uploading keys). The alert service they provide is also handy in node error system.
+LogDNA provides both data storage and data visualization and alerting functionality. Besides the usual log collecting agent like Loki, LogDNA also provides the option to sends logs directly to their API which could save us the work to implement a micro-service by ourselves (depending on whether we feel safe to give users the log-uploading keys). The alert service they provide is also handy in node error system.
 
 ## Prices
 
