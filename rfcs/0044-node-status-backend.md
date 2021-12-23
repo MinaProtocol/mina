@@ -14,15 +14,15 @@ We need a backend for node staus/error systems. Candidates for the backend inclu
 
 [implementation]:#implementation
 
-A mini-service will be deployed at https://node-status.minaprotocol.com. The mini-service would do some simple check against the format of the data that nodes send us. The mini-service would be implemented using python or javascript. The mini-service would listen on the designated port and decode the json data that peers send and then do a simple check that make sure that all the non-optional field are present and then call AWS `PUT` function to push it to the AWS kenesis firehose data stream. This mini-service would be put in a AWS EC2 container to make the configuration of things minimal.
-
-I only consider simple validity checks here against the format of the json data because any more complicated check would require us to run a node to observe the network conditions.
+A micro-service will be deployed at https://node-status.minaprotocol.com. The micro-service would just consists of a script that redirects the user input to kenesis firehose data stream. For now it won't do any check against the validity of the data for now. If such validity check is desired later, we can add those without change the interface of the system. This mini-service would be put in an AWS EC2 container to make the configuration minimal.
 
 For the AWS stack we need to setup
 1 Kenesis firehose data stream to receive the logs, and
 1 S3 storage bucket to store the logs, and
 1 OpenSearch service that provides the search ability for the logs, and
 1 Kibana service that provides the visualization for the data
+
+The same setup also applies to the node error system backend.
 
 ## Other choices
 
