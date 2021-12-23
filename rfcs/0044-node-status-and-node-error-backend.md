@@ -46,6 +46,8 @@ LogDNA provides both data storage and data visualization and alerting functional
 ## Rationale Behind our choices
 
 The reason that we choose AWS stack for our backend is that
+0. The requirements for the node status collection and node error collection system is that we need a backend that provides the storage of data and an easy way to search and visualize the data. AWS stack fulfills these requirements.
+
 1. AWS stack is robust and easy to use. It has built-in DOS protection. And we have team members who has used the AWS stack before and this means that some of the team members are already familiar with it. And it seems to be the cheapest choice for us.
 
 2. For LogDNA, it has a 30 days log retention limit which clearly doesn't suit our needs. Plus, LogDNA is much expensive than the other 2.
