@@ -26,6 +26,9 @@ in {
       cp go.mod go.sum *.go $out/
     '';
   };
+  sodium-static = final.libsodium.overrideAttrs (o: {
+    dontDisableStatic = true;
+  });
 
   marlin_plonk_bindings_stubs = pkgs.rustPlatform.buildRustPackage {
     pname = "marlin_plonk_bindings_stubs";
