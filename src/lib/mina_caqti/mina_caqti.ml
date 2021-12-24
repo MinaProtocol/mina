@@ -149,7 +149,7 @@ let add_if_snapp_check (f : 'arg -> ('res, 'err) Deferred.Result.t) :
     'arg Snapp_basic.Or_ignore.t -> ('res option, 'err) Deferred.Result.t =
   Fn.compose (add_if_some f) Snapp_basic.Or_ignore.to_option
 
-(* `select_cols ~select:"s0" ~table_name:"t0" ["col0", "col1", ...]`
+(* `select_cols ~select:"s0" ~table_name:"t0" ~cols:["col0";"col1";...]`
    creates the string
    `"SELECT s0 FROM t0 WHERE col0 = ? AND col1 = ? AND..."`.
    The optional `tannot` function maps column names to type annotations. *)
@@ -164,15 +164,15 @@ let select_cols ~(select : string) ~(table_name : string)
   |> String.concat ~sep:" AND "
   |> sprintf "SELECT %s FROM %s WHERE %s" select table_name
 
-(* `select_cols_from_id ~table_name:"t0" ["col0", "col1", ...]`
+(* `select_cols_from_id ~table_name:"t0" ~cols:["col0";"col1";...]`
    creates the string
-   `"SELECT col0,col1,... FROM t0 WHERE id = ?"
+   `"SELECT col0,col1,... FROM t0 WHERE id = ?"`
 *)
 let select_cols_from_id ~(table_name : string) ~(cols : string list) : string =
   let comma_cols = String.concat cols ~sep:"," in
   sprintf "SELECT %s FROM %s WHERE id = ?" comma_cols table_name
 
-(* `insert_into_cols ~returning:ret0 ~table_name:t0 ["col0", "col1", ...]`
+(* `insert_into_cols ~returning:ret0 ~table_name:t0 ~cols:["col0";"col1";...]`
    creates the string
    `"INSERT INTO t0 (col0, col1, ...) VALUES (?, ?, ...) RETURNING ret0"`.
    The optional `tannot` function maps column names to type annotations.

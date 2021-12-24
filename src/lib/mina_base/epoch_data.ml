@@ -14,9 +14,8 @@ module Poly = struct
         { ledger : 'epoch_ledger
         ; seed : 'epoch_seed
         ; start_checkpoint : 'start_checkpoint
-              (* The lock checkpoint is the hash of the latest state in the seed update range,
-                 not including the current state.
-              *)
+              (* The lock checkpoint is the hash of the latest state in the seed update range, not including
+                 the current state. *)
         ; lock_checkpoint : 'lock_checkpoint
         ; epoch_length : 'length
         }
