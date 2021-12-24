@@ -72,6 +72,7 @@ let
         buildPhase = ''
           sed 's/mina_version.normal/mina_version.dummy/' -i src/lib/mina_version/dune
           sed 's,/usr/local/lib/librocksdb_coda.a,${pkgs.rocksdb}/lib/librocksdb.a,' -i src/external/ocaml-rocksdb/dune
+          sed 's,make ,make GO_CAPNP_STD=${pkgs.go-capnproto2.src}/std ,' -i src/libp2p_ipc/dune
           dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe
         '';
         installPhase = ''
