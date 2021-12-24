@@ -12,14 +12,14 @@ let
   export = opam-nix.opamListToQuery
     (opam-nix.fromOPAM ./src/opam.export).installed;
   external-packages = {
-    "sodium" = null;
-    "capnp" = null;
-    "rpc_parallel" = null;
-    "ocaml-extlib" = null;
-    "async_kernel" = null;
-    "base58" = null;
-    "graphql_ppx" = null;
-    "ppx_deriving_yojson" = null;
+    "sodium" = "dev";
+    "capnp" = "local";
+    "rpc_parallel" = "v0.13.0";
+    "ocaml-extlib" = "local";
+    "async_kernel" = "v0.13.0";
+    "base58" = "0.1.0";
+    "graphql_ppx" = "0.0.4";
+    "ppx_deriving_yojson" = "local";
   };
 
   implicit-deps = export // external-packages;
