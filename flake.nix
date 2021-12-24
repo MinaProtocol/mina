@@ -6,8 +6,11 @@
   # todo: upstream
   inputs.mix-to-nix.url = "github:serokell/mix-to-nix/yorickvp/deadlock";
   inputs.nix-npm-buildPackage.url = "github:lumiguide/nix-npm-buildpackage"; # todo: upstream
+  inputs.opam-nix.url = "github:balsoft/opam-nix";
+  inputs.opam-repository.url = "github:ocaml/opam-repository";
+  inputs.opam-repository.flake = false;
 
-  outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage }:
+  outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage, opam-nix, opam-repository }:
     utils.lib.mkFlake {
       inherit self inputs;
       supportedSystems = [ "x86_64-linux" ];
@@ -29,6 +32,7 @@
             hash = "sha256-afdLw7of5AksR4ErCMqXqXCOnJ/nHK2Lo4xkC5McBfM";
           };
         };
+        ocamlPackages = import ./mina.nix inputs pkgs;
       in {
 
         # todo: Fast
@@ -165,6 +169,8 @@
           '';
         };
 
+        inherit ocamlPackages;
+        packages.mina = ocamlPackages.mina;
       };
     };
 }
