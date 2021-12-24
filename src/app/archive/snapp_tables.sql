@@ -193,7 +193,7 @@ CREATE TABLE snapp_predicate_protocol_states
 , curr_global_slot_since_hard_fork int                            REFERENCES snapp_global_slot_bounds(id)
 , global_slot_since_genesis        int                            REFERENCES snapp_global_slot_bounds(id)
 , staking_epoch_data_id            int                            REFERENCES snapp_epoch_data(id)
-, next_epoch_data                  int                            REFERENCES snapp_epoch_data(id)
+, next_epoch_data_id               int                            REFERENCES snapp_epoch_data(id)
 );
 
 /* events_ids and sequence_events_ids indicate a list of ids in
