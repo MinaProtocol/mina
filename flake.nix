@@ -11,27 +11,24 @@
   inputs.opam-repository.flake = false;
 
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage, opam-nix, opam-repository }:
+    let
+      inherit (utils.lib) exportOverlays exportPackages;
+    in
     utils.lib.mkFlake {
       inherit self inputs;
       supportedSystems = [ "x86_64-linux" ];
       channelsConfig.allowUnfree = true;
       #sharedOverlays = [ mix-to-nix.overlay ];
+      sharedOverlays = [self.overlay];
+      overlays = exportOverlays {
+        inherit (self) pkgs inputs;
+      };
+      overlay = import ./overlay.nix;
       outputsBuilder = channels: let
         pkgs = channels.nixpkgs;
         inherit (pkgs) lib;
         mix-to-nix = pkgs.callPackage inputs.mix-to-nix {};
         nix-npm-buildPackage = pkgs.callPackage inputs.nix-npm-buildPackage {};
-        go-capnproto2 = pkgs.buildGoModule rec {
-          pname = "capnpc-go";
-          version = "v3.0.0-alpha.1";
-          vendorSha256 = "sha256-jbX/nnlnQoItFXFL/MZZKe4zAjM/EA3q+URJG8I3hok=";
-          src = pkgs.fetchFromGitHub {
-            owner = "capnproto";
-            repo = "go-capnproto2";
-            rev = "v3.0.0-alpha.1";
-            hash = "sha256-afdLw7of5AksR4ErCMqXqXCOnJ/nHK2Lo4xkC5McBfM";
-          };
-        };
         ocamlPackages = import ./mina.nix inputs pkgs;
       in {
 
@@ -93,39 +90,6 @@
           name = "coda_validation-0.1.0";
           version = "0.1.0";
         });
-
-        # Jobs/Test/Libp2pUnitTest
-        packages.libp2p_ipc_go = pkgs.stdenv.mkDerivation {
-          # todo: buildgomodule?
-          name = "libp2p_ipc-go";
-          buildInputs = [ pkgs.capnproto go-capnproto2 ];
-          src = ./src/libp2p_ipc;
-          buildPhase = ''
-            capnp compile -ogo -I${go-capnproto2.src}/std libp2p_ipc.capnp
-          '';
-          installPhase = ''
-            mkdir $out
-            cp go.mod go.sum *.go $out/
-          '';
-        };
-        packages.libp2p_helper = pkgs.buildGoModule {
-          pname = "libp2p_helper";
-          version = "0.1";
-          src = ./src/app/libp2p_helper/src;
-          runVend = true; # missing some schema files
-          vendorSha256 = "sha256-g0DsuLMiXjUTsGbhCSeFKEFKMEMtg3UTUjmYwUka6iE=";
-          postConfigure = ''
-            chmod +w vendor
-            cp -r --reflink=auto ${self.packages.${pkgs.system}.libp2p_ipc_go}/ vendor/libp2p_ipc
-          '';
-          NO_MDNS_TEST = 1; # no multicast support inside the nix sandbox
-          overrideModAttrs = n: {
-            # remove libp2p_ipc from go.mod, inject it back in postconfigure
-            postConfigure = ''
-              sed -i '/libp2p_ipc/d' go.mod
-            '';
-          };
-        };
         # todo: libp2p_ipc
 
         # Jobs/Lint/OCaml.dhall
@@ -171,6 +135,9 @@
 
         inherit ocamlPackages;
         packages.mina = ocamlPackages.mina;
+        packages.marlin_plonk_bindings_stubs = pkgs.marlin_plonk_bindings_stubs;
+        packages.go-capnproto2 = pkgs.go-capnproto2;
+        packages.libp2p_helper = pkgs.libp2p_helper;
       };
     };
 }
