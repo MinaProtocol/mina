@@ -56,7 +56,8 @@ let
         deps;
     in {
       sodium = super.sodium.overrideAttrs (_: {
-        NIX_CFLAGS_COMPILE = "-I${super.native.libsodium.dev}/include";
+        NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
+        propagatedBuildInputs = [pkgs.sodium-static];
         preBuild = ''
           export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
         '';
@@ -66,8 +67,10 @@ let
         pname = "mina";
         version = "dev";
         src = ./.;
-        buildInputs = unique' (deps ++ propagatedExternalBuildInputs);
-        nativeBuildInputs = [ self.dune self.ocamlfind pkgs.cargo pkgs.rustc ];
+        # todo: slimmed rocksdb
+        buildInputs = unique' (deps ++ propagatedExternalBuildInputs ++ [pkgs.zlib pkgs.bzip2 pkgs.snappy pkgs.lz4 pkgs.zstd]);
+        nativeBuildInputs = [ self.dune self.ocamlfind ];
+        NIX_LDFLAGS = "-lsnappy -llz4 -lzstd";
         # TODO, get this from somewhere
         MARLIN_REPO_SHA = "bacef43ea34122286745578258066c29091dc36a";
 
