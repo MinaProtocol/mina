@@ -2114,7 +2114,7 @@ module Block = struct
     ; next_available_token : int64
     ; ledger_hash : string
     ; height : int64
-    ; global_slot_since_hard_fork : int64
+    ; global_slot : int64
     ; global_slot_since_genesis : int64
     ; timestamp : int64
     }
@@ -2240,7 +2240,7 @@ module Block = struct
                 consensus_state
                 |> Consensus.Data.Consensus_state.blockchain_length
                 |> Unsigned.UInt32.to_int64
-            ; global_slot_since_hard_fork =
+            ; global_slot =
                 Consensus.Data.Consensus_state.curr_global_slot consensus_state
                 |> Unsigned.UInt32.to_int64
             ; global_slot_since_genesis =
@@ -2557,7 +2557,7 @@ module Block = struct
                 |> Unsigned.UInt64.to_int64
             ; ledger_hash = block.ledger_hash |> Ledger_hash.to_base58_check
             ; height = block.height |> Unsigned.UInt32.to_int64
-            ; global_slot_since_hard_fork =
+            ; global_slot =
                 block.global_slot_since_hard_fork |> Unsigned.UInt32.to_int64
             ; global_slot_since_genesis =
                 block.global_slot_since_genesis |> Unsigned.UInt32.to_int64
