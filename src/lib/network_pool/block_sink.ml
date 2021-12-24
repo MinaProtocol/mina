@@ -14,15 +14,14 @@ type t =
       { writer : (stream_msg, synchronous, unit Deferred.t) Writer.t
       ; rate_limiter : Rate_limiter.t
       ; logger : Logger.t
-      ; time_controller : Block_time.Controller.t
       }
   | Void
 
-let push sink (e, cb) =
+let push sink (e, tm, cb) =
   match sink with
   | Void ->
       Deferred.unit
-  | Sink { writer; rate_limiter; logger; time_controller; _ } -> (
+  | Sink { writer; rate_limiter; logger; _ } -> (
       let sender = Envelope.Incoming.sender e in
       match
         Rate_limiter.add rate_limiter sender ~now:(Time.now ()) ~score:1
@@ -34,7 +33,7 @@ let push sink (e, cb) =
           Mina_net2.Validation_callback.fire_if_not_already_fired cb `Reject ;
           Deferred.unit
       | `Within_capacity ->
-          Writer.write writer (e, Block_time.now time_controller, cb) )
+          Writer.write writer (e, tm, cb) )
 
 let log_rate_limiter_occasionally rl ~logger ~label =
   let t = Time.Span.of_min 1. in
@@ -43,7 +42,7 @@ let log_rate_limiter_occasionally rl ~logger ~label =
         ~metadata:[ ("rate_limiter", Rate_limiter.summary rl) ]
         !"%s $rate_limiter" label)
 
-let create ~logger ~slot_duration_ms ~time_controller =
+let create ~logger ~slot_duration_ms =
   let rate_limiter =
     Rate_limiter.create
       ~capacity:
@@ -53,6 +52,6 @@ let create ~logger ~slot_duration_ms ~time_controller =
   in
   log_rate_limiter_occasionally rate_limiter ~logger ~label:"new_block" ;
   let reader, writer = create Synchronous in
-  (reader, Sink { writer; rate_limiter; logger; time_controller })
+  (reader, Sink { writer; rate_limiter; logger })
 
 let void = Void

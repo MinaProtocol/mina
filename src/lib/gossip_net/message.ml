@@ -63,7 +63,7 @@ module Latest = V1
 [%%define_locally Latest.(summary)]
 
 type block_sink_msg =
-  state_msg Envelope.Incoming.t * Mina_net2.Validation_callback.t
+  state_msg Envelope.Incoming.t * Block_time.t * Mina_net2.Validation_callback.t
 
 type tx_sink_msg =
   transaction_pool_diff_msg Envelope.Incoming.t
@@ -120,9 +120,15 @@ module Wrapped_sinks (S : Sinks) = struct
     ; sink_snark_work = (sinks.sink_snark_work, snark_push_modifier)
     }
 
-  let preprocess ~block_fn ~tx_fn ~snark_fn =
-    let modifier fn f msg = fn msg >>= fun () -> f msg in
-    wrap ~block_push_modifier:(modifier block_fn)
-      ~tx_push_modifier:(modifier tx_fn)
-      ~snark_push_modifier:(modifier snark_fn)
+  let wrap_simple ?block_pre ?tx_pre ?snark_pre ?block_post ?tx_post ?snark_post
+      =
+    let modifier pre post f msg =
+      Option.value ~default:(const Deferred.unit) pre msg
+      >>= fun () ->
+      f msg >>= fun () -> Option.value ~default:(const Deferred.unit) post msg
+    in
+    wrap
+      ~block_push_modifier:(modifier block_pre block_post)
+      ~tx_push_modifier:(modifier tx_pre tx_post)
+      ~snark_push_modifier:(modifier snark_pre snark_post)
 end

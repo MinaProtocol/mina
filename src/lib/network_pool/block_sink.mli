@@ -5,12 +5,12 @@ include
   Mina_net2.Sink.S_with_void
     with type msg :=
           External_transition.t Envelope.Incoming.t
+          * Block_time.t
           * Mina_net2.Validation_callback.t
 
 val create :
      logger:Logger.t
   -> slot_duration_ms:Block_time.Span.t
-  -> time_controller:Block_time.Controller.t
   -> ( External_transition.t Envelope.Incoming.t
      * Block_time.t
      * Mina_net2.Validation_callback.t )

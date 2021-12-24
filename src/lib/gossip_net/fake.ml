@@ -127,6 +127,7 @@ module Make
       ; connection_gating : Mina_net2.connection_gating ref
       ; ban_notification_reader : ban_notification Linear_pipe.Reader.t
       ; ban_notification_writer : ban_notification Linear_pipe.Writer.t
+      ; time_controller : Block_time.Controller.t
       }
 
     let rpc_hook t rpc_handlers =
@@ -169,6 +170,10 @@ module Make
       let ban_notification_reader, ban_notification_writer =
         Linear_pipe.create ()
       in
+      let time_controller =
+        Block_time.Controller.create
+        @@ Block_time.Controller.basic ~logger:(Logger.create ())
+      in
       let t =
         { network
         ; me
@@ -181,6 +186,7 @@ module Make
                 { banned_peers = []; trusted_peers = []; isolate = false }
         ; ban_notification_reader
         ; ban_notification_writer
+        ; time_controller
         }
       in
       Network.(
@@ -253,8 +259,9 @@ module Make
     let query_random_peers _ = failwith "TODO stub"
 
     let broadcast_state t state =
-      Network.broadcast t.network ~sender:t.me state (fun sinks ->
-          SinksImpl.Block_sink.push sinks.sink_block)
+      Network.broadcast t.network ~sender:t.me state (fun sinks (env, vc) ->
+          let time = Block_time.now t.time_controller in
+          SinksImpl.Block_sink.push sinks.sink_block (env, time, vc))
 
     let broadcast_snark_pool_diff t diff =
       Network.broadcast t.network ~sender:t.me diff (fun sinks ->

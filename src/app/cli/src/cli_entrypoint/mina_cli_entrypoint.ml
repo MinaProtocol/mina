@@ -1080,12 +1080,14 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           ; isolate = Option.value ~default:false isolate
           ; keypair = libp2p_keypair
           ; all_peers_seen_metric
+          ; time_controller
           }
       in
       let net_config =
         { Mina_networking.Config.logger
         ; trust_system
         ; time_controller
+        ; consensus_constants = precomputed_values.consensus_constants
         ; consensus_local_state
         ; genesis_ledger_hash
         ; constraint_constants = precomputed_values.constraint_constants

@@ -431,6 +431,7 @@ module T = struct
               ; mina_peer_exchange = true
               ; keypair = Some libp2p_keypair
               ; all_peers_seen_metric = false
+              ; time_controller
               }
           in
           let net_config =
@@ -442,6 +443,7 @@ module T = struct
             ; genesis_ledger_hash =
                 Ledger.merkle_root (Lazy.force Genesis_ledger.t)
             ; constraint_constants
+            ; consensus_constants = precomputed_values.consensus_constants
             ; log_gossip_heard =
                 { snark_pool_diff = true
                 ; transaction_pool_diff = true

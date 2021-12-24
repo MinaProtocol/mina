@@ -1,6 +1,5 @@
 open Core_kernel
 open Async
-open Unsigned
 open Mina_base
 open Mina_transition
 open Pipe_lib
@@ -1564,7 +1563,6 @@ let create ?wallets (config : Config.t) =
             Network_pool.Block_sink.create ~logger:config.logger
               ~slot_duration_ms:
                 config.precomputed_values.consensus_constants.slot_duration_ms
-              ~time_controller:config.time_controller
           in
           let sinks =
             { Mina_networking.Sinks.Unwrapped.sink_block = block_sink
@@ -1713,36 +1711,7 @@ let create ?wallets (config : Config.t) =
                     config.persistent_frontier_location
                   ~frontier_broadcast_pipe:
                     (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
-                  ~catchup_mode (* TODO Remove pipe map form here *)
-                  ~network_transition_reader:
-                    (Strict_pipe.Reader.map block_reader ~f:(fun (tn, tm, cb) ->
-                         let lift_consensus_time =
-                           Fn.compose UInt32.to_int
-                             Consensus.Data.Consensus_time.to_uint32
-                         in
-                         let tn_production_consensus_time =
-                           External_transition.consensus_time_produced_at
-                             (Envelope.Incoming.data tn)
-                         in
-                         let tn_production_slot =
-                           lift_consensus_time tn_production_consensus_time
-                         in
-                         let tn_production_time =
-                           Consensus.Data.Consensus_time.to_time
-                             ~constants:consensus_constants
-                             tn_production_consensus_time
-                         in
-                         let tm_slot =
-                           lift_consensus_time
-                             (Consensus.Data.Consensus_time.of_time_exn
-                                ~constants:consensus_constants tm)
-                         in
-                         Mina_metrics.Block_latency.Gossip_slots.update
-                           (Float.of_int (tm_slot - tn_production_slot)) ;
-                         Mina_metrics.Block_latency.Gossip_time.update
-                           Block_time.(
-                             Span.to_time_span @@ diff tm tn_production_time) ;
-                         (`Transition tn, `Time_received tm, `Valid_cb cb)))
+                  ~catchup_mode ~network_transition_reader:block_reader
                   ~producer_transition_reader:
                     (Strict_pipe.Reader.map producer_transition_reader
                        ~f:(fun breadcrumb ->

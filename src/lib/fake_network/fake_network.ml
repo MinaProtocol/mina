@@ -113,6 +113,7 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
         Ledger.merkle_root
           (Lazy.force (Precomputed_values.genesis_ledger precomputed_values))
     ; constraint_constants = precomputed_values.constraint_constants
+    ; consensus_constants = precomputed_values.consensus_constants
     ; creatable_gossip_net =
         Gossip_net.Any.Creatable
           ( (module Gossip_net.Fake)

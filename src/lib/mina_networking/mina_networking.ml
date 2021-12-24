@@ -1020,6 +1020,7 @@ module Config = struct
     { logger : Logger.t
     ; trust_system : Trust_system.t
     ; time_controller : Block_time.Controller.t
+    ; consensus_constants : Consensus.Constants.t
     ; consensus_local_state : Consensus.Data.Local_state.t
     ; genesis_ledger_hash : Ledger_hash.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
@@ -1430,9 +1431,10 @@ let create (config : Config.t) ~sinks
     online_broadcaster ~constraint_constants:config.constraint_constants
       config.time_controller
   in
+  let consensus_constants = config.consensus_constants in
   let wrapped_sinks =
-    Sinks.preprocess
-      ~block_fn:(fun (envelope, valid_cb) ->
+    Sinks.wrap_simple
+      ~block_pre:(fun (envelope, _, valid_cb) ->
         Ivar.fill_if_empty first_received_message_signal () ;
         Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
         let state = envelope.data in
@@ -1469,7 +1471,7 @@ let create (config : Config.t) ~sinks
         Mina_net2.Validation_callback.set_message_type valid_cb `Block ;
         Mina_metrics.(Counter.inc_one Network.Block.received) ;
         notify_online ())
-      ~snark_fn:(fun (envelope, valid_cb) ->
+      ~snark_pre:(fun (envelope, valid_cb) ->
         Ivar.fill_if_empty first_received_message_signal () ;
         Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
         Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_received) ;
@@ -1483,7 +1485,7 @@ let create (config : Config.t) ~sinks
         Mina_metrics.(Counter.inc_one Network.Snark_work.received) ;
         Mina_net2.Validation_callback.set_message_type valid_cb `Snark_work ;
         notify_online ())
-      ~tx_fn:(fun (envelope, valid_cb) ->
+      ~tx_pre:(fun (envelope, valid_cb) ->
         Ivar.fill_if_empty first_received_message_signal () ;
         Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
         Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_received) ;
@@ -1496,6 +1498,32 @@ let create (config : Config.t) ~sinks
         Mina_net2.Validation_callback.set_message_type valid_cb `Transaction ;
         Mina_metrics.(Counter.inc_one Network.Transaction.received) ;
         notify_online ())
+      ~block_post:(fun (tn, tm, _) ->
+        let lift_consensus_time =
+          Fn.compose Unsigned.UInt32.to_int
+            Consensus.Data.Consensus_time.to_uint32
+        in
+        let tn_production_consensus_time =
+          External_transition.consensus_time_produced_at
+            (Envelope.Incoming.data tn)
+        in
+        let tn_production_slot =
+          lift_consensus_time tn_production_consensus_time
+        in
+        let tn_production_time =
+          Consensus.Data.Consensus_time.to_time ~constants:consensus_constants
+            tn_production_consensus_time
+        in
+        let tm_slot =
+          lift_consensus_time
+            (Consensus.Data.Consensus_time.of_time_exn
+               ~constants:consensus_constants tm)
+        in
+        Mina_metrics.Block_latency.Gossip_slots.update
+          (Float.of_int (tm_slot - tn_production_slot)) ;
+        Mina_metrics.Block_latency.Gossip_time.update
+          Block_time.(Span.to_time_span @@ diff tm tn_production_time) ;
+        Deferred.unit)
       sinks
   in
   let%map gossip_net =

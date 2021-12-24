@@ -171,6 +171,7 @@ module Config : sig
     { logger : Logger.t
     ; trust_system : Trust_system.t
     ; time_controller : Block_time.Controller.t
+    ; consensus_constants : Consensus.Constants.t
     ; consensus_local_state : Consensus.Data.Local_state.t
     ; genesis_ledger_hash : Ledger_hash.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
