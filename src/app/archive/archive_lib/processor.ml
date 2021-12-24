@@ -2118,7 +2118,7 @@ module Block = struct
     ; global_slot_since_genesis : int64
     ; timestamp : int64
     }
-  [@@deriving hlist]
+  [@@deriving hlist, fields]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -2153,17 +2153,11 @@ module Block = struct
          "SELECT id FROM blocks WHERE state_hash = ?")
       (State_hash.to_base58_check state_hash)
 
-  let load (module Conn : CONNECTION) ~(id : int) =
+  let load (module Conn : CONNECTION) ~id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         {sql| SELECT state_hash, parent_id, parent_hash, creator_id,
-                      block_winner_id, snarked_ledger_hash_id,
-                      staking_epoch_data_id,next_epoch_data_id,
-                      min_window_density, total_next, currency_token_id,
-                      ledger_hash, height, global_slot,
-                      global_slot_since_genesis, timestamp FROM blocks
-               WHERE id = ?
-         |sql})
+         (Mina_caqti.select_cols_from_id ~table_name:"blocks"
+            ~cols:Fields.names))
       id
 
   let add_parts_if_doesn't_exist (module Conn : CONNECTION)
