@@ -119,11 +119,11 @@
         "tezos": "tezos"
       },
       "locked": {
-        "lastModified": 1640353625,
-        "narHash": "sha256-03pE87k5gYLPWEbFIaQ04RI6e+4egZ7EFR5qaTtkLIs=",
+        "lastModified": 1640377906,
+        "narHash": "sha256-J7zmob0zUpdIF4iBsnYtYZklCKuo/gBfT//C/KUyWKI=",
         "owner": "balsoft",
         "repo": "opam-nix",
-        "rev": "b8c94e60b32a8106f1bf676e50ed8e8f392c1c98",
+        "rev": "1df875c22d1026083cc572367991160449e36407",
         "type": "github"
       },
       "original": {

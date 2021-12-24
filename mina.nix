@@ -3,16 +3,11 @@ pkgs:
 let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
 
-  repos = {
-    default = pkgs.runCommand "opam-repository-depext-fix" {
-      src = inputs.opam-repository;
-    } ''
-      cp --no-preserve=all -R $src $out
-      sed 's/available: .*//' -i $out/packages/depext/depext.transition/opam
-    '';
-
-    mina = opam-nix.makeOpamRepo ./src/external;
-  };
+  repos = [
+    (opam-nix.makeOpamRepo ./src/external) # Pin external packages
+    ./nix/fake-opam-repo # Remove opam version restriction imposed by a depext dependency
+    inputs.opam-repository
+  ];
 
   export = opam-nix.opamListToQuery
     (opam-nix.fromOPAM ./src/opam.export).installed;
@@ -81,7 +76,7 @@ let
           sed 's,cargo build --release,mkdir target,' -i src/lib/marlin_plonk_bindings/stubs/dune
           sed 's,target/release,${pkgs.marlin_plonk_bindings_stubs}/lib,' -i src/lib/marlin_plonk_bindings/stubs/dune
           patchShebangs src/lib/zexe_backend/zexe_backend_common/gen_version.sh
-          dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe
+          dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe -j$NIX_BUILD_CORES
         '';
         installPhase = ''
           mkdir -p $out/bin
