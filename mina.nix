@@ -68,6 +68,8 @@ let
         src = ./.;
         buildInputs = unique' (deps ++ propagatedExternalBuildInputs);
         nativeBuildInputs = [ self.dune self.ocamlfind pkgs.cargo pkgs.rustc ];
+        # TODO, get this from somewhere
+        MARLIN_REPO_SHA = "bacef43ea34122286745578258066c29091dc36a";
 
         buildPhase = ''
           sed 's/mina_version.normal/mina_version.dummy/' -i src/lib/mina_version/dune
@@ -75,6 +77,7 @@ let
           sed 's,make ,make GO_CAPNP_STD=${pkgs.go-capnproto2.src}/std ,' -i src/libp2p_ipc/dune
           sed 's,cargo build --release,mkdir target,' -i src/lib/marlin_plonk_bindings/stubs/dune
           sed 's,target/release,${pkgs.marlin_plonk_bindings_stubs}/lib,' -i src/lib/marlin_plonk_bindings/stubs/dune
+          patchShebangs src/lib/zexe_backend/zexe_backend_common/gen_version.sh
           dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe
         '';
         installPhase = ''
