@@ -4,13 +4,13 @@ let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
 
   repos = [
-    (opam-nix.makeOpamRepo ./src/external) # Pin external packages
-    ./nix/fake-opam-repo # Remove opam version restriction imposed by a depext dependency
+    (opam-nix.makeOpamRepo ../src/external) # Pin external packages
+    ./fake-opam-repo # Remove opam version restriction imposed by a depext dependency
     inputs.opam-repository
   ];
 
   export = opam-nix.opamListToQuery
-    (opam-nix.fromOPAM ./src/opam.export).installed;
+    (opam-nix.fromOPAM ../src/opam.export).installed;
   external-packages = {
     "sodium" = "dev";
     "capnp" = "local";
@@ -34,6 +34,8 @@ let
 
   installedPackageNames =
     map (x: (opam-nix.splitNameVer x).name) (builtins.attrNames implicit-deps);
+
+  sourceInfo = inputs.self.sourceInfo or {};
 
   overlay = self: super:
     let
@@ -61,7 +63,7 @@ let
       mina = pkgs.stdenv.mkDerivation {
         pname = "mina";
         version = "dev";
-        src = ./.;
+        src = ../src;
         # todo: slimmed rocksdb
         buildInputs = unique' (deps ++ propagatedExternalBuildInputs ++ [pkgs.zlib pkgs.bzip2 pkgs.snappy pkgs.lz4 pkgs.zstd]);
         nativeBuildInputs = [ self.dune self.ocamlfind ];
@@ -69,18 +71,22 @@ let
         # TODO, get this from somewhere
         MARLIN_REPO_SHA = "bacef43ea34122286745578258066c29091dc36a";
 
+        MINA_COMMIT_DATE = sourceInfo.lastModifiedDate or "<unknown>";
+        MINA_COMMIT_SHA1 = sourceInfo.rev or "DIRTY";
+        MINA_BRANCH = "<unknown>";
+
         buildPhase = ''
-          sed 's/mina_version.normal/mina_version.dummy/' -i src/lib/mina_version/dune
-          sed 's,/usr/local/lib/librocksdb_coda.a,${pkgs.rocksdb}/lib/librocksdb.a,' -i src/external/ocaml-rocksdb/dune
-          sed 's,make ,make GO_CAPNP_STD=${pkgs.go-capnproto2.src}/std ,' -i src/libp2p_ipc/dune
-          sed 's,cargo build --release,mkdir target,' -i src/lib/marlin_plonk_bindings/stubs/dune
-          sed 's,target/release,${pkgs.marlin_plonk_bindings_stubs}/lib,' -i src/lib/marlin_plonk_bindings/stubs/dune
-          patchShebangs src/lib/zexe_backend/zexe_backend_common/gen_version.sh
-          dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe -j$NIX_BUILD_CORES
+          export MINA_ROOT="$NIX_BUILD_TOP/$sourceRoot"
+          sed 's,/usr/local/lib/librocksdb_coda.a,${pkgs.rocksdb}/lib/librocksdb.a,' -i external/ocaml-rocksdb/dune
+          sed 's,make ,make GO_CAPNP_STD=${pkgs.go-capnproto2.src}/std ,' -i libp2p_ipc/dune
+          sed 's,cargo build --release,mkdir target,' -i lib/marlin_plonk_bindings/stubs/dune
+          sed 's,target/release,${pkgs.marlin_plonk_bindings_stubs}/lib,' -i lib/marlin_plonk_bindings/stubs/dune
+          patchShebangs .
+          dune build app/logproc/logproc.exe app/cli/src/mina.exe -j$NIX_BUILD_CORES
         '';
         installPhase = ''
           mkdir -p $out/bin
-          mv _build/default/src/app/{logproc/logproc.exe,cli/src/mina.exe} $out/bin
+          mv _build/default/app/{logproc/logproc.exe,cli/src/mina.exe} $out/bin
         '';
       };
     };
