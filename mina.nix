@@ -80,7 +80,7 @@ let
         '';
         installPhase = ''
           mkdir -p $out/bin
-          mv src/app/logproc/logproc.exe src/app/cli/src/mina.exe $out/bin
+          mv _build/default/src/app/{logproc/logproc.exe,cli/src/mina.exe} $out/bin
         '';
       };
     };
