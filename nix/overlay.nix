@@ -17,7 +17,7 @@ in {
     # todo: buildgomodule?
     name = "libp2p_ipc-go";
     buildInputs = [ pkgs.capnproto pkgs.go-capnproto2 ];
-    src = ./src/libp2p_ipc;
+    src = ../src/libp2p_ipc;
     buildPhase = ''
       capnp compile -ogo -I${pkgs.go-capnproto2.src}/std libp2p_ipc.capnp
     '';
@@ -26,14 +26,14 @@ in {
       cp go.mod go.sum *.go $out/
     '';
   };
-  sodium-static = final.libsodium.overrideAttrs (o: {
+  sodium-static = pkgs.libsodium.overrideAttrs (o: {
     dontDisableStatic = true;
   });
 
   marlin_plonk_bindings_stubs = pkgs.rustPlatform.buildRustPackage {
     pname = "marlin_plonk_bindings_stubs";
     version = "0.1.0";
-    srcs = [./src/lib/marlin_plonk_bindings/stubs ./src/lib/marlin];
+    srcs = [../src/lib/marlin_plonk_bindings/stubs ../src/lib/marlin];
     nativeBuildInputs = [pkgs.ocaml-ng.ocamlPackages_4_11.ocaml];
     sourceRoot = "stubs";
     postUnpack = ''
@@ -41,14 +41,14 @@ in {
       mv stubs marlin_plonk_bindings
       export sourceRoot=marlin_plonk_bindings/stubs
     '';
-    cargoLock.lockFile = ./src/lib/marlin_plonk_bindings/stubs/Cargo.lock;
+    cargoLock.lockFile = ../src/lib/marlin_plonk_bindings/stubs/Cargo.lock;
   };
 
   # Jobs/Test/Libp2pUnitTest
   libp2p_helper = pkgs.buildGoModule {
     pname = "libp2p_helper";
     version = "0.1";
-    src = ./src/app/libp2p_helper/src;
+    src = ../src/app/libp2p_helper/src;
     runVend = true; # missing some schema files
     vendorSha256 = "sha256-g0DsuLMiXjUTsGbhCSeFKEFKMEMtg3UTUjmYwUka6iE=";
     postConfigure = ''
