@@ -1,5 +1,4 @@
-inputs:
-pkgs:
+inputs: pkgs:
 let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
 
@@ -9,8 +8,8 @@ let
     inputs.opam-repository
   ];
 
-  export = opam-nix.opamListToQuery
-    (opam-nix.fromOPAM ../src/opam.export).installed;
+  export =
+    opam-nix.opamListToQuery (opam-nix.fromOPAM ../src/opam.export).installed;
   external-packages = {
     "sodium" = "dev";
     "capnp" = "local";
@@ -35,7 +34,7 @@ let
   installedPackageNames =
     map (x: (opam-nix.splitNameVer x).name) (builtins.attrNames implicit-deps);
 
-  sourceInfo = inputs.self.sourceInfo or {};
+  sourceInfo = inputs.self.sourceInfo or { };
 
   overlay = self: super:
     let
@@ -49,12 +48,11 @@ let
 
       propagatedExternalBuildInputs = pkgs.lib.concatMap (dep:
         pkgs.lib.optionals (dep ? passthru.pkgdef)
-        (dep.buildInputs or [ ] ++ dep.propagatedBuildInputs or [ ]))
-        deps;
+        (dep.buildInputs or [ ] ++ dep.propagatedBuildInputs or [ ])) deps;
     in {
       sodium = super.sodium.overrideAttrs (_: {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
-        propagatedBuildInputs = [pkgs.sodium-static];
+        propagatedBuildInputs = [ pkgs.sodium-static ];
         preBuild = ''
           export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
         '';
@@ -65,7 +63,8 @@ let
         version = "dev";
         src = ../src;
         # todo: slimmed rocksdb
-        buildInputs = unique' (deps ++ propagatedExternalBuildInputs ++ [pkgs.zlib pkgs.bzip2 pkgs.snappy pkgs.lz4 pkgs.zstd]);
+        buildInputs = unique' (deps ++ propagatedExternalBuildInputs
+          ++ [ pkgs.zlib pkgs.bzip2 pkgs.snappy pkgs.lz4 pkgs.zstd ]);
         nativeBuildInputs = [ self.dune self.ocamlfind ];
         NIX_LDFLAGS = "-lsnappy -llz4 -lzstd";
         # TODO, get this from somewhere
