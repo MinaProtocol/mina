@@ -119,11 +119,11 @@
         "tezos": "tezos"
       },
       "locked": {
-        "lastModified": 1640382746,
-        "narHash": "sha256-kUdZ7jHpdfY3iiIRHUf0KroPOUY0bNHo0Gf5bWNYcYE=",
+        "lastModified": 1640525663,
+        "narHash": "sha256-eepdBCdcm871kR1IBLoOgh2oH7ifwoZBMFFoUdePEgE=",
         "owner": "balsoft",
         "repo": "opam-nix",
-        "rev": "90e85e73a4b1c7eefa5ebe77d3e17b6b2277a0c9",
+        "rev": "f8b4cbba2bf4941efa6afc159f20757df0037479",
         "type": "github"
       },
       "original": {
@@ -167,11 +167,11 @@
     "opam2json": {
       "flake": false,
       "locked": {
-        "lastModified": 1639407772,
-        "narHash": "sha256-r55h5B9mRQ9JM/82XZNrkO4/0HyiP2Wt1S7IZtcupCc=",
+        "lastModified": 1640459568,
+        "narHash": "sha256-YrvRqaevet2iz2sZNT9qlRy9xAbEBVW5rYFAQbFEtVQ=",
         "owner": "tweag",
         "repo": "opam2json",
-        "rev": "db0cecf937f5f57ec1149120e56652816d8a1b51",
+        "rev": "e700f86b03871697d12ebbbcb781a6146104fcc2",
         "type": "github"
       },
       "original": {
