@@ -35,18 +35,18 @@ inputs: pkgs: {
   lint-check-format = pkgs.stdenv.mkDerivation {
     # todo: only depend on ./src
     name = "lint-check-format";
-    # todo: from opam
     buildInputs = with inputs.self.ocamlPackages.${pkgs.system}; [
-      ocaml
-      dune_2
-      ppx_jane
-      findlib
-      async
-      ocamlformat
-    ];
+        ocaml
+        dune
+        base_quickcheck
+        ocamlfind
+        async
+        ocamlformat
+        ppx_jane
+      ];
     src = ../.;
     buildPhase = "make check-format";
-    installPhase = "echo ok > $out";
+    installPhase = "touch $out";
   };
 
   # todo: libp2p_ipc
