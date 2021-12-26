@@ -33,9 +33,8 @@
 
           checks = import ./nix/checks.nix inputs pkgs;
 
-          ocamlPackages = import ./nix/mina.nix inputs pkgs;
+          ocamlPackages = import ./nix/ocaml.nix inputs pkgs;
         in {
-          inherit checks;
 
           # Jobs/Lint/Rust.dhall
           packages.trace-tool =
@@ -95,9 +94,12 @@
           packages.go-capnproto2 = pkgs.go-capnproto2;
           packages.libp2p_helper = pkgs.libp2p_helper;
 
+
           defaultPackage = ocamlPackages.mina;
 
-          devShells.impure = import ./nix/impure.nix pkgs;
+          devShells.impure = import ./nix/impure-shell.nix pkgs;
+
+          inherit checks;
         };
     };
 }
