@@ -13,6 +13,11 @@ in {
   sodium = super.sodium.overrideAttrs (oa: {
     buildInputs = oa.buildInputs ++ [ self.nixpkgs.sodium-static ];
     nativeBuildInputs = oa.nativeBuildInputs ++ [ fake-cc ];
+    # buildPhase = ''
+    #   runHook preBuild
+    #    query ctypes) ocamlbuild -use-ocamlfind -classic-display lib/sodium.cma lib/sodium.cmxa
+    #   runHook postBuild
+    # '';
   });
 
   conf-gmp = super.conf-gmp.overrideAttrs
@@ -51,6 +56,10 @@ in {
       make -C src all opt
     '';
   });
+
+  # conduit-async = super.conduit-async.overrideAttrs (oa: {
+  #   dontStrip = true; # todo: segfault
+  # });
 
   ocamlgraph = super.ocamlgraph.overrideAttrs (oa: {
     buildPhase = ''
