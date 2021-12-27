@@ -43,7 +43,7 @@ type BlockRequester interface {
 }
 
 type RootDownloadState struct {
-	allDescedants        *cid.Set
+	allDescendants       *cid.Set
 	session              BlockRequester
 	cancelF              context.CancelFunc
 	schema               *BitswapBlockSchema
@@ -100,8 +100,7 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 	if !hasDC {
 		bitswapLogger.Errorf("Tag %d is not supported by Bitswap downloader", tag)
 	}
-	err := bs.SetStatus(root_, codanet.Partial)
-	if err != nil {
+	if err := bs.SetStatus(root_, codanet.Partial); err != nil {
 		bitswapLogger.Debugf("Skipping download request for %s due to status: %w", codanet.BlockHashToCidSuffix(root_), err)
 		status, err := bs.GetStatus(root_)
 		if err == nil && status == codanet.Full {
@@ -109,8 +108,8 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 		}
 		return
 	}
-	s2 := cid.NewSet()
-	s2.Add(rootCid)
+	allDescendants := cid.NewSet()
+	allDescendants.Add(rootCid)
 	downloadTimeout := dataConf.downloadTimeout
 	session, cancelF := bs.NewSession(downloadTimeout)
 	np, hasNP := nodeDownloadParams[rootCid]
@@ -120,29 +119,35 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 	}
 	np[root_] = append(np[root_], 0)
 	rootDownloadStates[root_] = &RootDownloadState{
-		allDescedants:        s2,
+		allDescendants:       allDescendants,
 		session:              session,
 		cancelF:              cancelF,
 		tag:                  tag,
 		remainingNodeCounter: 1,
 	}
+	handleError := func(err error) {
+		bitswapLogger.Errorf("Error initializing block download: %w", err)
+		ClearRootDownloadState(bs, root_)
+	}
 	var rootBlock []byte
-	err = bs.ViewBlock(root_, func(b []byte) error {
-		rootBlock := make([]byte, len(b))
+	rootBlockViewF := func(b []byte) error {
+		rootBlock = make([]byte, len(b))
 		copy(rootBlock, b)
 		return nil
-	})
-	hasRootBlock := err == nil
-	if err == blockstore.ErrNotFound {
-		err = session.RequestBlocks([]cid.Cid{rootCid})
+	}
+	if err := bs.ViewBlock(root_, rootBlockViewF); err != nil && err != blockstore.ErrNotFound {
+		handleError(err)
+		return
+	}
+	hasRootBlock := rootBlock != nil
+	if !hasRootBlock {
+		if err := session.RequestBlocks([]cid.Cid{rootCid}); err != nil {
+			handleError(err)
+			return
+		}
 		bitswapLogger.Debugf("Requested download of %s", codanet.BlockHashToCidSuffix(root_))
 	}
-	if err == nil {
-		bs.RegisterDeadlineTracker(root_, downloadTimeout)
-	} else {
-		bitswapLogger.Errorf("Error initializing block download: %w", err)
-		FreeRoot(bs, root_)
-	}
+	bs.RegisterDeadlineTracker(root_, downloadTimeout)
 	if hasRootBlock {
 		b, _ := blocks.NewBlockWithCid(rootBlock, rootCid)
 		processDownloadedBlock(b, bs)
@@ -151,9 +156,9 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 
 type malformedRoots map[root]error
 
-// processDownloadedBlockImpl is a small-step transition of root block retrieval state machine
+// processDownloadedBlockStep is a small-step transition of root block retrieval state machine
 // It calculates state transition for a single block
-func processDownloadedBlockImpl(params map[root][]NodeIndex, block blocks.Block, rootParams map[root]RootParams,
+func processDownloadedBlockStep(params map[root][]NodeIndex, block blocks.Block, rootParams map[root]RootParams,
 	maxBlockSize int, di DepthIndices, tagConfig map[BitswapDataTag]BitswapDataConfig) (map[BitswapBlockLink]map[root][]NodeIndex, malformedRoots) {
 	id := block.Cid()
 	malformed := make(malformedRoots)
@@ -263,10 +268,10 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 		rootState.remainingNodeCounter = rootState.remainingNodeCounter - len(ixs)
 		rps[root] = rootState
 	}
-	newParams, malformed := processDownloadedBlockImpl(oldPs, block, rps, bs.MaxBlockSize(), depthIndices, bs.DataConfig())
+	newParams, malformed := processDownloadedBlockStep(oldPs, block, rps, bs.MaxBlockSize(), depthIndices, bs.DataConfig())
 	for root, err := range malformed {
 		bitswapLogger.Warnf("Block %s of root %s is malformed: %s", id, codanet.BlockHashToCidSuffix(root), err)
-		FreeRoot(bs, root)
+		ClearRootDownloadState(bs, root)
 		bs.SendResourceUpdate(ipc.ResourceUpdateType_broken, root)
 	}
 
@@ -289,7 +294,7 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 				continue
 			}
 			someRootState = rootState
-			rootState.allDescedants.Add(childId)
+			rootState.allDescendants.Add(childId)
 			rootState.remainingNodeCounter = rootState.remainingNodeCounter + len(ixs)
 		}
 		var blockBytes []byte
@@ -323,7 +328,7 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 			if err != nil {
 				bitswapLogger.Warnf("Failed to update status of fully downloaded root %s: %s", root, err)
 			}
-			FreeRoot(bs, root)
+			ClearRootDownloadState(bs, root)
 			bs.SendResourceUpdate(ipc.ResourceUpdateType_added, root)
 		}
 	}

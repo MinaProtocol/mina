@@ -360,7 +360,7 @@ func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 }
 
 func beginMDNS(app *app, foundPeerCh chan peerDiscovery) error {
-	mdns, err := mdns.NewMdnsService(app.Ctx, app.P2p.Host, time.Second, "_coda-discovery._udp.local")
+	mdns, err := mdns.NewMdnsService(app.Ctx, app.P2p.Host, time.Minute, "_coda-discovery._udp.local")
 	if err != nil {
 		return err
 	}

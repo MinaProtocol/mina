@@ -108,7 +108,7 @@ type CodaConnectionManager struct {
 	OnConnect        func(network.Network, network.Conn)
 	OnDisconnect     func(network.Network, network.Conn)
 	// protectedMirror is a map of protected peer ids/tags, mirroring the structure in
-	// BasicConnMgr which is not accesible from CodaConnectionManager
+	// BasicConnMgr which is not accessible from CodaConnectionManager
 	protectedMirror     map[peer.ID]map[string]interface{}
 	protectedMirrorLock sync.Mutex
 }
