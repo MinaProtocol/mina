@@ -1,11 +1,40 @@
 final: prev:
 let pkgs = final;
 in {
-  postgresql = final.pkgsBuildBuild.postgresql_12;
+  postgresql = (prev.postgresql.override {
+    enableSystemd = false;
+  }).overrideAttrs (o: {
+    doCheck = !prev.stdenv.hostPlatform.isMusl;
+  });
 
-  openssh = (prev.openssh.override { libredirect = ""; }).overrideAttrs
-    (_: { doCheck = false; });
+  openssh = (if prev.stdenv.hostPlatform.isMusl then (prev.openssh.override {
+    # todo: fix libredirect musl
+    libredirect = "";
+  }).overrideAttrs (o: {
+    doCheck = !prev.stdenv.hostPlatform.isMusl;
+  }) else prev.openssh);
 
+  git = prev.git.overrideAttrs (o: {
+    doCheck = o.doCheck && !prev.stdenv.hostPlatform.isMusl;
+  });
+#mozillaOverlay = import (builtins.fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz); nixpkgs = import nixpkgs-unstable { overlays = [ mozillaOverlay ]; }; rust = (nixpkgs.rustChannelOf { channel = "nightly"; }).rust.override { targets = [ "x86_64-unknown-linux-musl" ]; }; rustPlatform = nixpkgs.makeRustPlatform { cargo = rust; rustc = rust; }; in nixpkgs.stdenv.mkDerivation { name = "rust-env"; nativeBuildInputs = [ rustPlatform.rust.cargo rustPlatform.rust.rustc nixpkgs.file ]; } 
+  pkgs_normal = import (final.path) {
+    overlays = final.overlays;
+    system = "x86_64-linux";
+  };
+  rust-musl = ((final.pkgs_normal.buildPackages.rustChannelOf {
+    channel = "nightly";
+    sha256 = "sha256-eKL7cdPXGBICoc9FGMSHgUs6VGMg+3W2y/rXN8TuuAI=";
+    date = "2021-12-27";
+  }).rust.override {
+    targets = [ "x86_64-unknown-linux-musl" ];
+  }) // {
+    inherit (prev.rust) toRustTarget toRustTargetSpec;
+  };
+  rustPlatform-musl = prev.makeRustPlatform {
+    cargo = final.rust-musl;
+    rustc = final.rust-musl;
+  };
   go-capnproto2 = pkgs.buildGoModule rec {
     pname = "capnpc-go";
     version = "v3.0.0-alpha.1";
@@ -34,7 +63,7 @@ in {
   sodium-static =
     pkgs.libsodium.overrideAttrs (o: { dontDisableStatic = true; });
 
-  marlin_plonk_bindings_stubs = pkgs.rustPlatform.buildRustPackage {
+  marlin_plonk_bindings_stubs = pkgs.rustPlatform-musl.buildRustPackage {
     pname = "marlin_plonk_bindings_stubs";
     version = "0.1.0";
     srcs = [ ../src/lib/marlin_plonk_bindings/stubs ../src/lib/marlin ];

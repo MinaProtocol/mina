@@ -33,7 +33,7 @@ let
     map (x: (opam-nix.splitNameVer x).name) (builtins.attrNames implicit-deps);
 
   sourceInfo = inputs.self.sourceInfo or { };
-
+  dds = x: x.overrideAttrs (o: { dontDisableStatic = true; });
   overlay = self: super:
     {
       sodium = super.sodium.overrideAttrs (_: {
@@ -57,16 +57,18 @@ let
         # todo: slimmed rocksdb
         buildInputs =
           (builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self))
-          ++ [ pkgs'.zlib pkgs'.bzip2 pkgs'.snappy pkgs'.lz4 pkgs'.zstd ];
-        nativeBuildInputs = [ pkgs.capnproto ]
+          ++ (map dds [ pkgs.zlib pkgs.bzip2 pkgs.snappy pkgs.lz4 pkgs.zstd ]);
+        nativeBuildInputs = [ self.dune self.ocamlfind pkgs.capnproto ]
           ++ builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self);
-        NIX_LDFLAGS = "-lsnappy -llz4 -lzstd";
+        #NIX_LDFLAGS = "-lsnappy -llz4 -lzstd";
         # TODO, get this from somewhere
         MARLIN_REPO_SHA = "bacef43ea34122286745578258066c29091dc36a";
 
         MINA_COMMIT_DATE = sourceInfo.lastModifiedDate or "<unknown>";
         MINA_COMMIT_SHA1 = sourceInfo.rev or "DIRTY";
         MINA_BRANCH = "<unknown>";
+
+        OCAMLPARAM = "_,ccopt=-static";
 
         buildPhase = ''
           export MINA_ROOT="$NIX_BUILD_TOP/$sourceRoot"
