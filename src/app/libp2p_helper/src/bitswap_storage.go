@@ -63,39 +63,40 @@ func (bs_ *BitswapStorageLmdb) GetStatus(key [32]byte) (res RootBlockStatus, err
 
 func (bs_ *BitswapStorageLmdb) DeleteStatus(key [32]byte) error {
 	bs := (*lmdbbs.Blockstore)(bs_)
-	return bs.PutData(statusKey(key), func(prevVal []byte, exists bool) (newVal []byte, newExists bool, err error) {
+	return bs.PutData(statusKey(key), func(prevVal []byte, exists bool) ([]byte, bool, error) {
 		prev, err := UnmarshalRootBlockStatus(prevVal)
 		if err != nil {
-			return
+			return nil, false, err
 		}
-		newExists = false
 		if exists && prev != Deleting {
-			err = fmt.Errorf("wrong status deletion from %d", prev)
+			return nil, false, fmt.Errorf("wrong status deletion from %d", prev)
 		}
-		return
+		return nil, false, nil
 	})
+}
+
+func isStatusTransitionAllowed(exists bool, prev RootBlockStatus, newStatus RootBlockStatus) bool {
+	allowed := newStatus == Partial && (!exists || prev == Partial)
+	allowed = allowed || (newStatus == Full && (!exists || prev <= Full))
+	allowed = allowed || (newStatus == Deleting && exists)
+	return allowed
 }
 
 func (bs_ *BitswapStorageLmdb) SetStatus(key [32]byte, newStatus RootBlockStatus) error {
 	bs := (*lmdbbs.Blockstore)(bs_)
-	return bs.PutData(statusKey(key), func(prevVal []byte, exists bool) (newVal []byte, newExists bool, err error) {
+	return bs.PutData(statusKey(key), func(prevVal []byte, exists bool) ([]byte, bool, error) {
 		var prev RootBlockStatus
 		if exists {
+			var err error
 			prev, err = UnmarshalRootBlockStatus(prevVal)
 			if err != nil {
-				return
+				return nil, false, err
 			}
 		}
-		newVal = []byte{byte(newStatus)}
-		newExists = true
-		allowed := false
-		allowed = allowed || (newStatus == Partial && (!exists || prev == Partial))
-		allowed = allowed || (newStatus == Full && (!exists || prev <= Full))
-		allowed = allowed || (newStatus == Deleting && exists)
-		if !allowed {
-			err = fmt.Errorf("wrong status transition: from %d to %d", prev, newStatus)
+		if !isStatusTransitionAllowed(exists, prev, newStatus) {
+			return nil, false, fmt.Errorf("wrong status transition: from %d to %d", prev, newStatus)
 		}
-		return
+		return []byte{byte(newStatus)}, true, nil
 	})
 }
 func (bs_ *BitswapStorageLmdb) DeleteBlocks(keys [][32]byte) error {

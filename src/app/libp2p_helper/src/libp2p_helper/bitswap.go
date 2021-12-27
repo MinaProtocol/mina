@@ -87,41 +87,42 @@ func announceNewRootBlock(engine *bitswap.Bitswap, statusStorage codanet.Bitswap
 }
 
 func (bs *BitswapCtx) deleteRoot(root BitswapBlockLink) error {
-	err := bs.storage.SetStatus(root, codanet.Deleting)
-	if err != nil {
+	if err := bs.storage.SetStatus(root, codanet.Deleting); err != nil {
 		return err
 	}
-	FreeRoot(bs, root)
-	allDescedants := []BitswapBlockLink{root}
-	for i := 0; i < len(allDescedants); i++ {
-		block := allDescedants[i]
-		err := bs.storage.ViewBlock(block, func(b []byte) error {
-			links, _, err := ReadBitswapBlock(b)
-			if err == nil {
-				for _, l := range links {
-					var l2 BitswapBlockLink
-					copy(l2[:], l[:])
-					allDescedants = append(allDescedants, l2)
-				}
+	ClearRootDownloadState(bs, root)
+	allDescendants := []BitswapBlockLink{root}
+	viewBlockF := func(b []byte) error {
+		links, _, err := ReadBitswapBlock(b)
+		if err == nil {
+			for _, l := range links {
+				var l2 BitswapBlockLink
+				copy(l2[:], l[:])
+				allDescendants = append(allDescendants, l2)
 			}
-			return err
-		})
-		if err != nil && err != blockstore.ErrNotFound {
+		}
+		return err
+	}
+	for _, block := range allDescendants {
+		if err := bs.storage.ViewBlock(block, viewBlockF); err != nil && err != blockstore.ErrNotFound {
 			return err
 		}
 	}
-	return bs.storage.DeleteBlocks(allDescedants)
+	if err := bs.storage.DeleteBlocks(allDescendants); err != nil {
+		return err
+	}
+	return bs.storage.DeleteStatus(root)
 }
 
-func FreeRoot(bs BitswapState, root root) {
-	states := bs.RootDownloadStates()
+func ClearRootDownloadState(bs BitswapState, root root) {
+	rootStates := bs.RootDownloadStates()
 	nodeParams := bs.NodeDownloadParams()
-	state, has := states[root]
+	state, has := rootStates[root]
 	if !has {
 		return
 	}
-	delete(states, root)
-	state.allDescedants.ForEach(func(c cid.Cid) error {
+	delete(rootStates, root)
+	state.allDescendants.ForEach(func(c cid.Cid) error {
 		np, hasNp := nodeParams[c]
 		if hasNp {
 			delete(np, root)
@@ -224,7 +225,7 @@ func (bs *BitswapCtx) Loop() {
 			return
 		case root := <-bs.deadlineChan:
 			configuredCheck()
-			FreeRoot(bs, root)
+			ClearRootDownloadState(bs, root)
 		case cmd := <-bs.addCmds:
 			configuredCheck()
 			blocks, root := SplitDataToBitswapBlocksLengthPrefixedWithTag(bs.maxBlockSize, cmd.data, BlockBodyTag)
@@ -239,9 +240,6 @@ func (bs *BitswapCtx) Loop() {
 			success := []root{}
 			for _, root := range cmd.rootIds {
 				err := bs.deleteRoot(root)
-				if err == nil {
-					err = storage.DeleteStatus(root)
-				}
 				if err == nil {
 					success = append(success, root)
 				} else {

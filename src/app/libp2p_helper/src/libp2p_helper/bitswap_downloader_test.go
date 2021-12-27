@@ -264,7 +264,7 @@ func (bg *blockGroup) execute(r *rand.Rand, tagConfig map[BitswapDataTag]Bitswap
 			panic("unexpected no np")
 		}
 		delete(nodeParams, link)
-		children, malformed_ := processDownloadedBlockImpl(np, block, rootParams, bg.maxBlockSize, di, tagConfig)
+		children, malformed_ := processDownloadedBlockStep(np, block, rootParams, bg.maxBlockSize, di, tagConfig)
 		for child, childMap := range children {
 			np, hasNp := nodeParams[child]
 			if !hasNp {
@@ -490,7 +490,7 @@ func (proto *bitswapTreeProto) genTreeFromProto(r *rand.Rand, tag BitswapDataTag
 	}
 }
 
-func TestProcessDownloadedBlockImplInvalidStructure(t *testing.T) {
+func TestProcessDownloadedBlockStepInvalidStructure(t *testing.T) {
 	tagConfig := map[BitswapDataTag]BitswapDataConfig{
 		0: {maxSize: math.MaxInt32, downloadTimeout: time.Minute},
 	}
@@ -532,7 +532,7 @@ func TestProcessDownloadedBlockImplInvalidStructure(t *testing.T) {
 	}
 }
 
-func TestProcessDownloadedBlockImpl(t *testing.T) {
+func TestProcessDownloadedBlockStep(t *testing.T) {
 	tagConfig := map[BitswapDataTag]BitswapDataConfig{
 		0: {maxSize: math.MaxInt32, downloadTimeout: time.Minute},
 		1: {maxSize: math.MaxInt32, downloadTimeout: time.Minute},
