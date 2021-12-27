@@ -1,6 +1,10 @@
 final: prev:
 let pkgs = final;
 in {
+  postgresql = prev.postgresql.override {
+    enableSystemd = false;
+  };
+
   go-capnproto2 = pkgs.buildGoModule rec {
     pname = "capnpc-go";
     version = "v3.0.0-alpha.1";
