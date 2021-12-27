@@ -76,10 +76,10 @@ dispatch begin
     flag ["c"; "ocamlmklib"; "use_sodium"] & S lsodium;
 
     (* Linking generated stubs *)
-    dep ["ocaml"; "link"; "byte"; "library"; "use_sodium_stubs"]
+    (* dep ["ocaml"; "link"; "byte"; "library"; "use_sodium_stubs"]
       ["lib/dllsodium_stubs"-.-(!Options.ext_dll)];
     flag ["ocaml"; "link"; "byte"; "library"; "use_sodium_stubs"] &
-      S[A"-dllib"; A"-lsodium_stubs"];
+      S[A"-dllib"; A"-lsodium_stubs"]; *)
 
     dep ["ocaml"; "link"; "native"; "library"; "use_sodium_stubs"]
       ["lib/libsodium_stubs"-.-(!Options.ext_lib)];
