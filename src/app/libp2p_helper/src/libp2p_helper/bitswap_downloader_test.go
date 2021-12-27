@@ -726,17 +726,22 @@ func (bs *testBitswapState) CheckInvariants() {
 	}
 }
 
-func testBitswapDownloadDo(t *testing.T, r *rand.Rand, bg blockGroup, removedBlocks map[cid.Cid]root, expectedToFail []root) {
+func testBitswapDownloadDo(t *testing.T, r *rand.Rand, bg blockGroup, prepopulatedBlocks *cid.Set, removedBlocks map[cid.Cid]root, expectedToFail []root) {
 	expectedToTimeout := map[root]bool{}
 	for _, b := range removedBlocks {
 		expectedToTimeout[b] = true
 	}
+	initBlocks := map[cid.Cid][]byte{}
+	prepopulatedBlocks.ForEach(func(c cid.Cid) error {
+		initBlocks[c] = bg.blocks[c]
+		return nil
+	})
 	totalBlocks := len(bg.blocks)
 	blockSink := make(chan blocks.Block, 1000)
 	bs := &testBitswapState{
 		r:                  r,
 		statuses:           map[BitswapBlockLink]codanet.RootBlockStatus{},
-		blocks:             map[cid.Cid][]byte{},
+		blocks:             initBlocks,
 		nodeDownloadParams: map[cid.Cid]map[root][]NodeIndex{},
 		rootDownloadStates: map[root]*RootDownloadState{},
 		awaitingBlocks:     map[cid.Cid]interface{}{},
@@ -915,9 +920,50 @@ func TestBitswapDownload(t *testing.T) {
 	seed := time.Now().Unix()
 	t.Logf("Seed: %d", seed)
 	r := rand.New(rand.NewSource(seed))
+	empty := cid.NewSet()
 	for i := 0; i < 1000; i++ {
 		bg1, removedBlocks, expectFail := genLargeBlockGroup(r)
-		testBitswapDownloadDo(t, r, bg1, removedBlocks, expectFail)
+		testBitswapDownloadDo(t, r, bg1, empty, removedBlocks, expectFail)
+		if t.Failed() {
+			bg1.print()
+			break
+		}
+	}
+}
+
+func TestBitswapDownloadPrepoluated(t *testing.T) {
+	seed := time.Now().Unix()
+	t.Logf("Seed: %d", seed)
+	r := rand.New(rand.NewSource(seed))
+	for i := 0; i < 1000; i++ {
+		bg1, removedBlocks, expectFail := genLargeBlockGroup(r)
+		prepopulated := cid.NewSet()
+		nHalved := len(bg1.blocks) / 2
+		if nHalved > 0 {
+			prepopulatedIxs := make([]int, r.Intn(nHalved)+1)
+			for ix := 0; ix < len(prepopulatedIxs); ix++ {
+				prepopulatedIxs[ix] = r.Intn(len(bg1.blocks))
+			}
+			j := 0
+			ix := 0
+			for k := range bg1.blocks {
+				if j == prepopulatedIxs[ix] {
+					if _, has := removedBlocks[k]; has {
+						prepopulatedIxs[ix]++
+					} else {
+						prepopulated.Add(k)
+						ks := k.String()
+						fmt.Printf("Prepopulating %s\n", ks[len(ks)-6:])
+						ix++
+						if ix == len(prepopulatedIxs) {
+							break
+						}
+					}
+				}
+				j++
+			}
+		}
+		testBitswapDownloadDo(t, r, bg1, prepopulated, removedBlocks, expectFail)
 		if t.Failed() {
 			bg1.print()
 			break
