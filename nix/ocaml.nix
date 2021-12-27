@@ -47,6 +47,10 @@ let
         '';
       });
 
+      rpc_parallel = super.rpc_parallel.overrideAttrs (oa: {
+        buildInputs = oa.buildInputs ++ [ self.ctypes ];
+      });
+
       mina = pkgs.stdenv.mkDerivation {
         pname = "mina";
         version = "dev";

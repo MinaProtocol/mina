@@ -1,51 +1,54 @@
 self: super: {
-    conf-gmp = super.conf-gmp.overrideAttrs (oa: {
-      nativeBuildInputs = oa.nativeBuildInputs ++ [
-        (self.nixpkgs.writeShellScriptBin "cc" ''$CC "$@"'')
-      ];
-    });
+  "conf-g++" = super."conf-g++".overrideAttrs (oa: {
+    nativeBuildInputs = oa.nativeBuildInputs
+      ++ [ (self.nixpkgs.writeShellScriptBin "g++" ''$CXX "$@"'') ];
+  });
 
-    base58 = super.base58.overrideAttrs (oa: {
-      buildPhase = ''
-        make lib.byte
-        ocamlbuild -I src -I tests base58.cmxa
-      '';
-    });
+  conf-gmp = super.conf-gmp.overrideAttrs (oa: {
+    nativeBuildInputs = oa.nativeBuildInputs
+      ++ [ (self.nixpkgs.writeShellScriptBin "cc" ''$CC "$@"'') ];
+  });
 
-    zarith = super.zarith.overrideAttrs (oa: {
-      preBuild = ''
-        sed "s/ar='ar'/ar='$AR'/" -i configure
-      '';
-    });
+  base58 = super.base58.overrideAttrs (oa: {
+    buildPhase = ''
+      make lib.byte
+      ocamlbuild -I src -I tests base58.cmxa
+    '';
+  });
 
-    digestif = super.digestif.overrideAttrs (oa: {
-      buildPhase = ''
-        dune build -p digestif -j $NIX_BUILD_CORES
-      '';
-    });
+  zarith = super.zarith.overrideAttrs (oa: {
+    preBuild = ''
+      sed "s/ar='ar'/ar='$AR'/" -i configure
+    '';
+  });
 
-    cmdliner = super.cmdliner.overrideAttrs (oa: {
-      buildPhase = ''
-        make build-byte build-native
-      '';
-      installPhase = ''
-        make PREFIX=$out LIBDIR=$OCAMLFIND_DESTDIR install-common install-native
-      '';
-    });
+  digestif = super.digestif.overrideAttrs (oa: {
+    buildPhase = ''
+      dune build -p digestif -j $NIX_BUILD_CORES
+    '';
+  });
 
-    ocaml-extlib = super.ocaml-extlib.overrideAttrs (oa: {
-      buildPhase = ''
-        make -C src all opt
-      '';
-    });
+  cmdliner = super.cmdliner.overrideAttrs (oa: {
+    buildPhase = ''
+      make build-byte build-native
+    '';
+    installPhase = ''
+      make PREFIX=$out LIBDIR=$OCAMLFIND_DESTDIR install-common install-native
+    '';
+  });
 
-    ocamlgraph = super.ocamlgraph.overrideAttrs (oa: {
-      buildPhase = ''
-        ./configure
-        sed 's/graph.cmxs//' -i Makefile
-        make NATIVE_DYNLINK=false
-      '';
-    });
+  ocaml-extlib = super.ocaml-extlib.overrideAttrs (oa: {
+    buildPhase = ''
+      make -C src all opt
+    '';
+  });
 
+  ocamlgraph = super.ocamlgraph.overrideAttrs (oa: {
+    buildPhase = ''
+      ./configure
+      sed 's/graph.cmxs//' -i Makefile
+      make NATIVE_DYNLINK=false
+    '';
+  });
 
 }
