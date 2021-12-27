@@ -555,7 +555,7 @@ func TestBitswapSmall(t *testing.T) {
 
 func TestBitswapQC(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping TestBitswapJumbo in short mode")
+		t.Skip("skipping TestBitswapQC in short mode")
 		return
 	}
 	nodes, cancels := initNodes(t, 20, resourceUpdateOnlyMask)
