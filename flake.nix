@@ -14,15 +14,18 @@
   inputs.opam-repository.url = "github:ocaml/opam-repository";
   inputs.opam-repository.flake = false;
 
+  inputs.nixpkgs-mozilla.url = "github:mozilla/nixpkgs-mozilla";
+  inputs.nixpkgs-mozilla.flake = false;
+
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
-    , opam-nix, opam-repository }:
+    , opam-nix, opam-repository, nixpkgs-mozilla }:
     let inherit (utils.lib) exportOverlays exportPackages;
     in utils.lib.mkFlake {
       inherit self inputs;
       supportedSystems = [ "x86_64-linux" ];
       channelsConfig.allowUnfree = true;
       #sharedOverlays = [ mix-to-nix.overlay ];
-      sharedOverlays = [ self.overlay ];
+      sharedOverlays = [ (import nixpkgs-mozilla) self.overlay ];
       overlays = exportOverlays { inherit (self) pkgs inputs; };
       overlay = import ./nix/overlay.nix;
       outputsBuilder = channels:
@@ -35,7 +38,7 @@
 
           checks = import ./nix/checks.nix inputs pkgs;
 
-          ocamlPackages_static = assert self.sourceInfo.submodules; import ./nix/ocaml.nix inputs pkgs.pkgsStatic;
+          ocamlPackages_static = assert self.sourceInfo.submodules; import ./nix/ocaml.nix inputs pkgs.pkgsMusl;
 
           ocamlPackages = assert self.sourceInfo.submodules; import ./nix/ocaml.nix inputs pkgs;
         in {
@@ -102,6 +105,11 @@
             pkgs.marlin_plonk_bindings_stubs;
           packages.go-capnproto2 = pkgs.go-capnproto2;
           packages.libp2p_helper = pkgs.libp2p_helper;
+          packages.marlin_plonk_bindings_stubs_static =
+            pkgs.pkgsMusl.marlin_plonk_bindings_stubs;
+
+          legacyPackages.musl = pkgs.pkgsMusl;
+          legacyPackages.regular = pkgs;
 
 
           defaultPackage = ocamlPackages.mina;
