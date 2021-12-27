@@ -33,6 +33,8 @@
 
           checks = import ./nix/checks.nix inputs pkgs;
 
+          ocamlPackages_static = import ./nix/ocaml.nix inputs pkgs.pkgsStatic;
+
           ocamlPackages = import ./nix/ocaml.nix inputs pkgs;
         in {
 
@@ -87,8 +89,9 @@
             '';
           };
 
-          inherit ocamlPackages;
+          inherit ocamlPackages ocamlPackages_static;
           packages.mina = ocamlPackages.mina;
+          packages.mina_static = ocamlPackages_static.mina;
           packages.marlin_plonk_bindings_stubs =
             pkgs.marlin_plonk_bindings_stubs;
           packages.go-capnproto2 = pkgs.go-capnproto2;
