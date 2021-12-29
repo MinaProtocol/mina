@@ -155,17 +155,17 @@ module Public_key_compressed_direct = struct
     (* of_unpackable assumes a 255-bit value, but we want  *)
     let { Public_key.Compressed.Poly.x; is_odd } = pk_compressed in
     let field_bits = Field.unpack x in
-    (* Our Field representation has zero-th bit first so reverse *)
+    (* our Field representation has zero-th bit first so reverse *)
     let bits = List.rev field_bits in
-    (* Insert a parity bit at the highest bit of the highest byte *)
+    (* insert a parity bit at the highest bit of the highest byte *)
     let bits_parity = is_odd :: bits in
-    (* Convert to bytes *)
+    (* convert to bytes *)
     let bits_by_8s = bits_by_n 8 bits_parity in
-    (* All bytes should have 8 bits now *)
+    (* all bytes should have 8 bits now *)
     List.iter bits_by_8s ~f:(fun byte -> [%test_eq: int] (List.length byte) 8) ;
-    (* Encoding wants highest byte at the end *)
+    (* encoding wants highest byte at the end *)
     let final_bits_by_8s = List.rev bits_by_8s in
-    (* We need by 4s to encode in hex *)
+    (* we need by 4s to encode in hex *)
     let bits_by_4s = List.concat final_bits_by_8s |> bits_by_n 4 in
     let cs = List.map bits_by_4s ~f:bits4_to_hex_char in
     let result = String.of_char_list cs in
@@ -193,18 +193,10 @@ module Public_key_compressed_direct = struct
       (* drop the parity bit *)
       List.concat bits_by_8s_good_order |> List.tl_exn
     in
-    (* Our Field representation has zero-th bit first so reverse *)
+    (* our Field representation has zero-th bit first so reverse *)
     let field_bits = List.rev bits in
     let x = Field.project field_bits in
     { Public_key.Compressed.Poly.x; is_odd }
-
-  (*
-    TODO:
-      1. Decode to bytes
-      2. Print out every byte here (and every byte on Go)
-      3. re-arrange to be consistent
-      4. Convert back to bits and then "project"
-    *)
 end
 
 let to_public_key_compressed raw =
