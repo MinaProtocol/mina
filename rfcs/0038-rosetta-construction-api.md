@@ -149,6 +149,10 @@ Add support for creating/marshalling public keys ([via Derivation](#derivation))
 
 **Format**
 
+Public keys are repesented in one of two formats
+
+**Format 1**
+
 Public keys are represented as hex-encoded, little-endian, `Fq.t` pairs.
 
 ```
@@ -164,6 +168,25 @@ is encoded as the string:
 `000000000000000000000000000000000000000000000000000000000001E0F300000000000000000000000000000000000000000000000000000000000392FA`
 
 (abbreviated as `...01E0F3...0392FA` for the purposes of this doc)
+
+**Format 2**
+
+Compressed public keys are accepted of the following form:
+
+Field elements are expected to be backed by a 32-byte array where the highest bits of the field are stored in arr[31].
+
+Presented is a hex encoded 32-byte array where the highest bit of arr[31] is the `is_odd` parity bit.
+
+```
+|----- pk : Fq.t (32 bytes) ------{is_odd}--|
+
+```
+
+Example:
+
+The encoding `fad1d3e31aede102793fb2cce62b4f1e71a214c94ce18ad5756eba67ef398390`
+
+Decodes as the "number" (also with the highest bits stored in arr[31]) `fad1d3e31aede102793fb2cce62b4f1e71a214c94ce18ad5756eba67ef398310` and is_odd set to true.
 
 **Name**
 
