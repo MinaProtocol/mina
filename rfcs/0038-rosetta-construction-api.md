@@ -155,6 +155,15 @@ Public keys are repesented in one of two formats
 
 Public keys are represented as hex-encoded, little-endian, `Fq.t` pairs.
 
+Specifically, field elements are by default represented by laying out their bits from high to low (adding a padding zero at the highest bit in the front) and then grouping by 8 and converting to bytes:
+
+```
+(always zero) Bit254 Bit253 Bit252 ... Bit2 Bit1 Bit0
+|----groups of 8---|--groups of 8---|
+```
+
+Public key field pair:
+
 ```
 |----- fst pk : Fq.t (32 bytes) ---------|----- snd pk : Fq.t (32 bytes) ------|
 ```
