@@ -94,7 +94,7 @@ var plonk_wasm = (function() {
         env.memory =
             new joo_global_object.WebAssembly.Memory({
                 initial: 20,
-                maximum: 16384,
+                maximum: 65536,
                 shared: true});
         joo_global_object.startWorkers = startWorkers;
     } else {
