@@ -26,7 +26,7 @@ module Failure = struct
         | Snapp_account_not_present
         | Update_not_permitted_balance
         | Update_not_permitted_timing_existing_account
-        | Update_not_permitted_token
+        | Update_not_permitted_delegate
         | Update_not_permitted_app_state
         | Update_not_permitted_verification_key
         | Update_not_permitted_sequence_state
@@ -91,8 +91,8 @@ module Failure = struct
         "Update_not_permitted_balance"
     | Update_not_permitted_timing_existing_account ->
         "Update_not_permitted_timing_existing_account"
-    | Update_not_permitted_token ->
-        "Update_not_permitted_token"
+    | Update_not_permitted_delegate ->
+        "update_not_permitted_delegate"
     | Update_not_permitted_app_state ->
         "Update_not_permitted_app_state"
     | Update_not_permitted_verification_key ->
@@ -147,8 +147,8 @@ module Failure = struct
         Ok Update_not_permitted_balance
     | "Update_not_permitted_timing_existing_account" ->
         Ok Update_not_permitted_timing_existing_account
-    | "Update_not_permitted_token" ->
-        Ok Update_not_permitted_token
+    | "update_not_permitted_delegate" ->
+        Ok Update_not_permitted_delegate
     | "Update_not_permitted_app_state" ->
         Ok Update_not_permitted_app_state
     | "Update_not_permitted_verification_key" ->
@@ -216,9 +216,9 @@ module Failure = struct
          to its balance"
     | Update_not_permitted_timing_existing_account ->
         "The timing of an existing account cannot be updated"
-    | Update_not_permitted_token ->
+    | Update_not_permitted_delegate ->
         "The authentication for an account didn't allow the requested update \
-         to its token id"
+         to its delegate"
     | Update_not_permitted_app_state ->
         "The authentication for an account didn't allow the requested update \
          to its app state"
@@ -276,7 +276,7 @@ module Failure = struct
         ; snapp_account_not_present : 'bool
         ; update_not_permitted_balance : 'bool
         ; update_not_permitted_timing_existing_account : 'bool
-        ; update_not_permitted_token : 'bool
+        ; update_not_permitted_delegate : 'bool
         ; update_not_permitted_app_state : 'bool
         ; update_not_permitted_verification_key : 'bool
         ; update_not_permitted_sequence_state : 'bool
@@ -307,7 +307,7 @@ module Failure = struct
           ; snapp_account_not_present
           ; update_not_permitted_balance
           ; update_not_permitted_timing_existing_account
-          ; update_not_permitted_token
+          ; update_not_permitted_delegate
           ; update_not_permitted_app_state
           ; update_not_permitted_verification_key
           ; update_not_permitted_sequence_state
@@ -337,7 +337,7 @@ module Failure = struct
         ; update_not_permitted_balance = f update_not_permitted_balance
         ; update_not_permitted_timing_existing_account =
             f update_not_permitted_timing_existing_account
-        ; update_not_permitted_token = f update_not_permitted_token
+        ; update_not_permitted_delegate = f update_not_permitted_delegate
         ; update_not_permitted_app_state = f update_not_permitted_app_state
         ; update_not_permitted_verification_key =
             f update_not_permitted_verification_key
@@ -371,7 +371,7 @@ module Failure = struct
       ; snapp_account_not_present : 'bool
       ; update_not_permitted_balance : 'bool
       ; update_not_permitted_timing_existing_account : 'bool
-      ; update_not_permitted_token : 'bool
+      ; update_not_permitted_delegate : 'bool
       ; update_not_permitted_app_state : 'bool
       ; update_not_permitted_verification_key : 'bool
       ; update_not_permitted_sequence_state : 'bool
@@ -419,8 +419,8 @@ module Failure = struct
           t.update_not_permitted_balance
       | Update_not_permitted_timing_existing_account ->
           t.update_not_permitted_timing_existing_account
-      | Update_not_permitted_token ->
-          t.update_not_permitted_token
+      | Update_not_permitted_delegate ->
+          t.update_not_permitted_delegate
       | Update_not_permitted_app_state ->
           t.update_not_permitted_app_state
       | Update_not_permitted_verification_key ->
@@ -464,7 +464,7 @@ module Failure = struct
         ; snapp_account_not_present
         ; update_not_permitted_balance
         ; update_not_permitted_timing_existing_account
-        ; update_not_permitted_token
+        ; update_not_permitted_delegate
         ; update_not_permitted_app_state
         ; update_not_permitted_verification_key
         ; update_not_permitted_sequence_state
@@ -494,7 +494,7 @@ module Failure = struct
         + bool_to_int snapp_account_not_present
         + bool_to_int update_not_permitted_balance
         + bool_to_int update_not_permitted_timing_existing_account
-        + bool_to_int update_not_permitted_token
+        + bool_to_int update_not_permitted_delegate
         + bool_to_int update_not_permitted_app_state
         + bool_to_int update_not_permitted_verification_key
         + bool_to_int update_not_permitted_sequence_state
@@ -559,7 +559,7 @@ module Failure = struct
       ; snapp_account_not_present = false
       ; update_not_permitted_balance = false
       ; update_not_permitted_timing_existing_account = false
-      ; update_not_permitted_token = false
+      ; update_not_permitted_delegate = false
       ; update_not_permitted_app_state = false
       ; update_not_permitted_verification_key = false
       ; update_not_permitted_sequence_state = false
@@ -612,8 +612,8 @@ module Failure = struct
     let update_not_permitted_timing_existing_account =
       { none with update_not_permitted_timing_existing_account = true }
 
-    let update_not_permitted_token =
-      { none with update_not_permitted_token = true }
+    let update_not_permitted_delegate =
+      { none with update_not_permitted_delegate = true }
 
     let update_not_permitted_app_state =
       { none with update_not_permitted_app_state = true }
@@ -677,8 +677,8 @@ module Failure = struct
           to_enum Update_not_permitted_balance
       | { update_not_permitted_timing_existing_account = true; _ } ->
           to_enum Update_not_permitted_timing_existing_account
-      | { update_not_permitted_token = true; _ } ->
-          to_enum Update_not_permitted_token
+      | { update_not_permitted_delegate = true; _ } ->
+          to_enum Update_not_permitted_delegate
       | { update_not_permitted_app_state = true; _ } ->
           to_enum Update_not_permitted_app_state
       | { update_not_permitted_verification_key = true; _ } ->
@@ -743,8 +743,8 @@ module Failure = struct
                     update_not_permitted_balance
                 | Update_not_permitted_timing_existing_account ->
                     update_not_permitted_timing_existing_account
-                | Update_not_permitted_token ->
-                    update_not_permitted_token
+                | Update_not_permitted_delegate ->
+                    update_not_permitted_delegate
                 | Update_not_permitted_app_state ->
                     update_not_permitted_app_state
                 | Update_not_permitted_verification_key ->
@@ -833,7 +833,7 @@ module Failure = struct
 
     val update_not_permitted_timing_existing_account : t
 
-    val update_not_permitted_token : t
+    val update_not_permitted_delegate : t
 
     val update_not_permitted_app_state : t
 
@@ -879,7 +879,7 @@ module Failure = struct
            ; snapp_account_not_present
            ; update_not_permitted_balance
            ; update_not_permitted_timing_existing_account
-           ; update_not_permitted_token
+           ; update_not_permitted_delegate
            ; update_not_permitted_app_state
            ; update_not_permitted_verification_key
            ; update_not_permitted_sequence_state
@@ -911,7 +911,7 @@ module Failure = struct
                ; (snapp_account_not_present :> Field.Var.t)
                ; (update_not_permitted_balance :> Field.Var.t)
                ; (update_not_permitted_timing_existing_account :> Field.Var.t)
-               ; (update_not_permitted_token :> Field.Var.t)
+               ; (update_not_permitted_delegate :> Field.Var.t)
                ; (update_not_permitted_app_state :> Field.Var.t)
                ; (update_not_permitted_verification_key :> Field.Var.t)
                ; (update_not_permitted_sequence_state :> Field.Var.t)
@@ -991,7 +991,8 @@ module Failure = struct
     let update_not_permitted_timing_existing_account =
       mk_var As_record.update_not_permitted_timing_existing_account
 
-    let update_not_permitted_token = mk_var As_record.update_not_permitted_token
+    let update_not_permitted_delegate =
+      mk_var As_record.update_not_permitted_delegate
 
     let update_not_permitted_app_state =
       mk_var As_record.update_not_permitted_app_state

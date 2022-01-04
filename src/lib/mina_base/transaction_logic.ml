@@ -1355,7 +1355,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         update a.permissions.set_delegate delegate a.delegate
           ~is_keep:Set_or_keep.is_keep
           ~update:(fun u x -> match u with Keep -> x | Set y -> Some y)
-          ~error:Update_not_permitted_token
+          ~error:Update_not_permitted_delegate
       else return a.delegate
     in
     let%bind snapp =
