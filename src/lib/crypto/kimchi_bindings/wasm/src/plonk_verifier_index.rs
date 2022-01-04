@@ -4,7 +4,7 @@ use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use array_init::array_init;
 use commitment_dlog::srs::SRS;
-use kimchi::index::VerifierIndex as DlogVerifierIndex;
+use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
 use kimchi_circuits::expr::{Column, Linearization, PolishToken, Variable};
 use kimchi_circuits::gate::{CurrOrNext, GateType};
 use kimchi_circuits::{
@@ -13,7 +13,7 @@ use kimchi_circuits::{
 };
 use paste::paste;
 use std::convert::TryInto;
-// use std::path::Path;
+use std::path::Path;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 
@@ -600,32 +600,6 @@ macro_rules! impl_verification_key {
                     }
                 }
 
-                // #[wasm_bindgen]
-                // pub fn partial_dummy(
-                //     domain: &WasmDomain,
-                //     max_poly_size: i32,
-                //     max_quot_size: i32,
-                //     srs: &$WasmSrs,
-                //     evals: &WasmPlonkVerificationEvals,
-                //     // shifts: &WasmShifts,
-                //     linearization: &WasmLinearization,
-                // ) -> Self {
-                //     let dummy = [<$name:snake _dummy>]();
-                //     WasmPlonkVerifierIndex {
-                //         domain: domain.clone(),
-                //         max_poly_size,
-                //         max_quot_size,
-                //         srs: srs.clone(),
-                //         // srs: dummy.srs.clone(),
-                //         evals: evals.clone(),
-                //         // evals: dummy.evals.clone(),
-                //         // shifts: shifts.clone(),
-                //         shifts: dummy.shifts.clone(),
-                //         // linearization: dummy.linearization.clone(),
-                //         linearization: linearization.clone(),
-                //     }
-                // }
-
                 #[wasm_bindgen(getter)]
                 pub fn srs(&self) -> $WasmSrs {
                     self.srs.clone()
@@ -823,7 +797,7 @@ macro_rules! impl_verification_key {
                 }
             }
 
-            /* pub fn read_raw(
+            pub fn read_raw(
                 offset: Option<i32>,
                 srs: &$WasmSrs,
                 path: String,
@@ -840,9 +814,9 @@ macro_rules! impl_verification_key {
                     fq_sponge_params,
                     fr_sponge_params,
                 ).map_err(|e| JsValue::from_str(format!("read_raw: {}", e).as_str()))
-            } */
+            }
 
-            /* #[wasm_bindgen]
+            #[wasm_bindgen]
             pub fn [<$name:snake _read>](
                 offset: Option<i32>,
                 srs: &$WasmSrs,
@@ -865,7 +839,7 @@ macro_rules! impl_verification_key {
                     println!("{}", e);
                     JsValue::from_str("caml_pasta_fp_plonk_verifier_index_raw_read")
                 })
-            } */
+            }
 
             #[wasm_bindgen]
             pub fn [<$name:snake _create>](
@@ -942,12 +916,12 @@ macro_rules! impl_verification_key {
                 }
             }
 
-            // #[wasm_bindgen]
-            // pub fn [<$name:snake _deep_copy>](
-            //     x: &WasmPlonkVerifierIndex,
-            // ) -> WasmPlonkVerifierIndex {
-            //     x.clone()
-            // }
+            #[wasm_bindgen]
+            pub fn [<$name:snake _deep_copy>](
+                x: &WasmPlonkVerifierIndex,
+            ) -> WasmPlonkVerifierIndex {
+                x.clone()
+            }
 
         }
     }
