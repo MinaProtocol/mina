@@ -22,6 +22,6 @@
    (run chmod -R +w ../../wasm)
    (setenv
      RUSTFLAGS
-     "-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features"
+     "-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"
     (run rustup run nightly-2021-10-31 wasm-pack build --target nodejs --out-dir ../js/node_js ../../wasm -- -Z build-std=panic_abort,std --features nodejs))
    (write-file flags.sexp "()"))))
