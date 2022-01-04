@@ -164,6 +164,28 @@ impl From<WasmVariable> for Variable {
     }
 }
 
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
+pub enum WasmPolishTokenTag {
+    Alpha,
+    Beta,
+    Gamma,
+    JointCombiner,
+    EndoCoefficient,
+    Mds,
+    Literal,
+    Cell,
+    Dup,
+    Pow,
+    Add,
+    Mul,
+    Sub,
+    VanishesOnLast4Rows,
+    UnnormalizedLagrangeBasis,
+    Store,
+    Load,
+}
+
 macro_rules! impl_verification_key {
     (
      $name: ident,
@@ -373,27 +395,7 @@ macro_rules! impl_verification_key {
                 pub Box<Linearization<Vec<PolishToken<$F>>>>);
             type WasmLinearization = [<Wasm $field_name:camel Linearization>]; */
 
-            #[wasm_bindgen]
-            #[derive(Clone, Copy)]
-            pub enum WasmPolishTokenTag {
-                Alpha,
-                Beta,
-                Gamma,
-                JointCombiner,
-                EndoCoefficient,
-                Mds,
-                Literal,
-                Cell,
-                Dup,
-                Pow,
-                Add,
-                Mul,
-                Sub,
-                VanishesOnLast4Rows,
-                UnnormalizedLagrangeBasis,
-                Store,
-                Load,
-            }
+
 
             #[derive(Clone, Copy)]
             #[wasm_bindgen]
