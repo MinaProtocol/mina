@@ -42,7 +42,7 @@ module Sql = struct
 
                 FROM blocks b
                 WHERE height = (select MAX(height) from blocks)
-                ORDER BY timestamp ASC
+                ORDER BY timestamp ASC, state_hash
                 LIMIT 1)
 
                 UNION ALL
