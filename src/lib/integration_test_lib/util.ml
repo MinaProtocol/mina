@@ -90,7 +90,6 @@ let rec prompt_continue prompt_string =
 module Make (Engine : Intf.Engine.S) = struct
   let pub_key_of_node node =
     let open Signature_lib in
-    (* let n = Engine.Network.Node *)
     match Engine.Network.Node.network_keypair node with
     | Some nk ->
         Malleable_error.return (nk.keypair.public_key |> Public_key.compress)
@@ -129,11 +128,6 @@ module Make (Engine : Intf.Engine.S) = struct
       [%log error] "%s" error_str ;
       Malleable_error.soft_error ~value:() (Error.of_string error_str)
 
-  (* type network = Network.t
-
-     type node = Network.Node.t *)
-
-  (* this function not exported *)
   let check_peer_connectivity ~nodes_by_peer_id ~peer_id ~connected_peers =
     let get_node_id p =
       p |> String.Map.find_exn nodes_by_peer_id |> Engine.Network.Node.id
