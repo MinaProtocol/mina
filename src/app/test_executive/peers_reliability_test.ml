@@ -1,7 +1,6 @@
 open Core
 open Async
 open Integration_test_lib
-open Intg_test_util
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
@@ -9,11 +8,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Dsl
 
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
-  (* type network = Network.t
+  type network = Network.t
 
-     type node = Network.Node.t
+  type node = Network.Node.t
 
-     type dsl = Dsl.t *)
+  type dsl = Dsl.t
 
   let config =
     let open Test_config in
@@ -80,7 +79,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "network is fully connected upon initialization"
-        (check_peers ~logger all_nodes)
+        (Util.check_peers ~logger all_nodes)
     in
     let%bind _ =
       section "blocks are produced"
@@ -106,5 +105,5 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     section "network is fully connected after one node was restarted"
       (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
-       check_peers ~logger all_nodes)
+       Util.check_peers ~logger all_nodes)
 end

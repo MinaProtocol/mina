@@ -1,6 +1,5 @@
 open Core
 open Integration_test_lib
-open Intg_test_util
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
@@ -81,5 +80,5 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          List.map labeled_chains ~f:(fun (_, chain) -> chain)
        in
        print_chains labeled_chains ;
-       check_common_prefixes chains ~tolerance:1 ~logger)
+       Util.check_common_prefixes chains ~tolerance:1 ~logger)
 end
