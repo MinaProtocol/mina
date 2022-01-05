@@ -195,7 +195,7 @@ Example:
 
 The encoding `fad1d3e31aede102793fb2cce62b4f1e71a214c94ce18ad5756eba67ef398390`
 
-Decodes as the "number" (also with the highest bits stored in arr[31]) `fad1d3e31aede102793fb2cce62b4f1e71a214c94ce18ad5756eba67ef398310` and is_odd set to true.
+Decodes to the field represented by the number `fad1d3e31aede102793fb2cce62b4f1e71a214c94ce18ad5756eba67ef398310`. That's the same as the encoding, except that the 9 representing the high nybble of the final byte is replaced by 1, by zeroing the high bit. Because the high bit was set, is_odd is true.
 
 **Name**
 

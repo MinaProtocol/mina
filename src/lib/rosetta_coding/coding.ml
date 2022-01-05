@@ -69,21 +69,26 @@ module type Packed = sig
   val unpack : t -> bool list
 end
 
+(* break of the bits byte by byte *)
+let bits_by_n n bits =
+  let rec go bits acc =
+    if List.is_empty bits then List.rev acc
+    else
+      let bitsn, rest = List.split_n bits n in
+      go rest (bitsn :: acc)
+  in
+  go bits []
+
+let bits_by_4s = bits_by_n 4
+
+let bits_by_8s = bits_by_n 8
+
 let of_unpackable (type t) (module M : Packed with type t = t) (packed : t) =
   let bits0 = M.unpack packed |> List.rev in
   assert (List.length bits0 = 255) ;
   (* field elements, scalars are 255 bits, left-pad to get 32 bytes *)
   let bits = false :: bits0 in
-  let bits_by_4s =
-    let rec go bits acc =
-      if List.is_empty bits then List.rev acc
-      else
-        let bits4, rest = List.split_n bits 4 in
-        go rest (bits4 :: acc)
-    in
-    go bits []
-  in
-  let cs = List.map bits_by_4s ~f:bits4_to_hex_char in
+  let cs = List.map (bits_by_4s bits) ~f:bits4_to_hex_char in
   String.of_char_list cs
 
 let of_field = of_unpackable (module Field)
@@ -138,15 +143,6 @@ module Public_key_compressed_direct = struct
     input[31] &= 0x7F
     x = input
   *)
-  (* break of the bits byte by byte *)
-  let bits_by_n n bits =
-    let rec go bits acc =
-      if List.is_empty bits then List.rev acc
-      else
-        let bitsn, rest = List.split_n bits n in
-        go rest (bitsn :: acc)
-    in
-    go bits []
 
   (* direct hex encoding and decoding of bits in compressed public key
      [encode] differs from [of_public_key_compressed], which converts to an uncompressed key first
@@ -160,14 +156,14 @@ module Public_key_compressed_direct = struct
     (* insert a parity bit at the highest bit of the highest byte *)
     let bits_parity = is_odd :: bits in
     (* convert to bytes *)
-    let bits_by_8s = bits_by_n 8 bits_parity in
+    let bytes = bits_by_8s bits_parity in
     (* all bytes should have 8 bits now *)
-    List.iter bits_by_8s ~f:(fun byte -> [%test_eq: int] (List.length byte) 8) ;
+    List.iter bytes ~f:(fun byte -> [%test_eq: int] (List.length byte) 8) ;
     (* encoding wants highest byte at the end *)
-    let final_bits_by_8s = List.rev bits_by_8s in
+    let final_bytes = List.rev bytes in
     (* we need by 4s to encode in hex *)
-    let bits_by_4s = List.concat final_bits_by_8s |> bits_by_n 4 in
-    let cs = List.map bits_by_4s ~f:bits4_to_hex_char in
+    let nibbles = List.concat final_bytes |> bits_by_4s in
+    let cs = List.map nibbles ~f:bits4_to_hex_char in
     let result = String.of_char_list cs in
     assert (String.length result = 64) ;
     result
@@ -179,19 +175,19 @@ module Public_key_compressed_direct = struct
       String.to_list raw |> List.map ~f:hex_char_to_bits4 |> List.concat
     in
     (* break of the bits byte by byte *)
-    let bits_by_8s = bits_by_n 8 raw_bits in
+    let bytes = bits_by_8s raw_bits in
     (* the highest byte is at the end and the lowest at the beginning,
        so we reverse here *)
-    let bits_by_8s_good_order = List.rev bits_by_8s in
+    let bytes_good_order = List.rev bytes in
     (* Now the high byte has the parity so get it out *)
-    let high_byte = List.hd_exn bits_by_8s_good_order in
+    let high_byte = List.hd_exn bytes_good_order in
     let high_bit = List.hd_exn high_byte in
     (* is_odd if this is true *)
     let is_odd = Bool.equal high_bit true in
     (* ungroup the bits *)
     let bits =
       (* drop the parity bit *)
-      List.concat bits_by_8s_good_order |> List.tl_exn
+      List.concat bytes_good_order |> List.tl_exn
     in
     (* our Field representation has zero-th bit first so reverse *)
     let field_bits = List.rev bits in
