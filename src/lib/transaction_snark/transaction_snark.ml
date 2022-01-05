@@ -2043,13 +2043,12 @@ module Base = struct
             in
             (* The fee-payer must increment their nonce. *)
             add_check Boolean.(party.data.body.increment_nonce ||| not is_start) ;
-            (* If there's a valid signature, it must increment the nonce. *)
-            (* TODO(#9743): Relax this when this party uses a 'full'
-               commitment.
-            *)
+            (* If there's a valid signature, it must increment the nonce or use full commitment *)
             add_check
               Boolean.(
-                party.data.body.increment_nonce ||| not signature_verifies) ;
+                party.data.body.increment_nonce
+                ||| party.data.body.use_full_commitment
+                ||| not signature_verifies) ;
             let account', `proof_must_verify proof_must_verify =
               let tag =
                 Option.map snapp_statement ~f:(fun (i, _) -> side_loaded i)
@@ -5210,7 +5209,15 @@ let%test_module "transaction_snark" =
       let open Transaction_logic.For_tests in
       Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-              let partiess = List.map ~f:party_send specs in
+              let partiess =
+                List.map
+                  ~f:(fun s ->
+                    let use_full_commitment =
+                      Quickcheck.random_value Bool.quickcheck_generator
+                    in
+                    party_send ~use_full_commitment s)
+                  specs
+              in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               apply_parties ledger partiess)
           |> fun ((), ()) -> ())
