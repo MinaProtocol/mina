@@ -25,9 +25,9 @@ end
 module R = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
-        G.Stable.V1.t Pickles_base.Side_loaded_verification_key.Repr.Stable.V1.t
+        G.Stable.V1.t Pickles_base.Side_loaded_verification_key.Repr.Stable.V2.t
 
       let to_latest = Fn.id
     end
@@ -36,11 +36,11 @@ end
 
 [%%versioned_binable
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
       ( G.Stable.V1.t
       , unit )
-      Pickles_base.Side_loaded_verification_key.Poly.Stable.V1.t
+      Pickles_base.Side_loaded_verification_key.Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]
 
     open Pickles_base.Side_loaded_verification_key
@@ -48,7 +48,7 @@ module Stable = struct
     let to_latest = Fn.id
 
     include Binable.Of_binable
-              (R.Stable.V1)
+              (R.Stable.V2)
               (struct
                 type nonrec t = t
 

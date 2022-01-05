@@ -44,10 +44,10 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
       ( Predicate.Stable.V1.t
-      , Snapp_command.Party.Body.Stable.V1.t )
+      , Snapp_command.Party.Body.Stable.V2.t )
       Poly.Stable.V1.t
     [@@deriving sexp]
 

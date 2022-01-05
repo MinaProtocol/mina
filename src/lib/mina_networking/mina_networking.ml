@@ -245,12 +245,12 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+    module V2 = struct
       module T = struct
         type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
         [@@deriving bin_io, sexp, version { rpc }]
 
-        type response = Sync_ledger.Answer.Stable.V1.t Core.Or_error.Stable.V1.t
+        type response = Sync_ledger.Answer.Stable.V2.t Core.Or_error.Stable.V1.t
         [@@deriving bin_io, sexp, version { rpc }]
 
         let query_of_caller_model = Fn.id

@@ -25,7 +25,7 @@ module V2 = struct
   module T = struct
     type msg = Master.T.msg =
       | New_state of External_transition.Stable.V2.t
-      | Snark_pool_diff of Snark_pool.Diff_versioned.Stable.V1.t
+      | Snark_pool_diff of Snark_pool.Diff_versioned.Stable.V2.t
       | Transaction_pool_diff of Transaction_pool.Diff_versioned.Stable.V2.t
     [@@deriving bin_io, sexp, version { rpc }]
 

@@ -91,27 +91,12 @@ module Transaction_applied = struct
       module V2 = struct
         type t =
           { accounts :
-              (Account_id.Stable.V1.t * Account.Stable.V1.t option) list
+              (Account_id.Stable.V1.t * Account.Stable.V2.t option) list
           ; command : Snapp_command.Stable.V2.t With_status.Stable.V1.t
           }
         [@@deriving sexp]
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t =
-          { accounts :
-              (Account_id.Stable.V1.t * Account.Stable.V1.t option) list
-          ; command : Snapp_command.Stable.V1.t With_status.Stable.V1.t
-          }
-        [@@deriving sexp]
-
-        let to_latest (t : t) : V2.t =
-          { accounts = t.accounts
-          ; command =
-              With_status.map ~f:Snapp_command.Stable.V1.to_latest t.command
-          }
       end
     end]
   end
@@ -122,7 +107,7 @@ module Transaction_applied = struct
       module V1 = struct
         type t =
           { accounts :
-              (Account_id.Stable.V1.t * Account.Stable.V1.t option) list
+              (Account_id.Stable.V1.t * Account.Stable.V2.t option) list
           ; command : Parties.Stable.V1.t With_status.Stable.V1.t
           }
         [@@deriving sexp]
@@ -142,19 +127,6 @@ module Transaction_applied = struct
         [@@deriving sexp]
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t =
-          | Signed_command of Signed_command_applied.Stable.V1.t
-          | Snapp_command of Snapp_command_applied.Stable.V1.t
-        [@@deriving sexp]
-
-        let to_latest : t -> Latest.t = function
-          | Signed_command s ->
-              Signed_command s
-          | Snapp_command _ ->
-              failwith "Snapp_command"
       end
     end]
   end
@@ -205,22 +177,6 @@ module Transaction_applied = struct
 
         let to_latest = Fn.id
       end
-
-      module V1 = struct
-        type t =
-          | Command of Command_applied.Stable.V1.t
-          | Fee_transfer of Fee_transfer_applied.Stable.V1.t
-          | Coinbase of Coinbase_applied.Stable.V1.t
-        [@@deriving sexp]
-
-        let to_latest : t -> Latest.t = function
-          | Command x ->
-              Command (Command_applied.Stable.V1.to_latest x)
-          | Fee_transfer x ->
-              Fee_transfer x
-          | Coinbase x ->
-              Coinbase x
-      end
     end]
   end
 
@@ -234,17 +190,6 @@ module Transaction_applied = struct
       [@@deriving sexp]
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t =
-        { previous_hash : Ledger_hash.Stable.V1.t
-        ; varying : Varying.Stable.V1.t
-        }
-      [@@deriving sexp]
-
-      let to_latest { previous_hash; varying } : Latest.t =
-        { previous_hash; varying = Varying.Stable.V1.to_latest varying }
     end
   end]
 end

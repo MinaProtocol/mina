@@ -138,7 +138,7 @@ module Timing = Account_timing
 module Binable_arg = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         ( Public_key.Compressed.Stable.V1.t
         , Token_id.Stable.V1.t
@@ -150,7 +150,7 @@ module Binable_arg = struct
         , State_hash.Stable.V1.t
         , Timing.Stable.V1.t
         , Permissions.Stable.V1.t
-        , Snapp_account.Stable.V1.t option )
+        , Snapp_account.Stable.V2.t option )
         Poly.Stable.V1.t
       [@@deriving sexp, equal, hash, compare, yojson]
 
@@ -186,12 +186,12 @@ let check (t : Binable_arg.t) =
 
 [%%versioned_binable
 module Stable = struct
-  module V1 = struct
-    type t = Binable_arg.Stable.V1.t
+  module V2 = struct
+    type t = Binable_arg.Stable.V2.t
     [@@deriving sexp, equal, hash, compare, yojson]
 
     include Binable.Of_binable
-              (Binable_arg.Stable.V1)
+              (Binable_arg.Stable.V2)
               (struct
                 type nonrec t = t
 
