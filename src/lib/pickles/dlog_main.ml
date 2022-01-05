@@ -445,12 +445,12 @@ struct
     scalar_chal zeta_0 zeta_1
 
   let assert_eq_marlin
-      (m1 : (_, Field.t Pickles_types.Scalar_challenge.t) Plonk.Minimal.t)
+      (m1 : (_, Field.t Import.Scalar_challenge.t) Plonk.Minimal.t)
       (m2 : (_, Scalar_challenge.t) Plonk.Minimal.t) =
     iter2 m1 m2
       ~chal:(fun c1 c2 -> Field.Assert.equal c1 c2)
       ~scalar_chal:
-        (fun ({ inner = t1 } : _ Pickles_types.Scalar_challenge.t)
+        (fun ({ inner = t1 } : _ Import.Scalar_challenge.t)
              ({ inner = t2 } : Scalar_challenge.t) -> Field.Assert.equal t1 t2)
 
   let incrementally_verify_proof (type b)

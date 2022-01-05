@@ -1,6 +1,6 @@
 open Core_kernel
 open Import
-module SC = Pickles_types.Scalar_challenge
+module SC = Scalar_challenge
 
 (* Implementation of the algorithm described on page 29 of the Halo paper
    https://eprint.iacr.org/2019/1021.pdf

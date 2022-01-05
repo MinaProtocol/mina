@@ -12,4 +12,4 @@
    h_list.ppx))
  (instrumentation
   (backend bisect_ppx))
- (libraries snarky.backendless core_kernel kimchi))
+ (libraries snarky.backendless core_kernel))

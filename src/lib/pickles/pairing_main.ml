@@ -1,9 +1,9 @@
 (* q > p *)
 open Core_kernel
+module SC = Scalar_challenge
 open Import
 open Util
 open Types.Pairing_based
-module SC = Scalar_challenge
 open Pickles_types
 open Common
 open Import
@@ -306,16 +306,16 @@ struct
   let assert_eq_deferred_values
       (m1 :
         ( 'a
-        , Inputs.Impl.Field.t Pickles_types.Scalar_challenge.t )
+        , Inputs.Impl.Field.t Import.Scalar_challenge.t )
         Types.Pairing_based.Proof_state.Deferred_values.Plonk.Minimal.t)
       (m2 :
         ( Inputs.Impl.Field.t
-        , Inputs.Impl.Field.t Pickles_types.Scalar_challenge.t )
+        , Inputs.Impl.Field.t Import.Scalar_challenge.t )
         Types.Pairing_based.Proof_state.Deferred_values.Plonk.Minimal.t) =
     let open Types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal in
     let chal c1 c2 = Field.Assert.equal c1 c2 in
-    let scalar_chal ({ SC.SC.inner = t1 } : _ Pickles_types.Scalar_challenge.t)
-        ({ SC.SC.inner = t2 } : _ Pickles_types.Scalar_challenge.t) =
+    let scalar_chal ({ SC.SC.inner = t1 } : _ Import.Scalar_challenge.t)
+        ({ SC.SC.inner = t2 } : _ Import.Scalar_challenge.t) =
       Field.Assert.equal t1 t2
     in
     with_label __LOC__ (fun () -> chal m1.beta m2.beta) ;
@@ -1096,7 +1096,7 @@ struct
           (Vector.to_array unfinalized.deferred_values.bulletproof_challenges)
           ~f:(fun i c1 ->
             let c2 = bulletproof_challenges_actual.(i) in
-            let { Pickles_types.Scalar_challenge.inner = c1 } =
+            let { Import.Scalar_challenge.inner = c1 } =
               c1.Bulletproof_challenge.prechallenge
             in
             let c2 =

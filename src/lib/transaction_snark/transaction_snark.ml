@@ -984,7 +984,7 @@ module Base = struct
             ( Pickles.Scalar_challenge.to_field_checked'
                 (module Impl)
                 ~num_bits:16
-                (Pickles_types.Scalar_challenge.create x)
+                (Kimchi_backend_common.Scalar_challenge.create x)
               : Field.t * Field.t * Field.t ) ;
           ignore
             ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5
@@ -996,7 +996,7 @@ module Base = struct
               : Pickles.Step_main_inputs.Inner_curve.t ) ;
           ignore
             ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
-                (Scalar_challenge.create x)
+                (Kimchi_backend_common.Scalar_challenge.create x)
               : Field.t * Field.t ))
 
   let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
