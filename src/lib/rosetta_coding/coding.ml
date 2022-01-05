@@ -203,6 +203,61 @@ let to_public_key_compressed raw =
   else (* uncompressed encoding *)
     to_public_key raw |> Public_key.compress
 
+module Signature_direct = struct
+  let encode (signature : string) =
+    assert (String.length signature = 128) ;
+    (* get the raw bits *)
+    let raw_bits =
+      String.to_list signature |> List.map ~f:hex_char_to_bits4 |> List.concat
+    in
+    (* break of the bits byte by byte *)
+    let bytes = bits_by_8s raw_bits in
+    (* first 32bytes are the field, the second is the scalar *)
+    let field, scalar = List.split_n bytes 32 in
+    (* the highest byte is at the end and the lowest at the beginning,
+       so we reverse here *)
+    let field_good_order = List.rev field in
+    let scalar_good_order = List.rev scalar in
+    let bytes_good_order = scalar_good_order @ field_good_order in
+    (* ungroup the bits *)
+    (* we need by 4s to encode in hex *)
+    let nibbles = List.concat bytes_good_order |> bits_by_4s in
+    let cs = List.map nibbles ~f:bits4_to_hex_char in
+    let result = String.of_char_list ('*' :: cs) in
+    assert (String.length result = 129) ;
+    result
+
+  let decode raw =
+    assert (String.length raw = 129) ;
+    (* drop the * *)
+    let raw_128 = String.to_list raw |> List.tl_exn in
+    (* get the raw bits *)
+    let raw_bits = raw_128 |> List.map ~f:hex_char_to_bits4 |> List.concat in
+    (* break of the bits byte by byte *)
+    let bytes = bits_by_8s raw_bits in
+    (* first 32bytes are the scalar, the second is the field *)
+    let scalar, field = List.split_n bytes 32 in
+    (* the highest byte is at the end and the lowest at the beginning,
+       so we reverse here *)
+    let field_good_order = List.rev field in
+    let scalar_good_order = List.rev scalar in
+    let bytes_good_order = field_good_order @ scalar_good_order in
+    (* ungroup the bits *)
+    (* we need by 4s to encode in hex *)
+    let nibbles = List.concat bytes_good_order |> bits_by_4s in
+    let cs = List.map nibbles ~f:bits4_to_hex_char in
+    let result = String.of_char_list cs in
+    assert (String.length result = 128) ;
+    result
+end
+
+let of_signature_raw raw =
+  let len = String.length raw in
+  if len = 129 then Signature_direct.decode raw
+  else
+    (* If this is already 128 hex chars, than assume we don't need to process it *)
+    raw
+
 (* inline tests hard-to-impossible to setup with JS *)
 
 let field_example_test () =
@@ -238,6 +293,14 @@ let pk_compressed_roundtrip_test hex_key () =
   let hex' = Public_key_compressed_direct.encode pk in
   String.equal (String.lowercase hex_key) (String.lowercase hex')
 
+let hex_signature =
+  "*fad1d3e31aede102793fb2cce62b4f1e71a214c94ce18ad5756eba67ef3983907e406ca640115a8c44ece6ef5d0c56af343b1a993d8c871648ab7980ecaf8230"
+
+let signature_direct_test () =
+  let sig1 = Signature_direct.decode hex_signature in
+  let sig2 = Signature_direct.encode sig1 in
+  String.equal (String.lowercase sig2) (String.lowercase hex_signature)
+
 let%test "field_example" = field_example_test ()
 
 let%test "field_hex round-trip" = field_hex_roundtrip_test ()
@@ -249,6 +312,8 @@ let%test "public key compressed roundtrip odd" =
 
 let%test "public key compressed roundtrip even" =
   pk_compressed_roundtrip_test hex_key_even ()
+
+let%test "signature direct" = signature_direct_test ()
 
 [%%ifndef consensus_mechanism]
 
@@ -262,6 +327,7 @@ let unit_tests =
     , pk_compressed_roundtrip_test hex_key_odd )
   ; ( "public key compressed round-trip even"
     , pk_compressed_roundtrip_test hex_key_even )
+  ; ("signature direct", signature_direct)
   ]
 
 let run_unit_tests () =
