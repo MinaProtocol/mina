@@ -359,11 +359,6 @@ WITH RECURSIVE chain AS (
       in
       Int64.(>) num_canonical_at_height Int64.zero
 
-    let max_height_delta =
-      match Sys.getenv "MINA_ROSETTA_MAX_HEIGHT_DELTA" with
-      | Some n -> Int64.of_string n
-      | None -> 0L
-
     let run (module Conn : Caqti_async.CONNECTION) = function
       | Some (`This (`Height h)) ->
         let open Deferred.Result.Let_syntax in
@@ -375,7 +370,7 @@ WITH RECURSIVE chain AS (
               (Caqti_request.find Caqti_type.unit Caqti_type.int64
                  {sql| SELECT MAX(height) FROM blocks |sql}) ()
           in
-          let max_queryable_height = Int64.(-) max_height max_height_delta in
+          let max_queryable_height = Int64.(-) max_height Network.Sql.max_height_delta in
           if Int64.(<=) h max_queryable_height then
             Conn.find_opt query_height_pending h
           else
