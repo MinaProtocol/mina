@@ -232,7 +232,6 @@ module Snapp_command = struct
   type t =
     { fee_payer_id : int
     ; other_party_ids : int array
-    ; predicate_protocol_state_id : int
     ; block_id : int
     ; global_slot_since_genesis : int64
     ; txn_global_slot_since_genesis : int64
@@ -245,20 +244,11 @@ module Snapp_command = struct
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.
-        [ int
-        ; Mina_caqti.array_int_typ
-        ; int
-        ; int
-        ; int64
-        ; int64
-        ; int
-        ; int
-        ; string
-        ]
+        [ int; Mina_caqti.array_int_typ; int; int64; int64; int; int; string ]
 
   let query =
     Caqti_request.collect Caqti_type.int typ
-      {sql| SELECT fee_payer_id,other_party_ids,predicate_protocol_state_id,
+      {sql| SELECT fee_payer_id,other_party_ids,
                    blocks.id,blocks.global_slot_since_genesis,parent.global_slot_since_genesis,
                    sequence_no,fee_payer_balance,hash
 
@@ -280,40 +270,6 @@ module Snapp_command = struct
 
   let run (module Conn : Caqti_async.CONNECTION) snapp_cmd_id =
     Conn.collect_list query snapp_cmd_id
-end
-
-module Snapp_protocol_state = struct
-  type t =
-    { snarked_ledger_hash_id : int
-    ; snarked_next_available_token_id : int
-    ; timestamp_id : int
-    ; blockchain_length_id : int
-    ; min_window_density_id : int
-          (* omitting 'last_vrf_output', it's unit value in OCaml *)
-    ; total_currency_id : int
-    ; curr_global_slot_since_hard_fork : int
-    ; global_slot_since_genesis : int
-    ; staking_epoch_data_id : int
-    ; next_epoch_data : int
-    }
-  [@@deriving hlist]
-
-  let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int; int; int; int; int; int; int; int ]
-
-  let query =
-    Caqti_request.find Caqti_type.int typ
-      {sql| SELECT snarked_ledger_hash_id,snarked_next_available_token_id,
-                   timestamp_id,blockchain_length_id,
-                   min_window_density_id,total_currency_id,              ,
-                   curr_global_slot_since_hard_fork,global_slot_since_genesis,
-                   staking_epoch_data_id,next_epoch_data
-            FROM snapp_predicate_protocol_states
-            WHERE id = ?
-      |sql}
-
-  let run (module Conn : Caqti_async.CONNECTION) id = Conn.find query id
 end
 
 module Internal_command_ids = struct

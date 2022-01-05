@@ -702,10 +702,10 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
 
 module Snapp_helpers = struct
   let get_parent_state_view ~pool block_id :
-      (* when a Snapp is applied, use the protocol state associated with the parent block
-         of the block containing the transaction
-      *)
       Snapp_predicate.Protocol_state.View.t Deferred.t =
+    (* when a Snapp is applied, use the protocol state associated with the parent block
+       of the block containing the transaction
+    *)
     let%bind parent_id =
       query_db pool
         ~f:(fun db -> Sql.Block.get_parent_id db block_id)
@@ -1592,8 +1592,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
       in
       [%log info] "Loading Snapp command ids" ;
       let%bind snapp_cmd_ids =
-        return []
-        (*        get_command_ids (module Sql.Snapp_command_ids) "Snapp" *)
+        get_command_ids (module Sql.Snapp_command_ids) "Snapp"
       in
       [%log info]
         "Obtained %d user command ids, %d internal command ids, and %d Snapp \

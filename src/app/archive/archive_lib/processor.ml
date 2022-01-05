@@ -1306,11 +1306,22 @@ module Epoch_data = struct
     in
     match%bind
       Conn.find_opt
-        (Caqti_request.find_opt
-           Caqti_type.(tup2 string int)
-           Caqti_type.int
-           "SELECT id FROM epoch_data WHERE seed = ? AND ledger_hash_id = ?")
-        (seed, ledger_hash_id)
+        (Caqti_request.find_opt typ Caqti_type.int
+           {sql| SELECT id FROM epoch_data
+                 WHERE seed = $1
+                 AND ledger_hash_id = $2
+                 AND total_currency = $3
+                 AND start_checkpoint = $4
+                 AND lock_checkpoint = $5
+                 AND epoch_length = $6
+           |sql})
+        { seed
+        ; ledger_hash_id
+        ; total_currency
+        ; start_checkpoint
+        ; lock_checkpoint
+        ; epoch_length
+        }
     with
     | Some id ->
         return id
@@ -2536,7 +2547,8 @@ module Block = struct
                       min_window_density, total_currency, next_available_token,
                       ledger_hash, height, global_slot_since_hard_fork,
                       global_slot_since_genesis, timestamp)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     RETURNING id
                |sql})
             { state_hash = block.state_hash |> State_hash.to_base58_check
             ; parent_id
