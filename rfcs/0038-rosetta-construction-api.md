@@ -406,20 +406,38 @@ This endpoint will also accept a query parameter `?plain_random_oracle`
 Since we'll later be broadcasting the signed transaction via GraphQL, our signed transaction encoding is precicesly the union of the format required for the sendPayment mutation and the sendDelegation mutation (stringified):
 
 ```
-// Signature encoding
-
-a signature is a field and a scalar
-|----- field 32bytes ----|---- scalar 32bytes ---|
-Use the same hex-encoded little endian represenation as described above for
-the public key for these 64 bytes
-```
-
-```
 {
-  signature: string (* Signature as described above *),
+  signature: string (* Signature hex bytes as described below *),
   payment: payment?,
   stakeDelegation: stakeDelegation?
 }
+```
+
+**Format**
+
+Signature hex bytes are represented in one of two formats. If presented in format 2, it is converted to format 1 in the [combine endpoint](#combine-endpoint), the [parse endpoint](#parse-endpoint) only accepts format 1. Note: If you did create the combined transaction using the [combine endpoint](#combine-endpoint) everything will work properly.
+
+**Format 1**
+
+```
+// Signature encoding
+
+a signature is a field and a scalar
+|----- field 32bytes (Fp) ----|---- scalar 32bytes (Fq) ---|
+Use the same hex-encoded little endian represenation as described above for
+format1 for the public key for these 64 bytes.
+```
+
+**Format 2**
+
+Note that format2 flips the scalar and field layout.
+
+```
+// Signature encoding
+
+a signature is a field and a scalar
+|----- scalar 32bytes (Fq) ----|---- scalar 32bytes (Fp) ---|
+Use the same hex-encoded represenation as described above using format2 for the public keys for each of the 32byte chunks.
 ```
 
 #### Parse Endpoint
