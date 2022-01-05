@@ -70,12 +70,14 @@ CREATE TABLE snapp_permissions
 , set_snapp_uri            snapp_auth_required_type    NOT NULL
 , edit_sequence_state      snapp_auth_required_type    NOT NULL
 , set_token_symbol         snapp_auth_required_type    NOT NULL
+, increment_nonce          snapp_auth_required_type    NOT NULL
 );
 
 CREATE TABLE snapp_timing_info
 ( id                       serial  PRIMARY KEY
 , initial_minimum_balance  bigint  NOT NULL
 , cliff_time               bigint  NOT NULL
+, cliff_amount             bigint  NOT NULL
 , vesting_period           bigint  NOT NULL
 , vesting_increment        bigint  NOT NULL
 );
@@ -191,7 +193,7 @@ CREATE TABLE snapp_predicate_protocol_states
 , curr_global_slot_since_hard_fork int                            REFERENCES snapp_global_slot_bounds(id)
 , global_slot_since_genesis        int                            REFERENCES snapp_global_slot_bounds(id)
 , staking_epoch_data_id            int                            REFERENCES snapp_epoch_data(id)
-, next_epoch_data                  int                            REFERENCES snapp_epoch_data(id)
+, next_epoch_data_id               int                            REFERENCES snapp_epoch_data(id)
 );
 
 /* events_ids and sequence_events_ids indicate a list of ids in

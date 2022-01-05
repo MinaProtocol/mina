@@ -6,6 +6,7 @@
    async_kernel
    caqti-driver-postgresql
    core
+   archive_lib
    mina_base
    mina_caqti
    mina_state
