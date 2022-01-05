@@ -7,17 +7,24 @@ type validation_result = [ `Accept | `Reject | `Ignore ] [@@deriving equal]
 type t =
   { expiration : Time_ns.t option
   ; signal : validation_result Ivar.t
+        (* TODO Make it immutable (after deprecation of an old topic) *)
   ; mutable message_type : [ `Unknown | `Block | `Snark_work | `Transaction ]
+  ; on_accept_callback : unit -> unit Deferred.t
   }
 
 let create expiration =
   { expiration = Some expiration
   ; signal = Ivar.create ()
   ; message_type = `Unknown
+  ; on_accept_callback = const Deferred.unit
   }
 
 let create_without_expiration () =
-  { expiration = None; signal = Ivar.create (); message_type = `Unknown }
+  { expiration = None
+  ; signal = Ivar.create ()
+  ; message_type = `Unknown
+  ; on_accept_callback = const Deferred.unit
+  }
 
 let is_expired cb =
   match cb.expiration with
@@ -107,10 +114,26 @@ let await cb =
 let await_exn cb =
   match%map await cb with None -> failwith "timeout" | Some result -> result
 
-let fire_if_not_already_fired cb result =
+let fire_if_not_already_fired ~default ~on_fill_handler cb result =
   if not (is_expired cb) then (
     if Ivar.is_full cb.signal then
       [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-    Ivar.fill cb.signal result )
+    Ivar.fill cb.signal result ;
+    on_fill_handler () )
+  else default
+
+let accept_if_not_already_fired cb =
+  fire_if_not_already_fired ~default:Deferred.unit
+    ~on_fill_handler:(fun () -> cb.on_accept_callback ())
+    cb `Accept
+
+let reject_if_not_already_fired cb =
+  fire_if_not_already_fired ~default:() ~on_fill_handler:ignore cb `Reject
+
+let ignore_if_not_already_fired cb =
+  fire_if_not_already_fired ~default:() ~on_fill_handler:ignore cb `Ignore
 
 let set_message_type t x = t.message_type <- x
+
+let append_on_accept_callback cb f =
+  { cb with on_accept_callback = (fun () -> cb.on_accept_callback () >>= f) }

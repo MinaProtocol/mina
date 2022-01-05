@@ -1771,8 +1771,7 @@ let create ?wallets (config : Config.t) =
                   in
                   Mina_networking.broadcast_transaction_pool_diff net x)) ;
           trace_task "valid_transitions_for_network broadcast loop" (fun () ->
-              Strict_pipe.Reader.iter_without_pushback
-                valid_transitions_for_network
+              Strict_pipe.Reader.iter valid_transitions_for_network
                 ~f:(fun (`Transition transition, `Source source) ->
                   let hash =
                     External_transition.Validated.state_hash transition
@@ -1808,7 +1807,7 @@ let create ?wallets (config : Config.t) =
                       | `Catchup ->
                           (*Noop for directly downloaded transitions*)
                           External_transition.Validated.accept transition )
-                  | Error reason -> (
+                  | Error reason ->
                       let timing_error_json =
                         match reason with
                         | `Too_early ->
@@ -1825,7 +1824,7 @@ let create ?wallets (config : Config.t) =
                         ]
                       in
                       External_transition.Validated.reject transition ;
-                      match source with
+                      ( match source with
                       | `Catchup ->
                           ()
                       | `Internal ->
@@ -1836,7 +1835,8 @@ let create ?wallets (config : Config.t) =
                       | `Gossip ->
                           [%log' warn config.logger] ~metadata
                             "Not rebroadcasting block $state_hash because it \
-                             was received $timing" ))) ;
+                             was received $timing" ) ;
+                      Deferred.unit)) ;
           (* FIXME #4093: augment ban_notifications with a Peer.ID so we can implement ban_notify
              trace_task "ban notification loop" (fun () ->
               Linear_pipe.iter (Mina_networking.ban_notification_reader net)

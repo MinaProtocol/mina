@@ -258,16 +258,19 @@ module Make
 
     let query_random_peers _ = failwith "TODO stub"
 
-    let broadcast_state t state =
+    let broadcast_state ?origin_topic t state =
+      ignore origin_topic ;
       Network.broadcast t.network ~sender:t.me state (fun sinks (env, vc) ->
           let time = Block_time.now t.time_controller in
           SinksImpl.Block_sink.push sinks.sink_block (env, time, vc))
 
-    let broadcast_snark_pool_diff t diff =
+    let broadcast_snark_pool_diff ?origin_topic t diff =
+      ignore origin_topic ;
       Network.broadcast t.network ~sender:t.me diff (fun sinks ->
           SinksImpl.Snark_sink.push sinks.sink_snark_work)
 
-    let broadcast_transaction_pool_diff t diff =
+    let broadcast_transaction_pool_diff ?origin_topic t diff =
+      ignore origin_topic ;
       Network.broadcast t.network ~sender:t.me diff (fun sinks ->
           SinksImpl.Tx_sink.push sinks.sink_tx)
 

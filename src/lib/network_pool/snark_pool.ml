@@ -1066,8 +1066,8 @@ let%test_module "random set test" =
                    ( Envelope.Incoming.local work
                    , Mina_net2.Validation_callback.create_without_expiration ()
                    ))
-            |> List.iter ~f:(fun diff ->
-                   Mock_snark_pool.Remote_sink.push remote_sink diff
+            |> List.iter ~f:(fun (env, vc) ->
+                   Mock_snark_pool.Remote_sink.push remote_sink (env, vc)
                    |> Deferred.don't_wait_for) ;
             (* locally generated diffs *)
             List.map (List.drop works per_reader) ~f:create_work

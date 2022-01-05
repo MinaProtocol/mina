@@ -88,7 +88,7 @@ let%test_module "all-ipc test" =
       }
 
     let check_msg (env : 'a Network_peer.Envelope.Incoming.t) cb has_received
-        expected_sender vr =
+        expected_sender vc_call =
       assert (not !has_received) ;
       has_received := true ;
       ( match env.sender with
@@ -96,7 +96,7 @@ let%test_module "all-ipc test" =
           raise UnexpectedState
       | Remote p ->
           assert (String.equal p.peer_id expected_sender) ) ;
-      Validation_callback.fire_if_not_already_fired cb vr
+      vc_call cb
 
     let mk_banning_gating_config peer_id =
       let fake_peer =
@@ -207,19 +207,19 @@ let%test_module "all-ipc test" =
       let topic_c_received_1 = ref false in
       let topic_c_received_2 = ref false in
       let topic_c_received_ivar = Ivar.create () in
+      let open Validation_callback in
       let%bind _ =
         Pubsub.subscribe_encode a topic_c
           ~on_decode_failure:(`Call (fun _ _ -> raise UnexpectedState))
           ~bin_prot:bin_typed_msg
           ~handle_and_validate_incoming_message:(fun env cb ->
-            Deferred.return
-              ( if equal_typed_msg env.data msgs.topic_c_msg_1 then
-                  check_msg env cb topic_c_received_1 ad.b_peerid `Accept
+              if equal_typed_msg env.data msgs.topic_c_msg_1 then
+                  check_msg env cb topic_c_received_1 ad.b_peerid accept_if_not_already_fired
                 else if equal_typed_msg env.data msgs.topic_c_msg_2 then
-                  check_msg env cb topic_c_received_2 ad.b_peerid `Accept
-                else raise UnexpectedState ;
+                  check_msg env cb topic_c_received_2 ad.b_peerid accept_if_not_already_fired
+                else raise UnexpectedState >>| fun () -> 
                 if !topic_c_received_1 && !topic_c_received_2 then
-                  Ivar.fill_if_empty topic_c_received_ivar () ))
+                  Ivar.fill_if_empty topic_c_received_ivar () )
       in
       (* Subscribe to topic "a" *)
       let topic_a_received_1 = ref false in
@@ -229,18 +229,18 @@ let%test_module "all-ipc test" =
       let%bind _ =
         Pubsub.subscribe a topic_a
           ~handle_and_validate_incoming_message:(fun env cb ->
-            Deferred.return
-              ( if String.equal env.data msgs.topic_a_msg_1 then
-                  check_msg env cb topic_a_received_1 ad.c_peerid `Accept
+               if String.equal env.data msgs.topic_a_msg_1 then
+                  check_msg env cb topic_a_received_1 ad.c_peerid accept_if_not_already_fired
                 else if String.equal env.data msgs.topic_a_msg_2 then
-                  check_msg env cb topic_a_received_2 ad.c_peerid `Reject
+                  (check_msg env cb topic_a_received_2 ad.c_peerid reject_if_not_already_fired ;
+                  Deferred.unit)
                 else if String.equal env.data msgs.topic_a_msg_3 then
-                  check_msg env cb topic_a_received_3 ad.b_peerid `Accept
-                else raise UnexpectedState ;
+                  check_msg env cb topic_a_received_3 ad.b_peerid accept_if_not_already_fired
+                else raise UnexpectedState >>| fun () ->
                 if
                   !topic_a_received_1 && !topic_a_received_2
                   && !topic_a_received_3
-                then Ivar.fill_if_empty topic_a_received_ivar () ))
+                then Ivar.fill_if_empty topic_a_received_ivar () )
         >>| Or_error.ok_exn
       in
       (* Open stream 1 to Bob *)
@@ -388,10 +388,9 @@ let%test_module "all-ipc test" =
       let%bind subA =
         Pubsub.subscribe b topic_a
           ~handle_and_validate_incoming_message:(fun env cb ->
-            Deferred.return
               ( if String.equal env.data msgs.topic_a_msg_1 then
-                  check_msg env cb topic_a_received_1 ad.a_peerid `Accept
-                else raise UnexpectedState ;
+                  check_msg env cb topic_a_received_1 ad.a_peerid Validation_callback.accept_if_not_already_fired
+                else raise UnexpectedState >>| fun () ->
                 Ivar.fill topic_a_received_ivar () ))
         >>| Or_error.ok_exn
       in
@@ -550,6 +549,7 @@ let%test_module "all-ipc test" =
           ~direct_peers:[] ~seed_peers ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~min_connections:25 ~max_connections:50
           ~validation_queue_size:150 ~initial_gating_config:gating_config
+          ~topic_config:[[topic_a; topic_c]]
         >>| Or_error.ok_exn
       in
       let%bind raw_seed_peers = listening_addrs node >>| Or_error.ok_exn in

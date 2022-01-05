@@ -17,6 +17,16 @@ end
 
 type pubsub_topic_mode_t = RO | RW | N
 
+let v1_topic_block = "mina/block/1.0.0"
+
+let v1_topic_tx = "mina/tx/1.0.0"
+
+let v1_topic_snark_work = "mina/snark-work/1.0.0"
+
+let v1_topics = [ v1_topic_block; v1_topic_snark_work; v1_topic_tx ]
+
+let v0_topic = "coda/consensus-messages/0.0.1"
+
 module Config = struct
   type t =
     { timeout : Time.Span.t
@@ -66,27 +76,34 @@ let download_seed_peer_list uri =
   let%map contents = Cohttp_async.Body.to_string body in
   Mina_net2.Multiaddr.of_file_contents contents
 
-type publish_functions = { publish_v0 : Message.msg -> unit Deferred.t }
+type publish_functions =
+  { publish_v0 : Message.msg -> unit Deferred.t
+  ; publish_v1_block : Message.state_msg -> unit Deferred.t
+  ; publish_v1_tx : Message.transaction_pool_diff_msg -> unit Deferred.t
+  ; publish_v1_snark_work : Message.snark_pool_diff_msg -> unit Deferred.t
+  }
 
 let empty_publish_functions =
   let unit _ = Deferred.unit in
-  { publish_v0 = unit }
+  { publish_v0 = unit
+  ; publish_v1_block = unit
+  ; publish_v1_tx = unit
+  ; publish_v1_snark_work = unit
+  }
 
 let validate_gossip_base ~fn my_peer_id envelope validation_callback =
   (* Messages from ourselves are valid. Don't try and reingest them. *)
   match Envelope.Incoming.sender envelope with
   | Local ->
-      Mina_net2.Validation_callback.fire_if_not_already_fired
-        validation_callback `Accept ;
-      Deferred.unit
+      Mina_net2.Validation_callback.accept_if_not_already_fired
+        validation_callback
   | Remote sender ->
       if not (Peer.Id.equal sender.peer_id my_peer_id) then
         (* Match on different cases *)
         fn (envelope, validation_callback)
-      else (
-        Mina_net2.Validation_callback.fire_if_not_already_fired
-          validation_callback `Accept ;
-        Deferred.unit )
+      else
+        Mina_net2.Validation_callback.accept_if_not_already_fired
+          validation_callback
 
 let on_gossip_decode_failure (config : Config.t) envelope (err : Error.t) =
   let peer = Envelope.Incoming.sender envelope |> Envelope.Sender.remote_exn in
@@ -179,11 +196,45 @@ module Make
 
     let peers_snapshot_max_staleness = Time.Span.of_sec 30.
 
+    (* Do not broadcast to the topic from which message was originally received *)
+    let guard_topic ?origin_topic topic f msg =
+      if Option.equal String.equal origin_topic (Some topic) then Deferred.unit
+      else f msg
+
+    (* broadcast to new topics  *)
+    let broadcast_state_impl ?origin_topic pfs state =
+      guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block state
+      >>= fun () ->
+      guard_topic ?origin_topic v0_topic pfs.publish_v0
+        (Message.New_state state)
+
+    let broadcast_state ?origin_topic t =
+      broadcast_state_impl ?origin_topic !(t.publish_functions)
+
+    let broadcast_transaction_pool_diff_impl ?origin_topic pfs diff =
+      guard_topic ?origin_topic v1_topic_tx pfs.publish_v1_tx diff
+      >>= fun () ->
+      guard_topic ?origin_topic v0_topic pfs.publish_v0
+        (Message.Transaction_pool_diff diff)
+
+    let broadcast_transaction_pool_diff ?origin_topic t =
+      broadcast_transaction_pool_diff_impl ?origin_topic !(t.publish_functions)
+
+    let broadcast_snark_pool_diff_impl ?origin_topic pfs diff =
+      guard_topic ?origin_topic v1_topic_snark_work pfs.publish_v1_snark_work
+        diff
+      >>= fun () ->
+      guard_topic ?origin_topic v0_topic pfs.publish_v0
+        (Message.Snark_pool_diff diff)
+
+    let broadcast_snark_pool_diff ?origin_topic t =
+      broadcast_snark_pool_diff_impl ?origin_topic !(t.publish_functions)
+
     (* Creates just the helper, making sure to register everything
        BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
         high_connectivity_ivar ~added_seeds ~pids ~on_unexpected_termination
-        ~(sinks : SinksImpl.sinks) =
+        ~(sinks : SinksImpl.sinks) ~pfs_ref =
       let ctr = ref 0 in
       let record_peer_connection () =
         [%log' trace config.logger] "Fired peer_connected callback" ;
@@ -305,6 +356,7 @@ module Make
                           config.initial_peers
                     ; isolate = config.isolate
                     }
+                ~topic_config:[ [ v0_topic ]; v1_topics ]
             in
             let implementation_list =
               List.bind rpc_handlers ~f:create_rpc_implementations
@@ -389,24 +441,103 @@ module Make
                 ~bin_prot
                 ~on_decode_failure:(`Call (on_gossip_decode_failure config))
             in
+            let tx_bin_prot =
+              Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.bin_t
+            in
+            let snark_bin_prot =
+              Network_pool.Snark_pool.Diff_versioned.Stable.Latest.bin_t
+            in
+            let block_bin_prot =
+              Mina_transition.External_transition.Stable.Latest.bin_t
+            in
+            let unit_f _ = Deferred.unit in
+            let publish_v1_impl push_impl bin_prot topic =
+              match config.pubsub_v1 with
+              | RW ->
+                  subscribe ~fn:push_impl topic bin_prot >>| Pubsub.publish net2
+              | RO ->
+                  subscribe ~fn:push_impl topic bin_prot >>| fun _ -> unit_f
+              | _ ->
+                  Deferred.Or_error.return unit_f
+            in
+            let%bind publish_v1_tx =
+              publish_v1_impl
+                (fun (env, vc) ->
+                  let vc' =
+                    Validation_callback.append_on_accept_callback vc (fun () ->
+                        broadcast_transaction_pool_diff_impl
+                          ~origin_topic:v1_topic_tx !pfs_ref env.data)
+                  in
+                  SinksImpl.Tx_sink.push sinks.sink_tx (env, vc'))
+                tx_bin_prot v1_topic_tx
+            in
+            let%bind publish_v1_snark_work =
+              publish_v1_impl
+                (fun (env, vc) ->
+                  let vc' =
+                    Validation_callback.append_on_accept_callback vc (fun () ->
+                        broadcast_snark_pool_diff_impl
+                          ~origin_topic:v1_topic_snark_work !pfs_ref env.data)
+                  in
+                  SinksImpl.Snark_sink.push sinks.sink_snark_work (env, vc'))
+                snark_bin_prot v1_topic_snark_work
+            in
+            let%bind publish_v1_block =
+              publish_v1_impl
+                (fun (env, vc) ->
+                  let vc' =
+                    Validation_callback.append_on_accept_callback vc (fun () ->
+                        broadcast_state_impl ~origin_topic:v1_topic_block
+                          !pfs_ref env.data)
+                  in
+                  SinksImpl.Block_sink.push sinks.sink_block
+                    (env, Block_time.now config.time_controller, vc'))
+                block_bin_prot v1_topic_block
+            in
             let subscribe_v0_impl =
               subscribe
                 ~fn:(fun (env, vc) ->
-                  match Envelope.Incoming.data env with
+                  match env.data with
                   | Message.New_state state ->
+                      let vc' =
+                        Validation_callback.append_on_accept_callback vc
+                          (fun () ->
+                            broadcast_state_impl ~origin_topic:v0_topic !pfs_ref
+                              state)
+                      in
                       SinksImpl.Block_sink.push sinks.sink_block
                         ( Envelope.Incoming.map ~f:(fun _ -> state) env
                         , Block_time.now config.time_controller
-                        , vc )
+                        , vc' )
                   | Message.Transaction_pool_diff diff ->
+                      let vc' =
+                        Validation_callback.append_on_accept_callback vc
+                          (fun () ->
+                            broadcast_transaction_pool_diff_impl
+                              ~origin_topic:v0_topic !pfs_ref diff)
+                      in
                       SinksImpl.Tx_sink.push sinks.sink_tx
-                        (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc)
+                        (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc')
                   | Message.Snark_pool_diff diff ->
+                      let vc' =
+                        Validation_callback.append_on_accept_callback vc
+                          (fun () ->
+                            broadcast_snark_pool_diff_impl
+                              ~origin_topic:v0_topic !pfs_ref diff)
+                      in
                       SinksImpl.Snark_sink.push sinks.sink_snark_work
-                        (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc))
-                "coda/consensus-messages/0.0.1" Message.Latest.T.bin_msg
+                        (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc'))
+                v0_topic Message.Latest.T.bin_msg
             in
-            let%bind publish_v0 = subscribe_v0_impl >>| Pubsub.publish net2 in
+            let%bind publish_v0 =
+              match config.pubsub_v0 with
+              | RW ->
+                  subscribe_v0_impl >>| Pubsub.publish net2
+              | RO ->
+                  subscribe_v0_impl >>| fun _ -> unit_f
+              | _ ->
+                  Deferred.Or_error.return unit_f
+            in
             let%map _ =
               (* XXX: this ALWAYS needs to be AFTER handle_protocol/subscribe
                  or it is possible to miss connections! *)
@@ -445,7 +576,11 @@ module Make
                        [%log' warn config.logger]
                          "starting libp2p up failed: $error"
                          ~metadata:[ ("error", Error_json.error_to_yojson e) ])) ;
-            { publish_v0 }
+            { publish_v0
+            ; publish_v1_block
+            ; publish_v1_tx
+            ; publish_v1_snark_work
+            }
           in
           match%map initializing_libp2p_result with
           | Ok pfs ->
@@ -505,7 +640,13 @@ module Make
             let%bind _, pf, _ = res in
             f pf msg
           in
-          pfs_ref := { publish_v0 = pf_impl (fun pf -> pf.publish_v0) } ;
+          pfs_ref :=
+            { publish_v0 = pf_impl (fun pf -> pf.publish_v0)
+            ; publish_v1_block = pf_impl (fun pf -> pf.publish_v1_block)
+            ; publish_v1_tx = pf_impl (fun pf -> pf.publish_v1_tx)
+            ; publish_v1_snark_work =
+                pf_impl (fun pf -> pf.publish_v1_snark_work)
+            } ;
           upon res (fun (_, _, me) ->
               (* This is a hack so that we keep the same keypair across restarts. *)
               config.keypair <- Some me ;
@@ -515,7 +656,7 @@ module Make
           let libp2p =
             create_libp2p config rpc_handlers first_peer_ivar
               high_connectivity_ivar ~added_seeds ~pids
-              ~on_unexpected_termination:restart_libp2p ~sinks
+              ~on_unexpected_termination:restart_libp2p ~sinks ~pfs_ref
           in
           on_libp2p_create libp2p ; Deferred.ignore_m libp2p
         and restart_libp2p () = don't_wait_for (start_libp2p ()) in
@@ -810,18 +951,6 @@ module Make
         !"Querying random peers: %s"
         (Peer.pretty_list peers) ;
       List.map peers ~f:(fun peer -> query_peer t peer.peer_id rpc query)
-
-    let broadcast_state t state =
-      let pfs = !(t.publish_functions) in
-      pfs.publish_v0 (Message.New_state state)
-
-    let broadcast_transaction_pool_diff t diff =
-      let pfs = !(t.publish_functions) in
-      pfs.publish_v0 (Message.Transaction_pool_diff diff)
-
-    let broadcast_snark_pool_diff t diff =
-      let pfs = !(t.publish_functions) in
-      pfs.publish_v0 (Message.Snark_pool_diff diff)
 
     let on_first_connect t ~f = Deferred.map (Ivar.read t.first_peer_ivar) ~f
 

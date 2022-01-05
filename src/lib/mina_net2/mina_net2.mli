@@ -161,6 +161,7 @@ val configure :
   -> min_connections:int
   -> max_connections:int
   -> validation_queue_size:int
+  -> topic_config:string list list
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.

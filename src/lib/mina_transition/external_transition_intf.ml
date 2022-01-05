@@ -57,7 +57,7 @@ module type External_transition_common_intf = sig
 
   val proposed_protocol_version_opt : t -> Protocol_version.t option
 
-  val accept : t -> unit
+  val accept : t -> unit Deferred.t
 
   val reject : t -> unit
 

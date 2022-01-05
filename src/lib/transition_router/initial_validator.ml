@@ -303,8 +303,8 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                      (With_hash.hash transition_with_hash, sender, time_received) ;
                    return ()
                | Error error ->
-                   Mina_net2.Validation_callback.fire_if_not_already_fired
-                     valid_cb `Reject ;
+                   Mina_net2.Validation_callback.reject_if_not_already_fired
+                     valid_cb ;
                    Interruptible.uninterruptible
                    @@ handle_validation_error ~logger ~rejected_blocks_logger
                         ~time_received ~trust_system ~sender

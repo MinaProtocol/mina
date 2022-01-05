@@ -125,14 +125,15 @@ module Base
     match t with
     | Sink { writer = w; logger; rate_limiter = rl; pool; wrap; trace_label }
       -> (
-        let env' = Msg.convert msg in
         let cb' = Msg.convert_callback cb in
-        match%bind verify_impl ~logger ~trace_label pool rl env' cb' with
+        match%bind
+          verify_impl ~logger ~trace_label pool rl (Msg.convert msg) cb'
+        with
         | None ->
             (* TODO log unverified? *)
             Deferred.unit
-        | Some verified_env ->
-            let m' = wrap (verified_env, cb') in
+        | Some env' ->
+            let m' = wrap (env', cb') in
             Option.value ~default:Deferred.unit (Strict_pipe.Writer.write w m')
         )
     | Void ->
@@ -175,7 +176,7 @@ module Local_sink
 
       let convert_callback cb = BC.Local cb
 
-      let convert m = Envelope.Incoming.local m
+      let convert = Envelope.Incoming.local
     end)
 
 module Remote_sink

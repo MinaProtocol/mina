@@ -30,7 +30,7 @@ let push sink (e, tm, cb) =
           [%log' warn logger]
             "$sender has sent many blocks. This is very unusual."
             ~metadata:[ ("sender", Envelope.Sender.to_yojson sender) ] ;
-          Mina_net2.Validation_callback.fire_if_not_already_fired cb `Reject ;
+          Mina_net2.Validation_callback.reject_if_not_already_fired cb ;
           Deferred.unit
       | `Within_capacity ->
           Writer.write writer (e, tm, cb) )
