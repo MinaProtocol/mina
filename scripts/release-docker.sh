@@ -77,6 +77,10 @@ mina-rosetta)
 mina-rosetta-ubuntu)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu"
   ;;
+mina-snapp-test-txn)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-snapp-test-txn"
+  DOCKER_CONTEXT="dockerfiles/"
+  ;;
 leaderboard)
   DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
   DOCKER_CONTEXT="frontend/leaderboard"

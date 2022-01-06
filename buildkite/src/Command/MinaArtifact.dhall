@@ -110,7 +110,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         let snappTestTxnSpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOnGitEnv,
           service="mina-snapp-test-txn",
-          extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH}",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="snapp-test-txn-${DebianVersions.lowerName debVersion}-docker-image"
         }
