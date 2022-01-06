@@ -74,7 +74,7 @@ module Make
       String.init length_in_bytes ~f:(fun _ -> Char.of_int_exn (Random.int 255))
     in
     let h = "0x" ^ Hex.encode bytes in
-    [%test_eq: string] h (to_hex_string (of_hex_string h))
+    [%test_eq: string] h (String.lowercase (to_hex_string (of_hex_string h)))
 
   let t_of_sexp s = of_hex_string (String.t_of_sexp s)
 
