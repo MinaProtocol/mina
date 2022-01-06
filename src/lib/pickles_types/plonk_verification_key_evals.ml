@@ -1,5 +1,4 @@
 open Core_kernel
-
 module H_list = Snarky_backendless.H_list
 
 let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
