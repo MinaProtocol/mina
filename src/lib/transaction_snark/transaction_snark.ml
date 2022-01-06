@@ -2042,12 +2042,34 @@ module Base = struct
             in
             (* The fee-payer must increment their nonce. *)
             add_check Boolean.(party.data.body.increment_nonce ||| not is_start) ;
-            (* If there's a valid signature, it must increment the nonce or use full commitment *)
-            add_check
-              Boolean.(
-                party.data.body.increment_nonce
-                ||| party.data.body.use_full_commitment
-                ||| not signature_verifies) ;
+            ( match auth_type with
+            | Signature ->
+                let is_fixed_nonce_predicate =
+                  (* Note: we abuse [Or_ignore.Checked.check] here to say that
+                     the check 'passes' when it's either set to [Ignore] or when
+                     the upper and lower balances aren't equal. Then, by negating
+                     the result, this value is true exactly when the upper and
+                     lower bounds are equal; i.e. this part of the predicate is
+                     exactly some fixed nonce.
+                  *)
+                  Boolean.not
+                    (Snapp_basic.Or_ignore.Checked.check
+                       party.data.predicate.nonce
+                       ~f:(fun { Snapp_predicate.Closed_interval.upper; lower }
+                          ->
+                         Boolean.not
+                           (run_checked
+                              (Account.Nonce.Checked.equal upper lower))))
+                in
+                (* If there's a valid signature, it must increment the nonce or
+                   use the full commitment.
+                *)
+                add_check
+                  Boolean.(
+                    is_fixed_nonce_predicate &&& party.data.body.increment_nonce
+                    ||| party.data.body.use_full_commitment)
+            | None_given | Proof ->
+                () ) ;
             let account', `proof_must_verify proof_must_verify =
               let tag =
                 Option.map snapp_statement ~f:(fun (i, _) -> side_loaded i)

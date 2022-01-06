@@ -1718,12 +1718,21 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             let%bind.Result () =
               match
                 ( Control.tag p.authorization
+                , p.data.predicate
                 , p.data.body.increment_nonce
                 , p.data.body.use_full_commitment )
               with
-              | Signature, false, false ->
+              | Signature, (Accept | Full { nonce = Ignore; _ }), _, false ->
+                  (* Signature must have a nonce predicate. *)
+                  Error Transaction_status.Failure.Update_not_permitted
+              | Signature, Full { nonce = Check { lower; upper }; _ }, _, false
+                when not (Global_slot.equal lower upper) ->
+                  (* Signature must have a constant nonce predicate. *)
+                  Error Transaction_status.Failure.Update_not_permitted
+              | Signature, _, false, false ->
                   (* If there's a signature, it must increment the nonce or use
-                     full commitment to avoid replays *)
+                     the full commitment to avoid replays.
+                  *)
                   Error Transaction_status.Failure.Update_not_permitted
               | _ ->
                   Ok ()
