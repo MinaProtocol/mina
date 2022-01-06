@@ -39,6 +39,21 @@ macro_rules! impl_vector_old {
                         .unwrap()),
                 }
             }
+
+            #[ocaml_gen::func]
+            #[ocaml::func]
+            pub fn [<$name:snake _set>](
+                mut v: $name,
+                i: ocaml::Int,
+                value: $CamlF,
+            ) -> Result<(), ocaml::Error> {
+                match v.get_mut(i as usize) {
+                    Some(x) => Ok(*x = value.into()),
+                    None => Err(ocaml::Error::invalid_argument("vector_set")
+                        .err()
+                        .unwrap()),
+                }
+            }
         }
     };
 }
@@ -81,6 +96,22 @@ macro_rules! impl_vector {
                 match v.get(i as usize) {
                     Some(x) => Ok(x.into()),
                     None => Err(ocaml::Error::invalid_argument("vector_get")
+                        .err()
+                        .unwrap()),
+                }
+            }
+
+            #[ocaml_gen::func]
+            #[ocaml::func]
+            pub fn [<$name:snake _set>](
+                v: $name,
+                i: ocaml::Int,
+                value: $CamlF,
+            ) -> Result<(), ocaml::Error> {
+                let mut v = v.write().map_err(|_| ocaml::CamlError::Failure("vector_set: could not capture lock"))?;
+                match v.get_mut(i as usize) {
+                    Some(x) => Ok(*x = value.into()),
+                    None => Err(ocaml::Error::invalid_argument("vector_set")
                         .err()
                         .unwrap()),
                 }

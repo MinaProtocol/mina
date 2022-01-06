@@ -160,6 +160,7 @@ fn generate_bindings(mut w: impl std::io::Write) {
             decl_func!(w, env, caml_fp_vector_length => "length");
             decl_func!(w, env, caml_fp_vector_emplace_back => "emplace_back");
             decl_func!(w, env, caml_fp_vector_get => "get");
+            decl_func!(w, env, caml_fp_vector_set => "set");
         });
 
         decl_module!(w, env, "Fq", {
@@ -170,6 +171,7 @@ fn generate_bindings(mut w: impl std::io::Write) {
             decl_func!(w, env, caml_fq_vector_length => "length");
             decl_func!(w, env, caml_fq_vector_emplace_back => "emplace_back");
             decl_func!(w, env, caml_fq_vector_get => "get");
+            decl_func!(w, env, caml_fq_vector_set => "set");
         });
     });
 
