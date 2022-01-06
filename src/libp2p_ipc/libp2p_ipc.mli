@@ -65,6 +65,7 @@ val create_libp2p_config :
   -> seed_peers:multiaddr list
   -> peer_exchange:bool
   -> mina_peer_exchange:bool
+  -> min_connections:int
   -> max_connections:int
   -> validation_queue_size:int
   -> gating_config:gating_config

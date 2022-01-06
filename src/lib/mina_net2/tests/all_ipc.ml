@@ -548,7 +548,7 @@ let%test_module "all-ipc test" =
         configure node ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
           ~network_id ~peer_exchange:true ~mina_peer_exchange:true
           ~direct_peers:[] ~seed_peers ~flooding:false ~metrics_port:None
-          ~unsafe_no_trust_ip:true ~max_connections:50
+          ~unsafe_no_trust_ip:true ~min_connections:25 ~max_connections:50
           ~validation_queue_size:150 ~initial_gating_config:gating_config
         >>| Or_error.ok_exn
       in

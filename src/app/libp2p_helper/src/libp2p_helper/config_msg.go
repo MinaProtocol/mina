@@ -11,7 +11,6 @@ import (
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
-	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	discovery "github.com/libp2p/go-libp2p-discovery"
@@ -30,17 +29,7 @@ func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
-
-	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
-		app.updateConnectionMetrics()
-		app.writeMsg(mkPeerConnectedUpcall(peer.Encode(c.RemotePeer())))
-	}
-
-	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
-		app.updateConnectionMetrics()
-		app.writeMsg(mkPeerDisconnectedUpcall(peer.Encode(c.RemotePeer())))
-	}
-
+	app.SetConnectionHandlers()
 	for _, info := range app.AddedPeers {
 		app.P2p.Logger.Debug("Trying to connect to: ", info)
 		err := app.P2p.Host.Connect(app.Ctx, info)
@@ -74,7 +63,7 @@ func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) *capnp.Message {
 				if connInfo.ConnCount < connInfo.LowWater {
 					err := app.P2p.Host.Connect(app.Ctx, discovery.info)
 					if err != nil {
-						app.P2p.Logger.Error("failed to connect to peer after discovering it: ", discovery.info, err.Error())
+						app.P2p.Logger.Errorf("failed to connect to peer after discovering it: ", discovery.info, err.Error())
 						continue
 					}
 				}
@@ -139,6 +128,21 @@ func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) *capnp.Message {
 	})
 }
 
+func configurePubsub(app *app, validationQueueSize int, directPeers []peer.AddrInfo, opts ...pubsub.Option) error {
+	// SOMEDAY:
+	// - stop putting block content on the mesh.
+	// - bigger than 32MiB block size?
+	ps, err := pubsub.NewGossipSub(app.Ctx, app.P2p.Host,
+		append([]pubsub.Option{
+			pubsub.WithMaxMessageSize(1024 * 1024 * 32),
+			pubsub.WithDirectPeers(directPeers),
+			pubsub.WithValidateQueueSize(validationQueueSize),
+		}, opts...)...,
+	)
+	app.P2p.Pubsub = ps
+	return err
+}
+
 type ConfigureReqT = ipc.Libp2pHelperInterface_Configure_Request
 type ConfigureReq ConfigureReqT
 
@@ -169,6 +173,9 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 	}
 
 	seedPeersMaList, err := m.SeedPeers()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
 	seeds := make([]peer.AddrInfo, 0, seedPeersMaList.Len())
 	err = multiaddrListForeach(seedPeersMaList, func(v string) error {
 		addr, err := addrInfoOfString(v)
@@ -187,6 +194,9 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 	app.AddedPeers = append(app.AddedPeers, seeds...)
 
 	directPeersMaList, err := m.DirectPeers()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
 	directPeers := make([]peer.AddrInfo, 0, directPeersMaList.Len())
 	err = multiaddrListForeach(directPeersMaList, func(v string) error {
 		addr, err := addrInfoOfString(v)
@@ -242,29 +252,21 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, listenOn, externalMaddr, stateDir, privk, netId, seeds, gatingConfig, int(m.MaxConnections()), m.MinaPeerExchange())
+	helper, err := codanet.MakeHelper(app.Ctx, listenOn, externalMaddr, stateDir, privk, netId, seeds, gatingConfig, int(m.MinConnections()), int(m.MaxConnections()), m.MinaPeerExchange(), time.Millisecond)
 	if err != nil {
 		return mkRpcRespError(seqno, badHelper(err))
 	}
 
-	// SOMEDAY:
-	// - stop putting block content on the mesh.
-	// - bigger than 32MiB block size?
-	opts := []pubsub.Option{pubsub.WithMaxMessageSize(1024 * 1024 * 32),
-		pubsub.WithPeerExchange(m.PeerExchange()),
-		pubsub.WithFloodPublish(m.Flood()),
-		pubsub.WithDirectPeers(directPeers),
-		pubsub.WithValidateQueueSize(int(m.ValidationQueueSize())),
-	}
-
-	var ps *pubsub.PubSub
-	ps, err = pubsub.NewGossipSub(app.Ctx, helper.Host, opts...)
-	if err != nil {
-		return mkRpcRespError(seqno, badHelper(err))
-	}
-
-	helper.Pubsub = ps
 	app.P2p = helper
+	app.bitswapCtx.engine = helper.Bitswap
+	app.bitswapCtx.storage = helper.BitswapStorage
+
+	err = configurePubsub(app, int(m.ValidationQueueSize()), directPeers,
+		pubsub.WithFloodPublish(m.Flood()),
+		pubsub.WithPeerExchange(m.PeerExchange()))
+	if err != nil {
+		return mkRpcRespError(seqno, badHelper(err))
+	}
 
 	app.P2p.Logger.Infof("here are the seeds: %v", seeds)
 
@@ -273,7 +275,7 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 		metricsServer.Shutdown()
 	}
 	if m.MetricsPort() > 0 {
-		metricsServer = startMetricsServer(m.MetricsPort())
+		app.metricsServer = startMetricsServer(m.MetricsPort())
 		if !app.metricsCollectionStarted {
 			go app.checkBandwidth()
 			go app.checkPeerCount()
@@ -344,6 +346,7 @@ func (msg GenerateKeypairReq) handle(app *app, seqno uint64) *capnp.Message {
 		panicOnErr(res.SetPrivateKey(privkBytes))
 		panicOnErr(res.SetPublicKey(pubkBytes))
 		pid, err := res.NewPeerId()
+		panicOnErr(err)
 		panicOnErr(pid.SetId(peer.Encode(peerID)))
 	})
 }
