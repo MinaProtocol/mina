@@ -82,6 +82,46 @@ ls -lh mina*.deb
 
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
 
+##################################### SNAPP TEST TXN #######################################
+
+mkdir -p "${BUILDDIR}/DEBIAN"
+cat << EOF > "${BUILDDIR}/DEBIAN/control"
+
+Package: mina-snapp-test-txn
+Version: ${MINA_DEB_VERSION}
+License: Apache-2.0
+Vendor: none
+Architecture: amd64
+Maintainer: o(1)Labs <build@o1labs.org>
+Installed-Size:
+Depends: ${SHARED_DEPS}
+Section: base
+Priority: optional
+Homepage: https://minaprotocol.com/
+Description: Utility to generate Snapp transactions in Mina GraphQL format
+ Built from ${GITHASH} by ${BUILD_URL}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILDDIR}/DEBIAN/control"
+
+# Binaries
+mkdir -p "${BUILDDIR}/usr/local/bin"
+cp ./default/src/app/snapp_test_transaction/snapp_test_transaction.exe "${BUILDDIR}/usr/local/bin/mina-snapp-test-transaction"
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILDDIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-snapp-test-txn_${MINA_DEB_VERSION}.deb
+ls -lh mina*.deb
+
+##################################### END SNAPP TEST TXN PACKAGE #######################################
+
 ###### deb without the proving keys
 echo "------------------------------------------------------------"
 echo "Building mainnet deb without keys:"
@@ -134,7 +174,7 @@ mkdir -p "${BUILDDIR}/etc/coda/build_config"
 cp ../src/config/mainnet.mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
 rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
-# Copy the genesis ledgers and proofs as these are fairly small and very valueable to have l
+# Copy the genesis ledgers and proofs as these are fairly small and very valuable to have
 # Genesis Ledger/proof/epoch ledger Copy
 mkdir -p "${BUILDDIR}/var/lib/coda"
 for f in /tmp/coda_cache_dir/genesis*; do
@@ -262,6 +302,6 @@ done
 #remove build dir to prevent running out of space on the host machine
 rm -rf "${BUILDDIR}"
 
-# Build mina block producer sidecar 
+# Build mina block producer sidecar
 ../automation/services/mina-bp-stats/sidecar/build.sh
 ls -lh mina*.deb
