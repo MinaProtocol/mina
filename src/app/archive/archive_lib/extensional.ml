@@ -84,6 +84,8 @@ module Block = struct
     ; global_slot_since_genesis: Mina_numbers.Global_slot.Stable.Latest.t
     ; timestamp: Block_time.Stable.Latest.t
     ; user_cmds: User_command.t list
-    ; internal_cmds: Internal_command.t list }
+    ; internal_cmds: Internal_command.t list
+    ; chain_status: Chain_status.t
+    }
   [@@deriving yojson, equal, bin_io_unversioned]
 end

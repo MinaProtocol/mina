@@ -64,21 +64,24 @@ CREATE TABLE epoch_data
 , ledger_hash_id int    NOT NULL REFERENCES snarked_ledger_hashes(id)
 );
 
+CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending');
+
 CREATE TABLE blocks
-( id                      serial PRIMARY KEY
-, state_hash              text   NOT NULL UNIQUE
-, parent_id               int                    REFERENCES blocks(id)
-, parent_hash             text   NOT NULL
-, creator_id              int    NOT NULL        REFERENCES public_keys(id)
-, block_winner_id         int    NOT NULL        REFERENCES public_keys(id)
-, snarked_ledger_hash_id  int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
-, staking_epoch_data_id   int    NOT NULL        REFERENCES epoch_data(id)
-, next_epoch_data_id      int    NOT NULL        REFERENCES epoch_data(id)
-, ledger_hash             text   NOT NULL
-, height                  bigint NOT NULL
-, global_slot             bigint NOT NULL
-, global_slot_since_genesis bigint NOT NULL
-, timestamp               bigint NOT NULL
+( id                         serial PRIMARY KEY
+, state_hash                 text   NOT NULL UNIQUE
+, parent_id                  int                    REFERENCES blocks(id)
+, parent_hash                text   NOT NULL
+, creator_id                 int    NOT NULL        REFERENCES public_keys(id)
+, block_winner_id            int    NOT NULL        REFERENCES public_keys(id)
+, snarked_ledger_hash_id     int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
+, staking_epoch_data_id      int    NOT NULL        REFERENCES epoch_data(id)
+, next_epoch_data_id         int    NOT NULL        REFERENCES epoch_data(id)
+, ledger_hash                text   NOT NULL
+, height                     bigint NOT NULL
+, global_slot                bigint NOT NULL
+, global_slot_since_genesis  bigint NOT NULL
+, timestamp                  bigint NOT NULL
+, chain_status               chain_status_type NOT NULL
 );
 
 CREATE INDEX idx_blocks_id ON blocks(id);
@@ -86,6 +89,7 @@ CREATE INDEX idx_blocks_parent_id ON blocks(parent_id);
 CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);
 CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
+CREATE INDEX idx_chain_status      ON blocks(chain_status);
 
 CREATE TABLE balances
 ( id            serial PRIMARY KEY

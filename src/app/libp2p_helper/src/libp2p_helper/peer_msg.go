@@ -40,7 +40,7 @@ func (m AddPeerReq) handle(app *app, seqno uint64) *capnp.Message {
 	}
 
 	app.AddedPeers = append(app.AddedPeers, *info)
-	app.P2p.GatingState.TrustedPeers.Add(info.ID)
+	app.P2p.GatingState().TrustedPeers.Add(info.ID)
 
 	if app.Bootstrapper != nil {
 		app.Bootstrapper.Close()
