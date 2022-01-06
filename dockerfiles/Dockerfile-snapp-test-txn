@@ -39,6 +39,6 @@ RUN mkdir /healthcheck && curl https://raw.githubusercontent.com/MinaProtocol/mi
 # Snapp test transaction package
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get -y update \
-  && apt-get install -y "mina-snapp-test-txn=$deb_version"
+  && apt-get install -y "snapp-test-txn=$deb_version"
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]
