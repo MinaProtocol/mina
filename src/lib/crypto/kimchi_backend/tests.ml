@@ -56,7 +56,7 @@ let%test_module "vesta" =
     open Impl
 
     let%test_unit "test snarky instance" =
-      Kimchi_pasta.Pallas_based_plonk.Keypair.set_urs_info [] ;
+      Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] ;
       let _kp = Impl.generate_keypair ~exposing:[ Field.typ ] main in
       let _witness =
         Impl.generate_witness [ Field.typ ] main () (Field.Constant.of_int 4)
