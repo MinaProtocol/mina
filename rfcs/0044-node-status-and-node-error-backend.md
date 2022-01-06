@@ -40,6 +40,11 @@ Grafana Loki functions as basically a log aggregation system for the logs. For l
 
 LogDNA provides both data storage and data visualization and alerting functionality. Besides the usual log collecting agent like Loki, LogDNA also provides the option to sends logs directly to their API which could save us the work to implement a micro-service by ourselves (depending on whether we feel safe to give users the log-uploading keys). The alert service they provide is also handy in node error system.
 
+### Google Cloud Logging
+
+Google Cloud Loggind provides storage and data searching/visualization of logs. It provides a handy command line sdk tool. There's also various libraries for mainstream languages. Since we are already using gcloud logging for our nodes, the integrated `Logs explorer` would be familiar for most of our engineers. It also provides some log-based metrics and alerts. By default the user defined log bucket has a 30-day log retention, but it's configurable. Comparible to the AWS stack, the architecture is a little different. There's no `Kenesis data stream`-equivalent part for gcloud logging. The logs go directly to the Google Cloud Logging API, as illustrated in the following diagram:
+![](res/gcloud_logging.png)
+
 ## Prices
 
 1. S3, $0.023 for 1GB/month, would be a little cheaper if we use more than 50GB
