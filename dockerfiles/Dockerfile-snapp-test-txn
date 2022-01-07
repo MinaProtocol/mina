@@ -20,7 +20,8 @@ RUN apt-get -y update \
         curl \
         jq \
         dumb-init \
-        apt-utils \
+        libssl1.1 \
+	apt-utils \
         man \
     && rm -rf /var/lib/apt/lists/*
 
