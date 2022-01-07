@@ -567,7 +567,8 @@ let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger :
   let%map body0 =
     gen_party_body ?permissions_auth ~account_id ~is_fee_payer:true
       ~increment_nonce:() ~gen_balance_change:gen_fee
-      ~f_balance_change:fee_to_amt ~gen_use_full_commitment:(return ()) ~ledger ()
+      ~f_balance_change:fee_to_amt ~gen_use_full_commitment:(return ()) ~ledger
+      ()
   in
   (* make sure the fee payer's token id is the default,
      which is represented by the unit value in the body

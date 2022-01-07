@@ -101,10 +101,8 @@ let parties_with_ledger () =
             ()
       | Ok (`Added, _) ->
           ()) ;
-  let%bind protocol_state = Snapp_predicate.Protocol_state.gen in
   let%bind parties =
-    Snapp_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger
-      ~protocol_state ()
+    Snapp_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger ()
   in
   (* include generated ledger in result *)
   return (User_command.Parties parties, fee_payer_keypair, keymap, ledger)

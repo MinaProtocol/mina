@@ -2412,59 +2412,6 @@ let%test_module "staged ledger tests" =
       assert (List.length cmds = num_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
-    let snapps_init_protocol_state : Snapp_predicate.Protocol_state.t =
-      let ({ snarked_ledger_hash
-           ; snarked_next_available_token
-           ; timestamp
-           ; blockchain_length
-           ; min_window_density
-           ; last_vrf_output
-           ; total_currency
-           ; global_slot_since_hard_fork
-           ; global_slot_since_genesis
-           ; staking_epoch_data
-           ; next_epoch_data
-           }
-            : Snapp_predicate.Protocol_state.View.t) =
-        dummy_state_view ()
-      in
-      let open Snapp_basic.Or_ignore in
-      let mk_point_interval (type a) (num : a) :
-          a Snapp_predicate.Closed_interval.t =
-        { lower = num; upper = num }
-      in
-      let mk_epoch_ledger ({ hash; total_currency } : _ Epoch_ledger.Poly.t) :
-          _ Epoch_ledger.Poly.t =
-        { hash = Check hash
-        ; total_currency = Check (mk_point_interval total_currency)
-        }
-      in
-      let mk_epoch_data
-          ({ ledger; seed; start_checkpoint; lock_checkpoint; epoch_length } :
-            _ Epoch_data.Poly.t) : _ Epoch_data.Poly.t =
-        { ledger = mk_epoch_ledger ledger
-        ; seed = Check seed
-        ; start_checkpoint = Check start_checkpoint
-        ; lock_checkpoint = Check lock_checkpoint
-        ; epoch_length = Check (mk_point_interval epoch_length)
-        }
-      in
-      { snarked_ledger_hash = Check snarked_ledger_hash
-      ; snarked_next_available_token =
-          Check (mk_point_interval snarked_next_available_token)
-      ; timestamp = Check (mk_point_interval timestamp)
-      ; blockchain_length = Check (mk_point_interval blockchain_length)
-      ; min_window_density = Check (mk_point_interval min_window_density)
-      ; last_vrf_output
-      ; total_currency = Check (mk_point_interval total_currency)
-      ; global_slot_since_hard_fork =
-          Check (mk_point_interval global_slot_since_hard_fork)
-      ; global_slot_since_genesis =
-          Check (mk_point_interval global_slot_since_genesis)
-      ; staking_epoch_data = mk_epoch_data staking_epoch_data
-      ; next_epoch_data = mk_epoch_data next_epoch_data
-      }
-
     let gen_snapps_at_capacity :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
@@ -2478,33 +2425,29 @@ let%test_module "staged ledger tests" =
       let snapps =
         List.map parties_and_fee_payer_keypairs ~f:(function
           | Parties parties, fee_payer_keypair, keymap ->
-              (* replace protocol state *)
-              let parties' =
-                { parties with protocol_state = snapps_init_protocol_state }
-              in
               let fee_payer_signature =
                 Signature_lib.Schnorr.sign fee_payer_keypair.private_key
                   (Random_oracle.Input.field
-                     ( Parties.commitment parties'
+                     ( Parties.commitment parties
                      |> Parties.Transaction_commitment.with_fee_payer
                           ~fee_payer_hash:
                             (Party.Predicated.digest
                                (Party.Predicated.of_fee_payer
-                                  parties'.fee_payer.data)) ))
-              in
-              let fee_payer_with_valid_signature =
-                { parties'.fee_payer with authorization = fee_payer_signature }
+                                  parties.fee_payer.data)) ))
               in
               (* replace fee payer signature, because new protocol state invalidates the old *)
-              let protocol_state_predicate_hash =
-                Snapp_predicate.Protocol_state.digest parties'.protocol_state
+              let fee_payer_with_valid_signature =
+                { parties.fee_payer with authorization = fee_payer_signature }
               in
-              let memo_hash = Signed_command_memo.hash parties'.memo in
+              let memo_hash = Signed_command_memo.hash parties.memo in
               let other_parties_hash =
                 Parties.Party_or_stack.With_hashes.other_parties_hash
-                  parties'.other_parties
+                  parties.other_parties
               in
-              let sign_for_other_party sk =
+              let sign_for_other_party sk protocol_state =
+                let protocol_state_predicate_hash =
+                  Snapp_predicate.Protocol_state.digest protocol_state
+                in
                 Signature_lib.Schnorr.sign sk
                   (Random_oracle.Input.field
                      (Parties.Transaction_commitment.create ~memo_hash
@@ -2512,7 +2455,7 @@ let%test_module "staged ledger tests" =
               in
               (* replace other party's signatures, because of new protocol state *)
               let other_parties_with_valid_signatures =
-                List.map parties'.other_parties
+                List.map parties.other_parties
                   ~f:(fun { data; authorization } ->
                     let authorization_with_valid_signature =
                       match authorization with
@@ -2533,7 +2476,9 @@ let%test_module "staged ledger tests" =
                                    .to_base58_check pk)
                                   ()
                           in
-                          let signature = sign_for_other_party sk in
+                          let signature =
+                            sign_for_other_party sk data.body.protocol_state
+                          in
                           Control.Signature signature
                       | Proof _ | None_given ->
                           authorization
@@ -2542,13 +2487,13 @@ let%test_module "staged ledger tests" =
                     ; authorization = authorization_with_valid_signature
                     })
               in
-              let parties'' =
-                { parties' with
+              let parties' =
+                { parties with
                   fee_payer = fee_payer_with_valid_signature
                 ; other_parties = other_parties_with_valid_signatures
                 }
               in
-              User_command.Parties parties''
+              User_command.Parties parties'
           | Signed_command _, _, _ ->
               failwith "Expected a Parties, got a Signed command")
       in
