@@ -60,7 +60,7 @@ pub mod linearization {
         let kimchi_circuits::expr::Linearization {
             constant_term,
             mut index_terms,
-        } = kimchi::index::constraints_expr(d1, false, false, None)
+        } = kimchi::index::constraints_expr(d1, false, None)
             .linearize(evaluated_cols)
             .unwrap();
         // HashMap deliberately uses an unstable order; here we sort to ensure that the output is

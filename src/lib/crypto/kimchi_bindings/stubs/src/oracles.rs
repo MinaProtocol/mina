@@ -46,7 +46,7 @@ macro_rules! impl_oracles {
                         .iter()
                         .map(Into::<$F>::into)
                         .map(|s| -s)
-                        .collect(),
+                        .collect::<Vec<_>>(),
                 );
 
                 let proof: ProverProof<$G> = proof.into();

@@ -4,7 +4,7 @@ type curr_or_next = Curr | Next
 
 module Gate_type = struct
   module T = struct
-    type t = Poseidon | Vbmul | Endomul | CompleteAdd | EndomulScalar
+    type t = Poseidon | VarBaseMul | EndoMul | CompleteAdd | EndoMulScalar
     [@@deriving hash, eq, compare, sexp]
   end
 
@@ -202,7 +202,7 @@ module Tick : S = struct
              + alpha_pow 24
                * ( (x_1 * cell (var (Witness 9, Curr)))
                  - cell (var (Witness 6, Curr)) )) )
-      ; ( Index Vbmul
+      ; ( Index VarBaseMul
         , lazy
             (let x_0 =
                cell (var (Witness 7, Next)) * cell (var (Witness 7, Next))
@@ -470,7 +470,7 @@ module Tick : S = struct
                    * x_13
                  - (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Next)))
                    * x_14 )) )
-      ; ( Index Endomul
+      ; ( Index EndoMul
         , lazy
             (let x_0 =
                ( field
@@ -560,7 +560,7 @@ module Tick : S = struct
                      + cell (var (Witness 13, Curr)) )
                  + cell (var (Witness 14, Curr))
                  - cell (var (Witness 6, Next)) )) )
-      ; ( Index EndomulScalar
+      ; ( Index EndoMulScalar
         , lazy
             (let x_0 =
                ( ( field
@@ -1193,7 +1193,7 @@ module Tock : S = struct
              + alpha_pow 24
                * ( (x_1 * cell (var (Witness 9, Curr)))
                  - cell (var (Witness 6, Curr)) )) )
-      ; ( Index Vbmul
+      ; ( Index VarBaseMul
         , lazy
             (let x_0 =
                cell (var (Witness 7, Next)) * cell (var (Witness 7, Next))
@@ -1461,7 +1461,7 @@ module Tock : S = struct
                    * x_13
                  - (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Next)))
                    * x_14 )) )
-      ; ( Index Endomul
+      ; ( Index EndoMul
         , lazy
             (let x_0 =
                ( field
@@ -1551,7 +1551,7 @@ module Tock : S = struct
                      + cell (var (Witness 13, Curr)) )
                  + cell (var (Witness 14, Curr))
                  - cell (var (Witness 6, Next)) )) )
-      ; ( Index EndomulScalar
+      ; ( Index EndoMulScalar
         , lazy
             (let x_0 =
                ( ( field

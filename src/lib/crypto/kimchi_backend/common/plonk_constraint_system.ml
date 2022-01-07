@@ -78,7 +78,6 @@ module Gate_spec = struct
   (** A gate/row/constraint consists of a type (kind), a row, the other cells its columns/cells are connected to (wired_to), and the selector polynomial associated with the gate *)
   type ('row, 'f) t =
     { kind : (Kimchi.Protocol.gate_type[@sexp.opaque])
-    ; row : 'row
     ; wired_to : 'row Position.t array
     ; coeffs : 'f array
     }
@@ -92,11 +91,10 @@ module Gate_spec = struct
         ~f:(fun (pos : _ Position.t) -> { pos with row = f pos.row })
         t.wired_to
     in
-    { t with row = f t.row; wired_to }
+    { t with wired_to }
 
   (* TODO: just send the array to Rust directly *)
-  let to_rust_gate { kind; row; wired_to; coeffs } :
-      _ Kimchi.Protocol.circuit_gate =
+  let to_rust_gate { kind; wired_to; coeffs } : _ Kimchi.Protocol.circuit_gate =
     let typ = kind in
     let c = coeffs in
     let wired_to = Array.map ~f:Position.to_rust_wire wired_to in
@@ -109,7 +107,7 @@ module Gate_spec = struct
       , wired_to.(5)
       , wired_to.(6) )
     in
-    { typ; row; wires; c }
+    { typ; wires; c }
 end
 
 (** Represents the state of a hash function *)
@@ -561,7 +559,6 @@ struct
           wire' sys public_var (Row.Public_input row) 0 ;
           pub_input_gate_specs_rev :=
             { Gate_spec.kind = Generic
-            ; row = ()
             ; wired_to = [||]
             ; coeffs = pub_selectors
             }
@@ -577,8 +574,7 @@ struct
         let update_gate_with_permutation_info (row : Row.t)
             (gate : (unit, _) Gate_spec.t) : (Row.t, _) Gate_spec.t =
           { gate with
-            row
-          ; wired_to =
+            wired_to =
               Array.init Constants.permutation_cols ~f:(fun col ->
                   permutation { row; col })
           }
@@ -680,7 +676,7 @@ struct
         (* add to gates *)
         let open Position in
         sys.gates <-
-          `Unfinalized_rev ({ kind; row = (); wired_to = [||]; coeffs } :: gates) ;
+          `Unfinalized_rev ({ kind; wired_to = [||]; coeffs } :: gates) ;
         (* increment row *)
         sys.next_row <- sys.next_row + 1 ;
         (* add to row *)
@@ -1147,7 +1143,7 @@ struct
              ; None
             |]
           in
-          add_row sys curr_row Vbmul [||] ;
+          add_row sys curr_row VarBaseMul [||] ;
           add_row sys next_row Zero [||]
         in
 
@@ -1178,7 +1174,7 @@ struct
              ; Some round.b4
             |]
           in
-          add_row sys row Kimchi.Protocol.Endomul [||]
+          add_row sys row Kimchi.Protocol.EndoMul [||]
         in
         Array.iter state ~f:add_endoscale_round ;
         (* last row *)
@@ -1222,7 +1218,7 @@ struct
              ; None
             |]
           in
-          add_row sys row Kimchi.Protocol.EndomulScalar [||]
+          add_row sys row Kimchi.Protocol.EndoMulScalar [||]
         in
         Array.iter state
           ~f:

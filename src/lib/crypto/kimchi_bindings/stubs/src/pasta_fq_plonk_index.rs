@@ -37,7 +37,6 @@ pub fn caml_pasta_fq_plonk_index_create(
         .0
         .iter()
         .map(|gate| CircuitGate::<Fq> {
-            row: gate.row,
             typ: gate.typ,
             wires: gate.wires,
             c: gate.c.clone(),
@@ -137,7 +136,7 @@ pub fn caml_pasta_fq_plonk_index_read(
     t.cs.fr_sponge_params = oracle::pasta::fq_3::params();
     t.srs = srs.clone();
     t.fq_sponge_params = oracle::pasta::fp_3::params();
-    t.linearization = expr_linearization(t.cs.domain.d1, false, false, None);
+    t.linearization = expr_linearization(t.cs.domain.d1, false, None);
 
     Ok(CamlPastaFqPlonkIndex(Box::new(t)))
 }
