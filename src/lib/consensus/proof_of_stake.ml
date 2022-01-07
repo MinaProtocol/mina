@@ -181,7 +181,7 @@ module Data = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V1 = struct
+      module V2 = struct
         type t =
           { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
           ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
@@ -189,7 +189,7 @@ module Data = struct
           ; global_slot : Mina_numbers.Global_slot.Stable.V1.t
           ; global_slot_since_genesis : Mina_numbers.Global_slot.Stable.V1.t
           ; delegatee_table :
-              Mina_base.Account.Stable.V1.t
+              Mina_base.Account.Stable.V2.t
               Mina_base.Account.Index.Stable.V1.Table.t
               Public_key.Compressed.Stable.V1.Table.t
           }
