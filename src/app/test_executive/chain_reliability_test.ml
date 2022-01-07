@@ -26,35 +26,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; num_snark_workers = 0
     }
 
-  let check_common_prefixes ~tolerance ~logger chains =
-    assert (List.length chains > 1) ;
-    let hashset_chains =
-      List.map chains ~f:(Hash_set.of_list (module String))
-    in
-    let longest_chain_length =
-      chains |> List.map ~f:List.length
-      |> List.max_elt ~compare:Int.compare
-      |> Option.value_exn
-    in
-    let common_prefixes =
-      List.reduce hashset_chains ~f:Hash_set.inter |> Option.value_exn
-    in
-    let common_prefixes_length = Hash_set.length common_prefixes in
-    let length_difference = longest_chain_length - common_prefixes_length in
-    if length_difference = 0 || length_difference <= tolerance then
-      Malleable_error.return ()
-    else
-      let error_str =
-        sprintf
-          "Chains have common prefix of %d blocks, longest absolute chain is \
-           %d blocks.  the difference is %d blocks, which is greater than \
-           allowed tolerance of %d blocks"
-          common_prefixes_length longest_chain_length length_difference
-          tolerance
-      in
-      [%log error] "%s" error_str ;
-      Malleable_error.soft_error ~value:() (Error.of_string error_str)
-
   let run network t =
     let open Network in
     let open Malleable_error.Let_syntax in
@@ -109,5 +80,5 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          List.map labeled_chains ~f:(fun (_, chain) -> chain)
        in
        print_chains labeled_chains ;
-       check_common_prefixes chains ~tolerance:1 ~logger)
+       Util.check_common_prefixes chains ~tolerance:1 ~logger)
 end
