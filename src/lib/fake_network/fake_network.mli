@@ -20,8 +20,7 @@ type peer_state =
          Deferred.t
   ; get_some_initial_peers : unit Envelope.Incoming.t -> Peer.t list Deferred.t
   ; answer_sync_ledger_query :
-         (Kimchi.Foundations.Fp.t * Sync_ledger.Query.t)
-         Envelope.Incoming.t
+         (Kimchi.Foundations.Fp.t * Sync_ledger.Query.t) Envelope.Incoming.t
       -> (Sync_ledger.Answer.t, Error.t) result Deferred.t
   ; get_ancestry :
          ( Consensus.Data.Consensus_state.Value.t
@@ -36,8 +35,8 @@ type peer_state =
   ; get_best_tip :
          unit Envelope.Incoming.t
       -> ( Mina_transition.External_transition.t
-         , Kimchi.Foundations.Fp.t list
-           * Mina_transition.External_transition.t )
+         , Kimchi.Foundations.Fp.t list * Mina_transition.External_transition.t
+         )
          Proof_carrying_data.t
          option
          Deferred.t
@@ -46,13 +45,10 @@ type peer_state =
       -> (Mina_networking.Rpcs.Get_node_status.Node_status.t, Error.t) result
          Deferred.t
   ; get_transition_knowledge :
-         unit Envelope.Incoming.t
-      -> Kimchi.Foundations.Fp.t list Deferred.t
+      unit Envelope.Incoming.t -> Kimchi.Foundations.Fp.t list Deferred.t
   ; get_transition_chain_proof :
          Kimchi.Foundations.Fp.t Envelope.Incoming.t
-      -> ( Kimchi.Foundations.Fp.t
-         * Kimchi.Foundations.Fp.t list )
-         option
+      -> (Kimchi.Foundations.Fp.t * Kimchi.Foundations.Fp.t list) option
          Deferred.t
   ; get_transition_chain :
          Kimchi.Foundations.Fp.t list Envelope.Incoming.t
@@ -102,8 +98,7 @@ module Generator : sig
     -> ?get_some_initial_peers:
          (unit Envelope.Incoming.t -> Peer.t list Deferred.t)
     -> ?answer_sync_ledger_query:
-         (   (Kimchi.Foundations.Fp.t * Sync_ledger.Query.t)
-             Envelope.Incoming.t
+         (   (Kimchi.Foundations.Fp.t * Sync_ledger.Query.t) Envelope.Incoming.t
           -> (Sync_ledger.Answer.t, Error.t) result Deferred.t)
     -> ?get_ancestry:
          (   ( Consensus.Data.Consensus_state.Value.t
@@ -131,13 +126,10 @@ module Generator : sig
              result
              Deferred.t)
     -> ?get_transition_knowledge:
-         (   unit Envelope.Incoming.t
-          -> Kimchi.Foundations.Fp.t list Deferred.t)
+         (unit Envelope.Incoming.t -> Kimchi.Foundations.Fp.t list Deferred.t)
     -> ?get_transition_chain_proof:
          (   Kimchi.Foundations.Fp.t Envelope.Incoming.t
-          -> ( Kimchi.Foundations.Fp.t
-             * Kimchi.Foundations.Fp.t list )
-             option
+          -> (Kimchi.Foundations.Fp.t * Kimchi.Foundations.Fp.t list) option
              Deferred.t)
     -> ?get_transition_chain:
          (   Kimchi.Foundations.Fp.t list Envelope.Incoming.t
@@ -159,8 +151,7 @@ module Generator : sig
     -> ?get_some_initial_peers:
          (unit Envelope.Incoming.t -> Peer.t list Deferred.t)
     -> ?answer_sync_ledger_query:
-         (   (Kimchi.Foundations.Fp.t * Sync_ledger.Query.t)
-             Envelope.Incoming.t
+         (   (Kimchi.Foundations.Fp.t * Sync_ledger.Query.t) Envelope.Incoming.t
           -> (Sync_ledger.Answer.t, Error.t) result Deferred.t)
     -> ?get_ancestry:
          (   ( Consensus.Data.Consensus_state.Value.t
@@ -188,13 +179,10 @@ module Generator : sig
              result
              Deferred.t)
     -> ?get_transition_knowledge:
-         (   unit Envelope.Incoming.t
-          -> Kimchi.Foundations.Fp.t list Deferred.t)
+         (unit Envelope.Incoming.t -> Kimchi.Foundations.Fp.t list Deferred.t)
     -> ?get_transition_chain_proof:
          (   Kimchi.Foundations.Fp.t Envelope.Incoming.t
-          -> ( Kimchi.Foundations.Fp.t
-             * Kimchi.Foundations.Fp.t list )
-             option
+          -> (Kimchi.Foundations.Fp.t * Kimchi.Foundations.Fp.t list) option
              Deferred.t)
     -> ?get_transition_chain:
          (   Kimchi.Foundations.Fp.t list Envelope.Incoming.t
