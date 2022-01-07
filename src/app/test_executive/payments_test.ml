@@ -40,8 +40,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { balance = "3000"; timing = Untimed }
         ; { balance = "1000"
           ; timing =
-              make_timing ~min_balance:100_000_000_000 ~cliff_time:4
-                ~cliff_amount:0 ~vesting_period:2
+              make_timing ~min_balance:100_000_000_000 ~cliff_time:8
+                ~cliff_amount:0 ~vesting_period:4
                 ~vesting_increment:50_000_000_000
           }
         ]
