@@ -10,7 +10,7 @@ module Tree = struct
         | Account of 'account
         | Hash of 'hash
         | Node of 'hash * ('hash, 'account) t * ('hash, 'account) t
-      [@@deriving equal, sexp, to_yojson]
+      [@@deriving equal, sexp, yojson]
     end
   end]
 
@@ -18,7 +18,7 @@ module Tree = struct
     | Account of 'account
     | Hash of 'hash
     | Node of 'hash * ('hash, 'account) t * ('hash, 'account) t
-  [@@deriving equal, sexp, to_yojson]
+  [@@deriving equal, sexp, yojson]
 end
 
 module T = struct
@@ -33,7 +33,7 @@ module T = struct
         ; tree : ('hash, 'account) Tree.Stable.V1.t
         ; next_available_token : 'token_id
         }
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson]
     end
   end]
 
@@ -44,7 +44,7 @@ module T = struct
     ; tree : ('hash, 'account) Tree.t
     ; next_available_token : 'token_id
     }
-  [@@deriving sexp, to_yojson]
+  [@@deriving sexp, yojson]
 end
 
 module type S = sig
@@ -56,8 +56,7 @@ module type S = sig
 
   type account
 
-  type t = (hash, account_id, account, token_id) T.t
-  [@@deriving sexp, to_yojson]
+  type t = (hash, account_id, account, token_id) T.t [@@deriving sexp, yojson]
 
   val of_hash : depth:int -> next_available_token:token_id -> hash -> t
 
@@ -87,19 +86,19 @@ let of_hash ~depth ~next_available_token h =
   { T.indexes = []; depth; tree = Hash h; next_available_token }
 
 module Make (Hash : sig
-  type t [@@deriving equal, sexp, to_yojson, compare]
+  type t [@@deriving equal, sexp, yojson, compare]
 
   val merge : height:int -> t -> t -> t
 end) (Token_id : sig
-  type t [@@deriving sexp, to_yojson]
+  type t [@@deriving sexp, yojson]
 
   val next : t -> t
 
   val max : t -> t -> t
 end) (Account_id : sig
-  type t [@@deriving equal, sexp, to_yojson]
+  type t [@@deriving equal, sexp, yojson]
 end) (Account : sig
-  type t [@@deriving equal, sexp, to_yojson]
+  type t [@@deriving equal, sexp, yojson]
 
   val data_hash : t -> Hash.t
 
@@ -115,7 +114,7 @@ end) : sig
   val hash : (Hash.t, Account.t) Tree.t -> Hash.t
 end = struct
   type t = (Hash.t, Account_id.t, Account.t, Token_id.t) T.t
-  [@@deriving sexp, to_yojson]
+  [@@deriving sexp, yojson]
 
   let of_hash ~depth ~next_available_token (hash : Hash.t) =
     of_hash ~depth ~next_available_token hash
@@ -128,7 +127,7 @@ end = struct
     | Node (h, _, _) ->
         h
 
-  type index = int [@@deriving sexp, to_yojson]
+  type index = int [@@deriving sexp, yojson]
 
   let depth { T.depth; _ } = depth
 
@@ -284,7 +283,7 @@ end
 
 type ('hash, 'key, 'account, 'token_id) t =
   ('hash, 'key, 'account, 'token_id) T.t
-[@@deriving to_yojson]
+[@@deriving yojson]
 
 let%test_module "sparse-ledger-test" =
   ( module struct
@@ -294,6 +293,13 @@ let%test_module "sparse-ledger-test" =
       let equal h1 h2 = Int.equal (compare h1 h2) 0
 
       let to_yojson md5 = `String (Core_kernel.Md5.to_hex md5)
+
+      let of_yojson = function
+        | `String x ->
+            Or_error.try_with (fun () -> Core_kernel.Md5.of_hex_exn x)
+            |> Result.map_error ~f:Error.to_string_hum
+        | _ ->
+            Error "Expected a hex-encoded MD5 hash"
 
       let merge ~height x y =
         let open Md5 in
@@ -306,7 +312,7 @@ let%test_module "sparse-ledger-test" =
     end
 
     module Token_id = struct
-      type t = unit [@@deriving sexp, to_yojson]
+      type t = unit [@@deriving sexp, yojson]
 
       let max () () = ()
 
@@ -316,7 +322,7 @@ let%test_module "sparse-ledger-test" =
     module Account = struct
       module T = struct
         type t = { name : string; favorite_number : int }
-        [@@deriving bin_io, equal, sexp, to_yojson]
+        [@@deriving bin_io, equal, sexp, yojson]
       end
 
       include T
@@ -335,7 +341,7 @@ let%test_module "sparse-ledger-test" =
     end
 
     module Account_id = struct
-      type t = string [@@deriving sexp, equal, to_yojson]
+      type t = string [@@deriving sexp, equal, yojson]
     end
 
     include Make (Hash) (Token_id) (Account_id) (Account)

@@ -180,6 +180,15 @@ locals {
         fi
       EOF
 
+      "00-fix-letsencrypt-cert" = <<-EOF
+        #!/bin/bash
+        # workarounds from https://github.com/nodesource/distributions/issues/1266
+        apt-get -y update && apt-get -y install ca-certificates
+        rm /usr/share/ca-certificates/mozilla/DST_Root_CA_X3.crt
+        dpkg-reconfigure ca-certificates
+        update-ca-certificates
+      EOF
+
       "01-install-gcloudsdk" = <<-EOF
         #!/bin/bash
 
@@ -334,8 +343,8 @@ locals {
         ln --symbolic --force /docker-entrypoint.d/00-artifact-cache-helper /usr/local/bin/artifact-cache-helper.sh
 
         # Install mina debian package tools
-        echo "deb [trusted=yes] http://packages.o1test.net unstable main" > /etc/apt/sources.list.d/o1.list
-        apt-get update && apt-get install -y "mina-testnet-postake-medium-curves"
+        echo "deb [trusted=yes] http://packages.o1test.net stretch stable" > /etc/apt/sources.list.d/o1.list
+        apt-get update && apt-get install -y tzdata mina-devnet
       EOF
     }
   }

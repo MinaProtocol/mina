@@ -68,6 +68,10 @@ val extensions : t -> Extensions.t
 
 val genesis_state_hash : t -> State_hash.t
 
+val rejected_blocks : (State_hash.t * Network_peer.Envelope.Sender.t * Block_time.t * [`Invalid_proof | `Invalid_delta_transition_chain_proof | `Too_early | `Too_late | `Invalid_genesis_protocol_state | `Invalid_protocol_version  | `Mismatched_protocol_version]) Core.Queue.t
+
+val validated_blocks : (State_hash.t * Network_peer.Envelope.Sender.t * Block_time.t) Core.Queue.t
+
 module For_tests : sig
   open Core_kernel
   open Signature_lib

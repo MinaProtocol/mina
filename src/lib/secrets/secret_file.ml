@@ -63,8 +63,8 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
       Deferred.Result.return x
   | Error e -> (
       match Error.to_exn e with
-      | Unix.Unix_error (_, _, _) ->
-          Deferred.return (Error (`Cannot_open_file path))
+      | Unix.Unix_error (error_code, _, _) ->
+          Deferred.return (Error (`Cannot_open_file (path, error_code)))
       | e ->
           Deferred.return @@ corrupted_privkey (Error.of_exn e) )
 

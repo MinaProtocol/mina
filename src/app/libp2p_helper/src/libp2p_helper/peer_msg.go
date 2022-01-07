@@ -158,7 +158,7 @@ func (msg ListPeersReq) handle(app *app, seqno uint64) *capnp.Message {
 	for _, conn := range connsHere {
 		maybePeer, err := parseMultiaddrWithID(conn.RemoteMultiaddr(), conn.RemotePeer())
 		if err != nil {
-			app.P2p.Logger.Warning("skipping maddr ", conn.RemoteMultiaddr().String(), " because it failed to parse: ", err.Error())
+			app.P2p.Logger.Warn("skipping maddr ", conn.RemoteMultiaddr().String(), " because it failed to parse: ", err.Error())
 			continue
 		}
 		peerInfos = append(peerInfos, *maybePeer)

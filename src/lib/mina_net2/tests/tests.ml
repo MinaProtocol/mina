@@ -2,6 +2,9 @@ open Core
 open Async
 open Mina_net2
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
+
 let%test_module "coda network tests" =
   ( module struct
     let logger = Logger.create ()
@@ -45,7 +48,7 @@ let%test_module "coda network tests" =
         configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
           ~network_id ~peer_exchange:true ~mina_peer_exchange:true
           ~direct_peers:[] ~seed_peers:[] ~flooding:false ~metrics_port:None
-          ~unsafe_no_trust_ip:true ~max_connections:50
+          ~unsafe_no_trust_ip:true ~max_connections:50 ~min_connections:20
           ~validation_queue_size:150
           ~initial_gating_config:
             { trusted_peers = []; banned_peers = []; isolate = false }
@@ -65,8 +68,8 @@ let%test_module "coda network tests" =
         configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
           ~network_id ~peer_exchange:true ~mina_peer_exchange:true
           ~direct_peers:[] ~seed_peers:[ seed_peer ] ~flooding:false
-          ~metrics_port:None ~unsafe_no_trust_ip:true ~max_connections:50
-          ~validation_queue_size:150
+          ~min_connections:20 ~metrics_port:None ~unsafe_no_trust_ip:true
+          ~max_connections:50 ~validation_queue_size:150
           ~initial_gating_config:
             { trusted_peers = []; banned_peers = []; isolate = false }
         >>| Or_error.ok_exn
@@ -75,7 +78,7 @@ let%test_module "coda network tests" =
           ~network_id ~peer_exchange:true ~mina_peer_exchange:true
           ~direct_peers:[] ~seed_peers:[ seed_peer ] ~flooding:false
           ~metrics_port:None ~unsafe_no_trust_ip:true ~max_connections:50
-          ~validation_queue_size:150
+          ~min_connections:20 ~validation_queue_size:150
           ~initial_gating_config:
             { trusted_peers = []; banned_peers = []; isolate = false }
         >>| Or_error.ok_exn

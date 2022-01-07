@@ -13,9 +13,13 @@ import (
 	"sync"
 	"time"
 
+	lmdbbs "github.com/georgeee/go-bs-lmdb"
+	"github.com/ipfs/go-bitswap"
+	bitnet "github.com/ipfs/go-bitswap/network"
 	dsb "github.com/ipfs/go-ds-badger"
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 	p2p "github.com/libp2p/go-libp2p"
+
 	p2pconnmgr "github.com/libp2p/go-libp2p-connmgr"
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/control"
@@ -34,7 +38,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	record "github.com/libp2p/go-libp2p-record"
 	p2pconfig "github.com/libp2p/go-libp2p/config"
-	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
+	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns_legacy"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"golang.org/x/crypto/blake2b"
@@ -73,6 +77,7 @@ var (
 
 	pxProtocolID         = protocol.ID("/mina/peer-exchange")
 	NodeStatusProtocolID = protocol.ID("/mina/node-status")
+	BitSwapExchange      = protocol.ID("/mina/bitswap-exchange")
 
 	privateIpFilter *ma.Filters = nil
 )
@@ -93,23 +98,30 @@ func isPrivateAddr(addr ma.Multiaddr) bool {
 }
 
 type CodaConnectionManager struct {
-	ctx              context.Context
-	host             host.Host
-	p2pManager       *p2pconnmgr.BasicConnMgr
+	ctx        context.Context
+	host       host.Host
+	p2pManager *p2pconnmgr.BasicConnMgr
+	// minaPeerExchange controls whether to send random peers to the other ndoe before trimming its
+	// recently opened connection
 	minaPeerExchange bool
 	getRandomPeers   getRandomPeersFunc
 	OnConnect        func(network.Network, network.Conn)
 	OnDisconnect     func(network.Network, network.Conn)
+	// protectedMirror is a map of protected peer ids/tags, mirroring the structure in
+	// BasicConnMgr which is not accessible from CodaConnectionManager
+	protectedMirror     map[peer.ID]map[string]interface{}
+	protectedMirrorLock sync.Mutex
 }
 
-func newCodaConnectionManager(maxConnections int, minaPeerExchange bool) *CodaConnectionManager {
+func newCodaConnectionManager(minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration) *CodaConnectionManager {
 	noop := func(net network.Network, c network.Conn) {}
 
 	return &CodaConnectionManager{
-		p2pManager:       p2pconnmgr.NewConnManager(25, maxConnections, time.Duration(1*time.Millisecond)),
+		p2pManager:       p2pconnmgr.NewConnManager(minConnections, maxConnections, grace),
 		OnConnect:        noop,
 		OnDisconnect:     noop,
 		minaPeerExchange: minaPeerExchange,
+		protectedMirror:  make(map[peer.ID]map[string]interface{}),
 	}
 }
 
@@ -125,9 +137,33 @@ func (cm *CodaConnectionManager) GetTagInfo(p peer.ID) *connmgr.TagInfo {
 	return cm.p2pManager.GetTagInfo(p)
 }
 func (cm *CodaConnectionManager) TrimOpenConns(ctx context.Context) { cm.p2pManager.TrimOpenConns(ctx) }
-func (cm *CodaConnectionManager) Protect(p peer.ID, tag string)     { cm.p2pManager.Protect(p, tag) }
+func (cm *CodaConnectionManager) Protect(p peer.ID, tag string) {
+	cm.p2pManager.Protect(p, tag)
+	cm.protectedMirrorLock.Lock()
+	defer cm.protectedMirrorLock.Unlock()
+	pm := cm.protectedMirror
+	pm_, has := pm[p]
+	if !has {
+		pm_ = make(map[string]interface{})
+		pm[p] = pm_
+	}
+	pm_[tag] = nil
+}
 func (cm *CodaConnectionManager) Unprotect(p peer.ID, tag string) bool {
-	return cm.p2pManager.Unprotect(p, tag)
+	res := cm.p2pManager.Unprotect(p, tag)
+	cm.protectedMirrorLock.Lock()
+	defer cm.protectedMirrorLock.Unlock()
+	pm := cm.protectedMirror
+	pm_, has := pm[p]
+	if has {
+		delete(pm_, tag)
+	}
+	return res
+}
+func (cm *CodaConnectionManager) ViewProtected(f func(map[peer.ID]map[string]interface{})) {
+	cm.protectedMirrorLock.Lock()
+	defer cm.protectedMirrorLock.Unlock()
+	f(cm.protectedMirror)
 }
 func (cm *CodaConnectionManager) IsProtected(p peer.ID, tag string) bool {
 	return cm.p2pManager.IsProtected(p, tag)
@@ -170,11 +206,11 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 
 	cm.TrimOpenConns(context.Background())
 
-	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), info.HighWater, len(net.Peers()))
-
 	if !cm.minaPeerExchange {
 		return
 	}
+
+	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), info.HighWater, len(net.Peers()))
 
 	defer func() {
 		go func() {
@@ -228,11 +264,13 @@ func (cm *CodaConnectionManager) GetInfo() p2pconnmgr.CMInfo {
 // Helper contains all the daemon state
 type Helper struct {
 	Host              host.Host
+	Bitswap           *bitswap.Bitswap
+	BitswapStorage    BitswapStorage
 	Mdns              *mdns.Service
 	Dht               *dual.DHT
 	Ctx               context.Context
 	Pubsub            *pubsub.PubSub
-	Logger            logging.EventLogger
+	Logger            logging.StandardLogger
 	Rendezvous        string
 	Discovery         *discovery.RoutingDiscovery
 	Me                peer.ID
@@ -628,7 +666,7 @@ func (h Helper) pxConnectionWorker() {
 }
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, maxConnections int, minaPeerExchange bool) (*Helper, error) {
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration) (*Helper, error) {
 	me, err := peer.IDFromPrivateKey(pk)
 	if err != nil {
 		return nil, err
@@ -665,7 +703,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	mplex.MaxMessageSize = 1 << 30
 
-	connManager := newCodaConnectionManager(maxConnections, minaPeerExchange)
+	connManager := newCodaConnectionManager(minConnections, maxConnections, minaPeerExchange, grace)
 	bandwidthCounter := metrics.NewBandwidthCounter()
 
 	host, err := p2p.New(ctx,
@@ -707,9 +745,26 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		return nil, err
 	}
 
+	// 256MiB, a large enough mmap size to make mmap grow() a rare event
+	opt := lmdbbs.Options{
+		Path:            path.Join(statedir, "block-db"),
+		InitialMmapSize: 256 << 20,
+		CidToKeyMapper:  cidToKeyMapper,
+		KeyToCidMapper:  keyToCidMapper,
+	}
+	bstore, err := lmdbbs.Open(&opt)
+	if err != nil {
+		return nil, err
+	}
+
+	bitswapNetwork := bitnet.NewFromIpfsHost(host, kad, bitnet.Prefix(BitSwapExchange))
+	bs := bitswap.New(context.Background(), bitswapNetwork, bstore).(*bitswap.Bitswap)
+
 	// nil fields are initialized by beginAdvertising
 	h := &Helper{
 		Host:              host,
+		Bitswap:           bs,
+		BitswapStorage:    (*BitswapStorageLmdb)(bstore),
 		Ctx:               ctx,
 		Mdns:              nil,
 		Dht:               kad,

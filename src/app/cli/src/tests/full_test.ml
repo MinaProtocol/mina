@@ -142,6 +142,7 @@ let run_test () : unit Deferred.t =
               ; client_port
               }
           ; trust_system
+          ; min_connections = 20
           ; max_connections = 50
           ; validation_queue_size = 150
           ; keypair = None
@@ -211,7 +212,7 @@ let run_test () : unit Deferred.t =
              ~epoch_ledger_location ~time_controller ~snark_work_fee
              ~consensus_local_state ~work_reassignment_wait:420000
              ~precomputed_values ~start_time ~log_precomputed_blocks:false
-             ~upload_blocks_to_gcloud:false ())
+             ~upload_blocks_to_gcloud:false ~stop_time:48 ())
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
