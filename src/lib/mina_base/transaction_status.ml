@@ -692,11 +692,11 @@ module Failure = struct
       | { update_not_permitted_permissions = true; _ } ->
           to_enum Update_not_permitted_permissions
       | { update_not_permitted_nonce = true; _ } ->
-          to_enum Update_not_permitted_timing_existing_account
+          to_enum Update_not_permitted_nonce
       | { parties_replay_check_failed = true; _ } ->
-          to_enum Update_not_permitted_timing_existing_account
+          to_enum Parties_replay_check_failed
       | { fee_payer_nonce_must_increase = true; _ } ->
-          to_enum Update_not_permitted_timing_existing_account
+          to_enum Fee_payer_nonce_must_increase
       | { incorrect_nonce = true; _ } ->
           to_enum Incorrect_nonce
       | { invalid_fee_excess = true; _ } ->
