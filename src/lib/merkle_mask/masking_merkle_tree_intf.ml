@@ -55,6 +55,7 @@ module type S = sig
     (** get hash from mask, if present, else from its parent *)
     val get_hash : t -> Addr.t -> hash option
 
+    (** registers a new account in the ledger; unsafe to call if account id already exists *)
     val unsafe_create_account :
       t -> account_id -> account -> Location.t Or_error.t
 

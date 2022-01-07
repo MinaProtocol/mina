@@ -176,6 +176,69 @@ end]
 
 (**********Helpers*************)
 
+let create_expected_statement ~constraint_constants
+    { Transaction_with_witness.transaction_with_info
+    ; state_hash
+    ; state_view
+    ; ledger_witness
+    ; init_stack
+    ; statement
+    } =
+  let open Or_error.Let_syntax in
+  let source =
+    Frozen_ledger_hash.of_ledger_hash
+    @@ Sparse_ledger.merkle_root ledger_witness
+  in
+  let next_available_token_before =
+    Sparse_ledger.next_available_token ledger_witness
+  in
+  let { With_status.data = transaction; status = _ } =
+    Transaction_logic.Transaction_applied.transaction_with_status
+      transaction_with_info
+  in
+  let%bind after, _ =
+    Sparse_ledger.apply_transaction ~constraint_constants
+      ~txn_state_view:state_view ledger_witness transaction
+  in
+  let target =
+    Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
+  in
+  let next_available_token_after = Sparse_ledger.next_available_token after in
+  let%bind pending_coinbase_before =
+    match init_stack with
+    | Base source ->
+        Ok source
+    | Merge ->
+        Or_error.errorf
+          !"Invalid init stack in Pending coinbase stack state . Expected Base \
+            found Merge"
+  in
+  let pending_coinbase_after =
+    let state_body_hash = snd state_hash in
+    let pending_coinbase_with_state =
+      Pending_coinbase.Stack.push_state state_body_hash pending_coinbase_before
+    in
+    match transaction with
+    | Coinbase c ->
+        Pending_coinbase.Stack.push_coinbase c pending_coinbase_with_state
+    | _ ->
+        pending_coinbase_with_state
+  in
+  let%bind fee_excess = Transaction.fee_excess transaction in
+  let%map supply_increase = Transaction.supply_increase transaction in
+  { Transaction_snark.Statement.source
+  ; target
+  ; fee_excess
+  ; next_available_token_before
+  ; next_available_token_after
+  ; supply_increase
+  ; pending_coinbase_stack_state =
+      { statement.pending_coinbase_stack_state with
+        target = pending_coinbase_after
+      }
+  ; sok_digest = ()
+  }
+
 let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
     'a Or_error.t =
   let sok_digest = Ledger_proof.sok_digest current_proof
@@ -304,7 +367,7 @@ struct
   end
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
-  let scan_statement tree ~verifier :
+  let scan_statement tree ~constraint_constants ~statement_check ~verifier :
       ( Transaction_snark.Statement.t
       , [ `Error of Error.t | `Empty ] )
       Deferred.Result.t =
@@ -313,6 +376,9 @@ struct
     let yield_occasionally =
       let f = Staged.unstage (Async.Scheduler.yield_every ~n:50) in
       fun () -> f () |> Deferred.map ~f:Or_error.return
+    in
+    let yield_always () =
+      Async.Scheduler.yield () |> Deferred.map ~f:Or_error.return
     in
     let module Acc = struct
       type t = (Transaction_snark.Statement.t * P.t list) option
@@ -363,7 +429,34 @@ struct
           return acc_statement
       | Full { job = transaction; _ } ->
           let open Transaction_with_witness in
-          merge_acc ~proofs:[] acc_statement transaction.statement
+          with_error "Bad base statement" ~f:(fun () ->
+              let%bind expected_statement =
+                match statement_check with
+                | `Full ->
+                    let%bind result =
+                      Timer.time timer
+                        (sprintf "create_expected_statement:%s" __LOC__)
+                        (fun () ->
+                          Deferred.return
+                            (create_expected_statement ~constraint_constants
+                               transaction))
+                    in
+                    let%map () = yield_always () in
+                    result
+                | `Partial ->
+                    return transaction.statement
+              in
+              if
+                Transaction_snark.Statement.equal transaction.statement
+                  expected_statement
+              then merge_acc ~proofs:[] acc_statement transaction.statement
+              else
+                Deferred.Or_error.error_string
+                  (sprintf
+                     !"Bad base statement expected: \
+                       %{sexp:Transaction_snark.Statement.t} got: \
+                       %{sexp:Transaction_snark.Statement.t}"
+                     transaction.statement expected_statement))
     in
     let%bind.Deferred res =
       Fold.fold_chronological_until tree ~init:None
@@ -401,15 +494,18 @@ struct
     | Error e ->
         Deferred.return (Error (`Error e))
 
-  let check_invariants t ~verifier ~error_prefix
-      ~ledger_hash_end:current_ledger_hash
+  let check_invariants t ~constraint_constants ~statement_check ~verifier
+      ~error_prefix ~ledger_hash_end:current_ledger_hash
       ~ledger_hash_begin:snarked_ledger_hash
       ~next_available_token_begin:snarked_ledger_next_available_token
       ~next_available_token_end:current_ledger_next_available_token =
     let clarify_error cond err =
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
     in
-    match%map time "scan_statement" (fun () -> scan_statement ~verifier t) with
+    match%map
+      time "scan_statement" (fun () ->
+          scan_statement ~constraint_constants ~statement_check ~verifier t)
+    with
     | Error (`Error e) ->
         Error e
     | Error `Empty ->

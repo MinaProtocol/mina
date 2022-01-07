@@ -50,6 +50,8 @@ module Make_statement_scanner (Verifier : sig
 end) : sig
   val scan_statement :
        t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> statement_check:[ `Full | `Partial ]
     -> verifier:Verifier.t
     -> ( Transaction_snark.Statement.t
        , [ `Empty | `Error of Error.t ] )
@@ -57,6 +59,8 @@ end) : sig
 
   val check_invariants :
        t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> statement_check:[ `Full | `Partial ]
     -> verifier:Verifier.t
     -> error_prefix:string
     -> ledger_hash_end:Frozen_ledger_hash.t
