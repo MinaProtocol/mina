@@ -30,8 +30,6 @@ RUN apt-get -y update \
         man \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir /healthcheck && curl https://raw.githubusercontent.com/MinaProtocol/mina/develop/dockerfiles/scripts/healthcheck-utilities.sh -o /healthcheck/utilities.sh
-
 # Snapp test transaction package
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get -y update \
