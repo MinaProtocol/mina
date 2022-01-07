@@ -318,10 +318,12 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
     failwith "gen_party_body: snapp_account but not new_account" ;
   (* fee payers have to be in the ledger *)
   assert (not (is_fee_payer && new_account)) ;
-  assert (
-    Bool.equal
-      (Option.is_some required_balance_change)
-      (Option.is_some required_balance) ) ;
+  (* a required balance is associated with a new account *)
+  ( match (required_balance, new_account) with
+  | Some _, false ->
+      failwith "Required balance, but not new account"
+  | _ ->
+      () ) ;
   let%bind update =
     Party.Update.gen ?permissions_auth ~snapp_account ~new_account ()
   in
@@ -719,13 +721,14 @@ let gen_parties_from ?(succeed = true)
       match required_balance_change with
       | { magnitude; sgn = Sgn.Neg } ->
           (* put in enough balance so we can subtract it all *)
-          Currency.Amount.to_uint64 magnitude |> Currency.Balance.of_uint64
+          Some
+            (Currency.Amount.to_uint64 magnitude |> Currency.Balance.of_uint64)
       | { sgn = Sgn.Pos; _ } ->
-          (* we're adding to the account, so it can have a zero balance *)
-          Currency.Balance.zero
+          (* we're adding to the account, so no required balance *)
+          None
     in
     gen_party_from ~permissions_auth ~new_account:true ~available_public_keys
-      ~succeed ~ledger ~required_balance_change ~required_balance ~balances_tbl
+      ~succeed ~ledger ~required_balance_change ?required_balance ~balances_tbl
       ()
   in
   let other_parties = balancing_party :: other_parties0 in
