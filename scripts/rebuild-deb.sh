@@ -50,7 +50,7 @@ Version: ${MINA_DEB_VERSION}
 License: Apache-2.0
 Vendor: none
 Architecture: amd64
-Maintainer: o(1)Labs <build@o1labs.org>
+Maintainer: O(1)Labs <build@o1labs.org>
 Installed-Size:
 Depends: ${SHARED_DEPS}
 Section: base
@@ -87,12 +87,12 @@ ls -lh mina*.deb
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 
-Package: mina-snapp-test-txn
+Package: mina-snapp-test-transaction
 Version: ${MINA_DEB_VERSION}
 License: Apache-2.0
 Vendor: none
 Architecture: amd64
-Maintainer: o(1)Labs <build@o1labs.org>
+Maintainer: O(1)Labs <build@o1labs.org>
 Installed-Size:
 Depends: ${SHARED_DEPS}
 Section: base
@@ -117,7 +117,7 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-snapp-test-txn_${MINA_DEB_VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-snapp-test-transaction_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
 ##################################### END SNAPP TEST TXN PACKAGE #######################################
@@ -139,7 +139,7 @@ Suggests: postgresql
 Conflicts: mina-devnet
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
-Maintainer: o(1)Labs <build@o1labs.org>
+Maintainer: O(1)Labs <build@o1labs.org>
 Description: Mina Client and Daemon
  Mina Protocol Client and Daemon
  Built from ${GITHASH} by ${BUILD_URL}
@@ -222,7 +222,7 @@ Suggests: postgresql
 Conflicts: mina-mainnet
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
-Maintainer: o(1)Labs <build@o1labs.org>
+Maintainer: O(1)Labs <build@o1labs.org>
 Description: Mina Client and Daemon
  Mina Protocol Client and Daemon
  Built from ${GITHASH} by ${BUILD_URL}

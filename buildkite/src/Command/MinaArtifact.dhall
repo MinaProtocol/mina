@@ -109,9 +109,9 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         -- Snapp test transaction image
         let snappTestTxnSpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOn debVersion,
-          service="mina-snapp-test-txn",
+          service="mina-snapp-test-transaction",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="snapp-test-txn-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="snapp-test-transaction-${DebianVersions.lowerName debVersion}-docker-image"
         }
 
         in
