@@ -83,7 +83,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section "short bootstrap"
         (let%bind () = Node.stop node_c in
-         let%bind _ = wait_for t (Wait_condition.blocks_to_be_produced 1) in
+         let%bind _ =
+           wait_for t
+             ( Wait_condition.blocks_to_be_produced 1
+             (* Extend the wait timeout, only 2/3 of stake is online. *)
+             |> Wait_condition.with_timeouts
+                  ~soft_timeout:(Network_time_span.Slots 3)
+                  ~hard_timeout:(Network_time_span.Slots 6) )
+         in
          let%bind () = Node.start ~fresh_state:true node_c in
          let%bind () = wait_for t (Wait_condition.node_to_initialize node_c) in
          wait_for t
@@ -91,7 +98,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            |> Wait_condition.with_timeouts
                 ~hard_timeout:
                   (Network_time_span.Literal
-                     (Time.Span.of_ms (20. *. 60. *. 1000.))) ))
+                     (Time.Span.of_ms (15. *. 60. *. 1000.))) ))
     in
     section "network is fully connected after one node is restarted"
       (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 180.0)) in
