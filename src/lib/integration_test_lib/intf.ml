@@ -265,13 +265,38 @@ module Dsl = struct
          result
          Async_kernel.Deferred.t
 
-    val check_peers :
+    val fetch_connectivity_data :
          logger:Logger.t
       -> Engine.Network.Node.t list
+      -> ( (Engine.Network.Node.t * (string * string list)) list
+           Malleable_error.Result_accumulator.t
+         , Malleable_error.Hard_fail.t )
+         result
+         Deferred.t
+
+    val assert_peers_completely_connected :
+         (Engine.Network.Node.t * (string * string list)) list
       -> ( unit Malleable_error.Result_accumulator.t
          , Malleable_error.Hard_fail.t )
          result
          Deferred.t
+
+    val assert_peers_cant_be_partitioned :
+         max_disconnections:int
+      -> (Engine.Network.Node.t * (string * string list)) list
+      -> ( unit Malleable_error.Result_accumulator.t
+         , Malleable_error.Hard_fail.t )
+         result
+         Deferred.t
+
+    (*
+       val check_peers :
+            logger:Logger.t
+         -> Engine.Network.Node.t list
+         -> ( unit Malleable_error.Result_accumulator.t
+            , Malleable_error.Hard_fail.t )
+            result
+            Deferred.t *)
   end
 
   module type S = sig
