@@ -27,27 +27,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; num_snark_workers = 0
     }
 
-  open Graph_algorithms
-
-  module X = struct
-    include String
-
-    type display = string [@@deriving yojson]
-
-    let display = Fn.id
-
-    let name = Fn.id
-  end
-
-  module G = Visualization.Make_ocamlgraph (X)
-
-  let graph_of_adjacency_list adj =
-    List.fold adj ~init:G.empty ~f:(fun acc (x, xs) ->
-        let acc = G.add_vertex acc x in
-        List.fold xs ~init:acc ~f:(fun acc y ->
-            let acc = G.add_vertex acc y in
-            G.add_edge acc x y))
-
   let run network t =
     let open Network in
     let open Malleable_error.Let_syntax in

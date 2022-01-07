@@ -128,6 +128,26 @@ module Make (Engine : Intf.Engine.S) = struct
       [%log error] "%s" error_str ;
       Malleable_error.soft_error ~value:() (Error.of_string error_str)
 
+  module X = struct
+    include String
+
+    type display = string [@@deriving yojson]
+
+    let display = Fn.id
+
+    let name = Fn.id
+  end
+
+  module G = Visualization.Make_ocamlgraph (X)
+
+  let graph_of_adjacency_list
+      (adj : (Engine.Network.Node.t * (string * string list)) list) =
+    List.fold adj ~init:G.empty ~f:(fun acc (_, (x, xs)) ->
+        let acc = G.add_vertex acc x in
+        List.fold xs ~init:acc ~f:(fun acc y ->
+            let acc = G.add_vertex acc y in
+            G.add_edge acc x y))
+
   let check_peer_connectivity ~nodes_by_peer_id ~peer_id ~connected_peers =
     let get_node_id p =
       p |> String.Map.find_exn nodes_by_peer_id |> Engine.Network.Node.id
@@ -155,6 +175,20 @@ module Make (Engine : Intf.Engine.S) = struct
           in
           (node, response))
     in
+    let open Graph_algorithms in
+    (* let () =
+         Out_channel.with_file "/tmp/network-graph.dot" ~f:(fun c ->
+             G.output_graph c (graph_of_adjacency_list nodes_and_responses))
+       in
+       (* Check that the network cannot be disconnected by removing 0 or 1 nodes. *)
+       let () =
+         match Nat.take ( Graph_algorithms.connectivity (module String) nodes_and_responses) 2 with
+         | `Failed_after n ->
+             failwithf "The network could be disconnected by removing %d node(s)" n
+               ()
+         | `Ok ->
+             ()
+       in *)
     let nodes_by_peer_id =
       nodes_and_responses
       |> List.map ~f:(fun (node, (peer_id, _)) -> (peer_id, node))
