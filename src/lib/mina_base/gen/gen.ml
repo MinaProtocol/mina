@@ -30,7 +30,7 @@ let expr ~loc =
   let open E in
   let earray =
     E.pexp_array
-      (List.map keypairs ~f:(fun {public_key; private_key} ->
+      (List.map keypairs ~f:(fun { public_key; private_key } ->
            E.pexp_tuple
              [ estring
                  (Binable.to_string
@@ -39,7 +39,8 @@ let expr ~loc =
              ; estring
                  (Binable.to_string
                     (module Private_key.Stable.Latest)
-                    private_key) ] ))
+                    private_key)
+             ]))
   in
   let%expr conv (pk, sk) =
     ( Core_kernel.Binable.of_string
@@ -67,15 +68,15 @@ let json =
                  Public_key.(
                    Compressed.to_base58_check (compress kp.public_key)) )
            ; ( "private_key"
-             , `String (Private_key.to_base58_check kp.private_key) ) ] ))
+             , `String (Private_key.to_base58_check kp.private_key) )
+           ]))
 
 let main () =
   Out_channel.with_file "sample_keypairs.ml" ~f:(fun ml_file ->
       let fmt = Format.formatter_of_out_channel ml_file in
-      Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none))
-  ) ;
+      Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none))) ;
   Out_channel.with_file "sample_keypairs.json" ~f:(fun json_file ->
-      Yojson.pretty_to_channel json_file json ) ;
+      Yojson.pretty_to_channel json_file json) ;
   exit 0
 
 let () = main ()

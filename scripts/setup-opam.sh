@@ -10,7 +10,7 @@ export OPAMYES=1
 # Set term to xterm if not set
 export TERM=${TERM:-xterm}
 
-SWITCH='ocaml-variants.4.07.1+logoom'
+SWITCH='4.11.2'
 
 if [[ -d ~/.opam ]]; then
   # ocaml environment
@@ -65,6 +65,7 @@ opam uninstall extlib
 opam pin add src/external/ocaml-sodium
 opam pin add src/external/rpc_parallel
 opam pin add src/external/ocaml-extlib
+opam pin add src/external/capnp-ocaml
 
 # workaround a permissions problem in rpc_parallel .git
 sudo chmod -R u+rw ~/.opam
@@ -72,6 +73,8 @@ sudo chmod -R u+rw ~/.opam
 opam pin add src/external/async_kernel
 opam pin add src/external/coda_base58
 opam pin add src/external/graphql_ppx
+opam pin add src/external/ppx_deriving_yojson
+opam pin add src/external/prometheus
 eval $(opam config env)
 
 # show switch list at end

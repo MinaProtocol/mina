@@ -29,14 +29,15 @@ module type Resource_pool_base_intf = sig
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
-    -> frontier_broadcast_pipe:transition_frontier Option.t
-                               Broadcast_pipe.Reader.t
+    -> frontier_broadcast_pipe:
+         transition_frontier Option.t Broadcast_pipe.Reader.t
     -> config:Config.t
     -> logger:Logger.t
-    -> tf_diff_writer:( transition_frontier_diff
-                      , Strict_pipe.synchronous
-                      , unit Deferred.t )
-                      Strict_pipe.Writer.t
+    -> tf_diff_writer:
+         ( transition_frontier_diff
+         , Strict_pipe.synchronous
+         , unit Deferred.t )
+         Strict_pipe.Writer.t
     -> t
 end
 
@@ -86,7 +87,7 @@ module type Resource_pool_diff_intf = sig
        pool
     -> verified Envelope.Incoming.t
     -> ( t * rejected
-       , [`Locally_generated of t * rejected | `Other of Error.t] )
+       , [ `Locally_generated of t * rejected | `Other of Error.t ] )
        Result.t
        Deferred.t
 
@@ -109,7 +110,7 @@ module type Resource_pool_intf = sig
       remove it from the set of potentially-rebroadcastable item.
   *)
   val get_rebroadcastable :
-    t -> has_timed_out:(Time.t -> [`Timed_out | `Ok]) -> Diff.t list
+    t -> has_timed_out:(Time.t -> [ `Timed_out | `Ok ]) -> Diff.t list
 end
 
 (** A [Network_pool_base_intf] is the core implementation of a
@@ -148,15 +149,16 @@ module type Network_pool_base_intf = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
-    -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
-                      * Mina_net2.Validation_callback.t )
-                      Strict_pipe.Reader.t
-    -> local_diffs:( resource_pool_diff
-                   * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
-                   )
-                   Strict_pipe.Reader.t
-    -> frontier_broadcast_pipe:transition_frontier Option.t
-                               Broadcast_pipe.Reader.t
+    -> incoming_diffs:
+         ( resource_pool_diff Envelope.Incoming.t
+         * Mina_net2.Validation_callback.t )
+         Strict_pipe.Reader.t
+    -> local_diffs:
+         ( resource_pool_diff
+         * ((resource_pool_diff * rejected_diff) Or_error.t -> unit) )
+         Strict_pipe.Reader.t
+    -> frontier_broadcast_pipe:
+         transition_frontier Option.t Broadcast_pipe.Reader.t
     -> logger:Logger.t
     -> t
 
@@ -164,19 +166,22 @@ module type Network_pool_base_intf = sig
        resource_pool
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
-                      * Mina_net2.Validation_callback.t )
-                      Strict_pipe.Reader.t
-    -> local_diffs:( resource_pool_diff
-                   * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
-                   )
-                   Strict_pipe.Reader.t
+    -> incoming_diffs:
+         ( resource_pool_diff Envelope.Incoming.t
+         * Mina_net2.Validation_callback.t )
+         Strict_pipe.Reader.t
+    -> local_diffs:
+         ( resource_pool_diff
+         * ((resource_pool_diff * rejected_diff) Or_error.t -> unit) )
+         Strict_pipe.Reader.t
     -> tf_diffs:transition_frontier_diff Strict_pipe.Reader.t
     -> t
 
   val resource_pool : t -> resource_pool
 
   val broadcasts : t -> resource_pool_diff Linear_pipe.Reader.t
+
+  val create_rate_limiter : unit -> Rate_limiter.t
 
   val apply_and_broadcast :
        t
@@ -202,7 +207,7 @@ module type Snark_resource_pool_intf = sig
     -> work:Transaction_snark_work.Statement.t
     -> proof:Ledger_proof.t One_or_two.t
     -> fee:Fee_with_prover.t
-    -> [`Added | `Statement_not_referenced]
+    -> [ `Added | `Statement_not_referenced ] Deferred.t
 
   val request_proof :
        t
@@ -211,8 +216,9 @@ module type Snark_resource_pool_intf = sig
 
   val verify_and_act :
        t
-    -> work:Transaction_snark_work.Statement.t
-            * Ledger_proof.t One_or_two.t Priced_proof.t
+    -> work:
+         Transaction_snark_work.Statement.t
+         * Ledger_proof.t One_or_two.t Priced_proof.t
     -> sender:Envelope.Sender.t
     -> bool Deferred.t
 
@@ -238,16 +244,17 @@ module type Snark_pool_diff_intf = sig
   type verified = t [@@deriving compare, sexp]
 
   type compact =
-    { work: Transaction_snark_work.Statement.t
-    ; fee: Currency.Fee.t
-    ; prover: Signature_lib.Public_key.Compressed.t }
+    { work : Transaction_snark_work.Statement.t
+    ; fee : Currency.Fee.t
+    ; prover : Signature_lib.Public_key.Compressed.t
+    }
   [@@deriving yojson, hash]
 
   include
     Resource_pool_diff_intf
-    with type t := t
-     and type verified := t
-     and type pool := resource_pool
+      with type t := t
+       and type verified := t
+       and type pool := resource_pool
 
   val to_compact : t -> compact option
 
@@ -291,9 +298,9 @@ module type Transaction_pool_diff_intf = sig
 
   include
     Resource_pool_diff_intf
-    with type t := t
-     and type pool := resource_pool
-     and type rejected = Rejected.t
+      with type t := t
+       and type pool := resource_pool
+       and type rejected = Rejected.t
 end
 
 module type Transaction_resource_pool_intf = sig
@@ -307,8 +314,7 @@ module type Transaction_resource_pool_intf = sig
     -> verifier:Verifier.t
     -> Config.t
 
-  val member :
-    t -> Transaction_hash.User_command_with_valid_signature.t -> bool
+  val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
 
   val transactions :
        logger:Logger.t
@@ -337,7 +343,12 @@ module type Base_ledger_intf = sig
 
   val location_of_account : t -> Account_id.t -> Location.t option
 
+  val location_of_account_batch :
+    t -> Account_id.t list -> (Account_id.t * Location.t option) list
+
   val get : t -> Location.t -> Account.t option
+
+  val get_batch : t -> Location.t list -> (Location.t * Account.t option) list
 
   val detached_signal : t -> unit Deferred.t
 end

@@ -14,16 +14,16 @@ end
 
 module Make (Inputs : Inputs_intf) :
   Database_intf.S
-  with module Location = Inputs.Location
-   and module Addr = Inputs.Location.Addr
-   and type key := Inputs.Key.t
-   and type token_id := Inputs.Token_id.t
-   and type token_id_set := Inputs.Token_id.Set.t
-   and type account := Inputs.Account.t
-   and type root_hash := Inputs.Hash.t
-   and type hash := Inputs.Hash.t
-   and type account_id := Inputs.Account_id.t
-   and type account_id_set := Inputs.Account_id.Set.t = struct
+    with module Location = Inputs.Location
+     and module Addr = Inputs.Location.Addr
+     and type key := Inputs.Key.t
+     and type token_id := Inputs.Token_id.t
+     and type token_id_set := Inputs.Token_id.Set.t
+     and type account := Inputs.Account.t
+     and type root_hash := Inputs.Hash.t
+     and type hash := Inputs.Hash.t
+     and type account_id := Inputs.Account_id.t
+     and type account_id_set := Inputs.Account_id.Set.t = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   open Inputs
 
@@ -54,11 +54,12 @@ module Make (Inputs : Inputs_intf) :
   end
 
   type t =
-    { uuid: Uuid.Stable.V1.t
-    ; kvdb: Kvdb.t sexp_opaque
-    ; depth: int
-    ; directory: string
-    ; detached_parent_signal: Detached_parent_signal.t }
+    { uuid : Uuid.Stable.V1.t
+    ; kvdb : Kvdb.t [@sexp.opaque]
+    ; depth : int
+    ; directory : string
+    ; detached_parent_signal : Detached_parent_signal.t
+    }
   [@@deriving sexp]
 
   let get_uuid t = t.uuid
@@ -82,22 +83,32 @@ module Make (Inputs : Inputs_intf) :
     in
     Unix.mkdir_p directory ;
     let kvdb = Kvdb.create directory in
-    {uuid; kvdb; depth; directory; detached_parent_signal= Async.Ivar.create ()}
+    { uuid
+    ; kvdb
+    ; depth
+    ; directory
+    ; detached_parent_signal = Async.Ivar.create ()
+    }
 
   let create_checkpoint t ~directory_name () =
     let uuid = Uuid_unix.create () in
     let kvdb = Kvdb.create_checkpoint t.kvdb directory_name in
     { uuid
     ; kvdb
-    ; depth= t.depth
-    ; directory= directory_name
-    ; detached_parent_signal= Async.Ivar.create () }
+    ; depth = t.depth
+    ; directory = directory_name
+    ; detached_parent_signal = Async.Ivar.create ()
+    }
 
-  let close {kvdb; uuid= _; depth= _; directory= _; detached_parent_signal} =
+  let make_checkpoint t ~directory_name =
+    Kvdb.make_checkpoint t.kvdb directory_name
+
+  let close { kvdb; uuid = _; depth = _; directory = _; detached_parent_signal }
+      =
     Kvdb.close kvdb ;
     Async.Ivar.fill_if_empty detached_parent_signal ()
 
-  let detached_signal {detached_parent_signal; _} =
+  let detached_signal { detached_parent_signal; _ } =
     Async.Ivar.read detached_parent_signal
 
   let with_ledger ~depth ~f =
@@ -110,19 +121,30 @@ module Make (Inputs : Inputs_intf) :
   let empty_hash =
     Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
 
-  let get_raw {kvdb; depth; _} location =
+  let get_raw { kvdb; depth; _ } location =
     Kvdb.get kvdb ~key:(Location.serialize ~ledger_depth:depth location)
 
-  let get_bin mdb location bin_read =
-    get_raw mdb location
-    |> Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0))
+  let get_raw_batch { kvdb; depth; _ } locations =
+    let keys = List.map locations ~f:(Location.serialize ~ledger_depth:depth) in
+    Kvdb.get_batch kvdb ~keys
 
-  let delete_raw {kvdb; depth; _} location =
+  let get_bin mdb location bin_read =
+    get_raw mdb location |> Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0))
+
+  let get_bin_batch mdb locations bin_read =
+    get_raw_batch mdb locations
+    |> List.map ~f:(Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0)))
+
+  let delete_raw { kvdb; depth; _ } location =
     Kvdb.remove kvdb ~key:(Location.serialize ~ledger_depth:depth location)
 
   let get mdb location =
     assert (Location.is_account location) ;
     get_bin mdb location Account.bin_read_t
+
+  let get_batch mdb locations =
+    assert (List.for_all locations ~f:Location.is_account) ;
+    List.zip_exn locations (get_bin_batch mdb locations Account.bin_read_t)
 
   let get_hash mdb location =
     assert (Location.is_hash location) ;
@@ -132,7 +154,7 @@ module Make (Inputs : Inputs_intf) :
     | None ->
         empty_hash (Location.height ~ledger_depth:mdb.depth location)
 
-  let account_list_bin {kvdb; _} account_bin_read : Account.t list =
+  let account_list_bin { kvdb; _ } account_bin_read : Account.t list =
     let all_keys_values = Kvdb.to_alist kvdb in
     (* see comment at top of location.ml about encoding of locations *)
     let account_location_prefix =
@@ -142,22 +164,22 @@ module Make (Inputs : Inputs_intf) :
     let locations_accounts_bin =
       List.filter all_keys_values ~f:(fun (loc, _v) ->
           let ch = Bigstring.get_uint8 loc ~pos:0 in
-          Int.equal ch account_location_prefix )
+          Int.equal ch account_location_prefix)
     in
     List.map locations_accounts_bin ~f:(fun (_location_bin, account_bin) ->
-        account_bin_read account_bin ~pos_ref:(ref 0) )
+        account_bin_read account_bin ~pos_ref:(ref 0))
 
   let to_list mdb = account_list_bin mdb Account.bin_read_t
 
   let accounts mdb =
     to_list mdb |> List.map ~f:Account.identifier |> Account_id.Set.of_list
 
-  let set_raw {kvdb; depth; _} location bin =
+  let set_raw { kvdb; depth; _ } location bin =
     Kvdb.set kvdb
       ~key:(Location.serialize ~ledger_depth:depth location)
       ~data:bin
 
-  let set_raw_batch {kvdb; depth; _} locations_bins =
+  let set_raw_batch { kvdb; depth; _ } locations_bins =
     let serialize_location (loc, bin) =
       (Location.serialize ~ledger_depth:depth loc, bin)
     in
@@ -166,13 +188,13 @@ module Make (Inputs : Inputs_intf) :
 
   let set_bin mdb location bin_size bin_write v =
     let buf = Bigstring.create (bin_size v) in
-    ignore (bin_write buf ~pos:0 v) ;
+    ignore (bin_write buf ~pos:0 v : int) ;
     set_raw mdb location buf
 
   let set_bin_batch mdb bin_size bin_write locations_vs =
     let create_buf (loc, v) =
       let buf = Bigstring.create (bin_size v) in
-      ignore (bin_write buf ~pos:0 v) ;
+      ignore (bin_write buf ~pos:0 v : int) ;
       (loc, buf)
     in
     let locs_bufs = List.map locations_vs ~f:create_buf in
@@ -191,6 +213,10 @@ module Make (Inputs : Inputs_intf) :
   let get_generic mdb location =
     assert (Location.is_generic location) ;
     get_raw mdb location
+
+  let get_generic_batch mdb locations =
+    assert (List.for_all locations ~f:Location.is_generic) ;
+    get_raw_batch mdb locations
 
   module Account_location = struct
     (** encodes a key, token_id pair as a location used as a database key, so
@@ -217,6 +243,18 @@ module Make (Inputs : Inputs_intf) :
           Location.parse ~ledger_depth:mdb.depth location_bin
           |> Result.map_error ~f:(fun () -> Db_error.Malformed_database)
 
+    let get_batch mdb keys =
+      let parse_location bin =
+        match Location.parse ~ledger_depth:mdb.depth bin with
+        | Ok loc ->
+            Some loc
+        | Error () ->
+            None
+      in
+      List.map keys ~f:build_location
+      |> get_generic_batch mdb
+      |> List.map ~f:(Option.bind ~f:parse_location)
+
     let delete mdb key = delete_raw mdb (build_location key)
 
     let set mdb key location =
@@ -234,8 +272,8 @@ module Make (Inputs : Inputs_intf) :
     let last_location_key () =
       Location.build_generic (Bigstring.of_string "last_account_location")
 
-    let serialize_last_account_kv ~ledger_depth
-        (location, last_account_location) =
+    let serialize_last_account_kv ~ledger_depth (location, last_account_location)
+        =
       ( Location.serialize ~ledger_depth location
       , Location.serialize ~ledger_depth last_account_location )
 
@@ -249,25 +287,24 @@ module Make (Inputs : Inputs_intf) :
               ( Addr.of_directions
               @@ List.init mdb.depth ~f:(fun _ -> Direction.Left) )
           in
-          set_raw mdb location
-            (Location.serialize ~ledger_depth first_location) ;
+          set_raw mdb location (Location.serialize ~ledger_depth first_location) ;
           Result.return first_location
       | Some prev_location -> (
-        match Location.parse ~ledger_depth:mdb.depth prev_location with
-        | Error () ->
-            Error Db_error.Malformed_database
-        | Ok prev_account_location ->
-            Location.next prev_account_location
-            |> Result.of_option ~error:Db_error.Out_of_leaves
-            |> Result.map ~f:(fun next_account_location ->
-                   set_raw mdb location
-                     (Location.serialize ~ledger_depth next_account_location) ;
-                   next_account_location ) )
+          match Location.parse ~ledger_depth:mdb.depth prev_location with
+          | Error () ->
+              Error Db_error.Malformed_database
+          | Ok prev_account_location ->
+              Location.next prev_account_location
+              |> Result.of_option ~error:Db_error.Out_of_leaves
+              |> Result.map ~f:(fun next_account_location ->
+                     set_raw mdb location
+                       (Location.serialize ~ledger_depth next_account_location) ;
+                     next_account_location) )
 
     let allocate mdb key =
       let location_result = increment_last_account_location mdb in
       Result.map location_result ~f:(fun location ->
-          set mdb key location ; location )
+          set mdb key location ; location)
 
     let last_location_address mdb =
       match
@@ -298,8 +335,7 @@ module Make (Inputs : Inputs_intf) :
   module Tokens = struct
     let next_available_key =
       Memo.unit (fun () ->
-          Location.build_generic (Bigstring.of_string "next_available_token")
-      )
+          Location.build_generic (Bigstring.of_string "next_available_token"))
 
     let next_available mdb =
       Option.value
@@ -310,7 +346,7 @@ module Make (Inputs : Inputs_intf) :
       let token_buf =
         Bin_prot.Common.create_buf (Token_id.Stable.Latest.bin_size_t tid)
       in
-      ignore (Token_id.Stable.Latest.bin_write_t token_buf ~pos:0 tid) ;
+      ignore (Token_id.Stable.Latest.bin_write_t token_buf ~pos:0 tid : int) ;
       (Location.serialize ~ledger_depth (next_available_key ()), token_buf)
 
     let set_next_available mdb tid =
@@ -331,7 +367,7 @@ module Make (Inputs : Inputs_intf) :
         let pk_buf =
           Bin_prot.Common.create_buf (Key.Stable.Latest.bin_size_t pk)
         in
-        ignore (Key.Stable.Latest.bin_write_t pk_buf ~pos:0 pk) ;
+        ignore (Key.Stable.Latest.bin_write_t pk_buf ~pos:0 pk : int) ;
         (Location.serialize ~ledger_depth (build_location tid), pk_buf)
 
       let get mdb token_id =
@@ -373,11 +409,10 @@ module Make (Inputs : Inputs_intf) :
       let tokens_buf =
         Bin_prot.Common.create_buf (Token_id.Set.bin_size_t tids)
       in
-      ignore (Token_id.Set.bin_write_t tokens_buf ~pos:0 tids) ;
+      ignore (Token_id.Set.bin_write_t tokens_buf ~pos:0 tids : int) ;
       (Location.serialize ~ledger_depth (build_location pk), tokens_buf)
 
-    let get_opt mdb pk =
-      get_bin mdb (build_location pk) Token_id.Set.bin_read_t
+    let get_opt mdb pk = get_bin mdb (build_location pk) Token_id.Set.bin_read_t
 
     let get mdb pk = Option.value ~default:Token_id.Set.empty (get_opt mdb pk)
 
@@ -403,13 +438,13 @@ module Make (Inputs : Inputs_intf) :
 
     let update mdb pk ~f =
       change_opt mdb pk ~f:(fun x ->
-          to_opt @@ f (Option.value ~default:Token_id.Set.empty x) )
+          to_opt @@ f (Option.value ~default:Token_id.Set.empty x))
 
     let add mdb pk tid = update mdb pk ~f:(fun tids -> Set.add tids tid)
 
     let _add_several mdb pk new_tids =
       update mdb pk ~f:(fun tids ->
-          Set.union tids (Token_id.Set.of_list new_tids) )
+          Set.union tids (Token_id.Set.of_list new_tids))
 
     let add_account mdb aid account =
       let token = Account_id.token_id aid in
@@ -422,7 +457,7 @@ module Make (Inputs : Inputs_intf) :
 
     let _remove_several mdb pk rem_tids =
       update mdb pk ~f:(fun tids ->
-          Set.diff tids (Token_id.Set.of_list rem_tids) )
+          Set.diff tids (Token_id.Set.of_list rem_tids))
 
     let remove_account mdb aid =
       let token = Account_id.token_id aid in
@@ -435,7 +470,7 @@ module Make (Inputs : Inputs_intf) :
     let add_batch_create mdb pks_to_tokens =
       let pks_to_all_tokens =
         Map.filter_mapi pks_to_tokens ~f:(fun ~key:pk ~data:tokens_to_add ->
-            to_opt (Set.union (get mdb pk) tokens_to_add) )
+            to_opt (Set.union (get mdb pk) tokens_to_add))
       in
       Map.to_alist pks_to_all_tokens
       |> List.map ~f:(serialize_kv ~ledger_depth:mdb.depth)
@@ -451,6 +486,9 @@ module Make (Inputs : Inputs_intf) :
         None
     | Ok location ->
         Some location
+
+  let location_of_account_batch t keys =
+    List.zip_exn keys (Account_location.get_batch t keys)
 
   let last_filled t = Account_location.last_location t
 
@@ -509,17 +547,18 @@ module Make (Inputs : Inputs_intf) :
                 | Some set ->
                     Set.add set (Account_id.token_id aid)
                 | None ->
-                    Token_id.Set.singleton (Account_id.token_id aid) )
+                    Token_id.Set.singleton (Account_id.token_id aid))
             , (* If the token is present in an account, it is no longer
                  available.
               *)
               Token_id.max next_available_token
-                (Token_id.next (Account_id.token_id aid)) ) )
+                (Token_id.next (Account_id.token_id aid)) ))
       in
       let next_available_token_change =
-        if new_next_available_token > next_available_token then
+        if Token_id.(new_next_available_token > next_available_token) then
           [ Tokens.next_available_kv ~ledger_depth:mdb.depth
-              new_next_available_token ]
+              new_next_available_token
+          ]
         else []
       in
       let batched_changes =
@@ -543,13 +582,14 @@ module Make (Inputs : Inputs_intf) :
               Some
                 (Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
                    (Account_id.token_id aid, Account_id.public_key aid))
-            else None )
+            else None)
       in
       Kvdb.set_batch mdb.kvdb ~remove_keys:[]
         ~key_data_pairs:token_owner_changes
   end)
 
-  let set_hash mdb location new_hash = set_hash_batch mdb [(location, new_hash)]
+  let set_hash mdb location new_hash =
+    set_hash_batch mdb [ (location, new_hash) ]
 
   module For_tests = struct
     let gen_account_location ~ledger_depth =
@@ -586,13 +626,14 @@ module Make (Inputs : Inputs_intf) :
   let get_or_create_account mdb account_id account =
     match Account_location.get mdb account_id with
     | Error Account_location_not_found -> (
-      match Account_location.allocate mdb account_id with
-      | Ok location ->
-          set mdb location account ;
-          Tokens.add_account mdb account_id account ;
-          Ok (`Added, location)
-      | Error err ->
-          Error (Error.create "get_or_create_account" err Db_error.sexp_of_t) )
+        match Account_location.allocate mdb account_id with
+        | Ok location ->
+            set mdb location account ;
+            Tokens.add_account mdb account_id account ;
+            Ok (`Added, location)
+        | Error err ->
+            Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
+        )
     | Error err ->
         Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
     | Ok location ->
@@ -627,7 +668,7 @@ module Make (Inputs : Inputs_intf) :
         let ignored_indices =
           Int.Set.map ignored_accounts ~f:(fun account_id ->
               try index_of_account_exn t account_id with _ -> -1
-              (* dummy index for accounts not in database *) )
+              (* dummy index for accounts not in database *))
         in
         let last = Addr.to_int last_addr in
         Sequence.range ~stop:`inclusive 0 last
@@ -667,11 +708,11 @@ module Make (Inputs : Inputs_intf) :
         | [] ->
             accum (* no need to reverse *)
         | key :: rest -> (
-          match Account_location.get t key with
-          | Ok loc ->
-              loop rest (loc :: accum)
-          | Error err ->
-              raise (Db_error.Db_exception err) )
+            match Account_location.get t key with
+            | Ok loc ->
+                loop rest (loc :: accum)
+            | Error err ->
+                raise (Db_error.Db_exception err) )
       in
       loop keys []
     in
@@ -683,7 +724,7 @@ module Make (Inputs : Inputs_intf) :
     (* recalculate hashes for each removed account *)
     List.iter locations ~f:(fun loc ->
         let hash_loc = Location.Hash (Location.to_path_exn loc) in
-        set_hash t hash_loc Hash.empty_account )
+        set_hash t hash_loc Hash.empty_account)
 
   let merkle_path mdb location =
     let location =

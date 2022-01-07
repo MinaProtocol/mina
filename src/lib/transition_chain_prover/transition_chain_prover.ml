@@ -9,7 +9,7 @@ end
 
 module Make (Inputs : Inputs_intf) :
   Mina_intf.Transition_chain_prover_intf
-  with type transition_frontier := Inputs.Transition_frontier.t = struct
+    with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
   let find_in_root_history frontier state_hash =

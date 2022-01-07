@@ -18,16 +18,20 @@ type Structured_log_events.t +=
   | Bootstrapping
   | Ledger_catchup
   | Synced
-  | Rebroadcast_transition of {state_hash: State_hash.t}
+  | Rebroadcast_transition of { state_hash : State_hash.t }
   [@@deriving register_event]
 
 exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t
 
+exception Offline_shutdown
+
 val time_controller : t -> Block_time.Controller.t
 
 val subscription : t -> Coda_subscriptions.t
+
+val daemon_start_time : Time_ns.t
 
 (** Derived from local state (aka they may not reflect the latest public keys to which you've attempted to change *)
 val block_production_pubkeys : t -> Public_key.Compressed.Set.t
@@ -86,7 +90,7 @@ val snark_job_state : t -> Work_selector.State.t
 val get_current_nonce :
      t
   -> Account_id.t
-  -> ([> `Min of Account.Nonce.t] * Account.Nonce.t, string) result
+  -> ([> `Min of Account.Nonce.t ] * Account.Nonce.t, string) result
 
 val add_transactions :
      t
@@ -137,8 +141,9 @@ module Root_diff : sig
   module Stable : sig
     module V1 : sig
       type t =
-        { commands: User_command.Stable.V1.t With_status.Stable.V1.t list
-        ; root_length: int }
+        { commands : User_command.Stable.V1.t With_status.Stable.V1.t list
+        ; root_length : int
+        }
     end
   end]
 end
@@ -183,8 +188,13 @@ val subscriptions : t -> Coda_subscriptions.t
 val most_recent_valid_transition :
   t -> External_transition.Initial_validated.t Broadcast_pipe.Reader.t
 
+val block_produced_bvar :
+  t -> (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
+
 val top_level_logger : t -> Logger.t
 
 val config : t -> Config.t
 
 val net : t -> Mina_networking.t
+
+val runtime_config : t -> Runtime_config.t

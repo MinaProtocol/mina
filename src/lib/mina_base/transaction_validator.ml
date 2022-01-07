@@ -2,9 +2,10 @@ open Base
 
 module Hashless_ledger = struct
   type t =
-    { base: Ledger.t
-    ; overlay: (Account.Identifier.t, Account.t) Hashtbl.t
-    ; mutable next_available_token: Token_id.t }
+    { base : Ledger.t
+    ; overlay : (Account.Identifier.t, Account.t) Hashtbl.t
+    ; mutable next_available_token : Token_id.t
+    }
 
   type location = Ours of Account.Identifier.t | Theirs of Ledger.Location.t
 
@@ -16,15 +17,15 @@ module Hashless_ledger = struct
     | Ours key ->
         Hashtbl.find t.overlay key
     | Theirs loc -> (
-      match Ledger.get t.base loc with
-      | Some a -> (
-        match Hashtbl.find t.overlay (Account.identifier a) with
+        match Ledger.get t.base loc with
+        | Some a -> (
+            match Hashtbl.find t.overlay (Account.identifier a) with
+            | None ->
+                Some a
+            | s ->
+                s )
         | None ->
-            Some a
-        | s ->
-            s )
-      | None ->
-          failwith (msg "get") )
+            failwith (msg "get") )
 
   let location_of_account t key =
     match Hashtbl.find t.overlay key with
@@ -42,11 +43,11 @@ module Hashless_ledger = struct
     | Ours key ->
         Hashtbl.set t.overlay ~key ~data:acct
     | Theirs loc -> (
-      match Ledger.get t.base loc with
-      | Some a ->
-          Hashtbl.set t.overlay ~key:(Account.identifier a) ~data:acct
-      | None ->
-          failwith (msg "set") )
+        match Ledger.get t.base loc with
+        | Some a ->
+            Hashtbl.set t.overlay ~key:(Account.identifier a) ~data:acct
+        | None ->
+            failwith (msg "set") )
 
   let get_or_create_account t key account =
     match location_of_account t key with
@@ -72,16 +73,17 @@ module Hashless_ledger = struct
   let merkle_root _t = Ledger_hash.empty_hash
 
   let create l =
-    { base= l
-    ; overlay= Hashtbl.create (module Account_id)
-    ; next_available_token= Ledger.next_available_token l }
+    { base = l
+    ; overlay = Hashtbl.create (module Account_id)
+    ; next_available_token = Ledger.next_available_token l
+    }
 
   let with_ledger ~depth ~f =
     Ledger.with_ledger ~depth ~f:(fun l ->
         let t = create l in
-        f t )
+        f t)
 
-  let next_available_token {next_available_token; _} = next_available_token
+  let next_available_token { next_available_token; _ } = next_available_token
 
   let set_next_available_token t tid = t.next_available_token <- tid
 end
@@ -93,9 +95,8 @@ let create = Hashless_ledger.create
 let apply_user_command ~constraint_constants ~txn_global_slot l uc =
   Result.map
     ~f:(fun applied_txn ->
-      applied_txn.Transaction_applied.Signed_command_applied.common
-        .user_command
-        .status )
+      applied_txn.Transaction_applied.Signed_command_applied.common.user_command
+        .status)
     (apply_user_command l ~constraint_constants ~txn_global_slot uc)
 
 let apply_transaction ~constraint_constants ~txn_state_view l txn =

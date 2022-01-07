@@ -7,7 +7,7 @@ FROM debian:stretch-slim AS production
 ENV DEBIAN_FRONTEND noninteractive
 
 # Dependencies
-# buster-slim configures apt to not store any cache, so no need to rm it
+# stretch-slim configures apt to not store any cache, so no need to rm it
 # TODO: make sure this is the minimum runtime deps
 RUN apt-get -y update \
   && apt -y install \
@@ -24,9 +24,9 @@ RUN apt-get -y update \
     tzdata
 
 # mina keypair package
-RUN echo "deb [trusted=yes] http://packages.o1test.net release main" > /etc/apt/sources.list.d/o1.list \
+RUN echo "deb [trusted=yes] http://packages.o1test.net stretch stable" > /etc/apt/sources.list.d/o1.list \
    && apt-get update \
-   && apt-get install -y "mina-generate-keypair=1.0.2-06f3c5c"
+   && apt-get install -y "mina-generate-keypair=1.2.1beta1-45440dc"
 
 WORKDIR /
 

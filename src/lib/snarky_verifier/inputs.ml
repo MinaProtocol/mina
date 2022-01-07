@@ -17,9 +17,9 @@ module type S = sig
     module Shifted : sig
       module type S =
         Snarky_curves.Shifted_intf
-        with type ('a, 'b) checked := ('a, 'b) Checked.t
-         and type curve_var := t
-         and type boolean_var := Boolean.var
+          with type ('a, 'b) checked := ('a, 'b) Checked.t
+           and type curve_var := t
+           and type boolean_var := Boolean.var
 
       type 'a m = (module S with type t = 'a)
 
@@ -41,9 +41,9 @@ module type S = sig
     module Shifted : sig
       module type S =
         Snarky_curves.Shifted_intf
-        with type ('a, 'b) checked := ('a, 'b) Checked.t
-         and type curve_var := t
-         and type boolean_var := Boolean.var
+          with type ('a, 'b) checked := ('a, 'b) Checked.t
+           and type curve_var := t
+           and type boolean_var := Boolean.var
 
       type 'a m = (module S with type t = 'a)
 

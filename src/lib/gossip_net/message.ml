@@ -27,7 +27,7 @@ module V1 = struct
       | New_state of External_transition.Stable.V1.t
       | Snark_pool_diff of Snark_pool.Diff_versioned.Stable.V1.t
       | Transaction_pool_diff of Transaction_pool.Diff_versioned.Stable.V1.t
-    [@@deriving bin_io, sexp, version {rpc}]
+    [@@deriving bin_io, sexp, version { rpc }]
 
     let callee_model_of_msg = Fn.id
 
@@ -47,5 +47,4 @@ end
 
 module Latest = V1
 
-[%%define_locally
-Latest.(summary)]
+[%%define_locally Latest.(summary)]

@@ -31,6 +31,7 @@ module Schema = struct
     module Prefixed_state_hash = struct
       [%%versioned
       module Stable = struct
+        [@@@no_toplevel_latest_type]
         module V1 = struct
           type t = string * State_hash.Stable.V1.t
 
@@ -280,7 +281,9 @@ let check t ~genesis_state_hash =
         then Ok ()
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
-      check_arcs root_hash )
+      let%map () = check_arcs root_hash in
+      External_transition.blockchain_state root_transition
+      |> Mina_state.Blockchain_state.snarked_ledger_hash )
   |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
   |> Result.join
 

@@ -12,9 +12,9 @@ const fs = require("fs");
 const { tmpdir } = require("os");
 const Path = require("path");
 
-const CODA_GRAPHQL_HOST = process.env["CODA_GRAPHQL_HOST"] || "localhost";
-const CODA_GRAPHQL_PORT = process.env["CODA_GRAPHQL_PORT"] || 3085;
-const CODA_GRAPHQL_PATH = process.env["CODA_GRAPHQL_PATH"] || "/graphql";
+const MINA_GRAPHQL_HOST = process.env["MINA_GRAPHQL_HOST"] || "localhost";
+const MINA_GRAPHQL_PORT = process.env["MINA_GRAPHQL_PORT"] || 3085;
+const MINA_GRAPHQL_PATH = process.env["MINA_GRAPHQL_PATH"] || "/graphql";
 const CODA_TESTNET_NAME = process.env["CODA_TESTNET_NAME"] || "unknown";
 
 const API_KEY_SECRET = process.env["GOOGLE_CLOUD_STORAGE_API_KEY"];
@@ -29,7 +29,7 @@ const json_file_path = Path.join(tmpdir(), "google_cloud_api_key.json");
 fs.writeFileSync(json_file_path, API_KEY_SECRET);
 
 const graphqlUriNoScheme =
-  CODA_GRAPHQL_HOST + ":" + CODA_GRAPHQL_PORT + CODA_GRAPHQL_PATH;
+  MINA_GRAPHQL_HOST + ":" + MINA_GRAPHQL_PORT + MINA_GRAPHQL_PATH;
 const httpLink = new HttpLink({
   uri: "http://" + graphqlUriNoScheme,
   fetch: fetch,

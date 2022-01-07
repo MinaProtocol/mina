@@ -10,8 +10,8 @@ type engine = string * (module Intf.Engine.S)
 
 module Make_test_inputs (Engine : Intf.Engine.S) () :
   Intf.Test.Inputs_intf
-  with type Engine.Network_config.Cli_inputs.t =
-              Engine.Network_config.Cli_inputs.t = struct
+    with type Engine.Network_config.Cli_inputs.t =
+          Engine.Network_config.Cli_inputs.t = struct
   module Engine = Engine
 
   module Dsl = Dsl.Make (Engine) ()
@@ -25,26 +25,26 @@ type test_inputs_with_cli_inputs =
       -> test_inputs_with_cli_inputs
 
 type inputs =
-  { test_inputs: test_inputs_with_cli_inputs
-  ; test: test
-  ; coda_image: string
-  ; archive_image: string
-  ; debug: bool }
+  { test_inputs : test_inputs_with_cli_inputs
+  ; test : test
+  ; mina_image : string
+  ; archive_image : string
+  ; debug : bool
+  }
 
-let validate_inputs {coda_image; _} =
-  if String.is_empty coda_image then
-    failwith "Coda image cannot be an empt string"
+let validate_inputs { mina_image; _ } =
+  if String.is_empty mina_image then
+    failwith "Mina image cannot be an empty string"
 
 let engines : engine list =
-  [("cloud", (module Integration_test_cloud_engine : Intf.Engine.S))]
+  [ ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S)) ]
 
 let tests : test list =
-  [ ("reliability", (module Reliability_test.Make : Intf.Test.Functor_intf))
+  [ ( "peers-reliability"
+    , (module Peers_reliability_test.Make : Intf.Test.Functor_intf) )
+  ; ( "chain-reliability"
+    , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
   ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
-    (*
-  ; ( "bp-timed-accts"
-    , (module Block_production_timed_accounts_test.Make : Intf.Test.Functor_intf) )
-  *)
   ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
   ]
@@ -107,14 +107,13 @@ let report_test_errors ~log_error_set ~internal_error_set =
       "=== Log %ss ===\n" log_type ;
     Error_accumulator.iter_contexts log_errors ~f:(fun node_id log_errors ->
         color_eprintf Bash_colors.light_magenta "    %s:\n" node_id ;
-        List.iter log_errors ~f:(fun (severity, {error_message; _}) ->
+        List.iter log_errors ~f:(fun (severity, { error_message; _ }) ->
             color_eprintf
               (color_of_severity severity)
               "        [%s] %s\n"
               (Time.to_string error_message.timestamp)
-              (Yojson.Safe.to_string (Logger.Message.to_yojson error_message))
-        ) ;
-        Print.eprintf "\n" )
+              (Yojson.Safe.to_string (Logger.Message.to_yojson error_message))) ;
+        Print.eprintf "\n")
   in
   (* check invariants *)
   if List.length log_errors.from_current_context > 0 then
@@ -134,20 +133,20 @@ let report_test_errors ~log_error_set ~internal_error_set =
       print_category_header
         (max_severity_of_list (List.map errors ~f:fst))
         "%s" context ;
-      List.iter errors ~f:(fun (severity, {occurrence_time; error}) ->
+      List.iter errors ~f:(fun (severity, { occurrence_time; error }) ->
           color_eprintf
             (color_of_severity severity)
             "    [%s] %s\n"
             (Time.to_string occurrence_time)
-            (Error.to_string_hum error) ) ) ;
+            (Error.to_string_hum error))) ;
   (* report non-contextualized internal errors *)
   List.iter internal_errors.from_current_context
-    ~f:(fun (severity, {occurrence_time; error}) ->
+    ~f:(fun (severity, { occurrence_time; error }) ->
       color_eprintf
         (color_of_severity severity)
         "[%s] %s\n"
         (Time.to_string occurrence_time)
-        (Error.to_string_hum error) ) ;
+        (Error.to_string_hum error)) ;
   (* determine if test is passed/failed and exit accordingly *)
   let test_failed =
     match (log_errors_severity, internal_errors_severity) with
@@ -164,8 +163,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
         "The test has failed. See the above errors for details.\n\n" ;
       false )
     else (
-      color_eprintf Bash_colors.green
-        "The test has completed successfully.\n\n" ;
+      color_eprintf Bash_colors.green "The test has completed successfully.\n\n" ;
       true )
   in
   let%bind () = Writer.(flushed (Lazy.force stderr)) in
@@ -175,8 +173,8 @@ let report_test_errors ~log_error_set ~internal_error_set =
 
 let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
     ~log_engine_cleanup_func ~lift_accumulated_errors_func ~net_manager_ref
-    ~log_engine_ref ~network_state_writer_ref ~cleanup_deferred_ref
-    ~exit_reason ~test_result : unit Deferred.t =
+    ~log_engine_ref ~network_state_writer_ref ~cleanup_deferred_ref ~exit_reason
+    ~test_result : unit Deferred.t =
   let cleanup () : unit Deferred.t =
     let%bind log_engine_cleanup_result =
       Option.value_map !log_engine_ref
@@ -185,13 +183,11 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
     in
     Option.value_map !network_state_writer_ref ~default:()
       ~f:Broadcast_pipe.Writer.close ;
-    let%bind test_error_set =
-      Malleable_error.lift_error_set_unit test_result
-    in
+    let%bind test_error_set = Malleable_error.lift_error_set_unit test_result in
     let log_error_set = lift_accumulated_errors_func () in
     let internal_error_set =
       let open Test_error.Set in
-      combine [test_error_set; of_hard_or_error log_engine_cleanup_result]
+      combine [ test_error_set; of_hard_or_error log_engine_cleanup_result ]
     in
     let%bind test_was_successful =
       report_test_errors ~log_error_set ~internal_error_set
@@ -206,13 +202,13 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
   match !cleanup_deferred_ref with
   | Some deferred ->
       [%log error]
-        "additional call to cleanup testnet while already cleaning up \
-         (reason: $reason)"
-        ~metadata:[("reason", `String exit_reason)] ;
+        "additional call to cleanup testnet while already cleaning up (reason: \
+         $reason)"
+        ~metadata:[ ("reason", `String exit_reason) ] ;
       deferred
   | None ->
       [%log info] "cleaning up testnet (reason: $reason)"
-        ~metadata:[("reason", `String exit_reason)] ;
+        ~metadata:[ ("reason", `String exit_reason) ] ;
       let deferred = cleanup () in
       cleanup_deferred_ref := Some deferred ;
       deferred
@@ -225,8 +221,7 @@ let main inputs =
   let open Test_inputs in
   let test_name, (module Test) = inputs.test in
   let (module T) =
-    (module Test (Test_inputs)
-    : Intf.Test.S
+    (module Test (Test_inputs) : Intf.Test.S
       with type network = Engine.Network.t
        and type node = Engine.Network.Node.t
        and type dsl = Dsl.t )
@@ -243,11 +238,12 @@ let main inputs =
    *)
   let logger = Logger.create () in
   let images =
-    { Test_config.Container_images.coda= inputs.coda_image
-    ; archive_node= inputs.archive_image
-    ; user_agent= "codaprotocol/coda-user-agent:0.1.5"
-    ; bots= "codaprotocol/coda-bots:0.0.13-beta-1"
-    ; points= "codaprotocol/coda-points-hack:32b.4" }
+    { Test_config.Container_images.mina = inputs.mina_image
+    ; archive_node = inputs.archive_image
+    ; user_agent = "codaprotocol/coda-user-agent:0.1.5"
+    ; bots = "minaprotocol/mina-bots:latest"
+    ; points = "codaprotocol/coda-points-hack:32b.4"
+    }
   in
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
@@ -284,7 +280,7 @@ let main inputs =
       in
       don't_wait_for
         (f_dispatch_cleanup ~exit_reason:"signal received"
-           ~test_result:(Malleable_error.hard_error error)) ) ;
+           ~test_result:(Malleable_error.hard_error error))) ;
   let%bind monitor_test_result =
     let on_fatal_error message =
       don't_wait_for
@@ -328,7 +324,7 @@ let main inputs =
           Deferred.bind init_result ~f:Malleable_error.or_hard_error
         in
         let%bind () = Engine.Network.initialize ~logger network in
-        T.run network dsl )
+        T.run network dsl)
   in
   let exit_reason, test_result =
     match monitor_test_result with
@@ -358,13 +354,13 @@ let test_arg =
   let doc = "The name of the test to execute." in
   Arg.(required & pos 0 (some (enum indexed_tests)) None & info [] ~doc)
 
-let coda_image_arg =
-  let doc = "Identifier of the coda docker image to test." in
-  let env = Arg.env_var "CODA_IMAGE" ~doc in
+let mina_image_arg =
+  let doc = "Identifier of the Mina docker image to test." in
+  let env = Arg.env_var "MINA_IMAGE" ~doc in
   Arg.(
     required
     & opt (some string) None
-    & info ["coda-image"] ~env ~docv:"CODA_IMAGE" ~doc)
+    & info [ "mina-image" ] ~env ~docv:"MINA_IMAGE" ~doc)
 
 let archive_image_arg =
   let doc = "Identifier of the archive node docker image to test." in
@@ -372,20 +368,20 @@ let archive_image_arg =
   Arg.(
     value
       ( opt string "unused"
-      & info ["archive-image"] ~env ~docv:"ARCHIVE_IMAGE" ~doc ))
+      & info [ "archive-image" ] ~env ~docv:"ARCHIVE_IMAGE" ~doc ))
 
 let debug_arg =
   let doc =
     "Enable debug mode. On failure, the test executive will pause for user \
      input before destroying the network it deployed."
   in
-  Arg.(value & flag & info ["debug"; "d"] ~doc)
+  Arg.(value & flag & info [ "debug"; "d" ] ~doc)
 
 let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 
 let engine_cmd ((engine_name, (module Engine)) : engine) =
   let info =
-    let doc = "Run coda integration test(s) on remote cloud provider." in
+    let doc = "Run mina integration test(s) on remote cloud provider." in
     Term.info engine_name ~doc ~exits:Term.default_exits
   in
   let test_inputs_with_cli_inputs_arg =
@@ -396,12 +392,12 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     Term.(const wrap_cli_inputs $ Engine.Network_config.Cli_inputs.term)
   in
   let inputs_term =
-    let cons_inputs test_inputs test coda_image archive_image debug =
-      {test_inputs; test; coda_image; archive_image; debug}
+    let cons_inputs test_inputs test mina_image archive_image debug =
+      { test_inputs; test; mina_image; archive_image; debug }
     in
     Term.(
       const cons_inputs $ test_inputs_with_cli_inputs_arg $ test_arg
-      $ coda_image_arg $ archive_image_arg $ debug_arg)
+      $ mina_image_arg $ archive_image_arg $ debug_arg)
   in
   let term = Term.(const start $ inputs_term) in
   (term, info)
@@ -412,11 +408,11 @@ let help_cmd =
   (help_term, info)
 
 let default_cmd =
-  let doc = "Run coda integration test(s)." in
+  let doc = "Run mina integration test(s)." in
   let info = Term.info "test_executive" ~doc ~exits:Term.default_error_exits in
   (help_term, info)
 
 (* TODO: move required args to positions instead of flags, or provide reasonable defaults to make them optional *)
 let () =
   let engine_cmds = List.map engines ~f:engine_cmd in
-  Term.(exit @@ eval_choice default_cmd (engine_cmds @ [help_cmd]))
+  Term.(exit @@ eval_choice default_cmd (engine_cmds @ [ help_cmd ]))

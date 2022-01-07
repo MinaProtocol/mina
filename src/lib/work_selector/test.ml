@@ -48,7 +48,7 @@ struct
               in
               match stuff with None -> return () | _ -> go (i + 1)
             in
-            go 0 ) )
+            go 0))
 
   let%test_unit "Reassign work after the wait time" =
     Backtrace.elide := false ;
@@ -57,9 +57,7 @@ struct
     let logger = Logger.null () in
     let send_work work_state =
       let rec go all_work =
-        let stuff =
-          Selection_method.work ~snark_pool ~fee ~logger work_state
-        in
+        let stuff = Selection_method.work ~snark_pool ~fee ~logger work_state in
         match stuff with
         | None ->
             all_work
@@ -78,7 +76,7 @@ struct
               Async.after (Time.Span.of_ms (Float.of_int reassignment_wait))
             in
             let work_sent_again = send_work work_state in
-            assert (List.length work_sent = List.length work_sent_again) ) )
+            assert (List.length work_sent = List.length work_sent_again)))
 
   let gen_snark_pool (works : ('a, 'b, 'c) Lib.Work_spec.t One_or_two.t list)
       fee =
@@ -91,7 +89,7 @@ struct
           return ()
       | work :: rest ->
           let%bind fee =
-            Quickcheck.Generator.of_list [cheap_work_fee; expensive_work_fee]
+            Quickcheck.Generator.of_list [ cheap_work_fee; expensive_work_fee ]
           in
           T.Snark_pool.add_snark snark_pool ~work ~fee ;
           add_works rest
@@ -112,9 +110,7 @@ struct
       let%map pool =
         gen_snark_pool
           ( T.Staged_ledger.all_work_pairs sl ~get_state:(fun _ ->
-                Ok
-                  (Lazy.force precomputed_values).protocol_state_with_hash.data
-            )
+                Ok (Lazy.force precomputed_values).protocol_state_with_hash.data)
           |> Or_error.ok_exn )
           (Currency.Fee.of_int 2)
       in
@@ -134,8 +130,7 @@ struct
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
               let work =
-                Selection_method.work ~snark_pool ~fee:my_fee work_state
-                  ~logger
+                Selection_method.work ~snark_pool ~fee:my_fee work_state ~logger
               in
               match work with
               | None ->
@@ -148,5 +143,5 @@ struct
                        (One_or_two.map job ~f:Lib.Work_spec.statement)) ;
                   go (i + 1)
             in
-            go 0 ) )
+            go 0))
 end

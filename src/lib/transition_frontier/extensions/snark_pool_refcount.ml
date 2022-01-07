@@ -10,11 +10,6 @@ module T = struct
               their scan state.
               Work is included iff it is a member of some block scan state.
           *)
-    ; inclusion_table: int Work.Table.t
-          (** Tracks the number of blocks that have purchased a proof for each
-              work statement.
-              Work is included iff it is was purchased in some block.
-          *)
     ; best_tip_table: Work.Hash_set.t
           (** The set of all snark work statements present in the scan state
               for the last 10 blocks in the best chain.
@@ -27,11 +22,6 @@ module T = struct
           (** Tracks the number of blocks that have each work statement in
               their scan state.
               Work is included iff it is a member of some block scan state.
-          *)
-    ; inclusion_table: int Work.Table.t
-          (** Tracks the number of blocks that have purchased a proof for each
-              work statement.
-              Work is included iff it is was purchased in some block.
           *)
     ; best_tip_table: Work.Hash_set.t
           (** The set of all snark work statements present in the scan state
@@ -72,23 +62,12 @@ module T = struct
   let add_scan_state_to_ref_table table scan_state : bool =
     add_to_table ~get_work ~get_statement:Fn.id table scan_state
 
-  let add_transition_to_inclusion_table table transition : bool =
-    add_to_table
-      ~get_work:Mina_transition.External_transition.Validated.completed_works
-      ~get_statement:Transaction_snark_work.statement table transition
-
   let remove_scan_state_from_ref_table table scan_state : bool =
     remove_from_table ~get_work ~get_statement:Fn.id table scan_state
-
-  let remove_transition_from_inclusion_table table transition : bool =
-    remove_from_table
-      ~get_work:Mina_transition.External_transition.Validated.completed_works
-      ~get_statement:Transaction_snark_work.statement table transition
 
   let create ~logger:_ frontier =
     let t =
       { refcount_table= Work.Table.create ()
-      ; inclusion_table= Work.Table.create ()
       ; best_tip_table= Work.Hash_set.create () }
     in
     let () =
@@ -96,15 +75,11 @@ module T = struct
       let scan_state =
         Breadcrumb.staged_ledger breadcrumb |> Staged_ledger.scan_state
       in
-      let transition = Breadcrumb.validated_transition breadcrumb in
-      ignore (add_scan_state_to_ref_table t.refcount_table scan_state : bool) ;
-      ignore
-        (add_transition_to_inclusion_table t.inclusion_table transition : bool)
+      ignore (add_scan_state_to_ref_table t.refcount_table scan_state : bool)
     in
     ( t
     , { removed= 0
       ; refcount_table= t.refcount_table
-      ; inclusion_table= t.inclusion_table
       ; best_tip_table= t.best_tip_table } )
 
   type diff_update = {num_removed: int; is_added: bool}
@@ -118,16 +93,11 @@ module T = struct
             let scan_state =
               Breadcrumb.staged_ledger breadcrumb |> Staged_ledger.scan_state
             in
-            let transition = Breadcrumb.validated_transition breadcrumb in
             let added_scan_state =
               add_scan_state_to_ref_table t.refcount_table scan_state
             in
-            let added_transition =
-              add_transition_to_inclusion_table t.inclusion_table transition
-            in
-            { num_removed
-            ; is_added= is_added || added_scan_state || added_transition }
-        | E (Root_transitioned {new_root= _; garbage= Full garbage_nodes}, _)
+            {num_removed; is_added= is_added || added_scan_state}
+        | E (Root_transitioned {new_root= _; garbage= Full garbage_nodes; _}, _)
           ->
             let open Diff.Node_list in
             let extra_num_removed =
@@ -139,9 +109,6 @@ module T = struct
                     then 1
                     else 0
                   in
-                  ignore
-                  @@ remove_transition_from_inclusion_table t.inclusion_table
-                       node.transition ;
                   acc + delta )
             in
             {num_removed= num_removed + extra_num_removed; is_added}
@@ -162,7 +129,7 @@ module T = struct
                     update_best_tip_table (blocks_remaining - 1)
                       (Breadcrumb.parent_hash breadcrumb)
             in
-            let num_blocks_to_include = 10 in
+            let num_blocks_to_include = 3 in
             Hash_set.clear t.best_tip_table ;
             update_best_tip_table num_blocks_to_include new_best_tip_hash ;
             {num_removed; is_added= true} )
@@ -171,7 +138,6 @@ module T = struct
       Some
         { removed= num_removed
         ; refcount_table= t.refcount_table
-        ; inclusion_table= t.inclusion_table
         ; best_tip_table= t.best_tip_table }
     else None
 end

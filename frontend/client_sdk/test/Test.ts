@@ -1,25 +1,31 @@
-import * as CodaSDK from "../src/SDKWrapper";
+import * as MinaSDK from "../src/SDKWrapper";
 import { deepStrictEqual } from "assert";
 
-let key = CodaSDK.genKeys();
-let publicKey = CodaSDK.derivePublicKey(key.privateKey);
-let signed = CodaSDK.signMessage("hello", key);
-CodaSDK.verifyMessage(signed);
+let key = MinaSDK.genKeys();
+let publicKey = MinaSDK.derivePublicKey(key.privateKey);
+let signed = MinaSDK.signMessage("hello", key);
+MinaSDK.verifyMessage(signed);
 
 deepStrictEqual(publicKey, key.publicKey, "Public keys do not match");
 
 deepStrictEqual(
-  CodaSDK.verifyKeypair(key),
+  MinaSDK.verifyKeypair(key),
   true,
   "Generated keypair could not be verified"
 );
 
-let payment1 = CodaSDK.unsafeSignAny(
+deepStrictEqual(
+  typeof MinaSDK.publicKeyToRaw(key.publicKey),
+  "string",
+  "Conversion to valid raw public key failed"
+);
+
+let payment1 = MinaSDK.unsafeSignAny(
   { to: key.publicKey, from: key.publicKey, amount: "1", fee: "1", nonce: "0" },
   key
 );
 
-let payment2 = CodaSDK.signPayment(
+let payment2 = MinaSDK.signPayment(
   { to: key.publicKey, from: key.publicKey, amount: 1, fee: 1, nonce: 0 },
   key
 );
@@ -31,29 +37,29 @@ deepStrictEqual(
 );
 
 deepStrictEqual(
-  CodaSDK.verifyPaymentSignature(payment1),
+  MinaSDK.verifyPaymentSignature(payment1),
   true,
   "Unsafe signed payment could not be verified"
 );
 deepStrictEqual(
-  CodaSDK.verifyPaymentSignature(payment2),
+  MinaSDK.verifyPaymentSignature(payment2),
   true,
   "Signed payment could not be verified"
 );
 
-let invalidPayment = { ...payment2, publicKey: CodaSDK.genKeys().publicKey };
+let invalidPayment = { ...payment2, publicKey: MinaSDK.genKeys().publicKey };
 deepStrictEqual(
-  CodaSDK.verifyPaymentSignature(invalidPayment),
+  MinaSDK.verifyPaymentSignature(invalidPayment),
   false,
   "Invalid signed payment was verified"
 );
 
-let sd1 = CodaSDK.signStakeDelegation(
+let sd1 = MinaSDK.signStakeDelegation(
   { to: key.publicKey, from: key.publicKey, fee: "1", nonce: "0" },
   key
 );
 
-let sd2 = CodaSDK.signStakeDelegation(
+let sd2 = MinaSDK.signStakeDelegation(
   { to: key.publicKey, from: key.publicKey, fee: 1, nonce: 0 },
   key
 );
@@ -64,16 +70,16 @@ deepStrictEqual(
   "Stake delegation signatures don't match (string vs numeric inputs)"
 );
 
-CodaSDK.verifyStakeDelegationSignature(sd1);
+MinaSDK.verifyStakeDelegationSignature(sd1);
 deepStrictEqual(
-  CodaSDK.verifyStakeDelegationSignature(sd1),
+  MinaSDK.verifyStakeDelegationSignature(sd1),
   true,
   "Signed delegation could not be verified"
 );
 
-let invalidSd = { ...sd1, publicKey: CodaSDK.genKeys().publicKey };
+let invalidSd = { ...sd1, publicKey: MinaSDK.genKeys().publicKey };
 deepStrictEqual(
-  CodaSDK.verifyStakeDelegationSignature(invalidSd),
+  MinaSDK.verifyStakeDelegationSignature(invalidSd),
   false,
   "Invalid signed delegation was verified"
 );
@@ -98,9 +104,8 @@ const signedRosettaTnxMock = `
   }
 `;
 
-const signedGraphQLCommand = CodaSDK.signedRosettaTransactionToSignedCommand(
-  signedRosettaTnxMock
-);
+const signedGraphQLCommand =
+  MinaSDK.signedRosettaTransactionToSignedCommand(signedRosettaTnxMock);
 const signedRosettaTnxMockJson = JSON.parse(signedRosettaTnxMock);
 const signedGraphQLCommandJson = JSON.parse(signedGraphQLCommand);
 

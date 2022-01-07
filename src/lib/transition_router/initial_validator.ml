@@ -8,7 +8,7 @@ open Mina_transition
 open Network_peer
 
 type validation_error =
-  [ `Invalid_time_received of [`Too_early | `Too_late of int64]
+  [ `Invalid_time_received of [ `Too_early | `Too_late of int64 ]
   | `Invalid_genesis_protocol_state
   | `Invalid_proof
   | `Invalid_delta_transition_chain_proof
@@ -26,7 +26,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     let message' =
       "external transition with state hash $state_hash"
       ^ Option.value_map message ~default:"" ~f:(fun (txt, _) ->
-            sprintf ", %s" txt )
+            sprintf ", %s" txt)
     in
     let metadata =
       ("state_hash", State_hash.to_yojson state_hash)
@@ -39,13 +39,15 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     match error with
     | `Invalid_time_received `Too_early ->
         [ ("reason", `String "invalid time")
-        ; ("time_error", `String "too early") ]
+        ; ("time_error", `String "too early")
+        ]
     | `Invalid_time_received (`Too_late slot_diff) ->
         [ ("reason", `String "invalid time")
         ; ("time_error", `String "too late")
-        ; ("slot_diff", `String (Int64.to_string slot_diff)) ]
+        ; ("slot_diff", `String (Int64.to_string slot_diff))
+        ]
     | `Invalid_genesis_protocol_state ->
-        [("reason", `String "invalid genesis state")]
+        [ ("reason", `String "invalid genesis state") ]
     | `Invalid_proof ->
         [ ("reason", `String "invalid proof")
         ; ( "protocol_state"
@@ -53,16 +55,18 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
             |> Protocol_state.value_to_yojson )
         ; ( "proof"
           , External_transition.protocol_state_proof transition
-            |> Proof.to_yojson ) ]
+            |> Proof.to_yojson )
+        ]
     | `Invalid_delta_transition_chain_proof ->
-        [("reason", `String "invalid delta transition chain proof")]
+        [ ("reason", `String "invalid delta transition chain proof") ]
     | `Verifier_error err ->
         [ ("reason", `String "verifier error")
-        ; ("error", Error_json.error_to_yojson err) ]
+        ; ("error", Error_json.error_to_yojson err)
+        ]
     | `Mismatched_protocol_version ->
-        [("reason", `String "protocol version mismatch")]
+        [ ("reason", `String "protocol version mismatch") ]
     | `Invalid_protocol_version ->
-        [("reason", `String "invalid protocol version")]
+        [ ("reason", `String "invalid protocol version") ]
   in
   let metadata =
     [ ("state_hash", State_hash.to_yojson state_hash)
@@ -70,7 +74,8 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
       , `String
           (Time.to_string_abs
              (Block_time.to_time time_received)
-             ~zone:Time.Zone.utc) ) ]
+             ~zone:Time.Zone.utc) )
+    ]
     @ metadata
   in
   [%log error] ~metadata
@@ -86,32 +91,49 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
      rejected for reason $reason" ;
   match error with
   | `Verifier_error err ->
-      let error_metadata = [("error", Error_json.error_to_yojson err)] in
+      let error_metadata = [ ("error", Error_json.error_to_yojson err) ] in
       [%log error]
         ~metadata:
-          (error_metadata @ [("state_hash", State_hash.to_yojson state_hash)])
+          (error_metadata @ [ ("state_hash", State_hash.to_yojson state_hash) ])
         "Error in verifier verifying blockchain proof for $state_hash: $error" ;
       Deferred.unit
   | `Invalid_proof ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.invalid_proof) ;
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Invalid_proof) ;
       punish Sent_invalid_proof None
   | `Invalid_delta_transition_chain_proof ->
+      Queue.enqueue Transition_frontier.rejected_blocks
+        ( state_hash
+        , sender
+        , time_received
+        , `Invalid_delta_transition_chain_proof ) ;
       punish Sent_invalid_transition_chain_merkle_proof None
   | `Invalid_time_received `Too_early ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.received_early) ;
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Too_early) ;
       punish Gossiped_future_transition None
   | `Invalid_genesis_protocol_state ->
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Invalid_genesis_protocol_state) ;
       punish Has_invalid_genesis_protocol_state None
   | `Invalid_time_received (`Too_late slot_diff) ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.received_late) ;
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Too_late) ;
       punish
         (Gossiped_old_transition (slot_diff, delta))
         (Some
            ( "off by $slot_diff slots"
-           , [("slot_diff", `String (Int64.to_string slot_diff))] ))
+           , [ ("slot_diff", `String (Int64.to_string slot_diff)) ] ))
   | `Invalid_protocol_version ->
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Invalid_protocol_version) ;
       punish Sent_invalid_protocol_version None
   | `Mismatched_protocol_version ->
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Mismatched_protocol_version) ;
       punish Sent_mismatched_protocol_version None
 
 module Duplicate_block_detector = struct
@@ -121,8 +143,9 @@ module Duplicate_block_detector = struct
     module T = struct
       (* order of fields significant, compare by epoch, then slot, then producer *)
       type t =
-        { consensus_time: Consensus.Data.Consensus_time.t
-        ; block_producer: Public_key.Compressed.t }
+        { consensus_time : Consensus.Data.Consensus_time.t
+        ; block_producer : Public_key.Compressed.t
+        }
       [@@deriving sexp, compare]
     end
 
@@ -130,18 +153,20 @@ module Duplicate_block_detector = struct
     include Comparable.Make (T)
   end
 
-  type t = {mutable table: State_hash.t Blocks.Map.t; mutable latest_epoch: int}
+  type t =
+    { mutable table : State_hash.t Blocks.Map.t; mutable latest_epoch : int }
 
   let gc_count = ref 0
 
   (* create dummy block to split map on *)
   let make_splitting_block ~consensus_constants
-      ({consensus_time; block_producer= _} : Blocks.t) : Blocks.t =
+      ({ consensus_time; block_producer = _ } : Blocks.t) : Blocks.t =
     let block_producer = Public_key.Compressed.empty in
-    { consensus_time=
+    { consensus_time =
         Consensus.Data.Consensus_time.get_old ~constants:consensus_constants
           consensus_time
-    ; block_producer }
+    ; block_producer
+    }
 
   (* every gc_interval blocks seen, discard blocks more than gc_width ago *)
   let table_gc ~(precomputed_values : Precomputed_values.t) t block =
@@ -159,7 +184,7 @@ module Duplicate_block_detector = struct
       let _, _, gt_map = Map.split t.table splitting_block in
       t.table <- gt_map
 
-  let create () = {table= Map.empty (module Blocks); latest_epoch= 0}
+  let create () = { table = Map.empty (module Blocks); latest_epoch = 0 }
 
   let check ~precomputed_values ~rejected_blocks_logger ~time_received t logger
       external_transition_with_hash =
@@ -173,7 +198,7 @@ module Duplicate_block_detector = struct
     let block_producer =
       External_transition.block_producer external_transition
     in
-    let block = Blocks.{consensus_time; block_producer} in
+    let block = Blocks.{ consensus_time; block_producer } in
     (* try table GC *)
     table_gc ~precomputed_values t block ;
     match Map.find t.table block with
@@ -192,7 +217,8 @@ module Duplicate_block_detector = struct
               , `String
                   (Time.to_string_abs
                      (Block_time.to_time time_received)
-                     ~zone:Time.Zone.utc) ) ]
+                     ~zone:Time.Zone.utc) )
+            ]
           in
           let msg : (_, unit, string, unit) format4 =
             "Duplicate producer and slot: producer = $block_producer, \
@@ -204,8 +230,7 @@ module Duplicate_block_detector = struct
 end
 
 let run ~logger ~trust_system ~verifier ~transition_reader
-    ~valid_transition_writer ~initialization_finish_signal ~precomputed_values
-    =
+    ~valid_transition_writer ~initialization_finish_signal ~precomputed_values =
   let genesis_state_hash =
     Precomputed_values.genesis_state_hash precomputed_values
   in
@@ -265,8 +290,8 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                          (validate_genesis_protocol_state ~genesis_state_hash)
                    >>= (fun x ->
                          Interruptible.uninterruptible
-                           (validate_proofs ~verifier [x])
-                         >>| List.hd_exn )
+                           (validate_proofs ~verifier [ x ])
+                         >>| List.hd_exn)
                    >>= defer validate_delta_transition_chain
                    >>= defer validate_protocol_versions)
                with
@@ -278,6 +303,8 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                    |> Writer.write valid_transition_writer ;
                    Mina_metrics.Transition_frontier
                    .update_max_blocklength_observed blockchain_length ;
+                   Queue.enqueue Transition_frontier.validated_blocks
+                     (With_hash.hash transition_with_hash, sender, time_received) ;
                    return ()
                | Error error ->
                    Mina_net2.Validation_callback.fire_if_not_already_fired
@@ -304,8 +331,9 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                    , `String
                        (Time.to_string_abs
                           (Block_time.to_time time_received)
-                          ~zone:Time.Zone.utc) ) ]
+                          ~zone:Time.Zone.utc) )
+                 ]
                in
                [%log error] ~metadata
                  "Dropping blocks because libp2p validation expired" )
-         else Deferred.unit ))
+         else Deferred.unit))

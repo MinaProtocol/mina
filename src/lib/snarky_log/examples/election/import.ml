@@ -6,6 +6,5 @@ module Field = struct
 
   let to_bits = Field.unpack
 
-  let var_to_bits =
-    Field.Checked.choose_preimage_var ~length:Field.size_in_bits
+  let var_to_bits = Field.Checked.choose_preimage_var ~length:Field.size_in_bits
 end

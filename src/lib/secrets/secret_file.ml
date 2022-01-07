@@ -15,12 +15,12 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
           let%bind stat = Unix.stat dn in
           Deferred.return
           @@
-          if stat.kind <> `Directory then
+          if Unix.File_kind.equal stat.kind `Directory then Ok true
+          else
             corrupted_privkey
               (Error.createf
                  "%s exists and it is not a directory, can't store files there"
-                 dn)
-          else Ok true )
+                 dn))
     with
     | Ok x ->
         return x
@@ -44,7 +44,7 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
             Deferred.Result.return ()
           else if not parent_exists then
             Deferred.return (Error (`Parent_directory_does_not_exist dn))
-          else Deferred.Result.return () )
+          else Deferred.Result.return ())
     with
     | Ok x ->
         Deferred.return x
@@ -57,16 +57,16 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
   let open Deferred.Let_syntax in
   match%bind
     Deferred.Or_error.try_with ~here:[%here] ~extract_exn:true (fun () ->
-        f path )
+        f path)
   with
   | Ok x ->
       Deferred.Result.return x
   | Error e -> (
-    match Error.to_exn e with
-    | Unix.Unix_error (_, _, _) ->
-        Deferred.return (Error (`Cannot_open_file path))
-    | e ->
-        Deferred.return @@ corrupted_privkey (Error.of_exn e) )
+      match Error.to_exn e with
+      | Unix.Unix_error (error_code, _, _) ->
+          Deferred.return (Error (`Cannot_open_file (path, error_code)))
+      | e ->
+          Deferred.return @@ corrupted_privkey (Error.of_exn e) )
 
 let lift (t : 'a Deferred.t) : ('a, 'b) Deferred.Result.t = t >>| fun x -> Ok x
 

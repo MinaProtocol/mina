@@ -21,7 +21,7 @@ module type S = sig
     val dummy : t
   end
 
-  val typ' : [`Constrained | `Unconstrained] -> (t, Constant.t) Typ.t
+  val typ' : [ `Constrained | `Unconstrained ] -> (t, Constant.t) Typ.t
 
   val typ_unchecked : (t, Constant.t) Typ.t
 

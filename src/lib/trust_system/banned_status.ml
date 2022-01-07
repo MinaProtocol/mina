@@ -14,12 +14,13 @@ module Stable = struct
       | Banned_until tm ->
           `Assoc
             [ ( "Banned_until"
-              , `String (Time.to_string_abs tm ~zone:Time.Zone.utc) ) ]
+              , `String (Time.to_string_abs tm ~zone:Time.Zone.utc) )
+            ]
 
     let of_yojson = function
       | `String "Unbanned" ->
           Ok Unbanned
-      | `Assoc [("Banned_until", `String s)] ->
+      | `Assoc [ ("Banned_until", `String s) ] ->
           Ok (Banned_until (Time.of_string s))
       | _ ->
           Error "Banned_status.of_yojson: unexpected JSON"
@@ -36,5 +37,4 @@ module Stable = struct
   end
 end]
 
-[%%define_locally
-Stable.Latest.(to_yojson, of_yojson)]
+[%%define_locally Stable.Latest.(to_yojson, of_yojson)]

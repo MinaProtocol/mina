@@ -33,8 +33,8 @@ let main () =
   in
   Deferred.don't_wait_for (print_heartbeat logger) ;
   let%bind () =
-    Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
-      ~keypairs ~n:3
+    Coda_worker_testnet.Payments.send_several_payments testnet ~node:0 ~keypairs
+      ~n:3
   in
   Coda_worker_testnet.Api.teardown testnet ~logger
 

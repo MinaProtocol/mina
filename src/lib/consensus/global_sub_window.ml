@@ -36,7 +36,7 @@ module Checked = struct
             (Mina_numbers.Length.Checked.to_integer
                constants.slots_per_sub_window)
         in
-        q )
+        q)
 
   let sub_window ~(constants : Constants.var) (t : t) :
       (Sub_window.Checked.t, _) Checked.t =
@@ -46,7 +46,7 @@ module Checked = struct
             (Mina_numbers.Length.Checked.to_integer
                constants.sub_windows_per_window)
         in
-        Sub_window.Checked.Unsafe.of_integer shift )
+        Sub_window.Checked.Unsafe.of_integer shift)
 
   let succ (t : t) : t = Integer.succ ~m t
 

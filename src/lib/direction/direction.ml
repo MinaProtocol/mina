@@ -1,6 +1,6 @@
-open Core
+open Core_kernel
 
-type t = Left | Right [@@deriving sexp, eq]
+type t = Left | Right [@@deriving sexp, equal]
 
 let of_bool = function false -> Left | true -> Right
 
@@ -33,4 +33,4 @@ let shrinker =
         | Left ->
             None
         | Right ->
-            Some (Left, Left) ) )
+            Some (Left, Left)))

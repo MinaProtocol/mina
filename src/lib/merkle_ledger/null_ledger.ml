@@ -9,22 +9,22 @@ end
 module Make (Inputs : Inputs_intf) : sig
   include
     Base_ledger_intf.S
-    with module Addr = Inputs.Location.Addr
-    with module Location = Inputs.Location
-    with type key := Inputs.Key.t
-     and type token_id := Inputs.Token_id.t
-     and type token_id_set := Inputs.Token_id.Set.t
-     and type account_id := Inputs.Account_id.t
-     and type account_id_set := Inputs.Account_id.Set.t
-     and type hash := Inputs.Hash.t
-     and type root_hash := Inputs.Hash.t
-     and type account := Inputs.Account.t
+      with module Addr = Inputs.Location.Addr
+      with module Location = Inputs.Location
+      with type key := Inputs.Key.t
+       and type token_id := Inputs.Token_id.t
+       and type token_id_set := Inputs.Token_id.Set.t
+       and type account_id := Inputs.Account_id.t
+       and type account_id_set := Inputs.Account_id.Set.t
+       and type hash := Inputs.Hash.t
+       and type root_hash := Inputs.Hash.t
+       and type account := Inputs.Account.t
 
   val create : depth:int -> unit -> t
 end = struct
   open Inputs
 
-  type t = {uuid: Uuid.t; depth: int} [@@deriving sexp_of]
+  type t = { uuid : Uuid.t; depth : int } [@@deriving sexp_of]
 
   let t_of_sexp _ = failwith "t_of_sexp unimplemented"
 
@@ -37,7 +37,7 @@ end = struct
 
   module Addr = Location.Addr
 
-  let create ~depth () = {uuid= Uuid_unix.create (); depth}
+  let create ~depth () = { uuid = Uuid_unix.create (); depth }
 
   let remove_accounts_exn _t keys =
     if List.is_empty keys then ()
@@ -85,6 +85,8 @@ end = struct
 
   let get _t _loc = None
 
+  let get_batch _t locs = List.map locs ~f:(fun loc -> (loc, None))
+
   let get_uuid t = t.uuid
 
   let get_directory _ = None
@@ -97,6 +99,9 @@ end = struct
     failwith "get_or_create_account: null ledgers cannot be mutated"
 
   let location_of_account _t _ = None
+
+  let location_of_account_batch _t accts =
+    List.map accts ~f:(fun acct -> (acct, None))
 
   let accounts _t = Account_id.Set.empty
 

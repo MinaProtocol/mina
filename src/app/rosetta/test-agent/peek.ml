@@ -164,7 +164,7 @@ module Construction = struct
             |> to_yojson)
         ~path:"construction/submit"
     in
-    Lift.res ~logger res ~of_yojson:Construction_submit_response.of_yojson
+    Lift.res ~logger res ~of_yojson:Transaction_identifier_response.of_yojson
     |> Lift.successfully
 end
 

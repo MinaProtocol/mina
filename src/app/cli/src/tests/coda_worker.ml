@@ -8,29 +8,30 @@ open Init
 
 module Input = struct
   type t =
-    { addrs_and_ports: Node_addrs_and_ports.Display.Stable.Latest.t
-    ; libp2p_keypair: Mina_net2.Keypair.Stable.Latest.t
-    ; net_configs:
+    { addrs_and_ports : Node_addrs_and_ports.Display.Stable.Latest.t
+    ; libp2p_keypair : Mina_net2.Keypair.Stable.Latest.t
+    ; net_configs :
         ( Node_addrs_and_ports.Display.Stable.Latest.t
         * Mina_net2.Keypair.Stable.Latest.t )
         list
         * Node_addrs_and_ports.Display.Stable.Latest.t list list
-    ; snark_worker_key: Public_key.Compressed.Stable.Latest.t option
-    ; env: (string * string) list
-    ; block_production_key: int option
-    ; work_selection_method:
+    ; snark_worker_key : Public_key.Compressed.Stable.Latest.t option
+    ; env : (string * string) list
+    ; block_production_key : int option
+    ; work_selection_method :
         Cli_lib.Arg_type.Work_selection_method.Stable.Latest.t
-    ; conf_dir: string
-    ; trace_dir: string option
-    ; program_dir: string
-    ; acceptable_delay: Time.Span.t
-    ; chain_id: string
-    ; peers: string list
-    ; max_concurrent_connections: int option
-    ; is_archive_rocksdb: bool
-    ; is_seed: bool
-    ; archive_process_location: Core.Host_and_port.t option
-    ; runtime_config: Runtime_config.t }
+    ; conf_dir : string
+    ; trace_dir : string option
+    ; program_dir : string
+    ; acceptable_delay : Time.Span.t
+    ; chain_id : string
+    ; peers : string list
+    ; max_concurrent_connections : int option
+    ; is_archive_rocksdb : bool
+    ; is_seed : bool
+    ; archive_process_location : Core.Host_and_port.t option
+    ; runtime_config : Runtime_config.t
+    }
   [@@deriving bin_io_unversioned]
 end
 
@@ -56,95 +57,94 @@ module T = struct
   type state_hashes = bool list * bool list
 
   type 'worker functions =
-    { peers: ('worker, unit, Network_peer.Peer.t list) Rpc_parallel.Function.t
-    ; start: ('worker, unit, unit) Rpc_parallel.Function.t
-    ; get_balance:
+    { peers : ('worker, unit, Network_peer.Peer.t list) Rpc_parallel.Function.t
+    ; start : ('worker, unit, unit) Rpc_parallel.Function.t
+    ; get_balance :
         ( 'worker
         , Account_id.t
         , Currency.Balance.t option )
         Rpc_parallel.Function.t
-    ; get_nonce:
+    ; get_nonce :
         ( 'worker
         , Account_id.t
         , Mina_numbers.Account_nonce.t option )
         Rpc_parallel.Function.t
-    ; root_length: ('worker, unit, int) Rpc_parallel.Function.t
-    ; send_user_command:
+    ; root_length : ('worker, unit, int) Rpc_parallel.Function.t
+    ; send_user_command :
         ( 'worker
         , Send_payment_input.t
         , Signed_command.t Or_error.t )
         Rpc_parallel.Function.t
-    ; process_user_command:
+    ; process_user_command :
         ( 'worker
         , User_command_input.t
         , Signed_command.t Or_error.t )
         Rpc_parallel.Function.t
-    ; verified_transitions:
+    ; verified_transitions :
         ('worker, unit, state_hashes Pipe.Reader.t) Rpc_parallel.Function.t
-    ; sync_status:
+    ; sync_status :
         ('worker, unit, Sync_status.t Pipe.Reader.t) Rpc_parallel.Function.t
-    ; new_user_command:
+    ; new_user_command :
         ( 'worker
         , Public_key.Compressed.t
         , Signed_command.t Pipe.Reader.t )
         Rpc_parallel.Function.t
-    ; root_diff:
+    ; root_diff :
         ( 'worker
         , unit
         , Mina_lib.Root_diff.t Pipe.Reader.t )
         Rpc_parallel.Function.t
-    ; initialization_finish_signal:
+    ; initialization_finish_signal :
         ('worker, unit, unit Pipe.Reader.t) Rpc_parallel.Function.t
-    ; new_block:
+    ; new_block :
         ( 'worker
         , Account.key
         , (Filtered_external_transition.t, State_hash.t) With_hash.t
           Pipe.Reader.t )
         Rpc_parallel.Function.t
-    ; dump_tf: ('worker, unit, string) Rpc_parallel.Function.t
-    ; best_path:
-        ( 'worker
-        , unit
-        , State_hash.Stable.Latest.t list )
-        Rpc_parallel.Function.t
-    ; replace_snark_worker_key:
+    ; dump_tf : ('worker, unit, string) Rpc_parallel.Function.t
+    ; best_path :
+        ('worker, unit, State_hash.Stable.Latest.t list) Rpc_parallel.Function.t
+    ; replace_snark_worker_key :
         ('worker, Public_key.Compressed.t option, unit) Rpc_parallel.Function.t
-    ; stop_snark_worker: ('worker, unit, unit) Rpc_parallel.Function.t
-    ; validated_transitions_keyswaptest:
+    ; stop_snark_worker : ('worker, unit, unit) Rpc_parallel.Function.t
+    ; validated_transitions_keyswaptest :
         ( 'worker
         , unit
         , External_transition.Validated.t Pipe.Reader.t )
-        Rpc_parallel.Function.t }
+        Rpc_parallel.Function.t
+    }
 
   type coda_functions =
-    { coda_peers: unit -> Network_peer.Peer.t list Deferred.t
-    ; coda_start: unit -> unit Deferred.t
-    ; coda_get_balance: Account_id.t -> Currency.Balance.t option Deferred.t
-    ; coda_get_nonce:
+    { coda_peers : unit -> Network_peer.Peer.t list Deferred.t
+    ; coda_start : unit -> unit Deferred.t
+    ; coda_get_balance : Account_id.t -> Currency.Balance.t option Deferred.t
+    ; coda_get_nonce :
         Account_id.t -> Mina_numbers.Account_nonce.t option Deferred.t
-    ; coda_root_length: unit -> int Deferred.t
-    ; coda_send_payment:
+    ; coda_root_length : unit -> int Deferred.t
+    ; coda_send_payment :
         Send_payment_input.t -> Signed_command.t Or_error.t Deferred.t
-    ; coda_process_user_command:
+    ; coda_process_user_command :
         User_command_input.t -> Signed_command.t Or_error.t Deferred.t
-    ; coda_verified_transitions: unit -> state_hashes Pipe.Reader.t Deferred.t
-    ; coda_sync_status: unit -> Sync_status.t Pipe.Reader.t Deferred.t
-    ; coda_new_user_command:
+    ; coda_verified_transitions : unit -> state_hashes Pipe.Reader.t Deferred.t
+    ; coda_sync_status : unit -> Sync_status.t Pipe.Reader.t Deferred.t
+    ; coda_new_user_command :
         Public_key.Compressed.t -> Signed_command.t Pipe.Reader.t Deferred.t
-    ; coda_replace_snark_worker_key:
+    ; coda_replace_snark_worker_key :
         Public_key.Compressed.t option -> unit Deferred.t
-    ; coda_stop_snark_worker: unit -> unit Deferred.t
-    ; coda_validated_transitions_keyswaptest:
+    ; coda_stop_snark_worker : unit -> unit Deferred.t
+    ; coda_validated_transitions_keyswaptest :
         unit -> External_transition.Validated.t Pipe.Reader.t Deferred.t
-    ; coda_root_diff: unit -> Mina_lib.Root_diff.t Pipe.Reader.t Deferred.t
-    ; coda_initialization_finish_signal: unit -> unit Pipe.Reader.t Deferred.t
-    ; coda_new_block:
+    ; coda_root_diff : unit -> Mina_lib.Root_diff.t Pipe.Reader.t Deferred.t
+    ; coda_initialization_finish_signal : unit -> unit Pipe.Reader.t Deferred.t
+    ; coda_new_block :
            Account.key
         -> (Filtered_external_transition.t, State_hash.t) With_hash.t
            Pipe.Reader.t
            Deferred.t
-    ; coda_dump_tf: unit -> string Deferred.t
-    ; coda_best_path: unit -> State_hash.t list Deferred.t }
+    ; coda_dump_tf : unit -> string Deferred.t
+    ; coda_best_path : unit -> State_hash.t list Deferred.t
+    }
 
   module Worker_state = struct
     type init_arg = Input.t [@@deriving bin_io_unversioned]
@@ -160,8 +160,8 @@ module T = struct
 
   module Functions
       (C : Rpc_parallel.Creator
-           with type worker_state := Worker_state.t
-            and type connection_state := Connection_state.t) =
+             with type worker_state := Worker_state.t
+              and type connection_state := Connection_state.t) =
   struct
     let peers_impl ~worker_state ~conn_state:() () = worker_state.coda_peers ()
 
@@ -217,8 +217,7 @@ module T = struct
 
     let peers =
       C.create_rpc ~f:peers_impl ~name:"peers" ~bin_input:Unit.bin_t
-        ~bin_output:[%bin_type_class: Network_peer.Peer.Stable.Latest.t list]
-        ()
+        ~bin_output:[%bin_type_class: Network_peer.Peer.Stable.Latest.t list] ()
 
     let start =
       C.create_rpc ~name:"start" ~f:start_impl ~bin_input:Unit.bin_t
@@ -238,8 +237,8 @@ module T = struct
         ()
 
     let root_length =
-      C.create_rpc ~name:"root_length" ~f:root_length_impl
-        ~bin_input:Unit.bin_t ~bin_output:Int.bin_t ()
+      C.create_rpc ~name:"root_length" ~f:root_length_impl ~bin_input:Unit.bin_t
+        ~bin_output:Int.bin_t ()
 
     let new_block =
       C.create_pipe ~f:new_block_impl ~name:"new_block"
@@ -248,19 +247,20 @@ module T = struct
           [%bin_type_class:
             ( Filtered_external_transition.Stable.Latest.t
             , State_hash.Stable.Latest.t )
-            With_hash.Stable.Latest.t] ()
+            With_hash.Stable.Latest.t]
+        ()
 
     let send_user_command =
       C.create_rpc ~name:"send_user_command" ~f:send_payment_impl
         ~bin_input:Send_payment_input.Stable.Latest.bin_t
-        ~bin_output:
-          [%bin_type_class: Signed_command.Stable.Latest.t Or_error.t] ()
+        ~bin_output:[%bin_type_class: Signed_command.Stable.Latest.t Or_error.t]
+        ()
 
     let process_user_command =
       C.create_rpc ~name:"process_user_command" ~f:process_user_command_impl
         ~bin_input:User_command_input.Stable.Latest.bin_t
-        ~bin_output:
-          [%bin_type_class: Signed_command.Stable.Latest.t Or_error.t] ()
+        ~bin_output:[%bin_type_class: Signed_command.Stable.Latest.t Or_error.t]
+        ()
 
     let verified_transitions =
       C.create_pipe ~name:"verified_transitions" ~f:verified_transitions_impl
@@ -328,7 +328,8 @@ module T = struct
       ; new_user_command
       ; replace_snark_worker_key
       ; stop_snark_worker
-      ; validated_transitions_keyswaptest }
+      ; validated_transitions_keyswaptest
+      }
 
     let init_worker_state
         { addrs_and_ports
@@ -340,17 +341,19 @@ module T = struct
         ; trace_dir
         ; chain_id
         ; peers
-        ; max_concurrent_connections= _ (* FIXME #4095: use this *)
+        ; max_concurrent_connections = _ (* FIXME #4095: use this *)
         ; is_archive_rocksdb
         ; is_seed
         ; archive_process_location
         ; runtime_config
-        ; _ } =
+        ; _
+        } =
       let logger =
         Logger.create
           ~metadata:
             [ ("host", `String addrs_and_ports.external_ip)
-            ; ("port", `Int addrs_and_ports.libp2p_port) ]
+            ; ("port", `Int addrs_and_ports.libp2p_port)
+            ]
           ()
       in
       let%bind precomputed_values, _runtime_config =
@@ -365,7 +368,7 @@ module T = struct
         Option.value_map trace_dir
           ~f:(fun d ->
             let%bind () = Async.Unix.mkdir ~p:() d in
-            Coda_tracing.start d )
+            Coda_tracing.start d)
           ~default:Deferred.unit
       in
       let%bind () = File_system.create_dir conf_dir in
@@ -384,7 +387,7 @@ module T = struct
           let block_production_keypair =
             Option.map block_production_key ~f:(fun i ->
                 List.nth_exn (Lazy.force Genesis_ledger.accounts) i
-                |> Genesis_ledger.keypair_of_account_record_exn )
+                |> Genesis_ledger.keypair_of_account_record_exn)
           in
           let initial_block_production_keypairs =
             Keypair.Set.of_list (block_production_keypair |> Option.to_list)
@@ -393,7 +396,7 @@ module T = struct
             Public_key.Compressed.Set.of_list
               ( Option.map block_production_keypair ~f:(fun keypair ->
                     let open Keypair in
-                    Public_key.compress keypair.public_key )
+                    Public_key.compress keypair.public_key)
               |> Option.to_list )
           in
           let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
@@ -408,40 +411,44 @@ module T = struct
           in
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
-              { timeout= Time.Span.of_sec 3.
-              ; initial_peers= List.map ~f:Mina_net2.Multiaddr.of_string peers
-              ; addrs_and_ports=
+              { timeout = Time.Span.of_sec 3.
+              ; initial_peers = List.map ~f:Mina_net2.Multiaddr.of_string peers
+              ; addrs_and_ports =
                   Node_addrs_and_ports.of_display addrs_and_ports
-              ; metrics_port= None
+              ; metrics_port = None
               ; conf_dir
               ; chain_id
               ; logger
-              ; seed_peer_list_url= None
-              ; unsafe_no_trust_ip= true
-              ; isolate= false
+              ; seed_peer_list_url = None
+              ; unsafe_no_trust_ip = true
+              ; isolate = false
               ; trust_system
-              ; flooding= false
-              ; direct_peers= []
-              ; max_connections= 50
-              ; validation_queue_size= 150
-              ; peer_exchange= true
-              ; mina_peer_exchange= true
-              ; keypair= Some libp2p_keypair }
+              ; flooding = false
+              ; direct_peers = []
+              ; min_connections = 20
+              ; max_connections = 50
+              ; validation_queue_size = 150
+              ; peer_exchange = true
+              ; mina_peer_exchange = true
+              ; keypair = Some libp2p_keypair
+              ; all_peers_seen_metric = false
+              }
           in
           let net_config =
             { Mina_networking.Config.logger
             ; trust_system
             ; time_controller
             ; consensus_local_state
-            ; is_seed= List.is_empty peers
-            ; genesis_ledger_hash=
+            ; is_seed = List.is_empty peers
+            ; genesis_ledger_hash =
                 Ledger.merkle_root (Lazy.force Genesis_ledger.t)
             ; constraint_constants
-            ; log_gossip_heard=
-                { snark_pool_diff= true
-                ; transaction_pool_diff= true
-                ; new_state= true }
-            ; creatable_gossip_net=
+            ; log_gossip_heard =
+                { snark_pool_diff = true
+                ; transaction_pool_diff = true
+                ; new_state = true
+                }
+            ; creatable_gossip_net =
                 Mina_networking.Gossip_net.(
                   Any.Creatable
                     ((module Libp2p), Libp2p.create gossip_net_params ~pids))
@@ -465,25 +472,25 @@ module T = struct
                       work_selection_method)
                  ~snark_worker_config:
                    Mina_lib.Config.Snark_worker_config.
-                     { initial_snark_worker_key= snark_worker_key
-                     ; shutdown_on_disconnect= true
-                     ; num_threads= None }
+                     { initial_snark_worker_key = snark_worker_key
+                     ; shutdown_on_disconnect = true
+                     ; num_threads = None
+                     }
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~persistent_root_location:(conf_dir ^/ "root")
                  ~persistent_frontier_location:(conf_dir ^/ "frontier")
                  ~epoch_ledger_location
-                 ~wallets_disk_location:(conf_dir ^/ "wallets")
-                 ~time_controller ~snark_work_fee:(Currency.Fee.of_int 0)
+                 ~wallets_disk_location:(conf_dir ^/ "wallets") ~time_controller
+                 ~snark_work_fee:(Currency.Fee.of_int 0)
                  ~initial_block_production_keypairs ~monitor
                  ~consensus_local_state ~is_archive_rocksdb
                  ~work_reassignment_wait:420000 ~precomputed_values ~start_time
                  ~upload_blocks_to_gcloud:false
                  ~archive_process_location:
-                   (Option.map archive_process_location
-                      ~f:(fun host_and_port ->
+                   (Option.map archive_process_location ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
-                          {name= "dummy"; value= host_and_port} ))
-                 ~log_precomputed_blocks:false ())
+                          { name = "dummy"; value = host_and_port }))
+                 ~log_precomputed_blocks:false ~stop_time:48 ())
           in
           let coda_ref : Mina_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
@@ -495,7 +502,7 @@ module T = struct
                 coda_ref := Some coda ;
                 [%log info] "Setting up snark worker " ;
                 Coda_run.setup_local_server coda ;
-                coda )
+                coda)
               ()
           in
           [%log info] "Worker finish setting up coda" ;
@@ -525,10 +532,11 @@ module T = struct
                 ~valid_until:None
                 ~body:
                   (Payment
-                     { source_pk= sender_pk
+                     { source_pk = sender_pk
                      ; receiver_pk
-                     ; token_id= Token_id.default
-                     ; amount })
+                     ; token_id = Token_id.default
+                     ; amount
+                     })
                 ~sign_choice:
                   (User_command_input.Sign_choice.Keypair
                      (Keypair.of_private_key_exn sender_sk))
@@ -582,7 +590,7 @@ module T = struct
                         reader end? dropping this write..." ;
                    Linear_pipe.write_without_pushback_if_open w
                      (prev_state_hash, state_hash) ;
-                   Deferred.unit )) ;
+                   Deferred.unit)) ;
             return r.pipe
           in
           let coda_validated_transitions_keyswaptest () =
@@ -591,13 +599,12 @@ module T = struct
           let coda_root_diff () =
             let r, w = Linear_pipe.create () in
             don't_wait_for
-              (Strict_pipe.Reader.iter (Mina_lib.root_diff coda)
-                 ~f:(fun diff ->
+              (Strict_pipe.Reader.iter (Mina_lib.root_diff coda) ~f:(fun diff ->
                    if Pipe.is_closed w then
                      [%log error]
                        "[coda_root_diff] why is this w pipe closed? did \
                         someone close the reader end? dropping this write..." ;
-                   Linear_pipe.write_if_open w diff )) ;
+                   Linear_pipe.write_if_open w diff)) ;
             return r.pipe
           in
           let coda_initialization_finish_signal () =
@@ -617,7 +624,8 @@ module T = struct
             Deferred.return (Option.value ~default:[] path)
           in
           let parse_sync_status_exn = function
-            | `Assoc [("data", `Assoc [("newSyncUpdate", `String status)])] ->
+            | `Assoc [ ("data", `Assoc [ ("newSyncUpdate", `String status) ]) ]
+              ->
                 Sync_status.of_string status |> Or_error.ok_exn
             | unexpected_json ->
                 failwithf
@@ -637,7 +645,7 @@ module T = struct
                       | Error json ->
                           failwith
                             (sprintf "Receiving sync status error: %s"
-                               (Yojson.Basic.to_string json)) )
+                               (Yojson.Basic.to_string json)))
                 | _ ->
                     failwith "Expected to get a stream of sync updates" )
             | Error e ->
@@ -649,27 +657,28 @@ module T = struct
             Fn.compose Deferred.return
             @@ Mina_commands.For_tests.Subscriptions.new_user_commands coda
           in
-          { coda_peers= with_monitor coda_peers
-          ; coda_verified_transitions= with_monitor coda_verified_transitions
-          ; coda_root_diff= with_monitor coda_root_diff
-          ; coda_initialization_finish_signal=
+          { coda_peers = with_monitor coda_peers
+          ; coda_verified_transitions = with_monitor coda_verified_transitions
+          ; coda_root_diff = with_monitor coda_root_diff
+          ; coda_initialization_finish_signal =
               with_monitor coda_initialization_finish_signal
-          ; coda_get_balance= with_monitor coda_get_balance
-          ; coda_get_nonce= with_monitor coda_get_nonce
-          ; coda_root_length= with_monitor coda_root_length
-          ; coda_send_payment= with_monitor coda_send_payment
-          ; coda_process_user_command= with_monitor coda_process_user_command
-          ; coda_new_block= with_monitor coda_new_block
-          ; coda_start= with_monitor coda_start
-          ; coda_dump_tf= with_monitor coda_dump_tf
-          ; coda_best_path= with_monitor coda_best_path
-          ; coda_sync_status= with_monitor coda_sync_status
-          ; coda_new_user_command= with_monitor coda_new_user_command
-          ; coda_validated_transitions_keyswaptest=
+          ; coda_get_balance = with_monitor coda_get_balance
+          ; coda_get_nonce = with_monitor coda_get_nonce
+          ; coda_root_length = with_monitor coda_root_length
+          ; coda_send_payment = with_monitor coda_send_payment
+          ; coda_process_user_command = with_monitor coda_process_user_command
+          ; coda_new_block = with_monitor coda_new_block
+          ; coda_start = with_monitor coda_start
+          ; coda_dump_tf = with_monitor coda_dump_tf
+          ; coda_best_path = with_monitor coda_best_path
+          ; coda_sync_status = with_monitor coda_sync_status
+          ; coda_new_user_command = with_monitor coda_new_user_command
+          ; coda_validated_transitions_keyswaptest =
               with_monitor coda_validated_transitions_keyswaptest
-          ; coda_replace_snark_worker_key=
+          ; coda_replace_snark_worker_key =
               with_monitor coda_replace_snark_worker_key
-          ; coda_stop_snark_worker= with_monitor coda_stop_snark_worker } )
+          ; coda_stop_snark_worker = with_monitor coda_stop_snark_worker
+          })
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end

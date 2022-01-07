@@ -19,8 +19,8 @@ let%test_module "blake2-equality test" =
       in
       checked_result
 
-    let test_equal (type a) ?(sexp_of_t = sexp_of_opaque) ?(equal = ( = )) typ1
-        typ2 checked unchecked input =
+    let test_equal (type a) ?(sexp_of_t = sexp_of_opaque) ?(equal = Poly.( = ))
+        typ1 typ2 checked unchecked input =
       let checked_result = checked_to_unchecked typ1 typ2 checked input in
       let sexp_of_a = sexp_of_t in
       let compare_a x y = if equal x y then 0 else 1 in
@@ -33,7 +33,7 @@ let%test_module "blake2-equality test" =
 
     let to_bitstring bits =
       String.init (Array.length bits) ~f:(fun i ->
-          if bits.(i) then '1' else '0' )
+          if bits.(i) then '1' else '0')
 
     let%test_unit "constraint count" =
       assert (
@@ -63,5 +63,5 @@ let%test_module "blake2-equality test" =
             ~sexp_of_t:(Fn.compose [%sexp_of: string] to_bitstring)
             input_typ output_typ
             (blake2s ?personalization:None)
-            blake2_unchecked input )
+            blake2_unchecked input)
   end )

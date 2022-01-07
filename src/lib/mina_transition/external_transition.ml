@@ -20,6 +20,8 @@ module Validate_content = struct
 
   let sexp_of_t _ = sexp_of_unit ()
 
+  let compare _ _ = 0
+
   let __versioned__ = ()
 end
 
@@ -29,15 +31,16 @@ module Raw_versioned__ = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { protocol_state: Protocol_state.Value.Stable.V1.t
-        ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
-        ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
-        ; delta_transition_chain_proof:
+        { protocol_state : Protocol_state.Value.Stable.V1.t
+        ; protocol_state_proof : Proof.Stable.V1.t [@sexp.opaque]
+        ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
+        ; delta_transition_chain_proof :
             State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
-        ; current_protocol_version: Protocol_version.Stable.V1.t
-        ; proposed_protocol_version_opt: Protocol_version.Stable.V1.t option
-        ; mutable validation_callback: Validate_content.t }
-      [@@deriving sexp, fields]
+        ; current_protocol_version : Protocol_version.Stable.V1.t
+        ; proposed_protocol_version_opt : Protocol_version.Stable.V1.t option
+        ; mutable validation_callback : Validate_content.t
+        }
+      [@@deriving compare, sexp, fields]
 
       let to_latest = Fn.id
 
@@ -52,8 +55,8 @@ module Raw_versioned__ = struct
         -> 'a
 
       let map_creator c ~f ~protocol_state ~protocol_state_proof
-          ~staged_ledger_diff ~delta_transition_chain_proof
-          ~validation_callback ?proposed_protocol_version_opt () =
+          ~staged_ledger_diff ~delta_transition_chain_proof ~validation_callback
+          ?proposed_protocol_version_opt () =
         f
           (c ~protocol_state ~protocol_state_proof ~staged_ledger_diff
              ~delta_transition_chain_proof ~validation_callback
@@ -75,7 +78,8 @@ module Raw_versioned__ = struct
         ; delta_transition_chain_proof
         ; current_protocol_version
         ; proposed_protocol_version_opt
-        ; validation_callback }
+        ; validation_callback
+        }
     end
   end]
 end
@@ -95,17 +99,17 @@ Raw_versioned__.
   , current_protocol_version
   , proposed_protocol_version_opt
   , validation_callback
-  , set_validation_callback )]
+  , set_validation_callback
+  , compare )]
 
-[%%define_locally
-Stable.Latest.(create, sexp_of_t, t_of_sexp)]
+[%%define_locally Stable.Latest.(create, sexp_of_t, t_of_sexp)]
 
 type external_transition = t
 
 (*
 type t_ = Raw_versioned__.t =
   { protocol_state: Protocol_state.Value.t
-  ; protocol_state_proof: Proof.t sexp_opaque
+  ; protocol_state_proof: Proof.t [@sexp.opaque]
   ; staged_ledger_diff: Staged_ledger_diff.t
   ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list
   ; current_protocol_version: Protocol_version.t
@@ -118,9 +122,7 @@ module Precomputed_block = struct
     type t = Proof.t
 
     let to_bin_string proof =
-      let proof_string =
-        Binable.to_string (module Proof.Stable.Latest) proof
-      in
+      let proof_string = Binable.to_string (module Proof.Stable.Latest) proof in
       (* We use base64 with the uri-safe alphabet to ensure that encoding and
          decoding is cheap, and that the proof can be easily sent over http
          etc. without escaping or re-encoding.
@@ -152,19 +154,20 @@ module Precomputed_block = struct
           |> Result.map_error ~f:(fun err ->
                  sprintf
                    "External_transition.Precomputed_block.Proof.of_yojson: %s"
-                   (Error.to_string_hum err) )
+                   (Error.to_string_hum err))
       | json ->
           Proof.of_yojson json
   end
 
   module T = struct
     type t =
-      { scheduled_time: Block_time.t
-      ; protocol_state: Protocol_state.value
-      ; protocol_state_proof: Proof.t
-      ; staged_ledger_diff: Staged_ledger_diff.t
-      ; delta_transition_chain_proof:
-          Frozen_ledger_hash.t * Frozen_ledger_hash.t list }
+      { scheduled_time : Block_time.t
+      ; protocol_state : Protocol_state.value
+      ; protocol_state_proof : Proof.t
+      ; staged_ledger_diff : Staged_ledger_diff.t
+      ; delta_transition_chain_proof :
+          Frozen_ledger_hash.t * Frozen_ledger_hash.t list
+      }
     [@@deriving sexp, yojson]
   end
 
@@ -176,13 +179,13 @@ module Precomputed_block = struct
 
     module V1 = struct
       type t = T.t =
-        { scheduled_time: Block_time.Stable.V1.t
-        ; protocol_state: Protocol_state.Value.Stable.V1.t
-        ; protocol_state_proof: Mina_base.Proof.Stable.V1.t
-        ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
-        ; delta_transition_chain_proof:
-            Frozen_ledger_hash.Stable.V1.t
-            * Frozen_ledger_hash.Stable.V1.t list }
+        { scheduled_time : Block_time.Stable.V1.t
+        ; protocol_state : Protocol_state.Value.Stable.V1.t
+        ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
+        ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
+        ; delta_transition_chain_proof :
+            Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
+        }
 
       let to_latest = Fn.id
     end
@@ -190,10 +193,11 @@ module Precomputed_block = struct
 
   let of_external_transition ~scheduled_time (t : external_transition) =
     { scheduled_time
-    ; protocol_state= t.protocol_state
-    ; protocol_state_proof= t.protocol_state_proof
-    ; staged_ledger_diff= t.staged_ledger_diff
-    ; delta_transition_chain_proof= t.delta_transition_chain_proof }
+    ; protocol_state = t.protocol_state
+    ; protocol_state_proof = t.protocol_state_proof
+    ; staged_ledger_diff = t.staged_ledger_diff
+    ; delta_transition_chain_proof = t.delta_transition_chain_proof
+    }
 
   (* NOTE: This serialization is used externally and MUST NOT change.
      If the underlying types change, you should write a conversion, or add
@@ -244,8 +248,7 @@ end
 
 let consensus_state = Fn.compose Protocol_state.consensus_state protocol_state
 
-let blockchain_state =
-  Fn.compose Protocol_state.blockchain_state protocol_state
+let blockchain_state = Fn.compose Protocol_state.blockchain_state protocol_state
 
 let state_hash = Fn.compose Protocol_state.hash protocol_state
 
@@ -267,8 +270,7 @@ let coinbase_receiver =
   Fn.compose Consensus.Data.Consensus_state.coinbase_receiver consensus_state
 
 let supercharge_coinbase =
-  Fn.compose Consensus.Data.Consensus_state.supercharge_coinbase
-    consensus_state
+  Fn.compose Consensus.Data.Consensus_state.supercharge_coinbase consensus_state
 
 let block_winner =
   Fn.compose Consensus.Data.Consensus_state.block_stake_winner consensus_state
@@ -290,7 +292,8 @@ let to_yojson t =
       , `String
           (Option.value_map
              (proposed_protocol_version_opt t)
-             ~default:"<None>" ~f:Protocol_version.to_string) ) ]
+             ~default:"<None>" ~f:Protocol_version.to_string) )
+    ]
 
 let equal =
   Comparable.lift Consensus.Data.Consensus_state.Value.equal ~f:consensus_state
@@ -314,17 +317,20 @@ let transactions ~constraint_constants t =
 
 let payments t =
   List.filter_map (commands t) ~f:(function
-    | {data= Signed_command ({payload= {body= Payment _; _}; _} as c); status}
-      ->
-        Some {With_status.data= c; status}
+    | { data = Signed_command ({ payload = { body = Payment _; _ }; _ } as c)
+      ; status
+      } ->
+        Some { With_status.data = c; status }
     | _ ->
-        None )
+        None)
 
-let broadcast t =
-  Mina_net2.Validation_callback.fire_exn (validation_callback t) `Accept
+let accept t =
+  Mina_net2.Validation_callback.fire_if_not_already_fired
+    (validation_callback t) `Accept
 
-let don't_broadcast t =
-  Mina_net2.Validation_callback.fire_exn (validation_callback t) `Reject
+let reject t =
+  Mina_net2.Validation_callback.fire_if_not_already_fired
+    (validation_callback t) `Reject
 
 let poke_validation_callback t cb = set_validation_callback t cb
 
@@ -333,7 +339,7 @@ let timestamp =
     (Fn.compose Protocol_state.blockchain_state protocol_state)
 
 type protocol_version_status =
-  {valid_current: bool; valid_next: bool; matches_daemon: bool}
+  { valid_current : bool; valid_next : bool; matches_daemon : bool }
 
 let protocol_version_status t =
   let valid_current = Protocol_version.is_valid (current_protocol_version t) in
@@ -345,7 +351,7 @@ let protocol_version_status t =
   let matches_daemon =
     Protocol_version.compatible_with_daemon (current_protocol_version t)
   in
-  {valid_current; valid_next; matches_daemon}
+  { valid_current; valid_next; matches_daemon }
 
 module Validation = struct
   type ( 'time_received
@@ -363,36 +369,36 @@ module Validation = struct
     * 'frontier_dependencies
     * 'staged_ledger_diff
     * 'protocol_versions
-    constraint 'time_received = [`Time_received] * (unit, _) Truth.t
-    constraint 'genesis_state = [`Genesis_state] * (unit, _) Truth.t
-    constraint 'proof = [`Proof] * (unit, _) Truth.t
+    constraint 'time_received = [ `Time_received ] * (unit, _) Truth.t
+    constraint 'genesis_state = [ `Genesis_state ] * (unit, _) Truth.t
+    constraint 'proof = [ `Proof ] * (unit, _) Truth.t
     constraint
       'delta_transition_chain =
-      [`Delta_transition_chain] * (State_hash.t Non_empty_list.t, _) Truth.t
+      [ `Delta_transition_chain ] * (State_hash.t Non_empty_list.t, _) Truth.t
     constraint
       'frontier_dependencies =
-      [`Frontier_dependencies] * (unit, _) Truth.t
-    constraint 'staged_ledger_diff = [`Staged_ledger_diff] * (unit, _) Truth.t
-    constraint 'protocol_versions = [`Protocol_versions] * (unit, _) Truth.t
+      [ `Frontier_dependencies ] * (unit, _) Truth.t
+    constraint 'staged_ledger_diff = [ `Staged_ledger_diff ] * (unit, _) Truth.t
+    constraint 'protocol_versions = [ `Protocol_versions ] * (unit, _) Truth.t
 
   type fully_invalid =
-    ( [`Time_received] * unit Truth.false_t
-    , [`Genesis_state] * unit Truth.false_t
-    , [`Proof] * unit Truth.false_t
-    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.false_t
-    , [`Frontier_dependencies] * unit Truth.false_t
-    , [`Staged_ledger_diff] * unit Truth.false_t
-    , [`Protocol_versions] * unit Truth.false_t )
+    ( [ `Time_received ] * unit Truth.false_t
+    , [ `Genesis_state ] * unit Truth.false_t
+    , [ `Proof ] * unit Truth.false_t
+    , [ `Delta_transition_chain ] * State_hash.t Non_empty_list.t Truth.false_t
+    , [ `Frontier_dependencies ] * unit Truth.false_t
+    , [ `Staged_ledger_diff ] * unit Truth.false_t
+    , [ `Protocol_versions ] * unit Truth.false_t )
     t
 
   type fully_valid =
-    ( [`Time_received] * unit Truth.true_t
-    , [`Genesis_state] * unit Truth.true_t
-    , [`Proof] * unit Truth.true_t
-    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
-    , [`Frontier_dependencies] * unit Truth.true_t
-    , [`Staged_ledger_diff] * unit Truth.true_t
-    , [`Protocol_versions] * unit Truth.true_t )
+    ( [ `Time_received ] * unit Truth.true_t
+    , [ `Genesis_state ] * unit Truth.true_t
+    , [ `Proof ] * unit Truth.true_t
+    , [ `Delta_transition_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+    , [ `Frontier_dependencies ] * unit Truth.true_t
+    , [ `Staged_ledger_diff ] * unit Truth.true_t
+    , [ `Protocol_versions ] * unit Truth.true_t )
     t
 
   type ( 'time_received
@@ -423,23 +429,23 @@ module Validation = struct
     , (`Protocol_versions, Truth.False) )
 
   type initial_valid =
-    ( [`Time_received] * unit Truth.true_t
-    , [`Genesis_state] * unit Truth.true_t
-    , [`Proof] * unit Truth.true_t
-    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
-    , [`Frontier_dependencies] * unit Truth.false_t
-    , [`Staged_ledger_diff] * unit Truth.false_t
-    , [`Protocol_versions] * unit Truth.true_t )
+    ( [ `Time_received ] * unit Truth.true_t
+    , [ `Genesis_state ] * unit Truth.true_t
+    , [ `Proof ] * unit Truth.true_t
+    , [ `Delta_transition_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+    , [ `Frontier_dependencies ] * unit Truth.false_t
+    , [ `Staged_ledger_diff ] * unit Truth.false_t
+    , [ `Protocol_versions ] * unit Truth.true_t )
     t
 
   type almost_valid =
-    ( [`Time_received] * unit Truth.true_t
-    , [`Genesis_state] * unit Truth.true_t
-    , [`Proof] * unit Truth.true_t
-    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
-    , [`Frontier_dependencies] * unit Truth.true_t
-    , [`Staged_ledger_diff] * unit Truth.false_t
-    , [`Protocol_versions] * unit Truth.true_t )
+    ( [ `Time_received ] * unit Truth.true_t
+    , [ `Genesis_state ] * unit Truth.true_t
+    , [ `Proof ] * unit Truth.true_t
+    , [ `Delta_transition_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+    , [ `Frontier_dependencies ] * unit Truth.true_t
+    , [ `Staged_ledger_diff ] * unit Truth.false_t
+    , [ `Protocol_versions ] * unit Truth.true_t )
     t
 
   let wrap t = (t, fully_invalid)
@@ -503,7 +509,7 @@ module Validation = struct
 
   module Unsafe = struct
     let set_valid_time_received :
-           ( [`Time_received] * unit Truth.false_t
+           ( [ `Time_received ] * unit Truth.false_t
            , 'genesis_state
            , 'proof
            , 'delta_transition_chain
@@ -511,7 +517,7 @@ module Validation = struct
            , 'staged_ledger_diff
            , 'protocol_versions )
            t
-        -> ( [`Time_received] * unit Truth.true_t
+        -> ( [ `Time_received ] * unit Truth.true_t
            , 'genesis_state
            , 'proof
            , 'delta_transition_chain
@@ -539,7 +545,7 @@ module Validation = struct
     let set_valid_proof :
            ( 'time_received
            , 'genesis_state
-           , [`Proof] * unit Truth.false_t
+           , [ `Proof ] * unit Truth.false_t
            , 'delta_transition_chain
            , 'frontier_dependencies
            , 'staged_ledger_diff
@@ -547,7 +553,7 @@ module Validation = struct
            t
         -> ( 'time_received
            , 'genesis_state
-           , [`Proof] * unit Truth.true_t
+           , [ `Proof ] * unit Truth.true_t
            , 'delta_transition_chain
            , 'frontier_dependencies
            , 'staged_ledger_diff
@@ -572,7 +578,7 @@ module Validation = struct
 
     let set_valid_genesis_state :
            ( 'time_received
-           , [`Genesis_state] * unit Truth.false_t
+           , [ `Genesis_state ] * unit Truth.false_t
            , 'proof
            , 'delta_transition_chain
            , 'frontier_dependencies
@@ -580,7 +586,7 @@ module Validation = struct
            , 'protocol_versions )
            t
         -> ( 'time_received
-           , [`Genesis_state] * unit Truth.true_t
+           , [ `Genesis_state ] * unit Truth.true_t
            , 'proof
            , 'delta_transition_chain
            , 'frontier_dependencies
@@ -608,7 +614,7 @@ module Validation = struct
            ( 'time_received
            , 'genesis_state
            , 'proof
-           , [`Delta_transition_chain]
+           , [ `Delta_transition_chain ]
              * State_hash.t Non_empty_list.t Truth.false_t
            , 'frontier_dependencies
            , 'staged_ledger_diff
@@ -618,7 +624,7 @@ module Validation = struct
         -> ( 'time_received
            , 'genesis_state
            , 'proof
-           , [`Delta_transition_chain]
+           , [ `Delta_transition_chain ]
              * State_hash.t Non_empty_list.t Truth.true_t
            , 'frontier_dependencies
            , 'staged_ledger_diff
@@ -648,7 +654,7 @@ module Validation = struct
            , 'genesis_state
            , 'proof
            , 'delta_transition_chain
-           , [`Frontier_dependencies] * unit Truth.false_t
+           , [ `Frontier_dependencies ] * unit Truth.false_t
            , 'staged_ledger_diff
            , 'protocol_versions )
            t
@@ -656,7 +662,7 @@ module Validation = struct
            , 'genesis_state
            , 'proof
            , 'delta_transition_chain
-           , [`Frontier_dependencies] * unit Truth.true_t
+           , [ `Frontier_dependencies ] * unit Truth.true_t
            , 'staged_ledger_diff
            , 'protocol_versions )
            t = function
@@ -683,7 +689,7 @@ module Validation = struct
            , 'proof
            , 'delta_transition_chain
            , 'frontier_dependencies
-           , [`Staged_ledger_diff] * unit Truth.false_t
+           , [ `Staged_ledger_diff ] * unit Truth.false_t
            , 'protocol_versions )
            t
         -> ( 'time_received
@@ -691,7 +697,7 @@ module Validation = struct
            , 'proof
            , 'delta_transition_chain
            , 'frontier_dependencies
-           , [`Staged_ledger_diff] * unit Truth.true_t
+           , [ `Staged_ledger_diff ] * unit Truth.true_t
            , 'protocol_versions )
            t = function
       | ( time_received
@@ -718,7 +724,7 @@ module Validation = struct
            , 'delta_transition_chain
            , 'frontier_dependencies
            , 'staged_ledger_diff
-           , [`Protocol_versions] * unit Truth.false_t )
+           , [ `Protocol_versions ] * unit Truth.false_t )
            t
         -> ( 'time_received
            , 'genesis_state
@@ -726,7 +732,7 @@ module Validation = struct
            , 'delta_transition_chain
            , 'frontier_dependencies
            , 'staged_ledger_diff
-           , [`Protocol_versions] * unit Truth.true_t )
+           , [ `Protocol_versions ] * unit Truth.true_t )
            t = function
       | ( time_received
         , genesis_state
@@ -801,13 +807,13 @@ let validate_proofs tvs ~verifier =
            let transition = With_hash.data t in
            Blockchain_snark.Blockchain.create
              ~state:(protocol_state transition)
-             ~proof:(protocol_state_proof transition) ))
+             ~proof:(protocol_state_proof transition)))
   with
   | Ok verified ->
       if verified then
         Ok
           (List.map tvs ~f:(fun (t, validation) ->
-               (t, Validation.Unsafe.set_valid_proof validation) ))
+               (t, Validation.Unsafe.set_valid_proof validation)))
       else Error `Invalid_proof
   | Error e ->
       Error (`Verifier_error e)
@@ -820,14 +826,12 @@ let validate_delta_transition_chain (t, validation) =
   with
   | Some hashes ->
       Ok
-        ( t
-        , Validation.Unsafe.set_valid_delta_transition_chain validation hashes
-        )
+        (t, Validation.Unsafe.set_valid_delta_transition_chain validation hashes)
   | None ->
       Error `Invalid_delta_transition_chain_proof
 
 let validate_protocol_versions (t, validation) =
-  let {valid_current; valid_next; matches_daemon} =
+  let { valid_current; valid_next; matches_daemon } =
     protocol_version_status (With_hash.data t)
   in
   if not (valid_current && valid_next) then Error `Invalid_protocol_version
@@ -907,11 +911,19 @@ module With_validation = struct
 
   let protocol_version_status t = lift protocol_version_status t
 
-  let broadcast t = lift broadcast t
+  let accept t = lift accept t
 
-  let don't_broadcast t = lift don't_broadcast t
+  let reject t = lift reject t
 
   let poke_validation_callback t = lift poke_validation_callback t
+
+  let handle_dropped_transition ?pipe_name ~logger t =
+    [%log warn] "Dropping state_hash $state_hash from $pipe transition pipe"
+      ~metadata:
+        [ ("state_hash", State_hash.to_yojson (state_hash t))
+        ; ("pipe", `String (Option.value pipe_name ~default:"an unknown"))
+        ] ;
+    reject t
 end
 
 module Initial_validated = struct
@@ -919,7 +931,7 @@ module Initial_validated = struct
     (external_transition, State_hash.t) With_hash.t * Validation.initial_valid
 
   type nonrec protocol_version_status = protocol_version_status =
-    {valid_current: bool; valid_next: bool; matches_daemon: bool}
+    { valid_current : bool; valid_next : bool; matches_daemon : bool }
 
   include With_validation
 end
@@ -929,7 +941,7 @@ module Almost_validated = struct
     (external_transition, State_hash.t) With_hash.t * Validation.almost_valid
 
   type nonrec protocol_version_status = protocol_version_status =
-    {valid_current: bool; valid_next: bool; matches_daemon: bool}
+    { valid_current : bool; valid_next : bool; matches_daemon : bool }
 
   include With_validation
 end
@@ -940,14 +952,14 @@ module Validated = struct
     module V1 = struct
       type t =
         (external_transition, State_hash.t) With_hash.t
-        * ( [`Time_received] * (unit, Truth.True.t) Truth.t
-          , [`Genesis_state] * (unit, Truth.True.t) Truth.t
-          , [`Proof] * (unit, Truth.True.t) Truth.t
-          , [`Delta_transition_chain]
+        * ( [ `Time_received ] * (unit, Truth.True.t) Truth.t
+          , [ `Genesis_state ] * (unit, Truth.True.t) Truth.t
+          , [ `Proof ] * (unit, Truth.True.t) Truth.t
+          , [ `Delta_transition_chain ]
             * (State_hash.t Non_empty_list.t, Truth.True.t) Truth.t
-          , [`Frontier_dependencies] * (unit, Truth.True.t) Truth.t
-          , [`Staged_ledger_diff] * (unit, Truth.True.t) Truth.t
-          , [`Protocol_versions] * (unit, Truth.True.t) Truth.t )
+          , [ `Frontier_dependencies ] * (unit, Truth.True.t) Truth.t
+          , [ `Staged_ledger_diff ] * (unit, Truth.True.t) Truth.t
+          , [ `Protocol_versions ] * (unit, Truth.True.t) Truth.t )
           Validation.t
 
       let to_latest = Fn.id
@@ -955,7 +967,7 @@ module Validated = struct
       module Erased = struct
         (* if this type receives a new version, that changes the serialization of
                  the type `t', so that type must also get a new version
-          *)
+        *)
         [%%versioned
         module Stable = struct
           module V1 = struct
@@ -1031,7 +1043,7 @@ module Validated = struct
   end]
 
   type nonrec protocol_version_status = protocol_version_status =
-    {valid_current: bool; valid_next: bool; matches_daemon: bool}
+    { valid_current : bool; valid_next : bool; matches_daemon : bool }
 
   [%%define_locally
   Stable.Latest.
@@ -1044,8 +1056,8 @@ module Validated = struct
     , current_protocol_version
     , proposed_protocol_version_opt
     , protocol_version_status
-    , broadcast
-    , don't_broadcast
+    , accept
+    , reject
     , poke_validation_callback
     , protocol_state_proof
     , blockchain_state
@@ -1065,7 +1077,8 @@ module Validated = struct
     , payments
     , global_slot
     , erase
-    , to_yojson )]
+    , to_yojson
+    , handle_dropped_transition )]
 
   include Comparable.Make (Stable.Latest)
 
@@ -1080,7 +1093,7 @@ module Validated = struct
         let (`If_this_is_used_it_should_have_a_comment_justifying_it c) =
           User_command.to_valid_unsafe x.data
         in
-        {x with data= c} )
+        { x with data = c })
 end
 
 let genesis ~precomputed_values =
@@ -1095,17 +1108,17 @@ let genesis ~precomputed_values =
            create
              ~protocol_state
                (* We pass a dummy proof here, with the understanding that it will
-                never be validated except as part of the snark for the first
-                block produced (where we will explicitly generate the genesis
-                proof).
-             *)
+                  never be validated except as part of the snark for the first
+                  block produced (where we will explicitly generate the genesis
+                  proof).
+               *)
              ~protocol_state_proof:Proof.blockchain_dummy
              ~staged_ledger_diff:empty_diff
              ~validation_callback:
                (Mina_net2.Validation_callback.create_without_expiration ())
              ~delta_transition_chain_proof:
                (Protocol_state.previous_state_hash protocol_state, [])
-             () ))
+             ()))
   in
   transition
 
@@ -1164,7 +1177,8 @@ struct
                  [ ( "selection_context"
                    , `String
                        "External_transition.Transition_frontier_validation.validate_frontier_dependencies"
-                   ) ])
+                   )
+                 ])
             ~existing:(With_hash.map ~f:consensus_state root_transition)
             ~candidate:(With_hash.map ~f:consensus_state t) )
         ~error:`Not_selected_over_frontier_root
@@ -1183,13 +1197,13 @@ module Staged_ledger_validation = struct
     Fn.compose statement_target statement
 
   let validate_staged_ledger_diff :
-         ?skip_staged_ledger_verification:[`All | `Proofs]
+         ?skip_staged_ledger_verification:[ `All | `Proofs ]
       -> ( 'time_received
          , 'genesis_state
          , 'proof
          , 'delta_transition_chain
          , 'frontier_dependencies
-         , [`Staged_ledger_diff] * unit Truth.false_t
+         , [ `Staged_ledger_diff ] * unit Truth.false_t
          , 'protocol_versions )
          Validation.with_transition
       -> logger:Logger.t
@@ -1197,17 +1211,17 @@ module Staged_ledger_validation = struct
       -> verifier:Verifier.t
       -> parent_staged_ledger:Staged_ledger.t
       -> parent_protocol_state:Protocol_state.value
-      -> ( [`Just_emitted_a_proof of bool]
+      -> ( [ `Just_emitted_a_proof of bool ]
            * [ `External_transition_with_validation of
                ( 'time_received
                , 'genesis_state
                , 'proof
                , 'delta_transition_chain
                , 'frontier_dependencies
-               , [`Staged_ledger_diff] * unit Truth.true_t
+               , [ `Staged_ledger_diff ] * unit Truth.true_t
                , 'protocol_versions )
                Validation.with_transition ]
-           * [`Staged_ledger of Staged_ledger.t]
+           * [ `Staged_ledger of Staged_ledger.t ]
          , [ `Invalid_staged_ledger_diff of
              [ `Incorrect_target_staged_ledger_hash
              | `Incorrect_target_snarked_ledger_hash ]
@@ -1247,7 +1261,7 @@ module Staged_ledger_validation = struct
            , body_hash ))
         ~coinbase_receiver ~supercharge_coinbase
       |> Deferred.Result.map_error ~f:(fun e ->
-             `Staged_ledger_application_failed e )
+             `Staged_ledger_application_failed e)
     in
     [%log debug]
       ~metadata:
@@ -1279,7 +1293,8 @@ module Staged_ledger_validation = struct
             (not
                (Frozen_ledger_hash.equal target_ledger_hash
                   (Blockchain_state.snarked_ledger_hash blockchain_state)))
-            `Incorrect_target_snarked_ledger_hash ]
+            `Incorrect_target_snarked_ledger_hash
+        ]
     in
     Deferred.return
       ( match maybe_errors with

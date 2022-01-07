@@ -3,7 +3,7 @@ open Async
 
 module Level = struct
   type t = Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
-  [@@deriving sexp, compare, show {with_path= false}, enumerate]
+  [@@deriving sexp, equal, compare, show { with_path = false }, enumerate]
 
   let of_string str =
     try Ok (t_of_sexp (Sexp.Atom str))
@@ -25,10 +25,10 @@ module Time = struct
 end
 
 module Source = struct
-  type t = {module_: string [@key "module"]; location: string}
+  type t = { module_ : string [@key "module"]; location : string }
   [@@deriving yojson]
 
-  let create ~module_ ~location = {module_; location}
+  let create ~module_ ~location = { module_; location }
 end
 
 module Metadata = struct
@@ -73,7 +73,7 @@ module Metadata = struct
 
   let extend (t : t) alist =
     List.fold_left alist ~init:t ~f:(fun acc (key, data) ->
-        String.Map.set acc ~key ~data )
+        String.Map.set acc ~key ~data)
 
   let merge (a : t) (b : t) = extend a (String.Map.to_alist b)
 end
@@ -86,12 +86,13 @@ let append_to_global_metadata l =
 
 module Message = struct
   type t =
-    { timestamp: Time.t
-    ; level: Level.t
-    ; source: Source.t option [@default None]
-    ; message: string
-    ; metadata: Metadata.t
-    ; event_id: Structured_log_events.id option [@default None] }
+    { timestamp : Time.t
+    ; level : Level.t
+    ; source : Source.t option [@default None]
+    ; message : string
+    ; metadata : Metadata.t
+    ; event_id : Structured_log_events.id option [@default None]
+    }
   [@@deriving yojson]
 
   let check_invariants (t : t) =
@@ -103,7 +104,7 @@ module Message = struct
           | `Interpolate item ->
               Metadata.mem t.metadata item
           | `Raw _ ->
-              true )
+              true)
 end
 
 module Processor = struct
@@ -121,7 +122,7 @@ module Processor = struct
     let create ~log_level = log_level
 
     let process log_level (msg : Message.t) =
-      if msg.level < log_level then None
+      if Level.compare msg.level log_level < 0 then None
       else
         let msg_json_fields =
           Message.to_yojson msg |> Yojson.Safe.Util.to_assoc
@@ -129,20 +130,21 @@ module Processor = struct
         let json =
           if Level.compare msg.level Level.Spam = 0 then
             `Assoc
-              (List.filter msg_json_fields ~f:(fun (k, _) -> k <> "source"))
+              (List.filter msg_json_fields ~f:(fun (k, _) ->
+                   not (String.equal k "source")))
           else `Assoc msg_json_fields
         in
         Some (Yojson.Safe.to_string json)
   end
 
   module Pretty = struct
-    type t = {log_level: Level.t; config: Logproc_lib.Interpolator.config}
+    type t = { log_level : Level.t; config : Logproc_lib.Interpolator.config }
 
-    let create ~log_level ~config = {log_level; config}
+    let create ~log_level ~config = { log_level; config }
 
-    let process {log_level; config} (msg : Message.t) =
+    let process { log_level; config } (msg : Message.t) =
       let open Message in
-      if msg.level < log_level then None
+      if Level.compare msg.level log_level < 0 then None
       else
         match
           Logproc_lib.Interpolator.interpolate config msg.message msg.metadata
@@ -150,7 +152,7 @@ module Processor = struct
         | Error err ->
             Option.iter msg.source ~f:(fun source ->
                 Core.printf "logproc interpolation error in %s: %s\n"
-                  source.location err ) ;
+                  source.location err) ;
             None
         | Ok (str, extra) ->
             let formatted_extra =
@@ -163,8 +165,7 @@ module Processor = struct
                 ~zone:Time.Zone.utc
             in
             Some
-              ( time ^ " [" ^ Level.show msg.level ^ "] " ^ str
-              ^ formatted_extra )
+              (time ^ " [" ^ Level.show msg.level ^ "] " ^ str ^ formatted_extra)
   end
 
   let raw ?(log_level = Level.Spam) () = T ((module Raw), Raw.create ~log_level)
@@ -199,28 +200,29 @@ module Transport = struct
       let log_perm = 0o644
 
       type t =
-        { directory: string
-        ; log_filename: string
-        ; max_size: int
-        ; num_rotate: int
-        ; mutable curr_index: int
-        ; mutable primary_log: File_descr.t
-        ; mutable primary_log_size: int }
+        { directory : string
+        ; log_filename : string
+        ; max_size : int
+        ; num_rotate : int
+        ; mutable curr_index : int
+        ; mutable primary_log : File_descr.t
+        ; mutable primary_log_size : int
+        }
 
       let create ~directory ~max_size ~log_filename ~num_rotate =
-        if not (Result.is_ok (access directory [`Exists])) then
+        if not (Result.is_ok (access directory [ `Exists ])) then
           mkdir_p ~perm:0o755 directory ;
-        if not (Result.is_ok (access directory [`Exists; `Read; `Write])) then
+        if not (Result.is_ok (access directory [ `Exists; `Read; `Write ])) then
           failwithf
             "cannot create log files: read/write permissions required on %s"
             directory () ;
         let primary_log_loc = Filename.concat directory log_filename in
         let primary_log_size, mode =
-          if Result.is_ok (access primary_log_loc [`Exists; `Read; `Write])
+          if Result.is_ok (access primary_log_loc [ `Exists; `Read; `Write ])
           then
             let log_stats = stat primary_log_loc in
-            (Int64.to_int_exn log_stats.st_size, [O_RDWR; O_APPEND])
-          else (0, [O_RDWR; O_CREAT])
+            (Int64.to_int_exn log_stats.st_size, [ O_RDWR; O_APPEND ])
+          else (0, [ O_RDWR; O_CREAT ])
         in
         let primary_log = openfile ~perm:log_perm ~mode primary_log_loc in
         { directory
@@ -229,7 +231,8 @@ module Transport = struct
         ; primary_log
         ; primary_log_size
         ; num_rotate
-        ; curr_index= 0 }
+        ; curr_index = 0
+        }
 
       let rotate t =
         let primary_log_loc = Filename.concat t.directory t.log_filename in
@@ -243,8 +246,8 @@ module Transport = struct
         in
         close t.primary_log ;
         rename ~src:primary_log_loc ~dst:secondary_log_loc ;
-        t.primary_log
-        <- openfile ~perm:log_perm ~mode:[O_RDWR; O_CREAT] primary_log_loc ;
+        t.primary_log <-
+          openfile ~perm:log_perm ~mode:[ O_RDWR; O_CREAT ] primary_log_loc ;
         t.primary_log_size <- 0
 
       let transport t str =
@@ -265,7 +268,7 @@ module Transport = struct
 end
 
 module Consumer_registry = struct
-  type consumer = {processor: Processor.t; transport: Transport.t}
+  type consumer = { processor : Processor.t; transport : Transport.t }
 
   module Consumer_tbl = Hashtbl.Make (String)
 
@@ -276,20 +279,22 @@ module Consumer_registry = struct
   type id = string
 
   let register ~(id : id) ~processor ~transport =
-    Consumer_tbl.add_multi t ~key:id ~data:{processor; transport}
+    Consumer_tbl.add_multi t ~key:id ~data:{ processor; transport }
 
   let broadcast_log_message ~id msg =
     Hashtbl.find_and_call t id
       ~if_found:(fun consumers ->
         List.iter consumers
-          ~f:(fun { processor= Processor.T ((module Processor), processor)
-                  ; transport= Transport.T ((module Transport), transport) }
+          ~f:(fun
+               { processor = Processor.T ((module Processor), processor)
+               ; transport = Transport.T ((module Transport), transport)
+               }
              ->
             match Processor.process processor msg with
             | Some str ->
                 Transport.transport transport str
             | None ->
-                () ) )
+                ()))
       ~if_not_found:(fun _ ->
         let (Processor.T ((module Processor), processor)) = Processor.raw () in
         let (Transport.T ((module Transport), transport)) =
@@ -299,13 +304,13 @@ module Consumer_registry = struct
         | Some str ->
             Transport.transport transport str
         | None ->
-            () )
+            ())
 end
 
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = {null: bool; metadata: Metadata.Stable.V1.t; id: string}
+    type t = { null : bool; metadata : Metadata.Stable.V1.t; id : string }
 
     let to_latest = Fn.id
   end
@@ -316,13 +321,14 @@ let metadata t = t.metadata
 let create ?(metadata = []) ?(id = "default") () =
   let pid = lazy (Unix.getpid () |> Pid.to_int) in
   let metadata' = ("pid", `Int (Lazy.force pid)) :: metadata in
-  {null= false; metadata= Metadata.extend Metadata.empty metadata'; id}
+  { null = false; metadata = Metadata.extend Metadata.empty metadata'; id }
 
-let null () = {null= true; metadata= Metadata.empty; id= "default"}
+let null () = { null = true; metadata = Metadata.empty; id = "default" }
 
-let extend t metadata = {t with metadata= Metadata.extend t.metadata metadata}
+let extend t metadata =
+  { t with metadata = Metadata.extend t.metadata metadata }
 
-let change_id {null; metadata; id= _} ~id = {null; metadata; id}
+let change_id { null; metadata; id = _ } ~id = { null; metadata; id }
 
 let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
     =
@@ -336,26 +342,42 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
         ("$duplicated_keys", `List (List.map ~f:(fun (s, _) -> `String s) dups))
         :: List.dedup_and_sort m ~compare:key_cmp
   in
-  { Message.timestamp= Time.now ()
+  { Message.timestamp = Time.now ()
   ; level
-  ; source= Some (Source.create ~module_ ~location)
+  ; source = Some (Source.create ~module_ ~location)
   ; message
-  ; metadata=
+  ; metadata =
       Metadata.extend
         (Metadata.merge (Metadata.of_alist_exn global_metadata') t.metadata)
         metadata
-  ; event_id }
+  ; event_id
+  }
 
-let raw ({id; _} as t) msg =
+let raw ({ id; _ } as t) msg =
   if t.null then ()
   else if Message.check_invariants msg then
     Consumer_registry.broadcast_log_message ~id msg
-  else failwithf "invalid log call \"%s\"" (String.escaped msg.message) ()
+  else
+    let msg' =
+      Message.
+        { timestamp = msg.timestamp
+        ; level = Error
+        ; source = None
+        ; message =
+            String.concat
+              [ "invalid log call: "
+              ; String.tr ~target:'$' ~replacement:'.' msg.message
+              ]
+        ; metadata = Metadata.empty
+        ; event_id = None
+        }
+    in
+    Consumer_registry.broadcast_log_message ~id msg'
 
 let add_tags_to_metadata metadata tags =
   Option.value_map tags ~default:metadata ~f:(fun tags ->
       let tags_item = ("tags", `List (List.map tags ~f:Tags.to_yojson)) in
-      tags_item :: metadata )
+      tags_item :: metadata)
 
 let log t ~level ~module_ ~location ?tags ?(metadata = []) ?event_id fmt =
   let metadata = add_tags_to_metadata metadata tags in

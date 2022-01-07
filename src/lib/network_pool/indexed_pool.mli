@@ -14,16 +14,17 @@ module Command_error : sig
         [ `Expected of Account.Nonce.t
         | `Between of Account.Nonce.t * Account.Nonce.t ]
         * Account.Nonce.t
-    | Insufficient_funds of [`Balance of Currency.Amount.t] * Currency.Amount.t
+    | Insufficient_funds of
+        [ `Balance of Currency.Amount.t ] * Currency.Amount.t
     | (* NOTE: don't punish for this, attackers can induce nodes to banlist
           each other that way! *)
         Insufficient_replace_fee of
-        [`Replace_fee of Currency.Fee.t] * Currency.Fee.t
+        [ `Replace_fee of Currency.Fee.t ] * Currency.Fee.t
     | Overflow
     | Bad_token
     | Expired of
-        [`Valid_until of Mina_numbers.Global_slot.t]
-        * [`Current_global_slot of Mina_numbers.Global_slot.t]
+        [ `Valid_until of Mina_numbers.Global_slot.t ]
+        * [ `Current_global_slot of Mina_numbers.Global_slot.t ]
     | Unwanted_fee_token of Token_id.t
     | Invalid_transaction
   [@@deriving sexp_of, to_yojson]
@@ -78,8 +79,7 @@ val handle_committed_txn :
   -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
      , [ `Queued_txns_by_sender of
          string
-         * Transaction_hash.User_command_with_valid_signature.t Sequence.t ]
-     )
+         * Transaction_hash.User_command_with_valid_signature.t Sequence.t ] )
      Result.t
 
 (** Add a command to the pool. Pass the current nonce for the account and
@@ -116,9 +116,7 @@ val member : t -> Transaction_hash.User_command.t -> bool
 
 (** Get all the user commands sent by a user with a particular account *)
 val all_from_account :
-     t
-  -> Account_id.t
-  -> Transaction_hash.User_command_with_valid_signature.t list
+  t -> Account_id.t -> Transaction_hash.User_command_with_valid_signature.t list
 
 (** Get all user commands in the pool. *)
 val get_all : t -> Transaction_hash.User_command_with_valid_signature.t list

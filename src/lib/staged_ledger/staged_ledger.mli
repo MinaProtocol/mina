@@ -20,7 +20,8 @@ module Scan_state : sig
   end
 
   module Space_partition : sig
-    type t = {first: int * int; second: (int * int) option} [@@deriving sexp]
+    type t = { first : int * int; second : (int * int) option }
+    [@@deriving sexp]
   end
 
   val hash : t -> Staged_ledger_hash.Aux_hash.t
@@ -115,7 +116,7 @@ val copy : t -> t
 val hash : t -> Staged_ledger_hash.t
 
 val apply :
-     ?skip_verification:[`Proofs | `All]
+     ?skip_verification:[ `Proofs | `All ]
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
   -> Staged_ledger_diff.t
@@ -125,12 +126,12 @@ val apply :
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
-  -> ( [`Hash_after_applying of Staged_ledger_hash.t]
+  -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
            (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
            option ]
-       * [`Staged_ledger of t]
-       * [`Pending_coinbase_update of bool * Pending_coinbase.Update.t]
+       * [ `Staged_ledger of t ]
+       * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
      , Staged_ledger_error.t )
      Deferred.Result.t
 
@@ -143,12 +144,12 @@ val apply_diff_unchecked :
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
-  -> ( [`Hash_after_applying of Staged_ledger_hash.t]
+  -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
            (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
            option ]
-       * [`Staged_ledger of t]
-       * [`Pending_coinbase_update of bool * Pending_coinbase.Update.t]
+       * [ `Staged_ledger of t ]
+       * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
      , Staged_ledger_error.t )
      Deferred.Result.t
 
@@ -164,8 +165,9 @@ val create_diff :
   -> logger:Logger.t
   -> current_state_view:Snapp_predicate.Protocol_state.View.t
   -> transactions_by_fee:User_command.Valid.t Sequence.t
-  -> get_completed_work:(   Transaction_snark_work.Statement.t
-                         -> Transaction_snark_work.Checked.t option)
+  -> get_completed_work:
+       (   Transaction_snark_work.Statement.t
+        -> Transaction_snark_work.Checked.t option)
   -> supercharge_coinbase:bool
   -> ( Staged_ledger_diff.With_valid_signatures_and_proofs.t
      , Pre_diff_info.Error.t )
@@ -180,7 +182,7 @@ val can_apply_supercharged_coinbase_exn :
 val statement_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
-  -> [`Non_empty of Transaction_snark.Statement.t | `Empty] Deferred.t
+  -> [ `Non_empty of Transaction_snark.Statement.t | `Empty ] Deferred.t
 
 val of_scan_state_pending_coinbases_and_snarked_ledger :
      logger:Logger.t

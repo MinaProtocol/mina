@@ -6,9 +6,9 @@
  * Schema Network_list_response.t : A NetworkListResponse contains all NetworkIdentifiers that the node can serve information for.
  *)
 
-type t = {network_identifiers: Network_identifier.t list}
-[@@deriving yojson {strict= false}, show]
+type t = { network_identifiers : Network_identifier.t list }
+[@@deriving yojson { strict = false }, show, eq]
 
 (** A NetworkListResponse contains all NetworkIdentifiers that the node can serve information for. *)
 let create (network_identifiers : Network_identifier.t list) : t =
-  {network_identifiers}
+  { network_identifiers }

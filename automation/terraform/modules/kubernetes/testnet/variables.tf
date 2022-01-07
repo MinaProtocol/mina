@@ -41,12 +41,22 @@ variable "deploy_watchdog" {
   default = true
 }
 
-variable "coda_image" {
+variable "mina_image" {
   type    = string
-  default = "codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"
+  default = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet"
 }
 
-variable "coda_archive_image" {
+variable "use_custom_entrypoint" {
+  type    = bool
+  default = false
+}
+
+variable "custom_entrypoint" {
+  type    = string
+  default = ""
+}
+
+variable "mina_archive_image" {
   type    = string
   default = ""
 }
@@ -61,22 +71,23 @@ variable "archive_node_count" {
   default = 0
 }
 
-variable "coda_agent_image" {
+variable "mina_agent_image" {
   type    = string
   default = "codaprotocol/coda-user-agent:0.1.4"
 }
 
-variable "coda_agent_active" {
+#this var doesn't actually hook up to anything
+variable "mina_agent_active" {
   type    = string
   default = "true"
 }
 
-variable "coda_bots_image" {
+variable "mina_bots_image" {
   type    = string
   default = ""
 }
 
-variable "coda_points_image" {
+variable "mina_points_image" {
   type    = string
   default = ""
 }
@@ -87,20 +98,20 @@ variable "watchdog_image" {
 }
 
 # this must be a string to avoid scientific notation truncation
-variable "coda_faucet_amount" {
+variable "mina_faucet_amount" {
   type    = string
   default = "10000000000"
 }
 
 # this must be a string to avoid scientific notation truncation
-variable "coda_faucet_fee" {
+variable "mina_faucet_fee" {
   type    = string
   default = "100000000"
 }
 
 variable "testnet_name" {
   type    = string
-  default = "coda-testnet"
+  default = "mina-testnet"
 }
 
 variable "additional_peers" {
@@ -200,26 +211,16 @@ variable "seed_configs" {
   default = []
 }
 
+
+variable "plain_node_configs" {
+  default = null
+}
+
 # Snark Worker Vars
 
-variable "snark_worker_replicas" {
-  type    = number
-  default = 1
-}
-
-variable "snark_worker_fee" {
-  type    = string
-  default = "0.025"
-}
-
-variable "snark_worker_public_key" {
-  type    = string
-  default = "4vsRCVadXwWMSGA9q81reJRX3BZ5ZKRtgZU7PtGsNq11w2V9tUNf4urZAGncZLUiP4SfWqur7AZsyhJKD41Ke7rJJ8yDibL41ePBeATLUnwNtMTojPDeiBfvTfgHzbAVFktD65vzxMNCvvAJ"
-}
-
-variable "snark_worker_host_port" {
-  type    = number
-  default = 10400
+variable "snark_coordinators" {
+  type    = list(any)
+  default = []
 }
 
 variable "agent_min_fee" {
@@ -257,7 +258,7 @@ variable "gcloud_seeds" {
   default = []
 }
 
-# Coda network services vars
+# Mina network services vars
 
 variable "restart_nodes" {
   type    = bool

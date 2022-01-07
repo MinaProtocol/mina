@@ -1,13 +1,11 @@
 (* receipt.ml *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 module B58_lib = Base58_check
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
 
@@ -39,15 +37,14 @@ module Chain_hash = struct
 
     module V1 = struct
       module T = struct
-        type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
+        type t = Field.t [@@deriving sexp, compare, hash, version { asserted }]
       end
 
       include T
 
       let to_latest = Fn.id
 
-      [%%define_from_scope
-      to_yojson, of_yojson]
+      [%%define_from_scope to_yojson, of_yojson]
 
       include Comparable.Make (T)
       include Hashable.Make_binable (T)
@@ -73,8 +70,7 @@ module Chain_hash = struct
     Input.(append x (field (t :> Field.t)))
     |> pack_input |> hash ~init |> of_hash
 
-  [%%if
-  defined consensus_mechanism]
+  [%%if defined consensus_mechanism]
 
   module Checked = struct
     module Elt = struct
@@ -106,7 +102,7 @@ module Chain_hash = struct
       in
       make_checked (fun () ->
           hash ~init (pack_input Input.(append x (var_to_input t)))
-          |> var_of_hash_packed )
+          |> var_of_hash_packed)
   end
 
   let%test_unit "checked-unchecked equivalence" =
@@ -129,12 +125,11 @@ module Chain_hash = struct
           let (), x = Or_error.ok_exn (run_and_check comp ()) in
           x
         in
-        assert (equal unchecked checked) )
+        assert (equal unchecked checked))
 
   let%test_unit "json" =
     Quickcheck.test ~trials:20 gen ~sexp_of:sexp_of_t ~f:(fun t ->
-        assert (Codable.For_tests.check_encoding (module Stable.V1) ~equal t)
-    )
+        assert (Codable.For_tests.check_encoding (module Stable.V1) ~equal t))
 
   [%%endif]
 end

@@ -23,7 +23,7 @@ module type S = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> t Deferred.t
 
-  val initialized : t -> [`Initialized] Deferred.Or_error.t
+  val initialized : t -> [ `Initialized ] Deferred.Or_error.t
 
   val extend_blockchain :
        t

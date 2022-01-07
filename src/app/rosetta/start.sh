@@ -51,7 +51,7 @@ sleep 3
     -log-level debug &
 
 # wait for it to settle
-sleep 3
+sleep 60
 
 # rosetta
 ../../../_build/default/src/app/rosetta/rosetta.exe \
@@ -97,4 +97,3 @@ else
   # then cleanup and forward the status
   cleanup $AGENT_STATUS
 fi
-

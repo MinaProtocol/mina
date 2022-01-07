@@ -38,10 +38,10 @@ module Group = struct
 
   let to_string_list_exn (t : t) =
     let x, y = Inner_curve.to_affine_exn t in
-    [Field.to_string x; Field.to_string y]
+    [ Field.to_string x; Field.to_string y ]
 
   let of_string_list_exn = function
-    | [x; y] ->
+    | [ x; y ] ->
         Inner_curve.of_affine (Field.of_string x, Field.of_string y)
     | _ ->
         invalid_arg
@@ -78,7 +78,7 @@ module Message = struct
   module Global_slot = Mina_numbers.Global_slot
 
   type ('global_slot, 'epoch_seed, 'delegator) t =
-    {global_slot: 'global_slot; seed: 'epoch_seed; delegator: 'delegator}
+    { global_slot : 'global_slot; seed : 'epoch_seed; delegator : 'delegator }
   [@@deriving sexp, hlist]
 
   type value =
@@ -93,12 +93,14 @@ module Message = struct
 
   let to_input
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ({global_slot; seed; delegator} : value) =
-    { Random_oracle.Input.field_elements= [|(seed :> Tick.field)|]
-    ; bitstrings=
+      ({ global_slot; seed; delegator } : value) =
+    { Random_oracle.Input.field_elements = [| (seed :> Tick.field) |]
+    ; bitstrings =
         [| Global_slot.Bits.to_bits global_slot
          ; Mina_base.Account.Index.to_bits
-             ~ledger_depth:constraint_constants.ledger_depth delegator |] }
+             ~ledger_depth:constraint_constants.ledger_depth delegator
+        |]
+    }
 
   let data_spec
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
@@ -106,7 +108,8 @@ module Message = struct
     [ Global_slot.typ
     ; Mina_base.Epoch_seed.typ
     ; Mina_base.Account.Index.Unpacked.typ
-        ~ledger_depth:constraint_constants.ledger_depth ]
+        ~ledger_depth:constraint_constants.ledger_depth
+    ]
 
   let typ ~constraint_constants : (var, value) Tick.Typ.t =
     Tick.Typ.of_hlistable
@@ -122,20 +125,21 @@ module Message = struct
   module Checked = struct
     open Tick
 
-    let to_input ({global_slot; seed; delegator} : var) =
+    let to_input ({ global_slot; seed; delegator } : var) =
       let open Tick.Checked.Let_syntax in
       let%map global_slot = Global_slot.Checked.to_bits global_slot in
       let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
-      { Random_oracle.Input.field_elements=
-          [|Mina_base.Epoch_seed.var_to_hash_packed seed|]
-      ; bitstrings= [|s global_slot; delegator|] }
+      { Random_oracle.Input.field_elements =
+          [| Mina_base.Epoch_seed.var_to_hash_packed seed |]
+      ; bitstrings = [| s global_slot; delegator |]
+      }
 
     let hash_to_group msg =
       let%bind input = to_input msg in
       Tick.make_checked (fun () ->
           Random_oracle.Checked.hash ~init:Mina_base.Hash_prefix.vrf_message
             (Random_oracle.Checked.pack_input input)
-          |> Group_map.Checked.to_group )
+          |> Group_map.Checked.to_group)
   end
 
   let gen ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
@@ -146,7 +150,7 @@ module Message = struct
       Mina_base.Account.Index.gen
         ~ledger_depth:constraint_constants.ledger_depth
     in
-    {global_slot; seed; delegator}
+    { global_slot; seed; delegator }
 end
 
 (* c is a constant factor on vrf-win likelihood *)
@@ -176,7 +180,7 @@ module Output = struct
                   sprintf
                     "Error decoding vrf output in \
                      Vrf.Output.Truncated.Stable.V1.of_yojson: %s"
-                    err )
+                    err)
           | _ ->
               Error
                 "Vrf.Output.Truncated.Stable.V1.of_yojson: Expected a string"
@@ -203,7 +207,7 @@ module Output = struct
       Typ.array ~length:length_in_bits Boolean.typ
       |> Typ.transport
            ~there:(fun s ->
-             Array.sub (Blake2.string_to_bits s) ~pos:0 ~len:length_in_bits )
+             Array.sub (Blake2.string_to_bits s) ~pos:0 ~len:length_in_bits)
            ~back:Blake2.bits_to_string
 
     let dummy =
@@ -240,7 +244,7 @@ module Output = struct
       Random_oracle.Input.(
         append
           (Message.to_input ~constraint_constants msg)
-          (field_elements [|x; y|]))
+          (field_elements [| x; y |]))
     in
     let open Random_oracle in
     hash ~init:Hash_prefix_states.vrf_output (pack_input input)
@@ -250,14 +254,16 @@ module Output = struct
       Tick.make_checked (fun () ->
           Random_oracle.Checked.Digest.to_bits ~length:Truncated.length_in_bits
             x
-          |> Array.of_list )
+          |> Array.of_list)
 
     let hash msg (x, y) =
       let%bind msg = Message.Checked.to_input msg in
-      let input = Random_oracle.Input.(append msg (field_elements [|x; y|])) in
+      let input =
+        Random_oracle.Input.(append msg (field_elements [| x; y |]))
+      in
       make_checked (fun () ->
           let open Random_oracle.Checked in
-          hash ~init:Hash_prefix_states.vrf_output (pack_input input) )
+          hash ~init:Hash_prefix_states.vrf_output (pack_input input))
   end
 
   let%test_unit "hash unchecked vs. checked equality" =
@@ -300,8 +306,8 @@ module Threshold = struct
 
   let bigint_of_uint64 = Fn.compose Bigint.of_string UInt64.to_string
 
-  (*  Check if
-      vrf_output / 2^256 <= c * (1 - (1 - f)^(amount / total_stake))
+  (* Check if
+     vrf_output / 2^256 <= c * (1 - (1 - f)^(amount / total_stake))
   *)
   let is_satisfied ~my_stake ~total_stake vrf_output =
     let open Currency in
@@ -311,7 +317,7 @@ module Threshold = struct
          This is equal to
 
          floor(2^params.per_term_precision * top / bottom) / 2^params.per_term_precision
-          *)
+      *)
       let k = params.per_term_precision in
       let top = bigint_of_uint64 (Balance.to_uint64 my_stake) in
       let bottom = bigint_of_uint64 (Amount.to_uint64 total_stake) in
@@ -345,7 +351,7 @@ module Threshold = struct
           Floating_point.(
             le ~m
               (of_bits ~m lhs ~precision:Output.Truncated.length_in_bits)
-              rhs) )
+              rhs))
   end
 end
 
@@ -354,16 +360,18 @@ module Evaluation_hash = struct
     let input =
       let open Random_oracle_input in
       let g_to_input g =
-        { field_elements=
+        { field_elements =
             (let f1, f2 = Group.to_affine_exn g in
-             [|f1; f2|])
-        ; bitstrings= [||] }
+             [| f1; f2 |])
+        ; bitstrings = [||]
+        }
       in
       Array.reduce_exn ~f:Random_oracle_input.append
         [| Message.to_input ~constraint_constants message
          ; g_to_input public_key
          ; g_to_input g1
-         ; g_to_input g2 |]
+         ; g_to_input g2
+        |]
     in
     let tick_output =
       Random_oracle.hash ~init:Mina_base.Hash_prefix.vrf_evaluation
@@ -378,17 +386,21 @@ module Evaluation_hash = struct
       let%bind input =
         let open Random_oracle_input in
         let g_to_input (f1, f2) =
-          {field_elements= [|f1; f2|]; bitstrings= [||]}
+          { field_elements = [| f1; f2 |]; bitstrings = [||] }
         in
         let%map message_input = Message.Checked.to_input message in
         Array.reduce_exn ~f:Random_oracle_input.append
-          [|message_input; g_to_input public_key; g_to_input g1; g_to_input g2|]
+          [| message_input
+           ; g_to_input public_key
+           ; g_to_input g1
+           ; g_to_input g2
+          |]
       in
       let%bind tick_output =
         Tick.make_checked (fun () ->
             Random_oracle.Checked.hash
               ~init:Mina_base.Hash_prefix.vrf_evaluation
-              (Random_oracle.Checked.pack_input input) )
+              (Random_oracle.Checked.pack_input input))
       in
       (* This isn't great cryptographic practice.. *)
       Tick.Field.Checked.unpack_full tick_output
@@ -396,9 +408,23 @@ module Evaluation_hash = struct
 end
 
 module Output_hash = struct
-  type value = Snark_params.Tick.Field.t [@@deriving sexp, compare]
+  [%%versioned
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
 
-  type t = value
+    module V1 = struct
+      module T = struct
+        type t = Snark_params.Tick.Field.t
+        [@@deriving sexp, compare, hash, version { asserted }]
+      end
+
+      include T
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t [@@deriving sexp, compare]
 
   type var = Random_oracle.Checked.Digest.t
 
@@ -457,26 +483,30 @@ module Layout = struct
   *)
   module Message = struct
     type t =
-      { global_slot: Mina_numbers.Global_slot.t [@key "globalSlot"]
-      ; epoch_seed: Mina_base.Epoch_seed.t [@key "epochSeed"]
-      ; delegator_index: int [@key "delegatorIndex"] }
+      { global_slot : Mina_numbers.Global_slot.t [@key "globalSlot"]
+      ; epoch_seed : Mina_base.Epoch_seed.t [@key "epochSeed"]
+      ; delegator_index : int [@key "delegatorIndex"]
+      }
     [@@deriving yojson]
 
     let to_message (t : t) : Message.value =
-      { global_slot= t.global_slot
-      ; seed= t.epoch_seed
-      ; delegator= t.delegator_index }
+      { global_slot = t.global_slot
+      ; seed = t.epoch_seed
+      ; delegator = t.delegator_index
+      }
 
     let of_message (t : Message.value) : t =
-      { global_slot= t.global_slot
-      ; epoch_seed= t.seed
-      ; delegator_index= t.delegator }
+      { global_slot = t.global_slot
+      ; epoch_seed = t.seed
+      ; delegator_index = t.delegator
+      }
   end
 
   module Threshold = struct
     type t =
-      { delegated_stake: Currency.Balance.t [@key "delegatedStake"]
-      ; total_stake: Currency.Amount.t [@key "totalStake"] }
+      { delegated_stake : Currency.Balance.t [@key "delegatedStake"]
+      ; total_stake : Currency.Amount.t [@key "totalStake"]
+      }
     [@@deriving yojson]
 
     let is_satisfied vrf_output t =
@@ -486,36 +516,40 @@ module Layout = struct
 
   module Evaluation = struct
     type t =
-      { message: Message.t
-      ; public_key: Signature_lib.Public_key.t [@key "publicKey"]
-      ; c: Scalar.t
-      ; s: Scalar.t
-      ; scaled_message_hash: Group.t [@key "ScaledMessageHash"]
-      ; vrf_threshold: Threshold.t option [@default None] [@key "vrfThreshold"]
-      ; vrf_output: Output.Truncated.t option
+      { message : Message.t
+      ; public_key : Signature_lib.Public_key.t [@key "publicKey"]
+      ; c : Scalar.t
+      ; s : Scalar.t
+      ; scaled_message_hash : Group.t [@key "ScaledMessageHash"]
+      ; vrf_threshold : Threshold.t option [@default None] [@key "vrfThreshold"]
+      ; vrf_output : Output.Truncated.t option
             [@default None] [@key "vrfOutput"]
-      ; vrf_output_fractional: float option
+      ; vrf_output_fractional : float option
             [@default None] [@key "vrfOutputFractional"]
-      ; threshold_met: bool option [@default None] [@key "thresholdMet"] }
+      ; threshold_met : bool option [@default None] [@key "thresholdMet"]
+      }
     [@@deriving yojson]
 
     let to_evaluation_and_context (t : t) : evaluation * context =
-      ( { discrete_log_equality= {c= t.c; s= t.s}
-        ; scaled_message_hash= t.scaled_message_hash }
-      , { message= Message.to_message t.message
-        ; public_key= Group.of_affine t.public_key } )
+      ( { discrete_log_equality = { c = t.c; s = t.s }
+        ; scaled_message_hash = t.scaled_message_hash
+        }
+      , { message = Message.to_message t.message
+        ; public_key = Group.of_affine t.public_key
+        } )
 
-    let of_evaluation_and_context
-        ((evaluation, context) : evaluation * context) : t =
-      { message= Message.of_message context.message
-      ; public_key= Group.to_affine_exn context.public_key
-      ; c= evaluation.discrete_log_equality.c
-      ; s= evaluation.discrete_log_equality.s
-      ; scaled_message_hash= evaluation.scaled_message_hash
-      ; vrf_threshold= None
-      ; vrf_output= None
-      ; vrf_output_fractional= None
-      ; threshold_met= None }
+    let of_evaluation_and_context ((evaluation, context) : evaluation * context)
+        : t =
+      { message = Message.of_message context.message
+      ; public_key = Group.to_affine_exn context.public_key
+      ; c = evaluation.discrete_log_equality.c
+      ; s = evaluation.discrete_log_equality.s
+      ; scaled_message_hash = evaluation.scaled_message_hash
+      ; vrf_threshold = None
+      ; vrf_output = None
+      ; vrf_output_fractional = None
+      ; threshold_met = None
+      }
 
     let of_message_and_sk ~constraint_constants (message : Message.t)
         (private_key : Signature_lib.Private_key.t) =
@@ -526,9 +560,10 @@ module Layout = struct
       let standalone_eval = Standalone.Evaluation.create private_key message in
       let context : Standalone.Context.t =
         { message
-        ; public_key=
+        ; public_key =
             Signature_lib.Public_key.of_private_key_exn private_key
-            |> Group.of_affine }
+            |> Group.of_affine
+        }
       in
       of_evaluation_and_context (standalone_eval, context)
 
@@ -544,9 +579,10 @@ module Layout = struct
       match to_vrf ~constraint_constants t with
       | None ->
           { t with
-            vrf_output= None
-          ; vrf_output_fractional= None
-          ; threshold_met= None }
+            vrf_output = None
+          ; vrf_output_fractional = None
+          ; threshold_met = None
+          }
       | Some vrf ->
           let vrf_output = Output.truncate vrf in
           let vrf_output_fractional =
@@ -555,7 +591,7 @@ module Layout = struct
           let vrf_threshold =
             match (delegated_stake, total_stake) with
             | Some delegated_stake, Some total_stake ->
-                Some {Threshold.delegated_stake; total_stake}
+                Some { Threshold.delegated_stake; total_stake }
             | _ ->
                 t.vrf_threshold
           in
@@ -564,9 +600,10 @@ module Layout = struct
           in
           { t with
             vrf_threshold
-          ; vrf_output= Some vrf_output
-          ; vrf_output_fractional= Some vrf_output_fractional
-          ; threshold_met }
+          ; vrf_output = Some vrf_output
+          ; vrf_output_fractional = Some vrf_output_fractional
+          ; threshold_met
+          }
   end
 end
 
@@ -589,12 +626,12 @@ let%test_unit "Standalone and integrates vrfs are consistent" =
       let standalone_eval = Standalone.Evaluation.create private_key message in
       let context : Standalone.Context.t =
         { message
-        ; public_key=
+        ; public_key =
             Signature_lib.Public_key.of_private_key_exn private_key
-            |> Group.of_affine }
+            |> Group.of_affine
+        }
       in
       let standalone_vrf =
         Standalone.Evaluation.verified_output standalone_eval context
       in
-      [%test_eq: Output_hash.value option] (Some integrated_vrf) standalone_vrf
-  )
+      [%test_eq: Output_hash.t option] (Some integrated_vrf) standalone_vrf)

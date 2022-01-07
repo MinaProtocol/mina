@@ -4,12 +4,12 @@ open Core_kernel
 
 module Block_info = struct
   type t =
-    {id: int; global_slot: int64; state_hash: string; ledger_hash: string}
+    { id : int; global_slot : int64; state_hash : string; ledger_hash : string }
   [@@deriving hlist]
 
   let typ =
     let open Archive_lib.Processor.Caqti_type_spec in
-    let spec = Caqti_type.[int; int64; string; string] in
+    let spec = Caqti_type.[ int; int64; string; string ] in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
@@ -68,26 +68,27 @@ let find_command_ids_query s =
 
 module User_command = struct
   type t =
-    { type_: string
-    ; fee_payer_id: int
-    ; source_id: int
-    ; receiver_id: int
-    ; fee: int64
-    ; fee_token: int64
-    ; token: int64
-    ; amount: int64 option
-    ; valid_until: int64 option
-    ; memo: string
-    ; nonce: int64
-    ; block_id: int
-    ; global_slot: int64
-    ; txn_global_slot: int64
-    ; sequence_no: int
-    ; status: string
-    ; created_token: int64 option
-    ; fee_payer_balance: int
-    ; source_balance: int option
-    ; receiver_balance: int option }
+    { type_ : string
+    ; fee_payer_id : int
+    ; source_id : int
+    ; receiver_id : int
+    ; fee : int64
+    ; fee_token : int64
+    ; token : int64
+    ; amount : int64 option
+    ; valid_until : int64 option
+    ; memo : string
+    ; nonce : int64
+    ; block_id : int
+    ; global_slot : int64
+    ; txn_global_slot : int64
+    ; sequence_no : int
+    ; status : string
+    ; created_token : int64 option
+    ; fee_payer_balance : int
+    ; source_balance : int option
+    ; receiver_balance : int option
+    }
   [@@deriving yojson, hlist, equal]
 
   let typ =
@@ -113,7 +114,8 @@ module User_command = struct
         ; option int64
         ; int
         ; option int
-        ; option int ]
+        ; option int
+        ]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
@@ -174,8 +176,8 @@ module User_command = struct
 
        |sql}
 
-  let run_payments_by_source_and_receiver
-      (module Conn : Caqti_async.CONNECTION) ~source_id ~receiver_id =
+  let run_payments_by_source_and_receiver (module Conn : Caqti_async.CONNECTION)
+      ~source_id ~receiver_id =
     Conn.collect_list query_payments_by_source_and_receiver
       (source_id, receiver_id)
 

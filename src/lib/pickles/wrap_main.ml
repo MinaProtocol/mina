@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Pickles_types
 open Hlist
 open Common
@@ -70,7 +70,7 @@ let pad_domains (type prev_varss prev_valuess branches n)
     let dummy_domains =
       (* TODO: The dummy should really be equal to one of the already present domains. *)
       let d = Domain.Pow_2_roots_of_unity 1 in
-      {Domains.h= d; x= d}
+      { Domains.h = d; x = d }
     in
     let module M =
       H4.Map
@@ -110,7 +110,7 @@ let pack_statement max_branching =
   let pack_fq (Shifted_value.Shifted_value (x : Field.t)) =
     with_label __LOC__ (fun () ->
         let lo, hi = Util.split_last (Unsafe.unpack_unboolean x) in
-        [|lo; [hi]|] )
+        [| lo; [ hi ] |])
   in
   fun t ->
     with_label __LOC__ (fun () ->
@@ -119,7 +119,7 @@ let pack_statement max_branching =
           pack_fq
           (Types.Pairing_based.Statement.spec max_branching
              Backend.Tock.Rounds.n)
-          (Types.Pairing_based.Statement.to_data t) )
+          (Types.Pairing_based.Statement.to_data t))
 
 let shifts ~log2_size =
   Common.tock_shifts ~log2_size
@@ -167,22 +167,25 @@ let wrap_main
     Requests.Wrap.((create () : (max_branching, max_local_max_branchings) t))
   in
   Timer.clock __LOC__ ;
-  let {Full_signature.padded; maxes= (module Max_widths_by_slot)} =
+  let { Full_signature.padded; maxes = (module Max_widths_by_slot) } =
     full_signature
   in
   Timer.clock __LOC__ ;
   let main
-      ({ proof_state=
-           { deferred_values=
+      ({ proof_state =
+           { deferred_values =
                { plonk
                ; xi
                ; combined_inner_product
                ; b
                ; which_branch
-               ; bulletproof_challenges }
+               ; bulletproof_challenges
+               }
            ; sponge_digest_before_evaluations
-           ; me_only= me_only_digest }
-       ; pass_through } :
+           ; me_only = me_only_digest
+           }
+       ; pass_through
+       } :
         ( _
         , _
         , _ Shifted_value.t
@@ -200,7 +203,7 @@ let wrap_main
           let typ =
             typ (module Impl) Max_branching.n (Shifted_value.typ Field.typ)
           in
-          exists typ ~request:(fun () -> Req.Proof_state) )
+          exists typ ~request:(fun () -> Req.Proof_state))
     in
     let pairing_plonk_index =
       with_label __LOC__ (fun () ->
@@ -208,16 +211,16 @@ let wrap_main
             (Vector.map (Lazy.force step_keys)
                ~f:
                  (Plonk_verification_key_evals.map ~f:(function
-                   | [|g|] ->
+                   | [| g |] ->
                        Inner_curve.constant g
                    | xs ->
                        failwithf "Expected commitment to have length 1. Got %d"
-                         (Array.length xs) () ))) )
+                         (Array.length xs) ()))))
     in
     let prev_step_accs =
       with_label __LOC__ (fun () ->
           exists (Vector.typ Inner_curve.typ Max_branching.n)
-            ~request:(fun () -> Req.Step_accs) )
+            ~request:(fun () -> Req.Step_accs))
     in
     let old_bp_chals =
       with_label __LOC__ (fun () ->
@@ -247,17 +250,17 @@ let wrap_main
           Z.f Max_widths_by_slot.maxes
             (exists typ ~request:(fun () -> Req.Old_bulletproof_challenges))
           |> M.f
-          |> V.f Max_widths_by_slot.length )
+          |> V.f Max_widths_by_slot.length)
     in
     let domainses =
       with_label __LOC__ (fun () ->
-          pad_domains (module Max_branching) pi_branches prev_wrap_domains )
+          pad_domains (module Max_branching) pi_branches prev_wrap_domains)
     in
     let eval_lengths =
       with_label __LOC__ (fun () ->
           Vector.map domainses ~f:(fun v ->
               Commitment_lengths.generic Vector.map
-                ~h:(Vector.map v ~f:(fun {h; _} -> Domain.size h)) ) )
+                ~h:(Vector.map v ~f:(fun { h; _ } -> Domain.size h))))
     in
     let new_bulletproof_challenges =
       with_label __LOC__ (fun () ->
@@ -276,8 +279,7 @@ let wrap_main
             exists ty ~request:(fun () -> Req.Evals)
           in
           let chals =
-            let (wrap_domains : (_, Max_branching.n) Vector.t), max_quot_sizes
-                =
+            let (wrap_domains : (_, Max_branching.n) Vector.t), max_quot_sizes =
               Vector.map domainses ~f:(fun ds ->
                   let h =
                     Plonk_checks.domain
@@ -287,7 +289,7 @@ let wrap_main
                   ( h
                   , ( which_branch
                     , Vector.map ds ~f:(fun d ->
-                          Common.max_quot_size_int (Domain.size d.h) ) ) ) )
+                          Common.max_quot_size_int (Domain.size d.h)) ) ))
               |> Vector.unzip
             in
             let actual_branchings =
@@ -295,7 +297,7 @@ let wrap_main
               |> Vector.map ~f:(fun branchings_in_slot ->
                      Pseudo.choose
                        (which_branch, branchings_in_slot)
-                       ~f:Field.of_int )
+                       ~f:Field.of_int)
             in
             Vector.mapn
               [ (* This is padded to max_branching for the benefit of wrapping with dummy unfinalized proofs *)
@@ -305,30 +307,35 @@ let wrap_main
               ; evals
               ; eval_lengths
               ; wrap_domains
-              ; max_quot_sizes ]
-              ~f:(fun [ { deferred_values
-                        ; sponge_digest_before_evaluations
-                        ; should_finalize }
-                      ; old_bulletproof_challenges
-                      ; actual_branching
-                      ; evals
-                      ; eval_lengths
-                      ; domain
-                      ; max_quot_size ]
+              ; max_quot_sizes
+              ]
+              ~f:(fun
+                   [ { deferred_values
+                     ; sponge_digest_before_evaluations
+                     ; should_finalize
+                     }
+                   ; old_bulletproof_challenges
+                   ; actual_branching
+                   ; evals
+                   ; eval_lengths
+                   ; domain
+                   ; max_quot_size
+                   ]
                  ->
                 let sponge =
                   let s = Sponge.create sponge_params in
                   Sponge.absorb s sponge_digest_before_evaluations ;
                   s
                 in
+
                 (* the type of the local max branching depends on
-               which kind of step proof we are wrapping. *)
-                (* For each i in [0..max_branching-1], we have 
-               Max_local_max_branching, which is the largest
-               Local_max_branching which is the i^th inner proof of a step proof.
-            
-               Need to compute this value from the which_branch.
-            *)
+                   which kind of step proof we are wrapping. *)
+                (* For each i in [0..max_branching-1], we have
+                   Max_local_max_branching, which is the largest
+                   Local_max_branching which is the i^th inner proof of a step proof.
+
+                   Need to compute this value from the which_branch.
+                *)
                 let (T (max_local_max_branching, old_bulletproof_challenges)) =
                   old_bulletproof_challenges
                 in
@@ -339,12 +346,12 @@ let wrap_main
                         ~max_quot_size ~actual_branching
                         ~domain:(domain :> _ Plonk_checks.plonk_domain)
                         ~sponge deferred_values ~old_bulletproof_challenges
-                        evals )
+                        evals)
                 in
-                Boolean.(Assert.any [finalized; not should_finalize]) ;
-                chals )
+                Boolean.(Assert.any [ finalized; not should_finalize ]) ;
+                chals)
           in
-          chals )
+          chals)
     in
     let prev_statement =
       let prev_me_onlys =
@@ -355,10 +362,11 @@ let wrap_main
                  will have to fix this. *)
             let T = Nat.eq_exn max_local_max_branching Max_branching.n in
             hash_me_only Max_branching.n
-              {sg= sacc; old_bulletproof_challenges= chals} )
+              { sg = sacc; old_bulletproof_challenges = chals })
       in
-      { Types.Pairing_based.Statement.pass_through= prev_me_onlys
-      ; proof_state= prev_proof_state }
+      { Types.Pairing_based.Statement.pass_through = prev_me_onlys
+      ; proof_state = prev_proof_state
+      }
     in
     let openings_proof =
       let shift = Shifts.tick in
@@ -371,11 +379,11 @@ let wrap_main
                    Shifted_value.of_field (module Backend.Tick.Field) ~shift x
                  with
                  | Shifted_value x ->
-                     x )
+                     x)
                ~back:(fun x ->
                  Shifted_value.to_field
                    (module Backend.Tick.Field)
-                   ~shift (Shifted_value x) )
+                   ~shift (Shifted_value x))
            (* When reading, unshift *)
            |> Typ.transport_var
               (* For the var, we just wrap the now shifted underlying value. *)
@@ -398,46 +406,46 @@ let wrap_main
                      ~h:
                        (Vector.map step_domains
                           ~f:(Fn.compose Domain.size Domains.h))))
-              ~request:(fun () -> Req.Messages) )
+              ~request:(fun () -> Req.Messages))
       in
       let sponge = Opt.create sponge_params in
       let xi =
         with_label __LOC__ (fun () ->
             Pickles_types.Scalar_challenge.map xi
-              ~f:(Unsafe.unpack_unboolean ~length:Challenge.length) )
+              ~f:(Unsafe.unpack_unboolean ~length:Challenge.length))
       in
       with_label __LOC__ (fun () ->
           incrementally_verify_proof
             (module Max_branching)
-            ~step_widths ~step_domains ~verification_key:pairing_plonk_index
-            ~xi ~sponge
+            ~step_widths ~step_domains ~verification_key:pairing_plonk_index ~xi
+            ~sponge
             ~public_input:(pack_statement Max_branching.n prev_statement)
-            ~sg_old:prev_step_accs ~combined_inner_product ~advice:{b}
+            ~sg_old:prev_step_accs ~combined_inner_product ~advice:{ b }
             ~messages ~which_branch ~openings_proof
             ~plonk:
               (with_label __LOC__ (fun () ->
-                   Types.Dlog_based.Proof_state.Deferred_values.Plonk
-                   .In_circuit
+                   Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit
                    .map_fields
                      plonk
                      (* We don't use a boolean-constraining unpacking function. It's not
-   necessary with PLONK. *)
-                     ~f:
-                       (Shifted_value.map ~f:Other_field.Packed.to_bits_unsafe)
-               )) )
+                        necessary with PLONK. *)
+                     ~f:(Shifted_value.map ~f:Other_field.Packed.to_bits_unsafe))))
     in
     Boolean.Assert.is_true bulletproof_success ;
     Field.Assert.equal me_only_digest
       (hash_me_only Max_branching.n
-         { Types.Dlog_based.Proof_state.Me_only.sg= openings_proof.sg
-         ; old_bulletproof_challenges= new_bulletproof_challenges }) ;
+         { Types.Dlog_based.Proof_state.Me_only.sg = openings_proof.sg
+         ; old_bulletproof_challenges = new_bulletproof_challenges
+         }) ;
     Field.Assert.equal sponge_digest_before_evaluations
       sponge_digest_before_evaluations_actual ;
     Array.iter2_exn bulletproof_challenges_actual
       (Vector.to_array bulletproof_challenges)
-      ~f:(fun {prechallenge= Scalar_challenge x1}
-         ({prechallenge= Scalar_challenge x2} : _ SC.t Bulletproof_challenge.t)
-         -> Field.Assert.equal x1 x2 ) ;
+      ~f:(fun
+           { prechallenge = Scalar_challenge x1 }
+           ({ prechallenge = Scalar_challenge x2 } :
+             _ SC.t Bulletproof_challenge.t)
+         -> Field.Assert.equal x1 x2) ;
     ()
   in
   Timer.clock __LOC__ ;

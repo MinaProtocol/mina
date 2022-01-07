@@ -1,10 +1,8 @@
 (* account.ml *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
-[%%ifndef
-consensus_mechanism]
+[%%ifndef consensus_mechanism]
 
 module Signature_lib = Signature_lib_nonconsensus
 module Mina_compile_config =

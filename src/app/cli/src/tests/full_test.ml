@@ -1,5 +1,4 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core
 open Async
@@ -15,15 +14,13 @@ let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
 let name = "full-test"
 
-[%%if
-proof_level = "full"]
+[%%if proof_level = "full"]
 
 let with_snark = true
 
 let with_check = false
 
-[%%elif
-proof_level = "check"]
+[%%elif proof_level = "check"]
 
 let with_snark = false
 
@@ -37,8 +34,7 @@ let with_check = false
 
 [%%endif]
 
-[%%if
-curve_size = 255]
+[%%if curve_size = 255]
 
 let medium_curves = true
 
@@ -48,11 +44,10 @@ let medium_curves = false
 
 [%%endif]
 
-[%%if
-time_offsets = true]
+[%%if time_offsets = true]
 
 let setup_time_offsets consensus_constants =
-  Unix.putenv ~key:"CODA_TIME_OFFSET"
+  Unix.putenv ~key:"MINA_TIME_OFFSET"
     ~data:
       ( Time.Span.to_int63_seconds_round_down_exn
           (Coda_processes.offset consensus_constants)
@@ -68,8 +63,7 @@ let setup_time_offsets _ = ()
 
 let heartbeat_flag = ref true
 
-[%%inject
-"test_full_epoch", test_full_epoch]
+[%%inject "test_full_epoch", test_full_epoch]
 
 let print_heartbeat logger =
   let rec loop () =
@@ -95,7 +89,7 @@ let run_test () : unit Deferred.t =
     ~f:(fun temp_conf_dir ->
       let keypair = Genesis_ledger.largest_account_keypair_exn () in
       let%bind () =
-        match Unix.getenv "CODA_TRACING" with
+        match Unix.getenv "MINA_TRACING" with
         | Some trace_dir ->
             let%bind () = Async.Unix.mkdir ~p:() trace_dir in
             Coda_tracing.start trace_dir
@@ -127,29 +121,33 @@ let run_test () : unit Deferred.t =
       let chain_id = "bogus chain id for testing" in
       let gossip_net_params =
         Gossip_net.Libp2p.Config.
-          { timeout= Time.Span.of_sec 3.
+          { timeout = Time.Span.of_sec 3.
           ; logger
-          ; initial_peers= []
-          ; unsafe_no_trust_ip= true
-          ; isolate= false
-          ; metrics_port= None
-          ; conf_dir= temp_conf_dir
+          ; initial_peers = []
+          ; unsafe_no_trust_ip = true
+          ; isolate = false
+          ; metrics_port = None
+          ; conf_dir = temp_conf_dir
           ; chain_id
-          ; flooding= false
-          ; direct_peers= []
-          ; seed_peer_list_url= None
-          ; peer_exchange= true
-          ; mina_peer_exchange= true
-          ; addrs_and_ports=
-              { external_ip= Unix.Inet_addr.localhost
-              ; bind_ip= Unix.Inet_addr.localhost
-              ; peer= None
+          ; flooding = false
+          ; direct_peers = []
+          ; seed_peer_list_url = None
+          ; peer_exchange = true
+          ; mina_peer_exchange = true
+          ; addrs_and_ports =
+              { external_ip = Unix.Inet_addr.localhost
+              ; bind_ip = Unix.Inet_addr.localhost
+              ; peer = None
               ; libp2p_port
-              ; client_port }
+              ; client_port
+              }
           ; trust_system
-          ; max_connections= 50
-          ; validation_queue_size= 150
-          ; keypair= None }
+          ; min_connections = 20
+          ; max_connections = 50
+          ; validation_queue_size = 150
+          ; keypair = None
+          ; all_peers_seen_metric = false
+          }
       in
       let net_config =
         Mina_networking.Config.
@@ -157,18 +155,20 @@ let run_test () : unit Deferred.t =
           ; trust_system
           ; time_controller
           ; consensus_local_state
-          ; is_seed= true
-          ; genesis_ledger_hash=
+          ; is_seed = true
+          ; genesis_ledger_hash =
               Ledger.merkle_root (Lazy.force Genesis_ledger.t)
           ; constraint_constants
-          ; log_gossip_heard=
-              { snark_pool_diff= false
-              ; transaction_pool_diff= false
-              ; new_state= false }
-          ; creatable_gossip_net=
+          ; log_gossip_heard =
+              { snark_pool_diff = false
+              ; transaction_pool_diff = false
+              ; new_state = false
+              }
+          ; creatable_gossip_net =
               Mina_networking.Gossip_net.(
                 Any.Creatable
-                  ((module Libp2p), Libp2p.create ~pids gossip_net_params)) }
+                  ((module Libp2p), Libp2p.create ~pids gossip_net_params))
+          }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
@@ -199,11 +199,12 @@ let run_test () : unit Deferred.t =
              ~initial_block_production_keypairs:(Keypair.Set.singleton keypair)
              ~snark_worker_config:
                Mina_lib.Config.Snark_worker_config.
-                 { initial_snark_worker_key=
+                 { initial_snark_worker_key =
                      Some
                        (Public_key.compress largest_account_keypair.public_key)
-                 ; shutdown_on_disconnect= true
-                 ; num_threads= None }
+                 ; shutdown_on_disconnect = true
+                 ; num_threads = None
+                 }
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~persistent_root_location:(temp_conf_dir ^/ "root")
@@ -211,7 +212,7 @@ let run_test () : unit Deferred.t =
              ~epoch_ledger_location ~time_controller ~snark_work_fee
              ~consensus_local_state ~work_reassignment_wait:420000
              ~precomputed_values ~start_time ~log_precomputed_blocks:false
-             ~upload_blocks_to_gcloud:false ())
+             ~upload_blocks_to_gcloud:false ~stop_time:48 ())
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
@@ -225,7 +226,7 @@ let run_test () : unit Deferred.t =
             let%bind () = after (Time.Span.of_sec 10.) in
             go ()
         in
-        Deferred.any [after (Time.Span.of_min timeout_min); go ()]
+        Deferred.any [ after (Time.Span.of_min timeout_min); go () ]
       in
       let balance_change_or_timeout ~initial_receiver_balance receiver_id =
         let cond t =
@@ -265,7 +266,7 @@ let run_test () : unit Deferred.t =
       assert (Option.is_none @@ Mina_lib.staged_ledger_ledger_proof coda) ;
       (* Note: This is much less than half of the high balance account so we can test
          *       payment replays being prohibited
-        *)
+      *)
       let send_amount = Currency.Amount.of_int 10 in
       (* Send money to someone *)
       let build_payment ?nonce amount sender_sk receiver_pk fee =
@@ -279,14 +280,15 @@ let run_test () : unit Deferred.t =
               ~fee_token:Token_id.default ~memo ~valid_until:None
               ~body:
                 (Payment
-                   { source_pk= signer
+                   { source_pk = signer
                    ; receiver_pk
-                   ; token_id= Token_id.default
-                   ; amount })
+                   ; token_id = Token_id.default
+                   ; amount
+                   })
               ~sign_choice:
                 (User_command_input.Sign_choice.Keypair
                    (Keypair.of_private_key_exn sender_sk))
-              () )
+              ())
       in
       let assert_ok x = ignore (Or_error.ok_exn x) in
       let send_payment (payment : User_command_input.t) =
@@ -345,19 +347,19 @@ let run_test () : unit Deferred.t =
           Map.update balance_sheet sender_pk ~f:(fun v ->
               Option.value_exn
                 (Currency.Balance.sub_amount (Option.value_exn v)
-                   (Option.value_exn (Currency.Amount.add_fee amount fee))) )
+                   (Option.value_exn (Currency.Amount.add_fee amount fee))))
         in
         let new_balance_sheet' =
           Map.update new_balance_sheet receiver_pk ~f:(fun v ->
               Option.value_exn
-                (Currency.Balance.add_amount (Option.value_exn v) amount) )
+                (Currency.Balance.add_amount (Option.value_exn v) amount))
         in
         let%map p_res = send_payment payment in
         assert_ok p_res ; new_balance_sheet'
       in
       let pks accounts =
         List.map accounts ~f:(fun ((keypair : Signature_lib.Keypair.t), _) ->
-            Public_key.compress keypair.public_key )
+            Public_key.compress keypair.public_key)
       in
       let send_payments accounts ~txn_count balance_sheet f_amount =
         let pks = pks accounts in
@@ -366,11 +368,12 @@ let run_test () : unit Deferred.t =
             let sender_pk = Public_key.compress keypair.public_key in
             let receiver =
               List.random_element_exn
-                (List.filter pks ~f:(fun pk -> not (pk = sender_pk)))
+                (List.filter pks ~f:(fun pk ->
+                     not (Public_key.Compressed.equal pk sender_pk)))
             in
             send_payment_update_balance_sheet keypair.private_key sender_pk
               receiver (f_amount i) acc
-              Mina_compile_config.minimum_user_command_fee )
+              Mina_compile_config.minimum_user_command_fee)
       in
       let blockchain_length t =
         Mina_lib.best_protocol_state t
@@ -387,18 +390,18 @@ let run_test () : unit Deferred.t =
             (List.map accounts
                ~f:(fun ((keypair : Signature_lib.Keypair.t), account) ->
                  ( Public_key.compress keypair.public_key
-                 , account.Account.Poly.balance ) ))
+                 , account.Account.Poly.balance )))
         in
         let%bind updated_balance_sheet =
           send_payments accounts ~txn_count balance_sheet (fun i ->
-              Currency.Amount.of_int ((i + 1) * 10) )
+              Currency.Amount.of_int ((i + 1) * 10))
         in
         (*After mining a few blocks and emitting a ledger_proof (by the parallel scan), check if the balances match *)
         let%map () = wait_for_proof_or_timeout timeout_min () in
         assert (Option.is_some @@ Mina_lib.staged_ledger_ledger_proof coda) ;
         Map.fold updated_balance_sheet ~init:() ~f:(fun ~key ~data () ->
             let account_id = Account_id.create key Token_id.default in
-            assert_balance account_id data ) ;
+            assert_balance account_id data) ;
         blockchain_length coda
       in
       let test_duplicate_payments (sender_keypair : Signature_lib.Keypair.t)
@@ -415,33 +418,32 @@ let run_test () : unit Deferred.t =
       let receiver_keypair =
         let receiver =
           Genesis_ledger.find_new_account_record_exn
-            [largest_account_keypair.public_key]
+            [ largest_account_keypair.public_key ]
         in
         Genesis_ledger.keypair_of_account_record_exn receiver
       in
       let sender_keypair =
         let sender =
           Genesis_ledger.find_new_account_record_exn
-            [largest_account_keypair.public_key; receiver_keypair.public_key]
+            [ largest_account_keypair.public_key; receiver_keypair.public_key ]
         in
         Genesis_ledger.keypair_of_account_record_exn sender
       in
       let other_accounts =
-        List.filter (Lazy.force Genesis_ledger.accounts)
-          ~f:(fun (_, account) ->
+        List.filter (Lazy.force Genesis_ledger.accounts) ~f:(fun (_, account) ->
             let reserved_public_keys =
               [ largest_account_keypair.public_key
               ; receiver_keypair.public_key
-              ; sender_keypair.public_key ]
+              ; sender_keypair.public_key
+              ]
             in
             not
               (List.exists reserved_public_keys ~f:(fun pk ->
                    Public_key.equal pk
-                     (Public_key.decompress_exn @@ Account.public_key account)
-               )) )
+                     (Public_key.decompress_exn @@ Account.public_key account))))
         |> List.map ~f:(fun (sk, account) ->
                ( Genesis_ledger.keypair_of_account_record_exn (sk, account)
-               , account ) )
+               , account ))
       in
       let timeout_mins =
         if (with_snark || with_check) && medium_curves then 90.
@@ -465,8 +467,9 @@ let run_test () : unit Deferred.t =
           let%map () =
             wait_until_cond
               ~f:(fun t ->
-                blockchain_length t
-                > Length.add blockchain_length' wait_till_length )
+                Length.(
+                  blockchain_length t
+                  > Length.add blockchain_length' wait_till_length))
               ~timeout_min:
                 ( (Length.to_int consensus_constants.delta + 1 + 8)
                   * ( ( Block_time.Span.to_ms
@@ -477,8 +480,9 @@ let run_test () : unit Deferred.t =
                 |> Float.of_int )
           in
           assert (
-            blockchain_length coda
-            > Length.add blockchain_length' wait_till_length )
+            Length.(
+              blockchain_length coda
+              > Length.add blockchain_length' wait_till_length) )
         else if with_check then
           let%bind _ =
             test_multiple_payments other_accounts
@@ -494,7 +498,7 @@ let run_test () : unit Deferred.t =
           in
           test_duplicate_payments sender_keypair receiver_keypair
       in
-      heartbeat_flag := false )
+      heartbeat_flag := false)
 
 let command =
   let open Async in

@@ -6,17 +6,17 @@ use crate::plonk_verifier_index::{
 };
 use crate::pasta_fp_plonk_index::CamlPastaFpPlonkIndexPtr;
 use crate::pasta_fp_urs::CamlPastaFpUrs;
+use mina_curves::pasta::{vesta::Affine as GAffine, pallas::Affine as GAffineOther, fp::Fp};
 use algebra::{
     curves::AffineCurve,
-    pasta::{vesta::Affine as GAffine, pallas::Affine as GAffineOther, fp::Fp},
     One,
 };
 
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 
-use commitment_dlog::{commitment::PolyComm, srs::SRS};
+use commitment_dlog::{commitment::PolyComm, srs::{SRS, SRSValue}};
 use plonk_circuits::constraints::{zk_polynomial, zk_w, ConstraintSystem};
-use plonk_protocol_dlog::index::{SRSValue, VerifierIndex as DlogVerifierIndex};
+use plonk_protocol_dlog::index::{VerifierIndex as DlogVerifierIndex};
 
 use std::{
     fs::{File, OpenOptions},

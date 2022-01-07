@@ -24,7 +24,7 @@ module Poly : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type 'a t = {transaction: 'a; block_data: Block_data.Stable.V1.t}
+      type 'a t = { transaction : 'a; block_data : Block_data.Stable.V1.t }
       [@@deriving sexp]
     end
   end]
@@ -37,8 +37,7 @@ module Stable : sig
 
     val to_latest : ('a -> 'b) -> 'a t -> 'b t
 
-    val of_latest :
-      ('a -> ('b, 'err) Result.t) -> 'a t -> ('b t, 'err) Result.t
+    val of_latest : ('a -> ('b, 'err) Result.t) -> 'a t -> ('b t, 'err) Result.t
   end
 end]
 

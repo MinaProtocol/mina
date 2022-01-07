@@ -1,7 +1,7 @@
 (** Simple container of one of two values of a given type. *)
-open Core
+open Core_kernel
 
-open Async
+open Async_kernel
 
 module Stable : sig
   module V1 : sig
@@ -10,8 +10,7 @@ module Stable : sig
 
     val to_latest : ('a -> 'b) -> 'a t -> 'b t
 
-    val of_latest :
-      ('a -> ('b, 'err) Result.t) -> 'a t -> ('b t, 'err) Result.t
+    val of_latest : ('a -> ('b, 'err) Result.t) -> 'a t -> ('b t, 'err) Result.t
   end
 
   module Latest = V1

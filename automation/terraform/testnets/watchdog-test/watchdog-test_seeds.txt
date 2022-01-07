@@ -1,2 +1,0 @@
-/dns4/seed-1.watchdog-test.o1test.net/tcp/10000/p2p/12D3KooWNsctZjNbANQiBRMwCyAbqEH9gJj7V3AumCmRQN1iaGys
-

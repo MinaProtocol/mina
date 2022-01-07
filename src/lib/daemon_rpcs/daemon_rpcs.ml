@@ -32,8 +32,7 @@ module Send_user_commands = struct
 end
 
 module Get_ledger = struct
-  type query = State_hash.Stable.Latest.t option
-  [@@deriving bin_io_unversioned]
+  type query = State_hash.Stable.Latest.t option [@@deriving bin_io_unversioned]
 
   type response = Account.Stable.Latest.t list Or_error.t
   [@@deriving bin_io_unversioned]
@@ -43,8 +42,7 @@ module Get_ledger = struct
 end
 
 module Get_snarked_ledger = struct
-  type query = State_hash.Stable.Latest.t option
-  [@@deriving bin_io_unversioned]
+  type query = State_hash.Stable.Latest.t option [@@deriving bin_io_unversioned]
 
   type response = Account.Stable.Latest.t list Or_error.t
   [@@deriving bin_io_unversioned]
@@ -119,8 +117,7 @@ end
 module Chain_id_inputs = struct
   type query = unit [@@deriving bin_io_unversioned]
 
-  type response =
-    State_hash.Stable.Latest.t * Genesis_constants.t * string list
+  type response = State_hash.Stable.Latest.t * Genesis_constants.t * string list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -162,7 +159,7 @@ module Get_nonce = struct
 end
 
 module Get_status = struct
-  type query = [`Performance | `None] [@@deriving bin_io_unversioned]
+  type query = [ `Performance | `None ] [@@deriving bin_io_unversioned]
 
   type response = Types.Status.t [@@deriving bin_io_unversioned]
 
@@ -171,13 +168,12 @@ module Get_status = struct
 end
 
 module Clear_hist_status = struct
-  type query = [`Performance | `None] [@@deriving bin_io_unversioned]
+  type query = [ `Performance | `None ] [@@deriving bin_io_unversioned]
 
   type response = Types.Status.t [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Clear_hist_status" ~version:0 ~bin_query
-      ~bin_response
+    Rpc.Rpc.create ~name:"Clear_hist_status" ~version:0 ~bin_query ~bin_response
 end
 
 module Get_public_keys_with_details = struct
@@ -258,7 +254,7 @@ module Visualization = struct
   module Frontier = struct
     type query = string [@@deriving bin_io_unversioned]
 
-    type response = [`Active of unit | `Bootstrapping]
+    type response = [ `Active of unit | `Bootstrapping ]
     [@@deriving bin_io_unversioned]
 
     let rpc : (query, response) Rpc.Rpc.t =
@@ -305,8 +301,7 @@ module Get_trustlist = struct
 end
 
 module Get_node_status = struct
-  type query = Mina_net2.Multiaddr.t list option
-  [@@deriving bin_io_unversioned]
+  type query = Mina_net2.Multiaddr.t list option [@@deriving bin_io_unversioned]
 
   type response =
     Mina_networking.Rpcs.Get_node_status.Node_status.Stable.Latest.t Or_error.t

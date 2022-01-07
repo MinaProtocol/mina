@@ -12,16 +12,6 @@ module Get_balance =
 [%graphql
 {|
     query get_balance($public_key: PublicKey!, $token_id: TokenId) {
-      genesisBlock {
-        stateHash
-      }
-      bestChain {
-        stateHash
-      }
-      initialPeers
-      daemonStatus {
-        chainId
-      }
       account(publicKey: $public_key, token: $token_id) {
         balance {
           blockHeight @bsDecoder(fn: "Decoders.uint32")
@@ -36,6 +26,7 @@ module Get_balance =
 
 module Balance_info = struct
   type t = {liquid_balance: int64; total_balance: int64}
+           [@@deriving yojson]
 end
 
 module Sql = struct
@@ -44,7 +35,7 @@ module Sql = struct
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         Caqti_type.(tup2 int64 int64)
-        {|
+        {sql|
 WITH RECURSIVE chain AS (
   (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp
   FROM blocks b
@@ -63,6 +54,7 @@ relevant_internal_block_balances AS (
   SELECT
     block_internal_command.block_id,
     block_internal_command.sequence_no,
+    block_internal_command.secondary_sequence_no,
     receiver_balance.balance
   FROM blocks_internal_commands block_internal_command
   INNER JOIN balances receiver_balance ON block_internal_command.receiver_balance = receiver_balance.id
@@ -70,32 +62,57 @@ relevant_internal_block_balances AS (
   WHERE receiver_pk.value = $1
 ),
 
-relevant_user_block_balances AS (
+relevant_user_block_fee_payer_balances AS (
   SELECT
     block_user_command.block_id,
     block_user_command.sequence_no,
-    CASE WHEN fee_payer_pk.value = $1 THEN fee_payer_balance.balance
-         WHEN source_pk.value = $1 THEN source_balance.balance
-         ELSE receiver_balance.balance
-    END
+    fee_payer_balance.balance
   FROM blocks_user_commands block_user_command
 
   INNER JOIN balances fee_payer_balance ON fee_payer_balance.id = block_user_command.fee_payer_balance
-  INNER JOIN balances source_balance ON source_balance.id = block_user_command.source_balance
-  INNER JOIN balances receiver_balance ON receiver_balance.id = block_user_command.receiver_balance
 
   INNER JOIN public_keys fee_payer_pk ON fee_payer_pk.id = fee_payer_balance.public_key_id
+  WHERE fee_payer_pk.value = $1
+),
+
+relevant_user_block_source_balances AS (
+  SELECT
+    block_user_command.block_id,
+    block_user_command.sequence_no,
+    source_balance.balance
+  FROM blocks_user_commands block_user_command
+
+  INNER JOIN balances source_balance ON source_balance.id = block_user_command.source_balance
+
   INNER JOIN public_keys source_pk ON source_pk.id = source_balance.public_key_id
+  WHERE source_pk.value = $1
+),
+
+relevant_user_block_receiver_balances AS (
+  SELECT
+    block_user_command.block_id,
+    block_user_command.sequence_no,
+    receiver_balance.balance
+  FROM blocks_user_commands block_user_command
+
+  INNER JOIN balances receiver_balance ON receiver_balance.id = block_user_command.receiver_balance
+
   INNER JOIN public_keys receiver_pk ON receiver_pk.id = receiver_balance.public_key_id
-  WHERE
-    (fee_payer_pk.value = $1 OR source_pk.value = $1 OR receiver_pk.value = $1) AND
-    block_user_command.status = 'applied'
+  WHERE receiver_pk.value = $1
+),
+
+relevant_user_block_balances AS (
+  (SELECT block_id, sequence_no, balance FROM relevant_user_block_fee_payer_balances)
+  UNION
+  (SELECT block_id, sequence_no, balance FROM relevant_user_block_source_balances)
+  UNION
+  (SELECT block_id, sequence_no, balance FROM relevant_user_block_receiver_balances)
 ),
 
 relevant_block_balances AS (
-  (SELECT block_id, sequence_no, balance from relevant_internal_block_balances)
+  (SELECT block_id, sequence_no, secondary_sequence_no, balance FROM relevant_internal_block_balances)
   UNION
-  (SELECT block_id, sequence_no, balance from relevant_user_block_balances)
+  (SELECT block_id, sequence_no, 0 AS secondary_sequence_no, balance FROM relevant_user_block_balances)
 )
 
 SELECT
@@ -105,9 +122,9 @@ FROM
 chain
 JOIN relevant_block_balances rbb ON chain.id = rbb.block_id
 WHERE chain.height <= $2
-ORDER BY (chain.height, sequence_no) DESC
+ORDER BY (chain.height, sequence_no, secondary_sequence_no) DESC
 LIMIT 1
-      |}
+      |sql}
 
     let run (module Conn : Caqti_async.CONNECTION) requested_block_height
         address =
@@ -184,13 +201,13 @@ LIMIT 1
     let%bind liquid_balance =
       match (last_relevant_command_info_opt, timing_info_opt) with
       | None, None ->
-          (* We've never heard of this account, at least as of the block_identifier provided *)
-          (* This means they requested a block from before account creation;
+        (* We've never heard of this account, at least as of the block_identifier provided *)
+        (* This means they requested a block from before account creation;
          * this is ambiguous in the spec but Coinbase confirmed we can return 0.
          * https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
-          Deferred.Result.return 0L
+        Deferred.Result.return 0L
       | Some (_, last_relevant_command_balance), None ->
-          (* This account has no special vesting, so just use its last known balance *)
+        (* This account has no special vesting, so just use its last known balance *)
           Deferred.Result.return last_relevant_command_balance
       | None, Some timing_info ->
           (* This account hasn't seen any transactions but was in the genesis ledger, so compute its balance at the start block *)
@@ -256,7 +273,7 @@ module Balance = struct
                block_query:Block_query.t
             -> address:string
             -> (Block_identifier.t * Balance_info.t, Errors.t) M.t
-        ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t }
+        ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
     end
 
     (* The real environment does things asynchronously *)
@@ -292,17 +309,6 @@ module Balance = struct
             (* TODO: Add variants to cover every branch *)
             Result.return
             @@ object
-                 method genesisBlock =
-                   object
-                     method stateHash = "STATE_HASH_GENESIS"
-                   end
-
-                 method bestChain =
-                   Some
-                     [| object
-                          method stateHash = "STATE_HASH_TIP"
-                        end |]
-
                  method account =
                    Some
                      (object
@@ -323,7 +329,7 @@ module Balance = struct
                end )
       ; db_block_identifier_and_balance_info=
           (fun ~block_query ~address ->
-            let () = ignore (block_query, address) in
+            ignore ((block_query, address) : Block_query.t * string) ;
             let balance_info : Balance_info.t =
               {liquid_balance= 0L; total_balance= 0L}
             in
@@ -337,10 +343,11 @@ module Balance = struct
     module Query = Block_query.T (M)
 
     let handle :
-           env:'gql E.t
+            graphql_uri: Uri.t
+        -> env:'gql E.t
         -> Account_balance_request.t
         -> (Account_balance_response.t, Errors.t) M.t =
-     fun ~env req ->
+     fun ~graphql_uri ~env req ->
       let open M.Let_syntax in
       let address = req.account_identifier.address in
       let%bind token_id = Token_id.decode req.account_identifier.metadata in
@@ -351,7 +358,7 @@ module Balance = struct
       in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~gql_response:res
+          ~graphql_uri
       in
       let%bind account =
         match res#account with
@@ -364,10 +371,10 @@ module Balance = struct
         let amount =
           ( match token_id with
           | None ->
-              Amount_of.coda
+              Amount_of.mina
           | Some token_id ->
               Amount_of.token token_id )
-            liquid_balance
+            total_balance
         in
         let locked_balance =
           Unsigned.UInt64.sub total_balance liquid_balance
@@ -376,6 +383,8 @@ module Balance = struct
           `Assoc
             [ ( "locked_balance"
               , `Intlit (Unsigned.UInt64.to_string locked_balance) )
+            ; ( "liquid_balance"
+              , `Intlit (Unsigned.UInt64.to_string liquid_balance) )
             ; ( "total_balance"
               , `Intlit (Unsigned.UInt64.to_string total_balance) ) ]
         in
@@ -395,7 +404,7 @@ module Balance = struct
                   (Errors.create
                      ~context:
                        "Failed accessing state hash from GraphQL \
-                        communication with the Coda Daemon."
+                        communication with the Mina Daemon."
                      `Chain_info_missing)
             | Some state_hash ->
                 M.return state_hash
@@ -444,7 +453,7 @@ module Balance = struct
       let%test_unit "account exists lookup" =
         Test.assert_ ~f:Account_balance_response.to_yojson
           ~expected:
-            (Mock.handle ~env:Env.mock
+            (Mock.handle ~graphql_uri:(Uri.of_string "http://minaprotocol.com") ~env:Env.mock
                (Account_balance_request.create
                   (Network_identifier.create "x" "y")
                   (Account_identifier.create "x")))
@@ -456,11 +465,12 @@ module Balance = struct
                ; balances=
                    [ { Amount.value= "66000"
                      ; currency=
-                         {Currency.symbol= "CODA"; decimals= 9l; metadata= None}
+                         {Currency.symbol= "MINA"; decimals= 9l; metadata= None}
                      ; metadata=
                          Some
                            (`Assoc
                              [ ("locked_balance", `Intlit "0")
+                             ; ("liquid_balance", `Intlit "66000")
                              ; ("total_balance", `Intlit "66000") ]) } ]
                ; metadata= Some (`Assoc [("nonce", `Intlit "2")]) })
     end )
@@ -473,15 +483,30 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
   match route with
   | ["balance"] ->
       with_db (fun ~db ->
-          let%bind req =
+        let body =
+          (* workaround: rosetta-cli with view:balance does not seem to have a way to submit the
+             currencies list, so supply it here
+          *)
+          match body with
+          | `Assoc items -> (
+            match List.Assoc.find items "currencies" ~equal:String.equal with
+                Some _ -> body
+              | None ->
+                `Assoc (items @ [("currencies",`List [`Assoc [("symbol",`String "MINA");("decimals", `Int 9)]])])
+          )
+          | _ ->
+            (* will fail on JSON parse below *)
+            body
+        in
+        let%bind req =
             Errors.Lift.parse ~context:"Request"
             @@ Account_balance_request.of_yojson body
             |> Errors.Lift.wrap
           in
           let%map res =
-            Balance.Real.handle ~env:(Balance.Env.real ~db ~graphql_uri) req
+            Balance.Real.handle ~graphql_uri ~env:(Balance.Env.real ~db ~graphql_uri) req
             |> Errors.Lift.wrap
           in
-          Account_balance_response.to_yojson res )
+          Account_balance_response.to_yojson res)
   | _ ->
       Deferred.Result.fail `Page_not_found

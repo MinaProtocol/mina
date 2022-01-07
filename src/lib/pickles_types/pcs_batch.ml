@@ -1,9 +1,9 @@
 open Core_kernel
 
 type ('a, 'n, 'm) t =
-  {without_degree_bound: 'n Nat.t; with_degree_bound: ('a, 'm) Vector.t}
+  { without_degree_bound : 'n Nat.t; with_degree_bound : ('a, 'm) Vector.t }
 
-let map t ~f = {t with with_degree_bound= Vector.map t.with_degree_bound ~f}
+let map t ~f = { t with with_degree_bound = Vector.map t.with_degree_bound ~f }
 
 let num_bits n = Int.floor_log2 n + 1
 
@@ -19,7 +19,7 @@ let%test_unit "num_bits" =
     go 0
   in
   Quickcheck.test (Int.gen_uniform_incl 0 Int.max_value) ~f:(fun n ->
-      [%test_eq: int] (num_bits n) (naive n) )
+      [%test_eq: int] (num_bits n) (naive n))
 
 let pow ~one ~mul x n =
   assert (n >= 0) ;
@@ -35,7 +35,7 @@ let pow ~one ~mul x n =
   go one (k - 1)
 
 let create ~without_degree_bound ~with_degree_bound =
-  {without_degree_bound; with_degree_bound}
+  { without_degree_bound; with_degree_bound }
 
 let combine_commitments _t ~scale ~add ~xi (type n)
     (without_degree_bound : (_, n) Vector.t) with_degree_bound =
@@ -46,12 +46,12 @@ let combine_commitments _t ~scale ~add ~xi (type n)
       let polys =
         Vector.to_list without_degree_bound
         @ List.concat_map (Vector.to_list with_degree_bound)
-            ~f:(fun (unshifted, shifted) -> [unshifted; shifted])
+            ~f:(fun (unshifted, shifted) -> [ unshifted; shifted ])
       in
       List.fold_left polys ~init ~f:(fun acc p -> add p (scale acc xi))
 
 let combine_evaluations' (type a n m)
-    ({without_degree_bound= _; with_degree_bound} : (a, n Nat.s, m) t)
+    ({ without_degree_bound = _; with_degree_bound } : (a, n Nat.s, m) t)
     ~shifted_pow ~mul ~add ~one:_ ~evaluation_point ~xi
     (init :: evals0 : (_, n Nat.s) Vector.t) (evals1 : (_, m) Vector.t) =
   let evals =
@@ -59,7 +59,7 @@ let combine_evaluations' (type a n m)
     @ List.concat
         (Vector.to_list
            (Vector.map2 with_degree_bound evals1 ~f:(fun deg fx ->
-                [fx; mul (shifted_pow deg evaluation_point) fx] )))
+                [ fx; mul (shifted_pow deg evaluation_point) fx ])))
   in
   List.fold_left evals ~init ~f:(fun acc fx -> add fx (mul acc xi))
 
@@ -86,18 +86,18 @@ let combine_split_commitments _t ~scale_and_add ~init:i ~xi (type n)
   let flat =
     List.concat_map (Vector.to_list without_degree_bound) ~f:Array.to_list
     @ List.concat_map (Vector.to_list with_degree_bound)
-        ~f:(fun {With_degree_bound.unshifted; shifted} ->
-          Array.to_list unshifted @ [shifted] )
+        ~f:(fun { With_degree_bound.unshifted; shifted } ->
+          Array.to_list unshifted @ [ shifted ])
   in
   match List.rev flat with
   | [] ->
       failwith "combine_split_commitments: empty"
   | init :: comms ->
       List.fold_left comms ~init:(i init) ~f:(fun acc p ->
-          scale_and_add ~acc ~xi p )
+          scale_and_add ~acc ~xi p)
 
 let combine_split_evaluations (type a n m f f')
-    ({without_degree_bound= _; with_degree_bound} : (a, n, m) t)
+    ({ without_degree_bound = _; with_degree_bound } : (a, n, m) t)
     ~(shifted_pow : a -> f' -> f') ~(mul : f -> f' -> f)
     ~(mul_and_add : acc:f' -> xi:f' -> f -> f') ~(evaluation_point : f')
     ~init:(i : f -> f') ~(last : f array -> f) ~(xi : f')
@@ -109,11 +109,11 @@ let combine_split_evaluations (type a n m f f')
            (Vector.map2 with_degree_bound evals1 ~f:(fun deg unshifted ->
                 let u = last unshifted in
                 Array.to_list unshifted
-                @ [mul u (shifted_pow deg evaluation_point)] )))
+                @ [ mul u (shifted_pow deg evaluation_point) ])))
   in
   match List.rev flat with
   | [] ->
       failwith "combine_split_evaluations: empty"
   | init :: es ->
       List.fold_left es ~init:(i init) ~f:(fun acc fx ->
-          mul_and_add ~acc ~xi fx )
+          mul_and_add ~acc ~xi fx)

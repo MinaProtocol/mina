@@ -24,21 +24,21 @@ let public_key_compressed =
         exit 1
       in
       try Public_key.of_base58_check_decompress_exn s
-      with e -> error_string (Error.of_exn e) )
+      with e -> error_string (Error.of_exn e))
 
 (* Hack to allow us to deprecate a value without needing to add an mli
  * just for this. We only want to have one "kind" of public key in the
  * public-facing interface if possible *)
 include (
   struct
-      let public_key =
-        Command.Arg_type.map public_key_compressed ~f:(fun pk ->
-            match Public_key.decompress pk with
-            | None ->
-                failwith "Invalid key"
-            | Some pk' ->
-                pk' )
-    end :
+    let public_key =
+      Command.Arg_type.map public_key_compressed ~f:(fun pk ->
+          match Public_key.decompress pk with
+          | None ->
+              failwith "Invalid key"
+          | Some pk' ->
+              pk')
+  end :
     sig
       val public_key : Public_key.t Command.Arg_type.t
         [@@deprecated "Use public_key_compressed in commandline args"]
@@ -49,7 +49,7 @@ let token_id =
 
 let receipt_chain_hash =
   Command.Arg_type.map Command.Param.string
-    ~f:Mina_base.Receipt.Chain_hash.of_string
+    ~f:Mina_base.Receipt.Chain_hash.of_base58_check_exn
 
 let peer : Host_and_port.t Command.Arg_type.t =
   Command.Arg_type.create (fun s -> Host_and_port.of_string s)
@@ -74,8 +74,7 @@ let hd_index =
 let ip_address =
   Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string
 
-let cidr_mask =
-  Command.Arg_type.map Command.Param.string ~f:Unix.Cidr.of_string
+let cidr_mask = Command.Arg_type.map Command.Param.string ~f:Unix.Cidr.of_string
 
 let log_level =
   Command.Arg_type.map Command.Param.string ~f:(fun log_level_str_with_case ->
@@ -90,14 +89,14 @@ let log_level =
             |> String.concat ~sep:", " ) ;
           exit 14
       | Ok ll ->
-          ll )
+          ll)
 
 let user_command =
   Command.Arg_type.create (fun s ->
       try Mina_base.Signed_command.of_base58_check_exn s
       with e ->
         Error.tag (Error.of_exn e) ~tag:"Couldn't decode transaction id"
-        |> Error.raise )
+        |> Error.raise)
 
 module Work_selection_method = struct
   [%%versioned

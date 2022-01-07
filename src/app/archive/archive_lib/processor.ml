@@ -218,7 +218,7 @@ end
 
 module Snarked_ledger_hash = struct
   let find (module Conn : CONNECTION) (t : Frozen_ledger_hash.t) =
-    let hash = Frozen_ledger_hash.to_string t in
+    let hash = Frozen_ledger_hash.to_base58_check t in
     Conn.find
       (Caqti_request.find Caqti_type.string Caqti_type.int
          "SELECT id FROM snarked_ledger_hashes WHERE value = ?")
@@ -227,7 +227,7 @@ module Snarked_ledger_hash = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (t : Frozen_ledger_hash.t) =
     let open Deferred.Result.Let_syntax in
-    let hash = Frozen_ledger_hash.to_string t in
+    let hash = Frozen_ledger_hash.to_base58_check t in
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt Caqti_type.string Caqti_type.int
@@ -256,7 +256,7 @@ module Epoch_data = struct
   let add_from_seed_and_ledger_hash_id (module Conn : CONNECTION) ~seed
       ~ledger_hash_id =
     let open Deferred.Result.Let_syntax in
-    let seed = Epoch_seed.to_string seed in
+    let seed = Epoch_seed.to_base58_check seed in
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt typ Caqti_type.int
@@ -395,7 +395,7 @@ module User_command = struct
                {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
                       receiver_id, fee_token, token, nonce, amount, fee,
                       valid_until, memo, hash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?::user_command_type, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     RETURNING id |sql})
             { typ=
                 ( match via with
@@ -489,7 +489,7 @@ module User_command = struct
          {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
                       receiver_id, fee_token, token, nonce, amount, fee,
                       valid_until, memo, hash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?::user_command_type, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     RETURNING id
          |sql})
       { typ= user_cmd.typ
@@ -540,7 +540,7 @@ module Internal_command = struct
       (Caqti_request.find_opt
          Caqti_type.(tup2 string string)
          Caqti_type.int
-         "SELECT id FROM internal_commands WHERE hash = $1 AND type = $2")
+         "SELECT id FROM internal_commands WHERE hash = $1 AND type = $2::internal_command_type")
       (Transaction_hash.to_base58_check transaction_hash, typ)
 
   let load (module Conn : CONNECTION) ~(id : int) =
@@ -570,7 +570,7 @@ module Internal_command = struct
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
                     (type, receiver_id, fee, token,hash)
-                   VALUES (?, ?, ?, ?, ?)
+                   VALUES (?::internal_command_type, ?, ?, ?, ?)
                    RETURNING id
              |sql})
           { typ= internal_cmd.typ
@@ -596,7 +596,7 @@ module Fee_transfer = struct
   end
 
   type t =
-    {kind: Kind.t; receiver_id: int; fee: int; token: int64; hash: string}
+    {kind: Kind.t; receiver_id: int; fee: int64; token: int64; hash: string}
 
   let typ =
     let encode t =
@@ -616,7 +616,7 @@ module Fee_transfer = struct
       in
       Ok {kind; receiver_id; fee; token; hash}
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int int64) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
@@ -640,18 +640,18 @@ module Fee_transfer = struct
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
                     (type, receiver_id, fee, token, hash)
-                   VALUES (?, ?, ?, ?, ?)
+                   VALUES (?::internal_command_type, ?, ?, ?, ?)
                    RETURNING id
              |sql})
           { kind
           ; receiver_id
-          ; fee= Fee_transfer.Single.fee t |> Currency.Fee.to_int
+          ; fee= Fee_transfer.Single.fee t |> Currency.Fee.to_uint64 |> Unsigned.UInt64.to_int64
           ; token= Token_id.to_string t.fee_token |> Int64.of_string
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
 end
 
 module Coinbase = struct
-  type t = {receiver_id: int; amount: int; hash: string}
+  type t = {receiver_id: int; amount: int64; hash: string}
 
   let coinbase_typ = "coinbase"
 
@@ -667,7 +667,7 @@ module Coinbase = struct
     let decode ((_, receiver_id, amount, _), hash) =
       Ok {receiver_id; amount; hash}
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int int64) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : Coinbase.t) =
@@ -688,11 +688,11 @@ module Coinbase = struct
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
                     (type, receiver_id, fee, token, hash)
-                   VALUES (?, ?, ?, ?, ?)
+                   VALUES (?::internal_command_type, ?, ?, ?, ?)
                    RETURNING id
              |sql})
           { receiver_id
-          ; amount= Coinbase.amount t |> Currency.Amount.to_int
+          ; amount= Coinbase.amount t |> Currency.Amount.to_uint64 |> Unsigned.UInt64.to_int64
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
 end
 
@@ -756,28 +756,32 @@ module Block_and_internal_command = struct
     ; internal_command_id: int
     ; sequence_no: int
     ; secondary_sequence_no: int
+    ; receiver_account_creation_fee_paid: int64 option
     ; receiver_balance_id: int }
   [@@deriving hlist]
 
   let typ =
     let open Caqti_type_spec in
-    let spec = Caqti_type.[int; int; int; int; int] in
+    let spec = Caqti_type.[int; int; int; int; option int64; int] in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
 
   let add (module Conn : CONNECTION) ~block_id ~internal_command_id
-      ~sequence_no ~secondary_sequence_no ~receiver_balance_id =
+      ~sequence_no ~secondary_sequence_no ~receiver_account_creation_fee_paid
+      ~receiver_balance_id =
     Conn.exec
       (Caqti_request.exec typ
          {sql| INSERT INTO blocks_internal_commands
-                (block_id, internal_command_id, sequence_no, secondary_sequence_no, receiver_balance)
-                VALUES (?, ?, ?, ?, ?)
+                (block_id, internal_command_id, sequence_no, secondary_sequence_no,
+                 receiver_account_creation_fee_paid,receiver_balance)
+                VALUES (?, ?, ?, ?, ?, ?)
          |sql})
       { block_id
       ; internal_command_id
       ; sequence_no
       ; secondary_sequence_no
+      ; receiver_account_creation_fee_paid
       ; receiver_balance_id }
 
   let find (module Conn : CONNECTION) ~block_id ~internal_command_id
@@ -796,7 +800,7 @@ module Block_and_internal_command = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
       ~internal_command_id ~sequence_no ~secondary_sequence_no
-      ~receiver_balance_id =
+      ~receiver_account_creation_fee_paid ~receiver_balance_id =
     let open Deferred.Result.Let_syntax in
     match%bind
       find
@@ -809,7 +813,7 @@ module Block_and_internal_command = struct
         add
           (module Conn)
           ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
-          ~receiver_balance_id
+          ~receiver_account_creation_fee_paid ~receiver_balance_id
 end
 
 module Block_and_signed_command = struct
@@ -881,7 +885,7 @@ module Block_and_signed_command = struct
                  fee_payer_balance,
                  source_balance,
                  receiver_balance)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               VALUES (?, ?, ?, ?::user_command_status, ?, ?, ?, ?, ?, ?, ?)
          |sql})
       { block_id
       ; user_command_id
@@ -1016,9 +1020,11 @@ module Block = struct
     ; next_epoch_data_id: int
     ; ledger_hash: string
     ; height: int64
-    ; global_slot: int64
+    ; global_slot_since_hard_fork: int64
     ; global_slot_since_genesis: int64
-    ; timestamp: int64 }
+    ; timestamp: int64
+    ; chain_status: string
+    }
   [@@deriving hlist]
 
   let typ =
@@ -1037,7 +1043,9 @@ module Block = struct
         ; int64
         ; int64
         ; int64
-        ; int64 ]
+        ; int64
+        ; string
+        ]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
@@ -1047,13 +1055,13 @@ module Block = struct
     Conn.find
       (Caqti_request.find Caqti_type.string Caqti_type.int
          "SELECT id FROM blocks WHERE state_hash = ?")
-      (State_hash.to_string state_hash)
+      (State_hash.to_base58_check state_hash)
 
   let find_opt (module Conn : CONNECTION) ~(state_hash : State_hash.t) =
     Conn.find_opt
       (Caqti_request.find_opt Caqti_type.string Caqti_type.int
          "SELECT id FROM blocks WHERE state_hash = ?")
-      (State_hash.to_string state_hash)
+      (State_hash.to_base58_check state_hash)
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
@@ -1061,7 +1069,7 @@ module Block = struct
          {sql| SELECT state_hash, parent_id, parent_hash, creator_id,
                       block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id,
                       next_epoch_data_id, ledger_hash, height, global_slot,
-                      global_slot_since_genesis, timestamp FROM blocks
+                      global_slot_since_genesis, timestamp, chain_status FROM blocks
                WHERE id = ?
          |sql})
       id
@@ -1112,14 +1120,15 @@ module Block = struct
                       creator_id, block_winner_id,
                       snarked_ledger_hash_id, staking_epoch_data_id,
                       next_epoch_data_id, ledger_hash, height, global_slot,
-                      global_slot_since_genesis, timestamp)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+                      global_slot_since_genesis, timestamp, chain_status)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
+                     RETURNING id
                |sql})
-            { state_hash= hash |> State_hash.to_string
+            { state_hash= hash |> State_hash.to_base58_check
             ; parent_id
             ; parent_hash=
                 Protocol_state.previous_state_hash protocol_state
-                |> State_hash.to_string
+                |> State_hash.to_base58_check
             ; creator_id
             ; block_winner_id
             ; snarked_ledger_hash_id
@@ -1128,12 +1137,12 @@ module Block = struct
             ; ledger_hash=
                 Protocol_state.blockchain_state protocol_state
                 |> Blockchain_state.staged_ledger_hash
-                |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_string
+                |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_base58_check
             ; height=
                 consensus_state
                 |> Consensus.Data.Consensus_state.blockchain_length
                 |> Unsigned.UInt32.to_int64
-            ; global_slot=
+            ; global_slot_since_hard_fork=
                 Consensus.Data.Consensus_state.curr_global_slot consensus_state
                 |> Unsigned.UInt32.to_int64
             ; global_slot_since_genesis=
@@ -1142,7 +1151,10 @@ module Block = struct
                 |> Unsigned.UInt32.to_int64
             ; timestamp=
                 Protocol_state.blockchain_state protocol_state
-                |> Blockchain_state.timestamp |> Block_time.to_int64 }
+                |> Blockchain_state.timestamp |> Block_time.to_int64
+            (* we don't yet know the chain status for a block we're adding *)
+            ; chain_status=Chain_status.(to_string Pending)
+            }
         in
         let transactions =
           let coinbase_receiver =
@@ -1159,6 +1171,36 @@ module Block = struct
               transactions
           | Error e ->
               Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
+        in
+        let account_creation_fee_of_fees_and_balance ?additional_fee fee balance =
+          (* TODO: add transaction statuses to internal commands
+             the archive lib should not know the details of
+             account creation fees; the calculation below is
+             a temporizing hack
+          *)
+          let fee_uint64 = Currency.Fee.to_uint64 fee in
+          let balance_uint64 = Currency.Balance.to_uint64 balance in
+          let account_creation_fee_uint64 = Currency.Fee.to_uint64
+              constraint_constants.account_creation_fee
+          in
+          (* for coinbases, an associated fee transfer may reduce
+             the amount given to the coinbase receiver beyond
+             the account creation fee
+          *)
+          let creation_deduction_uint64 =
+            match additional_fee with
+            | None -> account_creation_fee_uint64
+            | Some fee' ->
+              Unsigned.UInt64.add (Currency.Fee.to_uint64 fee')
+                account_creation_fee_uint64
+          in
+          (* first compare guards against underflow in subtraction *)
+          if Unsigned.UInt64.compare fee_uint64 creation_deduction_uint64 >= 0 &&
+             Unsigned.UInt64.equal balance_uint64
+               (Unsigned.UInt64.sub fee_uint64 creation_deduction_uint64) then
+            Some (Unsigned.UInt64.to_int64 account_creation_fee_uint64)
+          else
+            None
         in
         let%bind (_ : int) =
           deferred_result_list_fold transactions ~init:0 ~f:(fun sequence_no ->
@@ -1209,7 +1251,7 @@ module Block = struct
                           (module Conn)
                           fee_transfer `Normal
                       in
-                      (id, secondary_sequence_no, fee_transfer.receiver_pk)
+                      (id, secondary_sequence_no, fee_transfer.fee, fee_transfer.receiver_pk)
                       :: acc )
                 in
                 let fee_transfer_infos_with_balances =
@@ -1229,7 +1271,7 @@ module Block = struct
                   deferred_result_list_fold fee_transfer_infos_with_balances
                     ~init:()
                     ~f:(fun ()
-                       ( (fee_transfer_id, secondary_sequence_no, receiver_pk)
+                       ( (fee_transfer_id, secondary_sequence_no, fee, receiver_pk)
                        , balance )
                        ->
                       let%bind receiver_id =
@@ -1242,10 +1284,14 @@ module Block = struct
                           (module Conn)
                           ~public_key_id:receiver_id ~balance
                       in
+                      let receiver_account_creation_fee_paid =
+                        account_creation_fee_of_fees_and_balance fee balance
+                      in
                       Block_and_internal_command.add
                         (module Conn)
                         ~block_id ~internal_command_id:fee_transfer_id
                         ~sequence_no ~secondary_sequence_no
+                        ~receiver_account_creation_fee_paid
                         ~receiver_balance_id
                       >>| ignore )
                 in
@@ -1255,10 +1301,10 @@ module Block = struct
                   Transaction_status.Coinbase_balance_data.of_balance_data_exn
                     (Transaction_status.balance_data status)
                 in
-                let%bind () =
+                let%bind additional_fee =
                   match Mina_base.Coinbase.fee_transfer coinbase with
                   | None ->
-                      return ()
+                      return None
                   | Some {receiver_pk; fee} ->
                       let fee_transfer =
                         Mina_base.Fee_transfer.Single.create ~receiver_pk ~fee
@@ -1274,19 +1320,26 @@ module Block = struct
                           (module Conn)
                           receiver_pk
                       in
+                      let balance = Option.value_exn
+                          balances.fee_transfer_receiver_balance
+                      in
                       let%bind receiver_balance_id =
                         Balance.add_if_doesn't_exist
                           (module Conn)
                           ~public_key_id:fee_transfer_receiver_id
-                          ~balance:
-                            (Option.value_exn
-                               balances.fee_transfer_receiver_balance)
+                          ~balance
                       in
-                      Block_and_internal_command.add
+                      let receiver_account_creation_fee_paid =
+                        account_creation_fee_of_fees_and_balance fee balance
+                      in
+                      let%bind () = Block_and_internal_command.add
                         (module Conn)
                         ~block_id ~internal_command_id:id ~sequence_no
-                        ~secondary_sequence_no:0 ~receiver_balance_id
-                      >>| ignore
+                        ~secondary_sequence_no:0
+                        ~receiver_account_creation_fee_paid
+                        ~receiver_balance_id
+                      in
+                      return (Some fee)
                 in
                 let%bind id =
                   Coinbase.add_if_doesn't_exist (module Conn) coinbase
@@ -1302,11 +1355,17 @@ module Block = struct
                     ~public_key_id:coinbase_receiver_id
                     ~balance:balances.coinbase_receiver_balance
                 in
+                let receiver_account_creation_fee_paid =
+                  account_creation_fee_of_fees_and_balance ?additional_fee
+                    (Currency.Amount.to_fee coinbase.amount)
+                    balances.coinbase_receiver_balance
+                in
                 let%map () =
                   Block_and_internal_command.add
                     (module Conn)
                     ~block_id ~internal_command_id:id ~sequence_no
-                    ~secondary_sequence_no:0 ~receiver_balance_id
+                    ~secondary_sequence_no:0 ~receiver_account_creation_fee_paid
+                    ~receiver_balance_id
                   >>| ignore
                 in
                 sequence_no + 1 )
@@ -1376,23 +1435,26 @@ module Block = struct
                       creator_id, block_winner_id,
                       snarked_ledger_hash_id, staking_epoch_data_id,
                       next_epoch_data_id, ledger_hash, height, global_slot,
-                      global_slot_since_genesis, timestamp)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+                      global_slot_since_genesis, timestamp, chain_status)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
+                     RETURNING id
                |sql})
-            { state_hash= block.state_hash |> State_hash.to_string
+            { state_hash= block.state_hash |> State_hash.to_base58_check
             ; parent_id
-            ; parent_hash= block.parent_hash |> State_hash.to_string
+            ; parent_hash= block.parent_hash |> State_hash.to_base58_check
             ; creator_id
             ; block_winner_id
             ; snarked_ledger_hash_id
             ; staking_epoch_data_id
             ; next_epoch_data_id
-            ; ledger_hash= block.ledger_hash |> Ledger_hash.to_string
+            ; ledger_hash= block.ledger_hash |> Ledger_hash.to_base58_check
             ; height= block.height |> Unsigned.UInt32.to_int64
-            ; global_slot= block.global_slot |> Unsigned.UInt32.to_int64
+            ; global_slot_since_hard_fork= block.global_slot_since_hard_fork |> Unsigned.UInt32.to_int64
             ; global_slot_since_genesis=
                 block.global_slot_since_genesis |> Unsigned.UInt32.to_int64
-            ; timestamp= block.timestamp |> Block_time.to_int64 }
+            ; timestamp= block.timestamp |> Block_time.to_int64
+            ; chain_status= Chain_status.to_string block.chain_status
+            }
     in
     (* add user commands *)
     let%bind user_cmds_with_ids =
@@ -1477,9 +1539,15 @@ module Block = struct
             balance_id_of_pk_and_balance internal_command.receiver
               internal_command.receiver_balance
           in
+          let receiver_account_creation_fee_paid = internal_command.receiver_account_creation_fee_paid
+                                                   |> Option.map ~f:(fun amount ->
+                                                       Currency.Amount.to_uint64 amount |>
+                                                       Unsigned.UInt64.to_int64)
+          in
           Block_and_internal_command.add_if_doesn't_exist
             (module Conn)
             ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
+            ~receiver_account_creation_fee_paid
             ~receiver_balance_id )
     in
     return block_id
@@ -1494,6 +1562,79 @@ module Block = struct
                AND parent_id IS NULL
          |sql})
       (parent_id, State_hash.to_base58_check parent_hash)
+
+  let get_subchain (module Conn : CONNECTION) ~start_block_id ~end_block_id =
+    Conn.collect_list
+      (Caqti_request.collect Caqti_type.(tup2 int int) typ
+      {sql| WITH RECURSIVE chain AS (
+              SELECT id,state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
+                     next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp, chain_status
+              FROM blocks b WHERE b.id = $1
+
+              UNION ALL
+
+              SELECT b.id,b.state_hash,b.parent_id,b.parent_hash,b.creator_id,b.block_winner_id,b.snarked_ledger_hash_id,b.staking_epoch_data_id,
+                     b.next_epoch_data_id,b.ledger_hash,b.height,b.global_slot,b.global_slot_since_genesis,b.timestamp,b.chain_status
+              FROM blocks b
+
+              INNER JOIN chain
+
+              ON b.id = chain.parent_id AND (chain.id <> $2 OR b.id = $2)
+
+           )
+
+           SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
+                  next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp,chain_status
+           FROM chain ORDER BY height ASC
+      |sql})
+      (end_block_id,start_block_id)
+
+  let get_highest_canonical_blocks (module Conn : CONNECTION) =
+    Conn.collect_list
+      (Caqti_request.collect Caqti_type.unit Caqti_type.(tup2 int int64)
+         "SELECT id,height FROM blocks WHERE chain_status='canonical' ORDER BY height DESC LIMIT 1")
+
+  let mark_as_canonical (module Conn : CONNECTION) ~state_hash =
+    Conn.exec
+      (Caqti_request.exec Caqti_type.string
+         "UPDATE blocks SET chain_status='canonical' WHERE state_hash = ?")
+      state_hash
+
+  let mark_as_orphaned (module Conn : CONNECTION) ~state_hash ~height =
+    Conn.exec
+      (Caqti_request.exec Caqti_type.(tup2 string int64)
+         {sql| UPDATE blocks SET chain_status='orphaned'
+               WHERE height = $2
+               AND state_hash <> $1
+         |sql})
+      (state_hash,height)
+
+  (* update chain_status for blocks now known to be canonical or orphaned *)
+   let update_chain_status (module Conn : CONNECTION) ~block_id =
+     let open Deferred.Result.Let_syntax in
+     match%bind get_highest_canonical_blocks (module Conn) () with
+     | [] ->
+       (* no canonical blocks in this database, don't update statuses
+          this can happen on a new database, such as a test database
+       *)
+       Deferred.Result.return ()
+     | [highest_canonical_block_id,greatest_canonical_height] ->
+       let%bind block = load (module Conn) ~id:block_id in
+       let k_int64 = Genesis_constants.k |> Int64.of_int in
+       let block_height_less_k_int64 = Int64.(-) block.height k_int64 in
+       if Int64.(>) block.height (Int64.(+) greatest_canonical_height k_int64) then
+         (* subchain between new block and highest canonical block *)
+         let%bind subchain_blocks = get_subchain (module Conn) ~start_block_id:highest_canonical_block_id ~end_block_id:block_id in
+         (* mark canonical, orphaned blocks in subchain at least k behind the new block *)
+         let canonical_blocks = List.filter subchain_blocks ~f:(fun subchain_block ->
+             Int64.(<=) subchain_block.height block_height_less_k_int64) in
+         deferred_result_list_fold canonical_blocks ~init:() ~f:(fun () block ->
+             let%bind () = mark_as_canonical (module Conn) ~state_hash:block.state_hash in
+             mark_as_orphaned (module Conn) ~state_hash:block.state_hash ~height:block.height)
+       else
+         Deferred.Result.return ()
+     | _ ->
+       failwith "update_chain_status: expected 0 or 1 results from get_highest_canonical_blocks"
 
   let delete_if_older_than ?height ?num_blocks ?timestamp
       (module Conn : CONNECTION) =
@@ -1601,12 +1742,17 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
           let%bind () = Conn.start () in
           let%bind block_id = add_block (module Conn : CONNECTION) block in
           (* if an existing block has a parent hash that's for the block just added,
-       set its parent id
-      *)
+             set its parent id
+          *)
           let%bind () =
             Block.set_parent_id_if_null
               (module Conn)
               ~parent_hash:(hash block) ~parent_id:block_id
+          in
+          (* update chain status for existing blocks *)
+          let%bind () =
+            Block.update_chain_status (module Conn)
+              ~block_id
           in
           match delete_older_than with
           | Some num_blocks ->
@@ -1842,7 +1988,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
           | Ok () ->
               () )
       |> don't_wait_for ;
-      Deferred.ignore
+      Deferred.ignore_m
       @@ Tcp.Server.create
            ~on_handler_error:
              (`Call

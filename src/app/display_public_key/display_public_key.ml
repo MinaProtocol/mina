@@ -2,7 +2,7 @@ open Async
 open Signature_lib
 
 let main privkey_path =
-  let%map {public_key; _} =
+  let%map { public_key; _ } =
     Secrets.Keypair.Terminal_stdin.read_exn privkey_path
   in
   printf "%s\n%!"

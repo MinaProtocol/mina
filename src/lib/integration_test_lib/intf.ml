@@ -86,7 +86,7 @@ module Engine = struct
       val dump_archive_data :
         logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
 
-      val dump_container_logs :
+      val dump_mina_logs :
         logger:Logger.t -> t -> log_file:string -> unit Malleable_error.t
 
       val dump_precomputed_blocks :
@@ -158,8 +158,8 @@ module Engine = struct
 
     module Network_manager :
       Network_manager_intf
-      with module Network_config := Network_config
-       and module Network := Network
+        with module Network_config := Network_config
+         and module Network := Network
 
     module Log_engine : Log_engine_intf with module Network := Network
   end
@@ -172,7 +172,7 @@ module Dsl = struct
     type t
 
     type ('a, 'b) handler_func =
-      Engine.Network.Node.t -> 'a -> [`Stop of 'b | `Continue] Deferred.t
+      Engine.Network.Node.t -> 'a -> [ `Stop of 'b | `Continue ] Deferred.t
 
     type 'a event_subscription
 
@@ -202,14 +202,15 @@ module Dsl = struct
     module Event_router : Event_router_intf with module Engine := Engine
 
     type t =
-      { block_height: int
-      ; epoch: int
-      ; global_slot: int
-      ; snarked_ledgers_generated: int
-      ; blocks_generated: int
-      ; node_initialization: bool String.Map.t
-      ; gossip_received: Gossip_state.t String.Map.t
-      ; best_tips_by_node: State_hash.t String.Map.t }
+      { block_height : int
+      ; epoch : int
+      ; global_slot : int
+      ; snarked_ledgers_generated : int
+      ; blocks_generated : int
+      ; node_initialization : bool String.Map.t
+      ; gossip_received : Gossip_state.t String.Map.t
+      ; best_tips_by_node : State_hash.t String.Map.t
+      }
 
     val listen :
          logger:Logger.t
@@ -224,8 +225,8 @@ module Dsl = struct
 
     module Network_state :
       Network_state_intf
-      with module Engine := Engine
-       and module Event_router := Event_router
+        with module Engine := Engine
+         and module Event_router := Event_router
 
     type t
 
@@ -263,20 +264,22 @@ module Dsl = struct
 
     module Network_state :
       Network_state_intf
-      with module Engine := Engine
-       and module Event_router := Event_router
+        with module Engine := Engine
+         and module Event_router := Event_router
 
     module Wait_condition :
       Wait_condition_intf
-      with module Engine := Engine
-       and module Event_router := Event_router
-       and module Network_state := Network_state
+        with module Engine := Engine
+         and module Event_router := Event_router
+         and module Network_state := Network_state
 
     module Util : Util_intf with module Engine := Engine
 
     type t
 
-    val section : string -> 'a Malleable_error.t -> 'a Malleable_error.t
+    val section_hard : string -> 'a Malleable_error.t -> 'a Malleable_error.t
+
+    val section : string -> unit Malleable_error.t -> unit Malleable_error.t
 
     val network_state : t -> Network_state.t
 
@@ -288,7 +291,7 @@ module Dsl = struct
       -> network:Engine.Network.t
       -> event_router:Event_router.t
       -> network_state_reader:Network_state.t Broadcast_pipe.Reader.t
-      -> [`Don't_call_in_tests of t]
+      -> [ `Don't_call_in_tests of t ]
 
     type log_error_accumulator
 
@@ -324,20 +327,9 @@ module Test = struct
 
   (* NB: until the DSL is actually implemented, a test just takes in the engine
    * implementation directly. *)
-  module type Functor_intf = functor (Inputs : Inputs_intf) -> S
-                                                               with type network =
-                                                                           Inputs
-                                                                           .Engine
-                                                                           .Network
-                                                                           .t
-                                                                and type node =
-                                                                           Inputs
-                                                                           .Engine
-                                                                           .Network
-                                                                           .Node
-                                                                           .t
-                                                                and type dsl =
-                                                                           Inputs
-                                                                           .Dsl
-                                                                           .t
+  module type Functor_intf = functor (Inputs : Inputs_intf) ->
+    S
+      with type network = Inputs.Engine.Network.t
+       and type node = Inputs.Engine.Network.Node.t
+       and type dsl = Inputs.Dsl.t
 end

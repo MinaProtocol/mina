@@ -1,10 +1,8 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
 open Snark_bits
@@ -55,10 +53,6 @@ module type Basic = sig
   include Bits_intf.S with type t := t
 
   [%%endif]
-
-  val to_string : t -> string
-
-  val of_string : string -> t
 
   val to_base58_check : t -> string
 

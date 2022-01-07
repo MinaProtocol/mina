@@ -34,12 +34,12 @@ module type S = sig
 
   module Unchecked :
     Unchecked
-    with type scalar := Scalar.Unchecked.t
-     and type group := Group.Unchecked.t
+      with type scalar := Scalar.Unchecked.t
+       and type group := Group.Unchecked.t
 
   module Checked :
     Checked
-    with module Impl := Impl
-     and type scalar := Scalar.Checked.t
-     and type group := Group.Checked.t
+      with module Impl := Impl
+       and type scalar := Scalar.Checked.t
+       and type group := Group.Checked.t
 end

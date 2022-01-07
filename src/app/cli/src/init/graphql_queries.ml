@@ -377,3 +377,9 @@ mutation ($path: String!, $password: String!) {
   }
 }
 |}]
+
+module Runtime_config = [%graphql {|
+query {
+  runtimeConfig
+}
+|}]

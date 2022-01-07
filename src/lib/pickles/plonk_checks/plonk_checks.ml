@@ -5,15 +5,15 @@ open Tuple_lib
 module Domain = Domain
 
 type 'field vanishing_polynomial_domain =
-  < vanishing_polynomial: 'field -> 'field >
+  < vanishing_polynomial : 'field -> 'field >
 
 type 'field plonk_domain =
-  < vanishing_polynomial: 'field -> 'field
-  ; shifts: 'field Marlin_plonk_bindings.Types.Plonk_verification_shifts.t
-  ; generator: 'field
-  ; size: 'field >
+  < vanishing_polynomial : 'field -> 'field
+  ; shifts : 'field Marlin_plonk_bindings.Types.Plonk_verification_shifts.t
+  ; generator : 'field
+  ; size : 'field >
 
-type 'field domain = < size: 'field ; vanishing_polynomial: 'field -> 'field >
+type 'field domain = < size : 'field ; vanishing_polynomial : 'field -> 'field >
 
 let debug = false
 
@@ -65,7 +65,8 @@ let domain (type t) ((module F) : t field) ~shifts ~domain_generator
     method generator = generator
   end
 
-let all_but m = List.filter Abc.Label.all ~f:(( <> ) m)
+let all_but m =
+  List.filter Abc.Label.all ~f:(fun label -> not (Abc.Label.equal label m))
 
 let actual_evaluation (type f) (module Field : Field_intf with type t = f)
     (e : Field.t array) (pt : Field.t) ~rounds : Field.t =
@@ -107,10 +108,10 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
     (* x^5 *)
     square (square x) * x
   in
-  let {Marlin_plonk_bindings.Types.Plonk_verification_shifts.r; o} =
+  let { Marlin_plonk_bindings.Types.Plonk_verification_shifts.r; o } =
     domain#shifts
   in
-  fun ({alpha; beta; gamma; zeta} : _ Minimal.t)
+  fun ({ alpha; beta; gamma; zeta } : _ Minimal.t)
       ((e0, e1) : _ Dlog_plonk_types.Evals.t Double.t) p_eval0 ->
     let alphas =
       let arr =
@@ -150,7 +151,7 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
             * (e0.o + (bz * o) + gamma)
             * alpha * zkp
             + (alphas Range.perm 0 * vp_zeta / (zeta - one))
-            + (alphas Range.perm 1 * vp_zeta / (zeta - w3)) )
+            + (alphas Range.perm 1 * vp_zeta / (zeta - w3)))
       in
       let perm1 =
         let beta_sigma1 = with_label __LOC__ (fun () -> beta * e0.sigma1) in
@@ -159,7 +160,7 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
         with_label __LOC__ (fun () ->
             negate (e0.l + beta_sigma1 + gamma)
             * (e0.r + beta_sigma2 + gamma)
-            * (e1.z * beta_alpha * zkp) )
+            * (e1.z * beta_alpha * zkp))
       in
       (perm0, perm1)
     in
@@ -168,14 +169,14 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
     let gnrc_o = e0.o in
     let psdn0 =
       let lro =
-        let s = [|sbox e0.l; sbox e0.r; sbox e0.o|] in
+        let s = [| sbox e0.l; sbox e0.r; sbox e0.o |] in
         Array.map mds ~f:(fun m ->
-            Array.reduce_exn ~f:F.( + ) (Array.map2_exn s m ~f:F.( * )) )
+            Array.reduce_exn ~f:F.( + ) (Array.map2_exn s m ~f:F.( * )))
       in
       with_label __LOC__ (fun () ->
-          Array.mapi [|e1.l; e1.r; e1.o|] ~f:(fun i e ->
-              (lro.(i) - e) * alphas Range.psdn i )
-          |> Array.reduce_exn ~f:( + ) )
+          Array.mapi [| e1.l; e1.r; e1.o |] ~f:(fun i e ->
+              (lro.(i) - e) * alphas Range.psdn i)
+          |> Array.reduce_exn ~f:( + ))
     in
     let ecad0 =
       with_label __LOC__ (fun () ->
@@ -183,21 +184,21 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
           * alphas Range.add 0
           + ( ((e1.l + e1.r + e1.o) * (e1.l - e1.o) * (e1.l - e1.o))
             - ((e0.o + e0.l) * (e0.o + e0.l)) )
-            * alphas Range.add 1 )
+            * alphas Range.add 1)
     in
     let vbmul0, vbmul1 =
       let tmp = double e0.l - square e0.r + e1.r in
       ( with_label __LOC__ (fun () ->
             ((square e0.r - e0.r) * alphas Range.mul 0)
             + (((e1.l - e0.l) * e1.r) - e1.o + (e0.o * (double e0.r - one)))
-              * alphas Range.mul 1 )
+              * alphas Range.mul 1)
       , with_label __LOC__ (fun () ->
             ( square (double e0.o - (tmp * e0.r))
             - ((square e0.r - e1.r + e1.l) * square tmp) )
             * alphas Range.mul 2
             + ( ((e0.l - e1.l) * (double e0.o - (tmp * e0.r)))
               - ((e1.o + e0.o) * tmp) )
-              * alphas Range.mul 3 ) )
+              * alphas Range.mul 3) )
     in
     let endomul0, endomul1, endomul2 =
       let xr = square e0.r - e0.l - e1.r in
@@ -207,15 +208,14 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
             ((square e0.l - e0.l) * alphas Range.endml 0)
             + ((square e1.l - e1.l) * alphas Range.endml 1)
             + (e1.r - ((one + (e0.l * (endo - one))) * e0.r))
-              * alphas Range.endml 2 )
+              * alphas Range.endml 2)
       , with_label __LOC__ (fun () ->
             (((e1.l - e0.r) * e1.r) - e1.o + (e0.o * (double e0.l - one)))
-            * alphas Range.endml 3 )
+            * alphas Range.endml 3)
       , with_label __LOC__ (fun () ->
-            (square u - (square t * (xr + e0.l + e1.l)))
-            * alphas Range.endml 4
+            ((square u - (square t * (xr + e0.l + e1.l))) * alphas Range.endml 4)
             + (((e0.l - e1.l) * u) - (t * (e0.o + e1.o)))
-              * alphas Range.endml 5 ) )
+              * alphas Range.endml 5) )
     in
     let linearization_check =
       let w = w3 in
@@ -246,7 +246,8 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
         ; vbmul1
         ; endomul0
         ; endomul1
-        ; endomul2 }
+        ; endomul2
+        }
     , linearization_check )
 
 let checked (type t)
@@ -256,10 +257,11 @@ let checked (type t)
     derive_plonk ~with_label:Impl.with_label
       (module Impl.Field)
       ~endo ~mds ~domain ~shift
-      { alpha= plonk.alpha
-      ; beta= plonk.beta
-      ; gamma= plonk.gamma
-      ; zeta= plonk.zeta }
+      { alpha = plonk.alpha
+      ; beta = plonk.beta
+      ; gamma = plonk.gamma
+      ; zeta = plonk.zeta
+      }
       evals p0
   in
   let open Impl in
@@ -279,5 +281,6 @@ let checked (type t)
            ; vbmul1
            ; endomul0
            ; endomul1
-           ; endomul2 ]
-      |> Boolean.all )
+           ; endomul2
+           ]
+      |> Boolean.all)

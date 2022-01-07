@@ -12,7 +12,8 @@ type t = Stable.V1.t
 
 module Level : sig
   type t = Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
-  [@@deriving sexp, compare, yojson, show {with_path= false}, enumerate]
+  [@@deriving
+    sexp, equal, compare, yojson, show { with_path = false }, enumerate]
 
   val of_string : string -> (t, string) result
 end
@@ -26,7 +27,7 @@ module Time : sig
 end
 
 module Source : sig
-  type t = {module_: string [@key "module"]; location: string}
+  type t = { module_ : string [@key "module"]; location : string }
   [@@deriving yojson]
 
   val create : module_:string -> location:string -> t
@@ -49,12 +50,13 @@ val metadata : t -> Metadata.t
 
 module Message : sig
   type t =
-    { timestamp: Time.t
-    ; level: Level.t
-    ; source: Source.t option
-    ; message: string
-    ; metadata: Metadata.t
-    ; event_id: Structured_log_events.id option }
+    { timestamp : Time.t
+    ; level : Level.t
+    ; source : Source.t option
+    ; message : string
+    ; metadata : Metadata.t
+    ; event_id : Structured_log_events.id option
+    }
   [@@deriving yojson]
 end
 
@@ -105,8 +107,7 @@ end
 module Consumer_registry : sig
   type id = string
 
-  val register :
-    id:id -> processor:Processor.t -> transport:Transport.t -> unit
+  val register : id:id -> processor:Processor.t -> transport:Transport.t -> unit
 end
 
 type 'a log_function =

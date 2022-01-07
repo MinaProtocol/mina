@@ -9,7 +9,7 @@ module type S = sig
   module Resource_pool : sig
     include
       Intf.Snark_resource_pool_intf
-      with type transition_frontier := transition_frontier
+        with type transition_frontier := transition_frontier
 
     val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 
@@ -19,20 +19,20 @@ module type S = sig
   module For_tests : sig
     val get_rebroadcastable :
          Resource_pool.t
-      -> has_timed_out:(Core.Time.t -> [`Timed_out | `Ok])
+      -> has_timed_out:(Core.Time.t -> [ `Timed_out | `Ok ])
       -> Resource_pool.Diff.t list
   end
 
   include
     Intf.Network_pool_base_intf
-    with type resource_pool := Resource_pool.t
-     and type resource_pool_diff := Resource_pool.Diff.t
-     and type resource_pool_diff_verified := Resource_pool.Diff.verified
-     and type transition_frontier := transition_frontier
-     and type config := Resource_pool.Config.t
-     and type transition_frontier_diff :=
-                Resource_pool.transition_frontier_diff
-     and type rejected_diff := Resource_pool.Diff.rejected
+      with type resource_pool := Resource_pool.t
+       and type resource_pool_diff := Resource_pool.Diff.t
+       and type resource_pool_diff_verified := Resource_pool.Diff.verified
+       and type transition_frontier := transition_frontier
+       and type config := Resource_pool.Config.t
+       and type transition_frontier_diff :=
+            Resource_pool.transition_frontier_diff
+       and type rejected_diff := Resource_pool.Diff.rejected
 
   val get_completed_work :
        t
@@ -45,16 +45,17 @@ module type S = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
-    -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
-                      * Mina_net2.Validation_callback.t )
-                      Strict_pipe.Reader.t
-    -> local_diffs:( Resource_pool.Diff.t
-                   * (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected)
-                         Or_error.t
-                      -> unit) )
-                   Strict_pipe.Reader.t
-    -> frontier_broadcast_pipe:transition_frontier option
-                               Broadcast_pipe.Reader.t
+    -> incoming_diffs:
+         ( Resource_pool.Diff.t Envelope.Incoming.t
+         * Mina_net2.Validation_callback.t )
+         Strict_pipe.Reader.t
+    -> local_diffs:
+         ( Resource_pool.Diff.t
+         * (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected) Or_error.t
+            -> unit) )
+         Strict_pipe.Reader.t
+    -> frontier_broadcast_pipe:
+         transition_frontier option Broadcast_pipe.Reader.t
     -> t Deferred.t
 end
 
@@ -83,12 +84,12 @@ end
 
 module Make
     (Base_ledger : Intf.Base_ledger_intf) (Staged_ledger : sig
-        type t
+      type t
 
-        val ledger : t -> Base_ledger.t
+      val ledger : t -> Base_ledger.t
     end)
     (Transition_frontier : Transition_frontier_intf
-                           with type staged_ledger := Staged_ledger.t) :
+                             with type staged_ledger := Staged_ledger.t) :
   S with type transition_frontier := Transition_frontier.t
 
 include S with type transition_frontier := Transition_frontier.t

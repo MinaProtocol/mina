@@ -1,12 +1,10 @@
 (* test_encodings.ml -- print out Rosetta encodings *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Signature_lib
 open Rosetta_coding

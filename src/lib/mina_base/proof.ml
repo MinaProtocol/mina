@@ -1,5 +1,4 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
@@ -17,8 +16,7 @@ module Stable = struct
   end
 end]
 
-[%%define_locally
-Stable.Latest.(to_yojson, of_yojson)]
+[%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 
 let%test_module "proof-tests" =
   ( module struct
@@ -26,8 +24,7 @@ let%test_module "proof-tests" =
        in Tock_backend.Proof, which is not versioned
     *)
 
-    [%%if
-    curve_size = 255]
+    [%%if curve_size = 255]
 
     let%test "proof serialization v1" =
       let proof = blockchain_dummy in

@@ -19,36 +19,35 @@ let name = "define_locally"
 
 let raise_errorf = Location.raise_errorf
 
-let expand ~loc ~path:_ override (module_name : longident) defs =
+let expr_to_id loc expr =
+  match expr.pexp_desc with
+  | Pexp_ident { txt = Lident s; _ } ->
+      s
+  | _ ->
+      Location.raise_errorf ~loc "Expected identifier"
+
+let expand ~loc ~path:_ open_decl defs =
   match defs.pexp_desc with
   | Pexp_tuple exps ->
-      let names =
-        List.map exps ~f:(fun {pexp_desc= item; pexp_loc= loc; _} ->
-            match item with
-            | Pexp_ident {txt= Lident id; _} ->
-                id
-            | __ ->
-                raise_errorf ~loc "Item in opened module is not an identifier"
-        )
-      in
-      let vars =
-        List.map names ~f:(fun name -> Pat.var ~loc {txt= name; loc})
-      in
+      let (module Ast_builder) = Ast_builder.make loc in
+      let open Ast_builder in
+      let names = List.map exps ~f:(expr_to_id loc) in
+      let vars = List.map names ~f:pvar in
       Str.value ~loc Nonrecursive
-        [ Vb.mk ~loc (Pat.tuple ~loc vars)
-            (Exp.open_ ~loc override {txt= module_name; loc} defs) ]
-  | Pexp_ident {txt= Lident id; _} ->
+        [ Vb.mk ~loc (Pat.tuple ~loc vars) (Exp.open_ ~loc open_decl defs) ]
+  | Pexp_ident { txt = Lident id; _ } ->
       Str.value ~loc Nonrecursive
         [ Vb.mk ~loc
-            (Pat.var ~loc {txt= id; loc})
-            (Exp.open_ ~loc override {txt= module_name; loc} defs) ]
+            (Pat.var ~loc { txt = id; loc })
+            (Exp.open_ ~loc open_decl defs)
+        ]
   | _ ->
       raise_errorf ~loc "Must provide an identifier or tuple of identifiers"
 
 let ext =
   Extension.declare name Extension.Context.structure_item
-    Ast_pattern.(single_expr_payload (pexp_open __ __ __))
+    Ast_pattern.(single_expr_payload (pexp_open __ __))
     expand
 
 let () =
-  Driver.register_transformation name ~rules:[Context_free.Rule.extension ext]
+  Driver.register_transformation name ~rules:[ Context_free.Rule.extension ext ]

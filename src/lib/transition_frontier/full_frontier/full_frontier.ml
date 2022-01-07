@@ -65,7 +65,11 @@ type t =
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; max_length: int
   ; precomputed_values: Precomputed_values.t
-  ; time_controller: Block_time.Controller.t }
+  ; time_controller: Block_time.Controller.t
+  ; persistent_root_instance: Persistent_root.Instance.t }
+
+let persistent_root_instance {persistent_root_instance; _} =
+  persistent_root_instance
 
 let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
@@ -100,11 +104,12 @@ let best_tip t = find_exn t t.best_tip
 let close ~loc t =
   Mina_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
   ignore
-    (Ledger.Maskable.unregister_mask_exn ~loc ~grandchildren:`Recursive
-       (Breadcrumb.mask (root t)))
+    ( Ledger.Maskable.unregister_mask_exn ~loc ~grandchildren:`Recursive
+        (Breadcrumb.mask (root t))
+      : Ledger.unattached_mask )
 
 let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
-    ~precomputed_values ~time_controller =
+    ~precomputed_values ~persistent_root_instance ~time_controller =
   let open Root_data in
   let transition_receipt_time = None in
   let root_hash =
@@ -137,19 +142,17 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
   in
   let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
   Mina_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 1.0) ;
-  let t =
-    { logger
-    ; root_ledger
-    ; root= root_hash
-    ; best_tip= root_hash
-    ; table
-    ; consensus_local_state
-    ; max_length
-    ; precomputed_values
-    ; protocol_states_for_root_scan_state
-    ; time_controller }
-  in
-  t
+  { logger
+  ; root_ledger
+  ; root= root_hash
+  ; best_tip= root_hash
+  ; table
+  ; consensus_local_state
+  ; max_length
+  ; precomputed_values
+  ; protocol_states_for_root_scan_state
+  ; persistent_root_instance
+  ; time_controller }
 
 let root_data t =
   let open Root_data in
@@ -232,8 +235,8 @@ let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) : State_hash.t
       go ancestors1 ancestors2 (parent_unless_root b1) (parent_unless_root b2)
   in
   go
-    (Hash_set.create (module State_hash) ())
-    (Hash_set.create (module State_hash) ())
+    (Hash_set.create (module State_hash))
+    (Hash_set.create (module State_hash))
     bc1 bc2
 
 (* TODO: separate visualizer? *)
@@ -314,8 +317,12 @@ let calculate_root_transition_diff t heir =
         (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
       ~protocol_states
   in
+  let just_emitted_a_proof = Breadcrumb.just_emitted_a_proof heir in
   Diff.Full.E.E
-    (Root_transitioned {new_root= new_root_data; garbage= Full garbage_nodes})
+    (Root_transitioned
+       { new_root= new_root_data
+       ; garbage= Full garbage_nodes
+       ; just_emitted_a_proof })
 
 let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
     ~enable_epoch_ledger_sync =
@@ -389,7 +396,9 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         let breadcrumb = find_exn t hash in
         let mask = Breadcrumb.mask breadcrumb in
         (* this should get garbage collected and should not require additional destruction *)
-        ignore (Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mask) ;
+        ignore
+          ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mask
+            : Ledger.unattached_mask ) ;
         Hashtbl.remove t.table hash ) ;
     (* STEP 2 *)
     (* go ahead and remove the old root from the frontier *)
@@ -417,6 +426,18 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
     (* we need to perform steps 4-7 iff there was a proof emitted in the scan
      * state we are transitioning to *)
     if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
+      let location =
+        Persistent_root.Locations.potential_snarked_ledger
+          t.persistent_root_instance.factory.directory
+      in
+      let () =
+        Ledger.Db.make_checkpoint t.persistent_root_instance.snarked_ledger
+          ~directory_name:location
+      in
+      [%log' info t.logger]
+        ~metadata:[ ("potential_snarked_ledger_hash", Frozen_ledger_hash.to_yojson @@ Frozen_ledger_hash.of_ledger_hash @@ Ledger.Db.merkle_root t.persistent_root_instance.snarked_ledger)] "Enqueued a snarked ledger" ;
+      Persistent_root.Instance.enqueue_snarked_ledger ~location
+        t.persistent_root_instance ;
       let s = t.root_ledger in
       (* STEP 4 *)
       let mt =
@@ -436,15 +457,18 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
             |> Protocol_state.Body.view
           in
           ignore
-            (Or_error.ok_exn
-               (Ledger.apply_transaction
-                  ~constraint_constants:
-                    t.precomputed_values.constraint_constants ~txn_state_view
-                  mt txn.data)) ) ;
+            ( Or_error.ok_exn
+                (Ledger.apply_transaction
+                   ~constraint_constants:
+                     t.precomputed_values.constraint_constants ~txn_state_view
+                   mt txn.data)
+              : Ledger.Transaction_applied.t ) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
-      ignore (Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mt) ) ;
+      ignore
+        ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mt
+          : Ledger.unattached_mask ) ) ;
     new_staged_ledger
   in
   (* rewrite the new root breadcrumb to contain the new root mask *)
@@ -494,15 +518,17 @@ let calculate_diffs t breadcrumb =
       (* check if new breadcrumb will be best tip *)
       let diffs =
         if
-          Consensus.Hooks.select
-            ~constants:t.precomputed_values.consensus_constants
-            ~existing:(Breadcrumb.consensus_state_with_hash current_best_tip)
-            ~candidate:(Breadcrumb.consensus_state_with_hash breadcrumb)
-            ~logger:
-              (Logger.extend t.logger
-                 [ ( "selection_context"
-                   , `String "comparing new breadcrumb to best tip" ) ])
-          = `Take
+          Consensus.Hooks.equal_select_status
+            (Consensus.Hooks.select
+               ~constants:t.precomputed_values.consensus_constants
+               ~existing:
+                 (Breadcrumb.consensus_state_with_hash current_best_tip)
+               ~candidate:(Breadcrumb.consensus_state_with_hash breadcrumb)
+               ~logger:
+                 (Logger.extend t.logger
+                    [ ( "selection_context"
+                      , `String "comparing new breadcrumb to best tip" ) ]))
+            `Take
         then Full.E.E (Best_tip_changed breadcrumb_hash) :: diffs
         else diffs
       in
@@ -529,7 +555,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       let old_best_tip = t.best_tip in
       t.best_tip <- new_best_tip ;
       (old_best_tip, None)
-  | Root_transitioned {new_root; garbage= Full garbage} ->
+  | Root_transitioned {new_root; garbage= Full garbage; _} ->
       let new_root_hash = Root_data.Limited.hash new_root in
       let old_root_hash = t.root in
       let new_root_protocol_states =
@@ -686,6 +712,7 @@ let update_metrics_with_diff (type mutant) t
       let best_tip = best_tip t in
       let open Consensus.Data.Consensus_state in
       let slot_time = slot_time t best_tip in
+      let height = blockchain_length (Breadcrumb.consensus_state best_tip) in
       let is_recent_block =
         let now = Block_time.now t.time_controller in
         let two_slots =
@@ -709,6 +736,8 @@ let update_metrics_with_diff (type mutant) t
           (Int.to_float (longest_fork t)) ;
         Gauge.set Transition_frontier.best_tip_slot_time_sec
           (slot_time_to_offset_time_span slot_time) ;
+        Gauge.set Transition_frontier.best_tip_block_height
+          (Mina_numbers.Length.to_int height |> Int.to_float) ;
         Gauge.set Transition_frontier.empty_blocks_at_best_tip
           (Int.to_float (empty_blocks_at_best_tip t)))
 
@@ -739,7 +768,11 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
     )
   in
   [%log' trace t.logger] "after applying diffs to full frontier" ;
-  if (not (enable_epoch_ledger_sync = `Disabled)) && not has_long_catchup_job
+  if
+    (not
+       ([%equal: [`Enabled of _ | `Disabled]] enable_epoch_ledger_sync
+          `Disabled))
+    && not has_long_catchup_job
   then
     Debug_assert.debug_assert (fun () ->
         match

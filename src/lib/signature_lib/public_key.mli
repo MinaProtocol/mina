@@ -20,8 +20,7 @@ include Codable.S with type t := t
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t
-    [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
+    type nonrec t = t [@@deriving bin_io, sexp, compare, hash, yojson, version]
   end
 
   module Latest = V1
@@ -45,17 +44,16 @@ val of_private_key_exn : Private_key.t -> t
 
 module Compressed : sig
   module Poly : sig
-    type ('field, 'boolean) t = {x: 'field; is_odd: 'boolean}
+    type ('field, 'boolean) t = { x : 'field; is_odd : 'boolean }
 
-    module Stable :
-      sig
-        module V1 : sig
-          type ('field, 'boolean) t
-        end
-
-        module Latest = V1
+    module Stable : sig
+      module V1 : sig
+        type ('field, 'boolean) t
       end
-      with type ('field, 'boolean) V1.t = ('field, 'boolean) t
+
+      module Latest = V1
+    end
+    with type ('field, 'boolean) V1.t = ('field, 'boolean) t
   end
 
   type t = (Field.t, bool) Poly.t [@@deriving sexp, hash]
@@ -64,9 +62,11 @@ module Compressed : sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash, version]
+      type nonrec t = t [@@deriving sexp, bin_io, equal, compare, hash, version]
 
       include Codable.S with type t := t
+
+      include Hashable.S_binable with type t := t
     end
 
     module Latest = V1

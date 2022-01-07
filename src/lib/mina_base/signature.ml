@@ -1,10 +1,8 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
 
@@ -29,7 +27,7 @@ end
 module Stable = struct
   module V1 = struct
     type t = (Field.t, Inner_curve.Scalar.t) Signature_poly.Stable.V1.t
-    [@@deriving sexp, compare, eq, hash]
+    [@@deriving sexp, compare, equal, hash]
 
     type _unused = unit constraint t = Arg.t
 
@@ -41,13 +39,12 @@ module Stable = struct
   end
 
   module Tests = struct
-    [%%if
-    curve_size = 255]
+    [%%if curve_size = 255]
 
     let%test "signature serialization v1 (curve_size=255)" =
       let signature =
-        Quickcheck.random_value
-          ~seed:(`Deterministic "signature serialization") V1.gen
+        Quickcheck.random_value ~seed:(`Deterministic "signature serialization")
+          V1.gen
       in
       let known_good_digest = "88a094d50a90b5054152af85bd6e60e8" in
       Ppx_version_runtime.Serialization.check_serialization
@@ -79,11 +76,10 @@ module Raw = struct
 
   let%test_unit "partial isomorphism" =
     Quickcheck.test ~trials:300 Stable.Latest.gen ~f:(fun signature ->
-        [%test_eq: t option] (Some signature) (encode signature |> decode) )
+        [%test_eq: t option] (Some signature) (encode signature |> decode))
 end
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 type var = Field.Var.t * Inner_curve.Scalar.var
 

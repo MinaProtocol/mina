@@ -26,8 +26,8 @@ let rec to_vector : type a n. (a, n) t -> a Vector.e = function
 let rec map : type a b n. (a, n) t -> f:(a -> b) -> (b, n) t =
  fun xs ~f -> match xs with [] -> [] | x :: xs -> f x :: map xs ~f
 
-let rec extend_to_vector : type a n.
-    (a, n) t -> a -> n Nat.t -> (a, n) Vector.t =
+let rec extend_to_vector : type a n. (a, n) t -> a -> n Nat.t -> (a, n) Vector.t
+    =
  fun v a n ->
   match (v, n) with
   | [], Z ->
@@ -118,13 +118,12 @@ module At_most_2 = struct
       include (
         With_length
           (Nat.N2) :
-          module type of With_length (Nat.N2) with type 'a t := 'a t )
-    end
-  end]
+            module type of With_length (Nat.N2) with type 'a t := 'a t )
+      end
+    end]
 
-  type 'a t = 'a Stable.Latest.t
-  [@@deriving sexp, equal, compare, hash, yojson]
-end
+  type 'a t = 'a Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
+  end
 
 module At_most_8 = struct
   [%%versioned_binable
@@ -147,10 +146,9 @@ module At_most_8 = struct
       include (
         With_length
           (Nat.N8) :
-          module type of With_length (Nat.N8) with type 'a t := 'a t )
-    end
-  end]
+            module type of With_length (Nat.N8) with type 'a t := 'a t )
+      end
+    end]
 
-  type 'a t = 'a Stable.Latest.t
-  [@@deriving sexp, equal, compare, hash, yojson]
-end
+  type 'a t = 'a Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
+  end

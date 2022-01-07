@@ -26,9 +26,9 @@ module Chain_hash : sig
 
   include Codable.S with type t := t
 
-  val to_string : t -> string
+  val to_base58_check : t -> string
 
-  val of_string : string -> t
+  val of_base58_check : string -> t Or_error.t
 
   val empty : t
 

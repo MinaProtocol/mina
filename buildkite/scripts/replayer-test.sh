@@ -7,22 +7,20 @@ set -eo pipefail
 
 echo "Updating apt, installing packages"
 apt-get update
-# time zone = US Pacific
-/bin/echo -e "12\n10" | apt-get install -y tzdata
-apt-get install -y git postgresql
-
-export DUNE_PROFILE=testnet_postake_medium_curves
-
-source buildkite/scripts/export-git-env-vars.sh
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get install -y apt-transport-https ca-certificates
-echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt/sources.list.d/coda.list
+# time zone = US Pacific
+/bin/echo -e "12\n10" | apt-get install -y tzdata
+apt-get install -y git postgresql apt-transport-https ca-certificates curl
+
+source buildkite/scripts/export-git-env-vars.sh
+
+echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/mina.list
 apt-get update
 
-echo "Installing archive node package: mina-archive=${VERSION}"
-apt-get install --allow-downgrades -y curl mina-archive=${VERSION}
+echo "Installing archive node package: mina-archive=${MINA_DEB_VERSION}"
+apt-get install --allow-downgrades -y mina-archive=${MINA_DEB_VERSION}
 
 echo "Generating locale for Postgresql"
 locale-gen en_US.UTF-8

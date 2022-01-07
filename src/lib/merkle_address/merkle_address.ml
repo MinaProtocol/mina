@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Bitstring
 
 let depth = bitstring_length
@@ -6,7 +6,7 @@ let depth = bitstring_length
 let add_padding path =
   let length = depth path in
   if length mod 8 = 0 then path
-  else concat [path; zeroes_bitstring (8 - (length mod 8))]
+  else concat [ path; zeroes_bitstring (8 - (length mod 8)) ]
 
 let slice = subbitstring
 
@@ -42,6 +42,8 @@ let of_tuple (length, string) = slice (bitstring_of_string string) 0 length
 module Binable_arg = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = int * string
 
@@ -82,8 +84,7 @@ module Stable = struct
     let hash_fold_t hash_state t =
       [%hash_fold: int * string] hash_state (to_tuple t)
 
-    [%%define_from_scope
-    compare, to_yojson]
+    [%%define_from_scope compare, to_yojson]
 
     let equal = equals
   end
@@ -135,18 +136,19 @@ let to_int (path : t) : int =
   Sequence.range 0 (depth path)
   |> Sequence.fold ~init:0 ~f:(fun acc i ->
          let index = depth path - 1 - i in
-         acc + ((if get path index <> 0 then 1 else 0) lsl i) )
+         acc + ((if get path index <> 0 then 1 else 0) lsl i))
 
 let of_int_exn ~ledger_depth index =
   if index >= 1 lsl ledger_depth then failwith "Index is too large"
   else
     let buf = create_bitstring ledger_depth in
-    Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive
-      (ledger_depth - 1) 0
-    |> Sequence.fold ~init:index ~f:(fun i pos ->
-           Bitstring.put buf pos (i % 2) ;
-           i / 2 )
-    |> ignore ;
+    ignore
+      ( Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive
+          (ledger_depth - 1) 0
+        |> Sequence.fold ~init:index ~f:(fun i pos ->
+               Bitstring.put buf pos (i % 2) ;
+               i / 2)
+        : int ) ;
     buf
 
 let dirs_from_root t =
@@ -208,7 +210,7 @@ let serialize ~ledger_depth path =
   assert (path_len <= required_bits) ;
   let required_padding = required_bits - path_len in
   Bigstring.of_string @@ string_of_bitstring
-  @@ concat [path; zeroes_bitstring required_padding]
+  @@ concat [ path; zeroes_bitstring required_padding ]
 
 let is_parent_of parent ~maybe_child = Bitstring.is_prefix maybe_child parent
 
@@ -220,8 +222,7 @@ module Range = struct
     if comparison > 0 then
       raise (Invalid_argument "first address needs to precede last address")
     else if comparison = 0 then init
-    else
-      fold_exl (next first |> Option.value_exn, last) ~init:(f first init) ~f
+    else fold_exl (next first |> Option.value_exn, last) ~init:(f first init) ~f
 
   let fold_incl (first, last) ~init ~f =
     f last @@ fold_exl (first, last) ~init ~f
@@ -236,10 +237,10 @@ module Range = struct
 
   let subtree_range ~ledger_depth address =
     let first_node =
-      concat [address; zeroes_bitstring @@ height ~ledger_depth address]
+      concat [ address; zeroes_bitstring @@ height ~ledger_depth address ]
     in
     let last_node =
-      concat [address; ones_bitstring @@ height ~ledger_depth address]
+      concat [ address; ones_bitstring @@ height ~ledger_depth address ]
     in
     (first_node, last_node)
 
@@ -255,14 +256,14 @@ module Range = struct
               Some (current_node, (current_node, `Stop))
             else
               Option.map (next current_node) ~f:(fun next_node ->
-                  (current_node, (next_node, `Don't_stop)) ) )
+                  (current_node, (next_node, `Don't_stop))))
 end
 
 let%test "Bitstring bin_io serialization does not change" =
   (* Bitstring.t is trustlisted as a versioned type. This test assures that serializations of that type haven't changed *)
   let text =
-    "Contrary to popular belief, Lorem Ipsum is not simply random text. It \
-     has roots in a piece of classical Latin literature."
+    "Contrary to popular belief, Lorem Ipsum is not simply random text. It has \
+     roots in a piece of classical Latin literature."
   in
   let bitstring = Bitstring.bitstring_of_string text in
   let known_good_digest = "c4c7ade09ba305b69ffac494a6eab60e" in
@@ -275,7 +276,7 @@ module Make_test (Input : sig
 end) =
 struct
   let%test "the merkle root should have no path" =
-    dirs_from_root (root ()) = []
+    List.is_empty (dirs_from_root (root ()))
 
   let%test_unit "parent_exn(child_exn(node)) = node" =
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t List.t * Direction.t]
@@ -286,28 +287,27 @@ struct
         let address = of_directions path in
         [%test_eq: t]
           (parent_exn (child_exn ~ledger_depth:Input.depth address direction))
-          address )
+          address)
 
   let%test_unit "to_index(of_index_exn(i)) = i" =
     Quickcheck.test ~sexp_of:[%sexp_of: int]
       (Int.gen_incl 0 ((1 lsl Input.depth) - 1))
       ~f:(fun index ->
         [%test_result: int] ~expect:index
-          (to_int @@ of_int_exn ~ledger_depth:Input.depth index) )
+          (to_int @@ of_int_exn ~ledger_depth:Input.depth index))
 
   let%test_unit "of_index_exn(to_index(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
       (Direction.gen_list Input.depth) ~f:(fun directions ->
         let address = of_directions directions in
         [%test_result: t] ~expect:address
-          (of_int_exn ~ledger_depth:Input.depth @@ to_int address) )
+          (of_int_exn ~ledger_depth:Input.depth @@ to_int address))
 
   let%test_unit "nonempty(addr): sibling(sibling(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
-      (Direction.gen_var_length_list ~start:1 Input.depth)
-      ~f:(fun directions ->
+      (Direction.gen_var_length_list ~start:1 Input.depth) ~f:(fun directions ->
         let address = of_directions directions in
-        [%test_result: t] ~expect:address (sibling @@ sibling address) )
+        [%test_result: t] ~expect:address (sibling @@ sibling address))
 
   let%test_unit "prev(next(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
@@ -317,7 +317,7 @@ struct
         | None ->
             ()
         | Some addr' ->
-            [%test_result: t option] ~expect:(Some address) (prev addr') )
+            [%test_result: t option] ~expect:(Some address) (prev addr'))
 end
 
 let%test_module "Address" =

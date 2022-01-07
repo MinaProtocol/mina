@@ -111,17 +111,6 @@ def _process_log_iterator(ctx, log_iterator):
             #print(message)
             state_hash = metadata["state_hash"]
         # In case we get old incompatible logs
-<<<<<<< HEAD
-        except KeyError:
-            # EJECT!!
-            #print(json.dumps(metadata, indent=2))
-            continue
-
-        if labels == None:
-            continue
-
-        if "Broadcasting new state" in message:
-=======
         except KeyError: 
             # EJECT!!
             #print(json.dumps(metadata, indent=2))
@@ -131,28 +120,18 @@ def _process_log_iterator(ctx, log_iterator):
             continue
         
         if "Broadcasting new state" in message: 
->>>>>>> 37c289bb9f1ea1bf3d1b2249381a42ba3f24027d
             if state_hash in broadcasting_block_logs:
                 broadcasting_block_logs[state_hash].append({**json_payload, **labels})
             else:
                 broadcasting_block_logs[state_hash] = [{**json_payload, **labels}]
 
-<<<<<<< HEAD
-        if "Received" in message:
-=======
         if "Received" in message: 
->>>>>>> 37c289bb9f1ea1bf3d1b2249381a42ba3f24027d
             if state_hash in received_block_logs:
                 received_block_logs[state_hash].append({**json_payload, **labels})
             else:
                 received_block_logs[state_hash] = [{**json_payload, **labels}]
-<<<<<<< HEAD
-
-        elif "Rebroadcasting" in message:
-=======
         
         elif "Rebroadcasting" in message: 
->>>>>>> 37c289bb9f1ea1bf3d1b2249381a42ba3f24027d
             if state_hash in rebroadcasting_block_logs:
                 rebroadcasting_block_logs[state_hash].append({**json_payload, **labels})
             else:
@@ -172,11 +151,7 @@ def _process_log_iterator(ctx, log_iterator):
 
         #     # Mark the originator node as the block creator
         #     network_graph.add_node(peer_id, color="orange", label=entry["k8s-pod/app"])
-<<<<<<< HEAD
-
-=======
         
->>>>>>> 37c289bb9f1ea1bf3d1b2249381a42ba3f24027d
         # Build all the edges
         if key in received_block_logs:
             for receive_log in received_block_logs[key]:
@@ -216,15 +191,9 @@ def _process_log_iterator(ctx, log_iterator):
 
                 send_datetime = dateutil.parser.isoparse(send_time)
                 receive_datetime = dateutil.parser.isoparse(receive_log["timestamp"])
-<<<<<<< HEAD
-
-                edge_weight = (receive_datetime - send_datetime).microseconds / 1000
-
-=======
                 
                 edge_weight = (receive_datetime - send_datetime).microseconds / 1000
                 
->>>>>>> 37c289bb9f1ea1bf3d1b2249381a42ba3f24027d
                 network_graph.add_node(receiver["peer_id"], label=receive_log["k8s-pod/app"].replace("-block-producer-", "-"))
                 network_graph.add_edge(sender["peer_id"], receiver["peer_id"], weight=edge_weight)
 
@@ -233,13 +202,8 @@ def _process_log_iterator(ctx, log_iterator):
                 # print(f"Sent: {send_datetime}")
                 # print(f"Rece: {receive_datetime}")
                 # print(edge_weight)
-<<<<<<< HEAD
-
-
-=======
         
         
->>>>>>> 37c289bb9f1ea1bf3d1b2249381a42ba3f24027d
 
         edges = network_graph.edges()
         edgelist = []
@@ -254,21 +218,13 @@ def _process_log_iterator(ctx, log_iterator):
                 color_map.append(node[1]["color"])
             else:
                 color_map.append("blue")
-<<<<<<< HEAD
-        labels = nx.get_node_attributes(network_graph, 'label')
-=======
         labels = nx.get_node_attributes(network_graph, 'label') 
->>>>>>> 37c289bb9f1ea1bf3d1b2249381a42ba3f24027d
 
         weights = [network_graph[u][v]['weight'] for u,v in list(edgelist)]
         degree = network_graph.degree()
 
 
-<<<<<<< HEAD
-
-=======
         
->>>>>>> 37c289bb9f1ea1bf3d1b2249381a42ba3f24027d
 #        blockchain_length = broadcasting_block_logs[key][0]["metadata"]["message"][1]["protocol_state"]["body"]["consensus_state"]["blockchain_length"]
         pos=nx.nx_agraph.graphviz_layout(network_graph, prog="dot", args="-Nk=30")
         plt.figure(figsize=(100,20))
@@ -285,62 +241,6 @@ def visualize_gossip_net(ctx):
     # Python Logging Config
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     logger = logging.getLogger()
-<<<<<<< HEAD
-
-    if ctx.obj["cache_logs"]:
-        outfile = open(ctx.obj["cache_file"], "w")
-
-    if ctx.obj["in_file"] == None:
-        #BROADCAST_LOG_FILTER = ' "Broadcasting new state over gossip net" AND jsonPayload.metadata.state_hash:""'
-        BLOCK_LOG_FILTER = ' "Broadcasting new state over gossip net" OR "Rebroadcasting $state_hash" OR "Received a block $block from $sender" AND jsonPayload.metadata.state_hash:"" AND jsonPayload.metadata.state_hash:""'
-        #broadcast_log_iterator = fetch_logs(namespace=ctx.obj["namespace"], hours_ago=ctx.obj["hours_ago"], log_filter=BROADCAST_LOG_FILTER)
-        log_iterator = fetch_logs(namespace=ctx.obj["namespace"], hours_ago=ctx.obj["hours_ago"], log_filter=BLOCK_LOG_FILTER)
-    else:
-        fd = open(ctx.obj["in_file"], "r")
-        log_iterator = map(lambda x: json.loads(x), fd.readlines())
-
-    _process_log_iterator(ctx, log_iterator)
-
-
-
-
-
-        # # process rebroadcasting block logs for each block
-        # for key in rebroadcasting_block_logs.keys():
-        #     for entry in rebroadcasting_block_logs[key]:
-        #         message = json_payload["message"]
-        #         metadata = json_payload["metadata"]
-        #         state_hash = metadata["state_hash"]
-
-        #     # Insert the rebroadcast event into the graph
-
-
-
-
-    # Load Rebroadcasting Block Logs as Node Color
-    # Load Received Block Logs as Edges
-        # # if we haven't seen this sender before
-        # if sender["peer_id"] not in network_graph:
-        #     network_graph.add_node(sender["peer_id"])
-        # # if we haven't seen this receiver before
-        # if receiver["peer_id"] not in network_graph:
-        #     network_graph.add_node(receiver["peer_id"])
-        # # if the sender has sent a node to the receiver before
-        # if receiver["peer_id"] in network_graph[sender["peer_id"]]:
-        #     # increase the edge weight
-        #     print(f'increasing weight: {network_graph[sender["peer_id"]][receiver["peer_id"]]["weight"]}')
-        #     network_graph[sender["peer_id"]][receiver["peer_id"]]["weight"] += 1
-        # else:
-        #     # else, just create an edge of width=1
-        #     network_graph.add_edge(sender["peer_id"], receiver["peer_id"], weight=1)
-
-
-
-
-
-
-
-=======
     
     if ctx.obj["cache_logs"]:
         outfile = open(ctx.obj["cache_file"], "w")
@@ -395,7 +295,6 @@ def visualize_gossip_net(ctx):
         
 
     
->>>>>>> 37c289bb9f1ea1bf3d1b2249381a42ba3f24027d
 
 
 def insert_node(graph, label):
@@ -412,11 +311,7 @@ def visualize_blockchain(ctx, count_best_tips, remote_graphql_port):
     # Python Logging Config
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     logger = logging.getLogger()
-<<<<<<< HEAD
-
-=======
     
->>>>>>> 37c289bb9f1ea1bf3d1b2249381a42ba3f24027d
     if ctx.obj["cache_logs"]:
         outfile = open(ctx.obj["cache_file"], "w")
 
@@ -433,11 +328,7 @@ def visualize_blockchain(ctx, count_best_tips, remote_graphql_port):
     for entry in log_iterator:  # API call(s)
         if ctx.obj["cache_logs"] and ctx.obj["in_file"] == None:
             outfile.write(json.dumps(entry, default=str) + "\n")
-<<<<<<< HEAD
-
-=======
         
->>>>>>> 37c289bb9f1ea1bf3d1b2249381a42ba3f24027d
 
         block = entry[-1]["metadata"]
         #print(json.dumps(block, indent=2, default=str))
@@ -445,11 +336,7 @@ def visualize_blockchain(ctx, count_best_tips, remote_graphql_port):
         labels = entry[1]
         state_hash = block["state_hash"]
         parent_hash = block["external_transition"]["data"]["protocol_state"]["previous_state_hash"]
-<<<<<<< HEAD
-
-=======
         
->>>>>>> 37c289bb9f1ea1bf3d1b2249381a42ba3f24027d
         logger.debug(json.dumps(block, indent=2, default=str))
         nBlocks += 1
 
@@ -458,11 +345,7 @@ def visualize_blockchain(ctx, count_best_tips, remote_graphql_port):
             logger.info(f"Processing {nBlocks}")
 
     logger.info("{} Blocks During the inspected timespan.".format(nBlocks))
-<<<<<<< HEAD
-
-=======
     
->>>>>>> 37c289bb9f1ea1bf3d1b2249381a42ba3f24027d
     if count_best_tips:
         print("Loading Best Tips...")
         config.load_kube_config()
@@ -505,11 +388,7 @@ def visualize_blockchain(ctx, count_best_tips, remote_graphql_port):
                     logging.error("Error fetching chain for {}".format(pod.metadata.name))
                     return
 
-<<<<<<< HEAD
-                if result['data']['bestChain'] == None:
-=======
                 if result['data']['bestChain'] == None: 
->>>>>>> 37c289bb9f1ea1bf3d1b2249381a42ba3f24027d
                     logging.error("No Best Tip for {}".format(pod.metadata.name))
                     return
                 logger.info("Got Response from {}".format(pod.metadata.name))
@@ -580,11 +459,7 @@ class CustomError(Exception):
 def get_best_chain(port):
     coda = CodaClient.Client(graphql_host="localhost", graphql_port=port)
     result = coda._send_query (query="query bestChainQuery { bestChain { stateHash } }")
-<<<<<<< HEAD
-
-=======
     
->>>>>>> 37c289bb9f1ea1bf3d1b2249381a42ba3f24027d
     return result
 
 

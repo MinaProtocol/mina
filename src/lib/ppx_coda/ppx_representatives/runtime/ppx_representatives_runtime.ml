@@ -12,26 +12,26 @@ module Util = struct
     go [] l
 end
 
-let unit_to_representatives = lazy [()]
+let unit_to_representatives = lazy [ () ]
 
-let bool_to_representatives = lazy [false]
+let bool_to_representatives = lazy [ false ]
 
-let int_to_representatives = lazy [0]
+let int_to_representatives = lazy [ 0 ]
 
-let string_to_representatives = lazy [""]
+let string_to_representatives = lazy [ "" ]
 
-let char_to_representatives = lazy [' ']
+let char_to_representatives = lazy [ ' ' ]
 
-let bytes_to_representatives = lazy [Bytes.empty]
+let bytes_to_representatives = lazy [ Bytes.empty ]
 
-let int32_to_representatives = lazy [0l]
+let int32_to_representatives = lazy [ 0l ]
 
-let int64_to_representatives = lazy [0L]
+let int64_to_representatives = lazy [ 0L ]
 
-let nativeint_to_representatives = lazy [0n]
+let nativeint_to_representatives = lazy [ 0n ]
 
-let list_to_representatives _ = lazy [[]]
+let list_to_representatives _ = lazy [ [] ]
 
-let option_to_representatives _ = lazy [None]
+let option_to_representatives _ = lazy [ None ]
 
-let array_to_representatives _ = lazy [[||]]
+let array_to_representatives _ = lazy [ [||] ]

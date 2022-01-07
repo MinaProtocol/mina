@@ -1,6 +1,6 @@
 ARG BAKE_VERSION
 
-FROM codaprotocol/coda-daemon:${BAKE_VERSION}
+FROM minaprotocol/mina-daemon:${BAKE_VERSION}
 
 ARG COMMIT_HASH=master
 ARG TESTNET_NAME=testworld
@@ -11,10 +11,11 @@ RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/auto
 RUN head ${CONFIG_FILE}
 
 # Create the defautl config dir and an empty config
-RUN mkdir -p /root/.mina-config && echo "{}" > /root/.mina-config/daemon.json
+RUN mkdir -p /root/.mina-config
+# && echo "{}" > /root/.mina-config/daemon.json
 
-RUN mina daemon -config-file ${CONFIG_FILE} -generate-genesis-proof true; \
-  mv ~/.mina-config/genesis/genesis_* /var/lib/coda/
+#RUN mina daemon -config-file ${CONFIG_FILE} -generate-genesis-proof true; \
+#  mv ~/.mina-config/genesis/genesis_* /var/lib/coda/
 
 #RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/develop/dockerfiles/scripts/healthcheck-utilities.sh -o /healthcheck/utilities.sh
 
@@ -27,7 +28,7 @@ command=$1 \n\
 shift \n\
 while true; do\n\
   rm -f /root/.mina-config/.mina-lock\n\
-  mina "$command" -config-file "'${CONFIG_FILE}'" "$@" 2>&1 >mina.log &\n\
+  catchsegv mina "$command" -config-file "'${CONFIG_FILE}'" "$@" 2>&1 >mina.log &\n\
   mina_pid=$!\n\
   tail -q -f mina.log &\n\
   tail_pid=$!\n\
@@ -43,6 +44,6 @@ done'\
 
 RUN chmod +x init_mina_baked.sh
 
-ENV CODA_TIME_OFFSET 0
+ENV MINA_TIME_OFFSET 0
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/root/init_mina_baked.sh"]

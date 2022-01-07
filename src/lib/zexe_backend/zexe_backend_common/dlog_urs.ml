@@ -30,9 +30,7 @@ module Make (Inputs : Inputs_intf) = struct
     let urs_info = Set_once.create () in
     let urs = ref None in
     let degree = 1 lsl Pickles_types.Nat.to_int Rounds.n in
-    let set_urs_info specs =
-      Set_once.set_exn urs_info Lexing.dummy_pos specs
-    in
+    let set_urs_info specs = Set_once.set_exn urs_info Lexing.dummy_pos specs in
     let load () =
       match !urs with
       | Some urs ->
@@ -50,7 +48,7 @@ module Make (Inputs : Inputs_intf) = struct
               (fun () -> name)
               (fun () ~path -> Or_error.try_with (fun () -> Urs.read path))
               (fun _ urs path ->
-                Or_error.try_with (fun () -> Urs.write urs path) )
+                Or_error.try_with (fun () -> Urs.write urs path))
           in
           let u =
             match Key_cache.Sync.read specs store () with
@@ -58,13 +56,13 @@ module Make (Inputs : Inputs_intf) = struct
                 u
             | Error _e ->
                 let urs = Urs.create (Unsigned.Size_t.of_int degree) in
-                let _ =
+                let (_ : (unit, Error.t) Result.t) =
                   Key_cache.Sync.write
                     (List.filter specs ~f:(function
                       | On_disk _ ->
                           true
                       | S3 _ ->
-                          false ))
+                          false))
                     store () urs
                 in
                 urs

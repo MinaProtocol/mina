@@ -96,15 +96,15 @@ struct
 
   let of_base58_check_exn s = of_base58_check s |> Or_error.ok_exn
 
-  module String_ops = struct
-    type t = T.t
+  let to_yojson t = `String (to_base58_check t)
 
-    let to_string = to_base58_check
-
-    let of_string = of_base58_check_exn
-  end
-
-  include Make_of_string (String_ops)
+  let of_yojson = function
+    | `String s ->
+        Result.map_error (of_base58_check s) ~f:Error.to_string_hum
+    | json ->
+        failwithf "of_yojson: expect JSON string, got %s"
+          (Yojson.Safe.to_string json)
+          ()
 end
 
 module type Base58_check_base_intf = sig
@@ -119,12 +119,6 @@ end
 
 module type Base58_check_intf = sig
   type t
-
-  (** string encoding (Base58Check) *)
-  val to_string : t -> string
-
-  (** string (Base58Check) decoding *)
-  val of_string : string -> t
 
   (** explicit Base58Check encoding *)
   val to_base58_check : t -> string

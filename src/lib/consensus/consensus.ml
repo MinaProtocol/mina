@@ -1,20 +1,16 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 module Intf = Intf
 
-[%%if
-consensus_mechanism = "proof_of_stake"]
+[%%if consensus_mechanism = "proof_of_stake"]
 
 include Proof_of_stake
 
 [%%else]
 
-[%%show
-consesus_mechanism]
+[%%show consesus_mechanism]
 
-[%%optcomp.error
-"invalid value for \"consensus_mechanism\""]
+[%%optcomp.error "invalid value for \"consensus_mechanism\""]
 
 [%%endif]
 

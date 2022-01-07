@@ -15,7 +15,7 @@ let create () = State_hash.Table.create ()
 let add (t : t) ~parent new_child =
   State_hash.Table.update t parent ~f:(function
     | None ->
-        [new_child]
+        [ new_child ]
     | Some children ->
         if
           List.mem children new_child ~equal:(fun e1 e2 ->
@@ -23,9 +23,9 @@ let add (t : t) ~parent new_child =
                 ( Envelope.Incoming.data e1
                 |> External_transition.Initial_validated.state_hash )
                 ( Envelope.Incoming.data e2
-                |> External_transition.Initial_validated.state_hash ) )
+                |> External_transition.Initial_validated.state_hash ))
         then children
-        else new_child :: children )
+        else new_child :: children)
 
 let data t =
   let collected_transitions = State_hash.Table.data t |> List.concat in

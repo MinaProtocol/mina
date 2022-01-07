@@ -2,5 +2,5 @@
 
 . lib.sh
 
-req /network/status '{ network_identifier: { blockchain: "coda", network: "debug" }, metadata: {} }'
+req /network/status '{ network_identifier: { blockchain: "mina", network: "debug" }, metadata: {} }'
 

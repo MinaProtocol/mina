@@ -56,7 +56,8 @@ let test_module (module M : Unsigned.S) =
     ; (__LOC__, 0xFFL, 0xFFL)
     ; (__LOC__, 0xFFFFL, 0xFFFFL)
     ; (__LOC__, 0xFFFFFFL, 0xFFFFFFL)
-    ; (__LOC__, 0xFFFFFFFFL, 0xFFFFFFFFL) ] ;
+    ; (__LOC__, 0xFFFFFFFFL, 0xFFFFFFFFL)
+    ] ;
   let check (loc, x, y) =
     let x, y = on_int ~f:M.add ~f_32:( + ) (M.of_int64 x) (M.of_int64 y) in
     print (x, y) ;
@@ -67,7 +68,8 @@ let test_module (module M : Unsigned.S) =
     ; (__LOC__, 0xFFL, 0xFFL)
     ; (__LOC__, 0xFFFFL, 0xFFFFL)
     ; (__LOC__, 0xFFFFFFL, 0xFFFFFFL)
-    ; (__LOC__, 0xFFFFFFFFL, 0xFFFFFFFFL) ]
+    ; (__LOC__, 0xFFFFFFFFL, 0xFFFFFFFFL)
+    ]
 
 let () =
   Format.eprintf "UInt8@." ;

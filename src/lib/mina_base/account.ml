@@ -1,12 +1,10 @@
 (* account.ml *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params
 open Tick
@@ -30,17 +28,23 @@ module Index = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = int [@@deriving to_yojson, sexp]
+      module T = struct
+        type t = int [@@deriving to_yojson, sexp, hash, compare]
+      end
+
+      include T
 
       let to_latest = Fn.id
+
+      include Hashable.Make_binable (T)
     end
   end]
+
+  include Hashable.Make_binable (Stable.Latest)
 
   let to_int = Int.to_int
 
   let gen ~ledger_depth = Int.gen_incl 0 ((1 lsl ledger_depth) - 1)
-
-  module Table = Int.Table
 
   module Vector = struct
     include Int
@@ -54,23 +58,21 @@ module Index = struct
 
   let to_bits ~ledger_depth t = List.init ledger_depth ~f:(Vector.get t)
 
-  let of_bits =
-    List.foldi ~init:Vector.empty ~f:(fun i t b -> Vector.set t i b)
+  let of_bits = List.foldi ~init:Vector.empty ~f:(fun i t b -> Vector.set t i b)
 
   let fold_bits ~ledger_depth t =
-    { Fold.fold=
+    { Fold.fold =
         (fun ~init ~f ->
           let rec go acc i =
-            if i = ledger_depth then acc
-            else go (f acc (Vector.get t i)) (i + 1)
+            if i = ledger_depth then acc else go (f acc (Vector.get t i)) (i + 1)
           in
-          go init 0 ) }
+          go init 0)
+    }
 
   let fold ~ledger_depth t =
     Fold.group3 ~default:false (fold_bits ~ledger_depth t)
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   module Unpacked = struct
     type var = Tick.Boolean.var list
@@ -104,18 +106,19 @@ module Poly = struct
            , 'permissions
            , 'snapp_opt )
            t =
-        { public_key: 'pk
-        ; token_id: 'tid
-        ; token_permissions: 'token_permissions
-        ; balance: 'amount
-        ; nonce: 'nonce
-        ; receipt_chain_hash: 'receipt_chain_hash
-        ; delegate: 'delegate
-        ; voting_for: 'state_hash
-        ; timing: 'timing
-        ; permissions: 'permissions
-        ; snapp: 'snapp_opt }
-      [@@deriving sexp, eq, compare, hash, yojson, fields, hlist]
+        { public_key : 'pk
+        ; token_id : 'tid
+        ; token_permissions : 'token_permissions
+        ; balance : 'amount
+        ; nonce : 'nonce
+        ; receipt_chain_hash : 'receipt_chain_hash
+        ; delegate : 'delegate
+        ; voting_for : 'state_hash
+        ; timing : 'timing
+        ; permissions : 'permissions
+        ; snapp : 'snapp_opt
+        }
+      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
     end
   end]
 end
@@ -125,7 +128,7 @@ module Key = struct
   module Stable = struct
     module V1 = struct
       type t = Public_key.Compressed.Stable.V1.t
-      [@@deriving sexp, eq, hash, compare, yojson]
+      [@@deriving sexp, equal, hash, compare, yojson]
 
       let to_latest = Fn.id
     end
@@ -134,7 +137,7 @@ end
 
 module Identifier = Account_id
 
-type key = Key.t [@@deriving sexp, eq, hash, compare, yojson]
+type key = Key.t [@@deriving sexp, equal, hash, compare, yojson]
 
 module Timing = Account_timing
 
@@ -155,7 +158,7 @@ module Binable_arg = struct
         , Permissions.Stable.V1.t
         , Snapp_account.Stable.V1.t option )
         Poly.Stable.V1.t
-      [@@deriving sexp, eq, hash, compare, yojson]
+      [@@deriving sexp, equal, hash, compare, yojson]
 
       let to_latest = Fn.id
 
@@ -166,8 +169,7 @@ end
 
 let check = Fn.id
 
-[%%if
-not feature_snapps]
+[%%if not feature_snapps]
 
 let check (t : Binable_arg.t) =
   let t = check t in
@@ -179,8 +181,7 @@ let check (t : Binable_arg.t) =
 
 [%%endif]
 
-[%%if
-not feature_tokens]
+[%%if not feature_tokens]
 
 let check (t : Binable_arg.t) =
   let t = check t in
@@ -193,7 +194,7 @@ let check (t : Binable_arg.t) =
 module Stable = struct
   module V1 = struct
     type t = Binable_arg.Stable.V1.t
-    [@@deriving sexp, eq, hash, compare, yojson]
+    [@@deriving sexp, equal, hash, compare, yojson]
 
     include Binable.Of_binable
               (Binable_arg.Stable.V1)
@@ -211,12 +212,11 @@ module Stable = struct
   end
 end]
 
-[%%define_locally
-Stable.Latest.(public_key)]
+[%%define_locally Stable.Latest.(public_key)]
 
-let token {Poly.token_id; _} = token_id
+let token { Poly.token_id; _ } = token_id
 
-let identifier ({public_key; token_id; _} : t) =
+let identifier ({ public_key; token_id; _ } : t) =
   Account_id.create public_key token_id
 
 type value =
@@ -245,15 +245,16 @@ let initialize account_id : t =
   in
   { public_key
   ; token_id
-  ; token_permissions= Token_permissions.default
-  ; balance= Balance.zero
-  ; nonce= Nonce.zero
-  ; receipt_chain_hash= Receipt.Chain_hash.empty
+  ; token_permissions = Token_permissions.default
+  ; balance = Balance.zero
+  ; nonce = Nonce.zero
+  ; receipt_chain_hash = Receipt.Chain_hash.empty
   ; delegate
-  ; voting_for= State_hash.dummy
-  ; timing= Timing.Untimed
-  ; permissions= Permissions.user_default
-  ; snapp= None }
+  ; voting_for = State_hash.dummy
+  ; timing = Timing.Untimed
+  ; permissions = Permissions.user_default
+  ; snapp = None
+  }
 
 let hash_snapp_account_opt = function
   | None ->
@@ -285,8 +286,7 @@ let crypto_hash t =
   Random_oracle.hash ~init:crypto_hash_prefix
     (Random_oracle.pack_input (to_input t))
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 type var =
   ( Public_key.Compressed.var
@@ -304,7 +304,7 @@ type var =
   )
   Poly.t
 
-let identifier_of_var ({public_key; token_id; _} : var) =
+let identifier_of_var ({ public_key; token_id; _ } : var) =
   Account_id.Checked.create public_key token_id
 
 let typ : (var, value) Typ.t =
@@ -313,8 +313,7 @@ let typ : (var, value) Typ.t =
       , Snapp_account.t option )
       Typ.t =
     let account :
-        (Snapp_account.t option As_prover.Ref.t, Snapp_account.t option) Typ.t
-        =
+        (Snapp_account.t option As_prover.Ref.t, Snapp_account.t option) Typ.t =
       Typ.Internal.ref ()
     in
     let alloc =
@@ -330,7 +329,7 @@ let typ : (var, value) Typ.t =
       (x, y)
     in
     let check (x, _) = Typ.field.check x in
-    {alloc; read; store; check}
+    { alloc; read; store; check }
   in
   let spec =
     Data_spec.
@@ -343,11 +342,12 @@ let typ : (var, value) Typ.t =
       ; Typ.transport Public_key.Compressed.typ ~there:delegate_opt
           ~back:(fun delegate ->
             if Public_key.Compressed.(equal empty) delegate then None
-            else Some delegate )
+            else Some delegate)
       ; State_hash.typ
       ; Timing.typ
       ; Permissions.typ
-      ; snapp ]
+      ; snapp
+      ]
   in
   Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
@@ -363,19 +363,21 @@ let var_of_t
      ; voting_for
      ; timing
      ; permissions
-     ; snapp } :
+     ; snapp
+     } :
       value) =
-  { Poly.public_key= Public_key.Compressed.var_of_t public_key
-  ; token_id= Token_id.var_of_t token_id
-  ; token_permissions= Token_permissions.var_of_t token_permissions
-  ; balance= Balance.var_of_t balance
-  ; nonce= Nonce.Checked.constant nonce
-  ; receipt_chain_hash= Receipt.Chain_hash.var_of_t receipt_chain_hash
-  ; delegate= Public_key.Compressed.var_of_t (delegate_opt delegate)
-  ; voting_for= State_hash.var_of_t voting_for
-  ; timing= Timing.var_of_t timing
-  ; permissions= Permissions.Checked.constant permissions
-  ; snapp= Field.Var.constant (hash_snapp_account_opt snapp) }
+  { Poly.public_key = Public_key.Compressed.var_of_t public_key
+  ; token_id = Token_id.var_of_t token_id
+  ; token_permissions = Token_permissions.var_of_t token_permissions
+  ; balance = Balance.var_of_t balance
+  ; nonce = Nonce.Checked.constant nonce
+  ; receipt_chain_hash = Receipt.Chain_hash.var_of_t receipt_chain_hash
+  ; delegate = Public_key.Compressed.var_of_t (delegate_opt delegate)
+  ; voting_for = State_hash.var_of_t voting_for
+  ; timing = Timing.var_of_t timing
+  ; permissions = Permissions.Checked.constant permissions
+  ; snapp = Field.Var.constant (hash_snapp_account_opt snapp)
+  }
 
 module Checked = struct
   module Unhashed = struct
@@ -400,7 +402,7 @@ module Checked = struct
     let open Random_oracle.Input in
     let bits conv =
       f (fun x ->
-          bitstring (Bitstring_lib.Bitstring.Lsb_first.to_list (conv x)) )
+          bitstring (Bitstring_lib.Bitstring.Lsb_first.to_list (conv x)))
     in
     make_checked (fun () ->
         List.reduce_exn ~f:append
@@ -419,16 +421,16 @@ module Checked = struct
              ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
              ~delegate:(f Public_key.Compressed.Checked.to_input)
              ~voting_for:(f State_hash.var_to_input)
-             ~timing:(bits Timing.var_to_bits)) )
+             ~timing:(bits Timing.var_to_bits)))
 
   let digest t =
     make_checked (fun () ->
         Random_oracle.Checked.(
           hash ~init:crypto_hash_prefix
-            (pack_input (Run.run_checked (to_input t)))) )
+            (pack_input (Run.run_checked (to_input t)))))
 
-  let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount
-      ~vesting_period ~vesting_increment ~initial_minimum_balance =
+  let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
+      ~vesting_increment ~initial_minimum_balance =
     let%bind before_cliff = Global_slot.Checked.(global_slot < cliff_time) in
     let balance_to_int balance =
       Snarky_integer.Integer.of_bits ~m @@ Balance.var_to_bits balance
@@ -438,9 +440,7 @@ module Checked = struct
     make_checked (fun () ->
         if_ ~m before_cliff ~then_:initial_minimum_balance_int
           ~else_:
-            (let global_slot_int =
-               Global_slot.Checked.to_integer global_slot
-             in
+            (let global_slot_int = Global_slot.Checked.to_integer global_slot in
              let cliff_time_int = Global_slot.Checked.to_integer cliff_time in
              let _, slot_diff =
                subtract_unpacking_or_zero ~m global_slot_int cliff_time_int
@@ -459,23 +459,22 @@ module Checked = struct
              let vesting_increment_int =
                Amount.var_to_bits vesting_increment |> of_bits ~m
              in
-             let vesting_decrement =
-               mul ~m num_periods vesting_increment_int
-             in
+             let vesting_decrement = mul ~m num_periods vesting_increment_int in
              let _, min_balance_less_cliff_and_vesting_decrements =
                subtract_unpacking_or_zero ~m min_balance_less_cliff_decrement
                  vesting_decrement
              in
-             min_balance_less_cliff_and_vesting_decrements) )
+             min_balance_less_cliff_and_vesting_decrements))
 
   let has_locked_tokens ~global_slot (t : var) =
     let open Timing.As_record in
-    let { is_timed= _
+    let { is_timed = _
         ; initial_minimum_balance
         ; cliff_time
         ; cliff_amount
         ; vesting_period
-        ; vesting_increment } =
+        ; vesting_increment
+        } =
       t.timing
     in
     let%bind cur_min_balance =
@@ -488,7 +487,7 @@ module Checked = struct
           (Bigint.of_field Field.zero |> Bigint.to_bignum_bigint)
       in
       make_checked (fun () ->
-          Snarky_integer.Integer.equal ~m cur_min_balance zero_int )
+          Snarky_integer.Integer.equal ~m cur_min_balance zero_int)
     in
     (*Note: Untimed accounts will always have zero min balance*)
     Boolean.not zero_min_balance
@@ -499,19 +498,20 @@ end
 let digest = crypto_hash
 
 let empty =
-  { Poly.public_key= Public_key.Compressed.empty
-  ; token_id= Token_id.default
-  ; token_permissions= Token_permissions.default
-  ; balance= Balance.zero
-  ; nonce= Nonce.zero
-  ; receipt_chain_hash= Receipt.Chain_hash.empty
-  ; delegate= None
-  ; voting_for= State_hash.dummy
-  ; timing= Timing.Untimed
-  ; permissions=
+  { Poly.public_key = Public_key.Compressed.empty
+  ; token_id = Token_id.default
+  ; token_permissions = Token_permissions.default
+  ; balance = Balance.zero
+  ; nonce = Nonce.zero
+  ; receipt_chain_hash = Receipt.Chain_hash.empty
+  ; delegate = None
+  ; voting_for = State_hash.dummy
+  ; timing = Timing.Untimed
+  ; permissions =
       Permissions.user_default
       (* TODO: This should maybe be Permissions.empty *)
-  ; snapp= None }
+  ; snapp = None
+  }
 
 let empty_digest = digest empty
 
@@ -524,15 +524,16 @@ let create account_id balance =
   in
   { Poly.public_key
   ; token_id
-  ; token_permissions= Token_permissions.default
+  ; token_permissions = Token_permissions.default
   ; balance
-  ; nonce= Nonce.zero
-  ; receipt_chain_hash= Receipt.Chain_hash.empty
+  ; nonce = Nonce.zero
+  ; receipt_chain_hash = Receipt.Chain_hash.empty
   ; delegate
-  ; voting_for= State_hash.dummy
-  ; timing= Timing.Untimed
-  ; permissions= Permissions.user_default
-  ; snapp= None }
+  ; voting_for = State_hash.dummy
+  ; timing = Timing.Untimed
+  ; permissions = Permissions.user_default
+  ; snapp = None
+  }
 
 let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     ~cliff_amount ~vesting_period ~vesting_increment =
@@ -551,25 +552,26 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     Or_error.return
       { Poly.public_key
       ; token_id
-      ; token_permissions= Token_permissions.default
+      ; token_permissions = Token_permissions.default
       ; balance
-      ; nonce= Nonce.zero
-      ; receipt_chain_hash= Receipt.Chain_hash.empty
+      ; nonce = Nonce.zero
+      ; receipt_chain_hash = Receipt.Chain_hash.empty
       ; delegate
-      ; voting_for= State_hash.dummy
-      ; snapp= None
-      ; permissions= Permissions.user_default
-      ; timing=
+      ; voting_for = State_hash.dummy
+      ; snapp = None
+      ; permissions = Permissions.user_default
+      ; timing =
           Timing.Timed
             { initial_minimum_balance
             ; cliff_time
             ; cliff_amount
             ; vesting_period
-            ; vesting_increment } }
+            ; vesting_increment
+            }
+      }
 
 (* no vesting after cliff time + 1 slot *)
-let create_time_locked public_key balance ~initial_minimum_balance ~cliff_time
-    =
+let create_time_locked public_key balance ~initial_minimum_balance ~cliff_time =
   create_timed public_key balance ~initial_minimum_balance ~cliff_time
     ~vesting_period:Global_slot.(succ zero)
     ~vesting_increment:initial_minimum_balance
@@ -592,8 +594,17 @@ let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
             |> to_int64 |> UInt64.of_int64)
         in
         let vesting_decrement =
-          UInt64.Infix.(num_periods * Amount.to_uint64 vesting_increment)
-          |> Amount.of_uint64
+          let vesting_increment = Amount.to_uint64 vesting_increment in
+          if
+            try
+              UInt64.(compare Infix.(max_int / num_periods) vesting_increment)
+              < 0
+            with Division_by_zero -> false
+          then
+            (* The vesting decrement will overflow, use [max_int] instead. *)
+            UInt64.max_int |> Amount.of_uint64
+          else
+            UInt64.Infix.(num_periods * vesting_increment) |> Amount.of_uint64
         in
         match Balance.(min_balance_past_cliff - vesting_decrement) with
         | None ->
@@ -626,7 +637,8 @@ let has_locked_tokens ~global_slot (account : t) =
       ; cliff_time
       ; cliff_amount
       ; vesting_period
-      ; vesting_increment } ->
+      ; vesting_increment
+      } ->
       let curr_min_balance =
         min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount
           ~vesting_period ~vesting_increment ~initial_minimum_balance

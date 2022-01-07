@@ -52,7 +52,7 @@ module T = struct
   module Stable = struct
     module V1 = struct
       type t =
-        [`Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup]
+        [ `Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup ]
       [@@deriving sexp, hash, compare, equal, enumerate]
 
       let to_latest = Fn.id
@@ -77,9 +77,9 @@ include Hashable.Make (T)
 
 let check_conv to_repr of_repr ok_or_fail =
   List.for_all
-    [`Offline; `Bootstrap; `Synced; `Connecting; `Listening; `Catchup]
+    [ `Offline; `Bootstrap; `Synced; `Connecting; `Listening; `Catchup ]
     ~f:(fun sync_status ->
-      equal sync_status (of_repr (to_repr sync_status) |> ok_or_fail) )
+      equal sync_status (of_repr (to_repr sync_status) |> ok_or_fail))
 
 let%test "of_string (to_string x) == x" =
   check_conv to_string of_string Or_error.ok_exn

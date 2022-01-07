@@ -1,7 +1,9 @@
 open Core_kernel
 open Pickles_types
+
 module Unshifted_acc =
   Pairing_marlin_types.Accumulator.Degree_bound_checks.Unshifted_accumulators
+
 open Import
 open Backend
 
@@ -14,8 +16,8 @@ end
 let tick_shifts, tock_shifts =
   let mk g =
     let f =
-      Memo.general ~cache_size_bound:20 ~hashable:Int.hashable
-        (fun log2_size -> g ~log2_size)
+      Memo.general ~cache_size_bound:20 ~hashable:Int.hashable (fun log2_size ->
+          g ~log2_size)
     in
     fun ~log2_size -> f log2_size
   in
@@ -23,15 +25,16 @@ let tick_shifts, tock_shifts =
   , mk Backend.Tock.Verification_key.shifts )
 
 let wrap_domains =
-  { Domains.h= Pow_2_roots_of_unity 17
-  ; x=
+  { Domains.h = Pow_2_roots_of_unity 17
+  ; x =
       Pow_2_roots_of_unity
         (let (T (typ, _)) = Impls.Wrap.input () in
-         Int.ceil_log2 (Impls.Wrap.Data_spec.size [typ])) }
+         Int.ceil_log2 (Impls.Wrap.Data_spec.size [ typ ]))
+  }
 
 let hash_pairing_me_only ~app_state
     (t : _ Types.Pairing_based.Proof_state.Me_only.t) =
-  let g (x, y) = [x; y] in
+  let g (x, y) = [ x; y ] in
   let open Backend in
   Tick_field_sponge.digest Tick_field_sponge.params
     (Types.Pairing_based.Proof_state.Me_only.to_field_elements t ~g
@@ -39,7 +42,7 @@ let hash_pairing_me_only ~app_state
          (fun (x :
                 Tock.Curve.Affine.t
                 Dlog_plonk_types.Poly_comm.Without_degree_bound.t) ->
-         Array.concat_map x ~f:(Fn.compose Array.of_list g) )
+         Array.concat_map x ~f:(Fn.compose Array.of_list g))
        ~app_state)
 
 let hash_dlog_me_only (type n) (_max_branching : n Nat.t)
@@ -49,12 +52,12 @@ let hash_dlog_me_only (type n) (_max_branching : n Nat.t)
       Types.Dlog_based.Proof_state.Me_only.t) =
   Tock_field_sponge.digest Tock_field_sponge.params
     (Types.Dlog_based.Proof_state.Me_only.to_field_elements t
-       ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [x; y]))
+       ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ]))
 
 let dlog_pcs_batch (type n_branching total)
     ((without_degree_bound, _pi) :
       total Nat.t * (n_branching, Nat.N8.n, total) Nat.Adds.t) ~max_quot_size =
-  Pcs_batch.create ~without_degree_bound ~with_degree_bound:[max_quot_size]
+  Pcs_batch.create ~without_degree_bound ~with_degree_bound:[ max_quot_size ]
 
 module Pairing_pcs_batch = struct
   let beta_1 : (int, _, _) Pcs_batch.t =
@@ -68,9 +71,7 @@ module Pairing_pcs_batch = struct
 end
 
 let when_profiling profiling default =
-  match
-    Option.map (Sys.getenv_opt "PICKLES_PROFILING") ~f:String.lowercase
-  with
+  match Option.map (Sys.getenv_opt "PICKLES_PROFILING") ~f:String.lowercase with
   | None | Some ("0" | "false") ->
       default
   | Some _ ->
@@ -83,7 +84,7 @@ let time lab f =
       let x = f () in
       let stop = Time.now () in
       printf "%s: %s\n%!" lab (Time.Span.to_string_hum (Time.diff stop start)) ;
-      x )
+      x)
     f ()
 
 let bits_random_oracle =
@@ -92,20 +93,20 @@ let bits_random_oracle =
     Digestif.digest_string h s |> Digestif.to_raw_string h |> String.to_list
     |> List.concat_map ~f:(fun c ->
            let c = Char.to_int c in
-           List.init 8 ~f:(fun i -> (c lsr i) land 1 = 1) )
+           List.init 8 ~f:(fun i -> (c lsr i) land 1 = 1))
     |> fun a -> List.take a length
 
 let bits_to_bytes bits =
   let byte_of_bits bs =
     List.foldi bs ~init:0 ~f:(fun i acc b ->
-        if b then acc lor (1 lsl i) else acc )
+        if b then acc lor (1 lsl i) else acc)
     |> Char.of_int_exn
   in
   List.map (List.groupi bits ~break:(fun i _ _ -> i mod 8 = 0)) ~f:byte_of_bits
   |> String.of_char_list
 
 let group_map m ~a ~b =
-  let params = Group_map.Params.create m {a; b} in
+  let params = Group_map.Params.create m { a; b } in
   stage (fun x -> Group_map.to_group m ~params x)
 
 module Shifts = struct
@@ -126,8 +127,8 @@ module Ipa = struct
     endo_to_field c
 
   let compute_challenges ~endo_to_field field chals =
-    Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge} ->
-        compute_challenge field ~endo_to_field prechallenge )
+    Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
+        compute_challenge field ~endo_to_field prechallenge)
 
   module Wrap = struct
     let field =
@@ -173,25 +174,25 @@ module Ipa = struct
       in
       let comms =
         Array.of_list_map comm_chals ~f:(fun (comm, _) ->
-            Or_infinity.Finite comm )
+            Or_infinity.Finite comm)
       in
-      Marlin_plonk_bindings.Pasta_fp_urs.batch_accumulator_check
-        (Backend.Tick.Keypair.load_urs ())
-        comms chals
+      let urs = Backend.Tick.Keypair.load_urs () in
+      Run_in_thread.run_in_thread (fun () ->
+          Marlin_plonk_bindings.Pasta_fp_urs.batch_accumulator_check urs comms
+            chals)
   end
 end
 
 let tock_unpadded_public_input_of_statement prev_statement =
   let input =
     let (T (typ, _conv)) = Impls.Wrap.input () in
-    Impls.Wrap.generate_public_input [typ] prev_statement
+    Impls.Wrap.generate_public_input [ typ ] prev_statement
   in
   List.init
     (Backend.Tock.Field.Vector.length input)
     ~f:(Backend.Tock.Field.Vector.get input)
 
-let tock_public_input_of_statement s =
-  tock_unpadded_public_input_of_statement s
+let tock_public_input_of_statement s = tock_unpadded_public_input_of_statement s
 
 let tick_public_input_of_statement ~max_branching
     (prev_statement : _ Types.Pairing_based.Statement.t) =
@@ -199,7 +200,7 @@ let tick_public_input_of_statement ~max_branching
     let (T (input, _conv)) =
       Impls.Step.input ~branching:max_branching ~wrap_rounds:Tock.Rounds.n
     in
-    Impls.Step.generate_public_input [input] prev_statement
+    Impls.Step.generate_public_input [ input ] prev_statement
   in
   List.init
     (Backend.Tick.Field.Vector.length input)

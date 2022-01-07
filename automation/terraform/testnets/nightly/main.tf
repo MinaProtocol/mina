@@ -27,7 +27,7 @@ variable "testnet_name" {
   default     = "ci-net"
 }
 
-variable "coda_image" {
+variable "mina_image" {
   type = string
 
   description = "Mina daemon image to use in provisioning a ci-net"
@@ -48,7 +48,7 @@ variable "fish_count" {
   default     = 1
 }
 
-variable "coda_archive_image" {
+variable "mina_archive_image" {
   type = string
 
   description = "Mina archive node image to use in provisioning a ci-net"
@@ -73,11 +73,11 @@ module "ci_testnet" {
   k8s_context           = "gke_o1labs-192920_us-east4_coda-infra-east4"
   testnet_name          = var.testnet_name
 
-  coda_image            = var.coda_image
-  coda_archive_image    = var.coda_archive_image
-  coda_agent_image      = "codaprotocol/coda-user-agent:0.1.5"
-  coda_bots_image       = "codaprotocol/coda-bots:0.0.13-beta-1"
-  coda_points_image     = "codaprotocol/coda-points-hack:32b.4"
+  mina_image            = var.mina_image
+  mina_archive_image    = var.mina_archive_image
+  mina_agent_image      = "codaprotocol/coda-user-agent:0.1.5"
+  mina_bots_image       = "codaprotocol/coda-bots:0.0.13-beta-1"
+  mina_points_image     = "codaprotocol/coda-points-hack:32b.4"
 
   coda_faucet_amount    = "10000000000"
   coda_faucet_fee       = "100000000"
@@ -100,11 +100,26 @@ module "ci_testnet" {
   block_producer_key_pass           = "naughty blue worm"
   block_producer_starting_host_port = 10501
 
-  snark_worker_replicas   = 1
-  snark_worker_fee        = "0.025"
-  snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
-  snark_worker_host_port  = 10401
+  snark_coordinators = [
+    {
+      snark_worker_replicas   = 1
+      snark_worker_fee        = "0.025"
+      snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
+      snark_coordinators_host_port  = 10401
+    }
+  ]
+  
+  whales= [
+    for i in range(var.whale_count):{
+      duplicates = 1
+    }
+  ]
+  
+  fishes= [
+    for i in range(var.fish_count):{
+      duplicates = 1
+    }
+  ]
+  plain_node_count = 0
 
-  whale_count = var.whale_count
-  fish_count  = var.fish_count
 }

@@ -7,13 +7,13 @@ module Git_sha = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = string [@@deriving sexp, to_yojson, eq]
+      type t = string [@@deriving sexp, to_yojson, equal]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, to_yojson, eq]
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson, equal]
 
   let of_string s = s
 end
@@ -30,13 +30,13 @@ module Status = struct
           let padding =
             String.init (max_key_length - String.length s) ~f:(fun _ -> ' ')
           in
-          sprintf "%s: %s %s" s padding x )
+          sprintf "%s: %s %s" s padding x)
       |> String.concat ~sep:"\n"
     in
     title ^ "\n" ^ output ^ "\n"
 
   let summarize_report
-      {Perf_histograms.Report.values; intervals; overflow; underflow} =
+      { Perf_histograms.Report.values; intervals; overflow; underflow } =
     (* Show the largest 3 buckets *)
     let zipped = List.zip_exn values intervals in
     let best =
@@ -47,7 +47,7 @@ module Status = struct
       List.map best ~f:(fun (v, (lo, hi)) ->
           Printf.sprintf
             !"(%{sexp: Time.Span.t}, %{sexp: Time.Span.t}): %d"
-            lo hi v )
+            lo hi v)
     in
     let total = List.sum (module Int) values ~f:Fn.id in
     List.fold msgs
@@ -58,21 +58,22 @@ module Status = struct
 
   module Rpc_timings = struct
     module Rpc_pair = struct
-      type 'a t = {dispatch: 'a; impl: 'a}
+      type 'a t = { dispatch : 'a; impl : 'a }
       [@@deriving to_yojson, bin_io_unversioned, fields]
     end
 
     type t =
-      { get_staged_ledger_aux: Perf_histograms.Report.t option Rpc_pair.t
-      ; answer_sync_ledger_query: Perf_histograms.Report.t option Rpc_pair.t
-      ; get_ancestry: Perf_histograms.Report.t option Rpc_pair.t
-      ; get_transition_chain_proof: Perf_histograms.Report.t option Rpc_pair.t
-      ; get_transition_chain: Perf_histograms.Report.t option Rpc_pair.t }
+      { get_staged_ledger_aux : Perf_histograms.Report.t option Rpc_pair.t
+      ; answer_sync_ledger_query : Perf_histograms.Report.t option Rpc_pair.t
+      ; get_ancestry : Perf_histograms.Report.t option Rpc_pair.t
+      ; get_transition_chain_proof : Perf_histograms.Report.t option Rpc_pair.t
+      ; get_transition_chain : Perf_histograms.Report.t option Rpc_pair.t
+      }
     [@@deriving to_yojson, bin_io_unversioned, fields]
 
     let to_text s =
       let entries =
-        let add_rpcs ~name {Rpc_pair.dispatch; impl} acc =
+        let add_rpcs ~name { Rpc_pair.dispatch; impl } acc =
           let name k =
             let go s = sprintf "%s (%s)" name s in
             match k with `Dispatch -> go "dispatch" | `Impl -> go "impl"
@@ -90,14 +91,14 @@ module Status = struct
         let f x = Field.get x s in
         Fields.fold ~init:[]
           ~get_staged_ledger_aux:(fun acc x ->
-            add_rpcs ~name:"Get Staged Ledger Aux" (f x) acc )
+            add_rpcs ~name:"Get Staged Ledger Aux" (f x) acc)
           ~answer_sync_ledger_query:(fun acc x ->
-            add_rpcs ~name:"Answer Sync Ledger Query" (f x) acc )
+            add_rpcs ~name:"Answer Sync Ledger Query" (f x) acc)
           ~get_ancestry:(fun acc x -> add_rpcs ~name:"Get Ancestry" (f x) acc)
           ~get_transition_chain_proof:(fun acc x ->
-            add_rpcs ~name:"Get transition chain proof" (f x) acc )
+            add_rpcs ~name:"Get transition chain proof" (f x) acc)
           ~get_transition_chain:(fun acc x ->
-            add_rpcs ~name:"Get transition chain" (f x) acc )
+            add_rpcs ~name:"Get transition chain" (f x) acc)
         |> List.rev
       in
       digest_entries ~title:"RPCs" entries
@@ -105,12 +106,13 @@ module Status = struct
 
   module Histograms = struct
     type t =
-      { rpc_timings: Rpc_timings.t
-      ; external_transition_latency: Perf_histograms.Report.t option
-      ; accepted_transition_local_latency: Perf_histograms.Report.t option
-      ; accepted_transition_remote_latency: Perf_histograms.Report.t option
-      ; snark_worker_transition_time: Perf_histograms.Report.t option
-      ; snark_worker_merge_time: Perf_histograms.Report.t option }
+      { rpc_timings : Rpc_timings.t
+      ; external_transition_latency : Perf_histograms.Report.t option
+      ; accepted_transition_local_latency : Perf_histograms.Report.t option
+      ; accepted_transition_remote_latency : Perf_histograms.Report.t option
+      ; snark_worker_transition_time : Perf_histograms.Report.t option
+      ; snark_worker_merge_time : Perf_histograms.Report.t option
+      }
     [@@deriving to_yojson, bin_io_unversioned, fields]
 
     let to_text s =
@@ -118,13 +120,13 @@ module Status = struct
         let f x = Field.get x s in
         Fields.fold ~init:[]
           ~rpc_timings:(fun acc x ->
-            ("RPC Timings", Rpc_timings.to_text (f x)) :: acc )
+            ("RPC Timings", Rpc_timings.to_text (f x)) :: acc)
           ~external_transition_latency:(fun acc x ->
             match f x with
             | None ->
                 acc
             | Some report ->
-                ("Block Latencies (hist.)", summarize_report report) :: acc )
+                ("Block Latencies (hist.)", summarize_report report) :: acc)
           ~accepted_transition_local_latency:(fun acc x ->
             match f x with
             | None ->
@@ -132,7 +134,7 @@ module Status = struct
             | Some report ->
                 ( "Accepted local block Latencies (hist.)"
                 , summarize_report report )
-                :: acc )
+                :: acc)
           ~accepted_transition_remote_latency:(fun acc x ->
             match f x with
             | None ->
@@ -140,42 +142,42 @@ module Status = struct
             | Some report ->
                 ( "Accepted remote block Latencies (hist.)"
                 , summarize_report report )
-                :: acc )
+                :: acc)
           ~snark_worker_transition_time:(fun acc x ->
             match f x with
             | None ->
                 acc
             | Some report ->
-                ("Snark Worker a->b (hist.)", summarize_report report) :: acc
-            )
+                ("Snark Worker a->b (hist.)", summarize_report report) :: acc)
           ~snark_worker_merge_time:(fun acc x ->
             match f x with
             | None ->
                 acc
             | Some report ->
-                ("Snark Worker Merge (hist.)", summarize_report report) :: acc
-            )
+                ("Snark Worker Merge (hist.)", summarize_report report) :: acc)
       in
       digest_entries ~title:"Performance Histograms" entries
   end
 
   module Next_producer_timing = struct
     type slot =
-      { slot: Mina_numbers.Global_slot.Stable.Latest.t
-      ; global_slot_since_genesis: Mina_numbers.Global_slot.Stable.Latest.t }
+      { slot : Mina_numbers.Global_slot.Stable.Latest.t
+      ; global_slot_since_genesis : Mina_numbers.Global_slot.Stable.Latest.t
+      }
     [@@deriving to_yojson, fields, bin_io_unversioned]
 
     (* time is the start-time of for_slot.slot*)
-    type producing_time = {time: Block_time.Stable.Latest.t; for_slot: slot}
+    type producing_time = { time : Block_time.Stable.Latest.t; for_slot : slot }
     [@@deriving to_yojson, bin_io_unversioned, fields]
 
     type timing =
       | Check_again of Block_time.Stable.Latest.t
       | Produce of producing_time
       | Produce_now of producing_time
+      | Evaluating_vrf of Mina_numbers.Global_slot.Stable.Latest.t
     [@@deriving to_yojson, bin_io_unversioned]
 
-    type t = {generated_from_consensus_at: slot; timing: timing}
+    type t = { generated_from_consensus_at : slot; timing : timing }
     [@@deriving to_yojson, bin_io_unversioned]
   end
 
@@ -208,7 +210,7 @@ module Status = struct
           let list_str =
             if len > 0 then " " ^ List.to_string ~f:to_string list else ""
           in
-          Printf.sprintf "%d%s" len list_str )
+          Printf.sprintf "%d%s" len list_str)
 
     let num_accounts = int_option_entry "Global number of accounts"
 
@@ -221,7 +223,7 @@ module Status = struct
 
     let uptime_secs =
       map_entry "Local uptime" ~f:(fun secs ->
-          Time.Span.to_string (Time.Span.of_int_sec secs) )
+          Time.Span.to_string (Time.Span.of_int_sec secs))
 
     let ledger_merkle_root = string_option_entry "Ledger Merkle root"
 
@@ -255,7 +257,7 @@ module Status = struct
         | None ->
             "Block producer"
         | Some pk ->
-            pk )
+            pk)
 
     let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
@@ -268,7 +270,7 @@ module Status = struct
               (* TODO: We will temporarily have to create a time controller
                   until the inversion relationship between GraphQL and the RPC code inverts *)
               Block_time.now
-              @@ Block_time.Controller.basic ~logger:(Logger.create ())
+              @@ Block_time.Controller.basic ~logger:(Logger.null ())
             in
             let diff = diff time current_time in
             if Block_time.(time > current_time) then
@@ -289,11 +291,15 @@ module Status = struct
           | Check_again time ->
               sprintf "None this epoch… checking at %s (%s)" (str time)
                 generated_from
-          | Produce {time; for_slot} ->
+          | Evaluating_vrf last_checked_slot ->
+              sprintf "Evaluating VRF… Last checked global slot %s (%s)"
+                (Mina_numbers.Global_slot.to_string last_checked_slot)
+                generated_from
+          | Produce { time; for_slot } ->
               sprintf "%s for %s (%s)" (str time) (slot_str for_slot)
                 generated_from
-          | Produce_now {for_slot; _} ->
-              sprintf "Now (for %s %s)" (slot_str for_slot) generated_from )
+          | Produce_now { for_slot; _ } ->
+              sprintf "Now (for %s %s)" (slot_str for_slot) generated_from)
 
     let consensus_time_best_tip =
       option_entry "Best tip consensus time"
@@ -333,7 +339,7 @@ module Status = struct
 
     let addrs_and_ports =
       let render conf =
-        let fmt_field name op field = [(name, op (Field.get field conf))] in
+        let fmt_field name op field = [ (name, op (Field.get field conf)) ] in
         Node_addrs_and_ports.Display.Stable.V1.Fields.to_list
           ~external_ip:(fmt_field "External IP" Fn.id)
           ~bind_ip:(fmt_field "Bind IP" Fn.id)
@@ -343,9 +349,9 @@ module Status = struct
             let peer = Field.get field conf in
             match peer with
             | Some peer ->
-                [("Libp2p PeerID", peer.peer_id)]
+                [ ("Libp2p PeerID", peer.peer_id) ]
             | None ->
-                [] )
+                [])
         |> List.concat
         |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
         |> digest_entries ~title:""
@@ -376,47 +382,48 @@ module Status = struct
               | Wait_for_parent ->
                   "Waiting for parent to finish"
             in
-            ("\t" ^ s, Int.to_string n) )
+            ("\t" ^ s, Int.to_string n))
         |> digest_entries ~title:""
       in
       option_entry "Catchup status" ~f:render
   end
 
   type t =
-    { num_accounts: int option
-    ; blockchain_length: int option
-    ; highest_block_length_received: int
-    ; highest_unvalidated_block_length_received: int
-    ; uptime_secs: int
-    ; ledger_merkle_root: string option
-    ; state_hash: string option
-    ; chain_id: string
-    ; commit_id: Git_sha.Stable.Latest.t
-    ; conf_dir: string
-    ; peers: Network_peer.Peer.Display.Stable.Latest.t list
-    ; user_commands_sent: int
-    ; snark_worker: string option
-    ; snark_work_fee: int
-    ; sync_status: Sync_status.Stable.Latest.t
-    ; catchup_status:
+    { num_accounts : int option
+    ; blockchain_length : int option
+    ; highest_block_length_received : int
+    ; highest_unvalidated_block_length_received : int
+    ; uptime_secs : int
+    ; ledger_merkle_root : string option
+    ; state_hash : string option
+    ; chain_id : string
+    ; commit_id : Git_sha.Stable.Latest.t
+    ; conf_dir : string
+    ; peers : Network_peer.Peer.Display.Stable.Latest.t list
+    ; user_commands_sent : int
+    ; snark_worker : string option
+    ; snark_work_fee : int
+    ; sync_status : Sync_status.Stable.Latest.t
+    ; catchup_status :
         (Transition_frontier.Full_catchup_tree.Node.State.Enum.t * int) list
         option
-    ; block_production_keys: string list
-    ; coinbase_receiver: string option
-    ; histograms: Histograms.t option
-    ; consensus_time_best_tip:
+    ; block_production_keys : string list
+    ; coinbase_receiver : string option
+    ; histograms : Histograms.t option
+    ; consensus_time_best_tip :
         Consensus.Data.Consensus_time.Stable.Latest.t option
-    ; global_slot_since_genesis_best_tip: int option
-    ; next_block_production: Next_producer_timing.t option
-    ; consensus_time_now: Consensus.Data.Consensus_time.Stable.Latest.t
-    ; consensus_mechanism: string
-    ; consensus_configuration: Consensus.Configuration.Stable.Latest.t
-    ; addrs_and_ports: Node_addrs_and_ports.Display.Stable.Latest.t }
+    ; global_slot_since_genesis_best_tip : int option
+    ; next_block_production : Next_producer_timing.t option
+    ; consensus_time_now : Consensus.Data.Consensus_time.Stable.Latest.t
+    ; consensus_mechanism : string
+    ; consensus_configuration : Consensus.Configuration.Stable.Latest.t
+    ; addrs_and_ports : Node_addrs_and_ports.Display.Stable.Latest.t
+    }
   [@@deriving to_yojson, bin_io_unversioned, fields]
 
   let entries (s : t) =
     let module M = Make_entries (struct
-      type nonrec 'a t = ([`Read | `Set_and_create], t, 'a) Field.t_with_perm
+      type nonrec 'a t = ([ `Read | `Set_and_create ], t, 'a) Field.t_with_perm
 
       let get field = Field.get field s
     end) in

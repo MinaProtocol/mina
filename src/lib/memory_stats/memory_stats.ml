@@ -12,16 +12,18 @@ let ocaml_memory_stats () =
   ; ("max_heap_size_bytes", `Int (stat.top_heap_words * bytes_per_word))
   ; ("live_size_bytes", `Int (stat.live_words * bytes_per_word))
   ; ("live_blocks", `Int stat.live_blocks)
-  ; ("fragments", `Int stat.fragments) ]
+  ; ("fragments", `Int stat.fragments)
+  ]
 
 let jemalloc_memory_stats () =
-  let {Jemalloc.active; resident; allocated; mapped} =
+  let { Jemalloc.active; resident; allocated; mapped } =
     Jemalloc.get_memory_stats ()
   in
   [ ("active", `Int active)
   ; ("resident", `Int resident)
   ; ("allocated", `Int allocated)
-  ; ("mapped", `Int mapped) ]
+  ; ("mapped", `Int mapped)
+  ]
 
 let log_memory_stats logger ~process =
   don't_wait_for
@@ -32,9 +34,9 @@ let log_memory_stats logger ~process =
              run major GCs often enough, which means the finalizers don't run
              and we use way too much memory. As a band-aid solution, we run a
              major GC cycle every ten minutes.
-      *)
+     *)
      let gc_method =
-       Option.value ~default:"full" @@ Unix.getenv "CODA_GC_HACK_MODE"
+       Option.value ~default:"full" @@ Unix.getenv "MINA_GC_HACK_MODE"
      in
      (* Doing Gc.major is known to work, but takes quite a bit of time.
              Running a single slice might be sufficient, but I haven't tested it
@@ -47,15 +49,15 @@ let log_memory_stats logger ~process =
            fun () -> ignore (Gc.major_slice 0)
        | other ->
            failwithf
-             "CODA_GC_HACK_MODE was %s, it should be full or slice. Default \
-              is full."
+             "MINA_GC_HACK_MODE was %s, it should be full or slice. Default is \
+              full."
              other
      in
      let interval =
        Time.Span.of_sec
        @@ Option.(
             value ~default:600.
-              (map ~f:Float.of_string @@ Unix.getenv "CODA_GC_HACK_INTERVAL"))
+              (map ~f:Float.of_string @@ Unix.getenv "MINA_GC_HACK_INTERVAL"))
      in
      let log_stats suffix =
        let proc = ("process", `String process) in

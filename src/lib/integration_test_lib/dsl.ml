@@ -19,7 +19,7 @@ let broadcast_pipe_fold_until_with_timeout reader ~timeout_duration
                 true
             | `Continue x ->
                 acc := x ;
-                false ) )
+                false ))
   in
   match%map Timeout.await () ~timeout_duration read_deferred with
   | `Ok () ->
@@ -40,18 +40,22 @@ module Make (Engine : Intf.Engine.S) () :
 
   (* TODO: monadify as Malleable_error w/ global value threading *)
   type t =
-    { logger: Logger.t
-    ; network: Engine.Network.t
-    ; event_router: Event_router.t
-    ; network_state_reader: Network_state.t Broadcast_pipe.Reader.t }
+    { logger : Logger.t
+    ; network : Engine.Network.t
+    ; event_router : Event_router.t
+    ; network_state_reader : Network_state.t Broadcast_pipe.Reader.t
+    }
 
   let network_state t = Broadcast_pipe.Reader.peek t.network_state_reader
 
   let create ~logger ~network ~event_router ~network_state_reader =
-    let t = {logger; network; event_router; network_state_reader} in
+    let t = { logger; network; event_router; network_state_reader } in
     `Don't_call_in_tests t
 
-  let section = Malleable_error.contextualize
+  let section_hard = Malleable_error.contextualize
+
+  let section context m =
+    m |> Malleable_error.soften_error |> Malleable_error.contextualize context
 
   let hard_wait_for_network_state_predicate ~logger ~hard_timeout
       ~network_state_reader ~init ~check =
@@ -117,12 +121,11 @@ module Make (Engine : Intf.Engine.S) () :
       ~metadata:
         [ ( "soft_timeout"
           , `String
-              (Network_time_span.to_string ~constants condition.soft_timeout)
-          )
+              (Network_time_span.to_string ~constants condition.soft_timeout) )
         ; ( "hard_timeout"
           , `String
-              (Network_time_span.to_string ~constants condition.hard_timeout)
-          ) ] ;
+              (Network_time_span.to_string ~constants condition.hard_timeout) )
+        ] ;
     let%bind result =
       match condition.predicate with
       | Network_state_predicate (init, check) ->
@@ -142,7 +145,8 @@ module Make (Engine : Intf.Engine.S) () :
           (Error.of_list
              [ Error.createf "wait_for hit an error waiting for %s"
                  condition.description
-             ; error ])
+             ; error
+             ])
     | `Success ->
         let soft_timeout_was_met =
           Time.(add start_time soft_timeout >= now ())
@@ -163,58 +167,61 @@ module Make (Engine : Intf.Engine.S) () :
   type log_error = Node.t * Event_type.Log_error.t
 
   type log_error_accumulator =
-    { warn: log_error DynArray.t
-    ; error: log_error DynArray.t
-    ; faulty_peer: log_error DynArray.t
-    ; fatal: log_error DynArray.t }
+    { warn : log_error DynArray.t
+    ; error : log_error DynArray.t
+    ; faulty_peer : log_error DynArray.t
+    ; fatal : log_error DynArray.t
+    }
 
   let empty_log_error_accumulator () =
-    { warn= DynArray.create ()
-    ; error= DynArray.create ()
-    ; faulty_peer= DynArray.create ()
-    ; fatal= DynArray.create () }
+    { warn = DynArray.create ()
+    ; error = DynArray.create ()
+    ; faulty_peer = DynArray.create ()
+    ; fatal = DynArray.create ()
+    }
 
   let watch_log_errors ~logger ~event_router ~on_fatal_error =
     let log_error_accumulator = empty_log_error_accumulator () in
     ignore
-      (Event_router.on event_router Event_type.Log_error
-         ~f:(fun node message ->
-           let open Logger.Message in
-           let acc =
-             match message.level with
-             | Warn ->
-                 log_error_accumulator.warn
-             | Error ->
-                 log_error_accumulator.error
-             | Faulty_peer ->
-                 log_error_accumulator.faulty_peer
-             | Fatal ->
-                 log_error_accumulator.fatal
-             | _ ->
-                 failwith "unexpected log level encountered"
-           in
-           DynArray.add acc (node, message) ;
-           if message.level = Fatal then (
-             [%log fatal] "Error occured $error"
-               ~metadata:[("error", Logger.Message.to_yojson message)] ;
-             on_fatal_error message ) ;
-           Deferred.return `Continue )) ;
+      ( Event_router.on event_router Event_type.Log_error
+          ~f:(fun node message ->
+            let open Logger.Message in
+            let acc =
+              match message.level with
+              | Warn ->
+                  log_error_accumulator.warn
+              | Error ->
+                  log_error_accumulator.error
+              | Faulty_peer ->
+                  log_error_accumulator.faulty_peer
+              | Fatal ->
+                  log_error_accumulator.fatal
+              | _ ->
+                  failwith "unexpected log level encountered"
+            in
+            DynArray.add acc (node, message) ;
+            if Logger.Level.equal message.level Fatal then (
+              [%log fatal] "Error occured $error"
+                ~metadata:[ ("error", Logger.Message.to_yojson message) ] ;
+              on_fatal_error message ) ;
+            Deferred.return `Continue)
+        : 'a Event_router.event_subscription ) ;
     log_error_accumulator
 
-  let lift_accumulated_log_errors {warn; faulty_peer; error; fatal} =
+  let lift_accumulated_log_errors { warn; faulty_peer; error; fatal } =
     let open Test_error in
     let lift error_array =
       DynArray.to_list error_array
       |> List.map ~f:(fun (node, message) ->
-             {node_id= Node.id node; error_message= message} )
+             { node_id = Node.id node; error_message = message })
     in
-    let time_of_error {error_message; _} = error_message.timestamp in
+    let time_of_error { error_message; _ } = error_message.timestamp in
     let accumulate_errors =
       List.fold ~init:Error_accumulator.empty ~f:(fun acc error ->
           Error_accumulator.add_to_context acc error.node_id error
-            ~time_of_error )
+            ~time_of_error)
     in
     let soft_errors = accumulate_errors (lift warn @ lift faulty_peer) in
     let hard_errors = accumulate_errors (lift error @ lift fatal) in
-    {Set.soft_errors; hard_errors}
+    { Set.soft_errors; hard_errors }
 end
