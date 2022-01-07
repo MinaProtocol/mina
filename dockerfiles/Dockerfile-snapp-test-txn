@@ -20,17 +20,7 @@ RUN apt-get -y update \
         curl \
         jq \
         dumb-init \
-        libssl1.1 \
-        libgomp1 \
-        libpq-dev \
-        apt-transport-https \
-        ca-certificates \
-        dnsutils \
-        tzdata \
-        postgresql \
-        postgresql-contrib \
         apt-utils \
-        procps \
         man \
     && rm -rf /var/lib/apt/lists/*
 
