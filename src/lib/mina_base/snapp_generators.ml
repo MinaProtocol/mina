@@ -293,17 +293,23 @@ let gen_balance_change ?balances_tbl (account : Account.t) =
       in
       Currency.Signed_poly.{ magnitude; sgn = Sgn.Neg }
 
-(* the type a is associated with the balance_change field, which is an unsigned fee for the fee payer,
-   and a signed amount for other parties
+let gen_use_full_commitment : bool Base_quickcheck.Generator.t =
+  Bool.quickcheck_generator
+
+(* The type `a` is associated with the `delta` field, which is an unsigned fee
+   for the fee payer, and a signed amount for other parties.
+   The type `b` is associated with the `use_full_commitment` field, which is
+   `unit` for the fee payer, and `bool` for other parties.
 *)
 let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
     ?(snapp_account = false) ?(is_fee_payer = false) ?available_public_keys
     ?permissions_auth ?(required_balance_change : a option)
     ?(required_balance : Currency.Balance.t option)
     ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
+    ~(gen_use_full_commitment : b Quickcheck.Generator.t)
     ~(f_balance_change : a -> Currency.Amount.Signed.t) ~(increment_nonce : b)
     ~ledger () :
-    (_, _, _, a, _, _, _, b) Party.Body.Poly.t Quickcheck.Generator.t =
+    (_, _, _, a, _, _, _, b, _) Party.Body.Poly.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   (* ledger may contain non-Snapp accounts, so if we need a Snapp account,
      must generate a new one
@@ -484,9 +490,12 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
   let%bind sequence_events =
     field_array_list_gen ~max_array_len:4 ~max_list_len:6
   in
-  let%map call_data = Snark_params.Tick.Field.gen in
+  let%bind call_data = Snark_params.Tick.Field.gen in
   (* update the depth when generating `other_parties` in Parties.t *)
   let call_depth = 0 in
+  let protocol_state = Snapp_predicate.Protocol_state.accept in
+
+  let%map use_full_commitment = gen_use_full_commitment in
   { Party.Body.Poly.pk
   ; update
   ; token_id
@@ -496,6 +505,8 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
   ; sequence_events
   ; call_data
   ; call_depth
+  ; protocol_state
+  ; use_full_commitment
   }
 
 let gen_predicated_from ?(succeed = true) ?(new_account = false)
@@ -508,7 +519,7 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false)
       ?permissions_auth ?available_public_keys ?required_balance_change
       ?required_balance ~ledger ~balances_tbl
       ~gen_balance_change:(gen_balance_change ~balances_tbl)
-      ~f_balance_change:Fn.id ()
+      ~f_balance_change:Fn.id () ~gen_use_full_commitment
   in
   let account_id =
     Account_id.create body.Party.Body.Poly.pk body.Party.Body.Poly.token_id
@@ -549,19 +560,6 @@ let gen_party_from ?(succeed = true) ?(new_account = false) ?permissions_auth
   in
   return { Party.data; authorization }
 
-(* takes an optional account id, if we want to sign this data *)
-let gen_party_predicated_signed ?account_id ?permissions_auth ~ledger :
-    Party.Predicated.Signed.t Quickcheck.Generator.t =
-  let open Quickcheck.Let_syntax in
-  let%bind body =
-    gen_party_body ~gen_balance_change ~f_balance_change:Fn.id ?account_id
-      ?permissions_auth
-      ~increment_nonce:(Option.is_some account_id)
-      ~ledger ()
-  in
-  let%map predicate = Account.Nonce.gen in
-  Party.Predicated.Poly.{ body; predicate }
-
 (* takes an account id, if we want to sign this data *)
 let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger :
     Party.Predicated.Fee_payer.t Quickcheck.Generator.t =
@@ -569,25 +567,30 @@ let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger :
   let%map body0 =
     gen_party_body ?permissions_auth ~account_id ~is_fee_payer:true
       ~increment_nonce:() ~gen_balance_change:gen_fee
-      ~f_balance_change:fee_to_amt ~ledger ()
+      ~f_balance_change:fee_to_amt ~gen_use_full_commitment:(return ()) ~ledger ()
   in
   (* make sure the fee payer's token id is the default,
      which is represented by the unit value in the body
   *)
   assert (Token_id.equal body0.token_id Token_id.default) ;
   let body = { body0 with token_id = () } in
-  let predicate = Account.Nonce.zero in
-  Party.Predicated.Poly.{ body; predicate }
-
-let gen_party_signed ?permissions_auth ?account_id ~ledger :
-    Party.Signed.t Quickcheck.Generator.t =
-  let open Quickcheck.Let_syntax in
-  let%map data =
-    gen_party_predicated_signed ?permissions_auth ?account_id ~ledger
+  (* use nonce from account in ledger *)
+  let pk = body.pk in
+  let account_id = Account_id.create pk Token_id.default in
+  let account =
+    match Ledger.location_of_account ledger account_id with
+    | None ->
+        failwith
+          "gen_party_predicated_fee_payer: expected account to be in ledger"
+    | Some loc -> (
+        match Ledger.get ledger loc with
+        | None ->
+            failwith "gen_party_predicated_fee_payer: no account at location"
+        | Some account ->
+            account )
   in
-  (* real signature to be added when this data inserted into a Parties.t *)
-  let authorization = Signature.dummy in
-  Party.Signed.{ data; authorization }
+  let predicate = account.nonce in
+  Party.Predicated.Poly.{ body; predicate }
 
 let gen_fee_payer ?permissions_auth ~account_id ~ledger () :
     Party.Fee_payer.t Quickcheck.Generator.t =
@@ -605,7 +608,7 @@ let gen_parties_from ?(succeed = true)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t)
-    ~ledger ~protocol_state () =
+    ~ledger () =
   let open Quickcheck.Let_syntax in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
@@ -728,7 +731,7 @@ let gen_parties_from ?(succeed = true)
   let%bind memo = Signed_command_memo.gen in
   let memo_hash = Signed_command_memo.hash memo in
   let parties_dummy_signatures : Parties.t =
-    { fee_payer; other_parties; protocol_state; memo }
+    { fee_payer; other_parties; memo }
   in
   (* replace dummy signature in fee payer *)
   let fee_payer_signature =
@@ -752,7 +755,7 @@ let gen_parties_from ?(succeed = true)
   in
   let protocol_state_predicate_hash =
     Snapp_predicate.Protocol_state.digest
-      parties_dummy_signatures.protocol_state
+      parties_dummy_signatures.fee_payer.data.body.protocol_state
   in
   let sign_for_other_party sk =
     Signature_lib.Schnorr.sign sk

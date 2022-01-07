@@ -238,7 +238,6 @@ module Stable = struct
     type t =
       { fee_payer : Party.Fee_payer.Stable.V1.t
       ; other_parties : Party.Stable.V1.t list
-      ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
       ; memo : Signed_command_memo.Stable.V1.t
       }
     [@@deriving sexp, compare, equal, hash, yojson]
@@ -274,7 +273,7 @@ let check_depths (t : t) =
     true
   with _ -> false
 
-let check (t : t) = check_depths t
+let check (t : t) : bool = check_depths t
 
 let parties (t : t) : Party.t list =
   let p = t.fee_payer in
@@ -300,7 +299,7 @@ let fee_excess (t : t) =
 let accounts_accessed (t : t) =
   List.map (parties t) ~f:(fun p ->
       Account_id.create p.data.body.pk p.data.body.token_id)
-  |> List.dedup_and_sort ~compare:Account_id.compare
+  |> List.stable_dedup
 
 let fee_payer_pk (t : t) = t.fee_payer.data.body.pk
 
@@ -385,7 +384,6 @@ module Verifiable = struct
         ; other_parties :
             Pickles.Side_loaded.Verification_key.Stable.V1.t option
             Party_or_stack.With_hashes.Stable.V1.t
-        ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
         ; memo : Signed_command_memo.Stable.V1.t
         }
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -399,17 +397,8 @@ let of_verifiable (t : Verifiable.t) : t =
   { fee_payer = t.fee_payer
   ; other_parties =
       List.map ~f:fst (Party_or_stack.to_parties_list t.other_parties)
-  ; protocol_state = t.protocol_state
   ; memo = t.memo
   }
-
-let valid_interval (t : t) =
-  let open Snapp_predicate.Closed_interval in
-  match t.protocol_state.global_slot_since_genesis with
-  | Ignore ->
-      Mina_numbers.Global_slot.{ lower = zero; upper = max_value }
-  | Check i ->
-      i
 
 module Transaction_commitment = struct
   module Stable = Zexe_backend.Pasta.Fp.Stable [@deriving sexp]
@@ -446,7 +435,8 @@ let commitment (t : t) : Transaction_commitment.t =
     ~other_parties_hash:
       (Party_or_stack.With_hashes.other_parties_hash t.other_parties)
     ~protocol_state_predicate_hash:
-      (Snapp_predicate.Protocol_state.digest t.protocol_state)
+      (Snapp_predicate.Protocol_state.digest
+         t.fee_payer.data.body.protocol_state)
     ~memo_hash:(Signed_command_memo.hash t.memo)
 
 (** This module defines weights for each component of a `Parties.t` element. *)
@@ -457,18 +447,15 @@ module Weight = struct
 
   let other_parties : Party.t list -> int = List.sum (module Int) ~f:party
 
-  let protocol_state : Snapp_predicate.Protocol_state.t -> int = fun _ -> 0
-
   let memo : Signed_command_memo.t -> int = fun _ -> 0
 end
 
 let weight (parties : t) : int =
-  let { fee_payer; other_parties; protocol_state; memo } = parties in
+  let { fee_payer; other_parties; memo } = parties in
   List.sum
     (module Int)
     ~f:Fn.id
     [ Weight.fee_payer fee_payer
     ; Weight.other_parties other_parties
-    ; Weight.protocol_state protocol_state
     ; Weight.memo memo
     ]

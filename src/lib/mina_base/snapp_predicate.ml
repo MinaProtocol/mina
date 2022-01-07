@@ -502,6 +502,8 @@ module Account = struct
     ; proved_state = Ignore
     }
 
+  let is_accept : t -> bool = equal accept
+
   let to_input
       ({ balance
        ; nonce
@@ -705,7 +707,7 @@ end
 
 module Protocol_state = struct
   (* On each numeric field, you may assert a range
-      On each hash field, you may assert an equality
+     On each hash field, you may assert an equality
   *)
 
   module Epoch_data = struct

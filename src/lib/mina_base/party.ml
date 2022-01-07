@@ -376,7 +376,8 @@ module Body = struct
              , 'events
              , 'call_data
              , 'int
-             , 'bool )
+             , 'bool
+             , 'protocol_state )
              t =
           { pk : 'pk
           ; update : 'update
@@ -387,6 +388,8 @@ module Body = struct
           ; sequence_events : 'events
           ; call_data : 'call_data
           ; call_depth : 'int
+          ; protocol_state : 'protocol_state
+          ; use_full_commitment : 'bool
           }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
@@ -407,7 +410,8 @@ module Body = struct
         , Pickles.Backend.Tick.Field.Stable.V1.t array list
         , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
         , int
-        , bool )
+        , bool
+        , Snapp_predicate.Protocol_state.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -415,7 +419,7 @@ module Body = struct
     end
   end]
 
-  (* * Delta for the fee payer is always going to be Neg, so represent it using
+  (* * Balance change for the fee payer is always going to be Neg, so represent it using
        an unsigned fee,
      * token id is always going to be the default, so use unit value as a
        placeholder,
@@ -434,7 +438,8 @@ module Body = struct
           , Pickles.Backend.Tick.Field.Stable.V1.t array list
           , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
           , int
-          , unit )
+          , unit
+          , Snapp_predicate.Protocol_state.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -452,6 +457,8 @@ module Body = struct
       ; sequence_events = []
       ; call_data = Field.zero
       ; call_depth = 0
+      ; protocol_state = Snapp_predicate.Protocol_state.accept
+      ; use_full_commitment = ()
       }
   end
 
@@ -463,6 +470,7 @@ module Body = struct
         }
     ; token_id = Token_id.default
     ; increment_nonce = true
+    ; use_full_commitment = true
     }
 
   module Checked = struct
@@ -474,7 +482,8 @@ module Body = struct
       , Events.var
       , Field.Var.t
       , int As_prover.Ref.t
-      , Boolean.var )
+      , Boolean.var
+      , Snapp_predicate.Protocol_state.Checked.t )
       Poly.t
 
     let to_input
@@ -487,6 +496,8 @@ module Body = struct
          ; sequence_events
          ; call_data
          ; call_depth = _depth (* ignored *)
+         ; protocol_state
+         ; use_full_commitment
          } :
           t) =
       List.reduce_exn ~f:Random_oracle_input.append
@@ -498,6 +509,8 @@ module Body = struct
         ; Events.var_to_input events
         ; Events.var_to_input sequence_events
         ; Random_oracle_input.field call_data
+        ; Snapp_predicate.Protocol_state.Checked.to_input protocol_state
+        ; Random_oracle_input.bitstring [ use_full_commitment ]
         ]
 
     let digest (t : t) =
@@ -517,6 +530,8 @@ module Body = struct
       ; Events.typ
       ; Field.typ
       ; Typ.Internal.ref ()
+      ; Snapp_predicate.Protocol_state.typ
+      ; Impl.Boolean.typ
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -531,6 +546,8 @@ module Body = struct
     ; sequence_events = []
     ; call_data = Field.zero
     ; call_depth = 0
+    ; protocol_state = Snapp_predicate.Protocol_state.accept
+    ; use_full_commitment = false
     }
 
   let to_input
@@ -543,6 +560,8 @@ module Body = struct
        ; sequence_events
        ; call_data
        ; call_depth = _ (* ignored *)
+       ; protocol_state
+       ; use_full_commitment
        } :
         t) =
     List.reduce_exn ~f:Random_oracle_input.append
@@ -554,6 +573,8 @@ module Body = struct
       ; Events.to_input events
       ; Events.to_input sequence_events
       ; Random_oracle_input.field call_data
+      ; Snapp_predicate.Protocol_state.to_input protocol_state
+      ; Random_oracle_input.bitstring [ use_full_commitment ]
       ]
 
   let digest (t : t) =
@@ -876,3 +897,6 @@ let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
     the funds made available by previous parties in the same transaction.
 *)
 let balance_change (t : t) : Amount.Signed.t = t.data.body.balance_change
+
+let protocol_state (t : t) : Snapp_predicate.Protocol_state.t =
+  t.data.body.protocol_state

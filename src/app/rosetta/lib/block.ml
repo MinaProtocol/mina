@@ -356,9 +356,7 @@ WITH RECURSIVE chain AS (
 
       let created_token t = t.created_token
 
-      let typ =
-        let open Mina_caqti.Type_spec in
-        let spec =
+      let typ = Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
           Caqti_type.
             [ string
             ; string
@@ -368,10 +366,6 @@ WITH RECURSIVE chain AS (
             ; option int64
             ; option int64
             ; option int64 ]
-        in
-        let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-        let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
-        Caqti_type.custom ~encode ~decode (to_rep spec)
     end
 
     let typ =

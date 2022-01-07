@@ -414,6 +414,15 @@ val generate_transaction_witness :
   -> unit
 
 module Parties_segment : sig
+  module Spec : sig
+    type single =
+      { auth_type : Control.Tag.t
+      ; is_start : [ `Yes | `No | `Compute_in_circuit ]
+      }
+
+    type t = single list
+  end
+
   module Witness = Transaction_witness.Parties_segment_witness
 
   module Basic : sig
@@ -429,6 +438,8 @@ module Parties_segment : sig
         [@@deriving sexp, yojson]
       end
     end]
+
+    val to_single_list : t -> Spec.single list
   end
 end
 
@@ -542,6 +553,22 @@ val constraint_system_digests :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> unit
   -> (string * Md5.t) list
+
+(* Every circuit must have at least 1 of each type of constraint.
+   This function can be used to add the missing constraints *)
+val dummy_constraints : unit -> (unit, 'a) Tick.Checked.t
+
+module Base : sig
+  module Parties_snark : sig
+    val main :
+         ?witness:Parties_segment.Witness.t
+      -> Parties_segment.Spec.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
+      -> (int * Snapp_statement.Checked.t) list
+      -> Statement.With_sok.var
+      -> unit
+  end
+end
 
 module For_tests : sig
   val create_trivial_predicate_snapp :

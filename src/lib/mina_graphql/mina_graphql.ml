@@ -438,7 +438,7 @@ module Types = struct
 
   let account_timing : (Mina_lib.t, Account_timing.t option) typ =
     obj "AccountTiming" ~fields:(fun _ ->
-        [ field "initialMininumBalance" ~typ:uint64
+        [ field "initialMinimumBalance" ~typ:uint64
             ~doc:"The initial minimum balance for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -1630,15 +1630,11 @@ module Types = struct
                 in
                 List.map account_ids ~f:(fun acct_id ->
                     AccountObj.get_best_ledger_account coda acct_id))
-          ; field_no_status "fee" ~typ:uint64 ~args:[]
+          ; field_no_status "fee" ~typ:(non_null uint64) ~args:[]
               ~doc:
                 "Transaction fee paid by the fee-payer for the Snapp \
                  transaction" ~resolve:(fun _ parties ->
-                try
-                  Some
-                    ( Parties.fee parties.With_hash.data
-                    |> Currency.Fee.to_uint64 )
-                with _ -> None)
+                Parties.fee parties.With_hash.data |> Currency.Fee.to_uint64)
           ; field_no_status "feeToken" ~typ:(non_null token_id) ~args:[]
               ~doc:"Token used to pay the fee" ~resolve:(fun _ parties ->
                 Parties.fee_token parties.With_hash.data)
@@ -2389,190 +2385,6 @@ module Types = struct
             ; arg "timing" ~doc:"Timing info, or null if Keep" ~typ:snapp_timing
             ]
 
-      let snapp_party_body : (Party.Body.t, string) Result.t option arg_typ =
-        obj "PartyBody" ~doc:"Body component of a Snapp Party"
-          ~coerce:
-            (fun pk update_result token_id balance_change increment_nonce events
-                 sequence_events call_data call_depth ->
-            try
-              let open Result.Let_syntax in
-              let%bind pk =
-                Result.map_error
-                  (Public_key.Compressed.of_base58_check pk)
-                  ~f:Error.to_string_hum
-              in
-              let token_id = Token_id.of_string token_id in
-              let mk_field_arrays evs =
-                List.map evs ~f:(fun fields ->
-                    List.map fields ~f:Snark_params.Tick.Field.of_string
-                    |> Array.of_list)
-              in
-              let%bind update = update_result in
-              let%map balance_change = balance_change in
-              let events = mk_field_arrays events in
-              let sequence_events = mk_field_arrays sequence_events in
-              let call_data = Snark_params.Tick.Field.of_string call_data in
-              Party.Body.Poly.
-                { pk
-                ; update
-                ; token_id
-                ; increment_nonce
-                ; balance_change
-                ; events
-                ; sequence_events
-                ; call_data
-                ; call_depth
-                }
-            with exn -> Error (Exn.to_string exn))
-          ~fields:
-            [ arg "publicKey" ~doc:"Public key as a Base58Check string"
-                ~typ:(non_null string)
-            ; arg "update" ~doc:"Update part of the body"
-                ~typ:(non_null snapp_update)
-            ; arg "tokenId" ~doc:"Token id" ~typ:(non_null string)
-            ; arg "balance_change"
-                ~doc:
-                  "Signed amount representing the amount to change for this \
-                   particular relevant party."
-                ~typ:(non_null snapp_balance_change)
-            ; arg "incrementNonce" ~doc:"Whether to increment the nonce"
-                ~typ:(non_null bool)
-              (* TODO: Do we want fields in base58 in graphQL? Should we use a string of the base10 number like in other parts? Should we use a hex 32bytes -- that seems most natural to me? *)
-            ; arg "events"
-                ~doc:
-                  "A list of events emitted by the snapp. Each event is a list \
-                   of field elements, the particular meaning of each event is \
-                   determined by the snapp's internal logic."
-                ~typ:(non_null (list (non_null (list (non_null string)))))
-            ; arg "sequenceEvents"
-                ~doc:
-                  "A list of sequence events emitted by the snapp. Each event \
-                   is a list of field elements, the particular meaning of each \
-                   event is determined by the snapp's internal logic. A \
-                   commitment to these events is added to the sequenceState of \
-                   the snapp account for later use"
-                ~typ:(non_null (list (non_null (list (non_null string)))))
-            ; arg "callData"
-                ~doc:
-                  "A commitment to the arguments passed to the snapp and the \
-                   returned value, for internal use by the calling snapp. This \
-                   commitment is opaque to ensure that private data can be \
-                   passed between snapps without revealing it on chain."
-                ~typ:(non_null string)
-            ; arg "callDepth"
-                ~doc:
-                  "The number of nested snapp calls in the transaction before \
-                   reaching this party."
-                ~typ:(non_null int)
-            ]
-
-      let snapp_fee_payer_party_body =
-        obj "FeePayerPartyBody" ~doc:"Body component of a Snapp Fee Payer Party"
-          ~coerce:
-            (fun pk update_result fee events sequence_events call_data
-                 call_depth ->
-            try
-              let open Result.Let_syntax in
-              let%bind pk =
-                Result.map_error
-                  (Public_key.Compressed.of_base58_check pk)
-                  ~f:Error.to_string_hum
-              in
-              let token_id = () in
-              let increment_nonce = () in
-              let mk_field_arrays evs =
-                List.map evs ~f:(fun fields ->
-                    List.map fields ~f:Snark_params.Tick.Field.of_string
-                    |> Array.of_list)
-              in
-              let%map update = update_result in
-              let balance_change = fee in
-              let events = mk_field_arrays events in
-              let sequence_events = mk_field_arrays sequence_events in
-              let call_data = Snark_params.Tick.Field.of_string call_data in
-              let call_depth = Int.of_string call_depth in
-              { Party.Body.Poly.pk
-              ; update
-              ; token_id
-              ; balance_change
-              ; increment_nonce
-              ; events
-              ; sequence_events
-              ; call_data
-              ; call_depth
-              }
-            with exn -> Error (Exn.to_string exn))
-          ~fields:
-            [ arg "pk" ~doc:"Public key as a Base58Check string"
-                ~typ:(non_null string)
-            ; arg "update" ~doc:"Update part of the body"
-                ~typ:(non_null snapp_update)
-            ; arg "fee" ~doc:"Transaction fee" ~typ:(non_null fee)
-            ; arg "events" ~doc:"A list of list of fields in Base58Check"
-                ~typ:(non_null (list (non_null (list (non_null string)))))
-            ; arg "sequenceEvents"
-                ~doc:"A list of list of fields in Base58Check"
-                ~typ:(non_null (list (non_null (list (non_null string)))))
-            ; arg "callData" ~doc:"A field in Base58Check"
-                ~typ:(non_null string)
-            ; arg "callDepth" ~doc:"An integer in string format"
-                ~typ:(non_null string)
-            ]
-
-      let snapp_party_predicated_fee_payer :
-          (Party.Predicated.Fee_payer.t, string) Result.t option arg_typ =
-        obj "SnappPartyPredicatedFeePayer"
-          ~doc:"A party to a Snapp transaction with a nonce predicate"
-          ~coerce:(fun body nonce ->
-            let open Result.Let_syntax in
-            let%map body = body in
-            let predicate = nonce in
-            Party.Predicated.Poly.{ body; predicate })
-          ~fields:
-            [ arg "body" ~doc:"fee payer party"
-                ~typ:(non_null snapp_fee_payer_party_body)
-            ; arg "predicate" ~doc:"nonce" ~typ:(non_null nonce)
-            ]
-
-      let snapp_signature =
-        scalar "Signature" ~coerce:(fun signature ->
-            match signature with
-            | `String s ->
-                Result.map_error
-                  (Signature.of_base58_check s)
-                  ~f:Error.to_string_hum
-            | _ ->
-                Error "Expected signature as a string in Base58Check format")
-
-      (* TODO: define a type otherwise identical to Party.Fee_party.t, but
-         which makes the nonce optional
-      *)
-      let snapp_party_fee_payer =
-        obj "SnappPartyFeePayer"
-          ~doc:"A party to a Snapp transaction with a signature authorization"
-          ~coerce:(fun data authorization ->
-            let open Result.Let_syntax in
-            let%bind data = data in
-            Ok Party.Fee_payer.{ data; authorization })
-          ~fields:
-            [ arg "data" ~doc:"party with a signature and nonce predicate"
-                ~typ:(non_null snapp_party_predicated_fee_payer)
-            ; arg "authorization" ~doc:"signature"
-                ~typ:(non_null snapp_signature)
-            ]
-
-      (* like Party.Predicate.t with nullary constructors *)
-      type party_predicate = Full | Nonce | Accept
-
-      let snapp_predicate_enum =
-        enum "SnappPredicateConstructors"
-          ~doc:"Constructors for Snapp predicates"
-          ~values:
-            [ enum_value "Full" ~value:Full
-            ; enum_value "Nonce" ~value:Nonce
-            ; enum_value "Accept" ~value:Accept
-            ]
-
       let snapp_balance =
         scalar "Balance" ~coerce:(fun s ->
             try
@@ -2582,29 +2394,6 @@ module Types = struct
               | _ ->
                   Error "Expected balance as a string"
             with exn -> Error (Exn.to_string exn))
-
-      let snapp_receipt_chain_hash =
-        scalar "ReceiptChainHash" ~coerce:(fun s ->
-            try
-              match s with
-              | `String chain_hash ->
-                  Receipt.Chain_hash.of_base58_check chain_hash
-                  |> Result.map_error ~f:Error.to_string_hum
-              | _ ->
-                  Error "Expected balance as a string"
-            with exn -> Error (Exn.to_string exn))
-
-      let snapp_state =
-        obj "SnappState" ~doc:"Snapp state, a list of 8 field elements"
-          ~coerce:(fun element_results ->
-            let elements =
-              List.map ~f:Snapp_basic.Or_ignore.of_option element_results
-            in
-            if List.length elements = 8 then
-              (* length check means this won't raise *)
-              Ok (Snapp_state.V.of_list_exn elements)
-            else Error "Expected 8 elements for Snapp state")
-          ~fields:[ arg "elements" ~typ:(non_null (list field)) ]
 
       let snapp_global_slot =
         scalar "GlobalSlot" ~coerce:(fun amt ->
@@ -2639,123 +2428,6 @@ module Types = struct
 
         let token_id = i "TokenId" token_id_arg
       end
-
-      let snapp_predicate_account =
-        obj "SnappPredicateAccount"
-          ~coerce:
-            (fun balance nonce receipt_chain_hash public_key delegate
-                 state_result sequence_state proved_state ->
-            let open Result.Let_syntax in
-            let v o = Snapp_basic.Or_ignore.of_option o in
-            let%map state = state_result in
-            ( Snapp_predicate.Account.Poly.
-                { balance = v balance
-                ; nonce = v nonce
-                ; receipt_chain_hash = v receipt_chain_hash
-                ; public_key = v public_key
-                ; delegate = v delegate
-                ; state
-                ; sequence_state = v sequence_state
-                ; proved_state = v proved_state
-                }
-              : Snapp_predicate.Account.t ))
-          ~fields:
-            [ arg "balance" ~typ:Interval.balance
-            ; arg "nonce" ~typ:Interval.nonce
-            ; arg "receiptChainHash"
-                ~doc:"receipt chain hash, or null if Ignore"
-                ~typ:snapp_receipt_chain_hash
-            ; arg "publicKey" ~typ:public_key_arg
-            ; arg "delegate" ~typ:public_key_arg
-            ; arg "state" ~typ:(non_null snapp_state)
-            ; arg "sequenceState" ~typ:field
-            ; arg "provedState" ~typ:bool
-            ]
-
-      let snapp_predicate =
-        obj "SnappPredicate"
-          ~coerce:(fun account_opt nonce_opt ->
-            match (account_opt, nonce_opt) with
-            | None, None ->
-                Ok Party.Predicate.Accept
-            | Some account_result, None -> (
-                match account_result with
-                | Ok account ->
-                    Ok (Party.Predicate.Full account)
-                | Error err ->
-                    Error err )
-            | None, Some nonce ->
-                Ok (Party.Predicate.Nonce nonce)
-            | Some _, Some _ ->
-                Error
-                  "Ill-defined predicate. Account and nonce cannot both be \
-                   provided.")
-          ~fields:
-            [ arg "account"
-                ~doc:
-                  "The constraints that the account must satisfy in order for \
-                   this update to succeed. Snapps can use this field to assert \
-                   properties about the account."
-                ~typ:snapp_predicate_account
-            ; arg "nonce"
-                ~doc:
-                  "The constraints that the nonce must satisfy in order for \
-                   this update to succeed."
-                ~typ:nonce
-            ]
-
-      let snapp_party_predicated =
-        obj "SnappPartyPredicated"
-          ~coerce:(fun body_result predicate_result ->
-            let open Result.Let_syntax in
-            let%bind body = body_result in
-            let%bind predicate = predicate_result in
-            Ok Party.Predicated.Poly.{ body; predicate })
-          ~fields:
-            [ arg "body" ~doc:"Body of the party predicated"
-                ~typ:(non_null snapp_party_body)
-            ; arg "predicate" ~doc:"Predicate of the party predicated"
-                ~typ:(non_null snapp_predicate)
-            ]
-
-      let snapp_proof =
-        scalar "SnappProof" ~coerce:(fun proof ->
-            match proof with
-            | `String s ->
-                Pickles.Side_loaded.Proof.of_base64 s
-            | _ ->
-                Error "Expected Snapp proof as base64-encoded string")
-
-      let snapp_control =
-        obj "Control"
-          ~coerce:(fun proof_opt signature_opt ->
-            match (proof_opt, signature_opt) with
-            | Some proof, None ->
-                Ok (Control.Proof proof)
-            | None, Some signature ->
-                Ok (Control.Signature signature)
-            | Some _, Some _ ->
-                Error "Expected a proof or a signature, but not both"
-            | None, None ->
-                Ok Control.None_given)
-          ~fields:
-            [ arg "proof" ~typ:snapp_proof
-            ; arg "signature" ~typ:snapp_signature
-            ]
-
-      let snapp_party_arg =
-        obj "SnappParty" ~doc:"A party to a Snapp transaction"
-          ~coerce:(fun predicated_result authorization_result ->
-            let open Result.Let_syntax in
-            let%bind data = predicated_result in
-            let%bind authorization = authorization_result in
-            Ok Party.{ data; authorization })
-          ~fields:
-            [ arg "data" ~doc:"Predicated party"
-                ~typ:(non_null snapp_party_predicated)
-            ; arg "authorization" ~doc:"Authorization for this party"
-                ~typ:(non_null snapp_control)
-            ]
 
       let snapp_vrf_output =
         scalar "VrfOutput" ~coerce:(fun vrf_output ->
@@ -2882,6 +2554,348 @@ module Types = struct
             ; arg "globalSlotSinceGenesis" ~typ:Interval.global_slot
             ; arg "stakingEpochData" ~typ:(non_null snapp_epoch_data)
             ; arg "nextEpochData" ~typ:(non_null snapp_epoch_data)
+            ]
+
+      let snapp_party_body : (Party.Body.t, string) Result.t option arg_typ =
+        obj "PartyBody" ~doc:"Body component of a Snapp Party"
+          ~coerce:
+            (fun pk update_result token_id balance_change increment_nonce events
+                 sequence_events call_data call_depth protocol_state
+                 use_full_commitment ->
+            try
+              let open Result.Let_syntax in
+              let%bind pk =
+                Result.map_error
+                  (Public_key.Compressed.of_base58_check pk)
+                  ~f:Error.to_string_hum
+              in
+              let token_id = Token_id.of_string token_id in
+              let mk_field_arrays evs =
+                List.map evs ~f:(fun fields ->
+                    List.map fields ~f:Snark_params.Tick.Field.of_string
+                    |> Array.of_list)
+              in
+              let%bind update = update_result in
+              let%bind balance_change = balance_change in
+              let%map protocol_state = protocol_state in
+              let events = mk_field_arrays events in
+              let sequence_events = mk_field_arrays sequence_events in
+              let call_data = Snark_params.Tick.Field.of_string call_data in
+              Party.Body.Poly.
+                { pk
+                ; update
+                ; token_id
+                ; increment_nonce
+                ; balance_change
+                ; events
+                ; sequence_events
+                ; call_data
+                ; call_depth
+                ; protocol_state
+                ; use_full_commitment
+                }
+            with exn -> Error (Exn.to_string exn))
+          ~fields:
+            [ arg "publicKey" ~doc:"Public key as a Base58Check string"
+                ~typ:(non_null string)
+            ; arg "update" ~doc:"Update part of the body"
+                ~typ:(non_null snapp_update)
+            ; arg "tokenId" ~doc:"Token id" ~typ:(non_null string)
+            ; arg "balance_change"
+                ~doc:
+                  "Signed amount representing the amount to change for this \
+                   particular relevant party."
+                ~typ:(non_null snapp_balance_change)
+            ; arg "incrementNonce" ~doc:"Whether to increment the nonce"
+                ~typ:(non_null bool)
+              (* TODO: Do we want fields in base58 in graphQL? Should we use a string of the base10 number like in other parts? Should we use a hex 32bytes -- that seems most natural to me? *)
+            ; arg "events"
+                ~doc:
+                  "A list of events emitted by the snapp. Each event is a list \
+                   of field elements, the particular meaning of each event is \
+                   determined by the snapp's internal logic."
+                ~typ:(non_null (list (non_null (list (non_null string)))))
+            ; arg "sequenceEvents"
+                ~doc:
+                  "A list of sequence events emitted by the snapp. Each event \
+                   is a list of field elements, the particular meaning of each \
+                   event is determined by the snapp's internal logic. A \
+                   commitment to these events is added to the sequenceState of \
+                   the snapp account for later use"
+                ~typ:(non_null (list (non_null (list (non_null string)))))
+            ; arg "callData"
+                ~doc:
+                  "A commitment to the arguments passed to the snapp and the \
+                   returned value, for internal use by the calling snapp. This \
+                   commitment is opaque to ensure that private data can be \
+                   passed between snapps without revealing it on chain."
+                ~typ:(non_null string)
+            ; arg "callDepth"
+                ~doc:
+                  "The number of nested snapp calls in the transaction before \
+                   reaching this party."
+                ~typ:(non_null int)
+            ; arg "protocolState"
+                ~typ:(non_null snapp_protocol_state_arg)
+                ~doc:"The protocol state in a Snapp transaction"
+            ; arg "use_full_commitment"
+                ~doc:
+                  "Use the full or partial commitment when checking the party \
+                   predicate."
+                ~typ:(non_null bool)
+            ]
+
+      let snapp_fee_payer_party_body =
+        obj "FeePayerPartyBody" ~doc:"Body component of a Snapp Fee Payer Party"
+          ~coerce:
+            (fun pk update_result fee events sequence_events call_data
+                 call_depth protocol_state ->
+            try
+              let open Result.Let_syntax in
+              let%bind pk =
+                Result.map_error
+                  (Public_key.Compressed.of_base58_check pk)
+                  ~f:Error.to_string_hum
+              in
+              let token_id = () in
+              let increment_nonce = () in
+              let mk_field_arrays evs =
+                List.map evs ~f:(fun fields ->
+                    List.map fields ~f:Snark_params.Tick.Field.of_string
+                    |> Array.of_list)
+              in
+              let%bind update = update_result in
+              let balance_change = fee in
+              let events = mk_field_arrays events in
+              let sequence_events = mk_field_arrays sequence_events in
+              let call_data = Snark_params.Tick.Field.of_string call_data in
+              let call_depth = Int.of_string call_depth in
+              let%map protocol_state = protocol_state in
+              { Party.Body.Poly.pk
+              ; update
+              ; token_id
+              ; balance_change
+              ; increment_nonce
+              ; events
+              ; sequence_events
+              ; call_data
+              ; call_depth
+              ; protocol_state
+              ; use_full_commitment = ()
+              }
+            with exn -> Error (Exn.to_string exn))
+          ~fields:
+            [ arg "pk" ~doc:"Public key as a Base58Check string"
+                ~typ:(non_null string)
+            ; arg "update" ~doc:"Update part of the body"
+                ~typ:(non_null snapp_update)
+            ; arg "fee" ~doc:"Transaction fee" ~typ:(non_null fee)
+            ; arg "events" ~doc:"A list of list of fields in Base58Check"
+                ~typ:(non_null (list (non_null (list (non_null string)))))
+            ; arg "sequenceEvents"
+                ~doc:"A list of list of fields in Base58Check"
+                ~typ:(non_null (list (non_null (list (non_null string)))))
+            ; arg "callData" ~doc:"A field in Base58Check"
+                ~typ:(non_null string)
+            ; arg "callDepth" ~doc:"An integer in string format"
+                ~typ:(non_null string)
+            ; arg "protocolState"
+                ~typ:(non_null snapp_protocol_state_arg)
+                ~doc:"The protocol state in a Snapp transaction"
+            ]
+
+      let snapp_party_predicated_fee_payer :
+          (Party.Predicated.Fee_payer.t, string) Result.t option arg_typ =
+        obj "SnappPartyPredicatedFeePayer"
+          ~doc:"A party to a Snapp transaction with a nonce predicate"
+          ~coerce:(fun body nonce ->
+            let open Result.Let_syntax in
+            let%map body = body in
+            let predicate = nonce in
+            Party.Predicated.Poly.{ body; predicate })
+          ~fields:
+            [ arg "body" ~doc:"fee payer party"
+                ~typ:(non_null snapp_fee_payer_party_body)
+            ; arg "predicate" ~doc:"nonce" ~typ:(non_null nonce)
+            ]
+
+      let snapp_signature =
+        scalar "Signature" ~coerce:(fun signature ->
+            match signature with
+            | `String s ->
+                Result.map_error
+                  (Signature.of_base58_check s)
+                  ~f:Error.to_string_hum
+            | _ ->
+                Error "Expected signature as a string in Base58Check format")
+
+      (* TODO: define a type otherwise identical to Party.Fee_party.t, but
+         which makes the nonce optional
+      *)
+      let snapp_party_fee_payer =
+        obj "SnappPartyFeePayer"
+          ~doc:"A party to a Snapp transaction with a signature authorization"
+          ~coerce:(fun data authorization ->
+            let open Result.Let_syntax in
+            let%bind data = data in
+            Ok Party.Fee_payer.{ data; authorization })
+          ~fields:
+            [ arg "data" ~doc:"party with a signature and nonce predicate"
+                ~typ:(non_null snapp_party_predicated_fee_payer)
+            ; arg "authorization" ~doc:"signature"
+                ~typ:(non_null snapp_signature)
+            ]
+
+      (* like Party.Predicate.t with nullary constructors *)
+      type party_predicate = Full | Nonce | Accept
+
+      let snapp_predicate_enum =
+        enum "SnappPredicateConstructors"
+          ~doc:"Constructors for Snapp predicates"
+          ~values:
+            [ enum_value "Full" ~value:Full
+            ; enum_value "Nonce" ~value:Nonce
+            ; enum_value "Accept" ~value:Accept
+            ]
+
+      let snapp_receipt_chain_hash =
+        scalar "ReceiptChainHash" ~coerce:(fun s ->
+            try
+              match s with
+              | `String chain_hash ->
+                  Receipt.Chain_hash.of_base58_check chain_hash
+                  |> Result.map_error ~f:Error.to_string_hum
+              | _ ->
+                  Error "Expected balance as a string"
+            with exn -> Error (Exn.to_string exn))
+
+      let snapp_state =
+        obj "SnappState" ~doc:"Snapp state, a list of 8 field elements"
+          ~coerce:(fun element_results ->
+            let elements =
+              List.map ~f:Snapp_basic.Or_ignore.of_option element_results
+            in
+            if List.length elements = 8 then
+              (* length check means this won't raise *)
+              Ok (Snapp_state.V.of_list_exn elements)
+            else Error "Expected 8 elements for Snapp state")
+          ~fields:[ arg "elements" ~typ:(non_null (list field)) ]
+
+      let snapp_predicate_account =
+        obj "SnappPredicateAccount"
+          ~coerce:
+            (fun balance nonce receipt_chain_hash public_key delegate
+                 state_result sequence_state proved_state ->
+            let open Result.Let_syntax in
+            let v o = Snapp_basic.Or_ignore.of_option o in
+            let%map state = state_result in
+            ( Snapp_predicate.Account.Poly.
+                { balance = v balance
+                ; nonce = v nonce
+                ; receipt_chain_hash = v receipt_chain_hash
+                ; public_key = v public_key
+                ; delegate = v delegate
+                ; state
+                ; sequence_state = v sequence_state
+                ; proved_state = v proved_state
+                }
+              : Snapp_predicate.Account.t ))
+          ~fields:
+            [ arg "balance" ~typ:Interval.balance
+            ; arg "nonce" ~typ:Interval.nonce
+            ; arg "receiptChainHash"
+                ~doc:"receipt chain hash, or null if Ignore"
+                ~typ:snapp_receipt_chain_hash
+            ; arg "publicKey" ~typ:public_key_arg
+            ; arg "delegate" ~typ:public_key_arg
+            ; arg "state" ~typ:(non_null snapp_state)
+            ; arg "sequenceState" ~typ:field
+            ; arg "provedState" ~typ:bool
+            ]
+
+      let snapp_predicate =
+        obj "SnappPredicate"
+          ~coerce:(fun account_opt nonce_opt ->
+            match (account_opt, nonce_opt) with
+            | None, None ->
+                Ok Party.Predicate.Accept
+            | Some account_result, None -> (
+                match account_result with
+                | Ok account ->
+                    Ok (Party.Predicate.Full account)
+                | Error err ->
+                    Error err )
+            | None, Some nonce ->
+                Ok (Party.Predicate.Nonce nonce)
+            | Some _, Some _ ->
+                Error
+                  "Ill-defined predicate. Account and nonce cannot both be \
+                   provided.")
+          ~fields:
+            [ arg "account"
+                ~doc:
+                  "The constraints that the account must satisfy in order for \
+                   this update to succeed. Snapps can use this field to assert \
+                   properties about the account."
+                ~typ:snapp_predicate_account
+            ; arg "nonce"
+                ~doc:
+                  "The constraints that the nonce must satisfy in order for \
+                   this update to succeed."
+                ~typ:nonce
+            ]
+
+      let snapp_party_predicated =
+        obj "SnappPartyPredicated"
+          ~coerce:(fun body_result predicate_result ->
+            let open Result.Let_syntax in
+            let%bind body = body_result in
+            let%bind predicate = predicate_result in
+            Ok Party.Predicated.Poly.{ body; predicate })
+          ~fields:
+            [ arg "body" ~doc:"Body of the party predicated"
+                ~typ:(non_null snapp_party_body)
+            ; arg "predicate" ~doc:"Predicate of the party predicated"
+                ~typ:(non_null snapp_predicate)
+            ]
+
+      let snapp_proof =
+        scalar "SnappProof" ~coerce:(fun proof ->
+            match proof with
+            | `String s ->
+                Pickles.Side_loaded.Proof.of_base64 s
+            | _ ->
+                Error "Expected Snapp proof as base64-encoded string")
+
+      let snapp_control =
+        obj "Control"
+          ~coerce:(fun proof_opt signature_opt ->
+            match (proof_opt, signature_opt) with
+            | Some proof, None ->
+                Ok (Control.Proof proof)
+            | None, Some signature ->
+                Ok (Control.Signature signature)
+            | Some _, Some _ ->
+                Error "Expected a proof or a signature, but not both"
+            | None, None ->
+                Ok Control.None_given)
+          ~fields:
+            [ arg "proof" ~typ:snapp_proof
+            ; arg "signature" ~typ:snapp_signature
+            ]
+
+      let snapp_party_arg =
+        obj "SnappParty" ~doc:"A party to a Snapp transaction"
+          ~coerce:(fun predicated_result authorization_result ->
+            let open Result.Let_syntax in
+            let%bind data = predicated_result in
+            let%bind authorization = authorization_result in
+            Ok Party.{ data; authorization })
+          ~fields:
+            [ arg "data" ~doc:"Predicated party"
+                ~typ:(non_null snapp_party_predicated)
+            ; arg "authorization" ~doc:"Authorization for this party"
+                ~typ:(non_null snapp_control)
             ]
     end
 
@@ -3131,10 +3145,9 @@ module Types = struct
     let send_snapp =
       let open Fields in
       obj "SendSnappInput"
-        ~coerce:(fun fee_payer other_parties protocol_state memo ->
-          (fee_payer, other_parties, protocol_state, memo))
-        ~fields:
-          [ snapp_fee_payer; snapp_other_parties; snapp_protocol_state; memo ]
+        ~coerce:(fun fee_payer other_parties memo ->
+          (fee_payer, other_parties, memo))
+        ~fields:[ snapp_fee_payer; snapp_other_parties; memo ]
 
     let send_delegation =
       let open Fields in
@@ -3909,23 +3922,19 @@ module Mutations = struct
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.send_snapp) ]
       ~resolve:
         (fun { ctx = coda; _ } ()
-             ( fee_payer_result
-             , other_parties_results
-             , protocol_state_result
-             , memo ) ->
+             (fee_payer_result, other_parties_results, memo) ->
         let parties_result =
           let open Result.Let_syntax in
           let other_parties_result = Result.all other_parties_results in
           let%bind fee_payer = fee_payer_result in
           let%bind other_parties = other_parties_result in
-          let%bind protocol_state = protocol_state_result in
           let%map memo =
             Option.value_map memo ~default:(Ok Signed_command_memo.empty)
               ~f:(fun memo ->
                 result_of_exn Signed_command_memo.create_from_string_exn memo
                   ~error:"Invalid `memo` provided.")
           in
-          { Parties.fee_payer; other_parties; protocol_state; memo }
+          { Parties.fee_payer; other_parties; memo }
         in
         match parties_result with
         | Ok parties ->
