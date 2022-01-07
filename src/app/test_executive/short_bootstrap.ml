@@ -91,7 +91,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            |> Wait_condition.with_timeouts
                 ~hard_timeout:
                   (Network_time_span.Literal
-                     (Time.Span.of_ms (15. *. 60. *. 1000.))) ))
+                     (Time.Span.of_ms (20. *. 60. *. 1000.))) ))
     in
     section "network is fully connected after one node is restarted"
       (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 180.0)) in
