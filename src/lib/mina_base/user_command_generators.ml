@@ -13,14 +13,14 @@ let ledger_depth = 20
 let parties_with_ledger () =
   let open Quickcheck.Let_syntax in
   let open Signature_lib in
-  (* Need a fee payer keypair, and max_other_parties * 2 keypairs, because
-     all the other parties might be new and their accounts not in the ledger;
-     or they might all be old and in the ledger
+  (* Need a fee payer keypair, a keypair for the "balancing" account (so that the balance changes
+     sum to zero), and max_other_parties * 2 keypairs, because all the other parties
+     might be new and their accounts not in the ledger; or they might all be old and in the ledger
 
      We'll put the fee payer account and max_other_parties accounts in the
      ledger, and have max_other_parties keypairs available for new accounts
   *)
-  let num_keypairs = (Snapp_generators.max_other_parties * 2) + 1 in
+  let num_keypairs = (Snapp_generators.max_other_parties * 2) + 2 in
   let keypairs = List.init num_keypairs ~f:(fun _ -> Keypair.create ()) in
   let keymap =
     List.fold keypairs ~init:Public_key.Compressed.Map.empty

@@ -298,7 +298,8 @@ let gen_balance_change ?balances_tbl (account : Account.t) =
 *)
 let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
     ?(snapp_account = false) ?(is_fee_payer = false) ?available_public_keys
-    ?permissions_auth
+    ?permissions_auth ?(required_balance_change : a option)
+    ?(required_balance : Currency.Balance.t option)
     ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
     ~(f_balance_change : a -> Currency.Amount.Signed.t) ~(increment_nonce : b)
     ~ledger () :
@@ -311,6 +312,10 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
     failwith "gen_party_body: snapp_account but not new_account" ;
   (* fee payers have to be in the ledger *)
   assert (not (is_fee_payer && new_account)) ;
+  assert (
+    Bool.equal
+      (Option.is_some required_balance_change)
+      (Option.is_some required_balance) ) ;
   let%bind update =
     Party.Update.gen ?permissions_auth ~snapp_account ~new_account ()
   in
@@ -326,9 +331,16 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
             "gen_party_body: new_account is true, but available_public_keys \
              not provided"
       | Some available_pks ->
+          let low, high =
+            match required_balance with
+            | Some bal ->
+                (bal, bal)
+            | _ ->
+                ( Currency.Balance.of_int 10_000_000_000
+                , Currency.Balance.of_int 500_000_000_000 )
+          in
           let%map account_with_gen_pk =
-            Account.gen_with_constrained_balance ~low:10_000_000_000
-              ~high:500_000_000_000
+            Account.gen_with_constrained_balance ~low ~high
           in
           let available_pk =
             match
@@ -414,8 +426,14 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
   in
   let pk = account.public_key in
   let token_id = account.token_id in
-  let%bind balance_change = gen_balance_change account in
-  (* update balances table, if provided, with generated balance_change *)
+  let%bind balance_change =
+    match required_balance_change with
+    | Some bal_change ->
+        return bal_change
+    | None ->
+        gen_balance_change account
+  in
+  (* update balances table, if provided, with balance_change *)
   ( match balances_tbl with
   | None ->
       ()
@@ -482,11 +500,13 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
 
 let gen_predicated_from ?(succeed = true) ?(new_account = false)
     ?(snapp_account = false) ?(increment_nonce = false) ?available_public_keys
-    ?permissions_auth ~ledger ~balances_tbl =
+    ?permissions_auth ?required_balance_change ?required_balance ~ledger
+    ~balances_tbl =
   let open Quickcheck.Let_syntax in
   let%bind body =
     gen_party_body ~new_account ~snapp_account ~increment_nonce
-      ?permissions_auth ?available_public_keys ~ledger ~balances_tbl
+      ?permissions_auth ?available_public_keys ?required_balance_change
+      ?required_balance ~ledger ~balances_tbl
       ~gen_balance_change:(gen_balance_change ~balances_tbl)
       ~f_balance_change:Fn.id ()
   in
@@ -497,7 +517,8 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false)
   Party.Predicated.Poly.{ body; predicate }
 
 let gen_party_from ?(succeed = true) ?(new_account = false) ?permissions_auth
-    ~available_public_keys ~ledger ~balances_tbl () =
+    ?required_balance_change ?required_balance ~available_public_keys ~ledger
+    ~balances_tbl () =
   let open Quickcheck.Let_syntax in
   (* see TODO below about splitting a Party.t; we'll want to choose
      an authorization
@@ -522,8 +543,9 @@ let gen_party_from ?(succeed = true) ?(new_account = false) ?permissions_auth
   *)
   let new_account = new_account || snapp_account in
   let%bind data =
-    gen_predicated_from ?permissions_auth ~succeed ~new_account ~snapp_account
-      ~increment_nonce ~available_public_keys ~ledger ~balances_tbl
+    gen_predicated_from ?permissions_auth ?required_balance_change
+      ?required_balance ~succeed ~new_account ~snapp_account ~increment_nonce
+      ~available_public_keys ~ledger ~balances_tbl
   in
   return { Party.data; authorization }
 
@@ -622,12 +644,12 @@ let gen_parties_from ?(succeed = true)
   let%bind fee_payer =
     gen_fee_payer ~permissions_auth ~account_id:fee_payer_account_id ~ledger ()
   in
-  let gen_parties_with_dynamic_balance ~new_parties num_parties =
-    (* table of public keys to balances, updated when generating each party
-       a Map would be more principled, but threading that map through the code
+  (* table of public keys to balances, updated when generating each party
+     a Map would be more principled, but threading that map through the code
        adds complexity
-    *)
-    let balances_tbl = Signature_lib.Public_key.Compressed.Table.create () in
+  *)
+  let balances_tbl = Signature_lib.Public_key.Compressed.Table.create () in
+  let gen_parties_with_dynamic_balance ~new_parties num_parties =
     (* add fee payer account, in case same account used again *)
     let fee_payer_pk = fee_payer.data.body.pk in
     let fee_payer_balance =
@@ -671,7 +693,38 @@ let gen_parties_from ?(succeed = true)
   let%bind new_parties =
     gen_parties_with_dynamic_balance ~new_parties:true num_new_accounts
   in
-  let other_parties = old_parties @ new_parties in
+  let other_parties0 = old_parties @ new_parties in
+  let balance_change_sum =
+    List.fold other_parties0 ~init:Currency.Amount.Signed.zero
+      ~f:(fun acc party ->
+        match Currency.Amount.Signed.add acc party.data.body.balance_change with
+        | Some sum ->
+            sum
+        | None ->
+            failwith "Overflow adding other parties balances")
+  in
+  (* create a party with balance change to yield a zero sum
+     a new account, because the balance change for an existing
+      account might be constrained by its balance
+  *)
+  let%bind balancing_party =
+    let required_balance_change =
+      Currency.Amount.Signed.negate balance_change_sum
+    in
+    let required_balance =
+      match required_balance_change with
+      | { magnitude; sgn = Sgn.Neg } ->
+          (* put in enough balance so we can subtract it all *)
+          Currency.Amount.to_uint64 magnitude |> Currency.Balance.of_uint64
+      | { sgn = Sgn.Pos; _ } ->
+          (* we're adding to the account, so it can have a zero balance *)
+          Currency.Balance.zero
+    in
+    gen_party_from ~permissions_auth ~new_account:true ~available_public_keys
+      ~succeed ~ledger ~required_balance_change ~required_balance ~balances_tbl
+      ()
+  in
+  let other_parties = balancing_party :: other_parties0 in
   let%bind memo = Signed_command_memo.gen in
   let memo_hash = Signed_command_memo.hash memo in
   let parties_dummy_signatures : Parties.t =
