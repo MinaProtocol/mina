@@ -19,8 +19,10 @@ RUN apt-get -y update \
         procps \
         curl \
         jq \
+        jemalloc-dev \
         dumb-init \
         libssl1.1 \
+        libpq-dev \
         apt-transport-https \
         ca-certificates \
         dnsutils \
