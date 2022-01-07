@@ -182,7 +182,7 @@ let unlock { cache; path } ~needle ~password =
   let unlock_keypair = function
     | Locked file ->
         Secret_keypair.read ~privkey_path:(path ^/ file) ~password
-        |> Deferred.Result.map_error ~f:(fun _ -> `Bad_password)
+        |> Deferred.Result.map_error ~f:(fun e -> `Key_read_error e)
         |> Deferred.Result.map ~f:(fun kp ->
                Public_key.Compressed.Table.set cache ~key:needle
                  ~data:(Unlocked (file, kp)))

@@ -169,10 +169,16 @@ module type S = sig
   end
 
   val sign_payload :
-    Signature_lib.Private_key.t -> Signed_command_payload.t -> Signature.t
+       ?signature_kind:Mina_signature_kind.t
+    -> Signature_lib.Private_key.t
+    -> Signed_command_payload.t
+    -> Signature.t
 
   val sign :
-    Signature_keypair.t -> Signed_command_payload.t -> With_valid_signature.t
+       ?signature_kind:Mina_signature_kind.t
+    -> Signature_keypair.t
+    -> Signed_command_payload.t
+    -> With_valid_signature.t
 
   val check_signature : ?signature_kind:Mina_signature_kind.t -> t -> bool
 
@@ -184,8 +190,12 @@ module type S = sig
     -> With_valid_signature.t option
 
   module For_tests : sig
+    (** the signature kind is an argument, to match `sign`, but ignored *)
     val fake_sign :
-      Signature_keypair.t -> Signed_command_payload.t -> With_valid_signature.t
+         ?signature_kind:Mina_signature_kind.t
+      -> Signature_keypair.t
+      -> Signed_command_payload.t
+      -> With_valid_signature.t
   end
 
   val check : t -> With_valid_signature.t option

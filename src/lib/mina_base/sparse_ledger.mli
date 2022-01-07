@@ -10,9 +10,12 @@ module Stable : sig
       , Account.Stable.V2.t
       , Token_id.Stable.V1.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson]
   end
 end]
+
+module L :
+  Transaction_logic.Ledger_intf with type t = t ref and type location = int
 
 val merkle_root : t -> Ledger_hash.t
 

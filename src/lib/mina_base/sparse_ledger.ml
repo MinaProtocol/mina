@@ -11,7 +11,7 @@ module Stable = struct
       , Account.Stable.V2.t
       , Token_id.Stable.V1.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
-    [@@deriving to_yojson, sexp]
+    [@@deriving yojson, sexp]
 
     let to_latest = Fn.id
   end
@@ -40,7 +40,12 @@ module L = struct
   type location = int
 
   let get : t -> location -> Account.t option =
-   fun t loc -> Option.try_with (fun () -> M.get_exn !t loc)
+   fun t loc ->
+    Option.try_with (fun () ->
+        let account = M.get_exn !t loc in
+        if Public_key.Compressed.(equal empty account.public_key) then None
+        else Some account)
+    |> Option.bind ~f:Fn.id
 
   let location_of_account : t -> Account_id.t -> location option =
    fun t id -> Option.try_with (fun () -> M.find_index_exn !t id)
@@ -100,6 +105,7 @@ module T = Transaction_logic.Make (L)
 M.
   ( of_hash
   , to_yojson
+  , of_yojson
   , get_exn
   , path_exn
   , set_exn

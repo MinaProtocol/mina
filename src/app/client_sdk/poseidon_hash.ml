@@ -108,7 +108,7 @@ type string_js = Js.js_string Js.t
 (* input is a raw string of bytes *)
 let hash_bytearray (bytearray : u8_array_js) : string_js =
   let string_to_bitstring s =
-    let char_bits = String_sign.Message.char_bits in
+    let char_bits = String_sign.char_bits in
     let x = Stdlib.(Array.of_seq (Seq.map char_bits (String.to_seq s))) in
     Random_oracle_input.bitstrings x
   in

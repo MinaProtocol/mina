@@ -22,6 +22,9 @@ open Core
 open Async
 open Mina_net2
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
+
 type status = NotMet | Connected | Disconnected [@@deriving sexp]
 
 type typed_msg = { a : int; b : string option }
@@ -326,15 +329,19 @@ let%test_module "all-ipc test" =
         set_connection_gating_config a (mk_banning_gating_config ad.c_peerid)
       in
 
-      (* TODO uncomment after fixing the issue. *)
       (* Wait for Carol to disconnect. This will deadlock Alice and Carol
          unless new gating config is put into effect and Carol becomes banned. *)
-      (* let%bind () = pcIter (fun () ->
-         match !carolStatus with
-           | Connected -> false
-           | Disconnected -> true
-           | _ -> raise UnexpectedState
-         ) |> or_timeout ~msg:"Alice: wait for Carol to disconnect" in *)
+      let%bind () =
+        pcIter (fun () ->
+            match !carolStatus with
+            | Connected ->
+                false
+            | Disconnected ->
+                true
+            | _ ->
+                raise UnexpectedState)
+        |> or_timeout ~msg:"Alice: wait for Carol to disconnect"
+      in
 
       (* Await Bob to terminate. This statement ensures that Alice doesn't finishes
          before Bob received all of the messages on topic "a" *)
@@ -541,7 +548,7 @@ let%test_module "all-ipc test" =
         configure node ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
           ~network_id ~peer_exchange:true ~mina_peer_exchange:true
           ~direct_peers:[] ~seed_peers ~flooding:false ~metrics_port:None
-          ~unsafe_no_trust_ip:true ~max_connections:50
+          ~unsafe_no_trust_ip:true ~min_connections:25 ~max_connections:50
           ~validation_queue_size:150 ~initial_gating_config:gating_config
         >>| Or_error.ok_exn
       in

@@ -1437,6 +1437,9 @@ include Make
               Extensions.(get_view_pipe (extensions t) Best_tip_diff)
           end)
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
+
 let%test_module _ =
   ( module struct
     module Mock_base_ledger = Mocks.Base_ledger

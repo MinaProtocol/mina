@@ -23,44 +23,58 @@ let parse id (m : Logger.Message.t) =
 
 let bad_parse = Or_error.error_string "bad parse"
 
+type 'a parse_event =
+  | From_error_log of (Logger.Message.t -> 'a Or_error.t)
+  | From_daemon_log of
+      Structured_log_events.id * (Logger.Message.t -> 'a Or_error.t)
+  | From_puppeteer_log of string * (Puppeteer_message.t -> 'a Or_error.t)
+
 module type Event_type_intf = sig
   type t [@@deriving to_yojson]
 
   val name : string
 
-  val structured_event_id : Structured_log_events.id option
-
-  val parse : Logger.Message.t -> t Or_error.t
+  val parse : t parse_event
 end
 
 module Log_error = struct
   let name = "Log_error"
 
-  let structured_event_id = None
-
   type t = Logger.Message.t [@@deriving to_yojson]
 
-  let parse = Or_error.return
+  let parse_func = Or_error.return
+
+  let parse = From_error_log parse_func
 end
 
 module Node_initialization = struct
   let name = "Node_initialization"
 
+  type t = unit [@@deriving to_yojson]
+
   let structured_event_id =
-    Some
-      Transition_router
-      .starting_transition_frontier_controller_structured_events_id
+    Transition_router
+    .starting_transition_frontier_controller_structured_events_id
+
+  let parse_func = Fn.const (Or_error.return ())
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
+end
+
+module Node_offline = struct
+  let name = "Node_offline"
 
   type t = unit [@@deriving to_yojson]
 
-  let parse = Fn.const (Or_error.return ())
+  let puppeteer_event_type = "node_offline"
+
+  let parse_func = Fn.const (Or_error.return ())
+
+  let parse = From_puppeteer_log (puppeteer_event_type, parse_func)
 end
 
 module Transition_frontier_diff_application = struct
   let name = "Transition_frontier_diff_application"
-
-  let structured_event_id =
-    Some Transition_frontier.applying_diffs_structured_events_id
 
   type root_transitioned =
     { new_root : State_hash.t; garbage : State_hash.t list }
@@ -86,7 +100,10 @@ module Transition_frontier_diff_application = struct
     | None ->
         Ok (lens.set (Some x) result)
 
-  let parse message =
+  let structured_event_id =
+    Transition_frontier.applying_diffs_structured_events_id
+
+  let parse_func message =
     let open Json_parsing in
     let open Or_error.Let_syntax in
     let%bind diffs = get_metadata message "diffs" >>= parse (list json) in
@@ -111,13 +128,12 @@ module Transition_frontier_diff_application = struct
             )
         | _ ->
             Or_error.error_string "unexpected transition frontier diff format")
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
 end
 
 module Block_produced = struct
   let name = "Block_produced"
-
-  let structured_event_id =
-    Some Block_producer.block_produced_structured_events_id
 
   type t =
     { block_height : int
@@ -157,8 +173,9 @@ module Block_produced = struct
     else aggregated
   *)
 
-  (*TODO: Once we transition to structured events, this should call Structured_log_event.parse_exn and match on the structured events that it returns.*)
-  let parse message =
+  let structured_event_id = Block_producer.block_produced_structured_events_id
+
+  let parse_func message =
     let open Json_parsing in
     let open Or_error.Let_syntax in
     let%bind breadcrumb = get_metadata message "breadcrumb" in
@@ -182,18 +199,20 @@ module Block_produced = struct
     in
     let%map epoch = find int breadcrumb_consensus_state [ "epoch_count" ] in
     { block_height; global_slot; epoch; snarked_ledger_generated }
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
 end
 
 module Breadcrumb_added = struct
   let name = "Breadcrumb_added"
 
-  let structured_event_id =
-    Some Transition_frontier.added_breadcrumb_user_commands_structured_events_id
-
   type t = { user_commands : User_command.Valid.t With_status.t list }
   [@@deriving to_yojson]
 
-  let parse message =
+  let structured_event_id =
+    Transition_frontier.added_breadcrumb_user_commands_structured_events_id
+
+  let parse_func message =
     let open Json_parsing in
     let open Or_error.Let_syntax in
     let%map user_commands =
@@ -201,6 +220,8 @@ module Breadcrumb_added = struct
       >>= parse valid_commands_with_statuses
     in
     { user_commands }
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
 end
 
 module Gossip = struct
@@ -215,17 +236,15 @@ module Gossip = struct
   end
 
   module Block = struct
-    let id = Mina_networking.block_received_structured_events_id
-
-    let structured_event_id = Some id
-
     type r = { state_hash : State_hash.t } [@@deriving yojson, hash]
 
     type t = r With_direction.t [@@deriving yojson]
 
     let name = "Block_gossip"
 
-    let parse message : t Or_error.t =
+    let id = Mina_networking.block_received_structured_events_id
+
+    let parse_func message =
       match%bind parse id message with
       | Mina_networking.Block_received { state_hash; sender = _ } ->
           Ok ({ state_hash }, Direction.Received)
@@ -233,13 +252,11 @@ module Gossip = struct
           Ok ({ state_hash }, Sent)
       | _ ->
           bad_parse
+
+    let parse = From_daemon_log (id, parse_func)
   end
 
   module Snark_work = struct
-    let id = Mina_networking.snark_work_received_structured_events_id
-
-    let structured_event_id = Some id
-
     type r = { work : Network_pool.Snark_pool.Resource_pool.Diff.compact }
     [@@deriving yojson, hash]
 
@@ -247,7 +264,9 @@ module Gossip = struct
 
     let name = "Snark_work_gossip"
 
-    let parse message =
+    let id = Mina_networking.snark_work_received_structured_events_id
+
+    let parse_func message =
       match%bind parse id message with
       | Mina_networking.Snark_work_received { work; sender = _ } ->
           Ok ({ work }, Direction.Received)
@@ -255,13 +274,11 @@ module Gossip = struct
           Ok ({ work }, Direction.Received)
       | _ ->
           bad_parse
+
+    let parse = From_daemon_log (id, parse_func)
   end
 
   module Transactions = struct
-    let id = Mina_networking.transactions_received_structured_events_id
-
-    let structured_event_id = Some id
-
     type r =
       { txns : Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.t }
     [@@deriving yojson, hash]
@@ -270,7 +287,9 @@ module Gossip = struct
 
     let name = "Transactions_gossip"
 
-    let parse message =
+    let id = Mina_networking.transactions_received_structured_events_id
+
+    let parse_func message =
       match%bind parse id message with
       | Mina_networking.Transactions_received { txns; sender = _ } ->
           Ok ({ txns }, Direction.Received)
@@ -278,12 +297,15 @@ module Gossip = struct
           Ok ({ txns }, Sent)
       | _ ->
           bad_parse
+
+    let parse = From_daemon_log (id, parse_func)
   end
 end
 
 type 'a t =
   | Log_error : Log_error.t t
   | Node_initialization : Node_initialization.t t
+  | Node_offline : Node_offline.t t
   | Transition_frontier_diff_application
       : Transition_frontier_diff_application.t t
   | Block_produced : Block_produced.t t
@@ -299,6 +321,8 @@ let existential_to_string = function
       "Log_error"
   | Event_type Node_initialization ->
       "Node_initialization"
+  | Event_type Node_offline ->
+      "Node_offline"
   | Event_type Transition_frontier_diff_application ->
       "Transition_frontier_diff_application"
   | Event_type Block_produced ->
@@ -319,6 +343,8 @@ let existential_of_string_exn = function
       Event_type Log_error
   | "Node_initialization" ->
       Event_type Node_initialization
+  | "Node_offline" ->
+      Event_type Node_offline
   | "Transition_frontier_diff_application" ->
       Event_type Transition_frontier_diff_application
   | "Block_produced" ->
@@ -364,6 +390,7 @@ let type_of_event (Event (t, _)) = Event_type t
 let all_event_types =
   [ Event_type Log_error
   ; Event_type Node_initialization
+  ; Event_type Node_offline
   ; Event_type Transition_frontier_diff_application
   ; Event_type Block_produced
   ; Event_type Breadcrumb_added
@@ -378,6 +405,8 @@ let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
       (module Log_error)
   | Node_initialization ->
       (module Node_initialization)
+  | Node_offline ->
+      (module Node_offline)
   | Transition_frontier_diff_application ->
       (module Transition_frontier_diff_application)
   | Block_produced ->
@@ -398,35 +427,93 @@ let event_to_yojson event =
 
 let to_structured_event_id event_type =
   let (Event_type t) = event_type in
-  let (module Type) = event_type_module t in
-  Type.structured_event_id
+  let (module Ty) = event_type_module t in
+  match Ty.parse with From_daemon_log (id, _) -> Some id | _ -> None
 
-let of_structured_event_id =
+let structured_events_table =
   let open Option.Let_syntax in
-  let table =
-    all_event_types
-    |> List.filter_map ~f:(fun t ->
-           let%map event_id = to_structured_event_id t in
-           (Structured_log_events.string_of_id event_id, t))
-    |> String.Table.of_alist_exn
-  in
-  Fn.compose (String.Table.find table) Structured_log_events.string_of_id
+  all_event_types
+  |> List.filter_map ~f:(fun t ->
+         let%map event_id = to_structured_event_id t in
+         (Structured_log_events.string_of_id event_id, t))
+  |> String.Table.of_alist_exn
 
-let parse_event (message : Logger.Message.t) =
+let of_structured_event_id id =
+  Structured_log_events.string_of_id id
+  |> String.Table.find structured_events_table
+
+let to_puppeteer_event_string event_type =
+  let (Event_type t) = event_type in
+  let (module Ty) = event_type_module t in
+  match Ty.parse with From_puppeteer_log (id, _) -> Some id | _ -> None
+
+let puppeteer_events_table =
+  let open Option.Let_syntax in
+  all_event_types
+  |> List.filter_map ~f:(fun t ->
+         let%map event_id = to_puppeteer_event_string t in
+         (event_id, t))
+  |> String.Table.of_alist_exn
+
+let of_puppeteer_event_string id = String.Table.find puppeteer_events_table id
+
+let parse_error_log (message : Logger.Message.t) =
+  let open Or_error.Let_syntax in
+  match Log_error.parse with
+  | From_error_log fnc ->
+      let%map data = fnc message in
+      Event (Log_error, data)
+  | _ ->
+      failwith
+        "Log_error.parse should always be a `From_error_log variant, but was \
+         mis-programmed as something else. this is a progammer error"
+
+let parse_daemon_event (message : Logger.Message.t) =
   let open Or_error.Let_syntax in
   match message.event_id with
-  | Some event_id ->
-      let (Event_type event_type) =
+  | Some event_id -> (
+      let (Event_type ev_type) =
         of_structured_event_id event_id
         |> Option.value ~default:(Event_type Log_error)
       in
-      let (module Type) = event_type_module event_type in
-      let%map data = Type.parse message in
-      Event (event_type, data)
+      let (module Ty) = event_type_module ev_type in
+      match Ty.parse with
+      | From_error_log fnc | From_daemon_log (_, fnc) ->
+          let%map data = fnc message in
+          Event (ev_type, data)
+      | _ ->
+          failwith
+            "the 'parse' field of a daemon event should always be a \
+             `From_daemon_log variant, but was mis-programmed as something \
+             else. this is a progammer error" )
   | None ->
       (* TODO: check log level to ensure it matches error log level *)
-      let%map data = Log_error.parse message in
-      Event (Log_error, data)
+      parse_error_log message
+
+let parse_puppeteer_event (message : Puppeteer_message.t) =
+  let open Or_error.Let_syntax in
+  match
+    Option.bind message.puppeteer_event_type ~f:of_puppeteer_event_string
+  with
+  | Some exis -> (
+      let (Event_type ev_type) = exis in
+      let (module Ty) = event_type_module ev_type in
+      match Ty.parse with
+      | From_puppeteer_log (_, fnc) ->
+          let%map data = fnc message in
+          Event (ev_type, data)
+      | _ ->
+          failwith
+            "the 'parse' field of a puppeteer event should always be a \
+             `From_puppeteer_log variant, but was mis-programmed as something \
+             else. this is a progammer error" )
+  | None ->
+      failwith
+        (Printf.sprintf
+           "the events emitting from the puppeteer script are either not \
+            formatted correctly, or are trying to emit an event_type which is \
+            not actually recognized by the integration test framework.  this \
+            should not happen and is a programmer error")
 
 let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
  fun t1 e t2 h ->
@@ -434,6 +521,8 @@ let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
   | Log_error, Log_error ->
       h e
   | Node_initialization, Node_initialization ->
+      h e
+  | Node_offline, Node_offline ->
       h e
   | Transition_frontier_diff_application, Transition_frontier_diff_application
     ->
