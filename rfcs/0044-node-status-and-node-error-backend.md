@@ -18,13 +18,14 @@ We need a backend for node staus/error systems. Candidates for the backend inclu
 
 Like the diagram shown above, We would setup a public Kenesis firehose data stream where the mina client can push to. And this Kenesis data stream would be connected to the S3 bucket, the OpenSearch and Kibana. We just won't use the Splunk and Redshift.
 
-This means we would modify the mina client to add the AWS SDK to do the push. There would no server maintained by us at the backend.
+We would directly push the status/error reports to AWS Kenesis firehose data stream. There would be no server maintained by us at the backend. When writing this RFC, the frontend of the node status collection service has already been merged (https://github.com/MinaProtocol/mina/blob/compatible/src/lib/node_status_service/node_status_service.ml). In the current implementation we send the report to the url that provided by users through `--node-status-url`. In the new design, what we would do is to let the mina client by default send the report directly to our Kenesis data stream with the help of ocaml-aws library. The user still have the option to send their reports elsewhere through the `--node-status-url`.
 
 In summary, For the AWS stack we need to setup
 1 Kenesis firehose data stream to receive the logs, and
 1 S3 storage bucket to store the logs, and
 1 OpenSearch service that provides the search ability for the logs, and
 1 Kibana service that provides the visualization for the data
+The communication between different components are through Kenesis data stream, what we need to do is to setup things correctly.
 
 The same setup also applies to the node error system backend.
 
