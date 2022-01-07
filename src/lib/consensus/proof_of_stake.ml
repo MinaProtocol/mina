@@ -832,7 +832,7 @@ module Data = struct
       in
       let rec go acc = function
         | [] ->
-            Interruptible.return None
+            Interruptible.return acc
         | (delegator, (account : Mina_base.Account.t)) :: delegators ->
             let%bind () = Interruptible.return () in
             let vrf_result =
