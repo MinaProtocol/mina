@@ -381,6 +381,12 @@ let setup_daemon logger =
   and node_status_url =
     flag "--node-status-url" ~aliases:[ "node-status-url" ] (optional string)
       ~doc:"URL of the node status collection service"
+  and node_error_url =
+    flag "--node-error-url" ~aliases:[ "node-error-url" ] (optional string)
+      ~doc:"URL of the node error collection service"
+  and contact_info =
+    flag "--contact-info" ~aliases:[ "contact-info" ] (optional string)
+      ~doc:"contact info used in node error report service"
   and uptime_url_string =
     flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
       ~doc:"URL URL of the uptime service of the Mina delegation program"
@@ -719,7 +725,6 @@ let setup_daemon logger =
         maybe_from_config YJ.Util.to_string_option "node-status-url"
           node_status_url
       in
-
       (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
       let _max_concurrent_connections =
         (*if
@@ -1168,7 +1173,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
     (* Breaks a dependency cycle with monitor initilization and coda *)
     let coda_ref : Mina_lib.t option ref = ref None in
     Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-      ~child_pids:pids ~top_logger:logger coda_ref ;
+      ~child_pids:pids ~top_logger:logger ~node_error_url ~contact_info coda_ref ;
     Async.Scheduler.within' ~monitor
     @@ fun () ->
     let%bind { Coda_initialization.coda
