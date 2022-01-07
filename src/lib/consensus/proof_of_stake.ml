@@ -865,18 +865,21 @@ module Data = struct
                 Blake2.(Fn.compose to_raw_string digest_string)
               in
               let vrf_eval = string_of_blake2 truncated_vrf_result in
+              let this_vrf () =
+                go
+                  (Some
+                     ( `Vrf_eval vrf_eval
+                     , `Vrf_output vrf_result
+                     , `Delegator (account.public_key, delegator) ))
+                  delegators
+              in
               match acc with
               | Some (`Vrf_eval prev_best_vrf_eval, _, _) ->
                   if String.compare prev_best_vrf_eval vrf_eval < 0 then
-                    go
-                      (Some
-                         ( `Vrf_eval vrf_eval
-                         , `Vrf_output vrf_result
-                         , `Delegator (account.public_key, delegator) ))
-                      delegators
+                    this_vrf ()
                   else go acc delegators
               | None ->
-                  go acc delegators
+                  this_vrf ()
             else go acc delegators
       in
       go None delegators
