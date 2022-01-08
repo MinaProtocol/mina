@@ -83,12 +83,19 @@ let bits_by_4s = bits_by_n 4
 
 let bits_by_8s = bits_by_n 8
 
-let of_unpackable (type t) (module M : Packed with type t = t) (packed : t) =
+let of_unpackable (type t) (module M : Packed with type t = t)
+    ?(padding_bit = false) (packed : t) =
   let bits0 = M.unpack packed |> List.rev in
   assert (List.length bits0 = 255) ;
   (* field elements, scalars are 255 bits, left-pad to get 32 bytes *)
-  let bits = false :: bits0 in
-  let cs = List.map (bits_by_4s bits) ~f:bits4_to_hex_char in
+  let bits = padding_bit :: bits0 in
+  (* break of the bits byte by byte *)
+  (* In our encoding, we want highest bytes at the end and lowest at the
+     beginning. *)
+  let bytes = bits_by_8s bits in
+  let bytes' = List.rev bytes in
+  let bits' = List.concat bytes' in
+  let cs = List.map (bits_by_4s bits') ~f:bits4_to_hex_char in
   String.of_char_list cs
 
 let of_field = of_unpackable (module Field)
@@ -104,170 +111,38 @@ end
 let pack (type t) (module M : Unpacked with type t = t) raw =
   (* 256 bits = 64 hex chars *)
   assert (Int.equal (String.length raw) 64) ;
-  let bits0 =
+  let bits =
     String.to_list raw |> List.map ~f:hex_char_to_bits4 |> List.concat
   in
+  (* In our encoding, we have highest bytes at the end and lowest at the
+     beginning. *)
+  let bytes = bits_by_8s bits in
+  let bytes' = List.rev bytes in
+  let bits' = List.concat bytes' in
+
+  let padding_bit = List.hd_exn bits' in
   (* remove padding bit *)
-  let bits = List.tl_exn bits0 |> List.rev in
-  M.project bits
+  let bits'' = List.tl_exn bits' |> List.rev in
+  (padding_bit, M.project bits'')
 
-let to_field = pack (module Field)
+let to_field hex = pack (module Field) hex |> snd
 
-let to_scalar = pack (module Scalar)
+let to_scalar hex = pack (module Scalar) hex |> snd
 
-let of_public_key pk =
-  let field1, field2 = pk in
-  of_field field1 ^ of_field field2
+let of_public_key_compressed pk =
+  let { Public_key.Compressed.Poly.x; is_odd } = pk in
+  of_field ~padding_bit:is_odd x
 
-(* differs from [encode_public_key_compressed], below, which does not convert to public key first *)
-let of_public_key_compressed pk = Public_key.decompress_exn pk |> of_public_key
-
-let to_public_key raw =
-  let len = String.length raw in
-  let field_len = len / 2 in
-  let raw1 = String.sub raw ~pos:0 ~len:field_len in
-  let raw2 = String.sub raw ~pos:field_len ~len:field_len in
-  (to_field raw1, to_field raw2)
-
-module Public_key_compressed_direct = struct
-  (*
-    Go encode:
-
-    x := p1.x.Bytes()
-    x[31] |= (p1.y.Bytes()[0] & 1) << 7
-    return x[:]
-
-    Go decode:
-
-    sign := (input[31] >> 7) & 1
-    input[31] &= 0x7F
-    x = input
-  *)
-
-  (* direct hex encoding and decoding of bits in compressed public key
-     [encode] differs from [of_public_key_compressed], which converts to an uncompressed key first
-  *)
-  let encode (pk_compressed : Public_key.Compressed.t) =
-    (* of_unpackable assumes a 255-bit value, but we want  *)
-    let { Public_key.Compressed.Poly.x; is_odd } = pk_compressed in
-    let field_bits = Field.unpack x in
-    (* our Field representation has zero-th bit first so reverse *)
-    let bits = List.rev field_bits in
-    (* insert a parity bit at the highest bit of the highest byte *)
-    let bits_parity = is_odd :: bits in
-    (* convert to bytes *)
-    let bytes = bits_by_8s bits_parity in
-    (* all bytes should have 8 bits now *)
-    List.iter bytes ~f:(fun byte -> [%test_eq: int] (List.length byte) 8) ;
-    (* encoding wants highest byte at the end *)
-    let final_bytes = List.rev bytes in
-    (* we need by 4s to encode in hex *)
-    let nibbles = List.concat final_bytes |> bits_by_4s in
-    let cs = List.map nibbles ~f:bits4_to_hex_char in
-    let result = String.of_char_list cs in
-    assert (String.length result = 64) ;
-    result
-
-  let decode raw : Public_key.Compressed.t =
-    assert (String.length raw = 64) ;
-    (* get the raw bits *)
-    let raw_bits =
-      String.to_list raw |> List.map ~f:hex_char_to_bits4 |> List.concat
-    in
-    (* break of the bits byte by byte *)
-    let bytes = bits_by_8s raw_bits in
-    (* the highest byte is at the end and the lowest at the beginning,
-       so we reverse here *)
-    let bytes_good_order = List.rev bytes in
-    (* Now the high byte has the parity so get it out *)
-    let high_byte = List.hd_exn bytes_good_order in
-    let high_bit = List.hd_exn high_byte in
-    (* is_odd if this is true *)
-    let is_odd = Bool.equal high_bit true in
-    (* ungroup the bits *)
-    let bits =
-      (* drop the parity bit *)
-      List.concat bytes_good_order |> List.tl_exn
-    in
-    (* our Field representation has zero-th bit first so reverse *)
-    let field_bits = List.rev bits in
-    let x = Field.project field_bits in
-    { Public_key.Compressed.Poly.x; is_odd }
-end
+let of_public_key pk = of_public_key_compressed (Public_key.compress pk)
 
 let to_public_key_compressed raw =
-  let len = String.length raw in
-  if len = 64 then
-    (* compressed encoding *)
-    Public_key_compressed_direct.decode raw
-  else (* uncompressed encoding *)
-    to_public_key raw |> Public_key.compress
+  let is_odd, x = pack (module Field) raw in
+  { Public_key.Compressed.Poly.x; is_odd }
 
-module Signature_direct = struct
-  let encode (signature : string) =
-    assert (String.length signature = 128) ;
-    (* get the raw bits *)
-    let raw_bits =
-      String.to_list signature |> List.map ~f:hex_char_to_bits4 |> List.concat
-    in
-    (* break of the bits byte by byte *)
-    let bytes = bits_by_8s raw_bits in
-    (* first 32bytes are the field, the second is the scalar *)
-    let field, scalar = List.split_n bytes 32 in
-    (* the highest byte is at the end and the lowest at the beginning,
-       so we reverse here *)
-    let field_good_order = List.rev field in
-    let scalar_good_order = List.rev scalar in
-    let bytes_good_order = scalar_good_order @ field_good_order in
-    (* ungroup the bits *)
-    (* we need by 4s to encode in hex *)
-    let nibbles = List.concat bytes_good_order |> bits_by_4s in
-    let cs = List.map nibbles ~f:bits4_to_hex_char in
-    let result = String.of_char_list ('*' :: cs) in
-    assert (String.length result = 129) ;
-    result
-
-  let decode raw =
-    assert (String.length raw = 129) ;
-    (* drop the * *)
-    let raw_128 = String.to_list raw |> List.tl_exn in
-    (* get the raw bits *)
-    let raw_bits = raw_128 |> List.map ~f:hex_char_to_bits4 |> List.concat in
-    (* break of the bits byte by byte *)
-    let bytes = bits_by_8s raw_bits in
-    (* first 32bytes are the scalar, the second is the field *)
-    let scalar, field = List.split_n bytes 32 in
-    (* the highest byte is at the end and the lowest at the beginning,
-       so we reverse here *)
-    let field_good_order = List.rev field in
-    let scalar_good_order = List.rev scalar in
-    let bytes_good_order = field_good_order @ scalar_good_order in
-    (* ungroup the bits *)
-    (* we need by 4s to encode in hex *)
-    let nibbles = List.concat bytes_good_order |> bits_by_4s in
-    let cs = List.map nibbles ~f:bits4_to_hex_char in
-    let result = String.of_char_list cs in
-    assert (String.length result = 128) ;
-    result
-end
-
-let of_signature_raw raw =
-  let len = String.length raw in
-  if len = 129 then Signature_direct.decode raw
-  else
-    (* If this is already 128 hex chars, than assume we don't need to process it *)
-    raw
+let to_public_key raw =
+  to_public_key_compressed raw |> Public_key.decompress_exn
 
 (* inline tests hard-to-impossible to setup with JS *)
-
-let field_example_test () =
-  (* from RFC 0038 *)
-  let field = Field.of_int 123123 in
-  let hex = of_field field in
-  let last_part = "01E0F3" in
-  (* left-pad with 0s *)
-  let expected = String.make (64 - String.length last_part) '0' ^ last_part in
-  String.equal hex expected
 
 let field_hex_roundtrip_test () =
   let field0 = Field.of_int 123123 in
@@ -276,11 +151,12 @@ let field_hex_roundtrip_test () =
   Field.equal field0 field1
 
 let pk_roundtrip_test () =
-  let field0 = Field.of_int 123123 in
-  let field1 = Field.of_int 234234 in
-  let hex = of_public_key (field0, field1) in
-  let field0', field1' = to_public_key hex in
-  Public_key.equal (field0, field1) (field0', field1')
+  let pk =
+    { Public_key.Compressed.Poly.x = Field.of_int 123123; is_odd = true }
+  in
+  let hex = of_public_key_compressed pk in
+  let pk' = to_public_key_compressed hex in
+  Public_key.Compressed.equal pk pk'
 
 let hex_key_odd =
   "fad1d3e31aede102793fb2cce62b4f1e71a214c94ce18ad5756eba67ef398390"
@@ -289,19 +165,9 @@ let hex_key_even =
   "7e406ca640115a8c44ece6ef5d0c56af343b1a993d8c871648ab7980ecaf8230"
 
 let pk_compressed_roundtrip_test hex_key () =
-  let pk = Public_key_compressed_direct.decode hex_key in
-  let hex' = Public_key_compressed_direct.encode pk in
+  let pk = to_public_key hex_key in
+  let hex' = of_public_key pk in
   String.equal (String.lowercase hex_key) (String.lowercase hex')
-
-let hex_signature =
-  "*fad1d3e31aede102793fb2cce62b4f1e71a214c94ce18ad5756eba67ef3983907e406ca640115a8c44ece6ef5d0c56af343b1a993d8c871648ab7980ecaf8230"
-
-let signature_direct_test () =
-  let sig1 = Signature_direct.decode hex_signature in
-  let sig2 = Signature_direct.encode sig1 in
-  String.equal (String.lowercase sig2) (String.lowercase hex_signature)
-
-let%test "field_example" = field_example_test ()
 
 let%test "field_hex round-trip" = field_hex_roundtrip_test ()
 
@@ -313,21 +179,17 @@ let%test "public key compressed roundtrip odd" =
 let%test "public key compressed roundtrip even" =
   pk_compressed_roundtrip_test hex_key_even ()
 
-let%test "signature direct" = signature_direct_test ()
-
 [%%ifndef consensus_mechanism]
 
 (* for running tests from JS *)
 
 let unit_tests =
-  [ ("field example", field_example_test)
-  ; ("field-hex round-trip", field_hex_roundtrip_test)
+  [ ("field-hex round-trip", field_hex_roundtrip_test)
   ; ("public key round-trip", pk_roundtrip_test)
   ; ( "public key compressed round-trip odd"
     , pk_compressed_roundtrip_test hex_key_odd )
   ; ( "public key compressed round-trip even"
     , pk_compressed_roundtrip_test hex_key_even )
-  ; ("signature direct", signature_direct)
   ]
 
 let run_unit_tests () =

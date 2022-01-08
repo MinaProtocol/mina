@@ -149,37 +149,6 @@ Add support for creating/marshalling public keys ([via Derivation](#derivation))
 
 **Format**
 
-Public keys are repesented in one of two formats
-
-**Format 1**
-
-Public keys are represented as hex-encoded, little-endian, `Fq.t` pairs.
-
-Specifically, field elements are by default represented by laying out their bits from high to low (adding a padding zero at the highest bit in the front) and then grouping by 8 and converting to bytes:
-
-```
-(always zero) Bit254 Bit253 Bit252 ... Bit2 Bit1 Bit0
-|----groups of 8---|--groups of 8---|
-```
-
-Public key field pair:
-
-```
-|----- fst pk : Fq.t (32 bytes) ---------|----- snd pk : Fq.t (32 bytes) ------|
-```
-
-Example:
-
-`(123123, 234234)`
-
-is encoded as the string:
-
-`000000000000000000000000000000000000000000000000000000000001E0F300000000000000000000000000000000000000000000000000000000000392FA`
-
-(abbreviated as `...01E0F3...0392FA` for the purposes of this doc)
-
-**Format 2**
-
 Compressed public keys are accepted of the following form:
 
 Field elements are expected to be backed by a 32-byte array where the highest bits of the field are stored in arr[31].
@@ -306,13 +275,21 @@ The Rosetta spec leaves the encoding of unsigned transactions implementation-def
 
 Specifically this is the user command having been transformed into a `Transaction_union_payload.t` and then hashed into a `(field, bool) Random_oracle_input.t`. We will serialize the Random_oracle_input in two ways as defined below and send that byte-buffer as hex-encoded ascii.
 
+
 ```
 // Serialization schema for Random oracle input (1)
 
 00 00 00 05  # 4-byte prefix for length of array (little endian)
              #
 xx xx ...    # each field encoded as a 32-bytes each one for each of the length
-yy yy ...    #     (little endian) (same represenation as above Fq.t above)
+yy yy ...    #
+             # Field elements are represented by laying out their bits from high
+             # to low (adding a padding zero at the highest bit in the front)
+             # and then grouping by 8 and converting to bytes:
+             #
+             #     (always zero) Bit254 Bit253 Bit252 ... Bit2 Bit1 Bit0
+             #     |----groups of 8---|--groups of 8---|
+             #
              #
 00 00 34 D4  # 4-byte prefix for length of bits in the bitstring (little endian)
              #
@@ -415,29 +392,12 @@ Since we'll later be broadcasting the signed transaction via GraphQL, our signed
 
 **Format**
 
-Signature hex bytes are represented in one of two formats. If presented in format 2, it is converted to format 1 in the [combine endpoint](#combine-endpoint), the [parse endpoint](#parse-endpoint) only accepts format 1. Note: If you did create the combined transaction using the [combine endpoint](#combine-endpoint) everything will work properly.
-
-**Format 1**
-
 ```
 // Signature encoding
 
 a signature is a field and a scalar
-|----- field 32bytes (Fp) ----|---- scalar 32bytes (Fq) ---|
-Use the same hex-encoded little endian represenation as described above for
-format1 for the public key for these 64 bytes.
-```
-
-**Format 2**
-
-Note that format2 flips the scalar and field layout.
-
-```
-// Signature encoding
-
-a signature is a field and a scalar
-|----- scalar 32bytes (Fq) ----|---- scalar 32bytes (Fp) ---|
-Use the same hex-encoded represenation as described above using format2 for the public keys for each of the 32byte chunks.
+|---- field 32bytes (Fp) ---|----- scalar 32bytes (Fq) ----|
+Use the same hex-encoded represenation as described above for the public keys for each of the 32byte chunks.
 ```
 
 #### Parse Endpoint

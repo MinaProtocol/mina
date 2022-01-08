@@ -632,15 +632,12 @@ module Combine = struct
         |> env.lift
       in
       (* TODO: validate that public key is correct w.r.t. signature for this transaction *)
-      let%bind signature_raw =
+      let%bind signature =
         match req.signatures with
         | s :: _ ->
             M.return s.hex_bytes
         | _ ->
             M.fail (Errors.create `Signature_missing)
-      in
-      let signature =
-        Rosetta_coding.Coding.of_signature_raw signature_raw
       in
       let signed_transaction_full =
         { Transaction.Signed.signature
