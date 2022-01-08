@@ -397,7 +397,7 @@ Since we'll later be broadcasting the signed transaction via GraphQL, our signed
 
 a signature is a field and a scalar
 |---- field 32bytes (Fp) ---|----- scalar 32bytes (Fq) ----|
-Use the same hex-encoded represenation as described above for the public keys for each of the 32byte chunks.
+Use the same hex-encoded representation as described above for the public keys for each of the 32byte chunks.
 ```
 
 #### Parse Endpoint
