@@ -52,7 +52,7 @@ module Update = struct
       type t =
         ( F.Stable.V1.t Set_or_keep.Stable.V1.t
         , Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
-        , ( Pickles.Side_loaded.Verification_key.Stable.V1.t
+        , ( Pickles.Side_loaded.Verification_key.Stable.V2.t
           , F.Stable.V1.t )
           With_hash.Stable.V1.t
           Set_or_keep.Stable.V1.t
@@ -412,10 +412,10 @@ module Proved = struct
     module V1 = struct
       type t =
             Poly(Predicated.Proved.Stable.V1)
-              (Pickles.Side_loaded.Proof.Stable.V1)
+              (Pickles.Side_loaded.Proof.Stable.V2)
             .t =
         { data : Predicated.Proved.Stable.V1.t
-        ; authorization : Pickles.Side_loaded.Proof.Stable.V1.t
+        ; authorization : Pickles.Side_loaded.Proof.Stable.V2.t
         }
       [@@deriving sexp, equal, yojson, hash, compare]
 

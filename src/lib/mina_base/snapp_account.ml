@@ -35,10 +35,10 @@ type ('app_state, 'vk) t_ = ('app_state, 'vk) Poly.t =
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
       ( Snapp_state.Value.Stable.V1.t
-      , ( Side_loaded_verification_key.Stable.V1.t
+      , ( Side_loaded_verification_key.Stable.V2.t
         , F.Stable.V1.t )
         With_hash.Stable.V1.t
         option )

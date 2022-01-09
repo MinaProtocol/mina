@@ -416,8 +416,8 @@ end
 module Proof = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Pickles.Proof.Branching_2.Stable.V1.t
+    module V2 = struct
+      type t = Pickles.Proof.Branching_2.Stable.V2.t
       [@@deriving
         version { asserted }, yojson, bin_io, compare, equal, sexp, hash]
 
@@ -428,9 +428,9 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      { statement : Statement.With_sok.Stable.V1.t; proof : Proof.Stable.V1.t }
+      { statement : Statement.With_sok.Stable.V1.t; proof : Proof.Stable.V2.t }
     [@@deriving compare, equal, fields, sexp, version, yojson, hash]
 
     let to_latest = Fn.id
@@ -976,15 +976,27 @@ module Base = struct
     make_checked
       Impl.(
         fun () ->
-          let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
+          let x =
+            exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3)
+          in
           let g = exists Inner_curve.typ ~compute:(fun _ -> Inner_curve.one) in
           ignore
-            ( Pickles.Step_main_inputs.Ops.scale_fast g
-                (`Plus_two_to_len [| b; b |])
+            ( Pickles.Scalar_challenge.to_field_checked'
+                (module Impl)
+                ~num_bits:16
+                (Kimchi_backend_common.Scalar_challenge.create x)
+              : Field.t * Field.t * Field.t ) ;
+          ignore
+            ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5
+                (Shifted_value x)
               : Pickles.Step_main_inputs.Inner_curve.t ) ;
           ignore
-            ( Pickles.Pairing_main.Scalar_challenge.endo g
-                (Scalar_challenge [ b ])
+            ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5
+                (Shifted_value x)
+              : Pickles.Step_main_inputs.Inner_curve.t ) ;
+          ignore
+            ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
+                (Kimchi_backend_common.Scalar_challenge.create x)
               : Field.t * Field.t ))
 
   let%snarkydef check_signature shifted ~payload ~is_user_command ~signer

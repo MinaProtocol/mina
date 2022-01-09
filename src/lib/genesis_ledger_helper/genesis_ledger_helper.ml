@@ -601,14 +601,14 @@ module Genesis_proof = struct
     (* TODO: Use [Writer.write_bin_prot]. *)
     Monitor.try_with_or_error ~here:[%here] ~extract_exn:true (fun () ->
         let%bind wr = Writer.open_file filename in
-        Writer.write wr (Proof.Stable.V1.sexp_of_t proof |> Sexp.to_string) ;
+        Writer.write wr (Proof.Stable.V2.sexp_of_t proof |> Sexp.to_string) ;
         Writer.close wr)
 
   let load filename =
     (* TODO: Use [Reader.load_bin_prot]. *)
     Monitor.try_with_or_error ~here:[%here] ~extract_exn:true (fun () ->
         Reader.file_contents filename
-        >>| Sexp.of_string >>| Proof.Stable.V1.t_of_sexp)
+        >>| Sexp.of_string >>| Proof.Stable.V2.t_of_sexp)
 
   let id_to_json x =
     `String (Sexp.to_string (Pickles.Verification_key.Id.sexp_of_t x))

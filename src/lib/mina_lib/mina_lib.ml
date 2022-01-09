@@ -752,21 +752,6 @@ module Root_diff = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t =
-        { commands : User_command.Stable.V1.t With_status.Stable.V1.t list
-        ; root_length : int
-        }
-
-      let to_latest (t : t) : V2.t =
-        { commands =
-            List.map
-              ~f:(With_status.map ~f:User_command.Stable.V1.to_latest)
-              t.commands
-        ; root_length = t.root_length
-        }
-    end
   end]
 end
 

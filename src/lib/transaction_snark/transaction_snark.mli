@@ -202,7 +202,7 @@ end
 
 [%%versioned:
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t [@@deriving compare, equal, sexp, yojson, hash]
   end
 end]
