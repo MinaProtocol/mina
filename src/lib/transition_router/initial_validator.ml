@@ -99,24 +99,41 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
       Deferred.unit
   | `Invalid_proof ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.invalid_proof) ;
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Invalid_proof) ;
       punish Sent_invalid_proof None
   | `Invalid_delta_transition_chain_proof ->
+      Queue.enqueue Transition_frontier.rejected_blocks
+        ( state_hash
+        , sender
+        , time_received
+        , `Invalid_delta_transition_chain_proof ) ;
       punish Sent_invalid_transition_chain_merkle_proof None
   | `Invalid_time_received `Too_early ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.received_early) ;
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Too_early) ;
       punish Gossiped_future_transition None
   | `Invalid_genesis_protocol_state ->
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Invalid_genesis_protocol_state) ;
       punish Has_invalid_genesis_protocol_state None
   | `Invalid_time_received (`Too_late slot_diff) ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.received_late) ;
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Too_late) ;
       punish
         (Gossiped_old_transition (slot_diff, delta))
         (Some
            ( "off by $slot_diff slots"
            , [ ("slot_diff", `String (Int64.to_string slot_diff)) ] ))
   | `Invalid_protocol_version ->
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Invalid_protocol_version) ;
       punish Sent_invalid_protocol_version None
   | `Mismatched_protocol_version ->
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Mismatched_protocol_version) ;
       punish Sent_mismatched_protocol_version None
 
 module Duplicate_block_detector = struct
@@ -286,6 +303,8 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                    |> Writer.write valid_transition_writer ;
                    Mina_metrics.Transition_frontier
                    .update_max_blocklength_observed blockchain_length ;
+                   Queue.enqueue Transition_frontier.validated_blocks
+                     (With_hash.hash transition_with_hash, sender, time_received) ;
                    return ()
                | Error error ->
                    Mina_net2.Validation_callback.fire_if_not_already_fired

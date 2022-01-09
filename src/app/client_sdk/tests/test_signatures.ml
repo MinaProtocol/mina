@@ -98,12 +98,19 @@ let delegations =
       ~nonce:1010 ~valid_until:100000 "another memo"
   ]
 
+let strings =
+  [ "this is a test"
+  ; "this is only a test"
+  ; "if this had been an actual emergency..."
+  ]
+
 let transactions = payments @ delegations
 
 type jsSignature = { privateKey : Field.t; publicKey : Inner_curve.Scalar.t }
 
-let get_signature payload =
-  (Signed_command.sign keypair payload :> Signed_command.With_valid_signature.t)
+let get_signature ~signature_kind payload =
+  ( Signed_command.sign ~signature_kind keypair payload
+    :> Signed_command.With_valid_signature.t )
 
 (* output format matches signatures in client SDK *)
 let print_signature field scalar =
@@ -111,22 +118,48 @@ let print_signature field scalar =
   printf "  , scalar: '%s'\n" (Inner_curve.Scalar.to_string scalar) ;
   printf "  },\n%!"
 
+let signature_kinds =
+  let open Mina_signature_kind in
+  [ Testnet; Mainnet ]
+
 let main () =
-  let signatures = List.map transactions ~f:get_signature in
-  (* make sure signatures verify *)
-  List.iteri signatures ~f:(fun i signature ->
-      let signature = (signature :> Signed_command.t) in
-      if not (Signed_command.check_signature signature) then (
-        eprintf
-          !"Signature (%d) failed to verify: %{sexp: Signed_command.t}\n%!"
-          i signature ;
-        exit 1 )) ;
-  printf "[\n" ;
-  List.iter signatures ~f:(fun signature ->
-      let Signed_command.Poly.{ signature = field, scalar; _ } =
-        (signature :> Signed_command.t)
+  List.iter signature_kinds ~f:(fun signature_kind ->
+      let txn_signatures =
+        List.map transactions ~f:(get_signature ~signature_kind)
       in
-      print_signature field scalar) ;
-  printf "]\n"
+      let string_signatures =
+        List.map strings
+          ~f:(String_sign.sign ~signature_kind keypair.private_key)
+      in
+      (* make sure signatures verify *)
+      List.iteri txn_signatures ~f:(fun i signature ->
+          let signature = (signature :> Signed_command.t) in
+          if not (Signed_command.check_signature ~signature_kind signature) then (
+            eprintf
+              !"Transaction signature (%d) failed to verify: %{sexp: \
+                Signed_command.t}\n\
+                %!"
+              i signature ;
+            exit 1 )) ;
+      List.iteri string_signatures ~f:(fun i signature ->
+          if
+            not
+              (String_sign.verify ~signature_kind signature keypair.public_key
+                 (List.nth_exn strings i))
+          then (
+            eprintf
+              !"Signature (%d) failed to verify for string: %s\n%!"
+              i (List.nth_exn strings i) ;
+            exit 1 )) ;
+      printf "[\n" ;
+      List.iter txn_signatures ~f:(fun signature ->
+          let Signed_command.Poly.{ signature = field, scalar; _ } =
+            (signature :> Signed_command.t)
+          in
+          print_signature field scalar) ;
+      List.iter string_signatures ~f:(fun signature ->
+          let field, scalar = signature in
+          print_signature field scalar) ;
+      printf "]\n")
 
 let _ = main ()

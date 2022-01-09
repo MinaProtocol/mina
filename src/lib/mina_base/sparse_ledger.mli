@@ -3,16 +3,19 @@ open Snark_params.Tick
 
 [%%versioned:
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t =
       ( Ledger_hash.Stable.V1.t
       , Account_id.Stable.V1.t
-      , Account.Stable.V1.t
+      , Account.Stable.V2.t
       , Token_id.Stable.V1.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson]
   end
 end]
+
+module L :
+  Transaction_logic.Ledger_intf with type t = t ref and type location = int
 
 val merkle_root : t -> Ledger_hash.t
 

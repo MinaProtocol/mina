@@ -22,8 +22,8 @@ module Worker = struct
 
           type response =
             ( ( Transaction.Stable.V2.t
-              , Transaction_witness.Stable.V1.t
-              , Inputs.Ledger_proof.Stable.V1.t )
+              , Transaction_witness.Stable.V2.t
+              , Inputs.Ledger_proof.Stable.V2.t )
               Snark_work_lib.Work.Single.Spec.Stable.V1.t
               Snark_work_lib.Work.Spec.Stable.V1.t
             * Public_key.Compressed.Stable.V1.t )
@@ -51,11 +51,11 @@ module Worker = struct
         module T = struct
           type query =
             ( ( Transaction.Stable.V2.t
-              , Transaction_witness.Stable.V1.t
-              , Ledger_proof.Stable.V1.t )
+              , Transaction_witness.Stable.V2.t
+              , Ledger_proof.Stable.V2.t )
               Snark_work_lib.Work.Single.Spec.Stable.V1.t
               Snark_work_lib.Work.Spec.Stable.V1.t
-            , Ledger_proof.Stable.V1.t )
+            , Ledger_proof.Stable.V2.t )
             Snark_work_lib.Work.Result.Stable.V1.t
           [@@deriving bin_io, version { rpc }]
 

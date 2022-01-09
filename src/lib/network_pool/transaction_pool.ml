@@ -46,12 +46,6 @@ module Diff_versioned = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t = User_command.Stable.V1.t list [@@deriving sexp, yojson, hash]
-
-      let to_latest = List.map ~f:User_command.Stable.V1.to_latest
-    end
   end]
 
   (* We defer do any checking on signed-commands until the call to
@@ -148,15 +142,6 @@ module Diff_versioned = struct
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
-        [@@deriving sexp, yojson]
-
-        let to_latest (t : t) : V2.t =
-          List.map t ~f:(fun (cmd, err) ->
-              (User_command.Stable.V1.to_latest cmd, err))
       end
     end]
 
@@ -1451,6 +1436,9 @@ include Make
             let best_tip_diff_pipe t =
               Extensions.(get_view_pipe (extensions t) Best_tip_diff)
           end)
+
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 
 let%test_module _ =
   ( module struct

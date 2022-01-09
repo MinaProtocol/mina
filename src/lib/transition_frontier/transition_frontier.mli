@@ -48,7 +48,8 @@ val load :
   -> ( t
      , [> `Failure of string
        | `Bootstrap_required
-       | `Persistent_frontier_malformed ] )
+       | `Persistent_frontier_malformed
+       | `Snarked_ledger_mismatch ] )
      Deferred.Result.t
 
 val close : loc:string -> t -> unit Deferred.t
@@ -66,6 +67,10 @@ val root_snarked_ledger : t -> Ledger.Db.t
 val extensions : t -> Extensions.t
 
 val genesis_state_hash : t -> State_hash.t
+
+val rejected_blocks : (State_hash.t * Network_peer.Envelope.Sender.t * Block_time.t * [`Invalid_proof | `Invalid_delta_transition_chain_proof | `Too_early | `Too_late | `Invalid_genesis_protocol_state | `Invalid_protocol_version  | `Mismatched_protocol_version]) Core.Queue.t
+
+val validated_blocks : (State_hash.t * Network_peer.Envelope.Sender.t * Block_time.t) Core.Queue.t
 
 module For_tests : sig
   open Core_kernel
@@ -87,7 +92,8 @@ module For_tests : sig
     -> ( t
        , [> `Failure of string
          | `Bootstrap_required
-         | `Persistent_frontier_malformed ] )
+         | `Persistent_frontier_malformed
+         | `Snarked_ledger_mismatch ] )
        Deferred.Result.t
 
   val gen_genesis_breadcrumb :

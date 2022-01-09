@@ -19,8 +19,9 @@ module Wrap = struct
 
     type _ t +=
       | Evals :
-          ( (Field.Constant.t array Dlog_plonk_types.Evals.t * Field.Constant.t)
-            Tuple_lib.Double.t
+          ( ( Field.Constant.t
+            , Field.Constant.t array )
+            Dlog_plonk_types.All_evals.t
           , max_branching )
           Vector.t
           t
@@ -30,7 +31,7 @@ module Wrap = struct
       | Proof_state :
           ( ( ( Challenge.Constant.t
               , Challenge.Constant.t Scalar_challenge.t
-              , Field.Constant.t Shifted_value.t
+              , Field.Constant.t Shifted_value.Type2.t
               , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
                 , Tock.Rounds.n )
                 Vector.t
@@ -42,11 +43,7 @@ module Wrap = struct
           , Digest.Constant.t )
           Types.Pairing_based.Proof_state.t
           t
-      | Messages :
-          ( Tock.Inner_curve.Affine.t
-          , Tock.Inner_curve.Affine.t Or_infinity.t )
-          Dlog_plonk_types.Messages.t
-          t
+      | Messages : Tock.Inner_curve.Affine.t Dlog_plonk_types.Messages.t t
       | Openings_proof :
           ( Tock.Inner_curve.Affine.t
           , Tick.Field.t )
@@ -72,9 +69,7 @@ module Wrap = struct
 
       type _ t +=
         | Evals :
-            (Tock.Field.t array Dlog_plonk_types.Evals.t * Tock.Field.t)
-            Tuple_lib.Double.t
-            vec
+            (Tock.Field.t, Tock.Field.t array) Dlog_plonk_types.All_evals.t vec
             t
         | Step_accs : Tock.Inner_curve.Affine.t vec t
         | Old_bulletproof_challenges :
@@ -82,7 +77,7 @@ module Wrap = struct
         | Proof_state :
             ( ( ( Challenge.Constant.t
                 , Challenge.Constant.t Scalar_challenge.t
-                , Tock.Field.t Shifted_value.t
+                , Tock.Field.t Shifted_value.Type2.t
                 , ( Challenge.Constant.t Scalar_challenge.t
                     Bulletproof_challenge.t
                   , Tock.Rounds.n )
@@ -95,11 +90,7 @@ module Wrap = struct
             , Digest.Constant.t )
             Types.Pairing_based.Proof_state.t
             t
-        | Messages :
-            ( Tock.Inner_curve.Affine.t
-            , Tock.Inner_curve.Affine.t Or_infinity.t )
-            Dlog_plonk_types.Messages.t
-            t
+        | Messages : Tock.Inner_curve.Affine.t Dlog_plonk_types.Messages.t t
         | Openings_proof :
             ( Tock.Inner_curve.Affine.t
             , Tick.Field.t )
@@ -110,8 +101,6 @@ module Wrap = struct
 end
 
 module Step = struct
-  open Zexe_backend
-
   module type S = sig
     type statement
 
@@ -131,7 +120,7 @@ module Step = struct
           , local_branches )
           H3.T(Per_proof_witness.Constant).t
           t
-      | Wrap_index : Tock.Curve.Affine.t array Plonk_verification_key_evals.t t
+      | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
       | App_state : statement t
   end
 
@@ -163,8 +152,7 @@ module Step = struct
             , local_branches )
             H3.T(Per_proof_witness.Constant).t
             t
-        | Wrap_index :
-            Tock.Curve.Affine.t array Plonk_verification_key_evals.t t
+        | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
         | App_state : statement t
     end in
     (module R)

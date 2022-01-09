@@ -9,9 +9,9 @@ module Snark_tables = struct
   module Serializable = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
-          ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+          ( Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
             Priced_proof.Stable.V1.t
           * [ `Rebroadcastable of Core.Time.Stable.With_utc_sexp.V2.t
             | `Not_rebroadcastable ] )
@@ -725,11 +725,11 @@ module Diff_versioned = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t = Resource_pool.Diff.t =
         | Add_solved_work of
             Transaction_snark_work.Statement.Stable.V1.t
-            * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+            * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
       [@@deriving compare, sexp, to_yojson, hash]
@@ -745,6 +745,9 @@ module Diff_versioned = struct
     | Empty
   [@@deriving compare, sexp, to_yojson, hash]
 end
+
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 
 let%test_module "random set test" =
   ( module struct

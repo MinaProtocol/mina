@@ -67,6 +67,7 @@ bot)
 mina-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
   DOCKER_CONTEXT="dockerfiles/"
+  VERSION="${VERSION}-${NETWORK##*=}"
   ;;
 mina-toolchain)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps"
@@ -92,13 +93,12 @@ delegation-backend-toolchain)
 esac
 
 
+REPO="--build-arg MINA_REPO=${BUILDKITE_PULL_REQUEST_REPO}"
 if [[ -z "${BUILDKITE_PULL_REQUEST_REPO}" ]]; then
   REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
-else
-  REPO="--build-arg MINA_REPO=${BUILDKITE_PULL_REQUEST_REPO}"
 fi
 
-TAG="gcr.io/o1labs-192920/$SERVICE:$VERSION"
+TAG="minaprotocol/$SERVICE:$VERSION"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
@@ -108,9 +108,12 @@ else
   docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
-if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
-  TARGET="minaprotocol/$SERVICE:$VERSION"
-  docker tag "$TAG" "$TARGET"
-  docker push "$TAG"
-  docker push "$TARGET"
+tag-and-push() {
+  docker tag "${TAG}" "$1"
+  docker push "$1"
+}
+
+if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then
+  docker push "${TAG}"
+  tag-and-push "gcr.io/o1labs-192920/$SERVICE:$VERSION"
 fi

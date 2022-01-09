@@ -1,3 +1,4 @@
+module Scalar_challenge = Scalar_challenge
 open Core_kernel
 open Async_kernel
 open Pickles_types
@@ -11,6 +12,7 @@ module Impls = Impls
 module Inductive_rule = Inductive_rule
 module Tag = Tag
 module Pairing_main = Pairing_main
+module Common = Common
 
 module type Statement_intf = sig
   type field
@@ -29,7 +31,7 @@ module type Statement_value_intf =
 module Verification_key : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t
     end
   end]
@@ -74,7 +76,7 @@ module Proof : sig
   module Branching_2 : sig
     [%%versioned:
     module Stable : sig
-      module V1 : sig
+      module V2 : sig
         type t = Make(Nat.N2)(Nat.N2).t
         [@@deriving sexp, compare, equal, yojson, hash]
       end
@@ -124,10 +126,16 @@ module Side_loaded : sig
   module Verification_key : sig
     [%%versioned:
     module Stable : sig
-      module V1 : sig
+      module V2 : sig
         type t [@@deriving sexp, equal, compare, hash, yojson]
       end
     end]
+
+    val to_base58_check : t -> string
+
+    val of_base58_check : string -> t Or_error.t
+
+    val of_base58_check_exn : string -> t
 
     val dummy : t
 
@@ -143,21 +151,31 @@ module Side_loaded : sig
 
     val typ : (Checked.t, t) Impls.Step.Typ.t
 
+    val of_compiled : _ Tag.t -> t
+
     module Max_branches : Nat.Add.Intf
 
-    module Max_width : Nat.Add.Intf
+    module Max_width = Nat.N2
   end
 
   module Proof : sig
     [%%versioned:
     module Stable : sig
-      module V1 : sig
+      module V2 : sig
         (* TODO: This should really be able to be any width up to the max width... *)
         type t =
           (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
         [@@deriving sexp, equal, yojson, hash, compare]
+
+        val to_base64 : t -> string
+
+        val of_base64 : string -> (t, string) Result.t
       end
     end]
+
+    val to_base64 : t -> string
+
+    val of_base64 : string -> (t, string) Result.t
   end
 
   val create :

@@ -5,6 +5,8 @@ open Types
 open Common
 open Backend
 
+let hash_fold_array = Pickles_types.Dlog_plonk_types.hash_fold_array
+
 module Base = struct
   module Me_only = Reduced_me_only
 
@@ -41,32 +43,31 @@ module Base = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V1 = struct
+      module V2 = struct
         type ('dlog_me_only, 'pairing_me_only) t =
           { statement :
               ( Limb_vector.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
               , Limb_vector.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
-                Scalar_challenge.Stable.V1.t
-              , Tick.Field.Stable.V1.t Shifted_value.Stable.V1.t
+                Scalar_challenge.Stable.V2.t
+              , Tick.Field.Stable.V1.t Shifted_value.Type1.Stable.V1.t
               , Tock.Field.Stable.V1.t
               , 'dlog_me_only
               , Digest.Constant.Stable.V1.t
               , 'pairing_me_only
               , Limb_vector.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
-                Scalar_challenge.Stable.V1.t
+                Scalar_challenge.Stable.V2.t
                 Bulletproof_challenge.Stable.V1.t
                 Step_bp_vec.Stable.V1.t
               , Index.Stable.V1.t )
               Types.Dlog_based.Statement.Minimal.Stable.V1.t
           ; prev_evals :
-              Tick.Field.Stable.V1.t Dlog_plonk_types.Pc_array.Stable.V1.t
-              Dlog_plonk_types.Evals.Stable.V1.t
-              Double.Stable.V1.t
-          ; prev_x_hat : Tick.Field.Stable.V1.t Double.Stable.V1.t
-          ; proof : Tock.Proof.Stable.V1.t
+              ( Tick.Field.Stable.V1.t
+              , Tick.Field.Stable.V1.t array )
+              Dlog_plonk_types.All_evals.Stable.V1.t
+          ; proof : Tock.Proof.Stable.V2.t
           }
         [@@deriving compare, sexp, yojson, hash, equal]
       end
@@ -77,7 +78,7 @@ module Base = struct
       { statement :
           ( Challenge.Constant.t
           , Challenge.Constant.t Scalar_challenge.t
-          , Tick.Field.t Shifted_value.t
+          , Tick.Field.t Shifted_value.Type1.t
           , Tock.Field.t
           , 'dlog_me_only
           , Digest.Constant.t
@@ -87,9 +88,7 @@ module Base = struct
           , Index.t )
           Types.Dlog_based.Statement.Minimal.t
       ; prev_evals :
-          Tick.Field.t Dlog_plonk_types.Pc_array.t Dlog_plonk_types.Evals.t
-          Double.t
-      ; prev_x_hat : Tick.Field.t Double.t
+          (Tick.Field.t, Tick.Field.t array) Dlog_plonk_types.All_evals.t
       ; proof : Tock.Proof.t
       }
     [@@deriving compare, sexp, yojson, hash, equal]
@@ -121,11 +120,8 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
   let open Ro in
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
-  let tock len = Array.init len ~f:(fun _ -> tock ()) in
   let tick_arr len = Array.init len ~f:(fun _ -> tick ()) in
-  let lengths =
-    Commitment_lengths.of_domains wrap_domains ~max_degree:Max_degree.wrap
-  in
+  let lengths = Commitment_lengths.create ~of_int:Fn.id in
   T
     { statement =
         { proof_state =
@@ -164,15 +160,9 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
         }
     ; proof =
         { messages =
-            { l_comm = g lengths.l
-            ; r_comm = g lengths.r
-            ; o_comm = g lengths.o
+            { w_comm = Vector.map lengths.w ~f:g
             ; z_comm = g lengths.z
-            ; t_comm =
-                { unshifted =
-                    Array.map (g lengths.t) ~f:(fun x -> Or_infinity.Finite x)
-                ; shifted = Finite g0
-                }
+            ; t_comm = g lengths.t
             }
         ; openings =
             { proof =
@@ -184,14 +174,22 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                 ; sg = g0
                 }
             ; evals =
-                (let e () = Dlog_plonk_types.Evals.map lengths ~f:tock in
-                 (e (), e ()))
+                Tuple_lib.Double.map Dummy.evals.evals ~f:(fun e -> e.evals)
+            ; ft_eval1 = Dummy.evals.ft_eval1
             }
         }
     ; prev_evals =
-        (let e () = Dlog_plonk_types.Evals.map lengths ~f:tick_arr in
-         (e (), e ()))
-    ; prev_x_hat = (tick (), tick ())
+        (let e () =
+           Dlog_plonk_types.Evals.map
+             (Evaluation_lengths.create ~of_int:Fn.id)
+             ~f:tick_arr
+         in
+         let ex () =
+           { Dlog_plonk_types.All_evals.With_public_input.public_input = tick ()
+           ; evals = e ()
+           }
+         in
+         { ft_eval1 = tick (); evals = (ex (), ex ()) })
     }
 
 module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
@@ -265,6 +263,20 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
               let of_sexpable = of_repr
             end)
 
+  let to_base64 t =
+    (* assume call to Nat.lte_exn does not raise with a valid instance of t *)
+    let sexp = sexp_of_t t in
+    (* raises only on invalid optional arguments *)
+    Base64.encode_exn (Sexp.to_string sexp)
+
+  let of_base64 b64 =
+    match Base64.decode b64 with
+    | Ok t -> (
+        try Ok (t_of_sexp (Sexp.of_string t))
+        with exn -> Error (Exn.to_string exn) )
+    | Error (`Msg s) ->
+        Error s
+
   let to_yojson x = Repr.to_yojson (to_repr x)
 
   let of_yojson x = Result.map ~f:of_repr (Repr.of_yojson x)
@@ -278,21 +290,21 @@ module Branching_2 = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V1 = struct
+      module V2 = struct
         type t =
           ( ( Tock.Inner_curve.Affine.Stable.V1.t
-            , Reduced_me_only.Dlog_based.Challenges_vector.Stable.V1.t
+            , Reduced_me_only.Dlog_based.Challenges_vector.Stable.V2.t
               Vector.Vector_2.Stable.V1.t )
             Dlog_based.Proof_state.Me_only.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t At_most.At_most_2.Stable.V1.t
             , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
-              Scalar_challenge.Stable.V1.t
+              Scalar_challenge.Stable.V2.t
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
               At_most.At_most_2.Stable.V1.t )
             Base.Me_only.Pairing_based.Stable.V1.t )
-          Base.Dlog_based.Stable.V1.t
+          Base.Dlog_based.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
         let to_latest = Fn.id
@@ -313,7 +325,7 @@ module Branching_2 = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t = T.t
 
       let to_latest = Fn.id
@@ -321,7 +333,7 @@ module Branching_2 = struct
       include (T : module type of T with type t := t with module Repr := T.Repr)
 
       include Binable.Of_binable
-                (Repr.Stable.V1)
+                (Repr.Stable.V2)
                 (struct
                   type nonrec t = t
 
@@ -346,22 +358,22 @@ module Branching_max = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V1 = struct
+      module V2 = struct
         type t =
           ( ( Tock.Inner_curve.Affine.Stable.V1.t
-            , Reduced_me_only.Dlog_based.Challenges_vector.Stable.V1.t
+            , Reduced_me_only.Dlog_based.Challenges_vector.Stable.V2.t
               Side_loaded_verification_key.Width.Max_vector.Stable.V1.t )
             Dlog_based.Proof_state.Me_only.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t
             , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
-              Scalar_challenge.Stable.V1.t
+              Scalar_challenge.Stable.V2.t
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t )
             Base.Me_only.Pairing_based.Stable.V1.t )
-          Base.Dlog_based.Stable.V1.t
+          Base.Dlog_based.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
         let to_latest = Fn.id
@@ -382,7 +394,7 @@ module Branching_max = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t = T.t
 
       let to_latest = Fn.id
@@ -390,7 +402,7 @@ module Branching_max = struct
       include (T : module type of T with type t := t with module Repr := T.Repr)
 
       include Binable.Of_binable
-                (Repr.Stable.V1)
+                (Repr.Stable.V2)
                 (struct
                   type nonrec t = t
 

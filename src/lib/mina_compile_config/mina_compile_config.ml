@@ -45,6 +45,8 @@ let default_snark_worker_fee =
 
 [%%inject "block_window_duration_ms", block_window_duration]
 
+[%%inject "vrf_poll_interval_ms", vrf_poll_interval]
+
 let rpc_handshake_timeout_sec = 60.0
 
 let rpc_heartbeat_timeout_sec = 60.0

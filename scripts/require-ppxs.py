@@ -16,8 +16,9 @@ def dune_paths_ok(dune):
     path = dune.split('/')
     path_prefix2 = path[1:2]
     path_prefix3 = path[1:3]
+    path_prefix4 = path[1:4]
     return (not (path_prefix2 == ['_build'] or path_prefix2 == ['external']
-                 or path_prefix3 == ['lib', 'marlin']
+                 or path_prefix4 == ['lib', 'crypto', 'proof-systems']
                  or path_prefix3 == ['lib', 'snarky']
                  or path_prefix3 == ['lib', 'ppx_version']
                  or path_prefix3 == ['app', 'reformat']
