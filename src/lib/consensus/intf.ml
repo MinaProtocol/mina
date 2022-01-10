@@ -365,12 +365,6 @@ module type S = sig
 
           val to_latest : t -> t
         end
-
-        module V1 : sig
-          type t
-
-          val to_latest : t -> V2.t
-        end
       end]
 
       type t = Stable.Latest.t [@@deriving to_yojson, sexp]

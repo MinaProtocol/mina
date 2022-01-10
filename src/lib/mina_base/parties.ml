@@ -1,5 +1,5 @@
 open Core
-module Digest = Zexe_backend.Pasta.Fp
+module Digest = Kimchi_backend.Pasta.Basic.Fp
 
 module Party_or_stack = struct
   [%%versioned
@@ -382,7 +382,7 @@ module Verifiable = struct
       type t =
         { fee_payer : Party.Fee_payer.Stable.V1.t
         ; other_parties :
-            Pickles.Side_loaded.Verification_key.Stable.V1.t option
+            Pickles.Side_loaded.Verification_key.Stable.V2.t option
             Party_or_stack.With_hashes.Stable.V1.t
         ; memo : Signed_command_memo.Stable.V1.t
         }
@@ -401,7 +401,7 @@ let of_verifiable (t : Verifiable.t) : t =
   }
 
 module Transaction_commitment = struct
-  module Stable = Zexe_backend.Pasta.Fp.Stable [@deriving sexp]
+  module Stable = Kimchi_backend.Pasta.Basic.Fp.Stable
 
   type t = Stable.Latest.t
 

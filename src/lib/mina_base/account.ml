@@ -314,52 +314,6 @@ module Binable_arg = struct
 
       let public_key (t : t) : key = t.public_key
     end
-
-    module V1 = struct
-      type t =
-        ( Public_key.Compressed.Stable.V1.t
-        , Token_id.Stable.V1.t
-        , Token_permissions.Stable.V1.t
-        , Balance.Stable.V1.t
-        , Nonce.Stable.V1.t
-        , Receipt.Chain_hash.Stable.V1.t
-        , Public_key.Compressed.Stable.V1.t option
-        , State_hash.Stable.V1.t
-        , Timing.Stable.V1.t
-        , Permissions.Stable.V1.t
-        , Snapp_account.Stable.V1.t option )
-        Poly.Stable.V1.t
-      [@@deriving sexp, equal, hash, compare, yojson]
-
-      let to_latest
-          ({ public_key
-           ; token_id
-           ; token_permissions
-           ; balance
-           ; nonce
-           ; receipt_chain_hash
-           ; delegate
-           ; voting_for
-           ; timing
-           ; permissions
-           ; snapp
-           } :
-            t) : V2.t =
-        { public_key
-        ; token_id
-        ; token_permissions
-        ; token_symbol = ""
-        ; balance
-        ; nonce
-        ; receipt_chain_hash
-        ; delegate
-        ; voting_for
-        ; timing
-        ; permissions
-        ; snapp = Option.map ~f:Snapp_account.Stable.V1.to_latest snapp
-        ; snapp_uri = ""
-        }
-    end
   end]
 end
 
@@ -405,46 +359,6 @@ module Stable = struct
     let to_latest = Fn.id
 
     let public_key (t : t) : key = t.public_key
-  end
-
-  module V1 = struct
-    type t = Binable_arg.Stable.V1.t
-    [@@deriving sexp, equal, hash, compare, yojson]
-
-    let check = Fn.id
-
-    [%%if not feature_snapps]
-
-    let check (t : t) =
-      let t = check t in
-      match t.snapp with
-      | None ->
-          t
-      | Some _ ->
-          failwith "Snapp accounts not supported"
-
-    [%%endif]
-
-    [%%if not feature_tokens]
-
-    let check (t : t) =
-      let t = check t in
-      if Token_id.equal Token_id.default t.token_id then t
-      else failwith "Token accounts not supported"
-
-    [%%endif]
-
-    include Binable.Of_binable
-              (Binable_arg.Stable.V1)
-              (struct
-                type nonrec t = t
-
-                let to_binable = check
-
-                let of_binable = check
-              end)
-
-    let to_latest = Binable_arg.Stable.V1.to_latest
   end
 end]
 

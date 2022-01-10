@@ -465,14 +465,14 @@ struct
 end
 
 type evaluation =
-  ( Marlin_plonk_bindings_pasta_pallas.t
-  , Marlin_plonk_bindings_pasta_fq.t
+  ( Kimchi.Pallas.t
+  , Kimchi.Foundations.Fq.t
     Vrf_lib.Standalone.Evaluation.Discrete_log_equality.Poly.t )
   Vrf_lib.Standalone.Evaluation.Poly.t
 
 type context =
-  ( (Unsigned.uint32, Marlin_plonk_bindings_pasta_fp.t, int) Message.t
-  , Marlin_plonk_bindings_pasta_pallas.t )
+  ( (Unsigned.uint32, Kimchi.Foundations.Fp.t, int) Message.t
+  , Kimchi.Pallas.t )
   Vrf_lib.Standalone.Context.t
 
 module Layout = struct

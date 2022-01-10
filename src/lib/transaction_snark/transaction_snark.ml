@@ -447,8 +447,8 @@ end
 module Proof = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Pickles.Proof.Branching_2.Stable.V1.t
+    module V2 = struct
+      type t = Pickles.Proof.Branching_2.Stable.V2.t
       [@@deriving
         version { asserted }, yojson, bin_io, compare, equal, sexp, hash]
 
@@ -461,21 +461,10 @@ end
 module Stable = struct
   module V2 = struct
     type t =
-      { statement : Statement.With_sok.Stable.V2.t; proof : Proof.Stable.V1.t }
+      { statement : Statement.With_sok.Stable.V2.t; proof : Proof.Stable.V2.t }
     [@@deriving compare, equal, fields, sexp, version, yojson, hash]
 
     let to_latest = Fn.id
-  end
-
-  module V1 = struct
-    type t =
-      { statement : Statement.With_sok.Stable.V1.t; proof : Proof.Stable.V1.t }
-    [@@deriving compare, equal, fields, sexp, version, yojson, hash]
-
-    let to_latest (t : t) : Latest.t =
-      { statement = Statement.With_sok.Stable.V1.to_latest t.statement
-      ; proof = t.proof
-      }
   end
 end]
 
@@ -586,14 +575,25 @@ let dummy_constraints () =
   make_checked
     Impl.(
       fun () ->
-        let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
+        let x = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3) in
         let g = exists Inner_curve.typ ~compute:(fun _ -> Inner_curve.one) in
         ignore
-          ( Pickles.Step_main_inputs.Ops.scale_fast g
-              (`Plus_two_to_len [| b; b |])
+          ( Pickles.Scalar_challenge.to_field_checked'
+              (module Impl)
+              ~num_bits:16
+              (Kimchi_backend_common.Scalar_challenge.create x)
+            : Field.t * Field.t * Field.t ) ;
+        ignore
+          ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5
+              (Shifted_value x)
             : Pickles.Step_main_inputs.Inner_curve.t ) ;
         ignore
-          ( Pickles.Pairing_main.Scalar_challenge.endo g (Scalar_challenge [ b ])
+          ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5
+              (Shifted_value x)
+            : Pickles.Step_main_inputs.Inner_curve.t ) ;
+        ignore
+          ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
+              (Kimchi_backend_common.Scalar_challenge.create x)
             : Field.t * Field.t ))
 
 module Base = struct
@@ -4163,26 +4163,11 @@ end
 
 module For_tests = struct
   let create_trivial_predicate_snapp ~constraint_constants spec ledger =
-    let local_dummy_constraints () =
-      let open Run in
-      let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
-      let g =
-        exists Pickles.Step_main_inputs.Inner_curve.typ ~compute:(fun _ ->
-            Tick.Inner_curve.(to_affine_exn one))
-      in
-      let (_ : _) =
-        Pickles.Step_main_inputs.Ops.scale_fast g (`Plus_two_to_len [| b; b |])
-      in
-      let (_ : _) =
-        Pickles.Pairing_main.Scalar_challenge.endo g (Scalar_challenge [ b ])
-      in
-      ()
-    in
     let tag, _, (module P), Pickles.Provers.[ trivial_prover; _ ] =
       let trivial_rule : _ Pickles.Inductive_rule.t =
         let trivial_main (tx_commitment : Snapp_statement.Checked.t) :
             (unit, _) Checked.t =
-          local_dummy_constraints ()
+          Impl.run_checked (dummy_constraints ())
           |> fun () ->
           Snapp_statement.Checked.Assert.equal tx_commitment tx_commitment
           |> return
@@ -4218,7 +4203,7 @@ module For_tests = struct
             ; main_value = (fun [ _; _ ] _ -> [ true; true ])
             ; main =
                 (fun [ _; _ ] _ ->
-                  local_dummy_constraints ()
+                  Impl.run_checked (dummy_constraints ())
                   |> fun () ->
                   (* Unsatisfiable. *)
                   Run.exists Field.typ ~compute:(fun () ->
@@ -5217,29 +5202,7 @@ let%test_module "transaction_snark" =
                           ; main_value = (fun [ _; _ ] _ -> [ true; true ])
                           ; main =
                               (fun [ _; _ ] _ ->
-                                let dummy_constraints () =
-                                  let open Run in
-                                  let b =
-                                    exists Boolean.typ_unchecked
-                                      ~compute:(fun _ -> true)
-                                  in
-                                  let g =
-                                    exists
-                                      Pickles.Step_main_inputs.Inner_curve.typ
-                                      ~compute:(fun _ ->
-                                        Tick.Inner_curve.(to_affine_exn one))
-                                  in
-                                  let (_ : _) =
-                                    Pickles.Step_main_inputs.Ops.scale_fast g
-                                      (`Plus_two_to_len [| b; b |])
-                                  in
-                                  let (_ : _) =
-                                    Pickles.Pairing_main.Scalar_challenge.endo g
-                                      (Scalar_challenge [ b ])
-                                  in
-                                  ()
-                                in
-                                dummy_constraints ()
+                                Impl.run_checked (dummy_constraints ())
                                 |> fun () ->
                                 (* Unsatisfiable. *)
                                 Run.exists Field.typ ~compute:(fun () ->

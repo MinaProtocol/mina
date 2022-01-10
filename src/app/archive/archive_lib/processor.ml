@@ -495,7 +495,7 @@ module Snapp_account = struct
     in
     let receipt_chain_hash =
       Snapp_basic.Or_ignore.to_option acct.receipt_chain_hash
-      |> Option.map ~f:Marlin_plonk_bindings_pasta_fp.to_string
+      |> Option.map ~f:Kimchi_backend.Pasta.Basic.Fp.to_string
     in
     let proved_state = Snapp_basic.Or_ignore.to_option acct.proved_state in
     let value =
@@ -944,15 +944,15 @@ module Snapp_epoch_data = struct
     in
     let epoch_seed =
       Snapp_basic.Or_ignore.to_option epoch_data.seed
-      |> Option.map ~f:Marlin_plonk_bindings_pasta_fp.to_string
+      |> Option.map ~f:Kimchi_backend.Pasta.Basic.Fp.to_string
     in
     let start_checkpoint =
       Snapp_basic.Or_ignore.to_option epoch_data.start_checkpoint
-      |> Option.map ~f:Marlin_plonk_bindings_pasta_fp.to_string
+      |> Option.map ~f:Kimchi_backend.Pasta.Basic.Fp.to_string
     in
     let lock_checkpoint =
       Snapp_basic.Or_ignore.to_option epoch_data.lock_checkpoint
-      |> Option.map ~f:Marlin_plonk_bindings_pasta_fp.to_string
+      |> Option.map ~f:Kimchi_backend.Pasta.Basic.Fp.to_string
     in
     let value =
       { epoch_ledger_id

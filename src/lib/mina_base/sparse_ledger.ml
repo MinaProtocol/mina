@@ -15,20 +15,6 @@ module Stable = struct
 
     let to_latest = Fn.id
   end
-
-  module V1 = struct
-    type t =
-      ( Ledger_hash.Stable.V1.t
-      , Account_id.Stable.V1.t
-      , Account.Stable.V1.t
-      , Token_id.Stable.V1.t )
-      Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
-    [@@deriving yojson, sexp]
-
-    let to_latest =
-      Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.to_latest
-        Account.Stable.V1.to_latest
-  end
 end]
 
 type sparse_ledger = t [@@deriving sexp, to_yojson]

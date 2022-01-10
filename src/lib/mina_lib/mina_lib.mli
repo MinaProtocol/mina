@@ -152,13 +152,6 @@ module Root_diff : sig
         ; root_length : int
         }
     end
-
-    module V1 : sig
-      type t =
-        { commands : User_command.Stable.V1.t With_status.Stable.V1.t list
-        ; root_length : int
-        }
-    end
   end]
 end
 

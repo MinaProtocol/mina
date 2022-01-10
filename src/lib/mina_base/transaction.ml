@@ -33,14 +33,6 @@ module Valid = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t = User_command.Valid.Stable.V1.t Poly.Stable.V1.t
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      let to_latest : t -> Latest.t =
-        Poly.Stable.V1.map ~f:User_command.Valid.Stable.V1.to_latest
-    end
   end]
 
   include Hashable.Make (Stable.Latest)
@@ -54,14 +46,6 @@ module Stable = struct
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
-  end
-
-  module V1 = struct
-    type t = User_command.Stable.V1.t Poly.Stable.V1.t
-    [@@deriving sexp, compare, equal, hash, yojson]
-
-    let to_latest : t -> Latest.t =
-      Poly.Stable.V1.map ~f:User_command.Stable.V1.to_latest
   end
 end]
 

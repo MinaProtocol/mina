@@ -31,7 +31,7 @@ module Stable = struct
     module T = struct
       type t =
         { protocol_state : Protocol_state.Value.Stable.V2.t
-        ; protocol_state_proof : Proof.Stable.V1.t [@sexp.opaque]
+        ; protocol_state_proof : Proof.Stable.V2.t [@sexp.opaque]
         ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
         ; delta_transition_chain_proof :
             State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
@@ -105,32 +105,6 @@ module Stable = struct
 
           include Sexpable.S with type t := T.t
         end )
-  end
-
-  module V1 = struct
-    type t =
-      { protocol_state : Protocol_state.Value.Stable.V1.t
-      ; protocol_state_proof : Proof.Stable.V1.t [@sexp.opaque]
-      ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
-      ; delta_transition_chain_proof :
-          State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
-      ; current_protocol_version : Protocol_version.Stable.V1.t
-      ; proposed_protocol_version_opt : Protocol_version.Stable.V1.t option
-      ; mutable validation_callback : Validate_content.t
-      }
-    [@@deriving compare, sexp, fields]
-
-    let to_latest (t : t) : V2.t =
-      { protocol_state =
-          Protocol_state.Value.Stable.V1.to_latest t.protocol_state
-      ; protocol_state_proof = t.protocol_state_proof
-      ; staged_ledger_diff =
-          Staged_ledger_diff.Stable.V1.to_latest t.staged_ledger_diff
-      ; delta_transition_chain_proof = t.delta_transition_chain_proof
-      ; current_protocol_version = t.current_protocol_version
-      ; proposed_protocol_version_opt = t.proposed_protocol_version_opt
-      ; validation_callback = t.validation_callback
-      }
   end
 end]
 
@@ -228,7 +202,7 @@ module Precomputed_block = struct
       type t = T.t =
         { scheduled_time : Block_time.Stable.V1.t
         ; protocol_state : Protocol_state.Value.Stable.V2.t
-        ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
+        ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
         ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
               (* TODO: Delete this or find out why it is here. *)
         ; delta_transition_chain_proof :
@@ -236,27 +210,6 @@ module Precomputed_block = struct
         }
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t =
-        { scheduled_time : Block_time.Stable.V1.t
-        ; protocol_state : Protocol_state.Value.Stable.V1.t
-        ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
-        ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
-        ; delta_transition_chain_proof :
-            Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
-        }
-
-      let to_latest (t : t) : V2.t =
-        { scheduled_time = t.scheduled_time
-        ; protocol_state =
-            Protocol_state.Value.Stable.V1.to_latest t.protocol_state
-        ; protocol_state_proof = t.protocol_state_proof
-        ; staged_ledger_diff =
-            Staged_ledger_diff.Stable.V1.to_latest t.staged_ledger_diff
-        ; delta_transition_chain_proof = t.delta_transition_chain_proof
-        }
     end
   end]
 
@@ -1030,15 +983,6 @@ module Validated = struct
 
         let to_latest = Fn.id
       end
-
-      module V1 = struct
-        type t =
-          (Stable.V1.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
-          * State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
-        [@@deriving sexp]
-
-        let to_latest (x, y) = (With_hash.map ~f:Stable.V1.to_latest x, y)
-      end
     end]
   end
 
@@ -1115,58 +1059,6 @@ module Validated = struct
 
       let create_unsafe t =
         create_unsafe_pre_hashed (With_hash.of_data t ~hash_data:state_hash)
-
-      include With_validation
-    end
-
-    module V1 = struct
-      type t =
-        (Stable.V1.t, State_hash.t) With_hash.t
-        * ( [ `Time_received ] * (unit, Truth.True.t) Truth.t
-          , [ `Genesis_state ] * (unit, Truth.True.t) Truth.t
-          , [ `Proof ] * (unit, Truth.True.t) Truth.t
-          , [ `Delta_transition_chain ]
-            * (State_hash.t Non_empty_list.t, Truth.True.t) Truth.t
-          , [ `Frontier_dependencies ] * (unit, Truth.True.t) Truth.t
-          , [ `Staged_ledger_diff ] * (unit, Truth.True.t) Truth.t
-          , [ `Protocol_versions ] * (unit, Truth.True.t) Truth.t )
-          Validation.t
-
-      let to_latest (x, y) = (With_hash.map ~f:Stable.V1.to_latest x, y)
-
-      let erase (transition_with_hash, validation) =
-        ( transition_with_hash
-        , Validation.extract_delta_transition_chain_witness validation )
-
-      let elaborate (transition_with_hash, delta_transition_chain_witness) =
-        ( transition_with_hash
-        , ( (`Time_received, Truth.True ())
-          , (`Genesis_state, Truth.True ())
-          , (`Proof, Truth.True ())
-          , (`Delta_transition_chain, Truth.True delta_transition_chain_witness)
-          , (`Frontier_dependencies, Truth.True ())
-          , (`Staged_ledger_diff, Truth.True ())
-          , (`Protocol_versions, Truth.True ()) ) )
-
-      include Sexpable.Of_sexpable
-                (Erased.Stable.V1)
-                (struct
-                  type nonrec t = t
-
-                  let of_sexpable = elaborate
-
-                  let to_sexpable = erase
-                end)
-
-      include Binable.Of_binable
-                (Erased.Stable.V1)
-                (struct
-                  type nonrec t = t
-
-                  let of_binable = elaborate
-
-                  let to_binable = erase
-                end)
 
       include With_validation
     end

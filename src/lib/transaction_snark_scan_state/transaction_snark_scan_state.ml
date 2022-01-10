@@ -49,33 +49,6 @@ module Transaction_with_witness = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t =
-        { transaction_with_info :
-            Transaction_logic.Transaction_applied.Stable.V1.t
-        ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
-        ; state_view : Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
-        ; statement : Transaction_snark.Statement.Stable.V1.t
-        ; init_stack :
-            Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
-            .t
-        ; ledger_witness : Mina_base.Sparse_ledger.Stable.V1.t [@sexp.opaque]
-        }
-      [@@deriving sexp]
-
-      let to_latest (t : t) : V2.t =
-        { transaction_with_info =
-            Transaction_logic.Transaction_applied.Stable.V1.to_latest
-              t.transaction_with_info
-        ; state_hash = t.state_hash
-        ; statement =
-            Transaction_snark.Statement.Stable.V1.to_latest t.statement
-        ; init_stack = t.init_stack
-        ; ledger_witness =
-            Mina_base.Sparse_ledger.Stable.V1.to_latest t.ledger_witness
-        }
-    end
   end]
 end
 
@@ -87,13 +60,6 @@ module Ledger_proof_with_sok_message = struct
       [@@deriving sexp]
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
-      [@@deriving sexp]
-
-      let to_latest ((x, y) : t) : V2.t = (Ledger_proof.Stable.V1.to_latest x, y)
     end
   end]
 end
@@ -196,32 +162,6 @@ module Stable = struct
         Parallel_scan.State.hash t
           (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
           (Binable.to_string (module Transaction_with_witness.Stable.V2))
-      in
-      Staged_ledger_hash.Aux_hash.of_bytes
-        (state_hash |> Digestif.SHA256.to_raw_string)
-  end
-
-  module V1 = struct
-    type t =
-      ( Ledger_proof_with_sok_message.Stable.V1.t
-      , Transaction_with_witness.Stable.V1.t )
-      Parallel_scan.State.Stable.V1.t
-    [@@deriving sexp]
-
-    let to_latest (t : t) : V2.t =
-      Parallel_scan.State.map t
-        ~f1:Ledger_proof_with_sok_message.Stable.V1.to_latest
-        ~f2:Transaction_with_witness.Stable.V1.to_latest
-
-    (* TODO: Review this. The version bytes for the underlying types are
-       included in the hash, so it can never be stable between versions.
-    *)
-
-    let hash t =
-      let state_hash =
-        Parallel_scan.State.hash t
-          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V1))
-          (Binable.to_string (module Transaction_with_witness.Stable.V1))
       in
       Staged_ledger_hash.Aux_hash.of_bytes
         (state_hash |> Digestif.SHA256.to_raw_string)

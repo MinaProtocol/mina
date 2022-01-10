@@ -155,7 +155,7 @@ module Stable = struct
   module V2 = struct
     type t =
       ( Snapp_state.Value.Stable.V1.t
-      , ( Side_loaded_verification_key.Stable.V1.t
+      , ( Side_loaded_verification_key.Stable.V2.t
         , F.Stable.V1.t )
         With_hash.Stable.V1.t
         option
@@ -167,28 +167,6 @@ module Stable = struct
     [@@deriving sexp, equal, compare, hash, yojson]
 
     let to_latest = Fn.id
-  end
-
-  module V1 = struct
-    type t =
-      ( Snapp_state.Value.Stable.V1.t
-      , ( Side_loaded_verification_key.Stable.V1.t
-        , F.Stable.V1.t )
-        With_hash.Stable.V1.t
-        option )
-      Poly.Stable.V1.t
-    [@@deriving sexp, equal, compare, hash, yojson]
-
-    let to_latest ({ app_state; verification_key } : t) : V2.t =
-      { app_state
-      ; verification_key
-      ; snapp_version = Mina_numbers.Snapp_version.zero
-      ; sequence_state =
-          (let empty = Lazy.force Sequence_events.empty_hash in
-           [ empty; empty; empty; empty; empty ])
-      ; last_sequence_slot = Mina_numbers.Global_slot.zero
-      ; proved_state = false
-      }
   end
 end]
 

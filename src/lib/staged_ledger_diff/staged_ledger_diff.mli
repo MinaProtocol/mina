@@ -38,6 +38,8 @@ module Pre_diff_two : sig
     }
   [@@deriving compare, sexp, yojson]
 
+  val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
+
   module Stable : sig
     module V1 : sig
       type ('a, 'b) t [@@deriving compare, sexp, yojson, bin_io, version]
@@ -56,6 +58,8 @@ module Pre_diff_one : sig
     }
   [@@deriving compare, sexp, yojson]
 
+  val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
+
   module Stable : sig
     module V1 : sig
       type ('a, 'b) t [@@deriving compare, sexp, yojson, bin_io, version]
@@ -73,10 +77,6 @@ module Pre_diff_with_at_most_two_coinbase : sig
     module V2 : sig
       type t [@@deriving compare, sexp, yojson, bin_io, version]
     end
-
-    module V1 : sig
-      type t [@@deriving compare, sexp, yojson, bin_io, version]
-    end
   end
   with type V2.t = t
 end
@@ -88,10 +88,6 @@ module Pre_diff_with_at_most_one_coinbase : sig
 
   module Stable : sig
     module V2 : sig
-      type t [@@deriving compare, sexp, yojson, bin_io, version]
-    end
-
-    module V1 : sig
       type t [@@deriving compare, sexp, yojson, bin_io, version]
     end
   end
@@ -108,10 +104,6 @@ module Diff : sig
     module V2 : sig
       type t [@@deriving compare, sexp, bin_io, yojson, version]
     end
-
-    module V1 : sig
-      type t [@@deriving compare, sexp, bin_io, yojson, version]
-    end
   end
   with type V2.t = t
 end
@@ -124,13 +116,6 @@ module Stable : sig
     [@@deriving compare, sexp, compare, yojson, bin_io, version]
 
     val to_latest : t -> t
-  end
-
-  module V1 : sig
-    type t = { diff : Diff.Stable.V1.t }
-    [@@deriving compare, sexp, compare, yojson, bin_io, version]
-
-    val to_latest : t -> V2.t
   end
 
   module Latest = V2
