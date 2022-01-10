@@ -23,7 +23,7 @@ include Frontier_intf.S
 type Structured_log_events.t += Added_breadcrumb_user_commands
   [@@deriving register_event]
 
-type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
+type Structured_log_events.t += Applying_diffs of { diffs : Yojson.Safe.t list }
   [@@deriving register_event]
 
 val max_catchup_chunk_length : int
@@ -43,7 +43,7 @@ val load :
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
   -> precomputed_values:Precomputed_values.t
-  -> catchup_mode:[`Normal | `Super]
+  -> catchup_mode:[ `Normal | `Super ]
   -> unit
   -> ( t
      , [> `Failure of string
@@ -83,7 +83,7 @@ module For_tests : sig
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
     -> precomputed_values:Precomputed_values.t
-    -> catchup_mode:[`Normal | `Super]
+    -> catchup_mode:[ `Normal | `Super ]
     -> unit
     -> ( t
        , [> `Failure of string
@@ -112,13 +112,12 @@ module For_tests : sig
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
-    -> ?root_ledger_and_accounts:Ledger.t
-                                 * (Private_key.t option * Account.t) list
-    -> ?gen_root_breadcrumb:( Breadcrumb.t
-                            * ( Mina_base.State_hash.t
-                              * Mina_state.Protocol_state.value )
-                              list )
-                            Quickcheck.Generator.t
+    -> ?root_ledger_and_accounts:
+         Ledger.t * (Private_key.t option * Account.t) list
+    -> ?gen_root_breadcrumb:
+         ( Breadcrumb.t
+         * (Mina_base.State_hash.t * Mina_state.Protocol_state.value) list )
+         Quickcheck.Generator.t
     -> max_length:int
     -> size:int
     -> ?use_super_catchup:bool
@@ -131,13 +130,12 @@ module For_tests : sig
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
-    -> ?root_ledger_and_accounts:Ledger.t
-                                 * (Private_key.t option * Account.t) list
-    -> ?gen_root_breadcrumb:( Breadcrumb.t
-                            * ( Mina_base.State_hash.t
-                              * Mina_state.Protocol_state.value )
-                              list )
-                            Quickcheck.Generator.t
+    -> ?root_ledger_and_accounts:
+         Ledger.t * (Private_key.t option * Account.t) list
+    -> ?gen_root_breadcrumb:
+         ( Breadcrumb.t
+         * (Mina_base.State_hash.t * Mina_state.Protocol_state.value) list )
+         Quickcheck.Generator.t
     -> ?get_branch_root:(t -> Breadcrumb.t)
     -> max_length:int
     -> frontier_size:int
