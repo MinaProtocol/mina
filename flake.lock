@@ -95,11 +95,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1640319671,
-        "narHash": "sha256-ZkKmakwaOaLiZOpIZWbeJZwap5CzJ30s4UJTfydYIYc=",
-        "owner": "nixos",
+        "lastModified": 1640418986,
+        "narHash": "sha256-a8GGtxn2iL3WAkY5H+4E0s3Q7XJt6bTOvos9qqxT5OQ=",
+        "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "eac07edbd20ed4908b98790ba299250b5527ecdf",
+        "rev": "5c37ad87222cfc1ec36d6cd1364514a9efc2f7f2",
         "type": "github"
       },
       "original": {
@@ -113,21 +113,24 @@
       "inputs": {
         "flake-compat": "flake-compat",
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs_2",
-        "opam-repository": "opam-repository",
-        "opam2json": "opam2json",
-        "tezos": "tezos"
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "opam-repository": [
+          "opam-repository"
+        ],
+        "opam2json": "opam2json"
       },
       "locked": {
-        "lastModified": 1640605333,
-        "narHash": "sha256-BsZncBhKdKUwctIaChAbUiHrkBedYBY6VAA+EofiyQQ=",
-        "owner": "balsoft",
+        "lastModified": 1641803783,
+        "narHash": "sha256-P4vmdFViWmMk/PRmZjdkCIpdqNpHyowkzFGRwjZZQJc=",
+        "owner": "tweag",
         "repo": "opam-nix",
-        "rev": "50a09abf5e8c994861808a9e2df2fbaa210ce10b",
+        "rev": "313243044d45f04639abffde9b3dd138fad960c3",
         "type": "github"
       },
       "original": {
-        "owner": "balsoft",
+        "owner": "tweag",
         "repo": "opam-nix",
         "type": "github"
       }
@@ -148,30 +151,16 @@
         "type": "github"
       }
     },
-    "opam-repository_2": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1640349521,
-        "narHash": "sha256-8ooQFVDFg1WOlGivMueU2HH0E1qfthJMkOMhUAAqjyA=",
-        "owner": "ocaml",
-        "repo": "opam-repository",
-        "rev": "c7b45b3cbcfbe22a7b3b8af1e5bb9998f3aa0e8a",
-        "type": "github"
-      },
-      "original": {
-        "owner": "ocaml",
-        "repo": "opam-repository",
-        "type": "github"
-      }
-    },
     "opam2json": {
-      "flake": false,
+      "inputs": {
+        "nixpkgs": "nixpkgs_2"
+      },
       "locked": {
-        "lastModified": 1640459568,
-        "narHash": "sha256-YrvRqaevet2iz2sZNT9qlRy9xAbEBVW5rYFAQbFEtVQ=",
+        "lastModified": 1640804047,
+        "narHash": "sha256-YA9cIwndl3ixDYaAtSUFMvAko7nkjfwmWOqwZjzze60=",
         "owner": "tweag",
         "repo": "opam2json",
-        "rev": "e700f86b03871697d12ebbbcb781a6146104fcc2",
+        "rev": "7652f94ac18ec94bc1ae697169c7f7f8b809270a",
         "type": "github"
       },
       "original": {
@@ -186,24 +175,8 @@
         "nix-npm-buildPackage": "nix-npm-buildPackage",
         "nixpkgs": "nixpkgs",
         "opam-nix": "opam-nix",
-        "opam-repository": "opam-repository_2",
+        "opam-repository": "opam-repository",
         "utils": "utils"
-      }
-    },
-    "tezos": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1640270007,
-        "narHash": "sha256-zwten69tEsrMNr0zXdoAaj/j9o3Zsh8y5UcE004+nmc=",
-        "owner": "tezos",
-        "repo": "tezos",
-        "rev": "1a27b35a255f095cbda2efb98464637d00694ef1",
-        "type": "gitlab"
-      },
-      "original": {
-        "owner": "tezos",
-        "repo": "tezos",
-        "type": "gitlab"
       }
     },
     "utils": {

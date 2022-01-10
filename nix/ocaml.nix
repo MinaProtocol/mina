@@ -1,36 +1,33 @@
-inputs: pkgs:
+inputs: pkgs':
 let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
 
+  pkgs = pkgs'.buildPackages;
+
+  external-repo = opam-nix.makeOpamRepo ../src/external; # Pin external packages
   repos = [
-    (opam-nix.makeOpamRepo ../src/external) # Pin external packages
+    external-repo
     ./fake-opam-repo # Remove opam version restriction imposed by a depext dependency
     inputs.opam-repository
   ];
 
   export =
-    opam-nix.opamListToQuery (opam-nix.fromOPAM ../src/opam.export).installed;
-  external-packages = {
-    "sodium" = "dev";
-    "capnp" = "local";
-    "rpc_parallel" = "v0.13.0";
-    "ocaml-extlib" = "local";
-    "async_kernel" = "v0.13.0";
-    "base58" = "0.1.0";
-    "graphql_ppx" = "0.0.4";
-    "ppx_deriving_yojson" = "local";
-  };
+    opam-nix.opamListToQuery (opam-nix.importOpam ../src/opam.export).installed;
+  external-packages = pkgs.lib.getAttrs [
+    "sodium"
+    "capnp"
+    "rpc_parallel"
+    "ocaml-extlib"
+    "async_kernel"
+    "base58"
+    "graphql_ppx"
+    "ppx_deriving_yojson"
+  ] (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
   implicit-deps = export // external-packages;
 
-  query = {
-    ocaml = "4.11.2";
-    opam-depext = "1.2.0";
-  };
-
-  scope = opam-nix.applyOverlays [ opam-nix.defaultOverlay ]
-    (opam-nix.defsToScope pkgs
-      (opam-nix.queryToDefs repos (export // external-packages // query)));
+  scope = opam-nix.applyOverlays opam-nix.__overlays
+    (opam-nix.defsToScope pkgs (opam-nix.queryToDefs repos implicit-deps));
 
   installedPackageNames =
     map (x: (opam-nix.splitNameVer x).name) (builtins.attrNames implicit-deps);
@@ -47,11 +44,10 @@ let
         '';
       });
 
-      rpc_parallel = super.rpc_parallel.overrideAttrs (oa: {
-        buildInputs = oa.buildInputs ++ [ self.ctypes ];
-      });
+      rpc_parallel = super.rpc_parallel.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
 
-      mina = pkgs.stdenv.mkDerivation {
+      mina = pkgs'.stdenv.mkDerivation {
         pname = "mina";
         version = "dev";
         # Prevent unnecessary rebuilds on non-source changes
@@ -61,8 +57,9 @@ let
         # todo: slimmed rocksdb
         buildInputs =
           (builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self))
-          ++ [ pkgs.zlib pkgs.bzip2 pkgs.snappy pkgs.lz4 pkgs.zstd ];
-        nativeBuildInputs = [ self.dune self.ocamlfind pkgs.capnproto ];
+          ++ [ pkgs'.zlib pkgs'.bzip2 pkgs'.snappy pkgs'.lz4 pkgs'.zstd ];
+        nativeBuildInputs = [ pkgs.capnproto ]
+          ++ builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self);
         NIX_LDFLAGS = "-lsnappy -llz4 -lzstd";
         # TODO, get this from somewhere
         MARLIN_REPO_SHA = "bacef43ea34122286745578258066c29091dc36a";
