@@ -7,7 +7,9 @@
   inputs.mix-to-nix.url = "github:serokell/mix-to-nix/yorickvp/deadlock";
   inputs.nix-npm-buildPackage.url =
     "github:lumiguide/nix-npm-buildpackage"; # todo: upstream
-  inputs.opam-nix.url = "github:balsoft/opam-nix";
+  inputs.opam-nix.url = "github:tweag/opam-nix";
+  inputs.opam-nix.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.opam-nix.inputs.opam-repository.follows = "opam-repository";
 
   inputs.opam-repository.url = "github:ocaml/opam-repository";
   inputs.opam-repository.flake = false;
@@ -33,9 +35,9 @@
 
           checks = import ./nix/checks.nix inputs pkgs;
 
-          ocamlPackages_static = import ./nix/ocaml.nix inputs pkgs.pkgsStatic;
+          ocamlPackages_static = assert self.sourceInfo.submodules; import ./nix/ocaml.nix inputs pkgs.pkgsStatic;
 
-          ocamlPackages = import ./nix/ocaml.nix inputs pkgs;
+          ocamlPackages = assert self.sourceInfo.submodules; import ./nix/ocaml.nix inputs pkgs;
         in {
 
           # Jobs/Lint/Rust.dhall
@@ -91,6 +93,10 @@
 
           inherit ocamlPackages ocamlPackages_static;
           packages.mina = ocamlPackages.mina;
+          packages.mina-docker = pkgs.dockerTools.buildImage {
+            name = "mina";
+            contents = [ ocamlPackages.mina ];
+          };
           packages.mina_static = ocamlPackages_static.mina;
           packages.marlin_plonk_bindings_stubs =
             pkgs.marlin_plonk_bindings_stubs;
