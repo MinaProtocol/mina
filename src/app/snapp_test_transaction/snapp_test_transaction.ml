@@ -138,24 +138,20 @@ let graphql_snapp_command (parties : Parties.t) =
           sprintf "{ nonce: \"%s\" }" (Account.Nonce.to_string n)
       | Full _a ->
           (*TODO*)
-          "{\n\
-          \          account: {\n\
-          \            balance:null,\n\
-          \            nonce:null,\n\
-          \            receiptChainHash:null,\n\
-          \            publicKey:null,\n\
-          \            delegate:null,\n\
-          \            state:\n\
-          \              {elements: [null,\n\
-          \              null,\n\
-          \              null,\n\
-          \              null,\n\
-          \              null,\n\
-          \              null,\n\
-          \              null,\n\
-          \             null]},\n\
-          \            sequenceState:null,\n\
-          \            provedState:null}}"
+          {|
+          {
+            account: {
+              balance:null,
+              nonce:null,
+              receiptChainHash:null,
+              publicKey:null,
+              delegate:null,
+              state:
+                {elements: [null,null,null,null,null,null,null,null]},
+              sequenceState:null,
+              provedState:null}
+          }
+          |}
       | Accept ->
           "{account:null, nonce:null}"
     in
@@ -383,7 +379,6 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t) =
     (Parties.to_yojson parties |> Yojson.Safe.to_string) ;
   Core.printf "Snapp transaction graphQL input %s\n\n%!"
     (graphql_snapp_command parties) ;
-  Core.printf "Updated accounts\n" ;
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
       ~protocol_constants:Genesis_constants.compiled.protocol
@@ -450,22 +445,23 @@ module Flags = struct
       (Param.optional txn_fee)
 
   let snapp_account_key =
-    Param.flag "--snapp-account-key" ~doc:"Public Key of the new snapp account"
+    Param.flag "--snapp-account-key"
+      ~doc:"PUBLIC KEY Base58 encoded public key of the new snapp account"
       Param.(required public_key_compressed)
 
   let amount =
-    Param.flag "--receiver-amount" ~doc:"Receiver amount"
+    Param.flag "--receiver-amount" ~doc:"NN Receiver amount in Mina"
       (Param.required txn_amount)
 
   let nonce =
-    Param.flag "--nonce" ~doc:"Nonce of the fee payer account"
+    Param.flag "--nonce" ~doc:"NN Nonce of the fee payer account"
       Param.(required txn_nonce)
 
   let snapp_state =
     Param.flag "--snapp-state"
       ~doc:
-        "A list of 8 values that can be Integers, arbitrarty strings,  hashes, \
-         or field elements"
+        "FIELDS A list of 8 values that can be Integers, arbitrarty strings,  \
+         hashes, or field elements"
       Param.(required txn_nonce)
 
   let common_flags =
@@ -553,8 +549,8 @@ module Util = struct
       ~which:"payment keypair"
 
   let print_snapp_transaction parties =
-    Core.printf !"Parties sexp: %{sexp: Parties.t}\n%!" parties ;
-    Core.printf "Snapp transaction yojson: %s\n\n%!"
+    Core.printf !"Parties sexp:\n %{sexp: Parties.t}\n\n%!" parties ;
+    Core.printf "Snapp transaction yojson:\n %s\n\n%!"
       (Parties.to_yojson parties |> Yojson.Safe.to_string) ;
     Core.printf "Snapp transaction graphQL input %s\n\n%!"
       (graphql_snapp_command parties)
