@@ -176,6 +176,10 @@ let to_yojson =
     @@ List.map (Hashtbl.to_alist t.states) ~f:(fun (state, hashes) ->
            (state, (State_hash.Set.length hashes, State_hash.Set.to_list hashes)))
 
+let to_node_status_report (t : t) =
+  List.map (Hashtbl.to_alist t.states) ~f:(fun (state, hashes) ->
+      (state, State_hash.Set.length hashes))
+
 let max_catchup_chain_length (t : t) =
   (* Find the longest directed path *)
   let lengths = State_hash.Table.create () in

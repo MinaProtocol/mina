@@ -11,33 +11,51 @@ import (
 	"sync"
 	"time"
 
+	ipc "libp2p_ipc"
+
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
+	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns_legacy"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/prometheus/client_golang/prometheus"
-	ipc "libp2p_ipc"
 )
 
 func newApp() *app {
+	outChan := make(chan *capnp.Message, 64)
+	ctx := context.Background()
 	return &app{
 		P2p:                      nil,
-		Ctx:                      context.Background(),
+		Ctx:                      ctx,
 		Subs:                     make(map[uint64]subscription),
 		Topics:                   make(map[string]*pubsub.Topic),
 		ValidatorMutex:           &sync.Mutex{},
 		Validators:               make(map[uint64]*validationStatus),
 		Streams:                  make(map[uint64]net.Stream),
-		OutChan:                  make(chan *capnp.Message, 64),
+		OutChan:                  outChan,
 		Out:                      bufio.NewWriter(os.Stdout),
 		AddedPeers:               []peer.AddrInfo{},
 		MetricsRefreshTime:       time.Minute,
 		metricsCollectionStarted: false,
 		metricsServer:            nil,
+		bitswapCtx:               NewBitswapCtx(ctx, outChan),
 	}
+}
+
+func (app *app) SetConnectionHandlers() {
+	app.setConnectionHandlersOnce.Do(func() {
+		app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
+			app.updateConnectionMetrics()
+			app.writeMsg(mkPeerConnectedUpcall(peer.Encode(c.RemotePeer())))
+		}
+
+		app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
+			app.updateConnectionMetrics()
+			app.writeMsg(mkPeerDisconnectedUpcall(peer.Encode(c.RemotePeer())))
+		}
+	})
 }
 
 func (app *app) NextId() uint64 {
@@ -83,8 +101,19 @@ func (app *app) writeMsg(msg *capnp.Message) {
 	if app.NoUpcalls {
 		return
 	}
-
-	app.OutChan <- msg
+	select {
+	case <-app.Ctx.Done():
+		app.P2p.Logger.Debug("Droping message for sending, context closed")
+	case app.OutChan <- msg:
+	default:
+		app.P2p.Logger.Warn("Couldn't stack message for sending, blocking...")
+		select {
+		case <-app.Ctx.Done():
+			app.P2p.Logger.Debug("Droping message for sending, context closed (unblocked)")
+		case app.OutChan <- msg:
+			app.P2p.Logger.Info("Stacked message, unblocked...")
+		}
+	}
 }
 
 func (app *app) updateConnectionMetrics() {
@@ -325,7 +354,7 @@ func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 		app.writeMsg(mkStreamCompleteUpcall(idx))
 		err := stream.Close()
 		if err != nil {
-			app.P2p.Logger.Warning("Error while closing the stream: ", err.Error())
+			app.P2p.Logger.Warn("Error while closing the stream: ", err.Error())
 		}
 	}()
 }

@@ -47,6 +47,9 @@ type app struct {
 	counter uint64
 	// Mutex for id generation
 	counterMutex sync.Mutex
+
+	bitswapCtx                *BitswapCtx
+	setConnectionHandlersOnce sync.Once
 }
 
 type subscription struct {

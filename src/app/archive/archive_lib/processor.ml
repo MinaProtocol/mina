@@ -2666,11 +2666,15 @@ module Block = struct
             balance_id_of_pk_and_balance internal_command.receiver
               internal_command.receiver_balance
           in
+          let receiver_account_creation_fee_paid =
+            internal_command.receiver_account_creation_fee_paid
+            |> Option.map ~f:(fun amount ->
+                   Currency.Amount.to_uint64 amount |> Unsigned.UInt64.to_int64)
+          in
           Block_and_internal_command.add_if_doesn't_exist
             (module Conn)
             ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
-            ~receiver_account_creation_fee_paid:None (* TEMP *)
-            ~receiver_balance_id)
+            ~receiver_account_creation_fee_paid ~receiver_balance_id)
     in
     return block_id
 

@@ -1227,6 +1227,9 @@ let add_from_backtrack :
 
 let global_slot_since_genesis t = global_slot_since_genesis t.config
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
+
 let%test_module _ =
   ( module struct
     open For_tests
