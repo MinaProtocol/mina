@@ -25,7 +25,7 @@ module Sc =
   Pickles.Scalar_challenge.Make (Impl) (Pickles.Step_main_inputs.Inner_curve)
     (Challenge)
     (Pickles.Endo.Step_inner_curve)
-open Js_of_ocaml
+module Js = Js_of_ocaml.Js
 
 (*
 let () =
@@ -80,35 +80,33 @@ module As_field = struct
   (* number | string | boolean | field_class | cvar *)
   type t
 
-  open Impl
-
-  let of_field (x : Field.t) : t = Obj.magic x
+  let of_field (x : Impl.Field.t) : t = Obj.magic x
 
   let of_field_obj (x : field_class Js.t) : t = Obj.magic x
 
-  let value (value : t) : Field.t =
+  let value (value : t) : Impl.Field.t =
     match Js.to_string (Js.typeof (Obj.magic value)) with
     | "number" ->
         let value = Js.float_of_number (Obj.magic value) in
         if Float.is_integer value then
           let value = Float.to_int value in
-          if value >= 0 then Field.of_int value
-          else Field.negate (Field.of_int (-value))
+          if value >= 0 then Impl.Field.of_int value
+          else Impl.Field.negate (Impl.Field.of_int (-value))
         else raise_error "Cannot convert a float to a field element"
     | "boolean" ->
         let value = Js.to_bool (Obj.magic value) in
-        if value then Field.one else Field.zero
+        if value then Impl.Field.one else Impl.Field.zero
     | "string" -> (
         let value : Js.js_string Js.t = Obj.magic value in
         let s = Js.to_string value in
         try
-          Field.constant
+          Impl.Field.constant
             ( if
               String.length s >= 2
               && Char.equal s.[0] '0'
               && Char.equal (Char.lowercase_ascii s.[1]) 'x'
             then Kimchi_pasta.Pasta.Fp.(of_bigint (Bigint.of_hex_string s))
-            else Field.Constant.of_string s )
+            else Impl.Field.Constant.of_string s )
         with Failure e -> raise_error e )
     | "object" ->
         let is_array = Js.to_bool (Js.Unsafe.global ##. Array##isArray value) in
@@ -171,19 +169,17 @@ module As_bool = struct
   (* boolean | bool_class | Boolean.var *)
   type t
 
-  open Impl
-
-  let of_boolean (x : Boolean.var) : t = Obj.magic x
+  let of_boolean (x : Impl.Boolean.var) : t = Obj.magic x
 
   let of_bool_obj (x : bool_class Js.t) : t = Obj.magic x
 
   let of_js_bool (b : bool Js.t) : t = Obj.magic b
 
-  let value (value : t) : Boolean.var =
+  let value (value : t) : Impl.Boolean.var =
     match Js.to_string (Js.typeof (Obj.magic value)) with
     | "boolean" ->
         let value = Js.to_bool (Obj.magic value) in
-        Boolean.var_of_value value
+        Impl.Boolean.var_of_value value
     | "object" ->
         let is_array = Js.to_bool (Js.Unsafe.global ##. Array##isArray value) in
         if is_array then
@@ -219,7 +215,14 @@ let bool_constr : (As_bool.t -> bool_class Js.t) Js.constr =
 
 (* TODO: Extend prototype for number to allow for field element methods *)
 
-open Impl
+module Field = Impl.Field
+module Boolean = Impl.Boolean
+module As_prover = Impl.As_prover
+module Constraint = Impl.Constraint
+module Bigint = Impl.Bigint
+module Keypair = Impl.Keypair
+module Verification_key = Impl.Verification_key
+module Typ = Impl.Typ
 
 let singleton_array (type a) (x : a) : a Js.js_array Js.t =
   let arr = new%js Js.array_empty in
@@ -321,12 +324,11 @@ let () =
      ; ("gt", fun { less_or_equal; _ } -> Boolean.not less_or_equal)
      ; ("gte", fun { less; _ } -> Boolean.not less)
      ] ;
-   let open Field.Assert in
    List.iter ~f:cmp_method
-     [ ("assertLt", lt)
-     ; ("assertLte", lte)
-     ; ("assertGt", gt)
-     ; ("assertGte", gte)
+     [ ("assertLt", Field.Assert.lt)
+     ; ("assertLte", Field.Assert.lte)
+     ; ("assertGt", Field.Assert.gt)
+     ; ("assertGte", Field.Assert.gte)
      ]) ;
   method_ "assertEquals" (fun this (y : As_field.t) : unit ->
       try Field.Assert.equal this##.value (As_field.value y)
@@ -339,7 +341,7 @@ let () =
         Js.raise_js_error (new%js Js.error_constr (Js.string s))) ;
 
   method_ "assertBoolean" (fun this : unit ->
-      assert_ (Constraint.boolean this##.value)) ;
+      Impl.assert_ (Constraint.boolean this##.value)) ;
   method_ "isZero" (fun this : bool_class Js.t ->
       new%js bool_constr
         (As_bool.of_boolean (Field.equal this##.value Field.zero))) ;
@@ -408,7 +410,7 @@ let () =
         Field.Assert.equal (As_field.value x) (As_field.value y)) ;
   field_class##.assertBoolean
   := Js.wrap_callback (fun (x : As_field.t) : unit ->
-         assert_ (Constraint.boolean (As_field.value x))) ;
+         Impl.assert_ (Constraint.boolean (As_field.value x))) ;
   field_class##.isZero :=
     Js.wrap_callback (fun (x : As_field.t) : bool_class Js.t ->
         new%js bool_constr
@@ -618,7 +620,7 @@ let () =
           (fun x -> mk (Boolean.Unsafe.of_cvar x##.value))
       else raise_error "Expected array of length 1") ;
   static_method "check" (fun (x : bool_class Js.t) : unit ->
-      assert_ (Constraint.boolean (x##.value :> Field.t))) ;
+      Impl.assert_ (Constraint.boolean (x##.value :> Field.t))) ;
   method_ "toJSON" (fun (this : bool_class Js.t) : < .. > Js.t ->
       Js.Unsafe.coerce this##toBoolean) ;
   static_method "toJSON" (fun (this : bool_class Js.t) : < .. > Js.t ->
@@ -902,12 +904,13 @@ let () =
       let p1, p2 =
         (As_group.value (As_group.of_group_obj p1), As_group.value p2)
       in
-      let open Pickles.Step_main_inputs in
       match (p1, p2) with
       | (Constant x1, Constant y1), (Constant x2, Constant y2) ->
-          constant (Inner_curve.Constant.( + ) (x1, y1) (x2, y2))
+          constant
+            (Pickles.Step_main_inputs.Inner_curve.Constant.( + ) (x1, y1)
+               (x2, y2))
       | _ ->
-          Ops.add_fast p1 p2 |> mk) ;
+          Pickles.Step_main_inputs.Ops.add_fast p1 p2 |> mk) ;
   method_ "neg" (fun (p1 : group_class Js.t) : group_class Js.t ->
       Pickles.Step_main_inputs.Inner_curve.negate
         (As_group.value (As_group.of_group_obj p1))
@@ -917,18 +920,18 @@ let () =
       p1##add (As_group.to_group_obj p2)##neg) ;
   method_ "scale"
     (fun (p1 : group_class Js.t) (s : scalar_class Js.t) : group_class Js.t ->
-      let open Pickles.Step_main_inputs in
       match
         ( As_group.(value (of_group_obj p1))
         , Js.Optdef.to_option s##.constantValue )
       with
       | (Constant x, Constant y), Some s ->
-          Inner_curve.Constant.scale (x, y) s |> constant
+          Pickles.Step_main_inputs.Inner_curve.Constant.scale (x, y) s
+          |> constant
       | _ ->
           let bits = Array.copy s##.value in
           (* Have to convert LSB -> MSB *)
           Array.rev_inplace bits ;
-          Ops.scale_fast_msb_bits
+          Pickles.Step_main_inputs.Ops.scale_fast_msb_bits
             (As_group.value (As_group.of_group_obj p1))
             (Shifted_value bits)
           |> mk) ;
@@ -986,8 +989,7 @@ let () =
         (As_field.of_field_obj (array_get_exn xs 1))) ;
   static_method "sizeInFields" (fun () : int -> 2) ;
   static_method "check" (fun (p : group_class Js.t) : unit ->
-      let open Pickles.Step_main_inputs in
-      Inner_curve.assert_on_curve
+      Pickles.Step_main_inputs.Inner_curve.assert_on_curve
         Field.((p##.x##.value :> t), (p##.y##.value :> t))) ;
   method_ "toJSON" (fun (p : group_class Js.t) : < .. > Js.t ->
       object%js
@@ -1046,14 +1048,16 @@ let poseidon =
             match x##.value with Constant x -> x | x -> As_prover.read_var x)
       with
       | exception _ ->
-          let open Pickles.Step_main_inputs in
+          let module Sponge = Pickles.Step_main_inputs.Sponge in
+          let sponge_params = Pickles.Step_main_inputs.sponge_params in
           let s = Sponge.create sponge_params in
           for i = 0 to xs##.length - 1 do
             Sponge.absorb s (`Field (array_get_exn xs i)##.value)
           done ;
           new%js field_constr (As_field.of_field (Sponge.squeeze_field s))
       | xs ->
-          let open Pickles.Tick_field_sponge in
+          let module Field = Pickles.Tick_field_sponge.Field in
+          let params = Pickles.Tick_field_sponge.params in
           let s = Field.create params in
           array_iter xs ~f:(Field.absorb s) ;
           new%js field_constr
@@ -1343,7 +1347,7 @@ module Circuit = struct
   let witness (type a) (typ : a as_field_elements Js.t)
       (f : (unit -> a) Js.callback) : a =
     let a =
-      exists (typ_ typ) ~compute:(fun () : a -> Js.Unsafe.fun_call f [||])
+      Impl.exists (typ_ typ) ~compute:(fun () : a -> Js.Unsafe.fun_call f [||])
     in
     if Js.Optdef.test (Js.Unsafe.coerce typ)##.check then
       (Js.Unsafe.coerce typ)##check a ;
@@ -1386,20 +1390,21 @@ module Circuit = struct
       in
       Js.Unsafe.(fun_call c##.snarkyMain [| inject w; inject public |])
     in
-    (main, Data_spec.[ typ_ c##.snarkyPublicTyp ])
+    (main, Impl.Data_spec.[ typ_ c##.snarkyPublicTyp ])
 
   let generate_keypair (type w p) (c : (w, p) Circuit_main.t) :
       keypair_class Js.t =
     let main, spec = main_and_input c in
-    new%js keypair_constr (generate_keypair ~exposing:spec (fun x -> main x))
+    new%js keypair_constr
+      (Impl.generate_keypair ~exposing:spec (fun x -> main x))
 
   let prove (type w p) (c : (w, p) Circuit_main.t) (priv : w) (pub : p) kp :
       proof_class Js.t =
     let main, spec = main_and_input c in
     let pk = Keypair.pk kp in
     let p =
-      generate_witness_conv
-        ~f:(fun { Proof_inputs.auxiliary_inputs; public_inputs } ->
+      Impl.generate_witness_conv
+        ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } ->
           Backend.Proof.create pk ~auxiliary:auxiliary_inputs
             ~primary:public_inputs)
         spec (main ~w:priv) () pub
@@ -1465,7 +1470,7 @@ module Circuit = struct
         res *)) ;
     circuit##.asProver :=
       Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->
-          as_prover (fun () -> Js.Unsafe.fun_call f [||])) ;
+          Impl.as_prover (fun () -> Js.Unsafe.fun_call f [||])) ;
     circuit##.witness := Js.wrap_callback witness ;
     circuit##.array := Js.wrap_callback array ;
     circuit##.generateKeypair :=
@@ -1532,12 +1537,11 @@ let () =
       :
       bool Js.t
     ->
-      let open Backend.Field.Vector in
-      let v = create () in
+      let v = Backend.Field.Vector.create () in
       array_iter (Circuit.to_field_elts_magic pub) ~f:(fun x ->
           match x##.value with
           | Constant x ->
-              emplace_back v x
+              Backend.Field.Vector.emplace_back v x
           | _ ->
               raise_error "verify: Expected non-circuit values for input") ;
       Backend.Proof.verify pi##.value this##.value v |> Js.bool)
@@ -1673,7 +1677,11 @@ type AccountPredicate =
     Js.Unsafe.eval_string {js|(function(v) { this.value = v; return this })|js}
 
   module L : Mina_base_kernel.Transaction_logic.Ledger_intf = struct
-    open Mina_base_kernel
+    module Account = Mina_base_kernel.Account
+    module Account_id = Mina_base_kernel.Account_id
+    module Transaction_logic = Mina_base_kernel.Transaction_logic
+    module Ledger_hash = Mina_base_kernel.Ledger_hash
+    module Token_id = Mina_base_kernel.Token_id
 
     type t_ =
       { next_location : int
@@ -1772,13 +1780,15 @@ type AccountPredicate =
   let create_new_account_exn (t : L.t) account_id account =
     L.create_new_account t account_id account |> Or_error.ok_exn
 
-  open Mina_base_kernel
-  open Signature_lib
+  module Snapp_predicate = Mina_base_kernel.Snapp_predicate
+  module Party = Mina_base_kernel.Party
+  module Snapp_state = Mina_base_kernel.Snapp_state
+  module Token_id = Mina_base_kernel.Token_id
 
-  let field (x : js_field) : field =
+  let field (x : js_field) : Impl.field =
     match x##.value with Constant x -> x | x -> As_prover.read_var x
 
-  let public_key (pk : public_key) : Public_key.Compressed.t =
+  let public_key (pk : public_key) : Signature_lib.Public_key.Compressed.t =
     { x = field pk##.g##.x
     ; is_odd = Bigint.(test_bit (of_field (field pk##.g##.y)) 0)
     }
@@ -1804,7 +1814,7 @@ type AccountPredicate =
 
   let or_ignore (type a) elt (x : a or_ignore) =
     if Js.to_bool x##.check##toBoolean then
-      Snapp_basic.Or_ignore.Check (elt x##.value)
+      Mina_base_kernel.Snapp_basic.Or_ignore.Check (elt x##.value)
     else Ignore
 
   let closed_interval f (c : 'a closed_interval) :
@@ -1881,7 +1891,7 @@ type AccountPredicate =
 
   let set_or_keep (type a) elt (x : a set_or_keep) =
     if Js.to_bool x##.set##toBoolean then
-      Snapp_basic.Set_or_keep.Set (elt x##.value)
+      Mina_base_kernel.Snapp_basic.Set_or_keep.Set (elt x##.value)
     else Keep
 
   let body (b : party_body) : Party.Body.t =
@@ -1967,10 +1977,10 @@ type AccountPredicate =
   let party (party : party) : Party.Predicated.t =
     { body = body party##.body; predicate = predicate party##.predicate }
 
-  let parties (parties : parties) : Parties.t =
+  let parties (parties : parties) : Mina_base_kernel.Parties.t =
     { fee_payer =
         { data = fee_payer_party parties##.feePayer
-        ; authorization = Signature.dummy
+        ; authorization = Mina_base_kernel.Signature.dummy
         }
     ; other_parties =
         Js.to_array parties##.otherParties
@@ -1978,10 +1988,11 @@ type AccountPredicate =
                { data = party p; authorization = None_given })
         |> Array.to_list
     ; protocol_state = protocol_state parties##.protocolState
-    ; memo = Signed_command_memo.empty
+    ; memo = Mina_base_kernel.Signed_command_memo.empty
     }
 
-  let account_id pk = Account_id.create (public_key pk) Token_id.default
+  let account_id pk =
+    Mina_base_kernel.Account_id.create (public_key pk) Token_id.default
 
   let max_state_size = Pickles_types.Nat.to_int Snapp_state.Max_state_size.n
 
@@ -2002,8 +2013,8 @@ type AccountPredicate =
 
       let balance = Currency.Balance.of_uint64 bal_u64 in
 
-      let a : Account.t =
-        { (Account.create account_id balance) with
+      let a : Mina_base_kernel.Account.t =
+        { (Mina_base_kernel.Account.create account_id balance) with
           permissions = loose_permissions
         }
       in
@@ -2023,7 +2034,7 @@ type AccountPredicate =
     static_method "create" create ;
     let epoch_data =
       { Snapp_predicate.Protocol_state.Epoch_data.Poly.ledger =
-          { Epoch_ledger.Poly.hash = Field.Constant.zero
+          { Mina_base_kernel.Epoch_ledger.Poly.hash = Field.Constant.zero
           ; total_currency = Currency.Amount.zero
           }
       ; seed = Field.Constant.zero
