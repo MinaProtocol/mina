@@ -399,8 +399,7 @@ let gen_protocol_state_predicate (psv : Snapp_predicate.Protocol_state.View.t) :
 let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
     ?(snapp_account = false) ?(is_fee_payer = false) ?available_public_keys
     ?permissions_auth ?(required_balance_change : a option)
-    ?(required_balance : Currency.Balance.t option)
-    ?protocol_state_view
+    ?(required_balance : Currency.Balance.t option) ?protocol_state_view
     ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
     ~(gen_use_full_commitment : b Quickcheck.Generator.t)
     ~(f_balance_change : a -> Currency.Amount.Signed.t) ~(increment_nonce : b)
@@ -656,18 +655,20 @@ let gen_party_from ?(succeed = true) ?(new_account = false) ?permissions_auth
   let%bind data =
     gen_predicated_from ?permissions_auth ?required_balance_change
       ?required_balance ~succeed ~new_account ~snapp_account ~increment_nonce
-      ~available_public_keys ~ledger ~balances_tbl
+      ~available_public_keys ~ledger ~balances_tbl ()
   in
   return { Party.data; authorization }
 
 (* takes an account id, if we want to sign this data *)
-let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view () :
+let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
+    ?protocol_state_view () :
     Party.Predicated.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body0 =
-    gen_party_body ~account_id ~is_fee_payer:true ~increment_nonce:()
-      ~gen_balance_change:gen_fee ~f_balance_change:fee_to_amt
-      ~gen_use_full_commitment:(return ()) ~ledger ?protocol_state_view ()
+    gen_party_body ?permissions_auth ~account_id ~is_fee_payer:true
+      ~increment_nonce:() ~gen_balance_change:gen_fee
+      ~f_balance_change:fee_to_amt ~gen_use_full_commitment:(return ()) ~ledger
+      ?protocol_state_view ()
   in
   (* make sure the fee payer's token id is the default,
      which is represented by the unit value in the body
@@ -692,11 +693,12 @@ let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger ?protoc
   let predicate = account.nonce in
   Party.Predicated.Poly.{ body; predicate }
 
-let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view () :
-    Party.Fee_payer.t Quickcheck.Generator.t =
+let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ()
+    : Party.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map data =
-    gen_party_predicated_fee_payer ~account_id ~ledger ?protocol_state_view ()
+    gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
+      ?protocol_state_view ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
   let authorization = Signature.dummy in
@@ -745,7 +747,8 @@ let gen_parties_from ?(succeed = true)
       instead, those generated permissions are used in later transactions
   *)
   let%bind fee_payer =
-    gen_fee_payer ~permissions_auth ~account_id:fee_payer_account_id ~ledger ?protocol_state_view ()
+    gen_fee_payer ~permissions_auth ~account_id:fee_payer_account_id ~ledger
+      ?protocol_state_view ()
   in
   (* table of public keys to balances, updated when generating each party
      a Map would be more principled, but threading that map through the code

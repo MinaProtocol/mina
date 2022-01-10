@@ -1342,7 +1342,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let init =
       match a.snapp with None -> Snapp_account.default | Some a -> a
     in
-    let update _name perm u curr ~is_keep ~update ~error =
+    let update perm u curr ~is_keep ~update ~error =
       match check_auth perm with
       | false ->
           let%map () = check error (is_keep u) in
@@ -1367,7 +1367,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         else init.proved_state
       in
       let%map app_state =
-        update "app_state" a.permissions.edit_state app_state init.app_state
+        update a.permissions.edit_state app_state init.app_state
           ~is_keep:(Vector.for_all ~f:Set_or_keep.is_keep)
           ~update:(Vector.map2 ~f:Set_or_keep.set_or_keep)
           ~error:Update_not_permitted_app_state
@@ -1424,7 +1424,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       if Snapp_account.(equal default t) then None else Some t
     in
     let%bind snapp_uri =
-      update "snapp URI" a.permissions.set_snapp_uri snapp_uri a.snapp_uri
+      update a.permissions.set_snapp_uri snapp_uri a.snapp_uri
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
         ~error:Update_not_permitted_snapp_uri
     in
@@ -1443,7 +1443,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         if increment_nonce then Set_or_keep.Set (Account.Nonce.succ a.nonce)
         else Set_or_keep.Keep
       in
-      update "nonce" a.permissions.increment_nonce update_nonce a.nonce
+      update a.permissions.increment_nonce update_nonce a.nonce
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
         ~error:Update_not_permitted_nonce
     in
