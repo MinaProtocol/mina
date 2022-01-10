@@ -463,7 +463,7 @@ module Initial_validate_batcher = struct
 
   type nonrec 'a t = (input, input, 'a) t
 
-  let create ~verifier : _ t =
+  let create ~verifier ~precomputed_values : _ t =
     create
       ~logger:
         (Logger.create
@@ -482,10 +482,14 @@ module Initial_validate_batcher = struct
             c)
       (fun xs ->
         let input = function `Partially_validated x | `Init x -> x in
+        let genesis_state_hash =
+          Precomputed_values.genesis_state_with_hash precomputed_values
+          |> With_hash.hash
+        in
         List.map xs ~f:(fun x ->
             External_transition.Validation.wrap
               (Envelope.Incoming.data (input x)))
-        |> External_transition.validate_proofs ~verifier
+        |> External_transition.validate_proofs ~verifier ~genesis_state_hash
         >>| function
         | Ok tvs ->
             Ok (List.map tvs ~f:(fun x -> `Valid x))
@@ -700,7 +704,9 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
             | `Fatal_error of exn ] )
           Result.t
           Deferred.t) =
-  let initial_validation_batcher = Initial_validate_batcher.create ~verifier in
+  let initial_validation_batcher =
+    Initial_validate_batcher.create ~verifier ~precomputed_values
+  in
   let verify_work_batcher = Verify_work_batcher.create ~verifier in
   let set_state t node s =
     set_state t node s ;
