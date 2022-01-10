@@ -4349,7 +4349,7 @@ module For_tests = struct
                   ; call_data
                   ; call_depth = 0
                   ; protocol_state = Snapp_predicate.Protocol_state.accept
-                  ; use_full_commitment = false
+                  ; use_full_commitment = true
                   }
               ; predicate
               }
@@ -4395,28 +4395,31 @@ module For_tests = struct
       |> Parties.Party_or_stack.accumulate_hashes_predicated
     in
     let other_parties_hash = Parties.Party_or_stack.stack_hash ps in
-    let transaction : Parties.Transaction_commitment.t =
+    let commitment : Parties.Transaction_commitment.t =
       Parties.Transaction_commitment.create ~other_parties_hash
         ~protocol_state_predicate_hash
         ~memo_hash:(Signed_command_memo.hash memo)
     in
+    let full_commitment =
+      Parties.Transaction_commitment.with_fee_payer commitment
+        ~fee_payer_hash:Party.Predicated.(digest (of_fee_payer fee_payer.data))
+    in
     let fee_payer =
       let fee_payer_signature_auth =
-        let txn_comm =
-          Parties.Transaction_commitment.with_fee_payer transaction
-            ~fee_payer_hash:
-              Party.Predicated.(digest (of_fee_payer fee_payer.data))
-        in
         Signature_lib.Schnorr.sign sender.private_key
-          (Random_oracle.Input.field txn_comm)
+          (Random_oracle.Input.field full_commitment)
       in
       { fee_payer with authorization = fee_payer_signature_auth }
     in
     let sender_party =
       Option.map sender_party ~f:(fun s ->
+          let commitment =
+            if s.data.body.use_full_commitment then full_commitment
+            else commitment
+          in
           let sender_signature_auth =
             Signature_lib.Schnorr.sign sender.private_key
-              (Random_oracle.Input.field transaction)
+              (Random_oracle.Input.field commitment)
           in
           { Party.data = s.data
           ; authorization = Signature sender_signature_auth
@@ -4425,7 +4428,8 @@ module For_tests = struct
     ( `Parties { Parties.fee_payer; other_parties = other_receivers; memo }
     , `Sender_party sender_party
     , `Proof_party snapp_party
-    , `Txn_commitment transaction )
+    , `Txn_commitment commitment
+    , `Full_txn_commitment full_commitment )
 
   let deploy_snapp ~constraint_constants (spec : Spec.t) =
     let `VK vk, `Prover _trivial_prover =
@@ -4446,16 +4450,21 @@ module For_tests = struct
     let ( `Parties { Parties.fee_payer; other_parties; memo }
         , `Sender_party sender_party
         , `Proof_party snapp_party
-        , `Txn_commitment transaction ) =
+        , `Txn_commitment commitment
+        , `Full_txn_commitment full_commitment ) =
       create_parties spec ~update:update_vk ~predicate:Party.Predicate.Accept
     in
     assert (List.is_empty other_parties) ;
     let snapp_party =
       Option.value_map ~default:[] snapp_party ~f:(fun snapp_party ->
+          let commitment =
+            if snapp_party.data.body.use_full_commitment then full_commitment
+            else commitment
+          in
           let signature =
             Signature_lib.Schnorr.sign
               (Option.value_exn spec.snapp_account_keypair).private_key
-              (Random_oracle.Input.field transaction)
+              (Random_oracle.Input.field commitment)
           in
           [ { Party.data = snapp_party.data
             ; authorization = Signature signature
@@ -4473,7 +4482,8 @@ module For_tests = struct
     let ( `Parties { Parties.fee_payer; other_parties; memo }
         , `Sender_party sender_party
         , `Proof_party snapp_party
-        , `Txn_commitment transaction ) =
+        , `Txn_commitment commitment
+        , `Full_txn_commitment full_commitment ) =
       create_parties spec ~update:spec.snapp_update
         ~predicate:Party.Predicate.Accept
     in
@@ -4494,7 +4504,7 @@ module For_tests = struct
             Parties.Party_or_stack.stack_hash ps
           in
           let tx_statement : Snapp_statement.t =
-            { transaction; at_party = proof_party }
+            { transaction = commitment; at_party = proof_party }
           in
           let handler (Snarky_backendless.Request.With { request; respond }) =
             match request with _ -> respond Unhandled
@@ -4504,10 +4514,14 @@ module For_tests = struct
           in
           { Party.data = snapp_party.data; authorization = Proof pi }
       | Signature ->
+          let commitment =
+            if snapp_party.data.body.use_full_commitment then full_commitment
+            else commitment
+          in
           let signature =
             Signature_lib.Schnorr.sign
               (Option.value_exn spec.snapp_account_keypair).private_key
-              (Random_oracle.Input.field transaction)
+              (Random_oracle.Input.field commitment)
           in
           Async.Deferred.return
             { Party.data = snapp_party.data
@@ -4527,7 +4541,8 @@ module For_tests = struct
     let ( `Parties parties
         , `Sender_party sender_party
         , `Proof_party snapp_party
-        , `Txn_commitment _transaction ) =
+        , `Txn_commitment _commitment
+        , `Full_txn_commitment _full_commitment ) =
       create_parties spec ~update:spec.snapp_update
         ~predicate:Party.Predicate.Accept
     in
