@@ -296,6 +296,101 @@ let gen_balance_change ?balances_tbl (account : Account.t) =
 let gen_use_full_commitment : bool Base_quickcheck.Generator.t =
   Bool.quickcheck_generator
 
+let closed_interval_exact value =
+  Snapp_predicate.Closed_interval.{ lower = value; upper = value }
+
+let gen_epoch_data_predicate
+    (epoch_data :
+      ( ( Frozen_ledger_hash.Stable.V1.t
+        , Currency.Amount.Stable.V1.t )
+        Epoch_ledger.Poly.Stable.V1.t
+      , Epoch_seed.Stable.V1.t
+      , State_hash.Stable.V1.t
+      , State_hash.Stable.V1.t
+      , Mina_numbers.Length.Stable.V1.t )
+      Snapp_predicate.Protocol_state.Epoch_data.Poly.t) :
+    Snapp_predicate.Protocol_state.Epoch_data.t Base_quickcheck.Generator.t =
+  let open Quickcheck.Let_syntax in
+  let%bind ledger =
+    let%bind hash =
+      Snapp_basic.Or_ignore.gen @@ return epoch_data.ledger.hash
+    in
+    let%map total_currency =
+      closed_interval_exact epoch_data.ledger.total_currency
+      |> return |> Snapp_basic.Or_ignore.gen
+    in
+    Epoch_ledger.Poly.{ hash; total_currency }
+  in
+  let%bind seed = Snapp_basic.Or_ignore.gen @@ return epoch_data.seed in
+  let%bind start_checkpoint =
+    Snapp_basic.Or_ignore.gen @@ return epoch_data.start_checkpoint
+  in
+  let%bind lock_checkpoint =
+    Snapp_basic.Or_ignore.gen @@ return epoch_data.lock_checkpoint
+  in
+  let%map epoch_length =
+    Snapp_basic.Or_ignore.gen @@ return
+    @@ closed_interval_exact epoch_data.epoch_length
+  in
+  { Epoch_data.Poly.ledger
+  ; seed
+  ; start_checkpoint
+  ; lock_checkpoint
+  ; epoch_length
+  }
+
+let gen_protocol_state_predicate (psv : Snapp_predicate.Protocol_state.View.t) :
+    Snapp_predicate.Protocol_state.t Base_quickcheck.Generator.t =
+  let open Quickcheck.Let_syntax in
+  let%bind snarked_ledger_hash =
+    Snapp_basic.Or_ignore.gen @@ return psv.snarked_ledger_hash
+  in
+  let%bind snarked_next_available_token =
+    Snapp_basic.Or_ignore.gen
+      (return @@ closed_interval_exact psv.snarked_next_available_token)
+  in
+  let%bind timestamp =
+    Snapp_predicate.Closed_interval.
+      { lower = psv.timestamp; upper = Block_time.max_value }
+    |> return |> Snapp_basic.Or_ignore.gen
+  in
+  let%bind blockchain_length =
+    Snapp_basic.Or_ignore.gen
+      (return @@ closed_interval_exact psv.blockchain_length)
+  in
+  let%bind min_window_density =
+    Snapp_basic.Or_ignore.gen
+      (return @@ closed_interval_exact psv.min_window_density)
+  in
+  let%bind total_currency =
+    Snapp_basic.Or_ignore.gen
+      (return @@ closed_interval_exact psv.total_currency)
+  in
+  let%bind global_slot_since_hard_fork =
+    Snapp_basic.Or_ignore.gen
+      (return @@ closed_interval_exact psv.global_slot_since_hard_fork)
+  in
+  let%bind global_slot_since_genesis =
+    Snapp_basic.Or_ignore.gen
+      (return @@ closed_interval_exact psv.global_slot_since_genesis)
+  in
+  let%bind staking_epoch_data =
+    gen_epoch_data_predicate psv.staking_epoch_data
+  in
+  let%map next_epoch_data = gen_epoch_data_predicate psv.next_epoch_data in
+  { Snapp_predicate.Protocol_state.Poly.snarked_ledger_hash
+  ; snarked_next_available_token
+  ; timestamp
+  ; blockchain_length
+  ; min_window_density
+  ; last_vrf_output = ()
+  ; total_currency
+  ; global_slot_since_hard_fork
+  ; global_slot_since_genesis
+  ; staking_epoch_data
+  ; next_epoch_data
+  }
+
 (* The type `a` is associated with the `delta` field, which is an unsigned fee
    for the fee payer, and a signed amount for other parties.
    The type `b` is associated with the `use_full_commitment` field, which is
@@ -305,6 +400,7 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
     ?(snapp_account = false) ?(is_fee_payer = false) ?available_public_keys
     ?permissions_auth ?(required_balance_change : a option)
     ?(required_balance : Currency.Balance.t option)
+    ?protocol_state_view
     ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
     ~(gen_use_full_commitment : b Quickcheck.Generator.t)
     ~(f_balance_change : a -> Currency.Amount.Signed.t) ~(increment_nonce : b)
@@ -495,8 +591,10 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
   let%bind call_data = Snark_params.Tick.Field.gen in
   (* update the depth when generating `other_parties` in Parties.t *)
   let call_depth = 0 in
-  let protocol_state = Snapp_predicate.Protocol_state.accept in
-
+  let%bind protocol_state =
+    Option.value_map protocol_state_view ~f:gen_protocol_state_predicate
+      ~default:(return Snapp_predicate.Protocol_state.accept)
+  in
   let%map use_full_commitment = gen_use_full_commitment in
   { Party.Body.Poly.pk
   ; update
@@ -514,14 +612,14 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
 let gen_predicated_from ?(succeed = true) ?(new_account = false)
     ?(snapp_account = false) ?(increment_nonce = false) ?available_public_keys
     ?permissions_auth ?required_balance_change ?required_balance ~ledger
-    ~balances_tbl =
+    ~balances_tbl ?protocol_state_view () =
   let open Quickcheck.Let_syntax in
   let%bind body =
     gen_party_body ~new_account ~snapp_account ~increment_nonce
       ?permissions_auth ?available_public_keys ?required_balance_change
       ?required_balance ~ledger ~balances_tbl
       ~gen_balance_change:(gen_balance_change ~balances_tbl)
-      ~f_balance_change:Fn.id () ~gen_use_full_commitment
+      ~f_balance_change:Fn.id () ~gen_use_full_commitment ?protocol_state_view
   in
   let account_id =
     Account_id.create body.Party.Body.Poly.pk body.Party.Body.Poly.token_id
@@ -563,14 +661,13 @@ let gen_party_from ?(succeed = true) ?(new_account = false) ?permissions_auth
   return { Party.data; authorization }
 
 (* takes an account id, if we want to sign this data *)
-let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger :
+let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view () :
     Party.Predicated.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body0 =
-    gen_party_body ?permissions_auth ~account_id ~is_fee_payer:true
-      ~increment_nonce:() ~gen_balance_change:gen_fee
-      ~f_balance_change:fee_to_amt ~gen_use_full_commitment:(return ()) ~ledger
-      ()
+    gen_party_body ~account_id ~is_fee_payer:true ~increment_nonce:()
+      ~gen_balance_change:gen_fee ~f_balance_change:fee_to_amt
+      ~gen_use_full_commitment:(return ()) ~ledger ?protocol_state_view ()
   in
   (* make sure the fee payer's token id is the default,
      which is represented by the unit value in the body
@@ -595,11 +692,11 @@ let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger :
   let predicate = account.nonce in
   Party.Predicated.Poly.{ body; predicate }
 
-let gen_fee_payer ?permissions_auth ~account_id ~ledger () :
+let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view () :
     Party.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map data =
-    gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
+    gen_party_predicated_fee_payer ~account_id ~ledger ?protocol_state_view ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
   let authorization = Signature.dummy in
@@ -611,7 +708,7 @@ let gen_parties_from ?(succeed = true)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t)
-    ~ledger () =
+    ~ledger ?protocol_state_view () =
   let open Quickcheck.Let_syntax in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
@@ -648,7 +745,7 @@ let gen_parties_from ?(succeed = true)
       instead, those generated permissions are used in later transactions
   *)
   let%bind fee_payer =
-    gen_fee_payer ~permissions_auth ~account_id:fee_payer_account_id ~ledger ()
+    gen_fee_payer ~permissions_auth ~account_id:fee_payer_account_id ~ledger ?protocol_state_view ()
   in
   (* table of public keys to balances, updated when generating each party
      a Map would be more principled, but threading that map through the code
