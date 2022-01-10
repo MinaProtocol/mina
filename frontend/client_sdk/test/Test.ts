@@ -3,7 +3,9 @@ import { deepStrictEqual } from "assert";
 
 let key = MinaSDK.genKeys();
 let publicKey = MinaSDK.derivePublicKey(key.privateKey);
+console.log(MinaSDK.publicKeyToRaw(publicKey));
 let signed = MinaSDK.signMessage("hello", key);
+console.log(signed);
 MinaSDK.verifyMessage(signed);
 
 deepStrictEqual(publicKey, key.publicKey, "Public keys do not match");

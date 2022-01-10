@@ -77,6 +77,24 @@ let generate_command =
   printf "%s\n" Signer.Keys.(of_keypair keypair |> to_private_key_bytes) ;
   return ()
 
+let convert_signature_command =
+  let open Command.Let_syntax in
+  let%map_open field_str =
+      flag "--field" ~doc:"Field string in decimal (from client-sdk)"
+        (required string)
+  and scalar_str =
+      flag "--scalar" ~doc:"Scalar string in decimal (from client-sdk)"
+        (required string)
+  in
+  fun () ->
+  let open Deferred.Let_syntax in
+  let open Snark_params.Tick in
+  let field = Field.of_string field_str
+  and scalar = Inner_curve.Scalar.of_string scalar_str
+  in
+  printf "%s\n" (Mina_base.Signature.Raw.encode (field, scalar));
+  return ()
+
 let commands =
   [ ("sign", Command.async ~summary:"Sign an unsigned transaction" sign_command)
   ; ( "verify"
@@ -89,4 +107,7 @@ let commands =
     , Command.async ~summary:"Import a private key, returns a public-key"
         derive_command )
   ; ( "generate-private-key"
-    , Command.async ~summary:"Generate a new private key" generate_command ) ]
+    , Command.async ~summary:"Generate a new private key" generate_command )
+  ; ( "convert-signature"
+    , Command.async ~summary:"Convert signature from field,scalar decimal strings into Rosetta Signature" convert_signature_command )
+    ]
