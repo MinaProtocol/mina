@@ -46,10 +46,9 @@ LogDNA provides both data storage and data visualization and alerting functional
 Google Cloud Loggind provides storage and data searching/visualization of logs. It provides a handy command line sdk tool. There's also various libraries for mainstream languages. Since we are already using gcloud logging for our nodes, the integrated `Logs explorer` would be familiar for most of our engineers. It also provides some log-based metrics and alerts. By default the user defined log bucket has a 30-day log retention, but it's configurable. Comparible to the AWS stack, the architecture is a little different. There's no `Kenesis data stream`-equivalent part for gcloud logging. The logs go directly to the Google Cloud Logging API, as illustrated in the following diagram:
 ![](res/gcloud_logging.png)
 
-Currently there's no existing gcloud sdk bindings for OCaml that supports sending data to Cloud Logging API. We have 3 options here:
-1. Modify the existing gcloud binding libraries for ocaml (https://github.com/AestheticIntegration/ocaml-gcloud) to add supports for gcloud logging. This would take sometime.
-2. Call gcloud sdk directly from ocaml process as a separate process. This is kind of hacky.
-3. Set up a mini-service under the subdomain https://node-status-report.minaprotocol.com (https://node-error-report.minaprotocol.com for node error report system). The mini-service would just consists of a simple bash script that redirects the report to Google Cloud Logging API.
+To send logs to Cloud Logging API, we have 2 options:
+1. Call the RESTful API directly from node.
+2. Set up a mini-service under the subdomain https://node-status-report.minaprotocol.com (https://node-error-report.minaprotocol.com for node error report system). The mini-service would just consists of a simple bash/python script that redirects the report to Google Cloud Logging API. This would requires a bit setup but this gives us the flexibility of changing the backend at any time without modify the client.
 
 ## Prices
 
