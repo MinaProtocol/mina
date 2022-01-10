@@ -26,7 +26,8 @@ module Failure = struct
         | Snapp_account_not_present
         | Update_not_permitted
         | Incorrect_nonce
-      [@@deriving sexp, yojson, equal, compare, enum]
+        | Invalid_fee_excess
+      [@@deriving sexp, yojson, equal, compare, enum, hash]
 
       let to_latest = Fn.id
     end
@@ -38,7 +39,15 @@ module Failure = struct
 
   let failure_max = max
 
-  let to_latest = Fn.id
+  let failure_num_bits =
+    let num_values = failure_max - failure_min + 1 in
+    Int.ceil_log2 num_values
+
+  let gen =
+    let open Quickcheck.Let_syntax in
+    let%map ndx = Int.gen_uniform_incl failure_min failure_max in
+    (* bounds are checked, of_enum always returns Some *)
+    Option.value_exn (of_enum ndx)
 
   let to_string = function
     | Predicate ->
@@ -71,6 +80,8 @@ module Failure = struct
         "Update_not_permitted"
     | Incorrect_nonce ->
         "Incorrect_nonce"
+    | Invalid_fee_excess ->
+        "Invalid_fee_excess"
 
   let of_string = function
     | "Predicate" ->
@@ -103,6 +114,8 @@ module Failure = struct
         Ok Update_not_permitted
     | "Incorrect_nonce" ->
         Ok Incorrect_nonce
+    | "Invalid_fee_excess" ->
+        Ok Invalid_fee_excess
     | _ ->
         Error "Signed_command_status.Failure.of_string: Unknown value"
 
@@ -147,6 +160,8 @@ module Failure = struct
         "An account is not permitted to make the given update"
     | Incorrect_nonce ->
         "Incorrect nonce"
+    | Invalid_fee_excess ->
+        "Fee excess from parties transaction more than the transaction fees"
 
   [%%ifdef consensus_mechanism]
 
@@ -174,6 +189,7 @@ module Failure = struct
         ; snapp_account_not_present : 'bool
         ; update_not_permitted : 'bool
         ; incorrect_nonce : 'bool
+        ; invalid_fee_excess : 'bool
         }
       [@@deriving hlist, equal, sexp, compare]
 
@@ -193,6 +209,7 @@ module Failure = struct
           ; snapp_account_not_present
           ; update_not_permitted
           ; incorrect_nonce
+          ; invalid_fee_excess
           } =
         { predicate = f predicate
         ; source_not_present = f source_not_present
@@ -210,6 +227,7 @@ module Failure = struct
         ; snapp_account_not_present = f snapp_account_not_present
         ; update_not_permitted = f update_not_permitted
         ; incorrect_nonce = f incorrect_nonce
+        ; invalid_fee_excess = f invalid_fee_excess
         }
     end
 
@@ -229,6 +247,7 @@ module Failure = struct
       ; snapp_account_not_present : 'bool
       ; update_not_permitted : 'bool
       ; incorrect_nonce : 'bool
+      ; invalid_fee_excess : 'bool
       }
     [@@deriving equal, sexp, compare]
 
@@ -265,6 +284,8 @@ module Failure = struct
           t.update_not_permitted
       | Incorrect_nonce ->
           t.incorrect_nonce
+      | Invalid_fee_excess ->
+          t.invalid_fee_excess
 
     type var = Boolean.var poly
 
@@ -286,6 +307,7 @@ module Failure = struct
         ; snapp_account_not_present
         ; update_not_permitted
         ; incorrect_nonce
+        ; invalid_fee_excess
         } =
       let bool_to_int b = if b then 1 else 0 in
       let failures =
@@ -304,13 +326,14 @@ module Failure = struct
         + bool_to_int snapp_account_not_present
         + bool_to_int update_not_permitted
         + bool_to_int incorrect_nonce
+        + bool_to_int invalid_fee_excess
       in
       failures = 0 || failures = 1
 
     let typ : (var, t) Typ.t =
       let bt = Boolean.typ in
       Typ.of_hlistable
-        [ bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt ]
+        [ bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt ]
         ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
         ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
 
@@ -330,6 +353,7 @@ module Failure = struct
       ; snapp_account_not_present = false
       ; update_not_permitted = false
       ; incorrect_nonce = false
+      ; invalid_fee_excess = false
       }
 
     let predicate = { none with predicate = true }
@@ -369,6 +393,8 @@ module Failure = struct
 
     let incorrect_nonce = { none with incorrect_nonce = true }
 
+    let invalid_fee_excess = { none with invalid_fee_excess = true }
+
     let to_enum = function
       | { predicate = true; _ } ->
           to_enum Predicate
@@ -400,6 +426,8 @@ module Failure = struct
           to_enum Update_not_permitted
       | { incorrect_nonce = true; _ } ->
           to_enum Incorrect_nonce
+      | { invalid_fee_excess = true; _ } ->
+          to_enum Invalid_fee_excess
       | _ ->
           0
 
@@ -441,7 +469,9 @@ module Failure = struct
                 | Update_not_permitted ->
                     update_not_permitted
                 | Incorrect_nonce ->
-                    incorrect_nonce )
+                    incorrect_nonce
+                | Invalid_fee_excess ->
+                    invalid_fee_excess )
           | None ->
               None )
 
@@ -461,7 +491,7 @@ module Failure = struct
     end
 
     (** Canonical representation for user command failures in snarky.
-    
+
         This bundles some useful accumulators with the underlying record to
         enable us to do a cheap checking operation. The type is private to
         ensure that the invariants of this check are always satisfied.
@@ -508,6 +538,8 @@ module Failure = struct
 
     val incorrect_nonce : t
 
+    val invalid_fee_excess : t
+
     val get : t -> failure -> Boolean.var
   end = struct
     module Accumulators = struct
@@ -530,6 +562,7 @@ module Failure = struct
            ; snapp_account_not_present
            ; update_not_permitted
            ; incorrect_nonce
+           ; invalid_fee_excess
            } :
             As_record.var) : t =
         let user_command_failure =
@@ -550,6 +583,7 @@ module Failure = struct
                ; (snapp_account_not_present :> Field.Var.t)
                ; (update_not_permitted :> Field.Var.t)
                ; (incorrect_nonce :> Field.Var.t)
+               ; (invalid_fee_excess :> Field.Var.t)
                ])
         in
         { user_command_failure }
@@ -615,6 +649,8 @@ module Failure = struct
     let update_not_permitted = mk_var As_record.update_not_permitted
 
     let incorrect_nonce = mk_var As_record.incorrect_nonce
+
+    let invalid_fee_excess = mk_var As_record.invalid_fee_excess
 
     let get { data; _ } failure = As_record.get data failure
 

@@ -73,7 +73,7 @@ module Limited = struct
         { transition : External_transition.Validated.Stable.V2.t
         ; protocol_states :
             ( Mina_base.State_hash.Stable.V1.t
-            * Mina_state.Protocol_state.Value.Stable.V1.t )
+            * Mina_state.Protocol_state.Value.Stable.V2.t )
             list
         ; common : Common.Stable.V2.t
         }

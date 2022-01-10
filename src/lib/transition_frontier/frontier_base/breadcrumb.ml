@@ -221,18 +221,6 @@ let display t =
   ; parent
   }
 
-let all_user_commands breadcrumbs =
-  Sequence.fold (Sequence.of_list breadcrumbs) ~init:Signed_command.Set.empty
-    ~f:(fun acc_set breadcrumb ->
-      breadcrumb |> commands
-      |> List.filter_map ~f:(fun { data; _ } ->
-             match data with
-             | Parties _ ->
-                 None
-             | Signed_command c ->
-                 Some (Signed_command.forget_check c))
-      |> Signed_command.Set.of_list |> Set.union acc_set)
-
 module For_tests = struct
   open Currency
   open Signature_lib
@@ -372,23 +360,17 @@ module For_tests = struct
       let previous_protocol_state =
         previous_transition |> External_transition.Validated.protocol_state
       in
-      let previous_ledger_hash =
+      let previous_registers =
         previous_protocol_state |> Protocol_state.blockchain_state
-        |> Blockchain_state.snarked_ledger_hash
+        |> Blockchain_state.registers
       in
-      let next_ledger_hash =
+      let next_registers =
         Option.value_map ledger_proof_opt
           ~f:(fun (proof, _) ->
-            Ledger_proof.statement proof |> Ledger_proof.statement_target)
-          ~default:previous_ledger_hash
-      in
-      let snarked_next_available_token =
-        match ledger_proof_opt with
-        | Some (proof, _) ->
-            (Ledger_proof.statement proof).next_available_token_after
-        | None ->
-            previous_protocol_state |> Protocol_state.blockchain_state
-            |> Blockchain_state.snarked_next_available_token
+            { (Ledger_proof.statement proof |> Ledger_proof.statement_target) with
+              pending_coinbase_stack = ()
+            })
+          ~default:previous_registers
       in
       let genesis_ledger_hash =
         previous_protocol_state |> Protocol_state.blockchain_state
@@ -397,12 +379,12 @@ module For_tests = struct
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
-          ~snarked_ledger_hash:next_ledger_hash ~snarked_next_available_token
-          ~staged_ledger_hash:next_staged_ledger_hash ~genesis_ledger_hash
+          ~registers:next_registers ~staged_ledger_hash:next_staged_ledger_hash
+          ~genesis_ledger_hash
       in
       let previous_state_hash = Protocol_state.hash previous_protocol_state in
       let consensus_state =
-        make_next_consensus_state ~snarked_ledger_hash:previous_ledger_hash
+        make_next_consensus_state ~snarked_ledger_hash:previous_registers.ledger
           ~previous_protocol_state:
             With_hash.
               { data = previous_protocol_state; hash = previous_state_hash }

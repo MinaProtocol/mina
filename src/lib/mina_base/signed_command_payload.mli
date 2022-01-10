@@ -184,3 +184,10 @@ val next_available_token : t -> Token_id.t -> Token_id.t
 val tag : t -> Transaction_union_tag.t
 
 val gen : t Quickcheck.Generator.t
+
+(** This module defines a weight for each payload component *)
+module Weight : sig
+  val of_body : Body.t -> int
+end
+
+val weight : t -> int

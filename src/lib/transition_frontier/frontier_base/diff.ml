@@ -6,10 +6,49 @@ type full = Full
 
 type lite = Lite
 
+module Dummy_binable1 (T : sig
+  type 'a t
+end) =
+  Binable.Of_binable1
+    (struct
+      type 'a t = unit [@@deriving bin_io_unversioned]
+    end)
+    (struct
+      type 'a t = 'a T.t
+
+      let to_binable _ = ()
+
+      let of_binable _ = assert false
+    end)
+
+module Dummy_binable2 (T : sig
+  type (_, _) t
+end) =
+  Binable.Of_binable2
+    (struct
+      type (_, _) t = unit [@@deriving bin_io_unversioned]
+    end)
+    (struct
+      type ('a, 'b) t = ('a, 'b) T.t
+
+      let to_binable _ = ()
+
+      let of_binable _ = assert false
+    end)
+
 module Node = struct
-  type _ t =
-    | Full : Breadcrumb.t -> full t
-    | Lite : External_transition.Validated.t -> lite t
+  [%%versioned_binable
+  module Stable = struct
+    module V2 = struct
+      type 'a t =
+        | Full : Breadcrumb.t -> full t
+        | Lite : External_transition.Validated.Stable.V2.t -> lite t
+
+      include Dummy_binable1 (struct
+        type nonrec 'a t = 'a t
+      end)
+    end
+  end]
 end
 
 module Node_list = struct
@@ -133,12 +172,28 @@ module Root_transition = struct
   end
 end
 
-type ('repr, 'mutant) t =
+module T = struct
+  [%%versioned_binable
+  module Stable = struct
+    module V2 = struct
+      type ('repr, 'mutant) t =
+        | New_node : 'repr Node.Stable.V2.t -> ('repr, unit) t
+        | Root_transitioned : 'repr Root_transition.t -> ('repr, State_hash.t) t
+        | Best_tip_changed : State_hash.t -> (_, State_hash.t) t
+
+      include Dummy_binable2 (struct
+        type nonrec ('a, 'b) t = ('a, 'b) t
+      end)
+    end
+  end]
+end
+
+type ('repr, 'mutant) t = ('repr, 'mutant) T.t =
   | New_node : 'repr Node.t -> ('repr, unit) t
   | Root_transitioned : 'repr Root_transition.t -> ('repr, State_hash.t) t
   | Best_tip_changed : State_hash.t -> (_, State_hash.t) t
 
-type ('repr, 'mutant) diff = ('repr, 'mutant) t
+type ('repr, 'mutant) diff = ('repr, 'mutant) T.t
 
 let name : type repr mutant. (repr, mutant) t -> string = function
   | Root_transitioned _ ->

@@ -22,11 +22,23 @@ let sample_block_sexp =
             "\147\141\184\201\248,\140\181\141?>\244\253%\0006\164\141&\167\018u=/\222Z\189\003\168\\\171\244")))
          (pending_coinbase_hash
           27084379850098594655705071178420075456895794930390241653672386735138865173985)))
-       (snarked_ledger_hash
-        22336620733341347240280105727380801754115112664781960672802684772048600612014)
-       (genesis_ledger_hash
-        22336620733341347240280105727380801754115112664781960672802684772048600612014)
-       (snarked_next_available_token 2) (timestamp 1600251660000)))
+        (genesis_ledger_hash
+          22336620733341347240280105727380801754115112664781960672802684772048600612014)
+        (registers
+          ((ledger
+          22336620733341347240280105727380801754115112664781960672802684772048600612014)
+           (pending_coinbase_stack ()) (next_available_token 2)
+           (local_state
+            ((parties
+              0x0000000000000000000000000000000000000000000000000000000000000000)
+             (call_stack
+              0x0000000000000000000000000000000000000000000000000000000000000000)
+             (transaction_commitment
+              0x0000000000000000000000000000000000000000000000000000000000000000)
+             (full_transaction_commitment
+              0x0000000000000000000000000000000000000000000000000000000000000000)
+             (token_id 1) (excess 0) (ledger 0) (success true) (failure_status (Update_not_permitted))))))
+       (timestamp 1600251660000)))
      (consensus_state
       ((blockchain_length 2) (epoch_count 0) (min_window_density 77)
        (sub_window_densities (2 7 7 7 7 7 7 7 7 7 7))
@@ -3632,11 +3644,10 @@ let sample_block_json =
           "pending_coinbase_hash":
             "2n2Dr16Ft9cgknFUfVFXpcq6gE3rWoW5jtgAW5SDduE2am98kRSE"
         },
-        "snarked_ledger_hash":
-          "jxRZMzMSPVEMJ9wE4yqKEwQqVS3KZfDewHLYCC9aeqdig68Trco",
         "genesis_ledger_hash":
           "jxRZMzMSPVEMJ9wE4yqKEwQqVS3KZfDewHLYCC9aeqdig68Trco",
-        "snarked_next_available_token": "2",
+        "registers":{"ledger":"jxRZMzMSPVEMJ9wE4yqKEwQqVS3KZfDewHLYCC9aeqdig68Trco","pending_coinbase_stack":null,"next_available_token":"2","local_state":{"parties":"0x0000000000000000000000000000000000000000000000000000000000000000","call_stack":"0x0000000000000000000000000000000000000000000000000000000000000000","transaction_commitment":"0x0000000000000000000000000000000000000000000000000000000000000000","full_transaction_commitment":"0x0000000000000000000000000000000000000000000000000000000000000000","token_id":"1","excess":"0","ledger":"jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd","success":true,
+        "failure_status":["Update_not_permitted"]}},
         "timestamp": "1600251660000"
       },
       "consensus_state": {

@@ -218,7 +218,7 @@ end)
       ; constraint_constants
       }
     in
-    (*proiority: Transition frontier diffs > local diffs > incomming diffs*)
+    (* priority: Transition frontier diffs > local diffs > incoming diffs *)
     Strict_pipe.Reader.Merge.iter
       [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
             `Transition_frontier_extension diff)
@@ -295,7 +295,7 @@ end)
 
   let create ~config ~constraint_constants ~consensus_constants ~time_controller
       ~incoming_diffs ~local_diffs ~frontier_broadcast_pipe ~logger =
-    (*Diffs from tansition frontier extensions*)
+    (* Diffs from transition frontier extensions *)
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
         create ~name:"Network pool transition frontier diffs" Synchronous)

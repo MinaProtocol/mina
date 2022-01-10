@@ -81,8 +81,6 @@ val completed_works : t -> Transaction_snark_work.t list
 
 val mask : t -> Ledger.Mask.Attached.t
 
-val all_user_commands : t list -> Signed_command.Set.t
-
 val display : t -> display
 
 val name : t -> string
