@@ -80,20 +80,7 @@ func initNodes(t *testing.T, numNodes int, upcallMask uint32) ([]testNode, []con
 		nodes[ni].node = node
 		nodes[ni].trap = trap
 	}
-	go func() {
-		err, has := <-errChan
-		if has {
-			topCtxCancel()
-			errChan <- err
-		}
-	}()
-	t.Cleanup(func() {
-		topCtxCancel()
-		close(errChan)
-		for err := range errChan {
-			t.Errorf("feed upcall trap failed with %s", err)
-		}
-	})
+	handleErrChan(t, errChan, topCtxCancel)
 	return nodes, cancels
 }
 
