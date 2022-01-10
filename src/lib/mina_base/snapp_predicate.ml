@@ -707,7 +707,7 @@ end
 
 module Protocol_state = struct
   (* On each numeric field, you may assert a range
-      On each hash field, you may assert an equality
+     On each hash field, you may assert an equality
   *)
 
   module Epoch_data = struct
