@@ -1,6 +1,4 @@
 dune b src/lib/snarky_js_bindings/snarky_js_chrome.bc.js
-#rm -r ~/repos/snarkyjs/src/chrome_bindings/snippets
-#cp -r _build/default/src/lib/crypto/kimchi_bindings/js/chrome/snippets ~/repos/snarkyjs/src/chrome_bindings/snippets
 cp _build/default/src/lib/crypto/kimchi_bindings/js/chrome/plonk_wasm* ../snarkyjs/src/chrome_bindings/
 cp _build/default/src/lib/snarky_js_bindings/snarky_js_chrome*.js ../snarkyjs/src/chrome_bindings/
 
