@@ -82,8 +82,8 @@ spec:
         - name: DAEMON_METRICS_PORT
           value: {{ .Values.mina.ports.metrics | quote }}
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ .Values.mina.ports.p2p | quote }}
-        - name: CODA_CLIENT_TRUSTLIST
+          value: {{ .Values.coda.ports.p2p | quote }}
+        - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CONNECT_PRIVATE_IPS
           value: "true"
