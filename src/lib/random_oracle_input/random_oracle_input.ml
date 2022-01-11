@@ -1,50 +1,53 @@
 open Core_kernel
 
-type 'field t =
-  { field_elements : 'field array; packeds : ('field * int) array }
-[@@deriving sexp, compare]
+module Chunked = struct
+  type 'field t =
+    { field_elements : 'field array; packeds : ('field * int) array }
+  [@@deriving sexp, compare]
 
-let append (t1 : _ t) (t2 : _ t) =
-  { field_elements = Array.append t1.field_elements t2.field_elements
-  ; packeds = Array.append t1.packeds t2.packeds
-  }
+  let append (t1 : _ t) (t2 : _ t) =
+    { field_elements = Array.append t1.field_elements t2.field_elements
+    ; packeds = Array.append t1.packeds t2.packeds
+    }
 
-let field_elements (a : 'f array) : 'f t =
-  { field_elements = a; packeds = [||] }
+  let field_elements (a : 'f array) : 'f t =
+    { field_elements = a; packeds = [||] }
 
-let field x : _ t = field_elements [| x |]
+  let field x : _ t = field_elements [| x |]
 
-let packeds a = { field_elements = [||]; packeds = a }
+  let packeds a = { field_elements = [||]; packeds = a }
 
-let packed xn : _ t = packeds [| xn |]
+  let packed xn : _ t = packeds [| xn |]
 
-module type Field_intf = sig
-  type t
+  module type Field_intf = sig
+    type t
 
-  val size_in_bits : int
+    val size_in_bits : int
 
-  val zero : t
+    val zero : t
 
-  val ( + ) : t -> t -> t
+    val ( + ) : t -> t -> t
 
-  val ( * ) : t -> t -> t
-end
+    val ( * ) : t -> t -> t
+  end
 
-let pack_to_fields (type t) (module F : Field_intf with type t = t)
-    ~(pow2 : int -> t) { field_elements; packeds } =
-  let shift_left acc n = F.( * ) acc (pow2 n) in
-  let open F in
-  let packed_bits =
-    let xs, acc, acc_n =
-      Array.fold packeds ~init:([], zero, 0) ~f:(fun (xs, acc, acc_n) (x, n) ->
-          let n' = Int.(n + acc_n) in
-          if Int.(n' < size_in_bits) then (xs, shift_left acc n + x, n')
-          else (acc :: xs, zero, 0))
+  let pack_to_fields (type t) (module F : Field_intf with type t = t)
+      ~(pow2 : int -> t) { field_elements; packeds } =
+    let shift_left acc n = F.( * ) acc (pow2 n) in
+    let open F in
+    let packed_bits =
+      let xs, acc, acc_n =
+        Array.fold packeds ~init:([], zero, 0)
+          ~f:(fun (xs, acc, acc_n) (x, n) ->
+            let n' = Int.(n + acc_n) in
+            if Int.(n' < size_in_bits) then (xs, shift_left acc n + x, n')
+            else (acc :: xs, zero, 0))
+      in
+      let xs = if acc_n > 0 then acc :: xs else xs in
+      Array.of_list_rev xs
     in
-    let xs = if acc_n > 0 then acc :: xs else xs in
-    Array.of_list_rev xs
-  in
-  Array.append field_elements packed_bits
+    Array.append field_elements packed_bits
+end
 
 module Legacy = struct
   type ('field, 'bool) t =

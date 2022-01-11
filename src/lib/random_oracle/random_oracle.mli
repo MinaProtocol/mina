@@ -26,7 +26,7 @@ include
      and type field_constant := Field.t
      and type bool := bool
      and module State := State
-     and type input := Field.t Random_oracle_input.t
+     and type input := Field.t Random_oracle_input.Chunked.t
 
 val salt : string -> Field.t State.t
 
@@ -38,7 +38,7 @@ module Checked :
      and type field_constant := Field.t
      and type bool := Boolean.var
      and module State := State
-     and type input := Field.Var.t Random_oracle_input.t
+     and type input := Field.Var.t Random_oracle_input.Chunked.t
 
 [%%endif]
 

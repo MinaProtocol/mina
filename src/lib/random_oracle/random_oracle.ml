@@ -139,7 +139,7 @@ module Checked = struct
         hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs)
 
   let pack_input =
-    Input.pack_to_fields
+    Input.Chunked.pack_to_fields
       ~pow2:(Fn.compose Field.Var.constant pow2)
       (module Pickles.Impls.Step.Field)
 
@@ -148,7 +148,7 @@ end
 
 [%%endif]
 
-let pack_input = Input.pack_to_fields ~pow2 (module Field)
+let pack_input = Input.Chunked.pack_to_fields ~pow2 (module Field)
 
 let prefix_to_field (s : string) =
   let bits_per_character = 8 in
