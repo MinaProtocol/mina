@@ -94,7 +94,7 @@ Vendor: none
 Architecture: amd64
 Maintainer: O(1)Labs <build@o1labs.org>
 Installed-Size:
-Depends: ${SHARED_DEPS}
+Depends: ${SHARED_DEPS}${DAEMON_DEPS}
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/

@@ -79,7 +79,6 @@ mina-rosetta-ubuntu)
   ;;
 mina-snapp-test-transaction)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-snapp-test-transaction"
-  DOCKER_CONTEXT="dockerfiles/"
   ;;
 leaderboard)
   DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"

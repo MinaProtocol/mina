@@ -9,9 +9,6 @@ ARG deb_release=alpha
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $deb_codename $deb_release $deb_version"
 
-COPY scripts/archive-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
 # Dependencies
 RUN apt-get -y update \
     && apt-get -y upgrade \
@@ -19,10 +16,8 @@ RUN apt-get -y update \
         procps \
         curl \
         jq \
-        libjemalloc-dev \
         dumb-init \
         libssl1.1 \
-        libpq-dev \
         apt-transport-https \
         ca-certificates \
         dnsutils \
@@ -34,5 +29,3 @@ RUN apt-get -y update \
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get -y update \
   && apt-get install -y "mina-snapp-test-transaction=$deb_version"
-
-ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]
