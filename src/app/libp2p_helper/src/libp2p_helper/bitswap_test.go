@@ -497,7 +497,7 @@ func TestBitswapRootBlockCid(t *testing.T) {
 const resourceUpdateOnlyMask = upcallDropAllMask ^ (1 << ResourceUpdateChan)
 
 func testBitswap(t *testing.T, numNodes, numAttempts, numRequests, maxBlobSize int, delayBeforeDownload bool) {
-	nodes, cancels := initNodes(t, numNodes, resourceUpdateOnlyMask)
+	nodes, cancels, _ := initNodes(t, numNodes, resourceUpdateOnlyMask, CLOSE_PEERS, false)
 	// uncomment following lines to print a sed expression that will replace
 	// peer ids with node indexes in test logs (useful for debug of tests)
 
@@ -558,7 +558,7 @@ func TestBitswapQC(t *testing.T) {
 		t.Skip("skipping TestBitswapQC in short mode")
 		return
 	}
-	nodes, cancels := initNodes(t, 20, resourceUpdateOnlyMask)
+	nodes, cancels, _ := initNodes(t, 20, resourceUpdateOnlyMask, CLOSE_PEERS, false)
 	for ni := range nodes {
 		go func(ni int) {
 			nodes[ni].node.bitswapCtx.Loop()

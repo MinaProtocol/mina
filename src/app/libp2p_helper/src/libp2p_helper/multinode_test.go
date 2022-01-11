@@ -51,18 +51,33 @@ func beginAdvertisingOnNodes(t *testing.T, nodes []testNode) {
 	}
 }
 
-func initNodes(t *testing.T, numNodes int, upcallMask uint32) ([]testNode, []context.CancelFunc) {
+type PeerIdType int
+
+const (
+	ANY_PEERS = iota
+	CLOSE_PEERS
+	DISTANT_PEERS
+)
+
+func initNodes(t *testing.T, numNodes int, upcallMask uint32, pt PeerIdType, minaPeerExchange bool) ([]testNode, []context.CancelFunc, []uint16) {
 	nodes := make([]testNode, numNodes)
 	cancels := make([]context.CancelFunc, numNodes)
+	ports := make([]uint16, numNodes)
 	keys := make([]crypto.PrivKey, numNodes)
 	ids := make([]kb.ID, numNodes)
-	// We generate keys in such an awkward way to make dht not mark the peer ids as protected
+	// Generate keys that are either distant from first node or close to it, depending on the `pt`
+	// Keys are generated in such an awkward way to make dht not mark the peer ids as protected
 	for ni := 0; ni < numNodes; {
 		keys[ni] = newTestKey(t)
 		pid, err := peer.IDFromPrivateKey(keys[ni])
 		require.NoError(t, err)
 		ids[ni] = kb.ConvertPeerID(pid)
-		if ni == 0 || kb.CommonPrefixLen(ids[ni], ids[0]) >= 2 {
+		if ni == 0 {
+			ni++
+			continue
+		}
+		pl := kb.CommonPrefixLen(ids[ni], ids[0])
+		if pt == ANY_PEERS || (pl >= 2 && pt == CLOSE_PEERS) || (pl < 2 && pt == DISTANT_PEERS) {
 			ni++
 		}
 	}
@@ -72,16 +87,18 @@ func initNodes(t *testing.T, numNodes int, upcallMask uint32) ([]testNode, []con
 		trap := newUpcallTrap(fmt.Sprintf("node %d", ni), 64, upcallMask)
 		ctx, cancelF := context.WithCancel(topCtx)
 		cancels[ni] = cancelF
-		node := newTestAppWithMaxConnsAndCtx(t, keys[ni], nil, false, CONNS_LO, CONNS_HI, false, nextPort(), ctx)
+		port := nextPort()
+		node := newTestAppWithMaxConnsAndCtx(t, keys[ni], nil, false, CONNS_LO, CONNS_HI, minaPeerExchange, port, ctx)
 		node.NoMDNS = true
 		node.P2p.Logger = logging.Logger(fmt.Sprintf("node%d", ni))
 		node.SetConnectionHandlers()
 		launchFeedUpcallTrap(node.P2p.Logger, node.OutChan, trap, errChan, ctx)
 		nodes[ni].node = node
 		nodes[ni].trap = trap
+		ports[ni] = port
 	}
 	handleErrChan(t, errChan, topCtxCancel)
-	return nodes, cancels
+	return nodes, cancels, ports
 }
 
 func iteratePrevNextPeers(t *testing.T, nodes []testNode, f func(node testNode, prev, next peer.AddrInfo)) {
@@ -346,7 +363,7 @@ func buildConnectionGraph(nodes []testNode) map[int]map[int]bool {
 }
 
 func TestBroadcastInNotFullConnectedNetwork(t *testing.T) {
-	nodes, _ := initNodes(t, 10, upcallDropAllMask^(1<<GossipReceivedChan)^(1<<PeerConnectedChan)^(1<<PeerDisconnectedChan))
+	nodes, _, _ := initNodes(t, 10, upcallDropAllMask^(1<<GossipReceivedChan)^(1<<PeerConnectedChan)^(1<<PeerDisconnectedChan), CLOSE_PEERS, false)
 	// Connection graph is represented by map from node x to node y mapped to boolean (false entries are to be discraded)
 	// invariant: connectionGraph[x][y] == connectionGraph[y][x]
 	connectionGraph := make(map[int]map[int]bool)

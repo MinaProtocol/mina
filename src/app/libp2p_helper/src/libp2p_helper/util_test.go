@@ -73,10 +73,11 @@ func newTestAppWithMaxConnsAndCtx(t *testing.T, privkey crypto.PrivKey, seeds []
 	helper.ResetGatingConfigTrustedAddrFilters()
 	helper.Host.SetStreamHandler(testProtocol, testStreamHandler)
 
-	t.Cleanup(func() {
+	go func() {
+		<-ctx.Done()
 		panicOnErr(os.RemoveAll(dir))
 		panicOnErr(helper.Host.Close())
-	})
+	}()
 	outChan := make(chan *capnp.Message, 64)
 	bitswapCtx := NewBitswapCtx(ctx, outChan)
 	bitswapCtx.engine = helper.Bitswap
