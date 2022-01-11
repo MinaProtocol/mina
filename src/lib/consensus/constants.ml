@@ -337,11 +337,9 @@ let typ =
     ~value_of_hlist:Poly.of_hlist
 
 let to_input (t : t) =
-  let u = Length.to_bits in
-  let s = Block_time.Span.Bits.to_bits in
-  Random_oracle.Input.bitstrings
+  Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
     (Array.concat
-       [ Array.map ~f:u
+       [ Array.map ~f:Length.to_input
            [| t.k
             ; t.delta
             ; t.slots_per_sub_window
@@ -353,13 +351,13 @@ let to_input (t : t) =
             ; t.checkpoint_window_slots_per_year
             ; t.checkpoint_window_size_in_slots
            |]
-       ; Array.map ~f:s
+       ; Array.map ~f:Block_time.Span.to_input
            [| t.block_window_duration_ms
             ; t.slot_duration_ms
             ; t.epoch_duration
             ; t.delta_duration
            |]
-       ; [| Block_time.Bits.to_bits t.genesis_state_timestamp |]
+       ; [| Block_time.to_input t.genesis_state_timestamp |]
        ])
 
 let gc_parameters (constants : t) =
@@ -378,48 +376,29 @@ let gc_parameters (constants : t) =
   , `Gc_interval gc_interval )
 
 module Checked = struct
-  let to_input (var : var) =
-    let l = Bitstring_lib.Bitstring.Lsb_first.to_list in
-    let u = Length.Checked.to_bits in
-    let s = Block_time.Span.Unpacked.var_to_bits in
-    let%map k = u var.k
-    and delta = u var.delta
-    and slots_per_sub_window = u var.slots_per_sub_window
-    and slots_per_window = u var.slots_per_window
-    and sub_windows_per_window = u var.sub_windows_per_window
-    and slots_per_epoch = u var.slots_per_epoch
-    and grace_period_end = u var.grace_period_end
-    and epoch_size = u var.epoch_size
-    and checkpoint_window_slots_per_year =
-      u var.checkpoint_window_slots_per_year
-    and checkpoint_window_size_in_slots =
-      u var.checkpoint_window_size_in_slots
-    in
-    let block_window_duration_ms = s var.block_window_duration_ms in
-    let slot_duration_ms = s var.slot_duration_ms in
-    let epoch_duration = s var.epoch_duration in
-    let delta_duration = s var.delta_duration in
-    let genesis_state_timestamp =
-      Block_time.Unpacked.var_to_bits var.genesis_state_timestamp
-    in
-    Random_oracle.Input.bitstrings
-      (Array.map ~f:l
-         [| k
-          ; delta
-          ; slots_per_sub_window
-          ; slots_per_window
-          ; sub_windows_per_window
-          ; slots_per_epoch
-          ; grace_period_end
-          ; epoch_size
-          ; checkpoint_window_slots_per_year
-          ; checkpoint_window_size_in_slots
-          ; block_window_duration_ms
-          ; slot_duration_ms
-          ; epoch_duration
-          ; delta_duration
-          ; genesis_state_timestamp
-         |])
+  let to_input (t : var) =
+    Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
+      (Array.concat
+         [ Array.map ~f:Length.Checked.to_input
+             [| t.k
+              ; t.delta
+              ; t.slots_per_sub_window
+              ; t.slots_per_window
+              ; t.sub_windows_per_window
+              ; t.slots_per_epoch
+              ; t.grace_period_end
+              ; t.epoch_size
+              ; t.checkpoint_window_slots_per_year
+              ; t.checkpoint_window_size_in_slots
+             |]
+         ; Array.map ~f:Block_time.Span.Checked.to_input
+             [| t.block_window_duration_ms
+              ; t.slot_duration_ms
+              ; t.epoch_duration
+              ; t.delta_duration
+             |]
+         ; [| Block_time.Checked.to_input t.genesis_state_timestamp |]
+         ])
 
   let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(protocol_constants : Mina_base.Protocol_constants_checked.var) :

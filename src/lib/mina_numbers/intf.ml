@@ -62,7 +62,9 @@ module type S_unchecked = sig
 
   val of_bits : bool list -> t
 
-  val to_input : t -> (_, bool) Random_oracle.Input.t
+  val to_input : t -> Snark_params.Tick.Field.t Random_oracle.Input.Chunked.t
+
+  val to_input_legacy : t -> (_, bool) Random_oracle.Legacy.Input.t
 
   val fold : t -> bool Triple.t Fold.t
 end
@@ -107,7 +109,10 @@ module type S_checked = sig
 
   val to_bits : t -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
 
-  val to_input : t -> ((_, Boolean.var) Random_oracle.Input.t, _) Checked.t
+  val to_input : t -> Field.Var.t Random_oracle.Input.Chunked.t
+
+  val to_input_legacy :
+    t -> ((_, Boolean.var) Random_oracle.Legacy.Input.t, _) Checked.t
 
   val to_integer : t -> field Snarky_integer.Integer.t
 

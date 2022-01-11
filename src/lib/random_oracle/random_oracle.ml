@@ -146,6 +146,16 @@ module Checked = struct
   let digest xs = xs.(0)
 end
 
+let read_typ ({ field_elements; packeds } : _ Input.Chunked.t) =
+  let open Pickles.Impls.Step in
+  let open As_prover in
+  { Input.Chunked.field_elements = Array.map ~f:(read Field.typ) field_elements
+  ; packeds = Array.map packeds ~f:(fun (x, i) -> (read Field.typ x, i))
+  }
+
+let read_typ' input : _ Pickles.Impls.Step.Internal_Basic.As_prover.t =
+ fun _ x -> (x, read_typ input)
+
 [%%endif]
 
 let pack_input = Input.Chunked.pack_to_fields ~pow2 (module Field)

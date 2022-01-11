@@ -96,12 +96,12 @@ module Pending_coinbase_stack_state = struct
   let typ = Poly.typ Pending_coinbase.Stack.typ
 
   let to_input ({ source; target } : t) =
-    Random_oracle.Input.append
+    Random_oracle.Input.Chunked.append
       (Pending_coinbase.Stack.to_input source)
       (Pending_coinbase.Stack.to_input target)
 
   let var_to_input ({ source; target } : var) =
-    Random_oracle.Input.append
+    Random_oracle.Input.Chunked.append
       (Pending_coinbase.Stack.var_to_input source)
       (Pending_coinbase.Stack.var_to_input target)
 
@@ -256,7 +256,7 @@ module Statement = struct
         ; sok_digest
         } =
       let input =
-        Array.reduce_exn ~f:Random_oracle.Input.append
+        Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
           [| Sok_message.Digest.to_input sok_digest
            ; Frozen_ledger_hash.to_input source
            ; Frozen_ledger_hash.to_input target
@@ -269,8 +269,8 @@ module Statement = struct
       in
       if !top_hash_logging_enabled then
         Format.eprintf
-          !"Generating unchecked top hash from:@.%{sexp: (Tick.Field.t, bool) \
-            Random_oracle.Input.t}@."
+          !"Generating unchecked top hash from:@.%{sexp: Tick.Field.t \
+            Random_oracle.Input.Chunked.t}@."
           input ;
       input
 
@@ -291,15 +291,15 @@ module Statement = struct
           } =
         let open Tick in
         let open Checked.Let_syntax in
-        let%bind fee_excess = Fee_excess.to_input_checked fee_excess in
-        let%bind next_available_token_before =
+        let fee_excess = Fee_excess.to_input_checked fee_excess in
+        let next_available_token_before =
           Token_id.Checked.to_input next_available_token_before
         in
-        let%bind next_available_token_after =
+        let next_available_token_after =
           Token_id.Checked.to_input next_available_token_after
         in
         let input =
-          Array.reduce_exn ~f:Random_oracle.Input.append
+          Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
             [| Sok_message.Digest.Checked.to_input sok_digest
              ; Frozen_ledger_hash.var_to_input source
              ; Frozen_ledger_hash.var_to_input target
@@ -315,23 +315,11 @@ module Statement = struct
           as_prover
             As_prover.(
               if !top_hash_logging_enabled then
-                let%bind field_elements =
-                  read
-                    (Typ.list ~length:0 Field.typ)
-                    (Array.to_list input.field_elements)
-                in
-                let%map bitstrings =
-                  read
-                    (Typ.list ~length:0 (Typ.list ~length:0 Boolean.typ))
-                    (Array.to_list input.bitstrings)
-                in
+                let%map input = Random_oracle.read_typ' input in
                 Format.eprintf
-                  !"Generating checked top hash from:@.%{sexp: (Field.t, bool) \
-                    Random_oracle.Input.t}@."
-                  { Random_oracle.Input.field_elements =
-                      Array.of_list field_elements
-                  ; bitstrings = Array.of_list bitstrings
-                  }
+                  !"Generating checked top hash from:@.%{sexp: Field.t \
+                    Random_oracle.Input.Chunked.t}@."
+                  input
               else return ())
         in
         input
@@ -1001,9 +989,11 @@ module Base = struct
 
   let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
       ~signature =
-    let%bind input = Transaction_union_payload.Checked.to_input payload in
+    let%bind input =
+      Transaction_union_payload.Checked.to_input_legacy payload
+    in
     let%bind verifies =
-      Schnorr.Checked.verifies shifted signature signer input
+      Schnorr.Legacy.Checked.verifies shifted signature signer input
     in
     Boolean.Assert.any [ Boolean.not is_user_command; verifies ]
 
@@ -1368,14 +1358,14 @@ module Base = struct
 
     let signature_verifies ~shifted ~payload_digest req pk =
       let%bind signature =
-        exists Schnorr.Signature.typ ~request:(As_prover.return req)
+        exists Schnorr.Legacy.Signature.typ ~request:(As_prover.return req)
       in
       let%bind pk =
         Public_key.decompress_var pk
         (*           (Account_id.Checked.public_key fee_payer_id) *)
       in
-      Schnorr.Checked.verifies shifted signature pk
-        (Random_oracle.Input.field payload_digest)
+      Schnorr.Legacy.Checked.verifies shifted signature pk
+        (Random_oracle.Legacy.Input.field payload_digest)
 
     let pay_fee
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)

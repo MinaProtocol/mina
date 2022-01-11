@@ -122,7 +122,7 @@ module Compressed = struct
   let empty = Poly.{ x = Field.zero; is_odd = false }
 
   let to_input { Poly.x; is_odd } =
-    { Random_oracle.Input.field_elements = [| x |]
+    { Random_oracle.Input.Chunked.field_elements = [| x |]
     ; packeds = [| (Field.project [ is_odd ], 1) |]
     }
 
@@ -157,7 +157,7 @@ module Compressed = struct
       Boolean.(x_eq && odd_eq)
 
     let to_input ({ x; is_odd } : var) =
-      { Random_oracle.Input.field_elements = [| x |]
+      { Random_oracle.Input.Chunked.field_elements = [| x |]
       ; packeds = [| ((is_odd :> Field.Var.t), 1) |]
       }
 

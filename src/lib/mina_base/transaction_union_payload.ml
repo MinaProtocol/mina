@@ -176,29 +176,30 @@ module Body = struct
       ; token_locked = Boolean.var_of_value token_locked
       }
 
-    let to_input { tag; source_pk; receiver_pk; token_id; amount; token_locked }
-        =
-      let%map token_id = Token_id.Checked.to_input token_id in
-      Array.reduce_exn ~f:Random_oracle.Input.append
-        [| Tag.Unpacked.to_input tag
-         ; Public_key.Compressed.Checked.to_input source_pk
-         ; Public_key.Compressed.Checked.to_input receiver_pk
+    let to_input_legacy
+        { tag; source_pk; receiver_pk; token_id; amount; token_locked } =
+      let%map token_id = Token_id.Checked.to_input_legacy token_id in
+      Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
+        [| Tag.Unpacked.to_input_legacy tag
+         ; Public_key.Compressed.Checked.to_input_legacy source_pk
+         ; Public_key.Compressed.Checked.to_input_legacy receiver_pk
          ; token_id
-         ; Currency.Amount.var_to_input amount
-         ; Random_oracle.Input.bitstring [ token_locked ]
+         ; Currency.Amount.var_to_input_legacy amount
+         ; Random_oracle.Input.Legacy.bitstring [ token_locked ]
         |]
   end
 
   [%%endif]
 
-  let to_input { tag; source_pk; receiver_pk; token_id; amount; token_locked } =
-    Array.reduce_exn ~f:Random_oracle.Input.append
-      [| Tag.to_input tag
-       ; Public_key.Compressed.to_input source_pk
-       ; Public_key.Compressed.to_input receiver_pk
-       ; Token_id.to_input token_id
-       ; Currency.Amount.to_input amount
-       ; Random_oracle.Input.bitstring [ token_locked ]
+  let to_input_legacy
+      { tag; source_pk; receiver_pk; token_id; amount; token_locked } =
+    Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
+      [| Tag.to_input_legacy tag
+       ; Public_key.Compressed.to_input_legacy source_pk
+       ; Public_key.Compressed.to_input_legacy receiver_pk
+       ; Token_id.to_input_legacy token_id
+       ; Currency.Amount.to_input_legacy amount
+       ; Random_oracle.Input.Legacy.bitstring [ token_locked ]
       |]
 end
 
@@ -236,10 +237,11 @@ let typ : (var, t) Typ.t =
 let payload_typ = typ
 
 module Checked = struct
-  let to_input ({ common; body } : var) =
-    let%map common = Signed_command_payload.Common.Checked.to_input common
-    and body = Body.Checked.to_input body in
-    Random_oracle.Input.append common body
+  let to_input_legacy ({ common; body } : var) =
+    let%map common =
+      Signed_command_payload.Common.Checked.to_input_legacy common
+    and body = Body.Checked.to_input_legacy body in
+    Random_oracle.Input.Legacy.append common body
 
   let constant ({ common; body } : t) : var =
     { common = Signed_command_payload.Common.Checked.constant common
@@ -249,10 +251,10 @@ end
 
 [%%endif]
 
-let to_input ({ common; body } : t) =
-  Random_oracle.Input.append
-    (Signed_command_payload.Common.to_input common)
-    (Body.to_input body)
+let to_input_legacy ({ common; body } : t) =
+  Random_oracle.Input.Legacy.append
+    (Signed_command_payload.Common.to_input_legacy common)
+    (Body.to_input_legacy body)
 
 let excess (payload : t) : Amount.Signed.t =
   let tag = payload.body.tag in

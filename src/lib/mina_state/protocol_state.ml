@@ -94,7 +94,7 @@ module Body = struct
       ; consensus_state
       ; constants
       } =
-    Random_oracle.Input.(
+    Random_oracle.Input.Chunked.(
       append
         (Blockchain_state.to_input blockchain_state)
         (Consensus.Data.Consensus_state.to_input consensus_state)
@@ -104,20 +104,18 @@ module Body = struct
   let var_to_input
       { Poly.genesis_state_hash; blockchain_state; consensus_state; constants }
       =
-    let%bind blockchain_state =
-      Blockchain_state.var_to_input blockchain_state
-    in
-    let%bind constants = Protocol_constants_checked.var_to_input constants in
-    let%map consensus_state =
+    let blockchain_state = Blockchain_state.var_to_input blockchain_state in
+    let constants = Protocol_constants_checked.var_to_input constants in
+    let consensus_state =
       Consensus.Data.Consensus_state.var_to_input consensus_state
     in
-    Random_oracle.Input.(
+    Random_oracle.Input.Chunked.(
       append blockchain_state consensus_state
       |> append (field (State_hash.var_to_hash_packed genesis_state_hash))
       |> append constants)
 
   let hash_checked (t : var) =
-    let%bind input = var_to_input t in
+    let input = var_to_input t in
     make_checked (fun () ->
         Random_oracle.Checked.(
           hash ~init:Hash_prefix.protocol_state_body (pack_input input)

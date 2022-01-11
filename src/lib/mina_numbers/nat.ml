@@ -34,8 +34,11 @@ struct
       (make_checked (fun () -> Integer.to_bits ~length:N.length_in_bits ~m t))
 
   let to_input t =
+    Random_oracle_input.Chunked.packed (to_field t, N.length_in_bits)
+
+  let to_input_legacy t =
     Checked.map (to_bits t) ~f:(fun bits ->
-        Random_oracle.Input.bitstring
+        Random_oracle.Input.Legacy.bitstring
           (Bitstring_lib.Bitstring.Lsb_first.to_list bits))
 
   let constant n = Integer.constant ~length:N.length_in_bits ~m (N.to_bigint n)
@@ -160,7 +163,11 @@ struct
 
   let of_bits = Bits.of_bits
 
-  let to_input t = Random_oracle.Input.bitstring (to_bits t)
+  let to_input (t : t) =
+    Random_oracle.Input.Chunked.packed
+      (Snark_params.Tick.Field.project (to_bits t), N.length_in_bits)
+
+  let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
   let fold t = Fold.group3 ~default:false (Bits.fold t)
 

@@ -37,8 +37,8 @@ let typ =
     ~value_of_hlist:Poly.of_hlist
 
 let to_input (t : value) =
-  Random_oracle.Input.bitstrings
-    [| T.to_bits t.slot_number; Length.to_bits t.slots_per_epoch |]
+  Random_oracle.Input.Chunked.append (T.to_input t.slot_number)
+    (Length.to_input t.slots_per_epoch)
 
 let gen ~(constants : Constants.t) =
   let open Quickcheck.Let_syntax in
@@ -127,12 +127,10 @@ module Checked = struct
     and slots_per_epoch = Length.Checked.to_bits t.slots_per_epoch in
     List.concat_map ~f:to_list [ slot_number; slots_per_epoch ] |> of_list
 
-  let to_input (var : t) =
-    let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
-    let%map slot_number = T.Checked.to_bits var.slot_number
-    and slots_per_epoch = Length.Checked.to_bits var.slots_per_epoch in
-    Random_oracle.Input.bitstrings
-      (Array.map ~f:s [| slot_number; slots_per_epoch |])
+  let to_input (t : var) =
+    Random_oracle.Input.Chunked.append
+      (T.Checked.to_input t.slot_number)
+      (Length.Checked.to_input t.slots_per_epoch)
 
   let to_epoch_and_slot (t : t) :
       (Epoch.Checked.t * Slot.Checked.t, _) Checked.t =

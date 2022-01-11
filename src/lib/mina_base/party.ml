@@ -75,7 +75,7 @@ module Update = struct
       Poly.t
 
     let to_input ({ app_state; delegate; verification_key; permissions } : t) =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Snapp_state.to_input app_state
             ~f:(Set_or_keep.Checked.to_input ~f:field)
@@ -98,7 +98,7 @@ module Update = struct
   let dummy = noop
 
   let to_input ({ app_state; delegate; verification_key; permissions } : t) =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Snapp_state.to_input app_state
           ~f:(Set_or_keep.to_input ~dummy:Field.zero ~f:field)
@@ -169,10 +169,10 @@ module Body = struct
       Poly.t
 
     let to_input ({ pk; update; token_id; delta } : t) =
-      List.reduce_exn ~f:Random_oracle_input.append
+      List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Public_key.Compressed.Checked.to_input pk
         ; Update.Checked.to_input update
-        ; Impl.run_checked (Token_id.Checked.to_input token_id)
+        ; Token_id.Checked.to_input token_id
         ; Amount.Signed.Checked.to_input delta
         ]
 
@@ -200,7 +200,7 @@ module Body = struct
     }
 
   let to_input ({ pk; update; token_id; delta } : t) =
-    List.reduce_exn ~f:Random_oracle_input.append
+    List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Public_key.Compressed.to_input pk
       ; Update.to_input update
       ; Token_id.to_input token_id
@@ -267,8 +267,7 @@ module Predicate = struct
           Field.(
             if_ b
               ~then_:(constant (Lazy.force accept))
-              ~else_:
-                (digest (run_checked (Account.Nonce.Checked.to_input nonce))))
+              ~else_:(digest (Account.Nonce.Checked.to_input nonce)))
   end
 
   let typ () : (Snapp_predicate.Account.Checked.t, t) Typ.t =
@@ -308,9 +307,9 @@ module Predicated = struct
   end]
 
   let to_input ({ body; predicate } : t) =
-    List.reduce_exn ~f:Random_oracle_input.append
+    List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Body.to_input body
-      ; Random_oracle_input.field (Predicate.digest predicate)
+      ; Random_oracle_input.Chunked.field (Predicate.digest predicate)
       ]
 
   let digest (t : t) =
@@ -327,9 +326,9 @@ module Predicated = struct
     type t = (Body.Checked.t, Predicate.Checked.t) Poly.t
 
     let to_input ({ body; predicate } : t) =
-      List.reduce_exn ~f:Random_oracle_input.append
+      List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Body.Checked.to_input body
-        ; Random_oracle_input.field (Predicate.Checked.digest predicate)
+        ; Random_oracle_input.Chunked.field (Predicate.Checked.digest predicate)
         ]
 
     let digest (t : t) =

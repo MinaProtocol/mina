@@ -2,6 +2,8 @@
 
 open Core_kernel
 
+let field_of_bool = Util.field_of_bool
+
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
@@ -23,7 +25,8 @@ module Transition = struct
     end
   end]
 
-  let to_input { prev; next } ~f = Random_oracle_input.append (f prev) (f next)
+  let to_input { prev; next } ~f =
+    Random_oracle_input.Chunked.append (f prev) (f next)
 
   [%%ifdef consensus_mechanism]
 
@@ -46,14 +49,15 @@ module Flagged_data = struct
   [%%endif]
 
   let to_input' { flag; data } ~flag:f ~data:d =
-    Random_oracle_input.(append (f flag) (d data))
+    Random_oracle_input.Chunked.(append (f flag) (d data))
 end
 
 module Flagged_option = struct
   type ('bool, 'a) t = { is_some : 'bool; data : 'a } [@@deriving hlist, fields]
 
-  let to_input' { is_some; data } ~f =
-    Random_oracle_input.(append (bitstring [ is_some ]) (f data))
+  let to_input' ~field_of_bool { is_some; data } ~f =
+    Random_oracle_input.Chunked.(
+      append (packed (field_of_bool is_some, 1)) (f data))
 
   let to_input { is_some; data } ~default ~f =
     let data = if is_some then data else default in
@@ -120,8 +124,8 @@ module Set_or_keep = struct
 
     val to_input :
          'a t
-      -> f:('a -> ('f, Boolean.var) Random_oracle_input.t)
-      -> ('f, Boolean.var) Random_oracle_input.t
+      -> f:('a -> Field.Var.t Random_oracle_input.Chunked.t)
+      -> Field.Var.t Random_oracle_input.Chunked.t
   end = struct
     type 'a t = (Boolean.var, 'a) Flagged_option.t
 
@@ -139,7 +143,9 @@ module Set_or_keep = struct
         (Flagged_option.option_typ ~default:dummy t)
         ~there:to_option ~back:of_option
 
-    let to_input (t : _ t) ~f = Flagged_option.to_input' t ~f
+    let to_input (t : _ t) ~f =
+      Flagged_option.to_input' t ~f ~field_of_bool:(fun (b : Boolean.var) ->
+          (b :> Field.Var.t))
   end
 
   let typ = Checked.typ
@@ -147,7 +153,7 @@ module Set_or_keep = struct
   [%%endif]
 
   let to_input t ~dummy:default ~f =
-    Flagged_option.to_input ~default ~f
+    Flagged_option.to_input ~default ~f ~field_of_bool
       (Flagged_option.of_option ~default (to_option t))
 end
 
@@ -180,8 +186,8 @@ module Or_ignore = struct
 
     val to_input :
          'a t
-      -> f:('a -> ('f, Boolean.var) Random_oracle_input.t)
-      -> ('f, Boolean.var) Random_oracle_input.t
+      -> f:('a -> Field.Var.t Random_oracle_input.Chunked.t)
+      -> Field.Var.t Random_oracle_input.Chunked.t
 
     val check : 'a t -> f:('a -> Boolean.var) -> Boolean.var
   end = struct
@@ -194,7 +200,8 @@ module Or_ignore = struct
       | Implicit x ->
           f x
       | Explicit t ->
-          Flagged_option.to_input' t ~f
+          Flagged_option.to_input' t ~f ~field_of_bool:(fun (b : Boolean.var) ->
+              (b :> Field.Var.t))
 
     let check t ~f =
       match t with
@@ -241,7 +248,9 @@ module Account_state = struct
   module Encoding = struct
     type 'b t = { any : 'b; empty : 'b } [@@deriving hlist]
 
-    let to_input { any; empty } = Random_oracle_input.bitstring [ any; empty ]
+    let to_input ~field_of_bool { any; empty } =
+      Random_oracle_input.Chunked.packeds
+        [| (field_of_bool any, 1); (field_of_bool empty, 1) |]
   end
 
   let encode : t -> bool Encoding.t = function
@@ -260,7 +269,7 @@ module Account_state = struct
     | { any = true; empty = false } | { any = true; empty = true } ->
         Any
 
-  let to_input (x : t) = Encoding.to_input (encode x)
+  let to_input (x : t) = Encoding.to_input ~field_of_bool (encode x)
 
   let check (t : t) (x : [ `Empty | `Non_empty ]) =
     match (t, x) with
@@ -276,7 +285,9 @@ module Account_state = struct
 
     type t = Boolean.var Encoding.t
 
-    let to_input (t : t) = Encoding.to_input t
+    let to_input (t : t) =
+      Encoding.to_input t ~field_of_bool:(fun (b : Boolean.var) ->
+          (b :> Field.t))
 
     let check (t : t) ~is_empty =
       Boolean.(

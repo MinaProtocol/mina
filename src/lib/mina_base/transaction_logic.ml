@@ -2292,8 +2292,8 @@ module For_tests = struct
       }
     in
     let signature =
-      Schnorr.sign sender.private_key
-        (Random_oracle.Input.field
+      Schnorr.Chunked.sign sender.private_key
+        (Random_oracle.Input.Chunked.field
            ( Parties.Transaction_commitment.create
                ~other_parties_hash:
                  (Parties.With_hashes.other_parties_hash parties)

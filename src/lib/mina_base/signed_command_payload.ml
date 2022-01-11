@@ -107,15 +107,15 @@ module Common = struct
 
   [%%endif]
 
-  let to_input ({ fee; fee_token; fee_payer_pk; nonce; valid_until; memo } : t)
-      =
-    let bitstring = Random_oracle.Input.bitstring in
-    Array.reduce_exn ~f:Random_oracle.Input.append
-      [| Currency.Fee.to_input fee
-       ; Token_id.to_input fee_token
-       ; Public_key.Compressed.to_input fee_payer_pk
-       ; Account_nonce.to_input nonce
-       ; Global_slot.to_input valid_until
+  let to_input_legacy
+      ({ fee; fee_token; fee_payer_pk; nonce; valid_until; memo } : t) =
+    let bitstring = Random_oracle.Input.Legacy.bitstring in
+    Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
+      [| Currency.Fee.to_input_legacy fee
+       ; Token_id.to_input_legacy fee_token
+       ; Public_key.Compressed.to_input_legacy fee_payer_pk
+       ; Account_nonce.to_input_legacy nonce
+       ; Global_slot.to_input_legacy valid_until
        ; bitstring (Memo.to_bits memo)
       |]
 
@@ -177,18 +177,18 @@ module Common = struct
       ; valid_until = Global_slot.Checked.constant valid_until
       }
 
-    let to_input
+    let to_input_legacy
         ({ fee; fee_token; fee_payer_pk; nonce; valid_until; memo } : var) =
-      let%map nonce = Account_nonce.Checked.to_input nonce
-      and valid_until = Global_slot.Checked.to_input valid_until
-      and fee_token = Token_id.Checked.to_input fee_token in
-      Array.reduce_exn ~f:Random_oracle.Input.append
-        [| Currency.Fee.var_to_input fee
+      let%map nonce = Account_nonce.Checked.to_input_legacy nonce
+      and valid_until = Global_slot.Checked.to_input_legacy valid_until
+      and fee_token = Token_id.Checked.to_input_legacy fee_token in
+      Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
+        [| Currency.Fee.var_to_input_legacy fee
          ; fee_token
-         ; Public_key.Compressed.Checked.to_input fee_payer_pk
+         ; Public_key.Compressed.Checked.to_input_legacy fee_payer_pk
          ; nonce
          ; valid_until
-         ; Random_oracle.Input.bitstring
+         ; Random_oracle.Input.Legacy.bitstring
              (Array.to_list (memo :> Boolean.var array))
         |]
   end

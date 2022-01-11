@@ -273,10 +273,10 @@ module Checked = struct
   let width_size = Nat.to_int Width.Length.n
 
   let to_input =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
     fun { step_domains; step_widths; max_width; wrap_index; num_branches } :
-        _ Random_oracle_input.t ->
+        _ Random_oracle_input.Chunked.t ->
       let width w = (Width.Checked.to_field w, width_size) in
       List.reduce_exn ~f:append
         [ map_reduce (Vector.to_array step_domains) ~f:(fun { Domains.h } ->

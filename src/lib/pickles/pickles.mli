@@ -142,12 +142,12 @@ module Side_loaded : sig
 
     open Impls.Step
 
-    val to_input : t -> Field.Constant.t Random_oracle_input.t
+    val to_input : t -> Field.Constant.t Random_oracle_input.Chunked.t
 
     module Checked : sig
       type t
 
-      val to_input : t -> Field.t Random_oracle_input.t
+      val to_input : t -> Field.t Random_oracle_input.Chunked.t
     end
 
     val typ : (Checked.t, t) Impls.Step.Typ.t

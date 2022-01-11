@@ -40,6 +40,16 @@ module Checked :
      and module State := State
      and type input := Field.Var.t Random_oracle_input.Chunked.t
 
+(** Read a value stored within a circuit. Must only be used in an [As_prover]
+    block.
+*)
+val read_typ : Field.Var.t Input.Chunked.t -> Field.t Input.Chunked.t
+
+(** Read a value stored within a circuit. *)
+val read_typ' :
+     Field.Var.t Input.Chunked.t
+  -> (Field.t Input.Chunked.t, _) Pickles.Impls.Step.Internal_Basic.As_prover.t
+
 [%%endif]
 
 module Legacy : sig

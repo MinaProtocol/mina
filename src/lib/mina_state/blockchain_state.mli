@@ -83,10 +83,9 @@ val set_timestamp :
   -> 'time
   -> ('staged_ledger_hash, 'snarked_ledger_hash, 'token_id, 'time) Poly.t
 
-val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
+val to_input : Value.t -> Field.t Random_oracle.Input.Chunked.t
 
-val var_to_input :
-  var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 
 type display = (string, string, string, string) Poly.t [@@deriving yojson]
 
