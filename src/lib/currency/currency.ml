@@ -12,6 +12,7 @@ open Let_syntax
 
 [%%else]
 
+open Snark_params_nonconsensus
 open Snark_bits_nonconsensus
 module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
 

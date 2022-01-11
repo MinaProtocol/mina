@@ -1,7 +1,18 @@
+[%%import "/src/config.mlh"]
+
 open Core_kernel
 
-let field_of_bool =
-  Snark_params.Tick.(fun b -> if b then Field.one else Field.zero)
+[%%ifdef consensus_mechanism]
+
+open Snark_params.Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
+
+[%%endif]
+
+let field_of_bool b = if b then Field.one else Field.zero
 
 let bit_length_to_triple_length n =
   let r = n mod 3 in

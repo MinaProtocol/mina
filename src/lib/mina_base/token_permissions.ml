@@ -2,9 +2,14 @@
 
 open Core_kernel
 
-[%%ifndef consensus_mechanism]
+[%%ifdef consensus_mechanism]
+
+open Snark_params.Tick
+
+[%%else]
 
 open Import
+open Snark_params_nonconsensus
 
 [%%endif]
 
@@ -30,8 +35,7 @@ let to_input t =
     | Not_owned { account_disabled } ->
         [ false; account_disabled ]
   in
-  Random_oracle.Input.Chunked.packed
-    (Snark_params.Tick.Field.project bs, List.length bs)
+  Random_oracle.Input.Chunked.packed (Field.project bs, List.length bs)
 
 [%%ifdef consensus_mechanism]
 

@@ -8,10 +8,12 @@ open Unsigned
 [%%ifdef consensus_mechanism]
 
 open Snark_bits
+open Snark_params.Tick
 
 [%%else]
 
 open Snark_bits_nonconsensus
+open Snark_params_nonconsensus
 module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
@@ -62,7 +64,7 @@ module type S_unchecked = sig
 
   val of_bits : bool list -> t
 
-  val to_input : t -> Snark_params.Tick.Field.t Random_oracle.Input.Chunked.t
+  val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
   val to_input_legacy : t -> (_, bool) Random_oracle.Legacy.Input.t
 

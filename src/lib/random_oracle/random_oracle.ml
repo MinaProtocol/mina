@@ -107,9 +107,7 @@ let update ~state = update ~state params
 let hash ?init = hash ?init params
 
 let pow2 =
-  let rec pow2 acc n =
-    if n = 0 then acc else pow2 (Field.add acc acc) (n - 1)
-  in
+  let rec pow2 acc n = if n = 0 then acc else pow2 Field.(acc + acc) (n - 1) in
   Memo.general ~hashable:Int.hashable (fun n -> pow2 Field.one n)
 
 [%%ifdef consensus_mechanism]

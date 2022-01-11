@@ -116,8 +116,11 @@ struct
   let zero = zero_checked
 end
 
+open Snark_params.Tick
+
 [%%else]
 
+open Snark_params_nonconsensus
 open Snark_bits_nonconsensus
 
 [%%endif]
@@ -165,7 +168,7 @@ struct
 
   let to_input (t : t) =
     Random_oracle.Input.Chunked.packed
-      (Snark_params.Tick.Field.project (to_bits t), N.length_in_bits)
+      (Field.project (to_bits t), N.length_in_bits)
 
   let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 

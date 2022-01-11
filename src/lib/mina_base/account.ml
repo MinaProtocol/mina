@@ -11,6 +11,7 @@ open Tick
 
 [%%else]
 
+open Snark_params_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
@@ -61,7 +62,7 @@ module Index = struct
   let of_bits = List.foldi ~init:Vector.empty ~f:(fun i t b -> Vector.set t i b)
 
   let to_input ~ledger_depth x =
-    Random_oracle.Input.Chunked.packed (Tick.Field.of_int x, ledger_depth)
+    Random_oracle.Input.Chunked.packed (Field.of_int x, ledger_depth)
 
   let fold_bits ~ledger_depth t =
     { Fold.fold =
