@@ -70,7 +70,7 @@ function peerCountGreaterThan() {
     )
     
     [[ $peerCount -gt $peerCountMinThreshold ]] && return 0 ||
-        (echo "Peer count[${peerCount}] is not greater than mininum threshold[${peerCountMinThreshold}]." && return 1) 
+        (echo "Peer count[${peerCount}] is not greater than minimum threshold[${peerCountMinThreshold}]." && return 1) 
 }
 
 #
@@ -103,7 +103,7 @@ function hasSentUserCommandsGreaterThan() {
     )
     
     [[ $userCmdSent -gt $userCmdMinThreshold ]] && return 0 ||
-        (echo "User commands sent[${userCmdSent}] is not greater than mininum threshold[${userCmdMinThreshold}]." && return 1)
+        (echo "User commands sent[${userCmdSent}] is not greater than minimum threshold[${userCmdMinThreshold}]." && return 1)
 }
 
 #

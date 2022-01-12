@@ -737,11 +737,11 @@ module Data = struct
         in
         let my_stake = winner_account.balance in
         let%bind truncated_result = Output.Checked.truncate result in
-        let%map satisifed =
+        let%map satisfied =
           Threshold.Checked.is_satisfied ~my_stake
             ~total_stake:epoch_ledger.total_currency truncated_result
         in
-        (satisifed, result, truncated_result, winner_account)
+        (satisfied, result, truncated_result, winner_account)
     end
 
     let eval = T.eval
@@ -3953,7 +3953,7 @@ let%test_module "Proof of stake tests" =
      *  both the staking epoch and the next staking epoch, the root epoch
      *  is the staking epoch. The root epoch position this function generates
      *  is the epoch number of the staking epoch and the block height the
-     *  staking epoch starts at (the simulation of all blocks preceeding the
+     *  staking epoch starts at (the simulation of all blocks preceding the
      *  staking epoch).
      *)
     let gen_spot_root_epoch_position ~slot_fill_rate ~slot_fill_rate_delta =
@@ -4182,7 +4182,7 @@ let%test_module "Proof of stake tests" =
         (a, a_curr_epoch_length)
       in
       let%map b =
-        (* Handle relativity constriants for second state. *)
+        (* Handle relativity constraints for second state. *)
         let ( gen_staking_epoch_length
             , gen_next_epoch_length
             , gen_curr_epoch_position ) =
@@ -4200,7 +4200,7 @@ let%test_module "Proof of stake tests" =
                 in
                 (* This invariant needs to be held for the position of `a` *)
                 assert (max_epoch_slot > Length.to_int a_curr_epoch_slot + 2) ;
-                (* To make this easier, we assume there is a next block in the slot directly preceeding the block for `a`. *)
+                (* To make this easier, we assume there is a next block in the slot directly preceding the block for `a`. *)
                 let%bind added_slots =
                   Core.Int.gen_incl
                     (Length.to_int a_curr_epoch_slot + 2)

@@ -28,7 +28,7 @@ readinessProbe:
 {{- end }}
 
 {{/*
-ALL block-producer healthchecks - TODO: readd startupProbes once clusters k8s have been updated to 1.16
+ALL block-producer healthchecks - TODO: re-add startupProbes once clusters k8s have been updated to 1.16
 */}}
 {{- define "healthcheck.blockProducer.allChecks" }}
 {{- if .healthcheck.enabled }}
@@ -71,7 +71,7 @@ readinessProbe:
 {{- end }}
 
 {{/*
-ALL user-agent healthchecks - TODO: readd startupProbes once clusters k8s have been updated to 1.16
+ALL user-agent healthchecks - TODO: re-add startupProbes once clusters k8s have been updated to 1.16
 */}}
 {{- define "healthcheck.userAgent.allChecks" }}
 {{- if .healthcheck.enabled }}
@@ -114,7 +114,7 @@ readinessProbe:
 {{- end }}
 
 {{/*
-ALL bots healthchecks - TODO: readd startupProbes once GKE clusters have been updated to 1.16
+ALL bots healthchecks - TODO: re-add startupProbes once GKE clusters have been updated to 1.16
 */}}
 {{- define "healthcheck.bots.allChecks" }}
 {{- if .healthcheck.enabled }}

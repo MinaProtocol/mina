@@ -250,7 +250,7 @@ func (bs *BitswapCtx) Loop() {
 		case cmd := <-bs.downloadCmds:
 			configuredCheck()
 			// We put all ids to map to avoid
-			// unneccessary querying in case of id duplicates
+			// unnecessary querying in case of id duplicates
 			m := make(map[BitswapBlockLink]bool)
 			for _, root := range cmd.rootIds {
 				m[root] = true

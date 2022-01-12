@@ -154,7 +154,7 @@ module Exp = struct
       bit_params ~field_size_in_bits ~log_base:abs_log_base
     in
 
-    (* Precompute the coefficeints
+    (* Precompute the coefficients
 
        log(base)^i / i !
 

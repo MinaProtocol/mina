@@ -65,7 +65,7 @@ Broadcast Signed Transaction X to monitor status                     |
 
 This flow chart will guide our explanation of what is needed to build a full to-spec implementation of the API. Afterwards, we'll list out each proposed piece of work with details of how it should be implemented. Upon mergin of this RFC, each work item will become an issue on GitHub.
 
-The initial version of the construction API will _only_ support payments. We can quickly follow with a version that will support delgation as well. This RFC will talk about all the tasks assuming both payments and delegation are supported. All token-specific transactions (and any future transactions) are not yet supported and out-of-scope for this RFC.
+The initial version of the construction API will _only_ support payments. We can quickly follow with a version that will support delegation as well. This RFC will talk about all the tasks assuming both payments and delegation are supported. All token-specific transactions (and any future transactions) are not yet supported and out-of-scope for this RFC.
 
 ### Flow chart
 
@@ -77,7 +77,7 @@ Before the derivation step, we need to generate a keypair. We'll use the private
 
 [derivation]: #derivation
 
-Derivation demands that the public key expected as input be a hex-encoded byte-array value. So we'll [add functionality](#marshalkeys) to the [client-sdk](#marshalkeys), the [generate-keypair binary](#marshalkeys), and the offcial [Coda CLI](#marshalkeys) to marshall the `Fq.t * Fq.t` pair (the native representation of an uncompressed public key).
+Derivation demands that the public key expected as input be a hex-encoded byte-array value. So we'll [add functionality](#marshalkeys) to the [client-sdk](#marshalkeys), the [generate-keypair binary](#marshalkeys), and the official [Coda CLI](#marshalkeys) to marshall the `Fq.t * Fq.t` pair (the native representation of an uncompressed public key).
 
 The [derivation endpoint](#derivation-endpoint) would be responsible for reading in the uncompressed public key bytes which [requires adjusting the Rosetta spec](#addcurves), compressing the public key, and base58-encoding it inline with how we currently represent public keys in serialized form.
 
@@ -280,7 +280,7 @@ Specifically this is the user command having been transformed into a `Transactio
 00 00 00 05  # 4-byte prefix for length of array (little endian)
              #
 xx xx ...    # each field encoded as a 32-bytes each one for each of the length
-yy yy ...    #     (little endian) (same represenation as above Fq.t above)
+yy yy ...    #     (little endian) (same representation as above Fq.t above)
              #
 00 00 34 D4  # 4-byte prefix for length of bits in the bitstring (little endian)
              #
@@ -371,14 +371,14 @@ This endpoint will also accept a query parameter `?plain_random_oracle`
 
 [via After Payloads](#after-payloads)
 
-Since we'll later be broadcasting the signed transaction via GraphQL, our signed transaction encoding is precicesly the union of the format required for the sendPayment mutation and the sendDelegation mutation (stringified):
+Since we'll later be broadcasting the signed transaction via GraphQL, our signed transaction encoding is precisely the union of the format required for the sendPayment mutation and the sendDelegation mutation (stringified):
 
 ```
 // Signature encoding
 
 a signature is a field and a scalar
 |----- field 32bytes ----|---- scalar 32bytes ---|
-Use the same hex-encoded little endian represenation as described above for
+Use the same hex-encoded little endian representation as described above for
 the public key for these 64 bytes
 ```
 
@@ -447,7 +447,7 @@ We also should include logic that verifies the following:
 1. The unsigned transaction output by payloads parses into the same operations provided
 2. The signed transaction output by combine parses into the same operations provided
 3. After the signed transaction is in the mempool, the result from the data api is a superset of the operations provided originally
-4. After the signed transaction is in a block, the result from the data api is a superset of the operations provided orginally
+4. After the signed transaction is in a block, the result from the data api is a superset of the operations provided originally
 
 #### Test Rosetta CLI
 
@@ -475,7 +475,7 @@ Luckily Rosetta has a very clear specification, so our designs are mostly constr
 
 In [marshal keys (c)](#marshalkeys), we could also change commands that accept public keys to also accept this new format. Additionally, we could change the GraphQL API to support this new format too. I think both of these changes are unnecessary to prioritize as the normal flows will still be fine and we'll still encourage folks to pass around the standard base58-encoded compressed public keys as they are shorter.
 
-In the sections about [encoding unsigned transactions](#encoded-unsigned-transaction) and [encoding signed transactions](#encoded-signed-transaction), we make an explicit decision to pick a format that supports arbitrary signers. There is minimal change involved with the client-sdk to make that supported; additionally, this was done to improve implementation velocity and because we did conciously choose that interface with usability in mind. JSON is chosen to pack products of data as using a readable JSON string makes it easy to audit, debug, and understand our implementation.
+In the sections about [encoding unsigned transactions](#encoded-unsigned-transaction) and [encoding signed transactions](#encoded-signed-transaction), we make an explicit decision to pick a format that supports arbitrary signers. There is minimal change involved with the client-sdk to make that supported; additionally, this was done to improve implementation velocity and because we did consciously choose that interface with usability in mind. JSON is chosen to pack products of data as using a readable JSON string makes it easy to audit, debug, and understand our implementation.
 
 ## Prior art
 

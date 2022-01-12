@@ -94,7 +94,7 @@ let get_account_data ~public_key ~graphql_target_node =
       | Some s ->
           return (int_of_string s)
       | None ->
-          Deferred.Or_error.errorf "Account with %s somehow doesnt have a nonce"
+          Deferred.Or_error.errorf "Account with %s somehow doesn't have a nonce"
             (Public_key.Compressed.to_string pk) )
 
 let send_signed_transaction ~sender_priv_key ~nonce ~receiver_pub_key ~amount

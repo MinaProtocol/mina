@@ -8,7 +8,7 @@ When spinning up a network there are a few operations that can and have been aut
 2. Genesis Ledger Creation
 3. Distribution of custom network configuration and keys
 4. Deployment of infrastructure with updated configuration
-5. Monitoring the health of the network and debuging issues / crashes
+5. Monitoring the health of the network and debugging issues / crashes
 
 This document proposes a tool that unifies these processes by collecting tools already written for these purposes and packaging them in a simple CLI and JS API.
 
@@ -29,10 +29,10 @@ For these processes we mainly use the [testnet-keys.py](https://github.com/CodaP
 While this system is effective, there are a variety of potential improvements to this process.
 
 - Keypair generation depends on the daemon
-- Genesis ledger logic could be cleaned up and made more flexible to support a wider variety of configuraitons
+- Genesis ledger logic could be cleaned up and made more flexible to support a wider variety of configurations
 - These tools could be packaged together with a JavaScript API for extending functionality
 - The internal data structures for storing these keypairs, genesis configuration and distribution are not well defined and could be more robust
-- Tools for deployment and monitoring are seperate and these could be packaged in one simple workflow that uses the same underlying functionality
+- Tools for deployment and monitoring are separate and these could be packaged in one simple workflow that uses the same underlying functionality
 
 ## Proposal
 
@@ -164,7 +164,7 @@ Downside of this approach is needing to maintain functionality that is reasonabl
 
 ## Use Cases
 
-There are three target use cases for this tool. The main use case is sharing the required configuration and keyfiles for deploying testnets. Secondarily the programatic API would enable integrations into other flows (such as interation testing). Finally the tool should be useful for monitoring the health of a live network.
+There are three target use cases for this tool. The main use case is sharing the required configuration and keyfiles for deploying testnets. Secondarily the programmatic API would enable integrations into other flows (such as integration testing). Finally the tool should be useful for monitoring the health of a live network.
 
 ### Deploying Testnets
 
@@ -226,13 +226,13 @@ Cons:
 
 - Requires lots of rewriting from the ground up in an untyped language
 - Less clean integrating with the client-sdk
-- Lots of functinality we'd like to add in the future that will further muddy the python code
+- Lots of functionality we'd like to add in the future that will further muddy the python code
 
 # Outstanding Questions
 
 - Are there any more usecases this tool should cover or have we over extended the scope of this project.
 
-- ~Carey has played with a couple frameworks for writing CLI tools but they all seem over complicated and unneccissary, should they still be considered?~
+- ~Carey has played with a couple frameworks for writing CLI tools but they all seem over complicated and unnecessary, should they still be considered?~
   - After talking with people on the team I've settled on cmdliner, see the above section.
 
 # Epic Link

@@ -87,7 +87,7 @@ func LinksPerBlock(maxBlockSize int) int {
 	return linksPerBlock
 }
 
-// DepthIndices is a data structure that keeps indicies
+// DepthIndices is a data structure that keeps indices
 // of left-most vertex on each depth of a block tree
 type DepthIndices struct {
 	indices       []NodeIndex

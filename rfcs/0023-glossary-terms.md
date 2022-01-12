@@ -107,7 +107,7 @@ Additionally, the usage of "work" in snark worker can be misconstrued as a conne
 ### Protocol Transaction
 **Concept:** A transaction issued by the protocol - currently a fee transfer or coinbase (both are structurally identical).
 
-**Rationale:** In discussions with parties that were not familiar with the protocol, fee transfers were misunderstood as representations of fees associated with a user transaction. As soon as it was explained that these were transactions programatically issued by the protocol rather than a user, it became clear. As such, it is recommend to partition transactions into *user transactions* and *protocol transactions*.
+**Rationale:** In discussions with parties that were not familiar with the protocol, fee transfers were misunderstood as representations of fees associated with a user transaction. As soon as it was explained that these were transactions programmatically issued by the protocol rather than a user, it became clear. As such, it is recommend to partition transactions into *user transactions* and *protocol transactions*.
 
 **Downsides:** If there will ever be fee transfers issued by users, this will break the proposed structure. However, there currently doesn't seem to be any plans currently to do that.
 
@@ -123,7 +123,7 @@ Additionally, the usage of "work" in snark worker can be misconstrued as a conne
 
 **Downsides:** This didn't make sense when blocks were referred to as external transitions. Now that blocks is the accepted terminology, it should follow that the updated name for the reference is block hash.
 
-**Usage:** Each block contains a unique block hash that is used as an indentifier.
+**Usage:** Each block contains a unique block hash that is used as an identifier.
 
 **Alternatives:**
 - State hash - the previous term -- perhaps more accurate, but doesn't conform to broader industry terms.
@@ -131,7 +131,7 @@ Additionally, the usage of "work" in snark worker can be misconstrued as a conne
 ## Drawbacks
 [drawbacks]: #drawbacks
 
-The drawback to aligning on language is that we lose some specificity that comes with each specific term, relative to the others. However, this concern is minor, and is superceded by the need for consistent language.
+The drawback to aligning on language is that we lose some specificity that comes with each specific term, relative to the others. However, this concern is minor, and is superseded by the need for consistent language.
 
 ## Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives

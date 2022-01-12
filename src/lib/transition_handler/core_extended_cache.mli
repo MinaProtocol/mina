@@ -78,13 +78,13 @@ end
 
     This enables you to implement your own caching strategy and store.
 
-    Generic caching is based on separating the replacement policie and the
+    Generic caching is based on separating the replacement policy and the
     store and tying them together with [Make].
 *)
 
 (** Replacement policy
 
-    This dictates when elements will droped from the cache.
+    This dictates when elements will dropped from the cache.
 *)
 module type Strategy = sig
   type 'a t

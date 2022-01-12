@@ -1,6 +1,6 @@
 open Core_kernel
 
-(** The string that preceeds the JSON header, to identify the file kind before
+(** The string that precedes the JSON header, to identify the file kind before
     attempting to parse it.
 *)
 let header_string = "MINA_SNARK_KEYS\n"

@@ -103,13 +103,13 @@ func (app *app) writeMsg(msg *capnp.Message) {
 	}
 	select {
 	case <-app.Ctx.Done():
-		app.P2p.Logger.Debug("Droping message for sending, context closed")
+		app.P2p.Logger.Debug("Dropping message for sending, context closed")
 	case app.OutChan <- msg:
 	default:
 		app.P2p.Logger.Warn("Couldn't stack message for sending, blocking...")
 		select {
 		case <-app.Ctx.Done():
-			app.P2p.Logger.Debug("Droping message for sending, context closed (unblocked)")
+			app.P2p.Logger.Debug("Dropping message for sending, context closed (unblocked)")
 		case app.OutChan <- msg:
 			app.P2p.Logger.Info("Stacked message, unblocked...")
 		}

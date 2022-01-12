@@ -814,7 +814,7 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
                   [%log error]
                     "DELINQUENCY: Deficit in epoch %d from delegatee \
                      $delegatee to payout address $payout_addr is not \
-                     satisified by payments through slot 3500 in epoch %d, \
+                     satisfied by payments through slot 3500 in epoch %d, \
                      remaining deficit is $remaining_deficit"
                     (input.epoch - 1) input.epoch
                     ~metadata:
@@ -832,7 +832,7 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
                 else
                   [%log info]
                     "Deficit in epoch %d from delegatee $delegatee to payout \
-                     address $payout_addr is satisified by payments through \
+                     address $payout_addr is satisfied by payments through \
                      slot 3500 in epoch %d"
                     (input.epoch - 1) input.epoch
                     ~metadata:

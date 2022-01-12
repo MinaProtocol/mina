@@ -99,8 +99,8 @@ defmodule Class do
 
   # Class heiarchy
 
-  defmodule Hiearchy do
-    @moduledoc "Tree structure for representing class hiearchies."
+  defmodule Hierarchy do
+    @moduledoc "Tree structure for representing class hierarchies."
 
     @type t :: {Class.t(), [t]}
 

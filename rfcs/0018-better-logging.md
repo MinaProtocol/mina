@@ -14,7 +14,7 @@ Our logs in a state where they are both hard to read and hard to process. To bre
 - Messages contain lots of data in the form of large serialized sexp, reducing readability
 - No metadata is programmatically available without parsing the messages
 - Existing tools (jq, rq) are very slow at processing the raw format of our logs
-- Logs are very verbose, often containing redundant and unecessary information (long "paths", all logs are stamped with same info of host+pid which never changes across a single node)
+- Logs are very verbose, often containing redundant and unnecessary information (long "paths", all logs are stamped with same info of host+pid which never changes across a single node)
 - Lack of standard format or restrictions on length
 
 This design attempts to address each of these issues in turn. If done correctly, we should be left with a logging format this is easily parsed by machines and can be easily formatted for parsing by humans.
@@ -38,14 +38,14 @@ This design attempts to address each of these issues in turn. If done correctly,
 }
 ```
 
-The new format elides some of the previous fields, most notably host and pid. These can easily be decorated externally on a per log basis as these are really attributes of the node and never change across log messages. The new format also condenses the previous path section, which was used to store both the location based context and logger attributes. Instead, a single source is stored in the form of a module name and source location. The message is changed from a raw string into a special format string which can interpolate metadata stored inside of the logger message. The metadata field is an arbitrary json object which maps identifiers to any json value. Logging context is stored inside of metadata and can optionally be embeded into the message format string.
+The new format elides some of the previous fields, most notably host and pid. These can easily be decorated externally on a per log basis as these are really attributes of the node and never change across log messages. The new format also condenses the previous path section, which was used to store both the location based context and logger attributes. Instead, a single source is stored in the form of a module name and source location. The message is changed from a raw string into a special format string which can interpolate metadata stored inside of the logger message. The metadata field is an arbitrary json object which maps identifiers to any json value. Logging context is stored inside of metadata and can optionally be embedded into the message format string.
 
 The format string for the message will support interpolation of the form `$<id>` where `<id>` is some key in `metadata`. A log processor should decide whether to embed or elide this information based on the length of the interpolation and the input of the user. More details on this are documented in the log processor section below.
 
 ### Logger Interface
 [detailed-design-logger-interface]: #detailed-design-logger-interface
 
-The logger interface will be changed slightly to support the new format. Most noticably, it will take an associative list of json values for the metadata field. It will also support the ability to derive a new logger with some added context, much like the old `Logger.child` system. However, rather than tracking source, this will allow for passing metadata down to log statements without explicitly providing them to the log function each time. The logger will check the correctness of the format string at compile time.
+The logger interface will be changed slightly to support the new format. Most noticeably, it will take an associative list of json values for the metadata field. It will also support the ability to derive a new logger with some added context, much like the old `Logger.child` system. However, rather than tracking source, this will allow for passing metadata down to log statements without explicitly providing them to the log function each time. The logger will check the correctness of the format string at compile time.
 
 ### Logging PPX
 [detailed-design-logging-ppx]: #detailed-design-logging-ppx
@@ -155,5 +155,5 @@ Before our current format, we had a sexp style format with a custom log processo
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-- How much work will the PPX be to create? Is there a way we can fully validate that a message only interpolates known values at any point in the context (perhaps by modeling metadata inheritence)?
+- How much work will the PPX be to create? Is there a way we can fully validate that a message only interpolates known values at any point in the context (perhaps by modeling metadata inheritance)?
 - Is the filter language sufficient enough for our needs?

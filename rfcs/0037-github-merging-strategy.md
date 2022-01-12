@@ -32,7 +32,7 @@ individually committed changes within each PR. This hampers `git`'s ability to
 reduce or eliminate merge conflicts by combining the changes from individual
 commits, unnecessarily creating more merge conflicts to be handled manually.
 
-These unnecessary conflicts are particularly prevelant in PR chains. For
+These unnecessary conflicts are particularly prevalent in PR chains. For
 example,
 ```
 PR 1

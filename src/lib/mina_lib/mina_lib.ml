@@ -759,7 +759,7 @@ let initialization_finish_signal t = t.initialization_finish_signal
 
 (* TODO: this is a bad pattern for two reasons:
  *   - uses an abstraction leak to patch new functionality instead of making a new extension
- *   - every call to this function will create a new, unique pipe with it's own thread for transfering
+ *   - every call to this function will create a new, unique pipe with it's own thread for transferring
  *     items from the identity extension with no route for termination
  *)
 let root_diff t =
@@ -1100,7 +1100,7 @@ let stop_long_running_daemon t =
       Time_ns.(diff (now ()) daemon_start_time |> Span.to_min |> Int.of_float)
     in
     [%log' info t.config.logger]
-      "Deamon has been running for $uptime mins. Stopping now..."
+      "Daemon has been running for $uptime mins. Stopping now..."
       ~metadata:[ ("uptime", `Int uptime_mins) ] ;
     Scheduler.yield ()
     >>= (fun () -> return (Async.shutdown 1))

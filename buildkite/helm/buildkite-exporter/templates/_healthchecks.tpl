@@ -36,7 +36,7 @@ readinessProbe:
 {{- end }}
 
 {{/*
-ALL buildkite-exporter healthchecks - TODO: readd startupProbes once GKE clusters have been updated to 1.16
+ALL buildkite-exporter healthchecks - TODO: re-add startupProbes once GKE clusters have been updated to 1.16
 */}}
 {{- define "healthcheck.buildkite-exporter.healthChecks" }}
 {{- include "healthcheck.buildkite-exporter.livenessCheck" . }}

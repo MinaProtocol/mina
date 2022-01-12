@@ -187,7 +187,7 @@ let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
 let external_transition_compare consensus_constants =
   Comparable.lift
     (fun existing candidate ->
-      (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
+      (* To prevent the logger to spam a lot of messages, the logger input is set to null *)
       if State_hash.equal (With_hash.hash existing) (With_hash.hash candidate)
       then 0
       else if
@@ -501,7 +501,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                 ~genesis_state_hash:
                   precomputed_values.protocol_state_with_hash.hash
             in
-            (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
+            (* TODO: lazy load db in persistent root to avoid unnecessary opens like this *)
             Transition_frontier.Persistent_root.(
               with_instance_exn persistent_root ~f:(fun instance ->
                   Instance.set_root_state_hash instance

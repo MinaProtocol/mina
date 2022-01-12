@@ -183,7 +183,7 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
           [ ("error", Error_json.error_to_yojson error)
           ; ("state_hash", state_hash)
           ]
-        "initial_validate: verifier threw an error while verifying transiton \
+        "initial_validate: verifier threw an error while verifying transition \
          queried during ledger catchup: $error" ;
       Deferred.Or_error.fail (Error.tag ~tag:"verifier threw an error" error)
   | Error `Invalid_proof ->

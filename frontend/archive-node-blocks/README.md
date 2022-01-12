@@ -4,7 +4,7 @@ This project is responsible for taking a JSON file representing blocks and conve
 
 ## Resources Explained
 
-Please download the resouces needed here:
+Please download the resources needed here:
 `https://drive.google.com/file/d/1OjV40QTZDbUnin81vywBLUGhfMW8JU3d/view?usp=sharing`
 
 Note: You must have a o(1) labs email to access.

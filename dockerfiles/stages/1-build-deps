@@ -12,7 +12,7 @@ ARG OCAML_VARIANT=
 ARG OCAML_PACKAGE=
 ARG OPAM_VERSION=2.0.7
 
-# Golang version number used to detemine tarball name
+# Golang version number used to determine tarball name
 ARG GO_VERSION=1.16.5
 
 # Go Capnp Version (for capnpc dependency)

@@ -111,8 +111,8 @@ defmodule Architecture.ResourceSet do
         end
       end)
 
-    Class.Hiearchy.compute(Resource, all_resource_classes(set))
-    |> Class.Hiearchy.reduce_depth_first_exclusive(
+    Class.Hierarchy.compute(Resource, all_resource_classes(set))
+    |> Class.Hierarchy.reduce_depth_first_exclusive(
       nil,
       fn class, child_filters ->
         resource_filters = Map.get(resource_filters_by_class, class)

@@ -90,7 +90,7 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
   | Error (`Verifier_error error) ->
       [%log warn]
         ~metadata:[ ("error", Error_json.error_to_yojson error) ]
-        "verifier threw an error while verifying transiton queried during \
+        "verifier threw an error while verifying transition queried during \
          ledger catchup: $error" ;
       Deferred.Or_error.fail (Error.tag ~tag:"verifier threw an error" error)
   | Error `Invalid_proof ->

@@ -393,7 +393,7 @@ let%test_module "sparse-ledger-test" =
           iteri t ~f:(fun i _ ->
               [%test_result: bool]
                 ~message:
-                  "Iteri index should be contained in the indexes auxillary \
+                  "Iteri index should be contained in the indexes auxiliary \
                    structure"
                 ~expect:true (Int.Set.mem indexes i)))
 

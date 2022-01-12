@@ -218,7 +218,7 @@ end)
       ; constraint_constants
       }
     in
-    (*proiority: Transition frontier diffs > local diffs > incomming diffs*)
+    (*proiority: Transition frontier diffs > local diffs > incoming diffs*)
     Strict_pipe.Reader.Merge.iter
       [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
             `Transition_frontier_extension diff)

@@ -224,7 +224,7 @@ let eliminate_fee_excess (fee_token_l, fee_excess_l) (fee_token_m, fee_excess_m)
        well-defined, and is still 'correct' in the sense that currency is
        preserved.
 
-   This optimisation saves serveral hundred constraints in the proof by not
+   This optimisation saves several hundred constraints in the proof by not
    unpacking the result of each arithmetic operation.
 *)
 let%snarkydef eliminate_fee_excess_checked (fee_token_l, fee_excess_l)

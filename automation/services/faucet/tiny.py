@@ -41,7 +41,7 @@ TRANSACTION_COUNT = prometheus_client.Counter("faucet_transactions_sent", "Numbe
 TOTAL_CODA_SENT = prometheus_client.Counter("faucet_coda_sent", "Amount of Coda sent since the process started")
 PROCESS_METRICS = prometheus_client.ProcessCollector(namespace='faucet')
 PLEASE_WAIT_ERRORS = prometheus_client.Counter("faucet_please_wait_errors", "Number of 'Please Wait' Errors that have been issued")
-BLOCK_NOTIFICATIONS_RECIEVED = prometheus_client.Counter("faucet_block_notifications_recieved", "Number of Block Notifications recieved")
+BLOCK_NOTIFICATIONS_RECEIVED = prometheus_client.Counter("faucet_block_notifications_received", "Number of Block Notifications received")
 
 # This is a fix for a bug in the Daemon where the Nonce is
 # only incremented once per block, can be removed once it's fixed
@@ -50,7 +50,7 @@ async def new_block_callback(message):
     global SENT_TRANSACTION_THIS_BLOCK
     SENT_TRANSACTION_THIS_BLOCK = False
     logger.debug("Got a block! Resetting the Boolean to {}. {}".format(SENT_TRANSACTION_THIS_BLOCK, message))
-    BLOCK_NOTIFICATIONS_RECIEVED.inc()
+    BLOCK_NOTIFICATIONS_RECEIVED.inc()
 
 
 @client.event
@@ -71,7 +71,7 @@ async def on_connect():
 async def on_message(message):
     global SENT_TRANSACTION_THIS_BLOCK
 
-    # Dont listen to messages from me
+    # Don't listen to messages from me
     if message.author == client.user:
         return
 

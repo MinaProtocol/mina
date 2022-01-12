@@ -84,7 +84,7 @@ module TransactionsQueryString = [%graphql
 module TransactionsQuery = ReasonApollo.CreateQuery(TransactionsQueryString);
 
 /**
-  This function is getting pretty gnarly so here's an explaination.
+  This function is getting pretty gnarly so here's an explanation.
   We take in the GraphQL response object called `data`.
   Next we extract the data from the response object, and put it into a
   record of type `{ pending: [], blocks: [] }`.

@@ -16,7 +16,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   (* DONE BUT UNTESTED: porting send-payments *)
   (* CURRENTLY: port timed accounts test *)
-  (* TODO: refactor all currency values to decimal represenation *)
+  (* TODO: refactor all currency values to decimal representation *)
   (* TODO: test account creation fee *)
   (* TODO: test snark work *)
   let config =

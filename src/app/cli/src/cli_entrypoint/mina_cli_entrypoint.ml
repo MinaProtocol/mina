@@ -1198,7 +1198,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
       ; limited_graphql_port
       }
     in
-    (* Breaks a dependency cycle with monitor initilization and coda *)
+    (* Breaks a dependency cycle with monitor initialization and coda *)
     let coda_ref : Mina_lib.t option ref = ref None in
     Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
       ~child_pids:pids ~top_logger:logger coda_ref ;

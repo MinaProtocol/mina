@@ -441,7 +441,7 @@ func (gs *CodaGatingState) isAllowedAddr(addr ma.Multiaddr) bool {
 	return gs.isAddrTrusted(addr) || (!gs.isAddrBanned(addr) && publicOrKnownPrivate)
 }
 
-// checks if a peer is allowed to dial/accept; if the peer is in the trustlist, the address checks are overriden
+// checks if a peer is allowed to dial/accept; if the peer is in the trustlist, the address checks are overridden
 func (gs *CodaGatingState) isAllowedPeerWithAddr(p peer.ID, addr ma.Multiaddr) bool {
 	return gs.isPeerTrusted(p) || (gs.isAllowedPeer(p) && gs.isAllowedAddr(addr))
 }

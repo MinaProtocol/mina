@@ -188,7 +188,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           , `Staged_ledger transitioned_staged_ledger
           , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) )
         ->
-          (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
+          (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transition created out of this diff will be applied in Transition_frontier*)
           ignore
           @@ Ledger.unregister_mask_exn ~loc:__LOC__
                (Staged_ledger.ledger transitioned_staged_ledger) ;

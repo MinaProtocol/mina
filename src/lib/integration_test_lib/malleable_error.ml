@@ -244,7 +244,7 @@ end
 
 let%test_module "malleable error unit tests" =
   ( module struct
-    (* we derive custom equality and comparisions for our result type, as the
+    (* we derive custom equality and comparisons for our result type, as the
        * default behavior of ppx_assert is to use polymorphic equality and comparisons
        * for results (as to why, I have no clue) *)
     type 'a inner = ('a Result_accumulator.t, Hard_fail.t) Result.t

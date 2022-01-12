@@ -36,7 +36,7 @@ def main():
   context_deadline_exceeded=Gauge('Coda_watchdog_deadline_exceeded', 'Number of nodes that failed with the context-deadline-exceeded error to a node-status query')
   failed_security_protocol_negotiation=Gauge('Coda_watchdog_failed_negotiation', 'Number of nodes that failed with the security-protocol-negotiation error to a node-status query')
   connection_refused_errors=Gauge('Coda_watchdog_connection_refused', 'Number of nodes that failed with the connection-refused error to a node-status query')
-  size_limit_exceeded_errors=Gauge('Coda_watchdog_size_limit_exceeded', 'Number of nodes that failed to a respond to a node-status query becuase of the data size')
+  size_limit_exceeded_errors=Gauge('Coda_watchdog_size_limit_exceeded', 'Number of nodes that failed to a respond to a node-status query because of the data size')
   timed_out_errors=Gauge('Coda_watchdog_timed_out', 'Number of nodes that failed with the time-out error to a node-status query')
   stream_reset_errors=Gauge('Coda_watchdog_stream_reset', 'Number of nodes that failed with the stream-reset error to a node-status query')
   other_connection_errors=Gauge('Coda_watchdog_node_status_other_errors', 'Number of nodes that failed with an unexpected error to respond to a node-status query(look for it in the logs)')

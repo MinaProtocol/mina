@@ -128,7 +128,7 @@ defmodule Architecture.LogFilter.Language do
   defp parse_selection(syntax) do
     raise SyntaxError,
       syntax: syntax,
-      error: "invalid log data selector (left hand side of comparision operators)"
+      error: "invalid log data selector (left hand side of comparison operators)"
   end
 
   @spec parse_filter(Macro.t()) :: Macro.t()

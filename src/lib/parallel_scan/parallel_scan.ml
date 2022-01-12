@@ -772,7 +772,7 @@ module Tree = struct
     List.rev_mapi lst ~f:(fun i value -> { Job_view.position = len - i; value })
 end
 
-(*This struture works well because we always complete all the nodes on a specific level before proceeding to the next level*)
+(*This structure works well because we always complete all the nodes on a specific level before proceeding to the next level*)
 module T = struct
   module Binable_arg = struct
     [%%versioned

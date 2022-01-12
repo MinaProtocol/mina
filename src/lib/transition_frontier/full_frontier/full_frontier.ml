@@ -355,7 +355,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
    * the following operations on masks in order:
    *
    *     0) notify consensus that root transitioned
-   *     1) unattach and destroy all the garbage (to avoid unecessary trickling of
+   *     1) unattach and destroy all the garbage (to avoid unnecessary trickling of
    *        invalidations from `m0` during the next step)
    *     2) commit `m1` into `m0`, making `m0` into `m1'` (same merkle root as `m1`), and
    *        making `m1` into an identity mask (an empty mask on top of `m1'`).
@@ -629,7 +629,7 @@ module Metrics = struct
 
   let intprop f b = Unsigned.UInt32.to_int (f (Breadcrumb.consensus_state b))
 
-  (* Rate of slots filled on the main chain in the k slots preceeding the best tip. *)
+  (* Rate of slots filled on the main chain in the k slots preceding the best tip. *)
   let slot_fill_rate t =
     let open Consensus.Data.Consensus_state in
     let best_tip = best_tip t in

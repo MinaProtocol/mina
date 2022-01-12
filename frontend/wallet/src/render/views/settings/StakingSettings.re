@@ -143,7 +143,7 @@ let make = (~publicKey, ~stakingActive as _=false) => {
                 <Spacer height=1. />
                 <span className=Theme.Text.Body.regularLight>
                   {React.string(
-                     "To recieve your staking reward, your computer must be on and running this application 100% of the time.",
+                     "To receive your staking reward, your computer must be on and running this application 100% of the time.",
                    )}
                 </span>
                 <Spacer height=1. />

@@ -256,7 +256,7 @@ end = struct
                 [%log error]
                   ~metadata:[ ("error", Error_json.error_to_yojson e) ]
                   "When handling What_child_hashes request, the following \
-                   error happended: $error" ;
+                   error happened: $error" ;
                 Either.Second
                   ( Actions.Violated_protocol
                   , Some

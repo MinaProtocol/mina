@@ -273,7 +273,7 @@ val last_emitted_value : ('merge, 'base) State.t -> ('merge * 'base list) option
 (** If there aren't enough slots for [max_slots] many ['d], then before
  * continuing onto the next virtual tree, split max_slots = (x,y) such that
  * x = number of slots till the end of the current tree and y = max_slots - x
- * (starts from the begining of the next tree)  *)
+ * (starts from the beginning of the next tree)  *)
 val partition_if_overflowing : ('merge, 'base) State.t -> Space_partition.t
 
 (** Get the current job sequence number *)

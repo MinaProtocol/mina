@@ -86,7 +86,7 @@ let handle_dirty dirty =
        * See the background section of https://bkase.dev/posts/ocaml-writer
        * for more info on how this system works.
        *
-       * NOTE: This behaviour is overriden or external contributors, because they
+       * NOTE: This behaviour is overridden or external contributors, because they
        * cannot upload new keys if they have modified the snark. See branch
        * referencing "CIRCLE_PR_USERNAME" below.
        *)

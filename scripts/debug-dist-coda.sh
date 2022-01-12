@@ -19,7 +19,7 @@ system_profiler SPSoftwareDataType
 sysctl -n machdep.cpu.brand_string
 
 echo "========="
-echo "== Verify static initilization works"
+echo "== Verify static initialization works"
 echo "========="
 ./mina.exe -help
 

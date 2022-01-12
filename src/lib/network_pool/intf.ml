@@ -81,7 +81,7 @@ module type Resource_pool_diff_intf = sig
     -> verified Envelope.Incoming.t Deferred.Or_error.t
 
   (** Warning: Using this directly could corrupt the resource pool if it
-      conincides with applying locally generated diffs or diffs from the network
+      coincides with applying locally generated diffs or diffs from the network
       or diffs from transition frontier extensions.*)
   val unsafe_apply :
        pool

@@ -74,7 +74,7 @@ let handleResponse = (response, filename, dataEncoding, chunkCb, doneCb) => {
 };
 
 /**
-  Recusively follows redirects until non-redirect resource is hit, or
+  Recursively follows redirects until non-redirect resource is hit, or
   we reach `maxRedirects`, then passes onto handleResonse.
  */
 let rec download = (filename, url, encoding, maxRedirects, chunkCb, doneCb) => {
@@ -131,7 +131,7 @@ let extractZip = (src, dest, doneCb) => {
             "Error while unzipping the daemon bundle: "
             ++ (
               Js.Exn.message(err)
-              |> Tc.Option.withDefault(~default="an unknown error occured.")
+              |> Tc.Option.withDefault(~default="an unknown error occurred.")
             ),
           ),
         )

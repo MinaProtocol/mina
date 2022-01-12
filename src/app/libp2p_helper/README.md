@@ -70,7 +70,7 @@ Messages serving to configure libp2p helper.
     * Generates a new key pair, along with peer id
     * Returns the generated key pair
  * getListeningAddrs
-    * Returns set of addresses (external and internal) of the libp2p node (something like a self-portait)
+    * Returns set of addresses (external and internal) of the libp2p node (something like a self-portrait)
  * listen
     * Start listening to the new peers.
  * setGatingConfig
@@ -110,12 +110,12 @@ Messages to interact with pubsub protocol.
       * To validate a message a `gossipReceived` call is made to the OCaml process
       * Validation time is capped by `validationTimeout`, timeout is treated as the signal that message is invalid, unless `UnsafeNoTrustIP` flag is set.
       * Unsatisfied validations are kept in a map, always accessed under mutex.
-    * Subscrube to a topic (this is different from joining)
+    * Subscribe to a topic (this is different from joining)
     * Launch a subroutine that reads each message and logs an error if a message fails to be read
  * unsubscribe
     * Cancel the subscription, clean up associated resources
  * validation
-    * Fullfill the validation initiated by earlier `gossipReceived` with the result
+    * Fulfill the validation initiated by earlier `gossipReceived` with the result
     * Performs the action under app-global `ValidatorMutex`
     * Logs an error if validation has already timed out
 

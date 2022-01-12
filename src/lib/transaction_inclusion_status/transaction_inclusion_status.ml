@@ -19,7 +19,7 @@ module State = struct
     | Included ->
         "INCLUDED"
     | Unknown ->
-        "UNKOWN"
+        "UNKNOWN"
 end
 
 (* TODO: this is extremely expensive as implemented and needs to be replaced with an extension *)
@@ -111,7 +111,7 @@ let%test_module "transaction_status" =
     let create_pool ~frontier_broadcast_pipe =
       let pool_reader, _ =
         Strict_pipe.(
-          create ~name:"transaction_status incomming diff" Synchronous)
+          create ~name:"transaction_status incoming diff" Synchronous)
       in
       let local_reader, local_writer =
         Strict_pipe.(create ~name:"transaction_status local diff" Synchronous)

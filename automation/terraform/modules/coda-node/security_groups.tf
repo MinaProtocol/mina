@@ -35,7 +35,7 @@ resource "aws_security_group" "coda_sg" {
   }
 
   ingress {
-    description = "TCP Peer Disovery - libp2p"
+    description = "TCP Peer Discovery - libp2p"
     from_port   = "${var.port_libp2p}"
     to_port     = "${var.port_libp2p}"
     protocol    = "tcp"

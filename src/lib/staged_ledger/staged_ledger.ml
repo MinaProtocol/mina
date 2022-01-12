@@ -718,7 +718,7 @@ module T = struct
             Assumption: Only one of the partition will have coinbase transaction(s)in it.
             1. Get the latest stack for coinbase in the first set of transactions
             2. get the first set of scan_state data[data1]
-            3. get a new stack for the second partion because the second set of transactions would start from the begining of the next tree in the scan_state
+            3. get a new stack for the second partition because the second set of transactions would start from the beginning of the next tree in the scan_state
             4. Initialize the new stack with the state from the first stack
             5. get the second set of scan_state data[data2]*)
           let txns_for_partition1 = List.take transactions slots in
@@ -752,7 +752,7 @@ module T = struct
                 , `Update_two (updated_stack1, updated_stack2) )
             (*updated_stack2 does not have coinbase and but has the state from the previous stack*)
             | true, false ->
-                (*updated_stack1 has some new coinbase but parition 2 has no
+                (*updated_stack1 has some new coinbase but partition 2 has no
                   data and so we have only one stack to update*)
                 (Update_one, `Update_one updated_stack1)
             | false, true ->
@@ -1747,7 +1747,7 @@ module T = struct
                 let res2 = second_pre_diff res y ~add_coinbase:true cw_seq_2 in
                 ((res, log1), Some res2)
             | 1 ->
-                (*There's a slot available in the first partition, fill it with coinbase and create another pre_diff for the slots in the second partiton with the remaining user commands and work *)
+                (*There's a slot available in the first partition, fill it with coinbase and create another pre_diff for the slots in the second partition with the remaining user commands and work *)
                 incr_coinbase_and_compute res `One
             | 2 ->
                 (*There are two slots which cannot be filled using user commands, so we split the coinbase into two parts and fill those two spots*)

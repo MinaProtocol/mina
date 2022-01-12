@@ -21,7 +21,7 @@ let DeploySpec = {
     deployEnvFile = "export-git-env-vars.sh",
     workspace = "\\\${BUILDKITE_BRANCH//[_\\/]/-}",
     artifactPath = "/tmp/artifacts",
-    postDeploy = "echo 'Deployment successfull!'",
+    postDeploy = "echo 'Deployment successful!'",
     testnetDir = "automation/terraform/testnets/ci-net",
     deps = [] : List Command.TaggedKey.Type
   }

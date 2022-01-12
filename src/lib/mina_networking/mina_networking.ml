@@ -475,7 +475,7 @@ module Rpcs = struct
       let name = "get_ancestry"
 
       module T = struct
-        (** NB: The state hash sent in this query should not be trusted, as it can be forged. This is ok for how this RPC is implented, as we only use the state hash for tie breaking when checking whether or not the proof is worth serving. *)
+        (** NB: The state hash sent in this query should not be trusted, as it can be forged. This is ok for how this RPC is implemented, as we only use the state hash for tie breaking when checking whether or not the proof is worth serving. *)
         type query =
           (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
         [@@deriving sexp, to_yojson]
@@ -1466,7 +1466,7 @@ let create (config : Config.t)
   (* TODO: Think about buffering:
         I.e., what do we do when too many messages are coming in, or going out.
         For example, some things you really want to not drop (like your outgoing
-        block announcment).
+        block announcement).
   *)
   let received_gossips, online_notifier =
     Strict_pipe.Reader.Fork.two

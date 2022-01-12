@@ -215,7 +215,7 @@ module Make (Inputs : Inputs_intf) = struct
         Mask.Attached.unset_parent ~trigger_signal:trigger_detach_signal ~loc
           mask
 
-  (** a set calls the Base implementation set, notifies registered mask childen *)
+  (** a set calls the Base implementation set, notifies registered mask children *)
   let set t location account =
     Base.set t location account ;
     match Uuid.Table.find registered_masks (get_uuid t) with

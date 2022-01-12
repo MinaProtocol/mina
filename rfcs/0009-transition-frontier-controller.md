@@ -264,7 +264,7 @@ Blue arrows represent pipes and asynchronous boundaries of the system. Each
 arrow is annotated with the behavior when overflow of the pipe occurs.
 
 - `exception` means raise an exception if pipe buffer overflows (`write_exn`)
-- `blocking` means push back on a deffered if the buffer is full (`write`)
+- `blocking` means push back on a deferred if the buffer is full (`write`)
 - `drop old` means the buffer should drain oldest first when new data comes in
 
 Red arrows represent synchronous lines of access. Red components represent data
@@ -295,7 +295,7 @@ processes we shouldn't have a problem here.
 The main rationale for doing this redesign is to ease the difficulty of
 debugging asynchronous control. And to avoid debugging all the edge-cases
 we've never explored in the existing ledger-builder-controller (what happens in
-the presense of particular looking forks).
+the presence of particular looking forks).
 
 One alternative is to instead prioritize in investing in debugging
 infrastructure such as visualizations and logging tooling to get through these

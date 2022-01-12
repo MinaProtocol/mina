@@ -8,7 +8,7 @@ This RFC proposes a new system for persisting the transition frontier's state to
 ## Motivation
 [motivation]: #motivation
 
-The Transition Frontier is too large of a data structure to just blindly serialize and write to disk. Under non optimal network scenarios, we expect the upper bound of the data structure to be >100Gb. Even if the structure were smaller, we cannot write the structure out to disk every time we mutate it as the speed of the transition frontier data structure is critical to the systems ability to prevent DDoS attacks. Therefore, a more robust and effecient system is required to persist the Transition Frontier to disk without negatively effecting the speed of operations on the in memory copy of the Transition Frontier.
+The Transition Frontier is too large of a data structure to just blindly serialize and write to disk. Under non optimal network scenarios, we expect the upper bound of the data structure to be >100Gb. Even if the structure were smaller, we cannot write the structure out to disk every time we mutate it as the speed of the transition frontier data structure is critical to the systems ability to prevent DDoS attacks. Therefore, a more robust and efficient system is required to persist the Transition Frontier to disk without negatively effecting the speed of operations on the in memory copy of the Transition Frontier.
 
 ## Detailed design
 [detailed-design]: #detailed-design

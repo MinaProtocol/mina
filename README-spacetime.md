@@ -8,7 +8,7 @@ for revealing the location of memory leaks.
 To use Spacetime, you need an OCaml compiler built with that feature enabled. There are
 Spacetime-enabled compiler switches within OPAM. For example, there's the switch 
 4.07.1+spacetime, which works with same OPAM packages as vanilla 4.07.1. To build
-with it in your enviroment, install the switch:
+with it in your environment, install the switch:
 
 ```
   opam switch create 4.07.1+spacetime # or the current OCaml version for building Coda 

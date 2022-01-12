@@ -262,7 +262,7 @@ let run_test () : unit Deferred.t =
       let%bind () = Mina_lib.start coda in
       (* Let the system settle *)
       let%bind () = Async.after (Time.Span.of_ms 100.) in
-      (* No proof emitted by the parallel scan at the begining *)
+      (* No proof emitted by the parallel scan at the beginning *)
       assert (Option.is_none @@ Mina_lib.staged_ledger_ledger_proof coda) ;
       (* Note: This is much less than half of the high balance account so we can test
          *       payment replays being prohibited

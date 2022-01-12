@@ -302,7 +302,7 @@ func checkConnectionGraph(t *testing.T, numNodes int, connectionGraph map[int]ma
 			continue
 		}
 		if nextIx > 0 && expectConnected {
-			t.Errorf("Disconnected graph: at leats two roots 0 and %d", nextIx)
+			t.Errorf("Disconnected graph: at least two roots 0 and %d", nextIx)
 		}
 		q := []int{nextIx}
 		for ; len(q) > 0; q = q[1:] {

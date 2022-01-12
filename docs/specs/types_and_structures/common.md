@@ -15,7 +15,7 @@ Table of Contents
 
 ### `Option<T>`
 
-An optional value that eith either `Some(T)` or `None`, see [`std::option`](https://doc.rust-lang.org/std/option/)
+An optional value that is either `Some(T)` or `None`, see [`std::option`](https://doc.rust-lang.org/std/option/)
 
 ### `Result<T, E>`
 

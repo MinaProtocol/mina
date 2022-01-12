@@ -1083,7 +1083,7 @@ let%test_module "random set test" =
             let local_reader, local_writer =
               Strict_pipe.(create ~name:"Snark pool test" Synchronous)
             in
-            (*incomming diffs*)
+            (*incoming diffs*)
             List.map (List.take works per_reader) ~f:create_work
             |> List.map ~f:(fun work ->
                    ( Envelope.Incoming.local work

@@ -411,7 +411,7 @@ include struct
 
   let common_ancestor = proxy1 common_ancestor
 
-  (* reduce sucessors functions (probably remove hashes special case *)
+  (* reduce successor functions (probably remove hashes special case *)
   let successors = proxy1 successors
 
   let successors_rec = proxy1 successors_rec

@@ -45,7 +45,7 @@ defmodule Cloud.Google.LogSink do
         else
           raise Cloud.Google.ApiError,
             error_message: "failed to create sink",
-            erorr: json["error"]
+            error: json["error"]
         end
 
         # |> ok_or_error(Cloud.Google.ApiError, "failed to create sink")

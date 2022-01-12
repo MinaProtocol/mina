@@ -797,7 +797,7 @@ module Protocol_state = struct
           (pack_input (to_input t)))
 
     let check
-        (* Bind all the fields explicity so we make sure they are all used. *)
+        (* Bind all the fields explicitly so we make sure they are all used. *)
           ({ snarked_ledger_hash
            ; snarked_next_available_token
            ; timestamp
@@ -913,7 +913,7 @@ module Protocol_state = struct
     }
 
   let check
-      (* Bind all the fields explicity so we make sure they are all used. *)
+      (* Bind all the fields explicitly so we make sure they are all used. *)
         ({ snarked_ledger_hash
          ; snarked_next_available_token
          ; timestamp

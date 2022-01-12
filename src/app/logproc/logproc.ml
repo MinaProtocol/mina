@@ -267,7 +267,7 @@ let () =
       [ `S Manpage.s_description
       ; `P
           "Logproc processes coda logs from stdin and is capable of filtering \
-           and reformating logs in a user friendly fashion. A javascript-like \
+           and reformatting logs in a user friendly fashion. A javascript-like \
            filter language is included for defining boolean predicates on log \
            statements. Logproc will also attempt to interpolate logging \
            strings."

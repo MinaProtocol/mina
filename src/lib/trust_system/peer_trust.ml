@@ -288,7 +288,7 @@ let%test_module "peer_trust" =
     let peer0 = ip_of_id 0
 
     let%test "Peers are not present in the db on initialization and have no \
-              statuss" =
+              status" =
       let db = setup_mock_db () in
       match Peer_trust_test.lookup_ip db peer0 with
       | [] ->

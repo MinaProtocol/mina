@@ -1,4 +1,4 @@
--- Decorate a comand step with echos to make it stand out
+-- Decorate a command step with echos to make it stand out
 
 let Prelude = ../External/Prelude.dhall
 

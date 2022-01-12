@@ -46,7 +46,7 @@ val bits_typ : (Bits.var, t) Typ.t
 
 module Unpacked : sig
   (** Full representation. This pre-computes all of the tag variables, but may
-      still be convered to bits without adding any constraints.
+      still be converted to bits without adding any constraints.
   *)
   type var
 

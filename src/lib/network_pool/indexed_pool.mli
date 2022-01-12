@@ -1,4 +1,4 @@
-(** The data structure underlying the transaction pool. We want to efficently
+(** The data structure underlying the transaction pool. We want to efficiently
     support all the operations necessary. We also need to make sure that an
     attacker can't craft transactions or sequences thereof that take up an
     unacceptable amount of resources leading to a DoS.

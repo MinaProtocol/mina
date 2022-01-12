@@ -1315,7 +1315,7 @@ struct
               let open Interruptible.Let_syntax in
               let signal =
                 Deferred.map (Base_ledger.detached_signal ledger) ~f:(fun () ->
-                    Error.createf "Ledger was detatched"
+                    Error.createf "Ledger was detached"
                     |> Error.tag ~tag:"Transaction_pool.apply")
               in
               let%bind () = Interruptible.lift Deferred.unit signal in
@@ -1970,7 +1970,7 @@ let%test_module _ =
               ; reorg_best_tip = true
               }
           in
-          (*expired_command should not be in the pool becuase they are expired and (List.nth few_now 0) becuase it was committed in a block*)
+          (*expired_command should not be in the pool because they are expired and (List.nth few_now 0) because it was committed in a block*)
           let cmds_wo_check =
             List.map ~f:User_command.forget_check
               ( expires_later1 :: expires_later2 :: unexpired_command

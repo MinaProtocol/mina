@@ -17,7 +17,7 @@ When starting a proposer on an active network, we currently have no way to acqui
 ## Detailed design
 [detailed-design]: #detailed-design
 
-There are a number of options for implementing this, ranging from least correct and shortest time to implement, to most correct but longest time to implement. This RFC is layed out this way as there have been some questions as to what the true, mainnet-ready implementation of this system should look like, or if it should even exist internal to the protocol at all. Let's begin by reviewing the problem at a high level, and then jumping into the various levels of implementation.
+There are a number of options for implementing this, ranging from least correct and shortest time to implement, to most correct but longest time to implement. This RFC is laid out this way as there have been some questions as to what the true, mainnet-ready implementation of this system should look like, or if it should even exist internal to the protocol at all. Let's begin by reviewing the problem at a high level, and then jumping into the various levels of implementation.
 
 ### General idea
 [detailed-design-general-idea]: #detailed-design-general-idea
@@ -62,4 +62,4 @@ This overall approach has a number of drawbacks. For one, it enforces a hard req
 ## Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-An alternative to this would be to pull the responsiblity for providing this information out into a 3rd party service outside of the network protocol. If this was done, it would lift the need for every node to store this large amount of data locally and enable them to also synchronize more quickly as they would not need to download the entire epoch ledger but, rather, could just download the accounts and associated merkle proofs they are interested in evaluating VRFs for. However, this comes with a number of other issues, mostly related to high level concerns about the protocol's ability to maintain itself without external 3rd party services, and I cannot speak on those much as I cannot properly weight the implications.
+An alternative to this would be to pull the responsibility for providing this information out into a 3rd party service outside of the network protocol. If this was done, it would lift the need for every node to store this large amount of data locally and enable them to also synchronize more quickly as they would not need to download the entire epoch ledger but, rather, could just download the accounts and associated merkle proofs they are interested in evaluating VRFs for. However, this comes with a number of other issues, mostly related to high level concerns about the protocol's ability to maintain itself without external 3rd party services, and I cannot speak on those much as I cannot properly weight the implications.

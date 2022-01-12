@@ -28,7 +28,7 @@ readinessProbe:
 {{- end }}
 
 {{/*
-ALL snark-coordinator healthchecks - TODO: readd startupProbes once GKE clusters have been updated to 1.16
+ALL snark-coordinator healthchecks - TODO: re-add startupProbes once GKE clusters have been updated to 1.16
 */}}
 {{- define "healthcheck.snarkCoordinator.allChecks" }}
 {{- if .healthcheck.enabled }}

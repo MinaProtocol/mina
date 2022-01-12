@@ -72,7 +72,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                     with
                   | Error e ->
                       [%log fatal]
-                        "Error occured when updating available work: $error"
+                        "Error occurred when updating available work: $error"
                         ~metadata:[ ("error", Error_json.error_to_yojson e) ]
                   | Ok new_available_jobs ->
                       let end_time = Time.now () in

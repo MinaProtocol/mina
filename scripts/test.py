@@ -93,7 +93,7 @@ required_excludes = [
     'test_postake_catchup:*',
     'test_postake_three_producers:*',
     'test_postake_split_snarkless:*',
-    'test_postake:*'  # TODO: Reenable when plonk lands
+    'test_postake:*'  # TODO: Re-enable when plonk lands
 ]
 
 # these extra jobs are not filters, they are full status check names

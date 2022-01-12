@@ -42,7 +42,7 @@ Parameter | Description | Default
 `userAgent.minFee` | Minimum fee to accept for sending network transactions | ""
 `userAgent.maxFee` | Maximum fee to accept for sending network transactions | ""
 `userAgent.minTx` | Minimum transaction amount to send by the user-agent | ""
-`userAgent.maxTx` | Maxiumum transaction amount to send by the user-agent | ""
+`userAgent.maxTx` | Maximum transaction amount to send by the user-agent | ""
 `bots.faucet.amount` | Amount to send in response to request for faucet funds | "10000000000"
 `bots.faucet.fee` | Fee to charge for sending faucet funds | "100000000"
 

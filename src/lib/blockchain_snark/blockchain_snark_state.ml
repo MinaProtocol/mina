@@ -106,7 +106,7 @@ let%snarkydef step ~(logger : Logger.t)
     |> Staged_ledger_hash.pending_coinbase_hash_var
   in
   let%bind genesis_state_hash =
-    (*get the genesis state hash from previous state unless previous state is the genesis state itslef*)
+    (*get the genesis state hash from previous state unless previous state is the genesis state itself*)
     Protocol_state.genesis_state_hash_checked ~state_hash:previous_state_hash
       previous_state
   in

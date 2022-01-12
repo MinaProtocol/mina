@@ -1,7 +1,7 @@
 {
   "name": "echo-service",
   "version": "1.0.0",
-  "description": "Simple service that sends inverse transactions for each one it recieves.",
+  "description": "Simple service that sends inverse transactions for each one it receives.",
   "main": "index.js",
   "repository": "https://github.com/CodaProtocol/echo-service",
   "author": "Carey Janecka <carey@o1labs.org>",

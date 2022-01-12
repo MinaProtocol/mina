@@ -1,5 +1,5 @@
 (** This output is designed to be consumed by trace-tool in src/app/trace-tool.
-    Some fields are ommitted for the different kinds of event, and inferred
+    Some fields are omitted for the different kinds of event, and inferred
     from the meta-events [New_thread], [Cycle_start], [Cycle_end], [Pid_is].
 
     See the implementation in [emit_event] and the trace-tool source code for

@@ -1,7 +1,7 @@
 (** Different functor instantiations of Incremental in the Coda repository
     along with some functions to interface with pipes. Each module
     instantiation of Incremental should represent a connected component of
-    dependencies. We have this modue to prevent adding dependencies to
+    dependencies. We have this module to prevent adding dependencies to
     different functors*)
 
 open Pipe_lib

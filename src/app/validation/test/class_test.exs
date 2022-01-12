@@ -111,7 +111,7 @@ defmodule ClassTest do
     Test.run_test()
   end
 
-  test "hiearchy" do
+  test "hierarchy" do
     defmodule A do
       use Class
       defclass(x: integer)
@@ -153,7 +153,7 @@ defmodule ClassTest do
     end
 
     defmodule Test do
-      import Class.Hiearchy
+      import Class.Hierarchy
 
       def run_test do
         assert compute(A, [B]) ==

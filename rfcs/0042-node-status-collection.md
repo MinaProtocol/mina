@@ -28,13 +28,13 @@ The node status collection system would make the following `post` request to the
 
 ```
 { "data":
-  { "peer_id": "<base64 encodeing of the libp2p peer id>"
+  { "peer_id": "<base64 encoding of the libp2p peer id>"
   , "ip_address": "<hash of ip address of the submitter>"
   , "mina_version": "<mina version>"
   , "git_hash": "<git hash of the mina node>"
   , "timestamp": "<current time using RFC-3339 representation>"
   , "libp2p_input_bandwidth": "<input bandwidth for libp2p helper system>"
-  , "libp2p_output_bandwidth": "<output bandwith for libp2p helper system>"
+  , "libp2p_output_bandwidth": "<output bandwidth for libp2p helper system>"
   , "libp2p_cpu_usage": "<cpu usage for libp2p helper system>"
   , "pubsub_msg_received": { "new_state": { "count": "<integer, e.g. 10>"
                                           , "bandwidth": "<integer, bandwidth in bytes>" }

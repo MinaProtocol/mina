@@ -36,7 +36,7 @@ let verify_commands _ (cs : User_command.Verifiable.t list) :
   |> Deferred.Or_error.return
 
 let verify_transaction_snarks _ ts =
-  (* Don't check if the proof has default sok, becasue they were probably not
+  (* Don't check if the proof has default sok, because they were probably not
      intended to be checked. If it has some value then check that against the
      message passed.
      This is particularly used to test that invalid proofs are not added to the

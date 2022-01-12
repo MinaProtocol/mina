@@ -28,7 +28,7 @@ There are a multitude of naming issues which plague our codebase. Some names are
 |-----------------------|---------------------------------------------------------------------------|------------------------|
 | `Parallel_scan_state` | State of a series of parallel scan trees                                  | "                      |
 | `Ledger_builder`      | State of `Parallel_scan_state` + `Transaction_work`                       | `Pending_account_db`   |
-| `Ledger_builder_aux`  | Auxillary datastructure of `Pending_account_db`                           | `Work_queue`           |
+| `Ledger_builder_aux`  | Auxiliary datastructure of `Pending_account_db`                           | `Work_queue`           |
 | `Blockchain_state`    | State of `Account_db` root and `Pending_account_db` root at a block       | `Account_db_state`     |
 | `Consensus_state`     | Consensus mechanism specific state at a block                             | "                      |
 | `Protocol_state`      | The `Account_db_state` and `Consensus_state` at a block                   | "                      |

@@ -4,7 +4,7 @@
 
 # Goal
 
-What is the impact this change is intented to have?
+What is the impact this change is intended to have?
 What problems does it solve?
 
 # Design

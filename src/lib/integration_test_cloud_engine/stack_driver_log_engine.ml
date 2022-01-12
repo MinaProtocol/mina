@@ -171,7 +171,7 @@ module Subscription = struct
     let%bind _ = create_sink ~topic:t.topic ~filter ~key ~logger t.sink in
     let%map _ = create_subscription name t.topic in
     [%log debug]
-      "Succesfully created subscription \"$name\" to topic \"$topic\""
+      "Successfully created subscription \"$name\" to topic \"$topic\""
       ~metadata:[ ("name", `String name); ("topic", `String t.topic) ] ;
     t
 
@@ -346,7 +346,7 @@ let destroy t : unit Deferred.Or_error.t =
   [%log debug] "subscription deleted" ;
   ()
 
-(*TODO: unit tests without conencting to gcloud. The following test connects to joyous-occasion*)
+(*TODO: unit tests without connecting to gcloud. The following test connects to joyous-occasion*)
 (*let%test_module "Log tests" =
   ( module struct
     let logger = Logger.create ()

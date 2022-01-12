@@ -172,7 +172,7 @@ let gen_imperative_ktree ?(p = 0.75) (root_gen : 'a t) (node_gen : ('a -> 'a) t)
       match%bind size with
       | 0 ->
           return (fun _ -> [])
-      (* this case is optional but more effecient *)
+      (* this case is optional but more efficient *)
       | 1 ->
           let%map this = node_gen in
           fun parent -> [ this parent ]

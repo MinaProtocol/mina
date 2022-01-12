@@ -134,7 +134,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     else fun () -> Deferred.return ()
   in
 
-  (* contants regarding send amount and fees *)
+  (* constants regarding send amount and fees *)
   let base_send_amount = Currency.Amount.of_formatted_string "0" in
   let fee_amount =
     match txn_fee_option with

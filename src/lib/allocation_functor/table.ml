@@ -31,7 +31,7 @@ module Allocation_data = struct
 
   let initial_allocation_id = Int.min_value
 
-  (* indexed queue data structure would be more effecient here, but keeping this simple for now *)
+  (* indexed queue data structure would be more efficient here, but keeping this simple for now *)
   type t =
     { allocation_times : (allocation_id * Time.t) Queue.t
     ; mutable next_allocation_id : allocation_id

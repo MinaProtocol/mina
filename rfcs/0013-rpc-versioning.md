@@ -80,7 +80,7 @@ For a given query, if we wish to update the protocol, we'd add:
       let query_of_caller_model : T.Caller.query -> query = ...
       let callee_model_of_query : query -> T.Callee.query = ...
       let response_of_callee_model : T.Callee.response -> response = ...
-      let caller_model_of_response : reponse -> T.Caller.response = ...
+      let caller_model_of_response : response -> T.Caller.response = ...
    end
    include Register (T)
  end
@@ -110,7 +110,7 @@ and port represent the "connection state" of the TCP connection
 between the nodes, which is the host and ephemeral port of the
 caller. The version passed is the caller's. In theory, these functions
 could dispatch on the version. Instead, the version should be
-considered informative, and the real accomodation between versions
+considered informative, and the real accommodation between versions
 should happen in the coercions. Therefore, the implementation
 functions do not need to change between versions.
 

@@ -58,5 +58,5 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Malleable_error.List.iter block_producers ~f:(fun bp ->
           Network.Node.dump_precomputed_blocks ~logger bp)
     in
-    [%log info] "archive node test: succesfully completed"
+    [%log info] "archive node test: successfully completed"
 end

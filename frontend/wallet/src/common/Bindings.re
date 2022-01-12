@@ -134,7 +134,7 @@ module ChildProcess = {
 
   /**
     https://nodejs.org/api/child_process.html#child_process_options_stdio
-    The stdio parameter to spawn is a 3-element heterogenous list of some string
+    The stdio parameter to spawn is a 3-element heterogeneous list of some string
     keywords and Streams (as well as some other cases not supported here).
     This function lets us safely construct this parameter (with makeIOTriple).
     */

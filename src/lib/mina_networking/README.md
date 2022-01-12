@@ -2,7 +2,7 @@
 
 ## Typing Conventions
 
-In the context of this document, we will describe query and response types using a psuedo type-system. Tuples of data are in the form `(a, ..., b)`, lists are in the form `[a]`, and polymorphic types are represented as functions returning types. For example, we use the standard polymorphic types `optional :: type -> type` and `result :: type -> type -> type` throughout this document. The `optional` type constructor means that a value can be null, and a `result` type constructor means that there is 1 of 2 possible return types (typically a success type and an error type). For example, `optional int` might be an int or null, where as `result int error` is either an int or an error.
+In the context of this document, we will describe query and response types using a pseudo type-system. Tuples of data are in the form `(a, ..., b)`, lists are in the form `[a]`, and polymorphic types are represented as functions returning types. For example, we use the standard polymorphic types `optional :: type -> type` and `result :: type -> type -> type` throughout this document. The `optional` type constructor means that a value can be null, and a `result` type constructor means that there is 1 of 2 possible return types (typically a success type and an error type). For example, `optional int` might be an int or null, where as `result int error` is either an int or an error.
 
 ### Relevant types
 
@@ -15,7 +15,7 @@ In the context of this document, we will describe query and response types using
 - `protocol_state` == the proven contents of a block (contains `consensus_state`)
 - `block` == an entire block (contains `protocol_state` and the staged ledger diff for that block)
 - `staged_ledger` == the data structure which represents the intermediate (unsnarked) ledger state of the network (large)
-- `pending_coinbase` == a auxilliary hash which identifies some state related to the staged ledger
+- `pending_coinbase` == an auxillary hash which identifies some state related to the staged ledger
 - `sync_ledger_query` == queries for performing sync ledger protocol (requests for hashes or batches of subtrees of a merkle tree)
 - `sync_ledger_response` == responses for handling sync ledger protocol (responses of hashes or batches of subtrees of a merkle tree)
 - `transaction_pool_diff` == a bundle of multiple transactions to be included into the blockchain
@@ -90,7 +90,7 @@ Returns a bulk bulk set of blocks associated with a provided set of state hashes
 
 **Response**: `optional (state_hash, [state_body_hash])` (a merkle proof of block hashes)
 
-Returns a transition chain proof for a specified block on the blockchain. A transition chain proof proves that, given some block `b1`, there exists a block `b0` which is `k` blocks preceeding `b1`. To prove this, a node receives `H(b1)`, and returns `H(b0)` along with a merkle proof of all the intermediate "state body hashes" along the path `b0 -> b1`. The requester checks this proof by re-computing `H(b1)` from the provided merkle proof.
+Returns a transition chain proof for a specified block on the blockchain. A transition chain proof proves that, given some block `b1`, there exists a block `b0` which is `k` blocks preceding `b1`. To prove this, a node receives `H(b1)`, and returns `H(b0)` along with a merkle proof of all the intermediate "state body hashes" along the path `b0 -> b1`. The requester checks this proof by re-computing `H(b1)` from the provided merkle proof.
 
 ### get\_transition\_chain\_knowledge
 
@@ -136,4 +136,4 @@ Returns the best tip block along with the root block of the frontier, and a merk
 
 **Response**: `result node_status error`
 
-This acts as a telemetry RPC which asks a peer to provide invformation about their node status. Daemons do not have to respond to this request, and node operators may pass a command line flag to opt-out of responding to these node status requests.
+This acts as a telemetry RPC which asks a peer to provide information about their node status. Daemons do not have to respond to this request, and node operators may pass a command line flag to opt-out of responding to these node status requests.

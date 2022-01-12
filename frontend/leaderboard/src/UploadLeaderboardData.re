@@ -2,7 +2,7 @@
  UploadLeaderboardData.re has the responsibilities of uploading the
  information needed for the Leaderboard webpage to a Google Sheets tab.
 
- This information is seperate from points as it's data that is only
+ This information is separate from points as it's data that is only
  useful for the Leaderboard webpage.
 
   */

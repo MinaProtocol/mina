@@ -222,7 +222,7 @@ designated epoch and slot.
 [drawbacks]: #drawbacks
 
 In the best case, the network will run smoothly, making preparations
-for a hard fork gratuitious, and the software unnecessarily
+for a hard fork gratuitous, and the software unnecessarily
 complex. That said, the cost of forgoing those preparations is high.
 
 By starting from the transition frontier root, we are explicitly
