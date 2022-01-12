@@ -288,15 +288,6 @@ module Dsl = struct
          , Malleable_error.Hard_fail.t )
          result
          Deferred.t
-
-    (*
-       val check_peers :
-            logger:Logger.t
-         -> Engine.Network.Node.t list
-         -> ( unit Malleable_error.Result_accumulator.t
-            , Malleable_error.Hard_fail.t )
-            result
-            Deferred.t *)
   end
 
   module type S = sig

@@ -32,7 +32,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_nodes = Network.all_nodes network in
-    (* let all_nodes = Network.block_producers network in *)
     let[@warning "-8"] [ node_a; node_b; node_c ] =
       Network.block_producers network
     in
@@ -54,7 +53,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section
-        "network is can't be paritioned if 2 nodes are hypothetically taken \
+        "network can't be paritioned if 2 nodes are hypothetically taken \
          offline"
         (Util.assert_peers_cant_be_partitioned ~max_disconnections:2
            initial_connectivity_data)
