@@ -14,7 +14,8 @@ let () =
         ; "-lc++abi"
         ; "-lc++" ]
     | "Linux" ->
-        [ "-Wl,--push-state,-whole-archive"
+        [ "-Wl,--push-state,-E,-whole-archive"
+        ; "-lc"
         ; "-lrocksdb_stubs"
         ; "-Wl,--pop-state"
         ; "-lz"
