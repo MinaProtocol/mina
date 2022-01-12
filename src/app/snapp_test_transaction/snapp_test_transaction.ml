@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Async
 open Mina_base
 open Cli_lib.Arg_type
@@ -105,28 +105,28 @@ let graphql_snapp_command (parties : Parties.t) =
       {|
       {
       nextEpochData: {
-        epochLength: null, 
-        lockCheckpoint: null, 
-        startCheckpoint: null, 
-        seed: null, 
+        epochLength: null,
+        lockCheckpoint: null,
+        startCheckpoint: null,
+        seed: null,
         ledger: {
-          totalCurrency: null, 
-          hash: null}}, 
+          totalCurrency: null,
+          hash: null}},
       stakingEpochData: {
-        epochLength: null, 
-        lockCheckpoint: null, 
-        startCheckpoint: null, 
-        seed: null, 
+        epochLength: null,
+        lockCheckpoint: null,
+        startCheckpoint: null,
+        seed: null,
         ledger: {
-          totalCurrency: null, 
-          hash: null}}, 
-      globalSlotSinceGenesis: null, 
-      globalSlotSinceHardFork: null, 
-      totalCurrency: null, 
-      minWindowDensity: null, 
-      blockchainLength: null, 
-      timestamp: null, 
-      snarkedNextAvailableToken: null, 
+          totalCurrency: null,
+          hash: null}},
+      globalSlotSinceGenesis: null,
+      globalSlotSinceHardFork: null,
+      totalCurrency: null,
+      minWindowDensity: null,
+      blockchainLength: null,
+      timestamp: null,
+      snarkedNextAvailableToken: null,
       snarkedLedgerHash: null}
     |}
   in
@@ -137,7 +137,7 @@ let graphql_snapp_command (parties : Parties.t) =
       | Nonce n ->
           sprintf "{ nonce: \"%s\" }" (Account.Nonce.to_string n)
       | Full _a ->
-          (*TODO*)
+          (* TODO -- issue #10008 *)
           {|
           {
             account: {
@@ -196,25 +196,25 @@ let graphql_snapp_command (parties : Parties.t) =
     let pk = pk_string p.data.body.pk in
     sprintf
       {|
-        authorization: %s, 
+        authorization: %s,
       data: {
-        predicate: %s, 
+        predicate: %s,
         body: {
-          callDepth: 0, 
-          callData: %s, 
-          sequenceEvents: %s, 
-          events: %s, 
-          balance_change: %s, 
+          callDepth: 0,
+          callData: %s,
+          sequenceEvents: %s,
+          events: %s,
+          balance_change: %s,
           tokenId: "1",
-          incrementNonce: %s 
+          incrementNonce: %s
           update: {
-            timing: null, 
-            tokenSymbol: null, 
-            snappUri: null, 
-            permissions: %s, 
-            verificationKey: %s, 
-            delegate: null, 
-            appState: [%s]}, 
+            timing: null,
+            tokenSymbol: null,
+            snappUri: null,
+            permissions: %s,
+            verificationKey: %s,
+            delegate: null,
+            appState: [%s]},
           publicKey: "%s",
           protocolState: %s,
           use_full_commitment: %s}}
@@ -234,23 +234,23 @@ let graphql_snapp_command (parties : Parties.t) =
     let pk = pk_string p.data.body.pk in
     sprintf
       {|
-        authorization: "%s", 
+        authorization: "%s",
       data: {
-        predicate: "%s", 
+        predicate: "%s",
         body: {
-          callDepth: "0", 
-          callData: "0x0000000000000000000000000000000000000000000000000000000000000000", 
-          sequenceEvents:[], 
-          events: [], 
-          fee: "%s", 
+          callDepth: "0",
+          callData: "0x0000000000000000000000000000000000000000000000000000000000000000",
+          sequenceEvents:[],
+          events: [],
+          fee: "%s",
           update: {
-            timing: null, 
-            tokenSymbol: null, 
-            snappUri: null, 
-            permissions: %s, 
-            verificationKey: %s, 
-            delegate: null, 
-            appState: [%s]}, 
+            timing: null,
+            tokenSymbol: null,
+            snappUri: null,
+            permissions: %s,
+            verificationKey: %s,
+            delegate: null,
+            appState: [%s]},
           pk: "%s",
           protocolState: %s}}
         |}
@@ -279,12 +279,31 @@ let graphql_snapp_command (parties : Parties.t) =
     {|
 mutation MyMutation {
   __typename
-  sendSnapp(input: { 
+  sendSnapp(input: {
     feePayer: {%s},
     otherParties: %s })
 }
     |}
     fee_payer other_parties
+
+let parse_field_element_or_hash_string s ~f =
+  match Or_error.try_with (fun () -> Snark_params.Tick.Field.of_string s) with
+  | Ok field ->
+      f field
+  | Error e1 -> (
+      match Signed_command_memo.create_from_string s with
+      | Ok memo ->
+          Random_oracle.(
+            hash ~init:Hash_prefix.snapp_test
+              ( Signed_command_memo.to_bits memo
+              |> Random_oracle_input.bitstring |> pack_input ))
+          |> f
+      | Error e2 ->
+          failwith
+            (sprintf
+               "Neither a field element nor a suitable memo string: Errors \
+                (%s, %s)"
+               (Error.to_string_hum e1) (Error.to_string_hum e2)) )
 
 let gen_proof ?(snapp_account = None) (parties : Parties.t) =
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
@@ -343,7 +362,7 @@ let gen_proof ?(snapp_account = None) (parties : Parties.t) =
   let%map _ =
     Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
       ~f:(fun _ ((witness, spec, statement, snapp_statement) as w) ->
-        Core.printf "%s"
+        printf "%s"
           (sprintf
              !"current witness \
                %{sexp:(Transaction_witness.Parties_segment_witness.t * \
@@ -375,9 +394,9 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t) =
     Transaction_snark.For_tests.create_trivial_predicate_snapp
       ~constraint_constants spec ledger
   in
-  Core.printf "Snapp transaction yojson: %s\n\n%!"
+  printf "Snapp transaction yojson: %s\n\n%!"
     (Parties.to_yojson parties |> Yojson.Safe.to_string) ;
-  Core.printf "Snapp transaction graphQL input %s\n\n%!"
+  printf "Snapp transaction graphQL input %s\n\n%!"
     (graphql_snapp_command parties) ;
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
@@ -408,7 +427,7 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t) =
   let%map _ =
     Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
       ~f:(fun _ ((witness, spec, statement, snapp_statement) as w) ->
-        Core.printf "%s"
+        printf "%s"
           (sprintf
              !"current witness \
                %{sexp:(Transaction_witness.Parties_segment_witness.t * \
@@ -490,57 +509,21 @@ module App_state = struct
     match str with
     | "" ->
         Snapp_basic.Set_or_keep.Keep
-    | _ -> (
-        match
-          Or_error.try_with (fun () -> Snark_params.Tick.Field.of_string str)
-        with
-        | Ok f ->
-            Snapp_basic.Set_or_keep.Set f
-        | Error e1 -> (
-            match Signed_command_memo.create_from_string str with
-            | Ok d ->
-                let s =
-                  Random_oracle.(
-                    hash ~init:Hash_prefix.snapp_test
-                      ( Signed_command_memo.to_bits d
-                      |> Random_oracle_input.bitstring |> pack_input ))
-                in
-                Snapp_basic.Set_or_keep.Set s
-            | Error e2 ->
-                failwith
-                  (sprintf
-                     "Neither a field element nor limited length string Errors \
-                      (%s, %s)"
-                     (Error.to_string_hum e1) (Error.to_string_hum e2)) ) )
+    | _ ->
+        parse_field_element_or_hash_string str ~f:(fun result ->
+            Snapp_basic.Set_or_keep.Set result)
 end
 
 module Events = struct
   type t = Snark_params.Tick.Field.t
 
   let of_string_array (arr : string Array.t) =
-    Array.map arr ~f:(fun x ->
-        match x with
+    Array.map arr ~f:(fun s ->
+        match s with
         | "" ->
             Snark_params.Tick.Field.zero
-        | _ -> (
-            match
-              Or_error.try_with (fun () -> Snark_params.Tick.Field.of_string x)
-            with
-            | Ok f ->
-                f
-            | Error e1 -> (
-                match Signed_command_memo.create_from_string x with
-                | Ok d ->
-                    Random_oracle.(
-                      hash ~init:Hash_prefix.snapp_test
-                        ( Signed_command_memo.to_bits d
-                        |> Random_oracle_input.bitstring |> pack_input ))
-                | Error e2 ->
-                    failwith
-                      (sprintf
-                         "Neither a field element nor limited length string \
-                          Errors (%s, %s)"
-                         (Error.to_string_hum e1) (Error.to_string_hum e2)) ) ))
+        | _ ->
+            parse_field_element_or_hash_string s ~f:Fn.id)
 end
 
 module Util = struct
@@ -549,10 +532,10 @@ module Util = struct
       ~which:"payment keypair"
 
   let print_snapp_transaction parties =
-    Core.printf !"Parties sexp:\n %{sexp: Parties.t}\n\n%!" parties ;
-    Core.printf "Snapp transaction yojson:\n %s\n\n%!"
+    printf !"Parties sexp:\n %{sexp: Parties.t}\n\n%!" parties ;
+    printf "Snapp transaction yojson:\n %s\n\n%!"
       (Parties.to_yojson parties |> Yojson.Safe.to_string) ;
-    Core.printf "Snapp transaction graphQL input %s\n\n%!"
+    printf "Snapp transaction graphQL input %s\n\n%!"
       (graphql_snapp_command parties)
 
   let memo =
@@ -598,7 +581,7 @@ let test_snapp_with_genesis_ledger_main keyfile config_file () =
       | Accounts accounts ->
           lazy (Genesis_ledger_helper.Accounts.to_full accounts)
       | _ ->
-          failwith "invlaid genesis ledger- pass all the accounts"
+          failwith "Invalid genesis ledger, does not contain the accounts"
     in
     let packed =
       Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
@@ -655,7 +638,7 @@ let create_snapp_account =
 
 let upgrade_snapp =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-      ~verification_key ~auth () =
+      ~verification_key ~snapp_uri ~auth () =
     let open Deferred.Let_syntax in
     let%bind keypair = Util.keypair_of_file keyfile in
     let%bind snapp_account_keypair = Util.keypair_of_file snapp_keyfile in
@@ -674,7 +657,7 @@ let upgrade_snapp =
       ; snapp_account_keypair = Some snapp_account_keypair
       ; memo = Util.memo memo
       ; new_snapp_account = false
-      ; snapp_update = { Party.Update.dummy with verification_key }
+      ; snapp_update = { Party.Update.dummy with verification_key; snapp_uri }
       ; current_auth = auth
       ; call_data = Snark_params.Tick.Field.zero
       ; events = []
@@ -710,6 +693,9 @@ let upgrade_snapp =
          Param.flag "--verification-key"
            ~doc:"VERIFICATION_KEY the verification key for the snapp account"
            Param.(required string)
+       and snapp_uri_str =
+         Param.flag "--snapp-uri" ~doc:"URI the URI for the snapp account"
+           Param.(optional string)
        and auth =
          Param.flag "--auth"
            ~doc:
@@ -723,8 +709,9 @@ let upgrade_snapp =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_formatted_string Flags.min_fee)) ;
+       let snapp_uri = Snapp_basic.Set_or_keep.of_option snapp_uri_str in
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~verification_key ~auth))
+         ~verification_key ~snapp_uri ~auth))
 
 let transfer_funds =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers () =
@@ -760,13 +747,13 @@ let transfer_funds =
   let read_key_and_amount count =
     let read () =
       let open Deferred.Let_syntax in
-      Core.printf "Receiver Key:%!" ;
+      printf "Receiver Key:%!" ;
       match%bind Reader.read_line (Lazy.force Reader.stdin) with
       | `Ok key -> (
           let pk =
             Signature_lib.Public_key.Compressed.of_base58_check_exn key
           in
-          Core.printf !"Amount:%!" ;
+          printf !"Amount:%!" ;
           match%map Reader.read_line (Lazy.force Reader.stdin) with
           | `Ok amt ->
               let amount = Currency.Amount.of_formatted_string amt in
@@ -779,21 +766,20 @@ let transfer_funds =
     let rec go ?(prompt = true) count keys =
       if count <= 0 then return keys
       else if prompt then (
-        Core.printf "Continue?[y/n]\n%!" ;
+        printf "Continue? [N/y]\n%!" ;
         match%bind Reader.read_line (Lazy.force Reader.stdin) with
         | `Ok r ->
-            if String.(equal (lowercase r) "y") then
+            if String.Caseless.equal r "y" then
               let%bind key = read () in
               go (count - 1) (key :: keys)
             else return keys
         | `Eof ->
-            failwith "Invalid input" )
+            return keys )
       else
         let%bind key = read () in
         go (count - 1) (key :: keys)
     in
-
-    Core.printf "Enter at most %d receivers (base58 encoding) and amounts\n%!"
+    printf "Enter at most %d receivers (Base58Check encoding) and amounts\n%!"
       count ;
     let%bind ks = go ~prompt:false 1 [] in
     go (count - 1) ks
@@ -807,10 +793,11 @@ let transfer_funds =
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags in
        let fee = Option.value ~default:Flags.default_fee fee in
        if Currency.Fee.(fee < Flags.min_fee) then
-         failwith
-           (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
-       let receivers = read_key_and_amount 10 in
+         failwithf "Fee must at least be %s"
+           (Currency.Fee.to_formatted_string Flags.min_fee)
+           () ;
+       let max_keys = 10 in
+       let receivers = read_key_and_amount max_keys in
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers))
 
 let update_state =

@@ -1683,7 +1683,6 @@ module Base = struct
               exists (Party.Predicate.typ ()) ~compute:(fun () ->
                   (V.get first_party).data.predicate)
             in
-
             let auth =
               V.(create (fun () -> (V.get first_party).authorization))
             in
