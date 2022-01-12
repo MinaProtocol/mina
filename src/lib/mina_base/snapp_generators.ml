@@ -737,22 +737,27 @@ let gen_parties_from ?(succeed = true)
     tbl
   in
   let permissions_auth = Control.Tag.Signature in
+
   (* permissions_auth is Signature, for now, because permissions on new accounts are compatible with it
+
      TODO: split Party.ts into two:
      - the first sets permissions and vk using Signature authorization,
      - the second uses an authorization compatible with the new permissions
+
      N.B.: the given authorization constrains the generated permissions for the
-      fee payer and other parties; those are not the permissions used
-      when applying those parties, the existing permissions are used;
-      instead, those generated permissions are used in later transactions
+     fee payer and other parties; those are not the permissions used
+     when applying those parties, the existing permissions are used;
+     instead, those generated permissions are used in later transactions
   *)
   let%bind fee_payer =
     gen_fee_payer ~permissions_auth ~account_id:fee_payer_account_id ~ledger
       ?protocol_state_view ()
   in
+
   (* table of public keys to balances, updated when generating each party
+
      a Map would be more principled, but threading that map through the code
-       adds complexity
+     adds complexity
   *)
   let balances_tbl = Signature_lib.Public_key.Compressed.Table.create () in
   let gen_parties_with_dynamic_balance ~new_parties num_parties =
@@ -809,9 +814,11 @@ let gen_parties_from ?(succeed = true)
         | None ->
             failwith "Overflow adding other parties balances")
   in
+
   (* create a party with balance change to yield a zero sum
+
      a new account, because the balance change for an existing
-      account might be constrained by its balance
+     account might be constrained by its balance
   *)
   let%bind balancing_party =
     let required_balance_change =
