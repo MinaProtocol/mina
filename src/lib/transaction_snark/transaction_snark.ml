@@ -4078,15 +4078,21 @@ struct
                         (find_index_exn witness.local_state_init.ledger
                            account_id))
                   in
-                  (Option.value_exn account.snapp).verification_key
+                  match
+                    Option.value_map ~default:None account.snapp ~f:(fun s ->
+                        s.verification_key)
+                  with
+                  | None ->
+                      failwith "No verification key found in the account"
+                  | Some s ->
+                      s
                 in
                 (snapp_statement, pi, vk, tag))
           in
           proved
             ( match proofs with
             | [ (s, p, v, tag) ] ->
-                Pickles.Side_loaded.in_prover (Base.side_loaded tag)
-                  (Option.value_exn v).data ;
+                Pickles.Side_loaded.in_prover (Base.side_loaded tag) v.data ;
                 (* TODO: We should not have to pass the statement in here. *)
                 [ (s, p) ]
             | [] | _ :: _ :: _ ->
@@ -4162,7 +4168,27 @@ struct
 end
 
 module For_tests = struct
-  let create_trivial_predicate_snapp ~constraint_constants spec ledger =
+  module Spec = struct
+    type t =
+      { fee : Currency.Fee.t
+      ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; receivers :
+          (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
+      ; amount : Currency.Amount.t
+      ; snapp_account_keypair : Signature_lib.Keypair.t option
+      ; memo : Signed_command_memo.t
+      ; new_snapp_account : bool
+      ; snapp_update : Party.Update.t
+      ; current_auth : Permissions.Auth_required.t
+            (*Authorization for the update being performed*)
+      ; sequence_events : Tick.Field.t array list
+      ; events : Tick.Field.t array list
+      ; call_data : Tick.Field.t
+      }
+    [@@deriving sexp]
+  end
+
+  let create_trivial_snapp ~constraint_constants () =
     let local_dummy_constraints () =
       let open Run in
       let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
@@ -4236,6 +4262,297 @@ module For_tests = struct
           ])
     in
     let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
+    ( `VK (With_hash.of_data ~hash_data:Snapp_account.digest_vk vk)
+    , `Prover trivial_prover )
+
+  let create_parties spec ~update ~predicate =
+    let { Spec.fee
+        ; sender = sender, sender_nonce
+        ; receivers
+        ; amount
+        ; new_snapp_account
+        ; snapp_account_keypair
+        ; memo
+        ; sequence_events
+        ; events
+        ; call_data
+        ; _
+        } =
+      spec
+    in
+    let sender_pk = sender.public_key |> Public_key.compress in
+    let fee_payer =
+      { Party.Fee_payer.data =
+          { body =
+              { pk = sender_pk
+              ; update = Party.Update.noop
+              ; token_id = ()
+              ; balance_change = fee
+              ; increment_nonce = ()
+              ; events = []
+              ; sequence_events = []
+              ; call_data = Field.zero
+              ; call_depth = 0
+              ; protocol_state = Snapp_predicate.Protocol_state.accept
+              ; use_full_commitment = ()
+              }
+          ; predicate = sender_nonce
+          }
+          (*To be updated later*)
+      ; authorization = Signature.dummy
+      }
+    in
+    let sender_party : Party.t option =
+      let sender_party_data : Party.Predicated.t =
+        { body =
+            { pk = sender_pk
+            ; update = Party.Update.noop
+            ; token_id = Token_id.default
+            ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
+            ; increment_nonce = true
+            ; events = []
+            ; sequence_events = []
+            ; call_data = Field.zero
+            ; call_depth = 0
+            ; protocol_state = Snapp_predicate.Protocol_state.accept
+            ; use_full_commitment = false
+            }
+        ; predicate = Nonce (Account.Nonce.succ sender_nonce)
+        }
+      in
+      Option.some_if
+        ((not (List.is_empty receivers)) || new_snapp_account)
+        { Party.data = sender_party_data
+        ; authorization =
+            Control.Signature Signature.dummy (*To be updated later*)
+        }
+    in
+    let snapp_party : Party.t option =
+      Option.map snapp_account_keypair ~f:(fun snapp_account_keypair ->
+          let pk =
+            Signature_lib.Public_key.compress snapp_account_keypair.public_key
+          in
+          let delta =
+            if new_snapp_account then Amount.Signed.(of_unsigned amount)
+            else Amount.Signed.zero
+          in
+          { Party.data =
+              { body =
+                  { pk
+                  ; update
+                  ; token_id = Token_id.default
+                  ; balance_change = delta
+                  ; increment_nonce = false
+                  ; events
+                  ; sequence_events
+                  ; call_data
+                  ; call_depth = 0
+                  ; protocol_state = Snapp_predicate.Protocol_state.accept
+                  ; use_full_commitment = true
+                  }
+              ; predicate
+              }
+          ; authorization =
+              Control.Signature Signature.dummy (*To be updated later*)
+          })
+    in
+    let other_receivers =
+      List.map receivers ~f:(fun (receiver, amt) ->
+          { Party.data =
+              { body =
+                  { pk = receiver
+                  ; update
+                  ; token_id = Token_id.default
+                  ; balance_change = Amount.Signed.of_unsigned amt
+                  ; increment_nonce = false
+                  ; events = []
+                  ; sequence_events = []
+                  ; call_data = Field.zero
+                  ; call_depth = 0
+                  ; protocol_state = Snapp_predicate.Protocol_state.accept
+                  ; use_full_commitment = false
+                  }
+              ; predicate = Accept
+              }
+          ; authorization = Control.None_given
+          })
+    in
+    let protocol_state = Snapp_predicate.Protocol_state.accept in
+    let other_parties_data =
+      Option.value_map ~default:[] sender_party ~f:(fun p -> [ p.data ])
+      @ Option.value_map snapp_party ~default:[] ~f:(fun snapp_party ->
+            [ snapp_party.data ])
+      @ List.map other_receivers ~f:(fun p -> p.data)
+    in
+    let protocol_state_predicate_hash =
+      Snapp_predicate.Protocol_state.digest protocol_state
+    in
+    let ps =
+      Parties.Party_or_stack.of_parties_list
+        ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
+        other_parties_data
+      |> Parties.Party_or_stack.accumulate_hashes_predicated
+    in
+    let other_parties_hash = Parties.Party_or_stack.stack_hash ps in
+    let commitment : Parties.Transaction_commitment.t =
+      Parties.Transaction_commitment.create ~other_parties_hash
+        ~protocol_state_predicate_hash
+        ~memo_hash:(Signed_command_memo.hash memo)
+    in
+    let full_commitment =
+      Parties.Transaction_commitment.with_fee_payer commitment
+        ~fee_payer_hash:Party.Predicated.(digest (of_fee_payer fee_payer.data))
+    in
+    let fee_payer =
+      let fee_payer_signature_auth =
+        Signature_lib.Schnorr.sign sender.private_key
+          (Random_oracle.Input.field full_commitment)
+      in
+      { fee_payer with authorization = fee_payer_signature_auth }
+    in
+    let sender_party =
+      Option.map sender_party ~f:(fun s ->
+          let commitment =
+            if s.data.body.use_full_commitment then full_commitment
+            else commitment
+          in
+          let sender_signature_auth =
+            Signature_lib.Schnorr.sign sender.private_key
+              (Random_oracle.Input.field commitment)
+          in
+          { Party.data = s.data
+          ; authorization = Signature sender_signature_auth
+          })
+    in
+    ( `Parties { Parties.fee_payer; other_parties = other_receivers; memo }
+    , `Sender_party sender_party
+    , `Proof_party snapp_party
+    , `Txn_commitment commitment
+    , `Full_txn_commitment full_commitment )
+
+  let deploy_snapp ~constraint_constants (spec : Spec.t) =
+    let `VK vk, `Prover _trivial_prover =
+      create_trivial_snapp ~constraint_constants ()
+    in
+    let update_vk =
+      let update = spec.snapp_update in
+      { update with
+        verification_key = Snapp_basic.Set_or_keep.Set vk
+      ; permissions =
+          Snapp_basic.Set_or_keep.Set
+            { Permissions.user_default with
+              edit_state = Permissions.Auth_required.Proof
+            ; edit_sequence_state = Proof
+            }
+      }
+    in
+    let ( `Parties { Parties.fee_payer; other_parties; memo }
+        , `Sender_party sender_party
+        , `Proof_party snapp_party
+        , `Txn_commitment commitment
+        , `Full_txn_commitment full_commitment ) =
+      create_parties spec ~update:update_vk ~predicate:Party.Predicate.Accept
+    in
+    assert (List.is_empty other_parties) ;
+    let snapp_party =
+      Option.value_map ~default:[] snapp_party ~f:(fun snapp_party ->
+          let commitment =
+            if snapp_party.data.body.use_full_commitment then full_commitment
+            else commitment
+          in
+          let signature =
+            Signature_lib.Schnorr.sign
+              (Option.value_exn spec.snapp_account_keypair).private_key
+              (Random_oracle.Input.field commitment)
+          in
+          [ { Party.data = snapp_party.data
+            ; authorization = Signature signature
+            }
+          ])
+    in
+    let other_parties = [ Option.value_exn sender_party ] @ snapp_party in
+    let parties : Parties.t = { fee_payer; other_parties; memo } in
+    parties
+
+  let update_state ~constraint_constants (spec : Spec.t) =
+    let `VK vk, `Prover trivial_prover =
+      create_trivial_snapp ~constraint_constants ()
+    in
+    let ( `Parties { Parties.fee_payer; other_parties; memo }
+        , `Sender_party sender_party
+        , `Proof_party snapp_party
+        , `Txn_commitment commitment
+        , `Full_txn_commitment full_commitment ) =
+      create_parties spec ~update:spec.snapp_update
+        ~predicate:Party.Predicate.Accept
+    in
+    assert (List.is_empty other_parties) ;
+    assert (Option.is_none sender_party) ;
+    assert (Option.is_some snapp_party) ;
+    let snapp_party = Option.value_exn snapp_party in
+    let%map.Async.Deferred snapp_party =
+      match spec.current_auth with
+      | Permissions.Auth_required.Proof ->
+          let proof_party =
+            let ps =
+              Parties.Party_or_stack.of_parties_list
+                ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
+                [ snapp_party.data ]
+              |> Parties.Party_or_stack.accumulate_hashes_predicated
+            in
+            Parties.Party_or_stack.stack_hash ps
+          in
+          let tx_statement : Snapp_statement.t =
+            { transaction = commitment; at_party = proof_party }
+          in
+          let handler (Snarky_backendless.Request.With { request; respond }) =
+            match request with _ -> respond Unhandled
+          in
+          let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
+            trivial_prover ~handler [] tx_statement
+          in
+          { Party.data = snapp_party.data; authorization = Proof pi }
+      | Signature ->
+          let commitment =
+            if snapp_party.data.body.use_full_commitment then full_commitment
+            else commitment
+          in
+          let signature =
+            Signature_lib.Schnorr.sign
+              (Option.value_exn spec.snapp_account_keypair).private_key
+              (Random_oracle.Input.field commitment)
+          in
+          Async.Deferred.return
+            { Party.data = snapp_party.data
+            ; authorization = Signature signature
+            }
+      | None ->
+          Async.Deferred.return
+            { Party.data = snapp_party.data; authorization = None_given }
+      | _ ->
+          failwith "Current authorization not Proof or Signature or None_given"
+    in
+    let other_parties = [ snapp_party ] in
+    let parties : Parties.t = { fee_payer; other_parties; memo } in
+    (parties, vk)
+
+  let multiple_transfers (spec : Spec.t) =
+    let ( `Parties parties
+        , `Sender_party sender_party
+        , `Proof_party snapp_party
+        , `Txn_commitment _commitment
+        , `Full_txn_commitment _full_commitment ) =
+      create_parties spec ~update:spec.snapp_update
+        ~predicate:Party.Predicate.Accept
+    in
+    assert (Option.is_some sender_party) ;
+    assert (Option.is_none snapp_party) ;
+    let other_parties =
+      Option.value_exn sender_party :: parties.other_parties
+    in
+    { parties with other_parties }
+
+  let create_trivial_predicate_snapp ~constraint_constants spec ledger =
     let { Transaction_logic.For_tests.Transaction_spec.fee
         ; sender = sender, sender_nonce
         ; receiver = trivial_account_pk
@@ -4243,7 +4560,9 @@ module For_tests = struct
         } =
       spec
     in
-    let vk = With_hash.of_data ~hash_data:Snapp_account.digest_vk vk in
+    let `VK vk, `Prover trivial_prover =
+      create_trivial_snapp ~constraint_constants ()
+    in
     let set_or_create ledger id account =
       match Ledger.location_of_account ledger id with
       | Some loc ->

@@ -96,3 +96,5 @@ val snapp_events : Field.t State.t
 val snapp_sequence_events : Field.t State.t
 
 val snapp_memo : Field.t State.t
+
+val snapp_test : Field.t State.t

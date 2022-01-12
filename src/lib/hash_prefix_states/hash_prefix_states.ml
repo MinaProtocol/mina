@@ -117,3 +117,5 @@ let snapp_events = salt snapp_events
 let snapp_sequence_events = salt snapp_sequence_events
 
 let snapp_memo = salt snapp_memo
+
+let snapp_test = salt snapp_test

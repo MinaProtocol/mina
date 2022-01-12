@@ -609,7 +609,7 @@ module Predicate = struct
         Snapp_predicate.Account.accept
 
   module Tag = struct
-    type t = Full | Nonce | Accept [@@deriving equal, compare, sexp]
+    type t = Full | Nonce | Accept [@@deriving equal, compare, sexp, yojson]
   end
 
   let tag : t -> Tag.t = function
