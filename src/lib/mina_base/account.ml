@@ -3,6 +3,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Util
 
 [%%ifdef consensus_mechanism]
 
@@ -62,7 +63,8 @@ module Index = struct
   let of_bits = List.foldi ~init:Vector.empty ~f:(fun i t b -> Vector.set t i b)
 
   let to_input ~ledger_depth x =
-    Random_oracle.Input.Chunked.packed (Field.of_int x, ledger_depth)
+    List.map (to_bits ~ledger_depth x) ~f:(fun b -> (field_of_bool b, 1))
+    |> List.to_array |> Random_oracle.Input.Chunked.packeds
 
   let fold_bits ~ledger_depth t =
     { Fold.fold =
