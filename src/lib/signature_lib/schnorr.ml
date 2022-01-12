@@ -141,6 +141,8 @@ module Make
 
         val negate : t -> t
 
+        val to_string : t -> string
+
         module Checked : sig
           val to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
         end
@@ -237,6 +239,7 @@ module Make
           Message.hash_for_testnet
     in
     let e = hash ~public_key:pk ~r m in
+    printf "HASH: %s\n" (Curve.Scalar.to_string e) ;
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
     match Curve.to_affine_exn r_pt with
     | rx, ry ->
@@ -307,7 +310,7 @@ open Snark_params
 
 (* nonconsensus version of the functor; yes, there's some repeated code,
    but seems difficult to abstract over the functors and signatures
- *)
+*)
 
 module type S = sig
   open Snark_params_nonconsensus

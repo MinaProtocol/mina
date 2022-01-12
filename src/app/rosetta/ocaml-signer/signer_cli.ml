@@ -33,6 +33,33 @@ let sign_command =
         eprintf "Failed to sign transaction %s" (Errors.show e) ;
         exit 1
 
+let verify_message_command =
+  let open Command.Let_syntax in
+  let%map_open signature =
+    flag "--signature"
+      ~doc:"Rosetta signature" (required string)
+  and message =
+    flag "--message"
+      ~doc:"Message that was signed" (required string)
+  and public_key =
+    flag "--public-key" ~aliases:["public-key"] ~doc:"Public key hex bytes"
+      (required string)
+  in
+  let open Deferred.Let_syntax in
+  fun () ->
+    let signature = Option.value_exn (Mina_base.Signature.Raw.decode signature) in
+    let pk = Rosetta_coding.Coding.to_public_key public_key in
+    let inner_curve = pk |> Snark_params.Tick.Inner_curve.of_affine in
+    match
+      String_sign.Schnorr.verify signature inner_curve message
+    with
+    | true ->
+        return ()
+    | false ->
+        eprintf "Signature does not verify against this public key" ;
+        exit 1
+
+
 let verify_command =
   let open Command.Let_syntax in
   let%map_open signed_transaction =
@@ -65,8 +92,22 @@ let derive_command =
   in
   let open Deferred.Let_syntax in
   fun () ->
+    let keys =
+      try
+        Signer.Keys.of_private_key_bytes private_key
+      with
+      | _ -> Signer.Keys.of_private_key_box private_key
+    in
+    printf "Private Key:\n";
     printf "%s\n"
-      Signer.Keys.(of_private_key_bytes private_key).public_key_hex_bytes ;
+      Signer.Keys.(to_private_key_bytes keys);
+    printf "Public Key:\n";
+    printf "%s\n"
+      keys.public_key_hex_bytes ;
+    printf "%s\n"
+      (keys.keypair.public_key
+        |> Public_key.compress
+        |> Public_key.Compressed.to_base58_check) ;
     return ()
 
 let generate_command =
@@ -110,4 +151,6 @@ let commands =
     , Command.async ~summary:"Generate a new private key" generate_command )
   ; ( "convert-signature"
     , Command.async ~summary:"Convert signature from field,scalar decimal strings into Rosetta Signature" convert_signature_command )
+  ; ( "verify-message"
+    , Command.async ~summary:"Verify a string message was signed properly" verify_message_command )
     ]
