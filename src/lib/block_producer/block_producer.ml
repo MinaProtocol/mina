@@ -595,6 +595,28 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                 Transition_registry
             in
             let crumb = Transition_frontier.best_tip frontier in
+            let crumb =
+              let crumb_global_slot_since_genesis =
+                Breadcrumb.protocol_state crumb
+                |> Protocol_state.consensus_state
+                |> Consensus.Data.Consensus_state.global_slot_since_genesis
+              in
+              let block_global_slot_since_genesis =
+                Consensus.Proof_of_stake.Data.Block_data
+                .global_slot_since_genesis block_data
+              in
+              if
+                Mina_numbers.Global_slot.equal crumb_global_slot_since_genesis
+                  block_global_slot_since_genesis
+              then
+                (* We received a block for this slot over the network before
+                   attempting to produce our own. Build upon its parent instead
+                   of attempting (and failing) to build upon the block itself.
+                *)
+                Transition_frontier.find_exn frontier
+                  (Breadcrumb.parent_hash crumb)
+              else crumb
+            in
             let start = Time.now time_controller in
             [%log info]
               ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson crumb) ]
