@@ -34,6 +34,39 @@ let
 
   sourceInfo = inputs.self.sourceInfo or { };
   dds = x: x.overrideAttrs (o: { dontDisableStatic = true; });
+
+  external-libs = with pkgs';
+    if stdenv.hostPlatform.isMusl then
+      map dds [
+        (zlib.override { splitStaticOutput = false; })
+        (bzip2.override { linkStatic = true; })
+        (snappy.override { static = true; })
+        (lz4.override {
+          enableStatic = true;
+          enableShared = false;
+        })
+        (zstd.override { static = true; })
+        (jemalloc.overrideAttrs (oa: {
+          configureFlags = oa.configureFlags ++ [
+            "--with-jemalloc-prefix=je_"
+          ];
+        }))
+        (gmp.override { withStatic = true; })
+        (openssl.override { static = true; })
+        libffi
+      ]
+    else [
+      zlib
+      bzip2
+      snappy
+      lz4
+      zstd
+      jemalloc
+      gmp
+      openssl
+      libffi
+    ];
+
   overlay = self: super:
     {
       sodium = super.sodium.overrideAttrs (_: {
@@ -57,10 +90,10 @@ let
         # todo: slimmed rocksdb
         buildInputs =
           (builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self))
-          ++ (map dds [ pkgs.zlib pkgs.bzip2 pkgs.snappy pkgs.lz4 pkgs.zstd ]);
+          ++ external-libs;
         nativeBuildInputs = [ self.dune self.ocamlfind pkgs.capnproto ]
           ++ builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self);
-        #NIX_LDFLAGS = "-lsnappy -llz4 -lzstd";
+        NIX_LDFLAGS = "-lsnappy -llz4 -lzstd";
         # TODO, get this from somewhere
         MARLIN_REPO_SHA = "bacef43ea34122286745578258066c29091dc36a";
 
@@ -72,10 +105,12 @@ let
 
         buildPhase = ''
           export MINA_ROOT="$NIX_BUILD_TOP/$sourceRoot"
-          sed 's,/usr/local/lib/librocksdb_coda.a,${pkgs.buildPackages.buildPackages.rocksdb}/lib/librocksdb.a,' -i src/external/ocaml-rocksdb/dune
-          sed 's,make ,make GO_CAPNP_STD=${pkgs.buildPackages.buildPackages.go-capnproto2.src}/std ,' -i src/libp2p_ipc/dune
+          sed 's,/usr/local/lib/librocksdb_coda.a,${
+            pkgs'.rocksdb.override { enableJemalloc = false; }
+          }/lib/librocksdb.a,' -i src/external/ocaml-rocksdb/dune
+          sed 's,make ,make GO_CAPNP_STD=${pkgs'.go-capnproto2.src}/std ,' -i src/libp2p_ipc/dune
           sed 's,cargo build --release,mkdir target,' -i src/lib/marlin_plonk_bindings/stubs/dune
-          sed 's,target/release,${pkgs.buildPackages.buildPackages.marlin_plonk_bindings_stubs}/lib,' -i src/lib/marlin_plonk_bindings/stubs/dune
+          sed 's,target/release,${pkgs'.marlin_plonk_bindings_stubs}/lib,' -i src/lib/marlin_plonk_bindings/stubs/dune
           patchShebangs .
           dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe -j$NIX_BUILD_CORES
         '';
