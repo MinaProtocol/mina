@@ -185,11 +185,9 @@ module Update = struct
     end
   end]
 
-  let gen ?(new_account = false) ?(snapp_account = false) ?permissions_auth () :
+  let gen ?(snapp_account = false) ?permissions_auth () :
       t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
-    if snapp_account && not new_account then
-      failwith "Party.Update.gen: got snapp_account but not new_account" ;
     let%bind app_state =
       let%bind fields =
         let field_gen = Snark_params.Tick.Field.gen in

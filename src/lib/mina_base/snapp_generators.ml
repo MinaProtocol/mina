@@ -247,18 +247,18 @@ let gen_fee (account : Account.t) =
 
 let fee_to_amt fee = Currency.Amount.(Signed.of_unsigned (of_fee fee))
 
-let gen_balance_change ?balances_tbl (account : Account.t) =
+let gen_balance_change ?balances_tbl ?permissions_auth (account : Account.t) =
   let open Quickcheck.Let_syntax in
   let pk = account.public_key in
-  (* TODO: the authorization is Signature for new accounts only
-     this will change when we split party's into two
-  *)
-  let authorization = Control.Tag.Signature in
   let%bind sgn =
-    match authorization with
-    | Control.Tag.None_given ->
-        return Sgn.Pos
-    | _ ->
+    match permissions_auth with
+    | Some auth -> (
+        match auth with
+        | Control.Tag.None_given ->
+            return Sgn.Pos
+        | _ ->
+            Quickcheck.Generator.of_list [ Sgn.Pos; Neg ] )
+    | None ->
         Quickcheck.Generator.of_list [ Sgn.Pos; Neg ]
   in
   match sgn with
@@ -293,8 +293,13 @@ let gen_balance_change ?balances_tbl (account : Account.t) =
       in
       Currency.Signed_poly.{ magnitude; sgn = Sgn.Neg }
 
-let gen_use_full_commitment : bool Base_quickcheck.Generator.t =
-  Bool.quickcheck_generator
+let gen_use_full_commitment ~increment_nonce () :
+    bool Base_quickcheck.Generator.t =
+  (* to avoid replays, either increment_nonce or use_full_commitment must be true;
+     we never generate Accept as the predicate,
+  *)
+  if increment_nonce then Bool.quickcheck_generator
+  else Quickcheck.Generator.return true
 
 let closed_interval_exact value =
   Snapp_predicate.Closed_interval.{ lower = value; upper = value }
@@ -406,22 +411,22 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
     ~ledger () :
     (_, _, _, a, _, _, _, b, _) Party.Body.Poly.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
-  (* ledger may contain non-Snapp accounts, so if we need a Snapp account,
-     must generate a new one
-  *)
-  if snapp_account && not new_account then
-    failwith "gen_party_body: snapp_account but not new_account" ;
   (* fee payers have to be in the ledger *)
   assert (not (is_fee_payer && new_account)) ;
+  (* if it's a Snapp account, and we haven't provided an account id, then
+     we have to create a new account; not all ledger accounts are Snapp accounts,
+     so we can't just pick a ledger account
+  *)
+  let new_account =
+    new_account || (snapp_account && Option.is_none account_id)
+  in
   (* a required balance is associated with a new account *)
   ( match (required_balance, new_account) with
   | Some _, false ->
       failwith "Required balance, but not new account"
   | _ ->
       () ) ;
-  let%bind update =
-    Party.Update.gen ?permissions_auth ~snapp_account ~new_account ()
-  in
+  let%bind update = Party.Update.gen ?permissions_auth ~snapp_account () in
   let%bind account =
     if new_account then (
       if Option.is_some account_id then
@@ -501,7 +506,10 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
           let%map index =
             Int.gen_uniform_incl 0 (Ledger.num_accounts ledger - 1)
           in
-          Ledger.get_at_index_exn ledger index
+          let account = Ledger.get_at_index_exn ledger index in
+          if snapp_account && Option.is_none account.snapp then
+            failwith "gen_party_body: chosen account has no snapp field" ;
+          account
       | Some account_id -> (
           (* use given account from the ledger *)
           match Ledger.location_of_account ledger account_id with
@@ -525,6 +533,9 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
                     (Account_id.token_id account_id |> Token_id.to_string)
                     ()
               | Some acct ->
+                  if snapp_account && Option.is_none acct.snapp then
+                    failwith
+                      "gen_party_body: provided account has no snapp field" ;
                   return acct ) )
   in
   let pk = account.public_key in
@@ -608,17 +619,19 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
   ; use_full_commitment
   }
 
-let gen_predicated_from ?(succeed = true) ?(new_account = false)
+let gen_predicated_from ?(succeed = true) ?(new_account = false) ?account_id
     ?(snapp_account = false) ?(increment_nonce = false) ?available_public_keys
     ?permissions_auth ?required_balance_change ?required_balance ~ledger
     ~balances_tbl ?protocol_state_view () =
   let open Quickcheck.Let_syntax in
   let%bind body =
     gen_party_body ~new_account ~snapp_account ~increment_nonce
-      ?permissions_auth ?available_public_keys ?required_balance_change
-      ?required_balance ~ledger ~balances_tbl
-      ~gen_balance_change:(gen_balance_change ~balances_tbl)
-      ~f_balance_change:Fn.id () ~gen_use_full_commitment ?protocol_state_view
+      ?permissions_auth ?account_id ?available_public_keys
+      ?required_balance_change ?required_balance ~ledger ~balances_tbl
+      ~gen_balance_change:(gen_balance_change ?permissions_auth ~balances_tbl)
+      ~f_balance_change:Fn.id ()
+      ~gen_use_full_commitment:(gen_use_full_commitment ~increment_nonce ())
+      ?protocol_state_view
   in
   let account_id =
     Account_id.create body.Party.Body.Poly.pk body.Party.Body.Poly.token_id
@@ -626,34 +639,27 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false)
   let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger () in
   Party.Predicated.Poly.{ body; predicate }
 
-let gen_party_from ?(succeed = true) ?(new_account = false) ?permissions_auth
-    ?required_balance_change ?required_balance ~available_public_keys ~ledger
-    ~balances_tbl () =
+let gen_party_from ?(succeed = true) ?(new_account = false)
+    ?(snapp_account = false) ?account_id ?permissions_auth
+    ?required_balance_change ?required_balance ~authorization
+    ~available_public_keys ~ledger ~balances_tbl () =
   let open Quickcheck.Let_syntax in
-  (* see TODO below about splitting a Party.t; we'll want to choose
-     an authorization
-  *)
-  let authorization = Control.Signature Signature.dummy in
-  let snapp_account =
-    match authorization with
-    | Control.Proof _ ->
-        true
-    | Signature _ | None_given ->
-        false
-  in
   let increment_nonce =
-    match authorization with
-    | Signature _ ->
-        true
-    | Proof _ | None_given ->
+    (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
+       allow incrementing the nonce only if we know the authorization will be Signature
+    *)
+    match permissions_auth with
+    | Some tag -> (
+        match tag with
+        | Control.Tag.Signature ->
+            true
+        | Proof | None_given ->
+            false )
+    | None ->
         false
   in
-  (* if it's a Snapp account, generate a new account, since existing accounts in
-     ledger may not be Snapp accounts
-  *)
-  let new_account = new_account || snapp_account in
   let%bind data =
-    gen_predicated_from ?permissions_auth ?required_balance_change
+    gen_predicated_from ?permissions_auth ?account_id ?required_balance_change
       ?required_balance ~succeed ~new_account ~snapp_account ~increment_nonce
       ~available_public_keys ~ledger ~balances_tbl ()
   in
@@ -736,22 +742,9 @@ let gen_parties_from ?(succeed = true)
           Signature_lib.Public_key.Compressed.Table.add_exn tbl ~key:pk ~data:()) ;
     tbl
   in
-  let permissions_auth = Control.Tag.Signature in
-
-  (* permissions_auth is Signature, for now, because permissions on new accounts are compatible with it
-
-     TODO: split Party.ts into two:
-     - the first sets permissions and vk using Signature authorization,
-     - the second uses an authorization compatible with the new permissions
-
-     N.B.: the given authorization constrains the generated permissions for the
-     fee payer and other parties; those are not the permissions used
-     when applying those parties, the existing permissions are used;
-     instead, those generated permissions are used in later transactions
-  *)
   let%bind fee_payer =
-    gen_fee_payer ~permissions_auth ~account_id:fee_payer_account_id ~ledger
-      ?protocol_state_view ()
+    gen_fee_payer ~permissions_auth:Control.Tag.Signature
+      ~account_id:fee_payer_account_id ~ledger ?protocol_state_view ()
   in
 
   (* table of public keys to balances, updated when generating each party
@@ -786,11 +779,43 @@ let gen_parties_from ?(succeed = true)
     let rec go acc n =
       if n <= 0 then return (List.rev acc)
       else
-        let%bind party =
-          gen_party_from ~permissions_auth ~new_account:new_parties
-            ~available_public_keys ~succeed ~ledger ~balances_tbl ()
+        (* choose a random authorization
+
+           first Party.t updates the permissions, using the Signature authorization,
+            according the random authorization
+
+           second Party.t uses the random authorization
+        *)
+        let%bind permissions_auth = Control.Tag.gen in
+        let snapp_account =
+          match permissions_auth with
+          | Proof ->
+              true
+          | Signature | None_given ->
+              false
         in
-        go (party :: acc) (n - 1)
+        let%bind party0 =
+          (* Signature authorization to start *)
+          let authorization = Control.Signature Signature.dummy in
+          let required_balance_change = Currency.Amount.Signed.zero in
+          gen_party_from ~authorization ~new_account:new_parties
+            ~permissions_auth ~snapp_account ~available_public_keys
+            ~required_balance_change ~ledger ~balances_tbl ()
+        in
+        let%bind party =
+          (* authorization according to chosen permissions auth *)
+          let authorization = Control.dummy_of_tag permissions_auth in
+          let account_id =
+            Account_id.create party0.data.body.pk party0.data.body.token_id
+          in
+          (* if we use this account again, it will have a Signature authorization *)
+          let permissions_auth = Control.Tag.Signature in
+          gen_party_from ~account_id ~authorization ~permissions_auth
+            ~snapp_account ~available_public_keys ~succeed ~ledger ~balances_tbl
+            ()
+        in
+        (* this list will be reversed, so `party0` will execute before `party` *)
+        go (party :: party0 :: acc) (n - 1)
     in
     go [] num_parties
   in
@@ -834,7 +859,8 @@ let gen_parties_from ?(succeed = true)
           (* we're adding to the account, so no required balance *)
           None
     in
-    gen_party_from ~permissions_auth ~new_account:true ~available_public_keys
+    let authorization = Control.Signature Signature.dummy in
+    gen_party_from ~authorization ~new_account:true ~available_public_keys
       ~succeed ~ledger ~required_balance_change ?required_balance ~balances_tbl
       ()
   in
