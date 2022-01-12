@@ -1,36 +1,40 @@
 final: prev:
 let pkgs = final;
 in {
-  postgresql = (prev.postgresql.override {
-    enableSystemd = false;
-  }).overrideAttrs (o: {
-    doCheck = !prev.stdenv.hostPlatform.isMusl;
-  });
+  postgresql =
+    (prev.postgresql.override { enableSystemd = false; }).overrideAttrs
+    (o: { doCheck = !prev.stdenv.hostPlatform.isMusl; });
 
-  openssh = (if prev.stdenv.hostPlatform.isMusl then (prev.openssh.override {
-    # todo: fix libredirect musl
-    libredirect = "";
-  }).overrideAttrs (o: {
-    doCheck = !prev.stdenv.hostPlatform.isMusl;
-  }) else prev.openssh);
+  openssh = (if prev.stdenv.hostPlatform.isMusl then
+    (prev.openssh.override {
+      # todo: fix libredirect musl
+      libredirect = "";
+    }).overrideAttrs (o: { doCheck = !prev.stdenv.hostPlatform.isMusl; })
+  else
+    prev.openssh);
 
-  git = prev.git.overrideAttrs (o: {
-    doCheck = o.doCheck && !prev.stdenv.hostPlatform.isMusl;
-  });
-#mozillaOverlay = import (builtins.fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz); nixpkgs = import nixpkgs-unstable { overlays = [ mozillaOverlay ]; }; rust = (nixpkgs.rustChannelOf { channel = "nightly"; }).rust.override { targets = [ "x86_64-unknown-linux-musl" ]; }; rustPlatform = nixpkgs.makeRustPlatform { cargo = rust; rustc = rust; }; in nixpkgs.stdenv.mkDerivation { name = "rust-env"; nativeBuildInputs = [ rustPlatform.rust.cargo rustPlatform.rust.rustc nixpkgs.file ]; } 
+  git = prev.git.overrideAttrs
+    (o: { doCheck = o.doCheck && !prev.stdenv.hostPlatform.isMusl; });
+  #mozillaOverlay = import (builtins.fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz); nixpkgs = import nixpkgs-unstable { overlays = [ mozillaOverlay ]; }; rust = (nixpkgs.rustChannelOf { channel = "nightly"; }).rust.override { targets = [ "x86_64-unknown-linux-musl" ]; }; rustPlatform = nixpkgs.makeRustPlatform { cargo = rust; rustc = rust; }; in nixpkgs.stdenv.mkDerivation { name = "rust-env"; nativeBuildInputs = [ rustPlatform.rust.cargo rustPlatform.rust.rustc nixpkgs.file ]; }
   pkgs_normal = import (final.path) {
     overlays = final.overlays;
     system = "x86_64-linux";
   };
-  rust-musl = ((final.pkgs_normal.buildPackages.rustChannelOf {
+  rust-musl = (((final.rustChannelOf {
     channel = "nightly";
     sha256 = "sha256-eKL7cdPXGBICoc9FGMSHgUs6VGMg+3W2y/rXN8TuuAI=";
     date = "2021-12-27";
-  }).rust.override {
-    targets = [ "x86_64-unknown-linux-musl" ];
-  }) // {
-    inherit (prev.rust) toRustTarget toRustTargetSpec;
-  };
+  }).rust.override { targets = [ "x86_64-unknown-linux-musl" ]; }).overrideAttrs
+    (oa: {
+      nativeBuildInputs = [ final.makeWrapper ];
+      buildCommand = oa.buildCommand + ''
+        for exe in $(find "$out/bin" -type f -or -type l); do
+          wrapProgram "$exe" --prefix LD_LIBRARY_PATH : ${final.gcc-unwrapped.lib}/lib
+        done
+      '';
+    })) // {
+      inherit (prev.rust) toRustTarget toRustTargetSpec;
+    };
   rustPlatform-musl = prev.makeRustPlatform {
     cargo = final.rust-musl;
     rustc = final.rust-musl;
