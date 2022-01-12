@@ -144,7 +144,7 @@ module Timing = Account_timing
 module Binable_arg = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         ( Public_key.Compressed.Stable.V1.t
         , Token_id.Stable.V1.t
@@ -156,7 +156,7 @@ module Binable_arg = struct
         , State_hash.Stable.V1.t
         , Timing.Stable.V1.t
         , Permissions.Stable.V1.t
-        , Snapp_account.Stable.V1.t option )
+        , Snapp_account.Stable.V2.t option )
         Poly.Stable.V1.t
       [@@deriving sexp, equal, hash, compare, yojson]
 
@@ -192,12 +192,12 @@ let check (t : Binable_arg.t) =
 
 [%%versioned_binable
 module Stable = struct
-  module V1 = struct
-    type t = Binable_arg.Stable.V1.t
+  module V2 = struct
+    type t = Binable_arg.Stable.V2.t
     [@@deriving sexp, equal, hash, compare, yojson]
 
     include Binable.Of_binable
-              (Binable_arg.Stable.V1)
+              (Binable_arg.Stable.V2)
               (struct
                 type nonrec t = t
 
@@ -307,6 +307,28 @@ type var =
 let identifier_of_var ({ public_key; token_id; _ } : var) =
   Account_id.Checked.create public_key token_id
 
+let typ' snapp =
+  let spec =
+    Data_spec.
+      [ Public_key.Compressed.typ
+      ; Token_id.typ
+      ; Token_permissions.typ
+      ; Balance.typ
+      ; Nonce.typ
+      ; Receipt.Chain_hash.typ
+      ; Typ.transport Public_key.Compressed.typ ~there:delegate_opt
+          ~back:(fun delegate ->
+            if Public_key.Compressed.(equal empty) delegate then None
+            else Some delegate)
+      ; State_hash.typ
+      ; Timing.typ
+      ; Permissions.typ
+      ; snapp
+      ]
+  in
+  Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
+
 let typ : (var, value) Typ.t =
   let snapp :
       ( Field.Var.t * Snapp_account.t option As_prover.Ref.t
@@ -331,26 +353,7 @@ let typ : (var, value) Typ.t =
     let check (x, _) = Typ.field.check x in
     { alloc; read; store; check }
   in
-  let spec =
-    Data_spec.
-      [ Public_key.Compressed.typ
-      ; Token_id.typ
-      ; Token_permissions.typ
-      ; Balance.typ
-      ; Nonce.typ
-      ; Receipt.Chain_hash.typ
-      ; Typ.transport Public_key.Compressed.typ ~there:delegate_opt
-          ~back:(fun delegate ->
-            if Public_key.Compressed.(equal empty) delegate then None
-            else Some delegate)
-      ; State_hash.typ
-      ; Timing.typ
-      ; Permissions.typ
-      ; snapp
-      ]
-  in
-  Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
-    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
+  typ' snapp
 
 let var_of_t
     ({ public_key
@@ -394,6 +397,12 @@ module Checked = struct
       , Permissions.Checked.t
       , Snapp_account.Checked.t )
       Poly.t
+
+    let typ : (t, Stable.Latest.t) Typ.t =
+      typ'
+        (Typ.transport Snapp_account.typ
+           ~there:(fun t -> Option.value t ~default:Snapp_account.default)
+           ~back:(fun t -> Some t))
   end
 
   let to_input (t : var) =

@@ -2,7 +2,7 @@ module D = Digest
 open Core_kernel
 open Pickles_types
 open Hlist
-module Sc = Pickles_types.Scalar_challenge
+module Sc = Kimchi_backend_common.Scalar_challenge
 
 module Basic = struct
   type (_, _, _) t = ..
@@ -47,18 +47,17 @@ end =
 
 include T
 
-type ('bool, 'env) pack =
-  { pack : 'a 'b. ('a, 'b, 'env) Basic.t -> 'b -> 'bool list array }
+type ('scalar, 'env) pack =
+  { pack : 'a 'b. ('a, 'b, 'env) Basic.t -> 'b -> 'scalar array }
 
 let rec pack :
-    type t v env. ('bool, env) pack -> (t, v, env) T.t -> v -> 'bool list array
-    =
+    type t v env. ('scalar, env) pack -> (t, v, env) T.t -> v -> 'scalar array =
  fun p spec t ->
   match spec with
   | B spec ->
       p.pack spec t
   | Scalar chal ->
-      let (Scalar_challenge t) = t in
+      let { Sc.inner = t } = t in
       p.pack chal t
   | Vector (spec, _) ->
       Array.concat_map (Vector.to_array t) ~f:(pack p spec)
@@ -183,8 +182,7 @@ module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
 end
 
 let pack_basic (type field other_field other_field_var)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
-    (field : other_field_var -> Impl.Boolean.var list array) =
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field) =
   let open Impl in
   let module C = Common (Impl) in
   let open C in
@@ -192,59 +190,29 @@ let pack_basic (type field other_field other_field_var)
       type a b.
          (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) Basic.t
       -> b
-      -> Boolean.var list array =
+      -> [ `Field of other_field_var | `Packed_bits of Field.t * int ] array =
    fun basic x ->
     match basic with
     | Field ->
-        field x
+        [| `Field x |]
     | Bool ->
-        [| [ x ] |]
+        [| `Packed_bits ((x :> Field.t), 1) |]
     | Digest ->
-        [| Digest.to_bits x |]
+        [| `Packed_bits (x, Field.size_in_bits) |]
     | Challenge ->
-        [| Challenge.to_bits x |]
+        [| `Packed_bits (x, Challenge.length) |]
     | Index ->
-        [| Vector.to_list x |]
+        let x = Vector.to_list x in
+        [| `Packed_bits (Field.pack x, List.length x) |]
     | Bulletproof_challenge ->
-        let { Bulletproof_challenge.prechallenge = Scalar_challenge pre } = x in
-        [| Challenge.to_bits pre |]
+        let { Bulletproof_challenge.prechallenge = { Sc.inner = pre } } = x in
+        [| `Packed_bits (pre, Challenge.length) |]
     | _ ->
         failwith "unknown basic spec"
   in
   { pack }
 
-let pack_basic_unboolean (type field other_field other_field_var)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
-    (field : other_field_var -> Impl.Boolean.var list array) =
-  let open Impl in
-  let module C = Common (Impl) in
-  let open C in
-  let pack :
-      type a b.
-         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) Basic.t
-      -> b
-      -> Boolean.var list array =
-   fun basic x ->
-    match basic with
-    | Field ->
-        field x
-    | Bool ->
-        [| [ x ] |]
-    | Digest ->
-        [| Digest.Unsafe.to_bits_unboolean x |]
-    | Challenge ->
-        [| Challenge.to_bits x |]
-    | Index ->
-        [| Vector.to_list x |]
-    | Bulletproof_challenge ->
-        let { Bulletproof_challenge.prechallenge = Scalar_challenge pre } = x in
-        [| Challenge.to_bits pre |]
-    | _ ->
-        failwith "unknown basic spec"
-  in
-  { pack }
-
-let pack impl field t = pack (pack_basic_unboolean impl field) t
+let pack impl t = pack (pack_basic impl) t
 
 let typ_basic (type field other_field other_field_var)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
@@ -268,9 +236,9 @@ let typ_basic (type field other_field other_field_var)
     | Digest ->
         Digest.typ
     | Challenge ->
-        Challenge.typ' challenge
+        Challenge.typ
     | Bulletproof_challenge ->
-        Bulletproof_challenge.typ (Challenge.typ' scalar_challenge)
+        Bulletproof_challenge.typ Challenge.typ
     | _ ->
         failwith "unknown basic spec"
   in
@@ -315,19 +283,19 @@ let packed_typ_basic (type field other_field other_field_var)
     | Digest ->
         T (Digest.typ, Fn.id)
     | Challenge ->
-        T (Challenge.packed_typ, Fn.id)
+        T (Challenge.typ, Fn.id)
     | Index ->
         T (Index.packed_typ (module Impl), Fn.id)
     | Bulletproof_challenge ->
         let typ =
-          let there
-              { Bulletproof_challenge.prechallenge = Sc.Scalar_challenge pre } =
+          let there { Bulletproof_challenge.prechallenge = { Sc.inner = pre } }
+              =
             pre
           in
           let back pre =
-            { Bulletproof_challenge.prechallenge = Sc.Scalar_challenge pre }
+            { Bulletproof_challenge.prechallenge = { Sc.inner = pre } }
           in
-          Typ.transport Challenge.packed_typ ~there ~back
+          Typ.transport Challenge.typ ~there ~back
           |> Typ.transport_var ~there ~back
         in
         T (typ, Fn.id)

@@ -321,7 +321,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                   match transition with
                   | Snark_work_lib.Work.Single.Spec.Transition
                       ({ target; _ }, _, _) ->
-                      Marlin_plonk_bindings_pasta_fp.equal target
+                      Kimchi.Foundations.Fp.equal target
                         (Staged_ledger_hash.ledger_hash staged_ledger_hash)
                   | Merge _ ->
                       (* unreachable *)

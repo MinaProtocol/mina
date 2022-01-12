@@ -50,9 +50,9 @@ module User_command_with_valid_signature = struct
 
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
-        ( (User_command.Valid.Stable.V1.t
+        ( (User_command.Valid.Stable.V2.t
         [@hash.ignore])
         , (T.Stable.V1.t
         [@to_yojson hash_to_yojson]) )
@@ -94,9 +94,9 @@ module User_command = struct
 
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
-        ( (User_command.Stable.V1.t
+        ( (User_command.Stable.V2.t
         [@hash.ignore])
         , (T.Stable.V1.t
         [@to_yojson hash_to_yojson]) )

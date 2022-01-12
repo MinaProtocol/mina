@@ -34,13 +34,13 @@ end
 module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       (* TODO: The statement is redundant here - it can be computed from the
          witness and the transaction
       *)
       type t =
         { transaction_with_info :
-            Transaction_logic.Transaction_applied.Stable.V1.t
+            Transaction_logic.Transaction_applied.Stable.V2.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
               (* TODO: It's inefficient to store this here. Optimize it someday. *)
         ; state_view : Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
@@ -48,7 +48,7 @@ module Transaction_with_witness = struct
         ; init_stack :
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
-        ; ledger_witness : Mina_base.Sparse_ledger.Stable.V1.t [@sexp.opaque]
+        ; ledger_witness : Mina_base.Sparse_ledger.Stable.V2.t [@sexp.opaque]
         }
       [@@deriving sexp]
 
@@ -60,8 +60,8 @@ end
 module Ledger_proof_with_sok_message = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
+    module V2 = struct
+      type t = Ledger_proof.Stable.V2.t * Sok_message.Stable.V1.t
       [@@deriving sexp]
 
       let to_latest = Fn.id
@@ -148,10 +148,10 @@ type job = Available_job.t [@@deriving sexp]
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      ( Ledger_proof_with_sok_message.Stable.V1.t
-      , Transaction_with_witness.Stable.V1.t )
+      ( Ledger_proof_with_sok_message.Stable.V2.t
+      , Transaction_with_witness.Stable.V2.t )
       Parallel_scan.State.Stable.V1.t
     [@@deriving sexp]
 
@@ -164,8 +164,8 @@ module Stable = struct
     let hash t =
       let state_hash =
         Parallel_scan.State.hash t
-          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V1))
-          (Binable.to_string (module Transaction_with_witness.Stable.V1))
+          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
+          (Binable.to_string (module Transaction_with_witness.Stable.V2))
       in
       Staged_ledger_hash.Aux_hash.of_bytes
         (state_hash |> Digestif.SHA256.to_raw_string)

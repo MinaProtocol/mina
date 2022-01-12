@@ -137,6 +137,22 @@ val apply_transaction :
   -> Transaction.t
   -> Transaction_applied.t Or_error.t
 
+val apply_parties_unchecked :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> state_view:Snapp_predicate.Protocol_state.View.t
+  -> t
+  -> Parties.t
+  -> ( Transaction_applied.Parties_applied.t
+     * ( ( Party.t list
+         , Token_id.t
+         , Currency.Amount.t
+         , t
+         , bool
+         , unit )
+         Parties_logic.Local_state.t
+       * Currency.Amount.t ) )
+     Or_error.t
+
 val undo :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
@@ -149,11 +165,11 @@ val has_locked_tokens :
   -> t
   -> bool Or_error.t
 
-val merkle_root_after_snapp_command_exn :
+val merkle_root_after_parties_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_state_view:Snapp_predicate.Protocol_state.View.t
   -> t
-  -> Snapp_command.Valid.t
+  -> Parties.Valid.t
   -> Ledger_hash.t * [ `Next_available_token of Token_id.t ]
 
 val merkle_root_after_user_command_exn :
@@ -189,3 +205,5 @@ type init_state =
 
 (** Apply a generated state to a blank, concrete ledger. *)
 val apply_initial_ledger_state : t -> init_state -> unit
+
+module Ledger_inner : Transaction_logic.Ledger_intf with type t = t

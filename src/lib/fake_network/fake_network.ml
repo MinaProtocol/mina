@@ -14,21 +14,20 @@ type peer_state =
   { frontier : Transition_frontier.t
   ; consensus_local_state : Consensus.Data.Local_state.t
   ; get_staged_ledger_aux_and_pending_coinbases_at_hash :
-         Marlin_plonk_bindings_pasta_fp.t Envelope.Incoming.t
+         Kimchi.Foundations.Fp.t Envelope.Incoming.t
       -> ( Staged_ledger.Scan_state.t
-         * Marlin_plonk_bindings_pasta_fp.t
+         * Kimchi.Foundations.Fp.t
          * Pending_coinbase.t
          * Mina_state.Protocol_state.value list )
          option
          Deferred.t
   ; get_some_initial_peers : unit Envelope.Incoming.t -> Peer.t list Deferred.t
   ; answer_sync_ledger_query :
-         (Marlin_plonk_bindings_pasta_fp.t * Sync_ledger.Query.t)
-         Envelope.Incoming.t
+         (Kimchi.Foundations.Fp.t * Sync_ledger.Query.t) Envelope.Incoming.t
       -> (Sync_ledger.Answer.t, Error.t) result Deferred.t
   ; get_ancestry :
          ( Consensus.Data.Consensus_state.Value.t
-         , Marlin_plonk_bindings_pasta_fp.t )
+         , Kimchi.Foundations.Fp.t )
          With_hash.t
          Envelope.Incoming.t
       -> ( Mina_transition.External_transition.t
@@ -39,8 +38,8 @@ type peer_state =
   ; get_best_tip :
          unit Envelope.Incoming.t
       -> ( Mina_transition.External_transition.t
-         , Marlin_plonk_bindings_pasta_fp.t list
-           * Mina_transition.External_transition.t )
+         , Kimchi.Foundations.Fp.t list * Mina_transition.External_transition.t
+         )
          Proof_carrying_data.t
          option
          Deferred.t
@@ -49,16 +48,13 @@ type peer_state =
       -> (Mina_networking.Rpcs.Get_node_status.Node_status.t, Error.t) result
          Deferred.t
   ; get_transition_knowledge :
-         unit Envelope.Incoming.t
-      -> Marlin_plonk_bindings_pasta_fp.t list Deferred.t
+      unit Envelope.Incoming.t -> Kimchi.Foundations.Fp.t list Deferred.t
   ; get_transition_chain_proof :
-         Marlin_plonk_bindings_pasta_fp.t Envelope.Incoming.t
-      -> ( Marlin_plonk_bindings_pasta_fp.t
-         * Marlin_plonk_bindings_pasta_fp.t list )
-         option
+         Kimchi.Foundations.Fp.t Envelope.Incoming.t
+      -> (Kimchi.Foundations.Fp.t * Kimchi.Foundations.Fp.t list) option
          Deferred.t
   ; get_transition_chain :
-         Marlin_plonk_bindings_pasta_fp.t list Envelope.Incoming.t
+         Kimchi.Foundations.Fp.t list Envelope.Incoming.t
       -> Mina_transition.External_transition.t list option Deferred.t
   }
 

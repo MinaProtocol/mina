@@ -3,11 +3,11 @@ open Snark_params.Tick
 
 [%%versioned:
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t =
       ( Ledger_hash.Stable.V1.t
       , Account_id.Stable.V1.t
-      , Account.Stable.V1.t
+      , Account.Stable.V2.t
       , Token_id.Stable.V1.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
     [@@deriving sexp, yojson]
@@ -36,9 +36,6 @@ val of_root :
   -> next_available_index:int option
   -> Ledger_hash.t
   -> t
-
-val has_locked_tokens_exn :
-  global_slot:Mina_numbers.Global_slot.t -> account_id:Account_id.t -> t -> bool
 
 val apply_user_command :
      constraint_constants:Genesis_constants.Constraint_constants.t
@@ -77,5 +74,5 @@ val iteri : t -> f:(Account.Index.t -> Account.t -> unit) -> unit
 
 val handler : t -> Handler.t Staged.t
 
-val snapp_accounts :
-  t -> Transaction.t -> Snapp_account.t option * Snapp_account.t option
+val has_locked_tokens_exn :
+  global_slot:Mina_numbers.Global_slot.t -> account_id:Account_id.t -> t -> bool

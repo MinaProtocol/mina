@@ -16,11 +16,11 @@ let dedup_list ls ~comparator =
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
       ( Ledger_hash.Stable.V1.t
       , Account_id.Stable.V1.t
-      , Account.Stable.V1.t
+      , Account.Stable.V2.t
       , Token_id.Stable.V1.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
     [@@deriving yojson, sexp]
@@ -558,24 +558,3 @@ let handler t =
           respond (Provide index)
       | _ ->
           unhandled)
-
-let snapp_accounts (ledger : t) (t : Transaction.t) =
-  match t with
-  | Command (Signed_command _) | Fee_transfer _ | Coinbase _ ->
-      (None, None)
-  | Command (Snapp_command c) -> (
-      let token_id = Snapp_command.token_id c in
-      let get pk =
-        Option.try_with (fun () ->
-            ( find_index_exn ledger (Account_id.create pk token_id)
-            |> get_exn ledger )
-              .snapp)
-        |> Option.join
-      in
-      match Snapp_command.to_payload c with
-      | Zero_proved p ->
-          (get p.one.body.pk, get p.two.body.pk)
-      | One_proved p ->
-          (get p.one.body.pk, get p.two.body.pk)
-      | Two_proved p ->
-          (get p.one.body.pk, get p.two.body.pk) )

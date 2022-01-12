@@ -176,12 +176,12 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+    module V2 = struct
       module T = struct
         type query = State_hash.Stable.V1.t [@@deriving bin_io, version { rpc }]
 
         type response =
-          ( Staged_ledger.Scan_state.Stable.V1.t
+          ( Staged_ledger.Scan_state.Stable.V2.t
           * Ledger_hash.Stable.V1.t
           * Pending_coinbase.Stable.V1.t
           * Mina_state.Protocol_state.Value.Stable.V1.t list )
@@ -245,12 +245,12 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+    module V2 = struct
       module T = struct
         type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
         [@@deriving bin_io, sexp, version { rpc }]
 
-        type response = Sync_ledger.Answer.Stable.V1.t Core.Or_error.Stable.V1.t
+        type response = Sync_ledger.Answer.Stable.V2.t Core.Or_error.Stable.V1.t
         [@@deriving bin_io, sexp, version { rpc }]
 
         let query_of_caller_model = Fn.id
@@ -310,12 +310,12 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+    module V2 = struct
       module T = struct
         type query = State_hash.Stable.V1.t list
         [@@deriving bin_io, sexp, version { rpc }]
 
-        type response = External_transition.Stable.V1.t list option
+        type response = External_transition.Stable.V2.t list option
         [@@deriving bin_io, version { rpc }]
 
         let query_of_caller_model = Fn.id
@@ -511,7 +511,7 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+    module V2 = struct
       module T = struct
         type query =
           ( Consensus.Data.Consensus_state.Value.Stable.V1.t
@@ -520,8 +520,8 @@ module Rpcs = struct
         [@@deriving bin_io, sexp, version { rpc }]
 
         type response =
-          ( External_transition.Stable.V1.t
-          , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t
+          ( External_transition.Stable.V2.t
+          , State_body_hash.Stable.V1.t list * External_transition.Stable.V2.t
           )
           Proof_carrying_data.Stable.V1.t
           option
@@ -651,13 +651,13 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+    module V2 = struct
       module T = struct
         type query = unit [@@deriving bin_io, sexp, version { rpc }]
 
         type response =
-          ( External_transition.Stable.V1.t
-          , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t
+          ( External_transition.Stable.V2.t
+          , State_body_hash.Stable.V1.t list * External_transition.Stable.V2.t
           )
           Proof_carrying_data.Stable.V1.t
           option

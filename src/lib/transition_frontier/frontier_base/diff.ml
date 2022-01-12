@@ -81,7 +81,7 @@ module Root_transition = struct
       [@@@no_toplevel_latest_type]
       module V2 = struct
         type t =
-          { new_root: Root_data.Limited.Stable.V1.t
+          { new_root: Root_data.Limited.Stable.V2.t
           ; garbage: Node_list.Lite.Stable.V1.t
           ; just_emitted_a_proof: bool }
 
@@ -188,7 +188,7 @@ module Lite_binable = struct
     [@@@no_toplevel_latest_type]
     module V2 = struct
       type t =
-        | New_node of External_transition.Validated.Stable.V1.t
+        | New_node of External_transition.Validated.Stable.V2.t
         | Root_transitioned of Root_transition.Lite.Stable.V2.t
         | Best_tip_changed of State_hash.Stable.V1.t
 

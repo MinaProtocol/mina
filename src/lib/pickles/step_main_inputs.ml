@@ -8,7 +8,7 @@ open Import
 let high_entropy_bits = 128
 
 let sponge_params_constant =
-  Sponge.Params.(map pasta_p ~f:Impl.Field.Constant.of_string)
+  Sponge.Params.(map pasta_p_3 ~f:Impl.Field.Constant.of_string)
 
 let tick_field_random_oracle ?(length = Tick.Field.size_in_bits - 1) s =
   Tick.Field.of_bits (bits_random_oracle ~length s)
@@ -63,8 +63,7 @@ module Sponge = struct
 
   let squeeze_field = squeeze
 
-  let squeeze =
-    Util.squeeze_with_packed (module Impl) ~squeeze ~high_entropy_bits
+  let squeeze = squeeze
 
   let absorb t input =
     match input with
@@ -87,17 +86,17 @@ module Input_domain = struct
        time "lagrange" (fun () ->
            Array.init domain_size ~f:(fun i ->
                let v =
-                 (Marlin_plonk_bindings.Pasta_fq_urs.lagrange_commitment
+                 (Kimchi.Protocol.SRS.Fq.lagrange_commitment
                     (Backend.Tock.Keypair.load_urs ())
                     domain_size i)
                    .unshifted
                in
                assert (Array.length v = 1) ;
-               v.(0) |> Or_infinity.finite_exn)))
+               v.(0) |> Common.finite_exn)))
 end
 
 module Inner_curve = struct
-  module C = Pasta.Pallas
+  module C = Kimchi_pasta.Pasta.Pallas
 
   module Inputs = struct
     module Impl = Impl
@@ -174,7 +173,9 @@ module Inner_curve = struct
 
   module Scaling_precomputation = T.Scaling_precomputation
 
-  let ( + ) = T.add_exn
+  let ( + ) t1 t2 = Plonk_curve_ops.add_fast (module Impl) t1 t2
+
+  let double t = t + t
 
   let scale t bs =
     with_label __LOC__ (fun () ->
@@ -212,6 +213,6 @@ module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
 module Generators = struct
   let h =
     lazy
-      ( Marlin_plonk_bindings_pasta_fq_urs.h (Backend.Tock.Keypair.load_urs ())
-      |> Or_infinity.finite_exn )
+      ( Kimchi.Protocol.SRS.Fq.urs_h (Backend.Tock.Keypair.load_urs ())
+      |> Common.finite_exn )
 end
