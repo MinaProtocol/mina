@@ -467,8 +467,12 @@ let verify_transitions_and_build_breadcrumbs ~logger
   let%bind transitions_with_initial_validation, initial_hash =
     let%bind tvs =
       let open Deferred.Let_syntax in
+      let genesis_state_hash =
+        Precomputed_values.genesis_state_with_hash precomputed_values
+        |> With_hash.hash
+      in
       match%bind
-        External_transition.validate_proofs ~verifier
+        External_transition.validate_proofs ~verifier ~genesis_state_hash
           (List.map transitions ~f:(fun t ->
                External_transition.Validation.wrap (Envelope.Incoming.data t)))
       with
