@@ -255,6 +255,23 @@ module Dsl = struct
     val pub_key_of_node :
          Engine.Network.Node.t
       -> Signature_lib.Public_key.Compressed.t Malleable_error.t
+
+    val check_common_prefixes :
+         tolerance:int
+      -> logger:Logger.t
+      -> string list list
+      -> ( unit Malleable_error.Result_accumulator.t
+         , Malleable_error.Hard_fail.t )
+         result
+         Async_kernel.Deferred.t
+
+    val check_peers :
+         logger:Logger.t
+      -> Engine.Network.Node.t list
+      -> ( unit Malleable_error.Result_accumulator.t
+         , Malleable_error.Hard_fail.t )
+         result
+         Deferred.t
   end
 
   module type S = sig
