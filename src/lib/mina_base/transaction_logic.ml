@@ -1679,9 +1679,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           (acct, loc)
       | Check_inclusion (_ledger, _account, _loc) ->
           ()
-      | Check_protocol_state_predicate (pred, global_state) ->
+      | Check_protocol_state_predicate (pred, global_state) -> (
           Snapp_predicate.Protocol_state.check pred global_state.protocol_state
-          |> Or_error.is_ok
+          |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
       | Check_predicate (_is_start, party, account, _global_state) -> (
           match party.data.predicate with
           | Accept ->
