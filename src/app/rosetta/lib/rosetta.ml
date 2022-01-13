@@ -31,8 +31,7 @@ let router ~graphql_uri ~pool ~logger route body =
   try
     match route with
     | "network" :: tl ->
-        let%bind graphql_uri = get_graphql_uri_or_error () in
-        Network.router tl body ~graphql_uri ~logger ~with_db
+        Network.router tl body ~get_graphql_uri_or_error ~logger ~with_db
     | "account" :: tl ->
         let%bind graphql_uri = get_graphql_uri_or_error () in
         Account.router tl body ~graphql_uri ~logger ~with_db
