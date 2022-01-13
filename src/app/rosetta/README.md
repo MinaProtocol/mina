@@ -4,6 +4,12 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2022/01/13:
+
+- Construction APIs use a new encoding scheme
+- /network/list and /network/options also work offline
+- Release of rosetta-v15 with above changes
+
 2022/01/05:
 
 - Deterministic responses to block and account balance queries so that
@@ -146,9 +152,9 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## How to build your own docker image
 
-Checkout the "rosetta-v14" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
+Checkout the "rosetta-v15" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
 
-`cat dockerfiles/stages/1-build-deps-ubuntu dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-prod-ubuntu | docker build -t mina-rosetta:v14 --build-arg "MINA_BRANCH=rosetta-v14" -`
+`cat dockerfiles/stages/1-build-deps-ubuntu dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-prod-ubuntu | docker build -t mina-rosetta:v14 --build-arg "MINA_BRANCH=rosetta-v15" -`
 
 This creates an image (mina-rosetta:v14) based on the most up-to-date changes that support rosetta.
 
@@ -158,7 +164,7 @@ The container includes 4 scripts in /rosetta which run a different set of servic
 - `docker-standalone-start.sh` is the most straightforward, it starts only the mina-rosetta API endpoint and any flags passed into the script go to mina-rosetta. Use this for the "offline" part of the Construction API.
 - `docker-demo-start.sh` launches a mina node with a very simple 1-address genesis ledger as a sandbox for developing and playing around in. This script starts the full suite of tools (a mina node, mina-archive, a postgresql DB, and mina-rosetta), but for a demo network with all operations occuring inside this container and no external network activity.
 - `docker-test-start.sh` launches the same demo network as in demo-start.sh but also launches the mina-rosetta-test-agent to run a suite of tests against the rosetta API.
-- The default, `docker-start.sh`, which connects the mina node to our [Mainnet](https://docs.minaprotocol.com/en/using-mina/connecting) network and initializes the archive database from publicly-availible nightly O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. The script also periodically checks for blocks that may be missing between the nightly backup and the tip of the chain and will fill in those gaps by walking back the linked list of blocks in the canonical chain and importing them one at a time. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/rosetta-v14/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
+- The default, `docker-start.sh`, which connects the mina node to our [Mainnet](https://docs.minaprotocol.com/en/using-mina/connecting) network and initializes the archive database from publicly-availible nightly O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. The script also periodically checks for blocks that may be missing between the nightly backup and the tip of the chain and will fill in those gaps by walking back the linked list of blocks in the canonical chain and importing them one at a time. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/rosetta-v15/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
 - Finally, the previous default, `docker-devnet-start.sh`, which connects the mina node to our [Devnet](https://docs.minaprotocol.com/en/advanced/connecting-devnet) network with the archive database initalized in a similar way to docker-start.sh. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. `docker-devnet-start.sh` is now just a special case of `docker-start.sh` so inspect the source there for more detailed configuration.
 
 For example, to run the `docker-devnet-start.sh` and connect to the live devnet:
