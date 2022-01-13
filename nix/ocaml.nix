@@ -46,11 +46,7 @@ let
           enableShared = false;
         })
         (zstd.override { static = true; })
-        (jemalloc.overrideAttrs (oa: {
-          configureFlags = oa.configureFlags ++ [
-            "--with-jemalloc-prefix=je_"
-          ];
-        }))
+        (jemalloc)
         (gmp.override { withStatic = true; })
         (openssl.override { static = true; })
         libffi
