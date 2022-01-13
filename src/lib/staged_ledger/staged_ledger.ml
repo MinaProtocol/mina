@@ -555,7 +555,7 @@ module T = struct
       ; init_stack = new_init_stack
       } )
 
-  let apply_transaction_and_get_witness ~constraint_constants ledger
+  let apply_transaction_and_get_witness ~constraint_constants ledger ~next_idx
       pending_coinbase_stack_state s status txn_state_view state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let account_ids =
@@ -563,10 +563,18 @@ module T = struct
         ~next_available_token:(Sparse_ledger.next_available_token !ledger)
         s
     in
-    let ledger_witness =
+    let ledger_witness, next_idx =
       measure "extract witness" (fun () ->
-          Sparse_ledger.of_sparse_ledger_subset_exn !ledger
+          Sparse_ledger.of_sparse_ledger_subset_exn ~next_idx !ledger
             (Set.elements account_ids))
+    in
+    let%bind next_idx =
+      match next_idx with
+      | Some next_idx ->
+          return next_idx
+      | None ->
+          Deferred.Result.fail
+            (Staged_ledger_error.Unexpected (Error.createf "Ledger is full"))
     in
     let%bind () = yield_result () in
     let%bind applied_txn, statement, updated_pending_coinbase_stack_state =
@@ -599,15 +607,16 @@ module T = struct
       ; init_stack = Base pending_coinbase_stack_state.init_stack
       ; statement
       }
-    , updated_pending_coinbase_stack_state )
+    , updated_pending_coinbase_stack_state
+    , next_idx )
 
-  let update_ledger_and_get_statements ~constraint_constants ledger
+  let update_ledger_and_get_statements ~constraint_constants ledger ~next_idx
       current_stack ts current_state_view state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let current_stack_with_state =
       push_state current_stack (snd state_and_body_hash)
     in
-    let%map res_rev, pending_coinbase_stack_state =
+    let%map res_rev, pending_coinbase_stack_state, next_idx =
       let pending_coinbase_stack_state : Stack_state_with_init_stack.t =
         { pc = { source = current_stack; target = current_stack_with_state }
         ; init_stack = current_stack
@@ -615,8 +624,9 @@ module T = struct
       in
       let exception Exit of Staged_ledger_error.t in
       Async.try_with ~extract_exn:true (fun () ->
-          Deferred.List.fold ts ~init:([], pending_coinbase_stack_state)
-            ~f:(fun (acc, pending_coinbase_stack_state) t ->
+          Deferred.List.fold ts
+            ~init:([], pending_coinbase_stack_state, next_idx)
+            ~f:(fun (acc, pending_coinbase_stack_state, next_idx) t ->
               let open Deferred.Let_syntax in
               ( match
                   List.find (Transaction.public_keys t.With_status.data)
@@ -629,11 +639,11 @@ module T = struct
                   raise (Exit (Invalid_public_key pk)) ) ;
               match%map
                 apply_transaction_and_get_witness ~constraint_constants ledger
-                  pending_coinbase_stack_state t.With_status.data
+                  ~next_idx pending_coinbase_stack_state t.With_status.data
                   (Some t.status) current_state_view state_and_body_hash
               with
-              | Ok (res, updated_pending_coinbase_stack_state) ->
-                  (res :: acc, updated_pending_coinbase_stack_state)
+              | Ok (res, updated_pending_coinbase_stack_state, next_idx) ->
+                  (res :: acc, updated_pending_coinbase_stack_state, next_idx)
               | Error err ->
                   raise (Exit err)))
       |> Deferred.Result.map_error ~f:(function
@@ -642,7 +652,7 @@ module T = struct
            | exn ->
                raise exn)
     in
-    (List.rev res_rev, pending_coinbase_stack_state.pc.target)
+    (List.rev res_rev, pending_coinbase_stack_state.pc.target, next_idx)
 
   let check_completed_works ~logger ~verifier scan_state
       (completed_works : Transaction_snark_work.t list) =
@@ -714,7 +724,7 @@ module T = struct
     x
 
   let update_coinbase_stack_and_get_data ~constraint_constants scan_state ledger
-      pending_coinbase_collection transactions current_state_view
+      ~next_idx pending_coinbase_collection transactions current_state_view
       state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let coinbase_exists txns =
@@ -741,14 +751,16 @@ module T = struct
             working_stack pending_coinbase_collection ~is_new_stack
             |> Deferred.return
           in
-          let%map data, updated_stack =
+          let%map data, updated_stack, next_idx =
             update_ledger_and_get_statements ~constraint_constants ledger
-              working_stack transactions current_state_view state_and_body_hash
+              ~next_idx working_stack transactions current_state_view
+              state_and_body_hash
           in
           ( is_new_stack
           , data
           , Pending_coinbase.Update.Action.Update_one
-          , `Update_one updated_stack )
+          , `Update_one updated_stack
+          , next_idx )
       | Some _ ->
           (*Two partition:
             Assumption: Only one of the partition will have coinbase transaction(s)in it.
@@ -765,9 +777,9 @@ module T = struct
             working_stack pending_coinbase_collection ~is_new_stack:false
             |> Deferred.return
           in
-          let%bind data1, updated_stack1 =
+          let%bind data1, updated_stack1, next_idx =
             update_ledger_and_get_statements ~constraint_constants ledger
-              working_stack1 txns_for_partition1 current_state_view
+              ~next_idx working_stack1 txns_for_partition1 current_state_view
               state_and_body_hash
           in
           let txns_for_partition2 = List.drop transactions slots in
@@ -775,9 +787,9 @@ module T = struct
           let working_stack2 =
             Pending_coinbase.Stack.create_with working_stack1
           in
-          let%map data2, updated_stack2 =
+          let%map data2, updated_stack2, next_idx =
             update_ledger_and_get_statements ~constraint_constants ledger
-              working_stack2 txns_for_partition2 current_state_view
+              ~next_idx working_stack2 txns_for_partition2 current_state_view
               state_and_body_hash
           in
           let second_has_data = List.length txns_for_partition2 > 0 in
@@ -800,10 +812,15 @@ module T = struct
                 (* a diff consists of only non-coinbase transactions. This is currently not possible because a diff will have a coinbase at the very least, so don't update anything?*)
                 (Update_none, `Update_none)
           in
-          (false, data1 @ data2, pending_coinbase_action, stack_update)
+          (false, data1 @ data2, pending_coinbase_action, stack_update, next_idx)
     else
       Deferred.return
-        (Ok (false, [], Pending_coinbase.Update.Action.Update_none, `Update_none))
+        (Ok
+           ( false
+           , []
+           , Pending_coinbase.Update.Action.Update_none
+           , `Update_none
+           , next_idx ))
 
   (*update the pending_coinbase tree with the updated/new stack and delete the oldest stack if a proof was emitted*)
   let update_pending_coinbase_collection ~depth pending_coinbase_collection
@@ -888,9 +905,11 @@ module T = struct
         (* these functions should probably just operate on sets to begin with *)
         |> Sparse_ledger.of_ledger_subset_exn t.ledger )
     in
-    let%bind is_new_stack, data, stack_update_in_snark, stack_update =
+    let%bind is_new_stack, data, stack_update_in_snark, stack_update, _next_idx
+        =
       time ~logger "update_coinbase_stack_start_time" (fun () ->
           update_coinbase_stack_and_get_data ~constraint_constants t.scan_state
+            ~next_idx:(Ledger.num_accounts t.ledger)
             local_ledger t.pending_coinbase_collection transactions
             current_state_view state_and_body_hash)
     in
