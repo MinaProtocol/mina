@@ -303,15 +303,15 @@ module Poly = struct
     module V1 = struct
       type ('bool, 'controller) t =
         { stake : 'bool
-        ; edit_state : 'controller
+        ; edit_state : 'controller [@key "editState"]
         ; send : 'controller
         ; receive : 'controller
-        ; set_delegate : 'controller
-        ; set_permissions : 'controller
-        ; set_verification_key : 'controller
-        ; set_snapp_uri : 'controller
-        ; edit_sequence_state : 'controller
-        ; set_token_symbol : 'controller
+        ; set_delegate : 'controller [@key "setDelegate"]
+        ; set_permissions : 'controller [@key "setPermissions"]
+        ; set_verification_key : 'controller [@key "setVerificationKey"]
+        ; set_snapp_uri : 'controller [@key "setSnappUri"]
+        ; edit_sequence_state : 'controller [@key "editSequenceState"]
+        ; set_token_symbol : 'controller [@key "setTokenSymbol"]
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end

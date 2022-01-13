@@ -2281,6 +2281,7 @@ module Types = struct
             ; arg "hash" ~doc:"Hash of verification key" ~typ:(non_null string)
             ]
 
+      (* TODO: Fix with_hash to just be ocaml for now *)
       let snapp_vk_with_hash_set_or_keep =
         snapp_make_set_or_keep_for_result "VerificationKeyWithHashSetOrKeep"
           (arg "verificationKeyWithHash"

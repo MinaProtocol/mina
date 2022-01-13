@@ -236,9 +236,10 @@ end
 module Stable = struct
   module V1 = struct
     type t =
-      { fee_payer : Party.Fee_payer.Stable.V1.t
-      ; other_parties : Party.Stable.V1.t list
+      { fee_payer : Party.Fee_payer.Stable.V1.t [@key "snappFeePayer"]
+      ; other_parties : Party.Stable.V1.t list [@key "snappOtherParties"]
       ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
+            [@key "snappProtocolState"]
       ; memo : Signed_command_memo.Stable.V1.t
       }
     [@@deriving sexp, compare, equal, hash, yojson]

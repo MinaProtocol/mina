@@ -41,11 +41,12 @@ module Update = struct
              , 'timing )
              t =
           { app_state : 'state_element Snapp_state.V.Stable.V1.t
+                [@key "appState"]
           ; delegate : 'pk
-          ; verification_key : 'vk
+          ; verification_key : 'vk [@key "verificationKey"]
           ; permissions : 'perms
-          ; snapp_uri : 'snapp_uri
-          ; token_symbol : 'token_symbol
+          ; snapp_uri : 'snapp_uri [@key "snappUri"]
+          ; token_symbol : 'token_symbol [@key "tokenSymbol"]
           ; timing : 'timing
           }
         [@@deriving compare, equal, sexp, hash, yojson, hlist]
@@ -59,10 +60,11 @@ module Update = struct
       module V1 = struct
         type t =
           { initial_minimum_balance : Balance.Stable.V1.t
-          ; cliff_time : Global_slot.Stable.V1.t
-          ; cliff_amount : Amount.Stable.V1.t
-          ; vesting_period : Global_slot.Stable.V1.t
-          ; vesting_increment : Amount.Stable.V1.t
+                [@key "initialMininumBalance"]
+          ; cliff_time : Global_slot.Stable.V1.t [@key "cliffTime"]
+          ; cliff_amount : Amount.Stable.V1.t [@key "cliffAmount"]
+          ; vesting_period : Global_slot.Stable.V1.t [@key "vestingPeriod"]
+          ; vesting_increment : Amount.Stable.V1.t [@key "vestingIncrement"]
           }
         [@@deriving compare, equal, sexp, hash, yojson, hlist]
 
@@ -365,11 +367,11 @@ module Body = struct
         type ('pk, 'update, 'token_id, 'amount, 'events, 'call_data, 'int) t =
           { pk : 'pk
           ; update : 'update
-          ; token_id : 'token_id
+          ; token_id : 'token_id [@key "tokenId"]
           ; delta : 'amount
           ; events : 'events
-          ; sequence_events : 'events
-          ; call_data : 'call_data
+          ; sequence_events : 'events [@key "sequenceEvents"]
+          ; call_data : 'call_data [@key "callData"]
           ; depth : 'int
           }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]

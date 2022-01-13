@@ -18,12 +18,12 @@ let int_of_bits =
 
 module Transition = struct
   [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type 'a t = { prev : 'a; next : 'a }
-      [@@deriving hlist, sexp, equal, yojson, hash, compare]
-    end
-  end]
+    module Stable = struct
+      module V1 = struct
+        type 'a t = { prev : 'a; next : 'a }
+        [@@deriving hlist, sexp, equal, yojson, hash, compare]
+      end
+    end]
 
   let to_input { prev; next } ~f = Random_oracle_input.append (f prev) (f next)
 
@@ -64,9 +64,9 @@ module Flagged_option = struct
   let of_option t ~default =
     match t with
     | None ->
-        { is_some = false; data = default }
+      { is_some = false; data = default }
     | Some data ->
-        { is_some = true; data }
+      { is_some = true; data }
 
   let to_option { is_some; data } = Option.some_if is_some data
 
@@ -86,12 +86,20 @@ end
 
 module Set_or_keep = struct
   [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type 'a t = Set of 'a | Keep
-      [@@deriving sexp, equal, compare, hash, yojson]
-    end
-  end]
+    module Stable = struct
+      module V1 = struct
+        type 'a t = Set of 'a | Keep
+        [@@deriving sexp, equal, compare, hash]
+
+        let to_yojson f = function
+          | Set of a -> f a
+          | Keep -> `Null
+
+        let of_yojson f = function
+          | `Null -> Some Keep
+          | x -> Set (f x)
+      end
+    end]
 
   let map t ~f = match t with Keep -> Keep | Set x -> Set (f x)
 
@@ -134,7 +142,7 @@ module Set_or_keep = struct
     val map : f:('a -> 'b) -> 'a t -> 'b t
 
     val to_input :
-         'a t
+      'a t
       -> f:('a -> Field.Var.t Random_oracle_input.t)
       -> Field.Var.t Random_oracle_input.t
   end = struct
@@ -172,12 +180,20 @@ end
 
 module Or_ignore = struct
   [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type 'a t = Check of 'a | Ignore
-      [@@deriving sexp, equal, compare, hash, yojson]
-    end
-  end]
+    module Stable = struct
+      module V1 = struct
+        type 'a t = Check of 'a | Ignore
+        [@@deriving sexp, equal, compare, hash, yojson]
+
+        let to_yojson f = function
+          | Check of a -> f a
+          | Ignore -> `Null
+
+        let of_yojson f = function
+          | `Null -> Some Ignore
+          | x -> Check (f x)
+      end
+    end]
 
   let gen gen_a =
     let open Quickcheck.Let_syntax in
@@ -198,7 +214,7 @@ module Or_ignore = struct
     type 'a t
 
     val typ_implicit :
-         equal:('a -> 'a -> bool)
+      equal:('a -> 'a -> bool)
       -> ignore:'a
       -> ('a_var, 'a) Typ.t
       -> ('a_var t, 'a Stable.Latest.t) Typ.t
@@ -207,7 +223,7 @@ module Or_ignore = struct
       ignore:'a -> ('a_var, 'a) Typ.t -> ('a_var t, 'a Stable.Latest.t) Typ.t
 
     val to_input :
-         'a t
+      'a t
       -> f:('a -> Field.Var.t Random_oracle_input.t)
       -> Field.Var.t Random_oracle_input.t
 
@@ -220,26 +236,26 @@ module Or_ignore = struct
     let to_input t ~f =
       match t with
       | Implicit x ->
-          f x
+        f x
       | Explicit t ->
-          Flagged_option.to_input' t ~f ~field_of_bool:(fun (b : Boolean.var) ->
-              (b :> Field.Var.t))
+        Flagged_option.to_input' t ~f ~field_of_bool:(fun (b : Boolean.var) ->
+            (b :> Field.Var.t))
 
     let check t ~f =
       match t with
       | Implicit x ->
-          f x
+        f x
       | Explicit { is_some; data } ->
-          Pickles.Impls.Step.Boolean.(any [ not is_some; f data ])
+        Pickles.Impls.Step.Boolean.(any [ not is_some; f data ])
 
     let typ_implicit (type a a_var) ~equal ~(ignore : a) (t : (a_var, a) Typ.t)
-        : (a_var t, a Stable.Latest.t) Typ.t =
+      : (a_var t, a Stable.Latest.t) Typ.t =
       Typ.transport t
         ~there:(function Check x -> x | Ignore -> ignore)
         ~back:(fun x -> if equal x ignore then Ignore else Check x)
       |> Typ.transport_var
-           ~there:(function Implicit x -> x | Explicit _ -> assert false)
-           ~back:(fun x -> Implicit x)
+        ~there:(function Implicit x -> x | Explicit _ -> assert false)
+        ~back:(fun x -> Implicit x)
 
     let typ_explicit (type a_var a) ~ignore (t : (a_var, a) Typ.t) =
       Typ.transport_var
@@ -258,14 +274,14 @@ end
 
 module Account_state = struct
   [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = Empty | Non_empty | Any
-      [@@deriving sexp, equal, yojson, hash, compare, enum]
+    module Stable = struct
+      module V1 = struct
+        type t = Empty | Non_empty | Any
+        [@@deriving sexp, equal, yojson, hash, compare, enum]
 
-      let to_latest = Fn.id
-    end
-  end]
+        let to_latest = Fn.id
+      end
+    end]
 
   module Encoding = struct
     type 'b t = { any : 'b; empty : 'b } [@@deriving hlist]
@@ -277,28 +293,28 @@ module Account_state = struct
 
   let encode : t -> bool Encoding.t = function
     | Empty ->
-        { any = false; empty = true }
+      { any = false; empty = true }
     | Non_empty ->
-        { any = false; empty = false }
+      { any = false; empty = false }
     | Any ->
-        { any = true; empty = false }
+      { any = true; empty = false }
 
   let decode : bool Encoding.t -> t = function
     | { any = false; empty = true } ->
-        Empty
+      Empty
     | { any = false; empty = false } ->
-        Non_empty
+      Non_empty
     | { any = true; empty = false } | { any = true; empty = true } ->
-        Any
+      Any
 
   let to_input (x : t) = Encoding.to_input (encode x) ~field_of_bool
 
   let check (t : t) (x : [ `Empty | `Non_empty ]) =
     match (t, x) with
     | Any, _ | Non_empty, `Non_empty | Empty, `Empty ->
-        Ok ()
+      Ok ()
     | _ ->
-        Or_error.error_string "Bad account_type"
+      Or_error.error_string "Bad account_type"
 
   [%%ifdef consensus_mechanism]
 
