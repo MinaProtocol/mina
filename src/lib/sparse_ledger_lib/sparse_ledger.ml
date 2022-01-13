@@ -26,7 +26,7 @@ module T = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type ('hash, 'key, 'account, 'token_id) t =
         { indexes : ('key * int) list
         ; depth : int
@@ -35,6 +35,27 @@ module T = struct
         ; next_available_token : 'token_id
         }
       [@@deriving sexp, yojson]
+    end
+
+    module V1 = struct
+      type ('hash, 'key, 'account, 'token_id) t =
+        { indexes : ('key * int) list
+        ; depth : int
+        ; tree : ('hash, 'account) Tree.Stable.V1.t
+        ; next_available_token : 'token_id
+        }
+      [@@deriving sexp, yojson]
+
+      let to_latest
+          ({ indexes; depth; tree; next_available_token } :
+            ('hash, 'key, 'account, 'token_id) t) :
+          ('hash, 'key, 'account, 'token_id) Latest.t =
+        { indexes
+        ; depth
+        ; tree
+        ; next_available_index = None
+        ; next_available_token
+        }
     end
   end]
 

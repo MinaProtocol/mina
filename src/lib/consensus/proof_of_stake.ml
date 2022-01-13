@@ -2562,6 +2562,38 @@ module Hooks = struct
         include Master
       end)
 
+      module V2 = struct
+        module T = struct
+          type query = Mina_base.Ledger_hash.Stable.V1.t
+          [@@deriving bin_io, version { rpc }]
+
+          type response =
+            ( Mina_base.Sparse_ledger.Stable.V2.t
+            , string )
+            Core_kernel.Result.Stable.V1.t
+          [@@deriving bin_io, version { rpc }]
+
+          let query_of_caller_model = Fn.id
+
+          let callee_model_of_query = Fn.id
+
+          let response_of_callee_model = Fn.id
+
+          let caller_model_of_response = Fn.id
+        end
+
+        module T' =
+          Perf_histograms.Rpc.Plain.Decorate_bin_io
+            (struct
+              include M
+              include Master
+            end)
+            (T)
+
+        include T'
+        include Register (T')
+      end
+
       module V1 = struct
         module T = struct
           type query = Mina_base.Ledger_hash.Stable.V1.t
@@ -2577,9 +2609,34 @@ module Hooks = struct
 
           let callee_model_of_query = Fn.id
 
-          let response_of_callee_model = Fn.id
+          let response_of_callee_model result =
+            Result.map result
+              ~f:(fun
+                   ({ indexes
+                    ; depth
+                    ; tree
+                    ; next_available_index = _
+                    ; next_available_token
+                    } :
+                     Mina_base.Sparse_ledger.t)
+                   :
+                   Mina_base.Sparse_ledger.Stable.V1.t
+                 -> { indexes; depth; tree; next_available_token })
 
-          let caller_model_of_response = Fn.id
+          let caller_model_of_response response =
+            Result.map response
+              ~f:(fun
+                   ({ indexes; depth; tree; next_available_token } :
+                     Mina_base.Sparse_ledger.Stable.V1.t)
+                   :
+                   Mina_base.Sparse_ledger.t
+                 ->
+                { indexes
+                ; depth
+                ; tree
+                ; next_available_index = None
+                ; next_available_token
+                })
         end
 
         module T' =
