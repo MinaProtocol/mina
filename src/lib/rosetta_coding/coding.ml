@@ -108,7 +108,8 @@ module type Unpacked = sig
   val project : bool list -> t
 end
 
-let pack (type t) (module M : Unpacked with type t = t) raw =
+let pack (type t) (module M : Unpacked with type t = t) (raw : string) :
+    bool * t =
   (* 256 bits = 64 hex chars *)
   assert (Int.equal (String.length raw) 64) ;
   let bits =
@@ -117,8 +118,8 @@ let pack (type t) (module M : Unpacked with type t = t) raw =
   (* In our encoding, we have highest bytes at the end and lowest at the
      beginning. *)
   let bytes = bits_by_8s bits in
-  let bytes' = List.rev bytes in
-  let bits' = List.concat bytes' in
+  let bytes_rev = List.rev bytes in
+  let bits' = List.concat bytes_rev in
 
   let padding_bit = List.hd_exn bits' in
   (* remove padding bit *)
