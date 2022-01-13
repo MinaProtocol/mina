@@ -66,8 +66,18 @@ LogDNA provides both data storage and data visualization and alerting functional
 3. Loki, depending on the storage we choose. And we need to run the loki instance somewhere. We could choose to use the grafana cloud. But it seems to have 30 days of log retention. The prices $49/month for 100GB of logs. (I think we already use their service, so the log storage is already paid)
 4. LogDNA, $3/GB, logs also have 30 days of retention.
 
-## Rationale Behind our choices
+## Rationale Behind the choices
 
+### Rationale Behind the micro-service
+I personally think that the best option is to setup a micro-service that handles the traffic to our selected backend. The reasons are the following:
+1. This decouples the choice of the backend from the mina client. If we ever want to make any change to the backend, we won't need to update the client code.
+2. Hiding the choice of backend would also prevent us from exposing any credential files/configs to the users. This is safer.
+3. Having a micro-service sitting in the middle would gives us the room to add DOS protection in the future if that's ever needed.
+4. Having a micro-service would make the entire thing more decentralized in the sense that @Jason Borseth has talked about. It means that the mina client would always push the reports to any URL they specified (by default to us). This is more uniform than having the mina client to push to a certain backend in the default case or push to a URL if they choose not to send the report to us.
+5. The current implementation would just be simple bash script that redirects the reports to the GCloud Logging API, so it's really easy to implement. If we ever need to do any DOS protection, we could switch to a python script or any other languages that have GCloud SDK. This gives us a lot of flexibility for changes and upgrades.
+6. Since the traffic on node error/status service won't be high in the recent future, we won't need to worry about the scalability of this micro-service for now. If it ever becomes a problem, we can change this design then. For now, this design should be enough.
+
+### Rationale Behind the Google Cloud Logging
 The reason that we choose Google Cloud Logging fo our backend is that
 0. Google Cloud Logging meets the requirements of both node status/error system.
 
