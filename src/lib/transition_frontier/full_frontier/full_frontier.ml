@@ -462,7 +462,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
                    ~constraint_constants:
                      t.precomputed_values.constraint_constants ~txn_state_view
                    mt txn.data)
-              : Ledger.Transaction_applied.t ) ) ;
+              : Transaction_logic.Transaction_applied.t ) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)

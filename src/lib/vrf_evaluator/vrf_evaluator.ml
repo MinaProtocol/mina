@@ -194,7 +194,10 @@ module Worker_state = struct
                 with
                 | None ->
                     go keypairs
-                | Some (`Vrf_output vrf_result, `Delegator delegator) ->
+                | Some
+                    ( `Vrf_eval _vrf_string
+                    , `Vrf_output vrf_result
+                    , `Delegator delegator ) ->
                     [%log info] "Won slot %d in epoch %d" (Slot.to_int slot)
                       (Epoch.to_int epoch) ;
                     let slot_won =

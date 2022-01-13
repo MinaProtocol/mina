@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -207,4 +208,91 @@ func testSendStreamDo(t *testing.T, app *app, streamId uint64, msgBytes []byte, 
 func TestSendStream(t *testing.T) {
 	appA, streamId := testOpenStreamImpl(t, 9903, string(testProtocol))
 	testSendStreamDo(t, appA, streamId, []byte("somedata"), 4458)
+}
+
+func TestOpenStreamBeforeAndAfterSetGatingConfig(t *testing.T) {
+	ctx, ctxCancel := context.WithCancel(context.Background())
+	defer ctxCancel()
+
+	appA, _ := newTestApp(t, nil, false)
+	appAInfos, err := addrInfos(appA.P2p.Host)
+	require.NoError(t, err)
+	aTrap := newUpcallTrap("appA", 64, upcallDropAllMask^(1<<StreamLostChan))
+	aUpcallErrChan := make(chan error)
+	launchFeedUpcallTrap(appA.P2p.Logger, appA.OutChan, aTrap, aUpcallErrChan, ctx)
+
+	appB, appBPort := newTestApp(t, appAInfos, false)
+	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
+	require.NoError(t, err)
+	bTrap := newUpcallTrap("appB", 64, upcallDropAllMask^(1<<StreamMessageReceivedChan))
+	bUpcallErrChan := make(chan error)
+	launchFeedUpcallTrap(appB.P2p.Logger, appB.OutChan, bTrap, bUpcallErrChan, ctx)
+	testAddStreamHandlerDo(t, string(testProtocol), appB, 10990)
+
+	streamId := testOpenStreamDo(t, appA, appB.P2p.Host, appBPort, 9905, string(testProtocol))
+	testSendStreamDo(t, appA, streamId, []byte("somedata"), 4458)
+
+	select {
+	case err := <-aUpcallErrChan:
+		require.NoError(t, err)
+	case err := <-bUpcallErrChan:
+		require.NoError(t, err)
+	case <-bTrap.StreamMessageReceived:
+	}
+
+	{
+		_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+		require.NoError(t, err)
+		m, err := ipc.NewRootLibp2pHelperInterface_SetGatingConfig_Request(seg)
+		require.NoError(t, err)
+
+		gc, err := m.NewGatingConfig()
+		require.NoError(t, err)
+		_, err = gc.NewBannedIps(0)
+		require.NoError(t, err)
+		bPids, err := gc.NewBannedPeerIds(1)
+		require.NoError(t, err)
+		_, err = gc.NewTrustedIps(0)
+		require.NoError(t, err)
+		_, err = gc.NewTrustedPeerIds(0)
+		require.NoError(t, err)
+		require.NoError(t, bPids.At(0).SetId(appA.P2p.Me.String()))
+		gc.SetIsolate(false)
+
+		var mRpcSeqno uint64 = 2003
+		resMsg := SetGatingConfigReq(m).handle(appB, mRpcSeqno)
+		seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "setGatingConfig")
+		require.Equal(t, seqno, mRpcSeqno)
+		require.True(t, respSuccess.HasSetGatingConfig())
+		_, err = respSuccess.SetGatingConfig()
+		require.NoError(t, err)
+	}
+
+	select {
+	case err := <-bUpcallErrChan:
+		require.NoError(t, err)
+	case err := <-aUpcallErrChan:
+		require.NoError(t, err)
+	case msg := <-aTrap.StreamLost:
+		sid, err := msg.StreamId()
+		require.NoError(t, err)
+		require.Equal(t, streamId, sid.Id())
+	}
+
+	// We try to open a stream again, but it should fail because the peer is banned.
+	{
+		_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+		require.NoError(t, err)
+		m, err := ipc.NewRootLibp2pHelperInterface_OpenStream_Request(seg)
+		require.NoError(t, err)
+
+		require.NoError(t, m.SetProtocolId(string(testProtocol)))
+		pid, err := m.NewPeer()
+		require.NoError(t, pid.SetId(appB.P2p.Host.ID().String()))
+		require.NoError(t, err)
+
+		resMsg := OpenStreamReq(m).handle(appA, 9905)
+		seqno, _ := checkRpcResponseError(t, resMsg)
+		require.Equal(t, uint64(9905), seqno)
+	}
 }
