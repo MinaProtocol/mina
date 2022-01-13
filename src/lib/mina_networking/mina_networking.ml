@@ -176,6 +176,39 @@ module Rpcs = struct
       include Master
     end)
 
+    module V2 = struct
+      module T = struct
+        type query = State_hash.Stable.V1.t [@@deriving bin_io, version { rpc }]
+
+        type response =
+          ( Staged_ledger.Scan_state.Stable.V1.t
+          * Ledger_hash.Stable.V1.t
+          * Pending_coinbase.Stable.V2.t
+          * Mina_state.Protocol_state.Value.Stable.V1.t list )
+          option
+        [@@deriving bin_io, version { rpc }]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io
+          (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
+    end
+
     module V1 = struct
       module T = struct
         type query = State_hash.Stable.V1.t [@@deriving bin_io, version { rpc }]
@@ -192,9 +225,17 @@ module Rpcs = struct
 
         let callee_model_of_query = Fn.id
 
-        let response_of_callee_model = Fn.id
+        (* we never need to do a conversion from a later response type to an earlier response type *)
+        let response_of_callee_model _ = failwith "Not implemented"
 
-        let caller_model_of_response = Fn.id
+        let caller_model_of_response (response : response) : Master.T.response =
+          Option.map response
+            ~f:(fun (scan_state, ledger_hash, pending_coinbase, protocol_state)
+               ->
+              ( scan_state
+              , ledger_hash
+              , Pending_coinbase.Stable.V1.to_latest pending_coinbase
+              , protocol_state ))
       end
 
       module T' =
