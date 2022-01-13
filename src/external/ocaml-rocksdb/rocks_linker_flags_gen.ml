@@ -17,6 +17,7 @@ let () =
         [ "-Wl,--push-state,-E,-whole-archive"
         ; "-lc"
         ; "-lrocksdb_stubs"
+        ; "-ljemalloc"
         ; "-Wl,--pop-state"
         ; "-lz"
         ; "-lbz2"
