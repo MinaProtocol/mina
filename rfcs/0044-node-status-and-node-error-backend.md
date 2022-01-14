@@ -22,7 +22,7 @@ Google Cloud Loggind provides storage and data searching/visualization of logs. 
 
 For the frontend, each nodes would have 2 command line options to allow them to sed node status/error reports to any specific url: `--node-status-url URL` and `--node-error-url URL`. By default users would send their reports to our backend. They could change the destination by providing their own destination `URL` to the command options.
 
-We would setup micro-services under the corresponding subdomain: https://node-status-report.minaprotocol.com and https://node-error-report.minaprotocol.com. Those micro-services would redirect the reports to Google Cloud Logging API through gcloud commad line tool.
+We would setup micro-services under the corresponding subdomain: https://node-status-report.minaprotocol.com and https://node-error-report.minaprotocol.com. The micro-services would be implemented using nodejs. For now, the micro-service would just be consists of a simple http service and redirect the request to GCloud. There's official support for gcloud nodejs api. We are going to use that. For credentials, we would create a service account for this micro-service that allow operations to the log services.
 
 For storage of the logs, we can setup customized buckets that can be configured to have 3650 days of log retentions. Logs can also be redirected to 3rd-party analytical/data visualization tools like Grafana through Pub/Sub service.
 
