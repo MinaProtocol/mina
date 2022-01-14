@@ -8,7 +8,7 @@ open Mina_transition
 module Historical : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type t
     end
   end]
@@ -29,7 +29,7 @@ end
 module Limited : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type t [@@deriving to_yojson]
     end
   end]
@@ -61,7 +61,7 @@ end
 module Minimal : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type t
     end
   end]

@@ -148,7 +148,7 @@ type job = Available_job.t [@@deriving sexp]
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     type t =
       ( Ledger_proof_with_sok_message.Stable.V2.t
       , Transaction_with_witness.Stable.V3.t )
