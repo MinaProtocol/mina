@@ -38,9 +38,14 @@
 
           checks = import ./nix/checks.nix inputs pkgs;
 
-          ocamlPackages_static = assert self.sourceInfo.submodules; import ./nix/ocaml.nix inputs pkgs.pkgsMusl;
+          ocamlPackages_static = assert self.sourceInfo.submodules;
+            import ./nix/ocaml.nix {
+              inherit inputs pkgs;
+              static = true;
+            };
 
-          ocamlPackages = assert self.sourceInfo.submodules; import ./nix/ocaml.nix inputs pkgs;
+          ocamlPackages = assert self.sourceInfo.submodules;
+            import ./nix/ocaml.nix { inherit inputs pkgs; };
         in {
 
           # Jobs/Lint/Rust.dhall
@@ -110,7 +115,6 @@
 
           legacyPackages.musl = pkgs.pkgsMusl;
           legacyPackages.regular = pkgs;
-
 
           defaultPackage = ocamlPackages.mina;
 
