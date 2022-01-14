@@ -86,7 +86,7 @@ let
       buildInputs =
         (builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self))
         ++ external-libs;
-      nativeBuildInputs = [ self.dune self.ocamlfind pkgs.capnproto ]
+      nativeBuildInputs = [ self.dune self.ocamlfind pkgs.capnproto pkgs.removeReferencesTo ]
         ++ builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self);
       NIX_LDFLAGS = "-lsnappy -llz4 -lzstd";
       # TODO, get this from somewhere
@@ -108,6 +108,7 @@ let
       installPhase = ''
         mkdir -p $out/bin
         mv _build/default/src/app/{logproc/logproc.exe,cli/src/mina.exe} $out/bin
+        remove-references-to -t $(dirname $(dirname $(command -v ocaml))) $out/bin/*
       '';
     } // pkgs.lib.optionalAttrs static { OCAMLPARAM = "_,ccopt=-static"; });
   };
