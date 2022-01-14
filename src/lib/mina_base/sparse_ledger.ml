@@ -16,7 +16,7 @@ let dedup_list ls ~comparator =
 
 [%%versioned
 module Stable = struct
-  module V3 = struct
+  module V2 = struct
     type t =
       ( Ledger_hash.Stable.V1.t
       , Account_id.Stable.V1.t

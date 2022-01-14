@@ -176,12 +176,12 @@ module Rpcs = struct
       include Master
     end)
 
-    module V3 = struct
+    module V2 = struct
       module T = struct
         type query = State_hash.Stable.V1.t [@@deriving bin_io, version { rpc }]
 
         type response =
-          ( Staged_ledger.Scan_state.Stable.V3.t
+          ( Staged_ledger.Scan_state.Stable.V2.t
           * Ledger_hash.Stable.V1.t
           * Pending_coinbase.Stable.V2.t
           * Mina_state.Protocol_state.Value.Stable.V1.t list )

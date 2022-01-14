@@ -34,7 +34,7 @@ end
 module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
-    module V3 = struct
+    module V2 = struct
       (* TODO: The statement is redundant here - it can be computed from the
          witness and the transaction
       *)
@@ -48,7 +48,7 @@ module Transaction_with_witness = struct
         ; init_stack :
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
-        ; ledger_witness : Mina_base.Sparse_ledger.Stable.V3.t [@sexp.opaque]
+        ; ledger_witness : Mina_base.Sparse_ledger.Stable.V2.t [@sexp.opaque]
         }
       [@@deriving sexp]
 
@@ -148,10 +148,10 @@ type job = Available_job.t [@@deriving sexp]
 
 [%%versioned
 module Stable = struct
-  module V3 = struct
+  module V2 = struct
     type t =
       ( Ledger_proof_with_sok_message.Stable.V2.t
-      , Transaction_with_witness.Stable.V3.t )
+      , Transaction_with_witness.Stable.V2.t )
       Parallel_scan.State.Stable.V1.t
     [@@deriving sexp]
 
@@ -165,7 +165,7 @@ module Stable = struct
       let state_hash =
         Parallel_scan.State.hash t
           (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
-          (Binable.to_string (module Transaction_with_witness.Stable.V3))
+          (Binable.to_string (module Transaction_with_witness.Stable.V2))
       in
       Staged_ledger_hash.Aux_hash.of_bytes
         (state_hash |> Digestif.SHA256.to_raw_string)

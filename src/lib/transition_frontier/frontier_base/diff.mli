@@ -69,7 +69,7 @@ module Root_transition : sig
   module Lite : sig
     [%%versioned:
     module Stable : sig
-      module V3 : sig
+      module V2 : sig
         type t = lite root_transition
       end
     end]
@@ -130,7 +130,7 @@ module Lite : sig
   module E : sig
     [%%versioned:
     module Stable : sig
-      module V3 : sig
+      module V2 : sig
         type t = E : (lite, 'mutant) diff -> t
       end
     end]
