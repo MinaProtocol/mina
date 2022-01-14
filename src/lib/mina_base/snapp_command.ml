@@ -170,7 +170,7 @@ module Party = struct
         List.reduce_exn ~f:Random_oracle_input.Chunked.append
           [ Public_key.Compressed.Checked.to_input pk
           ; Update.Checked.to_input update
-          ; Amount.Signed.Checked.to_input delta
+          ; Impl.run_checked (Amount.Signed.Checked.to_input delta)
           ]
 
       let digest (t : t) =

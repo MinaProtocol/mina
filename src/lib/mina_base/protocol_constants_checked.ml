@@ -88,7 +88,7 @@ let to_input (t : value) =
 
 [%%if defined consensus_mechanism]
 
-type var = (T.Checked.t, T.Checked.t, Block_time.Unpacked.var) Poly.t
+type var = (T.Checked.t, T.Checked.t, Block_time.Checked.t) Poly.t
 
 let data_spec =
   Data_spec.
