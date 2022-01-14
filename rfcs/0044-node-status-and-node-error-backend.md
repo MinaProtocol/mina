@@ -2,7 +2,7 @@
 
 [summary]: #summary
 
-This RFC proposes that we use Google Cloud Logging service to be the backend of the node status/error system. The logs would be stored in the gcloud buckets; and we could use the Log Explorer to search around logs. Metrics can also be created against the logs.
+This RFC proposes that we use Google Cloud Logging service to be the backend of the node status/error system. The logs would be stored in the gcloud buckets; and we could use the Log Explorer to search around logs. Metrics can also be created against the logs. For visualization and graphing, we would use Kibana.
 
 ## Motivation
 
@@ -33,7 +33,9 @@ exports.nodeStatus = (req, res) => {
 };
 ```
 
-For storage of the logs, we can setup customized buckets that can be configured to have 3650 days of log retentions. Logs can also be redirected to 3rd-party analytical/data visualization tools like Grafana through Pub/Sub service.
+For storage of the logs, we can setup customized buckets that can be configured to have 3650 days of log retentions.
+
+For visualization and plotting, logs can be passed to the elastic cloud on GCP through Pub/Sub message sharing. For the details, please see this tutorial on how to export logs to elastic cloud: https://cloud.google.com/community/tutorials/exporting-stackdriver-elasticcloud
 
 In summary, we need to setup a micro-service for each corresponding system and we also need to setup separate log buckets and log sinks for them.
 
@@ -70,6 +72,7 @@ LogDNA provides both data storage and data visualization and alerting functional
 
 ## Prices
 
+0. Elastic Cloud on GCP for 0.0001/Count
 1. S3, $0.023 for 1GB/month, would be a little cheaper if we use more than 50GB
 2. OpenSearch, Free usage for the first 12 months for 750 hrs per month
 3. Loki, depending on the storage we choose. And we need to run the loki instance somewhere. We could choose to use the grafana cloud. But it seems to have 30 days of log retention. The prices $49/month for 100GB of logs. (I think we already use their service, so the log storage is already paid)
