@@ -191,6 +191,24 @@ let lift_error_set_unit (m : unit t) :
   | Error errors ->
       errors
 
+(* Returns hard error in case of Ok and vice versa *)
+let reverse_ok_error ?(preserve_soft = true) err =
+  let map_hard_error soft_errors =
+    if preserve_soft then
+      Deferred.map
+        ~f:
+          (Result.map_error
+             ~f:
+               Hard_fail.(
+                 fun { hard_errors; _ } -> { hard_errors; soft_errors }))
+    else ident
+  in
+  Deferred.bind ~f:(function
+    | Ok { Result_accumulator.soft_errors; _ } ->
+        map_hard_error soft_errors (hard_error err)
+    | merr ->
+        if preserve_soft then soften_error (Deferred.return merr) else ok_unit)
+
 module List = struct
   let rec iter ls ~f =
     let open T.Let_syntax in

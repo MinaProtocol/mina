@@ -11,6 +11,8 @@ type metrics_t =
   ; transaction_pool_diff_broadcasted : int
   ; transactions_added_to_pool : int
   ; transaction_pool_size : int
+  ; ban_notify_rpcs_sent : int
+  ; ban_notify_rpcs_received : int
   }
 
 type best_chain_block =
@@ -46,7 +48,11 @@ module Engine = struct
 
       val network_keypair : t -> Network_keypair.t option
 
-      val start : fresh_state:bool -> t -> unit Malleable_error.t
+      val start :
+           fresh_state:bool
+        -> ?env_vars:(string * string) list
+        -> t
+        -> unit Malleable_error.t
 
       val stop : t -> unit Malleable_error.t
 

@@ -40,17 +40,20 @@ module Node = struct
     Util.run_cmd_exn cwd "kubectl"
       (base_kube_args config @ [ "logs"; "-c"; container_id; pod_id ])
 
-  let run_in_container ?container_id ~cmd { pod_id; config; info; _ } =
+  let run_in_container ?(env_vars = []) ?container_id ~cmd
+      { pod_id; config; info; _ } =
     let container_id =
       Option.value container_id ~default:info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
+    let env = List.map ~f:(fun (k, v) -> sprintf "%s=%s" k v) env_vars in
+    let cmd_with_env = match env with [] -> cmd | _ -> ("env" :: env) @ cmd in
     Util.run_cmd_exn cwd "kubectl"
       ( base_kube_args config
       @ [ "exec"; "-c"; container_id; "-i"; pod_id; "--" ]
-      @ cmd )
+      @ cmd_with_env )
 
-  let start ~fresh_state node : unit Malleable_error.t =
+  let start ~fresh_state ?(env_vars = []) node : unit Malleable_error.t =
     let open Deferred.Let_syntax in
     let%bind () =
       if fresh_state then
@@ -59,7 +62,7 @@ module Node = struct
       else Deferred.return ()
     in
     let%bind () =
-      Deferred.ignore_m (run_in_container node ~cmd:[ "/start.sh" ])
+      Deferred.ignore_m (run_in_container ~env_vars node ~cmd:[ "/start.sh" ])
     in
     Malleable_error.return ()
 
@@ -246,6 +249,8 @@ module Node = struct
             transactionPoolDiffBroadcasted
             transactionsAddedToPool
             transactionPoolSize
+            banNotifyRpcsSent
+            banNotifyRpcsReceived
           }
         }
       }
@@ -705,6 +710,10 @@ module Node = struct
       exec_graphql_request ~logger ~node:t ~query_name:"query_metrics" query_obj
     in
     [%log info] "get_metrics, finished exec_graphql_request" ;
+    let bn_sent = query_result_obj#daemonStatus#metrics#banNotifyRpcsSent in
+    let bn_received =
+      query_result_obj#daemonStatus#metrics#banNotifyRpcsReceived
+    in
     let block_production_delay =
       Array.to_list
       @@ query_result_obj#daemonStatus#metrics#blockProductionDelay
@@ -718,20 +727,22 @@ module Node = struct
     let transaction_pool_size = metrics#transactionPoolSize in
     [%log info]
       "get_metrics, result of graphql query (block_production_delay; \
-       tx_received; tx_broadcasted; txs_added_to_pool; tx_pool_size) (%s; %d; \
-       %d; %d; %d)"
+       tx_received; tx_broadcasted; txs_added_to_pool; tx_pool_size; \
+       ban_notify_rpcs_sent; ban_notify_rpcs_received) (%s; %d; %d; %d; %d; \
+       %d; %d)"
       ( String.concat ~sep:", "
       @@ List.map ~f:string_of_int block_production_delay )
       transaction_pool_diff_received transaction_pool_diff_broadcasted
-      transactions_added_to_pool transaction_pool_size ;
+      transactions_added_to_pool transaction_pool_size bn_sent bn_received ;
     return
-      Intf.
-        { block_production_delay
-        ; transaction_pool_diff_broadcasted
-        ; transaction_pool_diff_received
-        ; transactions_added_to_pool
-        ; transaction_pool_size
-        }
+      { Intf.block_production_delay
+      ; transaction_pool_diff_broadcasted
+      ; transaction_pool_diff_received
+      ; transactions_added_to_pool
+      ; transaction_pool_size
+      ; ban_notify_rpcs_sent = bn_sent
+      ; ban_notify_rpcs_received = bn_received
+      }
 end
 
 module Workload = struct

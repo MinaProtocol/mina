@@ -42,6 +42,7 @@ let engines : engine list =
 let tests : test list =
   [ ( "peers-reliability"
     , (module Peers_reliability_test.Make : Intf.Test.Functor_intf) )
+  ; ("ban-notify", (module Ban_notify_test.Make : Intf.Test.Functor_intf))
   ; ( "chain-reliability"
     , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
   ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))

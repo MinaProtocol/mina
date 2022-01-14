@@ -366,10 +366,10 @@ let get_status ~flag t =
         None
   in
   let metrics =
-    let open Mina_metrics.Block_producer in
     Mina_metrics.
       { Daemon_rpcs.Types.Status.Metrics.block_production_delay =
-          Block_production_delay_histogram.buckets block_production_delay
+          Block_producer.(
+            Block_production_delay_histogram.buckets block_production_delay)
       ; transaction_pool_diff_received =
           Float.to_int @@ Gauge.value Network.transaction_pool_diff_received
       ; transaction_pool_diff_broadcasted =
@@ -379,6 +379,10 @@ let get_status ~flag t =
       ; transactions_added_to_pool =
           Float.to_int
           @@ Counter.value Transaction_pool.transactions_added_to_pool
+      ; ban_notify_rpcs_received =
+          Float.to_int @@ Gauge.value @@ snd Network.ban_notify_rpcs_received
+      ; ban_notify_rpcs_sent =
+          Float.to_int @@ Gauge.value @@ snd Network.ban_notify_rpcs_sent
       }
   in
   { Daemon_rpcs.Types.Status.num_accounts

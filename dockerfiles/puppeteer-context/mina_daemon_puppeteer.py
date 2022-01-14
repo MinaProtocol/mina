@@ -10,6 +10,7 @@
 #   - the script does not attempt to handle errors from the tail child process
 
 import os
+import os.path
 from pathlib import Path
 import signal
 import subprocess
@@ -86,10 +87,18 @@ def start_daemon():
   log("start_daemon called" )
   global mina_process
   with open('mina.log', 'a') as f:
+    env = os.environ.copy()
+    if os.path.isfile("/extra.env"): 
+      # this doesn't support quotes or multiline variables
+      with open("/extra.env", "r") as extra_env_file:
+        for l in extra_env_file.read().splitlines():
+          parts = l.split("=",1)
+          env[parts[0]] = parts[1]
     mina_process = subprocess.Popen(
         ['mina'] + daemon_args,
         stdout=f,
-        stderr=subprocess.STDOUT
+        stderr=subprocess.STDOUT,
+        env=env
     )
   log("touching /root/daemon-active" )
   Path('daemon-active').touch()

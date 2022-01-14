@@ -175,8 +175,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         { t.connection_gating with
           banned_peers = peer :: t.connection_gating.banned_peers
         } ;
-      Deferred.ignore_m
-        (Mina_net2.set_connection_gating_config net2 t.connection_gating)
+      O1trace.thread "execute_gossip_net_bans" (fun () ->
+          Deferred.ignore_m
+            (Mina_net2.set_connection_gating_config net2 t.connection_gating))
 
     let unban_peer t peer =
       let%bind net2 = t.net2 in

@@ -188,6 +188,8 @@ module Status = struct
       ; transaction_pool_diff_broadcasted : int
       ; transactions_added_to_pool : int
       ; transaction_pool_size : int
+      ; ban_notify_rpcs_sent : int
+      ; ban_notify_rpcs_received : int
       }
     [@@deriving to_yojson, bin_io_unversioned, fields]
   end
@@ -422,6 +424,9 @@ module Status = struct
         Metrics.Fields.to_list ~block_production_delay
           ~transaction_pool_diff_received ~transaction_pool_diff_broadcasted
           ~transactions_added_to_pool ~transaction_pool_size
+          ~ban_notify_rpcs_sent:(fmt_field "ban_notify_rpcs_sent" Int.to_string)
+          ~ban_notify_rpcs_received:
+            (fmt_field "ban_notify_rpcs_received" Int.to_string)
         |> List.concat
         |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
         |> digest_entries ~title:""
