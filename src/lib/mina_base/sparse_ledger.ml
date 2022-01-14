@@ -16,13 +16,13 @@ let dedup_list ls ~comparator =
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     type t =
       ( Ledger_hash.Stable.V1.t
       , Account_id.Stable.V1.t
       , Account.Stable.V2.t
       , Token_id.Stable.V1.t )
-      Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
+      Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
     [@@deriving yojson, sexp]
 
     let to_latest = Fn.id

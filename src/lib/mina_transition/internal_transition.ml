@@ -33,11 +33,11 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
       { snark_transition : Snark_transition.Value.Stable.V1.t
       ; ledger_proof : Ledger_proof.Stable.V2.t option
-      ; prover_state : Consensus.Data.Prover_state.Stable.V2.t
+      ; prover_state : Consensus.Data.Prover_state.Stable.V3.t
       ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
       }
 
@@ -45,7 +45,6 @@ module Stable = struct
   end
 end]
 
-(* bin_io, version omitted *)
 type t = Stable.Latest.t =
   { snark_transition : Snark_transition.Value.t
   ; ledger_proof : Ledger_proof.t option

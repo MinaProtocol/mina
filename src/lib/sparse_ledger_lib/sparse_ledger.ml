@@ -26,7 +26,7 @@ module T = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type ('hash, 'key, 'account, 'token_id) t =
         { indexes : ('key * int) list
         ; depth : int

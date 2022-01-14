@@ -525,13 +525,13 @@ end
 module Merkle_tree_versioned = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         ( Hash_versioned.Stable.V1.t
         , Stack_id.Stable.V1.t
         , Stack_versioned.Stable.V1.t
         , unit )
-        Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
+        Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
@@ -1234,9 +1234,9 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V1 = struct
+  module V2 = struct
     type t =
-      ( Merkle_tree_versioned.Stable.V1.t
+      ( Merkle_tree_versioned.Stable.V2.t
       , Stack_id.Stable.V1.t )
       Poly_versioned.Stable.V1.t
     [@@deriving sexp, to_yojson]
