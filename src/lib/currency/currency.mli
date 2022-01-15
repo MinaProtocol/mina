@@ -86,7 +86,11 @@ module Amount : sig
   [%%ifdef consensus_mechanism]
 
   module Signed :
-    Signed_intf with type magnitude := t and type magnitude_var := var
+    Signed_intf
+      with type magnitude := t
+       and type magnitude_var := var
+       and type signed_fee := Fee.Signed.t
+       and type Checked.signed_fee_var := Fee.Signed.Checked.t
 
   [%%else]
 
