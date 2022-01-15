@@ -425,15 +425,19 @@ module Make (Inputs : Inputs_intf) = struct
         handler) ((global_state : global_state), (local_state : _ Local_state.t))
       =
     let open Inputs in
+    let with_label s loc f =
+      Pickles.Impls.Step.with_label (Core_kernel.sprintf "%s:%s" s loc) f
+    in
     let is_start' =
       let is_start' = Ps.is_empty local_state.parties in
       ( match is_start with
       | `Compute _ ->
           ()
       | `Yes _ ->
-          Bool.assert_ is_start'
+          with_label "is_start check" __LOC__ (fun () -> Bool.assert_ is_start')
       | `No ->
-          Bool.assert_ (Bool.not is_start') ) ;
+          with_label "not is_start check" __LOC__ (fun () ->
+              Bool.assert_ (Bool.not is_start')) ) ;
       match is_start with
       | `Yes _ ->
           Bool.true_
@@ -533,13 +537,14 @@ module Make (Inputs : Inputs_intf) = struct
         &&& update_permitted)
     in
     (* The first party must succeed. *)
-    Bool.(assert_ ((not is_start') ||| party_succeeded)) ;
+    with_label "not is_start || party_succeeded" __LOC__ (fun () ->
+        Bool.(assert_ ((not is_start') ||| party_succeeded))) ;
     let local_state =
       { local_state with
         success = Bool.( &&& ) local_state.success party_succeeded
       }
     in
-    let local_delta =
+    let local_balance_change =
       (* NOTE: It is *not* correct to use the actual change in balance here.
          Indeed, if the account creation fee is paid, using that amount would
          be equivalent to paying it out to the block producer.
@@ -551,21 +556,28 @@ module Make (Inputs : Inputs_intf) = struct
       Amount.Signed.negate (Party.balance_change party)
     in
     let party_token = h.perform (Party_token_id party) in
-    Bool.(assert_ (not (Token_id.(equal invalid) party_token))) ;
+    with_label "valid party_token" __LOC__ (fun () ->
+        Bool.(assert_ (not (Token_id.(equal invalid) party_token)))) ;
     let new_local_fee_excess, `Overflow overflowed =
       let curr_token : Token_id.t = local_state.token_id in
       let curr_is_default = Token_id.(equal default) curr_token in
       let party_is_default = Token_id.(equal default) party_token in
-      Bool.(
-        assert_
-          ( (not is_start')
-          ||| (party_is_default &&& Amount.Signed.is_pos local_delta) )) ;
+      with_label
+        "not is_start || party_is_default && is_pos local_balance_change"
+        __LOC__ (fun () ->
+          Bool.(
+            assert_
+              ( (not is_start')
+              ||| ( party_is_default
+                  &&& Amount.Signed.is_pos local_balance_change ) ))) ;
       (* FIXME: Allow non-default tokens again. *)
-      Bool.(assert_ (party_is_default &&& curr_is_default)) ;
-      Amount.add_signed_flagged local_state.excess local_delta
+      with_label "default party is currrent" __LOC__ (fun () ->
+          Bool.(assert_ (party_is_default &&& curr_is_default))) ;
+      Amount.add_signed_flagged local_state.excess local_balance_change
     in
     (* The first party must succeed. *)
-    Bool.(assert_ (not (is_start' &&& overflowed))) ;
+    with_label "not is_start && overflowed" __LOC__ (fun () ->
+        Bool.(assert_ (not (is_start' &&& overflowed)))) ;
     let local_state =
       { local_state with
         excess = new_local_fee_excess
@@ -639,7 +651,8 @@ module Make (Inputs : Inputs_intf) = struct
               ~else_:local_state.excess
         } )
     in
-    Bool.(assert_ (not (is_start' &&& !global_excess_update_failed))) ;
+    with_label "not is_start && global_excess_update_failed" __LOC__ (fun () ->
+        Bool.(assert_ (not (is_start' &&& !global_excess_update_failed)))) ;
     let local_state =
       { local_state with
         success =
