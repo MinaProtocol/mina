@@ -555,7 +555,7 @@ module Payloads = struct
           req.operations
         |> lift_reason_validation_to_errors ~env
       in
-      let%bind pk =
+      let%bind () =
         let (`Pk pk) = partial_user_command.User_command_info.Partial.source in
         Public_key.Compressed.of_base58_check pk
         |> Result.map_error ~f:(fun _ ->
@@ -566,6 +566,7 @@ module Payloads = struct
                    (Errors.create ~context:"decompression"
                       `Public_key_format_not_valid))
         |> Result.map ~f:Rosetta_coding.Coding.of_public_key
+        |> Result.map ~f:ignore
         |> env.lift
       in
       let%bind user_command_payload =
@@ -635,7 +636,8 @@ module Combine = struct
       let%bind signature =
         match req.signatures with
         | s :: _ ->
-            M.return s.hex_bytes
+            Transaction.Signature.decode s.hex_bytes
+            |> env.lift
         | _ ->
             M.fail (Errors.create `Signature_missing)
       in
@@ -665,7 +667,7 @@ module Parse = struct
         { verify_payment_signature :
                network_identifier:Rosetta_models.Network_identifier.t
             -> payment:Transaction.Unsigned.Rendered.Payment.t
-            -> signature:string
+            -> signature:Mina_base.Signature.t
             -> unit
             -> (bool, Errors.t) M.t
         ; lift : 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t
@@ -727,27 +729,22 @@ module Parse = struct
               Signed_command_payload.create ~fee ~fee_token ~fee_payer_pk ~nonce
                 ~valid_until ~memo ~body
             in
-            match Signature.Raw.decode signature with
+            (* choose signature verification based on network *)
+            let signature_kind : Mina_signature_kind.t =
+              if String.equal network_identifier.network "mainnet" then
+                Mainnet
+              else Testnet
+            in
+            match
+              Signed_command.create_with_signature_checked ~signature_kind
+                signature signer payload
+            with
             | None ->
-                (* signature ill-formed, so invalid *)
+                (* invalid signature *)
                 false
-            | Some signature -> (
-                (* choose signature verification based on network *)
-                let signature_kind : Mina_signature_kind.t =
-                  if String.equal network_identifier.network "mainnet" then
-                    Mainnet
-                  else Testnet
-                in
-                match
-                  Signed_command.create_with_signature_checked ~signature_kind
-                    signature signer payload
-                with
-                | None ->
-                    (* invalid signature *)
-                    false
-                | Some _ ->
-                    (* valid signature *)
-                    true ))
+            | Some _ ->
+                (* valid signature *)
+                true )
       ; lift = Deferred.return
       }
   end
@@ -864,19 +861,17 @@ module Hash = struct
         |> Result.map_error ~f:(fun _ -> Errors.create `Malformed_public_key)
         |> env.lift
       in
-      let%bind payload =
+      let%map payload =
         User_command_info.Partial.to_user_command_payload
           ~nonce:signed_transaction.nonce signed_transaction.command
         |> env.lift
       in
-      (* TODO: Implement signature coding *)
-      let%map signature =
-        Result.of_option
-          (Signature.Raw.decode signed_transaction.signature)
-          ~error:(Errors.create `Signature_missing)
-        |> env.lift
+      let full_command =
+        { Signed_command.Poly.payload
+        ; signature = signed_transaction.signature
+        ; signer
+        }
       in
-      let full_command = { Signed_command.Poly.payload; signature; signer } in
       let hash =
         Transaction_hash.hash_command (User_command.Signed_command full_command)
         |> Transaction_hash.to_base58_check
