@@ -387,7 +387,8 @@ end
 
 module Options = struct
   module Impl (M : Monad_fail.S) = struct
-    let handle (network : Network_request.t) =
+    (* Currently, mainnet, testnet, devnet etc don't affect Rosetta options *)
+    let handle (_network : Network_request.t) =
       M.return @@
       { Network_options_response.version=
           Version.create "1.4.9" "v1.0"
