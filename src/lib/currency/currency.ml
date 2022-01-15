@@ -23,6 +23,8 @@ module Signed_poly = Signed_poly
 
 type uint64 = Unsigned.uint64
 
+[%%ifdef consensus_mechanism]
+
 module Signed_var = struct
   type 'mag repr = ('mag, Sgn.var) Signed_poly.t
 
@@ -30,6 +32,8 @@ module Signed_var = struct
   type nonrec 'mag t =
     { mutable repr : 'mag repr option; mutable value : Field.Var.t option }
 end
+
+[%%endif]
 
 module Make (Unsigned : sig
   include Unsigned_extended.S
