@@ -6,19 +6,19 @@ branch="${MINA_BRANCH-$(git rev-parse --verify --abbrev-ref HEAD || echo "<unkno
 # we are nested 6 directories deep (_build/<context>/src/lib/mina_version/normal)
 root="${MINA_ROOT-$(git rev-parse --show-toplevel || echo ../../../../../..)}"
 
-pushd "$root"
+pushd "$root" > /dev/null
   id="${MINA_COMMIT_SHA1-$(git rev-parse --verify HEAD || echo "<unknown>")}"
   commit_id_short="$(printf "%s" "$id" | cut -c1-8)"
-  if [[ -e .git ]] && ! git diff --stat --exit-code; then id="[DIRTY]$id"; fi
+  if [[ -e .git ]] && ! git diff --quiet; then id="[DIRTY]$id"; fi
   commit_date="${MINA_COMMIT_DATE-$(git show HEAD -s --format="%cI" || echo "<unknown>")}"
 
-  pushd src/lib/marlin
+  pushd src/lib/marlin > /dev/null
     marlin_commit_id="${MARLIN_COMMIT_ID-$(git rev-parse --verify HEAD || echo "<unknown>")}"
     marlin_commit_id_short="$(printf '%s' "$marlin_commit_id" | cut -c1-8)"
-    if [[ -e .git ]] && ! git diff --stat --exit-code; then marlin_commit_id="[DIRTY]$marlin_commit_id"; fi
+    if [[ -e .git ]] && ! git diff --quiet; then marlin_commit_id="[DIRTY]$marlin_commit_id"; fi
     marlin_commit_date="${MARLIN_COMMIT_DATE-$(git show HEAD -s --format="%cI" || echo "<unknown>")}"
-  popd
-popd
+  popd > /dev/null
+popd > /dev/null
 
 {
     printf 'let commit_id = "%s"\n' "$id"

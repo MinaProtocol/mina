@@ -96,15 +96,19 @@ let
       MINA_COMMIT_SHA1 = sourceInfo.rev or "DIRTY";
       MINA_BRANCH = "<unknown>";
 
-      buildPhase = ''
-        export MINA_ROOT="$NIX_BUILD_TOP/$sourceRoot"
-        sed 's,/usr/local/lib/librocksdb_coda.a,${pkgs.rocksdb}/lib/librocksdb.a,' -i src/external/ocaml-rocksdb/dune
-        sed 's,make ,make GO_CAPNP_STD=${pkgs.go-capnproto2.src}/std ,' -i src/libp2p_ipc/dune
-        sed 's,cargo build --release,mkdir target,' -i src/lib/marlin_plonk_bindings/stubs/dune
-        sed 's,target/release,${pkgs.marlin_plonk_bindings_stubs}/lib,' -i src/lib/marlin_plonk_bindings/stubs/dune
+      MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
+      GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
+      MARLIN_PLONK_STUBS = "${pkgs.marlin_plonk_bindings_stubs}/lib";
+
+      configurePhase = ''
+        export MINA_ROOT="$PWD"
         patchShebangs .
-        dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe -j$NIX_BUILD_CORES
       '';
+
+      buildPhase = ''
+        dune build --display=short src/app/logproc/logproc.exe src/app/cli/src/mina.exe -j$NIX_BUILD_CORES
+      '';
+
       installPhase = ''
         mkdir -p $out/bin
         mv _build/default/src/app/{logproc/logproc.exe,cli/src/mina.exe} $out/bin
