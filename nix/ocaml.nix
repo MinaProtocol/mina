@@ -40,12 +40,6 @@ let
       map dds [
         (zlib.override { splitStaticOutput = false; })
         (bzip2.override { linkStatic = true; })
-        (snappy.override { static = true; })
-        (lz4.override {
-          enableStatic = true;
-          enableShared = false;
-        })
-        (zstd.override { static = true; })
         (jemalloc)
         (gmp.override { withStatic = true; })
         (openssl.override { static = true; })
@@ -54,9 +48,6 @@ let
     else [
       zlib
       bzip2
-      snappy
-      lz4
-      zstd
       jemalloc
       gmp
       openssl
@@ -82,20 +73,20 @@ let
       src = builtins.filterSource (name: type:
         name == (toString (../. + "/dune"))
         || pkgs.lib.hasPrefix (toString (../. + "/src")) name) ../.;
-      # todo: slimmed rocksdb
-      buildInputs =
-        (builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self))
-        ++ external-libs;
-      nativeBuildInputs = [ self.dune self.ocamlfind pkgs.capnproto pkgs.removeReferencesTo ]
-        ++ builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self);
-      NIX_LDFLAGS = "-lsnappy -llz4 -lzstd";
       # TODO, get this from somewhere
-      MARLIN_REPO_SHA = "bacef43ea34122286745578258066c29091dc36a";
+      MARLIN_REPO_SHA = "<unknown>";
 
       MINA_COMMIT_DATE = sourceInfo.lastModifiedDate or "<unknown>";
       MINA_COMMIT_SHA1 = sourceInfo.rev or "DIRTY";
       MINA_BRANCH = "<unknown>";
 
+      buildInputs =
+        (builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self))
+        ++ external-libs;
+      nativeBuildInputs = [ self.dune self.ocamlfind pkgs.capnproto pkgs.removeReferencesTo ]
+        ++ builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self);
+
+      # todo: slimmed rocksdb
       MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
       GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
       MARLIN_PLONK_STUBS = "${pkgs.marlin_plonk_bindings_stubs}/lib";
