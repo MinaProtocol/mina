@@ -23,7 +23,7 @@ ENV DEBIAN_FRONTEND noninteractive
 # Dependencies
 RUN apt-get -y update && \
   DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
-  DEBIAN_FRONTEND=noninteractive apt-get -y install \
+  DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends \
     apt-transport-https \
     ca-certificates \
     curl \
