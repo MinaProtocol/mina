@@ -3,6 +3,7 @@
   nixConfig.allow-import-from-derivation = "true";
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable-small";
+
   # todo: upstream
   inputs.mix-to-nix.url = "github:serokell/mix-to-nix/yorickvp/deadlock";
   inputs.nix-npm-buildPackage.url =
@@ -17,8 +18,14 @@
   inputs.nixpkgs-mozilla.url = "github:mozilla/nixpkgs-mozilla";
   inputs.nixpkgs-mozilla.flake = false;
 
+  # For nix/compat.nix
+  inputs.flake-compat.url = "github:edolstra/flake-compat";
+  inputs.flake-compat.flake = false;
+  inputs.gitignore-nix.url = "github:hercules-ci/gitignore.nix";
+  inputs.gitignore-nix.inputs.nixpkgs.follows = "nixpkgs";
+
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
-    , opam-nix, opam-repository, nixpkgs-mozilla }:
+    , opam-nix, opam-repository, nixpkgs-mozilla, ... }:
     let inherit (utils.lib) exportOverlays exportPackages;
     in utils.lib.mkFlake {
       inherit self inputs;
@@ -36,16 +43,21 @@
           nix-npm-buildPackage =
             pkgs.callPackage inputs.nix-npm-buildPackage { };
 
+          requireSubmodules = lib.warnIf (!self.sourceInfo ? submodules) ''
+            Submodules are not enabled, you may be getting incorrect versions of dependencies.
+            Consider running nix/pin.sh and using the mina flake.
+            Ignore this message if you're using nix/compat.nix.
+          '';
+
           checks = import ./nix/checks.nix inputs pkgs;
 
-          ocamlPackages_static = assert self.sourceInfo.submodules;
-            import ./nix/ocaml.nix {
-              inherit inputs pkgs;
-              static = true;
-            };
+          ocamlPackages_static = requireSubmodules (import ./nix/ocaml.nix {
+            inherit inputs pkgs;
+            static = true;
+          });
 
-          ocamlPackages = assert self.sourceInfo.submodules;
-            import ./nix/ocaml.nix { inherit inputs pkgs; };
+          ocamlPackages =
+            requireSubmodules (import ./nix/ocaml.nix { inherit inputs pkgs; });
         in {
 
           # Jobs/Lint/Rust.dhall
@@ -118,6 +130,7 @@
 
           defaultPackage = ocamlPackages.mina;
 
+          packages.impure-shell = import ./nix/impure-shell.nix pkgs;
           devShells.impure = import ./nix/impure-shell.nix pkgs;
 
           inherit checks;
