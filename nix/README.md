@@ -103,5 +103,10 @@ update` . If you want to update a particular input, run `nix flake lock
 The "pure" build is performed with the help of
 [opam-nix](https://github.com/tweag/opam-nix). The switch is imported
 from `src/opam.export`, and then external deps (from `src/external`)
-are added on top. All the dependencies are then provided to the final
-Mina derivation. See [./ocaml.nix](./ocaml.nix) for more details.
+are added on top. Also, all in-tree Rust dependencies
+(`kimchi_bindings` in particular) are built as separate derivations
+using `rustPlatform`. Implicit native dependencies are taken from
+nixpkgs with some overlays applied (see
+[./overlay.nix](./overlay.nix)). All the dependencies are then
+provided to the final Mina derivation. See [./ocaml.nix](./ocaml.nix)
+for more details.
