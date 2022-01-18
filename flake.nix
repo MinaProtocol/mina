@@ -46,7 +46,7 @@
           requireSubmodules = lib.warnIf (!self.sourceInfo ? submodules) ''
             Submodules are not enabled, you may be getting incorrect versions of dependencies.
             Consider running nix/pin.sh and using the mina flake.
-            Ignore this message if you're using nix/compat.nix.
+            Ignore this message if you're not using flakes.
           '';
 
           checks = import ./nix/checks.nix inputs pkgs;
