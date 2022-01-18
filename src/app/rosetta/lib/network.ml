@@ -151,18 +151,27 @@ module Validate_choice = struct
 end
 
 module List_ = struct
+  module Env = struct
+    type t = string (* just the network name *)
+
+    module Real = struct
+      let read_network =
+        Memoize.ignores_args @@
+          fun logger ->
+            match Sys.getenv "MINA_ROSETTA_NETWORK" with
+            | Some s -> s
+            | None ->
+                [%log warn] "MINA_ROSETTA_NETWORK is not set, assuming debug network";
+                "debug"
+    end
+  end
+
   module Impl (M : Monad_fail.S) = struct
-    let handle =
+    let handle ~(env:Env.t) =
       M.return @@
       { Network_list_response.network_identifiers=
           [ { Network_identifier.blockchain= "mina"
-            ; network= "debug"
-            ; sub_network_identifier= None }
-          ; { Network_identifier.blockchain= "mina"
-            ; network= "devnet"
-            ; sub_network_identifier= None }
-          ; { Network_identifier.blockchain= "mina"
-            ; network= "mainnet"
+            ; network= env
             ; sub_network_identifier= None } ] }
   end
 
@@ -387,7 +396,8 @@ end
 
 module Options = struct
   module Impl (M : Monad_fail.S) = struct
-    let handle (network : Network_request.t) =
+    (* Currently, mainnet, testnet, devnet etc don't affect Rosetta options *)
+    let handle (_network : Network_request.t) =
       M.return @@
       { Network_options_response.version=
           Version.create "1.4.9" "v1.0"
@@ -442,7 +452,7 @@ let router ~get_graphql_uri_or_error ~logger ~with_db (route : string list) body
         |> Errors.Lift.wrap
       in
       let%map res =
-        List_.Real.handle |> Errors.Lift.wrap
+        List_.Real.handle ~env:(List_.Env.Real.read_network logger) |> Errors.Lift.wrap
       in
       Network_list_response.to_yojson res
   | ["status"] ->
