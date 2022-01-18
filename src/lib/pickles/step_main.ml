@@ -246,8 +246,10 @@ let step_main :
                   , unfinalized :: unfinalizeds
                   , should_verify :: should_verifys
                   , S pi ) ->
+                  (*
                     Boolean.Assert.( = ) unfinalized.should_finalize
                       should_verify ;
+                     *)
                     let ( app_state
                         , state
                         , prev_evals
@@ -344,16 +346,16 @@ let step_main :
                 go prevs datas pass_throughs unfinalized_proofs
                   proofs_should_verify branching
               in
-              Boolean.Assert.all vs ; chalss)
+              (* Boolean.Assert.all vs ;*) chalss)
         in
-        let () =
+        let _ : Boolean.var =
           with_label "hash_me_only" (fun () ->
               let hash_me_only =
                 unstage
                   (hash_me_only ~index:dlog_plonk_index
                      basic.var_to_field_elements)
               in
-              Field.Assert.equal stmt.proof_state.me_only
+              Field.equal stmt.proof_state.me_only
                 (hash_me_only
                    { app_state
                    ; dlog_plonk_index

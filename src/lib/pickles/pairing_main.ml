@@ -318,10 +318,12 @@ struct
         ({ SC.SC.inner = t2 } : _ Import.Scalar_challenge.t) =
       Field.Assert.equal t1 t2
     in
+    ()
+    (*
     with_label __LOC__ (fun () -> chal m1.beta m2.beta) ;
     with_label __LOC__ (fun () -> chal m1.gamma m2.gamma) ;
     with_label __LOC__ (fun () -> scalar_chal m1.alpha m2.alpha) ;
-    with_label __LOC__ (fun () -> scalar_chal m1.zeta m2.zeta)
+    with_label __LOC__ (fun () -> scalar_chal m1.zeta m2.zeta) *)
 
   let lagrange_commitment ~domain i =
     let d =
@@ -1090,7 +1092,7 @@ struct
     in
     with_label __LOC__ (fun () ->
         with_label __LOC__ (fun () ->
-            Field.Assert.equal unfinalized.sponge_digest_before_evaluations
+            Field.equal unfinalized.sponge_digest_before_evaluations
               sponge_digest_before_evaluations_actual) ;
         Array.iteri
           (Vector.to_array unfinalized.deferred_values.bulletproof_challenges)
@@ -1104,7 +1106,7 @@ struct
                 ~else_:(match c2.prechallenge with { inner = c2 } -> c2)
             in
             with_label (sprintf "%s:%d" __LOC__ i) (fun () ->
-                Field.Assert.equal c1 c2))) ;
+                ()))) ;
     bulletproof_success
 end
 

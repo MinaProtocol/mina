@@ -13,8 +13,8 @@ module Rounds : sig
   module Step_vector : Vector.With_version(Step).S
 end = struct
   open Pickles_types
-  module Wrap = Nat.N15
-  module Step = Nat.N16
+  module Wrap = Nat.N14
+  module Step = Nat.N14
 
   (* Think about versioning here! These vector types *will* change
      serialization if the numbers above change, and so will require a new
@@ -29,17 +29,17 @@ end = struct
       [@@@no_toplevel_latest_type]
 
       module V1 = struct
-        type 'a t = 'a Vector.Vector_15.Stable.V1.t
+        type 'a t = 'a Vector.Vector_14.Stable.V1.t
         [@@deriving compare, yojson, sexp, hash, equal]
       end
     end]
 
-    type 'a t = 'a Vector.Vector_15.t
+    type 'a t = 'a Vector.Vector_14.t
     [@@deriving compare, yojson, sexp, hash, equal]
 
     let map = Vector.map
 
-    let of_list_exn = Vector.Vector_15.of_list_exn
+    let of_list_exn = Vector.Vector_14.of_list_exn
 
     let to_list = Vector.to_list
   end
@@ -50,17 +50,17 @@ end = struct
       [@@@no_toplevel_latest_type]
 
       module V1 = struct
-        type 'a t = 'a Vector.Vector_16.Stable.V1.t
+        type 'a t = 'a Vector.Vector_14.Stable.V1.t
         [@@deriving compare, yojson, sexp, hash, equal]
       end
     end]
 
-    type 'a t = 'a Vector.Vector_16.t
+    type 'a t = 'a Vector.Vector_14.t
     [@@deriving compare, yojson, sexp, hash, equal]
 
     let map = Vector.map
 
-    let of_list_exn = Vector.Vector_16.of_list_exn
+    let of_list_exn = Vector.Vector_14.of_list_exn
 
     let to_list = Vector.to_list
   end

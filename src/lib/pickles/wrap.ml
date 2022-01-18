@@ -351,6 +351,8 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
   let me_only_prepared =
     P.Base.Me_only.Dlog_based.prepare next_statement.proof_state.me_only
   in
+  let (_ : Kimchi_pasta.Pasta.Pallas.Affine.t) = Lazy.force Dummy.Ipa.Wrap.sg in
+  let t0 = Time.now () in
   let%map.Deferred next_proof =
     let (T (input, conv)) = Impls.Wrap.input () in
     Common.time "wrap proof" (fun () ->
@@ -381,6 +383,8 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
               }
           })
   in
+  let t1 = Time.now () in
+  printf "wrap time = %s\n%!" (Time.Span.to_string_hum (Time.diff t1 t0)) ;
   ( { proof = next_proof
     ; statement = Types.Dlog_based.Statement.to_minimal next_statement
     ; prev_evals =

@@ -1006,7 +1006,7 @@ let%test_module "test no side-loaded" =
               (module Statement.Constant)
               ~typ:Field.typ
               ~branches:(module Nat.N1)
-              ~max_branching:(module Nat.N2)
+              ~max_branching:(module Nat.N1)
               ~name:"blockchain-snark"
               ~constraint_constants:
                 (* Dummy values *)
@@ -1023,19 +1023,19 @@ let%test_module "test no side-loaded" =
                 }
               ~choices:(fun ~self ->
                 [ { identifier = "main"
-                  ; prevs = [ self; self ]
+                  ; prevs = [ self ]
                   ; main =
-                      (fun [ prev; _ ] self ->
+                      (fun [ prev] self ->
                         let is_base_case = Field.equal Field.zero self in
                         let proof_must_verify = Boolean.not is_base_case in
                         let self_correct = Field.(equal (one + prev) self) in
                         Boolean.Assert.any [ self_correct; is_base_case ] ;
-                        [ proof_must_verify; Boolean.false_ ])
+                        [ proof_must_verify])
                   ; main_value =
                       (fun _ self ->
                         let is_base_case = Field.Constant.(equal zero self) in
                         let proof_must_verify = not is_base_case in
-                        [ proof_must_verify; false ])
+                        [ proof_must_verify ])
                   }
                 ]))
 
@@ -1044,14 +1044,14 @@ let%test_module "test no side-loaded" =
 
     let xs =
       let s_neg_one = Field.Constant.(negate one) in
-      let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
-        Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n
+      let b_neg_one : (Nat.N1.n, Nat.N1.n) Proof0.t =
+        Proof0.dummy Nat.N1.n Nat.N1.n Nat.N1.n
       in
       let b0 =
         Common.time "b0" (fun () ->
             Run_in_thread.block_on_async_exn (fun () ->
                 Blockchain_snark.step
-                  [ (s_neg_one, b_neg_one); (s_neg_one, b_neg_one) ]
+                  [ (s_neg_one, b_neg_one) ]
                   Field.Constant.zero))
       in
       assert (
@@ -1061,8 +1061,15 @@ let%test_module "test no side-loaded" =
         Common.time "b1" (fun () ->
             Run_in_thread.block_on_async_exn (fun () ->
                 Blockchain_snark.step
-                  [ (Field.Constant.zero, b0); (Field.Constant.zero, b0) ]
+                  [ (Field.Constant.zero, b0)  ]
                   Field.Constant.one))
+      in
+      let _b2 =
+        Common.time "b2" (fun () ->
+            Run_in_thread.block_on_async_exn (fun () ->
+                Blockchain_snark.step
+                  [ (Field.Constant.one, b1)  ]
+                  (Field.Constant.of_int 2)))
       in
       [ (Field.Constant.zero, b0); (Field.Constant.one, b1) ]
 
