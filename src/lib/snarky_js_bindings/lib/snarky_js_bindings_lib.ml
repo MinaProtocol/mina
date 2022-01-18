@@ -19,13 +19,23 @@ let loose_permissions : Mina_base_kernel.Permissions.t =
   }
 
 module Impl = Pickles.Impls.Step
+
+(* module Impl = Snarky_backendless.Snark.Run.Make (Backend) (Core_kernel.Unit) *)
+
 module Other_impl = Pickles.Impls.Wrap
+
+(* module Other_impl = Snarky_backendless.Snark.Run.Make (Other_backend) (Core_kernel.Unit) *)
+
 module Challenge = Limb_vector.Challenge.Make (Impl)
 module Sc =
   Pickles.Scalar_challenge.Make (Impl) (Pickles.Step_main_inputs.Inner_curve)
     (Challenge)
     (Pickles.Endo.Step_inner_curve)
 module Js = Js_of_ocaml.Js
+
+let console_log_string s = Js_of_ocaml.Firebug.console##log (Js.string s)
+
+let console_log s = Js_of_ocaml.Firebug.console##log s
 
 (*
 let () =
@@ -263,7 +273,7 @@ let optdef_arg_method (type a) class_ (name : string)
   in
   Js.Unsafe.set prototype (Js.string name) meth
 
-let () =
+let to_js_field =
   let method_ name (f : field_class Js.t -> _) = method_ field_class name f in
   let to_string (x : Field.t) =
     ( match x with
@@ -514,7 +524,8 @@ let () =
                  else Field.Constant.of_string s ))
           with Failure _ -> Js.Opt.empty )
       | _ ->
-          Js.Opt.empty)
+          Js.Opt.empty) ;
+  mk
 
 let () =
   let handle_constants2 f f_constant (x : Boolean.var) (y : Boolean.var) =
@@ -1563,6 +1574,74 @@ let () =
       bool Js.t
     -> vk##verify pub this)
 
+(* helpers for pickles_compile *)
+
+module Single_field_statement = struct
+  type t = Field.t
+
+  let to_field_elements x = [| x |]
+end
+
+module Single_field_statement_const = struct
+  type t = Field.Constant.t
+
+  let to_field_elements x = [| x |]
+end
+
+type ('a_var, 'a_value, 'a_weird) pickles_rule =
+  { identifier : string
+  ; prevs : 'a_weird list
+  ; main : 'a_var list -> 'a_var -> Boolean.var list
+  ; main_value : 'a_value list -> 'a_value -> bool list
+  }
+
+type pickles_rule_js = Js.js_string Js.t * (field_class Js.t -> unit)
+
+let create_pickles_rule ~self (identifier, main) =
+  { identifier = Js.to_string identifier
+  ; prevs = [ self ]
+  ; main =
+      (fun _ self ->
+        main (to_js_field self) ;
+        [ Boolean.false_ ])
+  ; main_value = (fun _ _ -> [ false ])
+  }
+
+let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
+  console_log_string "pickles_compile" ;
+  let choices = choices |> Js.to_array |> Array.to_list in
+  let choices ~self =
+    List.map choices ~f:(create_pickles_rule ~self) |> Obj.magic
+  in
+  let _tag, _cache, p, provers =
+    Pickles.compile ~choices
+      (module Single_field_statement)
+      (module Single_field_statement_const)
+      ~typ:Field.typ
+      ~branches:(module Pickles_types.Nat.N1)
+      ~max_branching:(module Pickles_types.Nat.N1)
+      ~name:"smart-contract"
+      ~constraint_constants:
+        (* TODO these are dummy values *)
+        { sub_windows_per_window = 0
+        ; ledger_depth = 0
+        ; work_delay = 0
+        ; block_window_duration_ms = 0
+        ; transaction_capacity = Log_2 0
+        ; pending_coinbase_depth = 0
+        ; coinbase_amount = Unsigned.UInt64.of_int 0
+        ; supercharged_coinbase_factor = 0
+        ; account_creation_fee = Unsigned.UInt64.of_int 0
+        ; fork = None
+        }
+  in
+  let module Proof = (val p) in
+  object%js
+    val provers = provers |> Obj.magic |> Array.of_list |> Js.array
+
+    val getVerificationKey = fun () -> Lazy.force Proof.verification_key
+  end
+
 module Ledger = struct
   type js_field = field_class Js.t
 
@@ -2121,7 +2200,7 @@ export class Ledger {
   static create(genesisAccounts: Array<{publicKey: PublicKey, balance: number}>): Ledger;
 
   applyPartiesTransaction(parties: Parties);
-  
+
   getAccount(publicKey: PublicKey): Account | null;
 };
 *)
@@ -2134,7 +2213,9 @@ let export () =
   Js.export "Group" group_class ;
   Js.export "Poseidon" poseidon ;
   Js.export "Circuit" Circuit.circuit ;
-  Js.export "Ledger" Ledger.ledger_class
+  Js.export "Ledger" Ledger.ledger_class ;
+  (* TODO: should we use Js.wrap_callback here? *)
+  Js.export "picklesCompile" pickles_compile
 
 let export_global () =
   let snarky_obj =
