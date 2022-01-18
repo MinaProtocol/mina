@@ -735,16 +735,9 @@ module Parse = struct
                 Mainnet
               else Testnet
             in
-            match
+            Option.is_some @@
               Signed_command.create_with_signature_checked ~signature_kind
-                signature signer payload
-            with
-            | None ->
-                (* invalid signature *)
-                false
-            | Some _ ->
-                (* valid signature *)
-                true )
+                signature signer payload )
       ; lift = Deferred.return
       }
   end
