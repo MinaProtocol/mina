@@ -556,8 +556,6 @@ let () =
   method_ "assertEquals" (fun this (y : As_bool.t) : unit ->
       Boolean.Assert.( = ) this##.value (As_bool.value y)) ;
   add_op2 "equals" equal ;
-  add_op1 "isTrue" Fn.id ;
-  add_op1 "isFalse" Boolean.not ;
   method_ "toBoolean" (fun this : bool Js.t ->
       match (this##.value :> Field.t) with
       | Constant x ->
@@ -606,8 +604,6 @@ let () =
   static_method "assertEqual" (fun (x : As_bool.t) (y : As_bool.t) : unit ->
       Boolean.Assert.( = ) (As_bool.value x) (As_bool.value y)) ;
   static_op2 "equal" equal ;
-  static_op1 "isTrue" Fn.id ;
-  static_op1 "isFalse" Boolean.not ;
   static_method "count"
     (fun (bs : As_bool.t Js.js_array Js.t) : field_class Js.t ->
       new%js field_constr
