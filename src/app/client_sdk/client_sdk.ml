@@ -271,9 +271,7 @@ let _ =
            in
            match payload_or_err with
            | Ok payload -> (
-               let signature =
-                 Signed_command.sign_payload sk payload |> Signature.Raw.encode
-               in
+               let signature = Signed_command.sign_payload sk payload in
                let signed_txn =
                  Transaction.Signed.{ command; nonce; signature }
                in

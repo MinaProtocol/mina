@@ -147,16 +147,18 @@ module Timing_info = struct
 
   let find_by_pk_opt (module Conn : CONNECTION) public_key =
     let open Deferred.Result.Let_syntax in
-    let%bind pk_id = Public_key.find (module Conn) public_key in
-    Conn.find_opt
-      (Caqti_request.find_opt Caqti_type.int typ
-         {sql| SELECT public_key_id, token, initial_balance,
-                     initial_minimum_balance, cliff_time, cliff_amount,
-                     vesting_period, vesting_increment
+    match%bind Public_key.find_opt (module Conn) public_key with
+    | None -> return None
+    | Some pk_id ->
+      Conn.find_opt
+        (Caqti_request.find_opt Caqti_type.int typ
+           {sql| SELECT public_key_id, token, initial_balance,
+                        initial_minimum_balance, cliff_time, cliff_amount,
+                        vesting_period, vesting_increment
                FROM timing_info
                WHERE public_key_id = ?
          |sql})
-      pk_id
+        pk_id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (acc : Account.t) =
     let open Deferred.Result.Let_syntax in
@@ -675,11 +677,18 @@ module Coinbase = struct
 end
 
 module Balance = struct
-  type t = {id: int; public_key_id: int; balance: int64} [@@deriving hlist]
+  type t = { id: int
+           ; public_key_id: int
+           ; balance: int64
+           ; block_id: int
+           ; block_height: int64
+           ; block_sequence_no: int
+           ; block_secondary_sequence_no: int
+           } [@@deriving hlist]
 
   let typ =
     let open Caqti_type_spec in
-    let spec = Caqti_type.[int; int; int64] in
+    let spec = Caqti_type.[int; int; int64; int; int64;int;int] in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
@@ -689,43 +698,55 @@ module Balance = struct
     |> Unsigned.UInt64.to_int64
 
   let find (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) =
+      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no =
     Conn.find_opt
       (Caqti_request.find_opt
-         Caqti_type.(tup2 int int64)
+         Caqti_type.(tup2 (tup2 int int64) (tup4 int int64 int int))
          Caqti_type.int
          {sql| SELECT id FROM balances
                WHERE public_key_id = $1
                AND balance = $2
+               AND block_id = $3
+               AND block_height = $4
+               AND block_sequence_no = $5
+               AND block_secondary_sequence_no = $6
          |sql})
-      (public_key_id, balance_to_int64 balance)
+         ((public_key_id, balance_to_int64 balance),
+          (block_id, block_height, block_sequence_no, block_secondary_sequence_no))
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
       (Caqti_request.find Caqti_type.int
-         Caqti_type.(tup2 int int64)
-         {sql| SELECT public_key_id, balance FROM balances
+         typ
+         {sql| SELECT id, public_key_id, balance,
+                      block_id, block_height,
+                      block_sequence_no, block_secondary_sequence_no
+               FROM balances
                WHERE id = $1
          |sql})
       id
 
   let add (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) =
+      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no =
     Conn.find
       (Caqti_request.find
-         Caqti_type.(tup2 int int64)
+         Caqti_type.(tup2 (tup2 int int64) (tup4 int int64 int int))
          Caqti_type.int
-         {sql| INSERT INTO balances (public_key_id, balance) VALUES (?, ?) RETURNING id |sql})
-      (public_key_id, balance_to_int64 balance)
+         {sql| INSERT INTO balances (public_key_id, balance,
+                                     block_id, block_height, block_sequence_no, block_secondary_sequence_no)
+               VALUES (?, ?, ?, ?, ?, ?)
+               RETURNING id |sql})
+      ((public_key_id, balance_to_int64 balance),
+       (block_id, block_height, block_sequence_no, block_secondary_sequence_no))
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) =
+      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no =
     let open Deferred.Result.Let_syntax in
-    match%bind find (module Conn) ~public_key_id ~balance with
+    match%bind find (module Conn) ~public_key_id ~balance  ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no with
     | Some balance_id ->
         return balance_id
     | None ->
-        add (module Conn) ~public_key_id ~balance
+        add (module Conn) ~public_key_id ~balance ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no
 end
 
 module Block_and_internal_command = struct
@@ -877,7 +898,7 @@ module Block_and_signed_command = struct
       ; source_balance_id
       ; receiver_balance_id }
 
-  let add_with_status (module Conn : CONNECTION) ~block_id ~user_command_id
+  let add_with_status (module Conn : CONNECTION) ~block_id ~block_height ~user_command_id
       ~sequence_no ~(status : Transaction_status.t) ~fee_payer_id ~source_id
       ~receiver_id =
     let open Deferred.Result.Let_syntax in
@@ -904,7 +925,7 @@ module Block_and_signed_command = struct
       | Failed (failure, balances) ->
           ("failed", Some failure, None, None, None, balances)
     in
-    let add_optional_balance id balance =
+    let add_optional_balance id balance ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no =
       match balance with
       | None ->
           Deferred.Result.return None
@@ -913,6 +934,7 @@ module Block_and_signed_command = struct
             Balance.add_if_doesn't_exist
               (module Conn)
               ~public_key_id:id ~balance
+              ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no
           in
           Some balance_id
     in
@@ -923,12 +945,15 @@ module Block_and_signed_command = struct
       Balance.add_if_doesn't_exist
         (module Conn)
         ~public_key_id:fee_payer_id ~balance:fee_payer_balance
+        ~block_id ~block_height ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0
     in
     let%bind source_balance_id =
       add_optional_balance source_id source_balance
+                ~block_id ~block_height ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0
     in
     let%bind receiver_balance_id =
       add_optional_balance receiver_id receiver_balance
+        ~block_id ~block_height ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0
     in
     add
       (module Conn)
@@ -1091,6 +1116,11 @@ module Block = struct
             (module Conn)
             (Consensus.Data.Consensus_state.next_epoch_data consensus_state)
         in
+        let height =
+          consensus_state
+          |> Consensus.Data.Consensus_state.blockchain_length
+          |> Unsigned.UInt32.to_int64
+        in
         let%bind block_id =
           Conn.find
             (Caqti_request.find typ Caqti_type.int
@@ -1116,10 +1146,7 @@ module Block = struct
                 Protocol_state.blockchain_state protocol_state
                 |> Blockchain_state.staged_ledger_hash
                 |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_base58_check
-            ; height=
-                consensus_state
-                |> Consensus.Data.Consensus_state.blockchain_length
-                |> Unsigned.UInt32.to_int64
+            ; height
             ; global_slot_since_hard_fork=
                 Consensus.Data.Consensus_state.curr_global_slot consensus_state
                 |> Unsigned.UInt32.to_int64
@@ -1202,7 +1229,7 @@ module Block = struct
                 let%map () =
                   Block_and_signed_command.add_with_status
                     (module Conn)
-                    ~block_id ~user_command_id:id ~sequence_no
+                      ~block_id ~block_height:height ~user_command_id:id ~sequence_no
                     ~status:user_command.status ~fee_payer_id ~source_id
                     ~receiver_id
                   >>| ignore
@@ -1261,6 +1288,8 @@ module Block = struct
                         Balance.add_if_doesn't_exist
                           (module Conn)
                           ~public_key_id:receiver_id ~balance
+                          ~block_id ~block_height:height
+                          ~block_sequence_no:sequence_no ~block_secondary_sequence_no:secondary_sequence_no
                       in
                       let receiver_account_creation_fee_paid =
                         account_creation_fee_of_fees_and_balance fee balance
@@ -1306,6 +1335,7 @@ module Block = struct
                           (module Conn)
                           ~public_key_id:fee_transfer_receiver_id
                           ~balance
+                          ~block_id ~block_height:height ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0
                       in
                       let receiver_account_creation_fee_paid =
                         account_creation_fee_of_fees_and_balance fee balance
@@ -1332,6 +1362,9 @@ module Block = struct
                     (module Conn)
                     ~public_key_id:coinbase_receiver_id
                     ~balance:balances.coinbase_receiver_balance
+                    ~block_id ~block_height:height
+                    ~block_sequence_no:sequence_no
+                    ~block_secondary_sequence_no:0
                 in
                 let receiver_account_creation_fee_paid =
                   account_creation_fee_of_fees_and_balance ?additional_fee
@@ -1448,33 +1481,40 @@ module Block = struct
       in
       List.zip_exn block.user_cmds (List.rev user_cmd_ids_rev)
     in
-    let balance_id_of_pk_and_balance pk balance =
+    let balance_id_of_info pk balance ~block_sequence_no ~block_secondary_sequence_no =
       let%bind public_key_id =
         Public_key.add_if_doesn't_exist (module Conn) pk
       in
       Balance.add_if_doesn't_exist (module Conn) ~public_key_id ~balance
+        ~block_id ~block_height:(block.height |> Unsigned.UInt32.to_int64) ~block_sequence_no
+        ~block_secondary_sequence_no
     in
-    let balance_id_of_pk_and_balance_opt pk balance_opt =
+    let balance_id_of_info_balance_opt pk balance_opt ~block_sequence_no ~block_secondary_sequence_no =
       Option.value_map balance_opt ~default:(Deferred.Result.return None)
         ~f:(fun balance ->
-          let%map id = balance_id_of_pk_and_balance pk balance in
-          Some id )
+            let%map id = balance_id_of_info pk balance
+                ~block_sequence_no ~block_secondary_sequence_no
+            in
+            Some id )
     in
     (* add user commands to join table *)
     let%bind () =
       deferred_result_list_fold user_cmds_with_ids ~init:()
         ~f:(fun () (user_command, user_command_id) ->
-          let%bind source_balance_id =
-            balance_id_of_pk_and_balance_opt user_command.source
-              user_command.source_balance
-          in
           let%bind fee_payer_balance_id =
-            balance_id_of_pk_and_balance user_command.fee_payer
+            balance_id_of_info user_command.fee_payer
               user_command.fee_payer_balance
+              ~block_sequence_no:user_command.sequence_no ~block_secondary_sequence_no:0
+          in
+          let%bind source_balance_id =
+            balance_id_of_info_balance_opt user_command.source
+              user_command.source_balance
+              ~block_sequence_no:user_command.sequence_no ~block_secondary_sequence_no:0
           in
           let%bind receiver_balance_id =
-            balance_id_of_pk_and_balance_opt user_command.receiver
+            balance_id_of_info_balance_opt user_command.receiver
               user_command.receiver_balance
+              ~block_sequence_no:user_command.sequence_no ~block_secondary_sequence_no:0
           in
           Block_and_signed_command.add_if_doesn't_exist
             (module Conn)
@@ -1514,8 +1554,9 @@ module Block = struct
            , (sequence_no, secondary_sequence_no) )
            ->
           let%bind receiver_balance_id =
-            balance_id_of_pk_and_balance internal_command.receiver
+            balance_id_of_info internal_command.receiver
               internal_command.receiver_balance
+              ~block_sequence_no:internal_command.sequence_no ~block_secondary_sequence_no:internal_command.secondary_sequence_no
           in
           let receiver_account_creation_fee_paid = internal_command.receiver_account_creation_fee_paid
                                                    |> Option.map ~f:(fun amount ->
@@ -1567,10 +1608,22 @@ module Block = struct
       |sql})
       (end_block_id,start_block_id)
 
-  let get_highest_canonical_blocks (module Conn : CONNECTION) =
-    Conn.collect_list
-      (Caqti_request.collect Caqti_type.unit Caqti_type.(tup2 int int64)
+  let get_highest_canonical_block_opt (module Conn : CONNECTION) =
+    Conn.find_opt
+      (Caqti_request.find_opt Caqti_type.unit Caqti_type.(tup2 int int64)
          "SELECT id,height FROM blocks WHERE chain_status='canonical' ORDER BY height DESC LIMIT 1")
+
+  let get_nearest_canonical_block_above (module Conn : CONNECTION) height =
+    Conn.find
+      (Caqti_request.find Caqti_type.int64 Caqti_type.(tup2 int int64)
+         "SELECT id,height FROM blocks WHERE chain_status='canonical' AND height > ? ORDER BY height ASC LIMIT 1")
+      height
+
+  let get_nearest_canonical_block_below (module Conn : CONNECTION) height =
+    Conn.find
+      (Caqti_request.find Caqti_type.int64 Caqti_type.(tup2 int int64)
+         "SELECT id,height FROM blocks WHERE chain_status='canonical' AND height < ? ORDER BY height DESC LIMIT 1")
+      height
 
   let mark_as_canonical (module Conn : CONNECTION) ~state_hash =
     Conn.exec
@@ -1588,33 +1641,40 @@ module Block = struct
       (state_hash,height)
 
   (* update chain_status for blocks now known to be canonical or orphaned *)
-   let update_chain_status (module Conn : CONNECTION) ~block_id =
-     let open Deferred.Result.Let_syntax in
-     match%bind get_highest_canonical_blocks (module Conn) () with
-     | [] ->
-       (* no canonical blocks in this database, don't update statuses
-          this can happen on a new database, such as a test database
-       *)
-       Deferred.Result.return ()
-     | [highest_canonical_block_id,greatest_canonical_height] ->
-       let%bind block = load (module Conn) ~id:block_id in
-       let k_int64 = Genesis_constants.k |> Int64.of_int in
-       let block_height_less_k_int64 = Int64.(-) block.height k_int64 in
-       if Int64.(>) block.height (Int64.(+) greatest_canonical_height k_int64) then
-         (* subchain between new block and highest canonical block *)
-         let%bind subchain_blocks = get_subchain (module Conn) ~start_block_id:highest_canonical_block_id ~end_block_id:block_id in
-         (* mark canonical, orphaned blocks in subchain at least k behind the new block *)
-         let canonical_blocks = List.filter subchain_blocks ~f:(fun subchain_block ->
-             Int64.(<=) subchain_block.height block_height_less_k_int64) in
-         deferred_result_list_fold canonical_blocks ~init:() ~f:(fun () block ->
-             let%bind () = mark_as_canonical (module Conn) ~state_hash:block.state_hash in
-             mark_as_orphaned (module Conn) ~state_hash:block.state_hash ~height:block.height)
-       else
-         Deferred.Result.return ()
-     | _ ->
-       failwith "update_chain_status: expected 0 or 1 results from get_highest_canonical_blocks"
+  let update_chain_status (module Conn : CONNECTION) ~block_id =
+    let open Deferred.Result.Let_syntax in
+    match%bind get_highest_canonical_block_opt (module Conn) () with
+    | None ->
+      (* unit tests, no canonical block, can't mark any block as canonical *)
+      Deferred.Result.return ()
+    | Some (highest_canonical_block_id,greatest_canonical_height) ->
+      let k_int64 = Genesis_constants.k |> Int64.of_int in
+      let%bind block = load (module Conn) ~id:block_id in
+      if Int64.(>) block.height (Int64.(+) greatest_canonical_height k_int64) then
+        (* a new block, allows marking some pending blocks as canonical *)
+        let%bind subchain_blocks = get_subchain (module Conn) ~start_block_id:highest_canonical_block_id ~end_block_id:block_id in
+        let block_height_less_k_int64 = Int64.(-) block.height k_int64 in
+        (* mark canonical, orphaned blocks in subchain at least k behind the new block *)
+        let canonical_blocks = List.filter subchain_blocks ~f:(fun subchain_block ->
+            Int64.(<=) subchain_block.height block_height_less_k_int64) in
+        deferred_result_list_fold canonical_blocks ~init:() ~f:(fun () block ->
+            let%bind () = mark_as_canonical (module Conn) ~state_hash:block.state_hash in
+            mark_as_orphaned (module Conn) ~state_hash:block.state_hash ~height:block.height)
+      else if Int64.(<) block.height greatest_canonical_height then
+        (* a missing block added in the middle of canonical chain *)
+        let%bind canonical_block_above_id,_above_height = get_nearest_canonical_block_above (module Conn) block.height in
+        let%bind canonical_block_below_id,_below_height = get_nearest_canonical_block_below (module Conn) block.height in
+        (* we can always find this chain: the genesis block should be marked as canonical, and we've found a
+           canonical block above this one *)
+        let%bind canonical_blocks = get_subchain (module Conn) ~start_block_id:canonical_block_below_id ~end_block_id:canonical_block_above_id in
+        deferred_result_list_fold canonical_blocks ~init:() ~f:(fun () block ->
+            let%bind () = mark_as_canonical (module Conn) ~state_hash:block.state_hash in
+            mark_as_orphaned (module Conn) ~state_hash:block.state_hash ~height:block.height)
+      else
+        (* a block at or above highest canonical block, not high enough to mark any blocks as canonical *)
+        Deferred.Result.return ()
 
-  let delete_if_older_than ?height ?num_blocks ?timestamp
+   let delete_if_older_than ?height ?num_blocks ?timestamp
       (module Conn : CONNECTION) =
     let open Deferred.Result.Let_syntax in
     let%bind height =
