@@ -382,7 +382,11 @@ func (h *Helper) GatingState() *CodaGatingState {
 }
 
 func (h *Helper) SetGatingState(gs *CodaGatingState) {
-	h.gatingState = gs
+	h.gatingState.TrustedPeers = gs.TrustedPeers
+	h.gatingState.BannedPeers = gs.BannedPeers
+	h.gatingState.TrustedAddrFilters = gs.TrustedAddrFilters
+	h.gatingState.BannedAddrFilters = gs.BannedAddrFilters
+	h.gatingState.KnownPrivateAddrFilters = gs.KnownPrivateAddrFilters
 	for _, c := range h.Host.Network().Conns() {
 		pid := c.RemotePeer()
 		maddr := c.RemoteMultiaddr()

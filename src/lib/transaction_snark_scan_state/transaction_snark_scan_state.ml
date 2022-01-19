@@ -189,15 +189,17 @@ let create_expected_statement ~constraint_constants
     Sparse_ledger.next_available_token ledger_witness
   in
   let { With_status.data = transaction; status = _ } =
-    Ledger.Transaction_applied.transaction transaction_with_info
+    Transaction_logic.Transaction_applied.transaction_with_status
+      transaction_with_info
   in
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
   let empty_local_state = Mina_state.Local_state.empty in
-  let%bind after =
+  let%bind after, _ =
     Or_error.try_with (fun () ->
-        Sparse_ledger.apply_transaction_exn ~constraint_constants
+        Sparse_ledger.apply_transaction ~constraint_constants
           ~txn_state_view:state_view ledger_witness transaction)
+    |> Or_error.join
   in
   let next_available_token_after = Sparse_ledger.next_available_token after in
   let target_merkle_root =
@@ -469,20 +471,24 @@ struct
           in
           (acc_statement, acc_pc)
       | Full { job = transaction; _ } ->
+          let open Transaction_with_witness in
           with_error "Bad base statement" ~f:(fun () ->
               let%bind expected_statement =
                 match statement_check with
                 | `Full get_state ->
-                    Timer.time timer
-                      (sprintf "create_expected_statement:%s" __LOC__)
-                      (fun () ->
-                        Deferred.return
-                          (create_expected_statement ~constraint_constants
-                             ~get_state transaction))
+                    let%bind result =
+                      Timer.time timer
+                        (sprintf "create_expected_statement:%s" __LOC__)
+                        (fun () ->
+                          Deferred.return
+                            (create_expected_statement ~constraint_constants
+                               ~get_state transaction))
+                    in
+                    let%map () = yield_always () in
+                    result
                 | `Partial ->
                     return transaction.statement
               in
-              let%bind () = yield_always () in
               if
                 Transaction_snark.Statement.equal transaction.statement
                   expected_statement
@@ -623,7 +629,7 @@ struct
 end
 
 module Staged_undos = struct
-  type applied_txn = Ledger.Transaction_applied.t
+  type applied_txn = Transaction_logic.Transaction_applied.t
 
   type t = applied_txn list
 
@@ -657,7 +663,7 @@ let extract_txns txns_with_witnesses =
   List.map txns_with_witnesses
     ~f:(fun (txn_with_witness : Transaction_with_witness.t) ->
       let txn =
-        Ledger.Transaction_applied.transaction
+        Transaction_logic.Transaction_applied.transaction_with_status
           txn_with_witness.transaction_with_info
       in
       let state_hash = fst txn_with_witness.state_hash in
@@ -680,7 +686,8 @@ let base_jobs_on_latest_tree = Parallel_scan.base_jobs_on_latest_tree
 (*All the transactions in the order in which they were applied*)
 let staged_transactions t =
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
-      t.transaction_with_info |> Ledger.Transaction_applied.transaction)
+      t.transaction_with_info
+      |> Transaction_logic.Transaction_applied.transaction_with_status)
   @@ Parallel_scan.pending_data t
 
 let staged_transactions_with_protocol_states t
@@ -688,7 +695,8 @@ let staged_transactions_with_protocol_states t
   let open Or_error.Let_syntax in
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
       let txn =
-        t.transaction_with_info |> Ledger.Transaction_applied.transaction
+        t.transaction_with_info
+        |> Transaction_logic.Transaction_applied.transaction_with_status
       in
       let%map protocol_state = get_state (fst t.state_hash) in
       (txn, protocol_state))
@@ -789,7 +797,8 @@ let all_work_pairs t
         , init_stack ) ->
         let%map witness =
           let { With_status.data = transaction; status } =
-            Ledger.Transaction_applied.transaction transaction_with_info
+            Transaction_logic.Transaction_applied.transaction_with_status
+              transaction_with_info
           in
           let%bind protocol_state_body =
             let%map state = get_state (fst state_hash) in

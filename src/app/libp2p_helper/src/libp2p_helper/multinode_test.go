@@ -80,20 +80,7 @@ func initNodes(t *testing.T, numNodes int, upcallMask uint32) ([]testNode, []con
 		nodes[ni].node = node
 		nodes[ni].trap = trap
 	}
-	go func() {
-		err, has := <-errChan
-		if has {
-			topCtxCancel()
-			errChan <- err
-		}
-	}()
-	t.Cleanup(func() {
-		topCtxCancel()
-		close(errChan)
-		for err := range errChan {
-			t.Errorf("feed upcall trap failed with %s", err)
-		}
-	})
+	handleErrChan(t, errChan, topCtxCancel)
 	return nodes, cancels
 }
 
@@ -120,9 +107,9 @@ func connectRingTopology(t *testing.T, nodes []testNode, protect bool) {
 	})
 }
 
-func testBroadcast(t *testing.T, nodes []testNode, senderIx int, timeout time.Duration) {
+func testBroadcast(t *testing.T, iterationIx int, nodes []testNode, senderIx int, timeout time.Duration) {
 	nodes[senderIx].node.P2p.Logger.Infof("Sending broadcast message")
-	msg := []byte("bla")
+	msg := []byte(fmt.Sprintf("broadcast message %d", iterationIx))
 	testPublishDo(t, nodes[senderIx].node, "test", msg, 102)
 	ctx, cancelF := context.WithTimeout(context.Background(), timeout)
 	defer cancelF()
@@ -391,6 +378,6 @@ func TestBroadcastInNotFullConnectedNetwork(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		time.Sleep(11 * time.Second)
 		trimConnections(nodes)
-		testBroadcast(t, nodes, r.Intn(len(nodes)), 2*time.Minute)
+		testBroadcast(t, i, nodes, r.Intn(len(nodes)), 2*time.Minute)
 	}
 }

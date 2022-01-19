@@ -830,9 +830,9 @@ module Data = struct
         get_delegators producer_public_key
         |> Option.value_map ~f:Hashtbl.to_alist ~default:[]
       in
-      let rec go = function
+      let rec go acc = function
         | [] ->
-            Interruptible.return None
+            Interruptible.return acc
         | (delegator, (account : Mina_base.Account.t)) :: delegators ->
             let%bind () = Interruptible.return () in
             let vrf_result =
@@ -861,13 +861,28 @@ module Data = struct
               Threshold.is_satisfied ~my_stake:account.balance ~total_stake
                 truncated_vrf_result
             then
-              Interruptible.return
-                (Some
-                   ( `Vrf_output vrf_result
-                   , `Delegator (account.public_key, delegator) ))
-            else go delegators
+              let string_of_blake2 =
+                Blake2.(Fn.compose to_raw_string digest_string)
+              in
+              let vrf_eval = string_of_blake2 truncated_vrf_result in
+              let this_vrf () =
+                go
+                  (Some
+                     ( `Vrf_eval vrf_eval
+                     , `Vrf_output vrf_result
+                     , `Delegator (account.public_key, delegator) ))
+                  delegators
+              in
+              match acc with
+              | Some (`Vrf_eval prev_best_vrf_eval, _, _) ->
+                  if String.compare prev_best_vrf_eval vrf_eval < 0 then
+                    this_vrf ()
+                  else go acc delegators
+              | None ->
+                  this_vrf ()
+            else go acc delegators
       in
-      go delegators
+      go None delegators
   end
 
   module Optional_state_hash = struct
