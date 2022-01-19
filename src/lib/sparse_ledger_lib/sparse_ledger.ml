@@ -64,12 +64,18 @@ module type S = sig
 
   val path_exn : t -> int -> [ `Left of hash | `Right of hash ] list
 
+  val arm_exn : t -> int -> ([ `Left | `Right ] * hash * hash) list
+
   val set_exn : t -> int -> account -> t
+
+  val find_index : t -> account_id -> int option
 
   val find_index_exn : t -> account_id -> int
 
   val add_path :
     t -> [ `Left of hash | `Right of hash ] list -> account_id -> account -> t
+
+  val data : t -> (int * account) list
 
   val iteri : t -> f:(int -> account -> unit) -> unit
 
@@ -81,6 +87,14 @@ module type S = sig
 end
 
 let tree { T.tree; _ } = tree
+
+(* integer indices mean that we cannot support tree depths > bit size of native machine int (- 1 for ocaml repr) *)
+let max_index depth =
+  let rec set_bits n i =
+    let n' = n lor (1 lsl i) in
+    if i = 0 then n' else set_bits n' (i - 1)
+  in
+  set_bits 0 depth
 
 let of_hash ~depth ~next_available_token h =
   { T.indexes = []; depth; tree = Hash h; next_available_token }
@@ -201,6 +215,9 @@ end = struct
 
   let ith_bit idx i = (idx lsr i) land 1 = 1
 
+  let find_index (t : t) aid =
+    List.Assoc.find t.indexes ~equal:Account_id.equal aid
+
   let find_index_exn (t : t) aid =
     List.Assoc.find_exn t.indexes ~equal:Account_id.equal aid
 
@@ -270,15 +287,34 @@ end = struct
       else
         match tree with
         | Tree.Account _ ->
-            failwithf "Sparse_ledger.path: Bad depth at index %i." idx ()
+            failwithf "Sparse_ledger.path_exn: Bad depth at index %i." idx ()
         | Hash _ ->
-            failwithf "Sparse_ledger.path: Dead end at index %i." idx ()
+            failwithf "Sparse_ledger.path_exn: Dead end at index %i." idx ()
         | Node (_, l, r) ->
-            let go_right = ith_bit idx i in
-            if go_right then go (`Right (hash l) :: acc) (i - 1) r
-            else go (`Left (hash r) :: acc) (i - 1) l
+            let next, sibling_hash =
+              if ith_bit idx i then (r, `Right (hash l)) else (l, `Left (hash r))
+            in
+            go (sibling_hash :: acc) (i - 1) next
     in
     go [] (depth - 1) tree
+
+  let arm_exn { T.tree; depth; _ } idx =
+    let rec go acc i tree =
+      if i < 0 then acc
+      else
+        match tree with
+        | Tree.Account _ ->
+            failwithf "Sparse_ledger.arm_exn: Bad depth at index %i." idx ()
+        | Hash _ ->
+            failwithf "Sparse_ledger.arm_exn: Dead end at index %i." idx ()
+        | Node (_, l, r) ->
+            let next, dir = if ith_bit idx i then (r, `Right) else (l, `Left) in
+            go ((dir, hash l, hash r) :: acc) (i - 1) next
+    in
+    go [] (depth - 1) tree
+
+  let data (t : t) =
+    List.map t.indexes ~f:(fun (_, idx) -> (idx, get_exn t idx))
 end
 
 type ('hash, 'key, 'account, 'token_id) t =

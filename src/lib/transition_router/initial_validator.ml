@@ -290,7 +290,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                          (validate_genesis_protocol_state ~genesis_state_hash)
                    >>= (fun x ->
                          Interruptible.uninterruptible
-                           (validate_proofs ~verifier [ x ])
+                           (validate_proofs ~verifier ~genesis_state_hash [ x ])
                          >>| List.hd_exn)
                    >>= defer validate_delta_transition_chain
                    >>= defer validate_protocol_versions)

@@ -26,48 +26,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; num_snark_workers = 0
     }
 
-  let check_common_prefixes ~tolerance ~logger chains =
-    assert (List.length chains > 1) ;
-    let hashset_chains =
-      List.map chains ~f:(Hash_set.of_list (module String))
-    in
-    let longest_chain_length =
-      chains |> List.map ~f:List.length
-      |> List.max_elt ~compare:Int.compare
-      |> Option.value_exn
-    in
-    let common_prefixes =
-      List.reduce hashset_chains ~f:Hash_set.inter |> Option.value_exn
-    in
-    let common_prefixes_length = Hash_set.length common_prefixes in
-    let length_difference = longest_chain_length - common_prefixes_length in
-    if length_difference = 0 || length_difference <= tolerance then
-      Malleable_error.return ()
-    else
-      let error_str =
-        sprintf
-          "Chains have common prefix of %d blocks, longest absolute chain is \
-           %d blocks.  the difference is %d blocks, which is greater than \
-           allowed tolerance of %d blocks"
-          common_prefixes_length longest_chain_length length_difference
-          tolerance
-      in
-      [%log error] "%s" error_str ;
-      Malleable_error.soft_error ~value:() (Error.of_string error_str)
-
   let run network t =
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    (* TEMP: until we fix the seed graphql port, we will only check peers for block producers *)
-    (* let all_nodes = Network.all_nodes network in *)
-    let all_nodes = Network.block_producers network in
+    let all_nodes = Network.all_nodes network in
+
     let[@warning "-8"] [ node_a; node_b; node_c ] =
       Network.block_producers network
     in
     (* TODO: let%bind () = wait_for t (Wait_condition.nodes_to_initialize [node_a; node_b; node_c]) in *)
     let%bind () =
-      Malleable_error.List.iter [ node_a; node_b; node_c ]
+      Malleable_error.List.iter all_nodes
         ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
     in
     let%bind _ =
@@ -109,5 +79,5 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          List.map labeled_chains ~f:(fun (_, chain) -> chain)
        in
        print_chains labeled_chains ;
-       check_common_prefixes chains ~tolerance:1 ~logger)
+       Util.check_common_prefixes chains ~tolerance:1 ~logger)
 end
