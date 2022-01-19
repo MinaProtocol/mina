@@ -43,11 +43,18 @@
           nix-npm-buildPackage =
             pkgs.callPackage inputs.nix-npm-buildPackage { };
 
-          requireSubmodules = lib.warnIf (!self.sourceInfo ? submodules) ''
-            Submodules are not enabled, you may be getting incorrect versions of dependencies.
-            Consider running nix/pin.sh and using the mina flake.
-            Ignore this message if you're not using flakes.
-          '';
+          submodules = map builtins.head (builtins.filter lib.isList
+            (map (builtins.match "	path = (.*)")
+              (lib.splitString "\n" (builtins.readFile ./.gitmodules))));
+
+          requireSubmodules = lib.warnIf (!builtins.all builtins.pathExists
+            (map (x: ./. + "/${x}") submodules)) ''
+              Some submodules are missing, you may get errors. Consider one of the following:
+              - run nix/pin.sh and use "mina" flake ref;
+              - use "git+file://$PWD?submodules=1";
+              - use "git+https://github.com/minaprotocol/mina?submodules=1";
+              - use non-flake commands like nix-build and nix-shell.
+            '';
 
           checks = import ./nix/checks.nix inputs pkgs;
 
