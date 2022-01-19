@@ -256,6 +256,14 @@ let setup_daemon logger =
         "true|false Help keep the mesh connected when closing connections \
          (default: true)"
       (optional_with_default true bool)
+  and min_connections =
+    flag "--min-connections" ~aliases:[ "min-connections" ]
+      ~doc:
+        (Printf.sprintf
+           "NN min number of connections that this peer will have to neighbors \
+            in the gossip network (default: %d)"
+           Cli_lib.Default.min_connections)
+      (optional int)
   and max_connections =
     flag "--max-connections" ~aliases:[ "max-connections" ]
       ~doc:
@@ -363,6 +371,14 @@ let setup_daemon logger =
          included as long as the required snark work is available and can be \
          paid for)"
       (optional txn_amount)
+  and stop_time =
+    flag "--stop-time" ~aliases:[ "stop-time" ] (optional int)
+      ~doc:
+        (sprintf
+           "UPTIME in hours after which the daemon stops itself (only if there \
+            were no slots won within an hour after the stop time) (Default: \
+            %d)"
+           Cli_lib.Default.stop_time)
   and upload_blocks_to_gcloud =
     flag "--upload-blocks-to-gcloud"
       ~aliases:[ "upload-blocks-to-gcloud" ]
@@ -390,11 +406,21 @@ let setup_daemon logger =
   and uptime_url_string =
     flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
       ~doc:"URL URL of the uptime service of the Mina delegation program"
-  and uptime_submitter_string =
-    flag "--uptime-submitter" ~aliases:[ "uptime-submitter" ] (optional string)
+  and uptime_submitter_key =
+    flag "--uptime-submitter-key" ~aliases:[ "uptime-submitter-key" ]
       ~doc:
-        "PUBLICKEY Public key of the submitter to the uptime service of the \
-         Mina delegation program"
+        "KEYFILE Private key file for the uptime submitter. You cannot provide \
+         both `uptime-submitter-key` and `uptime-submitter-pubkey`."
+      (optional string)
+  and uptime_submitter_pubkey =
+    flag "--uptime-submitter-pubkey"
+      ~aliases:[ "uptime-submitter-pubkey" ]
+      (optional string)
+      ~doc:
+        "PUBLICKEY Public key of the submitter to the Mina delegation program, \
+         for the associated private key that is being tracked by this daemon. \
+         You cannot provide both `uptime-submitter-key` and \
+         `uptime-submitter-pubkey`."
   in
   fun () ->
     let open Deferred.Let_syntax in
@@ -1013,6 +1039,10 @@ let setup_daemon logger =
       let direct_peers =
         List.map ~f:Mina_net2.Multiaddr.of_string direct_peers_raw
       in
+      let min_connections =
+        or_from_config YJ.Util.to_int_option "min-connections"
+          ~default:Cli_lib.Default.min_connections min_connections
+      in
       let max_connections =
         or_from_config YJ.Util.to_int_option "max-connections"
           ~default:Cli_lib.Default.max_connections max_connections
@@ -1020,6 +1050,10 @@ let setup_daemon logger =
       let validation_queue_size =
         or_from_config YJ.Util.to_int_option "validation-queue-size"
           ~default:Cli_lib.Default.validation_queue_size validation_queue_size
+      in
+      let stop_time =
+        or_from_config YJ.Util.to_int_option "stop-time"
+          ~default:Cli_lib.Default.stop_time stop_time
       in
       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
       let seed_peer_list_url =
@@ -1058,6 +1092,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           ; direct_peers
           ; mina_peer_exchange
           ; peer_exchange = Option.value ~default:false peer_exchange
+          ; min_connections
           ; max_connections
           ; validation_queue_size
           ; isolate = Option.value ~default:false isolate
@@ -1093,17 +1128,20 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
           proposed_protocol_version
       in
-      ( match (uptime_url_string, uptime_submitter_string) with
-      | Some _, Some _ | None, None ->
+      ( match
+          (uptime_url_string, uptime_submitter_key, uptime_submitter_pubkey)
+        with
+      | Some _, Some _, None | Some _, None, Some _ | None, None, None ->
           ()
       | _ ->
           Mina_user_error.raise
-            "Must provide both --uptime-url and --uptime-submitter" ) ;
+            "Must provide both --uptime-url and exactly one of \
+             --uptime-submitter-key or --uptime-submitter-pubkey" ) ;
       let uptime_url =
         Option.map uptime_url_string ~f:(fun s -> Uri.of_string s)
       in
-      let uptime_submitter =
-        Option.map uptime_submitter_string ~f:(fun s ->
+      let uptime_submitter_opt =
+        Option.map uptime_submitter_pubkey ~f:(fun s ->
             match Public_key.Compressed.of_base58_check s with
             | Ok pk -> (
                 match Public_key.decompress pk with
@@ -1120,10 +1158,10 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                   (Error.to_string_hum err) ())
       in
       let%bind uptime_submitter_keypair =
-        match uptime_submitter with
-        | None ->
+        match (uptime_submitter_key, uptime_submitter_opt) with
+        | None, None ->
             return None
-        | Some pk ->
+        | None, Some pk ->
             let%map kp =
               Secrets.Wallets.get_tracked_keypair ~logger
                 ~which:"uptime submitter keypair"
@@ -1133,6 +1171,18 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                 ~conf_dir pk
             in
             Some kp
+        | Some sk_file, None ->
+            let%map kp =
+              Secrets.Uptime_keypair.Terminal_stdin.read_exn
+                ~should_prompt_user:false ~should_reask:false
+                ~which:"uptime submitter keypair" sk_file
+            in
+            Some kp
+        | _ ->
+            (* unreachable, because of earlier check *)
+            failwith
+              "Cannot provide both uptime submitter public key and uptime \
+               submitter keyfile"
       in
       let start_time = Time.now () in
       let%map coda =
@@ -1162,7 +1212,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
              ~archive_process_location ~log_block_creation ~precomputed_values
              ~start_time ?precomputed_blocks_path ~log_precomputed_blocks
              ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-             ~uptime_submitter_keypair ~node_status_url ())
+             ~uptime_submitter_keypair ~stop_time ~node_status_url ())
       in
       { Coda_initialization.coda
       ; client_trustlist

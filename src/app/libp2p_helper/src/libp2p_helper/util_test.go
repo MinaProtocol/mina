@@ -5,6 +5,7 @@ import (
 	crand "crypto/rand"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -44,23 +45,28 @@ func newTestKey(t *testing.T) crypto.PrivKey {
 
 func testStreamHandler(_ net.Stream) {}
 
-func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool, maxConns int, port uint16) *app {
+func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool, minConns, maxConns int, port uint16) *app {
+	return newTestAppWithMaxConnsAndCtx(t, newTestKey(t), seeds, noUpcalls, minConns, maxConns, true, port, context.Background())
+}
+func newTestAppWithMaxConnsAndCtx(t *testing.T, privkey crypto.PrivKey, seeds []peer.AddrInfo, noUpcalls bool, minConns, maxConns int, minaPeerExchange bool, port uint16, ctx context.Context) *app {
 	dir, err := ioutil.TempDir("", "mina_test_*")
 	require.NoError(t, err)
 
 	addr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port))
 	require.NoError(t, err)
 
-	helper, err := codanet.MakeHelper(context.Background(),
+	helper, err := codanet.MakeHelper(ctx,
 		[]ma.Multiaddr{addr},
 		nil,
 		dir,
-		newTestKey(t),
+		privkey,
 		string(testProtocol),
 		seeds,
 		codanet.NewCodaGatingState(nil, nil, nil, nil),
+		minConns,
 		maxConns,
-		true,
+		minaPeerExchange,
+		10 * time.Second,
 	)
 	require.NoError(t, err)
 
@@ -68,26 +74,29 @@ func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool,
 	helper.Host.SetStreamHandler(testProtocol, testStreamHandler)
 
 	t.Cleanup(func() {
-		err := helper.Host.Close()
-		if err != nil {
-			panic(err)
-		}
+		panicOnErr(os.RemoveAll(dir))
+		panicOnErr(helper.Host.Close())
 	})
+	outChan := make(chan *capnp.Message, 64)
+	bitswapCtx := NewBitswapCtx(ctx, outChan)
+	bitswapCtx.engine = helper.Bitswap
+	bitswapCtx.storage = helper.BitswapStorage
 
 	return &app{
 		P2p:                      helper,
-		Ctx:                      context.Background(),
+		Ctx:                      ctx,
 		Subs:                     make(map[uint64]subscription),
 		Topics:                   make(map[string]*pubsub.Topic),
 		ValidatorMutex:           &sync.Mutex{},
 		Validators:               make(map[uint64]*validationStatus),
 		Streams:                  make(map[uint64]net.Stream),
 		AddedPeers:               make([]peer.AddrInfo, 0, 512),
-		OutChan:                  make(chan *capnp.Message, 64),
+		OutChan:                  outChan,
 		MetricsRefreshTime:       time.Second * 2,
 		NoUpcalls:                noUpcalls,
 		metricsServer:            nil,
 		metricsCollectionStarted: false,
+		bitswapCtx:               bitswapCtx,
 	}
 }
 
@@ -100,7 +109,7 @@ func nextPort() uint16 {
 
 func newTestApp(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool) (*app, uint16) {
 	port := nextPort()
-	return newTestAppWithMaxConns(t, seeds, noUpcalls, 50, port), port
+	return newTestAppWithMaxConns(t, seeds, noUpcalls, 20, 50, port), port
 }
 
 func addrInfos(h host.Host) (addrInfos []peer.AddrInfo, err error) {
@@ -142,13 +151,21 @@ func checkRpcResponseError(t *testing.T, resMsg *capnp.Message) (uint64, string)
 	return seqno.Seqno(), respError
 }
 
-func checkRpcResponseSuccess(t *testing.T, resMsg *capnp.Message) (uint64, ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+func checkRpcResponseSuccess(t *testing.T, resMsg *capnp.Message, request string) (uint64, ipc.Libp2pHelperInterface_RpcResponseSuccess) {
 	msg, err := ipc.ReadRootDaemonInterface_Message(resMsg)
 	require.NoError(t, err)
 	require.True(t, msg.HasRpcResponse())
 	resp, err := msg.RpcResponse()
 	require.NoError(t, err)
-	require.True(t, resp.HasSuccess())
+	if !resp.HasSuccess() {
+		if resp.HasError() {
+			str, _ := resp.Error()
+			t.Logf("Got error on %s: %s", request, str)
+		} else {
+			t.Logf("Neither Error nor Success on %s", request)
+		}
+		t.FailNow()
+	}
 	header, err := resp.Header()
 	require.NoError(t, err)
 	seqno, err := header.SequenceNumber()
@@ -166,34 +183,69 @@ func checkPeerInfo(t *testing.T, actual *codaPeerInfo, host host.Host, port uint
 	require.Equal(t, host.ID().String(), actual.PeerID)
 }
 
-func beginAdvertisingSendAndCheck(t *testing.T, app *app) {
+func beginAdvertisingSendAndCheckDo(app *app, rpcSeqno uint64) (*capnp.Message, error) {
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 	m, err := ipc.NewRootLibp2pHelperInterface_BeginAdvertising_Request(seg)
-	require.NoError(t, err)
-	var rpcSeqno uint64 = 123
-	resMsg := BeginAdvertisingReq(m).handle(app, rpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	if err != nil {
+		return nil, err
+	}
+	return BeginAdvertisingReq(m).handle(app, rpcSeqno), nil
+}
+
+func checkBeginAdvertisingResponse(t *testing.T, rpcSeqno uint64, resMsg *capnp.Message) {
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "beginAdvertising")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasBeginAdvertising())
-	_, err = respSuccess.BeginAdvertising()
+	_, err := respSuccess.BeginAdvertising()
 	require.NoError(t, err)
+}
+
+func beginAdvertisingSendAndCheck(t *testing.T, app *app) {
+	var rpcSeqno uint64 = 123
+	resMsg, err := beginAdvertisingSendAndCheckDo(app, rpcSeqno)
+	require.NoError(t, err)
+	checkBeginAdvertisingResponse(t, rpcSeqno, resMsg)
 }
 
 func withTimeout(t *testing.T, run func(), timeoutMsg string) {
-	withTimeoutAsync(t, func(done chan interface{}) {
-		defer close(done)
+	success := withCustomTimeout(run, testTimeout)
+	if !success {
+		t.Fatal(timeoutMsg)
+	}
+}
+
+func withCustomTimeout(run func(), timeout time.Duration) bool {
+	return withCustomTimeoutAsync(func(done chan interface{}) {
 		run()
-	}, timeoutMsg)
+		select {
+		case <-done:
+		default:
+			close(done)
+		}
+	}, timeout)
 }
 
 func withTimeoutAsync(t *testing.T, registerDone func(done chan interface{}), timeoutMsg string) {
+	success := withCustomTimeoutAsync(registerDone, testTimeout)
+	if !success {
+		t.Fatal(timeoutMsg)
+	}
+}
+func withCustomTimeoutAsync(registerDone func(done chan interface{}), timeout time.Duration) bool {
 	done := make(chan interface{})
 	go registerDone(done)
 	select {
-	case <-time.After(testTimeout):
-		close(done)
-		t.Fatal(timeoutMsg)
+	case <-time.After(timeout):
+		select {
+		case <-done:
+		default:
+			close(done)
+		}
+		return false
 	case <-done:
+		return true
 	}
 }

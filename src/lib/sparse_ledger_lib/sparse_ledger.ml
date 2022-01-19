@@ -10,7 +10,7 @@ module Tree = struct
         | Account of 'account
         | Hash of 'hash
         | Node of 'hash * ('hash, 'account) t * ('hash, 'account) t
-      [@@deriving equal, sexp, to_yojson]
+      [@@deriving equal, sexp, yojson]
     end
   end]
 
@@ -18,7 +18,7 @@ module Tree = struct
     | Account of 'account
     | Hash of 'hash
     | Node of 'hash * ('hash, 'account) t * ('hash, 'account) t
-  [@@deriving equal, sexp, to_yojson]
+  [@@deriving equal, sexp, yojson]
 end
 
 module T = struct
@@ -33,7 +33,7 @@ module T = struct
         ; tree : ('hash, 'account) Tree.Stable.V1.t
         ; next_available_token : 'token_id
         }
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson]
     end
   end]
 
@@ -44,7 +44,7 @@ module T = struct
     ; tree : ('hash, 'account) Tree.t
     ; next_available_token : 'token_id
     }
-  [@@deriving sexp, to_yojson]
+  [@@deriving sexp, yojson]
 end
 
 module type S = sig
@@ -56,8 +56,7 @@ module type S = sig
 
   type account
 
-  type t = (hash, account_id, account, token_id) T.t
-  [@@deriving sexp, to_yojson]
+  type t = (hash, account_id, account, token_id) T.t [@@deriving sexp, yojson]
 
   val of_hash : depth:int -> next_available_token:token_id -> hash -> t
 
@@ -65,12 +64,18 @@ module type S = sig
 
   val path_exn : t -> int -> [ `Left of hash | `Right of hash ] list
 
+  val arm_exn : t -> int -> ([ `Left | `Right ] * hash * hash) list
+
   val set_exn : t -> int -> account -> t
+
+  val find_index : t -> account_id -> int option
 
   val find_index_exn : t -> account_id -> int
 
   val add_path :
     t -> [ `Left of hash | `Right of hash ] list -> account_id -> account -> t
+
+  val data : t -> (int * account) list
 
   val iteri : t -> f:(int -> account -> unit) -> unit
 
@@ -83,23 +88,31 @@ end
 
 let tree { T.tree; _ } = tree
 
+(* integer indices mean that we cannot support tree depths > bit size of native machine int (- 1 for ocaml repr) *)
+let max_index depth =
+  let rec set_bits n i =
+    let n' = n lor (1 lsl i) in
+    if i = 0 then n' else set_bits n' (i - 1)
+  in
+  set_bits 0 depth
+
 let of_hash ~depth ~next_available_token h =
   { T.indexes = []; depth; tree = Hash h; next_available_token }
 
 module Make (Hash : sig
-  type t [@@deriving equal, sexp, to_yojson, compare]
+  type t [@@deriving equal, sexp, yojson, compare]
 
   val merge : height:int -> t -> t -> t
 end) (Token_id : sig
-  type t [@@deriving sexp, to_yojson]
+  type t [@@deriving sexp, yojson]
 
   val next : t -> t
 
   val max : t -> t -> t
 end) (Account_id : sig
-  type t [@@deriving equal, sexp, to_yojson]
+  type t [@@deriving equal, sexp, yojson]
 end) (Account : sig
-  type t [@@deriving equal, sexp, to_yojson]
+  type t [@@deriving equal, sexp, yojson]
 
   val data_hash : t -> Hash.t
 
@@ -115,7 +128,7 @@ end) : sig
   val hash : (Hash.t, Account.t) Tree.t -> Hash.t
 end = struct
   type t = (Hash.t, Account_id.t, Account.t, Token_id.t) T.t
-  [@@deriving sexp, to_yojson]
+  [@@deriving sexp, yojson]
 
   let of_hash ~depth ~next_available_token (hash : Hash.t) =
     of_hash ~depth ~next_available_token hash
@@ -128,7 +141,7 @@ end = struct
     | Node (h, _, _) ->
         h
 
-  type index = int [@@deriving sexp, to_yojson]
+  type index = int [@@deriving sexp, yojson]
 
   let depth { T.depth; _ } = depth
 
@@ -202,6 +215,9 @@ end = struct
 
   let ith_bit idx i = (idx lsr i) land 1 = 1
 
+  let find_index (t : t) aid =
+    List.Assoc.find t.indexes ~equal:Account_id.equal aid
+
   let find_index_exn (t : t) aid =
     List.Assoc.find_exn t.indexes ~equal:Account_id.equal aid
 
@@ -271,20 +287,39 @@ end = struct
       else
         match tree with
         | Tree.Account _ ->
-            failwithf "Sparse_ledger.path: Bad depth at index %i." idx ()
+            failwithf "Sparse_ledger.path_exn: Bad depth at index %i." idx ()
         | Hash _ ->
-            failwithf "Sparse_ledger.path: Dead end at index %i." idx ()
+            failwithf "Sparse_ledger.path_exn: Dead end at index %i." idx ()
         | Node (_, l, r) ->
-            let go_right = ith_bit idx i in
-            if go_right then go (`Right (hash l) :: acc) (i - 1) r
-            else go (`Left (hash r) :: acc) (i - 1) l
+            let next, sibling_hash =
+              if ith_bit idx i then (r, `Right (hash l)) else (l, `Left (hash r))
+            in
+            go (sibling_hash :: acc) (i - 1) next
     in
     go [] (depth - 1) tree
+
+  let arm_exn { T.tree; depth; _ } idx =
+    let rec go acc i tree =
+      if i < 0 then acc
+      else
+        match tree with
+        | Tree.Account _ ->
+            failwithf "Sparse_ledger.arm_exn: Bad depth at index %i." idx ()
+        | Hash _ ->
+            failwithf "Sparse_ledger.arm_exn: Dead end at index %i." idx ()
+        | Node (_, l, r) ->
+            let next, dir = if ith_bit idx i then (r, `Right) else (l, `Left) in
+            go ((dir, hash l, hash r) :: acc) (i - 1) next
+    in
+    go [] (depth - 1) tree
+
+  let data (t : t) =
+    List.map t.indexes ~f:(fun (_, idx) -> (idx, get_exn t idx))
 end
 
 type ('hash, 'key, 'account, 'token_id) t =
   ('hash, 'key, 'account, 'token_id) T.t
-[@@deriving to_yojson]
+[@@deriving yojson]
 
 let%test_module "sparse-ledger-test" =
   ( module struct
@@ -294,6 +329,13 @@ let%test_module "sparse-ledger-test" =
       let equal h1 h2 = Int.equal (compare h1 h2) 0
 
       let to_yojson md5 = `String (Core_kernel.Md5.to_hex md5)
+
+      let of_yojson = function
+        | `String x ->
+            Or_error.try_with (fun () -> Core_kernel.Md5.of_hex_exn x)
+            |> Result.map_error ~f:Error.to_string_hum
+        | _ ->
+            Error "Expected a hex-encoded MD5 hash"
 
       let merge ~height x y =
         let open Md5 in
@@ -306,7 +348,7 @@ let%test_module "sparse-ledger-test" =
     end
 
     module Token_id = struct
-      type t = unit [@@deriving sexp, to_yojson]
+      type t = unit [@@deriving sexp, yojson]
 
       let max () () = ()
 
@@ -316,7 +358,7 @@ let%test_module "sparse-ledger-test" =
     module Account = struct
       module T = struct
         type t = { name : string; favorite_number : int }
-        [@@deriving bin_io, equal, sexp, to_yojson]
+        [@@deriving bin_io, equal, sexp, yojson]
       end
 
       include T
@@ -335,7 +377,7 @@ let%test_module "sparse-ledger-test" =
     end
 
     module Account_id = struct
-      type t = string [@@deriving sexp, equal, to_yojson]
+      type t = string [@@deriving sexp, equal, yojson]
     end
 
     include Make (Hash) (Token_id) (Account_id) (Account)

@@ -437,6 +437,14 @@ module Block_latency : sig
 
     val clear : unit -> unit
   end
+
+  module Validation_acceptance_time : sig
+    val v : Gauge.t
+
+    val update : Time.Span.t -> unit
+
+    val clear : unit -> unit
+  end
 end
 
 module Rejected_blocks : sig

@@ -40,13 +40,11 @@ let engines : engine list =
   [ ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S)) ]
 
 let tests : test list =
-  [ ("reliability", (module Reliability_test.Make : Intf.Test.Functor_intf))
-    (* ; ("short-boot", (module Short_bootstrap.Make : Intf.Test.Functor_intf)) *)
+  [ ( "peers-reliability"
+    , (module Peers_reliability_test.Make : Intf.Test.Functor_intf) )
+  ; ( "chain-reliability"
+    , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
   ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
-    (*
-  ; ( "bp-timed-accts"
-    , (module Block_production_timed_accounts_test.Make : Intf.Test.Functor_intf) )
-  *)
   ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
   ]

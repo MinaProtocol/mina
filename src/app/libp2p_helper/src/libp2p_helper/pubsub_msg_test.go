@@ -21,7 +21,7 @@ func testPublishDo(t *testing.T, app *app, topic string, data []byte, rpcSeqno u
 
 	resMsg := PublishReq(m).handle(app, rpcSeqno)
 	require.NoError(t, err)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "publish")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasPublish())
 	_, err = respSuccess.Publish()
@@ -52,7 +52,7 @@ func testSubscribeDo(t *testing.T, app *app, topic string, subId uint64, rpcSeqn
 
 	resMsg := SubscribeReq(m).handle(app, rpcSeqno)
 	require.NoError(t, err)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "subscribe")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasSubscribe())
 	_, err = respSuccess.Subscribe()
@@ -96,7 +96,7 @@ func TestUnsubscribe(t *testing.T) {
 
 	resMsg := UnsubscribeReq(m).handle(testApp, 7739)
 	require.NoError(t, err)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "unsubscribe")
 	require.Equal(t, seqno, uint64(7739))
 	require.True(t, respSuccess.HasUnsubscribe())
 	_, err = respSuccess.Unsubscribe()
@@ -138,7 +138,7 @@ func TestValidationPush(t *testing.T) {
 		validationId, err := m.NewValidationId()
 		validationId.SetId(seqno)
 		m.SetResult(ipcValResults[i])
-		testApp.handleValidation(m)
+		ValidationPush(m).handle(testApp)
 		require.NoError(t, err)
 		require.Equal(t, pubsubValResults[i], result)
 		_, has := testApp.Validators[seqno]
