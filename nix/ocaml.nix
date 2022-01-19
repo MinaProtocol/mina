@@ -4,6 +4,10 @@ let
 
   pkgs = if static then args.pkgs.pkgsMusl else args.pkgs;
 
+  inherit (builtins) filterSource path;
+
+  inherit (pkgs.lib) hasPrefix;
+
   external-repo = opam-nix.makeOpamRepo ../src/external; # Pin external packages
   repos = [
     external-repo
@@ -70,20 +74,25 @@ let
       pname = "mina";
       version = "dev";
       # Prevent unnecessary rebuilds on non-source changes
-      src = builtins.filterSource (name: type:
-        name == (toString (../. + "/dune"))
-        || pkgs.lib.hasPrefix (toString (../. + "/src")) name) ../.;
+      src = path {
+        path = filterSource (name: type:
+          name == (toString (../. + "/dune"))
+          || hasPrefix (toString (../. + "/src")) name) ../.;
+        name = "mina";
+      };
       # TODO, get this from somewhere
       MARLIN_REPO_SHA = "<unknown>";
 
-      MINA_COMMIT_DATE = sourceInfo.lastModifiedDate or "<unknown>";
+      MINA_COMMIT_DATE =
+        if sourceInfo ? rev then sourceInfo.lastModifiedDate else "<unknown>";
       MINA_COMMIT_SHA1 = sourceInfo.rev or "DIRTY";
       MINA_BRANCH = "<unknown>";
 
       buildInputs =
         (builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self))
         ++ external-libs;
-      nativeBuildInputs = [ self.dune self.ocamlfind pkgs.capnproto pkgs.removeReferencesTo ]
+      nativeBuildInputs =
+        [ self.dune self.ocamlfind pkgs.capnproto pkgs.removeReferencesTo ]
         ++ builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self);
 
       # todo: slimmed rocksdb
