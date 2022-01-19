@@ -31,6 +31,7 @@ The node status collection system would make the following `post` request to the
   { "peer_id": "<base64 encodeing of the libp2p peer id>"
   , "ip_address": "<hash of ip address of the submitter>"
   , "mina_version": "<mina version>"
+  , "version": "<version of the node status protocol>"
   , "git_hash": "<git hash of the mina node>"
   , "timestamp": "<current time using RFC-3339 representation>"
   , "libp2p_input_bandwidth": "<input bandwidth for libp2p helper system>"

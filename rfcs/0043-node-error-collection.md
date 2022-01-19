@@ -36,6 +36,7 @@ The node error collection system would make the following `post` request to the 
   , "public_key": "<optional, public key of the block producer>"
   , "git_branch": "<optional, git branch of the mina node>"
   , "commit_hash": "<commit hash of the mina node>"
+  , "version": "<version of the node error protocol>"
   , "chain_id": "<a hash string to distinguish between different networks>"
   , "contact_info": "<optional, contact info provided by the block producer>"
   , "timestamp": "<current time and date>"
