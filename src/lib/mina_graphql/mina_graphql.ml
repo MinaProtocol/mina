@@ -91,7 +91,7 @@ module Reflection = struct
 
     let int a x = id ~typ:int a x
 
-    let nn_bool a x = id ~typ:(non_null bool) a x
+    let nn_bool ?doc a x = id ~typ:(non_null bool) a x
 
     let bool a x = id ~typ:bool a x
 
@@ -2308,35 +2308,48 @@ module Types = struct
             ]
 
       let snapp_permissions =
-        obj "Permissions"
-          ~coerce:
-            (fun stake edit_state send receive set_delegate set_permissions
-                 set_verification_key set_snapp_uri edit_sequence_state
-                 set_token_symbol ->
-            Ok
-              { Permissions.Poly.stake
-              ; edit_state
-              ; send
-              ; receive
-              ; set_delegate
-              ; set_permissions
-              ; set_verification_key
-              ; set_snapp_uri
-              ; edit_sequence_state
-              ; set_token_symbol
-              })
-          ~fields:
-            [ arg "stake" ~typ:(non_null bool)
-            ; arg "editState" ~typ:(non_null snapp_auth_required)
-            ; arg "send" ~typ:(non_null snapp_auth_required)
-            ; arg "receive" ~typ:(non_null snapp_auth_required)
-            ; arg "setDelegate" ~typ:(non_null snapp_auth_required)
-            ; arg "setPermissions" ~typ:(non_null snapp_auth_required)
-            ; arg "setVerificationKey" ~typ:(non_null snapp_auth_required)
-            ; arg "setSnappUri" ~typ:(non_null snapp_auth_required)
-            ; arg "editSequenceState" ~typ:(non_null snapp_auth_required)
-            ; arg "setTokenSymbol" ~typ:(non_null snapp_auth_required)
-            ]
+        let open Reflection.Shorthand in
+        obj "Permissions" ~fields:(fun _ ->
+            let a doc = id ~typ:(non_null snapp_auth_required) ~doc in
+            List.rev
+            @@ Permissions.Poly.Fields.fold ~init:[]
+                 ~stake:(nn_bool ~doc:"If true, allows this account to stake.")
+                 ~edit_state:
+                   (a "Authorization controlling if state is editable.")
+                 ~send:
+                   (a
+                      "Authorization controlling if sends are allowed from \
+                       this account.")
+                 ~receive:
+                   (a
+                      "Authorization controlling if receives are allowed to \
+                       this account.")
+                 ~set_delegate:
+                   (a
+                      "Authorization controlling if setting the delegate is \
+                       allowed on this account.")
+                 ~set_permissions:
+                   (a
+                      "Authorization controlling if setting the permissions is \
+                       allowed on this account. WARNING: This effectively \
+                       gives those permitted superuser abilities as these \
+                       permissions themselves can change.")
+                 ~set_verification_key:
+                   (a
+                      "Authorization controlling if setting the verification \
+                       key is allowed on this account. This effectively allows \
+                       users to upgrade the underlying smart contracts.")
+                 ~set_snapp_uri:
+                   (a
+                      "Authorization controlling if setting the snapp URI is \
+                       allowed on this account. Typically this should have the \
+                       same setting as set_verification_key")
+                 ~edit_sequence_state:
+                   (a "Authorization controlling if sequenceState is editable.")
+                 ~set_token_symbol:
+                   (a
+                      "Authorization controlling if changing the tokenSymbol \
+                       on this account is allowed."))
 
       let snapp_permissions_set_or_keep =
         snapp_make_set_or_keep_for_result "PermissionsSetOrKeep"

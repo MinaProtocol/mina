@@ -25,7 +25,7 @@
 (library
  (public_name kimchi)
  (name kimchi)
- (foreign_archives wires_15_stubs)
+;; (foreign_archives wires_15_stubs)
  (c_library_flags :standard "-lpthread")
  (instrumentation
   (backend bisect_ppx))
