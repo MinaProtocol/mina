@@ -1,3 +1,28 @@
+(** A verification key for a pickles proof, whose contents are not fixed within
+    the verifier circuit.
+    This is used to verify a proof where the verification key is determined by
+    some other constraint, for example to use a verification key provided as
+    input to the circuit, or loaded from an account that was chosen based upon
+    the circuit inputs.
+
+    Here and elsewhere, we use the terms
+    * **width**:
+      - the number of proofs that a proof has verified itself;
+      - (equivalently) the maximum number of proofs that a proof depends upon
+        directly.
+      - NB: This does not include recursively-verified proofs, this only refers
+        to proofs that were provided directly to pickles when the proof was
+        being generated.
+    * **branch**:
+      - a single 'rule' or 'circuit' for which a proof can be generated, where
+        a verification key verifies a proof for any of these branches.
+      - It is common to have a 'base' branch and a 'recursion' branch. For
+        example, the transaction snark has a 'transaction' proof that evaluates
+        a single transaction and a 'merge' proof that combines two transaction
+        snark proofs that prove sequential updates, each of which may be either
+        a 'transaction' or a 'merge'.
+*)
+
 open Core_kernel
 open Pickles_types
 open Common
@@ -263,13 +288,21 @@ module Checked = struct
 
   type t =
     { step_domains : (Field.t Domain.t Domains.t, Max_branches.n) Vector.t
+      (** The domain size for proofs of each branch. *)
     ; step_widths : (Width.Checked.t, Max_branches.n) Vector.t
+      (** The width for for proofs of each branch. *)
     ; max_width : Width.Checked.t
+      (** The maximum of all of the [step_widths]. *)
     ; wrap_index : Inner_curve.t Plonk_verification_key_evals.t
+      (** The plonk verification key for the 'wrapping' proof that this key is
+          used to verify.
+      *)
     ; num_branches : (Boolean.var, Max_branches.Log2.n) Vector.t
+      (** The number of branches, encoded as a bitstring. *)
     }
   [@@deriving hlist, fields]
 
+  (** [log_2] of the width. *)
   let width_size = Nat.to_int Width.Length.n
 
   let to_input =
