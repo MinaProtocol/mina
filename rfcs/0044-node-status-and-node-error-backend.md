@@ -25,11 +25,16 @@ For the frontend, each nodes would have 2 command line options to allow them to 
 We would setup micro-services under the corresponding subdomain: https://node-status-report.minaprotocol.com and https://node-error-report.minaprotocol.com. The micro-service would be implemented using `Google Functions`. It already has the environment setup for us which is very convenient. Here's the pseudo-code that demonstrates how it would work:
 ```js
 exports.nodeStatus = (req, res) => {
-  // validations against the request body can be added later. There's
-  // no validation at all because I just want to demonstrate how we
-  // redirect the user's node status data to Google Cloud Logging
-  console.log(req.body);
-  res.end();
+  if (req.body.payload.version != 1) {
+      res.status(400);
+      res.render('error', {error: "Version Mismatch"});
+  } else if (Buffer.byteLength(req.body, 'utf8') > 1000000) {
+      res.status(413);
+      res.render('error', {error: "Payload Too Large"})
+  } else {
+      console.log(req.body);
+      res.end();
+  }
 };
 ```
 
