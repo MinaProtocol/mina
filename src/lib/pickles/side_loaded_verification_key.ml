@@ -288,17 +288,17 @@ module Checked = struct
 
   type t =
     { step_domains : (Field.t Domain.t Domains.t, Max_branches.n) Vector.t
-      (** The domain size for proofs of each branch. *)
+          (** The domain size for proofs of each branch. *)
     ; step_widths : (Width.Checked.t, Max_branches.n) Vector.t
-      (** The width for for proofs of each branch. *)
+          (** The width for for proofs of each branch. *)
     ; max_width : Width.Checked.t
-      (** The maximum of all of the [step_widths]. *)
+          (** The maximum of all of the [step_widths]. *)
     ; wrap_index : Inner_curve.t Plonk_verification_key_evals.t
-      (** The plonk verification key for the 'wrapping' proof that this key is
-          used to verify.
-      *)
+          (** The plonk verification key for the 'wrapping' proof that this key
+              is used to verify.
+          *)
     ; num_branches : (Boolean.var, Max_branches.Log2.n) Vector.t
-      (** The number of branches, encoded as a bitstring. *)
+          (** The number of branches, encoded as a bitstring. *)
     }
   [@@deriving hlist, fields]
 
