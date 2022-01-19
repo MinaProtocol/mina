@@ -18,7 +18,9 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = string [@@deriving sexp, equal, compare, hash]
+    (** Short arbitrary message provided by the sender. *)
+    type t = string
+    [@@deriving sexp, equal, compare, hash, to_graphql, of_graphql]
 
     let to_latest = Fn.id
 

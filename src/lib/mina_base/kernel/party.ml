@@ -791,6 +791,7 @@ module Fee_payer = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
+      (** The fee payer party to a Snapp transaction. *)
       type t = Poly(Predicated.Fee_payer.Stable.V1)(Signature.Stable.V1).t =
         { data : Predicated.Fee_payer.Stable.V1.t
         ; authorization : Signature.Stable.V1.t

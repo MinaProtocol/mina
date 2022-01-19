@@ -3248,17 +3248,17 @@ module Types = struct
              private key"
 
       let snapp_fee_payer =
-        arg "snappFeePayer"
+        arg "feePayer"
           ~typ:(non_null Snapp_inputs.snapp_party_fee_payer)
           ~doc:"The fee payer party to a Snapp transaction"
 
       let snapp_other_parties =
-        arg "snappOtherParties"
+        arg "otherParties"
           ~typ:(non_null (list (non_null Snapp_inputs.snapp_party_arg)))
           ~doc:"The parties other than the fee payer in a Snapp transaction"
 
       let snapp_protocol_state =
-        arg "snappProtocolState"
+        arg "protocolState"
           ~typ:(non_null Snapp_inputs.snapp_protocol_state_arg)
           ~doc:"The protocol state in a Snapp transaction"
     end

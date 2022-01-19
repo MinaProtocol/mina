@@ -98,8 +98,11 @@ module Set_or_keep = struct
         let of_yojson f = function
           | `Null -> Some Keep
           | x -> Set (f x)
-      end
-    end]
+
+        let to_graphql = to_yojson
+
+        let of_graphql = of_yojson
+      end]
 
   let map t ~f = match t with Keep -> Keep | Set x -> Set (f x)
 
@@ -192,6 +195,10 @@ module Or_ignore = struct
         let of_yojson f = function
           | `Null -> Some Ignore
           | x -> Check (f x)
+
+        let to_graphql = to_yojson
+
+        let of_graphql = of_yojson
       end
     end]
 

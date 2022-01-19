@@ -235,14 +235,17 @@ end
 [%%versioned
 module Stable = struct
   module V1 = struct
+    (** A Snapp transaction. *)
     type t =
-      { fee_payer : Party.Fee_payer.Stable.V1.t [@key "snappFeePayer"]
-      ; other_parties : Party.Stable.V1.t list [@key "snappOtherParties"]
+      { fee_payer : Party.Fee_payer.Stable.V1.t [@key "feePayer"]
+      ; other_parties : Party.Stable.V1.t list [@key "otherParties"]
+            (** The parties other than the fee payer in a Snapp transaction. *)
       ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
-            [@key "snappProtocolState"]
+            [@key "protocolState"]
+            (** The protocol state in a Snapp transaction. *)
       ; memo : Signed_command_memo.Stable.V1.t
       }
-    [@@deriving sexp, compare, equal, hash, yojson]
+    [@@deriving sexp, compare, equal, hash, yojson, to_graphql, of_graphql]
 
     let to_latest = Fn.id
 
