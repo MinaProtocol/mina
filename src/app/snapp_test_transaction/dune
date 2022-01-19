@@ -12,6 +12,7 @@
    currency
    archive_lib
    mina_base
+   mina_graphql
    mina_state
    genesis_constants
    genesis_ledger_helper

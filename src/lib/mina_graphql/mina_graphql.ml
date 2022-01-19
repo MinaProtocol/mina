@@ -1201,7 +1201,7 @@ module Types = struct
              ; field "snappState"
                  ~typ:(list @@ non_null string)
                  ~doc:
-                   "The 8 field elements comprising the snapp state associated \
+                   "The 8 field elements comprising the Snapp state associated \
                     with this account encoded as bignum strings"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
@@ -1582,7 +1582,7 @@ module Types = struct
               ~typ:(non_null string)
               ~args:Arg.[]
               ~resolve:(fun _ (party : Party.t) ->
-                Public_key.Compressed.to_base58_check party.data.body.pk)
+                Public_key.Compressed.to_base58_check party.data.body.public_key)
           ; field "events"
               ~doc:"Events associated with the party (fields in Base58Check)"
               ~typ:(non_null (list (non_null (list (non_null string)))))
@@ -1649,7 +1649,7 @@ module Types = struct
                     Some (Transaction_status.Failure.to_string failure))
           ; field_no_status "parties"
               ~typ:(non_null (list (non_null party_display)))
-              ~args:[] ~doc:"Parties involved in the snapp transaction"
+              ~args:[] ~doc:"Parties involved in the Snapp transaction"
               ~resolve:(fun _ cmd -> Parties.parties cmd.With_hash.data)
           ])
   end
@@ -2564,7 +2564,7 @@ module Types = struct
                  use_full_commitment ->
             try
               let open Result.Let_syntax in
-              let%bind pk =
+              let%bind public_key =
                 Result.map_error
                   (Public_key.Compressed.of_base58_check pk)
                   ~f:Error.to_string_hum
@@ -2582,7 +2582,7 @@ module Types = struct
               let sequence_events = mk_field_arrays sequence_events in
               let call_data = Snark_params.Tick.Field.of_string call_data in
               Party.Body.Poly.
-                { pk
+                { public_key
                 ; update
                 ; token_id
                 ; increment_nonce
@@ -2601,7 +2601,7 @@ module Types = struct
             ; arg "update" ~doc:"Update part of the body"
                 ~typ:(non_null snapp_update)
             ; arg "tokenId" ~doc:"Token id" ~typ:(non_null string)
-            ; arg "balance_change"
+            ; arg "balanceChange"
                 ~doc:
                   "Signed amount representing the amount to change for this \
                    particular relevant party."
@@ -2611,9 +2611,9 @@ module Types = struct
               (* TODO: Do we want fields in base58 in graphQL? Should we use a string of the base10 number like in other parts? Should we use a hex 32bytes -- that seems most natural to me? *)
             ; arg "events"
                 ~doc:
-                  "A list of events emitted by the snapp. Each event is a list \
+                  "A list of events emitted by the Snapp. Each event is a list \
                    of field elements, the particular meaning of each event is \
-                   determined by the snapp's internal logic."
+                   determined by the Snapp's internal logic."
                 ~typ:(non_null (list (non_null (list (non_null string)))))
             ; arg "sequenceEvents"
                 ~doc:
@@ -2621,24 +2621,24 @@ module Types = struct
                    is a list of field elements, the particular meaning of each \
                    event is determined by the snapp's internal logic. A \
                    commitment to these events is added to the sequenceState of \
-                   the snapp account for later use"
+                   the Snapp account for later use"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
             ; arg "callData"
                 ~doc:
-                  "A commitment to the arguments passed to the snapp and the \
-                   returned value, for internal use by the calling snapp. This \
+                  "A commitment to the arguments passed to the Snapp and the \
+                   returned value, for internal use by the calling Snapp. This \
                    commitment is opaque to ensure that private data can be \
-                   passed between snapps without revealing it on chain."
+                   passed between Snapps without revealing it on chain."
                 ~typ:(non_null string)
             ; arg "callDepth"
                 ~doc:
-                  "The number of nested snapp calls in the transaction before \
+                  "The number of nested Snapp calls in the transaction before \
                    reaching this party."
                 ~typ:(non_null int)
             ; arg "protocolState"
                 ~typ:(non_null snapp_protocol_state_arg)
                 ~doc:"The protocol state in a Snapp transaction"
-            ; arg "use_full_commitment"
+            ; arg "useFullCommitment"
                 ~doc:
                   "Use the full or partial commitment when checking the party \
                    predicate."
@@ -2652,7 +2652,7 @@ module Types = struct
                  call_depth protocol_state ->
             try
               let open Result.Let_syntax in
-              let%bind pk =
+              let%bind public_key =
                 Result.map_error
                   (Public_key.Compressed.of_base58_check pk)
                   ~f:Error.to_string_hum
@@ -2669,9 +2669,8 @@ module Types = struct
               let events = mk_field_arrays events in
               let sequence_events = mk_field_arrays sequence_events in
               let call_data = Snark_params.Tick.Field.of_string call_data in
-              let call_depth = Int.of_string call_depth in
               let%map protocol_state = protocol_state in
-              { Party.Body.Poly.pk
+              { Party.Body.Poly.public_key
               ; update
               ; token_id
               ; balance_change
@@ -2685,7 +2684,7 @@ module Types = struct
               }
             with exn -> Error (Exn.to_string exn))
           ~fields:
-            [ arg "pk" ~doc:"Public key as a Base58Check string"
+            [ arg "publicKey" ~doc:"Public key as a Base58Check string"
                 ~typ:(non_null string)
             ; arg "update" ~doc:"Update part of the body"
                 ~typ:(non_null snapp_update)
@@ -2697,8 +2696,11 @@ module Types = struct
                 ~typ:(non_null (list (non_null (list (non_null string)))))
             ; arg "callData" ~doc:"A field in Base58Check"
                 ~typ:(non_null string)
-            ; arg "callDepth" ~doc:"An integer in string format"
-                ~typ:(non_null string)
+            ; arg "callDepth"
+                ~doc:
+                  "The number of nested Snapp calls in the transaction before \
+                   reaching the fee payer."
+                ~typ:(non_null int)
             ; arg "protocolState"
                 ~typ:(non_null snapp_protocol_state_arg)
                 ~doc:"The protocol state in a Snapp transaction"
@@ -2744,18 +2746,6 @@ module Types = struct
                 ~typ:(non_null snapp_party_predicated_fee_payer)
             ; arg "authorization" ~doc:"signature"
                 ~typ:(non_null snapp_signature)
-            ]
-
-      (* like Party.Predicate.t with nullary constructors *)
-      type party_predicate = Full | Nonce | Accept
-
-      let snapp_predicate_enum =
-        enum "SnappPredicateConstructors"
-          ~doc:"Constructors for Snapp predicates"
-          ~values:
-            [ enum_value "Full" ~value:Full
-            ; enum_value "Nonce" ~value:Nonce
-            ; enum_value "Accept" ~value:Accept
             ]
 
       let snapp_receipt_chain_hash =
@@ -4638,7 +4628,7 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "payment" ~typ:guid ~doc:"Id of a Payment"
-          ; arg "snappTransaction" ~typ:guid ~doc:"Id of a snapp transaction"
+          ; arg "snappTransaction" ~typ:guid ~doc:"Id of a Snapp transaction"
           ]
       ~resolve:
         (fun { ctx = coda; _ } () (serialized_payment : string option)
@@ -4665,7 +4655,7 @@ module Queries = struct
           match (serialized_payment, serialized_snapp) with
           | None, None | Some _, Some _ ->
               Error
-                "Invalid query: Specify either a payment ID or a snapp \
+                "Invalid query: Specify either a payment ID or a Snapp \
                  transaction ID"
           | Some payment, None ->
               deserialize_txn (`Signed_command payment)
