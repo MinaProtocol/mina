@@ -42,7 +42,7 @@ module Sql = struct
 
                 FROM blocks b
                 WHERE height = (select MAX(height) from blocks)
-                ORDER BY timestamp ASC
+                ORDER BY timestamp ASC, state_hash ASC
                 LIMIT 1)
 
                 UNION ALL
@@ -109,83 +109,88 @@ module Sql = struct
 
   let run (module Conn : Caqti_async.CONNECTION) block_query address =
     let open Deferred.Result.Let_syntax in
-    let%bind timing_info_opt =
-      Archive_lib.Processor.Timing_info.find_by_pk_opt
-        (module Conn)
-        (Signature_lib.Public_key.Compressed.of_base58_check_exn address)
-      |> Errors.Lift.sql ~context:"Finding timing info"
-    in
-    (* First find the block referenced by the block identifier. Then find the latest block no later than it that has a
-     * user or internal command relevant to the address we're checking and pull the balance from it. For non-vesting
-     * accounts that balance will still be the balance at the block identifier. For vesting accounts we'll also compute
-     * how much extra balance has accumulated in between the blocks. *)
-    let%bind ( requested_block_height
-             , requested_block_global_slot_since_genesis
-             , requested_block_hash ) =
-      match%bind
-        Sql.Block.run (module Conn) block_query
-        |> Errors.Lift.sql ~context:"Finding specified block"
-      with
-      | None ->
+    let pk = Signature_lib.Public_key.Compressed.of_base58_check_exn address in
+    match%bind Archive_lib.Processor.Public_key.find_opt (module Conn) pk |>
+                     Errors.Lift.sql ~context:"Finding public key" with
+    | None -> Deferred.Result.fail (Errors.create @@ `Account_not_found address)
+    | Some _ ->
+      let%bind timing_info_opt =
+        Archive_lib.Processor.Timing_info.find_by_pk_opt
+          (module Conn)
+          pk
+        |> Errors.Lift.sql ~context:"Finding timing info"
+      in
+      (* First find the block referenced by the block identifier. Then find the latest block no later than it that has a
+       * user or internal command relevant to the address we're checking and pull the balance from it. For non-vesting
+       * accounts that balance will still be the balance at the block identifier. For vesting accounts we'll also compute
+       * how much extra balance has accumulated in between the blocks. *)
+      let%bind ( requested_block_height
+               , requested_block_global_slot_since_genesis
+               , requested_block_hash ) =
+        match%bind
+          Sql.Block.run (module Conn) block_query
+          |> Errors.Lift.sql ~context:"Finding specified block"
+        with
+        | None ->
           Deferred.Result.fail (Errors.create @@ `Block_missing (Block_query.to_string block_query))
-      | Some (_block_id, block_info, _) ->
+        | Some (_block_id, block_info, _) ->
           Deferred.Result.return
             ( block_info.height
             , block_info.global_slot_since_genesis
             , block_info.state_hash )
-    in
-    let requested_block_identifier =
-      { Block_identifier.index= requested_block_height
-      ; hash= requested_block_hash }
-    in
-    let%bind last_relevant_command_info_opt =
-      Balance_from_last_relevant_command.run
-        (module Conn)
-        requested_block_height address
-      |> Errors.Lift.sql
-           ~context:
-             "Finding balance at last relevant internal or user command."
-    in
-    let open Unsigned in
-    let end_slot =
-      UInt32.of_int
-        (Int.of_int64_exn requested_block_global_slot_since_genesis)
-    in
-    let compute_incremental_balance
-        (timing_info : Archive_lib.Processor.Timing_info.t) ~start_slot =
-      let cliff_time =
-        UInt32.of_int (Int.of_int64_exn timing_info.cliff_time)
       in
-      let cliff_amount =
-        MinaCurrency.Amount.of_int (Int.of_int64_exn timing_info.cliff_amount)
+      let requested_block_identifier =
+        { Block_identifier.index= requested_block_height
+        ; hash= requested_block_hash }
       in
-      let vesting_period =
-        UInt32.of_int (Int.of_int64_exn timing_info.vesting_period)
+      let%bind last_relevant_command_info_opt =
+        Balance_from_last_relevant_command.run
+          (module Conn)
+          requested_block_height address
+        |> Errors.Lift.sql
+          ~context:
+            "Finding balance at last relevant internal or user command."
       in
-      let vesting_increment =
-        MinaCurrency.Amount.of_int
-          (Int.of_int64_exn timing_info.vesting_increment)
+      let open Unsigned in
+      let end_slot =
+        UInt32.of_int
+          (Int.of_int64_exn requested_block_global_slot_since_genesis)
       in
-      let initial_minimum_balance =
-        MinaCurrency.Balance.of_int
-          (Int.of_int64_exn timing_info.initial_minimum_balance)
+      let compute_incremental_balance
+          (timing_info : Archive_lib.Processor.Timing_info.t) ~start_slot =
+        let cliff_time =
+          UInt32.of_int (Int.of_int64_exn timing_info.cliff_time)
+        in
+        let cliff_amount =
+          MinaCurrency.Amount.of_int (Int.of_int64_exn timing_info.cliff_amount)
+        in
+        let vesting_period =
+          UInt32.of_int (Int.of_int64_exn timing_info.vesting_period)
+        in
+        let vesting_increment =
+          MinaCurrency.Amount.of_int
+            (Int.of_int64_exn timing_info.vesting_increment)
+        in
+        let initial_minimum_balance =
+          MinaCurrency.Balance.of_int
+            (Int.of_int64_exn timing_info.initial_minimum_balance)
+        in
+        Mina_base.Account.incremental_balance_between_slots ~start_slot ~end_slot
+          ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
+          ~initial_minimum_balance
       in
-      Mina_base.Account.incremental_balance_between_slots ~start_slot ~end_slot
-        ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
-        ~initial_minimum_balance
-    in
-    let%bind liquid_balance =
-      match (last_relevant_command_info_opt, timing_info_opt) with
-      | None, None ->
-        (* We've never heard of this account, at least as of the block_identifier provided *)
-        (* This means they requested a block from before account creation;
-         * this is ambiguous in the spec but Coinbase confirmed we can return 0.
-         * https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
-        Deferred.Result.return 0L
-      | Some (_, last_relevant_command_balance), None ->
-        (* This account has no special vesting, so just use its last known balance *)
+      let%bind liquid_balance =
+        match (last_relevant_command_info_opt, timing_info_opt) with
+        | None, None ->
+          (* We've never heard of this account, at least as of the block_identifier provided *)
+          (* This means they requested a block from before account creation;
+           * this is ambiguous in the spec but Coinbase confirmed we can return 0.
+           * https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
+          Deferred.Result.return 0L
+        | Some (_, last_relevant_command_balance), None ->
+          (* This account has no special vesting, so just use its last known balance *)
           Deferred.Result.return last_relevant_command_balance
-      | None, Some timing_info ->
+        | None, Some timing_info ->
           (* This account hasn't seen any transactions but was in the genesis ledger, so compute its balance at the start block *)
           let balance_at_genesis : int64 =
             Int64.(
@@ -197,16 +202,16 @@ module Sql = struct
           in
           Deferred.Result.return
             ( UInt64.Infix.(
-                UInt64.of_int64 balance_at_genesis
-                + incremental_balance_since_genesis)
-            |> UInt64.to_int64 )
-      | ( Some
-            ( last_relevant_command_global_slot_since_genesis
-            , last_relevant_command_balance )
-        , Some timing_info ) ->
+                  UInt64.of_int64 balance_at_genesis
+                  + incremental_balance_since_genesis)
+              |> UInt64.to_int64 )
+        | ( Some
+              ( last_relevant_command_global_slot_since_genesis
+              , last_relevant_command_balance )
+          , Some timing_info ) ->
           (* This block was in the genesis ledger and has been involved in at least one user or internal command. We need
-         * to compute the change in its balance between the most recent command and the start block (if it has vesting
-         * it may have changed). *)
+           * to compute the change in its balance between the most recent command and the start block (if it has vesting
+           * it may have changed). *)
           let incremental_balance_between_slots =
             compute_incremental_balance timing_info
               ~start_slot:
@@ -216,26 +221,26 @@ module Sql = struct
           in
           Deferred.Result.return
             ( UInt64.Infix.(
-                UInt64.of_int64 last_relevant_command_balance
-                + incremental_balance_between_slots)
-            |> UInt64.to_int64 )
-    in
-    let%bind total_balance =
-      match (last_relevant_command_info_opt, timing_info_opt) with
-      | None, None ->
+                  UInt64.of_int64 last_relevant_command_balance
+                  + incremental_balance_between_slots)
+              |> UInt64.to_int64 )
+      in
+      let%bind total_balance =
+        match (last_relevant_command_info_opt, timing_info_opt) with
+        | None, None ->
           (* We've never heard of this account, at least as of the block_identifier provided *)
           (* TODO: This means they requested a block from before account creation. Should it error instead? Need to clarify with Coinbase team. *)
           Deferred.Result.return 0L
-      | Some (_, last_relevant_command_balance), _ ->
+        | Some (_, last_relevant_command_balance), _ ->
           (* This account was involved in a command and we don't care about its vesting, so just use the last known
-         * balance from the command *)
+           * balance from the command *)
           Deferred.Result.return last_relevant_command_balance
-      | None, Some timing_info ->
+        | None, Some timing_info ->
           (* This account hasn't seen any transactions but was in the genesis ledger, so use its genesis balance  *)
           Deferred.Result.return timing_info.initial_balance
-    in
-    let balance_info : Balance_info.t = {liquid_balance; total_balance} in
-    Deferred.Result.return (requested_block_identifier, balance_info)
+      in
+      let balance_info : Balance_info.t = {liquid_balance; total_balance} in
+      Deferred.Result.return (requested_block_identifier, balance_info)
 end
 
 module Balance = struct

@@ -293,7 +293,7 @@ SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_win
         {|
 WITH RECURSIVE chain AS (
   (SELECT id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, global_slot, global_slot_since_genesis, timestamp, chain_status FROM blocks b WHERE height = (select MAX(height) from blocks)
-  ORDER BY timestamp ASC
+  ORDER BY timestamp ASC, state_hash ASC
   LIMIT 1)
 
   UNION ALL
@@ -346,7 +346,7 @@ WITH RECURSIVE chain AS (
            INNER JOIN public_keys bw
            ON bw.id = b.block_winner_id
            WHERE b.height = (select MAX(b.height) from blocks b)
-           ORDER BY timestamp ASC
+           ORDER BY timestamp ASC, state_hash ASC
            LIMIT 1 |}
 
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
@@ -366,7 +366,15 @@ WITH RECURSIVE chain AS (
         if has_canonical_height then
           Conn.find_opt query_height_canonical h
         else
-          Conn.find_opt query_height_pending h
+          let%bind max_height = Conn.find
+              (Caqti_request.find Caqti_type.unit Caqti_type.int64
+                 {sql| SELECT MAX(height) FROM blocks |sql}) ()
+          in
+          let max_queryable_height = Int64.(-) max_height Network.Sql.max_height_delta in
+          if Int64.(<=) h max_queryable_height then
+            Conn.find_opt query_height_pending h
+          else
+            return None
       | Some (`That (`Hash h)) ->
         Conn.find_opt query_hash h
       | Some (`Those (`Height height, `Hash hash)) ->
