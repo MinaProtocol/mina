@@ -1194,14 +1194,14 @@ module Types = struct
              ; field "snappUri" ~typ:string
                  ~doc:
                    "The URI associated with this account, usually pointing to \
-                    the Snapp source code"
+                    the snapp source code"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.snapp_uri)
              ; field "snappState"
                  ~typ:(list @@ non_null string)
                  ~doc:
-                   "The 8 field elements comprising the Snapp state associated \
+                   "The 8 field elements comprising the snapp state associated \
                     with this account encoded as bignum strings"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
@@ -1606,24 +1606,24 @@ module Types = struct
               ~typ:(non_null guid) ~args:[] ~resolve:(fun _ parties ->
                 Parties.to_base58_check parties.With_hash.data)
           ; field_no_status "hash"
-              ~doc:"A cryptographic hash of the Snapp command"
+              ~doc:"A cryptographic hash of the snapp command"
               ~typ:(non_null string) ~args:[] ~resolve:(fun _ parties ->
                 Transaction_hash.to_base58_check parties.With_hash.hash)
           ; field_no_status "nonce" ~typ:(non_null int) ~args:[]
               ~doc:
-                "Sequence number of the Snapp transaction for the fee-payer's \
+                "Sequence number of the snapp transaction for the fee-payer's \
                  account" ~resolve:(fun _ parties ->
                 Parties.nonce parties.With_hash.data |> Unsigned.UInt32.to_int)
           ; field_no_status "feePayer" ~typ:(non_null AccountObj.account)
               ~args:[]
-              ~doc:"Account that pays the fees for the Snapp transaction"
+              ~doc:"Account that pays the fees for the snapp transaction"
               ~resolve:(fun { ctx = coda; _ } cmd ->
                 AccountObj.get_best_ledger_account coda
                   (Parties.fee_payer cmd.With_hash.data))
           ; field_no_status "accountsAccessed"
               ~typ:(non_null (list (non_null AccountObj.account)))
               ~args:[]
-              ~doc:"List of accounts accessed to complete the Snapp transaction"
+              ~doc:"List of accounts accessed to complete the snapp transaction"
               ~resolve:(fun { ctx = coda; _ } parties ->
                 let account_ids =
                   Parties.accounts_accessed parties.With_hash.data
@@ -1632,7 +1632,7 @@ module Types = struct
                     AccountObj.get_best_ledger_account coda acct_id))
           ; field_no_status "fee" ~typ:(non_null uint64) ~args:[]
               ~doc:
-                "Transaction fee paid by the fee-payer for the Snapp \
+                "Transaction fee paid by the fee-payer for the snapp \
                  transaction" ~resolve:(fun _ parties ->
                 Parties.fee parties.With_hash.data |> Currency.Fee.to_uint64)
           ; field_no_status "feeToken" ~typ:(non_null token_id) ~args:[]
@@ -1640,7 +1640,7 @@ module Types = struct
                 Parties.fee_token parties.With_hash.data)
           ; field "failureReason" ~typ:string ~args:[]
               ~doc:
-                "The reason for the Snapp transaction failure; null means \
+                "The reason for the snapp transaction failure; null means \
                  success or the status is unknown" ~resolve:(fun _ cmd ->
                 match cmd.With_status.status with
                 | Applied | Enqueued ->
@@ -1649,7 +1649,7 @@ module Types = struct
                     Some (Transaction_status.Failure.to_string failure))
           ; field_no_status "parties"
               ~typ:(non_null (list (non_null party_display)))
-              ~args:[] ~doc:"Parties involved in the Snapp transaction"
+              ~args:[] ~doc:"Parties involved in the snapp transaction"
               ~resolve:(fun _ cmd -> Parties.parties cmd.With_hash.data)
           ])
   end
@@ -1681,7 +1681,7 @@ module Types = struct
                   | Parties _ ->
                       None))
         ; field "snappCommands"
-            ~doc:"List of Snapp commands included in this block"
+            ~doc:"List of snapp commands included in this block"
             ~typ:(non_null @@ list @@ non_null Snapp_command.snapp_command)
             ~args:Arg.[]
             ~resolve:(fun _ { commands; _ } ->
@@ -1969,7 +1969,7 @@ module Types = struct
       obj "SendSnappPayload" ~fields:(fun _ ->
           [ field "snapp"
               ~typ:(non_null Snapp_command.snapp_command)
-              ~doc:"Snapp transaction that was sent"
+              ~doc:"snapp transaction that was sent"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id)
           ])
@@ -2340,7 +2340,7 @@ module Types = struct
             ]
 
       let snapp_update : (Party.Update.t, string) Result.t option arg_typ =
-        obj "PartyUpdate" ~doc:"Update component of a Snapp Party"
+        obj "PartyUpdate" ~doc:"Update component of a snapp Party"
           ~coerce:
             (fun app_state_elts delegate vk perms snapp_uri tok_sym timing ->
             let open Result.Let_syntax in
@@ -2494,7 +2494,7 @@ module Types = struct
 
       let snapp_protocol_state_arg :
           (Snapp_predicate.Protocol_state.t, string) result option arg_typ =
-        obj "SnappProtocolState" ~doc:"Protocol state for a Snapp transaction"
+        obj "SnappProtocolState" ~doc:"Protocol state for a snapp transaction"
           ~coerce:
             (fun snarked_ledger_hash snarked_next_available_token timestamp
                  blockchain_length min_window_density last_vrf_output_opt
@@ -2557,7 +2557,7 @@ module Types = struct
             ]
 
       let snapp_party_body : (Party.Body.t, string) Result.t option arg_typ =
-        obj "PartyBody" ~doc:"Body component of a Snapp Party"
+        obj "PartyBody" ~doc:"Body component of a snapp Party"
           ~coerce:
             (fun pk update_result token_id balance_change increment_nonce events
                  sequence_events call_data call_depth protocol_state
@@ -2611,9 +2611,9 @@ module Types = struct
               (* TODO: Do we want fields in base58 in graphQL? Should we use a string of the base10 number like in other parts? Should we use a hex 32bytes -- that seems most natural to me? *)
             ; arg "events"
                 ~doc:
-                  "A list of events emitted by the Snapp. Each event is a list \
+                  "A list of events emitted by the snapp. Each event is a list \
                    of field elements, the particular meaning of each event is \
-                   determined by the Snapp's internal logic."
+                   determined by the snapp's internal logic."
                 ~typ:(non_null (list (non_null (list (non_null string)))))
             ; arg "sequenceEvents"
                 ~doc:
@@ -2621,23 +2621,23 @@ module Types = struct
                    is a list of field elements, the particular meaning of each \
                    event is determined by the snapp's internal logic. A \
                    commitment to these events is added to the sequenceState of \
-                   the Snapp account for later use"
+                   the snapp account for later use"
                 ~typ:(non_null (list (non_null (list (non_null string)))))
             ; arg "callData"
                 ~doc:
-                  "A commitment to the arguments passed to the Snapp and the \
-                   returned value, for internal use by the calling Snapp. This \
+                  "A commitment to the arguments passed to the snapp and the \
+                   returned value, for internal use by the calling snapp. This \
                    commitment is opaque to ensure that private data can be \
-                   passed between Snapps without revealing it on chain."
+                   passed between snapps without revealing it on chain."
                 ~typ:(non_null string)
             ; arg "callDepth"
                 ~doc:
-                  "The number of nested Snapp calls in the transaction before \
+                  "The number of nested snapp calls in the transaction before \
                    reaching this party."
                 ~typ:(non_null int)
             ; arg "protocolState"
                 ~typ:(non_null snapp_protocol_state_arg)
-                ~doc:"The protocol state in a Snapp transaction"
+                ~doc:"The protocol state in a snapp transaction"
             ; arg "useFullCommitment"
                 ~doc:
                   "Use the full or partial commitment when checking the party \
@@ -2646,7 +2646,7 @@ module Types = struct
             ]
 
       let snapp_fee_payer_party_body =
-        obj "FeePayerPartyBody" ~doc:"Body component of a Snapp Fee Payer Party"
+        obj "FeePayerPartyBody" ~doc:"Body component of a snapp Fee Payer Party"
           ~coerce:
             (fun pk update_result fee events sequence_events call_data
                  call_depth protocol_state ->
@@ -2698,18 +2698,18 @@ module Types = struct
                 ~typ:(non_null string)
             ; arg "callDepth"
                 ~doc:
-                  "The number of nested Snapp calls in the transaction before \
+                  "The number of nested snapp calls in the transaction before \
                    reaching the fee payer."
                 ~typ:(non_null int)
             ; arg "protocolState"
                 ~typ:(non_null snapp_protocol_state_arg)
-                ~doc:"The protocol state in a Snapp transaction"
+                ~doc:"The protocol state in a snapp transaction"
             ]
 
       let snapp_party_predicated_fee_payer :
           (Party.Predicated.Fee_payer.t, string) Result.t option arg_typ =
         obj "SnappPartyPredicatedFeePayer"
-          ~doc:"A party to a Snapp transaction with a nonce predicate"
+          ~doc:"A party to a snapp transaction with a nonce predicate"
           ~coerce:(fun body nonce ->
             let open Result.Let_syntax in
             let%map body = body in
@@ -2736,7 +2736,7 @@ module Types = struct
       *)
       let snapp_party_fee_payer =
         obj "SnappPartyFeePayer"
-          ~doc:"A party to a Snapp transaction with a signature authorization"
+          ~doc:"A party to a snapp transaction with a signature authorization"
           ~coerce:(fun data authorization ->
             let open Result.Let_syntax in
             let%bind data = data in
@@ -2760,7 +2760,7 @@ module Types = struct
             with exn -> Error (Exn.to_string exn))
 
       let snapp_state =
-        obj "SnappState" ~doc:"Snapp state, a list of 8 field elements"
+        obj "SnappState" ~doc:"snapp state, a list of 8 field elements"
           ~coerce:(fun element_results ->
             let elements =
               List.map ~f:Snapp_basic.Or_ignore.of_option element_results
@@ -2768,7 +2768,7 @@ module Types = struct
             if List.length elements = 8 then
               (* length check means this won't raise *)
               Ok (Snapp_state.V.of_list_exn elements)
-            else Error "Expected 8 elements for Snapp state")
+            else Error "Expected 8 elements for snapp state")
           ~fields:[ arg "elements" ~typ:(non_null (list field)) ]
 
       let snapp_predicate_account =
@@ -2855,7 +2855,7 @@ module Types = struct
             | `String s ->
                 Pickles.Side_loaded.Proof.of_base64 s
             | _ ->
-                Error "Expected Snapp proof as base64-encoded string")
+                Error "Expected snapp proof as base64-encoded string")
 
       let snapp_control =
         obj "Control"
@@ -2875,7 +2875,7 @@ module Types = struct
             ]
 
       let snapp_party_arg =
-        obj "SnappParty" ~doc:"A party to a Snapp transaction"
+        obj "SnappParty" ~doc:"A party to a snapp transaction"
           ~coerce:(fun predicated_result authorization_result ->
             let open Result.Let_syntax in
             let%bind data = predicated_result in
@@ -3102,17 +3102,17 @@ module Types = struct
       let snapp_fee_payer =
         arg "feePayer"
           ~typ:(non_null Snapp_inputs.snapp_party_fee_payer)
-          ~doc:"The fee payer party to a Snapp transaction"
+          ~doc:"The fee payer party to a snapp transaction"
 
       let snapp_other_parties =
         arg "otherParties"
           ~typ:(non_null (list (non_null Snapp_inputs.snapp_party_arg)))
-          ~doc:"The parties other than the fee payer in a Snapp transaction"
+          ~doc:"The parties other than the fee payer in a snapp transaction"
 
       let snapp_protocol_state =
         arg "protocolState"
           ~typ:(non_null Snapp_inputs.snapp_protocol_state_arg)
-          ~doc:"The protocol state in a Snapp transaction"
+          ~doc:"The protocol state in a snapp transaction"
     end
 
     let send_payment =
@@ -3754,7 +3754,7 @@ module Mutations = struct
             in
             Ok cmd_with_hash
         | Error e ->
-            Error ("Couldn't send Snapp command: " ^ Error.to_string_hum e) )
+            Error ("Couldn't send snapp command: " ^ Error.to_string_hum e) )
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
@@ -3907,7 +3907,7 @@ module Mutations = struct
             |> Deferred.Result.map ~f:Types.User_command.mk_user_command)
 
   let send_snapp =
-    io_field "sendSnapp" ~doc:"Send a Snapp transaction"
+    io_field "sendSnapp" ~doc:"Send a snapp transaction"
       ~typ:(non_null Types.Payload.send_snapp)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.send_snapp) ]
       ~resolve:
@@ -4422,17 +4422,17 @@ module Queries = struct
   let pooled_snapp_commands =
     field "pooledSnappCommands"
       ~doc:
-        "Retrieve all the scheduled Snapp commands for a specified sender that \
+        "Retrieve all the scheduled snapp commands for a specified sender that \
          the current daemon sees in its transaction pool. All scheduled \
          commands are queried if no sender is specified"
       ~typ:(non_null @@ list @@ non_null Types.Snapp_command.snapp_command)
       ~args:
         Arg.
-          [ arg "publicKey" ~doc:"Public key of sender of pooled Snapp commands"
+          [ arg "publicKey" ~doc:"Public key of sender of pooled snapp commands"
               ~typ:Types.Input.public_key_arg
-          ; arg "hashes" ~doc:"Hashes of the Snapp commands to find in the pool"
+          ; arg "hashes" ~doc:"Hashes of the snapp commands to find in the pool"
               ~typ:(list (non_null string))
-          ; arg "ids" ~typ:(list (non_null guid)) ~doc:"Ids of Snapp commands"
+          ; arg "ids" ~typ:(list (non_null guid)) ~doc:"Ids of snapp commands"
           ]
       ~resolve:(fun { ctx = coda; _ } () pk_opt hashes_opt txns_opt ->
         let transaction_pool = Mina_lib.transaction_pool coda in
@@ -4628,7 +4628,7 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "payment" ~typ:guid ~doc:"Id of a Payment"
-          ; arg "snappTransaction" ~typ:guid ~doc:"Id of a Snapp transaction"
+          ; arg "snappTransaction" ~typ:guid ~doc:"Id of a snapp transaction"
           ]
       ~resolve:
         (fun { ctx = coda; _ } () (serialized_payment : string option)
@@ -4655,7 +4655,7 @@ module Queries = struct
           match (serialized_payment, serialized_snapp) with
           | None, None | Some _, Some _ ->
               Error
-                "Invalid query: Specify either a payment ID or a Snapp \
+                "Invalid query: Specify either a payment ID or a snapp \
                  transaction ID"
           | Some payment, None ->
               deserialize_txn (`Signed_command payment)
