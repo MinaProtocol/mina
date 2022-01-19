@@ -113,10 +113,20 @@ module Time = struct
   module Bits = Bits.UInt64
   include B.Snarkable.UInt64 (Tick)
 
+  let to_input (t : t) =
+    Random_oracle.Input.Chunked.packeds
+      (Array.of_list
+         (List.map (Bits.to_bits t) ~f:(fun b ->
+              ((if b then Tick.Field.one else Tick.Field.zero), 1))))
+
   module Checked = struct
     type t = Unpacked.var
 
     module N = Mina_numbers.Nat.Make_checked (UInt64) (Bits)
+
+    let to_input (t : t) =
+      Random_oracle.Input.Chunked.packeds
+        (Array.of_list (List.map t ~f:(fun b -> ((b :> Tick.Field.Var.t), 1))))
 
     let op f (x : t) (y : t) : (Boolean.var, 'a) Checked.t =
       let g = Fn.compose N.of_bits Unpacked.var_to_bits in
@@ -179,6 +189,21 @@ module Time = struct
     let min = UInt64.min
 
     let zero = UInt64.zero
+
+    let to_input (t : t) =
+      Random_oracle.Input.Chunked.packeds
+        (Array.of_list
+           (List.map (Bits.to_bits t) ~f:(fun b ->
+                ((if b then Tick.Field.one else Tick.Field.zero), 1))))
+
+    module Checked = struct
+      type t = Unpacked.var
+
+      let to_input (t : t) =
+        Random_oracle.Input.Chunked.packeds
+          (Array.of_list
+             (List.map t ~f:(fun b -> ((b :> Tick.Field.Var.t), 1))))
+    end
   end
 
   include Comparable.Make (Stable.Latest)

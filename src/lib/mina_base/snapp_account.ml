@@ -48,7 +48,7 @@ module Events = struct
 
   let hash (x : t) = List.fold ~init:(Lazy.force empty_hash) ~f:push_event x
 
-  let to_input (x : t) = Random_oracle_input.field (hash x)
+  let to_input (x : t) = Random_oracle_input.Chunked.field (hash x)
 
   [%%ifdef consensus_mechanism]
 
@@ -192,19 +192,21 @@ module Checked = struct
     Poly.t
 
   let to_input' (t : _ Poly.t) =
-    let open Random_oracle.Input in
+    let open Random_oracle.Input.Chunked in
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-    let app_state v = Random_oracle.Input.field_elements (Vector.to_array v) in
+    let app_state v =
+      Random_oracle.Input.Chunked.field_elements (Vector.to_array v)
+    in
     Poly.Fields.fold ~init:[] ~app_state:(f app_state)
       ~verification_key:(f (fun x -> field x))
       ~snapp_version:
-        (f (fun x ->
-             Run.run_checked (Mina_numbers.Snapp_version.Checked.to_input x)))
+        (f (fun x -> Mina_numbers.Snapp_version.Checked.to_input x))
       ~sequence_state:(f app_state)
       ~last_sequence_slot:
-        (f (fun x ->
-             Run.run_checked (Mina_numbers.Global_slot.Checked.to_input x)))
-      ~proved_state:(f (fun b -> bitstring [ b ]))
+        (f (fun x -> Mina_numbers.Global_slot.Checked.to_input x))
+      ~proved_state:
+        (f (fun (b : Boolean.var) ->
+             Random_oracle.Input.Chunked.packed ((b :> Field.Var.t), 1)))
     |> List.reduce_exn ~f:append
 
   let to_input (t : t) =
@@ -255,9 +257,11 @@ let dummy_vk_hash =
   Memo.unit (fun () -> digest_vk Side_loaded_verification_key.dummy)
 
 let to_input (t : t) =
-  let open Random_oracle.Input in
+  let open Random_oracle.Input.Chunked in
   let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-  let app_state v = Random_oracle.Input.field_elements (Vector.to_array v) in
+  let app_state v =
+    Random_oracle.Input.Chunked.field_elements (Vector.to_array v)
+  in
   Poly.Fields.fold ~init:[] ~app_state:(f app_state)
     ~verification_key:
       (f
@@ -266,7 +270,8 @@ let to_input (t : t) =
     ~snapp_version:(f Mina_numbers.Snapp_version.to_input)
     ~sequence_state:(f app_state)
     ~last_sequence_slot:(f Mina_numbers.Global_slot.to_input)
-    ~proved_state:(f (fun b -> bitstring [ b ]))
+    ~proved_state:
+      (f (fun b -> Random_oracle.Input.Chunked.packed (field_of_bool b, 1)))
   |> List.reduce_exn ~f:append
 
 let default : _ Poly.t =

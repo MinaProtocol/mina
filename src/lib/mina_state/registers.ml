@@ -25,7 +25,7 @@ let gen =
 
 let to_input
     { ledger; pending_coinbase_stack; next_available_token; local_state } =
-  Array.reduce_exn ~f:Random_oracle.Input.append
+  Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
     [| Frozen_ledger_hash.to_input ledger
      ; Pending_coinbase.Stack.to_input pending_coinbase_stack
      ; Token_id.to_input next_available_token
@@ -68,10 +68,10 @@ module Checked = struct
 
   let to_input
       { ledger; pending_coinbase_stack; next_available_token; local_state } =
-    Array.reduce_exn ~f:Random_oracle.Input.append
+    Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
       [| Frozen_ledger_hash.var_to_input ledger
        ; Pending_coinbase.Stack.var_to_input pending_coinbase_stack
-       ; Impl.run_checked (Token_id.Checked.to_input next_available_token)
+       ; Token_id.Checked.to_input next_available_token
        ; Local_state.Checked.to_input local_state
       |]
 

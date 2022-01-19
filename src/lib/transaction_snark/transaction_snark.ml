@@ -97,12 +97,12 @@ module Pending_coinbase_stack_state = struct
   let typ = Poly.typ Pending_coinbase.Stack.typ
 
   let to_input ({ source; target } : t) =
-    Random_oracle.Input.append
+    Random_oracle.Input.Chunked.append
       (Pending_coinbase.Stack.to_input source)
       (Pending_coinbase.Stack.to_input target)
 
   let var_to_input ({ source; target } : var) =
-    Random_oracle.Input.append
+    Random_oracle.Input.Chunked.append
       (Pending_coinbase.Stack.var_to_input source)
       (Pending_coinbase.Stack.var_to_input target)
 
@@ -305,7 +305,7 @@ module Statement = struct
 
     let to_input { source; target; supply_increase; fee_excess; sok_digest } =
       let input =
-        Array.reduce_exn ~f:Random_oracle.Input.append
+        Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
           [| Sok_message.Digest.to_input sok_digest
            ; Registers.to_input source
            ; Registers.to_input target
@@ -315,8 +315,8 @@ module Statement = struct
       in
       if !top_hash_logging_enabled then
         Format.eprintf
-          !"Generating unchecked top hash from:@.%{sexp: (Tick.Field.t, bool) \
-            Random_oracle.Input.t}@."
+          !"Generating unchecked top hash from:@.%{sexp: Tick.Field.t \
+            Random_oracle.Input.Chunked.t}@."
           input ;
       input
 
@@ -328,14 +328,11 @@ module Statement = struct
       let to_input { source; target; supply_increase; fee_excess; sok_digest } =
         let open Tick in
         let open Checked.Let_syntax in
-        let%bind fee_excess = Fee_excess.to_input_checked fee_excess in
-        let%bind source =
-          make_checked (fun () -> Registers.Checked.to_input source)
-        and target =
-          make_checked (fun () -> Registers.Checked.to_input target)
-        in
+        let fee_excess = Fee_excess.to_input_checked fee_excess in
+        let source = Registers.Checked.to_input source
+        and target = Registers.Checked.to_input target in
         let input =
-          Array.reduce_exn ~f:Random_oracle.Input.append
+          Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
             [| Sok_message.Digest.Checked.to_input sok_digest
              ; source
              ; target
@@ -347,23 +344,11 @@ module Statement = struct
           as_prover
             As_prover.(
               if !top_hash_logging_enabled then
-                let%bind field_elements =
-                  read
-                    (Typ.list ~length:0 Field.typ)
-                    (Array.to_list input.field_elements)
-                in
-                let%map bitstrings =
-                  read
-                    (Typ.list ~length:0 (Typ.list ~length:0 Boolean.typ))
-                    (Array.to_list input.bitstrings)
-                in
+                let%map input = Random_oracle.read_typ' input in
                 Format.eprintf
-                  !"Generating checked top hash from:@.%{sexp: (Field.t, bool) \
-                    Random_oracle.Input.t}@."
-                  { Random_oracle.Input.field_elements =
-                      Array.of_list field_elements
-                  ; bitstrings = Array.of_list bitstrings
-                  }
+                  !"Generating checked top hash from:@.%{sexp: Field.t \
+                    Random_oracle.Input.Chunked.t}@."
+                  input
               else return ())
         in
         input
@@ -1101,9 +1086,11 @@ module Base = struct
 
   let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
       ~signature =
-    let%bind input = Transaction_union_payload.Checked.to_input payload in
+    let%bind input =
+      Transaction_union_payload.Checked.to_input_legacy payload
+    in
     let%bind verifies =
-      Schnorr.Checked.verifies shifted signature signer input
+      Schnorr.Legacy.Checked.verifies shifted signature signer input
     in
     Boolean.Assert.any [ Boolean.not is_user_command; verifies ]
 
@@ -1180,8 +1167,8 @@ module Base = struct
       Public_key.decompress_var pk
       (*           (Account_id.Checked.public_key fee_payer_id) *)
     in
-    Schnorr.Checked.verifies shifted signature pk
-      (Random_oracle.Input.field payload_digest)
+    Schnorr.Chunked.Checked.verifies shifted signature pk
+      (Random_oracle.Input.Chunked.field payload_digest)
 
   module Parties_snark = struct
     open Parties_segment
@@ -2022,7 +2009,7 @@ module Base = struct
                   Boolean.false_
               | Signature ->
                   let signature =
-                    exists Signature_lib.Schnorr.Signature.typ
+                    exists Signature_lib.Schnorr.Chunked.Signature.typ
                       ~compute:(fun () ->
                         match V.get control with
                         | Signature s ->
@@ -4365,15 +4352,15 @@ module For_tests = struct
           ~fee_payer_hash:
             Party.Predicated.(digest (of_fee_payer fee_payer.data))
       in
-      Signature_lib.Schnorr.sign sender.private_key
-        (Random_oracle.Input.field txn_comm)
+      Signature_lib.Schnorr.Chunked.sign sender.private_key
+        (Random_oracle.Input.Chunked.field txn_comm)
     in
     let fee_payer =
       { fee_payer with authorization = fee_payer_signature_auth }
     in
     let sender_signature_auth =
-      Signature_lib.Schnorr.sign sender.private_key
-        (Random_oracle.Input.field transaction)
+      Signature_lib.Schnorr.Chunked.sign sender.private_key
+        (Random_oracle.Input.Chunked.field transaction)
     in
     let sender =
       { Party.data = sender_party_data
@@ -4957,7 +4944,7 @@ let%test_module "transaction_snark" =
     let%test_module "multisig_account" =
       ( module struct
         module M_of_n_predicate = struct
-          type _witness = (Schnorr.Signature.t * Public_key.t) list
+          type _witness = (Schnorr.Chunked.Signature.t * Public_key.t) list
 
           (* check that two public keys are equal *)
           let eq_pk ((x0, y0) : Public_key.var) ((x1, y1) : Public_key.var) :
@@ -4984,7 +4971,7 @@ let%test_module "transaction_snark" =
           (* check a signature on msg against a public key *)
           let check_sig pk msg sigma : (Boolean.var, _) Checked.t =
             let%bind (module S) = Inner_curve.Checked.Shifted.create () in
-            Schnorr.Checked.verifies (module S) sigma pk msg
+            Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
 
           (* verify witness signatures against public keys *)
           let%snarkydef verify_sigs pubkeys commitment witness =
@@ -5013,20 +5000,21 @@ let%test_module "transaction_snark" =
             let gen =
               let open Quickcheck.Generator.Let_syntax in
               let%map sk = Private_key.gen and msg = Field.gen_uniform in
-              (sk, Random_oracle.Input.field_elements [| msg |])
+              (sk, Random_oracle.Input.Chunked.field_elements [| msg |])
             in
             Quickcheck.test ~trials:1 gen ~f:(fun (sk, msg) ->
                 let pk = Inner_curve.(scale one sk) in
                 (let%bind pk_var =
                    exists Inner_curve.typ ~compute:(As_prover.return pk)
                  in
-                 let sigma = Schnorr.sign sk msg in
+                 let sigma = Schnorr.Chunked.sign sk msg in
                  let%bind sigma_var =
-                   exists Schnorr.Signature.typ
+                   exists Schnorr.Chunked.Signature.typ
                      ~compute:(As_prover.return sigma)
                  in
                  let%bind msg_var =
-                   exists (Schnorr.message_typ ())
+                   exists
+                     (Schnorr.chunked_message_typ ())
                      ~compute:(As_prover.return msg)
                  in
                  let witness = [ (sigma_var, pk_var) ] in
@@ -5040,7 +5028,7 @@ let%test_module "transaction_snark" =
               let%map sk0 = Private_key.gen
               and sk1 = Private_key.gen
               and msg = Field.gen_uniform in
-              (sk0, sk1, Random_oracle.Input.field_elements [| msg |])
+              (sk0, sk1, Random_oracle.Input.Chunked.field_elements [| msg |])
             in
             Quickcheck.test ~trials:1 gen ~f:(fun (sk0, sk1, msg) ->
                 let pk0 = Inner_curve.(scale one sk0) in
@@ -5051,18 +5039,19 @@ let%test_module "transaction_snark" =
                  let%bind pk1_var =
                    exists Inner_curve.typ ~compute:(As_prover.return pk1)
                  in
-                 let sigma0 = Schnorr.sign sk0 msg in
-                 let sigma1 = Schnorr.sign sk1 msg in
+                 let sigma0 = Schnorr.Chunked.sign sk0 msg in
+                 let sigma1 = Schnorr.Chunked.sign sk1 msg in
                  let%bind sigma0_var =
-                   exists Schnorr.Signature.typ
+                   exists Schnorr.Chunked.Signature.typ
                      ~compute:(As_prover.return sigma0)
                  in
                  let%bind sigma1_var =
-                   exists Schnorr.Signature.typ
+                   exists Schnorr.Chunked.Signature.typ
                      ~compute:(As_prover.return sigma1)
                  in
                  let%bind msg_var =
-                   exists (Schnorr.message_typ ())
+                   exists
+                     (Schnorr.chunked_message_typ ())
                      ~compute:(As_prover.return msg)
                  in
                  let witness =
@@ -5101,7 +5090,9 @@ let%test_module "transaction_snark" =
 
         type _ Snarky_backendless.Request.t +=
           | Pubkey : int -> Inner_curve.t Snarky_backendless.Request.t
-          | Sigma : int -> Schnorr.Signature.t Snarky_backendless.Request.t
+          | Sigma :
+              int
+              -> Schnorr.Chunked.Signature.t Snarky_backendless.Request.t
 
         (* test with a 2-of-3 multisig *)
         let%test_unit "snapps-based proved transaction" =
@@ -5147,16 +5138,16 @@ let%test_module "transaction_snark" =
                         let msg_var =
                           tx_commitment
                           |> Snapp_statement.Checked.to_field_elements
-                          |> Random_oracle_input.field_elements
+                          |> Random_oracle_input.Chunked.field_elements
                         in
                         let%bind sigma0_var =
-                          exists Schnorr.Signature.typ
+                          exists Schnorr.Chunked.Signature.typ
                             ~request:(As_prover.return @@ Sigma 0)
                         and sigma1_var =
-                          exists Schnorr.Signature.typ
+                          exists Schnorr.Chunked.Signature.typ
                             ~request:(As_prover.return @@ Sigma 1)
                         and sigma2_var =
-                          exists Schnorr.Signature.typ
+                          exists Schnorr.Chunked.Signature.typ
                             ~request:(As_prover.return @@ Sigma 2)
                         in
                         let witness =
@@ -5359,11 +5350,11 @@ let%test_module "transaction_snark" =
                   in
                   let msg =
                     tx_statement |> Snapp_statement.to_field_elements
-                    |> Random_oracle_input.field_elements
+                    |> Random_oracle_input.Chunked.field_elements
                   in
-                  let sigma0 = Schnorr.sign sk0 msg in
-                  let sigma1 = Schnorr.sign sk1 msg in
-                  let sigma2 = Schnorr.sign sk2 msg in
+                  let sigma0 = Schnorr.Chunked.sign sk0 msg in
+                  let sigma1 = Schnorr.Chunked.sign sk1 msg in
+                  let sigma2 = Schnorr.Chunked.sign sk2 msg in
                   let handler
                       (Snarky_backendless.Request.With { request; respond }) =
                     match request with
@@ -5395,16 +5386,16 @@ let%test_module "transaction_snark" =
                     in
                     { fee_payer with
                       authorization =
-                        Signature_lib.Schnorr.sign sender.private_key
-                          (Random_oracle.Input.field txn_comm)
+                        Signature_lib.Schnorr.Chunked.sign sender.private_key
+                          (Random_oracle.Input.Chunked.field txn_comm)
                     }
                   in
                   let sender =
                     { Party.data = sender_party_data
                     ; authorization =
                         Signature
-                          (Signature_lib.Schnorr.sign sender.private_key
-                             (Random_oracle.Input.field transaction))
+                          (Signature_lib.Schnorr.Chunked.sign sender.private_key
+                             (Random_oracle.Input.Chunked.field transaction))
                     }
                   in
                   let parties : Parties.t =

@@ -45,10 +45,10 @@ let sign_blake2_hash ~private_key s =
   let bitstrings =
     [| Blake2.to_raw_string blake2 |> Blake2.string_to_bits |> Array.to_list |]
   in
-  let input : (Field.t, bool) Random_oracle.Input.t =
+  let input : (Field.t, bool) Random_oracle.Legacy.Input.t =
     { field_elements; bitstrings }
   in
-  Schnorr.sign private_key input
+  Schnorr.Legacy.sign private_key input
 
 let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
     ~state_hash ~produced block_data =

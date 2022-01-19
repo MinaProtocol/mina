@@ -3,6 +3,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Util
 
 [%%ifdef consensus_mechanism]
 
@@ -61,6 +62,10 @@ module Index = struct
 
   let of_bits = List.foldi ~init:Vector.empty ~f:(fun i t b -> Vector.set t i b)
 
+  let to_input ~ledger_depth x =
+    List.map (to_bits ~ledger_depth x) ~f:(fun b -> (field_of_bool b, 1))
+    |> List.to_array |> Random_oracle.Input.Chunked.packeds
+
   let fold_bits ~ledger_depth t =
     { Fold.fold =
         (fun ~init ~f ->
@@ -79,6 +84,10 @@ module Index = struct
     type var = Tick.Boolean.var list
 
     type value = Vector.t
+
+    let to_input x =
+      List.map x ~f:(fun (b : Boolean.var) -> ((b :> Field.Var.t), 1))
+      |> List.to_array |> Random_oracle.Input.Chunked.packeds
 
     let typ ~ledger_depth : (var, value) Tick.Typ.t =
       Typ.transport
@@ -179,8 +188,11 @@ module Token_symbol = struct
       ~f:(fun x -> assert (String.equal (of_bits (to_bits x)) x))
 
   let to_input (x : t) =
-    Random_oracle_input.bitstrings
-      [| Pickles_types.Vector.to_list (to_bits x) |]
+    Random_oracle_input.Chunked.packeds
+      (List.to_array
+         (List.map
+            ~f:(fun b -> (field_of_bool b, 1))
+            (Pickles_types.Vector.to_list (to_bits x))))
 
   [%%ifdef consensus_mechanism]
 
@@ -194,7 +206,11 @@ module Token_symbol = struct
     @@ Pickles_types.Vector.typ Boolean.typ Num_bits.n
 
   let var_to_input (x : var) =
-    Random_oracle_input.bitstrings [| Pickles_types.Vector.to_list x |]
+    Random_oracle_input.Chunked.packeds
+      (List.to_array
+         (List.map
+            ~f:(fun (b : Boolean.var) -> ((b :> Field.Var.t), 1))
+            (Pickles_types.Vector.to_list x)))
 
   let if_ (b : Boolean.var) ~(then_ : var) ~(else_ : var) : var =
     Pickles_types.Vector.map2 then_ else_ ~f:(fun then_ else_ ->
@@ -420,7 +436,7 @@ let hash_snapp_account_opt = function
    added below.
 *)
 let snapp_uri_non_preimage =
-  lazy (Random_oracle_input.field_elements [| Field.zero; Field.zero |])
+  lazy (Random_oracle_input.Chunked.field_elements [| Field.zero; Field.zero |])
 
 let hash_snapp_uri_opt (snapp_uri_opt : string option) =
   let input =
@@ -438,7 +454,8 @@ let hash_snapp_uri_opt (snapp_uri_opt : string option) =
               (* [Int.test_bit c j] *)
               bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
             done) ;
-        Random_oracle_input.bitstring (Array.to_list bits)
+        Random_oracle_input.Chunked.packeds
+          (Array.map ~f:(fun b -> (field_of_bool b, 1)) bits)
     | None ->
         Lazy.force snapp_uri_non_preimage
   in
@@ -450,17 +467,16 @@ let hash_snapp_uri (snapp_uri : string) = hash_snapp_uri_opt (Some snapp_uri)
 let delegate_opt = Option.value ~default:Public_key.Compressed.empty
 
 let to_input (t : t) =
-  let open Random_oracle.Input in
+  let open Random_oracle.Input.Chunked in
   let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-  let bits conv = f (Fn.compose bitstring conv) in
   Poly.Fields.fold ~init:[]
     ~public_key:(f Public_key.Compressed.to_input)
-    ~token_id:(f Token_id.to_input) ~balance:(bits Balance.to_bits)
+    ~token_id:(f Token_id.to_input) ~balance:(f Balance.to_input)
     ~token_permissions:(f Token_permissions.to_input)
-    ~token_symbol:(f Token_symbol.to_input) ~nonce:(bits Nonce.Bits.to_bits)
+    ~token_symbol:(f Token_symbol.to_input) ~nonce:(f Nonce.to_input)
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
     ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
-    ~voting_for:(f State_hash.to_input) ~timing:(bits Timing.to_bits)
+    ~voting_for:(f State_hash.to_input) ~timing:(f Timing.to_input)
     ~snapp:(f (Fn.compose field hash_snapp_account_opt))
     ~permissions:(f Permissions.to_input)
     ~snapp_uri:(f (Fn.compose field hash_snapp_uri))
@@ -601,39 +617,30 @@ module Checked = struct
   end
 
   let to_input (t : var) =
-    let ( ! ) f x = Run.run_checked (f x) in
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-    let open Random_oracle.Input in
-    let bits conv =
-      f (fun x ->
-          bitstring (Bitstring_lib.Bitstring.Lsb_first.to_list (conv x)))
-    in
-    make_checked (fun () ->
-        List.reduce_exn ~f:append
-          (Poly.Fields.fold ~init:[]
-             ~snapp:(f (fun (x, _) -> field x))
-             ~permissions:(f Permissions.Checked.to_input)
-             ~public_key:(f Public_key.Compressed.Checked.to_input)
-             ~token_id:
-               (* We use [run_checked] here to avoid routing the [Checked.t]
-                  monad throughout this calculation.
-               *)
-               (f (fun x -> Run.run_checked (Token_id.Checked.to_input x)))
-             ~token_symbol:(f Token_symbol.var_to_input)
-             ~token_permissions:(f Token_permissions.var_to_input)
-             ~balance:(bits Balance.var_to_bits)
-             ~nonce:(bits !Nonce.Checked.to_bits)
-             ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
-             ~delegate:(f Public_key.Compressed.Checked.to_input)
-             ~voting_for:(f State_hash.var_to_input)
-             ~timing:(bits Timing.var_to_bits)
-             ~snapp_uri:(f Data_as_hash.to_input)))
+    let open Random_oracle.Input.Chunked in
+    List.reduce_exn ~f:append
+      (Poly.Fields.fold ~init:[]
+         ~snapp:(f (fun (x, _) -> field x))
+         ~permissions:(f Permissions.Checked.to_input)
+         ~public_key:(f Public_key.Compressed.Checked.to_input)
+         ~token_id:
+           (* We use [run_checked] here to avoid routing the [Checked.t]
+              monad throughout this calculation.
+           *)
+           (f Token_id.Checked.to_input)
+         ~token_symbol:(f Token_symbol.var_to_input)
+         ~token_permissions:(f Token_permissions.var_to_input)
+         ~balance:(f Balance.var_to_input) ~nonce:(f Nonce.Checked.to_input)
+         ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
+         ~delegate:(f Public_key.Compressed.Checked.to_input)
+         ~voting_for:(f State_hash.var_to_input)
+         ~timing:(f Timing.var_to_input) ~snapp_uri:(f Data_as_hash.to_input))
 
   let digest t =
     make_checked (fun () ->
         Random_oracle.Checked.(
-          hash ~init:crypto_hash_prefix
-            (pack_input (Run.run_checked (to_input t)))))
+          hash ~init:crypto_hash_prefix (pack_input (to_input t))))
 
   let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
       ~vesting_increment ~initial_minimum_balance =

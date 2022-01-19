@@ -1,6 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Util
 
 [%%ifdef consensus_mechanism]
 
@@ -93,7 +94,7 @@ module Update = struct
       }
 
     let to_input (t : t) =
-      List.reduce_exn ~f:Random_oracle_input.append
+      List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Balance.to_input t.initial_minimum_balance
         ; Global_slot.to_input t.cliff_time
         ; Amount.to_input t.cliff_amount
@@ -138,13 +139,11 @@ module Update = struct
            ; vesting_increment
            } :
             t) =
-        List.reduce_exn ~f:Random_oracle_input.append
+        List.reduce_exn ~f:Random_oracle_input.Chunked.append
           [ Balance.var_to_input initial_minimum_balance
-          ; Snark_params.Tick.Run.run_checked
-              (Global_slot.Checked.to_input cliff_time)
+          ; Global_slot.Checked.to_input cliff_time
           ; Amount.var_to_input cliff_amount
-          ; Snark_params.Tick.Run.run_checked
-              (Global_slot.Checked.to_input vesting_period)
+          ; Global_slot.Checked.to_input vesting_period
           ; Amount.var_to_input vesting_increment
           ]
     end
@@ -267,7 +266,7 @@ module Update = struct
          ; timing
          } :
           t) =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Snapp_state.to_input app_state
             ~f:(Set_or_keep.Checked.to_input ~f:field)
@@ -306,7 +305,7 @@ module Update = struct
        ; timing
        } :
         t) =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Snapp_state.to_input app_state
           ~f:(Set_or_keep.to_input ~dummy:Field.zero ~f:field)
@@ -495,17 +494,19 @@ module Body = struct
          ; use_full_commitment
          } :
           t) =
-      List.reduce_exn ~f:Random_oracle_input.append
+      List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Public_key.Compressed.Checked.to_input pk
         ; Update.Checked.to_input update
-        ; Impl.run_checked (Token_id.Checked.to_input token_id)
+        ; Token_id.Checked.to_input token_id
         ; Amount.Signed.Checked.to_input balance_change
-        ; Random_oracle_input.bitstring [ increment_nonce ]
+        ; Random_oracle_input.Chunked.packed
+            ((increment_nonce :> Field.Var.t), 1)
         ; Events.var_to_input events
         ; Events.var_to_input sequence_events
-        ; Random_oracle_input.field call_data
+        ; Random_oracle_input.Chunked.field call_data
         ; Snapp_predicate.Protocol_state.Checked.to_input protocol_state
-        ; Random_oracle_input.bitstring [ use_full_commitment ]
+        ; Random_oracle_input.Chunked.packed
+            ((use_full_commitment :> Field.Var.t), 1)
         ]
 
     let digest (t : t) =
@@ -559,17 +560,17 @@ module Body = struct
        ; use_full_commitment
        } :
         t) =
-    List.reduce_exn ~f:Random_oracle_input.append
+    List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Public_key.Compressed.to_input pk
       ; Update.to_input update
       ; Token_id.to_input token_id
       ; Amount.Signed.to_input balance_change
-      ; Random_oracle_input.bitstring [ increment_nonce ]
+      ; Random_oracle_input.Chunked.packed (field_of_bool increment_nonce, 1)
       ; Events.to_input events
       ; Events.to_input sequence_events
-      ; Random_oracle_input.field call_data
+      ; Random_oracle_input.Chunked.field call_data
       ; Snapp_predicate.Protocol_state.to_input protocol_state
-      ; Random_oracle_input.bitstring [ use_full_commitment ]
+      ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)
       ]
 
   let digest (t : t) =
@@ -665,9 +666,9 @@ module Predicated = struct
   end]
 
   let to_input ({ body; predicate } : t) =
-    List.reduce_exn ~f:Random_oracle_input.append
+    List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Body.to_input body
-      ; Random_oracle_input.field (Predicate.digest predicate)
+      ; Random_oracle_input.Chunked.field (Predicate.digest predicate)
       ]
 
   let digest (t : t) =
@@ -684,9 +685,9 @@ module Predicated = struct
     type t = (Body.Checked.t, Predicate.Checked.t) Poly.t
 
     let to_input ({ body; predicate } : t) =
-      List.reduce_exn ~f:Random_oracle_input.append
+      List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Body.Checked.to_input body
-        ; Random_oracle_input.field (Predicate.Checked.digest predicate)
+        ; Random_oracle_input.Chunked.field (Predicate.Checked.digest predicate)
         ]
 
     let digest (t : t) =

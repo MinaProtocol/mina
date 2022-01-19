@@ -2651,7 +2651,8 @@ module For_tests = struct
     in
     let other_parties_signature =
       let c = if use_full_commitment then full_commitment else commitment in
-      Schnorr.sign sender.private_key (Random_oracle.Input.field c)
+      Schnorr.Chunked.sign sender.private_key
+        (Random_oracle.Input.Chunked.field c)
     in
     let other_parties =
       List.map parties.other_parties ~f:(fun party ->
@@ -2662,8 +2663,8 @@ module For_tests = struct
               party)
     in
     let signature =
-      Schnorr.sign sender.private_key
-        (Random_oracle.Input.field full_commitment)
+      Schnorr.Chunked.sign sender.private_key
+        (Random_oracle.Input.Chunked.field full_commitment)
     in
     { parties with
       fee_payer = { parties.fee_payer with authorization = signature }

@@ -21,7 +21,9 @@ module Stable : sig
   end
 end]
 
-val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+val to_input : t -> Field.t Random_oracle.Input.Chunked.t
+
+val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
 
 val to_string : t -> string
 
@@ -73,8 +75,13 @@ val typ : (var, t) Typ.t
 val var_of_t : t -> var
 
 module Checked : sig
-  val to_input :
-    var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Tick.Checked.t
+  val to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
+
+  val to_input_legacy :
+       var
+    -> ( (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
+       , _ )
+       Tick.Checked.t
 
   val next : var -> (var, _) Checked.t
 

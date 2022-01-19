@@ -41,7 +41,7 @@ module Closed_interval = struct
     else { lower = a2; upper = a1 }
 
   let to_input { lower; upper } ~f =
-    Random_oracle_input.append (f lower) (f upper)
+    Random_oracle_input.Chunked.append (f lower) (f upper)
 
   let typ x =
     Typ.of_hlistable [ x; x ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -61,9 +61,8 @@ module Numeric = struct
       ; compare : 'a -> 'a -> int
       ; equal : 'a -> 'a -> bool
       ; typ : ('var, 'a) Typ.t
-      ; to_input : 'a -> (F.t, bool) Random_oracle_input.t
-      ; to_input_checked :
-          'var -> (Field.Var.t, Boolean.var) Random_oracle_input.t
+      ; to_input : 'a -> F.t Random_oracle_input.Chunked.t
+      ; to_input_checked : 'var -> Field.Var.t Random_oracle_input.Chunked.t
       ; lte_checked : 'var -> 'var -> Boolean.var
       }
 
@@ -78,7 +77,7 @@ module Numeric = struct
         ; equal
         ; typ
         ; to_input
-        ; to_input_checked = Fn.compose Impl.run_checked Checked.to_input
+        ; to_input_checked = Checked.to_input
         }
 
     let amount =
@@ -114,7 +113,7 @@ module Numeric = struct
         ; equal
         ; typ
         ; to_input
-        ; to_input_checked = Fn.compose Impl.run_checked Checked.to_input
+        ; to_input_checked = Checked.to_input
         }
 
     let global_slot =
@@ -126,7 +125,7 @@ module Numeric = struct
         ; equal
         ; typ
         ; to_input
-        ; to_input_checked = Fn.compose Impl.run_checked Checked.to_input
+        ; to_input_checked = Checked.to_input
         }
 
     let token_id =
@@ -138,7 +137,7 @@ module Numeric = struct
         ; lte_checked = run Checked.( <= )
         ; typ
         ; to_input
-        ; to_input_checked = Fn.compose Impl.run_checked Checked.to_input
+        ; to_input_checked = Checked.to_input
         }
 
     let time =
@@ -149,11 +148,8 @@ module Numeric = struct
         ; zero
         ; max_value
         ; typ = Unpacked.typ
-        ; to_input = Fn.compose Random_oracle_input.bitstring Bits.to_bits
-        ; to_input_checked =
-            (fun x ->
-              Random_oracle_input.bitstring
-                (Unpacked.var_to_bits x :> Boolean.var list))
+        ; to_input
+        ; to_input_checked = Checked.to_input
         }
   end
 
@@ -214,15 +210,14 @@ module Eq_data = struct
       ; equal_checked : 'var -> 'var -> Boolean.var
       ; default : 'a
       ; typ : ('var, 'a) Typ.t
-      ; to_input : 'a -> (F.t, bool) Random_oracle_input.t
-      ; to_input_checked :
-          'var -> (Field.Var.t, Boolean.var) Random_oracle_input.t
+      ; to_input : 'a -> F.t Random_oracle_input.Chunked.t
+      ; to_input_checked : 'var -> Field.Var.t Random_oracle_input.Chunked.t
       }
 
     let run f x y = Impl.run_checked (f x y)
 
     let field =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       Field.
         { typ
         ; equal
@@ -233,7 +228,7 @@ module Eq_data = struct
         }
 
     let sequence_state =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       lazy
         Field.
           { typ
@@ -245,14 +240,15 @@ module Eq_data = struct
           }
 
     let boolean =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       Boolean.
         { typ
         ; equal = Bool.equal
         ; equal_checked = run equal
         ; default = false
-        ; to_input = (fun b -> bitstring [ b ])
-        ; to_input_checked = (fun b -> bitstring [ b ])
+        ; to_input = (fun b -> packed (field_of_bool b, 1))
+        ; to_input_checked =
+            (fun (b : Boolean.var) -> packed ((b :> Field.Var.t), 1))
         }
 
     let receipt_chain_hash =
@@ -313,7 +309,7 @@ module Eq_data = struct
 
   let to_input ~explicit { Tc.default; to_input; _ } (t : _ t) =
     if explicit then
-      Flagged_option.to_input' ~f:to_input
+      Flagged_option.to_input' ~f:to_input ~field_of_bool
         ( match t with
         | Ignore ->
             { is_some = false; data = default }
@@ -515,7 +511,7 @@ module Account = struct
        ; proved_state
        } :
         t) =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Numeric.(to_input Tc.balance balance)
       ; Numeric.(to_input Tc.nonce nonce)
@@ -554,7 +550,7 @@ module Account = struct
          ; proved_state
          } :
           t) =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Numeric.(Checked.to_input Tc.balance balance)
         ; Numeric.(Checked.to_input Tc.nonce nonce)
@@ -761,7 +757,7 @@ module Protocol_state = struct
          ; epoch_length
          } :
           t) =
-      let open Random_oracle.Input in
+      let open Random_oracle.Input.Chunked in
       List.reduce_exn ~f:append
         [ Hash.(to_input Tc.frozen_ledger_hash hash)
         ; Numeric.(to_input Tc.amount total_currency)
@@ -790,7 +786,7 @@ module Protocol_state = struct
            ; epoch_length
            } :
             t) =
-        let open Random_oracle.Input in
+        let open Random_oracle.Input.Chunked in
         List.reduce_exn ~f:append
           [ Hash.(to_input_checked Tc.frozen_ledger_hash hash)
           ; Numeric.(Checked.to_input Tc.amount total_currency)
@@ -922,7 +918,7 @@ module Protocol_state = struct
        ; next_epoch_data
        } :
         t) =
-    let open Random_oracle.Input in
+    let open Random_oracle.Input.Chunked in
     let () = last_vrf_output in
     let length = Numeric.(to_input Tc.length) in
     List.reduce_exn ~f:append
@@ -1015,7 +1011,7 @@ module Protocol_state = struct
          ; next_epoch_data
          } :
           t) =
-      let open Random_oracle.Input in
+      let open Random_oracle.Input.Chunked in
       let () = last_vrf_output in
       let length = Numeric.(Checked.to_input Tc.length) in
       List.reduce_exn ~f:append
@@ -1292,12 +1288,19 @@ module Account_type = struct
     | _ ->
         assert false
 
-  let to_input x = Random_oracle_input.bitstring (to_bits x)
+  let to_input x =
+    let open Random_oracle_input.Chunked in
+    Array.reduce_exn ~f:append
+      (Array.of_list_map (to_bits x) ~f:(fun b -> packed (field_of_bool b, 1)))
 
   module Checked = struct
     type t = { user : Boolean.var; snapp : Boolean.var } [@@deriving hlist]
 
-    let to_input { user; snapp } = Random_oracle_input.bitstring [ user; snapp ]
+    let to_input { user; snapp } =
+      let open Random_oracle_input.Chunked in
+      Array.reduce_exn ~f:append
+        (Array.map [| user; snapp |] ~f:(fun b ->
+             packed ((b :> Field.Var.t), 1)))
 
     let constant =
       let open Boolean in
@@ -1395,7 +1398,7 @@ module Other = struct
       Poly.Stable.Latest.t
 
     let to_input ({ predicate; account_transition; account_vk } : t) =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Account.Checked.to_input predicate
         ; Transition.to_input ~f:Account_state.Checked.to_input
@@ -1405,7 +1408,7 @@ module Other = struct
   end
 
   let to_input ({ predicate; account_transition; account_vk } : t) =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Account.to_input predicate
       ; Transition.to_input ~f:Account_state.to_input account_transition
@@ -1486,7 +1489,7 @@ module Digested = F
 
 let to_input
     ({ self_predicate; other; fee_payer; protocol_state_predicate } : t) =
-  let open Random_oracle_input in
+  let open Random_oracle_input.Chunked in
   List.reduce_exn ~f:append
     [ Account.to_input self_predicate
     ; Other.to_input other
@@ -1552,7 +1555,7 @@ module Checked = struct
 
   let to_input
       ({ self_predicate; other; fee_payer; protocol_state_predicate } : t) =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Account.Checked.to_input self_predicate
       ; Other.Checked.to_input other

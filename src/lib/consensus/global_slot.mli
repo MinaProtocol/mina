@@ -23,7 +23,7 @@ module Stable : sig
   end
 end]
 
-val to_input : t -> (_, bool) Random_oracle.Input.t
+val to_input : t -> Snark_params.Tick.Field.t Random_oracle.Input.Chunked.t
 
 val of_slot_number : constants:Constants.t -> Mina_numbers.Global_slot.t -> t
 
@@ -81,11 +81,7 @@ module Checked : sig
 
   val to_bits : t -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
 
-  val to_input :
-       t
-    -> ( (Field.Var.t, Snark_params.Tick.Boolean.var) Random_oracle.Input.t
-       , _ )
-       Checked.t
+  val to_input : t -> Field.Var.t Random_oracle.Input.Chunked.t
 
   val to_epoch_and_slot : t -> (Epoch.Checked.t * Slot.Checked.t, _) Checked.t
 

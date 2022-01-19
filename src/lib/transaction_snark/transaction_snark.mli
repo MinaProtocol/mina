@@ -55,9 +55,9 @@ module Pending_coinbase_stack_state : sig
 
   val typ : (var, t) Typ.t
 
-  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+  val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
-  val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+  val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 end
 
 (*
@@ -293,7 +293,7 @@ module Statement : sig
 
     val typ : (var, t) Typ.t
 
-    val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+    val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
     val to_field_elements : t -> Field.t array
 
@@ -301,7 +301,7 @@ module Statement : sig
       type t = var
 
       val to_input :
-        var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+        var -> (Field.Var.t Random_oracle.Input.Chunked.t, _) Checked.t
 
       (* This is actually a checked function. *)
       val to_field_elements : var -> Field.Var.t array
