@@ -32,6 +32,12 @@ module Config = struct
     { constraint_constants : Genesis_constants.Constraint_constants.t
     ; consensus_constants : Consensus.Constants.t
     ; time_controller : Block_time.Controller.t
+    ; expiry_ns : Time_ns.Span.t
+          (* Discard transactions after the expiry duration has elapsed,
+             and do not accept transactions that cannot become includable
+             before the expiry duration has elapsed.
+             Default value as in Bitcoin ('mempoolexpiry').
+             TODO: Make this configurable *)
     }
   [@@deriving sexp_of, equal, compare]
 end
@@ -60,6 +66,10 @@ type t =
   ; transactions_with_expiration :
       Transaction_hash.User_command_with_valid_signature.Set.t Global_slot.Map.t
         (*Only transactions that have an expiry*)
+  ; entry_times : Time_ns.t Transaction_hash.Map.t
+        (** The entry time for each transaction *)
+  ; all_by_entry_time : Transaction_hash.t Time_ns.Map.t
+        (** All transactions in the pool indexed by their entry time *)
   ; size : int
   ; config : Config.t
   }
@@ -290,14 +300,18 @@ module For_tests = struct
     [%test_eq: int] (Map.length all_by_hash) size
 end
 
-let empty ~constraint_constants ~consensus_constants ~time_controller : t =
+let empty ~constraint_constants ~consensus_constants ~time_controller ~expiry_ns
+    : t =
   { applicable_by_fee = Currency.Fee_rate.Map.empty
   ; all_by_sender = Account_id.Map.empty
   ; all_by_fee = Currency.Fee_rate.Map.empty
   ; all_by_hash = Transaction_hash.Map.empty
+  ; entry_times = Transaction_hash.Map.empty
+  ; all_by_entry_time = Time_ns.Map.empty
   ; transactions_with_expiration = Global_slot.Map.empty
   ; size = 0
-  ; config = { constraint_constants; consensus_constants; time_controller }
+  ; config =
+      { constraint_constants; consensus_constants; time_controller; expiry_ns }
   }
 
 let size : t -> int = fun t -> t.size
@@ -387,6 +401,29 @@ let remove_applicable_exn :
     applicable_by_fee = Map_set.remove_exn t.applicable_by_fee fee_per_wu cmd
   }
 
+(* Remove a command from entry_times and all_by_entry_time *)
+let remove_entry_times (cmd_hash : Transaction_hash.t) (t : t) : t =
+  let entry_time = Map.find t.entry_times cmd_hash in
+  match entry_time with
+  | Some entry_time ->
+      { t with
+        entry_times = Map.remove t.entry_times cmd_hash
+      ; all_by_entry_time = Map.remove t.all_by_entry_time entry_time
+      }
+  | None ->
+      failwithf "Entry time not found for command hash %s"
+        (Transaction_hash.to_base58_check cmd_hash)
+        ()
+
+(* Reset entry_times and all_by_entry_time for a command *)
+let reset_entry_times (cmd_hash : Transaction_hash.t) (t : t) : t =
+  let entry_time = Time_ns.now () in
+  { (remove_entry_times cmd_hash t) with
+    entry_times = Map.add_exn t.entry_times ~key:cmd_hash ~data:entry_time
+  ; all_by_entry_time =
+      Map.add_exn t.all_by_entry_time ~key:entry_time ~data:cmd_hash
+  }
+
 (* Remove a command from the all_by_fee and all_by_hash fields, and decrement
    size. This may break an invariant. *)
 let remove_all_by_fee_and_hash_and_expiration_exn :
@@ -396,15 +433,15 @@ let remove_all_by_fee_and_hash_and_expiration_exn :
     Transaction_hash.User_command_with_valid_signature.command cmd
     |> User_command.fee_per_wu
   in
+  let cmd_hash = Transaction_hash.User_command_with_valid_signature.hash cmd in
   { t with
     all_by_fee = Map_set.remove_exn t.all_by_fee fee_per_wu cmd
-  ; all_by_hash =
-      Map.remove t.all_by_hash
-        (Transaction_hash.User_command_with_valid_signature.hash cmd)
+  ; all_by_hash = Map.remove t.all_by_hash cmd_hash
   ; transactions_with_expiration =
       remove_from_expiration_exn t.transactions_with_expiration cmd
   ; size = t.size - 1
   }
+  |> remove_entry_times cmd_hash
 
 module Sender_local_state = struct
   type t0 =
@@ -480,19 +517,20 @@ module Update = struct
             }
           else acc
         in
+        let cmd_hash =
+          Transaction_hash.User_command_with_valid_signature.hash cmd
+        in
         { acc with
           all_by_fee =
             Map_set.insert
               (module Transaction_hash.User_command_with_valid_signature)
               acc.all_by_fee fee_per_wu cmd
-        ; all_by_hash =
-            Map.set acc.all_by_hash
-              ~key:(Transaction_hash.User_command_with_valid_signature.hash cmd)
-              ~data:cmd
+        ; all_by_hash = Map.set acc.all_by_hash ~key:cmd_hash ~data:cmd
         ; transactions_with_expiration =
             add_to_expiration acc.transactions_with_expiration cmd
         ; size = acc.size + 1
         }
+        |> reset_entry_times cmd_hash
     | Remove_all_by_fee_and_hash_and_expiration cmds ->
         F_sequence.foldl
           (fun acc cmd -> remove_all_by_fee_and_hash_and_expiration_exn acc cmd)
@@ -701,20 +739,65 @@ let revalidate :
               }
             , Sequence.append dropped_acc to_drop ))
 
-let remove_expired t :
-    Transaction_hash.User_command_with_valid_signature.t Sequence.t * t =
+let expired_by_predicate (t : t) :
+    Transaction_hash.User_command_with_valid_signature.t Sequence.t =
+  let time_now = Time_ns.now () in
+  let expiry_time = Time_ns.(sub time_now t.config.expiry_ns) in
+  Map.to_sequence t.all_by_hash
+  |> Sequence.filter_map ~f:(fun (cmd_hash, cmd) ->
+         Transaction_hash.User_command_with_valid_signature.data cmd
+         |> function
+         | User_command.Parties ps ->
+             Some (cmd_hash, ps)
+         | User_command.Signed_command _ ->
+             None)
+  |> Sequence.filter ~f:(fun (_, ps) ->
+         ps.other_parties
+         |> List.map ~f:Party.protocol_state
+         |> List.exists ~f:(fun predicate ->
+                match predicate.timestamp with
+                | Check { upper; _ } ->
+                    let upper =
+                      Block_time.to_time upper
+                      |> Time_ns.of_time_float_round_nearest_microsecond
+                    in
+                    Time_ns.(upper < expiry_time)
+                | _ ->
+                    false))
+  |> Sequence.map ~f:fst
+  |> Sequence.map ~f:(Map.find_exn t.all_by_hash)
+
+let expired_by_age (t : t) :
+    Transaction_hash.User_command_with_valid_signature.t Sequence.t =
+  let time_now = Time_ns.now () in
+  let expiry_time = Time_ns.(sub time_now t.config.expiry_ns) in
+  let expired, _, _ = Map.split t.all_by_entry_time expiry_time in
+  Map.to_sequence expired
+  |> Sequence.map ~f:(fun (_, cmd_hash) -> Map.find_exn t.all_by_hash cmd_hash)
+
+let expired_by_global_slot (t : t) :
+    Transaction_hash.User_command_with_valid_signature.t Sequence.t =
   let global_slot_since_genesis = global_slot_since_genesis t.config in
   let expired, _, _ =
     Map.split t.transactions_with_expiration global_slot_since_genesis
   in
-  Map.fold expired ~init:(Sequence.empty, t) ~f:(fun ~key:_ ~data:cmds acc ->
-      Set.fold cmds ~init:acc ~f:(fun acc' cmd ->
-          let dropped_acc, t = acc' in
-          (*[cmd] would not be in [t] if it depended on an expired transaction already handled*)
-          if member t (Transaction_hash.User_command.of_checked cmd) then
-            let removed, t' = remove_with_dependents_exn' t cmd in
-            (Sequence.append dropped_acc removed, t')
-          else acc'))
+  Map.to_sequence expired |> Sequence.map ~f:snd
+  |> Sequence.bind ~f:Set.to_sequence
+
+let expired (t : t) :
+    Transaction_hash.User_command_with_valid_signature.t Sequence.t =
+  [ expired_by_predicate t; expired_by_age t; expired_by_global_slot t ]
+  |> Sequence.of_list |> Sequence.concat
+
+let remove_expired t :
+    Transaction_hash.User_command_with_valid_signature.t Sequence.t * t =
+  Sequence.fold (expired t) ~init:(Sequence.empty, t) ~f:(fun acc cmd ->
+      let dropped_acc, t = acc in
+      (*[cmd] would not be in [t] if it depended on an expired transaction already handled*)
+      if member t (Transaction_hash.User_command.of_checked cmd) then
+        let removed, t' = remove_with_dependents_exn' t cmd in
+        (Sequence.append dropped_acc removed, t')
+      else acc)
 
 let handle_committed_txn :
        t
@@ -841,11 +924,40 @@ let get_highest_fee :
       replaced command by at least replace fee * (number of commands after the
       the replaced command + 1)
    4. No integer overflows are allowed.
-
+   5. protocol state predicate must be satisfiable before txs would expire
+      from the pool based on age
+   5a. timestamp predicate upper bound must be above current time.
+   5b. timestamp predicate lower bound must be below current time plus expiration time,
+       or the transaction will not become valid while in the pool
    These conditions are referenced in the comments below.
 *)
 
 module Add_from_gossip_exn (M : Writer_result.S) = struct
+  let check_timestamp_predicate expiry_ns (user_command : User_command.t) : bool
+      =
+    let current_time = Time_ns.now () in
+    match user_command with
+    | User_command.Signed_command _ ->
+        true
+    | User_command.Parties ps ->
+        ps.other_parties
+        |> List.map ~f:Party.protocol_state
+        |> List.exists ~f:(fun predicate ->
+               match predicate.timestamp with
+               | Check { lower; upper } ->
+                   let lower =
+                     Block_time.to_time lower
+                     |> Time_ns.of_time_float_round_nearest_microsecond
+                   in
+                   let upper =
+                     Block_time.to_time upper
+                     |> Time_ns.of_time_float_round_nearest_microsecond
+                   in
+                   Time_ns.(upper > current_time)
+                   && Time_ns.(lower < add current_time expiry_ns)
+               | _ ->
+                   true)
+
   let rec add_from_gossip_exn :
          config:Config.t
       -> verify:(User_command.Verifiable.t -> (User_command.Valid.t, _, _) M.t)
@@ -860,7 +972,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
          , Update.single
          , Command_error.t )
          M.t =
-   fun ~config:({ constraint_constants; _ } as config) ~verify cmd0
+   fun ~config:({ constraint_constants; expiry_ns; _ } as config) ~verify cmd0
        current_nonce balance by_sender ->
     let open Command_error in
     let unchecked_cmd =
@@ -890,6 +1002,11 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
     let%bind consumed =
       M.of_result
         Result.Let_syntax.(
+          (* C5 *)
+          let%bind () =
+            if check_timestamp_predicate expiry_ns unchecked then Ok ()
+            else Error Invalid_transaction
+          in
           let%bind () = check_expiry config unchecked in
           let%bind consumed =
             currency_consumed' ~constraint_constants unchecked
@@ -1155,6 +1272,8 @@ let add_from_backtrack :
   let%map () = check_expiry t.config unchecked in
   let fee_payer = User_command.fee_payer unchecked in
   let fee_per_wu = User_command.fee_per_wu unchecked in
+  let entry_time = Time_ns.now () in
+  let cmd_hash = Transaction_hash.User_command_with_valid_signature.hash cmd in
   let consumed =
     Option.value_exn (currency_consumed ~constraint_constants cmd)
   in
@@ -1170,16 +1289,16 @@ let add_from_backtrack :
           Map_set.insert
             (module Transaction_hash.User_command_with_valid_signature)
             t.all_by_fee fee_per_wu cmd
-      ; all_by_hash =
-          Map.set t.all_by_hash
-            ~key:(Transaction_hash.User_command_with_valid_signature.hash cmd)
-            ~data:cmd
+      ; all_by_hash = Map.set t.all_by_hash ~key:cmd_hash ~data:cmd
       ; applicable_by_fee =
           Map_set.insert
             (module Transaction_hash.User_command_with_valid_signature)
             t.applicable_by_fee fee_per_wu cmd
       ; transactions_with_expiration =
           add_to_expiration t.transactions_with_expiration cmd
+      ; entry_times = Map.add_exn t.entry_times ~key:cmd_hash ~data:entry_time
+      ; all_by_entry_time =
+          Map.add_exn t.all_by_entry_time ~key:entry_time ~data:cmd_hash
       ; size = t.size + 1
       ; config = t.config
       }
@@ -1221,6 +1340,9 @@ let add_from_backtrack :
               )
       ; transactions_with_expiration =
           add_to_expiration t.transactions_with_expiration cmd
+      ; entry_times = Map.add_exn t.entry_times ~key:cmd_hash ~data:entry_time
+      ; all_by_entry_time =
+          Map.add_exn t.all_by_entry_time ~key:entry_time ~data:cmd_hash
       ; size = t.size + 1
       ; config = t.config
       }
@@ -1253,8 +1375,11 @@ let%test_module _ =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let expiry_ns = Time_ns.Span.of_hr 72.0
+
     let empty =
       empty ~constraint_constants ~consensus_constants ~time_controller
+        ~expiry_ns
 
     let%test_unit "empty invariants" = assert_invariants empty
 
@@ -1293,6 +1418,29 @@ let%test_module _ =
                 [%test_eq: t] ~equal pool pool''
             | _ ->
                 failwith "should've succeeded")
+
+    let%test_unit "age-based expiry" =
+      Quickcheck.test ~trials:1 (User_command_generators.parties_with_ledger ())
+        ~f:(fun (cmd, _, _, _) ->
+          let cmd =
+            Transaction_hash.User_command_with_valid_signature.create cmd
+          in
+          let pool =
+            { empty with
+              config = { empty.config with expiry_ns = Time_ns.Span.of_sec 5.0 }
+            }
+          in
+          add_from_gossip_exn pool (`Checked cmd) Account_nonce.zero
+            ~verify:don't_verify
+            (Currency.Amount.of_int 3_000_000_000_000)
+          |> function
+          | Ok (_, pool', dropped) ->
+              assert (Sequence.is_empty dropped) ;
+              Unix.sleep 15 ;
+              let dropped, _ = remove_expired pool' in
+              assert (not @@ Sequence.is_empty dropped)
+          | Error e ->
+              failwithf !"Error: %{sexp: Command_error.t}" e ())
 
     let%test_unit "sequential adds (all valid)" =
       let gen :
