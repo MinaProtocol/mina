@@ -49,16 +49,14 @@ let verify_message_command =
   fun () ->
     let signature = Option.value_exn (Mina_base.Signature.Raw.decode signature) in
     let pk = Rosetta_coding.Coding.to_public_key public_key in
-    let inner_curve = pk |> Snark_params.Tick.Inner_curve.of_affine in
     match
-      String_sign.Schnorr.verify signature inner_curve message
+      String_sign.verify signature pk message
     with
     | true ->
         return ()
     | false ->
         eprintf "Signature does not verify against this public key" ;
         exit 1
-
 
 let verify_command =
   let open Command.Let_syntax in
