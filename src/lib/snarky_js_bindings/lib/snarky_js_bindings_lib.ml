@@ -2250,6 +2250,7 @@ let export_global () =
          ; ("Poseidon", i poseidon)
          ; ("Circuit", i Circuit.circuit)
          ; ("Ledger", i Ledger.ledger_class)
+         ; ("picklesCompile", i pickles_compile)
         |])
   in
   Js.Unsafe.(set global (Js.string "__snarky") snarky_obj)
