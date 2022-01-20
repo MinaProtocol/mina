@@ -1584,6 +1584,32 @@ module Single_field_statement_const = struct
   let to_field_elements x = [| x |]
 end
 
+let dummy_constraints =
+  let module Inner_curve = Kimchi_backend.Pasta.Pasta.Pallas in
+  let module Step_main_inputs = Pickles.Step_main_inputs in
+  let inner_curve_typ : (Field.t * Field.t, Inner_curve.t) Typ.t =
+    Typ.transport Step_main_inputs.Inner_curve.typ
+      ~there:Inner_curve.to_affine_exn ~back:Inner_curve.of_affine
+  in
+  fun () ->
+    let x =
+      Impl.exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3)
+    in
+    let g = Impl.exists inner_curve_typ ~compute:(fun _ -> Inner_curve.one) in
+    ignore
+      ( Pickles.Scalar_challenge.to_field_checked'
+          (module Impl)
+          ~num_bits:16
+          (Pickles_types.Scalar_challenge.create x)
+        : Field.t * Field.t * Field.t ) ;
+    ignore
+      ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
+        : Step_main_inputs.Inner_curve.t ) ;
+    ignore
+      ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
+          (Pickles_types.Scalar_challenge.create x)
+        : Field.t * Field.t )
+
 type ('a_var, 'a_value, 'a_weird) pickles_rule =
   { identifier : string
   ; prevs : 'a_weird list
@@ -1593,29 +1619,28 @@ type ('a_var, 'a_value, 'a_weird) pickles_rule =
 
 type pickles_rule_js = Js.js_string Js.t * (field_class Js.t -> unit)
 
-let create_pickles_rule ~self (identifier, main) =
+let create_pickles_rule (identifier, main) =
   { identifier = Js.to_string identifier
-  ; prevs = [ self ]
+  ; prevs = []
   ; main =
       (fun _ self ->
+        dummy_constraints () ;
         main (to_js_field self) ;
-        [ Boolean.false_ ])
-  ; main_value = (fun _ _ -> [ false ])
+        [])
+  ; main_value = (fun _ _ -> [])
   }
 
 let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   console_log_string "pickles_compile" ;
   let choices = choices |> Js.to_array |> Array.to_list in
-  let choices ~self =
-    List.map choices ~f:(create_pickles_rule ~self) |> Obj.magic
-  in
+  let choices ~self:_ = List.map choices ~f:create_pickles_rule |> Obj.magic in
   let _tag, _cache, p, provers =
     Pickles.compile ~choices
       (module Single_field_statement)
       (module Single_field_statement_const)
       ~typ:Field.typ
       ~branches:(module Pickles_types.Nat.N1)
-      ~max_branching:(module Pickles_types.Nat.N1)
+      ~max_branching:(module Pickles_types.Nat.N0)
       ~name:"smart-contract"
       ~constraint_constants:
         (* TODO these are dummy values *)
