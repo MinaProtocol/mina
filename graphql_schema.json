@@ -883,7 +883,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "SnappState",
-          "description": "Snapp state, a list of 8 field elements",
+          "description": "snapp state, a list of 8 field elements",
           "fields": [
             {
               "name": "elements",
@@ -1416,7 +1416,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "PartyBody",
-          "description": "Body component of a Snapp Party",
+          "description": "Body component of a snapp Party",
           "fields": [
             {
               "name": "useFullCommitment",
@@ -1437,7 +1437,7 @@
             },
             {
               "name": "protocolState",
-              "description": "The protocol state in a Snapp transaction",
+              "description": "The protocol state in a snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -1454,7 +1454,7 @@
             {
               "name": "callDepth",
               "description":
-                "The number of nested Snapp calls in the transaction before reaching this party.",
+                "The number of nested snapp calls in the transaction before reaching this party.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -1467,7 +1467,7 @@
             {
               "name": "callData",
               "description":
-                "A commitment to the arguments passed to the Snapp and the returned value, for internal use by the calling Snapp. This commitment is opaque to ensure that private data can be passed between Snapps without revealing it on chain.",
+                "A commitment to the arguments passed to the snapp and the returned value, for internal use by the calling snapp. This commitment is opaque to ensure that private data can be passed between snapps without revealing it on chain.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -1484,7 +1484,7 @@
             {
               "name": "sequenceEvents",
               "description":
-                "A list of sequence events emitted by the snapp. Each event is a list of field elements, the particular meaning of each event is determined by the snapp's internal logic. A commitment to these events is added to the sequenceState of the Snapp account for later use",
+                "A list of sequence events emitted by the snapp. Each event is a list of field elements, the particular meaning of each event is determined by the snapp's internal logic. A commitment to these events is added to the sequenceState of the snapp account for later use",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -1517,7 +1517,7 @@
             {
               "name": "events",
               "description":
-                "A list of events emitted by the Snapp. Each event is a list of field elements, the particular meaning of each event is determined by the Snapp's internal logic.",
+                "A list of events emitted by the snapp. Each event is a list of field elements, the particular meaning of each event is determined by the snapp's internal logic.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -1647,7 +1647,7 @@
             },
             {
               "name": "protocolState",
-              "description": "The protocol state in a Snapp transaction",
+              "description": "The protocol state in a snapp transaction",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1662,7 +1662,7 @@
             {
               "name": "callDepth",
               "description":
-                "The number of nested Snapp calls in the transaction before reaching this party.",
+                "The number of nested snapp calls in the transaction before reaching this party.",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1673,7 +1673,7 @@
             {
               "name": "callData",
               "description":
-                "A commitment to the arguments passed to the Snapp and the returned value, for internal use by the calling Snapp. This commitment is opaque to ensure that private data can be passed between Snapps without revealing it on chain.",
+                "A commitment to the arguments passed to the snapp and the returned value, for internal use by the calling snapp. This commitment is opaque to ensure that private data can be passed between snapps without revealing it on chain.",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1688,7 +1688,7 @@
             {
               "name": "sequenceEvents",
               "description":
-                "A list of sequence events emitted by the snapp. Each event is a list of field elements, the particular meaning of each event is determined by the snapp's internal logic. A commitment to these events is added to the sequenceState of the Snapp account for later use",
+                "A list of sequence events emitted by the snapp. Each event is a list of field elements, the particular meaning of each event is determined by the snapp's internal logic. A commitment to these events is added to the sequenceState of the snapp account for later use",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1719,7 +1719,7 @@
             {
               "name": "events",
               "description":
-                "A list of events emitted by the Snapp. Each event is a list of field elements, the particular meaning of each event is determined by the Snapp's internal logic.",
+                "A list of events emitted by the snapp. Each event is a list of field elements, the particular meaning of each event is determined by the snapp's internal logic.",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1898,7 +1898,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "SnappParty",
-          "description": "A party to a Snapp transaction",
+          "description": "A party to a snapp transaction",
           "fields": [
             {
               "name": "authorization",
@@ -2606,7 +2606,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "SnappProtocolState",
-          "description": "Protocol state for a Snapp transaction",
+          "description": "Protocol state for a snapp transaction",
           "fields": [
             {
               "name": "nextEpochData",
@@ -3539,7 +3539,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "PartyUpdate",
-          "description": "Update component of a Snapp Party",
+          "description": "Update component of a snapp Party",
           "fields": [
             {
               "name": "timing",
@@ -3715,11 +3715,11 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "FeePayerPartyBody",
-          "description": "Body component of a Snapp Fee Payer Party",
+          "description": "Body component of a snapp Fee Payer Party",
           "fields": [
             {
               "name": "protocolState",
-              "description": "The protocol state in a Snapp transaction",
+              "description": "The protocol state in a snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3736,7 +3736,7 @@
             {
               "name": "callDepth",
               "description":
-                "The number of nested Snapp calls in the transaction before reaching the fee payer.",
+                "The number of nested snapp calls in the transaction before reaching the fee payer.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3874,7 +3874,7 @@
           "inputFields": [
             {
               "name": "protocolState",
-              "description": "The protocol state in a Snapp transaction",
+              "description": "The protocol state in a snapp transaction",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -3889,7 +3889,7 @@
             {
               "name": "callDepth",
               "description":
-                "The number of nested Snapp calls in the transaction before reaching the fee payer.",
+                "The number of nested snapp calls in the transaction before reaching the fee payer.",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -4018,7 +4018,7 @@
           "kind": "INPUT_OBJECT",
           "name": "SnappPartyPredicatedFeePayer",
           "description":
-            "A party to a Snapp transaction with a nonce predicate",
+            "A party to a snapp transaction with a nonce predicate",
           "fields": [
             {
               "name": "predicate",
@@ -4091,7 +4091,7 @@
           "kind": "INPUT_OBJECT",
           "name": "SnappPartyFeePayer",
           "description":
-            "A party to a Snapp transaction with a signature authorization",
+            "A party to a snapp transaction with a signature authorization",
           "fields": [
             {
               "name": "authorization",
@@ -4176,7 +4176,7 @@
             {
               "name": "otherParties",
               "description":
-                "The parties other than the fee payer in a Snapp transaction",
+                "The parties other than the fee payer in a snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4200,7 +4200,7 @@
             },
             {
               "name": "feePayer",
-              "description": "The fee payer party to a Snapp transaction",
+              "description": "The fee payer party to a snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4225,7 +4225,7 @@
             {
               "name": "otherParties",
               "description":
-                "The parties other than the fee payer in a Snapp transaction",
+                "The parties other than the fee payer in a snapp transaction",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -4247,7 +4247,7 @@
             },
             {
               "name": "feePayer",
-              "description": "The fee payer party to a Snapp transaction",
+              "description": "The fee payer party to a snapp transaction",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -4271,7 +4271,7 @@
           "fields": [
             {
               "name": "snapp",
-              "description": "Snapp transaction that was sent",
+              "description": "snapp transaction that was sent",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6187,7 +6187,7 @@
             },
             {
               "name": "sendSnapp",
-              "description": "Send a Snapp transaction",
+              "description": "Send a snapp transaction",
               "args": [
                 {
                   "name": "input",
@@ -8030,7 +8030,7 @@
             },
             {
               "name": "hash",
-              "description": "A cryptographic hash of the Snapp command",
+              "description": "A cryptographic hash of the snapp command",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8047,7 +8047,7 @@
             {
               "name": "nonce",
               "description":
-                "Sequence number of the Snapp transaction for the fee-payer's account",
+                "Sequence number of the snapp transaction for the fee-payer's account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8060,7 +8060,7 @@
             {
               "name": "feePayer",
               "description":
-                "Account that pays the fees for the Snapp transaction",
+                "Account that pays the fees for the snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8077,7 +8077,7 @@
             {
               "name": "accountsAccessed",
               "description":
-                "List of accounts accessed to complete the Snapp transaction",
+                "List of accounts accessed to complete the snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8102,7 +8102,7 @@
             {
               "name": "fee",
               "description":
-                "Transaction fee paid by the fee-payer for the Snapp transaction",
+                "Transaction fee paid by the fee-payer for the snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8135,7 +8135,7 @@
             {
               "name": "failureReason",
               "description":
-                "The reason for the Snapp transaction failure; null means success or the status is unknown",
+                "The reason for the snapp transaction failure; null means success or the status is unknown",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
@@ -8143,7 +8143,7 @@
             },
             {
               "name": "parties",
-              "description": "Parties involved in the Snapp transaction",
+              "description": "Parties involved in the snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -10210,7 +10210,7 @@
             },
             {
               "name": "snappCommands",
-              "description": "List of Snapp commands included in this block",
+              "description": "List of snapp commands included in this block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -11669,7 +11669,7 @@
             {
               "name": "snappUri",
               "description":
-                "The URI associated with this account, usually pointing to the Snapp source code",
+                "The URI associated with this account, usually pointing to the snapp source code",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
@@ -11678,7 +11678,7 @@
             {
               "name": "snappState",
               "description":
-                "The 8 field elements comprising the Snapp state associated with this account encoded as bignum strings",
+                "The 8 field elements comprising the snapp state associated with this account encoded as bignum strings",
               "args": [],
               "type": {
                 "kind": "LIST",
@@ -13380,11 +13380,11 @@
             {
               "name": "pooledSnappCommands",
               "description":
-                "Retrieve all the scheduled Snapp commands for a specified sender that the current daemon sees in its transaction pool. All scheduled commands are queried if no sender is specified",
+                "Retrieve all the scheduled snapp commands for a specified sender that the current daemon sees in its transaction pool. All scheduled commands are queried if no sender is specified",
               "args": [
                 {
                   "name": "ids",
-                  "description": "Ids of Snapp commands",
+                  "description": "Ids of snapp commands",
                   "type": {
                     "kind": "LIST",
                     "name": null,
@@ -13403,7 +13403,7 @@
                 {
                   "name": "hashes",
                   "description":
-                    "Hashes of the Snapp commands to find in the pool",
+                    "Hashes of the snapp commands to find in the pool",
                   "type": {
                     "kind": "LIST",
                     "name": null,
@@ -13422,7 +13422,7 @@
                 {
                   "name": "publicKey",
                   "description":
-                    "Public key of sender of pooled Snapp commands",
+                    "Public key of sender of pooled snapp commands",
                   "type": {
                     "kind": "SCALAR",
                     "name": "PublicKey",
@@ -13457,7 +13457,7 @@
               "args": [
                 {
                   "name": "snappTransaction",
-                  "description": "Id of a Snapp transaction",
+                  "description": "Id of a snapp transaction",
                   "type": { "kind": "SCALAR", "name": "ID", "ofType": null },
                   "defaultValue": null
                 },
