@@ -20,7 +20,7 @@ Google Cloud Loggind provides storage and data searching/visualization of logs. 
 
 ![](res/gcloud_logging.png)
 
-For the frontend, each nodes would have 2 command line options to allow them to sed node status/error reports to any specific url: `--node-status-url URL` and `--node-error-url URL`. By default users would send their reports to our backend. They could change the destination by providing their own destination `URL` to the command options.
+For the frontend, each nodes would have 2 command line options to allow them to sed node status/error reports to any specific url: `--node-status-url URL` and `--node-error-url URL`. By default users would send their reports to our backend. They could change the destination by providing their own destination `URL` to the command options. Those setting could also be changed in the daemon.json file for the corresponding field.
 
 We would setup micro-services under the corresponding subdomain: https://node-status-report.minaprotocol.com and https://node-error-report.minaprotocol.com. The micro-service would be implemented using `Google Functions`. It already has the environment setup for us which is very convenient. Here's the pseudo-code that demonstrates how it would work:
 ```js
@@ -37,6 +37,8 @@ exports.nodeStatus = (req, res) => {
   }
 };
 ```
+
+We would setup an alert that tells us if user's input is over the designated limit (~1mb). This way we could tune the upper bound of the message size later.
 
 For storage of the logs, we can setup customized buckets that can be configured to have 3650 days of log retentions.
 
