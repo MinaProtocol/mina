@@ -799,29 +799,15 @@ let validate_genesis_protocol_state ~genesis_state_hash (t, validation) =
   then Ok (t, Validation.Unsafe.set_valid_genesis_state validation)
   else Error `Invalid_genesis_protocol_state
 
-let validate_proofs tvs ~verifier ~genesis_state_hash =
+let validate_proofs tvs ~verifier =
   let open Deferred.Let_syntax in
-  let to_verify =
-    List.filter_map tvs ~f:(fun (t, _validation) ->
-        if State_hash.equal (With_hash.hash t) genesis_state_hash then
-          (* Don't require a valid proof for the genesis block, since the
-             peer may not have one.
-          *)
-          None
-        else
-          let transition = With_hash.data t in
-          Some
-            (Blockchain_snark.Blockchain.create
-               ~state:(protocol_state transition)
-               ~proof:(protocol_state_proof transition)))
-  in
   match%map
-    match to_verify with
-    | [] ->
-        (* Skip calling the verifier, nothing here to verify. *)
-        return (Ok true)
-    | _ ->
-        Verifier.verify_blockchain_snarks verifier to_verify
+    Verifier.verify_blockchain_snarks verifier
+      (List.map tvs ~f:(fun (t, _validation) ->
+           let transition = With_hash.data t in
+           Blockchain_snark.Blockchain.create
+             ~state:(protocol_state transition)
+             ~proof:(protocol_state_proof transition)))
   with
   | Ok verified ->
       if verified then

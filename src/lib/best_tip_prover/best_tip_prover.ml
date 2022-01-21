@@ -87,7 +87,7 @@ module Make (Inputs : Inputs_intf) :
           (merkle_list, root |> External_transition.Validation.forget_validation)
       }
 
-  let validate_proof ~genesis_state_hash ~verifier transition_with_hash =
+  let validate_proof ~verifier transition_with_hash =
     let open Deferred.Result.Monad_infix in
     External_transition.(
       Validation.wrap transition_with_hash
@@ -97,8 +97,7 @@ module Make (Inputs : Inputs_intf) :
            `This_transition_was_generated_internally
       |> skip_protocol_versions_validation
            `This_transition_has_valid_protocol_versions
-      |> (fun x ->
-           validate_proofs ~genesis_state_hash ~verifier [ x ] >>| List.hd_exn)
+      |> (fun x -> validate_proofs ~verifier [ x ] >>| List.hd_exn)
       >>= Fn.compose Deferred.Result.return
             (skip_delta_transition_chain_validation
                `This_transition_was_not_received_via_gossip)
@@ -144,8 +143,8 @@ module Make (Inputs : Inputs_intf) :
     in
     let%map root, best_tip =
       Deferred.Or_error.both
-        (validate_proof ~genesis_state_hash ~verifier root_transition_with_hash)
-        (validate_proof ~genesis_state_hash ~verifier best_tip_with_hash)
+        (validate_proof ~verifier root_transition_with_hash)
+        (validate_proof ~verifier best_tip_with_hash)
     in
     (`Root root, `Best_tip best_tip)
 end

@@ -495,7 +495,6 @@ module type S = sig
        Validation.with_transition
        list
     -> verifier:Verifier.t
-    -> genesis_state_hash:State_hash.t
     -> ( ( 'time_received
          , 'genesis_state
          , [ `Proof ] * unit Truth.true_t
