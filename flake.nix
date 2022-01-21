@@ -1,6 +1,14 @@
 {
   description = "A very basic flake";
-  nixConfig.allow-import-from-derivation = "true";
+  nixConfig = {
+    allow-import-from-derivation = "true";
+    substituters = [ "https://mina-demo.cachix.org" "https://cache.nixos.org" ];
+    trusted-public-keys = [
+      "mina-demo.cachix.org-1:6Rttr65zJT5Fzndtu71WdInF6FnxKCU7KLtcQdWU4Ok="
+      "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+    ];
+  };
+
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable-small";
 
