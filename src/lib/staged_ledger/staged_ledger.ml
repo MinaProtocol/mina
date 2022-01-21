@@ -2460,7 +2460,7 @@ let%test_module "staged ledger tests" =
                     let authorization_with_valid_signature =
                       match authorization with
                       | Control.Signature _dummy ->
-                          let pk = data.body.pk in
+                          let pk = data.body.public_key in
                           let sk =
                             match
                               Signature_lib.Public_key.Compressed.Map.find

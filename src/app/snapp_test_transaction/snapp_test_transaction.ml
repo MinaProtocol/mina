@@ -7,284 +7,118 @@ let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
 let proof_level = Genesis_constants.Proof_level.Full
 
+(* transform JSON into a string for a Javascript object,
+   some special handling of cases where the GraphQL schema
+   differs from OCaml code
+*)
+let jsobj_of_json ?(fee_payer = false) (json : Yojson.Safe.t) : string =
+  let indent n = String.make n ' ' in
+  let rec go json level =
+    match json with
+    | `Tuple _ | `Variant _ | `Intlit _ ->
+        failwith "JSON not generated from OCaml"
+    | `Bool b ->
+        if b then "true" else "false"
+    | `Null ->
+        "null"
+    (* special handling of sign in Currency.Amount.Signed.t *)
+    | `Assoc [ ("magnitude", m); ("sgn", `List [ `String sgn ]) ] ->
+        let sgn' =
+          match sgn with
+          | "Pos" ->
+              "PLUS"
+          | "Neg" ->
+              "MINUS"
+          | _ ->
+              failwithf "Unexpected sign \"%s\" for currency amount" sgn ()
+        in
+        go (`Assoc [ ("magnitude", m); ("sign", `String sgn') ]) level
+    | `Assoc pairs ->
+        sprintf "{%s}"
+          ( List.map pairs ~f:(fun (s, json) ->
+                let cameled =
+                  (* special handling for balance_change in Party.Fee_payer.t *)
+                  if fee_payer && String.equal s "balance_change" then "fee"
+                  else Mina_graphql.Reflection.underToCamel s
+                in
+                sprintf "%s:%s" cameled (go json (level + 2)))
+          |> String.concat ~sep:(sprintf ",\n%s" (indent level)) )
+    (* Set_or_keep *)
+    | `List [ `String "Set"; v ] ->
+        go v level
+    | `List [ `String "Keep" ] ->
+        "null"
+    (* Check_or_ignore *)
+    | `List [ `String "Check"; v ] ->
+        go v level
+    | `List [ `String "Ignore" ] ->
+        "null"
+    (* Predicate special handling *)
+    | `List [ `String "Accept" ] ->
+        go (`Assoc [ ("account", `Null); ("nonce", `Null) ]) level
+    | `List [ `String "Nonce"; n ] ->
+        go (`Assoc [ ("nonce", n) ]) level
+    | `List [ `String "Full"; _ ] ->
+        (* TODO: issue #10008 *)
+        go
+          (`Assoc
+            [ ( "account"
+              , `Assoc
+                  [ ("balance", `Null)
+                  ; ("nonce", `Null)
+                  ; ("receiptChainHash", `Null)
+                  ; ("publicKey", `Null)
+                  ; ("delegate", `Null)
+                  ; ( "state"
+                    , `Assoc
+                        [ ( "elements"
+                          , `List
+                              [ `Null
+                              ; `Null
+                              ; `Null
+                              ; `Null
+                              ; `Null
+                              ; `Null
+                              ; `Null
+                              ; `Null
+                              ] )
+                        ] )
+                  ; ("sequenceState", `Null)
+                  ; ("provedState", `Null)
+                  ] )
+            ])
+          level
+    (* other constructors *)
+    | `List [ `String name; value ] ->
+        go (`Assoc [ (Mina_graphql.Reflection.underToCamel name, value) ]) level
+    | `List jsons ->
+        sprintf "[%s]"
+          ( List.map jsons ~f:(fun json -> sprintf "%s" (go json (level + 2)))
+          |> String.concat ~sep:(sprintf ",\n%s" (indent level)) )
+    | `Int n ->
+        sprintf "%d" n
+    | `Float f ->
+        sprintf "%f" f
+    | `String s ->
+        sprintf "\"%s\"" s
+  in
+  go json 4
+
 let graphql_snapp_command (parties : Parties.t) =
-  let pk_string = Signature_lib.Public_key.Compressed.to_base58_check in
-  let authorization (a : Control.t) =
-    match a with
-    | Proof pi ->
-        let p =
-          Pickles.Side_loaded.Proof.Stable.V1.sexp_of_t pi
-          |> Sexp.to_string |> Base64.encode_exn
-        in
-        sprintf "{ proof: \"%s\" }" p
-    | Signature s ->
-        sprintf "{  signature: \"%s\" }" (Signature.to_base58_check s)
-    | None_given ->
-        "{proof:null, signature:null}"
-  in
-  let app_state
-      (state :
-        Snark_params.Tick.Field.t Snapp_basic.Set_or_keep.t Snapp_state.V.t) =
-    String.concat ~sep:","
-      (List.map (Snapp_state.V.to_list state) ~f:(fun s ->
-           match s with
-           | Snapp_basic.Set_or_keep.Keep ->
-               "null"
-           | Set s ->
-               sprintf "\"%s\"" (Snark_params.Tick.Field.to_string s)))
-  in
-  let verification_key (update : Party.Update.t) =
-    match update.verification_key with
-    | Snapp_basic.Set_or_keep.Keep ->
-        "null"
-    | Set vk_with_hash ->
-        sprintf
-          {|
-          {verificationKey: "%s", hash: %s}
-        |}
-          (Pickles.Side_loaded.Verification_key.to_base58_check
-             vk_with_hash.data)
-          ( Pickles.Backend.Tick.Field.to_yojson vk_with_hash.hash
-          |> Yojson.Safe.to_string )
-  in
-  let permissions (p : Mina_base.Permissions.t Snapp_basic.Set_or_keep.t) =
-    match p with
-    | Keep ->
-        "null"
-    | Set
-        { stake
-        ; edit_state
-        ; send
-        ; receive
-        ; set_delegate
-        ; set_permissions
-        ; set_verification_key
-        ; set_snapp_uri
-        ; edit_sequence_state
-        ; set_token_symbol
-        ; increment_nonce
-        } ->
-        let auth = function
-          | Mina_base.Permissions.Auth_required.None ->
-              "None"
-          | Either ->
-              "Either"
-          | Proof ->
-              "Proof"
-          | Signature ->
-              "Signature"
-          | Both ->
-              "Both"
-          | Impossible ->
-              "Impossible"
-        in
-        sprintf
-          {|
-      { stake: %s
-  , editState: %s
-  , send: %s
-  , receive: %s
-  , setDelegate: %s
-  , setPermissions: %s
-  , setVerificationKey: %s
-  , setSnappUri: %s
-  , editSequenceState: %s
-  , setTokenSymbol: %s
-  , incrementNonce: %s
-      }
-    |}
-          (if stake then "true" else "false")
-          (auth edit_state) (auth send) (auth receive) (auth set_delegate)
-          (auth set_permissions)
-          (auth set_verification_key)
-          (auth set_snapp_uri) (auth edit_sequence_state)
-          (auth set_token_symbol) (auth increment_nonce)
-  in
-  let protocol_state =
-    sprintf
-      {|
-      {
-      nextEpochData: {
-        epochLength: null,
-        lockCheckpoint: null,
-        startCheckpoint: null,
-        seed: null,
-        ledger: {
-          totalCurrency: null,
-          hash: null}},
-      stakingEpochData: {
-        epochLength: null,
-        lockCheckpoint: null,
-        startCheckpoint: null,
-        seed: null,
-        ledger: {
-          totalCurrency: null,
-          hash: null}},
-      globalSlotSinceGenesis: null,
-      globalSlotSinceHardFork: null,
-      totalCurrency: null,
-      minWindowDensity: null,
-      blockchainLength: null,
-      timestamp: null,
-      snarkedNextAvailableToken: null,
-      snarkedLedgerHash: null}
-    |}
-  in
-  let party (p : Party.t) =
-    let authorization = authorization p.authorization in
-    let predicate =
-      match p.data.predicate with
-      | Nonce n ->
-          sprintf "{ nonce: \"%s\" }" (Account.Nonce.to_string n)
-      | Full _a ->
-          (* TODO -- issue #10008 *)
-          {|
-          {
-            account: {
-              balance:null,
-              nonce:null,
-              receiptChainHash:null,
-              publicKey:null,
-              delegate:null,
-              state:
-                {elements: [null,null,null,null,null,null,null,null]},
-              sequenceState:null,
-              provedState:null}
-          }
-          |}
-      | Accept ->
-          "{account:null, nonce:null}"
-    in
-    let balance_change =
-      let sgn =
-        match Currency.Amount.Signed.sgn p.data.body.balance_change with
-        | Pos ->
-            "PLUS"
-        | Neg ->
-            "MINUS"
-      in
-      let magnitude =
-        Currency.Amount.(
-          to_string (Signed.magnitude p.data.body.balance_change))
-      in
-      sprintf "{sign: %s, magnitude: \"%s\"}" sgn magnitude
-    in
-    let increment_nonce = Bool.to_string p.data.body.increment_nonce in
-    let sequence_events =
-      `List
-        (List.map p.data.body.sequence_events ~f:(fun a ->
-             `List
-               ( Array.map a ~f:(fun s ->
-                     `String (Snark_params.Tick.Field.to_string s))
-               |> Array.to_list )))
-      |> Yojson.Safe.to_string
-    in
-    let call_data =
-      `String (Snark_params.Tick.Field.to_string p.data.body.call_data)
-      |> Yojson.Safe.to_string
-    in
-    let events =
-      `List
-        (List.map p.data.body.events ~f:(fun a ->
-             `List
-               ( Array.map a ~f:(fun s ->
-                     `String (Snark_params.Tick.Field.to_string s))
-               |> Array.to_list )))
-      |> Yojson.Safe.to_string
-    in
-    let full_commitment = Bool.to_string p.data.body.use_full_commitment in
-    let pk = pk_string p.data.body.pk in
-    sprintf
-      {|
-        authorization: %s,
-      data: {
-        predicate: %s,
-        body: {
-          callDepth: 0,
-          callData: %s,
-          sequenceEvents: %s,
-          events: %s,
-          balance_change: %s,
-          tokenId: "1",
-          incrementNonce: %s
-          update: {
-            timing: null,
-            tokenSymbol: null,
-            snappUri: null,
-            permissions: %s,
-            verificationKey: %s,
-            delegate: null,
-            appState: [%s]},
-          publicKey: "%s",
-          protocolState: %s,
-          use_full_commitment: %s}}
-    |}
-      authorization predicate call_data sequence_events events balance_change
-      increment_nonce
-      (permissions p.data.body.update.permissions)
-      (verification_key p.data.body.update)
-      (app_state p.data.body.update.app_state)
-      pk protocol_state full_commitment
-  in
-  let fee_payer =
-    let p = parties.fee_payer in
-    let authorization = Signature.to_base58_check p.authorization in
-    let nonce = Account.Nonce.to_string p.data.predicate in
-    let fee = Currency.Fee.to_string p.data.body.balance_change in
-    let pk = pk_string p.data.body.pk in
-    sprintf
-      {|
-        authorization: "%s",
-      data: {
-        predicate: "%s",
-        body: {
-          callDepth: "0",
-          callData: "0x0000000000000000000000000000000000000000000000000000000000000000",
-          sequenceEvents:[],
-          events: [],
-          fee: "%s",
-          update: {
-            timing: null,
-            tokenSymbol: null,
-            snappUri: null,
-            permissions: %s,
-            verificationKey: %s,
-            delegate: null,
-            appState: [%s]},
-          pk: "%s",
-          protocolState: %s}}
-        |}
-      authorization nonce fee
-      (permissions p.data.body.update.permissions)
-      (verification_key p.data.body.update)
-      (app_state p.data.body.update.app_state)
-      pk protocol_state
-  in
-  let other_parties =
-    let start = ref true in
-    let a =
-      List.fold ~init:"[" parties.other_parties ~f:(fun acc p ->
-          let p = party p in
-          let sep =
-            if !start then (
-              start := false ;
-              "" )
-            else ","
-          in
-          acc ^ sprintf "%s { %s }" sep p)
-    in
-    a ^ "]"
-  in
   sprintf
     {|
 mutation MyMutation {
   __typename
   sendSnapp(input: {
-    feePayer: {%s},
-    otherParties: %s })
+    feePayer:%s,
+    otherParties:[%s] })
 }
     |}
-    fee_payer other_parties
+    ( jsobj_of_json ~fee_payer:true
+    @@ Party.Fee_payer.to_yojson parties.fee_payer )
+    ( List.map parties.other_parties ~f:(fun party ->
+          Party.to_yojson party |> jsobj_of_json)
+    |> String.concat ~sep:",\n    " )
 
 let parse_field_element_or_hash_string s ~f =
   match Or_error.try_with (fun () -> Snark_params.Tick.Field.of_string s) with
@@ -309,7 +143,7 @@ let gen_proof ?(snapp_account = None) (parties : Parties.t) =
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let _v =
     let id =
-      parties.fee_payer.data.body.pk
+      parties.fee_payer.data.body.public_key
       |> fun pk -> Account_id.create pk Token_id.default
     in
     Ledger.get_or_create_account ledger id
@@ -396,7 +230,7 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t) =
   in
   printf "Snapp transaction yojson: %s\n\n%!"
     (Parties.to_yojson parties |> Yojson.Safe.to_string) ;
-  printf "Snapp transaction graphQL input %s\n\n%!"
+  printf "(Snapp transaction graphQL input %s\n\n%!"
     (graphql_snapp_command parties) ;
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
