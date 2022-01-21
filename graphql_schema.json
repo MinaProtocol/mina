@@ -6219,7 +6219,7 @@
             {
               "name": "mockSnapp",
               "description":
-                "Mock a Snapp transaction, no effect on blockchain",
+                "Mock a snapp transaction, no effect on blockchain",
               "args": [
                 {
                   "name": "input",

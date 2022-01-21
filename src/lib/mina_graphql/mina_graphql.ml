@@ -2213,7 +2213,7 @@ module Types = struct
               Error "Expected string for fee")
 
     module Snapp_inputs = struct
-      (* inputs particular to Snapps *)
+      (* inputs particular to snapps *)
 
       let snapp_balance_change :
           ((Amount.t, Sgn.t) Signed_poly.t, string) Result.t option arg_typ =
@@ -3764,8 +3764,8 @@ module Mutations = struct
       , string )
       result
       Io.t =
-    (* instead of adding the parties to the transaction pool, as we would for an actual Snapp,
-       apply the Snapp using an ephemeral ledger
+    (* instead of adding the parties to the transaction pool, as we would for an actual snapp,
+       apply the snapp using an ephemeral ledger
     *)
     match Mina_lib.best_tip mina with
     | `Active breadcrumb -> (
@@ -3792,14 +3792,14 @@ module Mutations = struct
             | Ok (`Existed, _loc) ->
                 (* should be unreachable *)
                 failwithf
-                  "When creating ledger for mock Snapp, account with public \
+                  "When creating ledger for mock snapp, account with public \
                    key %s and token %s already existed"
                   (Signature_lib.Public_key.Compressed.to_string pk)
                   (Token_id.to_string token) ()
             | Error err ->
                 (* should be unreachable *)
                 Error.tag_arg err
-                  "When creating ledger for mock Snapp, error when adding \
+                  "When creating ledger for mock snapp, error when adding \
                    account"
                   (("public_key", pk), ("token", token))
                   [%sexp_of:
@@ -4033,12 +4033,12 @@ module Mutations = struct
             return (Error err))
 
   let send_snapp =
-    make_snapp_endpoint ~name:"sendSnapp" ~doc:"Send a Snapp transaction"
+    make_snapp_endpoint ~name:"sendSnapp" ~doc:"Send a snapp transaction"
       ~f:send_snapp_command
 
   let mock_snapp =
     make_snapp_endpoint ~name:"mockSnapp"
-      ~doc:"Mock a Snapp transaction, no effect on blockchain"
+      ~doc:"Mock a snapp transaction, no effect on blockchain"
       ~f:mock_snapp_command
 
   let create_token =
