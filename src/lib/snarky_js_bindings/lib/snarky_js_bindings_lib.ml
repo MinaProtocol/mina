@@ -347,13 +347,17 @@ let () =
   method_ "assertEquals" (fun this (y : As_field.t) : unit ->
       try Field.Assert.equal this##.value (As_field.value y)
       with _ ->
-        let s =
-          sprintf "assertEquals: %s != %s"
-            (Js.to_string this##toString)
-            (Js.to_string (As_field.to_field_obj y)##toString)
-        in
-        Js.raise_js_error (new%js Js.error_constr (Js.string s))) ;
+        console_log this ;
+        console_log (As_field.to_field_obj y) ;
+        let () = raise_error "assertEquals: not equal" in
+        ()) ;
 
+  (* TODO: bring back better error msg when .toString works in circuits *)
+  (* sprintf "assertEquals: %s != %s"
+         (Js.to_string this##toString)
+         (Js.to_string (As_field.to_field_obj y)##toString)
+     in
+     Js.raise_js_error (new%js Js.error_constr (Js.string s))) ; *)
   method_ "assertBoolean" (fun this : unit ->
       Impl.assert_ (Constraint.boolean this##.value)) ;
   method_ "isZero" (fun this : bool_class Js.t ->
@@ -1622,14 +1626,12 @@ type ('a_var, 'a_value, 'a_weird) pickles_rule =
 
 type pickles_rule_js = Js.js_string Js.t * (field_class Js.t -> unit)
 
-let create_pickles_rule (identifier, main) =
+let create_pickles_rule (identifier, _main) =
   { identifier = Js.to_string identifier
   ; prevs = []
   ; main =
-      (fun _ self ->
-        dummy_constraints () ;
-        main (to_js_field self) ;
-        [])
+      (fun _ _self -> dummy_constraints () ; (* main (to_js_field self) ; *)
+                                             [])
   ; main_value = (fun _ _ -> [])
   }
 
@@ -1662,6 +1664,11 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let to_value (x : Field.t) =
     match x with Constant y -> y | _ -> failwith "can't convert to value"
   in
+  let [ prover ] = provers in
+  let proof =
+    Run_in_thread.block_on_async_exn (fun () -> prover [] Field.Constant.zero)
+  in
+  console_log proof ;
   let to_js_prover prover thing =
     Run_in_thread.block_on_async_exn (fun () ->
         prover ~handler:(Obj.magic 0) [] (to_value (of_js_field thing)))
