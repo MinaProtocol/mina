@@ -90,37 +90,37 @@ end
 
 module Nonce = Account_nonce
 
-module Poly = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type ( 'pk
-           , 'tid
-           , 'token_permissions
-           , 'amount
-           , 'nonce
-           , 'receipt_chain_hash
-           , 'delegate
-           , 'state_hash
-           , 'timing
-           , 'permissions
-           , 'snapp_opt )
-           t =
-        { public_key : 'pk
-        ; token_id : 'tid
-        ; token_permissions : 'token_permissions
-        ; balance : 'amount
-        ; nonce : 'nonce
-        ; receipt_chain_hash : 'receipt_chain_hash
-        ; delegate : 'delegate
-        ; voting_for : 'state_hash
-        ; timing : 'timing
-        ; permissions : 'permissions
-        ; snapp : 'snapp_opt
-        }
-      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
-    end
-  end]
+module type TYPE = sig
+  type t [@@deriving sexp, equal, compare, hash, yojson]
+end
+
+module Poly_V1
+    (Pk : TYPE)
+    (Tid : TYPE)
+    (Token_permissions : TYPE)
+    (Amount : TYPE)
+    (Nonce : TYPE)
+    (Receipt_chain_hash : TYPE)
+    (Delegate : TYPE)
+    (State_hash : TYPE)
+    (Timing : TYPE)
+    (Permissions : TYPE)
+    (Snapp : TYPE) =
+struct
+  type t =
+    { public_key : Pk.t
+    ; token_id : Tid.t
+    ; token_permissions : Token_permissions.t
+    ; balance : Amount.t
+    ; nonce : Nonce.t
+    ; receipt_chain_hash : Receipt_chain_hash.t
+    ; delegate : Delegate.t option
+    ; voting_for : State_hash.t
+    ; timing : Timing.t
+    ; permissions : Permissions.t
+    ; snapp : Snapp.t option
+    }
+  [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
 end
 
 module Key = struct
@@ -146,18 +146,29 @@ module Binable_arg = struct
   module Stable = struct
     module V1 = struct
       type t =
-        ( Public_key.Compressed.Stable.V1.t
-        , Token_id.Stable.V1.t
-        , Token_permissions.Stable.V1.t
-        , Balance.Stable.V1.t
-        , Nonce.Stable.V1.t
-        , Receipt.Chain_hash.Stable.V1.t
-        , Public_key.Compressed.Stable.V1.t option
-        , State_hash.Stable.V1.t
-        , Timing.Stable.V1.t
-        , Permissions.Stable.V1.t
-        , Snapp_account.Stable.V1.t option )
-        Poly.Stable.V1.t
+            Poly_V1(Public_key.Compressed.Stable.V1)(Token_id.Stable.V1)
+              (Token_permissions.Stable.V1)
+              (Balance.Stable.V1)
+              (Nonce.Stable.V1)
+              (Receipt.Chain_hash.Stable.V1)
+              (Public_key.Compressed.Stable.V1)
+              (State_hash.Stable.V1)
+              (Timing.Stable.V1)
+              (Permissions.Stable.V1)
+              (Snapp_account.Stable.V1)
+            .t =
+        { public_key : Public_key.Compressed.Stable.V1.t
+        ; token_id : Token_id.Stable.V1.t
+        ; token_permissions : Token_permissions.Stable.V1.t
+        ; balance : Balance.Stable.V1.t
+        ; nonce : Nonce.Stable.V1.t
+        ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t
+        ; delegate : Public_key.Compressed.Stable.V1.t option
+        ; voting_for : State_hash.Stable.V1.t
+        ; timing : Timing.Stable.V1.t
+        ; permissions : Permissions.Stable.V1.t
+        ; snapp : Snapp_account.Stable.V1.t option
+        }
       [@@deriving sexp, equal, hash, compare, yojson]
 
       let to_latest = Fn.id
@@ -214,7 +225,7 @@ end]
 
 [%%define_locally Stable.Latest.(public_key)]
 
-let token { Poly.token_id; _ } = token_id
+let token ({ token_id; _ } : t) = token_id
 
 let identifier ({ public_key; token_id; _ } : t) =
   Account_id.create public_key token_id
