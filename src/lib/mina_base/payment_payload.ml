@@ -74,21 +74,21 @@ let typ : (var, t) Typ.t =
   Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
-let to_input { Poly.source_pk; receiver_pk; token_id; amount } =
-  Array.reduce_exn ~f:Random_oracle.Input.append
-    [| Public_key.Compressed.to_input source_pk
-     ; Public_key.Compressed.to_input receiver_pk
-     ; Token_id.to_input token_id
-     ; Amount.to_input amount
+let to_input_legacy { Poly.source_pk; receiver_pk; token_id; amount } =
+  Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
+    [| Public_key.Compressed.to_input_legacy source_pk
+     ; Public_key.Compressed.to_input_legacy receiver_pk
+     ; Token_id.to_input_legacy token_id
+     ; Amount.to_input_legacy amount
     |]
 
-let var_to_input { Poly.source_pk; receiver_pk; token_id; amount } =
-  let%map token_id = Token_id.Checked.to_input token_id in
-  Array.reduce_exn ~f:Random_oracle.Input.append
-    [| Public_key.Compressed.Checked.to_input source_pk
-     ; Public_key.Compressed.Checked.to_input receiver_pk
+let var_to_input_legacy { Poly.source_pk; receiver_pk; token_id; amount } =
+  let%map token_id = Token_id.Checked.to_input_legacy token_id in
+  Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
+    [| Public_key.Compressed.Checked.to_input_legacy source_pk
+     ; Public_key.Compressed.Checked.to_input_legacy receiver_pk
      ; token_id
-     ; Amount.var_to_input amount
+     ; Amount.var_to_input_legacy amount
     |]
 
 let var_of_t ({ source_pk; receiver_pk; token_id; amount } : t) : var =

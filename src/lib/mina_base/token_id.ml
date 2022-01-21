@@ -14,6 +14,8 @@ let default = T.of_uint64 Unsigned.UInt64.one
 
 let to_input = T.to_input
 
+let to_input_legacy = T.to_input_legacy
+
 let to_string = T.to_string
 
 let of_string = T.of_string
@@ -101,6 +103,8 @@ module Checked = struct
   let next_if = T.Checked.succ_if
 
   let to_input = T.Checked.to_input
+
+  let to_input_legacy = T.Checked.to_input_legacy
 
   let equal = T.Checked.equal
 

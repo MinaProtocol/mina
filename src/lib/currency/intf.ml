@@ -9,6 +9,7 @@ open Snark_params.Tick
 
 [%%else]
 
+open Snark_params_nonconsensus
 open Snark_bits_nonconsensus
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Sgn = Sgn_nonconsensus.Sgn
@@ -37,7 +38,9 @@ module type Basic = sig
 
   include Bits_intf.Convertible_bits with type t := t
 
-  val to_input : t -> (_, bool) Random_oracle.Input.t
+  val to_input : t -> Field.t Random_oracle.Input.Chunked.t
+
+  val to_input_legacy : t -> (_, bool) Random_oracle.Legacy.Input.t
 
   val zero : t
 
@@ -71,7 +74,9 @@ module type Basic = sig
 
   val var_to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
 
-  val var_to_input : var -> (_, Boolean.var) Random_oracle.Input.t
+  val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
+
+  val var_to_input_legacy : var -> (_, Boolean.var) Random_oracle.Legacy.Input.t
 
   val equal_var : var -> var -> (Boolean.var, _) Checked.t
 
@@ -121,7 +126,9 @@ module type Signed_intf = sig
 
   val is_negative : t -> bool
 
-  val to_input : t -> (_, bool) Random_oracle.Input.t
+  val to_input : t -> Field.t Random_oracle.Input.Chunked.t
+
+  val to_input_legacy : t -> (_, bool) Random_oracle.Legacy.Input.t
 
   val add : t -> t -> t option
 
@@ -146,7 +153,9 @@ module type Signed_intf = sig
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-    val to_input : var -> (_, Boolean.var) Random_oracle.Input.t
+    val to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
+
+    val to_input_legacy : var -> (_, Boolean.var) Random_oracle.Legacy.Input.t
 
     val add : var -> var -> (var, _) Checked.t
 

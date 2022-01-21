@@ -106,6 +106,10 @@ let update ~state = update ~state params
 
 let hash ?init = hash ?init params
 
+let pow2 =
+  let rec pow2 acc n = if n = 0 then acc else pow2 Field.(acc + acc) (n - 1) in
+  Memo.general ~hashable:Int.hashable (fun n -> pow2 Field.one n)
+
 [%%ifdef consensus_mechanism]
 
 module Checked = struct
@@ -133,15 +137,26 @@ module Checked = struct
         hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs)
 
   let pack_input =
-    Input.pack_to_fields ~size_in_bits:Field.size_in_bits ~pack:Field.Var.pack
+    Input.Chunked.pack_to_fields
+      ~pow2:(Fn.compose Field.Var.constant pow2)
+      (module Pickles.Impls.Step.Field)
 
   let digest xs = xs.(0)
 end
 
+let read_typ ({ field_elements; packeds } : _ Input.Chunked.t) =
+  let open Pickles.Impls.Step in
+  let open As_prover in
+  { Input.Chunked.field_elements = Array.map ~f:(read Field.typ) field_elements
+  ; packeds = Array.map packeds ~f:(fun (x, i) -> (read Field.typ x, i))
+  }
+
+let read_typ' input : _ Pickles.Impls.Step.Internal_Basic.As_prover.t =
+ fun _ x -> (x, read_typ input)
+
 [%%endif]
 
-let pack_input =
-  Input.pack_to_fields ~size_in_bits:Field.size_in_bits ~pack:Field.project
+let pack_input = Input.Chunked.pack_to_fields ~pow2 (module Field)
 
 let prefix_to_field (s : string) =
   let bits_per_character = 8 in
@@ -188,6 +203,8 @@ let%test_unit "check rust implementation of block-cipher" =
 [%%endif]
 
 module Legacy = struct
+  module Input = Random_oracle_input.Legacy
+
   let params : Field.t Sponge.Params.t =
     Sponge.Params.(map pasta_p ~f:Field.of_string)
 
@@ -224,14 +241,16 @@ module Legacy = struct
 
   let salt (s : string) = update ~state:initial_state [| prefix_to_field s |]
 
-  let pack_input = pack_input
+  let pack_input =
+    Input.pack_to_fields ~size_in_bits:Field.size_in_bits ~pack:Field.project
 
   module Digest = Digest
 
   [%%ifdef consensus_mechanism]
 
   module Checked = struct
-    let pack_input = Checked.pack_input
+    let pack_input =
+      Input.pack_to_fields ~size_in_bits:Field.size_in_bits ~pack:Field.Var.pack
 
     module Digest = Checked.Digest
 

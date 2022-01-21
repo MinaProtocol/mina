@@ -84,10 +84,10 @@ let _ =
              Mina_base_nonconsensus.Signed_command.sign_payload sk dummy_payload
            in
            let message =
-             Mina_base_nonconsensus.Signed_command.to_input dummy_payload
+             Mina_base_nonconsensus.Signed_command.to_input_legacy dummy_payload
            in
            let verified =
-             Schnorr.verify signature
+             Schnorr.Legacy.verify signature
                (Snark_params_nonconsensus.Inner_curve.of_affine pk)
                message
            in

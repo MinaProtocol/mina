@@ -67,7 +67,9 @@ module Stable = struct
   end
 end]
 
-let to_input = Pickles_base.Side_loaded_verification_key.to_input
+let to_input x =
+  Pickles_base.Side_loaded_verification_key.to_input
+    ~field_of_int:Snark_params_nonconsensus.Field.of_int x
 
 let dummy : t =
   let open Pickles_types in

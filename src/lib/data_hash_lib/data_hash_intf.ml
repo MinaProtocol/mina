@@ -35,7 +35,7 @@ module type Basic = sig
 
   val var_to_hash_packed : var -> Random_oracle.Checked.Digest.t
 
-  val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+  val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 
   val var_to_bits : var -> (Boolean.var list, _) Checked.t
 
@@ -60,7 +60,7 @@ module type Basic = sig
 
   val of_base58_check_exn : string -> t
 
-  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+  val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 end
 
 module type Full_size = sig

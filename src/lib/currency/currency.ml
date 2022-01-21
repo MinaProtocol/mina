@@ -12,6 +12,7 @@ open Let_syntax
 
 [%%else]
 
+open Snark_params_nonconsensus
 open Snark_bits_nonconsensus
 module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
 
@@ -146,7 +147,10 @@ end = struct
   let var_to_number t = Number.of_bits (var_to_bits t :> Boolean.var list)
 
   let var_to_input t =
-    Random_oracle.Input.bitstring (var_to_bits t :> Boolean.var list)
+    Random_oracle.Input.Chunked.packed (Field.Var.project t, length_in_bits)
+
+  let var_to_input_legacy t =
+    Random_oracle.Input.Legacy.bitstring (var_to_bits t :> Boolean.var list)
 
   let var_of_bits (bits : Boolean.var Bitstring.Lsb_first.t) : var =
     let bits = (bits :> Boolean.var list) in
@@ -185,7 +189,11 @@ end = struct
 
   type magnitude = t [@@deriving sexp, hash, compare, yojson]
 
-  let to_input t = Random_oracle.Input.bitstring @@ to_bits t
+  let to_input t =
+    Random_oracle.Input.Chunked.packed
+      (Field.project (to_bits t), length_in_bits)
+
+  let to_input_legacy t = Random_oracle.Input.Legacy.bitstring @@ to_bits t
 
   module Signed = struct
     type ('magnitude, 'sgn) typ = ('magnitude, 'sgn) Signed_poly.t =
@@ -242,7 +250,12 @@ end = struct
 
     let to_bits ({ sgn; magnitude } : t) = sgn_to_bool sgn :: to_bits magnitude
 
-    let to_input t = Random_oracle.Input.bitstring (to_bits t)
+    let to_input { sgn; magnitude } =
+      Random_oracle.Input.Chunked.(
+        append (to_input magnitude)
+          (packed (Field.project [ sgn_to_bool sgn ], 1)))
+
+    let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
     let add (x : t) (y : t) : t option =
       match (x.sgn, y.sgn) with
@@ -284,7 +297,12 @@ end = struct
       let to_bits { magnitude; sgn } =
         Sgn.Checked.is_pos sgn :: (var_to_bits magnitude :> Boolean.var list)
 
-      let to_input t = Random_oracle.Input.bitstring (to_bits t)
+      let to_input { magnitude; sgn } =
+        let mag = var_to_input magnitude in
+        Random_oracle.Input.Chunked.(
+          append mag (packed ((Sgn.Checked.is_pos sgn :> Field.Var.t), 1)))
+
+      let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
       let constant { magnitude; sgn } =
         { magnitude = var_of_t magnitude; sgn = Sgn.Checked.constant sgn }

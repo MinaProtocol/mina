@@ -1,3 +1,28 @@
+(** A verification key for a pickles proof, whose contents are not fixed within
+    the verifier circuit.
+    This is used to verify a proof where the verification key is determined by
+    some other constraint, for example to use a verification key provided as
+    input to the circuit, or loaded from an account that was chosen based upon
+    the circuit inputs.
+
+    Here and elsewhere, we use the terms
+    * **width**:
+      - the number of proofs that a proof has verified itself;
+      - (equivalently) the maximum number of proofs that a proof depends upon
+        directly.
+      - NB: This does not include recursively-verified proofs, this only refers
+        to proofs that were provided directly to pickles when the proof was
+        being generated.
+    * **branch**:
+      - a single 'rule' or 'circuit' for which a proof can be generated, where
+        a verification key verifies a proof for any of these branches.
+      - It is common to have a 'base' branch and a 'recursion' branch. For
+        example, the transaction snark has a 'transaction' proof that evaluates
+        a single transaction and a 'merge' proof that combines two transaction
+        snark proofs that prove sequential updates, each of which may be either
+        a 'transaction' or a 'merge'.
+*)
+
 open Core_kernel
 open Pickles_types
 open Common
@@ -263,29 +288,41 @@ module Checked = struct
 
   type t =
     { step_domains : (Field.t Domain.t Domains.t, Max_branches.n) Vector.t
+          (** The domain size for proofs of each branch. *)
     ; step_widths : (Width.Checked.t, Max_branches.n) Vector.t
+          (** The width for for proofs of each branch. *)
     ; max_width : Width.Checked.t
+          (** The maximum of all of the [step_widths]. *)
     ; wrap_index : Inner_curve.t Plonk_verification_key_evals.t
+          (** The plonk verification key for the 'wrapping' proof that this key
+              is used to verify.
+          *)
     ; num_branches : (Boolean.var, Max_branches.Log2.n) Vector.t
+          (** The number of branches, encoded as a bitstring. *)
     }
   [@@deriving hlist, fields]
 
+  (** [log_2] of the width. *)
+  let width_size = Nat.to_int Width.Length.n
+
   let to_input =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
     fun { step_domains; step_widths; max_width; wrap_index; num_branches } :
-        _ Random_oracle_input.t ->
+        _ Random_oracle_input.Chunked.t ->
+      let width w = (Width.Checked.to_field w, width_size) in
       List.reduce_exn ~f:append
         [ map_reduce (Vector.to_array step_domains) ~f:(fun { Domains.h } ->
               map_reduce [| h |] ~f:(fun (Domain.Pow_2_roots_of_unity x) ->
-                  bitstring (Field.unpack x ~length:max_log2_degree)))
-        ; Array.map (Vector.to_array step_widths) ~f:Width.Checked.to_bits
-          |> bitstrings
-        ; bitstring (Width.Checked.to_bits max_width)
+                  packed (x, max_log2_degree)))
+        ; Array.map (Vector.to_array step_widths) ~f:width |> packeds
+        ; packed (width max_width)
         ; wrap_index_to_input
             (Fn.compose Array.of_list Inner_curve.to_field_elements)
             wrap_index
-        ; bitstring (Vector.to_list num_branches)
+        ; packed
+            ( Field.project (Vector.to_list num_branches)
+            , Nat.to_int Max_branches.Log2.n )
         ]
 end
 
