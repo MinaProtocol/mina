@@ -8,10 +8,9 @@ let
 
   inherit (pkgs.lib) hasPrefix;
 
-  external-repo = opam-nix.makeOpamRepo ../src/external; # Pin external packages
+  external-repo = opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
   repos = [
     external-repo
-    ./fake-opam-repo # Remove opam version restriction imposed by a depext dependency
     inputs.opam-repository
   ];
 
