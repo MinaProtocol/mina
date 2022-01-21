@@ -126,8 +126,15 @@
             '';
           };
 
+          # FIXME: broken
+          packages.client_sdk = nix-npm-buildPackage.buildYarnPackage {
+            src = ./frontend/client_sdk;
+            yarnBuildMore = "yarn build";
+          };
+
           inherit ocamlPackages ocamlPackages_static;
           packages.mina = ocamlPackages.mina;
+          packages.mina_client_sdk_binding = ocamlPackages.mina_client_sdk;
           packages.mina-docker = pkgs.dockerTools.buildImage {
             name = "mina";
             contents = [ ocamlPackages.mina ];
