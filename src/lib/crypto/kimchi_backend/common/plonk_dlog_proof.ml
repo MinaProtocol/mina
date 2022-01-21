@@ -1,20 +1,18 @@
 open Core_kernel
+open Async_kernel
+open Pickles_types
 
 let tuple15_to_vec
     (w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14) =
-  Pickles_types.Vector.
-    [ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ]
+  Vector.[ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ]
 
 let tuple15_of_vec
-    Pickles_types.Vector.
-      [ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ] =
+    Vector.[ w0; w1; w2; w3; w4; w5; w6; w7; w8; w9; w10; w11; w12; w13; w14 ] =
   (w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14)
 
-let tuple6_to_vec (w0, w1, w2, w3, w4, w5) =
-  Pickles_types.Vector.[ w0; w1; w2; w3; w4; w5 ]
+let tuple6_to_vec (w0, w1, w2, w3, w4, w5) = Vector.[ w0; w1; w2; w3; w4; w5 ]
 
-let tuple6_of_vec Pickles_types.Vector.[ w0; w1; w2; w3; w4; w5 ] =
-  (w0, w1, w2, w3, w4, w5)
+let tuple6_of_vec Vector.[ w0; w1; w2; w3; w4; w5 ] = (w0, w1, w2, w3, w4, w5)
 
 module type Stable_v1 = sig
   module Stable : sig
@@ -110,12 +108,11 @@ module type Inputs_intf = sig
       -> Scalar_field.Vector.t
       -> Scalar_field.t array
       -> Curve.Affine.Backend.t array
-      -> t Async.Deferred.t
+      -> t Deferred.t
 
     val verify : Verifier_index.t -> t -> bool
 
-    val batch_verify :
-      Verifier_index.t array -> t array -> bool Async.Deferred.t
+    val batch_verify : Verifier_index.t array -> t array -> bool Deferred.t
   end
 end
 
@@ -157,14 +154,12 @@ module Make (Inputs : Inputs_intf) = struct
 
   type message = Challenge_polynomial.t list
 
-  include Allocation_functor.Make.Versioned_v1.Full_compare_eq_hash (struct
-    let id = "plong_dlog_proof_" ^ Inputs.id
+  let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
 
-    let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
-
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      module T = struct
         type t =
           ( G.Affine.Stable.V1.t
           , Fq.Stable.V1.t
@@ -172,7 +167,7 @@ module Make (Inputs : Inputs_intf) = struct
           Pickles_types.Dlog_plonk_types.Proof.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
-        let to_latest = Fn.id
+        let id = "plong_dlog_proof_" ^ Inputs.id
 
         type 'a creator =
              messages:
@@ -190,8 +185,19 @@ module Make (Inputs : Inputs_intf) = struct
           let open Pickles_types.Dlog_plonk_types.Proof in
           { messages; openings }
       end
-    end]
-  end)
+
+      include T
+
+      include (
+        Allocation_functor.Make.Full
+          (T) :
+            Allocation_functor.Intf.Output.Full_intf
+              with type t := t
+               and type 'a creator := 'a creator )
+
+      let to_latest = Fn.id
+    end
+  end]
 
   include (
     Stable.Latest :
@@ -209,8 +215,8 @@ module Make (Inputs : Inputs_intf) = struct
     Array.iter arr ~f:(fun fe -> Fq.Vector.emplace_back vec fe) ;
     vec
 
-  (** Note that this function will panic if some of the points are points at infinity *)
-  let opening_proof_of_backend (t : Opening_proof_backend.t) =
+  (** Note that this function will panic if any of the points are points at infinity *)
+  let opening_proof_of_backend_exn (t : Opening_proof_backend.t) =
     let g (x : G.Affine.Backend.t) : G.Affine.t =
       G.Affine.of_backend x |> Pickles_types.Or_infinity.finite_exn
     in
@@ -228,7 +234,7 @@ module Make (Inputs : Inputs_intf) = struct
     }
 
   let of_backend (t : Backend.t) : t =
-    let proof = opening_proof_of_backend t.proof in
+    let proof = opening_proof_of_backend_exn t.proof in
     let evals =
       (fst t.evals, snd t.evals)
       |> Tuple_lib.Double.map ~f:(fun e ->
@@ -288,7 +294,6 @@ module Make (Inputs : Inputs_intf) = struct
        } :
         t) : Backend.t =
     let g x = G.Affine.to_backend (Pickles_types.Or_infinity.Finite x) in
-    let pcw t = Poly_comm.to_backend (`With_degree_bound t) in
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
     let lr = Array.map lr ~f:(fun (x, y) -> (g x, g y)) in
     { commitments =
@@ -343,7 +348,7 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
           G.Affine.to_backend (Finite commitment))
     in
-    let%map.Async.Deferred res =
+    let%map.Deferred res =
       Backend.create_async pk primary auxiliary challenges commitments
     in
     of_backend res

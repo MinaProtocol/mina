@@ -148,6 +148,7 @@ module Rpcs : sig
         : ( Get_transition_chain_proof.query
           , Get_transition_chain_proof.response )
           rpc
+    | Get_node_status : (Get_node_status.query, Get_node_status.response) rpc
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
@@ -188,12 +189,18 @@ val states :
 
 val peers : t -> Network_peer.Peer.t list Deferred.t
 
+val bandwidth_info :
+     t
+  -> ([ `Input of float ] * [ `Output of float ] * [ `Cpu_usage of float ])
+     Deferred.Or_error.t
+
 val get_peer_node_status :
      t
   -> Network_peer.Peer.t
   -> Rpcs.Get_node_status.Node_status.t Deferred.Or_error.t
 
-val add_peer : t -> Network_peer.Peer.t -> seed:bool -> unit Deferred.Or_error.t
+val add_peer :
+  t -> Network_peer.Peer.t -> is_seed:bool -> unit Deferred.Or_error.t
 
 val on_first_received_message : t -> f:(unit -> 'a) -> 'a Deferred.t
 
@@ -295,9 +302,6 @@ val query_peer :
   -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t
 
 val restart_helper : t -> unit
-
-val ip_for_peer :
-  t -> Network_peer.Peer.Id.t -> Unix.Inet_addr.t option Deferred.t
 
 val initial_peers : t -> Mina_net2.Multiaddr.t list
 

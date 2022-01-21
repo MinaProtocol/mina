@@ -218,6 +218,9 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
            , `Overflow
                (Drop_head
                   (fun head ->
+                    Mina_metrics.(
+                      Counter.inc_one
+                        Pipe.Drop_on_overflow.bootstrap_sync_ledger) ;
                     External_transition.Initial_validated
                     .handle_dropped_transition
                       (Envelope.Incoming.data head)
@@ -378,7 +381,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               , Some staged_ledger_construction_time
               , result ) )
     in
-    Transition_frontier.Persistent_root.Instance.destroy
+    Transition_frontier.Persistent_root.Instance.close
       temp_persistent_root_instance ;
     match staged_ledger_aux_result with
     | Error e ->
@@ -522,6 +525,10 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     "bootstrap still required (indicates logical error in code)"
               | Error `Persistent_frontier_malformed ->
                   fail "persistent frontier was malformed"
+              | Error `Snarked_ledger_mismatch ->
+                  fail
+                    "this should not happen, because we just reset the \
+                     snarked_ledger"
             in
             [%str_log info] Bootstrap_complete ;
             let collected_transitions =
@@ -651,7 +658,7 @@ let%test_module "Bootstrap_controller tests" =
         let%bind fake_network =
           Fake_network.Generator.(
             gen ~precomputed_values ~verifier ~max_frontier_length
-              [ fresh_peer; fresh_peer ])
+              [ fresh_peer; fresh_peer ] ~use_super_catchup:false)
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq ~precomputed_values
@@ -785,6 +792,7 @@ let%test_module "Bootstrap_controller tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
+            ~use_super_catchup:false
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 2) + 2)

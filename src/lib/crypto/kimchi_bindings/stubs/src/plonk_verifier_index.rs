@@ -1,3 +1,5 @@
+use kimchi_circuits::expr::caml::{CamlLinearization, CamlPolishToken};
+
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlPlonkDomain<Fr> {
     pub log_size_of_group: ocaml::Int,
@@ -26,4 +28,5 @@ pub struct CamlPlonkVerifierIndex<Fr, SRS, PolyComm> {
     pub srs: SRS,
     pub evals: CamlPlonkVerificationEvals<PolyComm>,
     pub shifts: Vec<Fr>,
+    pub linearization: CamlLinearization<CamlPolishToken<Fr>>,
 }

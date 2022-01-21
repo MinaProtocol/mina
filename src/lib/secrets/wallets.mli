@@ -39,7 +39,9 @@ val unlock :
      t
   -> needle:Public_key.Compressed.t
   -> password:Secret_file.password
-  -> (unit, [ `Not_found | `Bad_password ]) Deferred.Result.t
+  -> ( unit
+     , [ `Not_found | `Bad_password | `Key_read_error of Privkey_error.t ] )
+     Deferred.Result.t
 
 val lock : t -> needle:Public_key.Compressed.t -> unit
 
@@ -47,3 +49,11 @@ val get_path : t -> Public_key.Compressed.t -> string
 
 val delete :
   t -> Public_key.Compressed.t -> (unit, [ `Not_found ]) Deferred.Result.t
+
+val get_tracked_keypair :
+     logger:Logger.t
+  -> which:string
+  -> read_from_env_exn:(which:string -> string -> Keypair.t Deferred.t)
+  -> conf_dir:string
+  -> Public_key.Compressed.t
+  -> Keypair.t Deferred.t

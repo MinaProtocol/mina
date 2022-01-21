@@ -64,6 +64,9 @@ end = struct
     in
     loop location
 
+  let merkle_path_batch t locs =
+    List.zip_exn locs (List.map locs ~f:(merkle_path t))
+
   let merkle_root t = empty_hash_at_height t.depth
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
@@ -85,6 +88,8 @@ end = struct
 
   let get _t _loc = None
 
+  let get_batch _t locs = List.map locs ~f:(fun loc -> (loc, None))
+
   let get_uuid t = t.uuid
 
   let get_directory _ = None
@@ -97,6 +102,9 @@ end = struct
     failwith "get_or_create_account: null ledgers cannot be mutated"
 
   let location_of_account _t _ = None
+
+  let location_of_account_batch _t accts =
+    List.map accts ~f:(fun acct -> (acct, None))
 
   let accounts _t = Account_id.Set.empty
 

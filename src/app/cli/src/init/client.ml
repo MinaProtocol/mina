@@ -1197,7 +1197,7 @@ let pending_snark_work =
                       Array.map bundle#workBundle ~f:(fun w ->
                           let f = w#fee_excess in
                           let hash_of_string =
-                            Mina_base.Frozen_ledger_hash.of_string
+                            Mina_base.Frozen_ledger_hash.of_base58_check_exn
                           in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id = w#work_id
@@ -1250,7 +1250,11 @@ let set_staking_graphql =
       ~doc:"PUBLICKEY Public key of account with which to produce blocks"
       (required public_key_compressed)
   in
-  Command.async ~summary:"Start producing blocks"
+  Command.async
+    ~summary:
+      "The set-staking command is deprecated and no longer has any effect.To \
+       enable block production, instead restart the daemon with the flag \
+       --block-producer-key"
     (Cli_lib.Background_daemon.graphql_init pk_flag
        ~f:(fun graphql_endpoint public_key ->
          let print_message msg arr =
@@ -1545,6 +1549,13 @@ let export_key =
                     !"wrong password provided for account \
                       %{Public_key.Compressed.to_base58_check}"
                     pk)
+           | Error (`Key_read_error e) ->
+               Error
+                 (sprintf
+                    !"Error reading the secret key file for account \
+                      %{Public_key.Compressed.to_base58_check}: %s"
+                    pk
+                    (Secrets.Privkey_error.to_string e))
            | Error `Not_found ->
                Error
                  (sprintf
@@ -1764,11 +1775,10 @@ let generate_libp2p_keypair =
           match%bind
             Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
               ~pids:(Child_processes.Termination.create_pid_table ())
-              ~on_unexpected_termination:(fun () ->
-                raise Child_processes.Child_died)
+              ~on_peer_connected:ignore ~on_peer_disconnected:ignore
           with
           | Ok net ->
-              let%bind me = Mina_net2.Keypair.random net in
+              let%bind me = Mina_net2.generate_random_keypair net in
               let%bind () = Mina_net2.shutdown net in
               let%map () =
                 Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path me
@@ -1921,16 +1931,10 @@ let compile_time_constants =
            home ^/ Cli_lib.Default.conf_dir_name
          in
          let config_file =
-           (* TODO: eventually, remove CODA_ variable *)
-           let mina_config_file = "MINA_CONFIG_FILE" in
-           let coda_config_file = "CODA_CONFIG_FILE" in
-           match (Sys.getenv mina_config_file, Sys.getenv coda_config_file) with
-           | Some config_file, _ ->
+           match Sys.getenv "MINA_CONFIG_FILE" with
+           | Some config_file ->
                config_file
-           | None, Some config_file ->
-               (* we print a deprecation warning on daemon startup, don't print here *)
-               config_file
-           | None, None ->
+           | None ->
                conf_dir ^/ "daemon.json"
          in
          let open Async in

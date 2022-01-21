@@ -14,25 +14,15 @@ use commitment_dlog::{
 };
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 
-use kimchi::index::VerifierIndex;
-use kimchi_circuits::{
-    expr::Linearization,
-    nolookup::constraints::{zk_polynomial, zk_w3, Shifts},
-    wires::{COLUMNS, PERMUTS},
-};
+use kimchi::index::{expr_linearization, VerifierIndex};
+use kimchi_circuits::expr::{Linearization, PolishToken};
+use kimchi_circuits::nolookup::constraints::{zk_polynomial, zk_w3, Shifts};
+use kimchi_circuits::wires::{COLUMNS, PERMUTS};
 use std::convert::TryInto;
 use std::path::Path;
 
-//
-// CamlPastaFqPlonkVerifierIndex
-//
-
 pub type CamlPastaFqPlonkVerifierIndex =
     CamlPlonkVerifierIndex<CamlFq, CamlFqSrs, CamlPolyComm<CamlGPallas>>;
-
-//
-// Handy conversion functions
-//
 
 impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
     fn from(vi: VerifierIndex<GAffine>) -> Self {
@@ -64,10 +54,12 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
                     .map(|x| x.to_vec().iter().map(Into::into).collect()),
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
+            linearization: vi.linearization.into(),
         }
     }
 }
 
+// TODO: This should really be a TryFrom or TryInto
 impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
     fn from(index: CamlPastaFqPlonkVerifierIndex) -> Self {
         let evals = index.evals;
@@ -122,17 +114,13 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
             lookup_used: None,
             lookup_tables: vec![],
             lookup_selectors: vec![],
-            linearization: Linearization::default(),
+            linearization: index.linearization.into(),
 
-            fr_sponge_params: oracle::pasta::fq::params(),
-            fq_sponge_params: oracle::pasta::fp::params(),
+            fr_sponge_params: oracle::pasta::fq_3::params(),
+            fq_sponge_params: oracle::pasta::fp_3::params(),
         }
     }
 }
-
-//
-// Serialization helpers
-//
 
 pub fn read_raw(
     offset: Option<ocaml::Int>,
@@ -141,8 +129,8 @@ pub fn read_raw(
 ) -> Result<VerifierIndex<GAffine>, ocaml::Error> {
     let path = Path::new(&path);
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
-    let fq_sponge_params = oracle::pasta::fp::params();
-    let fr_sponge_params = oracle::pasta::fq::params();
+    let fq_sponge_params = oracle::pasta::fp_3::params();
+    let fr_sponge_params = oracle::pasta::fq_3::params();
     VerifierIndex::<GAffine>::from_file(
         srs.0,
         path,
@@ -152,7 +140,6 @@ pub fn read_raw(
         fr_sponge_params,
     )
     .map_err(|e| {
-        println!("{}", e);
         ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
             .err()
             .unwrap()
@@ -160,7 +147,7 @@ pub fn read_raw(
 }
 
 //
-// Methods
+// OCaml methods
 //
 
 #[ocaml_gen::func]
@@ -170,7 +157,8 @@ pub fn caml_pasta_fq_plonk_verifier_index_read(
     srs: CamlFqSrs,
     path: String,
 ) -> Result<CamlPastaFqPlonkVerifierIndex, ocaml::Error> {
-    let vi = read_raw(offset, srs, path)?;
+    let mut vi = read_raw(offset, srs, path)?;
+    vi.linearization = expr_linearization(vi.domain, false, None);
     Ok(vi.into())
 }
 
@@ -184,7 +172,6 @@ pub fn caml_pasta_fq_plonk_verifier_index_write(
     let index: VerifierIndex<GAffine> = index.into();
     let path = Path::new(&path);
     index.to_file(path, append).map_err(|e| {
-        println!("{}", e);
         ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
             .err()
             .unwrap()
@@ -196,6 +183,11 @@ pub fn caml_pasta_fq_plonk_verifier_index_write(
 pub fn caml_pasta_fq_plonk_verifier_index_create(
     index: CamlPastaFqPlonkIndexPtr,
 ) -> CamlPastaFqPlonkVerifierIndex {
+    {
+        let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+            unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
+        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
+    }
     let verifier_index = index.as_ref().0.verifier_index();
     verifier_index.into()
 }
@@ -244,6 +236,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
             chacha_comm: None,
         },
         shifts: (0..PERMUTS - 1).map(|_| Fq::one().into()).collect(),
+        linearization: Linearization::<Vec<PolishToken<Fq>>>::default().into(),
     }
 }
 

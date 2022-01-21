@@ -1,6 +1,7 @@
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
 use wires_15_stubs::{
+    alphas,
     // we must import all here, to have access to the derived functions
     arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
     field_vector::{fp::*, fq::*},
@@ -16,17 +17,21 @@ use wires_15_stubs::{
     projective::{pallas::*, vesta::*},
     srs::{fp::*, fq::*},
     CamlCircuitGate,
+    CamlColumn,
+    CamlLinearization,
     CamlLookupEvaluations,
     CamlOpeningProof,
+    CamlPolishToken,
     CamlPolyComm,
     CamlProofEvaluations,
     CamlProverCommitments,
     CamlProverProof,
     CamlRandomOracles,
     CamlScalarChallenge,
+    CamlVariable,
     CamlWire,
+    CurrOrNext,
     GateType,
-    alphas,
 };
 
 fn main() {
@@ -156,6 +161,7 @@ fn generate_bindings(mut w: impl std::io::Write) {
             decl_func!(w, env, caml_fp_vector_length => "length");
             decl_func!(w, env, caml_fp_vector_emplace_back => "emplace_back");
             decl_func!(w, env, caml_fp_vector_get => "get");
+            decl_func!(w, env, caml_fp_vector_set => "set");
         });
 
         decl_module!(w, env, "Fq", {
@@ -166,6 +172,7 @@ fn generate_bindings(mut w: impl std::io::Write) {
             decl_func!(w, env, caml_fq_vector_length => "length");
             decl_func!(w, env, caml_fq_vector_emplace_back => "emplace_back");
             decl_func!(w, env, caml_fq_vector_get => "get");
+            decl_func!(w, env, caml_fq_vector_set => "set");
         });
     });
 
@@ -244,6 +251,12 @@ fn generate_bindings(mut w: impl std::io::Write) {
         decl_type!(w, env, CamlWire => "wire");
         decl_type!(w, env, GateType => "gate_type");
         decl_type!(w, env, CamlCircuitGate<T1> => "circuit_gate");
+
+        decl_type!(w, env, CurrOrNext => "curr_or_next");
+        decl_type!(w, env, CamlColumn => "column");
+        decl_type!(w, env, CamlVariable => "variable");
+        decl_type!(w, env, CamlPolishToken<T1> => "polish_token");
+        decl_type!(w, env, CamlLinearization<T1> => "linearization");
 
         decl_type!(w, env, CamlOracles<T1> => "oracles");
 

@@ -65,6 +65,9 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
     let name = "transition frontier controller pipe" in
     create_bufferred_pipe ~name
       ~f:(fun head ->
+        Mina_metrics.(
+          Counter.inc_one
+            Pipe.Drop_on_overflow.router_transition_frontier_controller) ;
         Mina_transition.External_transition.Initial_validated
         .handle_dropped_transition
           (Network_peer.Envelope.Incoming.data head)
@@ -105,6 +108,8 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
     let name = "bootstrap controller pipe" in
     create_bufferred_pipe ~name
       ~f:(fun head ->
+        Mina_metrics.(
+          Counter.inc_one Pipe.Drop_on_overflow.router_bootstrap_controller) ;
         Mina_transition.External_transition.Initial_validated
         .handle_dropped_transition
           (Network_peer.Envelope.Incoming.data head)
@@ -258,6 +263,9 @@ let load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
       None
   | Error (`Failure e) ->
       failwith ("failed to initialize transition frontier: " ^ e)
+  | Error `Snarked_ledger_mismatch ->
+      [%log warn] "Persistent database is out of sync with snarked_ledger" ;
+      None
 
 let wait_for_high_connectivity ~logger ~network ~is_seed =
   let connectivity_time_upperbound = 60.0 in
@@ -280,7 +288,7 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
                 [ ( "max seconds to wait for high connectivity"
                   , `Float connectivity_time_upperbound )
                 ]
-              "Will start initialization without connecting with too any peers"
+              "Will start initialization without connecting to any peers"
           else (
             [%log error]
               "Failed to find any peers during initialization (crashing \
@@ -293,8 +301,7 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
               ; ( "max seconds to wait for high connectivity"
                 , `Float connectivity_time_upperbound )
               ]
-            "Will start initialization without connecting with too many peers"
-      )
+            "Will start initialization without connecting to too many peers" )
     ]
 
 let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
@@ -472,6 +479,8 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     let name = "verified transitions" in
     create_bufferred_pipe ~name
       ~f:(fun (`Transition head, _) ->
+        Mina_metrics.(
+          Counter.inc_one Pipe.Drop_on_overflow.router_verified_transitions) ;
         Mina_transition.External_transition.Validated.handle_dropped_transition
           head ~pipe_name:name ~logger)
       ()
@@ -480,6 +489,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     let name = "transition pipe" in
     create_bufferred_pipe ~name
       ~f:(fun head ->
+        Mina_metrics.(Counter.inc_one Pipe.Drop_on_overflow.router_transitions) ;
         Mina_transition.External_transition.Initial_validated
         .handle_dropped_transition
           (Network_peer.Envelope.Incoming.data head)
@@ -503,6 +513,8 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
         let name = "valid transitions" in
         create_bufferred_pipe ~name
           ~f:(fun head ->
+            Mina_metrics.(
+              Counter.inc_one Pipe.Drop_on_overflow.router_valid_transitions) ;
             Mina_transition.External_transition.Initial_validated
             .handle_dropped_transition
               (Network_peer.Envelope.Incoming.data head)

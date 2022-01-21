@@ -136,6 +136,12 @@ let setup_daemon logger =
         "PORT metrics server for scraping via Prometheus (default no \
          metrics-server)"
       (optional int16)
+  and gc_stat_interval =
+    flag "--gc-stat-interval" ~aliases:[ "gc-stat-interval" ] (optional float)
+      ~doc:
+        (sprintf
+           "INTERVAL in mins for collecting GC stats for metrics (Default: %f)"
+           !Mina_metrics.Runtime.gc_stat_interval_mins)
   and libp2p_metrics_port =
     flag "--libp2p-metrics-port" ~aliases:[ "libp2p-metrics-port" ]
       ~doc:
@@ -250,6 +256,14 @@ let setup_daemon logger =
         "true|false Help keep the mesh connected when closing connections \
          (default: true)"
       (optional_with_default true bool)
+  and min_connections =
+    flag "--min-connections" ~aliases:[ "min-connections" ]
+      ~doc:
+        (Printf.sprintf
+           "NN min number of connections that this peer will have to neighbors \
+            in the gossip network (default: %d)"
+           Cli_lib.Default.min_connections)
+      (optional int)
   and max_connections =
     flag "--max-connections" ~aliases:[ "max-connections" ]
       ~doc:
@@ -333,7 +347,10 @@ let setup_daemon logger =
   and proof_level =
     flag "--proof-level" ~aliases:[ "proof-level" ]
       (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
-      ~doc:"full|check|none"
+      ~doc:
+        "full|check|none Internal, for testing. Start or connect to a network \
+         with full proving (full), snark-testing with dummy proofs (check), or \
+         dummy proofs (none)"
   and plugins = plugin_flag
   and precomputed_blocks_path =
     flag "--precomputed-blocks-file"
@@ -354,6 +371,14 @@ let setup_daemon logger =
          included as long as the required snark work is available and can be \
          paid for)"
       (optional txn_amount)
+  and stop_time =
+    flag "--stop-time" ~aliases:[ "stop-time" ] (optional int)
+      ~doc:
+        (sprintf
+           "UPTIME in hours after which the daemon stops itself (only if there \
+            were no slots won within an hour after the stop time) (Default: \
+            %d)"
+           Cli_lib.Default.stop_time)
   and upload_blocks_to_gcloud =
     flag "--upload-blocks-to-gcloud"
       ~aliases:[ "upload-blocks-to-gcloud" ]
@@ -369,6 +394,27 @@ let setup_daemon logger =
       ~doc:
         "true|false whether to track the set of all peers ever seen for the \
          all_peers metric (default: false)"
+  and node_status_url =
+    flag "--node-status-url" ~aliases:[ "node-status-url" ] (optional string)
+      ~doc:"URL of the node status collection service"
+  and uptime_url_string =
+    flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
+      ~doc:"URL URL of the uptime service of the Mina delegation program"
+  and uptime_submitter_key =
+    flag "--uptime-submitter-key" ~aliases:[ "uptime-submitter-key" ]
+      ~doc:
+        "KEYFILE Private key file for the uptime submitter. You cannot provide \
+         both `uptime-submitter-key` and `uptime-submitter-pubkey`."
+      (optional string)
+  and uptime_submitter_pubkey =
+    flag "--uptime-submitter-pubkey"
+      ~aliases:[ "uptime-submitter-pubkey" ]
+      (optional string)
+      ~doc:
+        "PUBLICKEY Public key of the submitter to the Mina delegation program, \
+         for the associated private key that is being tracked by this daemon. \
+         You cannot provide both `uptime-submitter-key` and \
+         `uptime-submitter-pubkey`."
   in
   fun () ->
     let open Deferred.Let_syntax in
@@ -414,7 +460,7 @@ let setup_daemon logger =
       ]
     in
     [%log info]
-      "Coda daemon is booting up; built with commit $commit on branch $branch"
+      "Mina daemon is booting up; built with commit $commit on branch $branch"
       ~metadata:version_metadata ;
     let%bind () = Mina_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir in
     if not @@ String.equal daemon_expiry "never" then (
@@ -460,8 +506,8 @@ let setup_daemon logger =
           | None ->
               return None
           | Some s ->
-              Secrets.Libp2p_keypair.Terminal_stdin.read_from_env_exn ~logger
-                ~which:"libp2p keypair" s
+              Secrets.Libp2p_keypair.Terminal_stdin.read_exn
+                ~should_prompt_user:false ~which:"libp2p keypair" s
               |> Deferred.map ~f:Option.some )
     in
     let%bind () =
@@ -548,18 +594,10 @@ let setup_daemon logger =
         (conf_dir ^/ "daemon.json", `May_be_missing)
       in
       let config_file_envvar =
-        (* TODO: remove deprecated variable, eventually *)
-        let mina_config_file = "MINA_CONFIG_FILE" in
-        let coda_config_file = "CODA_CONFIG_FILE" in
-        match (Sys.getenv mina_config_file, Sys.getenv coda_config_file) with
-        | Some config_file, _ ->
+        match Sys.getenv "MINA_CONFIG_FILE" with
+        | Some config_file ->
             Some (config_file, `Must_exist)
-        | None, Some config_file ->
-            [%log warn]
-              "Using deprecated environment variable %s, please use %s instead"
-              coda_config_file mina_config_file ;
-            Some (config_file, `Must_exist)
-        | None, None ->
+        | None ->
             None
       in
       let config_files =
@@ -695,6 +733,11 @@ let setup_daemon logger =
         or_from_config json_to_currency_fee_option "snark-worker-fee"
           ~default:Mina_compile_config.default_snark_worker_fee snark_work_fee
       in
+      let node_status_url =
+        maybe_from_config YJ.Util.to_string_option "node-status-url"
+          node_status_url
+      in
+
       (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
       let _max_concurrent_connections =
         (*if
@@ -817,18 +860,18 @@ let setup_daemon logger =
             Deferred.return None
         | Some sk_file, _ ->
             let%map kp =
-              Secrets.Keypair.Terminal_stdin.read_from_env_exn ~logger
+              Secrets.Keypair.Terminal_stdin.read_exn ~should_prompt_user:false
                 ~which:"block producer keypair" sk_file
             in
             Some kp
         | _, Some tracked_pubkey ->
-            let%bind wallets =
-              Secrets.Wallets.load ~logger ~disk_location:(conf_dir ^/ "wallets")
-            in
-            let sk_file = Secrets.Wallets.get_path wallets tracked_pubkey in
             let%map kp =
-              Secrets.Keypair.Terminal_stdin.read_from_env_exn ~logger
-                ~which:"block producer keypair" sk_file
+              Secrets.Wallets.get_tracked_keypair ~logger
+                ~which:"block producer keypair"
+                ~read_from_env_exn:
+                  (Secrets.Keypair.Terminal_stdin.read_exn
+                     ~should_prompt_user:false ~should_reask:false)
+                ~conf_dir tracked_pubkey
             in
             Some kp
       in
@@ -839,9 +882,7 @@ let setup_daemon logger =
         >>| Or_error.ok
       in
       let client_trustlist =
-        (* TODO: remove deprecated var, eventually *)
         let mina_client_trustlist = "MINA_CLIENT_TRUSTLIST" in
-        let coda_client_trustlist = "CODA_CLIENT_TRUSTLIST" in
         let cidrs_of_env_str env_str env_var =
           let cidrs =
             String.split ~on:',' env_str
@@ -855,17 +896,10 @@ let setup_daemon logger =
           in
           Some (List.append cidrs (Option.value ~default:[] client_trustlist))
         in
-        match
-          (Unix.getenv mina_client_trustlist, Unix.getenv coda_client_trustlist)
-        with
-        | Some env_str, _ ->
+        match Unix.getenv mina_client_trustlist with
+        | Some env_str ->
             cidrs_of_env_str env_str mina_client_trustlist
-        | None, Some env_str ->
-            [%log warn]
-              "Using deprecated environment variable %s, please use %s instead"
-              coda_client_trustlist mina_client_trustlist ;
-            cidrs_of_env_str env_str coda_client_trustlist
-        | None, None ->
+        | None ->
             client_trustlist
       in
       Stream.iter
@@ -955,7 +989,7 @@ let setup_daemon logger =
                   Reader.file_contents file)
             with
             | Ok contents ->
-                return (Mina_net2.Multiaddr.of_file_contents ~contents)
+                return (Mina_net2.Multiaddr.of_file_contents contents)
             | Error _ ->
                 Mina_user_error.raisef ~where:"reading libp2p peer address file"
                   "The file %s could not be read.\n\n\
@@ -983,6 +1017,10 @@ let setup_daemon logger =
       let direct_peers =
         List.map ~f:Mina_net2.Multiaddr.of_string direct_peers_raw
       in
+      let min_connections =
+        or_from_config YJ.Util.to_int_option "min-connections"
+          ~default:Cli_lib.Default.min_connections min_connections
+      in
       let max_connections =
         or_from_config YJ.Util.to_int_option "max-connections"
           ~default:Cli_lib.Default.max_connections max_connections
@@ -990,6 +1028,10 @@ let setup_daemon logger =
       let validation_queue_size =
         or_from_config YJ.Util.to_int_option "validation-queue-size"
           ~default:Cli_lib.Default.validation_queue_size validation_queue_size
+      in
+      let stop_time =
+        or_from_config YJ.Util.to_int_option "stop-time"
+          ~default:Cli_lib.Default.stop_time stop_time
       in
       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
       let seed_peer_list_url =
@@ -1022,12 +1064,13 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           ; seed_peer_list_url = Option.map seed_peer_list_url ~f:Uri.of_string
           ; initial_peers
           ; addrs_and_ports
-          ; metrics_port = Option.map libp2p_metrics_port ~f:Int.to_string
+          ; metrics_port = libp2p_metrics_port
           ; trust_system
           ; flooding = Option.value ~default:false enable_flooding
           ; direct_peers
           ; mina_peer_exchange
           ; peer_exchange = Option.value ~default:false peer_exchange
+          ; min_connections
           ; max_connections
           ; validation_queue_size
           ; isolate = Option.value ~default:false isolate
@@ -1063,6 +1106,62 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
           proposed_protocol_version
       in
+      ( match
+          (uptime_url_string, uptime_submitter_key, uptime_submitter_pubkey)
+        with
+      | Some _, Some _, None | Some _, None, Some _ | None, None, None ->
+          ()
+      | _ ->
+          Mina_user_error.raise
+            "Must provide both --uptime-url and exactly one of \
+             --uptime-submitter-key or --uptime-submitter-pubkey" ) ;
+      let uptime_url =
+        Option.map uptime_url_string ~f:(fun s -> Uri.of_string s)
+      in
+      let uptime_submitter_opt =
+        Option.map uptime_submitter_pubkey ~f:(fun s ->
+            match Public_key.Compressed.of_base58_check s with
+            | Ok pk -> (
+                match Public_key.decompress pk with
+                | Some _ ->
+                    pk
+                | None ->
+                    failwithf
+                      "Invalid public key %s for uptime submitter (could not \
+                       decompress)"
+                      s () )
+            | Error err ->
+                Mina_user_error.raisef
+                  "Invalid public key %s for uptime submitter, %s" s
+                  (Error.to_string_hum err) ())
+      in
+      let%bind uptime_submitter_keypair =
+        match (uptime_submitter_key, uptime_submitter_opt) with
+        | None, None ->
+            return None
+        | None, Some pk ->
+            let%map kp =
+              Secrets.Wallets.get_tracked_keypair ~logger
+                ~which:"uptime submitter keypair"
+                ~read_from_env_exn:
+                  (Secrets.Uptime_keypair.Terminal_stdin.read_exn
+                     ~should_prompt_user:false ~should_reask:false)
+                ~conf_dir pk
+            in
+            Some kp
+        | Some sk_file, None ->
+            let%map kp =
+              Secrets.Uptime_keypair.Terminal_stdin.read_exn
+                ~should_prompt_user:false ~should_reask:false
+                ~which:"uptime submitter keypair" sk_file
+            in
+            Some kp
+        | _ ->
+            (* unreachable, because of earlier check *)
+            failwith
+              "Cannot provide both uptime submitter public key and uptime \
+               submitter keyfile"
+      in
       let start_time = Time.now () in
       let%map coda =
         Mina_lib.create ~wallets
@@ -1090,7 +1189,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
              ~consensus_local_state ~is_archive_rocksdb ~work_reassignment_wait
              ~archive_process_location ~log_block_creation ~precomputed_values
              ~start_time ?precomputed_blocks_path ~log_precomputed_blocks
-             ~upload_blocks_to_gcloud ~block_reward_threshold ())
+             ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
+             ~uptime_submitter_keypair ~stop_time ~node_status_url ())
       in
       { Coda_initialization.coda
       ; client_trustlist
@@ -1127,6 +1227,9 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                 Uri.with_uri ~scheme:(Some "http") ~host:(Some "127.0.0.1")
                   ~port:(Some port) ~path:(Some "/metrics") Uri.empty)
           in
+          Mina_metrics.Runtime.(
+            gc_stat_interval_mins :=
+              Option.value ~default:!gc_stat_interval_mins gc_stat_interval) ;
           Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore)
       |> Option.value ~default:Deferred.unit
     in

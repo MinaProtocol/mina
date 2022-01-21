@@ -480,8 +480,8 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
           ~f:(fun { global_slot; state_hash; ledger_hash; _ } ->
             Hashtbl.add_exn global_slot_hashes_tbl ~key:global_slot
               ~data:
-                ( State_hash.of_string state_hash
-                , Ledger_hash.of_string ledger_hash )) ;
+                ( State_hash.of_base58_check_exn state_hash
+                , Ledger_hash.of_base58_check_exn ledger_hash )) ;
         Int.Set.of_list ids
       in
       (* check that genesis block is in chain to target hash

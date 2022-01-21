@@ -174,6 +174,11 @@ let to_yojson =
            ( state
            , (State_hash.Set.length hashes, State_hash.Set.to_list hashes) ) )
 
+let to_node_status_report =
+  fun (t : t) ->
+    List.map (Hashtbl.to_alist t.states) ~f:(fun (state, hashes) ->
+      ( state, State_hash.Set.length hashes))
+
 let max_catchup_chain_length (t : t) =
   (* Find the longest directed path *)
   let lengths = State_hash.Table.create () in
@@ -289,7 +294,7 @@ let apply_diffs (t : t) (ds : Diff.Full.E.t list) =
   List.iter ds ~f:(function
     | E (New_node (Full b)) ->
         breadcrumb_added t b
-    | E (Root_transitioned {new_root; garbage= Full hs}) ->
+    | E (Root_transitioned {new_root; garbage= Full hs; _}) ->
         List.iter (Diff.Node_list.to_lite hs) ~f:(remove_node t) ;
         let h = Root_data.Limited.hash new_root in
         if Hashtbl.mem t.nodes h then prune t ~root_hash:h

@@ -48,12 +48,13 @@ module Inputs = struct
     let worker_wait_time = 5.
   end
 
+  (* bin_io is for uptime service SNARK worker *)
   type single_spec =
-    ( Transaction.t
-    , Transaction_witness.t
-    , Transaction_snark.t )
-    Snark_work_lib.Work.Single.Spec.t
-  [@@deriving sexp]
+    ( Transaction.Stable.Latest.t
+    , Transaction_witness.Stable.Latest.t
+    , Transaction_snark.Stable.Latest.t )
+    Snark_work_lib.Work.Single.Spec.Stable.Latest.t
+  [@@deriving bin_io_unversioned, sexp]
 
   let perform_single ({ m; cache; proof_level } : Worker_state.t) ~message =
     let open Deferred.Or_error.Let_syntax in
@@ -105,20 +106,16 @@ module Inputs = struct
                             | None ->
                                 Or_error.errorf
                                   "Command has an invalid signature" )
-                        | Command (Snapp_command cmd) ->
-                            Ok (Command (Snapp_command cmd))
+                        | Command (Parties _) ->
+                            failwith "TODO"
                         | Fee_transfer ft ->
                             Ok (Fee_transfer ft)
                         | Coinbase cb ->
                             Ok (Coinbase cb)
                       in
-                      let snapp_account1, snapp_account2 =
-                        Sparse_ledger.snapp_accounts w.ledger
-                          (Transaction.forget t)
-                      in
                       Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                          M.of_transaction ~sok_digest ~snapp_account1
-                            ~snapp_account2
+                          M.of_transaction ~sok_digest ~snapp_account1:None
+                            ~snapp_account2:None
                             ~source:input.Transaction_snark.Statement.source
                             ~target:input.target
                             { Transaction_protocol_state.Poly.transaction = t

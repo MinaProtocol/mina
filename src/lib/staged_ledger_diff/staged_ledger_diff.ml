@@ -132,10 +132,10 @@ module Pre_diff_with_at_most_two_coinbase = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
-        ( Transaction_snark_work.Stable.V1.t
-        , User_command.Stable.V1.t With_status.Stable.V1.t )
+        ( Transaction_snark_work.Stable.V2.t
+        , User_command.Stable.V2.t With_status.Stable.V1.t )
         Pre_diff_two.Stable.V1.t
       [@@deriving compare, sexp, yojson]
 
@@ -151,10 +151,10 @@ module Pre_diff_with_at_most_one_coinbase = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
-        ( Transaction_snark_work.Stable.V1.t
-        , User_command.Stable.V1.t With_status.Stable.V1.t )
+        ( Transaction_snark_work.Stable.V2.t
+        , User_command.Stable.V2.t With_status.Stable.V1.t )
         Pre_diff_one.Stable.V1.t
       [@@deriving compare, sexp, yojson]
 
@@ -170,10 +170,10 @@ module Diff = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
-        Pre_diff_with_at_most_two_coinbase.Stable.V1.t
-        * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
+        Pre_diff_with_at_most_two_coinbase.Stable.V2.t
+        * Pre_diff_with_at_most_one_coinbase.Stable.V2.t option
       [@@deriving compare, sexp, yojson]
 
       let to_latest = Fn.id
@@ -187,8 +187,8 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V1 = struct
-    type t = { diff : Diff.Stable.V1.t } [@@deriving compare, sexp, yojson]
+  module V2 = struct
+    type t = { diff : Diff.Stable.V2.t } [@@deriving compare, sexp, yojson]
 
     let to_latest = Fn.id
   end

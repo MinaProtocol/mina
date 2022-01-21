@@ -35,6 +35,11 @@ pub fn caml_pasta_fq_plonk_proof_create(
     prev_challenges: Vec<CamlFq>,
     prev_sgs: Vec<CamlGPallas>,
 ) -> CamlProverProof<CamlGPallas, CamlFq> {
+    {
+        let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+            unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
+        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
+    }
     let prev: Vec<(Vec<Fq>, PolyComm<GAffine>)> = {
         if prev_challenges.is_empty() {
             Vec::new()
@@ -67,6 +72,8 @@ pub fn caml_pasta_fq_plonk_proof_create(
     let index: &Index<GAffine> = &index.as_ref().0;
 
     // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
+    // TODO: There's actually a way to get a handle to the runtime as a function argument. Switch
+    // to doing this instead.
     let runtime = unsafe { ocaml::Runtime::recover_handle() };
 
     // Release the runtime lock so that other threads can run using it while we generate the proof.

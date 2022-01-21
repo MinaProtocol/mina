@@ -21,7 +21,20 @@ end
 module Input = Random_oracle_input
 
 let params : Field.t Sponge.Params.t =
-  Sponge.Params.(map pasta_p ~f:Field.of_string)
+  Sponge.Params.(map pasta_p_3 ~f:Field.of_string)
+
+module Operations = struct
+  let add_assign ~state i x = Field.(state.(i) <- state.(i) + x)
+
+  let apply_affine_map (matrix, constants) v =
+    let dotv row =
+      Array.reduce_exn (Array.map2_exn row v ~f:Field.( * )) ~f:Field.( + )
+    in
+    let res = Array.map matrix ~f:dotv in
+    Array.map2_exn res constants ~f:Field.( + )
+
+  let copy a = Array.map a ~f:Fn.id
+end
 
 [%%ifdef consensus_mechanism]
 
@@ -32,34 +45,18 @@ module Inputs = Pickles.Tick_field_sponge.Inputs
 module Inputs = struct
   module Field = Field
 
-  let rounds_full = 63
+  let rounds_full = 55
 
-  let initial_ark = true
+  let initial_ark = false
 
   let rounds_partial = 0
 
-  (* Computes x^5 *)
+  (* Computes x^7 *)
   let to_the_alpha x =
     let open Field in
-    let res = x in
-    let res = res * res in
-    (* x^2 *)
-    let res = res * res in
-    (* x^4 *)
-    res * x
+    square (square x * x) * x
 
-  module Operations = struct
-    let add_assign ~state i x = Field.(state.(i) <- state.(i) + x)
-
-    let apply_affine_map (matrix, constants) v =
-      let dotv row =
-        Array.reduce_exn (Array.map2_exn row v ~f:Field.( * )) ~f:Field.( + )
-      in
-      let res = Array.map matrix ~f:dotv in
-      Array.map2_exn res constants ~f:Field.( + )
-
-    let copy a = Array.map a ~f:Fn.id
-  end
+  module Operations = Operations
 end
 
 [%%endif]
@@ -77,7 +74,33 @@ module Digest = struct
         List.take (unpack x) length
 end
 
-include Sponge.Make_hash (Sponge.Poseidon (Inputs))
+module Ocaml_permutation = Sponge.Poseidon (Inputs)
+
+[%%ifdef consensus_mechanism]
+
+module Permutation : Sponge.Intf.Permutation with module Field = Field = struct
+  module Field = Field
+
+  let add_assign = Ocaml_permutation.add_assign
+
+  let copy = Ocaml_permutation.copy
+
+  let params = Kimchi_pasta_fp_poseidon.create ()
+
+  let block_cipher _params (s : Field.t array) =
+    let v = Kimchi.FieldVectors.Fp.create () in
+    Array.iter s ~f:(Kimchi.FieldVectors.Fp.emplace_back v) ;
+    Kimchi_pasta_fp_poseidon.block_cipher params v ;
+    Array.init (Array.length s) ~f:(Kimchi.FieldVectors.Fp.get v)
+end
+
+[%%else]
+
+module Permutation = Ocaml_permutation
+
+[%%endif]
+
+include Sponge.Make_hash (Permutation)
 
 let update ~state = update ~state params
 
@@ -152,4 +175,111 @@ let%test_unit "sponge checked-unchecked" =
     (fun (x, y) -> hash [| x; y |])
     (x, y)
 
+let%test_unit "check rust implementation of block-cipher" =
+  let open Pickles.Impls.Step in
+  let module T = Internal_Basic in
+  Quickcheck.test (Quickcheck.Generator.list_with_length 3 T.Field.gen)
+    ~f:(fun s ->
+      let s () = Array.of_list s in
+      [%test_eq: T.Field.t array]
+        (Ocaml_permutation.block_cipher params (s ()))
+        (Permutation.block_cipher params (s ())))
+
 [%%endif]
+
+module Legacy = struct
+  let params : Field.t Sponge.Params.t =
+    Sponge.Params.(map pasta_p ~f:Field.of_string)
+
+  module Rounds = struct
+    let rounds_full = 63
+
+    let initial_ark = true
+
+    let rounds_partial = 0
+  end
+
+  module Inputs = struct
+    module Field = Field
+    include Rounds
+
+    (* Computes x^5 *)
+    let to_the_alpha x =
+      let open Field in
+      let res = x in
+      let res = res * res in
+      (* x^2 *)
+      let res = res * res in
+      (* x^4 *)
+      res * x
+
+    module Operations = Operations
+  end
+
+  include Sponge.Make_hash (Sponge.Poseidon (Inputs))
+
+  let hash ?init = hash ?init params
+
+  let update ~state = update ~state params
+
+  let salt (s : string) = update ~state:initial_state [| prefix_to_field s |]
+
+  let pack_input = pack_input
+
+  module Digest = Digest
+
+  [%%ifdef consensus_mechanism]
+
+  module Checked = struct
+    let pack_input = Checked.pack_input
+
+    module Digest = Checked.Digest
+
+    module Inputs = struct
+      include Rounds
+      module Impl = Pickles.Impls.Step
+      open Impl
+      module Field = Field
+
+      (* Computes x^5 *)
+      let to_the_alpha x =
+        let open Field in
+        let res = x in
+        let res = res * res in
+        (* x^2 *)
+        let res = res * res in
+        (* x^4 *)
+        res * x
+
+      module Operations = struct
+        open Field
+
+        let seal = Pickles.Util.seal (module Impl)
+
+        let add_assign ~state i x = state.(i) <- seal (state.(i) + x)
+
+        let apply_affine_map (matrix, constants) v =
+          let dotv row =
+            Array.reduce_exn (Array.map2_exn row v ~f:( * )) ~f:( + )
+          in
+          let res = Array.map matrix ~f:dotv in
+          Array.map2_exn res constants ~f:(fun x c -> seal (x + c))
+
+        let copy a = Array.map a ~f:Fn.id
+      end
+    end
+
+    include Sponge.Make_hash (Sponge.Poseidon (Inputs))
+
+    let params = Sponge.Params.map ~f:Inputs.Field.constant params
+
+    open Inputs.Field
+
+    let update ~state xs = update params ~state xs
+
+    let hash ?init xs =
+      hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs
+  end
+
+  [%%endif]
+end

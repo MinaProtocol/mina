@@ -1,5 +1,6 @@
 open Core
 open Signature_lib
+open Transaction_logic
 
 module Location : Merkle_ledger.Location_intf.S
 
@@ -100,88 +101,8 @@ val register_mask : t -> Mask.t -> Mask.Attached.t
 
 val commit : Mask.Attached.t -> unit
 
-module Transaction_applied : sig
-  open Transaction_logic
-
-  module Signed_command_applied : sig
-    module Common : sig
-      type t = Transaction_applied.Signed_command_applied.Common.t =
-        { user_command : Signed_command.t With_status.t
-        ; previous_receipt_chain_hash : Receipt.Chain_hash.t
-        ; fee_payer_timing : Account.Timing.t
-        ; source_timing : Account.Timing.t option
-        }
-      [@@deriving sexp]
-    end
-
-    module Body : sig
-      type t = Transaction_applied.Signed_command_applied.Body.t =
-        | Payment of { previous_empty_accounts : Account_id.t list }
-        | Stake_delegation of
-            { previous_delegate : Public_key.Compressed.t option }
-        | Create_new_token of { created_token : Token_id.t }
-        | Create_token_account
-        | Mint_tokens
-        | Failed
-      [@@deriving sexp]
-    end
-
-    type t = Transaction_applied.Signed_command_applied.t =
-      { common : Common.t; body : Body.t }
-    [@@deriving sexp]
-  end
-
-  module Snapp_command_applied : sig
-    type t = Transaction_applied.Snapp_command_applied.t =
-      { accounts : (Account_id.t * Account.t option) list
-      ; command : Snapp_command.t With_status.t
-      }
-    [@@deriving sexp]
-  end
-
-  module Command_applied : sig
-    type t = Transaction_applied.Command_applied.t =
-      | Signed_command of Signed_command_applied.t
-      | Snapp_command of Snapp_command_applied.t
-    [@@deriving sexp]
-  end
-
-  module Fee_transfer_applied : sig
-    type t = Transaction_applied.Fee_transfer_applied.t =
-      { fee_transfer : Fee_transfer.t
-      ; previous_empty_accounts : Account_id.t list
-      ; receiver_timing : Account.Timing.t
-      ; balances : Transaction_status.Fee_transfer_balance_data.t
-      }
-    [@@deriving sexp]
-  end
-
-  module Coinbase_applied : sig
-    type t = Transaction_applied.Coinbase_applied.t =
-      { coinbase : Coinbase.t
-      ; previous_empty_accounts : Account_id.t list
-      ; receiver_timing : Account.Timing.t
-      ; balances : Transaction_status.Coinbase_balance_data.t
-      }
-    [@@deriving sexp]
-  end
-
-  module Varying : sig
-    type t = Transaction_applied.Varying.t =
-      | Command of Command_applied.t
-      | Fee_transfer of Fee_transfer_applied.t
-      | Coinbase of Coinbase_applied.t
-    [@@deriving sexp]
-  end
-
-  type t = Transaction_applied.t =
-    { previous_hash : Ledger_hash.t; varying : Varying.t }
-  [@@deriving sexp]
-
-  val transaction : t -> Transaction.t With_status.t
-
-  val user_command_status : t -> Transaction_status.t
-end
+val unsafe_create_account :
+  t -> Account_id.t -> Account.t -> Location.t Or_error.t
 
 (** Raises if the ledger is full, or if an account already exists for the given
     [Account_id.t].
@@ -216,6 +137,22 @@ val apply_transaction :
   -> Transaction.t
   -> Transaction_applied.t Or_error.t
 
+val apply_parties_unchecked :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> state_view:Snapp_predicate.Protocol_state.View.t
+  -> t
+  -> Parties.t
+  -> ( Transaction_applied.Parties_applied.t
+     * ( ( Party.t list
+         , Token_id.t
+         , Currency.Amount.t
+         , t
+         , bool
+         , unit )
+         Parties_logic.Local_state.t
+       * Currency.Amount.t ) )
+     Or_error.t
+
 val undo :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
@@ -228,11 +165,11 @@ val has_locked_tokens :
   -> t
   -> bool Or_error.t
 
-val merkle_root_after_snapp_command_exn :
+val merkle_root_after_parties_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_state_view:Snapp_predicate.Protocol_state.View.t
   -> t
-  -> Snapp_command.Valid.t
+  -> Parties.Valid.t
   -> Ledger_hash.t * [ `Next_available_token of Token_id.t ]
 
 val merkle_root_after_user_command_exn :
@@ -268,3 +205,5 @@ type init_state =
 
 (** Apply a generated state to a blank, concrete ledger. *)
 val apply_initial_ledger_state : t -> init_state -> unit
+
+module Ledger_inner : Transaction_logic.Ledger_intf with type t = t

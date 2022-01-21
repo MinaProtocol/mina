@@ -39,7 +39,7 @@ module R1CS_constraint_system =
     (struct
       let params =
         Sponge.Params.(
-          map pasta_q ~f:(fun x ->
+          map pasta_q_3 ~f:(fun x ->
               Field.of_bigint (Bigint256.of_decimal_string x)))
     end)
 
@@ -101,9 +101,8 @@ module Proof = Plonk_dlog_proof.Make (struct
 
     let batch_verify =
       with_lagranges (fun lgrs vks ts ->
-          Async.In_thread.run (fun () -> batch_verify lgrs vks ts))
+          Run_in_thread.run_in_thread (fun () -> batch_verify lgrs vks ts))
 
-    (** auxiliary is the witness, primary is not used *)
     let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
         prev_comms =
       (* external values contains [1, primary..., auxiliary ] *)
@@ -134,7 +133,7 @@ module Proof = Plonk_dlog_proof.Make (struct
     let create_async (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
       create_aux pk primary auxiliary prev_chals prev_comms
         ~f:(fun pk auxiliary_input prev_challenges prev_sgs ->
-          Async.In_thread.run (fun () ->
+          Run_in_thread.run_in_thread (fun () ->
               create pk auxiliary_input prev_challenges prev_sgs))
 
     let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =

@@ -32,7 +32,7 @@ variable "artifact_path" {
 
 variable "mina_image" {
   type    = string
-  default = "codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"
+  default = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet"
 }
 
 variable "mina_archive_image" {
@@ -63,6 +63,11 @@ variable "mina_bots_image" {
 variable "mina_points_image" {
   type    = string
   default = ""
+}
+
+variable "use_embedded_runtime_config" {
+  type    = bool
+  default = false
 }
 
 variable "watchdog_image" {
@@ -121,6 +126,11 @@ variable "whales" {
 variable "fishes" {
   description = "individual fish block producer node deployment configurations"
   default = null
+}
+
+variable "nodes_with_user_agent" {
+  type = list(string)
+  default = []
 }
 
 variable "seed_count" {
@@ -205,7 +215,7 @@ variable "gcloud_seeds" {
   default = []
 }
 
-# Coda network services vars
+# Mina network services vars
 
 variable "restart_nodes" {
   type    = bool

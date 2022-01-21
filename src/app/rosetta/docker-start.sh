@@ -47,10 +47,11 @@ POSTGRES_USERNAME=${POSTGRES_USERNAME:=pguser}
 POSTGRES_DBNAME=${POSTGRES_DBNAME:=archive}
 POSTGRES_DATA_DIR=${POSTGRES_DATA_DIR:=/data/postgresql}
 PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${POSTGRES_DBNAME}
+DUMP_TIME=${DUMP_TIME:=0000}
 
 # Postgres
 echo "========================= INITIALIZING POSTGRESQL ==========================="
-./init-db.sh ${MINA_NETWORK} ${POSTGRES_DBNAME} ${POSTGRES_USERNAME} ${POSTGRES_DATA_DIR}
+./init-db.sh ${MINA_NETWORK} ${POSTGRES_DBNAME} ${POSTGRES_USERNAME} ${POSTGRES_DATA_DIR} ${DUMP_TIME}
 
 # Rosetta
 echo "========================= STARTING ROSETTA API on PORT ${MINA_ROSETTA_PORT} ==========================="
@@ -90,8 +91,7 @@ MINA_DAEMON_PID=$!
 sleep 30
 
 echo "========================= POPULATING MISSING BLOCKS ==========================="
-# Note: this script takes some time to fail even in the best case (~30 minutes) and we don't start waiting on the other daemons until it completes
-./download-missing-blocks.sh ${MINA_NETWORK} ${POSTGRES_DBNAME} ${POSTGRES_USERNAME}
+./download-missing-blocks.sh ${MINA_NETWORK} ${POSTGRES_DBNAME} ${POSTGRES_USERNAME} &
 
 
 if ! kill -0 "${MINA_DAEMON_PID}"; then

@@ -120,6 +120,8 @@ module Make_base (Inputs : Inputs_intf) :
 
     let merkle_path (T ((module Base), t)) = Base.merkle_path t
 
+    let merkle_path_batch (T ((module Base), t)) = Base.merkle_path_batch t
+
     let merkle_root (T ((module Base), t)) = Base.merkle_root t
 
     let index_of_account_exn (T ((module Base), t)) =
@@ -135,6 +137,8 @@ module Make_base (Inputs : Inputs_intf) :
 
     let get (T ((module Base), t)) = Base.get t
 
+    let get_batch (T ((module Base), t)) = Base.get_batch t
+
     let get_uuid (T ((module Base), t)) = Base.get_uuid t
 
     let get_directory (T ((module Base), t)) = Base.get_directory t
@@ -147,6 +151,9 @@ module Make_base (Inputs : Inputs_intf) :
       Base.get_or_create_account t
 
     let location_of_account (T ((module Base), t)) = Base.location_of_account t
+
+    let location_of_account_batch (T ((module Base), t)) =
+      Base.location_of_account_batch t
 
     let fold_until (T ((module Base), t)) = Base.fold_until t
 

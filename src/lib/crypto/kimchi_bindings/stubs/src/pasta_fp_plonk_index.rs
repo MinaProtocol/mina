@@ -1,6 +1,6 @@
 use crate::{gate_vector::fp::CamlPastaFpPlonkGateVectorPtr, srs::fp::CamlFpSrs};
 use ark_poly::EvaluationDomain;
-use kimchi::index::Index as DlogIndex;
+use kimchi::index::{expr_linearization, Index as DlogIndex};
 use kimchi_circuits::{gate::CircuitGate, nolookup::constraints::ConstraintSystem};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 use serde::{Deserialize, Serialize};
@@ -8,10 +8,6 @@ use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
 };
-
-//
-// CamlPastaFpPlonkIndex (custom type)
-//
 
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
 #[derive(ocaml_gen::CustomType)]
@@ -29,10 +25,6 @@ ocaml::custom!(CamlPastaFpPlonkIndex {
     finalize: caml_pasta_fp_plonk_index_finalize,
 });
 
-//
-// CamlPastaFpPlonkIndex methods
-//
-
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_create(
@@ -40,25 +32,22 @@ pub fn caml_pasta_fp_plonk_index_create(
     public: ocaml::Int,
     srs: CamlFpSrs,
 ) -> Result<CamlPastaFpPlonkIndex, ocaml::Error> {
-    // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
     let gates: Vec<_> = gates
         .as_ref()
         .0
         .iter()
         .map(|gate| CircuitGate::<Fp> {
-            row: gate.row,
             typ: gate.typ,
             wires: gate.wires,
             c: gate.c.clone(),
         })
         .collect();
-    println!("{}:{}", file!(), line!());
 
     // create constraint system
     let cs = match ConstraintSystem::<Fp>::create(
         gates,
         vec![],
-        oracle::pasta::fp::params(),
+        oracle::pasta::fp_3::params(),
         public as usize,
     ) {
         None => {
@@ -70,14 +59,20 @@ pub fn caml_pasta_fp_plonk_index_create(
         }
         Some(cs) => cs,
     };
-    println!("{}:{}", file!(), line!());
 
     // endo
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
 
+    // Unsafe if we are in a multi-core ocaml
+    {
+        let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+            unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+        ptr.add_lagrange_basis(cs.domain.d1);
+    }
+
     // create index
     Ok(CamlPastaFpPlonkIndex(Box::new(
-        DlogIndex::<GAffine>::create(cs, oracle::pasta::fq::params(), endo_q, srs.clone()),
+        DlogIndex::<GAffine>::create(cs, oracle::pasta::fq_3::params(), endo_q, srs.clone()),
     )))
 }
 
@@ -118,7 +113,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     srs: CamlFpSrs,
     path: String,
 ) -> Result<CamlPastaFpPlonkIndex, ocaml::Error> {
-    // read from file
+    // open the file for reading
     let file = match File::open(path) {
         Err(_) => {
             return Err(
@@ -138,11 +133,11 @@ pub fn caml_pasta_fp_plonk_index_read(
 
     // deserialize the index
     let mut t = DlogIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
-    t.cs.fr_sponge_params = oracle::pasta::fp::params();
+    t.cs.fr_sponge_params = oracle::pasta::fp_3::params();
     t.srs = srs.clone();
-    t.fq_sponge_params = oracle::pasta::fq::params();
+    t.fq_sponge_params = oracle::pasta::fq_3::params();
+    t.linearization = expr_linearization(t.cs.domain.d1, false, None);
 
-    //
     Ok(CamlPastaFpPlonkIndex(Box::new(t)))
 }
 

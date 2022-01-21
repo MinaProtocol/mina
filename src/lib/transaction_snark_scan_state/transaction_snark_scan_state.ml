@@ -1,6 +1,8 @@
 open Core_kernel
+open Async
 open Mina_base
 open Currency
+open O1trace
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -32,13 +34,13 @@ end
 module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       (* TODO: The statement is redundant here - it can be computed from the
          witness and the transaction
       *)
       type t =
         { transaction_with_info :
-            Transaction_logic.Transaction_applied.Stable.V1.t
+            Transaction_logic.Transaction_applied.Stable.V2.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
               (* TODO: It's inefficient to store this here. Optimize it someday. *)
         ; state_view : Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
@@ -46,7 +48,7 @@ module Transaction_with_witness = struct
         ; init_stack :
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
-        ; ledger_witness : Mina_base.Sparse_ledger.Stable.V1.t [@sexp.opaque]
+        ; ledger_witness : Mina_base.Sparse_ledger.Stable.V2.t [@sexp.opaque]
         }
       [@@deriving sexp]
 
@@ -58,8 +60,8 @@ end
 module Ledger_proof_with_sok_message = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
+    module V2 = struct
+      type t = Ledger_proof.Stable.V2.t * Sok_message.Stable.V1.t
       [@@deriving sexp]
 
       let to_latest = Fn.id
@@ -146,10 +148,10 @@ type job = Available_job.t [@@deriving sexp]
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      ( Ledger_proof_with_sok_message.Stable.V1.t
-      , Transaction_with_witness.Stable.V1.t )
+      ( Ledger_proof_with_sok_message.Stable.V2.t
+      , Transaction_with_witness.Stable.V2.t )
       Parallel_scan.State.Stable.V1.t
     [@@deriving sexp]
 
@@ -162,8 +164,8 @@ module Stable = struct
     let hash t =
       let state_hash =
         Parallel_scan.State.hash t
-          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V1))
-          (Binable.to_string (module Transaction_with_witness.Stable.V1))
+          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
+          (Binable.to_string (module Transaction_with_witness.Stable.V2))
       in
       Staged_ledger_hash.Aux_hash.of_bytes
         (state_hash |> Digestif.SHA256.to_raw_string)
@@ -191,12 +193,12 @@ let create_expected_statement ~constraint_constants
     Sparse_ledger.next_available_token ledger_witness
   in
   let { With_status.data = transaction; status = _ } =
-    Ledger.Transaction_applied.transaction transaction_with_info
+    Transaction_logic.Transaction_applied.transaction_with_status
+      transaction_with_info
   in
-  let%bind after =
-    Or_error.try_with (fun () ->
-        Sparse_ledger.apply_transaction_exn ~constraint_constants
-          ~txn_state_view:state_view ledger_witness transaction)
+  let%bind after, _ =
+    Sparse_ledger.apply_transaction ~constraint_constants
+      ~txn_state_view:state_view ledger_witness transaction
   in
   let target =
     Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
@@ -293,22 +295,20 @@ module P = struct
   type t = Ledger_proof_with_sok_message.t
 end
 
-module Make_statement_scanner
-    (M : Monad_with_Or_error_intf) (Verifier : sig
-      type t
+module Make_statement_scanner (Verifier : sig
+  type t
 
-      val verify : verifier:t -> P.t list -> bool M.Or_error.t
-    end) =
+  val verify : verifier:t -> P.t list -> bool Deferred.Or_error.t
+end) =
 struct
-  module Fold = Parallel_scan.State.Make_foldable (Monad.Ident)
+  module Fold = Parallel_scan.State.Make_foldable (Deferred)
 
   let logger = lazy (Logger.create ())
 
   let time label f =
     let logger = Lazy.force logger in
-    let open M.Let_syntax in
     let start = Core.Time.now () in
-    let%map x = f () in
+    let%map x = trace_recurring label f in
     [%log debug]
       ~metadata:
         [ ("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))
@@ -367,10 +367,19 @@ struct
   end
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
-  let scan_statement ~constraint_constants tree ~verifier :
-      (Transaction_snark.Statement.t, [ `Error of Error.t | `Empty ]) Result.t
-      M.t =
+  let scan_statement tree ~constraint_constants ~statement_check ~verifier :
+      ( Transaction_snark.Statement.t
+      , [ `Error of Error.t | `Empty ] )
+      Deferred.Result.t =
+    let open Deferred.Or_error.Let_syntax in
     let timer = Timer.create () in
+    let yield_occasionally =
+      let f = Staged.unstage (Async.Scheduler.yield_every ~n:50) in
+      fun () -> f () |> Deferred.map ~f:Or_error.return
+    in
+    let yield_always () =
+      Async.Scheduler.yield () |> Deferred.map ~f:Or_error.return
+    in
     let module Acc = struct
       type t = (Transaction_snark.Statement.t * P.t list) option
     end in
@@ -379,20 +388,20 @@ struct
     in
     let with_error ~f message =
       let result = f () in
-      Result.map_error result ~f:(fun e ->
+      Deferred.Result.map_error result ~f:(fun e ->
           Error.createf !"%s: %{sexp:Error.t}" (write_error message) e)
     in
-    let merge_acc ~proofs (acc : Acc.t) s2 : Acc.t Or_error.t =
-      let open Or_error.Let_syntax in
+    let merge_acc ~proofs (acc : Acc.t) s2 : Acc.t Deferred.Or_error.t =
       Timer.time timer (sprintf "merge_acc:%s" __LOC__) (fun () ->
           with_error "Bad merge proof" ~f:(fun () ->
               match acc with
               | None ->
-                  Ok (Some (s2, proofs))
+                  return (Some (s2, proofs))
               | Some (s1, ps) ->
-                  let%map merged_statement =
-                    Transaction_snark.Statement.merge s1 s2
+                  let%bind merged_statement =
+                    Deferred.return (Transaction_snark.Statement.merge s1 s2)
                   in
+                  let%map () = yield_occasionally () in
                   Some (merged_statement, proofs @ ps)))
     in
     let fold_step_a acc_statement job =
@@ -401,14 +410,14 @@ struct
           let statement = Ledger_proof.statement proof in
           merge_acc ~proofs:[ (proof, message) ] acc_statement statement
       | Empty | Full { status = Parallel_scan.Job_status.Done; _ } ->
-          Or_error.return acc_statement
+          return acc_statement
       | Full { left = proof_1, message_1; right = proof_2, message_2; _ } ->
-          let open Or_error.Let_syntax in
           let%bind merged_statement =
             Timer.time timer (sprintf "merge:%s" __LOC__) (fun () ->
-                Transaction_snark.Statement.merge
-                  (Ledger_proof.statement proof_1)
-                  (Ledger_proof.statement proof_2))
+                Deferred.return
+                  (Transaction_snark.Statement.merge
+                     (Ledger_proof.statement proof_1)
+                     (Ledger_proof.statement proof_2)))
           in
           merge_acc acc_statement merged_statement
             ~proofs:[ (proof_1, message_1); (proof_2, message_2) ]
@@ -417,52 +426,62 @@ struct
       match job with
       | Parallel_scan.Base.Job.Empty
       | Full { status = Parallel_scan.Job_status.Done; _ } ->
-          Or_error.return acc_statement
+          return acc_statement
       | Full { job = transaction; _ } ->
+          let open Transaction_with_witness in
           with_error "Bad base statement" ~f:(fun () ->
-              let open Or_error.Let_syntax in
               let%bind expected_statement =
-                Timer.time timer
-                  (sprintf "create_expected_statement:%s" __LOC__) (fun () ->
-                    create_expected_statement ~constraint_constants transaction)
+                match statement_check with
+                | `Full ->
+                    let%bind result =
+                      Timer.time timer
+                        (sprintf "create_expected_statement:%s" __LOC__)
+                        (fun () ->
+                          Deferred.return
+                            (create_expected_statement ~constraint_constants
+                               transaction))
+                    in
+                    let%map () = yield_always () in
+                    result
+                | `Partial ->
+                    return transaction.statement
               in
               if
                 Transaction_snark.Statement.equal transaction.statement
                   expected_statement
               then merge_acc ~proofs:[] acc_statement transaction.statement
               else
-                Or_error.error_string
+                Deferred.Or_error.error_string
                   (sprintf
                      !"Bad base statement expected: \
                        %{sexp:Transaction_snark.Statement.t} got: \
                        %{sexp:Transaction_snark.Statement.t}"
                      transaction.statement expected_statement))
     in
-    let res =
+    let%bind.Deferred res =
       Fold.fold_chronological_until tree ~init:None
         ~f_merge:(fun acc (_weight, job) ->
           let open Container.Continue_or_stop in
-          match fold_step_a acc job with
+          match%map.Deferred fold_step_a acc job with
           | Ok next ->
               Continue next
           | e ->
               Stop e)
         ~f_base:(fun acc (_weight, job) ->
           let open Container.Continue_or_stop in
-          match fold_step_d acc job with
+          match%map.Deferred fold_step_d acc job with
           | Ok next ->
               Continue next
           | e ->
               Stop e)
-        ~finish:Result.return
+        ~finish:return
     in
     Timer.log "scan_statement" timer ;
     match res with
     | Ok None ->
-        M.return (Error `Empty)
+        Deferred.return (Error `Empty)
     | Ok (Some (res, proofs)) -> (
-        let open M.Let_syntax in
-        match%map
+        match%map.Deferred
           ksprintf time "verify:%s" __LOC__ (fun () ->
               Verifier.verify ~verifier proofs)
         with
@@ -473,20 +492,19 @@ struct
         | Error e ->
             Error (`Error e) )
     | Error e ->
-        M.return (Error (`Error e))
+        Deferred.return (Error (`Error e))
 
-  let check_invariants t ~constraint_constants ~verifier ~error_prefix
-      ~ledger_hash_end:current_ledger_hash
+  let check_invariants t ~constraint_constants ~statement_check ~verifier
+      ~error_prefix ~ledger_hash_end:current_ledger_hash
       ~ledger_hash_begin:snarked_ledger_hash
       ~next_available_token_begin:snarked_ledger_next_available_token
       ~next_available_token_end:current_ledger_next_available_token =
     let clarify_error cond err =
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
     in
-    let open M.Let_syntax in
     match%map
       time "scan_statement" (fun () ->
-          scan_statement ~constraint_constants ~verifier t)
+          scan_statement ~constraint_constants ~statement_check ~verifier t)
     with
     | Error (`Error e) ->
         Error e
@@ -548,7 +566,7 @@ struct
 end
 
 module Staged_undos = struct
-  type applied_txn = Ledger.Transaction_applied.t
+  type applied_txn = Transaction_logic.Transaction_applied.t
 
   type t = applied_txn list
 
@@ -611,7 +629,7 @@ let extract_txns txns_with_witnesses =
   List.map txns_with_witnesses
     ~f:(fun (txn_with_witness : Transaction_with_witness.t) ->
       let txn =
-        Ledger.Transaction_applied.transaction
+        Transaction_logic.Transaction_applied.transaction_with_status
           txn_with_witness.transaction_with_info
       in
       let state_hash = fst txn_with_witness.state_hash in
@@ -641,7 +659,8 @@ let target_merkle_root t =
 (*All the transactions in the order in which they were applied*)
 let staged_transactions t =
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
-      t.transaction_with_info |> Ledger.Transaction_applied.transaction)
+      t.transaction_with_info
+      |> Transaction_logic.Transaction_applied.transaction_with_status)
   @@ Parallel_scan.pending_data t
 
 let staged_transactions_with_protocol_states t
@@ -649,7 +668,8 @@ let staged_transactions_with_protocol_states t
   let open Or_error.Let_syntax in
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
       let txn =
-        t.transaction_with_info |> Ledger.Transaction_applied.transaction
+        t.transaction_with_info
+        |> Transaction_logic.Transaction_applied.transaction_with_status
       in
       let%map protocol_state = get_state (fst t.state_hash) in
       (txn, protocol_state))
@@ -752,7 +772,8 @@ let all_work_pairs t
         , ledger_witness
         , init_stack ) ->
         let { With_status.data = transaction; status } =
-          Ledger.Transaction_applied.transaction transaction_with_info
+          Transaction_logic.Transaction_applied.transaction_with_status
+            transaction_with_info
         in
         let%bind protocol_state_body =
           let%map state = get_state (fst state_hash) in

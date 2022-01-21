@@ -3,7 +3,7 @@ open Core_kernel
 module Hash = struct
   include Ledger_hash.Stable.V1
 
-  let to_string = Ledger_hash.to_string
+  let to_base58_check = Ledger_hash.to_base58_check
 
   let merge = Ledger_hash.merge
 
@@ -51,10 +51,10 @@ end)
 module Answer = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         ( Ledger_hash.Stable.V1.t
-        , Account.Stable.V1.t )
+        , Account.Stable.V2.t )
         Syncable_ledger.Answer.Stable.V1.t
       [@@deriving sexp, to_yojson]
 

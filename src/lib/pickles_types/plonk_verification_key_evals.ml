@@ -1,6 +1,4 @@
 open Core_kernel
-
-(** TKTK *)
 module H_list = Snarky_backendless.H_list
 
 let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
@@ -16,6 +14,7 @@ module Stable = struct
       ; complete_add_comm : 'comm
       ; mul_comm : 'comm
       ; emul_comm : 'comm
+      ; endomul_scalar_comm : 'comm
       }
     [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
   end
@@ -29,6 +28,7 @@ let map
     ; complete_add_comm
     ; mul_comm
     ; emul_comm
+    ; endomul_scalar_comm
     } ~f =
   { sigma_comm = Vector.map ~f sigma_comm
   ; coefficients_comm = Vector.map ~f coefficients_comm
@@ -37,6 +37,7 @@ let map
   ; complete_add_comm = f complete_add_comm
   ; mul_comm = f mul_comm
   ; emul_comm = f emul_comm
+  ; endomul_scalar_comm = f endomul_scalar_comm
   }
 
 let map2 t1 t2 ~f =
@@ -47,12 +48,14 @@ let map2 t1 t2 ~f =
   ; complete_add_comm = f t1.complete_add_comm t2.complete_add_comm
   ; mul_comm = f t1.mul_comm t2.mul_comm
   ; emul_comm = f t1.emul_comm t2.emul_comm
+  ; endomul_scalar_comm = f t1.endomul_scalar_comm t2.endomul_scalar_comm
   }
 
 let typ g =
   Snarky_backendless.Typ.of_hlistable
     [ Vector.typ g Dlog_plonk_types.Permuts.n
     ; Vector.typ g Dlog_plonk_types.Columns.n
+    ; g
     ; g
     ; g
     ; g

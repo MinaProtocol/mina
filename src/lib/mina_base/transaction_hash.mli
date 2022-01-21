@@ -17,6 +17,8 @@ val of_base58_check_exn : string -> t
 
 val to_base58_check : t -> string
 
+val hash_signed_command : Signed_command.t -> t
+
 val hash_command : User_command.t -> t
 
 val hash_fee_transfer : Fee_transfer.Single.t -> t
@@ -32,10 +34,10 @@ module User_command_with_valid_signature : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V1 : sig
+    module V2 : sig
       type t =
         private
-        (User_command.Valid.Stable.V1.t, hash) With_hash.Stable.V1.t
+        (User_command.Valid.Stable.V2.t, hash) With_hash.Stable.V1.t
       [@@deriving sexp, compare, hash, to_yojson]
     end
   end]
@@ -64,8 +66,8 @@ module User_command : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V1 : sig
-      type t = private (User_command.Stable.V1.t, hash) With_hash.Stable.V1.t
+    module V2 : sig
+      type t = private (User_command.Stable.V2.t, hash) With_hash.Stable.V1.t
       [@@deriving sexp, compare, hash, to_yojson]
     end
   end]

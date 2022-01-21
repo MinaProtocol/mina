@@ -1,31 +1,31 @@
 open Core_kernel
 open Pickles_types
-
-module Unshifted_acc =
-  Pairing_marlin_types.Accumulator.Degree_bound_checks.Unshifted_accumulators
-
 open Import
 open Backend
 
 module Max_degree = struct
-  let step = 1 lsl Nat.to_int Backend.Tick.Rounds.n
+  let step_log2 = Nat.to_int Backend.Tick.Rounds.n
 
-  let wrap = 1 lsl Nat.to_int Backend.Tock.Rounds.n
+  let step = 1 lsl step_log2
+
+  let wrap_log2 = Nat.to_int Backend.Tock.Rounds.n
+
+  let wrap = 1 lsl wrap_log2
 end
 
 let tick_shifts, tock_shifts =
   let mk g =
     let f =
       Memo.general ~cache_size_bound:20 ~hashable:Int.hashable (fun log2_size ->
-          g ~log2_size)
+          g log2_size)
     in
     fun ~log2_size -> f log2_size
   in
-  ( mk Backend.Tick.Verification_key.shifts
-  , mk Backend.Tock.Verification_key.shifts )
+  ( mk Kimchi.Protocol.VerifierIndex.Fp.shifts
+  , mk Kimchi.Protocol.VerifierIndex.Fq.shifts )
 
 let wrap_domains =
-  { Domains.h = Pow_2_roots_of_unity 17
+  { Domains.h = Pow_2_roots_of_unity 15
   ; x =
       Pow_2_roots_of_unity
         (let (T (typ, _)) = Impls.Wrap.input () in
@@ -38,11 +38,7 @@ let hash_pairing_me_only ~app_state
   let open Backend in
   Tick_field_sponge.digest Tick_field_sponge.params
     (Types.Pairing_based.Proof_state.Me_only.to_field_elements t ~g
-       ~comm:
-         (fun (x :
-                Tock.Curve.Affine.t
-                Dlog_plonk_types.Poly_comm.Without_degree_bound.t) ->
-         Array.concat_map x ~f:(Fn.compose Array.of_list g))
+       ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
        ~app_state)
 
 let hash_dlog_me_only (type n) (_max_branching : n Nat.t)
@@ -56,19 +52,8 @@ let hash_dlog_me_only (type n) (_max_branching : n Nat.t)
 
 let dlog_pcs_batch (type n_branching total)
     ((without_degree_bound, _pi) :
-      total Nat.t * (n_branching, Nat.N8.n, total) Nat.Adds.t) ~max_quot_size =
-  Pcs_batch.create ~without_degree_bound ~with_degree_bound:[ max_quot_size ]
-
-module Pairing_pcs_batch = struct
-  let beta_1 : (int, _, _) Pcs_batch.t =
-    Pcs_batch.create ~without_degree_bound:Nat.N6.n ~with_degree_bound:[]
-
-  let beta_2 : (int, _, _) Pcs_batch.t =
-    Pcs_batch.create ~without_degree_bound:Nat.N2.n ~with_degree_bound:[]
-
-  let beta_3 : (int, _, _) Pcs_batch.t =
-    Pcs_batch.create ~without_degree_bound:Nat.N14.n ~with_degree_bound:[]
-end
+      total Nat.t * (n_branching, Nat.N26.n, total) Nat.Adds.t) =
+  Pcs_batch.create ~without_degree_bound ~with_degree_bound:[]
 
 let when_profiling profiling default =
   match Option.map (Sys.getenv_opt "PICKLES_PROFILING") ~f:String.lowercase with
@@ -110,12 +95,31 @@ let group_map m ~a ~b =
   stage (fun x -> Group_map.to_group m ~params x)
 
 module Shifts = struct
-  let tock : Tock.Field.t Shifted_value.Shift.t =
-    Shifted_value.Shift.create (module Tock.Field)
+  let tock1 : Tock.Field.t Shifted_value.Type1.Shift.t =
+    Shifted_value.Type1.Shift.create (module Tock.Field)
 
-  let tick : Tick.Field.t Shifted_value.Shift.t =
-    Shifted_value.Shift.create (module Tick.Field)
+  let tock2 : Tock.Field.t Shifted_value.Type2.Shift.t =
+    Shifted_value.Type2.Shift.create (module Tock.Field)
+
+  let tick1 : Tick.Field.t Shifted_value.Type1.Shift.t =
+    Shifted_value.Type1.Shift.create (module Tick.Field)
+
+  let tick2 : Tick.Field.t Shifted_value.Type2.Shift.t =
+    Shifted_value.Type2.Shift.create (module Tick.Field)
 end
+
+let finite_exn : 'a Kimchi.Foundations.or_infinity -> 'a * 'a = function
+  | Finite (x, y) ->
+      (x, y)
+  | Infinity ->
+      failwith "finite_exn"
+
+let or_infinite_conv :
+    ('a * 'a) Or_infinity.t -> 'a Kimchi.Foundations.or_infinity = function
+  | Finite (x, y) ->
+      Finite (x, y)
+  | Infinity ->
+      Infinity
 
 module Ipa = struct
   open Backend
@@ -123,7 +127,7 @@ module Ipa = struct
   (* TODO: Make all this completely generic over backend *)
 
   let compute_challenge (type f) ~endo_to_field
-      (module Field : Zexe_backend.Field.S with type t = f) c =
+      (module Field : Kimchi_backend.Field.S with type t = f) c =
     endo_to_field c
 
   let compute_challenges ~endo_to_field field chals =
@@ -132,7 +136,7 @@ module Ipa = struct
 
   module Wrap = struct
     let field =
-      (module Tock.Field : Zexe_backend.Field.S with type t = Tock.Field.t)
+      (module Tock.Field : Kimchi_backend.Field.S with type t = Tock.Field.t)
 
     let endo_to_field = Endo.Step_inner_curve.to_field
 
@@ -142,16 +146,16 @@ module Ipa = struct
 
     let compute_sg chals =
       let comm =
-        Marlin_plonk_bindings_pasta_fq_urs.b_poly_commitment
+        Kimchi.Protocol.SRS.Fq.b_poly_commitment
           (Backend.Tock.Keypair.load_urs ())
           (Pickles_types.Vector.to_array (compute_challenges chals))
       in
-      comm.unshifted.(0) |> Or_infinity.finite_exn
+      comm.unshifted.(0) |> finite_exn
   end
 
   module Step = struct
     let field =
-      (module Tick.Field : Zexe_backend.Field.S with type t = Tick.Field.t)
+      (module Tick.Field : Kimchi_backend.Field.S with type t = Tick.Field.t)
 
     let endo_to_field = Endo.Wrap_inner_curve.to_field
 
@@ -161,11 +165,11 @@ module Ipa = struct
 
     let compute_sg chals =
       let comm =
-        Marlin_plonk_bindings_pasta_fp_urs.b_poly_commitment
+        Kimchi.Protocol.SRS.Fp.b_poly_commitment
           (Backend.Tick.Keypair.load_urs ())
           (Pickles_types.Vector.to_array (compute_challenges chals))
       in
-      comm.unshifted.(0) |> Or_infinity.finite_exn
+      comm.unshifted.(0) |> finite_exn
 
     let accumulator_check comm_chals =
       let chals =
@@ -177,8 +181,9 @@ module Ipa = struct
             Or_infinity.Finite comm)
       in
       let urs = Backend.Tick.Keypair.load_urs () in
-      Async.In_thread.run (fun () ->
-          Marlin_plonk_bindings.Pasta_fp_urs.batch_accumulator_check urs comms
+      Run_in_thread.run_in_thread (fun () ->
+          Kimchi.Protocol.SRS.Fp.batch_accumulator_check urs
+            (Array.map comms ~f:or_infinite_conv)
             chals)
   end
 end
@@ -206,16 +211,54 @@ let tick_public_input_of_statement ~max_branching
     (Backend.Tick.Field.Vector.length input)
     ~f:(Backend.Tick.Field.Vector.get input)
 
-let index_commitment_length k ~max_degree =
-  let actual =
-    Int.round_up ~to_multiple_of:max_degree (Domain.size k) / max_degree
-  in
-  [%test_eq: int] actual 1 ;
-  1
-
 let max_log2_degree = Pickles_base.Side_loaded_verification_key.max_log2_degree
 
 let max_quot_size ~of_int ~mul:( * ) ~sub:( - ) domain_size =
   of_int 5 * (domain_size - of_int 1)
 
 let max_quot_size_int = max_quot_size ~of_int:Fn.id ~mul:( * ) ~sub:( - )
+
+let ft_comm ~add:( + ) ~scale ~endoscale ~negate
+    ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha
+    ~(plonk : _ Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit.t)
+    ~t_comm =
+  let ( * ) x g = scale g x in
+  let _, [ sigma_comm_last ] =
+    Vector.split m.sigma_comm
+      (snd (Dlog_plonk_types.Permuts_minus_1.add Nat.N1.n))
+  in
+  let f_comm =
+    let poseidon =
+      let (pn :: ps) = Vector.rev m.coefficients_comm in
+      scale
+        (Vector.fold ~init:pn ps ~f:(fun acc c -> c + endoscale acc alpha))
+        plonk.poseidon_selector
+      |> negate
+    in
+    let generic =
+      let coeffs = Vector.to_array m.coefficients_comm in
+      let (c0 :: cs) = plonk.generic in
+      Vector.foldi cs
+        ~init:(c0 * coeffs.(0))
+        ~f:(fun i acc c -> acc + (c * coeffs.(Int.(i + 1))))
+    in
+    List.reduce_exn ~f:( + )
+      [ plonk.perm * sigma_comm_last
+      ; generic
+      ; poseidon
+      ; plonk.vbmul * m.mul_comm
+      ; plonk.complete_add * m.complete_add_comm
+      ; plonk.endomul * m.emul_comm
+      ; plonk.endomul_scalar * m.endomul_scalar_comm
+      ]
+  in
+  let chunked_t_comm =
+    let n = Array.length t_comm in
+    let res = ref t_comm.(n - 1) in
+    for i = n - 2 downto 0 do
+      res := t_comm.(i) + scale !res plonk.zeta_to_srs_length
+    done ;
+    !res
+  in
+  f_comm + chunked_t_comm
+  + negate (scale chunked_t_comm plonk.zeta_to_domain_size)

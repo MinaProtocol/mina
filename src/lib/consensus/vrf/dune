@@ -2,6 +2,7 @@
  (name consensus_vrf)
  (public_name consensus.vrf)
  (libraries
+   base64
    core_kernel
    fold_lib
    mina_base
@@ -13,6 +14,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess
   (pps
+    ppx_coda
     h_list.ppx
     ppx_assert
     ppx_compare

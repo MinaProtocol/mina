@@ -16,11 +16,11 @@ spec:
         testnet: {{ $.Values.testnetName }}
         role: seed
         class: "plain-node"
-        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
+        version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
         syncStatus: INIT
       annotations:
         prometheus.io/scrape: 'true'
-        prometheus.io/port: {{ $.Values.coda.ports.metrics | quote }}
+        prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
       initContainers:
@@ -29,11 +29,11 @@ spec:
         resources:
           limits:
           requests:
-            memory: 32.0Gi
-            cpu: 12.0
-        image: {{ $.Values.coda.image }}
-        {{ if $.Values.coda.useCustomEntrypoint -}}
-        command: [{{ $.Values.coda.customEntrypoint }}]
+            memory: 14.0Gi
+            cpu: 8.0
+        image: {{ $.Values.mina.image }}
+        {{ if $.Values.mina.useCustomEntrypoint -}}
+        command: [{{ $.Values.mina.customEntrypoint }}]
         {{- end }}
         args: [ "daemon",
           "-log-level", "Debug",
@@ -45,23 +45,23 @@ spec:
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-enable-peer-exchange", "true",
-          {{- if $.Values.coda.runtimeConfig }}
+          {{- if $.Values.mina.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end }}
-          {{- if $.Values.coda.logPrecomputedBlocks }}
+          {{- if $.Values.mina.logPrecomputedBlocks }}
           "-log-precomputed-blocks", "true",
           {{- end -}}
-          {{- if $.Values.coda.logTxnPoolGossip }}
+          {{- if $.Values.mina.logTxnPoolGossip }}
           "-log-txn-pool-gossip", "true",
           {{- end -}}
-          {{- if $.Values.coda.maxConnections }}
-          "--max-connections", {{ $.Values.coda.maxConnections | quote }},
+          {{- if $.Values.mina.maxConnections }}
+          "--max-connections", {{ $.Values.mina.maxConnections | quote }},
           {{- end -}}
-          {{- range $.Values.coda.seedPeers }}
+          {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}
-          "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }},
-          {{- if $.Values.coda.uploadBlocksToGCloud }}
+          "-generate-genesis-proof", {{ $.Values.mina.generateGenesisProof | quote }},
+          {{- if $.Values.mina.uploadBlocksToGCloud }}
           "-upload-blocks-to-gcloud", "true",
           {{- end }}
         ]
@@ -69,11 +69,11 @@ spec:
         - name: "RAYON_NUM_THREADS"
           value: "6"
         - name: DAEMON_REST_PORT
-          value: {{ $.Values.coda.ports.graphql | quote }}
+          value: {{ $.Values.mina.ports.graphql | quote }}
         - name: DAEMON_CLIENT_PORT
-          value: {{ $.Values.coda.ports.client | quote }}
+          value: {{ $.Values.mina.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
-          value: {{ $.Values.coda.ports.metrics | quote }}
+          value: {{ $.Values.mina.ports.metrics | quote }}
         - name: CODA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CONNECT_PRIVATE_IPS
@@ -85,40 +85,40 @@ spec:
         - name: GCLOUD_BLOCK_UPLOAD_BUCKET
           value: "mina_network_block_data"
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ $.Values.coda.ports.p2p | quote }}
+          value: {{ $.Values.mina.ports.p2p | quote }}
         ports:
         - name: client-port
           protocol: TCP
-          containerPort: {{ $.Values.coda.ports.client }}
+          containerPort: {{ $.Values.mina.ports.client }}
         - name: graphql-port
           protocol: TCP
-          containerPort: {{ $.Values.coda.ports.graphql }}
+          containerPort: {{ $.Values.mina.ports.graphql }}
         - name: metrics-port
           protocol: TCP
-          containerPort: {{ $.Values.coda.ports.metrics }}
+          containerPort: {{ $.Values.mina.ports.metrics }}
         - name: external-port
           protocol: TCP
-          containerPort: {{ $.Values.coda.ports.p2p }}
-          hostPort: {{ $.Values.coda.ports.external }}
+          containerPort: {{ $.Values.mina.ports.p2p }}
+          hostPort: {{ $.Values.mina.ports.external }}
 {{$data := dict "name" $.Values.name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.seed.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
-        {{- if $.Values.coda.uploadBlocksToGCloud }}
+        {{- if $.Values.mina.uploadBlocksToGCloud }}
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
         {{- end }}
-        {{- if $.Values.coda.runtimeConfig }}
+        {{- if $.Values.mina.runtimeConfig }}
         - name: daemon-config
           mountPath: "/config/"
         {{- end }}
       volumes:
-      {{- if $.Values.coda.runtimeConfig }}
+      {{- if $.Values.mina.runtimeConfig }}
       - name: daemon-config
         configMap:
           name: seed-daemon-config
       {{- end }}
-      {{- if $.Values.coda.uploadBlocksToGCloud }}
+      {{- if $.Values.mina.uploadBlocksToGCloud }}
       - name: gcloud-keyfile
         secret:
           secretName: gcloud-keyfile
@@ -131,7 +131,7 @@ spec:
         emptyDir: {}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
 ---
-{{- if $.Values.coda.exposeGraphql }}
+{{- if $.Values.mina.exposeGraphql }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -145,7 +145,7 @@ spec:
   - name: http-graphql
     protocol: TCP
     port: 80
-    targetPort: {{ $.Values.coda.ports.graphql }}
+    targetPort: {{ $.Values.mina.ports.graphql }}
 {{- end }}
 ---
 

@@ -182,7 +182,7 @@ let unlock { cache; path } ~needle ~password =
   let unlock_keypair = function
     | Locked file ->
         Secret_keypair.read ~privkey_path:(path ^/ file) ~password
-        |> Deferred.Result.map_error ~f:(fun _ -> `Bad_password)
+        |> Deferred.Result.map_error ~f:(fun e -> `Key_read_error e)
         |> Deferred.Result.map ~f:(fun kp ->
                Public_key.Compressed.Table.set cache ~key:needle
                  ~data:(Unlocked (file, kp)))
@@ -203,6 +203,11 @@ let lock { cache; _ } ~needle =
         Some (Locked file)
     | k ->
         k)
+
+let get_tracked_keypair ~logger ~which ~read_from_env_exn ~conf_dir pk =
+  let%bind wallets = load ~logger ~disk_location:(conf_dir ^/ "wallets") in
+  let sk_file = get_path wallets pk in
+  read_from_env_exn ~which sk_file
 
 let%test_module "wallets" =
   ( module struct

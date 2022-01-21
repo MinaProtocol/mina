@@ -29,7 +29,9 @@ module type S = sig
   module Path : Merkle_path.S with type hash := hash
 
   module Location : sig
-    type t [@@deriving sexp, compare, hash, equal]
+    type t [@@deriving sexp, compare, hash]
+
+    include Comparable.S with type t := t
   end
 
   include
@@ -95,6 +97,9 @@ module type S = sig
 
   val location_of_account : t -> account_id -> Location.t option
 
+  val location_of_account_batch :
+    t -> account_id list -> (account_id * Location.t option) list
+
   (** This may return an error if the ledger is full. *)
   val get_or_create_account :
        t
@@ -115,6 +120,8 @@ module type S = sig
 
   val get : t -> Location.t -> account option
 
+  val get_batch : t -> Location.t list -> (Location.t * account option) list
+
   val set : t -> Location.t -> account -> unit
 
   val set_batch : t -> (Location.t * account) list -> unit
@@ -131,6 +138,8 @@ module type S = sig
   val merkle_root : t -> root_hash
 
   val merkle_path : t -> Location.t -> Path.t
+
+  val merkle_path_batch : t -> Location.t list -> (Location.t * Path.t) list
 
   val merkle_path_at_index_exn : t -> int -> Path.t
 

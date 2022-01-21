@@ -467,8 +467,12 @@ let verify_transitions_and_build_breadcrumbs ~logger
   let%bind transitions_with_initial_validation, initial_hash =
     let%bind tvs =
       let open Deferred.Let_syntax in
+      let genesis_state_hash =
+        Precomputed_values.genesis_state_with_hash precomputed_values
+        |> With_hash.hash
+      in
       match%bind
-        External_transition.validate_proofs ~verifier
+        External_transition.validate_proofs ~verifier ~genesis_state_hash
           (List.map transitions ~f:(fun t ->
                External_transition.Validation.wrap (Envelope.Incoming.data t)))
       with
@@ -817,6 +821,8 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                     Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
                 Catchup_jobs.decr ())))
 
+(* Unit tests *)
+
 let%test_module "Ledger_catchup tests" =
   ( module struct
     let () =
@@ -836,6 +842,8 @@ let%test_module "Ledger_catchup tests" =
     let trust_system = Trust_system.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
+
+    let use_super_catchup = false
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -949,7 +957,8 @@ let%test_module "Ledger_catchup tests" =
         failwith
           "catchup breadcrumbs were not equal to the best tip path we expected"
 
-    let%test_unit "can catchup to a peer within [2/k,k]" =
+    let%test_unit "can catchup to a peer within [k/2,k]" =
+      [%log info] "running catchup to peer" ;
       Quickcheck.test ~trials:5
         Fake_network.Generator.(
           let open Quickcheck.Generator.Let_syntax in
@@ -957,6 +966,7 @@ let%test_module "Ledger_catchup tests" =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
           gen ~precomputed_values ~verifier ~max_frontier_length
+            ~use_super_catchup
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size
             ])
@@ -977,6 +987,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
+            ~use_super_catchup
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -991,6 +1002,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
+            ~use_super_catchup
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
             ])

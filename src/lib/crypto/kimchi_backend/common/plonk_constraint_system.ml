@@ -4,7 +4,7 @@ open Unsigned.Size_t
 
 (* TODO: open Core here instead of opening it multiple times below *)
 
-(** a gate interface, parameterized by a field *)
+(** A gate interface, parameterized by a field *)
 module type Gate_vector_intf = sig
   open Unsigned
 
@@ -35,7 +35,7 @@ module Row = struct
         i + public_input_size
 end
 
-(* TODO: rename module Position to Permutation? *)
+(* TODO: rename module Position to Permutation/Wiring? *)
 
 (** A position represents the position of a cell in the constraint system *)
 module Position = struct
@@ -51,7 +51,7 @@ module Position = struct
   (** Given a number of columns, 
       append enough column wires to get an entire row.
       The wire appended will simply point to themselves,
-      as to not take part in the permutation argument. *)
+      so as to not take part in the permutation argument. *)
   let append_cols (row : 'row) (cols : _ t array) : _ t array =
     let padding_offset = Array.length cols in
     assert (padding_offset <= Constants.permutation_cols) ;
@@ -73,15 +73,13 @@ end
 module Gate_spec = struct
   open Core_kernel
 
+  (* TODO: split kind/coeffs from row/wired_to *)
+
   (** A gate/row/constraint consists of a type (kind), a row, the other cells its columns/cells are connected to (wired_to), and the selector polynomial associated with the gate *)
   type ('row, 'f) t =
-    { kind :
-        (Kimchi.Protocol.gate_type
-        [@sexp.opaque] (* TODO: change row and wired_to to options? *))
-    ; row : 'row
+    { kind : (Kimchi.Protocol.gate_type[@sexp.opaque])
     ; wired_to : 'row Position.t array
     ; coeffs : 'f array
-          (* TODO: shouldn't the coeffs live in the gate type enum? *)
     }
   [@@deriving sexp_of]
 
@@ -93,11 +91,10 @@ module Gate_spec = struct
         ~f:(fun (pos : _ Position.t) -> { pos with row = f pos.row })
         t.wired_to
     in
-    { t with row = f t.row; wired_to }
+    { t with wired_to }
 
   (* TODO: just send the array to Rust directly *)
-  let to_rust_gate { kind; row; wired_to; coeffs } :
-      _ Kimchi.Protocol.circuit_gate =
+  let to_rust_gate { kind; wired_to; coeffs } : _ Kimchi.Protocol.circuit_gate =
     let typ = kind in
     let c = coeffs in
     let wired_to = Array.map ~f:Position.to_rust_wire wired_to in
@@ -110,7 +107,7 @@ module Gate_spec = struct
       , wired_to.(5)
       , wired_to.(6) )
     in
-    { typ; row; wires; c }
+    { typ; wires; c }
 end
 
 (** Represents the state of a hash function *)
@@ -124,6 +121,8 @@ module Hash_state = struct
   let digest t = Md5.digest_string H.(to_raw_string (get t))
 
   (* TODO: it's weird to have a function that you don't know how to call here, this probably should be wrapped with a safer interface (I'm assuming it's the initial state) *)
+
+  (** The initial state *)
   let empty = H.feed_string H.empty "plonk_constraint_system_v3"
 end
 
@@ -131,7 +130,7 @@ end
 module Plonk_constraint = struct
   open Core_kernel
 
-  (** A PLONK constraint (or gate) can be [Basic], [Poseidon], [EC_add], [EC_scale] or [EC_endoscale] *)
+  (** A PLONK constraint (or gate) can be [Basic], [Poseidon], [EC_add_complete], [EC_scale], [EC_endoscale], or [EC_endoscalar] *)
   module T = struct
     type ('v, 'f) t =
       | Basic of { l : 'f * 'v; r : 'f * 'v; o : 'f * 'v; m : 'f; c : 'f }
@@ -150,12 +149,7 @@ module Plonk_constraint = struct
       | EC_scale of { state : 'v Scale_round.t array }
       | EC_endoscale of
           { state : 'v Endoscale_round.t array; xs : 'v; ys : 'v; n_acc : 'v }
-      | EC_endoscalar of
-          { state : 'v Endoscale_scalar_round.t array
-          ; n8 : 'v
-          ; a8 : 'v
-          ; b8 : 'v
-          }
+      | EC_endoscalar of { state : 'v Endoscale_scalar_round.t array }
     [@@deriving sexp]
 
     (** map t *)
@@ -188,16 +182,16 @@ module Plonk_constraint = struct
             ; ys = f ys
             ; n_acc = f n_acc
             }
-      | EC_endoscalar { state; n8; a8; b8 } ->
+      | EC_endoscalar { state } ->
           EC_endoscalar
             { state =
                 Array.map ~f:(fun x -> Endoscale_scalar_round.map ~f x) state
-            ; n8 = f n8
-            ; a8 = f a8
-            ; b8 = f b8
             }
 
-    (* TODO: this seems to be a "double check" type of function? It just checks that the basic gate is equal to 0? what is eval_one? what is v and f? *)
+    (** [eval (module F) get_variable gate] checks that [gate]'s polynomial is
+        satisfied by the assignments given by [get_variable].
+        Warning: currently only implemented for the [Basic] gate.
+    *)
     let eval (type v f)
         (module F : Snarky_backendless.Field_intf.S with type t = f)
         (eval_one : v -> f) (t : (v, f) t) =
@@ -224,10 +218,7 @@ module Plonk_constraint = struct
             false )
           else true
       | _ ->
-          (* TODO: this fails open for other gates than basic? *)
           true
-
-    (* TODO *)
   end
 
   include T
@@ -236,29 +227,26 @@ module Plonk_constraint = struct
   include Snarky_backendless.Constraint.Add_kind (T)
 end
 
-(* TODO: what is this? a counter? *)
 module Internal_var = Core_kernel.Unique_id.Int ()
 
-(** A hash table based on a type that represents external and internal variables. )*)
 module V = struct
   open Core_kernel
 
-  (*
-   An external variable is one generated by snarky (via exists).
-
-   An internal variable is one that we generate as an intermediate variable (e.g., in
-   reducing linear combinations to single PLONK positions).
-
-   Every internal variable is computable from a finite list of
-   external variables and internal variables.
-
-   Currently, in fact, every internal variable is a linear combination of
-   external variables and previously generated internal variables.
-*)
-
-  (* TODO: shouldn't this be defined outside of V? What does V mean here? Varaible perhaps? *)
   module T = struct
-    type t = External of int | Internal of Internal_var.t
+    (** Variables linking uses of the same data between different gates.
+
+        Every internal variable is computable from a finite list of external
+        variables and internal variables.
+        Currently, in fact, every internal variable is a linear combination of
+        external variables and previously generated internal variables.
+    *)
+    type t =
+      | External of int
+          (** An external variable (generated by snarky, via [exists]). *)
+      | Internal of Internal_var.t
+          (** An internal variable is generated to hold an intermediate value
+              (e.g., in reducing linear combinations to single PLONK positions).
+          *)
     [@@deriving compare, hash, sexp]
   end
 
@@ -273,7 +261,7 @@ type ('a, 'f) t =
     equivalence_classes : Row.t Position.t list V.Table.t
   ; (* How to compute each internal variable (as a linear combination of other variables) *)
     internal_vars : (('f * V.t) list * 'f option) Internal_var.Table.t
-  ; (* ?, in reversed order because functional programming *)
+  ; (* The variables that hold each witness value for each row, in reverse order *)
     mutable rows_rev : V.t option array list
   ; (* a circuit is described by a series of gates. A gate is finalized if TKTK *)
     mutable gates :
@@ -282,8 +270,6 @@ type ('a, 'f) t =
     mutable next_row : int
   ; (* hash of the circuit, for distinguishing different circuits *)
     mutable hash : Hash_state.t
-  ; (* ? *)
-    mutable constraints : int
   ; (* the size of the public input (which fills the first rows of our constraint system *)
     public_input_size : int Core_kernel.Set_once.t
   ; (* whatever is not public input *)
@@ -291,6 +277,19 @@ type ('a, 'f) t =
   ; (* queue (of size 1) of generic gate *)
     mutable pending_generic_gate :
       (V.t option * V.t option * V.t option * 'f array) option
+  ; (* V.t's corresponding to constant values. We reuse them so we don't need to
+       use a fresh generic constraint each time to create a constant. *)
+    cached_constants : ('f, V.t) Core_kernel.Hashtbl.t
+        (* The [equivalence_classes] field keeps track of the positions which must be
+           enforced to be equivalent due to the fact that they correspond to the same V.t value.
+           I.e., positions that are different usages of the same [V.t].
+
+           We use a union-find data structure to track equalities that a constraint system wants
+           enforced *between* [V.t] values. Then, at the end, for all [V.t]s that have been unioned
+           together, we combine their equivalence classes in the [equivalence_classes] table into
+           a single equivalence class, so that the permutation argument enforces these desired equalities
+           as well. *)
+  ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
   }
 
 module Hash = Core.Md5
@@ -307,7 +306,7 @@ let digest (t : _ t) = Hash_state.digest t.hash
 (** ? *)
 module Make
     (Fp : Field.S)
-    (* TODO: why is there a type for gate vector, instead of using Gate.t list? *)
+    (* We create a type for gate vector, instead of using `Gate.t list`. If we did, we would have to convert it to a `Gate.t array` to pass it across the FFI boundary, where then it gets converted to a `Vec<Gate>`; it's more efficient to just create the `Vec<Gate>` directly. *)
     (Gates : Gate_vector_intf with type field := Fp.t)
     (Params : sig
       val params : Fp.t Params.t
@@ -322,10 +321,9 @@ struct
 
   (** Used as a helper to unambiguously hash the circuit *)
   let feed_constraint t constr =
-    (* TODO: does to_bytes always return a fixed-size response? That invariant should be checked somewhere (e.g. by checking that `zero |> to_bytes` returns something of the appropriate length )*)
+    (* note: the output of `Fp.to_bytes` is fixed-length *)
     let absorb_field field acc = H.feed_bytes acc (Fp.to_bytes field) in
     let lc =
-      (* TODO: Bytes.of_char_list ['\x00', '\x00', '\x00', ...]*)
       let int_buf = Bytes.init 8 ~f:(fun _ -> '\000') in
       fun x t ->
         List.fold x ~init:t ~f:(fun acc (x, index) ->
@@ -392,21 +390,49 @@ struct
                     acc)
             in
             cvars [ xs; ys; n_acc ] t
-        | EC_endoscalar { state; n8; a8; b8 } ->
+        | EC_endoscalar { state } ->
             let t = H.feed_string t "ec_endoscale_scalar" in
-            let t =
-              Array.fold state ~init:t
-                ~f:(fun
-                     acc
-                     { n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 }
-                   ->
-                  cvars
-                    [ n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 ]
-                    acc)
-            in
-            cvars [ n8; a8; b8 ] t )
+            Array.fold state ~init:t
+              ~f:(fun
+                   acc
+                   { n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 }
+                 ->
+                cvars
+                  [ n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 ]
+                  acc) )
     | _ ->
         failwith "Unsupported constraint"
+
+  (** Converts the set of permutations (equivalence_classes) to
+      a hash table that maps each position to the next one.
+      For example, if one of the equivalence class is [pos1, pos3, pos7],
+      the function will return a hashtable that maps pos1 to pos3,
+      pos3 to pos7, and pos7 to pos1 *)
+  let equivalence_classes_to_hashtbl sys =
+    let module Relative_position = struct
+      module T = struct
+        type t = Row.t Position.t [@@deriving hash, sexp, compare]
+      end
+
+      include T
+      include Core_kernel.Hashable.Make (T)
+    end in
+    let equivalence_classes = V.Table.create () in
+    Hashtbl.iteri sys.equivalence_classes ~f:(fun ~key ~data ->
+        let u = Hashtbl.find_exn sys.union_finds key in
+        Hashtbl.update equivalence_classes (Union_find.get u) ~f:(function
+          | None ->
+              Relative_position.Hash_set.of_list data
+          | Some ps ->
+              List.iter ~f:(Hash_set.add ps) data ;
+              ps)) ;
+    let res = Relative_position.Table.create () in
+    Hashtbl.iter equivalence_classes ~f:(fun ps ->
+        let rotate_left = function [] -> [] | x :: xs -> xs @ [ x ] in
+        let ps = Hash_set.to_list ps in
+        List.iter2_exn ps (rotate_left ps) ~f:(fun input output ->
+            Hashtbl.add_exn res ~key:input ~data:output)) ;
+    res
 
   (** Compute the witness, given the constraint system `sys` and a function that converts the indexed secret inputs to their concrete values *)
   let compute_witness (sys : t) (external_values : int -> Fp.t) :
@@ -415,7 +441,6 @@ struct
       Internal_var.Table.create ()
     in
     let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
-    (* TODO: should we check that the gates are finalized at this point? num_rows is the length of the gates/rows field of sys *)
     let num_rows = public_input_size + sys.next_row in
     let res =
       Array.init Constants.columns ~f:(fun _ ->
@@ -444,7 +469,7 @@ struct
           in
           Fp.(acc + (s * x)))
     in
-    (* go through every rows *)
+    (* update the witness table with the value of the variables from each row *)
     List.iteri (List.rev sys.rows_rev) ~f:(fun i_after_input cols ->
         let row_idx = i_after_input + public_input_size in
         Array.iteri cols ~f:(fun col_idx var ->
@@ -461,9 +486,14 @@ struct
     (* return the witness *)
     res
 
+  let union_find sys v =
+    Hashtbl.find_or_add sys.union_finds v ~default:(fun () ->
+        Union_find.create v)
+
   (** Creates an internal variable and assigns it the value lc and constant *)
   let create_internal ?constant sys lc : V.t =
     let v = Internal_var.create () in
+    ignore (union_find sys (Internal v) : _ Union_find.t) ;
     Hashtbl.add_exn sys.internal_vars ~key:v ~data:(lc, constant) ;
     V.Internal v
 
@@ -478,10 +508,10 @@ struct
     ; gates = `Unfinalized_rev [] (* Gates.create () *)
     ; next_row = 0
     ; hash = Hash_state.empty
-    ; constraints = 0
-    ; public_input_size = Set_once.create ()
     ; auxiliary_input_size = 0
     ; pending_generic_gate = None
+    ; cached_constants = Hashtbl.create (module Fp)
+    ; union_finds = V.Table.create ()
     }
 
   (* TODO *)
@@ -493,76 +523,25 @@ struct
   (** returns the number of public inputs *)
   let get_primary_input_size t = Set_once.get_exn t.public_input_size [%here]
 
-  (* TODO: are these the private input? *)
+  (* non-public part of the witness *)
   let set_auxiliary_input_size t x = t.auxiliary_input_size <- x
 
   (** sets the number of public-input. It must and can only be called once. *)
   let set_primary_input_size (sys : t) num_pub_inputs =
     Set_once.set_exn sys.public_input_size [%here] num_pub_inputs
 
-  (* TODO: remove this no? isn't that a no-op? *)
-  let digest = digest
-
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.
       The row must be given relative to the start of the circuit 
       (so at the start of the public-input rows). *)
   let wire' sys key row (col : int) =
+    ignore (union_find sys key : V.t Union_find.t) ;
     V.Table.add_multi sys.equivalence_classes ~key ~data:{ row; col }
 
   (* TODO: rename to wire_abs and wire_rel? or wire_public and wire_after_public? or force a single use function that takes a Row.t? *)
 
   (** Same as wire', except that the row must be given relatively to the end of the public-input rows *)
   let wire sys key row col = wire' sys key (Row.After_public_input row) col
-
-  (** Converts the set of permutations (equivalence_classes) to 
-      a hash table that maps each position to the next one. 
-      For example, if one of the equivalence class is [pos1, pos3, pos7],
-      the function will return a hashtable that maps pos1 to pos3, 
-      pos3 to pos7, and pos7 to pos1 *)
-  let equivalence_classes_to_hashtbl
-      ~(equivalence_classes : Row.t Position.t list V.Table.t) =
-    let module Relative_position = struct
-      module T = struct
-        type t = Row.t Position.t [@@deriving hash, sexp, compare]
-      end
-
-      include Core_kernel.Hashable.Make (T)
-    end in
-    let res = Relative_position.Table.create () in
-    Hashtbl.iter equivalence_classes ~f:(fun ps ->
-        let rotate_right some_list =
-          List.last_exn some_list :: List.tl_exn some_list
-        in
-        List.iter2_exn ps (rotate_right ps) ~f:(fun input output ->
-            Hashtbl.add_exn res ~key:input ~data:output)) ;
-    res
-
-  (** Adds a row/gate/constraint to a constraint system `sys` *)
-  let add_row sys (vars : V.t option array) kind coeffs =
-    match sys.gates with
-    | `Finalized ->
-        failwith "add_row called on finalized constraint system"
-    | `Unfinalized_rev gates ->
-        (* as we're adding a row, we're adding new cells.
-           If these cells (the first 7) contain variables, make sure that they are wired *)
-        let num_vars = min Constants.permutation_cols (Array.length vars) in
-        let vars_for_perm = Array.slice vars 0 num_vars in
-        Array.iteri vars_for_perm ~f:(fun col some_x ->
-            Option.iter some_x ~f:(fun x -> wire sys x sys.next_row col)) ;
-
-        (* TODO: I think there are two things we should check here (and possible panic on):
-           - that these first 7 variables (that participate in the permutation argument) are not wired to anything that didn't participate in the permutation argument (hard to check as we don't have that information atm)
-           - that the remaining columns (that don't participate in the permutation argument) do not have anything that's part of the permutation argument (easy to check as we have that hashtbl) *)
-
-        (* add to gates *)
-        let open Position in
-        sys.gates <-
-          `Unfinalized_rev ({ kind; row = (); wired_to = [||]; coeffs } :: gates) ;
-        (* increment row *)
-        sys.next_row <- sys.next_row + 1 ;
-        (* add to row *)
-        sys.rows_rev <- vars :: sys.rows_rev
 
   (** Adds zero-knowledgeness to the gates/rows, and convert into Rust type [Gates.t].
       This can only be called once *)
@@ -584,7 +563,6 @@ struct
           wire' sys public_var (Row.Public_input row) 0 ;
           pub_input_gate_specs_rev :=
             { Gate_spec.kind = Generic
-            ; row = ()
             ; wired_to = [||]
             ; coeffs = pub_selectors
             }
@@ -600,39 +578,22 @@ struct
             sys.pending_generic_gate <- None ) ;
 
         (* construct permutation hashmap *)
-        let pos_map =
-          equivalence_classes_to_hashtbl
-            ~equivalence_classes:sys.equivalence_classes
-        in
+        let pos_map = equivalence_classes_to_hashtbl sys in
         let permutation (pos : Row.t Position.t) : Row.t Position.t =
           Option.value (Hashtbl.find pos_map pos) ~default:pos
         in
 
-        (*
-        let permutation ~equivalence_classes (pos : Row.t Position.t) :
-            Row.t Position.t =
-          let pos_map =
-            equivalence_classes_to_hashtbl
-              ~equivalence_classes:sys.equivalence_classes
-          in
-          Hashtbl.find_exn pos_map pos
-        in
-        let permutation =
-          permutation ~equivalence_classes:sys.equivalence_classes
-        in
-        *)
         let update_gate_with_permutation_info (row : Row.t)
             (gate : (unit, _) Gate_spec.t) : (Row.t, _) Gate_spec.t =
           { gate with
-            row
-          ; wired_to =
+            wired_to =
               Array.init Constants.permutation_cols ~f:(fun col ->
                   permutation { row; col })
           }
         in
 
         (* process public gates *)
-        let public_gates = !pub_input_gate_specs_rev |> List.rev in
+        let public_gates = List.rev !pub_input_gate_specs_rev in
         let public_gates =
           List.mapi public_gates ~f:(fun absolute_row gate ->
               update_gate_with_permutation_info (Row.Public_input absolute_row)
@@ -640,7 +601,7 @@ struct
         in
 
         (* construct all the other gates (except zero-knowledge rows) *)
-        let gates = gates_rev |> List.rev in
+        let gates = List.rev gates_rev in
         let gates =
           List.mapi gates ~f:(fun relative_row gate ->
               update_gate_with_permutation_info
@@ -651,14 +612,15 @@ struct
         let to_absolute_row =
           Gate_spec.map_rows ~f:(Row.to_absolute ~public_input_size)
         in
-        let all_gates = List.concat [ public_gates; gates ] in
-        let all_gates = List.map all_gates ~f:to_absolute_row in
-
-        printf !"%{sexp: (int, Fp.t) Gate_spec.t list}\n" all_gates ;
 
         (* convert all the gates into our Gates.t Rust vector type *)
-        List.iter all_gates ~f:(fun g ->
-            Gates.add rust_gates (Gate_spec.to_rust_gate g)) ;
+        let add_gates gates =
+          List.iter gates ~f:(fun g ->
+              let g = to_absolute_row g in
+              Gates.add rust_gates (Gate_spec.to_rust_gate g))
+        in
+        add_gates public_gates ;
+        add_gates gates ;
 
         (* drop the gates, we don't need them anymore *)
         sys.gates <- `Finalized ;
@@ -678,11 +640,11 @@ struct
       Returns `(last_scalar, last_variable, terms, terms_length)`
       where terms does not contain the last scalar and last variable observed.
   *)
-  let accumulate_sorted_terms (c0, i0) terms =
-    Sequence.of_list terms
-    |> Sequence.fold ~init:(c0, i0, [], 0) ~f:(fun (acc, i, ts, n) (c, j) ->
-           if Int.equal i j then (Fp.add acc c, i, ts, n)
-           else (c, j, (acc, i) :: ts, n + 1))
+  let accumulate_terms terms =
+    List.fold terms ~init:Int.Map.empty ~f:(fun acc (x, i) ->
+        Map.change acc i ~f:(fun y ->
+            let res = match y with None -> x | Some y -> Fp.add x y in
+            if Fp.(equal zero res) then None else Some res))
 
   (** Converts a [Cvar.t] to a `(terms, terms_length, has_constant)`.
       if `has_constant` is set, then terms start with a constant term in the form of (c, 0).
@@ -694,18 +656,43 @@ struct
           ~equal ~one:(of_int 1))
         x
     in
-    let terms =
-      List.sort terms ~compare:(fun (_, i) (_, j) -> Int.compare i j)
-    in
-    let has_constant_term = Option.is_some c in
-    (* TODO: shouldn't the constant term be (1, c) instead? *)
+    (* Note: [(c, 0)] represents the field element [c] multiplied by the 0th
+       variable, which is held constant as [Field.one].
+    *)
     let terms = match c with None -> terms | Some c -> (c, 0) :: terms in
-    match terms with
-    | [] ->
-        Some ([], 0, false)
-    | t0 :: terms ->
-        let acc, i, ts, n = accumulate_sorted_terms t0 terms in
-        Some (List.rev ((acc, i) :: ts), n + 1, has_constant_term)
+    let has_constant_term = Option.is_some c in
+    let terms = accumulate_terms terms in
+    let terms_list =
+      Map.fold_right ~init:[] terms ~f:(fun ~key ~data acc ->
+          (data, key) :: acc)
+    in
+    Some (terms_list, Map.length terms, has_constant_term)
+
+  (** Adds a row/gate/constraint to a constraint system `sys` *)
+  let add_row sys (vars : V.t option array) kind coeffs =
+    match sys.gates with
+    | `Finalized ->
+        failwith "add_row called on finalized constraint system"
+    | `Unfinalized_rev gates ->
+        (* as we're adding a row, we're adding new cells.
+           If these cells (the first 7) contain variables, make sure that they are wired *)
+        let num_vars = min Constants.permutation_cols (Array.length vars) in
+        let vars_for_perm = Array.slice vars 0 num_vars in
+        Array.iteri vars_for_perm ~f:(fun col x ->
+            Option.iter x ~f:(fun x -> wire sys x sys.next_row col)) ;
+
+        (* TODO: I think there are two things we should check here (and possible panic on):
+           - that these first 7 variables (that participate in the permutation argument) are not wired to anything that didn't participate in the permutation argument (hard to check as we don't have that information atm)
+           - that the remaining columns (that don't participate in the permutation argument) do not have anything that's part of the permutation argument (easy to check as we have that hashtbl) *)
+
+        (* add to gates *)
+        let open Position in
+        sys.gates <-
+          `Unfinalized_rev ({ kind; wired_to = [||]; coeffs } :: gates) ;
+        (* increment row *)
+        sys.next_row <- sys.next_row + 1 ;
+        (* add to row *)
+        sys.rows_rev <- vars :: sys.rows_rev
 
   (** Adds a generic constraint to the constraint system. 
       As there are two generic gates per row, we queue
@@ -773,20 +760,18 @@ struct
           ~equal ~one:(of_int 1))
         x
     in
-    let terms =
-      List.sort terms ~compare:(fun (_, i) (_, j) -> Int.compare i j)
+    let terms = accumulate_terms terms in
+    let terms_list =
+      Map.fold_right ~init:[] terms ~f:(fun ~key ~data acc ->
+          (data, key) :: acc)
     in
-    match (constant, terms) with
-    | Some c, [] ->
+    match (constant, Map.is_empty terms) with
+    | Some c, true ->
         (c, `Constant)
-    | None, [] ->
+    | None, true ->
         (Fp.zero, `Constant)
-    | _, t0 :: terms -> (
-        let terms =
-          let acc, i, ts, _ = accumulate_sorted_terms t0 terms in
-          List.rev ((acc, i) :: ts)
-        in
-        match terms with
+    | _ -> (
+        match terms_list with
         | [] ->
             assert false
         | [ (ls, lx) ] -> (
@@ -841,12 +826,17 @@ struct
               [| s; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero |]
               sys ;
             sx
-      | s, `Constant ->
-          let x = create_internal sys ~constant:s [] in
-          add_generic_constraint ~l:x
-            [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.negate s |]
-            sys ;
-          x
+      | s, `Constant -> (
+          match Hashtbl.find sys.cached_constants s with
+          | Some x ->
+              x
+          | None ->
+              let x = create_internal sys ~constant:s [] in
+              add_generic_constraint ~l:x
+                [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.negate s |]
+                sys ;
+              Hashtbl.set sys.cached_constants ~key:s ~data:x ;
+              x )
     in
     match constr with
     | Snarky_backendless.Constraint.Square (v1, v2) -> (
@@ -921,25 +911,45 @@ struct
         let (s1, x1), (s2, x2) = (red v1, red v2) in
         match (x1, x2) with
         | `Var x1, `Var x2 ->
-            (* s1 x1 - s2 x2 = 0
+            if Fp.equal s1 s2 then (
+              if not (Fp.equal s1 Fp.zero) then
+                Union_find.union (union_find sys x1) (union_find sys x2) )
+            else if (* s1 x1 - s2 x2 = 0
           *)
-            if not (Fp.equal s1 s2) then
+                    not (Fp.equal s1 s2) then
               add_generic_constraint ~l:x1 ~r:x2
                 [| s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero |]
                 sys
-              (* TODO: optimize by not adding generic costraint but rather permuting the vars *)
             else
               add_generic_constraint ~l:x1 ~r:x2
                 [| s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero |]
                 sys
-        | `Var x1, `Constant ->
-            add_generic_constraint ~l:x1
-              [| s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2 |]
-              sys
-        | `Constant, `Var x2 ->
-            add_generic_constraint ~r:x2
-              [| Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1 |]
-              sys
+        | `Var x1, `Constant -> (
+            (* s1 * x1 = s2
+               x1 = s2 / s1
+            *)
+            let ratio = Fp.(s2 / s1) in
+            match Hashtbl.find sys.cached_constants ratio with
+            | Some x2 ->
+                Union_find.union (union_find sys x1) (union_find sys x2)
+            | None ->
+                add_generic_constraint ~l:x1
+                  [| s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2 |]
+                  sys ;
+                Hashtbl.set sys.cached_constants ratio x1 )
+        | `Constant, `Var x2 -> (
+            (* s1 = s2 * x2
+               x2 = s1 / s2
+            *)
+            let ratio = Fp.(s1 / s2) in
+            match Hashtbl.find sys.cached_constants ratio with
+            | Some x1 ->
+                Union_find.union (union_find sys x1) (union_find sys x2)
+            | None ->
+                add_generic_constraint ~r:x2
+                  [| Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1 |]
+                  sys ;
+                Hashtbl.set sys.cached_constants ratio x2 )
         | `Constant, `Constant ->
             assert (Fp.(equal s1 s2)) )
     | Plonk_constraint.T (Basic { l; r; o; m; c }) ->
@@ -1037,9 +1047,6 @@ struct
             [| Params.params.round_constants.(round).(0)
              ; Params.params.round_constants.(round).(1)
              ; Params.params.round_constants.(round).(2)
-             ; Params.params.round_constants.(round + 4).(0) (* same for rc *)
-             ; Params.params.round_constants.(round + 4).(1)
-             ; Params.params.round_constants.(round + 4).(2)
              ; Params.params.round_constants.(round + 1).(0)
              ; Params.params.round_constants.(round + 1).(1)
              ; Params.params.round_constants.(round + 1).(2)
@@ -1049,6 +1056,9 @@ struct
              ; Params.params.round_constants.(round + 3).(0)
              ; Params.params.round_constants.(round + 3).(1)
              ; Params.params.round_constants.(round + 3).(2)
+             ; Params.params.round_constants.(round + 4).(0)
+             ; Params.params.round_constants.(round + 4).(1)
+             ; Params.params.round_constants.(round + 4).(2)
             |]
           in
           add_row sys vars Poseidon coeffs
@@ -1096,8 +1106,8 @@ struct
 
         *)
         let x1, y1 = reduce_curve_point p1 in
-        let x2, y2 = reduce_curve_point p1 in
-        let x3, y3 = reduce_curve_point p1 in
+        let x2, y2 = reduce_curve_point p2 in
+        let x3, y3 = reduce_curve_point p3 in
         let vars =
           [| Some x1
            ; Some y1
@@ -1162,9 +1172,10 @@ struct
              ; None
             |]
           in
-          add_row sys curr_row Vbmul [||] ;
+          add_row sys curr_row VarBaseMul [||] ;
           add_row sys next_row Zero [||]
         in
+
         Array.iter
           ~f:(fun round -> add_ecscale_round round ; incr i)
           (Array.map state ~f:(Scale_round.map ~f:reduce_to_v)) ;
@@ -1192,7 +1203,7 @@ struct
              ; Some round.b4
             |]
           in
-          add_row sys row Kimchi.Protocol.Endomul [||]
+          add_row sys row Kimchi.Protocol.EndoMul [||]
         in
         Array.iter state ~f:add_endoscale_round ;
         (* last row *)
@@ -1215,16 +1226,7 @@ struct
         in
         add_row sys vars Zero [||]
     | Plonk_constraint.T
-        (EC_endoscalar
-          { state : 'v Endoscale_scalar_round.t array
-          ; n8 : 'v
-          ; a8 : 'v
-          ; b8 : 'v
-          }) ->
-        (* reduce state *)
-        let state =
-          Array.map state ~f:(Endoscale_scalar_round.map ~f:reduce_to_v)
-        in
+        (EC_endoscalar { state : 'v Endoscale_scalar_round.t array }) ->
         (* add round function *)
         let add_endoscale_scalar_round (round : V.t Endoscale_scalar_round.t) =
           let row =
@@ -1245,28 +1247,12 @@ struct
              ; None
             |]
           in
-          add_row sys row Kimchi.Protocol.EndomulScalar [||]
+          add_row sys row Kimchi.Protocol.EndoMulScalar [||]
         in
-        Array.iter state ~f:add_endoscale_scalar_round ;
-        (* last row *)
-        let vars =
-          [| None
-           ; Some (reduce_to_v n8)
-           ; None
-           ; None
-           ; Some (reduce_to_v a8)
-           ; Some (reduce_to_v b8)
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-          |]
-        in
-        add_row sys vars Zero [||]
+        Array.iter state
+          ~f:
+            (Fn.compose add_endoscale_scalar_round
+               (Endoscale_scalar_round.map ~f:reduce_to_v))
     | constr ->
         failwithf "Unhandled constraint %s"
           Obj.(Extension_constructor.name (Extension_constructor.of_val constr))

@@ -1,10 +1,7 @@
 open Intf
-open Core
-
-(** some module *)
+open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
-(** some interface *)
 module type Input_intf = sig
   type t
 
@@ -46,7 +43,7 @@ module type Input_intf = sig
 
   val to_string : t -> string
 
-  val of_string : bytes -> t
+  val of_string : string -> t
 
   val random : unit -> t
 

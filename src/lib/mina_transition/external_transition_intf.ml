@@ -71,7 +71,7 @@ module type External_transition_base_intf = sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V1 : sig
+    module V2 : sig
       type nonrec t = t [@@deriving sexp]
     end
   end]
@@ -108,12 +108,12 @@ module type S = sig
     module Stable : sig
       [@@@no_toplevel_latest_type]
 
-      module V1 : sig
+      module V2 : sig
         type nonrec t = t =
           { scheduled_time : Block_time.Stable.V1.t
           ; protocol_state : Protocol_state.Value.Stable.V1.t
-          ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
-          ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
+          ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
+          ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
           ; delta_transition_chain_proof :
               Frozen_ledger_hash.Stable.V1.t
               * Frozen_ledger_hash.Stable.V1.t list
@@ -495,6 +495,7 @@ module type S = sig
        Validation.with_transition
        list
     -> verifier:Verifier.t
+    -> genesis_state_hash:State_hash.t
     -> ( ( 'time_received
          , 'genesis_state
          , [ `Proof ] * unit Truth.true_t

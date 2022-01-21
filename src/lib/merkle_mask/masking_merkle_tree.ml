@@ -179,6 +179,18 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.get (get_parent t) location
 
+    let get_batch t locations =
+      assert_is_attached t ;
+      let found_accounts, leftover_locations =
+        List.partition_map locations ~f:(fun location ->
+            match self_find_account t location with
+            | Some account ->
+                `Fst (location, Some account)
+            | None ->
+                `Snd location)
+      in
+      found_accounts @ Base.get_batch (get_parent t) leftover_locations
+
     (* fixup_merkle_path patches a Merkle path reported by the parent,
        overriding with hashes which are stored in the mask *)
 
@@ -227,6 +239,14 @@ module Make (Inputs : Inputs_intf.S) = struct
       let address = Location.to_path_exn location in
       let parent_merkle_path = Base.merkle_path (get_parent t) location in
       fixup_merkle_path t parent_merkle_path address
+
+    (* TODO: we should be able to optimize this some with a little thought *)
+    let merkle_path_batch t locations =
+      assert_is_attached t ;
+      locations
+      |> Base.merkle_path_batch (get_parent t)
+      |> List.map ~f:(fun (loc, path) ->
+             (loc, fixup_merkle_path t path (Location.to_path_exn loc)))
 
     (* given a Merkle path corresponding to a starting address, calculate
        addresses and hashes for each node affected by the starting hash; that is,
@@ -555,6 +575,19 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.location_of_account (get_parent t) account_id
 
+    let location_of_account_batch t account_ids =
+      assert_is_attached t ;
+      let found_locations, leftover_account_ids =
+        List.partition_map account_ids ~f:(fun account_id ->
+            match self_find_location t account_id with
+            | Some location ->
+                `Fst (account_id, Some location)
+            | None ->
+                `Snd account_id)
+      in
+      found_locations
+      @ Base.location_of_account_batch (get_parent t) leftover_account_ids
+
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let make_space_for t =
       assert_is_attached t ;
@@ -737,13 +770,37 @@ module Make (Inputs : Inputs_intf.S) = struct
         ( Addr.of_directions
         @@ List.init ledger_depth ~f:(fun _ -> Direction.Left) )
 
+    let next_location t =
+      let maybe_location =
+        match last_filled t with
+        | None ->
+            Some (first_location ~ledger_depth:t.depth)
+        | Some loc ->
+            Location.next loc
+      in
+      match maybe_location with
+      | None ->
+          Or_error.error_string "Db_error.Out_of_leaves"
+      | Some location ->
+          Ok location
+
     let loc_max a b =
       let a' = Location.to_path_exn a in
       let b' = Location.to_path_exn b in
       if Location.Addr.compare a' b' > 0 then a else b
 
+    (* NB: unsafe to call if account_id is already in ledger *)
+    let unsafe_create_account t account_id account =
+      let open Or_error.Let_syntax in
+      let%map location = next_location t in
+      set t location account ;
+      self_set_location t account_id location ;
+      t.current_location <- Some location ;
+      location
+
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t account_id account =
+      let open Or_error.Let_syntax in
       assert_is_attached t ;
       match self_find_location t account_id with
       | None -> (
@@ -751,23 +808,9 @@ module Make (Inputs : Inputs_intf.S) = struct
           match Base.location_of_account (get_parent t) account_id with
           | Some location ->
               Ok (`Existed, location)
-          | None -> (
-              (* not in parent, create new location *)
-              let maybe_location =
-                match last_filled t with
-                | None ->
-                    Some (first_location ~ledger_depth:t.depth)
-                | Some loc ->
-                    Location.next loc
-              in
-              match maybe_location with
-              | None ->
-                  Or_error.error_string "Db_error.Out_of_leaves"
-              | Some location ->
-                  set t location account ;
-                  self_set_location t account_id location ;
-                  t.current_location <- Some location ;
-                  Ok (`Added, location) ) )
+          | None ->
+              let%map location = unsafe_create_account t account_id account in
+              (`Added, location) )
       | Some location ->
           Ok (`Existed, location)
 

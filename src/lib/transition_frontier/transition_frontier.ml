@@ -21,6 +21,10 @@ let max_catchup_chunk_length = 20
 let global_max_length (genesis_constants : Genesis_constants.t) =
   genesis_constants.protocol.k
 
+let rejected_blocks = Queue.create () 
+
+let validated_blocks = Queue.create ()
+
 type t =
   { logger: Logger.t
   ; verifier: Verifier.t
@@ -102,7 +106,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
          ~root_ledger:
            (Persistent_root.Instance.snarked_ledger persistent_root_instance)
          ~consensus_local_state ~ignore_consensus_local_state
-         ~precomputed_values)
+         ~precomputed_values ~persistent_root_instance)
       ~f:
         (Result.map_error ~f:(function
           | `Sync_cannot_be_running ->
@@ -115,7 +119,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
     Deferred.return
       ( Persistent_frontier.Instance.start_sync
           ~constraint_constants:precomputed_values.constraint_constants
-          persistent_frontier_instance
+          ~persistent_root_instance persistent_frontier_instance
       |> Result.map_error ~f:(function
            | `Sync_cannot_be_running ->
                `Failure "sync job is already running on persistent frontier"
@@ -160,24 +164,32 @@ let rec load_with_max_length :
      ~precomputed_values ~catchup_mode () ->
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
-  let continue persistent_frontier_instance ~ignore_consensus_local_state =
-    let persistent_root_instance =
-      Persistent_root.create_instance_exn persistent_root
-    in
-    match%bind
-      load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
-        ~max_length ~persistent_root ~persistent_root_instance ~catchup_mode
-        ~persistent_frontier ~persistent_frontier_instance ~precomputed_values
-        ignore_consensus_local_state
+  let continue persistent_frontier_instance ~ignore_consensus_local_state
+      ~snarked_ledger_hash =
+    match
+      Persistent_root.load_from_disk_exn persistent_root ~snarked_ledger_hash ~logger
     with
-    | Ok _ as result ->
-        return result
     | Error _ as err ->
         let%map () =
           Persistent_frontier.Instance.destroy persistent_frontier_instance
         in
-        Persistent_root.Instance.destroy persistent_root_instance ;
         err
+    | Ok persistent_root_instance -> (
+        match%bind
+          load_from_persistence_and_start ~logger ~verifier
+            ~consensus_local_state ~max_length ~persistent_root
+            ~persistent_root_instance ~catchup_mode ~persistent_frontier
+            ~persistent_frontier_instance ~precomputed_values
+            ignore_consensus_local_state
+        with
+        | Ok _ as result ->
+            return result
+        | Error _ as err ->
+            let%map () =
+              Persistent_frontier.Instance.destroy persistent_frontier_instance
+            in
+            Persistent_root.Instance.close persistent_root_instance ;
+            err )
   in
   let persistent_frontier_instance =
     Persistent_frontier.create_instance_exn persistent_frontier
@@ -193,12 +205,15 @@ let rec load_with_max_length :
         ~root_data:(genesis_root_data ~precomputed_values)
         ~genesis_state_hash:precomputed_values.protocol_state_with_hash.hash
     in
-    let%bind () =
-      Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values
+    Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
+    let genesis_ledger_hash =
+      Precomputed_values.genesis_ledger precomputed_values
+      |> Lazy.force |> Ledger.merkle_root |> Frozen_ledger_hash.of_ledger_hash
     in
     continue
       (Persistent_frontier.create_instance_exn persistent_frontier)
       ~ignore_consensus_local_state:false
+      ~snarked_ledger_hash:genesis_ledger_hash
   in
   match
     Persistent_frontier.Instance.check_database
@@ -248,10 +263,10 @@ let rec load_with_max_length :
               | err ->
                   err ) )
       else return (Error `Persistent_frontier_malformed)
-  | Ok () -> (
+  | Ok snarked_ledger_hash -> (
       match%bind
         continue persistent_frontier_instance
-          ~ignore_consensus_local_state:true
+          ~ignore_consensus_local_state:true ~snarked_ledger_hash
       with
       | Error (`Failure err) when retry_with_fresh_db ->
           [%log error]
@@ -296,7 +311,7 @@ let close ~loc
   let%map () =
     Persistent_frontier.Instance.destroy persistent_frontier_instance
   in
-  Persistent_root.Instance.destroy persistent_root_instance ;
+  Persistent_root.Instance.close persistent_root_instance ;
   Ivar.fill_if_empty closed ()
 
 let closed t = Ivar.read t.closed
@@ -578,7 +593,7 @@ module For_tests = struct
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?(gen_root_breadcrumb =
         gen_genesis_breadcrumb_with_protocol_states ~logger ~verifier
-          ~precomputed_values ()) ~max_length ~size () =
+          ~precomputed_values ()) ~max_length ~size ?(use_super_catchup: bool option) () =
     let open Quickcheck.Generator.Let_syntax in
     let trust_system =
       Option.value trust_system ~default:(Trust_system.null ())
@@ -640,7 +655,7 @@ module For_tests = struct
       Async.Thread_safe.block_on_async_exn (fun () ->
           load_with_max_length ~max_length ~retry_with_fresh_db:false ~logger
             ~verifier ~consensus_local_state ~persistent_root
-            ~catchup_mode:`Normal ~persistent_frontier ~precomputed_values ()
+            ~catchup_mode:(match use_super_catchup with Some true -> `Super | Some false -> `Normal | None -> `Normal) ~persistent_frontier ~precomputed_values ()
       )
     in
     let frontier =
@@ -650,6 +665,8 @@ module For_tests = struct
           fail "bootstrap required"
       | Error `Persistent_frontier_malformed ->
           fail "persistent frontier malformed"
+      | Error `Snarked_ledger_mismatch ->
+          fail "persistent frontier is out of sync with snarked ledger"
       | Error (`Failure msg) ->
           fail msg
       | Ok frontier ->
@@ -674,10 +691,10 @@ module For_tests = struct
         ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?gen_root_breadcrumb ?(get_branch_root = root) ~max_length ~frontier_size
-      ~branch_size () =
+      ~branch_size ?(use_super_catchup: bool option) () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
-      gen ?logger ~verifier ?trust_system ?consensus_local_state
+      gen ?logger ~verifier ?trust_system ?use_super_catchup ?consensus_local_state
         ~precomputed_values ?gen_root_breadcrumb ~root_ledger_and_accounts
         ~max_length ~size:frontier_size ()
     in

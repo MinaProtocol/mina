@@ -49,7 +49,7 @@ module Ledger_inner = struct
 
         include Hashable.Make_binable (Arg)
 
-        let to_string = Ledger_hash.to_string
+        let to_base58_check = Ledger_hash.to_base58_check
 
         let merge = Ledger_hash.merge
 
@@ -63,8 +63,8 @@ module Ledger_inner = struct
   module Account = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
-        type t = Account.Stable.V1.t [@@deriving equal, compare, sexp]
+      module V2 = struct
+        type t = Account.Stable.V2.t [@@deriving equal, compare, sexp]
 
         let to_latest = Fn.id
 
@@ -364,3 +364,28 @@ let apply_initial_ledger_state : t -> init_state -> unit =
         }
       in
       create_new_account_exn t account_id account')
+
+let%test_unit "parties payment test" =
+  let open Transaction_logic.For_tests in
+  let module L = Ledger_inner in
+  Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+      let ts1 : Signed_command.t list = List.map specs ~f:command_send in
+      let ts2 : Parties.t list = List.map specs ~f:party_send in
+      L.with_ledger ~depth ~f:(fun l1 ->
+          L.with_ledger ~depth ~f:(fun l2 ->
+              Init_ledger.init (module L) init_ledger l1 ;
+              Init_ledger.init (module L) init_ledger l2 ;
+              let open Result.Let_syntax in
+              let%bind () =
+                iter_err ts1 ~f:(fun t ->
+                    apply_user_command_unchecked l1 t ~constraint_constants
+                      ~txn_global_slot)
+              in
+              let%bind () =
+                iter_err ts2 ~f:(fun t ->
+                    apply_parties_unchecked l2 t ~constraint_constants
+                      ~state_view:view)
+              in
+              let accounts = List.concat_map ~f:Parties.accounts_accessed ts2 in
+              test_eq (module L) accounts l1 l2))
+      |> Or_error.ok_exn)

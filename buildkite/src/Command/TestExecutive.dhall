@@ -20,16 +20,15 @@ in
         commands =
             -- Build test executive binary
             RunInToolchain.runInToolchainStretch [
-              "DUNE_PROFILE=${duneProfile}",
-              -- add zexe standardization preprocessing step (see: https://github.com/MinaProtocol/mina/pull/5777)
-              "PREPROCESSOR=./scripts/zexe-standardize.sh"
+              "DUNE_PROFILE=${duneProfile}"
             ] "./buildkite/scripts/build-test-executive.sh"
             
             #
             
             [
               -- Cache test-executive binary
-              Cmd.run "artifact-cache-helper.sh test_executive.exe --upload"
+              Cmd.run "artifact-cache-helper.sh test_executive.exe --upload",
+              Cmd.run "artifact-cache-helper.sh logproc.exe --upload"
             ],
         label = "Build test-executive",
         key = "build-test-executive",
@@ -44,13 +43,14 @@ in
             [
               -- Download test dependencies
               Cmd.run "artifact-cache-helper.sh test_executive.exe && chmod +x test_executive.exe",
+              Cmd.run "artifact-cache-helper.sh logproc.exe && chmod +x logproc.exe",
               Cmd.run (
                   "[ ! -f ${defaultArtifactStep.deploy_env_file} ] && buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID " ++
                       "--include-retried-jobs --step _${defaultArtifactStep.name}-${defaultArtifactStep.key} ${defaultArtifactStep.deploy_env_file} ."
               ),
 
               -- Execute test based on BUILD image
-              Cmd.run "source ${defaultArtifactStep.deploy_env_file} && ./buildkite/scripts/run-test-executive.sh ${testName}"
+              Cmd.run "MINA_DEB_CODENAME=buster ; source ${defaultArtifactStep.deploy_env_file} && ./buildkite/scripts/run-test-executive.sh ${testName}"
             ],
         artifact_paths = [SelectFiles.exactly "." "${testName}.test.log"],
         label = "${testName} integration test",

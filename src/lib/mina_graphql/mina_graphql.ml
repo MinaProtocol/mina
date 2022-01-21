@@ -250,6 +250,8 @@ module Types = struct
               match timing with
               | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
                   []
+              | Evaluating_vrf _last_checked_slot ->
+                  []
               | Produce info ->
                   [ of_time info.time ~consensus_constants ]
               | Produce_now info ->
@@ -262,6 +264,8 @@ module Types = struct
               (fun _ { Daemon_rpcs.Types.Status.Next_producer_timing.timing; _ } ->
               match timing with
               | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
+                  []
+              | Evaluating_vrf _last_checked_slot ->
                   []
               | Produce info ->
                   [ info.for_slot.global_slot_since_genesis ]
@@ -515,12 +519,12 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the source ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.source; _ } ->
-              Frozen_ledger_hash.to_string source)
+              Frozen_ledger_hash.to_base58_check source)
         ; field "targetLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the target ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.target; _ } ->
-              Frozen_ledger_hash.to_string target)
+              Frozen_ledger_hash.to_base58_check target)
         ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \
@@ -594,7 +598,7 @@ module Types = struct
               let snarked_ledger_hash =
                 Mina_state.Blockchain_state.snarked_ledger_hash blockchain_state
               in
-              Frozen_ledger_hash.to_string snarked_ledger_hash)
+              Frozen_ledger_hash.to_base58_check snarked_ledger_hash)
         ; field "stagedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the staged ledger"
             ~args:Arg.[]
@@ -603,7 +607,7 @@ module Types = struct
               let staged_ledger_hash =
                 Mina_state.Blockchain_state.staged_ledger_hash blockchain_state
               in
-              Mina_base.Ledger_hash.to_string
+              Mina_base.Ledger_hash.to_base58_check
               @@ Staged_ledger_hash.ledger_hash staged_ledger_hash)
         ; field "stagedLedgerProofEmitted" ~typ:bool
             ~doc:
@@ -1029,7 +1033,7 @@ module Types = struct
                  ~doc:"Top hash of the receipt chain merkle-list"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   Option.map ~f:Receipt.Chain_hash.to_string
+                   Option.map ~f:Receipt.Chain_hash.to_base58_check
                      account.Account.Poly.receipt_chain_hash)
              ; field "delegate" ~typ:public_key
                  ~doc:
@@ -1227,6 +1231,10 @@ module Types = struct
           ; abstract_field "feePayer"
               ~typ:(non_null AccountObj.account)
               ~args:[] ~doc:"Account that pays the fees for the command"
+          ; abstract_field "validUntil" ~typ:(non_null uint32) ~args:[]
+              ~doc:
+                "The global slot number after which this transaction cannot be \
+                 applied"
           ; abstract_field "token" ~typ:(non_null token_id) ~args:[]
               ~doc:"Token used by the command"
           ; abstract_field "amount" ~typ:(non_null uint64) ~args:[]
@@ -1318,6 +1326,11 @@ module Types = struct
           ~resolve:(fun { ctx = coda; _ } cmd ->
             AccountObj.get_best_ledger_account coda
               (Signed_command.fee_payer cmd.With_hash.data))
+      ; field_no_status "validUntil" ~typ:(non_null uint32) ~args:[]
+          ~doc:
+            "The global slot number after which this transaction cannot be \
+             applied" ~resolve:(fun _ cmd ->
+            Signed_command.valid_until cmd.With_hash.data)
       ; field_no_status "token" ~typ:(non_null token_id) ~args:[]
           ~doc:"Token used for the transaction" ~resolve:(fun _ cmd ->
             Signed_command.token cmd.With_hash.data)
@@ -1523,7 +1536,7 @@ module Types = struct
                       Some
                         (UserCommand.mk_user_command
                            { status; data = { t.data with data = c } })
-                  | Snapp_command _ ->
+                  | Parties _ ->
                       (* TODO: This should be supported in some graph QL query *)
                       None))
         ; field "feeTransfer"
@@ -1990,19 +2003,19 @@ module Types = struct
                      [Unsigned.UInt*] parsers:
                      * if the absolute value is greater than [max_int], the value
                        returned is [max_int]
-                       - ["99999999999999999999999999999999999"] is [max_int]
-                       - ["-99999999999999999999999999999999999"] is [max_int]
+                   - ["99999999999999999999999999999999999"] is [max_int]
+                   - ["-99999999999999999999999999999999999"] is [max_int]
                      * if otherwise the value is negative, the value returned is
                        [max_int - (x - 1)]
-                       - ["-1"] is [max_int]
+                   - ["-1"] is [max_int]
                      * if there is a non-numeric character part-way through the
                        string, the numeric prefix is treated as a number
-                       - ["1_000_000"] is [1]
-                       - ["-1_000_000"] is [max_int]
-                       - ["1.1"] is [1]
-                       - ["0x15"] is [0]
+                   - ["1_000_000"] is [1]
+                   - ["-1_000_000"] is [max_int]
+                   - ["1.1"] is [1]
+                   - ["0x15"] is [0]
                      * leading spaces are ignored
-                       - [" 1"] is [1]
+                   - [" 1"] is [1]
                      This is annoying to document, none of these behaviors are
                      useful to users, and unexpectedly triggering one of them
                      could have nasty consequences. Thus, we raise an error
@@ -2625,6 +2638,10 @@ module Mutations = struct
         Error "Could not find owned account associated with provided key"
     | Error `Bad_password ->
         Error "Wrong password provided"
+    | Error (`Key_read_error e) ->
+        Error
+          (sprintf "Error reading the secret key file: %s"
+             (Secrets.Privkey_error.to_string e))
     | Ok () ->
         Ok pk
 
@@ -3065,45 +3082,17 @@ module Mutations = struct
           ~f:(Fn.compose Yojson.Safe.to_string Error_json.error_to_yojson))
 
   let set_staking =
-    field "setStaking" ~doc:"Set keys you wish to stake with"
+    result_field "setStaking" ~doc:"Set keys you wish to stake with"
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.set_staking) ]
       ~typ:(non_null Types.Payload.set_staking)
-      ~resolve:(fun { ctx = coda; _ } () pks ->
-        let old_block_production_keys =
-          Mina_lib.block_production_pubkeys coda
-        in
-        let wallet = Mina_lib.wallets coda in
-        let unlocked, locked =
-          List.partition_map pks ~f:(fun pk ->
-              match Secrets.Wallets.find_unlocked ~needle:pk wallet with
-              | Some kp ->
-                  `Fst (kp, pk)
-              | None ->
-                  `Snd pk)
-        in
-        let unlocked_pks = List.map unlocked ~f:(fun (_kp, pk) -> pk) in
-        [%log' info (Mina_lib.top_level_logger coda)]
-          ~metadata:
-            [ ( "old"
-              , [%to_yojson: Public_key.Compressed.t list]
-                  (Public_key.Compressed.Set.to_list old_block_production_keys)
-              )
-            ; ("new", [%to_yojson: Public_key.Compressed.t list] unlocked_pks)
-            ]
-          "Block production key replacement; old: $old, new: $new" ;
-        if not (List.is_empty locked) then
-          [%log' warn (Mina_lib.top_level_logger coda)]
-            "Some public keys are locked and unavailable as block production \
-             keys"
-            ~metadata:
-              [ ("locked_pks", [%to_yojson: Public_key.Compressed.t list] locked)
-              ] ;
-        ignore
-        @@ Mina_lib.replace_block_production_keypairs coda
-             (Keypair.And_compressed_pk.Set.of_list unlocked) ;
-        ( Public_key.Compressed.Set.to_list old_block_production_keys
-        , locked
-        , List.map ~f:Tuple.T2.get2 unlocked ))
+      ~deprecated:
+        (Deprecated
+           (Some "Restart the daemon with the flag --block-producer-key instead"))
+      ~resolve:(fun { ctx = _coda; _ } () _pks ->
+        Error
+          "The setStaking command is deprecated and no longer has any effect. \
+           To enable block production, instead restart the daemon with the \
+           flag --block-producer-key.")
 
   let set_coinbase_receiver =
     field "setCoinbaseReceiver" ~doc:"Set the key to receive coinbases"
@@ -3188,12 +3177,12 @@ module Mutations = struct
           |> Deferred.return
         in
         let net = Mina_lib.net coda in
-        let seed = Option.value ~default:true seed in
+        let is_seed = Option.value ~default:true seed in
         let%bind.Async.Deferred maybe_failure =
           (* Add peers until we find an error *)
           Deferred.List.find_map peers ~f:(fun peer ->
               match%map.Async.Deferred
-                Mina_networking.add_peer net peer ~seed
+                Mina_networking.add_peer net peer ~is_seed
               with
               | Ok () ->
                   None
@@ -3394,7 +3383,7 @@ module Queries = struct
                    Some
                      (Types.UserCommand.mk_user_command
                         { status = Unknown; data = { x with data } })
-               | Snapp_command _ ->
+               | Parties _ ->
                    None))
 
   let sync_status =
@@ -3493,6 +3482,13 @@ module Queries = struct
           ]
       ~resolve:account_resolver
 
+  let get_ledger_and_breadcrumb coda =
+    coda |> Mina_lib.best_tip |> Participating_state.active
+    |> Option.map ~f:(fun tip ->
+           ( Transition_frontier.Breadcrumb.staged_ledger tip
+             |> Staged_ledger.ledger
+           , tip ))
+
   let account =
     field "account" ~doc:"Find any account via a public key and token"
       ~typ:Types.AccountObj.account
@@ -3505,10 +3501,15 @@ module Queries = struct
               ~typ:Types.Input.token_id_arg ~default:Token_id.default
           ]
       ~resolve:(fun { ctx = coda; _ } () pk token ->
-        Some
-          ( Account_id.create pk token
-          |> Types.AccountObj.Partial_account.of_account_id coda
-          |> Types.AccountObj.lift coda pk ))
+        Option.bind (get_ledger_and_breadcrumb coda)
+          ~f:(fun (ledger, breadcrumb) ->
+            let open Option.Let_syntax in
+            let%bind location =
+              Ledger.location_of_account ledger (Account_id.create pk token)
+            in
+            let%map account = Ledger.get ledger location in
+            Types.AccountObj.Partial_account.of_full_account ~breadcrumb account
+            |> Types.AccountObj.lift coda pk))
 
   let accounts_for_pk =
     field "accounts" ~doc:"Find all accounts for a public key"
@@ -3519,13 +3520,7 @@ module Queries = struct
               ~typ:(non_null Types.Input.public_key_arg)
           ]
       ~resolve:(fun { ctx = coda; _ } () pk ->
-        match
-          coda |> Mina_lib.best_tip |> Participating_state.active
-          |> Option.map ~f:(fun tip ->
-                 ( Transition_frontier.Breadcrumb.staged_ledger tip
-                   |> Staged_ledger.ledger
-                 , tip ))
-        with
+        match get_ledger_and_breadcrumb coda with
         | Some (ledger, breadcrumb) ->
             let tokens = Ledger.tokens ledger pk |> Set.to_list in
             List.filter_map tokens ~f:(fun token ->
@@ -3731,8 +3726,8 @@ module Queries = struct
           let height_uint32 =
             (* GraphQL int is signed 32-bit
                  empirically, conversion does not raise even if
-                 - the number is negative
-                 - the number is not representable using 32 bits
+               - the number is negative
+               - the number is not representable using 32 bits
             *)
             Unsigned.UInt32.of_int height
           in

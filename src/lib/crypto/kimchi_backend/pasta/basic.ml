@@ -1,9 +1,7 @@
 open Core_kernel
 open Kimchi_backend_common
 
-(** ? *)
 module Rounds : sig
-  (* TODO: remove open *)
   open Pickles_types
 
   module Wrap : Nat.Add.Intf_transparent
@@ -15,8 +13,8 @@ module Rounds : sig
   module Step_vector : Vector.With_version(Step).S
 end = struct
   open Pickles_types
-  module Wrap = Nat.N17
-  module Step = Nat.N18
+  module Wrap = Nat.N15
+  module Step = Nat.N16
 
   (* Think about versioning here! These vector types *will* change
      serialization if the numbers above change, and so will require a new
@@ -31,17 +29,17 @@ end = struct
       [@@@no_toplevel_latest_type]
 
       module V1 = struct
-        type 'a t = 'a Vector.Vector_17.Stable.V1.t
+        type 'a t = 'a Vector.Vector_15.Stable.V1.t
         [@@deriving compare, yojson, sexp, hash, equal]
       end
     end]
 
-    type 'a t = 'a Vector.Vector_17.t
+    type 'a t = 'a Vector.Vector_15.t
     [@@deriving compare, yojson, sexp, hash, equal]
 
     let map = Vector.map
 
-    let of_list_exn = Vector.Vector_17.of_list_exn
+    let of_list_exn = Vector.Vector_15.of_list_exn
 
     let to_list = Vector.to_list
   end
@@ -52,17 +50,17 @@ end = struct
       [@@@no_toplevel_latest_type]
 
       module V1 = struct
-        type 'a t = 'a Vector.Vector_18.Stable.V1.t
+        type 'a t = 'a Vector.Vector_16.Stable.V1.t
         [@@deriving compare, yojson, sexp, hash, equal]
       end
     end]
 
-    type 'a t = 'a Vector.Vector_18.t
+    type 'a t = 'a Vector.Vector_16.t
     [@@deriving compare, yojson, sexp, hash, equal]
 
     let map = Vector.map
 
-    let of_list_exn = Vector.Vector_18.of_list_exn
+    let of_list_exn = Vector.Vector_16.of_list_exn
 
     let to_list = Vector.to_list
   end
@@ -76,7 +74,7 @@ module Bigint256 =
       let length_in_bytes = 32
     end)
 
-(* the two pasta fields *)
+(* the two pasta fields and curves *)
 
 module Fp = Field.Make (struct
   module Bigint = Bigint256
@@ -89,8 +87,6 @@ module Fq = Field.Make (struct
   include Kimchi.Foundations.Fq
   module Vector = Kimchi.FieldVectors.Fq
 end)
-
-(* the two pasta curves *)
 
 module Vesta = struct
   module Params = struct

@@ -1,9 +1,10 @@
 open Core_kernel
+open Async_kernel
 open Mina_base
 
 [%%versioned:
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t [@@deriving sexp]
 
     val hash : t -> Staged_ledger_hash.Aux_hash.t
@@ -13,7 +14,7 @@ end]
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
-    { transaction_with_info : Ledger.Transaction_applied.t
+    { transaction_with_info : Transaction_logic.Transaction_applied.t
     ; state_hash : State_hash.t * State_body_hash.t
     ; state_view : Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
     ; statement : Transaction_snark.Statement.t
@@ -39,42 +40,34 @@ module Job_view : sig
   type t [@@deriving sexp, to_yojson]
 end
 
-module type Monad_with_Or_error_intf = sig
-  type 'a t
+module Make_statement_scanner (Verifier : sig
+  type t
 
-  include Monad.S with type 'a t := 'a t
-
-  module Or_error : sig
-    type nonrec 'a t = 'a Or_error.t t
-
-    include Monad.S with type 'a t := 'a t
-  end
-end
-
-module Make_statement_scanner
-    (M : Monad_with_Or_error_intf) (Verifier : sig
-      type t
-
-      val verify :
-        verifier:t -> Ledger_proof_with_sok_message.t list -> bool M.Or_error.t
-    end) : sig
+  val verify :
+       verifier:t
+    -> Ledger_proof_with_sok_message.t list
+    -> bool Deferred.Or_error.t
+end) : sig
   val scan_statement :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> t
+       t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> statement_check:[ `Full | `Partial ]
     -> verifier:Verifier.t
-    -> (Transaction_snark.Statement.t, [ `Empty | `Error of Error.t ]) result
-       M.t
+    -> ( Transaction_snark.Statement.t
+       , [ `Empty | `Error of Error.t ] )
+       Deferred.Result.t
 
   val check_invariants :
        t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> statement_check:[ `Full | `Partial ]
     -> verifier:Verifier.t
     -> error_prefix:string
     -> ledger_hash_end:Frozen_ledger_hash.t
     -> ledger_hash_begin:Frozen_ledger_hash.t option
     -> next_available_token_begin:Token_id.t option
     -> next_available_token_end:Token_id.t
-    -> (unit, Error.t) result M.t
+    -> (unit, Error.t) Deferred.Result.t
 end
 
 (*All the transactions with undos*)
