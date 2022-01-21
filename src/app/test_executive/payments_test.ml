@@ -94,7 +94,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ~receiver_pub_key ~amount))
     in
     section "unable to send payment from timed account using illiquid tokens"
-      (let amount = Currency.Amount.of_int 6_000_000_000_000 in
+      (let amount = Currency.Amount.of_int 6_900_000_000_000 in
        let receiver = untimed_node_b in
        let%bind receiver_pub_key = Util.pub_key_of_node receiver in
        let sender = timed_node_a in
