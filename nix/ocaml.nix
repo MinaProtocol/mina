@@ -8,11 +8,9 @@ let
 
   inherit (pkgs.lib) hasPrefix;
 
-  external-repo = opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
-  repos = [
-    external-repo
-    inputs.opam-repository
-  ];
+  external-repo =
+    opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
+  repos = [ external-repo inputs.opam-repository ];
 
   export =
     opam-nix.opamListToQuery (opam-nix.importOpam ../src/opam.export).installed;
@@ -57,62 +55,84 @@ let
       libffi
     ];
 
-  overlay = self: super: {
-    sodium = super.sodium.overrideAttrs (_: {
-      NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
-      propagatedBuildInputs = [ pkgs.sodium-static ];
-      preBuild = ''
-        export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
-      '';
-    });
+  filtered-src = path {
+    path = filterSource (name: type:
+      name == (toString (../. + "/dune"))
+      || hasPrefix (toString (../. + "/src")) name) ../.;
+    name = "mina";
+  };
 
-    rpc_parallel = super.rpc_parallel.overrideAttrs
-      (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
+  overlay = self: super:
+    let
+      ocaml-libs =
+        builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self);
+    in {
+      sodium = super.sodium.overrideAttrs (_: {
+        NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
+        propagatedBuildInputs = [ pkgs.sodium-static ];
+        preBuild = ''
+          export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
+        '';
+      });
 
-    mina = pkgs.stdenv.mkDerivation ({
-      pname = "mina";
-      version = "dev";
-      # Prevent unnecessary rebuilds on non-source changes
-      src = path {
-        path = filterSource (name: type:
-          name == (toString (../. + "/dune"))
-          || hasPrefix (toString (../. + "/src")) name) ../.;
-        name = "mina";
-      };
+      rpc_parallel = super.rpc_parallel.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
+
+      mina = pkgs.stdenv.mkDerivation ({
+        pname = "mina";
+        version = "dev";
+        # Prevent unnecessary rebuilds on non-source changes
+        src = filtered-src;
+
       # TODO, get this from somewhere
       MARLIN_REPO_SHA = "<unknown>";
+        MINA_COMMIT_DATE =
+          if sourceInfo ? rev then sourceInfo.lastModifiedDate else "<unknown>";
+        MINA_COMMIT_SHA1 = sourceInfo.rev or "DIRTY";
+        MINA_BRANCH = "<unknown>";
 
-      MINA_COMMIT_DATE =
-        if sourceInfo ? rev then sourceInfo.lastModifiedDate else "<unknown>";
-      MINA_COMMIT_SHA1 = sourceInfo.rev or "DIRTY";
-      MINA_BRANCH = "<unknown>";
+        buildInputs = ocaml-libs ++ external-libs;
+        nativeBuildInputs =
+          [ self.dune self.ocamlfind pkgs.capnproto pkgs.removeReferencesTo ]
+          ++ ocaml-libs;
 
-      buildInputs =
-        (builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self))
-        ++ external-libs;
-      nativeBuildInputs =
-        [ self.dune self.ocamlfind pkgs.capnproto pkgs.removeReferencesTo ]
-        ++ builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self);
+        # todo: slimmed rocksdb
+        MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
+        GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
-      # todo: slimmed rocksdb
-      MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
-      GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
       MARLIN_PLONK_STUBS = "${pkgs.marlin_plonk_bindings_stubs}/lib";
+        configurePhase = ''
+          export MINA_ROOT="$PWD"
+          patchShebangs .
+        '';
 
-      configurePhase = ''
-        export MINA_ROOT="$PWD"
-        patchShebangs .
-      '';
+        buildPhase = ''
+          dune build --display=short src/app/logproc/logproc.exe src/app/cli/src/mina.exe -j$NIX_BUILD_CORES
+        '';
 
-      buildPhase = ''
-        dune build --display=short src/app/logproc/logproc.exe src/app/cli/src/mina.exe -j$NIX_BUILD_CORES
-      '';
+        installPhase = ''
+          mkdir -p $out/bin
+          mv _build/default/src/app/{logproc/logproc.exe,cli/src/mina.exe} $out/bin
+          remove-references-to -t $(dirname $(dirname $(command -v ocaml))) $out/bin/*
+        '';
+      } // pkgs.lib.optionalAttrs static { OCAMLPARAM = "_,ccopt=-static"; });
 
-      installPhase = ''
-        mkdir -p $out/bin
-        mv _build/default/src/app/{logproc/logproc.exe,cli/src/mina.exe} $out/bin
-        remove-references-to -t $(dirname $(dirname $(command -v ocaml))) $out/bin/*
-      '';
-    } // pkgs.lib.optionalAttrs static { OCAMLPARAM = "_,ccopt=-static"; });
-  };
+      mina_client_sdk = pkgs.stdenv.mkDerivation {
+        pname = "mina_client_sdk";
+        version = "dev";
+        src = filtered-src;
+
+        buildInputs = ocaml-libs;
+
+        buildPhase = ''
+          export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$opam__zarith__lib/zarith"
+          dune build --display=short src/app/client_sdk/client_sdk.bc.js --profile=nonconsensus_mainnet
+        '';
+
+        installPhase = ''
+          mkdir -p $out/share/client_sdk
+          mv _build/default/src/app/client_sdk/client_sdk.bc.js $out/share/client_sdk
+        '';
+      };
+    };
 in scope.overrideScope' overlay
