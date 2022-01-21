@@ -377,7 +377,7 @@ module Body = struct
              , 'bool
              , 'protocol_state )
              t =
-          { pk : 'pk
+          { public_key : 'pk
           ; update : 'update
           ; token_id : 'token_id
           ; balance_change : 'amount
@@ -446,7 +446,7 @@ module Body = struct
     end]
 
     let dummy : t =
-      { pk = Public_key.Compressed.empty
+      { public_key = Public_key.Compressed.empty
       ; update = Update.dummy
       ; token_id = ()
       ; balance_change = Fee.zero
@@ -485,7 +485,7 @@ module Body = struct
       Poly.t
 
     let to_input
-        ({ pk
+        ({ public_key
          ; update
          ; token_id
          ; balance_change
@@ -499,7 +499,7 @@ module Body = struct
          } :
           t) =
       List.reduce_exn ~f:Random_oracle_input.append
-        [ Public_key.Compressed.Checked.to_input pk
+        [ Public_key.Compressed.Checked.to_input public_key
         ; Update.Checked.to_input update
         ; Impl.run_checked (Token_id.Checked.to_input token_id)
         ; Amount.Signed.Checked.to_input balance_change
@@ -535,7 +535,7 @@ module Body = struct
       ~value_of_hlist:of_hlist
 
   let dummy : t =
-    { pk = Public_key.Compressed.empty
+    { public_key = Public_key.Compressed.empty
     ; update = Update.dummy
     ; token_id = Token_id.default
     ; balance_change = Amount.Signed.zero
@@ -549,7 +549,7 @@ module Body = struct
     }
 
   let to_input
-      ({ pk
+      ({ public_key
        ; update
        ; token_id
        ; balance_change
@@ -563,7 +563,7 @@ module Body = struct
        } :
         t) =
     List.reduce_exn ~f:Random_oracle_input.append
-      [ Public_key.Compressed.to_input pk
+      [ Public_key.Compressed.to_input public_key
       ; Update.to_input update
       ; Token_id.to_input token_id
       ; Amount.Signed.to_input balance_change
@@ -827,7 +827,7 @@ module Signed = struct
   end]
 
   let account_id (t : t) : Account_id.t =
-    Account_id.create t.data.body.pk t.data.body.token_id
+    Account_id.create t.data.body.public_key t.data.body.token_id
 end
 
 module Fee_payer = struct
@@ -845,7 +845,7 @@ module Fee_payer = struct
   end]
 
   let account_id (t : t) : Account_id.t =
-    Account_id.create t.data.body.pk Token_id.default
+    Account_id.create t.data.body.public_key Token_id.default
 
   let to_signed (t : t) : Signed.t =
     { authorization = t.authorization
@@ -878,7 +878,7 @@ module Stable = struct
 end]
 
 let account_id (t : t) : Account_id.t =
-  Account_id.create t.data.body.pk t.data.body.token_id
+  Account_id.create t.data.body.public_key t.data.body.token_id
 
 let of_signed ({ data; authorization } : Signed.t) : t =
   { authorization = Signature authorization; data = Predicated.of_signed data }

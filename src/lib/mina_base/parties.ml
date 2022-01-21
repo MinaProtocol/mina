@@ -298,10 +298,10 @@ let fee_excess (t : t) =
 
 let accounts_accessed (t : t) =
   List.map (parties t) ~f:(fun p ->
-      Account_id.create p.data.body.pk p.data.body.token_id)
+      Account_id.create p.data.body.public_key p.data.body.token_id)
   |> List.stable_dedup
 
-let fee_payer_pk (t : t) = t.fee_payer.data.body.pk
+let fee_payer_pk (t : t) = t.fee_payer.data.body.public_key
 
 let value_if b ~then_ ~else_ = if b then then_ else else_
 

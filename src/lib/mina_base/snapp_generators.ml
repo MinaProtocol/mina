@@ -538,7 +538,7 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
                       "gen_party_body: provided account has no snapp field" ;
                   return acct ) )
   in
-  let pk = account.public_key in
+  let public_key = account.public_key in
   let token_id = account.token_id in
   let%bind balance_change =
     match required_balance_change with
@@ -574,7 +574,8 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
                   "add_balance_and_balance_change: underflow for difference" )
       in
       let balance_change = f_balance_change balance_change in
-      Signature_lib.Public_key.Compressed.Table.change tbl pk ~f:(function
+      Signature_lib.Public_key.Compressed.Table.change tbl public_key
+        ~f:(function
         | None ->
             (* new entry in table *)
             Some (add_balance_and_balance_change account.balance balance_change)
@@ -606,7 +607,7 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
       ~default:(return Snapp_predicate.Protocol_state.accept)
   in
   let%map use_full_commitment = gen_use_full_commitment in
-  { Party.Body.Poly.pk
+  { Party.Body.Poly.public_key
   ; update
   ; token_id
   ; balance_change
@@ -634,7 +635,8 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false) ?account_id
       ?protocol_state_view
   in
   let account_id =
-    Account_id.create body.Party.Body.Poly.pk body.Party.Body.Poly.token_id
+    Account_id.create body.Party.Body.Poly.public_key
+      body.Party.Body.Poly.token_id
   in
   let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger () in
   Party.Predicated.Poly.{ body; predicate }
@@ -682,7 +684,7 @@ let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
   assert (Token_id.equal body0.token_id Token_id.default) ;
   let body = { body0 with token_id = () } in
   (* use nonce from account in ledger *)
-  let pk = body.pk in
+  let pk = body.public_key in
   let account_id = Account_id.create pk Token_id.default in
   let account =
     match Ledger.location_of_account ledger account_id with
@@ -755,7 +757,7 @@ let gen_parties_from ?(succeed = true)
   let balances_tbl = Signature_lib.Public_key.Compressed.Table.create () in
   let gen_parties_with_dynamic_balance ~new_parties num_parties =
     (* add fee payer account, in case same account used again *)
-    let fee_payer_pk = fee_payer.data.body.pk in
+    let fee_payer_pk = fee_payer.data.body.public_key in
     let fee_payer_balance =
       (* if we've done things right, all the options here are Some *)
       let fee =
@@ -806,7 +808,8 @@ let gen_parties_from ?(succeed = true)
           (* authorization according to chosen permissions auth *)
           let authorization = Control.dummy_of_tag permissions_auth in
           let account_id =
-            Account_id.create party0.data.body.pk party0.data.body.token_id
+            Account_id.create party0.data.body.public_key
+              party0.data.body.token_id
           in
           (* if we use this account again, it will have a Signature authorization *)
           let permissions_auth = Control.Tag.Signature in
@@ -907,7 +910,7 @@ let gen_parties_from ?(succeed = true)
         let authorization_with_valid_signature =
           match authorization with
           | Control.Signature _dummy ->
-              let pk = data.body.pk in
+              let pk = data.body.public_key in
               let sk =
                 match
                   Signature_lib.Public_key.Compressed.Map.find keymap pk

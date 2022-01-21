@@ -1248,7 +1248,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ~(state_view : Snapp_predicate.Protocol_state.View.t) ~check_auth
       ~has_proof ~is_new ~global_slot_since_genesis ~is_start
       ({ body =
-           { pk = _
+           { public_key = _
            ; token_id
            ; update =
                { app_state
@@ -2591,7 +2591,7 @@ module For_tests = struct
       { fee_payer =
           { Party.Fee_payer.data =
               { body =
-                  { pk = sender_pk
+                  { public_key = sender_pk
                   ; update = Party.Update.noop
                   ; token_id = ()
                   ; balance_change = fee
@@ -2611,7 +2611,7 @@ module For_tests = struct
       ; other_parties =
           [ { data =
                 { body =
-                    { pk = sender_pk
+                    { public_key = sender_pk
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
                     ; balance_change =
@@ -2630,7 +2630,7 @@ module For_tests = struct
             }
           ; { data =
                 { body =
-                    { pk = receiver
+                    { public_key = receiver
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
                     ; balance_change = Amount.Signed.(of_unsigned amount)

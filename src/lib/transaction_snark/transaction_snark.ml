@@ -1236,7 +1236,7 @@ module Base = struct
         ~txn_global_slot ~(add_check : ?label:string -> Boolean.var -> unit)
         ~check_auth ~is_start
         ({ body =
-             { pk
+             { public_key
              ; token_id = _
              ; update =
                  { app_state
@@ -1284,7 +1284,9 @@ module Base = struct
       in
       with_label __LOC__ (fun () ->
           Boolean.Assert.any
-            [ is_new; !(Public_key.Compressed.Checked.equal pk a.public_key) ]) ;
+            [ is_new
+            ; !(Public_key.Compressed.Checked.equal public_key a.public_key)
+            ]) ;
       let is_receiver = Sgn.Checked.is_pos balance_change.sgn in
       let timing =
         let open Snapp_basic in
@@ -1467,7 +1469,7 @@ module Base = struct
       let delegate =
         let base_delegate =
           (* New accounts should have the delegate equal to the public key of the account. *)
-          !(Public_key.Compressed.Checked.if_ is_new ~then_:pk
+          !(Public_key.Compressed.Checked.if_ is_new ~then_:public_key
               ~else_:a.delegate)
         in
         update_authorized a.permissions.set_delegate
@@ -1524,7 +1526,7 @@ module Base = struct
         ; permissions
         ; timing
         ; nonce
-        ; public_key = pk
+        ; public_key
         ; snapp_uri
         ; token_symbol
         }
@@ -1845,7 +1847,7 @@ module Base = struct
         let body_id (body : Party.Body.Checked.t) =
           let open As_prover in
           Account_id.create
-            (read Public_key.Compressed.typ body.pk)
+            (read Public_key.Compressed.typ body.public_key)
             (read Token_id.typ body.token_id)
         in
         let idx ledger id = Sparse_ledger.find_index_exn ledger id in
@@ -2043,7 +2045,8 @@ module Base = struct
                      in
                      signature_verifies
                        ~shifted:(module S)
-                       ~payload_digest:commitment signature party.data.body.pk)
+                       ~payload_digest:commitment signature
+                       party.data.body.public_key)
             in
             (* The fee-payer must increment their nonce. *)
             add_check Boolean.(party.data.body.increment_nonce ||| not is_start) ;
@@ -4092,7 +4095,8 @@ struct
                 let%map pi = party_proof p in
                 let vk =
                   let account_id =
-                    Account_id.create p.data.body.pk p.data.body.token_id
+                    Account_id.create p.data.body.public_key
+                      p.data.body.token_id
                   in
                   let account : Account.t =
                     Sparse_ledger.(
@@ -4306,7 +4310,7 @@ module For_tests = struct
     let fee_payer =
       { Party.Fee_payer.data =
           { body =
-              { pk = sender_pk
+              { public_key = sender_pk
               ; update = Party.Update.noop
               ; token_id = ()
               ; balance_change = fee
@@ -4327,7 +4331,7 @@ module For_tests = struct
     let sender_party : Party.t option =
       let sender_party_data : Party.Predicated.t =
         { body =
-            { pk = sender_pk
+            { public_key = sender_pk
             ; update = Party.Update.noop
             ; token_id = Token_id.default
             ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
@@ -4351,7 +4355,7 @@ module For_tests = struct
     in
     let snapp_party : Party.t option =
       Option.map snapp_account_keypair ~f:(fun snapp_account_keypair ->
-          let pk =
+          let public_key =
             Signature_lib.Public_key.compress snapp_account_keypair.public_key
           in
           let delta =
@@ -4360,7 +4364,7 @@ module For_tests = struct
           in
           { Party.data =
               { body =
-                  { pk
+                  { public_key
                   ; update
                   ; token_id = Token_id.default
                   ; balance_change = delta
@@ -4382,7 +4386,7 @@ module For_tests = struct
       List.map receivers ~f:(fun (receiver, amt) ->
           { Party.data =
               { body =
-                  { pk = receiver
+                  { public_key = receiver
                   ; update
                   ; token_id = Token_id.default
                   ; balance_change = Amount.Signed.of_unsigned amt
@@ -4626,7 +4630,7 @@ module For_tests = struct
     let fee_payer =
       { Party.Fee_payer.data =
           { body =
-              { pk = sender_pk
+              { public_key = sender_pk
               ; update = Party.Update.noop
               ; token_id = ()
               ; balance_change = fee
@@ -4646,7 +4650,7 @@ module For_tests = struct
     in
     let sender_party_data : Party.Predicated.t =
       { body =
-          { pk = sender_pk
+          { public_key = sender_pk
           ; update = Party.Update.noop
           ; token_id = Token_id.default
           ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
@@ -4663,7 +4667,7 @@ module For_tests = struct
     in
     let snapp_party_data : Party.Predicated.t =
       { body =
-          { pk = trivial_account_pk
+          { public_key = trivial_account_pk
           ; update = update_empty_permissions
           ; token_id = Token_id.default
           ; balance_change = Amount.Signed.(of_unsigned amount)
@@ -5071,7 +5075,7 @@ let%test_module "transaction_snark" =
       { fee_payer =
           { Party.Fee_payer.data =
               { body =
-                  { pk = acct1.account.public_key
+                  { public_key = acct1.account.public_key
                   ; update =
                       { app_state =
                           Vector.map new_state ~f:(fun x ->
@@ -5100,7 +5104,7 @@ let%test_module "transaction_snark" =
       ; other_parties =
           [ { data =
                 { body =
-                    { pk = acct1.account.public_key
+                    { public_key = acct1.account.public_key
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
                     ; balance_change =
@@ -5119,7 +5123,7 @@ let%test_module "transaction_snark" =
             }
           ; { data =
                 { body =
-                    { pk = acct2.account.public_key
+                    { public_key = acct2.account.public_key
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
                     ; balance_change =
@@ -5657,7 +5661,7 @@ let%test_module "transaction_snark" =
                   let fee_payer =
                     { Party.Fee_payer.data =
                         { body =
-                            { pk = sender_pk
+                            { public_key = sender_pk
                             ; update = Party.Update.noop
                             ; token_id = ()
                             ; balance_change = fee
@@ -5678,7 +5682,7 @@ let%test_module "transaction_snark" =
                   in
                   let sender_party_data : Party.Predicated.t =
                     { body =
-                        { pk = sender_pk
+                        { public_key = sender_pk
                         ; update = Party.Update.noop
                         ; token_id = Token_id.default
                         ; balance_change =
@@ -5696,7 +5700,7 @@ let%test_module "transaction_snark" =
                   in
                   let snapp_party_data : Party.Predicated.t =
                     { Party.Predicated.Poly.body =
-                        { pk = multisig_account_pk
+                        { public_key = multisig_account_pk
                         ; update = update_empty_permissions
                         ; token_id = Token_id.default
                         ; balance_change = Amount.Signed.(of_unsigned amount)
