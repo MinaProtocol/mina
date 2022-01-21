@@ -273,7 +273,11 @@ let optdef_arg_method (type a) class_ (name : string)
   in
   Js.Unsafe.set prototype (Js.string name) meth
 
-let to_js_field =
+let to_js_field x : field_class Js.t = new%js field_constr (As_field.of_field x)
+
+let of_js_field (x : field_class Js.t) : Field.t = x##.value
+
+let () =
   let method_ name (f : field_class Js.t -> _) = method_ field_class name f in
   let to_string (x : Field.t) =
     ( match x with
@@ -284,7 +288,7 @@ let to_js_field =
         As_prover.read_var x )
     |> Field.Constant.to_string |> Js.string
   in
-  let mk x : field_class Js.t = new%js field_constr (As_field.of_field x) in
+  let mk = to_js_field in
   let add_op1 name (f : Field.t -> Field.t) =
     method_ name (fun this : field_class Js.t -> mk (f this##.value))
   in
@@ -524,8 +528,7 @@ let to_js_field =
                  else Field.Constant.of_string s ))
           with Failure _ -> Js.Opt.empty )
       | _ ->
-          Js.Opt.empty) ;
-  mk
+          Js.Opt.empty)
 
 let () =
   let handle_constants2 f f_constant (x : Boolean.var) (y : Boolean.var) =
@@ -1631,7 +1634,6 @@ let create_pickles_rule (identifier, main) =
   }
 
 let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
-  console_log_string "pickles_compile" ;
   let choices = choices |> Js.to_array |> Array.to_list in
   let choices ~self:_ = List.map choices ~f:create_pickles_rule |> Obj.magic in
   let _tag, _cache, p, provers =
@@ -1657,8 +1659,17 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
         }
   in
   let module Proof = (val p) in
+  let to_value (x : Field.t) =
+    match x with Constant y -> y | _ -> failwith "can't convert to value"
+  in
+  let to_js_prover prover thing =
+    Run_in_thread.block_on_async_exn (fun () ->
+        prover ~handler:(Obj.magic 0) [] (to_value (of_js_field thing)))
+  in
   object%js
-    val provers = provers |> Obj.magic |> Array.of_list |> Js.array
+    val provers =
+      provers |> Obj.magic |> List.map ~f:to_js_prover |> Array.of_list
+      |> Js.array
 
     val getVerificationKey = fun () -> Lazy.force Proof.verification_key
   end
