@@ -173,7 +173,7 @@ module Body = struct
         [ Public_key.Compressed.Checked.to_input pk
         ; Update.Checked.to_input update
         ; Token_id.Checked.to_input token_id
-        ; Amount.Signed.Checked.to_input delta
+        ; Impl.run_checked (Amount.Signed.Checked.to_input delta)
         ]
 
     let digest (t : t) =

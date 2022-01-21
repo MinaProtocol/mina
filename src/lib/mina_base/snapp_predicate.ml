@@ -140,7 +140,7 @@ module Numeric = struct
         ; lte_checked = run Checked.( <= )
         ; zero
         ; max_value
-        ; typ = Unpacked.typ
+        ; typ = Checked.typ
         ; to_input
         ; to_input_checked = Checked.to_input
         }
@@ -729,7 +729,7 @@ module Protocol_state = struct
       type t =
         ( Frozen_ledger_hash.var
         , Token_id.var
-        , Block_time.Unpacked.var
+        , Block_time.Checked.t
         , Length.Checked.t
         , unit (* TODO *)
         , Global_slot.Checked.t
@@ -748,7 +748,7 @@ module Protocol_state = struct
     type t =
       ( Frozen_ledger_hash.var Hash.Checked.t
       , Token_id.var Numeric.Checked.t
-      , Block_time.Unpacked.var Numeric.Checked.t
+      , Block_time.Checked.t Numeric.Checked.t
       , Length.Checked.t Numeric.Checked.t
       , unit (* TODO *)
       , Global_slot.Checked.t Numeric.Checked.t

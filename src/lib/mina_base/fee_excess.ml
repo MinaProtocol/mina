@@ -158,12 +158,10 @@ let to_input { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
 let to_input_checked { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
   let fee_token_l = Token_id.Checked.to_input fee_token_l
   and fee_token_r = Token_id.Checked.to_input fee_token_r in
+  let%map fee_excess_l = Fee.Signed.Checked.to_input fee_excess_l
+  and fee_excess_r = Fee.Signed.Checked.to_input fee_excess_r in
   List.reduce_exn ~f:Random_oracle.Input.Chunked.append
-    [ fee_token_l
-    ; Fee.Signed.Checked.to_input fee_excess_l
-    ; fee_token_r
-    ; Fee.Signed.Checked.to_input fee_excess_r
-    ]
+    [ fee_token_l; fee_excess_l; fee_token_r; fee_excess_r ]
 
 let assert_equal_checked (t1 : var) (t2 : var) =
   Checked.all_unit

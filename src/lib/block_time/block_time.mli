@@ -70,7 +70,11 @@ module Time : sig
   module Checked : sig
     open Snark_params.Tick
 
-    type t = Unpacked.var
+    type t
+
+    val typ : (t, Stable.Latest.t) Typ.t
+
+    val to_input : t -> Field.Var.t Random_oracle_input.Chunked.t
 
     val ( = ) : t -> t -> (Boolean.var, _) Checked.t
 
@@ -82,7 +86,11 @@ module Time : sig
 
     val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
 
-    val to_input : t -> Field.Var.t Random_oracle_input.Chunked.t
+    val to_field : t -> Field.Var.t
+
+    module Unsafe : sig
+      val of_field : Field.Var.t -> t
+    end
   end
 
   module Span : sig
@@ -106,7 +114,7 @@ module Time : sig
         with type Unpacked.value = t
          and type Packed.value = t
 
-    val to_time_ns_span : t -> Core.Time_ns.Span.t
+    val to_time_ns_span : t -> Core_kernel.Time_ns.Span.t
 
     val to_string_hum : t -> string
 
@@ -137,9 +145,19 @@ module Time : sig
     val to_input : t -> Tick.Field.t Random_oracle_input.Chunked.t
 
     module Checked : sig
-      type t = Unpacked.var
+      type t
 
-      val to_input : t -> Tick.Field.Var.t Random_oracle.Input.Chunked.t
+      val typ : (t, Stable.V1.t) Snark_params.Tick.Typ.t
+
+      open Snark_params.Tick
+
+      val to_input : t -> Tick.Field.Var.t Random_oracle_input.Chunked.t
+
+      val to_field : t -> Field.Var.t
+
+      module Unsafe : sig
+        val of_field : Field.Var.t -> t
+      end
     end
   end
 
@@ -172,6 +190,8 @@ module Time : sig
   val to_int64 : t -> Int64.t
 
   val of_int64 : Int64.t -> t
+
+  val of_uint64 : Unsigned.UInt64.t -> t
 
   val to_string : t -> string
 

@@ -178,13 +178,14 @@ module Body = struct
 
     let to_input_legacy
         { tag; source_pk; receiver_pk; token_id; amount; token_locked } =
-      let%map token_id = Token_id.Checked.to_input_legacy token_id in
+      let%map token_id = Token_id.Checked.to_input_legacy token_id
+      and amount = Currency.Amount.var_to_input_legacy amount in
       Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
         [| Tag.Unpacked.to_input_legacy tag
          ; Public_key.Compressed.Checked.to_input_legacy source_pk
          ; Public_key.Compressed.Checked.to_input_legacy receiver_pk
          ; token_id
-         ; Currency.Amount.var_to_input_legacy amount
+         ; amount
          ; Random_oracle.Input.Legacy.bitstring [ token_locked ]
         |]
   end
