@@ -1,3 +1,4 @@
+module Endo = Endo
 module P = Proof
 
 module type Statement_intf = Intf.Statement
@@ -814,6 +815,9 @@ module Side_loaded = struct
   module Verification_key = struct
     include Side_loaded_verification_key
 
+    let to_input (t : t) =
+      to_input ~field_of_int:Impls.Step.Field.Constant.of_int t
+
     let of_compiled tag : t =
       let d = Types_map.lookup_compiled tag.Tag.id in
       { wrap_vk = Some (Lazy.force d.wrap_vk)
@@ -1055,7 +1059,7 @@ let%test_module "test no side-loaded" =
                   Field.Constant.zero))
       in
       assert (
-        Async.Thread_safe.block_on_async_exn (fun () ->
+        Run_in_thread.block_on_async_exn (fun () ->
             Blockchain_snark.Proof.verify [ (Field.Constant.zero, b0) ]) ) ;
       let b1 =
         Common.time "b1" (fun () ->

@@ -20,7 +20,7 @@ module Token_id = Mina_base.Token_id
 
 module Unsigned = struct
   type t =
-    { random_oracle_input : (Field.t, bool) Random_oracle_input.t
+    { random_oracle_input : (Field.t, bool) Random_oracle_input.Legacy.t
     ; command : User_command_info.Partial.t
     ; nonce : Unsigned_extended.UInt32.t
     }
@@ -104,7 +104,7 @@ module Unsigned = struct
 
     type t =
       { random_oracle_input : string (* hex *) [@key "randomOracleInput"]
-      ; signer_input : Random_oracle_input.Coding2.Rendered.t
+      ; signer_input : Random_oracle_input.Legacy.Coding2.Rendered.t
             [@key "signerInput"]
       ; payment : Payment.t option
       ; stake_delegation : Delegation.t option [@key "stakeDelegation"]
@@ -118,11 +118,12 @@ module Unsigned = struct
 
   let string_of_field field =
     assert (Field.size_in_bits = 255) ;
-    Field.unpack field |> List.rev |> Random_oracle_input.Coding.string_of_field
+    Field.unpack field |> List.rev
+    |> Random_oracle_input.Legacy.Coding.string_of_field
 
   let field_of_string s =
     assert (Field.size_in_bits = 255) ;
-    Random_oracle_input.Coding.field_of_string s ~size_in_bits:255
+    Random_oracle_input.Legacy.Coding.field_of_string s ~size_in_bits:255
     |> Result.map ~f:(fun bits -> List.rev bits |> Field.project)
 
   let un_pk (`Pk pk) = pk
@@ -209,14 +210,14 @@ module Unsigned = struct
   let render (t : t) =
     let open Result.Let_syntax in
     let random_oracle_input =
-      Random_oracle_input.Coding.serialize ~string_of_field ~to_bool:Fn.id
-        ~of_bool:Fn.id t.random_oracle_input
+      Random_oracle_input.Legacy.Coding.serialize ~string_of_field
+        ~to_bool:Fn.id ~of_bool:Fn.id t.random_oracle_input
       |> Hex.Safe.to_hex
     in
     let signer_input =
-      Random_oracle_input.Coding2.serialize ~string_of_field ~pack:Field.project
-        t.random_oracle_input
-      |> Random_oracle_input.Coding2.Rendered.map ~f:Hex.Safe.to_hex
+      Random_oracle_input.Legacy.Coding2.serialize ~string_of_field
+        ~pack:Field.project t.random_oracle_input
+      |> Random_oracle_input.Legacy.Coding2.Rendered.map ~f:Hex.Safe.to_hex
     in
     match%map render_command ~nonce:t.nonce t.command with
     | `Payment payment ->
@@ -338,7 +339,8 @@ module Unsigned = struct
   let of_rendered (r : Rendered.t) : (t, Errors.t) Result.t =
     let open Result.Let_syntax in
     let%bind random_oracle_input =
-      Random_oracle_input.Coding.deserialize ~field_of_string ~of_bool:Fn.id
+      Random_oracle_input.Legacy.Coding.deserialize ~field_of_string
+        ~of_bool:Fn.id
         (String.to_list
            (Option.value_exn (Hex.Safe.of_hex r.random_oracle_input)))
       |> Result.map_error ~f:(fun e ->

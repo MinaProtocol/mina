@@ -64,4 +64,4 @@ module Value = struct
 end
 
 let to_input (t : _ V.t) ~f =
-  Vector.(reduce_exn (map t ~f) ~f:Random_oracle_input.append)
+  Vector.(reduce_exn (map t ~f) ~f:Random_oracle_input.Chunked.append)
