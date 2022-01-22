@@ -12,12 +12,11 @@ use commitment_dlog::{
     commitment::{caml::CamlPolyComm, PolyComm},
     srs::SRS,
 };
-use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
-
+use kimchi::circuits::constraints::{zk_polynomial, zk_w3, Shifts};
+use kimchi::circuits::expr::{Linearization, PolishToken};
+use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::index::{expr_linearization, VerifierIndex};
-use kimchi_circuits::expr::{Linearization, PolishToken};
-use kimchi_circuits::nolookup::constraints::{zk_polynomial, zk_w3, Shifts};
-use kimchi_circuits::wires::{COLUMNS, PERMUTS};
+use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 use std::convert::TryInto;
 use std::path::Path;
 
@@ -139,7 +138,7 @@ pub fn read_raw(
         fq_sponge_params,
         fr_sponge_params,
     )
-    .map_err(|e| {
+    .map_err(|_e| {
         ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
             .err()
             .unwrap()
@@ -158,7 +157,8 @@ pub fn caml_pasta_fq_plonk_verifier_index_read(
     path: String,
 ) -> Result<CamlPastaFqPlonkVerifierIndex, ocaml::Error> {
     let mut vi = read_raw(offset, srs, path)?;
-    vi.linearization = expr_linearization(vi.domain, false, None);
+    let (linearization, _powers_of_alpha) = expr_linearization(vi.domain, false, None);
+    vi.linearization = linearization;
     Ok(vi.into())
 }
 
@@ -171,7 +171,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_write(
 ) -> Result<(), ocaml::Error> {
     let index: VerifierIndex<GAffine> = index.into();
     let path = Path::new(&path);
-    index.to_file(path, append).map_err(|e| {
+    index.to_file(path, append).map_err(|_e| {
         ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
             .err()
             .unwrap()
