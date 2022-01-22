@@ -352,12 +352,16 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     P.Base.Me_only.Dlog_based.prepare next_statement.proof_state.me_only
   in
   let (_ : Kimchi_pasta.Pasta.Pallas.Affine.t) = Lazy.force Dummy.Ipa.Wrap.sg in
+  let after_witness = ref (Time.now ()) in
   let t0 = Time.now () in
   let%map.Deferred next_proof =
     let (T (input, conv)) = Impls.Wrap.input () in
     Common.time "wrap proof" (fun () ->
         Impls.Wrap.generate_witness_conv
           ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } ->
+              let t1 = Time.now () in
+              after_witness := t1 ;
+            printf "witness generation time = %s\n%!" (Time.Span.to_string_hum (Time.diff t1 t0)) ;
             Backend.Tock.Proof.create_async ~primary:public_inputs
               ~auxiliary:auxiliary_inputs pk
               ~message:
@@ -384,7 +388,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
           })
   in
   let t1 = Time.now () in
-  printf "wrap time = %s\n%!" (Time.Span.to_string_hum (Time.diff t1 t0)) ;
+  printf "prover time (one recursive verifier) = %s\n%!" (Time.Span.to_string_hum (Time.diff t1 !after_witness)) ;
   ( { proof = next_proof
     ; statement = Types.Dlog_based.Statement.to_minimal next_statement
     ; prev_evals =
