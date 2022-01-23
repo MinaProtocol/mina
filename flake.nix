@@ -128,8 +128,24 @@
 
           # FIXME: broken
           packages.client_sdk = nix-npm-buildPackage.buildYarnPackage {
+            name = "client_sdk";
             src = ./frontend/client_sdk;
-            yarnBuildMore = "yarn build";
+            yarnPostLink = pkgs.writeScript "yarn-post-link" ''
+              #!${pkgs.stdenv.shell}
+              ls node_modules/bs-platform/lib/*.linux
+              patchelf \
+                --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
+                --set-rpath "${pkgs.stdenv.cc.cc.lib}/lib" \
+                ./node_modules/bs-platform/lib/*.linux ./node_modules/bs-platform/vendor/ninja/snapshot/*.linux
+            '';
+            yarnBuildMore = ''
+              cp ${ocamlPackages.mina_client_sdk}/share/client_sdk/client_sdk.bc.js src
+              yarn build
+            '';
+            installPhase = ''
+              mkdir -p $out/share/client_sdk
+              mv src/*.js $out/share/client_sdk
+            '';
           };
 
           inherit ocamlPackages ocamlPackages_static;
