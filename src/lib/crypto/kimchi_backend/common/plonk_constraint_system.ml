@@ -568,7 +568,7 @@ struct
         sys.next_row <- sys.next_row + 1 ;
         (* add to row *)
         sys.rows_rev <- vars :: sys.rows_rev
-        
+
   (** Adds zero-knowledgeness to the gates/rows, and convert into Rust type [Gates.t].
       This can only be called once *)
   let finalize_and_get_gates sys =

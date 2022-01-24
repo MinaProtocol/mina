@@ -222,6 +222,7 @@ module Stable = struct
                     ; max_quot_size
                     ; srs = Backend.Tock.Keypair.load_urs ()
                     ; linearization = failwith "TODO"
+                    ; powers_of_alpha = failwith "TODO"
                     ; evals =
                         (let g (x, y) =
                            { Kimchi.Protocol.unshifted =

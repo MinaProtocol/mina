@@ -31,7 +31,7 @@ module Dlog_based = struct
         end
 
         open Pickles_types
-        module Generic_coeffs_vec = Vector.With_length (Nat.N5)
+        module Generic_coeffs_vec = Vector.With_length (Nat.N7)
 
         module In_circuit = struct
           type ('challenge, 'scalar_challenge, 'fp) t =
@@ -90,7 +90,7 @@ module Dlog_based = struct
               ; fp
               ; fp
               ; fp
-              ; Vector.typ fp Nat.N5.n
+              ; Vector.typ fp Nat.N7.n
               ]
               ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
               ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -478,7 +478,7 @@ module Dlog_based = struct
       let spec =
         let open Spec in
         Struct
-          [ Vector (B Field, Nat.N15.n)
+          [ Vector (B Field, Nat.N17.n)
           ; Vector (B Challenge, Nat.N2.n)
           ; Vector (Scalar Challenge, Nat.N3.n)
           ; Vector (B Digest, Nat.N3.n)
@@ -729,7 +729,7 @@ module Pairing_based = struct
         let spec bp_log2 =
           let open Spec in
           Struct
-            [ Vector (B Field, Nat.N15.n)
+            [ Vector (B Field, Nat.N17.n)
             ; Vector (B Digest, Nat.N1.n)
             ; Vector (B Challenge, Nat.N2.n)
             ; Vector (Scalar Challenge, Nat.N3.n)

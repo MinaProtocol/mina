@@ -57,6 +57,7 @@ module Stable = struct
         ; max_quot_size
         ; srs
         ; linearization = failwith "TODO"
+        ; powers_of_alpha = failwith "TODO"
         ; evals =
             (let g (x, y) =
                { Kimchi.Protocol.unshifted =

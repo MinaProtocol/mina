@@ -228,20 +228,26 @@ let ft_comm ~add:( + ) ~scale ~endoscale ~negate
       (snd (Dlog_plonk_types.Permuts_minus_1.add Nat.N1.n))
   in
   let f_comm =
+    (* the poseidon and generic gates are special cases as they use  coefficient commitments from the verifier index *)
+    (* note that for all gates, the powers of alpha start at a^0 = 1 *)
     let poseidon =
       let (pn :: ps) = Vector.rev m.coefficients_comm in
-      scale
-        (Vector.fold ~init:pn ps ~f:(fun acc c -> c + endoscale acc alpha))
-        plonk.poseidon_selector
-      |> negate
+      let res =
+        Vector.fold ~init:pn ps ~f:(fun acc c -> c + endoscale acc alpha)
+      in
+      scale res plonk.poseidon_selector |> negate
     in
     let generic =
       let coeffs = Vector.to_array m.coefficients_comm in
-      let (c0 :: cs) = plonk.generic in
-      Vector.foldi cs
-        ~init:(c0 * coeffs.(0))
-        ~f:(fun i acc c -> acc + (c * coeffs.(Int.(i + 1))))
+      let (generic_selector :: first_scalar :: scalars) = plonk.generic in
+      let init = first_scalar * coeffs.(0) in
+      let generic =
+        Vector.foldi scalars ~init ~f:(fun i acc scalar ->
+            acc + (scalar * coeffs.(Int.(i + 1))))
+      in
+      generic_selector * generic
     in
+
     List.reduce_exn ~f:( + )
       [ plonk.perm * sigma_comm_last
       ; generic
