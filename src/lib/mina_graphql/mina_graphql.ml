@@ -2213,7 +2213,7 @@ module Types = struct
               Error "Expected string for fee")
 
     module Snapp_inputs = struct
-      (* inputs particular to Snapps *)
+      (* inputs particular to snapps *)
 
       let snapp_balance_change :
           ((Amount.t, Sgn.t) Signed_poly.t, string) Result.t option arg_typ =
@@ -3736,8 +3736,8 @@ module Mutations = struct
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
-  let send_snapp_command coda parties =
-    match Mina_commands.setup_and_submit_snapp_command coda parties with
+  let send_snapp_command mina parties =
+    match Mina_commands.setup_and_submit_snapp_command mina parties with
     | `Active f -> (
         match%map f with
         | Ok parties ->
@@ -3755,6 +3755,106 @@ module Mutations = struct
             Ok cmd_with_hash
         | Error e ->
             Error ("Couldn't send snapp command: " ^ Error.to_string_hum e) )
+    | `Bootstrapping ->
+        return (Error "Daemon is bootstrapping")
+
+  let mock_snapp_command mina parties :
+      ( (Parties.t, Transaction_hash.t) With_hash.t
+        Types.Snapp_command.With_status.t
+      , string )
+      result
+      Io.t =
+    (* instead of adding the parties to the transaction pool, as we would for an actual snapp,
+       apply the snapp using an ephemeral ledger
+    *)
+    match Mina_lib.best_tip mina with
+    | `Active breadcrumb -> (
+        let best_tip_ledger =
+          Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+          |> Staged_ledger.ledger
+        in
+        let accounts = Ledger.to_list best_tip_ledger in
+        let constraint_constants =
+          Genesis_constants.Constraint_constants.compiled
+        in
+        let depth = constraint_constants.ledger_depth in
+        let ledger = Ledger.create_ephemeral ~depth () in
+        (* Ledger.copy doesn't actually copy
+           N.B.: The time for this copy grows with the number of accounts
+        *)
+        List.iter accounts ~f:(fun account ->
+            let pk = Account.public_key account in
+            let token = Account.token account in
+            let account_id = Account_id.create pk token in
+            match Ledger.get_or_create_account ledger account_id account with
+            | Ok (`Added, _loc) ->
+                ()
+            | Ok (`Existed, _loc) ->
+                (* should be unreachable *)
+                failwithf
+                  "When creating ledger for mock snapp, account with public \
+                   key %s and token %s already existed"
+                  (Signature_lib.Public_key.Compressed.to_string pk)
+                  (Token_id.to_string token) ()
+            | Error err ->
+                (* should be unreachable *)
+                Error.tag_arg err
+                  "When creating ledger for mock snapp, error when adding \
+                   account"
+                  (("public_key", pk), ("token", token))
+                  [%sexp_of:
+                    (string * Signature_lib.Public_key.Compressed.t)
+                    * (string * Token_id.t)]
+                |> Error.raise) ;
+        match
+          Pipe_lib.Broadcast_pipe.Reader.peek
+            (Mina_lib.transition_frontier mina)
+        with
+        | None ->
+            (* should be unreachable *)
+            return (Error "Transition frontier not available")
+        | Some tf -> (
+            let parent_hash =
+              Transition_frontier.Breadcrumb.parent_hash breadcrumb
+            in
+            match Transition_frontier.find_protocol_state tf parent_hash with
+            | None ->
+                (* should be unreachable *)
+                return (Error "Could not get parent breadcrumb")
+            | Some prev_state ->
+                let state_view =
+                  Mina_state.Protocol_state.body prev_state
+                  |> Mina_state.Protocol_state.Body.view
+                in
+                let applied =
+                  Ledger.apply_parties_unchecked ~constraint_constants
+                    ~state_view ledger parties
+                in
+                (* rearrange data to match result type of `send_snapp_command` *)
+                let applied_ok =
+                  Result.map applied
+                    ~f:(fun (parties_applied, _local_state_and_amount) ->
+                      let ({ data = parties; status } : Parties.t With_status.t)
+                          =
+                        parties_applied.command
+                      in
+                      let hash =
+                        Transaction_hash.hash_command (Parties parties)
+                      in
+                      let (with_hash : _ With_hash.t) =
+                        { data = parties; hash }
+                      in
+                      let (status : Types.Command_status.t) =
+                        match status with
+                        | Applied _ ->
+                            Applied
+                        | Failed (failure, _balance_data) ->
+                            Included_but_failed failure
+                      in
+                      ( { data = with_hash; status }
+                        : _ Types.Snapp_command.With_status.t ))
+                in
+                return @@ Result.map_error applied_ok ~f:Error.to_string_hum ) )
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
@@ -3906,8 +4006,8 @@ module Mutations = struct
               ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
             |> Deferred.Result.map ~f:Types.User_command.mk_user_command)
 
-  let send_snapp =
-    io_field "sendSnapp" ~doc:"Send a snapp transaction"
+  let make_snapp_endpoint ~name ~doc ~f =
+    io_field name ~doc
       ~typ:(non_null Types.Payload.send_snapp)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.send_snapp) ]
       ~resolve:
@@ -3928,9 +4028,18 @@ module Mutations = struct
         in
         match parties_result with
         | Ok parties ->
-            send_snapp_command coda parties
+            f coda parties
         | Error err ->
             return (Error err))
+
+  let send_snapp =
+    make_snapp_endpoint ~name:"sendSnapp" ~doc:"Send a snapp transaction"
+      ~f:send_snapp_command
+
+  let mock_snapp =
+    make_snapp_endpoint ~name:"mockSnapp"
+      ~doc:"Mock a snapp transaction, no effect on blockchain"
+      ~f:mock_snapp_command
 
   let create_token =
     io_field "createToken" ~doc:"Create a new token"
@@ -4304,6 +4413,7 @@ module Mutations = struct
     ; create_token_account
     ; mint_tokens
     ; send_snapp
+    ; mock_snapp
     ; export_logs
     ; set_staking
     ; set_coinbase_receiver
