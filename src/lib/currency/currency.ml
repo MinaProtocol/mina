@@ -253,8 +253,6 @@ end = struct
 
     type t = (Unsigned.t, Sgn.t) Signed_poly.t [@@deriving sexp, hash, yojson]
 
-    type signed_fee = t
-
     let compare : t -> t -> int =
       let cmp = [%compare: (Unsigned.t, Sgn.t) Signed_poly.t] in
       fun t1 t2 ->
@@ -356,6 +354,8 @@ end = struct
     let of_fee = Fn.id
 
     [%%ifdef consensus_mechanism]
+
+    type signed_fee = t
 
     let magnitude_to_field = to_field
 
