@@ -2,7 +2,7 @@
 
 set -eu
 
-if [ -z "$MARLIN_PLONK_STUBS" ]; then
+if [ -z "${MARLIN_PLONK_STUBS-}" ]; then
     cargo build --release
     MARLIN_PLONK_STUBS="target/release"
 fi
