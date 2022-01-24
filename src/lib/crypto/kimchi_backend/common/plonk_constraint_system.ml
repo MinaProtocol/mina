@@ -96,7 +96,6 @@ module Gate_spec = struct
   (* TODO: just send the array to Rust directly *)
   let to_rust_gate { kind; wired_to; coeffs } : _ Kimchi.Protocol.circuit_gate =
     let typ = kind in
-    let c = coeffs in
     let wired_to = Array.map ~f:Position.to_rust_wire wired_to in
     let wires =
       ( wired_to.(0)
@@ -107,7 +106,7 @@ module Gate_spec = struct
       , wired_to.(5)
       , wired_to.(6) )
     in
-    { typ; wires; c }
+    { typ; wires; coeffs }
 end
 
 (** Represents the state of a hash function *)
@@ -502,11 +501,12 @@ struct
 
   (* initializes a constraint system *)
   let create () : t =
-    { equivalence_classes = V.Table.create ()
+    { public_input_size = Set_once.create ()
     ; internal_vars = Internal_var.Table.create ()
-    ; rows_rev = []
     ; gates = `Unfinalized_rev [] (* Gates.create () *)
+    ; rows_rev = []
     ; next_row = 0
+    ; equivalence_classes = V.Table.create ()
     ; hash = Hash_state.empty
     ; auxiliary_input_size = 0
     ; pending_generic_gate = None
@@ -543,6 +543,32 @@ struct
   (** Same as wire', except that the row must be given relatively to the end of the public-input rows *)
   let wire sys key row col = wire' sys key (Row.After_public_input row) col
 
+  (** Adds a row/gate/constraint to a constraint system `sys` *)
+  let add_row sys (vars : V.t option array) kind coeffs =
+    match sys.gates with
+    | `Finalized ->
+        failwith "add_row called on finalized constraint system"
+    | `Unfinalized_rev gates ->
+        (* as we're adding a row, we're adding new cells.
+            If these cells (the first 7) contain variables, make sure that they are wired *)
+        let num_vars = min Constants.permutation_cols (Array.length vars) in
+        let vars_for_perm = Array.slice vars 0 num_vars in
+        Array.iteri vars_for_perm ~f:(fun col x ->
+            Option.iter x ~f:(fun x -> wire sys x sys.next_row col)) ;
+
+        (* TODO: I think there are two things we should check here (and possible panic on):
+            - that these first 7 variables (that participate in the permutation argument) are not wired to anything that didn't participate in the permutation argument (hard to check as we don't have that information atm)
+            - that the remaining columns (that don't participate in the permutation argument) do not have anything that's part of the permutation argument (easy to check as we have that hashtbl) *)
+
+        (* add to gates *)
+        let open Position in
+        sys.gates <-
+          `Unfinalized_rev ({ kind; wired_to = [||]; coeffs } :: gates) ;
+        (* increment row *)
+        sys.next_row <- sys.next_row + 1 ;
+        (* add to row *)
+        sys.rows_rev <- vars :: sys.rows_rev
+        
   (** Adds zero-knowledgeness to the gates/rows, and convert into Rust type [Gates.t].
       This can only be called once *)
   let finalize_and_get_gates sys =
@@ -667,32 +693,6 @@ struct
           (data, key) :: acc)
     in
     Some (terms_list, Map.length terms, has_constant_term)
-
-  (** Adds a row/gate/constraint to a constraint system `sys` *)
-  let add_row sys (vars : V.t option array) kind coeffs =
-    match sys.gates with
-    | `Finalized ->
-        failwith "add_row called on finalized constraint system"
-    | `Unfinalized_rev gates ->
-        (* as we're adding a row, we're adding new cells.
-           If these cells (the first 7) contain variables, make sure that they are wired *)
-        let num_vars = min Constants.permutation_cols (Array.length vars) in
-        let vars_for_perm = Array.slice vars 0 num_vars in
-        Array.iteri vars_for_perm ~f:(fun col x ->
-            Option.iter x ~f:(fun x -> wire sys x sys.next_row col)) ;
-
-        (* TODO: I think there are two things we should check here (and possible panic on):
-           - that these first 7 variables (that participate in the permutation argument) are not wired to anything that didn't participate in the permutation argument (hard to check as we don't have that information atm)
-           - that the remaining columns (that don't participate in the permutation argument) do not have anything that's part of the permutation argument (easy to check as we have that hashtbl) *)
-
-        (* add to gates *)
-        let open Position in
-        sys.gates <-
-          `Unfinalized_rev ({ kind; wired_to = [||]; coeffs } :: gates) ;
-        (* increment row *)
-        sys.next_row <- sys.next_row + 1 ;
-        (* add to row *)
-        sys.rows_rev <- vars :: sys.rows_rev
 
   (** Adds a generic constraint to the constraint system. 
       As there are two generic gates per row, we queue
