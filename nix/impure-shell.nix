@@ -18,6 +18,7 @@ pkgs.mkShell {
     bzip2.dev
     ncurses
   ];
+  OPAMSWITCH = "mina";
   shellHook = ''
     eval $(opam env)
     if ! opam list --installed 2>&1 | grep mina 2>&1 > /dev/null; then
@@ -27,7 +28,7 @@ pkgs.mkShell {
       echo
       tput bold
       printf 'opam init --bare\n'
-      printf 'opam switch import src/opam.export --switch mina%s\n'
+      printf 'opam switch import src/opam.export\n'
       printf 'eval $(opam env)\n'
       printf './scripts/pin-external-packages.sh\n'
       tput sgr0
