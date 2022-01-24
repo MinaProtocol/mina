@@ -126,7 +126,7 @@
             '';
           };
 
-          # FIXME: broken
+          # TODO: fix bs-platform build correctly
           packages.client_sdk = nix-npm-buildPackage.buildYarnPackage {
             name = "client_sdk";
             src = ./frontend/client_sdk;
