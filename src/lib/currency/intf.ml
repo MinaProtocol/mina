@@ -70,15 +70,18 @@ module type Basic = sig
 
   val var_of_t : t -> var
 
-  val var_to_number : var -> Number.t
-
-  val var_to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
+  val var_to_bits :
+    var -> (Boolean.var Bitstring_lib.Bitstring.Lsb_first.t, _) Checked.t
 
   val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 
-  val var_to_input_legacy : var -> (_, Boolean.var) Random_oracle.Legacy.Input.t
+  val var_to_input_legacy :
+       var
+    -> ((Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t, _) Checked.t
 
   val equal_var : var -> var -> (Boolean.var, _) Checked.t
+
+  val pack_var : var -> Field.Var.t
 
   [%%endif]
 end
@@ -150,7 +153,9 @@ module type Signed_intf = sig
 
   [%%ifdef consensus_mechanism]
 
-  type var = (magnitude_var, Sgn.var) Signed_poly.t
+  type var (* = (magnitude_var, Sgn.var) Signed_poly.t *)
+
+  val create_var : magnitude:magnitude_var -> sgn:Sgn.var -> var
 
   val typ : (var, t) Typ.t
 
@@ -161,13 +166,19 @@ module type Signed_intf = sig
 
     val of_unsigned : magnitude_var -> var
 
+    val sgn : var -> (Sgn.var, _) Checked.t
+
+    val magnitude : var -> (magnitude_var, _) Checked.t
+
     val negate : var -> var
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-    val to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
+    val to_input :
+      var -> (Field.Var.t Random_oracle.Input.Chunked.t, _) Checked.t
 
-    val to_input_legacy : var -> (_, Boolean.var) Random_oracle.Legacy.Input.t
+    val to_input_legacy :
+      var -> ((_, Boolean.var) Random_oracle.Legacy.Input.t, _) Checked.t
 
     val add : var -> var -> (var, _) Checked.t
 
@@ -181,14 +192,6 @@ module type Signed_intf = sig
     val ( + ) : var -> var -> (var, _) Checked.t
 
     val to_field_var : var -> (Field.Var.t, _) Checked.t
-
-    val scale : Field.Var.t -> var -> (var, _) Checked.t
-
-    val cswap :
-         Boolean.var
-      -> (magnitude_var, Sgn.t) Signed_poly.t
-         * (magnitude_var, Sgn.t) Signed_poly.t
-      -> (var * var, _) Checked.t
 
     val to_fee : var -> signed_fee_var
 
@@ -213,14 +216,14 @@ module type Checked_arithmetic_intf = sig
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-  val if_value : Boolean.var -> then_:value -> else_:value -> var
-
   val add : var -> var -> (var, _) Checked.t
 
   val sub : var -> var -> (var, _) Checked.t
 
   val sub_flagged :
     var -> var -> (var * [ `Underflow of Boolean.var ], _) Checked.t
+
+  val sub_or_zero : var -> var -> (var, _) Checked.t
 
   val add_flagged :
     var -> var -> (var * [ `Overflow of Boolean.var ], _) Checked.t

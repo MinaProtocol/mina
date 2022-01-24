@@ -94,8 +94,6 @@ let typ = T.typ
 let var_of_t = T.Checked.constant
 
 module Checked = struct
-  open Snark_params.Tick
-
   type t = var
 
   let next = T.Checked.succ
@@ -111,10 +109,7 @@ module Checked = struct
   let if_ = T.Checked.if_
 
   module Assert = struct
-    let equal x y =
-      let x = T.Checked.to_integer x |> Snarky_integer.Integer.to_field in
-      let y = T.Checked.to_integer y |> Snarky_integer.Integer.to_field in
-      Field.Checked.Assert.equal x y
+    let equal = T.Checked.Assert.equal
   end
 
   let ( = ) = T.Checked.( = )

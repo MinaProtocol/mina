@@ -1,6 +1,20 @@
 open Core_kernel
 
 module Chunked = struct
+  (** The input for a random oracle, formed of full field elements and 'chunks'
+      of fields that can be combined together into one or more field elements.
+
+      The chunks are represented as [(field, length)], where
+      [0 <= field < 2^length]. This allows us to efficiently combine values in
+      a known range. For example,
+{[
+    { field_elements= [||]; packeds= [|(x, 64); (y, 32); (z, 16)|] }
+]}
+      results in the chunks being combined as [x * 2^(32+16) + y * 2^(64) + z].
+      When the chunks do not fit within a single field element, they are
+      greedily concatenated to form field elements, from left to right.
+      This packing is performed by the [pack_to_fields] helper function.
+  *)
   type 'field t =
     { field_elements : 'field array; packeds : ('field * int) array }
   [@@deriving sexp, compare]
@@ -15,8 +29,15 @@ module Chunked = struct
 
   let field x : _ t = field_elements [| x |]
 
+  (** An input [[|(x_1, l_1); (x_2, l_2); ...|]] includes the values
+      [[|x_1; x_2; ...|]] in the input, assuming that `0 <= x_1 < 2^l_1`,
+      `0 <= x_2 < 2^l_2`, etc. so that multiple [x_i]s can be combined into a
+      single field element when the sum of their [l_i]s are less than the size
+      of the field modulus (in bits).
+  *)
   let packeds a = { field_elements = [||]; packeds = a }
 
+  (** [packed x = packeds [| x |]] *)
   let packed xn : _ t = packeds [| xn |]
 
   module type Field_intf = sig
@@ -31,6 +52,10 @@ module Chunked = struct
     val ( * ) : t -> t -> t
   end
 
+  (** Convert the input into a series of field elements, by concatenating
+      any chunks of input that fit into a single field element.
+      The concatenation is greedy, operating from left to right.
+  *)
   let pack_to_fields (type t) (module F : Field_intf with type t = t)
       ~(pow2 : int -> t) { field_elements; packeds } =
     let shift_left acc n = F.( * ) acc (pow2 n) in

@@ -83,12 +83,13 @@ let to_input_legacy { Poly.source_pk; receiver_pk; token_id; amount } =
     |]
 
 let var_to_input_legacy { Poly.source_pk; receiver_pk; token_id; amount } =
-  let%map token_id = Token_id.Checked.to_input_legacy token_id in
+  let%map token_id = Token_id.Checked.to_input_legacy token_id
+  and amount = Amount.var_to_input_legacy amount in
   Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
     [| Public_key.Compressed.Checked.to_input_legacy source_pk
      ; Public_key.Compressed.Checked.to_input_legacy receiver_pk
      ; token_id
-     ; Amount.var_to_input_legacy amount
+     ; amount
     |]
 
 let var_of_t ({ source_pk; receiver_pk; token_id; amount } : t) : var =

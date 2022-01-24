@@ -498,7 +498,8 @@ module Body = struct
         [ Public_key.Compressed.Checked.to_input pk
         ; Update.Checked.to_input update
         ; Token_id.Checked.to_input token_id
-        ; Amount.Signed.Checked.to_input balance_change
+        ; Snark_params.Tick.Run.run_checked
+            (Amount.Signed.Checked.to_input balance_change)
         ; Random_oracle_input.Chunked.packed
             ((increment_nonce :> Field.Var.t), 1)
         ; Events.var_to_input events

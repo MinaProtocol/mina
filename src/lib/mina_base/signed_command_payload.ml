@@ -181,9 +181,10 @@ module Common = struct
         ({ fee; fee_token; fee_payer_pk; nonce; valid_until; memo } : var) =
       let%map nonce = Account_nonce.Checked.to_input_legacy nonce
       and valid_until = Global_slot.Checked.to_input_legacy valid_until
-      and fee_token = Token_id.Checked.to_input_legacy fee_token in
+      and fee_token = Token_id.Checked.to_input_legacy fee_token
+      and fee = Currency.Fee.var_to_input_legacy fee in
       Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
-        [| Currency.Fee.var_to_input_legacy fee
+        [| fee
          ; fee_token
          ; Public_key.Compressed.Checked.to_input_legacy fee_payer_pk
          ; nonce

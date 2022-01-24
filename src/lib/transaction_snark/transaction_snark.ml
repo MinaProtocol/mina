@@ -328,7 +328,7 @@ module Statement = struct
       let to_input { source; target; supply_increase; fee_excess; sok_digest } =
         let open Tick in
         let open Checked.Let_syntax in
-        let fee_excess = Fee_excess.to_input_checked fee_excess in
+        let%bind fee_excess = Fee_excess.to_input_checked fee_excess in
         let source = Registers.Checked.to_input source
         and target = Registers.Checked.to_input target in
         let input =
@@ -1108,41 +1108,26 @@ module Base = struct
         } =
       account.timing
     in
-    let int_of_field field =
-      Snarky_integer.Integer.constant ~m
-        (Bigint.of_field field |> Bigint.to_bignum_bigint)
-    in
-    let zero_int = int_of_field Field.zero in
-    let balance_to_int balance =
-      Snarky_integer.Integer.of_bits ~m @@ Balance.var_to_bits balance
-    in
-    let txn_amount_int =
-      Snarky_integer.Integer.of_bits ~m @@ Amount.var_to_bits txn_amount
-    in
-    let balance_int = balance_to_int account.balance in
     let%bind curr_min_balance =
       Account.Checked.min_balance_at_slot ~global_slot:txn_global_slot
         ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
         ~initial_minimum_balance
     in
-    let%bind `Underflow underflow, proposed_balance_int =
-      make_checked (fun () ->
-          Snarky_integer.Integer.subtract_unpacking_or_zero ~m balance_int
-            txn_amount_int)
+    let%bind proposed_balance, `Underflow underflow =
+      Balance.Checked.sub_amount_flagged account.balance txn_amount
     in
     (* underflow indicates insufficient balance *)
     let%bind () = balance_check (Boolean.not underflow) in
     let%bind sufficient_timed_balance =
-      make_checked (fun () ->
-          Snarky_integer.Integer.(gte ~m proposed_balance_int curr_min_balance))
+      Balance.Checked.( >= ) proposed_balance curr_min_balance
     in
     let%bind () =
       let%bind ok = Boolean.(any [ not is_timed; sufficient_timed_balance ]) in
       timed_balance_check ok
     in
     let%bind is_timed_balance_zero =
-      make_checked (fun () ->
-          Snarky_integer.Integer.equal ~m curr_min_balance zero_int)
+      Balance.Checked.equal curr_min_balance
+        (Balance.Checked.Unsafe.of_field Field.(Var.constant zero))
     in
     (* if current min balance is zero, then timing becomes untimed *)
     let%bind is_untimed = Boolean.((not is_timed) ||| is_timed_balance_zero) in
@@ -1270,7 +1255,9 @@ module Base = struct
       in
       Boolean.Assert.any
         [ is_new; !(Public_key.Compressed.Checked.equal pk a.public_key) ] ;
-      let is_receiver = Sgn.Checked.is_pos balance_change.sgn in
+      let is_receiver =
+        Sgn.Checked.is_pos !(Currency.Amount.Signed.Checked.sgn balance_change)
+      in
       let timing =
         let open Snapp_basic in
         let new_timing =
@@ -1752,7 +1739,9 @@ module Base = struct
             let if_ b ~then_ ~else_ =
               run_checked (Amount.Signed.Checked.if_ b ~then_ ~else_)
 
-            let is_pos (t : t) = Sgn.Checked.is_pos t.sgn
+            let is_pos (t : t) =
+              Sgn.Checked.is_pos
+                (run_checked (Currency.Amount.Signed.Checked.sgn t))
 
             let negate = Amount.Signed.Checked.negate
 
@@ -2614,10 +2603,7 @@ module Base = struct
       Amount.Checked.of_fee
         Fee.(var_of_t constraint_constants.account_creation_fee)
     in
-    let%bind is_zero_fee =
-      fee |> Fee.var_to_number |> Number.to_var
-      |> Field.(Checked.equal (Var.constant zero))
-    in
+    let%bind is_zero_fee = Fee.(equal_var fee (var_of_t zero)) in
     let is_coinbase_or_fee_transfer = Boolean.not is_user_command in
     let%bind can_create_fee_payer_account =
       (* Fee transfers and coinbases may create an account. We check the normal
@@ -2685,7 +2671,7 @@ module Base = struct
                [%with_label "Compute fee payer amount"]
                  (let fee_payer_amount =
                     let sgn = Sgn.Checked.neg_if_true is_user_command in
-                    Amount.Signed.create
+                    Amount.Signed.create_var
                       ~magnitude:(Amount.Checked.of_fee fee)
                       ~sgn
                   in
@@ -2696,7 +2682,7 @@ module Base = struct
                         ~then_:account_creation_amount
                         ~else_:Amount.(var_of_t zero)
                     in
-                    Amount.Signed.create ~magnitude ~sgn:Sgn.Checked.neg
+                    Amount.Signed.create_var ~magnitude ~sgn:Sgn.Checked.neg
                   in
                   Amount.Signed.Checked.(
                     add fee_payer_amount account_creation_fee))
@@ -2705,9 +2691,11 @@ module Base = struct
              let%bind `Min_balance _, timing =
                [%with_label "Check fee payer timing"]
                  (let%bind txn_amount =
-                    Amount.Checked.if_
-                      (Sgn.Checked.is_neg amount.sgn)
-                      ~then_:amount.magnitude
+                    let%bind sgn = Amount.Signed.Checked.sgn amount in
+                    let%bind magnitude =
+                      Amount.Signed.Checked.magnitude amount
+                    in
+                    Amount.Checked.if_ (Sgn.Checked.is_neg sgn) ~then_:magnitude
                       ~else_:Amount.(var_of_t zero)
                   in
                   let balance_check ok =
@@ -3115,7 +3103,7 @@ module Base = struct
                Checked.(
                  add_flagged payload.body.amount (of_fee payload.common.fee))
              in
-             (Signed.create ~magnitude ~sgn:Sgn.Checked.neg, overflowed)
+             (Signed.create_var ~magnitude ~sgn:Sgn.Checked.neg, overflowed)
            in
            let%bind () =
              (* TODO: Reject this in txn pool before fees-in-tokens. *)
@@ -3194,7 +3182,8 @@ module Base = struct
          particular fee tokens used.
       *)
       let%bind fee_excess_zero =
-        Amount.equal_var fee_excess.magnitude Amount.(var_of_t zero)
+        Amount.Signed.Checked.equal fee_excess
+          Amount.Signed.(Checked.constant zero)
       in
       let%map fee_token_l =
         Token_id.Checked.if_ fee_excess_zero
@@ -3202,7 +3191,7 @@ module Base = struct
           ~else_:t.payload.common.fee_token
       in
       { Fee_excess.fee_token_l
-      ; fee_excess_l = Signed_poly.map ~f:Amount.Checked.to_fee fee_excess
+      ; fee_excess_l = Amount.Signed.Checked.to_fee fee_excess
       ; fee_token_r = Token_id.(var_of_t default)
       ; fee_excess_r = Fee.Signed.(Checked.constant zero)
       }
@@ -7314,17 +7303,6 @@ let%test_module "account timing check" =
       in
       min_balance
 
-    let snarky_integer_of_bools bools =
-      let snarky_bools =
-        List.map bools ~f:(fun b ->
-            let open Tick.Boolean in
-            if b then true_ else false_)
-      in
-      let bitstring_lsb =
-        Bitstring_lib.Bitstring.Lsb_first.of_list snarky_bools
-      in
-      Snarky_integer.Integer.of_bits ~m:Tick.m bitstring_lsb
-
     let run_checked_timing_and_compare account txn_amount txn_global_slot
         unchecked_timing unchecked_min_balance =
       let equal_balances_computation =
@@ -7343,14 +7321,9 @@ let%test_module "account timing check" =
           make_checked_min_balance_computation account txn_amount
             txn_global_slot
         in
-        let%bind unchecked_min_balance_as_snarky_integer =
-          Run.make_checked (fun () ->
-              snarky_integer_of_bools (Balance.to_bits unchecked_min_balance))
-        in
         let%map equal_balances_checked =
-          Run.make_checked (fun () ->
-              Snarky_integer.Integer.equal ~m checked_min_balance
-                unchecked_min_balance_as_snarky_integer)
+          Balance.Checked.equal checked_min_balance
+            (Balance.var_of_t unchecked_min_balance)
         in
         Snarky_backendless.As_prover.read Tick.Boolean.typ
           equal_balances_checked

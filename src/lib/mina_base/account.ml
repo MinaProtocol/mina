@@ -645,39 +645,36 @@ module Checked = struct
   let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
       ~vesting_increment ~initial_minimum_balance =
     let%bind before_cliff = Global_slot.Checked.(global_slot < cliff_time) in
-    let balance_to_int balance =
-      Snarky_integer.Integer.of_bits ~m @@ Balance.var_to_bits balance
+    let%bind else_branch =
+      make_checked (fun () ->
+          let _, slot_diff =
+            Tick.Run.run_checked
+              (Global_slot.Checked.sub_or_zero global_slot cliff_time)
+          in
+          let cliff_decrement = cliff_amount in
+          let min_balance_less_cliff_decrement, _ =
+            Tick.Run.run_checked
+              (Balance.Checked.sub_amount_flagged initial_minimum_balance
+                 cliff_decrement)
+          in
+          let num_periods, _ =
+            Tick.Run.run_checked
+              (Global_slot.Checked.div_mod slot_diff vesting_period)
+          in
+          let vesting_decrement =
+            Tick.Run.Field.mul
+              (Global_slot.Checked.to_field num_periods)
+              (Amount.pack_var vesting_increment)
+          in
+          let min_balance_less_cliff_and_vesting_decrements =
+            Tick.Run.run_checked
+              (Balance.Checked.sub_or_zero min_balance_less_cliff_decrement
+                 (Balance.Checked.Unsafe.of_field vesting_decrement))
+          in
+          min_balance_less_cliff_and_vesting_decrements)
     in
-    let open Snarky_integer.Integer in
-    let initial_minimum_balance_int = balance_to_int initial_minimum_balance in
-    make_checked (fun () ->
-        if_ ~m before_cliff ~then_:initial_minimum_balance_int
-          ~else_:
-            (let global_slot_int = Global_slot.Checked.to_integer global_slot in
-             let cliff_time_int = Global_slot.Checked.to_integer cliff_time in
-             let _, slot_diff =
-               subtract_unpacking_or_zero ~m global_slot_int cliff_time_int
-             in
-             let cliff_decrement_int =
-               Amount.var_to_bits cliff_amount |> of_bits ~m
-             in
-             let _, min_balance_less_cliff_decrement =
-               subtract_unpacking_or_zero ~m initial_minimum_balance_int
-                 cliff_decrement_int
-             in
-             let vesting_period_int =
-               Global_slot.Checked.to_integer vesting_period
-             in
-             let num_periods, _ = div_mod ~m slot_diff vesting_period_int in
-             let vesting_increment_int =
-               Amount.var_to_bits vesting_increment |> of_bits ~m
-             in
-             let vesting_decrement = mul ~m num_periods vesting_increment_int in
-             let _, min_balance_less_cliff_and_vesting_decrements =
-               subtract_unpacking_or_zero ~m min_balance_less_cliff_decrement
-                 vesting_decrement
-             in
-             min_balance_less_cliff_and_vesting_decrements))
+    Balance.Checked.if_ before_cliff ~then_:initial_minimum_balance
+      ~else_:else_branch
 
   let has_locked_tokens ~global_slot (t : var) =
     let open Timing.As_record in
@@ -695,12 +692,7 @@ module Checked = struct
         ~cliff_amount ~vesting_period ~vesting_increment
     in
     let%map zero_min_balance =
-      let zero_int =
-        Snarky_integer.Integer.constant ~m
-          (Bigint.of_field Field.zero |> Bigint.to_bignum_bigint)
-      in
-      make_checked (fun () ->
-          Snarky_integer.Integer.equal ~m cur_min_balance zero_int)
+      Balance.equal_var Balance.(var_of_t zero) cur_min_balance
     in
     (*Note: Untimed accounts will always have zero min balance*)
     Boolean.not zero_min_balance

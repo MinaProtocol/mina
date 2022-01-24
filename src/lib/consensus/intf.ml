@@ -51,7 +51,7 @@ module type Blockchain_state = sig
     , Frozen_ledger_hash.var
     , Token_id.var
     , Parties_logic.Local_state.Checked.t
-    , Block_time.Unpacked.var )
+    , Block_time.Checked.t )
     Poly.t
 
   val staged_ledger_hash :
