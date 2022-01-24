@@ -49,7 +49,7 @@ type var =
   ( Staged_ledger_hash.var
   , Frozen_ledger_hash.var
   , Token_id.var
-  , Block_time.Unpacked.var )
+  , Block_time.Checked.t )
   Poly.t
 
 let create_value ~staged_ledger_hash ~snarked_ledger_hash ~genesis_ledger_hash
@@ -67,7 +67,7 @@ let data_spec =
   ; Frozen_ledger_hash.typ
   ; Frozen_ledger_hash.typ
   ; Token_id.typ
-  ; Block_time.Unpacked.typ
+  ; Block_time.Checked.typ
   ]
 
 let typ : (var, Value.t) Typ.t =
@@ -82,18 +82,13 @@ let var_to_input
      ; timestamp
      } :
       var) =
-  let open Random_oracle.Input in
-  let%map.Checked snarked_next_available_token =
-    Token_id.Checked.to_input snarked_next_available_token
-  in
+  let open Random_oracle.Input.Chunked in
   List.reduce_exn ~f:append
     [ Staged_ledger_hash.var_to_input staged_ledger_hash
     ; field (Frozen_ledger_hash.var_to_hash_packed snarked_ledger_hash)
     ; field (Frozen_ledger_hash.var_to_hash_packed genesis_ledger_hash)
-    ; snarked_next_available_token
-    ; bitstring
-        (Bitstring_lib.Bitstring.Lsb_first.to_list
-           (Block_time.Unpacked.var_to_bits timestamp))
+    ; Token_id.Checked.to_input snarked_next_available_token
+    ; Block_time.Checked.to_input timestamp
     ]
 
 let to_input
@@ -104,13 +99,13 @@ let to_input
      ; timestamp
      } :
       Value.t) =
-  let open Random_oracle.Input in
+  let open Random_oracle.Input.Chunked in
   List.reduce_exn ~f:append
     [ Staged_ledger_hash.to_input staged_ledger_hash
     ; field (snarked_ledger_hash :> Field.t)
     ; field (genesis_ledger_hash :> Field.t)
     ; Token_id.to_input snarked_next_available_token
-    ; bitstring (Block_time.Bits.to_bits timestamp)
+    ; Block_time.to_input timestamp
     ]
 
 let set_timestamp t timestamp = { t with Poly.timestamp }

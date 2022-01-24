@@ -2,7 +2,11 @@
 
 [%%ifdef consensus_mechanism]
 
-open Pickles.Impls.Step
+open Snark_params.Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
 
 [%%endif]
 
@@ -15,7 +19,7 @@ module Auth_required : sig
     end
   end]
 
-  val to_input : t -> (_, bool) Random_oracle_input.t
+  val to_input : t -> Field.t Random_oracle_input.Chunked.t
 
   val check : t -> Control.Tag.t -> bool
 
@@ -26,7 +30,7 @@ module Auth_required : sig
 
     val if_ : Boolean.var -> then_:t -> else_:t -> t
 
-    val to_input : t -> (_, Boolean.var) Random_oracle_input.t
+    val to_input : t -> Field.Var.t Random_oracle_input.Chunked.t
 
     val eval_no_proof : t -> signature_verifies:Boolean.var -> Boolean.var
 
@@ -67,14 +71,14 @@ module Stable : sig
   end
 end]
 
-val to_input : t -> (_, bool) Random_oracle_input.t
+val to_input : t -> Field.t Random_oracle_input.Chunked.t
 
 [%%ifdef consensus_mechanism]
 
 module Checked : sig
   type t = (Boolean.var, Auth_required.Checked.t) Poly.Stable.Latest.t
 
-  val to_input : t -> (_, Boolean.var) Random_oracle_input.t
+  val to_input : t -> Field.Var.t Random_oracle_input.Chunked.t
 
   val constant : Stable.Latest.t -> t
 
