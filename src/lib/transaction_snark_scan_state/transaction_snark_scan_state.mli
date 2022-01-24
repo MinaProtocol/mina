@@ -14,7 +14,7 @@ end]
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
-    { transaction_with_info : Transaction_logic.Transaction_applied.t
+    { transaction_with_info : Ledger.Transaction_applied.t
     ; state_hash : State_hash.t * State_body_hash.t
     ; state_view : Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
     ; statement : Transaction_snark.Statement.t
@@ -49,9 +49,8 @@ module Make_statement_scanner (Verifier : sig
     -> bool Deferred.Or_error.t
 end) : sig
   val scan_statement :
-       t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> statement_check:[ `Full | `Partial ]
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> t
     -> verifier:Verifier.t
     -> ( Transaction_snark.Statement.t
        , [ `Empty | `Error of Error.t ] )
@@ -60,7 +59,6 @@ end) : sig
   val check_invariants :
        t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> statement_check:[ `Full | `Partial ]
     -> verifier:Verifier.t
     -> error_prefix:string
     -> ledger_hash_end:Frozen_ledger_hash.t
