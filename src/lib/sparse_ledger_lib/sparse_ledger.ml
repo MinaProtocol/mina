@@ -31,6 +31,7 @@ module T = struct
         { indexes : ('key * int) list
         ; depth : int
         ; tree : ('hash, 'account) Tree.Stable.V1.t
+        ; next_available_index : int option
         ; next_available_token : 'token_id
         }
       [@@deriving sexp, yojson]
@@ -42,6 +43,7 @@ module T = struct
     { indexes : ('key * int) list
     ; depth : int
     ; tree : ('hash, 'account) Tree.t
+    ; next_available_index : int option
     ; next_available_token : 'token_id
     }
   [@@deriving sexp, yojson]
@@ -58,7 +60,12 @@ module type S = sig
 
   type t = (hash, account_id, account, token_id) T.t [@@deriving sexp, yojson]
 
-  val of_hash : depth:int -> next_available_token:token_id -> hash -> t
+  val of_hash :
+       depth:int
+    -> next_available_token:token_id
+    -> next_available_index:int option
+    -> hash
+    -> t
 
   val get_exn : t -> int -> account
 
@@ -83,6 +90,8 @@ module type S = sig
 
   val depth : t -> int
 
+  val next_available_index : t -> int option
+
   val next_available_token : t -> token_id
 end
 
@@ -96,8 +105,15 @@ let max_index depth =
   in
   set_bits 0 depth
 
-let of_hash ~depth ~next_available_token h =
-  { T.indexes = []; depth; tree = Hash h; next_available_token }
+let of_hash ~depth ~next_available_index ~next_available_token h =
+  Option.iter next_available_index ~f:(fun idx ->
+      assert (idx <= max_index depth)) ;
+  { T.indexes = []
+  ; depth
+  ; tree = Hash h
+  ; next_available_index
+  ; next_available_token
+  }
 
 module Make (Hash : sig
   type t [@@deriving equal, sexp, yojson, compare]
@@ -130,8 +146,9 @@ end = struct
   type t = (Hash.t, Account_id.t, Account.t, Token_id.t) T.t
   [@@deriving sexp, yojson]
 
-  let of_hash ~depth ~next_available_token (hash : Hash.t) =
-    of_hash ~depth ~next_available_token hash
+  let of_hash ~depth ~next_available_token ~next_available_index (hash : Hash.t)
+      =
+    of_hash ~depth ~next_available_token ~next_available_index hash
 
   let hash : (Hash.t, Account.t) Tree.t -> Hash.t = function
     | Account a ->
@@ -146,6 +163,8 @@ end = struct
   let depth { T.depth; _ } = depth
 
   let merkle_root { T.tree; _ } = hash tree
+
+  let next_available_index { T.next_available_index; _ } = next_available_index
 
   let next_available_token { T.next_available_token; _ } = next_available_token
 
@@ -421,7 +440,12 @@ let%test_module "sparse-ledger-test" =
       in
       let%bind depth = Int.gen_incl 0 16 in
       let%map tree = gen depth >>| prune_hash_branches in
-      { T.tree; depth; indexes = indexes depth tree; next_available_token = () }
+      { T.tree
+      ; depth
+      ; indexes = indexes depth tree
+      ; next_available_token = ()
+      ; next_available_index = None
+      }
 
     let%test_unit "iteri consistent indices with t.indexes" =
       Quickcheck.test gen ~f:(fun t ->
