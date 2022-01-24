@@ -23,7 +23,7 @@ Of course, `open` is a useful tool and there are many cases where it makes sense
 The rules are up to change, but we propose the following very basic rule as a first step, which only defines when an `open` should be completely removed.
 
 **Remove** an `open` if:
-- it is used 5 times or less in its scope
+- it is used 5 times or fewer in its scope
 
 **Except** if either:
 - the opened module is one of "Base", "Core" or "Core_kernel"
