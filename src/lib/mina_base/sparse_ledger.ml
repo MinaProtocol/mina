@@ -1,18 +1,6 @@
-(* TODO NOW: pull over ledger batching code (new impl of `of_ledger_subset_exn`, updated usage of ledgers in staged_ledger.ml) *)
-(* TODO: refactor the misleading implementation of Ledger.foldi that confused me so much in the first place. *)
-
 open Core
 open Import
 open Snark_params.Tick
-
-let dedup_list ls ~comparator =
-  let ls', _ =
-    List.fold_right ls
-      ~init:([], Set.empty comparator)
-      ~f:(fun el (acc, seen) ->
-        if Set.mem seen el then (acc, seen) else (el :: acc, Set.add seen el))
-  in
-  ls'
 
 [%%versioned
 module Stable = struct
@@ -120,50 +108,29 @@ M.
   , of_yojson
   , get_exn
   , path_exn
-  , arm_exn
   , set_exn
-  , find_index
   , find_index_exn
   , add_path
   , merkle_root
-  , data
   , iteri
-  , depth
-  , next_available_token
-  , next_available_index )]
+  , next_available_token )]
 
-(* TODO: share this cache globally across modules *)
-let empty_hash =
-  Empty_hashes.extensible_cache
-    (module Ledger_hash)
-    ~init_hash:(Ledger_hash.of_digest Account.empty_digest)
-
-let of_root ~depth ~next_available_token ~next_available_index
-    (h : Ledger_hash.t) =
-  of_hash ~depth ~next_available_token ~next_available_index
-    (* TODO: Is this of_digest casting really necessary? What's it doing? *)
+let of_root ~depth ~next_available_token (h : Ledger_hash.t) =
+  of_hash ~depth ~next_available_token
     (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))
 
-let of_any_ledger_root ledger =
-  let next_available_index =
-    match Ledger.Any_ledger.M.last_filled ledger with
-    | Some (Ledger.Location.Account addr) ->
-        Option.map (Ledger.Addr.next addr) ~f:Ledger.Addr.to_int
-    | Some _ ->
-        failwith
-          "unable to get next available index from ledger: last filled \
-           location is invalid"
-    | None ->
-        Some 0
-  in
-  of_root
-    ~depth:(Ledger.Any_ledger.M.depth ledger)
-    ~next_available_token:(Ledger.Any_ledger.M.next_available_token ledger)
-    ~next_available_index
-    (Ledger.Any_ledger.M.merkle_root ledger)
+let of_ledger_root ledger =
+  of_root ~depth:(Ledger.depth ledger)
+    ~next_available_token:(Ledger.next_available_token ledger)
+    (Ledger.merkle_root ledger)
 
 let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
-  Ledger.Any_ledger.M.foldi ledger ~init:(of_any_ledger_root ledger)
+  Ledger.Any_ledger.M.foldi ledger
+    ~init:
+      (of_root
+         ~depth:(Ledger.Any_ledger.M.depth ledger)
+         ~next_available_token:(Ledger.Any_ledger.M.next_available_token ledger)
+         (Ledger.Any_ledger.M.merkle_root ledger))
     ~f:(fun _addr sparse_ledger account ->
       let loc =
         Option.value_exn
@@ -175,60 +142,38 @@ let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
         (Account.identifier account)
         (Option.value_exn (Ledger.Any_ledger.M.get ledger loc)))
 
-let of_ledger_subset_exn' (ledger : Ledger.t) locs_and_ids =
-  let locs, ids = List.unzip locs_and_ids in
-  let paths =
-    Ledger.merkle_path_batch ledger locs |> List.map ~f:(fun (_, path) -> path)
-  in
-  let accts =
-    Ledger.get_batch ledger locs
-    |> List.map ~f:(fun (_, acct) -> Option.value_exn acct)
-  in
-  List.zip_exn paths (List.zip_exn ids accts)
-  |> List.fold_left
-       ~init:
-         (of_any_ledger_root (Ledger.Any_ledger.cast (module Ledger) ledger))
-       ~f:(fun sparse_ledger (path, (id, acct)) ->
-         add_path sparse_ledger path id acct)
-
-let of_ledger_subset_exn (ledger : Ledger.t) keys =
-  let keys = dedup_list keys ~comparator:(module Account_id) in
-  let existing_account_locs_and_ids, missing_account_ids =
-    keys
-    |> Ledger.location_of_account_batch ledger
-    |> List.partition_map ~f:(fun (key, loc_opt) ->
-           match loc_opt with Some loc -> `Fst (loc, key) | None -> `Snd key)
-  in
-  let sparse_ledger =
-    of_ledger_subset_exn' ledger existing_account_locs_and_ids
-  in
-  let new_accounts =
-    let l = Ledger.copy ledger in
-    missing_account_ids
-    |> List.map ~f:(fun id ->
-           let account : Account.t = Account.empty in
-           let loc =
-             Ledger.unsafe_create_account l id account |> Or_error.ok_exn
-           in
-           let path = Ledger.merkle_path l loc in
-           (path, account))
-    |> List.zip_exn missing_account_ids
-  in
-  let sparse_ledger =
-    List.fold new_accounts ~init:sparse_ledger
-      ~f:(fun sparse_ledger (key, (path, acct)) ->
-        add_path sparse_ledger path key acct)
+let of_ledger_subset_exn (oledger : Ledger.t) keys =
+  let ledger = Ledger.copy oledger in
+  let _, sparse =
+    List.fold keys
+      ~f:(fun (new_keys, sl) key ->
+        match Ledger.location_of_account ledger key with
+        | Some loc ->
+            ( new_keys
+            , add_path sl
+                (Ledger.merkle_path ledger loc)
+                key
+                ( Ledger.get ledger loc
+                |> Option.value_exn ?here:None ?error:None ?message:None ) )
+        | None ->
+            let path, acct = Ledger.create_empty_exn ledger key in
+            (key :: new_keys, add_path sl path key acct))
+      ~init:([], of_ledger_root ledger)
   in
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)
-        ( (merkle_root sparse_ledger :> Random_oracle.Digest.t)
-        |> Ledger_hash.of_hash )) ;
-  sparse_ledger
+        ((merkle_root sparse :> Random_oracle.Digest.t) |> Ledger_hash.of_hash)) ;
+  sparse
 
-(* TODO: optimize this to batch as well (used during block production) *)
 let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
-  List.fold indexes ~init:(of_any_ledger_root ledger) ~f:(fun acc i ->
+  List.fold indexes
+    ~init:
+      (of_root
+         ~depth:(Ledger.Any_ledger.M.depth ledger)
+         ~next_available_token:(Ledger.Any_ledger.M.next_available_token ledger)
+         (Ledger.Any_ledger.M.merkle_root ledger))
+    ~f:(fun acc i ->
       let account = Ledger.Any_ledger.M.get_at_index_exn ledger i in
       add_path acc
         (Ledger.Any_ledger.M.merkle_path_at_index_exn ledger i)
@@ -252,248 +197,6 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
         (Ledger.merkle_root ledger)
         ((merkle_root sl :> Random_oracle.Digest.t) |> Ledger_hash.of_hash))
 
-let next_index ~depth idx =
-  if idx >= Sparse_ledger_lib.Sparse_ledger.max_index depth then None
-  else Some (idx + 1)
-
-let path_of_arm =
-  List.map ~f:(function `Left, _, r -> `Left r | `Right, l, _ -> `Right l)
-
-let left_empty_arm depth =
-  let rec loop height =
-    if height < 0 then []
-    else
-      let h = empty_hash height in
-      (`Left, h, h) :: loop (height - 1)
-  in
-  List.rev (loop (depth - 1))
-
-(** Derives the next arm of a merkle tree from the previous arm. Assumes that
-    all hashes to the right of the previous arm are derived from empty leaves
-    (thus, the next arm is a new arm in the tree). *)
-let derive_next_arm_exn prev_arm =
-  let is_right = function `Left, _, _ -> false | `Right, _, _ -> true in
-  let flip_left ~on_right ~empty_error = function
-    | [] ->
-        failwith empty_error
-    | (`Left, l, r) :: rest ->
-        (`Right, l, r) :: rest
-    | (`Right, _, _) :: _ ->
-        on_right ()
-  in
-  let rec flip_rights rights height =
-    match rights with
-    | [] ->
-        []
-    | (`Right, _, _) :: rest ->
-        let h = empty_hash height in
-        (`Left, h, h) :: flip_rights rest (height + 1)
-    | _ ->
-        failwith "this shouldn't happen"
-  in
-  flip_left prev_arm ~empty_error:"invalid arm" ~on_right:(fun () ->
-      let rights_to_flip, rest = List.split_while prev_arm ~f:is_right in
-      let rest' =
-        flip_left rest ~empty_error:"no space left in ledger"
-          ~on_right:(fun () -> failwith "this shouldn't happen")
-      in
-      flip_rights rights_to_flip 0 @ rest')
-
-let%test_unit "adding paths generated via derive_next_arm_exn does not \
-               conflict with the initial merkle root of the ledger" =
-  (* initial account to store in the left-most position (just needs to have some hash different than the empty account hash) *)
-  let account = { Account.empty with balance = Currency.Balance.of_int 100 } in
-  (* right leaning hashes for merkle proof *)
-  let path_hashes = List.map [ 0; 1; 2 ] ~f:empty_hash in
-  let path = List.map path_hashes ~f:(fun h -> `Left h) in
-  let root, _, arm_reversed =
-    List.fold_left path_hashes
-      ~init:(Ledger_hash.of_digest (Account.digest account), 0, [])
-      ~f:(fun (hash, height, acc) path_hash ->
-        ( Ledger_hash.merge ~height hash path_hash
-        , height + 1
-        , (`Left, hash, path_hash) :: acc ))
-  in
-  let arm = List.rev arm_reversed in
-  let ledger =
-    of_root ~depth:3
-      ~next_available_token:(Token_id.of_uint64 Unsigned_extended.UInt64.one)
-      ~next_available_index:(Some 1) root
-  in
-  let ledger = add_path ledger path (Account.identifier account) account in
-  let ledger, _ =
-    List.fold_left [ 1; 2; 3; 4; 5; 6; 7 ] ~init:(ledger, arm)
-      ~f:(fun (ledger, prev_arm) _ ->
-        let next_arm = derive_next_arm_exn prev_arm in
-        let ledger =
-          add_path ledger (path_of_arm next_arm)
-            (Account.identifier Account.empty)
-            Account.empty
-        in
-        (ledger, next_arm))
-  in
-  [%test_eq: Ledger_hash.t] (merkle_root ledger) root
-
-let of_sparse_ledger_subset_exn base_ledger account_ids =
-  let account_ids = dedup_list account_ids ~comparator:(module Account_id) in
-  let add_existing_accounts l =
-    List.fold_right account_ids ~init:(l, [])
-      ~f:(fun id (l, missing_accounts) ->
-        match find_index base_ledger id with
-        | Some idx ->
-            let account = get_exn base_ledger idx in
-            let path = path_exn base_ledger idx in
-            (add_path l path id account, missing_accounts)
-        | None ->
-            (l, id :: missing_accounts))
-  in
-  let add_missing_accounts l missing_account_ids =
-    let next_idx =
-      Option.value_exn (next_available_index l)
-        ~message:"not enough space in ledger"
-    in
-    let last_arm =
-      if next_idx > 0 then arm_exn base_ledger (next_idx - 1)
-      else left_empty_arm (depth l)
-    in
-    let result, _, _ =
-      (* TODO: we could just check the remaining available slots in the ledger upfront instead of folding over the index (which is otherwise unused here) *)
-      List.fold_left missing_account_ids ~init:(l, last_arm, Some next_idx)
-        ~f:(fun (l, prev_arm, idx_opt) id ->
-          let idx =
-            Option.value_exn idx_opt ~message:"not enough space in ledger"
-          in
-          let next_arm = derive_next_arm_exn prev_arm in
-          ( add_path l (path_of_arm next_arm) id Account.empty
-          , next_arm
-          , next_index ~depth:(depth l) idx ))
-    in
-    result
-  in
-  let result_ledger =
-    let ledger =
-      of_root ~depth:(depth base_ledger)
-        ~next_available_token:(next_available_token base_ledger)
-        ~next_available_index:(next_available_index base_ledger)
-        (merkle_root base_ledger)
-    in
-    let ledger, missing_account_ids = add_existing_accounts ledger in
-    if List.is_empty missing_account_ids then ledger
-    else add_missing_accounts ledger missing_account_ids
-  in
-  Debug_assert.debug_assert (fun () ->
-      [%test_eq: Ledger_hash.t]
-        (merkle_root result_ledger)
-        (merkle_root base_ledger)) ;
-  result_ledger
-
-(* IMPORTANT TODO: rightmost path in parent sparse ledger must exist in order for derivation on new accounts to work *)
-(* ^^^ should probably setup a test to ensure the error message is decent *)
-
-(* challenge: computing paths to empty accounts from another sparse ledger
-    universal issue: need to have path to last account loaded on any sparse ledger this is called on (read: every sparse ledger)
-    options:
-    - add accounts to copy of sparse ledger, get paths from that
-      issue: add_account_exn doens't work
-        - definition as is throws exn when account isn't already indexed as Account.empty
-        - logic in sparse ledger is not using the new next_available_index yet (pull code from other branch)
-    - compute the path dynamically
-      issue: complicated messy code
-    - don't load missing accounts at all
-      issue: defers computation to later
-*)
-
-let%test_module "of_sparse_ledger_subset_exn" =
-  ( module struct
-    (* TODO: let check_predicates ~expected_accounts ledger = ... *)
-
-    (* Not really a great solution for refining generators, but works ok so long as predicate fails on only a small subset of it's domain. *)
-    let gen_until ?(max_retries = 1_000) p g =
-      let open Quickcheck.Let_syntax in
-      let rec loop n =
-        if n < max_retries then
-          let%bind x = g in
-          if p x then return x else loop (n + 1)
-        else
-          failwith
-            "gen_until: failed to generate a value that matched specified \
-             predicate"
-      in
-      loop 0
-
-    (* Generates a unattached ledger mask with a random amount of accounts, along with a random selection of account
-       locations pointing to a subset of accounts in the ledger. *)
-    let gen_ledger_with_subset_selection ?(min_size = 1) ?(min_subset_size = 0)
-        ?(min_free_space = 0) depth =
-      let open Quickcheck.Let_syntax in
-      let max_size = Int.pow 2 depth in
-      assert (0 <= min_free_space && min_free_space <= max_size) ;
-      assert (0 <= min_size && min_size <= max_size - min_free_space) ;
-      let%bind size = Int.gen_incl min_size (max_size - min_free_space) in
-      let%bind accounts = List.gen_with_length size Account.gen in
-      let%map indices =
-        gen_until
-          (fun l -> List.length l > min_subset_size)
-          (List.gen_filtered (List.init size ~f:Fn.id))
-      in
-      let ledger = Ledger.create_ephemeral ~depth () in
-      List.iter accounts ~f:(fun acct ->
-          Ledger.create_new_account_exn ledger (Account.identifier acct) acct) ;
-      let account_ids =
-        List.map indices ~f:(fun i ->
-            Ledger.Location.Account
-              (Ledger.Addr.of_int_exn ~ledger_depth:depth i)
-            |> Ledger.get ledger |> Option.value_exn |> Account.identifier)
-      in
-      (ledger, account_ids)
-
-    let%test_unit "when all accounts already exist" =
-      let depth = 4 in
-      Quickcheck.test (gen_ledger_with_subset_selection depth) ~trials:100
-        ~f:(fun (ledger, account_ids) ->
-          let sl = of_ledger_subset_exn ledger account_ids in
-          [%test_result: Ledger_hash.t]
-            ~expect:(Ledger.merkle_root ledger)
-            (merkle_root @@ of_sparse_ledger_subset_exn sl account_ids))
-
-    let%test_unit "with new accounts" =
-      let depth = 4 in
-      let gen =
-        let open Quickcheck.Let_syntax in
-        let%bind num_new_accounts = Int.gen_incl 1 (Int.pow 2 depth - 1) in
-        let%bind new_account_ids =
-          List.gen_with_length num_new_accounts Account_id.gen
-        in
-        let%map ledger, existing_account_ids =
-          gen_ledger_with_subset_selection ~min_free_space:num_new_accounts
-            depth
-        in
-        (ledger, existing_account_ids @ new_account_ids)
-      in
-      Quickcheck.test gen ~trials:100 ~f:(fun (ledger, account_ids) ->
-          let sl =
-            of_ledger_subset_exn ledger
-              (ledger |> Ledger.accounts |> Set.elements)
-          in
-          [%test_result: Ledger_hash.t]
-            ~expect:(Ledger.merkle_root ledger)
-            (merkle_root @@ of_sparse_ledger_subset_exn sl account_ids))
-
-    let%test_unit "on an empty ledger" =
-      let depth = 4 in
-      let gen =
-        let open Quickcheck.Let_syntax in
-        let%bind n = Int.gen_incl 1 (Int.pow 2 depth - 1) in
-        List.gen_with_length n Account_id.gen
-      in
-      Quickcheck.test gen ~trials:100 ~f:(fun account_ids ->
-          let ledger = Ledger.create_ephemeral ~depth () in
-          let sl = of_ledger_subset_exn ledger [] in
-          [%test_result: Ledger_hash.t]
-            ~expect:(Ledger.merkle_root ledger)
-            (merkle_root @@ of_sparse_ledger_subset_exn sl account_ids))
-  end )
-
 let get_or_initialize_exn account_id t idx =
   let account = get_exn t idx in
   if Public_key.Compressed.(equal empty account.public_key) then
@@ -511,26 +214,420 @@ let get_or_initialize_exn account_id t idx =
       } )
   else (`Existed, account)
 
+let sub_account_creation_fee
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) action
+    (amount : Currency.Amount.t) =
+  if equal_account_state action `Added then
+    Option.value_exn
+      Currency.Amount.(
+        sub amount (of_fee constraint_constants.account_creation_fee))
+  else amount
+
+let apply_user_command_exn
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~txn_global_slot t
+    ({ signer; payload; signature = _ } as user_command : Signed_command.t) =
+  let open Currency in
+  let signer_pk = Public_key.compress signer in
+  let current_global_slot = txn_global_slot in
+  (* Fee-payer information *)
+  let fee_token = Signed_command.fee_token user_command in
+  let fee_payer = Signed_command.fee_payer user_command in
+  let nonce = Signed_command.nonce user_command in
+  assert (
+    Public_key.Compressed.equal (Account_id.public_key fee_payer) signer_pk ) ;
+  assert (Token_id.equal fee_token Token_id.default) ;
+  let fee_payer_idx, fee_payer_account =
+    let idx = find_index_exn t fee_payer in
+    let account = get_exn t idx in
+    assert (Account.Nonce.equal account.nonce nonce) ;
+    let fee = Signed_command.fee user_command in
+    let timing =
+      Or_error.ok_exn
+      @@ Transaction_logic.validate_timing ~txn_amount:(Amount.of_fee fee)
+           ~txn_global_slot:current_global_slot ~account
+    in
+    ( idx
+    , { account with
+        nonce = Account.Nonce.succ account.nonce
+      ; balance =
+          Balance.sub_amount account.balance (Amount.of_fee fee)
+          |> Option.value_exn ?here:None ?error:None ?message:None
+      ; receipt_chain_hash =
+          Receipt.Chain_hash.cons (Signed_command payload)
+            account.receipt_chain_hash
+      ; timing
+      } )
+  in
+  (* Charge the fee. *)
+  let t = set_exn t fee_payer_idx fee_payer_account in
+  let next_available_token = next_available_token t in
+  let source = Signed_command.source ~next_available_token user_command in
+  let receiver = Signed_command.receiver ~next_available_token user_command in
+  let exception Reject of exn in
+  let charge_account_creation_fee_exn (account : Account.t) =
+    let balance =
+      Option.value_exn
+        (Balance.sub_amount account.balance
+           (Amount.of_fee constraint_constants.account_creation_fee))
+    in
+    let account = { account with balance } in
+    let timing =
+      Or_error.ok_exn
+        (Transaction_logic.validate_timing ~txn_amount:Amount.zero
+           ~txn_global_slot:current_global_slot ~account)
+    in
+    { account with timing }
+  in
+  let compute_updates () =
+    (* Raise an exception if any of the invariants for the user command are not
+       satisfied, so that the command will not go through.
+
+       This must re-check the conditions in Transaction_logic, to ensure that
+       the failure cases are consistent.
+    *)
+    let predicate_passed =
+      if
+        Public_key.Compressed.equal
+          (Signed_command.fee_payer_pk user_command)
+          (Signed_command.source_pk user_command)
+      then true
+      else
+        match payload.body with
+        | Create_new_token _ ->
+            (* Any account is allowed to create a new token associated with a
+               public key.
+            *)
+            true
+        | Create_token_account _ ->
+            (* Predicate failure is deferred here. It will be checked later. *)
+            let predicate_result =
+              (* TODO(#4554): Hook predicate evaluation in here once
+                 implemented.
+              *)
+              false
+            in
+            predicate_result
+        | Payment _ | Stake_delegation _ | Mint_tokens _ ->
+            (* TODO(#4554): Hook predicate evaluation in here once implemented. *)
+            failwith
+              "The fee-payer is not authorised to issue commands for the \
+               source account"
+    in
+    match Signed_command.Payload.body payload with
+    | Stake_delegation _ ->
+        let receiver_account = get_exn t @@ find_index_exn t receiver in
+        (* Check that receiver account exists. *)
+        assert (
+          not Public_key.Compressed.(equal empty receiver_account.public_key) ) ;
+        let source_idx = find_index_exn t source in
+        let source_account = get_exn t source_idx in
+        (* Check that source account exists. *)
+        assert (
+          not Public_key.Compressed.(equal empty source_account.public_key) ) ;
+        let source_account =
+          (* Timing is always valid, but we need to record any switch from
+             timed to untimed here to stay in sync with the snark.
+          *)
+          let timing =
+            Or_error.ok_exn
+            @@ Transaction_logic.validate_timing ~txn_amount:Amount.zero
+                 ~txn_global_slot:current_global_slot ~account:source_account
+          in
+          { source_account with
+            delegate = Some (Account_id.public_key receiver)
+          ; timing
+          }
+        in
+        [ (source_idx, source_account) ]
+    | Payment { amount; token_id = token; _ } ->
+        let receiver_idx = find_index_exn t receiver in
+        let action, receiver_account =
+          get_or_initialize_exn receiver t receiver_idx
+        in
+        let receiver_amount =
+          if Token_id.(equal default) token then
+            sub_account_creation_fee ~constraint_constants action amount
+          else if equal_account_state action `Added then
+            failwith "Receiver account does not exist, and we cannot create it"
+          else amount
+        in
+        let receiver_account =
+          { receiver_account with
+            balance =
+              Balance.add_amount receiver_account.balance receiver_amount
+              |> Option.value_exn ?here:None ?error:None ?message:None
+          }
+        in
+        let source_idx = find_index_exn t source in
+        let source_account =
+          let account =
+            if Account_id.equal source receiver then (
+              assert (equal_account_state action `Existed) ;
+              receiver_account )
+            else get_exn t source_idx
+          in
+          (* Check that source account exists. *)
+          assert (not Public_key.Compressed.(equal empty account.public_key)) ;
+          try
+            { account with
+              balance =
+                Balance.sub_amount account.balance amount
+                |> Option.value_exn ?here:None ?error:None ?message:None
+            ; timing =
+                Or_error.ok_exn
+                @@ Transaction_logic.validate_timing ~txn_amount:amount
+                     ~txn_global_slot:current_global_slot ~account
+            }
+          with exn when Account_id.equal fee_payer source ->
+            (* Don't process transactions with insufficient balance from the
+               fee-payer.
+            *)
+            raise (Reject exn)
+        in
+        [ (receiver_idx, receiver_account); (source_idx, source_account) ]
+    | Create_new_token { disable_new_accounts; _ } ->
+        (* NOTE: source and receiver are definitionally equal here. *)
+        let fee_payer_account =
+          try charge_account_creation_fee_exn fee_payer_account
+          with exn -> raise (Reject exn)
+        in
+        let receiver_idx = find_index_exn t receiver in
+        let action, receiver_account =
+          get_or_initialize_exn receiver t receiver_idx
+        in
+        if not (equal_account_state action `Added) then
+          raise
+            (Reject
+               (Failure
+                  "Token owner account for newly created token already exists")) ;
+        let receiver_account =
+          { receiver_account with
+            token_permissions =
+              Token_permissions.Token_owned { disable_new_accounts }
+          }
+        in
+        [ (fee_payer_idx, fee_payer_account); (receiver_idx, receiver_account) ]
+    | Create_token_account { account_disabled; _ } ->
+        if
+          account_disabled
+          && Token_id.(equal default) (Account_id.token_id receiver)
+        then
+          raise
+            (Reject
+               (Failure "Cannot open a disabled account in the default token")) ;
+        let fee_payer_account =
+          try charge_account_creation_fee_exn fee_payer_account
+          with exn -> raise (Reject exn)
+        in
+        let receiver_idx = find_index_exn t receiver in
+        let action, receiver_account =
+          get_or_initialize_exn receiver t receiver_idx
+        in
+        if equal_account_state action `Existed then
+          failwith "Attempted to create an account that already exists" ;
+        let receiver_account =
+          { receiver_account with
+            token_permissions = Token_permissions.Not_owned { account_disabled }
+          }
+        in
+        let source_idx = find_index_exn t source in
+        let source_account =
+          if Account_id.equal source receiver then receiver_account
+          else if Account_id.equal source fee_payer then fee_payer_account
+          else
+            match get_or_initialize_exn receiver t source_idx with
+            | `Added, _ ->
+                failwith "Source account does not exist"
+            | `Existed, source_account ->
+                source_account
+        in
+        let () =
+          match source_account.token_permissions with
+          | Token_owned { disable_new_accounts } ->
+              if
+                not
+                  ( Bool.equal account_disabled disable_new_accounts
+                  || predicate_passed )
+              then
+                failwith
+                  "The fee-payer is not authorised to create token accounts \
+                   for this token"
+          | Not_owned _ ->
+              if Token_id.(equal default) (Account_id.token_id receiver) then ()
+              else failwith "Token owner account does not own the token"
+        in
+        let source_account =
+          let timing =
+            Or_error.ok_exn
+            @@ Transaction_logic.validate_timing ~txn_amount:Amount.zero
+                 ~txn_global_slot:current_global_slot ~account:source_account
+          in
+          { source_account with timing }
+        in
+        if Account_id.equal source receiver then
+          (* For token_id= default, we allow this *)
+          [ (fee_payer_idx, fee_payer_account); (source_idx, source_account) ]
+        else
+          [ (receiver_idx, receiver_account)
+          ; (fee_payer_idx, fee_payer_account)
+          ; (source_idx, source_account)
+          ]
+    | Mint_tokens { token_id = token; amount; _ } ->
+        assert (not (Token_id.(equal default) token)) ;
+        let receiver_idx = find_index_exn t receiver in
+        let action, receiver_account =
+          get_or_initialize_exn receiver t receiver_idx
+        in
+        assert (equal_account_state action `Existed) ;
+        let receiver_account =
+          { receiver_account with
+            balance =
+              Balance.add_amount receiver_account.balance amount
+              |> Option.value_exn ?here:None ?error:None ?message:None
+          }
+        in
+        let source_idx = find_index_exn t source in
+        let source_account =
+          let account =
+            if Account_id.equal source receiver then receiver_account
+            else get_exn t source_idx
+          in
+          (* Check that source account exists. *)
+          assert (not Public_key.Compressed.(equal empty account.public_key)) ;
+          (* Check that source account owns the token. *)
+          let () =
+            match account.token_permissions with
+            | Token_owned _ ->
+                ()
+            | Not_owned _ ->
+                failwithf
+                  !"The claimed token owner %{sexp: Account_id.t} does not own \
+                    the token %{sexp: Token_id.t}"
+                  source token ()
+          in
+          { account with
+            timing =
+              Or_error.ok_exn
+              @@ Transaction_logic.validate_timing ~txn_amount:Amount.zero
+                   ~txn_global_slot:current_global_slot ~account
+          }
+        in
+        [ (receiver_idx, receiver_account); (source_idx, source_account) ]
+  in
+  try
+    let indexed_accounts = compute_updates () in
+    (* User command succeeded, update accounts in the ledger. *)
+    List.fold ~init:t indexed_accounts ~f:(fun t (idx, account) ->
+        set_exn t idx account)
+  with
+  | Reject exn ->
+      (* TODO: These transactions should never reach this stage, this error
+         should be fatal.
+      *)
+      raise exn
+  | _ ->
+      (* Not able to apply the user command successfully, charge fee only. *)
+      t
+
+let apply_snapp_command_exn
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~txn_state_view t (c : Snapp_command.t) =
+  let t = ref t in
+  T.apply_transaction ~constraint_constants ~txn_state_view t
+    (Command (Snapp_command c))
+  |> Or_error.ok_exn |> ignore ;
+  !t
+
+let update_timing_when_no_deduction ~txn_global_slot account =
+  Transaction_logic.validate_timing ~txn_amount:Currency.Amount.zero
+    ~txn_global_slot ~account
+  |> Or_error.ok_exn
+
+let apply_fee_transfer_exn ~constraint_constants ~txn_global_slot =
+  let apply_single ~update_timing t (ft : Fee_transfer.Single.t) =
+    let account_id = Fee_transfer.Single.receiver ft in
+    let index = find_index_exn t account_id in
+    let action, account = get_or_initialize_exn account_id t index in
+    let open Currency in
+    let amount = Amount.of_fee ft.fee in
+    let timing =
+      if update_timing then
+        update_timing_when_no_deduction ~txn_global_slot account
+      else account.timing
+    in
+    let balance =
+      let amount' =
+        sub_account_creation_fee ~constraint_constants action amount
+      in
+      Option.value_exn (Balance.add_amount account.balance amount')
+    in
+    set_exn t index { account with balance; timing }
+  in
+  fun t transfer ->
+    match Fee_transfer.to_singles transfer with
+    | `One s ->
+        apply_single ~update_timing:true t s
+    | `Two (s1, s2) ->
+        (*Note: Not updating the timing for s1 to avoid additional check in transactions snark (check_timing for "receiver"). This is OK because timing rules will not be violated when balance increases and will be checked whenever an amount is deducted from the account.(#5973)*)
+        let t' = apply_single ~update_timing:false t s1 in
+        apply_single ~update_timing:true t' s2
+
+let apply_coinbase_exn ~constraint_constants ~txn_global_slot t
+    ({ receiver; fee_transfer; amount = coinbase_amount } : Coinbase.t) =
+  let open Currency in
+  let add_to_balance ~update_timing t pk amount =
+    let idx = find_index_exn t pk in
+    let action, a = get_or_initialize_exn pk t idx in
+    let timing =
+      if update_timing then update_timing_when_no_deduction ~txn_global_slot a
+      else a.timing
+    in
+    let balance =
+      let amount' =
+        sub_account_creation_fee ~constraint_constants action amount
+      in
+      Option.value_exn (Balance.add_amount a.balance amount')
+    in
+    set_exn t idx { a with balance; timing }
+  in
+  (* Note: Updating coinbase receiver timing only if there is no fee transfer. This is so as to not add any extra constraints in transaction snark for checking "receiver" timings. This is OK because timing rules will not be violated when balance increases and will be checked whenever an amount is deducted from the account(#5973)*)
+  let receiver_reward, t, update_coinbase_receiver_timing =
+    match fee_transfer with
+    | None ->
+        (coinbase_amount, t, true)
+    | Some ({ receiver_pk = _; fee } as ft) ->
+        let fee = Amount.of_fee fee in
+        let reward =
+          Amount.sub coinbase_amount fee
+          |> Option.value_exn ?here:None ?message:None ?error:None
+        in
+        let transferee_id = Coinbase.Fee_transfer.receiver ft in
+        (reward, add_to_balance ~update_timing:true t transferee_id fee, false)
+  in
+  let receiver_id = Account_id.create receiver Token_id.default in
+  add_to_balance ~update_timing:update_coinbase_receiver_timing t receiver_id
+    receiver_reward
+
+let apply_transaction_exn ~constraint_constants
+    ~(txn_state_view : Snapp_predicate.Protocol_state.View.t) t
+    (transition : Transaction.t) =
+  let txn_global_slot = txn_state_view.global_slot_since_genesis in
+  match transition with
+  | Fee_transfer tr ->
+      apply_fee_transfer_exn ~constraint_constants ~txn_global_slot t tr
+  | Command (Signed_command cmd) ->
+      apply_user_command_exn ~constraint_constants ~txn_global_slot t
+        (cmd :> Signed_command.t)
+  | Command (Snapp_command cmd) ->
+      apply_snapp_command_exn ~constraint_constants ~txn_state_view t cmd
+  | Coinbase c ->
+      apply_coinbase_exn ~constraint_constants ~txn_global_slot t c
+
 let has_locked_tokens_exn ~global_slot ~account_id t =
   let idx = find_index_exn t account_id in
   let _, account = get_or_initialize_exn account_id t idx in
   Account.has_locked_tokens ~global_slot account
-
-let apply_transaction_logic f t x =
-  let open Or_error.Let_syntax in
-  let t' = ref t in
-  let%map app = f t' x in
-  (!t', app)
-
-let apply_user_command ~constraint_constants ~txn_global_slot =
-  apply_transaction_logic
-    (T.apply_user_command ~constraint_constants ~txn_global_slot)
-
-let apply_transaction' = T.apply_transaction
-
-let apply_transaction ~constraint_constants ~txn_state_view =
-  apply_transaction_logic
-    (T.apply_transaction ~constraint_constants ~txn_state_view)
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
 
