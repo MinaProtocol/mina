@@ -4170,7 +4170,27 @@ struct
 end
 
 module For_tests = struct
-  let create_trivial_predicate_snapp ~constraint_constants spec ledger =
+  module Spec = struct
+    type t =
+      { fee : Currency.Fee.t
+      ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; receivers :
+          (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
+      ; amount : Currency.Amount.t
+      ; snapp_account_keypair : Signature_lib.Keypair.t option
+      ; memo : Signed_command_memo.t
+      ; new_snapp_account : bool
+      ; snapp_update : Party.Update.t
+      ; current_auth : Permissions.Auth_required.t
+            (*Authorization for the update being performed*)
+      ; sequence_events : Tick.Field.t array list
+      ; events : Tick.Field.t array list
+      ; call_data : Tick.Field.t
+      }
+    [@@deriving sexp]
+  end
+
+  let create_trivial_snapp ~constraint_constants () =
     let tag, _, (module P), Pickles.Provers.[ trivial_prover; _ ] =
       let trivial_rule : _ Pickles.Inductive_rule.t =
         let trivial_main (tx_commitment : Snapp_statement.Checked.t) :
@@ -4372,8 +4392,8 @@ module For_tests = struct
     in
     let fee_payer =
       let fee_payer_signature_auth =
-        Signature_lib.Schnorr.sign sender.private_key
-          (Random_oracle.Input.field full_commitment)
+        Signature_lib.Schnorr.Chunked.sign sender.private_key
+          (Random_oracle.Input.Chunked.field full_commitment)
       in
       { fee_payer with authorization = fee_payer_signature_auth }
     in
@@ -4384,8 +4404,8 @@ module For_tests = struct
             else commitment
           in
           let sender_signature_auth =
-            Signature_lib.Schnorr.sign sender.private_key
-              (Random_oracle.Input.field commitment)
+            Signature_lib.Schnorr.Chunked.sign sender.private_key
+              (Random_oracle.Input.Chunked.field commitment)
           in
           { Party.data = s.data
           ; authorization = Signature sender_signature_auth
@@ -4428,9 +4448,9 @@ module For_tests = struct
             else commitment
           in
           let signature =
-            Signature_lib.Schnorr.sign
+            Signature_lib.Schnorr.Chunked.sign
               (Option.value_exn spec.snapp_account_keypair).private_key
-              (Random_oracle.Input.field commitment)
+              (Random_oracle.Input.Chunked.field commitment)
           in
           [ { Party.data = snapp_party.data
             ; authorization = Signature signature
@@ -4485,9 +4505,9 @@ module For_tests = struct
             else commitment
           in
           let signature =
-            Signature_lib.Schnorr.sign
+            Signature_lib.Schnorr.Chunked.sign
               (Option.value_exn spec.snapp_account_keypair).private_key
-              (Random_oracle.Input.field commitment)
+              (Random_oracle.Input.Chunked.field commitment)
           in
           Async.Deferred.return
             { Party.data = snapp_party.data

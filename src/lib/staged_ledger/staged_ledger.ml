@@ -2481,8 +2481,8 @@ let%test_module "staged ledger tests" =
         List.map parties_and_fee_payer_keypairs ~f:(function
           | Parties parties, fee_payer_keypair, keymap ->
               let fee_payer_signature =
-                Signature_lib.Schnorr.sign fee_payer_keypair.private_key
-                  (Random_oracle.Input.field
+                Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
+                  (Random_oracle.Input.Chunked.field
                      ( Parties.commitment parties
                      |> Parties.Transaction_commitment.with_fee_payer
                           ~fee_payer_hash:
@@ -2503,8 +2503,8 @@ let%test_module "staged ledger tests" =
                 let protocol_state_predicate_hash =
                   Snapp_predicate.Protocol_state.digest protocol_state
                 in
-                Signature_lib.Schnorr.sign sk
-                  (Random_oracle.Input.field
+                Signature_lib.Schnorr.Chunked.sign sk
+                  (Random_oracle.Input.Chunked.field
                      (Parties.Transaction_commitment.create ~memo_hash
                         ~other_parties_hash ~protocol_state_predicate_hash))
               in
