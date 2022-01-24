@@ -19,6 +19,25 @@ You may also install Nix from your distribution's official repository;
 Note however that it is preferrable you get a relatively recent
 version (⩾ 2.5), and the version from the repository may be rather old.
 
+## Note about submodules
+
+Nix will **not** fetch submodules for you. You have to make sure that
+you have the entire mina source code, including submodules, before you
+run any nix commands. This should make sure you have the right
+versions checked out (in most cases):
+
+```
+git submodule init
+git submodule sync
+git submodule update
+```
+
+If you don't do this, Nix may not always yell at you right away
+(especially if all the submodule directories are present in the tree
+somehow, but not correctly filled in). It will however fail with a
+strange error during the build, when it fails to find a
+dependency. Make sure you do this!
+
 ## Note about Flakes
 
 Mina is packaged using [Nix Flakes](https://nixos.wiki/wiki/Flakes),
