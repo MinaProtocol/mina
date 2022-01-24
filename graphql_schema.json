@@ -883,7 +883,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "SnappState",
-          "description": "Snapp state, a list of 8 field elements",
+          "description": "snapp state, a list of 8 field elements",
           "fields": [
             {
               "name": "elements",
@@ -1416,10 +1416,10 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "PartyBody",
-          "description": "Body component of a Snapp Party",
+          "description": "Body component of a snapp Party",
           "fields": [
             {
-              "name": "use_full_commitment",
+              "name": "useFullCommitment",
               "description":
                 "Use the full or partial commitment when checking the party predicate.",
               "args": [],
@@ -1437,7 +1437,7 @@
             },
             {
               "name": "protocolState",
-              "description": "The protocol state in a Snapp transaction",
+              "description": "The protocol state in a snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -1564,7 +1564,7 @@
               "deprecationReason": null
             },
             {
-              "name": "balance_change",
+              "name": "balanceChange",
               "description":
                 "Signed amount representing the amount to change for this particular relevant party.",
               "args": [],
@@ -1631,7 +1631,7 @@
           ],
           "inputFields": [
             {
-              "name": "use_full_commitment",
+              "name": "useFullCommitment",
               "description":
                 "Use the full or partial commitment when checking the party predicate.",
               "type": {
@@ -1647,7 +1647,7 @@
             },
             {
               "name": "protocolState",
-              "description": "The protocol state in a Snapp transaction",
+              "description": "The protocol state in a snapp transaction",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1762,7 +1762,7 @@
               "defaultValue": null
             },
             {
-              "name": "balance_change",
+              "name": "balanceChange",
               "description":
                 "Signed amount representing the amount to change for this particular relevant party.",
               "type": {
@@ -1898,7 +1898,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "SnappParty",
-          "description": "A party to a Snapp transaction",
+          "description": "A party to a snapp transaction",
           "fields": [
             {
               "name": "authorization",
@@ -2606,7 +2606,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "SnappProtocolState",
-          "description": "Protocol state for a Snapp transaction",
+          "description": "Protocol state for a snapp transaction",
           "fields": [
             {
               "name": "nextEpochData",
@@ -3539,7 +3539,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "PartyUpdate",
-          "description": "Update component of a Snapp Party",
+          "description": "Update component of a snapp Party",
           "fields": [
             {
               "name": "timing",
@@ -3715,11 +3715,11 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "FeePayerPartyBody",
-          "description": "Body component of a Snapp Fee Payer Party",
+          "description": "Body component of a snapp Fee Payer Party",
           "fields": [
             {
               "name": "protocolState",
-              "description": "The protocol state in a Snapp transaction",
+              "description": "The protocol state in a snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3735,16 +3735,13 @@
             },
             {
               "name": "callDepth",
-              "description": "An integer in string format",
+              "description":
+                "The number of nested snapp calls in the transaction before reaching the fee payer.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -3858,7 +3855,7 @@
               "deprecationReason": null
             },
             {
-              "name": "pk",
+              "name": "publicKey",
               "description": "Public key as a Base58Check string",
               "args": [],
               "type": {
@@ -3877,7 +3874,7 @@
           "inputFields": [
             {
               "name": "protocolState",
-              "description": "The protocol state in a Snapp transaction",
+              "description": "The protocol state in a snapp transaction",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -3891,15 +3888,12 @@
             },
             {
               "name": "callDepth",
-              "description": "An integer in string format",
+              "description":
+                "The number of nested snapp calls in the transaction before reaching the fee payer.",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "defaultValue": null
             },
@@ -4002,7 +3996,7 @@
               "defaultValue": null
             },
             {
-              "name": "pk",
+              "name": "publicKey",
               "description": "Public key as a Base58Check string",
               "type": {
                 "kind": "NON_NULL",
@@ -4024,7 +4018,7 @@
           "kind": "INPUT_OBJECT",
           "name": "SnappPartyPredicatedFeePayer",
           "description":
-            "A party to a Snapp transaction with a nonce predicate",
+            "A party to a snapp transaction with a nonce predicate",
           "fields": [
             {
               "name": "predicate",
@@ -4097,7 +4091,7 @@
           "kind": "INPUT_OBJECT",
           "name": "SnappPartyFeePayer",
           "description":
-            "A party to a Snapp transaction with a signature authorization",
+            "A party to a snapp transaction with a signature authorization",
           "fields": [
             {
               "name": "authorization",
@@ -4182,7 +4176,7 @@
             {
               "name": "otherParties",
               "description":
-                "The parties other than the fee payer in a Snapp transaction",
+                "The parties other than the fee payer in a snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4206,7 +4200,7 @@
             },
             {
               "name": "feePayer",
-              "description": "The fee payer party to a Snapp transaction",
+              "description": "The fee payer party to a snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4231,7 +4225,7 @@
             {
               "name": "otherParties",
               "description":
-                "The parties other than the fee payer in a Snapp transaction",
+                "The parties other than the fee payer in a snapp transaction",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -4253,7 +4247,7 @@
             },
             {
               "name": "feePayer",
-              "description": "The fee payer party to a Snapp transaction",
+              "description": "The fee payer party to a snapp transaction",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -4277,7 +4271,7 @@
           "fields": [
             {
               "name": "snapp",
-              "description": "Snapp transaction that was sent",
+              "description": "snapp transaction that was sent",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6193,7 +6187,7 @@
             },
             {
               "name": "sendSnapp",
-              "description": "Send a Snapp transaction",
+              "description": "Send a snapp transaction",
               "args": [
                 {
                   "name": "input",
@@ -8037,7 +8031,7 @@
             },
             {
               "name": "hash",
-              "description": "A cryptographic hash of the Snapp command",
+              "description": "A cryptographic hash of the snapp command",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8054,7 +8048,7 @@
             {
               "name": "nonce",
               "description":
-                "Sequence number of the Snapp transaction for the fee-payer's account",
+                "Sequence number of the snapp transaction for the fee-payer's account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8067,7 +8061,7 @@
             {
               "name": "feePayer",
               "description":
-                "Account that pays the fees for the Snapp transaction",
+                "Account that pays the fees for the snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8084,7 +8078,7 @@
             {
               "name": "accountsAccessed",
               "description":
-                "List of accounts accessed to complete the Snapp transaction",
+                "List of accounts accessed to complete the snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8109,7 +8103,7 @@
             {
               "name": "fee",
               "description":
-                "Transaction fee paid by the fee-payer for the Snapp transaction",
+                "Transaction fee paid by the fee-payer for the snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8142,7 +8136,7 @@
             {
               "name": "failureReason",
               "description":
-                "The reason for the Snapp transaction failure; null means success or the status is unknown",
+                "The reason for the snapp transaction failure; null means success or the status is unknown",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
@@ -10217,7 +10211,7 @@
             },
             {
               "name": "snappCommands",
-              "description": "List of Snapp commands included in this block",
+              "description": "List of snapp commands included in this block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -11676,7 +11670,7 @@
             {
               "name": "snappUri",
               "description":
-                "The URI associated with this account, usually pointing to the Snapp source code",
+                "The URI associated with this account, usually pointing to the snapp source code",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
@@ -13387,11 +13381,11 @@
             {
               "name": "pooledSnappCommands",
               "description":
-                "Retrieve all the scheduled Snapp commands for a specified sender that the current daemon sees in its transaction pool. All scheduled commands are queried if no sender is specified",
+                "Retrieve all the scheduled snapp commands for a specified sender that the current daemon sees in its transaction pool. All scheduled commands are queried if no sender is specified",
               "args": [
                 {
                   "name": "ids",
-                  "description": "Ids of Snapp commands",
+                  "description": "Ids of snapp commands",
                   "type": {
                     "kind": "LIST",
                     "name": null,
@@ -13410,7 +13404,7 @@
                 {
                   "name": "hashes",
                   "description":
-                    "Hashes of the Snapp commands to find in the pool",
+                    "Hashes of the snapp commands to find in the pool",
                   "type": {
                     "kind": "LIST",
                     "name": null,
@@ -13429,7 +13423,7 @@
                 {
                   "name": "publicKey",
                   "description":
-                    "Public key of sender of pooled Snapp commands",
+                    "Public key of sender of pooled snapp commands",
                   "type": {
                     "kind": "SCALAR",
                     "name": "PublicKey",

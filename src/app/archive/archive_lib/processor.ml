@@ -1117,7 +1117,7 @@ module Snapp_party_body = struct
   let add_if_doesn't_exist (module Conn : CONNECTION) (body : Party.Body.t) =
     let open Deferred.Result.Let_syntax in
     let%bind public_key_id =
-      Public_key.add_if_doesn't_exist (module Conn) body.pk
+      Public_key.add_if_doesn't_exist (module Conn) body.public_key
     in
     let%bind update_id =
       Snapp_updates.add_if_doesn't_exist (module Conn) body.update

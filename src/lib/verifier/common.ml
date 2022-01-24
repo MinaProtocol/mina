@@ -68,7 +68,7 @@ let check :
                       [ Signature_lib.Public_key.compress pk ])
                 else ()
           in
-          check_signature fee_payer.authorization fee_payer.data.body.pk
+          check_signature fee_payer.authorization fee_payer.data.body.public_key
             (Parties.Transaction_commitment.with_fee_payer commitment
                ~fee_payer_hash:
                  (Party.Predicated.digest
@@ -82,7 +82,7 @@ let check :
               ~f:(fun ((p, vk_opt), at_party) ->
                 match p.authorization with
                 | Signature s ->
-                    check_signature s p.data.body.pk commitment ;
+                    check_signature s p.data.body.public_key commitment ;
                     None
                 | None_given ->
                     None

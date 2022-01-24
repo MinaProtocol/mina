@@ -1249,7 +1249,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ~(state_view : Snapp_predicate.Protocol_state.View.t) ~check_auth
       ~has_proof ~is_new ~global_slot_since_genesis ~is_start
       ({ body =
-           { pk = _
+           { public_key = _
            ; token_id
            ; update =
                { app_state
@@ -1292,7 +1292,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let%bind () =
       if Amount.(equal zero) balance_change.magnitude then Ok ()
       else
-        check Update_not_permitted
+        check Update_not_permitted_balance
           (check_auth
              ( match balance_change.sgn with
              | Pos ->
@@ -1320,7 +1320,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             *)
             failwith "Transaction contains invalid timing information"
       | Set _ ->
-          Error (failure Update_not_permitted)
+          Error (failure Update_not_permitted_timing_existing_account)
     in
     (* Check timing. *)
     let%bind timing =
@@ -1343,10 +1343,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let init =
       match a.snapp with None -> Snapp_account.default | Some a -> a
     in
-    let update perm u curr ~is_keep ~update =
+    let update perm u curr ~is_keep ~update ~error =
       match check_auth perm with
       | false ->
-          let%map () = check Update_not_permitted (is_keep u) in
+          let%map () = check error (is_keep u) in
           curr
       | true ->
           Ok (update u curr)
@@ -1354,8 +1354,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let%bind delegate =
       if Token_id.(equal default) a.token_id then
         update a.permissions.set_delegate delegate a.delegate
-          ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
-            match u with Keep -> x | Set y -> Some y)
+          ~is_keep:Set_or_keep.is_keep
+          ~update:(fun u x -> match u with Keep -> x | Set y -> Some y)
+          ~error:Update_not_permitted_delegate
       else return a.delegate
     in
     let%bind snapp =
@@ -1370,10 +1371,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         update a.permissions.edit_state app_state init.app_state
           ~is_keep:(Vector.for_all ~f:Set_or_keep.is_keep)
           ~update:(Vector.map2 ~f:Set_or_keep.set_or_keep)
+          ~error:Update_not_permitted_app_state
       and verification_key =
         update a.permissions.set_verification_key verification_key
-          init.verification_key ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
+          init.verification_key ~is_keep:Set_or_keep.is_keep
+          ~update:(fun u x ->
             match (u, x) with Keep, _ -> x | Set x, _ -> Some x)
+          ~error:Update_not_permitted_verification_key
       and sequence_state, last_sequence_slot =
         let [ s1; s2; s3; s4; s5 ] = init.sequence_state in
         let last_sequence_slot = init.last_sequence_slot in
@@ -1401,8 +1405,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         in
         update a.permissions.edit_sequence_state new_sequence_state
           (init.sequence_state, init.last_sequence_slot)
-          ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
-            match u with Keep -> x | Set x -> x)
+          ~is_keep:Set_or_keep.is_keep
+          ~update:(fun u x -> match u with Keep -> x | Set x -> x)
+          ~error:Update_not_permitted_sequence_state
       in
       let snapp_version =
         (* Current snapp version. Upgrade mechanism should live here. *)
@@ -1422,14 +1427,17 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let%bind snapp_uri =
       update a.permissions.set_snapp_uri snapp_uri a.snapp_uri
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
+        ~error:Update_not_permitted_snapp_uri
     in
     let%bind token_symbol =
       update a.permissions.set_token_symbol token_symbol a.token_symbol
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
+        ~error:Update_not_permitted_token_symbol
     in
     let%bind permissions =
       update a.permissions.set_permissions permissions a.permissions
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
+        ~error:Update_not_permitted_permissions
     in
     let%bind nonce =
       let update_nonce =
@@ -1438,6 +1446,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       in
       update a.permissions.increment_nonce update_nonce a.nonce
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
+        ~error:Update_not_permitted_nonce
     in
     (* enforce that either the predicate is `Accept`,
          the nonce is incremented,
@@ -1452,7 +1461,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ; use_full_commitment && not is_start
         ]
       |> Result.ok_if_true
-           ~error:Transaction_status.Failure.Update_not_permitted
+           ~error:Transaction_status.Failure.Parties_replay_check_failed
     in
     { a with
       balance
@@ -1671,9 +1680,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           (acct, loc)
       | Check_inclusion (_ledger, _account, _loc) ->
           ()
-      | Check_protocol_state_predicate (pred, global_state) ->
+      | Check_protocol_state_predicate (pred, global_state) -> (
           Snapp_predicate.Protocol_state.check pred global_state.protocol_state
-          |> Or_error.is_ok
+          |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
       | Check_predicate (_is_start, party, account, _global_state) -> (
           match party.data.predicate with
           | Accept ->
@@ -1713,7 +1722,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             let%bind.Result () =
               if is_start && not p.data.body.increment_nonce then
                 (* The fee-payer must increment their nonce. *)
-                Error Transaction_status.Failure.Update_not_permitted
+                Error Transaction_status.Failure.Fee_payer_nonce_must_increase
               else Ok ()
             in
             let%bind.Result () =
@@ -1725,7 +1734,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               | Signature, false, false ->
                   (* If there's a signature, it must increment the nonce or use
                      full commitment to avoid replays *)
-                  Error Transaction_status.Failure.Update_not_permitted
+                  Error Transaction_status.Failure.Parties_replay_check_failed
               | _ ->
                   Ok ()
             in
@@ -2583,7 +2592,7 @@ module For_tests = struct
       { fee_payer =
           { Party.Fee_payer.data =
               { body =
-                  { pk = sender_pk
+                  { public_key = sender_pk
                   ; update = Party.Update.noop
                   ; token_id = ()
                   ; balance_change = fee
@@ -2603,7 +2612,7 @@ module For_tests = struct
       ; other_parties =
           [ { data =
                 { body =
-                    { pk = sender_pk
+                    { public_key = sender_pk
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
                     ; balance_change =
@@ -2622,7 +2631,7 @@ module For_tests = struct
             }
           ; { data =
                 { body =
-                    { pk = receiver
+                    { public_key = receiver
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
                     ; balance_change = Amount.Signed.(of_unsigned amount)

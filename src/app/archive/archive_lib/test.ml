@@ -47,8 +47,8 @@ let%test_module "Archive node unit tests" =
     let keys = Array.init 5 ~f:(fun _ -> Keypair.create ())
 
     let user_command_signed_gen =
-      User_command.Gen.payment_with_random_participants ~keys ~max_amount:1000
-        ~fee_range:10 ()
+      User_command_generators.payment_with_random_participants ~keys
+        ~max_amount:1000 ~fee_range:10 ()
 
     let user_command_snapp_gen :
         ('a, Parties.t) User_command.t_ Base_quickcheck.Generator.t =

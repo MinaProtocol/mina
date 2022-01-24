@@ -854,7 +854,7 @@ module Snapp_helpers = struct
         ~f:(fun db -> Processor.Snapp_party_body.load db body_id)
         ~item:"Snapp party body"
     in
-    let%bind pk = pk_of_pk_id pool body_data.public_key_id in
+    let%bind public_key = pk_of_pk_id pool body_data.public_key_id in
     let%bind update_data =
       query_db pool
         ~f:(fun db -> Processor.Snapp_updates.load db body_data.update_id)
@@ -1178,7 +1178,7 @@ module Snapp_helpers = struct
     in
     let use_full_commitment = body_data.use_full_commitment in
     return
-      ( { pk
+      ( { public_key
         ; update
         ; token_id
         ; balance_change
@@ -1206,7 +1206,7 @@ module Snapp_helpers = struct
             "fee_payer_body_of_id: expected positive balance change for fee \
              payer"
     in
-    ( { pk = body.pk
+    ( { public_key = body.public_key
       ; update = body.update
       ; token_id = ()
       ; balance_change

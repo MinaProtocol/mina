@@ -181,7 +181,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           let fee_payer =
             { Party.Fee_payer.data =
                 { body =
-                    { pk = sender_pk
+                    { public_key = sender_pk
                     ; update = Party.Update.noop
                     ; token_id = ()
                     ; balance_change = Amount.to_fee fee
@@ -201,7 +201,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           in
           let sender_party_data : Party.Predicated.t =
             { body =
-                { pk = sender_pk
+                { public_key = sender_pk
                 ; update = Party.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
@@ -218,7 +218,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           in
           let snapp_party_data : Party.Predicated.t =
             { Party.Predicated.Poly.body =
-                { pk = ringsig_account_pk
+                { public_key = ringsig_account_pk
                 ; update = Party.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.(of_unsigned amount)

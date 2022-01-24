@@ -66,6 +66,8 @@ end]
 
 module Tag = struct
   type t = Proof | Signature | None_given [@@deriving equal, compare, sexp]
+
+  let gen = Quickcheck.Generator.of_list [ Proof; Signature; None_given ]
 end
 
 let tag : t -> Tag.t = function
@@ -75,3 +77,17 @@ let tag : t -> Tag.t = function
       Signature
   | None_given ->
       None_given
+
+[%%ifdef consensus_mechanism]
+
+let dummy_of_tag : Tag.t -> t = function
+  | Proof ->
+      let n2 = Pickles_types.Nat.N2.n in
+      let proof = Pickles.Proof.dummy n2 n2 n2 in
+      Proof proof
+  | Signature ->
+      Signature Signature.dummy
+  | None_given ->
+      None_given
+
+[%%endif]

@@ -75,7 +75,10 @@ module Stable : sig
   end
 end]
 
-val gen : t Core_kernel.Quickcheck.Generator.t
+(** if [auth_tag] is provided, the generated permissions will be compatible with
+    the corresponding authorization
+*)
+val gen : auth_tag:Control.Tag.t -> t Core_kernel.Quickcheck.Generator.t
 
 val to_input : t -> Field.t Random_oracle_input.Chunked.t
 

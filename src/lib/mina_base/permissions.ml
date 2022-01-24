@@ -73,9 +73,17 @@ module Auth_required = struct
     end
   end]
 
-  let gen : t Quickcheck.Generator.t =
-    Quickcheck.Generator.of_list
-      [ None; Either; Proof; Signature; Both; Impossible ]
+  (* permissions such that [check permission (Proof _)] is true *)
+  let gen_for_proof_authorization : t Quickcheck.Generator.t =
+    Quickcheck.Generator.of_list [ None; Either; Proof ]
+
+  (* permissions such that [check permission (Signature _)] is true *)
+  let gen_for_signature_authorization : t Quickcheck.Generator.t =
+    Quickcheck.Generator.of_list [ None; Either; Signature ]
+
+  (* permissions such that [check permission None_given] is true *)
+  let gen_for_none_given_authorization : t Quickcheck.Generator.t =
+    Quickcheck.Generator.return None
 
   (* The encoding is chosen so that it is easy to write this function
 
@@ -338,19 +346,29 @@ module Stable = struct
   end
 end]
 
-let gen : t Quickcheck.Generator.t =
-  let open Quickcheck.Let_syntax in
+let gen ~auth_tag : t Quickcheck.Generator.t =
+  let auth_required_gen =
+    (* for Auth_required permissions p, choose such that [check p authorization] is true *)
+    match auth_tag with
+    | Control.Tag.Proof ->
+        Auth_required.gen_for_proof_authorization
+    | Signature ->
+        Auth_required.gen_for_signature_authorization
+    | None_given ->
+        Auth_required.gen_for_none_given_authorization
+  in
+  let open Quickcheck.Generator.Let_syntax in
   let%bind stake = Quickcheck.Generator.bool in
-  let%bind edit_state = Auth_required.gen in
-  let%bind send = Auth_required.gen in
-  let%bind receive = Auth_required.gen in
-  let%bind set_delegate = Auth_required.gen in
-  let%bind set_permissions = Auth_required.gen in
-  let%bind set_verification_key = Auth_required.gen in
-  let%bind set_snapp_uri = Auth_required.gen in
-  let%bind edit_sequence_state = Auth_required.gen in
-  let%bind set_token_symbol = Auth_required.gen in
-  let%bind increment_nonce = Auth_required.gen in
+  let%bind edit_state = auth_required_gen in
+  let%bind send = auth_required_gen in
+  let%bind receive = auth_required_gen in
+  let%bind set_delegate = auth_required_gen in
+  let%bind set_permissions = auth_required_gen in
+  let%bind set_verification_key = auth_required_gen in
+  let%bind set_snapp_uri = auth_required_gen in
+  let%bind edit_sequence_state = auth_required_gen in
+  let%bind set_token_symbol = auth_required_gen in
+  let%bind increment_nonce = auth_required_gen in
   return
     { Poly.stake
     ; edit_state

@@ -867,11 +867,7 @@ let gen_with_constrained_balance ~low ~high =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in
   let%bind token_id = Token_id.gen in
-  let%map balance =
-    Currency.Balance.gen_incl
-      (Currency.Balance.of_int low)
-      (Currency.Balance.of_int high)
-  in
+  let%map balance = Currency.Balance.gen_incl low high in
   create (Account_id.create public_key token_id) balance
 
 let gen_timed =

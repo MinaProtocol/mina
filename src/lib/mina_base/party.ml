@@ -184,11 +184,9 @@ module Update = struct
     end
   end]
 
-  let gen ?(new_account = false) ?(snapp_account = false) () :
+  let gen ?(snapp_account = false) ?permissions_auth () :
       t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
-    if snapp_account && not new_account then
-      failwith "Party.Update.gen: got snapp_account but not new_account" ;
     let%bind app_state =
       let%bind fields =
         let field_gen = Snark_params.Tick.Field.gen in
@@ -208,8 +206,12 @@ module Update = struct
       else return Set_or_keep.Keep
     in
     let%bind permissions =
-      if snapp_account then Set_or_keep.gen Permissions.gen
-      else return Set_or_keep.Keep
+      match permissions_auth with
+      | None ->
+          return Set_or_keep.Keep
+      | Some auth_tag ->
+          let%map permissions = Permissions.gen ~auth_tag in
+          Set_or_keep.Set permissions
     in
     let%bind snapp_uri =
       let uri_gen =
@@ -229,19 +231,20 @@ module Update = struct
       in
       Set_or_keep.gen token_gen
     in
-    let%map timing =
-      if new_account then Set_or_keep.gen Timing_info.gen
-      else return Set_or_keep.Keep
-    in
-    Poly.
-      { app_state
-      ; delegate
-      ; verification_key
-      ; permissions
-      ; snapp_uri
-      ; token_symbol
-      ; timing
-      }
+    (* a new account for the Party.t is in the ledger when we use
+       this generated update in tests, so the timing must be Keep
+    *)
+    let timing = Set_or_keep.Keep in
+    return
+      Poly.
+        { app_state
+        ; delegate
+        ; verification_key
+        ; permissions
+        ; snapp_uri
+        ; token_symbol
+        ; timing
+        }
 
   module Checked = struct
     open Pickles.Impls.Step
@@ -373,7 +376,7 @@ module Body = struct
              , 'bool
              , 'protocol_state )
              t =
-          { pk : 'pk
+          { public_key : 'pk
           ; update : 'update
           ; token_id : 'token_id
           ; balance_change : 'amount
@@ -442,7 +445,7 @@ module Body = struct
     end]
 
     let dummy : t =
-      { pk = Public_key.Compressed.empty
+      { public_key = Public_key.Compressed.empty
       ; update = Update.dummy
       ; token_id = ()
       ; balance_change = Fee.zero
@@ -481,7 +484,7 @@ module Body = struct
       Poly.t
 
     let to_input
-        ({ pk
+        ({ public_key
          ; update
          ; token_id
          ; balance_change
@@ -495,7 +498,7 @@ module Body = struct
          } :
           t) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
-        [ Public_key.Compressed.Checked.to_input pk
+        [ Public_key.Compressed.Checked.to_input public_key
         ; Update.Checked.to_input update
         ; Token_id.Checked.to_input token_id
         ; Snark_params.Tick.Run.run_checked
@@ -534,7 +537,7 @@ module Body = struct
       ~value_of_hlist:of_hlist
 
   let dummy : t =
-    { pk = Public_key.Compressed.empty
+    { public_key = Public_key.Compressed.empty
     ; update = Update.dummy
     ; token_id = Token_id.default
     ; balance_change = Amount.Signed.zero
@@ -548,7 +551,7 @@ module Body = struct
     }
 
   let to_input
-      ({ pk
+      ({ public_key
        ; update
        ; token_id
        ; balance_change
@@ -562,7 +565,7 @@ module Body = struct
        } :
         t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
-      [ Public_key.Compressed.to_input pk
+      [ Public_key.Compressed.to_input public_key
       ; Update.to_input update
       ; Token_id.to_input token_id
       ; Amount.Signed.to_input balance_change
@@ -611,7 +614,7 @@ module Predicate = struct
         Snapp_predicate.Account.accept
 
   module Tag = struct
-    type t = Full | Nonce | Accept [@@deriving equal, compare, sexp]
+    type t = Full | Nonce | Accept [@@deriving equal, compare, sexp, yojson]
   end
 
   let tag : t -> Tag.t = function
@@ -826,7 +829,7 @@ module Signed = struct
   end]
 
   let account_id (t : t) : Account_id.t =
-    Account_id.create t.data.body.pk t.data.body.token_id
+    Account_id.create t.data.body.public_key t.data.body.token_id
 end
 
 module Fee_payer = struct
@@ -844,7 +847,7 @@ module Fee_payer = struct
   end]
 
   let account_id (t : t) : Account_id.t =
-    Account_id.create t.data.body.pk Token_id.default
+    Account_id.create t.data.body.public_key Token_id.default
 
   let to_signed (t : t) : Signed.t =
     { authorization = t.authorization
@@ -877,7 +880,7 @@ module Stable = struct
 end]
 
 let account_id (t : t) : Account_id.t =
-  Account_id.create t.data.body.pk t.data.body.token_id
+  Account_id.create t.data.body.public_key t.data.body.token_id
 
 let of_signed ({ data; authorization } : Signed.t) : t =
   { authorization = Signature authorization; data = Predicated.of_signed data }

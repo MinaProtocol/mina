@@ -1,15 +1,18 @@
 (executable
- (package trivial_snapp_txn_gen)
- (name trivial_snapp_txn_gen)
- (public_name trivial_snapp_txn_gen)
+ (package snapp_test_transaction)
+ (name snapp_test_transaction)
+ (public_name snapp_test_transaction)
  (libraries
    async_kernel
    core
    caqti
    caqti-async
    caqti-driver-postgresql
+   cli_lib
+   currency
    archive_lib
    mina_base
+   mina_graphql
    mina_state
    genesis_constants
    genesis_ledger_helper
