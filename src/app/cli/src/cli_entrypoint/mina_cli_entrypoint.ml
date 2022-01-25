@@ -402,7 +402,9 @@ let setup_daemon logger =
       ~doc:"URL of the node error collection service"
   and contact_info =
     flag "--contact-info" ~aliases:[ "contact-info" ] (optional string)
-      ~doc:"contact info used in node error report service"
+      ~doc:
+        "contact info used in node error report service (it could be either \
+         email address or discord username)"
   and uptime_url_string =
     flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
       ~doc:"URL URL of the uptime service of the Mina delegation program"
