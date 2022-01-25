@@ -11,6 +11,7 @@ use std::{
 use crate::srs::fp::WasmFpSrs as WasmSrs;
 use crate::gate_vector::fp::WasmGateVector;
 use wasm_bindgen::prelude::*;
+use crate::console_log;
 
 //
 // CamlPastaFpPlonkIndex (custom type)
@@ -43,13 +44,10 @@ pub fn caml_pasta_fp_plonk_index_create(
         })
         .collect();
 
-
-    /*
-    for (i, g) in gates.iter().enumerate() {
-        let x : Vec<_> = g.c.iter().map(|x| format!("{}", x)).collect();
-        let s = x.join(", ");
-        println!("c[{}][{:?}]: {}", i, g.typ, s);
-    } */
+    // console_log("Index.create Fp");
+    // for (i, g) in gates.iter().enumerate() {
+    //     console_log(&format_circuit_gate(i, g));
+    // }
 
     // create constraint system
     let cs = match ConstraintSystem::<Fp>::create(
@@ -156,4 +154,32 @@ pub fn caml_pasta_fp_plonk_index_write(
         .0
         .serialize(&mut rmp_serde::Serializer::new(w))
         .map_err(|e| JsValue::from_str(&format!("caml_pasta_fp_plonk_index_read: {}", e)))
+}
+
+// helpers
+
+fn format_field(f: &Fp) -> String {
+    // TODO this could be much nicer, should end up as "1", "-1", "0" etc
+    format!("{}", f)
+}
+
+pub fn format_circuit_gate(i: usize, gate: &CircuitGate<Fp>) -> String {
+    let coeffs = gate
+        .c
+        .iter()
+        .map(|coeff: &Fp| format_field(coeff))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let wires = gate
+        .wires
+        .iter()
+        .enumerate()
+        .filter(|(j, wire)| wire.row != i || wire.col != *j)
+        .map(|(j, wire)| format!("({}, {}) --> ({}, {})", i, j, wire.row, wire.col))
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!(
+        "c[{}][{:?}]:\nconstraints\n{}\nwires\n{}\n",
+        i, gate.typ, coeffs, wires
+    )
 }
