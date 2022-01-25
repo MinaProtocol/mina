@@ -6,7 +6,6 @@
    snarky_curve
    pickles
    kimchi_backend
-   run_in_thread.native
    kimchi
    ppx_inline_test)
  (instrumentation (backend bisect_ppx))

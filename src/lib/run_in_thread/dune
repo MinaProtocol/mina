@@ -5,5 +5,5 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
  (virtual_modules run_in_thread)
- ;(default_implementation run_in_thread.native)
+ (default_implementation run_in_thread.native)
  )
