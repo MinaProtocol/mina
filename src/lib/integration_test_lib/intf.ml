@@ -5,6 +5,17 @@ open Mina_base
 open Pipe_lib
 open Signature_lib
 
+type metrics_t =
+  { block_production_delay : int list
+  ; transaction_pool_diff_received : int
+  ; transaction_pool_diff_broadcasted : int
+  ; transactions_added_to_pool : int
+  ; transaction_pool_size : int
+  }
+
+type best_chain_block =
+  { state_hash : string; command_transaction_count : int; creator_pk : string }
+
 (* TODO: malleable error -> or error *)
 
 module Engine = struct
@@ -78,6 +89,17 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 
+      val must_send_test_payments :
+           repeat_count:Unsigned.uint32
+        -> repeat_delay_ms:Unsigned.uint32
+        -> logger:Logger.t
+        -> t
+        -> senders:Signature_lib.Private_key.t list
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
+        -> unit Malleable_error.t
+
       val get_balance :
            logger:Logger.t
         -> t
@@ -99,10 +121,16 @@ module Engine = struct
         logger:Logger.t -> t -> (string * string list) Malleable_error.t
 
       val get_best_chain :
-        logger:Logger.t -> t -> string list Async_kernel.Deferred.Or_error.t
+           ?max_length:int
+        -> logger:Logger.t
+        -> t
+        -> best_chain_block list Async_kernel.Deferred.Or_error.t
 
       val must_get_best_chain :
-        logger:Logger.t -> t -> string list Malleable_error.t
+           ?max_length:int
+        -> logger:Logger.t
+        -> t
+        -> best_chain_block list Malleable_error.t
 
       val dump_archive_data :
         logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
@@ -112,6 +140,9 @@ module Engine = struct
 
       val dump_precomputed_blocks :
         logger:Logger.t -> t -> unit Malleable_error.t
+
+      val get_metrics :
+        logger:Logger.t -> t -> metrics_t Async_kernel.Deferred.Or_error.t
     end
 
     type t
