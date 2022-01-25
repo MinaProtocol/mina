@@ -102,6 +102,22 @@ module Node = struct
       }
     |}]
 
+    module Send_test_payments =
+    [%graphql
+    {|
+      mutation ($senders: [PrivateKey!]!,
+      $receiver: PublicKey!,
+      $amount: UInt64!,
+      $fee: UInt64!,
+      $repeat_count: UInt32!,
+      $repeat_delay_ms: UInt32!) {
+        sendTestPayments(
+          senders: $senders, receiver: $receiver, amount: $amount, fee: $fee,
+          repeat_count: $repeat_count,
+          repeat_delay_ms: $repeat_delay_ms) 
+      }
+    |}]
+
     module Send_payment =
     [%graphql
     {|
@@ -175,9 +191,29 @@ module Node = struct
     module Best_chain =
     [%graphql
     {|
-      query {
-        bestChain {
+      query ($max_length: Int) {
+        bestChain (maxLength: $max_length) {
           stateHash
+          commandTransactionCount
+          creatorAccount {
+            publicKey
+          }
+        }
+      }
+    |}]
+
+    module Query_metrics =
+    [%graphql
+    {|
+      query {
+        daemonStatus {
+          metrics {
+            blockProductionDelay
+            transactionPoolDiffReceived
+            transactionPoolDiffBroadcasted
+            transactionsAddedToPool
+            transactionPoolSize
+          }
         }
       }
     |}]
@@ -194,9 +230,14 @@ module Node = struct
     else
       let uri = Graphql.ingress_uri node in
       let metadata =
-        [ ("query", `String query_name); ("uri", `String (Uri.to_string uri)) ]
+        [ ("query", `String query_name)
+        ; ("uri", `String (Uri.to_string uri))
+        ; ("init_delay", `Float initial_delay_sec)
+        ]
       in
-      [%log info] "Attempting to send GraphQL request \"$query\" to \"$uri\""
+      [%log info]
+        "Attempting to send GraphQL request \"$query\" to \"$uri\" after \
+         $init_delay sec"
         ~metadata ;
       let rec retry n =
         if n <= 0 then (
@@ -260,9 +301,9 @@ module Node = struct
   let must_get_peer_id ~logger t =
     get_peer_id ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let get_best_chain ~logger t =
+  let get_best_chain ?max_length ~logger t =
     let open Deferred.Or_error.Let_syntax in
-    let query = Graphql.Best_chain.make () in
+    let query = Graphql.Best_chain.make ?max_length () in
     let%bind result =
       exec_graphql_request ~logger ~node:t ~query_name:"best_chain" query
     in
@@ -271,10 +312,23 @@ module Node = struct
         Deferred.Or_error.error_string "failed to get best chains"
     | Some chain ->
         return
-        @@ List.map ~f:(fun block -> block#stateHash) (Array.to_list chain)
+        @@ List.map
+             ~f:(fun block ->
+               Intf.
+                 { state_hash = block#stateHash
+                 ; command_transaction_count = block#commandTransactionCount
+                 ; creator_pk =
+                     ( match block#creatorAccount#publicKey with
+                     | `String pk ->
+                         pk
+                     | _ ->
+                         "unknown" )
+                 })
+             (Array.to_list chain)
 
-  let must_get_best_chain ~logger t =
-    get_best_chain ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
+  let must_get_best_chain ?max_length ~logger t =
+    get_best_chain ?max_length ~logger t
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let get_balance ~logger t ~account_id =
     let open Deferred.Or_error.Let_syntax in
@@ -324,7 +378,7 @@ module Node = struct
           ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
           ()
       in
-      exec_graphql_request ~logger ~node:t
+      exec_graphql_request ~logger ~node:t ~initial_delay_sec:0.
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
     in
     let%bind _ = unlock_sender_account_graphql () in
@@ -410,6 +464,36 @@ module Node = struct
   let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount
       ~fee =
     send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  let send_test_payments ~repeat_count ~repeat_delay_ms ~logger t ~senders
+      ~receiver_pub_key ~amount ~fee =
+    [%log info] "Sending a series of test payments"
+      ~metadata:(logger_metadata t) ;
+    let open Deferred.Or_error.Let_syntax in
+    let send_payment_graphql () =
+      let send_payment_obj =
+        Graphql.Send_test_payments.make
+          ~senders:
+            (Array.of_list
+               (List.map ~f:Signature_lib.Private_key.to_yojson senders))
+          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
+          ~amount:(Graphql_lib.Encoders.amount amount)
+          ~fee:(Graphql_lib.Encoders.fee fee)
+          ~repeat_count:(Graphql_lib.Encoders.uint32 repeat_count)
+          ~repeat_delay_ms:(Graphql_lib.Encoders.uint32 repeat_delay_ms)
+          ()
+      in
+      exec_graphql_request ~logger ~node:t ~query_name:"send_payment_graphql"
+        send_payment_obj
+    in
+    let%map _ = send_payment_graphql () in
+    [%log info] "Sent test payments"
+
+  let must_send_test_payments ~repeat_count ~repeat_delay_ms ~logger t ~senders
+      ~receiver_pub_key ~amount ~fee =
+    send_test_payments ~repeat_count ~repeat_delay_ms ~logger t ~senders
+      ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =
@@ -525,6 +609,42 @@ module Node = struct
                   Out_channel.output_string out_ch block))
     in
     Malleable_error.return ()
+
+  let get_metrics ~logger t =
+    let open Deferred.Or_error.Let_syntax in
+    [%log info] "Getting node's metrics" ~metadata:(logger_metadata t) ;
+    let query_obj = Graphql.Query_metrics.make () in
+    let%bind query_result_obj =
+      exec_graphql_request ~logger ~node:t ~query_name:"query_metrics" query_obj
+    in
+    [%log info] "get_metrics, finished exec_graphql_request" ;
+    let block_production_delay =
+      Array.to_list
+      @@ query_result_obj#daemonStatus#metrics#blockProductionDelay
+    in
+    let metrics = query_result_obj#daemonStatus#metrics in
+    let transaction_pool_diff_received = metrics#transactionPoolDiffReceived in
+    let transaction_pool_diff_broadcasted =
+      metrics#transactionPoolDiffBroadcasted
+    in
+    let transactions_added_to_pool = metrics#transactionsAddedToPool in
+    let transaction_pool_size = metrics#transactionPoolSize in
+    [%log info]
+      "get_metrics, result of graphql query (block_production_delay; \
+       tx_received; tx_broadcasted; txs_added_to_pool; tx_pool_size) (%s; %d; \
+       %d; %d; %d)"
+      ( String.concat ~sep:", "
+      @@ List.map ~f:string_of_int block_production_delay )
+      transaction_pool_diff_received transaction_pool_diff_broadcasted
+      transactions_added_to_pool transaction_pool_size ;
+    return
+      Intf.
+        { block_production_delay
+        ; transaction_pool_diff_broadcasted
+        ; transaction_pool_diff_received
+        ; transactions_added_to_pool
+        ; transaction_pool_size
+        }
 end
 
 module Workload = struct
