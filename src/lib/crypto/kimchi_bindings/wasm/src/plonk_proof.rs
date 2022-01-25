@@ -26,6 +26,7 @@ use oracle::{
     poseidon::PlonkSpongeConstants15W,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
+use crate::console_log;
 
 #[wasm_bindgen]
 extern "C" {
@@ -626,6 +627,18 @@ macro_rules! impl_proof {
                     .expect("the witness should be a column of 15 vectors");
 
                 let index: &Index<$G> = &index.0.as_ref();
+
+                // print witness
+                // for (i, w) in witness.iter().enumerate() {
+                //     let st = w.iter().map(|f| format!("{}", f)).collect::<Vec<_>>().join("\n");
+                //     console_log(&format!("witness {}\n{}\n", i, st));
+                // }
+
+                // verify witness
+                // this seems to throw in general
+                // console_log(&"verifying witness!");
+                // index.cs.verify(&witness).expect("incorrect witness");
+                // console_log(&"verifying witness ok");
 
                 // Release the runtime lock so that other threads can run using it while we generate the proof.
                 let group_map = GroupMap::<_>::setup();
