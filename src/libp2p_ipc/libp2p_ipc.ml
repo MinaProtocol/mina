@@ -112,7 +112,8 @@ let unsafe_parse_peer peer_info =
   let libp2p_port = libp2p_port_get peer_info in
   let host = Unix.Inet_addr.of_string (host_get peer_info) in
   let peer_id = unsafe_parse_peer_id (peer_id_get peer_info) in
-  Peer.create host ~libp2p_port ~peer_id
+  let ws = ws_get peer_info in
+  Peer.create host ~libp2p_port ~peer_id ~ws
 
 let stream_id_to_string = Fn.compose Uint64.to_string Reader.StreamId.id_get
 
@@ -141,7 +142,7 @@ let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
       *> op statedir_set statedir
       *> list_op listen_on_set_list listen_on
       *> optional op metrics_port_set_exn metrics_port
-      *> builder_op external_multiaddr_set_builder external_multiaddr
+      *> list_op external_multiaddr_set_list external_multiaddr
       *> op network_id_set network_id
       *> op unsafe_no_trust_ip_set unsafe_no_trust_ip
       *> op flood_set flood

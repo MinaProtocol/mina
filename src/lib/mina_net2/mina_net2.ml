@@ -189,7 +189,7 @@ let bandwidth_info t =
        (Libp2p_ipc.Rpcs.BandwidthInfo.create_request ())
 
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
-let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
+let configure t ~me ~external_maddrs ~maddrs ~network_id ~metrics_port
     ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange
     ~mina_peer_exchange ~seed_peers ~initial_gating_config ~min_connections
     ~max_connections ~validation_queue_size =
@@ -199,7 +199,7 @@ let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
       ~statedir:t.conf_dir
       ~listen_on:(List.map ~f:Multiaddr.to_libp2p_ipc maddrs)
       ?metrics_port
-      ~external_multiaddr:(Multiaddr.to_libp2p_ipc external_maddr)
+      ~external_multiaddr:(List.map ~f:Multiaddr.to_libp2p_ipc external_maddrs)
       ~network_id ~unsafe_no_trust_ip ~flood:flooding
       ~direct_peers:(List.map ~f:Multiaddr.to_libp2p_ipc direct_peers)
       ~seed_peers:(List.map ~f:Multiaddr.to_libp2p_ipc seed_peers)

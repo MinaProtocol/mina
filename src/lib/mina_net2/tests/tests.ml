@@ -45,9 +45,9 @@ let%test_module "coda network tests" =
       let%bind kp_c = generate_random_keypair c in
       let maddrs = List.map [ "/ip4/127.0.0.1/tcp/0" ] ~f:Multiaddr.of_string in
       let%bind () =
-        configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
-          ~network_id ~peer_exchange:true ~mina_peer_exchange:true
-          ~direct_peers:[] ~seed_peers:[] ~flooding:false ~metrics_port:None
+        configure a ~external_maddrs:maddrs ~me:kp_a ~maddrs ~network_id
+          ~peer_exchange:true ~mina_peer_exchange:true ~direct_peers:[]
+          ~seed_peers:[] ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~max_connections:50 ~min_connections:20
           ~validation_queue_size:150
           ~initial_gating_config:
@@ -65,20 +65,20 @@ let%test_module "coda network tests" =
         ~metadata:[ ("peer", `String (Multiaddr.to_string seed_peer)) ]
         "Seed_peer: $peer" ;
       let%bind () =
-        configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
-          ~network_id ~peer_exchange:true ~mina_peer_exchange:true
-          ~direct_peers:[] ~seed_peers:[ seed_peer ] ~flooding:false
-          ~min_connections:20 ~metrics_port:None ~unsafe_no_trust_ip:true
-          ~max_connections:50 ~validation_queue_size:150
+        configure b ~external_maddrs:maddrs ~me:kp_b ~maddrs ~network_id
+          ~peer_exchange:true ~mina_peer_exchange:true ~direct_peers:[]
+          ~seed_peers:[ seed_peer ] ~flooding:false ~min_connections:20
+          ~metrics_port:None ~unsafe_no_trust_ip:true ~max_connections:50
+          ~validation_queue_size:150
           ~initial_gating_config:
             { trusted_peers = []; banned_peers = []; isolate = false }
         >>| Or_error.ok_exn
       and () =
-        configure c ~external_maddr:(List.hd_exn maddrs) ~me:kp_c ~maddrs
-          ~network_id ~peer_exchange:true ~mina_peer_exchange:true
-          ~direct_peers:[] ~seed_peers:[ seed_peer ] ~flooding:false
-          ~metrics_port:None ~unsafe_no_trust_ip:true ~max_connections:50
-          ~min_connections:20 ~validation_queue_size:150
+        configure c ~external_maddrs:maddrs ~me:kp_c ~maddrs ~network_id
+          ~peer_exchange:true ~mina_peer_exchange:true ~direct_peers:[]
+          ~seed_peers:[ seed_peer ] ~flooding:false ~metrics_port:None
+          ~unsafe_no_trust_ip:true ~max_connections:50 ~min_connections:20
+          ~validation_queue_size:150
           ~initial_gating_config:
             { trusted_peers = []; banned_peers = []; isolate = false }
         >>| Or_error.ok_exn

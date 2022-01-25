@@ -57,7 +57,7 @@ val create_libp2p_config :
   -> statedir:string
   -> listen_on:multiaddr list
   -> ?metrics_port:int
-  -> external_multiaddr:multiaddr
+  -> external_multiaddr:multiaddr list
   -> network_id:string
   -> unsafe_no_trust_ip:bool
   -> flood:bool

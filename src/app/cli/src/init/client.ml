@@ -1861,6 +1861,7 @@ let get_peers_graphql =
                   { host = Unix.Inet_addr.of_string peer#host
                   ; libp2p_port = peer#libp2pPort
                   ; peer_id = peer#peerId
+                  ; ws = peer#ws
                   }))))
 
 let add_peers_graphql =
@@ -1897,6 +1898,8 @@ let add_peers_graphql =
                      method libp2p_port = peer.libp2p_port
 
                      method peer_id = peer.peer_id
+
+                     method ws = peer.ws
                    end
                | None ->
                    eprintf
@@ -1918,6 +1921,7 @@ let add_peers_graphql =
                   { host = Unix.Inet_addr.of_string peer#host
                   ; libp2p_port = peer#libp2pPort
                   ; peer_id = peer#peerId
+                  ; ws = peer#ws
                   }))))
 
 let compile_time_constants =

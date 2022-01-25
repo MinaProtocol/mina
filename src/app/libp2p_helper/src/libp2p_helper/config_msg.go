@@ -212,18 +212,30 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	externalMa, err := m.ExternalMultiaddr()
+	externalMaList, err := m.ExternalMultiaddr()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
-	externalMaRepr, err := externalMa.Representation()
+
+	externalMaddrs := make([]multiaddr.Multiaddr, 0, externalMaList.Len())
+	err = multiaddrListForeach(externalMaList, func(v string) error {
+		res, err := multiaddr.NewMultiaddr(v)
+		if err == nil {
+			listenOn = append(listenOn, res)
+		}
+		return err
+	})
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
-	externalMaddr, err := multiaddr.NewMultiaddr(externalMaRepr)
-	if err != nil {
-		return mkRpcRespError(seqno, badAddr(err))
-	}
+	// externalMaRepr, err := externalMa.Representation()
+	// if err != nil {
+	// 	return mkRpcRespError(seqno, badRPC(err))
+	// }
+	// externalMaddr, err := multiaddr.NewMultiaddr(externalMaRepr)
+	// if err != nil {
+	// 	return mkRpcRespError(seqno, badAddr(err))
+	// }
 
 	gc, err := m.GatingConfig()
 	if err != nil {
@@ -252,7 +264,7 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, listenOn, externalMaddr, stateDir, privk, netId, seeds, gatingConfig, int(m.MinConnections()), int(m.MaxConnections()), m.MinaPeerExchange(), time.Millisecond)
+	helper, err := codanet.MakeHelper(app.Ctx, listenOn, externalMaddrs, stateDir, privk, netId, seeds, gatingConfig, int(m.MinConnections()), int(m.MaxConnections()), m.MinaPeerExchange(), time.Millisecond)
 	if err != nil {
 		return mkRpcRespError(seqno, badHelper(err))
 	}

@@ -102,7 +102,7 @@ let%test_module "all-ipc test" =
       let fake_peer =
         Network_peer.Peer.create
           (UnixLabels.inet_addr_of_string "8.8.8.8")
-          ~libp2p_port:9999 ~peer_id
+          ~libp2p_port:9999 ~peer_id ~ws:false
       in
       { trusted_peers = []; banned_peers = [ fake_peer ]; isolate = false }
 
@@ -545,9 +545,9 @@ let%test_module "all-ipc test" =
       in
       let maddrs = List.map [ "/ip4/127.0.0.1/tcp/0" ] ~f:Multiaddr.of_string in
       let%bind () =
-        configure node ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
-          ~network_id ~peer_exchange:true ~mina_peer_exchange:true
-          ~direct_peers:[] ~seed_peers ~flooding:false ~metrics_port:None
+        configure node ~external_maddrs:maddrs ~me:kp_a ~maddrs ~network_id
+          ~peer_exchange:true ~mina_peer_exchange:true ~direct_peers:[]
+          ~seed_peers ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~min_connections:25 ~max_connections:50
           ~validation_queue_size:150 ~initial_gating_config:gating_config
         >>| Or_error.ok_exn

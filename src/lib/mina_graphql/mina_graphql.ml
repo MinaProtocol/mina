@@ -360,7 +360,7 @@ module Types = struct
           let open Reflection.Shorthand in
           List.rev
           @@ Network_peer.Peer.Display.Fields.fold ~init:[] ~host:nn_string
-               ~libp2p_port:nn_int ~peer_id:nn_string)
+               ~libp2p_port:nn_int ~peer_id:nn_string ~ws:nn_bool)
 
     let addrs_and_ports : (_, Node_addrs_and_ports.Display.t option) typ =
       obj "AddrsAndPorts" ~fields:(fun _ ->
@@ -368,7 +368,7 @@ module Types = struct
           List.rev
           @@ Node_addrs_and_ports.Display.Fields.fold ~init:[]
                ~external_ip:nn_string ~bind_ip:nn_string ~client_port:nn_int
-               ~libp2p_port:nn_int ~peer:(id ~typ:peer))
+               ~libp2p_port:nn_int ~libp2p_ws_port:nn_int ~peer:(id ~typ:peer))
 
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
@@ -1923,17 +1923,22 @@ module Types = struct
     let peer : (Network_peer.Peer.t, string) result option arg_typ =
       obj "NetworkPeer"
         ~doc:"Network identifiers for another protocol participant"
-        ~coerce:(fun peer_id host libp2p_port ->
+        ~coerce:(fun peer_id host libp2p_port ws ->
           try
             Ok
               Network_peer.Peer.
-                { peer_id; host = Unix.Inet_addr.of_string host; libp2p_port }
+                { peer_id
+                ; host = Unix.Inet_addr.of_string host
+                ; libp2p_port
+                ; ws
+                }
           with _ -> Error "Invalid format for NetworkPeer.host")
         ~fields:
           [ arg "peer_id" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
           ; arg "host" ~doc:"IP address of the remote host"
               ~typ:(non_null string)
           ; arg "libp2p_port" ~typ:(non_null int)
+          ; arg "ws" ~typ:(non_null bool)
           ]
 
     let public_key_arg =

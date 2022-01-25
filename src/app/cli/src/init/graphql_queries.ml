@@ -318,6 +318,7 @@ query get_peers {
     host
     libp2pPort
     peerId
+    ws
   }
 }
 |}]
@@ -330,6 +331,7 @@ mutation ($peers: [NetworkPeer!]!, $seed: Boolean) {
     host
     libp2pPort
     peerId
+    ws
   }
 }
 |}]

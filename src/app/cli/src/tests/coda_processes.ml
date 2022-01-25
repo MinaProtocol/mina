@@ -6,7 +6,11 @@ open Async
 let init () = Parallel.init_master ()
 
 type ports =
-  { communication_port : int; discovery_port : int; libp2p_port : int }
+  { communication_port : int
+  ; discovery_port : int
+  ; libp2p_port : int
+  ; libp2p_ws_port : int
+  }
 
 let net_configs n =
   File_system.with_temp_dir "coda-processes-generate-keys" ~f:(fun tmpd ->
@@ -27,13 +31,16 @@ let net_configs n =
             let base = 23000 + (i * 2) in
             let libp2p_port = base in
             let client_port = base + 1 in
+            let libp2p_ws_port = base + 1000 in
             ( { Node_addrs_and_ports.external_ip = ip
               ; bind_ip = ip
               ; peer =
                   Some
                     (Network_peer.Peer.create ip ~libp2p_port
-                       ~peer_id:(Mina_net2.Keypair.to_peer_id key))
+                       ~peer_id:(Mina_net2.Keypair.to_peer_id key)
+                       ~ws:false)
               ; libp2p_port
+              ; libp2p_ws_port
               ; client_port
               }
             , key ))

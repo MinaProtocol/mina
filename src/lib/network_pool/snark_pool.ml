@@ -1161,7 +1161,7 @@ let%test_module "random set test" =
           (Peer.create
              (Unix.Inet_addr.of_string "1.2.3.4")
              ~peer_id:(Peer.Id.unsafe_of_string "contents should be irrelevant")
-             ~libp2p_port:8302)
+             ~libp2p_port:8302 ~ws:false)
       in
       let compare_work (x : Mock_snark_pool.Resource_pool.Diff.t)
           (y : Mock_snark_pool.Resource_pool.Diff.t) =

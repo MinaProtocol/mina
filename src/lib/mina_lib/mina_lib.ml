@@ -1241,6 +1241,7 @@ let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
     { Network_peer.Peer.host = Unix.Inet_addr.of_string "127.0.0.1"
     ; libp2p_port = 0
     ; peer_id = ""
+    ; ws = false
     }
   in
   let score = diff_score diff in

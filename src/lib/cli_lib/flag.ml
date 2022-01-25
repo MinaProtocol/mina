@@ -135,6 +135,8 @@ module Port = struct
 
   let default_libp2p = 8302
 
+  let default_libp2p_ws = 9302
+
   let of_raw raw =
     let open Or_error.Let_syntax in
     let%bind () =
@@ -154,6 +156,11 @@ module Port = struct
       create ~name:"--external-port" ~aliases:[ "external-port" ]
         ~default:default_libp2p
         "Port to use for all libp2p communications (gossip and RPC)"
+
+    let external_ws =
+      create ~name:"--external-ws-port" ~aliases:[ "external-ws-port" ]
+        ~default:default_libp2p_ws
+        "Websocket port to use for all libp2p communications (gossip and RPC)"
 
     let client =
       create ~name:"--client-port" ~aliases:[ "client-port" ]

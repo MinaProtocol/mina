@@ -51,6 +51,8 @@ module Port : sig
   module Daemon : sig
     val external_ : int Types.with_name_and_displayed_default Command.Param.t
 
+    val external_ws : int Types.with_name_and_displayed_default Command.Param.t
+
     val client : int Types.with_name_and_displayed_default Command.Param.t
 
     val rest_server : int Types.with_name_and_displayed_default Command.Param.t

@@ -345,6 +345,7 @@ module Status = struct
           ~bind_ip:(fmt_field "Bind IP" Fn.id)
           ~client_port:(fmt_field "Client port" string_of_int)
           ~libp2p_port:(fmt_field "Libp2p port" string_of_int)
+          ~libp2p_ws_port:(fmt_field "Libp2p websocket port" string_of_int)
           ~peer:(fun field ->
             let peer = Field.get field conf in
             match peer with

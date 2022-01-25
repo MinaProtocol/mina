@@ -13,11 +13,17 @@ let to_libp2p_ipc = Libp2p_ipc.create_multiaddr
 
 let to_peer t =
   match String.split ~on:'/' t with
+  | [ ""; "ip4"; ip4_str; "tcp"; tcp_str; "p2p"; peer_id; "ws" ] -> (
+      try
+        let host = Unix.Inet_addr.of_string ip4_str in
+        let libp2p_port = Int.of_string tcp_str in
+        Some (Peer.create host ~libp2p_port ~peer_id ~ws:true)
+      with _ -> None )
   | [ ""; "ip4"; ip4_str; "tcp"; tcp_str; "p2p"; peer_id ] -> (
       try
         let host = Unix.Inet_addr.of_string ip4_str in
         let libp2p_port = Int.of_string tcp_str in
-        Some (Peer.create host ~libp2p_port ~peer_id)
+        Some (Peer.create host ~libp2p_port ~peer_id ~ws:false)
       with _ -> None )
   | _ ->
       None

@@ -202,9 +202,10 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
           | None ->
               config.addrs_and_ports.peer <-
                 Some
+                  (* TODO: add ws_peer to addrs_and_ports*)
                   (Peer.create config.addrs_and_ports.bind_ip
                      ~libp2p_port:config.addrs_and_ports.libp2p_port
-                     ~peer_id:my_peer_id) ) ;
+                     ~peer_id:my_peer_id ~ws:false) ) ;
           [%log' info config.logger] "libp2p peer ID this session is $peer_id"
             ~metadata:[ ("peer_id", `String my_peer_id) ] ;
           let initializing_libp2p_result : _ Deferred.Or_error.t =
@@ -223,20 +224,26 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                    ])
             in
             let%bind () =
+              let addr_config = config.addrs_and_ports in
+              let external_ip =
+                config.addrs_and_ports.external_ip |> Unix.Inet_addr.to_string
+              in
               configure net2 ~me ~metrics_port:config.metrics_port
                 ~maddrs:
                   [ Multiaddr.of_string
-                      (sprintf "/ip4/0.0.0.0/tcp/%d"
-                         (Option.value_exn config.addrs_and_ports.peer)
-                           .libp2p_port)
+                      (sprintf "/ip4/0.0.0.0/tcp/%d" addr_config.libp2p_port)
+                  ; Multiaddr.of_string
+                      (sprintf "/ip4/0.0.0.0/tcp/%d/ws"
+                         addr_config.libp2p_ws_port)
                   ]
-                ~external_maddr:
-                  (Multiaddr.of_string
-                     (sprintf "/ip4/%s/tcp/%d"
-                        (Unix.Inet_addr.to_string
-                           config.addrs_and_ports.external_ip)
-                        (Option.value_exn config.addrs_and_ports.peer)
-                          .libp2p_port))
+                ~external_maddrs:
+                  [ Multiaddr.of_string
+                      (sprintf "/ip4/%s/tcp/%d" external_ip
+                         addr_config.libp2p_port)
+                  ; Multiaddr.of_string
+                      (sprintf "/ip4/%s/tcp/%d/ws" external_ip
+                         addr_config.libp2p_ws_port)
+                  ]
                 ~network_id:config.chain_id
                 ~unsafe_no_trust_ip:config.unsafe_no_trust_ip ~seed_peers
                 ~direct_peers:config.direct_peers

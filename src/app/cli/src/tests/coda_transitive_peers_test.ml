@@ -50,6 +50,7 @@ let main () =
         ( Node_addrs_and_ports.to_multiaddr_exn p :: peer_addrs
         , Network_peer.Peer.create p.external_ip ~libp2p_port:p.libp2p_port
             ~peer_id:(Mina_net2.Keypair.to_peer_id k)
+            ~ws:false
           :: peers ))
   in
   let addrs_and_ports, libp2p_keypair =

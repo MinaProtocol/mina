@@ -49,7 +49,7 @@ module Sender = struct
       let inet = Unix.Inet_addr.of_string ip in
       let%bind peer_id = String.gen_nonempty in
       let%map libp2p_port = Int.gen_uniform_incl 1025 49151 in
-      Peer.create inet ~peer_id ~libp2p_port
+      Peer.create inet ~peer_id ~libp2p_port ~ws:false
     in
     match%map Option.quickcheck_generator remote with
     | None ->

@@ -118,6 +118,7 @@ let setup_daemon logger =
          rand)"
       (optional work_selection_method)
   and libp2p_port = Flag.Port.Daemon.external_
+  and libp2p_ws_port = Flag.Port.Daemon.external_ws
   and client_port = Flag.Port.Daemon.client
   and rest_server_port = Flag.Port.Daemon.rest_server
   and limited_graphql_port = Flag.Port.Daemon.limited_graphql_server
@@ -726,6 +727,7 @@ let setup_daemon logger =
         or_from_config YJ.Util.to_int_option name ~default value
       in
       let libp2p_port = get_port libp2p_port in
+      let libp2p_ws_port = get_port libp2p_ws_port in
       let rest_server_port = get_port rest_server_port in
       let limited_graphql_port =
         let ({ value; name } : int option Flag.Types.with_name) =
@@ -832,7 +834,13 @@ let setup_daemon logger =
         Option.value bind_ip_opt ~default:"0.0.0.0" |> Unix.Inet_addr.of_string
       in
       let addrs_and_ports : Node_addrs_and_ports.t =
-        { external_ip; bind_ip; peer = None; client_port; libp2p_port }
+        { external_ip
+        ; bind_ip
+        ; peer = None
+        ; client_port
+        ; libp2p_port
+        ; libp2p_ws_port
+        }
       in
       let block_production_key =
         maybe_from_config YJ.Util.to_string_option "block-producer-key"

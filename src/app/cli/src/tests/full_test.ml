@@ -118,6 +118,7 @@ let run_test () : unit Deferred.t =
       in
       let client_port = 8123 in
       let libp2p_port = 8002 in
+      let libp2p_ws_port = 9002 in
       let chain_id = "bogus chain id for testing" in
       let gossip_net_params =
         Gossip_net.Libp2p.Config.
@@ -139,6 +140,7 @@ let run_test () : unit Deferred.t =
               ; bind_ip = Unix.Inet_addr.localhost
               ; peer = None
               ; libp2p_port
+              ; libp2p_ws_port
               ; client_port
               }
           ; trust_system

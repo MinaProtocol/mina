@@ -96,6 +96,7 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
             ~peer_id:
               (Peer.Id.unsafe_of_string
                  (sprintf "fake peer at port %d" libp2p_port))
+            ~ws:false
         in
         ((Int32.( + ) Int32.one ip, libp2p_port + 1), peer))
   in

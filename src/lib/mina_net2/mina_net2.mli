@@ -146,7 +146,7 @@ type connection_gating =
 val configure :
      t
   -> me:Keypair.t
-  -> external_maddr:Multiaddr.t
+  -> external_maddrs:Multiaddr.t list
   -> maddrs:Multiaddr.t list
   -> network_id:string
   -> metrics_port:int option

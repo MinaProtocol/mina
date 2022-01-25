@@ -24,6 +24,7 @@ struct PeerInfo {
   libp2pPort @0 :UInt16;
   host @1 :Text;
   peerId @2 :PeerId;
+  ws @3 :Bool;
 }
 
 struct SequenceNumber {
@@ -62,7 +63,7 @@ struct Libp2pConfig {
   networkId @2 :Text;
   listenOn @3 :List(Multiaddr);
   metricsPort @4 :UInt16;
-  externalMultiaddr @5 :Multiaddr;
+  externalMultiaddr @5 :List(Multiaddr);
   unsafeNoTrustIp @6 :Bool;
   flood @7 :Bool;
   peerExchange @8 :Bool;

@@ -9,6 +9,7 @@ type t =
       replaced with [Some] after libp2p initialization. *)
   ; mutable peer : Peer.Stable.Latest.t option
   ; libp2p_port : int
+  ; libp2p_ws_port : int
   ; client_port : int
   }
 [@@deriving fields, sexp]
@@ -22,6 +23,7 @@ module Display = struct
         ; bind_ip : string
         ; peer : Peer.Display.Stable.V1.t option
         ; libp2p_port : int
+        ; libp2p_ws_port : int
         ; client_port : int
         }
       [@@deriving fields, yojson, sexp]
@@ -37,6 +39,7 @@ let to_display (t : t) =
     ; bind_ip = Unix.Inet_addr.to_string t.bind_ip
     ; peer = Option.map ~f:Peer.to_display t.peer
     ; libp2p_port = t.libp2p_port
+    ; libp2p_ws_port = t.libp2p_ws_port
     ; client_port = t.client_port
     }
 
@@ -45,6 +48,7 @@ let of_display (d : Display.t) : t =
   ; bind_ip = Unix.Inet_addr.of_string d.bind_ip
   ; peer = Option.map ~f:Peer.of_display d.peer
   ; libp2p_port = d.libp2p_port
+  ; libp2p_ws_port = d.libp2p_ws_port
   ; client_port = d.client_port
   }
 
