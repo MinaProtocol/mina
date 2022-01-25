@@ -1177,26 +1177,27 @@ let start t =
     t.block_production_status := block_production_status ;
     t.next_producer_timing <- Some next_producer_timing
   in
-  Block_producer.run ~logger:t.config.logger
-    ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
-    ~set_next_producer_timing ~prover:t.processes.prover
-    ~trust_system:t.config.trust_system
-    ~transaction_resource_pool:
-      (Network_pool.Transaction_pool.resource_pool
-         t.components.transaction_pool)
-    ~get_completed_work:
-      (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
-    ~time_controller:t.config.time_controller
-    ~keypairs:(Agent.read_only t.block_production_keypairs)
-    ~coinbase_receiver:t.coinbase_receiver
-    ~consensus_local_state:t.config.consensus_local_state
-    ~frontier_reader:t.components.transition_frontier
-    ~transition_writer:t.pipes.producer_transition_writer
-    ~log_block_creation:t.config.log_block_creation
-    ~precomputed_values:t.config.precomputed_values
-    ~block_reward_threshold:t.config.block_reward_threshold
-    ~block_produced_bvar:t.components.block_produced_bvar ;
-  perform_compaction t ;
+  Scheduler.within ~priority:Priority.normal (fun () ->
+      Block_producer.run ~logger:t.config.logger
+        ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
+        ~set_next_producer_timing ~prover:t.processes.prover
+        ~trust_system:t.config.trust_system
+        ~transaction_resource_pool:
+          (Network_pool.Transaction_pool.resource_pool
+             t.components.transaction_pool)
+        ~get_completed_work:
+          (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
+        ~time_controller:t.config.time_controller
+        ~keypairs:(Agent.read_only t.block_production_keypairs)
+        ~coinbase_receiver:t.coinbase_receiver
+        ~consensus_local_state:t.config.consensus_local_state
+        ~frontier_reader:t.components.transition_frontier
+        ~transition_writer:t.pipes.producer_transition_writer
+        ~log_block_creation:t.config.log_block_creation
+        ~precomputed_values:t.config.precomputed_values
+        ~block_reward_threshold:t.config.block_reward_threshold
+        ~block_produced_bvar:t.components.block_produced_bvar ;
+      perform_compaction t) ;
   let () =
     match t.config.node_status_url with
     | Some node_status_url ->
@@ -1277,7 +1278,7 @@ let create ?wallets (config : Config.t) =
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
-  Async.Scheduler.within' ~monitor (fun () ->
+  Async.(Scheduler.within' ~monitor ~priority:Priority.low) (fun () ->
       trace "mina_lib" (fun () ->
           let block_production_keypairs =
             Agent.create
