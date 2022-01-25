@@ -89,6 +89,8 @@ module Reflection = struct
 
     let nn_int a x = id ~typ:(non_null int) a x
 
+    let nn_int_list a x = id ~typ:(non_null (list (non_null int))) a x
+
     let int a x = id ~typ:int a x
 
     let nn_bool a x = id ~typ:(non_null bool) a x
@@ -370,6 +372,13 @@ module Types = struct
                ~external_ip:nn_string ~bind_ip:nn_string ~client_port:nn_int
                ~libp2p_port:nn_int ~peer:(id ~typ:peer))
 
+    let metrics : (_, Daemon_rpcs.Types.Status.Metrics.t option) typ =
+      obj "Metrics" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Daemon_rpcs.Types.Status.Metrics.Fields.fold ~init:[]
+               ~block_production_delay:nn_int_list)
+
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
           let open Reflection.Shorthand in
@@ -396,7 +405,8 @@ module Types = struct
                ~consensus_configuration:
                  (id ~typ:(non_null consensus_configuration))
                ~highest_block_length_received:nn_int
-               ~highest_unvalidated_block_length_received:nn_int)
+               ~highest_unvalidated_block_length_received:nn_int
+               ~metrics:(id ~typ:(non_null metrics)))
   end
 
   let fee_transfer =
