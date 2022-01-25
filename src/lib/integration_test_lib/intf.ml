@@ -5,6 +5,8 @@ open Mina_base
 open Pipe_lib
 open Signature_lib
 
+type metrics_t = { block_production_delay : int list }
+
 (* TODO: malleable error -> or error *)
 
 module Engine = struct
@@ -40,7 +42,8 @@ module Engine = struct
       val stop : t -> unit Malleable_error.t
 
       val send_payment :
-           logger:Logger.t
+           ?initial_delay_sec:float
+        -> logger:Logger.t
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
@@ -49,7 +52,8 @@ module Engine = struct
         -> unit Deferred.Or_error.t
 
       val must_send_payment :
-           logger:Logger.t
+           ?initial_delay_sec:float
+        -> logger:Logger.t
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
@@ -91,6 +95,9 @@ module Engine = struct
 
       val dump_precomputed_blocks :
         logger:Logger.t -> t -> unit Malleable_error.t
+
+      val get_metrics :
+        logger:Logger.t -> t -> metrics_t Async_kernel.Deferred.Or_error.t
     end
 
     type t

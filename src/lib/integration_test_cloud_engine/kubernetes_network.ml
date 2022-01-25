@@ -215,6 +215,18 @@ module Node = struct
         }
       }
     |}]
+
+    module Query_metrics =
+    [%graphql
+    {|
+      query {
+        daemonStatus {
+          metrics {
+            blockProductionDelay
+          }
+        }
+      }
+    |}]
   end
 
   (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
@@ -344,7 +356,8 @@ module Node = struct
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
-  let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
+  let send_payment ?initial_delay_sec ~logger t ~sender_pub_key
+      ~receiver_pub_key ~amount ~fee =
     [%log info] "Sending a payment"
       ~metadata:
         [ ("namespace", `String t.namespace); ("pod_id", `String t.pod_id) ] ;
@@ -373,8 +386,8 @@ module Node = struct
           ~fee:(Graphql_lib.Encoders.fee fee)
           ()
       in
-      exec_graphql_request ~logger ~node:t ~query_name:"send_payment_graphql"
-        send_payment_obj
+      exec_graphql_request ?initial_delay_sec ~logger ~node:t
+        ~query_name:"send_payment_graphql" send_payment_obj
     in
     let%map sent_payment_obj = send_payment_graphql () in
     let (`UserCommand id_obj) = sent_payment_obj#sendPayment#payment in
@@ -383,9 +396,10 @@ module Node = struct
       ~metadata:[ ("user_command_id", `String user_cmd_id) ] ;
     ()
 
-  let must_send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
-      =
-    send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
+  let must_send_payment ?initial_delay_sec ~logger t ~sender_pub_key
+      ~receiver_pub_key ~amount ~fee =
+    send_payment ?initial_delay_sec ~logger t ~sender_pub_key ~receiver_pub_key
+      ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =
@@ -501,6 +515,25 @@ module Node = struct
                   Out_channel.output_string out_ch block))
     in
     Malleable_error.return ()
+
+  let get_metrics ~logger t =
+    let open Deferred.Or_error.Let_syntax in
+    [%log info] "Getting node's metrics"
+      ~metadata:
+        [ ("namespace", `String t.namespace); ("pod_id", `String t.pod_id) ] ;
+    let query_obj = Graphql.Query_metrics.make () in
+    let%bind query_result_obj =
+      exec_graphql_request ~logger ~node:t ~query_name:"query_metrics" query_obj
+    in
+    [%log info] "get_metrics, finished exec_graphql_request" ;
+    let bn_delay =
+      Array.to_list
+      @@ query_result_obj#daemonStatus#metrics#blockProductionDelay
+    in
+    [%log info]
+      "get_metrics, result of graphql query (block_production_delay) (%s)"
+      (String.concat ~sep:", " @@ List.map ~f:string_of_int bn_delay) ;
+    return { Intf.block_production_delay = bn_delay }
 end
 
 type t =

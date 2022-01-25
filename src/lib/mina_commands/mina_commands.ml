@@ -374,6 +374,12 @@ let get_status ~flag t =
     | _ ->
         None
   in
+  let metrics =
+    let open Mina_metrics.Block_producer in
+    { Daemon_rpcs.Types.Status.Metrics.block_production_delay =
+        Block_production_delay_histogram.buckets block_production_delay
+    }
+  in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
   ; catchup_status
@@ -406,6 +412,7 @@ let get_status ~flag t =
   ; consensus_mechanism
   ; consensus_configuration
   ; addrs_and_ports
+  ; metrics
   }
 
 let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t

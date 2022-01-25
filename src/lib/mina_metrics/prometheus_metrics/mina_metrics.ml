@@ -104,6 +104,8 @@ module type Histogram = sig
   type t
 
   val observe : t -> float -> unit
+
+  val buckets : t -> int list
 end
 
 module Runtime = struct
@@ -1057,6 +1059,17 @@ module Block_producer = struct
   let blocks_produced : Counter.t =
     let help = "blocks produced and submitted by the daemon" in
     Counter.v "blocks_produced" ~help ~namespace ~subsystem
+
+  module Block_production_delay_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 0.1 2. 5
+  end)
+
+  let block_production_delay =
+    let help =
+      "A histogram for delay between start of slot and time of block production"
+    in
+    Block_production_delay_histogram.v "block_production_delay" ~help ~namespace
+      ~subsystem
 end
 
 module Transition_frontier = struct

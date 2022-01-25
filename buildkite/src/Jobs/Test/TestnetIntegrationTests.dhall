@@ -28,6 +28,7 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "chain-reliability" dependsOn,
     TestExecutive.execute "payment" dependsOn,
     TestExecutive.execute "gossip-consis" dependsOn,
+    TestExecutive.execute "block-prod" dependsOn,
     TestExecutive.execute "archive-node" dependsOn
 
   ]

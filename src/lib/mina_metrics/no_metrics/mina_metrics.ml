@@ -35,12 +35,16 @@ module type Histogram = sig
   type t
 
   val observe : t -> float -> unit
+
+  val buckets : t -> int list
 end
 
 module Histogram = struct
   type t = unit
 
   let observe : t -> float -> unit = fun _ _ -> ()
+
+  let buckets () = []
 end
 
 module Runtime = struct
@@ -337,6 +341,10 @@ module Block_producer = struct
   let slots_won : Counter.t = ()
 
   let blocks_produced : Counter.t = ()
+
+  module Block_production_delay_histogram = Histogram
+
+  let block_production_delay : Block_production_delay_histogram.t = ()
 end
 
 module Transition_frontier = struct
