@@ -112,7 +112,7 @@ let to_string { host; libp2p_port; peer_id; ws } =
 let to_multiaddr_string { host; libp2p_port; peer_id; ws } =
   match ws with
   | true ->
-      sprintf "/ip4/%s/tcp/%d/p2p/%s/ws"
+      sprintf "/ip4/%s/tcp/%d/ws/p2p/%s"
         (Unix.Inet_addr.to_string host)
         libp2p_port peer_id
   | _ ->

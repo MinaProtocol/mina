@@ -221,7 +221,7 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 	err = multiaddrListForeach(externalMaList, func(v string) error {
 		res, err := multiaddr.NewMultiaddr(v)
 		if err == nil {
-			listenOn = append(listenOn, res)
+			externalMaddrs = append(externalMaddrs, res)
 		}
 		return err
 	})
