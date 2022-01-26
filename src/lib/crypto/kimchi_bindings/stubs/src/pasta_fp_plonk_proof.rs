@@ -70,6 +70,13 @@ pub fn caml_pasta_fp_plonk_proof_create(
         .expect("the witness should be a column of 15 vectors");
     let index: &Index<GAffine> = &index.as_ref().0;
 
+    
+    // let mut vec = index.linearization.index_terms.iter().map(|i| format!("{:?}", i)).collect::<Vec<_>>();
+    // vec.sort_by(|s, t| s.cmp(&t));
+    // println!("{:?}", vec);
+
+    // println!("{}", index.linearization.index_terms.iter().map(|i| format!("{:?}", i)).collect::<Vec<_>>().join("\n\n"));
+
     // print witness
     // for (i, w) in witness.iter().enumerate() {
     //     let st = w.iter().map(|f| format!("{}", f)).collect::<Vec<_>>().join("\n");
@@ -82,7 +89,9 @@ pub fn caml_pasta_fp_plonk_proof_create(
     // index.cs.verify(&witness).expect("incorrect witness");
     // println!("verifying witness ok");
 
-    // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
+    // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it
+    // once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no
+    // other way to get at the active runtime.
     let runtime = unsafe { ocaml::Runtime::recover_handle() };
 
     // Release the runtime lock so that other threads can run using it while we generate the proof.

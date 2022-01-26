@@ -628,6 +628,11 @@ macro_rules! impl_proof {
 
                 let index: &Index<$G> = &index.0.as_ref();
 
+
+                // let mut vec = index.linearization.index_terms.iter().map(|i| format!("{:?}", i)).collect::<Vec<_>>();
+                // vec.sort_by(|s, t| s.cmp(&t));
+                // console_log(&format!("{:?}", vec));
+
                 // print witness
                 // for (i, w) in witness.iter().enumerate() {
                 //     let st = w.iter().map(|f| format!("{}", f)).collect::<Vec<_>>().join("\n");
