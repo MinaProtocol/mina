@@ -34,7 +34,7 @@ open Core_kernel
 
 [%%ifndef consensus_mechanism]
 
-open Import
+open Mina_base_import
 
 [%%endif]
 

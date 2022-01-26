@@ -2,7 +2,7 @@
 (* TODO: refactor the misleading implementation of Ledger.foldi that confused me so much in the first place. *)
 
 open Core
-open Import
+open Mina_base_import
 open Snark_params.Tick
 
 let dedup_list ls ~comparator =

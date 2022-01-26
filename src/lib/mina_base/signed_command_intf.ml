@@ -2,7 +2,7 @@
 
 [%%import "/src/config.mlh"]
 
-open Import
+open Mina_base_import
 open Core_kernel
 
 [%%ifdef consensus_mechanism]

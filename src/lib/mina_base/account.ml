@@ -3,7 +3,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Util
+open Mina_base_util
 
 [%%ifdef consensus_mechanism]
 
@@ -23,7 +23,7 @@ module Mina_compile_config =
 open Currency
 open Mina_numbers
 open Fold_lib
-open Import
+open Mina_base_import
 
 module Index = struct
   [%%versioned

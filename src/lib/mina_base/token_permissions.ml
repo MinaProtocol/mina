@@ -8,7 +8,7 @@ open Snark_params.Tick
 
 [%%else]
 
-open Import
+open Mina_base_import
 open Snark_params_nonconsensus
 
 [%%endif]

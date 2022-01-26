@@ -2,7 +2,7 @@
 
 open Core_kernel
 
-let field_of_bool = Util.field_of_bool
+let field_of_bool = Mina_base_util.field_of_bool
 
 [%%ifdef consensus_mechanism]
 
