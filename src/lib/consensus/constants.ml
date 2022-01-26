@@ -31,12 +31,12 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
       ( Length.Stable.V1.t
       , Block_time.Stable.V1.t
       , Block_time.Span.Stable.V1.t )
-      Poly.Stable.V1.t
+      Poly.Stable.V2.t
     [@@deriving equal, ord, hash, sexp, to_yojson]
 
     let to_latest = Fn.id
@@ -382,7 +382,6 @@ module Checked = struct
               ; t.sub_windows_per_window
               ; t.slots_per_epoch
               ; t.grace_period_end
-              ; t.epoch_size
               ; t.checkpoint_window_slots_per_year
               ; t.checkpoint_window_size_in_slots
              |]
