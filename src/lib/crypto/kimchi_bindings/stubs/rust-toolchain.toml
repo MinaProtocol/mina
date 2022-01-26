@@ -1,3 +1,7 @@
+# ================================================
+# READ THIS IF YOU'RE PLANNING TO UPDATE THIS FILE
+# ================================================
+#
 # To update the version of Rust used in Mina (to pass CI),
 # you will have to follow these steps:
 #
