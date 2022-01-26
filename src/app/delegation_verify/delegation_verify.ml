@@ -179,4 +179,4 @@ let command =
                 display_error "fail to verify the snark work" ;
                 Deferred.unit))
 
-let () = Rpc_parallel.start_app command
+let () = Async.Command.run command
