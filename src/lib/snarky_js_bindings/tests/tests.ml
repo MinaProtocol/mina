@@ -64,7 +64,20 @@ let%test_unit "poseidon" =
     Impl.Data_spec.[ Field.typ ]
     (to_value hash) ~priv:(to_value preimage)
 
-let%test_unit "sqrt" =
+(* let%test_unit "simple" =
+  (* Core_kernel.printf "unit test simple\n" ; *)
+  let preimage = Field.one in
+  let hash = Field.of_int 2 in
+
+  let main ?w z () =
+    let preimage = read_witness Field.typ w in
+    Field.Assert.equal (Field.add preimage preimage) z
+  in
+  keygen_prove_verify main
+    Impl.Data_spec.[ Field.typ ]
+    (to_value hash) ~priv:(to_value preimage) *)
+
+(* let%test_unit "sqrt" =
   Core_kernel.printf "unit test sqrt\n" ;
 
   let main ?w:_ z () =
@@ -87,4 +100,4 @@ let%test_unit "sqrt witness" =
   in
   keygen_prove_verify main
     Impl.Data_spec.[ Field.typ ]
-    (Field.Constant.of_int 4) ~priv:(Field.Constant.of_int 2)
+    (Field.Constant.of_int 4) ~priv:(Field.Constant.of_int 2) *)
