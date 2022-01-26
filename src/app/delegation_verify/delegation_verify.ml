@@ -57,7 +57,7 @@ let decode_block str =
 
 let verify_block ~block =
   let open External_transition in
-  let verify_blockchain_snarks = force Verifier.verify_blockchain_snarks in
+  let verify_blockchain_snarks, _ = force Verifier.verify_functions in
   let%map result =
     verify_blockchain_snarks
       [ (protocol_state block, protocol_state_proof block) ]
@@ -73,7 +73,7 @@ let decode_snark_work str =
       Error `Fail_to_decode_snark_work
 
 let verify_snark_work ~proof ~message =
-  let verify_transaction_snarks = force Verifier.verify_transaction_snarks in
+  let _, verify_transaction_snarks = force Verifier.verify_functions in
   let%map result = verify_transaction_snarks [ (proof, message) ] in
   if result then Ok () else Error `Invalid_snark_work
 
