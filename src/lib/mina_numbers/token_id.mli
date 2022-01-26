@@ -10,7 +10,7 @@ open Tick
 [%%else]
 
 open Snark_params_nonconsensus
-open Import
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 

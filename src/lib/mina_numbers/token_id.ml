@@ -4,7 +4,7 @@ open Core_kernel
 
 [%%ifndef consensus_mechanism]
 
-open Import
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
