@@ -104,7 +104,7 @@ let validate_submission ~block_dir ~metadata_path ~no_checks =
           verify_snark_work ~proof ~message
   in
   ( External_transition.state_hash block
-  , External_transition.parent block
+  , External_transition.parent_hash block
   , External_transition.blockchain_length block
   , External_transition.global_slot block )
 
