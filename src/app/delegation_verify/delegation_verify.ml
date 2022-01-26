@@ -57,11 +57,10 @@ let decode_block str =
 
 let verify_block ~block =
   let open External_transition in
+  let verify_blockchain_snarks = force Verifier.verify_blockchain_snarks in
   let%map result =
-    Verifier.verify_blockchain_snarks
-      [ Blockchain_snark.Blockchain.create ~state:(protocol_state block)
-          ~proof:(protocol_state_proof block)
-      ]
+    verify_blockchain_snarks
+      [ (protocol_state block, protocol_state_proof block) ]
   in
   if result then Ok () else Error `Invalid_proof
 
@@ -74,7 +73,8 @@ let decode_snark_work str =
       Error `Fail_to_decode_snark_work
 
 let verify_snark_work ~proof ~message =
-  let%map result = Verifier.verify_transaction_snarks [ (proof, message) ] in
+  let verify_transaction_snarks = force Verifier.verify_transaction_snarks in
+  let%map result = verify_transaction_snarks [ (proof, message) ] in
   if result then Ok () else Error `Invalid_snark_work
 
 let validate_submission ~block_dir ~metadata_path ~no_checks =
