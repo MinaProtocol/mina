@@ -178,7 +178,7 @@ let perm_alpha0 : int = 21
 
 module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   (** Computes the ft evaluation at zeta 
-  (see https://o1-labs.github.io/mina-book/crypto/plonk/final_check.html)
+  (see https://o1-labs.github.io/mina-book/crypto/plonk/maller_15.html#the-evaluation-of-l)
   *)
   let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
       ~(env : t Scalars.Env.t) ({ alpha = _; beta; gamma; zeta } : _ Minimal.t)
@@ -237,8 +237,10 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
       in
       let generic =
         let open Vector in
-        let (w0 :: w1 :: w2 :: w3 :: w4 :: w5 :: _) = e0.w in
-        [ e0.generic_selector; w0; w1; w2; w3; w4; w5 ]
+        let (l1 :: r1 :: o1 :: l2 :: r2 :: o2 :: _) = e0.w in
+        let m1 = l1 * r1 in
+        let m2 = l2 * r2 in
+        [ e0.generic_selector; l1; r1; o1; m1; l2; r2; o2; m2 ]
       in
       In_circuit.map_fields
         ~f:(Shifted_value.of_field (module F) ~shift)

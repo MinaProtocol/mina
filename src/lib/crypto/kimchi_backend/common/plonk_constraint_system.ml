@@ -572,6 +572,14 @@ struct
   (** Adds zero-knowledgeness to the gates/rows, and convert into Rust type [Gates.t].
       This can only be called once *)
   let finalize_and_get_gates sys =
+    (* finalize any pending generic constraint *)
+    ( match sys.pending_generic_gate with
+    | None ->
+        ()
+    | Some (l, r, o, coeffs) ->
+        add_row sys [| l; r; o |] Generic coeffs ;
+        sys.pending_generic_gate <- None ) ;
+
     match sys.gates with
     | `Finalized ->
         failwith "Already finalized"
@@ -594,14 +602,6 @@ struct
             }
             :: !pub_input_gate_specs_rev
         done ;
-
-        (* finalize any pending generic constraint *)
-        ( match sys.pending_generic_gate with
-        | None ->
-            ()
-        | Some (l, r, o, coeffs) ->
-            add_row sys [| l; r; o |] Generic coeffs ;
-            sys.pending_generic_gate <- None ) ;
 
         (* construct permutation hashmap *)
         let pos_map = equivalence_classes_to_hashtbl sys in
@@ -704,16 +704,10 @@ struct
     | None ->
         sys.pending_generic_gate <- Some (l, r, o, coeffs)
     (* otherwise empty the queue and create the row  *)
-    | Some (l2, r2, o2, [| cl2; cr2; co2; cm2; cc2 |]) -> (
-        match coeffs with
-        | [| cl; cr; co; cm; cc |] ->
-            let coeffs = [| cl2; cr2; co2; cl; cr; co; cm2; cm; cc2; cc |] in
-            add_row sys [| l2; r2; o2; l; r; o |] Generic coeffs ;
-            sys.pending_generic_gate <- None
-        | _ ->
-            failwith "malformed generic gate" )
-    | _ ->
-        failwith "malformed generic gate"
+    | Some (l2, r2, o2, coeffs2) ->
+        let coeffs = Array.append coeffs coeffs2 in
+        add_row sys [| l; r; o; l2; r2; o2 |] Generic coeffs ;
+        sys.pending_generic_gate <- None
 
   (** Converts a number of scaled additions \sum s_i * x_i 
       to as many constraints as needed, 
