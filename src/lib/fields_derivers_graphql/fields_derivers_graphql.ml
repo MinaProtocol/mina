@@ -90,7 +90,8 @@ module Graphql_fields_raw = struct
       ( (fun _ -> failwith "Unused")
       , { Accumulator.Elem.run =
             (fun () ->
-              Schema.field (Field.name field)
+              Schema.field
+                (Fields_derivers.name_under_to_camel field)
                 ~args:Schema.Arg.[]
                 ?doc:None ?deprecated:None ~typ:(t_field.run ())
                 ~resolve:(fun _ x -> Field.get field x))
@@ -277,15 +278,15 @@ query IntrospectionQuery {
       | Error err ->
           failwith err
 
-    type t = { foo : int; bar : string } [@@deriving fields]
+    type t = { foo_hello : int; bar : string } [@@deriving fields]
 
-    let v = { foo = 1; bar = "baz" }
+    let v = { foo_hello = 1; bar = "baz" }
 
     let%test_unit "folding creates a graphql object we expect" =
       let open Graphql_fields.Prim in
       let typ1 =
         let typ_input =
-          Fields.make_creator (Graphql_fields.init ()) ~foo:nn_int
+          Fields.make_creator (Graphql_fields.init ()) ~foo_hello:nn_int
             ~bar:nn_string
           |> Graphql_fields.finish
         in
@@ -294,10 +295,10 @@ query IntrospectionQuery {
       let typ2 =
         Graphql_fields.Schema.(
           obj "TODO" ?doc:None ~fields:(fun _ ->
-              [ field "foo"
+              [ field "fooHello"
                   ~args:Arg.[]
                   ~typ:(non_null int)
-                  ~resolve:(fun _ t -> t.foo)
+                  ~resolve:(fun _ t -> t.foo_hello)
               ; field "bar"
                   ~args:Arg.[]
                   ~typ:(non_null string)

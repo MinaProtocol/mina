@@ -31,6 +31,23 @@ module type Deriver = sig
     -> 'input_type Output.t
 end
 
+let under_to_camel s =
+  let open Core_kernel in
+  let ws = String.split s ~on:'_' in
+  match ws with
+  | [] ->
+      ""
+  | w :: ws ->
+      w :: (ws |> List.map ~f:String.capitalize) |> String.concat ?sep:None
+
+let%test_unit "under_to_camel works as expected" =
+  let open Core_kernel in
+  [%test_eq: string] "fooHello" (under_to_camel "foo_hello") ;
+  [%test_eq: string] "fooHello" (under_to_camel "foo_hello___")
+
+(** Like Field.name but rewrites underscore_case to camelCase. *)
+let name_under_to_camel f = Fieldslib.Field.name f |> under_to_camel
+
 module Make2 (D1 : Deriver) (D2 : Deriver) : Deriver = struct
   module Input = struct
     type 'input_type t = 'input_type D1.Input.t * 'input_type D2.Input.t

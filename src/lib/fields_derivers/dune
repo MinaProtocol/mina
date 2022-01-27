@@ -3,4 +3,4 @@
  (public_name fields_derivers)
  (libraries core_kernel fieldslib)
  (inline_tests)
- (preprocess (pps ppx_fields_conv ppx_optcomp ppx_let ppx_inline_test ppx_custom_printf)))
+ (preprocess (pps ppx_jane ppx_fields_conv ppx_let ppx_inline_test ppx_custom_printf)))
