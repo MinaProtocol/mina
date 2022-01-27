@@ -49,93 +49,135 @@ module Graphql_args = struct
 end
 *)
 
-module Graphql_fields = struct
-  module Input = struct
-    open Graphql
+module Graphql_fields_raw = struct
+  module Make (IO : Graphql_intf.IO) = struct
+    module Schema = Graphql_schema.Make (IO)
 
-    type 'input_type t =
-      { run : 'ctx. ?doc:string -> unit -> ('ctx, 'input_type) Schema.typ }
-  end
-
-  module Creator = struct
-    type 'input_type t = unit
-  end
-
-  module Output = struct
-    type 'input_type t = 'input_type option Input.t
-  end
-
-  module Accumulator = struct
-    open Graphql
-
-    module Elem = struct
+    module Input = struct
       type 'input_type t =
-        { run : 'ctx. unit -> ('ctx, 'input_type) Schema.field }
+        { run : 'ctx. ?doc:string -> unit -> ('ctx, 'input_type) Schema.typ }
     end
 
-    (** thunks generating the schema in reverse *)
-    type 'input_type t = 'input_type Elem.t list
-  end
+    module Creator = struct
+      type 'input_type t = unit
+    end
 
-  let init () = []
+    module Output = struct
+      type 'input_type t = 'input_type option Input.t
+    end
 
-  let add_field (type f input_type) :
-         f Input.t
-      -> ( [< `Read | `Set_and_create ]
-         , input_type
-         , f )
-         Fieldslib.Field.t_with_perm
-      -> input_type Accumulator.t
-      -> (input_type Creator.t -> f) * input_type Accumulator.t =
-   fun t_field field acc ->
-    ( (fun _ -> failwith "Unused")
-    , { Accumulator.Elem.run =
-          (fun () ->
-            Graphql.Schema.field (Field.name field)
-              ~args:Graphql.Schema.Arg.[]
-              ?doc:None ?deprecated:None ~typ:(t_field.run ())
-              ~resolve:(fun _ x -> Field.get field x))
+    module Accumulator = struct
+      module Elem = struct
+        type 'input_type t =
+          { run : 'ctx. unit -> ('ctx, 'input_type) Schema.field }
+      end
+
+      (** thunks generating the schema in reverse *)
+      type 'input_type t = 'input_type Elem.t list
+    end
+
+    let init () = []
+
+    let add_field (type f input_type) :
+           f Input.t
+        -> ( [< `Read | `Set_and_create ]
+           , input_type
+           , f )
+           Fieldslib.Field.t_with_perm
+        -> input_type Accumulator.t
+        -> (input_type Creator.t -> f) * input_type Accumulator.t =
+     fun t_field field acc ->
+      ( (fun _ -> failwith "Unused")
+      , { Accumulator.Elem.run =
+            (fun () ->
+              Schema.field (Field.name field)
+                ~args:Schema.Arg.[]
+                ?doc:None ?deprecated:None ~typ:(t_field.run ())
+                ~resolve:(fun _ x -> Field.get field x))
+        }
+        :: acc )
+
+    (* TODO: Do we need doc and deprecated and name on finish? *)
+    let finish ((_creator, schema_rev_thunk) : 'u * 'input_type Accumulator.t) :
+        'input_type Output.t =
+      { run =
+          (fun ?doc () ->
+            Schema.obj "TODO" ?doc ~fields:(fun _ ->
+                List.rev
+                @@ List.map schema_rev_thunk ~f:(fun f ->
+                       f.Accumulator.Elem.run ())))
       }
-      :: acc )
 
-  (* TODO: Do we need doc and deprecated and name on finish? *)
-  let finish ((_creator, schema_rev_thunk) : 'u * 'input_type Accumulator.t) :
-      'input_type Output.t =
-    { run =
-        (fun ?doc () ->
-          let open Graphql in
-          Schema.obj "TODO" ?doc ~fields:(fun _ ->
-              List.rev
-              @@ List.map schema_rev_thunk ~f:(fun f ->
-                     f.Accumulator.Elem.run ())))
-    }
+    module Prim = struct
+      let int field acc =
+        add_field Input.{ run = (fun ?doc:_ () -> Schema.int) } field acc
 
-  module Prim = struct
-    open Graphql
+      let nn_int field acc =
+        add_field
+          Input.{ run = (fun ?doc:_ () -> Schema.(non_null int)) }
+          field acc
 
-    let int field acc =
-      add_field Input.{ run = (fun ?doc:_ () -> Schema.int) } field acc
+      let string field acc =
+        add_field Input.{ run = (fun ?doc:_ () -> Schema.string) } field acc
 
-    let nn_int field acc =
-      add_field
-        Input.{ run = (fun ?doc:_ () -> Schema.(non_null int)) }
-        field acc
-
-    let string field acc =
-      add_field Input.{ run = (fun ?doc:_ () -> Schema.string) } field acc
-
-    let nn_string field acc =
-      add_field
-        Input.{ run = (fun ?doc:_ () -> Schema.(non_null string)) }
-        field acc
+      let nn_string field acc =
+        add_field
+          Input.{ run = (fun ?doc:_ () -> Schema.(non_null string)) }
+          field acc
+    end
   end
 end
+
+module Graphql_fields = Graphql_fields_raw.Make (struct
+  include Async_kernel.Deferred
+
+  let bind x f = bind x ~f
+
+  module Stream = struct
+    type 'a t = 'a Async_kernel.Pipe.Reader.t
+
+    let map t f =
+      Async_kernel.Pipe.map' t ~f:(fun q ->
+          Async_kernel.Deferred.Queue.map q ~f)
+
+    let iter t f = Async_kernel.Pipe.iter t ~f
+
+    let close = Async_kernel.Pipe.close_read
+  end
+end)
+
+(** Convert this async Graphql_fields schema type into the official
+    Graphql_async one. The real Graphql_async functor application *is*
+    equivalent but the way the library is designed we can't actually see it so
+    this boils down to an Obj.magic. *)
+let typ_conv (typ : ('a, 'b) Graphql_fields.Schema.typ) :
+    ('a, 'b) Graphql_async.Schema.typ =
+  Obj.magic typ
 
 (* Make sure that this is a deriver *)
 module Graphql_fields_ : Fields_derivers.Deriver = Graphql_fields
 
 let%test_module "Test" =
   ( module struct
+    (* Pure -- just like Graphql libraries functor application *)
+    module Graphql_fields = Graphql_fields_raw.Make (struct
+      type +'a t = 'a
+
+      let bind t f = f t
+
+      let return t = t
+
+      module Stream = struct
+        type 'a t = 'a Seq.t
+
+        let map t f = Seq.map f t
+
+        let iter t f = Seq.iter f t
+
+        let close _t = ()
+      end
+    end)
+
     let introspection_query_raw =
       {graphql|
 query IntrospectionQuery {
@@ -250,7 +292,7 @@ query IntrospectionQuery {
         typ_input.run ()
       in
       let typ2 =
-        Graphql.Schema.(
+        Graphql_fields.Schema.(
           obj "TODO" ?doc:None ~fields:(fun _ ->
               [ field "foo"
                   ~args:Arg.[]
@@ -281,5 +323,7 @@ query IntrospectionQuery {
         | _ ->
             failwith "Unexpected response"
       in
-      [%test_eq: string] (hit_server typ1) (hit_server typ2)
+      [%test_eq: string]
+        (hit_server (Obj.magic typ1))
+        (hit_server (Obj.magic typ2))
   end )
