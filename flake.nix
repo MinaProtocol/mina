@@ -12,8 +12,7 @@
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable-small";
 
-  # todo: upstream
-  inputs.mix-to-nix.url = "github:serokell/mix-to-nix/yorickvp/deadlock";
+  inputs.mix-to-nix.url = "github:serokell/mix-to-nix";
   inputs.nix-npm-buildPackage.url =
     "github:lumiguide/nix-npm-buildpackage"; # todo: upstream
   inputs.opam-nix.url = "github:tweag/opam-nix";
