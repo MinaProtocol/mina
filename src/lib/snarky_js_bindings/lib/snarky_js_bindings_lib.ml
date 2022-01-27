@@ -1640,6 +1640,10 @@ let create_pickles_rule (identifier, _main) =
 (* type pickles_key = Pickles.Verification_key.t
 module Pickles_verification_key = Pickles.Verification_key.Stable.V2 *)
 
+let other_verification_key_constr :
+    (Other_impl.Verification_key.t -> verification_key_class Js.t) Js.constr =
+  Obj.magic verification_key_class
+
 let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let choices = choices |> Js.to_array |> Array.to_list in
   let choices ~self:_ = List.map choices ~f:create_pickles_rule |> Obj.magic in
@@ -1669,27 +1673,20 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let to_value (x : Field.t) =
     match x with Constant y -> y | _ -> failwith "can't convert to value"
   in
-  let [ prover ] = provers in
-  let proof =
-    Run_in_thread.block_on_async_exn (fun () -> prover [] Field.Constant.zero)
-  in
-  console_log proof ;
   let to_js_prover prover thing =
     Run_in_thread.block_on_async_exn (fun () ->
         prover ~handler:(Obj.magic 0) [] (to_value (of_js_field thing)))
   in
-
-  let getVerificationKey () =
-    let key = Lazy.force Proof.verification_key in
-    Pickles.Verification_key.index key
-  in
-
   object%js
     val provers =
       provers |> Obj.magic |> List.map ~f:to_js_prover |> Array.of_list
       |> Js.array
 
-    val getVerificationKey = getVerificationKey
+    val getVerificationKey =
+      fun () ->
+        let key = Lazy.force Proof.verification_key in
+        new%js other_verification_key_constr
+          (Pickles.Verification_key.index key)
   end
 
 module Ledger = struct
