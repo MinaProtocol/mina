@@ -128,7 +128,7 @@ in {
     version = "0.1";
     src = ../src/app/libp2p_helper/src;
     runVend = true; # missing some schema files
-    doCheck = false;
+    doCheck = false; # TODO: tests hang
     vendorSha256 = "sha256-W3p4OQoMehVT1jI2bBJouI2PPHYj94IUtdt55/NB0As=";
     NO_MDNS_TEST = 1; # no multicast support inside the nix sandbox
     overrideModAttrs = n: {
