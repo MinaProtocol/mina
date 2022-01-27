@@ -1477,7 +1477,7 @@ module Circuit = struct
                  res)
           (*
           Impl.run_and_check (fun () ->
-              fun () -> Js.Unsafe.fun_call g [||] ) 
+              fun () -> Js.Unsafe.fun_call g [||] )
             ()
           |> Or_error.ok_exn
         in
@@ -1680,12 +1680,8 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   in
 
   let getVerificationKey () =
-    (* key has type Pickles.verification_key.t, which is a record { index: ..., .... } *)
     let key = Lazy.force Proof.verification_key in
-    (* but I can't access the index! *)
-    key.index
-    (* no matter what syntax I try... *)
-    (* key.Pickles.Verification_key.index *)
+    Pickles.Verification_key.index key
   in
 
   object%js
