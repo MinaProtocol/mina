@@ -2478,15 +2478,16 @@ let%test_module "staged ledger tests" =
       let snapps =
         List.map parties_and_fee_payer_keypairs ~f:(function
           | Parties parties, fee_payer_keypair, keymap ->
+              let fee_payer_hash =
+                Party.Predicated.of_fee_payer parties.fee_payer.data
+                |> Party.Predicated.digest
+              in
               let fee_payer_signature =
                 Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
                   (Random_oracle.Input.Chunked.field
                      ( Parties.commitment parties
                      |> Parties.Transaction_commitment.with_fee_payer
-                          ~fee_payer_hash:
-                            (Party.Predicated.digest
-                               (Party.Predicated.of_fee_payer
-                                  parties.fee_payer.data)) ))
+                          ~fee_payer_hash ))
               in
               (* replace fee payer signature, because new protocol state invalidates the old *)
               let fee_payer_with_valid_signature =
@@ -2497,14 +2498,24 @@ let%test_module "staged ledger tests" =
                 Parties.Party_or_stack.With_hashes.other_parties_hash
                   parties.other_parties
               in
-              let sign_for_other_party sk protocol_state =
+              let sign_for_other_party ~use_full_commitment sk protocol_state =
                 let protocol_state_predicate_hash =
                   Snapp_predicate.Protocol_state.digest protocol_state
                 in
+                let tx_commitment =
+                  Parties.Transaction_commitment.create ~other_parties_hash
+                    ~protocol_state_predicate_hash ~memo_hash
+                in
+                let full_tx_commitment =
+                  Parties.Transaction_commitment.with_fee_payer tx_commitment
+                    ~fee_payer_hash
+                in
+                let commitment =
+                  if use_full_commitment then full_tx_commitment
+                  else tx_commitment
+                in
                 Signature_lib.Schnorr.Chunked.sign sk
-                  (Random_oracle.Input.Chunked.field
-                     (Parties.Transaction_commitment.create ~memo_hash
-                        ~other_parties_hash ~protocol_state_predicate_hash))
+                  (Random_oracle.Input.Chunked.field commitment)
               in
               (* replace other party's signatures, because of new protocol state *)
               let other_parties_with_valid_signatures =
@@ -2529,8 +2540,12 @@ let%test_module "staged ledger tests" =
                                    .to_base58_check pk)
                                   ()
                           in
+                          let use_full_commitment =
+                            data.body.use_full_commitment
+                          in
                           let signature =
-                            sign_for_other_party sk data.body.protocol_state
+                            sign_for_other_party ~use_full_commitment sk
+                              data.body.protocol_state
                           in
                           Control.Signature signature
                       | Proof _ | None_given ->
