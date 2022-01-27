@@ -157,8 +157,9 @@ pub fn caml_pasta_fq_plonk_verifier_index_read(
     path: String,
 ) -> Result<CamlPastaFqPlonkVerifierIndex, ocaml::Error> {
     let mut vi = read_raw(offset, srs, path)?;
-    let (linearization, _powers_of_alpha) = expr_linearization(vi.domain, false, None);
+    let (linearization, powers_of_alpha) = expr_linearization(vi.domain, false, None);
     vi.linearization = linearization;
+    vi.powers_of_alpha = powers_of_alpha;
     Ok(vi.into())
 }
 
