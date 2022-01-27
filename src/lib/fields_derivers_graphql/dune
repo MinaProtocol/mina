@@ -1,6 +1,6 @@
 (library
  (name fields_derivers_graphql)
  (public_name fields_derivers.graphql)
- (libraries core_kernel async_kernel fieldslib fields_derivers graphql graphql-async)
+ (libraries core_kernel fieldslib fields_derivers graphql graphql_parser)
  (inline_tests)
- (preprocess (pps ppx_fields_conv ppx_optcomp ppx_let ppx_inline_test ppx_custom_printf)))
+ (preprocess (pps ppx_jane ppx_fields_conv ppx_let ppx_inline_test ppx_custom_printf)))

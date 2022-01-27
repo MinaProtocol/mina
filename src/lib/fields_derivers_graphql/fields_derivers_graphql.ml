@@ -1,6 +1,7 @@
 open Core_kernel
 open Fieldslib
 
+(*
 module Graphql_args = struct
   module Input = struct
     open Graphql_async
@@ -11,7 +12,7 @@ module Graphql_args = struct
   module Creator = struct
     open Graphql_async
 
-    type 'input_type t =  String.Map.t
+    type 'input_type t = String.Map.t
 
     (*
     type 'input_type t =
@@ -40,17 +41,17 @@ module Graphql_args = struct
       -> input_type Accumulator.t
       -> (input_type Creator.t -> f) * input_type Accumulator.t =
    fun _t_field _field _acc ->
-     ((fun (E (args, coerce)) -> failwith "Unused")
-     , ())
+    ((fun (E (args, coerce)) -> failwith "Unused"), ())
 
   let finish ((_creator, _x) : 'u * 'input_type Accumulator.t) :
       'input_type Output.t =
     failwith "TODO"
 end
+*)
 
 module Graphql_fields = struct
   module Input = struct
-    open Graphql_async
+    open Graphql
 
     type 'input_type t =
       { run : 'ctx. ?doc:string -> unit -> ('ctx, 'input_type) Schema.typ }
@@ -65,7 +66,7 @@ module Graphql_fields = struct
   end
 
   module Accumulator = struct
-    open Graphql_async
+    open Graphql
 
     module Elem = struct
       type 'input_type t =
@@ -90,8 +91,8 @@ module Graphql_fields = struct
     ( (fun _ -> failwith "Unused")
     , { Accumulator.Elem.run =
           (fun () ->
-            Graphql_async.Schema.field (Field.name field)
-              ~args:Graphql_async.Schema.Arg.[]
+            Graphql.Schema.field (Field.name field)
+              ~args:Graphql.Schema.Arg.[]
               ?doc:None ?deprecated:None ~typ:(t_field.run ())
               ~resolve:(fun _ x -> Field.get field x))
       }
@@ -102,7 +103,7 @@ module Graphql_fields = struct
       'input_type Output.t =
     { run =
         (fun ?doc () ->
-          let open Graphql_async in
+          let open Graphql in
           Schema.obj "TODO" ?doc ~fields:(fun _ ->
               List.rev
               @@ List.map schema_rev_thunk ~f:(fun f ->
@@ -110,7 +111,7 @@ module Graphql_fields = struct
     }
 
   module Prim = struct
-    open Graphql_async
+    open Graphql
 
     let int field acc =
       add_field Input.{ run = (fun ?doc:_ () -> Schema.int) } field acc
@@ -135,18 +136,121 @@ module Graphql_fields_ : Fields_derivers.Deriver = Graphql_fields
 
 let%test_module "Test" =
   ( module struct
-    (*
+    let introspection_query_raw =
+      {graphql|
+query IntrospectionQuery {
+    __schema {
+      queryType { name }
+      mutationType { name }
+      subscriptionType { name }
+      types {
+        ...FullType
+      }
+      directives {
+        name
+        description
+        locations
+        args {
+          ...InputValue
+        }
+      }
+    }
+  }
+  fragment FullType on __Type {
+    kind
+    name
+    description
+    fields(includeDeprecated: true) {
+      name
+      description
+      args {
+        ...InputValue
+      }
+      type {
+        ...TypeRef
+      }
+      isDeprecated
+      deprecationReason
+    }
+    inputFields {
+      ...InputValue
+    }
+    interfaces {
+      ...TypeRef
+    }
+    enumValues(includeDeprecated: true) {
+      name
+      description
+      isDeprecated
+      deprecationReason
+    }
+    possibleTypes {
+      ...TypeRef
+    }
+  }
+  fragment InputValue on __InputValue {
+    name
+    description
+    type { ...TypeRef }
+    defaultValue
+  }
+  fragment TypeRef on __Type {
+    kind
+    name
+    ofType {
+      kind
+      name
+      ofType {
+        kind
+        name
+        ofType {
+          kind
+          name
+          ofType {
+            kind
+            name
+            ofType {
+              kind
+              name
+              ofType {
+                kind
+                name
+                ofType {
+                  kind
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+|graphql}
+
+    let introspection_query () =
+      match Graphql_parser.parse introspection_query_raw with
+      | Ok res ->
+          res
+      | Error err ->
+          failwith err
+
     type t = { foo : int; bar : string } [@@deriving fields]
 
     let v = { foo = 1; bar = "baz" }
-    let%test "folding creates a graphql object we expect" =
+
+    let%test_unit "folding creates a graphql object we expect" =
       let open Graphql_fields.Prim in
       let typ1 =
-        Fields.make_creator (Graphql_fields.init ()) ~foo:nn_int ~bar:nn_string
-        |> Graphql_fields.finish
+        let typ_input =
+          Fields.make_creator (Graphql_fields.init ()) ~foo:nn_int
+            ~bar:nn_string
+          |> Graphql_fields.finish
+        in
+        typ_input.run ()
       in
       let typ2 =
-        Graphql_async.Schema.(
+        Graphql.Schema.(
           obj "TODO" ?doc:None ~fields:(fun _ ->
               [ field "foo"
                   ~args:Arg.[]
@@ -158,26 +262,24 @@ let%test_module "Test" =
                   ~resolve:(fun _ t -> t.bar)
               ]))
       in
-
-      let hit_server typ =
+      let hit_server (typ : _ Graphql.Schema.typ) =
+        let query_top_level =
+          Graphql.Schema.(
+            field "query" ~typ:(non_null typ)
+              ~args:Arg.[]
+              ~doc:"sample query"
+              ~resolve:(fun _ _ -> v))
+        in
         let schema =
-          Graphql_async.Schema.(
-            schema Queries.commands ~mutations:[]
-              ~subscriptions:[])
+          Graphql.Schema.(
+            schema [ query_top_level ] ~mutations:[] ~subscriptions:[])
         in
-        let res =
-          Async.Thread_safe.block_on_async_exn (fun () ->
-              Graphql_async.Schema.execute Mina_graphql.schema fake_mina_lib
-                introspection_query)
-        in
-        let response =
-          match res with
-          | Ok (`Response data) ->
-            data
-          | _ ->
+        let res = Graphql.Schema.execute schema () (introspection_query ()) in
+        match res with
+        | Ok (`Response data) ->
+            data |> Yojson.Basic.to_string
+        | _ ->
             failwith "Unexpected response"
-        in
       in
-      *)
-  
+      [%test_eq: string] (hit_server typ1) (hit_server typ2)
   end )
