@@ -367,7 +367,7 @@ struct
   end
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
-  let scan_statement ~constraint_constants tree ~verifier :
+  let scan_statement tree ~constraint_constants ~statement_check ~verifier :
       ( Transaction_snark.Statement.t
       , [ `Error of Error.t | `Empty ] )
       Deferred.Result.t =
@@ -430,11 +430,20 @@ struct
       | Full { job = transaction; _ } ->
           with_error "Bad base statement" ~f:(fun () ->
               let%bind expected_statement =
-                Timer.time timer
-                  (sprintf "create_expected_statement:%s" __LOC__) (fun () ->
-                    Deferred.return
-                      (create_expected_statement ~constraint_constants
-                         transaction))
+                match statement_check with
+                | `Full ->
+                    let%bind result =
+                      Timer.time timer
+                        (sprintf "create_expected_statement:%s" __LOC__)
+                        (fun () ->
+                          Deferred.return
+                            (create_expected_statement ~constraint_constants
+                               transaction))
+                    in
+                    let%map () = yield_always () in
+                    result
+                | `Partial ->
+                    return transaction.statement
               in
               let%bind () = yield_always () in
               if
@@ -485,8 +494,8 @@ struct
     | Error e ->
         Deferred.return (Error (`Error e))
 
-  let check_invariants t ~constraint_constants ~verifier ~error_prefix
-      ~ledger_hash_end:current_ledger_hash
+  let check_invariants t ~constraint_constants ~statement_check ~verifier
+      ~error_prefix ~ledger_hash_end:current_ledger_hash
       ~ledger_hash_begin:snarked_ledger_hash
       ~next_available_token_begin:snarked_ledger_next_available_token
       ~next_available_token_end:current_ledger_next_available_token =
@@ -495,7 +504,7 @@ struct
     in
     match%map
       time "scan_statement" (fun () ->
-          scan_statement ~constraint_constants ~verifier t)
+          scan_statement t ~constraint_constants ~statement_check ~verifier)
     with
     | Error (`Error e) ->
         Error e
