@@ -128,17 +128,19 @@ in {
     version = "0.1";
     src = ../src/app/libp2p_helper/src;
     runVend = true; # missing some schema files
-    vendorSha256 = "sha256-g0DsuLMiXjUTsGbhCSeFKEFKMEMtg3UTUjmYwUka6iE=";
-    postConfigure = ''
-      chmod +w vendor
-      cp -r --reflink=auto ${pkgs.libp2p_ipc_go}/ vendor/libp2p_ipc
-    '';
+    doCheck = false;
+    vendorSha256 = "sha256-W3p4OQoMehVT1jI2bBJouI2PPHYj94IUtdt55/NB0As=";
     NO_MDNS_TEST = 1; # no multicast support inside the nix sandbox
     overrideModAttrs = n: {
       # remove libp2p_ipc from go.mod, inject it back in postconfigure
       postConfigure = ''
-        sed -i '/libp2p_ipc/d' go.mod
+        sed -i 's/.*libp2p_ipc.*//' go.mod
       '';
     };
+    postConfigure = ''
+      chmod +w vendor
+      cp -r --reflink=auto ${pkgs.libp2p_ipc_go}/ vendor/libp2p_ipc
+      sed -i 's/.*libp2p_ipc.*//' go.mod
+    '';
   };
 }
