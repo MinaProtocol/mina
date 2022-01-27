@@ -2467,12 +2467,10 @@ let%test_module "staged ledger tests" =
       assert (List.length cmds = num_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
-    let gen_snapps_at_capacity :
+    let gen_snapps ~iters ~num_snapps :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
-      let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
-      let num_snapps = transaction_capacity * iters in
       let%bind parties_and_fee_payer_keypairs, ledger =
         User_command_generators.sequence_parties_with_ledger ~length:num_snapps
           ()
@@ -2555,6 +2553,30 @@ let%test_module "staged ledger tests" =
       assert (List.length snapps = num_snapps) ;
       return (ledger, snapps, List.init iters ~f:(Fn.const None))
 
+    let gen_snapps_at_capacity :
+        (Ledger.t * User_command.Valid.t list * int option list)
+        Quickcheck.Generator.t =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
+      let num_snapps = transaction_capacity * iters in
+      gen_snapps ~num_snapps ~iters
+
+    let gen_snapps_below_capacity ?(extra_blocks = false) () :
+        (Ledger.t * User_command.Valid.t list * int option list)
+        Quickcheck.Generator.t =
+      let open Quickcheck.Generator.Let_syntax in
+      let iters_max =
+        max_blocks_for_coverage 0 * if extra_blocks then 4 else 2
+      in
+      let%bind iters = Int.gen_incl 1 iters_max in
+      (* see comment in gen_below_capacity for rationale *)
+      let%bind snapps_per_iter =
+        Quickcheck.Generator.list_with_length iters
+          (Int.gen_incl 1 ((transaction_capacity / 2) - 1))
+      in
+      let num_snapps = List.fold snapps_per_iter ~init:0 ~f:( + ) in
+      gen_snapps ~num_snapps ~iters
+
     (*Same as gen_at_capacity except that the number of iterations[iters] is
       the function of [extra_block_count] and is same for all generated values*)
     let gen_at_capacity_fixed_blocks extra_block_count :
@@ -2588,7 +2610,7 @@ let%test_module "staged ledger tests" =
         Quickcheck.Generator.list_with_length iters
           (Int.gen_incl 1 ((transaction_capacity / 2) - 1))
       in
-      let total_cmds = List.sum (module Int) ~f:Fn.id cmds_per_iter in
+      let total_cmds = List.fold cmds_per_iter ~init:0 ~f:( + ) in
       let%bind cmds =
         User_command.Valid.Gen.sequence ~length:total_cmds ~sign_type:`Real
           ledger_init_state
@@ -2643,6 +2665,16 @@ let%test_module "staged ledger tests" =
                 (init_pks ledger_init_state)
                 cmds iters sl test_mask `Many_provers stmt_to_work_random_prover))
 
+    let%test_unit "Be able to include random number of commands (snapps)" =
+      Quickcheck.test (gen_snapps_below_capacity ()) ~trials:4
+        ~f:(fun (ledger, snapps, iters) ->
+          async_with_given_ledger ledger (fun sl test_mask ->
+              let account_ids =
+                Ledger.accounts ledger |> Account_id.Set.to_list
+              in
+              test_simple account_ids snapps iters sl test_mask `Many_provers
+                stmt_to_work_random_prover))
+
     let%test_unit "Be able to include random number of commands (One prover)" =
       Quickcheck.test (gen_below_capacity ()) ~trials:20
         ~f:(fun (ledger_init_state, cmds, iters) ->
@@ -2650,6 +2682,17 @@ let%test_module "staged ledger tests" =
               test_simple
                 (init_pks ledger_init_state)
                 cmds iters sl test_mask `One_prover stmt_to_work_one_prover))
+
+    let%test_unit "Be able to include random number of commands (One prover, \
+                   snapps)" =
+      Quickcheck.test (gen_snapps_below_capacity ()) ~trials:4
+        ~f:(fun (ledger, snapps, iters) ->
+          async_with_given_ledger ledger (fun sl test_mask ->
+              let account_ids =
+                Ledger.accounts ledger |> Account_id.Set.to_list
+              in
+              test_simple account_ids snapps iters sl test_mask `One_prover
+                stmt_to_work_one_prover))
 
     let%test_unit "Zero proof-fee should not create a fee transfer" =
       let stmt_to_work_zero_fee stmts =

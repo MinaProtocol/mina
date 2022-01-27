@@ -58,36 +58,8 @@ let jsobj_of_json ?(fee_payer = false) (json : Yojson.Safe.t) : string =
         go (`Assoc [ ("account", `Null); ("nonce", `Null) ]) level
     | `List [ `String "Nonce"; n ] ->
         go (`Assoc [ ("nonce", n) ]) level
-    | `List [ `String "Full"; _ ] ->
-        (* TODO: issue #10008 *)
-        go
-          (`Assoc
-            [ ( "account"
-              , `Assoc
-                  [ ("balance", `Null)
-                  ; ("nonce", `Null)
-                  ; ("receiptChainHash", `Null)
-                  ; ("publicKey", `Null)
-                  ; ("delegate", `Null)
-                  ; ( "state"
-                    , `Assoc
-                        [ ( "elements"
-                          , `List
-                              [ `Null
-                              ; `Null
-                              ; `Null
-                              ; `Null
-                              ; `Null
-                              ; `Null
-                              ; `Null
-                              ; `Null
-                              ] )
-                        ] )
-                  ; ("sequenceState", `Null)
-                  ; ("provedState", `Null)
-                  ] )
-            ])
-          level
+    | `List [ `String "Full"; account ] ->
+        go (`Assoc [ ("account", account) ]) level
     (* other constructors *)
     | `List [ `String name; value ] ->
         go (`Assoc [ (Mina_graphql.Reflection.underToCamel name, value) ]) level
