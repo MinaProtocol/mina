@@ -240,9 +240,10 @@ module Node = struct
     else
       let uri = Graphql.ingress_uri node in
       let metadata =
-        [ ("query", `String query_name); ("uri", `String (Uri.to_string uri)) ]
+        [ ("query", `String query_name); ("uri", `String (Uri.to_string uri))
+        ; ("init_delay", `Float initial_delay_sec) ]
       in
-      [%log info] "Attempting to send GraphQL request \"$query\" to \"$uri\""
+      [%log info] "Attempting to send GraphQL request \"$query\" to \"$uri\" after $init_delay sec"
         ~metadata ;
       let rec retry n =
         if n <= 0 then (
@@ -358,6 +359,8 @@ module Node = struct
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ?initial_delay_sec ~logger t ~sender_pub_key
       ~receiver_pub_key ~amount ~fee =
+    (* We have two calls to `exec_graphql_request`, so we split total delay in half *)
+    let initial_delay_sec = Option.map initial_delay_sec ~f:(fun x -> x /. 2.) in
     [%log info] "Sending a payment"
       ~metadata:
         [ ("namespace", `String t.namespace); ("pod_id", `String t.pod_id) ] ;
@@ -373,7 +376,7 @@ module Node = struct
           ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
           ()
       in
-      exec_graphql_request ~logger ~node:t
+      exec_graphql_request ~logger ~node:t ?initial_delay_sec 
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
     in
     let%bind _ = unlock_sender_account_graphql () in
