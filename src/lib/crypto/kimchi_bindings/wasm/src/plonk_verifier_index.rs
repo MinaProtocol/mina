@@ -843,6 +843,44 @@ macro_rules! impl_verification_key {
                 })
             }
 
+            // TODO understand what serialization format we need
+
+            // #[wasm_bindgen]
+            // pub fn [<$name:snake _serialize>](
+            //     index: WasmPlonkVerifierIndex,
+            // ) -> Box<[u8]> {
+            //     let index: DlogVerifierIndex<$G> = index.into();
+            //     rmp_serde::to_vec(&index).unwrap().into_boxed_slice()
+            // }
+
+            // #[wasm_bindgen]
+            // pub fn [<$name:snake _deserialize>](
+            //     srs: &$WasmSrs,
+            //     index: Box<[u8]>,
+            // ) -> WasmPlonkVerifierIndex {
+            //     let mut vi: DlogVerifierIndex<$G> = rmp_serde::from_slice(&index).unwrap();
+            //     vi.linearization = expr_linearization(vi.domain, false, false, None);
+            //     return to_wasm(srs, vi.into())
+            // }
+
+            #[wasm_bindgen]
+            pub fn [<$name:snake _serialize>](
+                index: WasmPlonkVerifierIndex,
+            ) -> String {
+                let index: DlogVerifierIndex<$G> = index.into();
+                serde_json::to_string(&index).unwrap()
+            }
+
+            #[wasm_bindgen]
+            pub fn [<$name:snake _deserialize>](
+                srs: &$WasmSrs,
+                index: String,
+            ) -> WasmPlonkVerifierIndex {
+                let mut vi: DlogVerifierIndex<$G> = serde_json::from_str(&index).unwrap();
+                vi.linearization = expr_linearization(vi.domain, false, false, None);
+                return to_wasm(srs, vi.into())
+            }
+
             #[wasm_bindgen]
             pub fn [<$name:snake _create>](
                 index: &$WasmIndex,

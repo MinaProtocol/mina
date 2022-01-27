@@ -1508,7 +1508,9 @@ module Circuit = struct
     circuit##.inCheckedComputation
     := Js.wrap_callback (fun () : bool Js.t ->
            Js.bool (Impl.in_checked_computation ())) ;
-    Js.Unsafe.set circuit (Js.string "if") if_
+    Js.Unsafe.set circuit (Js.string "if") if_ ;
+    circuit##.getVerificationKey
+    := fun (vk : Verification_key.t) -> new%js verification_key_constr vk
 end
 
 let () =
