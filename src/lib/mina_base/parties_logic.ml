@@ -281,30 +281,15 @@ module Eff = struct
              ; failure : 'failure
              ; .. > )
            t
-    | Balance :
-        'account
-        -> ('amount, < account : 'account ; amount : 'amount ; .. >) t
-    | Transaction_commitments_on_start :
-        { protocol_state_predicate : 'protocol_state_pred
-        ; party : 'party
-        ; other_parties : 'parties
-        ; memo_hash : 'field
-        }
-        -> ( 'transaction_commitment * 'transaction_commitment
-           , < party : 'party
-             ; parties : 'parties
-             ; bool : 'bool
-             ; protocol_state_predicate : 'protocol_state_pred
-             ; transaction_commitment : 'transaction_commitment
-             ; full_transaction_commitment : 'transaction_commitment
-             ; field : 'field
-             ; .. > )
-           t
 end
 
 type 'e handler = { perform : 'r. ('r, 'e) Eff.t -> 'r }
 
 module type Inputs_intf = sig
+  module Field : sig
+    type t
+  end
+
   module Bool : Bool_intf
 
   module Amount : Amount_intf with type bool := Bool.t
@@ -335,6 +320,11 @@ module type Inputs_intf = sig
     include Iffable with type bool := Bool.t
 
     val empty : t
+
+    val commitment :
+      party:Party.t -> other_parties:Parties.t -> memo_hash:Field.t -> t
+
+    val full_commitment : party:Party.t -> commitment:t -> t
   end
 end
 
@@ -460,14 +450,13 @@ module Make (Inputs : Inputs_intf) = struct
             ( local_state.transaction_commitment
             , local_state.full_transaction_commitment )
         | `Yes start_data | `Compute start_data ->
-            let tx_commitment_on_start, full_tx_commitment_on_start =
-              h.perform
-                (Transaction_commitments_on_start
-                   { protocol_state_predicate = Party.protocol_state party
-                   ; other_parties = remaining
-                   ; memo_hash = start_data.memo_hash
-                   ; party
-                   })
+            let tx_commitment_on_start =
+              Transaction_commitment.commitment ~party ~other_parties:remaining
+                ~memo_hash:start_data.memo_hash
+            in
+            let full_tx_commitment_on_start =
+              Transaction_commitment.full_commitment ~party
+                ~commitment:tx_commitment_on_start
             in
             let tx_commitment =
               Transaction_commitment.if_ is_start' ~then_:tx_commitment_on_start

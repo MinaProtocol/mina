@@ -1486,6 +1486,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     module First_party = Party.Signed
     module Global_state = Global_state
 
+    module Field = struct
+      type t = Snark_params.Tick.Field.t
+    end
+
     module Bool = struct
       type t = bool
 
@@ -1534,6 +1538,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let empty = ()
 
       let if_ = Parties.value_if
+
+      let commitment ~party:_ ~other_parties:_ ~memo_hash:_ = ()
+
+      let full_commitment ~party:_ ~commitment:_ = ()
     end
 
     module Account = struct
@@ -1683,10 +1691,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       match eff with
       | Get_global_ledger _ ->
           L.create_masked ledger
-      | Transaction_commitments_on_start _ ->
-          ((), ())
-      | Balance a ->
-          Balance.to_amount a.balance
       | Check_protocol_state_predicate (pred, global_state) -> (
           Snapp_predicate.Protocol_state.check pred global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
