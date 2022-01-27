@@ -1555,8 +1555,25 @@ module Base = struct
           let assert_ = Assert.is_true
         end
 
+        module Account = struct
+          type t = (Account.Checked.Unhashed.t, Field.t) With_hash.t
+
+          let account_with_hash (account : Account.Checked.Unhashed.t) =
+            With_hash.of_data account ~hash_data:(fun a ->
+                let a =
+                  { a with
+                    snapp =
+                      ( Snapp_account.Checked.digest a.snapp
+                      , As_prover.Ref.create (fun () -> None) )
+                  }
+                in
+                run_checked (Account.Checked.digest a))
+        end
+
         module Ledger = struct
           type t = Ledger_hash.var * Sparse_ledger.t V.t
+
+          type inclusion_proof = (Boolean.var * Field.t) list
 
           let if_ b ~then_:(xt, rt) ~else_:(xe, re) =
             ( run_checked (Ledger_hash.if_ b ~then_:xt ~else_:xe)
@@ -1566,6 +1583,104 @@ module Base = struct
             let t = Sparse_ledger.empty ~depth () in
             ( Ledger_hash.var_of_t (Sparse_ledger.merkle_root t)
             , V.create (fun () -> t) )
+
+          let idx ledger id = Sparse_ledger.find_index_exn ledger id
+
+          let body_id (body : Party.Body.Checked.t) =
+            let open As_prover in
+            Account_id.create
+              (read Public_key.Compressed.typ body.public_key)
+              (read Token_id.typ body.token_id)
+
+          let get_account { party; _ } (_root, ledger) =
+            let idx =
+              V.map ledger ~f:(fun l -> idx l (body_id party.data.body))
+            in
+            let account =
+              exists Mina_base.Account.Checked.Unhashed.typ ~compute:(fun () ->
+                  Sparse_ledger.get_exn (V.get ledger) (V.get idx))
+            in
+            let account = Account.account_with_hash account in
+            let incl =
+              exists
+                Typ.(
+                  list ~length:constraint_constants.ledger_depth
+                    (Boolean.typ * field))
+                ~compute:(fun () ->
+                  List.map
+                    (Sparse_ledger.path_exn (V.get ledger) (V.get idx))
+                    ~f:(fun x ->
+                      match x with
+                      | `Left h ->
+                          (false, h)
+                      | `Right h ->
+                          (true, h)))
+            in
+            (account, incl)
+
+          let set_account (_root, ledger) (a, incl) =
+            ( implied_root a incl |> Ledger_hash.var_of_hash_packed
+            , V.map ledger
+                ~f:
+                  As_prover.(
+                    let account_typ =
+                      let snapp :
+                          ( Snapp_account.Checked.t
+                          , Snapp_account.t option )
+                          Typ.t =
+                        let open Snapp_account.Poly in
+                        let vk :
+                            ( ( Pickles.Side_loaded.Verification_key.Checked.t
+                                Lazy.t
+                              , Pickles.Impls.Step.Field.t Lazy.t )
+                              With_hash.t
+                            , ( Side_loaded_verification_key.t
+                              , Field.Constant.t )
+                              With_hash.t
+                              option )
+                            Typ.t =
+                          { store = (fun _ -> failwith "unused")
+                          ; check = (fun _ -> failwith "unused")
+                          ; alloc = Free (Alloc (fun _ -> failwith "unused"))
+                          ; read =
+                              Snarky_backendless.Typ_monads.Read.(
+                                fun v ->
+                                  let%map h = read (Lazy.force v.hash) in
+                                  Some
+                                    { With_hash.data =
+                                        Pickles.Side_loaded.Verification_key
+                                        .dummy
+                                    ; hash = h
+                                    })
+                          }
+                        in
+                        (* TODO: Refactor. This hacking around the vk is a code smell *)
+                        Typ.of_hlistable
+                          [ Snapp_state.typ Field.typ
+                          ; vk
+                          ; Mina_numbers.Snapp_version.typ
+                          ; Pickles_types.Vector.typ Field.typ
+                              Pickles_types.Nat.N5.n
+                          ; Mina_numbers.Global_slot.typ
+                          ; Boolean.typ
+                          ]
+                          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+                          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+                        |> Typ.transport
+                             ~there:(fun x -> Option.value_exn x)
+                             ~back:(fun x -> Some x)
+                      in
+                      Mina_base.Account.typ' snapp
+                    in
+                    fun ledger ->
+                      let a : Mina_base.Account.t = read account_typ a.data in
+                      let idx = idx ledger (Mina_base.Account.identifier a) in
+                      Sparse_ledger.set_exn ledger idx a) )
+
+          let check_inclusion (root, _) (account, incl) =
+            with_label __LOC__
+              (fun () -> Field.Assert.equal (implied_root account incl))
+              (Ledger_hash.var_to_hash_packed root)
         end
 
         module Parties = struct
@@ -1727,10 +1842,6 @@ module Base = struct
           let protocol_state (t : t) = t.party.data.body.protocol_state
         end
 
-        module Account = struct
-          type t = (Account.Checked.Unhashed.t, Field.t) With_hash.t
-        end
-
         module Amount = struct
           type t = Amount.Checked.t
 
@@ -1820,24 +1931,6 @@ module Base = struct
       include Parties_logic.Make (Inputs)
 
       let perform (type r) (eff : (r, Env.t) Parties_logic.Eff.t) : r =
-        let body_id (body : Party.Body.Checked.t) =
-          let open As_prover in
-          Account_id.create
-            (read Public_key.Compressed.typ body.public_key)
-            (read Token_id.typ body.token_id)
-        in
-        let idx ledger id = Sparse_ledger.find_index_exn ledger id in
-        let account_with_hash (account : Account.Checked.Unhashed.t) =
-          With_hash.of_data account ~hash_data:(fun a ->
-              let a =
-                { a with
-                  snapp =
-                    ( Snapp_account.Checked.digest a.snapp
-                    , As_prover.Ref.create (fun () -> None) )
-                }
-              in
-              run_checked (Account.Checked.digest a))
-        in
         match eff with
         | Get_global_ledger g ->
             g.ledger
@@ -1864,35 +1957,6 @@ module Base = struct
                     transaction_commitment ~fee_payer_hash:party.hash
                 in
                 (transaction_commitment, full_transaction_commitment) )
-        | Get_account ({ party; _ }, (_root, ledger)) ->
-            let idx =
-              V.map ledger ~f:(fun l -> idx l (body_id party.data.body))
-            in
-            let account =
-              exists Account.Checked.Unhashed.typ ~compute:(fun () ->
-                  Sparse_ledger.get_exn (V.get ledger) (V.get idx))
-            in
-            let account = account_with_hash account in
-            let incl =
-              exists
-                Typ.(
-                  list ~length:constraint_constants.ledger_depth
-                    (Boolean.typ * field))
-                ~compute:(fun () ->
-                  List.map
-                    (Sparse_ledger.path_exn (V.get ledger) (V.get idx))
-                    ~f:(fun x ->
-                      match x with
-                      | `Left h ->
-                          (false, h)
-                      | `Right h ->
-                          (true, h)))
-            in
-            (account, incl)
-        | Check_inclusion ((root, _), account, incl) ->
-            with_label __LOC__
-              (fun () -> Field.Assert.equal (implied_root account incl))
-              (Ledger_hash.var_to_hash_packed root)
         | Check_protocol_state_predicate (protocol_state_predicate, global_state)
           ->
             Snapp_predicate.Protocol_state.Checked.check
@@ -1900,64 +1964,6 @@ module Base = struct
         | Check_predicate (_is_start, { party; _ }, account, _global) ->
             Snapp_predicate.Account.Checked.check party.data.predicate
               account.data
-        | Set_account ((_root, ledger), a, incl) ->
-            ( implied_root a incl |> Ledger_hash.var_of_hash_packed
-            , V.map ledger
-                ~f:
-                  As_prover.(
-                    let account_typ =
-                      let snapp :
-                          ( Snapp_account.Checked.t
-                          , Snapp_account.t option )
-                          Typ.t =
-                        let open Snapp_account.Poly in
-                        let vk :
-                            ( ( Pickles.Side_loaded.Verification_key.Checked.t
-                                Lazy.t
-                              , Pickles.Impls.Step.Field.t Lazy.t )
-                              With_hash.t
-                            , ( Side_loaded_verification_key.t
-                              , Field.Constant.t )
-                              With_hash.t
-                              option )
-                            Typ.t =
-                          { store = (fun _ -> failwith "unused")
-                          ; check = (fun _ -> failwith "unused")
-                          ; alloc = Free (Alloc (fun _ -> failwith "unused"))
-                          ; read =
-                              Snarky_backendless.Typ_monads.Read.(
-                                fun v ->
-                                  let%map h = read (Lazy.force v.hash) in
-                                  Some
-                                    { With_hash.data =
-                                        Pickles.Side_loaded.Verification_key
-                                        .dummy
-                                    ; hash = h
-                                    })
-                          }
-                        in
-                        (* TODO: Refactor. This hacking around the vk is a code smell *)
-                        Typ.of_hlistable
-                          [ Snapp_state.typ Field.typ
-                          ; vk
-                          ; Mina_numbers.Snapp_version.typ
-                          ; Pickles_types.Vector.typ Field.typ
-                              Pickles_types.Nat.N5.n
-                          ; Mina_numbers.Global_slot.typ
-                          ; Boolean.typ
-                          ]
-                          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-                          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-                        |> Typ.transport
-                             ~there:(fun x -> Option.value_exn x)
-                             ~back:(fun x -> Some x)
-                      in
-                      Account.typ' snapp
-                    in
-                    fun ledger ->
-                      let a : Account.t = read account_typ a.data in
-                      let idx = idx ledger (Account.identifier a) in
-                      Sparse_ledger.set_exn ledger idx a) )
         | Check_fee_excess (valid_fee_excess, ()) ->
             with_label __LOC__ (fun () ->
                 Boolean.Assert.is_true valid_fee_excess)
@@ -2056,7 +2062,7 @@ module Base = struct
                   checks_succeeded
             in
             (* omit failure status here, unlike `Transaction_logic` *)
-            (account_with_hash account', success, ())
+            (Inputs.Account.account_with_hash account', success, ())
         | Balance account ->
             Balance.Checked.to_amount account.data.balance
     end
