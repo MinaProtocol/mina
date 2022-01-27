@@ -1637,6 +1637,9 @@ let create_pickles_rule (identifier, _main) =
   ; main_value = (fun _ _ -> [])
   }
 
+(* type pickles_key = Pickles.Verification_key.t
+module Pickles_verification_key = Pickles.Verification_key.Stable.V2 *)
+
 let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let choices = choices |> Js.to_array |> Array.to_list in
   let choices ~self:_ = List.map choices ~f:create_pickles_rule |> Obj.magic in
@@ -1675,12 +1678,22 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
     Run_in_thread.block_on_async_exn (fun () ->
         prover ~handler:(Obj.magic 0) [] (to_value (of_js_field thing)))
   in
+
+  let getVerificationKey () =
+    (* key has type Pickles.verification_key.t, which is a record { index: ..., .... } *)
+    let key = Lazy.force Proof.verification_key in
+    (* but I can't access the index! *)
+    key.index
+    (* no matter what syntax I try... *)
+    (* key.Pickles.Verification_key.index *)
+  in
+
   object%js
     val provers =
       provers |> Obj.magic |> List.map ~f:to_js_prover |> Array.of_list
       |> Js.array
 
-    val getVerificationKey = fun () -> Lazy.force Proof.verification_key
+    val getVerificationKey = getVerificationKey
   end
 
 module Ledger = struct
