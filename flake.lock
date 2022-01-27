@@ -84,16 +84,15 @@
     },
     "mix-to-nix": {
       "locked": {
-        "lastModified": 1638979539,
+        "lastModified": 1643291492,
         "narHash": "sha256-B+VIFF8qDJhF5hVMc8PbY/WPzUtbGgjsV1eAxTt5GuQ=",
         "owner": "serokell",
         "repo": "mix-to-nix",
-        "rev": "e1ac539bc82cb2ee2558267023e8aaeccd77182d",
+        "rev": "f6f0172b3ac4d32c0e6050a7d805734de0b7adef",
         "type": "github"
       },
       "original": {
         "owner": "serokell",
-        "ref": "yorickvp/deadlock",
         "repo": "mix-to-nix",
         "type": "github"
       }
