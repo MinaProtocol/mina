@@ -155,9 +155,13 @@ module type Party_intf = sig
 
   type protocol_state_predicate
 
+  type token_id
+
   val balance_change : t -> signed_amount
 
   val protocol_state : t -> protocol_state_predicate
+
+  val token_id : t -> token_id
 end
 
 module type Parties_intf = sig
@@ -256,9 +260,6 @@ module Eff = struct
              ; ledger : 'ledger
              ; .. > )
            t
-    | Party_token_id :
-        'party
-        -> ('token_id, < party : 'party ; token_id : 'token_id ; .. >) t
     | Check_auth_and_update_account :
         { is_start : 'bool
         ; party : 'party
@@ -302,6 +303,7 @@ module type Inputs_intf = sig
     Party_intf
       with type signed_amount := Amount.Signed.t
        and type protocol_state_predicate := Protocol_state_predicate.t
+       and type token_id := Token_id.t
 
   module Account : sig
     type t
@@ -530,7 +532,7 @@ module Make (Inputs : Inputs_intf) = struct
       *)
       Amount.Signed.negate (Party.balance_change party)
     in
-    let party_token = h.perform (Party_token_id party) in
+    let party_token = Party.token_id party in
     Bool.(assert_ (not (Token_id.(equal invalid) party_token))) ;
     let new_local_fee_excess, `Overflow overflowed =
       let curr_token : Token_id.t = local_state.token_id in

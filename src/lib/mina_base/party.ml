@@ -900,3 +900,5 @@ let balance_change (t : t) : Amount.Signed.t = t.data.body.balance_change
 
 let protocol_state (t : t) : Snapp_predicate.Protocol_state.t =
   t.data.body.protocol_state
+
+let token_id (t : t) : Token_id.t = t.data.body.token_id
