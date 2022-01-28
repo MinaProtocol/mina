@@ -1480,6 +1480,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; fee_excess : Amount.Signed.t
       ; protocol_state : Snapp_predicate.Protocol_state.View.t
       }
+
+    let ledger { ledger; _ } = L.create_masked ledger
+
+    let set_ledger ~should_update t ledger =
+      if should_update then L.apply_mask t.ledger ~masked:ledger ;
+      t
+
+    let fee_excess { fee_excess; _ } = fee_excess
+
+    let set_fee_excess t fee_excess = { t with fee_excess }
   end
 
   module Inputs = struct
@@ -1686,11 +1696,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; field : Snark_params.Tick.Field.t
       ; failure : Transaction_status.Failure.t option >
 
-    let perform ~constraint_constants ~state_view ledger (type r)
+    let perform ~constraint_constants ~state_view (type r)
         (eff : (r, t) Parties_logic.Eff.t) : r =
       match eff with
-      | Get_global_ledger _ ->
-          L.create_masked ledger
       | Check_protocol_state_predicate (pred, global_state) -> (
           Snapp_predicate.Protocol_state.check pred global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
@@ -1706,12 +1714,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           if not valid_fee_excess then
             Some Transaction_status.Failure.Invalid_fee_excess
           else prev_failure_status
-      | Modify_global_excess (s, f) ->
-          { s with fee_excess = f s.fee_excess }
-      | Modify_global_ledger { global_state; ledger; should_update } ->
-          (* Commit, modifying the underlying ledger. *)
-          if should_update then L.apply_mask global_state.ledger ~masked:ledger ;
-          global_state
       | Check_auth_and_update_account
           { is_start
           ; at_party = _
@@ -1776,9 +1778,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               let%map a = L.get ledger loc in
               (loc, a)) ))
     in
-    let perform eff =
-      Env.perform ~constraint_constants ~state_view ledger eff
-    in
+    let perform eff = Env.perform ~constraint_constants ~state_view eff in
     let rec step_all user_acc
         ( (g_state : Inputs.Global_state.t)
         , (l_state : _ Parties_logic.Local_state.t) ) : user_acc Or_error.t =

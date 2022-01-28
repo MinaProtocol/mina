@@ -1915,6 +1915,25 @@ module Base = struct
         module Field = struct
           type t = Field.t
         end
+
+        module Global_state = struct
+          type t = Global_state.t =
+            { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
+            ; fee_excess : Amount.Signed.t
+            ; protocol_state : Snapp_predicate.Protocol_state.View.Checked.t
+            }
+
+          let fee_excess { fee_excess; _ } = fee_excess
+
+          let set_fee_excess t fee_excess = { t with fee_excess }
+
+          let ledger { ledger; _ } = ledger
+
+          let set_ledger ~should_update t ledger =
+            { t with
+              ledger = Ledger.if_ should_update ~then_:ledger ~else_:t.ledger
+            }
+        end
       end
 
       module Env = struct
@@ -1951,8 +1970,6 @@ module Base = struct
 
       let perform (type r) (eff : (r, Env.t) Parties_logic.Eff.t) : r =
         match eff with
-        | Get_global_ledger g ->
-            g.ledger
         | Check_protocol_state_predicate (protocol_state_predicate, global_state)
           ->
             Snapp_predicate.Protocol_state.Checked.check
@@ -1963,14 +1980,6 @@ module Base = struct
         | Check_fee_excess (valid_fee_excess, ()) ->
             with_label __LOC__ (fun () ->
                 Boolean.Assert.is_true valid_fee_excess)
-        | Modify_global_excess (global, f) ->
-            { global with fee_excess = f global.fee_excess }
-        | Modify_global_ledger { global_state; ledger; should_update } ->
-            { global_state with
-              ledger =
-                Inputs.Ledger.if_ should_update ~then_:ledger
-                  ~else_:global_state.ledger
-            }
         | Check_auth_and_update_account
             { is_start
             ; at_party = at_party, _
