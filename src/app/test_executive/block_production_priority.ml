@@ -65,7 +65,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
     let sender_bp = List.nth_exn (Network.block_producers network) 1 in
     let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
-    let tps_i = 5 in
+    let tps_i = 20 in
     let tps = Unsigned.UInt32.of_int tps_i in
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
@@ -80,10 +80,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Network.Node.get_metrics ~logger node)
         ~f:Malleable_error.or_hard_error
     in
-    let end_ = Time.add (Time.now ()) (Time.Span.of_int_sec num_payments) in
+    let end_t = Time.add (Time.now ()) (Time.Span.of_int_sec num_payments) in
     let%bind () =
       send_payments ~tps ~logger ~sender_pub_key ~receiver_pub_key
-        ~node:sender_bp ~fee ~amount end_
+        ~node:sender_bp ~fee ~amount end_t
     in
     let%bind { block_production_delay = snd_delay } = get_metrics sender_bp in
     let%bind { block_production_delay = rcv_delay } = get_metrics receiver_bp in
