@@ -35,23 +35,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     |> Malleable_error.all_unit
 
   let send_payments ~tps ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee
-      ~node n =
+      ~node end_t =
     let open Malleable_error.Let_syntax in
     let rec go n =
-      if n = 0 then return ()
+      if Time.(now () > end_t) then return ()
       else
         let%bind () =
           let%map () =
-            Network.Node.must_send_payment
-              ~initial_delay_sec:(1. /. float_of_int tps)
+            Network.Node.send_payment
+              ~initial_delay_sec:1.
+              ~repeat_count:tps
               ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee node
+            |> Async_kernel.Deferred.bind ~f:(Malleable_error.or_soft_error ~value:())
           in
           [%log info] "payment #%d sent." n ;
           ()
         in
-        go (n - 1)
+        go (n + 1)
     in
-    go n
+    go 1
 
   let run network t =
     let open Malleable_error.Let_syntax in
@@ -63,23 +65,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
     let sender_bp = List.nth_exn (Network.block_producers network) 1 in
     let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
-    let tps = 5 in
+    let tps_i = 5 in
+    let tps = Unsigned.UInt32.of_int tps_i in
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
-    let num_slots = 10 in
-    let num_payments = tps * num_slots * window_ms / 1000 in
+    let num_slots = 2 in
+    let num_payments = num_slots * window_ms / 1000 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let amount = Currency.Amount.of_int 10_000_000 in
-    [%log info] "will now send %d payments" num_payments ;
+    [%log info] "will now send %d payment batches, %d payments each second" num_payments tps_i;
     let get_metrics node =
       Async_kernel.Deferred.bind
         (Network.Node.get_metrics ~logger node)
         ~f:Malleable_error.or_hard_error
     in
+    let end_ = Time.add (Time.now ()) (Time.Span.of_int_sec num_payments) in
     let%bind () =
       send_payments ~tps ~logger ~sender_pub_key ~receiver_pub_key
-        ~node:sender_bp ~fee ~amount num_payments
+        ~node:sender_bp ~fee ~amount end_
     in
     let%bind { block_production_delay = snd_delay } = get_metrics sender_bp in
     let%bind { block_production_delay = rcv_delay } = get_metrics receiver_bp in
@@ -92,7 +96,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ( rcv_delay0 > 0 && snd_delay0 > 0
         && List.is_empty (List.filter ~f:gt0 @@ List.tl_exn rcv_delay)
         && List.is_empty (List.filter ~f:gt0 @@ List.tl_exn snd_delay)
-        && rcv_delay0 + snd_delay0 = num_slots )
+        && rcv_delay0 + snd_delay0 >= num_slots - 1 )
     in
     [%log info] "block_production_priority test: test finished!!"
 end

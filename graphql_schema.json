@@ -2357,6 +2357,17 @@
               "description": "Send a payment",
               "args": [
                 {
+                  "name": "repeat_count",
+                  "description":
+                    "Should only be set in tests, specifies how many times shall transaction be repeated",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "UInt32",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
                   "name": "signature",
                   "description":
                     "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",

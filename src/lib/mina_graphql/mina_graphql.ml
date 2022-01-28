@@ -2156,6 +2156,12 @@ module Types = struct
             "If a signature is provided, this transaction is considered signed \
              and will be broadcasted to the network without requiring a \
              private key"
+
+      let repeat_count =
+        arg "repeat_count" ~typ:uint32_arg
+          ~doc:
+            "Should only be set in tests, specifies how many times shall \
+             transaction be repeated"
     end
 
     let send_payment =
@@ -2892,11 +2898,16 @@ module Mutations = struct
         Arg.
           [ arg "input" ~typ:(non_null Types.Input.send_payment)
           ; Types.Input.Fields.signature
+          ; Types.Input.Fields.repeat_count
           ]
       ~resolve:
         (fun { ctx = coda; _ } ()
              (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
-             signature ->
+             signature repeat_count_opt ->
+        let repeat_count =
+          Unsigned.UInt32.to_int
+          @@ Option.value ~default:(Unsigned.UInt32.of_int 1) repeat_count_opt
+        in
         let body =
           Signed_command_payload.Body.Payment
             { source_pk = from
@@ -2907,14 +2918,19 @@ module Mutations = struct
         in
         let fee_token = Token_id.default in
         match signature with
-        | None ->
-            send_unsigned_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
-              ~fee_token ~fee_payer_pk:from ~valid_until ~body
-            |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command
-        | Some signature ->
+        | None when repeat_count > 0 ->
+            Deferred.List.init repeat_count ~f:(fun _ ->
+                send_unsigned_user_command ~coda ~nonce_opt ~signer:from ~memo
+                  ~fee ~fee_token ~fee_payer_pk:from ~valid_until ~body
+                |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command)
+            >>| List.last_exn
+        | Some signature when repeat_count = 1 ->
             send_signed_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
               ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
-            |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command)
+            |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command
+        | _ ->
+            Deferred.Result.fail
+              "repeat_count must be 1 when used with signature")
 
   let create_token =
     io_field "createToken" ~doc:"Create a new token"

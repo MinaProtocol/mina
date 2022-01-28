@@ -43,6 +43,7 @@ module Engine = struct
 
       val send_payment :
            ?initial_delay_sec:float
+        -> ?repeat_count:Unsigned.uint32
         -> logger:Logger.t
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
@@ -53,6 +54,7 @@ module Engine = struct
 
       val must_send_payment :
            ?initial_delay_sec:float
+        -> ?repeat_count:Unsigned.uint32
         -> logger:Logger.t
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
