@@ -36,7 +36,7 @@
     let inherit (utils.lib) exportOverlays exportPackages;
     in utils.lib.mkFlake {
       inherit self inputs;
-      supportedSystems = [ "x86_64-linux" ];
+      supportedSystems = [ "x86_64-linux" "x86_64-darwin" ];
       channelsConfig.allowUnfree = true;
       #sharedOverlays = [ mix-to-nix.overlay ];
       sharedOverlays = [ (import nixpkgs-mozilla) self.overlay ];
