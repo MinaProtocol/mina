@@ -1762,12 +1762,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
           match
             let%bind.Result () =
-              if is_start && not p.data.body.increment_nonce then
-                (* The fee-payer must increment their nonce. *)
-                Error Transaction_status.Failure.Fee_payer_nonce_must_increase
-              else Ok ()
-            in
-            let%bind.Result () =
               match
                 ( Control.tag p.authorization
                 , p.data.body.increment_nonce

@@ -173,6 +173,8 @@ module type Party_intf = sig
 
   val use_full_commitment : t -> bool
 
+  val increment_nonce : t -> bool
+
   val check_authorization :
        account:account
     -> commitment:transaction_commitment
@@ -525,6 +527,11 @@ module Make (Inputs : Inputs_intf) = struct
           ~else_:local_state.transaction_commitment
       in
       Inputs.Party.check_authorization ~account:a ~commitment ~at_party party
+    in
+    (* The fee-payer must increment their nonce. *)
+    let local_state =
+      Local_state.add_check local_state Fee_payer_nonce_must_increase
+        Inputs.Bool.(Inputs.Party.increment_nonce party ||| not is_start')
     in
     let a', update_permitted, failure_status =
       h.perform
