@@ -151,17 +151,34 @@ end
 module type Party_intf = sig
   type t
 
+  type bool
+
+  type parties
+
   type signed_amount
+
+  type transaction_commitment
 
   type protocol_state_predicate
 
   type token_id
+
+  type account
 
   val balance_change : t -> signed_amount
 
   val protocol_state : t -> protocol_state_predicate
 
   val token_id : t -> token_id
+
+  val use_full_commitment : t -> bool
+
+  val check_authorization :
+       account:account
+    -> commitment:transaction_commitment
+    -> at_party:parties
+    -> t
+    -> [ `Signature_verifies of bool ]
 end
 
 module type Parties_intf = sig
@@ -240,9 +257,7 @@ module Eff = struct
         { is_start : 'bool
         ; party : 'party
         ; account : 'account
-        ; transaction_commitment : 'transaction_commitment
-        ; full_transaction_commitment : 'transaction_commitment
-        ; at_party : 'parties
+        ; signature_verifies : 'bool
         ; global_state : 'global_state
         ; inclusion_proof : 'ip
         }
@@ -251,8 +266,6 @@ module Eff = struct
              ; bool : 'bool
              ; party : 'party
              ; parties : 'parties
-             ; transaction_commitment : 'transaction_commitment
-             ; full_transaction_commitment : 'transaction_commitment
              ; account : 'account
              ; global_state : 'global_state
              ; failure : 'failure
@@ -275,15 +288,17 @@ module type Inputs_intf = sig
 
   module Protocol_state_predicate : Protocol_state_predicate_intf
 
+  module Account : sig
+    type t
+  end
+
   module Party :
     Party_intf
       with type signed_amount := Amount.Signed.t
        and type protocol_state_predicate := Protocol_state_predicate.t
        and type token_id := Token_id.t
-
-  module Account : sig
-    type t
-  end
+       and type bool := Bool.t
+       and type account := Account.t
 
   module Ledger :
     Ledger_intf
@@ -292,10 +307,14 @@ module type Inputs_intf = sig
        and type party := Party.t
 
   module Parties :
-    Parties_intf with type bool := Bool.t and type party := Party.t
+    Parties_intf
+      with type t = Party.parties
+       and type bool := Bool.t
+       and type party := Party.t
 
   module Transaction_commitment : sig
-    include Iffable with type bool := Bool.t
+    include
+      Iffable with type bool := Bool.t and type t = Party.transaction_commitment
 
     val empty : t
 
@@ -498,17 +517,23 @@ module Make (Inputs : Inputs_intf) = struct
         (Check_protocol_state_predicate
            (Party.protocol_state party, global_state))
     in
+    let (`Signature_verifies signature_verifies) =
+      let commitment =
+        Inputs.Transaction_commitment.if_
+          (Inputs.Party.use_full_commitment party)
+          ~then_:local_state.full_transaction_commitment
+          ~else_:local_state.transaction_commitment
+      in
+      Inputs.Party.check_authorization ~account:a ~commitment ~at_party party
+    in
     let a', update_permitted, failure_status =
       h.perform
         (Check_auth_and_update_account
            { is_start = is_start'
-           ; at_party
+           ; signature_verifies
            ; global_state
            ; party
            ; account = a
-           ; transaction_commitment = local_state.transaction_commitment
-           ; full_transaction_commitment =
-               local_state.full_transaction_commitment
            ; inclusion_proof
            })
     in

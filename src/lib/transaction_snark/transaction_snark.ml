@@ -1850,11 +1850,59 @@ module Base = struct
         module Party = struct
           type t = party
 
+          type parties = Parties.t
+
+          type transaction_commitment = Transaction_commitment.t
+
           let balance_change (t : t) = t.party.data.body.balance_change
 
           let protocol_state (t : t) = t.party.data.body.protocol_state
 
           let token_id (t : t) = t.party.data.body.token_id
+
+          let use_full_commitment (t : t) =
+            t.party.data.body.use_full_commitment
+
+          let check_authorization ~(account : Account.t) ~commitment
+              ~at_party:(at_party, _) ({ party; control; _ } : t) =
+            ( match (auth_type, snapp_statement) with
+            | Proof, Some (i, s) ->
+                Pickles.Side_loaded.in_circuit (side_loaded i)
+                  (Lazy.force account.data.snapp.verification_key.data) ;
+                with_label __LOC__ (fun () ->
+                    Snapp_statement.Checked.Assert.equal
+                      { transaction = commitment; at_party }
+                      s)
+            | (Signature | None_given), None ->
+                ()
+            | Proof, None | (Signature | None_given), Some _ ->
+                assert false ) ;
+            let signature_verifies =
+              match auth_type with
+              | None_given | Proof ->
+                  Boolean.false_
+              | Signature ->
+                  let signature =
+                    exists Signature_lib.Schnorr.Chunked.Signature.typ
+                      ~compute:(fun () ->
+                        match V.get control with
+                        | Signature s ->
+                            s
+                        | None_given ->
+                            Signature.dummy
+                        | Proof _ ->
+                            assert false)
+                  in
+                  run_checked
+                    (let%bind (module S) =
+                       Tick.Inner_curve.Checked.Shifted.create ()
+                     in
+                     signature_verifies
+                       ~shifted:(module S)
+                       ~payload_digest:commitment signature
+                       party.data.body.public_key)
+            in
+            `Signature_verifies signature_verifies
         end
 
         module Amount = struct
@@ -1996,57 +2044,13 @@ module Base = struct
               account.data
         | Check_auth_and_update_account
             { is_start
-            ; at_party = at_party, _
             ; global_state
-            ; party = { party; control; _ }
+            ; signature_verifies
+            ; party = { party; _ }
             ; account
-            ; transaction_commitment
-            ; full_transaction_commitment
             ; inclusion_proof = _
             } ->
-            let commitment =
-              Inputs.Transaction_commitment.if_
-                party.data.body.use_full_commitment
-                ~then_:full_transaction_commitment ~else_:transaction_commitment
-            in
-            ( match (auth_type, snapp_statement) with
-            | Proof, Some (i, s) ->
-                Pickles.Side_loaded.in_circuit (side_loaded i)
-                  (Lazy.force account.data.snapp.verification_key.data) ;
-                with_label __LOC__ (fun () ->
-                    Snapp_statement.Checked.Assert.equal
-                      { transaction = commitment; at_party }
-                      s)
-            | (Signature | None_given), None ->
-                ()
-            | Proof, None | (Signature | None_given), Some _ ->
-                assert false ) ;
             let add_check, checks_succeeded = create_checker () in
-            let signature_verifies =
-              match auth_type with
-              | None_given | Proof ->
-                  Boolean.false_
-              | Signature ->
-                  let signature =
-                    exists Signature_lib.Schnorr.Chunked.Signature.typ
-                      ~compute:(fun () ->
-                        match V.get control with
-                        | Signature s ->
-                            s
-                        | None_given ->
-                            Signature.dummy
-                        | Proof _ ->
-                            assert false)
-                  in
-                  run_checked
-                    (let%bind (module S) =
-                       Tick.Inner_curve.Checked.Shifted.create ()
-                     in
-                     signature_verifies
-                       ~shifted:(module S)
-                       ~payload_digest:commitment signature
-                       party.data.body.public_key)
-            in
             (* The fee-payer must increment their nonce. *)
             add_check Boolean.(party.data.body.increment_nonce ||| not is_start) ;
             (* If there's a valid signature, it must increment the nonce or use full commitment *)
