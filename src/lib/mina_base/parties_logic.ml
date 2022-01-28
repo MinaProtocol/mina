@@ -533,6 +533,13 @@ module Make (Inputs : Inputs_intf) = struct
       Local_state.add_check local_state Fee_payer_nonce_must_increase
         Inputs.Bool.(Inputs.Party.increment_nonce party ||| not is_start')
     in
+    let local_state =
+      Local_state.add_check local_state Parties_replay_check_failed
+        Inputs.Bool.(
+          Inputs.Party.increment_nonce party
+          ||| Inputs.Party.use_full_commitment party
+          ||| not signature_verifies)
+    in
     let a', update_permitted, failure_status =
       h.perform
         (Check_auth_and_update_account
