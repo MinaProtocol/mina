@@ -7,7 +7,15 @@
    composition_types
    pickles_base
 
-   zexe_backend
+   kimchi_backend
    pickles_types
    snarky.backendless
    core_kernel))
+
+(rule
+ (targets scalars.ml)
+ (mode promote)
+ (action
+  (progn
+   (run gen_scalars/gen_scalars.exe scalars.ml)
+   (run ocamlformat -i scalars.ml))))

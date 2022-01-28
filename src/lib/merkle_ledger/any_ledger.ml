@@ -120,6 +120,8 @@ module Make_base (Inputs : Inputs_intf) :
 
     let merkle_path (T ((module Base), t)) = Base.merkle_path t
 
+    let merkle_path_batch (T ((module Base), t)) = Base.merkle_path_batch t
+
     let merkle_root (T ((module Base), t)) = Base.merkle_root t
 
     let index_of_account_exn (T ((module Base), t)) =

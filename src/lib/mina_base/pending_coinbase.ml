@@ -38,18 +38,16 @@ module Coinbase_data = struct
     (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
 
   let to_input (pk, amount) =
-    let open Random_oracle.Input in
+    let open Random_oracle.Input.Chunked in
     List.reduce_exn ~f:append
-      [ Public_key.Compressed.to_input pk; bitstring (Amount.to_bits amount) ]
+      [ Public_key.Compressed.to_input pk; Amount.to_input amount ]
 
   module Checked = struct
     let to_input (public_key, amount) =
-      let open Random_oracle.Input in
+      let open Random_oracle.Input.Chunked in
       List.reduce_exn ~f:append
         [ Public_key.Compressed.Checked.to_input public_key
-        ; bitstring
-            (Bitstring_lib.Bitstring.Lsb_first.to_list
-               (Amount.var_to_bits amount))
+        ; Amount.var_to_input amount
         ]
   end
 
@@ -84,7 +82,7 @@ module Stack_id : sig
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, equal, to_yojson]
+  type t = Stable.Latest.t [@@deriving sexp, compare, equal, yojson]
 
   val of_int : int -> t
 
@@ -101,7 +99,7 @@ end = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = int [@@deriving sexp, to_yojson, compare]
+      type t = int [@@deriving sexp, yojson, compare]
 
       let to_latest = Fn.id
     end
@@ -171,7 +169,8 @@ module Coinbase_stack = struct
     let coinbase = Coinbase_data.of_coinbase cb in
     let open Random_oracle in
     hash ~init:Hash_prefix.coinbase_stack
-      (pack_input (Input.append (Coinbase_data.to_input coinbase) (to_input h)))
+      (pack_input
+         (Input.Chunked.append (Coinbase_data.to_input coinbase) (to_input h)))
     |> of_hash
 
   let empty = Random_oracle.salt "CoinbaseStack" |> Random_oracle.digest
@@ -184,7 +183,7 @@ module Coinbase_stack = struct
       make_checked (fun () ->
           hash ~init:Hash_prefix.coinbase_stack
             (pack_input
-               (Random_oracle.Input.append
+               (Random_oracle.Input.Chunked.append
                   (Coinbase_data.Checked.to_input cb)
                   (var_to_input h)))
           |> var_of_hash_packed)
@@ -261,12 +260,12 @@ module State_stack = struct
     { Poly.init; curr }
 
   let to_input (t : t) =
-    Random_oracle.Input.append
+    Random_oracle.Input.Chunked.append
       (Stack_hash.to_input t.init)
       (Stack_hash.to_input t.curr)
 
   let var_to_input (t : var) =
-    Random_oracle.Input.append
+    Random_oracle.Input.Chunked.append
       (Stack_hash.var_to_input t.init)
       (Stack_hash.var_to_input t.curr)
 
@@ -525,13 +524,13 @@ end
 module Merkle_tree_versioned = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         ( Hash_versioned.Stable.V1.t
         , Stack_id.Stable.V1.t
         , Stack_versioned.Stable.V1.t
         , unit )
-        Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
+        Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
@@ -572,7 +571,7 @@ module T = struct
     type var = (Coinbase_stack.var, State_stack.var) Poly.t
 
     let to_input ({ data; state } : t) =
-      Random_oracle.Input.append
+      Random_oracle.Input.Chunked.append
         (Coinbase_stack.to_input data)
         (State_stack.to_input state)
 
@@ -582,7 +581,7 @@ module T = struct
       |> Hash_builder.of_digest
 
     let var_to_input ({ data; state } : var) =
-      Random_oracle.Input.append
+      Random_oracle.Input.Chunked.append
         (Coinbase_stack.var_to_input data)
         (State_stack.var_to_input state)
 
@@ -742,7 +741,7 @@ module T = struct
         (Hash.t, Stack_id.t, Stack.t, unit) Sparse_ledger_lib.Sparse_ledger.T.t
 
     module Dummy_token = struct
-      type t = unit [@@deriving sexp, to_yojson]
+      type t = unit [@@deriving sexp, yojson]
 
       let max () () = ()
 
@@ -1036,7 +1035,8 @@ module T = struct
     let root_hash = hash_at_level depth in
     { Poly.tree =
         make_tree
-          (Merkle_tree.of_hash ~depth ~next_available_token:() root_hash)
+          (Merkle_tree.of_hash ~depth ~next_available_token:()
+             ~next_available_index:None root_hash)
           Stack_id.zero
     ; pos_list = []
     ; new_pos = Stack_id.zero
@@ -1251,9 +1251,9 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V1 = struct
+  module V2 = struct
     type t =
-      ( Merkle_tree_versioned.Stable.V1.t
+      ( Merkle_tree_versioned.Stable.V2.t
       , Stack_id.Stable.V1.t )
       Poly_versioned.Stable.V1.t
     [@@deriving sexp, to_yojson]

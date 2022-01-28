@@ -112,6 +112,8 @@ CREATE TABLE epoch_data
 , epoch_length     int    NOT NULL
 );
 
+CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending');
+
 CREATE TABLE blocks
 ( id                           serial PRIMARY KEY
 , state_hash                   text   NOT NULL UNIQUE
@@ -130,6 +132,7 @@ CREATE TABLE blocks
 , global_slot_since_hard_fork  bigint NOT NULL
 , global_slot_since_genesis    bigint NOT NULL
 , timestamp                    bigint NOT NULL
+, chain_status                 chain_status_type NOT NULL
 );
 
 CREATE INDEX idx_blocks_id ON blocks(id);
@@ -137,6 +140,7 @@ CREATE INDEX idx_blocks_parent_id ON blocks(parent_id);
 CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);
 CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
+CREATE INDEX idx_chain_status      ON blocks(chain_status);
 
 /* a balance is associated with a public key after a particular transaction
    the token id is given by the transaction, but implicit in this table

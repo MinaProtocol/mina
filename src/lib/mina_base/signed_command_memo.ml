@@ -167,7 +167,8 @@ let gen =
 
 let hash memo =
   Random_oracle.hash ~init:Hash_prefix.snapp_memo
-    (Random_oracle.pack_input (Random_oracle_input.bitstring (to_bits memo)))
+    (Random_oracle.Legacy.pack_input
+       (Random_oracle_input.Legacy.bitstring (to_bits memo)))
 
 [%%ifdef consensus_mechanism]
 

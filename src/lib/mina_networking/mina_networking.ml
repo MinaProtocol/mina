@@ -183,7 +183,7 @@ module Rpcs = struct
         type response =
           ( Staged_ledger.Scan_state.Stable.V2.t
           * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.Stable.V1.t
+          * Pending_coinbase.Stable.V2.t
           * Mina_state.Protocol_state.Value.Stable.V2.t list )
           option
         [@@deriving bin_io, version { rpc }]
@@ -195,46 +195,6 @@ module Rpcs = struct
         let response_of_callee_model = Fn.id
 
         let caller_model_of_response = Fn.id
-      end
-
-      module T' =
-        Perf_histograms.Rpc.Plain.Decorate_bin_io
-          (struct
-            include M
-            include Master
-          end)
-          (T)
-
-      include T'
-      include Register (T')
-    end
-
-    module V1 = struct
-      module T = struct
-        type query = State_hash.Stable.V1.t [@@deriving bin_io, version { rpc }]
-
-        type response =
-          ( Staged_ledger.Scan_state.Stable.V1.t
-          * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.Stable.V1.t
-          * Mina_state.Protocol_state.Value.Stable.V1.t list )
-          option
-        [@@deriving bin_io, version { rpc }]
-
-        let query_of_caller_model : Master.Caller.query -> query = Fn.id
-
-        let callee_model_of_query : query -> Master.Callee.query = Fn.id
-
-        let response_of_callee_model : Master.Callee.response -> response =
-         fun _ -> failwith "Cannot downgrade staged ledger"
-
-        let caller_model_of_response (t : response) : Master.Caller.response =
-          Option.map t ~f:(fun (x1, x2, x3, x4) ->
-              ( Staged_ledger.Scan_state.Stable.V1.to_latest x1
-              , x2
-              , x3
-              , List.map ~f:Mina_state.Protocol_state.Value.Stable.V1.to_latest
-                  x4 ))
       end
 
       module T' =
@@ -365,37 +325,6 @@ module Rpcs = struct
         let response_of_callee_model = Fn.id
 
         let caller_model_of_response = Fn.id
-      end
-
-      module T' =
-        Perf_histograms.Rpc.Plain.Decorate_bin_io
-          (struct
-            include M
-            include Master
-          end)
-          (T)
-
-      include T'
-      include Register (T')
-    end
-
-    module V1 = struct
-      module T = struct
-        type query = State_hash.Stable.V1.t list
-        [@@deriving bin_io, sexp, version { rpc }]
-
-        type response = External_transition.Stable.V1.t list option
-        [@@deriving bin_io, version { rpc }]
-
-        let query_of_caller_model = Fn.id
-
-        let callee_model_of_query = Fn.id
-
-        let response_of_callee_model : Master.Callee.response -> response =
-         fun _ -> failwith "Cannot downgrade external transition"
-
-        let caller_model_of_response (t : response) : Master.Caller.response =
-          Option.map t ~f:(List.map ~f:External_transition.Stable.V1.to_latest)
       end
 
       module T' =
@@ -618,49 +547,6 @@ module Rpcs = struct
       include T'
       include Register (T')
     end
-
-    module V1 = struct
-      module T = struct
-        type query =
-          ( Consensus.Data.Consensus_state.Value.Stable.V1.t
-          , State_hash.Stable.V1.t )
-          With_hash.Stable.V1.t
-        [@@deriving bin_io, sexp, version { rpc }]
-
-        type response =
-          ( External_transition.Stable.V1.t
-          , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t
-          )
-          Proof_carrying_data.Stable.V1.t
-          option
-        [@@deriving bin_io, version { rpc }]
-
-        let query_of_caller_model = Fn.id
-
-        let callee_model_of_query = Fn.id
-
-        let response_of_callee_model : Master.Callee.response -> response =
-         fun _ -> failwith "Cannot downgrade external transition"
-
-        let caller_model_of_response (t : response) : Master.Caller.response =
-          Option.map t
-            ~f:
-              (Proof_carrying_data.map
-                 ~f1:External_transition.Stable.V1.to_latest
-                 ~f2:(Tuple2.map_snd ~f:External_transition.Stable.V1.to_latest))
-      end
-
-      module T' =
-        Perf_histograms.Rpc.Plain.Decorate_bin_io
-          (struct
-            include M
-            include Master
-          end)
-          (T)
-
-      include T'
-      include Register (T')
-    end
   end
 
   module Ban_notify = struct
@@ -784,45 +670,6 @@ module Rpcs = struct
         let response_of_callee_model = Fn.id
 
         let caller_model_of_response = Fn.id
-      end
-
-      module T' =
-        Perf_histograms.Rpc.Plain.Decorate_bin_io
-          (struct
-            include M
-            include Master
-          end)
-          (T)
-
-      include T'
-      include Register (T')
-    end
-
-    module V1 = struct
-      module T = struct
-        type query = unit [@@deriving bin_io, sexp, version { rpc }]
-
-        type response =
-          ( External_transition.Stable.V1.t
-          , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t
-          )
-          Proof_carrying_data.Stable.V1.t
-          option
-        [@@deriving bin_io, version { rpc }]
-
-        let query_of_caller_model = Fn.id
-
-        let callee_model_of_query = Fn.id
-
-        let response_of_callee_model : Master.Callee.response -> response =
-         fun _ -> failwith "Cannot downgrade external transition"
-
-        let caller_model_of_response (t : response) : Master.Caller.response =
-          Option.map t
-            ~f:
-              (Proof_carrying_data.map
-                 ~f1:External_transition.Stable.V1.to_latest
-                 ~f2:(Tuple2.map_snd ~f:External_transition.Stable.V1.to_latest))
       end
 
       module T' =
@@ -1637,12 +1484,28 @@ let create (config : Config.t)
         Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
         match Envelope.Incoming.data envelope with
         | New_state state ->
+            let processing_start_time =
+              Block_time.(now config.time_controller |> to_time)
+            in
+            don't_wait_for
+              ( match%map Mina_net2.Validation_callback.await valid_cb with
+              | Some `Accept ->
+                  let processing_time_span =
+                    Time.diff
+                      Block_time.(now config.time_controller |> to_time)
+                      processing_start_time
+                  in
+                  Mina_metrics.Block_latency.(
+                    Validation_acceptance_time.update processing_time_span)
+              | _ ->
+                  () ) ;
             Perf_histograms.add_span ~name:"external_transition_latency"
               (Core.Time.abs_diff
                  Block_time.(now config.time_controller |> to_time)
                  ( External_transition.protocol_state state
                  |> Protocol_state.blockchain_state
                  |> Blockchain_state.timestamp |> Block_time.to_time )) ;
+            Mina_metrics.(Gauge.inc_one Network.new_state_received) ;
             if config.log_gossip_heard.new_state then
               [%str_log info]
                 ~metadata:
@@ -1659,6 +1522,7 @@ let create (config : Config.t)
               , Block_time.now config.time_controller
               , valid_cb )
         | Snark_pool_diff diff ->
+            Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_received) ;
             if config.log_gossip_heard.snark_pool_diff then
               Option.iter (Snark_pool.Resource_pool.Diff.to_compact diff)
                 ~f:(fun work ->
@@ -1669,6 +1533,7 @@ let create (config : Config.t)
             Mina_net2.Validation_callback.set_message_type valid_cb `Snark_work ;
             `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
         | Transaction_pool_diff diff ->
+            Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_received) ;
             if config.log_gossip_heard.transaction_pool_diff then
               [%str_log debug]
                 (Transactions_received
@@ -1694,6 +1559,8 @@ include struct
   let lift f { gossip_net; _ } = f gossip_net
 
   let peers = lift peers
+
+  let bandwidth_info = lift bandwidth_info
 
   let get_peer_node_status t peer =
     let open Deferred.Or_error.Let_syntax in
@@ -1753,13 +1620,16 @@ let broadcast_state t state =
   [%str_log' info t.logger]
     ~metadata:[ ("message", Gossip_net.Message.msg_to_yojson msg) ]
     (Gossip_new_state { state_hash = With_hash.hash state }) ;
+  Mina_metrics.(Gauge.inc_one Network.new_state_broadcasted) ;
   Gossip_net.Any.broadcast t.gossip_net msg
 
 let broadcast_transaction_pool_diff t diff =
+  Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_broadcasted) ;
   broadcast t (Gossip_net.Message.Transaction_pool_diff diff)
     ~log_msg:(Gossip_transaction_pool_diff { txns = diff })
 
 let broadcast_snark_pool_diff t diff =
+  Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_broadcasted) ;
   broadcast t (Gossip_net.Message.Snark_pool_diff diff)
     ~log_msg:
       (Gossip_snark_pool_diff

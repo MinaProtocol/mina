@@ -174,6 +174,7 @@ module Status = struct
       | Check_again of Block_time.Stable.Latest.t
       | Produce of producing_time
       | Produce_now of producing_time
+      | Evaluating_vrf of Mina_numbers.Global_slot.Stable.Latest.t
     [@@deriving to_yojson, bin_io_unversioned]
 
     type t = { generated_from_consensus_at : slot; timing : timing }
@@ -289,6 +290,10 @@ module Status = struct
           match producer_timing.timing with
           | Check_again time ->
               sprintf "None this epoch… checking at %s (%s)" (str time)
+                generated_from
+          | Evaluating_vrf last_checked_slot ->
+              sprintf "Evaluating VRF… Last checked global slot %s (%s)"
+                (Mina_numbers.Global_slot.to_string last_checked_slot)
                 generated_from
           | Produce { time; for_slot } ->
               sprintf "%s for %s (%s)" (str time) (slot_str for_slot)

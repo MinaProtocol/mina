@@ -739,7 +739,7 @@ end = struct
         ) )
     in
     let keys = List.map xs ~f:(fun x -> x.J.key) in
-    let fail ?punish (e : Error.t) =
+    let fail (e : Error.t) =
       let e = Error.to_string_hum e in
       [%log' debug t.logger] "Downloading from $peer failed ($error) on $keys"
         ~metadata:
@@ -747,12 +747,6 @@ end = struct
           ; ("error", `String e)
           ; ("keys", f xs)
           ] ;
-      if Option.is_some punish then
-        (* TODO: Make this an insta ban *)
-        Trust_system.(
-          record t.trust_system t.logger peer
-            Actions.(Violated_protocol, Some (e, [])))
-        |> don't_wait_for ;
       List.iter xs ~f:(fun x ->
           enqueue_exn t
             { x with

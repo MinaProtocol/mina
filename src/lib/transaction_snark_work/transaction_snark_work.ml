@@ -124,21 +124,6 @@ module T = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t =
-        { fee : Fee.Stable.V1.t
-        ; proofs : Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-        ; prover : Public_key.Compressed.Stable.V1.t
-        }
-      [@@deriving compare, sexp, yojson]
-
-      let to_latest (t : t) : V2.t =
-        { fee = t.fee
-        ; proofs = One_or_two.map t.proofs ~f:Ledger_proof.Stable.V1.to_latest
-        ; prover = t.prover
-        }
-    end
   end]
 
   type t = Stable.Latest.t =

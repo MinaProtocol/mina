@@ -18,6 +18,11 @@ module type Gossip_net_intf = sig
 
   val peers : t -> Peer.t list Deferred.t
 
+  val bandwidth_info :
+       t
+    -> ([ `Input of float ] * [ `Output of float ] * [ `Cpu_usage of float ])
+       Deferred.Or_error.t
+
   val set_node_status : t -> string -> unit Deferred.Or_error.t
 
   val get_peer_node_status : t -> Peer.t -> string Deferred.Or_error.t

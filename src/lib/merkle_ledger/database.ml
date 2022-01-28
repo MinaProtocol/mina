@@ -100,6 +100,9 @@ module Make (Inputs : Inputs_intf) :
     ; detached_parent_signal = Async.Ivar.create ()
     }
 
+  let make_checkpoint t ~directory_name =
+    Kvdb.make_checkpoint t.kvdb directory_name
+
   let close { kvdb; uuid = _; depth = _; directory = _; detached_parent_signal }
       =
     Kvdb.close kvdb ;
@@ -150,6 +153,17 @@ module Make (Inputs : Inputs_intf) :
         hash
     | None ->
         empty_hash (Location.height ~ledger_depth:mdb.depth location)
+
+  let get_hash_batch mdb locs =
+    assert (List.for_all locs ~f:Location.is_hash) ;
+    get_bin_batch mdb locs Hash.bin_read_t
+    |> List.zip_exn locs
+    |> List.map ~f:(fun (loc, result) ->
+           match result with
+           | Some hashes ->
+               hashes
+           | None ->
+               empty_hash (Location.height ~ledger_depth:mdb.depth loc))
 
   let account_list_bin { kvdb; _ } account_bin_read : Account.t list =
     let all_keys_values = Kvdb.to_alist kvdb in
@@ -740,6 +754,38 @@ module Make (Inputs : Inputs_intf) :
         :: loop (Location.parent k)
     in
     loop location
+
+  let merkle_path_batch mdb =
+    let rec loop height locs =
+      if height >= mdb.depth then List.init (List.length locs) ~f:(Fn.const [])
+      else
+        let siblings = List.map locs ~f:Location.sibling in
+        let hashes = get_hash_batch mdb siblings in
+        let this_layer =
+          List.zip_exn locs hashes
+          |> List.map ~f:(fun (loc, hash) ->
+                 loc |> Location.to_path_exn |> Location.last_direction
+                 |> Direction.map ~left:(`Left hash) ~right:(`Right hash))
+        in
+        let next_layer = loop (height + 1) (List.map locs ~f:Location.parent) in
+        List.zip_exn this_layer next_layer |> List.map ~f:(fun (h, t) -> h :: t)
+    in
+    fun locs ->
+      let locs =
+        List.map locs ~f:(fun loc ->
+            if Location.is_account loc then
+              Location.Hash (Location.to_path_exn loc)
+            else loc)
+      in
+      match locs with
+      | [] ->
+          []
+      | first_loc :: _ ->
+          let height = Location.height ~ledger_depth:mdb.depth first_loc in
+          assert (
+            List.for_all locs ~f:(fun loc ->
+                Location.height ~ledger_depth:mdb.depth loc = height) ) ;
+          List.zip_exn locs (loop height locs)
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
 

@@ -97,12 +97,12 @@ module Pending_coinbase_stack_state = struct
   let typ = Poly.typ Pending_coinbase.Stack.typ
 
   let to_input ({ source; target } : t) =
-    Random_oracle.Input.append
+    Random_oracle.Input.Chunked.append
       (Pending_coinbase.Stack.to_input source)
       (Pending_coinbase.Stack.to_input target)
 
   let var_to_input ({ source; target } : var) =
-    Random_oracle.Input.append
+    Random_oracle.Input.Chunked.append
       (Pending_coinbase.Stack.var_to_input source)
       (Pending_coinbase.Stack.var_to_input target)
 
@@ -305,7 +305,7 @@ module Statement = struct
 
     let to_input { source; target; supply_increase; fee_excess; sok_digest } =
       let input =
-        Array.reduce_exn ~f:Random_oracle.Input.append
+        Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
           [| Sok_message.Digest.to_input sok_digest
            ; Registers.to_input source
            ; Registers.to_input target
@@ -315,8 +315,8 @@ module Statement = struct
       in
       if !top_hash_logging_enabled then
         Format.eprintf
-          !"Generating unchecked top hash from:@.%{sexp: (Tick.Field.t, bool) \
-            Random_oracle.Input.t}@."
+          !"Generating unchecked top hash from:@.%{sexp: Tick.Field.t \
+            Random_oracle.Input.Chunked.t}@."
           input ;
       input
 
@@ -329,13 +329,10 @@ module Statement = struct
         let open Tick in
         let open Checked.Let_syntax in
         let%bind fee_excess = Fee_excess.to_input_checked fee_excess in
-        let%bind source =
-          make_checked (fun () -> Registers.Checked.to_input source)
-        and target =
-          make_checked (fun () -> Registers.Checked.to_input target)
-        in
+        let source = Registers.Checked.to_input source
+        and target = Registers.Checked.to_input target in
         let input =
-          Array.reduce_exn ~f:Random_oracle.Input.append
+          Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
             [| Sok_message.Digest.Checked.to_input sok_digest
              ; source
              ; target
@@ -347,23 +344,11 @@ module Statement = struct
           as_prover
             As_prover.(
               if !top_hash_logging_enabled then
-                let%bind field_elements =
-                  read
-                    (Typ.list ~length:0 Field.typ)
-                    (Array.to_list input.field_elements)
-                in
-                let%map bitstrings =
-                  read
-                    (Typ.list ~length:0 (Typ.list ~length:0 Boolean.typ))
-                    (Array.to_list input.bitstrings)
-                in
+                let%map input = Random_oracle.read_typ' input in
                 Format.eprintf
-                  !"Generating checked top hash from:@.%{sexp: (Field.t, bool) \
-                    Random_oracle.Input.t}@."
-                  { Random_oracle.Input.field_elements =
-                      Array.of_list field_elements
-                  ; bitstrings = Array.of_list bitstrings
-                  }
+                  !"Generating checked top hash from:@.%{sexp: Field.t \
+                    Random_oracle.Input.Chunked.t}@."
+                  input
               else return ())
         in
         input
@@ -447,8 +432,8 @@ end
 module Proof = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Pickles.Proof.Branching_2.Stable.V1.t
+    module V2 = struct
+      type t = Pickles.Proof.Branching_2.Stable.V2.t
       [@@deriving
         version { asserted }, yojson, bin_io, compare, equal, sexp, hash]
 
@@ -461,21 +446,10 @@ end
 module Stable = struct
   module V2 = struct
     type t =
-      { statement : Statement.With_sok.Stable.V2.t; proof : Proof.Stable.V1.t }
+      { statement : Statement.With_sok.Stable.V2.t; proof : Proof.Stable.V2.t }
     [@@deriving compare, equal, fields, sexp, version, yojson, hash]
 
     let to_latest = Fn.id
-  end
-
-  module V1 = struct
-    type t =
-      { statement : Statement.With_sok.Stable.V1.t; proof : Proof.Stable.V1.t }
-    [@@deriving compare, equal, fields, sexp, version, yojson, hash]
-
-    let to_latest (t : t) : Latest.t =
-      { statement = Statement.With_sok.Stable.V1.to_latest t.statement
-      ; proof = t.proof
-      }
   end
 end]
 
@@ -586,14 +560,25 @@ let dummy_constraints () =
   make_checked
     Impl.(
       fun () ->
-        let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
+        let x = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3) in
         let g = exists Inner_curve.typ ~compute:(fun _ -> Inner_curve.one) in
         ignore
-          ( Pickles.Step_main_inputs.Ops.scale_fast g
-              (`Plus_two_to_len [| b; b |])
+          ( Pickles.Scalar_challenge.to_field_checked'
+              (module Impl)
+              ~num_bits:16
+              (Kimchi_backend_common.Scalar_challenge.create x)
+            : Field.t * Field.t * Field.t ) ;
+        ignore
+          ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5
+              (Shifted_value x)
             : Pickles.Step_main_inputs.Inner_curve.t ) ;
         ignore
-          ( Pickles.Pairing_main.Scalar_challenge.endo g (Scalar_challenge [ b ])
+          ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5
+              (Shifted_value x)
+            : Pickles.Step_main_inputs.Inner_curve.t ) ;
+        ignore
+          ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
+              (Kimchi_backend_common.Scalar_challenge.create x)
             : Field.t * Field.t ))
 
 module Base = struct
@@ -1101,9 +1086,11 @@ module Base = struct
 
   let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
       ~signature =
-    let%bind input = Transaction_union_payload.Checked.to_input payload in
+    let%bind input =
+      Transaction_union_payload.Checked.to_input_legacy payload
+    in
     let%bind verifies =
-      Schnorr.Checked.verifies shifted signature signer input
+      Schnorr.Legacy.Checked.verifies shifted signature signer input
     in
     [%with_label "check signature"]
       (Boolean.Assert.any [ Boolean.not is_user_command; verifies ])
@@ -1122,41 +1109,26 @@ module Base = struct
         } =
       account.timing
     in
-    let int_of_field field =
-      Snarky_integer.Integer.constant ~m
-        (Bigint.of_field field |> Bigint.to_bignum_bigint)
-    in
-    let zero_int = int_of_field Field.zero in
-    let balance_to_int balance =
-      Snarky_integer.Integer.of_bits ~m @@ Balance.var_to_bits balance
-    in
-    let txn_amount_int =
-      Snarky_integer.Integer.of_bits ~m @@ Amount.var_to_bits txn_amount
-    in
-    let balance_int = balance_to_int account.balance in
     let%bind curr_min_balance =
       Account.Checked.min_balance_at_slot ~global_slot:txn_global_slot
         ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
         ~initial_minimum_balance
     in
-    let%bind `Underflow underflow, proposed_balance_int =
-      make_checked (fun () ->
-          Snarky_integer.Integer.subtract_unpacking_or_zero ~m balance_int
-            txn_amount_int)
+    let%bind proposed_balance, `Underflow underflow =
+      Balance.Checked.sub_amount_flagged account.balance txn_amount
     in
     (* underflow indicates insufficient balance *)
     let%bind () = balance_check (Boolean.not underflow) in
     let%bind sufficient_timed_balance =
-      make_checked (fun () ->
-          Snarky_integer.Integer.(gte ~m proposed_balance_int curr_min_balance))
+      Balance.Checked.( >= ) proposed_balance curr_min_balance
     in
     let%bind () =
       let%bind ok = Boolean.(any [ not is_timed; sufficient_timed_balance ]) in
       timed_balance_check ok
     in
     let%bind is_timed_balance_zero =
-      make_checked (fun () ->
-          Snarky_integer.Integer.equal ~m curr_min_balance zero_int)
+      Balance.Checked.equal curr_min_balance
+        (Balance.Checked.Unsafe.of_field Field.(Var.constant zero))
     in
     (* if current min balance is zero, then timing becomes untimed *)
     let%bind is_untimed = Boolean.((not is_timed) ||| is_timed_balance_zero) in
@@ -1181,8 +1153,8 @@ module Base = struct
       Public_key.decompress_var pk
       (*           (Account_id.Checked.public_key fee_payer_id) *)
     in
-    Schnorr.Checked.verifies shifted signature pk
-      (Random_oracle.Input.field payload_digest)
+    Schnorr.Chunked.Checked.verifies shifted signature pk
+      (Random_oracle.Input.Chunked.field payload_digest)
 
   module Parties_snark = struct
     open Parties_segment
@@ -1287,7 +1259,9 @@ module Base = struct
             [ is_new
             ; !(Public_key.Compressed.Checked.equal public_key a.public_key)
             ]) ;
-      let is_receiver = Sgn.Checked.is_pos balance_change.sgn in
+      let is_receiver =
+        Sgn.Checked.is_pos !(Currency.Amount.Signed.Checked.sgn balance_change)
+      in
       let timing =
         let open Snapp_basic in
         let new_timing =
@@ -1770,7 +1744,9 @@ module Base = struct
             let if_ b ~then_ ~else_ =
               run_checked (Amount.Signed.Checked.if_ b ~then_ ~else_)
 
-            let is_pos (t : t) = Sgn.Checked.is_pos t.sgn
+            let is_pos (t : t) =
+              Sgn.Checked.is_pos
+                (run_checked (Currency.Amount.Signed.Checked.sgn t))
 
             let negate = Amount.Signed.Checked.negate
 
@@ -2029,7 +2005,7 @@ module Base = struct
                   Boolean.false_
               | Signature ->
                   let signature =
-                    exists Signature_lib.Schnorr.Signature.typ
+                    exists Signature_lib.Schnorr.Chunked.Signature.typ
                       ~compute:(fun () ->
                         match V.get control with
                         | Signature s ->
@@ -2636,10 +2612,7 @@ module Base = struct
       Amount.Checked.of_fee
         Fee.(var_of_t constraint_constants.account_creation_fee)
     in
-    let%bind is_zero_fee =
-      fee |> Fee.var_to_number |> Number.to_var
-      |> Field.(Checked.equal (Var.constant zero))
-    in
+    let%bind is_zero_fee = Fee.(equal_var fee (var_of_t zero)) in
     let is_coinbase_or_fee_transfer = Boolean.not is_user_command in
     let%bind can_create_fee_payer_account =
       (* Fee transfers and coinbases may create an account. We check the normal
@@ -2707,7 +2680,7 @@ module Base = struct
                [%with_label "Compute fee payer amount"]
                  (let fee_payer_amount =
                     let sgn = Sgn.Checked.neg_if_true is_user_command in
-                    Amount.Signed.create
+                    Amount.Signed.create_var
                       ~magnitude:(Amount.Checked.of_fee fee)
                       ~sgn
                   in
@@ -2718,7 +2691,7 @@ module Base = struct
                         ~then_:account_creation_amount
                         ~else_:Amount.(var_of_t zero)
                     in
-                    Amount.Signed.create ~magnitude ~sgn:Sgn.Checked.neg
+                    Amount.Signed.create_var ~magnitude ~sgn:Sgn.Checked.neg
                   in
                   Amount.Signed.Checked.(
                     add fee_payer_amount account_creation_fee))
@@ -2727,9 +2700,11 @@ module Base = struct
              let%bind `Min_balance _, timing =
                [%with_label "Check fee payer timing"]
                  (let%bind txn_amount =
-                    Amount.Checked.if_
-                      (Sgn.Checked.is_neg amount.sgn)
-                      ~then_:amount.magnitude
+                    let%bind sgn = Amount.Signed.Checked.sgn amount in
+                    let%bind magnitude =
+                      Amount.Signed.Checked.magnitude amount
+                    in
+                    Amount.Checked.if_ (Sgn.Checked.is_neg sgn) ~then_:magnitude
                       ~else_:Amount.(var_of_t zero)
                   in
                   let balance_check ok =
@@ -3140,7 +3115,7 @@ module Base = struct
                Checked.(
                  add_flagged payload.body.amount (of_fee payload.common.fee))
              in
-             (Signed.create ~magnitude ~sgn:Sgn.Checked.neg, overflowed)
+             (Signed.create_var ~magnitude ~sgn:Sgn.Checked.neg, overflowed)
            in
            let%bind () =
              (* TODO: Reject this in txn pool before fees-in-tokens. *)
@@ -3219,7 +3194,8 @@ module Base = struct
          particular fee tokens used.
       *)
       let%bind fee_excess_zero =
-        Amount.equal_var fee_excess.magnitude Amount.(var_of_t zero)
+        Amount.Signed.Checked.equal fee_excess
+          Amount.Signed.(Checked.constant zero)
       in
       let%map fee_token_l =
         Token_id.Checked.if_ fee_excess_zero
@@ -3227,7 +3203,7 @@ module Base = struct
           ~else_:t.payload.common.fee_token
       in
       { Fee_excess.fee_token_l
-      ; fee_excess_l = Signed_poly.map ~f:Amount.Checked.to_fee fee_excess
+      ; fee_excess_l = Amount.Signed.Checked.to_fee fee_excess
       ; fee_token_r = Token_id.(var_of_t default)
       ; fee_excess_r = Fee.Signed.(Checked.constant zero)
       }
@@ -4215,26 +4191,11 @@ module For_tests = struct
   end
 
   let create_trivial_snapp ~constraint_constants () =
-    let local_dummy_constraints () =
-      let open Run in
-      let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
-      let g =
-        exists Pickles.Step_main_inputs.Inner_curve.typ ~compute:(fun _ ->
-            Tick.Inner_curve.(to_affine_exn one))
-      in
-      let (_ : _) =
-        Pickles.Step_main_inputs.Ops.scale_fast g (`Plus_two_to_len [| b; b |])
-      in
-      let (_ : _) =
-        Pickles.Pairing_main.Scalar_challenge.endo g (Scalar_challenge [ b ])
-      in
-      ()
-    in
     let tag, _, (module P), Pickles.Provers.[ trivial_prover; _ ] =
       let trivial_rule : _ Pickles.Inductive_rule.t =
         let trivial_main (tx_commitment : Snapp_statement.Checked.t) :
             (unit, _) Checked.t =
-          local_dummy_constraints ()
+          Impl.run_checked (dummy_constraints ())
           |> fun () ->
           Snapp_statement.Checked.Assert.equal tx_commitment tx_commitment
           |> return
@@ -4270,7 +4231,7 @@ module For_tests = struct
             ; main_value = (fun [ _; _ ] _ -> [ true; true ])
             ; main =
                 (fun [ _; _ ] _ ->
-                  local_dummy_constraints ()
+                  Impl.run_checked (dummy_constraints ())
                   |> fun () ->
                   (* Unsatisfiable. *)
                   Run.exists Field.typ ~compute:(fun () ->
@@ -4431,8 +4392,8 @@ module For_tests = struct
     in
     let fee_payer =
       let fee_payer_signature_auth =
-        Signature_lib.Schnorr.sign sender.private_key
-          (Random_oracle.Input.field full_commitment)
+        Signature_lib.Schnorr.Chunked.sign sender.private_key
+          (Random_oracle.Input.Chunked.field full_commitment)
       in
       { fee_payer with authorization = fee_payer_signature_auth }
     in
@@ -4443,8 +4404,8 @@ module For_tests = struct
             else commitment
           in
           let sender_signature_auth =
-            Signature_lib.Schnorr.sign sender.private_key
-              (Random_oracle.Input.field commitment)
+            Signature_lib.Schnorr.Chunked.sign sender.private_key
+              (Random_oracle.Input.Chunked.field commitment)
           in
           { Party.data = s.data
           ; authorization = Signature sender_signature_auth
@@ -4487,9 +4448,9 @@ module For_tests = struct
             else commitment
           in
           let signature =
-            Signature_lib.Schnorr.sign
+            Signature_lib.Schnorr.Chunked.sign
               (Option.value_exn spec.snapp_account_keypair).private_key
-              (Random_oracle.Input.field commitment)
+              (Random_oracle.Input.Chunked.field commitment)
           in
           [ { Party.data = snapp_party.data
             ; authorization = Signature signature
@@ -4544,9 +4505,9 @@ module For_tests = struct
             else commitment
           in
           let signature =
-            Signature_lib.Schnorr.sign
+            Signature_lib.Schnorr.Chunked.sign
               (Option.value_exn spec.snapp_account_keypair).private_key
-              (Random_oracle.Input.field commitment)
+              (Random_oracle.Input.Chunked.field commitment)
           in
           Async.Deferred.return
             { Party.data = snapp_party.data
@@ -4725,15 +4686,15 @@ module For_tests = struct
           ~fee_payer_hash:
             Party.Predicated.(digest (of_fee_payer fee_payer.data))
       in
-      Signature_lib.Schnorr.sign sender.private_key
-        (Random_oracle.Input.field txn_comm)
+      Signature_lib.Schnorr.Chunked.sign sender.private_key
+        (Random_oracle.Input.Chunked.field txn_comm)
     in
     let fee_payer =
       { fee_payer with authorization = fee_payer_signature_auth }
     in
     let sender_signature_auth =
-      Signature_lib.Schnorr.sign sender.private_key
-        (Random_oracle.Input.field transaction)
+      Signature_lib.Schnorr.Chunked.sign sender.private_key
+        (Random_oracle.Input.Chunked.field transaction)
     in
     let sender =
       { Party.data = sender_party_data
@@ -4968,12 +4929,12 @@ let%test_module "transaction_snark" =
             Sparse_ledger.of_ledger_subset_exn ledger
               [ producer_id; receiver_id; other_id ]
           in
-          let sparse_ledger_after =
-            Sparse_ledger.apply_transaction_exn ~constraint_constants
-              sparse_ledger
+          let sparse_ledger_after, _ =
+            Sparse_ledger.apply_transaction ~constraint_constants sparse_ledger
               ~txn_state_view:
                 (txn_in_block.block_data |> Mina_state.Protocol_state.Body.view)
               txn_in_block.transaction
+            |> Or_error.ok_exn
           in
           check_transaction txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
@@ -5317,7 +5278,7 @@ let%test_module "transaction_snark" =
     let%test_module "multisig_account" =
       ( module struct
         module M_of_n_predicate = struct
-          type _witness = (Schnorr.Signature.t * Public_key.t) list
+          type _witness = (Schnorr.Chunked.Signature.t * Public_key.t) list
 
           (* check that two public keys are equal *)
           let eq_pk ((x0, y0) : Public_key.var) ((x1, y1) : Public_key.var) :
@@ -5345,7 +5306,7 @@ let%test_module "transaction_snark" =
           (* check a signature on msg against a public key *)
           let check_sig pk msg sigma : (Boolean.var, _) Checked.t =
             let%bind (module S) = Inner_curve.Checked.Shifted.create () in
-            Schnorr.Checked.verifies (module S) sigma pk msg
+            Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
 
           (* verify witness signatures against public keys *)
           let%snarkydef verify_sigs pubkeys commitment witness =
@@ -5375,20 +5336,21 @@ let%test_module "transaction_snark" =
             let gen =
               let open Quickcheck.Generator.Let_syntax in
               let%map sk = Private_key.gen and msg = Field.gen_uniform in
-              (sk, Random_oracle.Input.field_elements [| msg |])
+              (sk, Random_oracle.Input.Chunked.field_elements [| msg |])
             in
             Quickcheck.test ~trials:1 gen ~f:(fun (sk, msg) ->
                 let pk = Inner_curve.(scale one sk) in
                 (let%bind pk_var =
                    exists Inner_curve.typ ~compute:(As_prover.return pk)
                  in
-                 let sigma = Schnorr.sign sk msg in
+                 let sigma = Schnorr.Chunked.sign sk msg in
                  let%bind sigma_var =
-                   exists Schnorr.Signature.typ
+                   exists Schnorr.Chunked.Signature.typ
                      ~compute:(As_prover.return sigma)
                  in
                  let%bind msg_var =
-                   exists (Schnorr.message_typ ())
+                   exists
+                     (Schnorr.chunked_message_typ ())
                      ~compute:(As_prover.return msg)
                  in
                  let witness = [ (sigma_var, pk_var) ] in
@@ -5402,7 +5364,7 @@ let%test_module "transaction_snark" =
               let%map sk0 = Private_key.gen
               and sk1 = Private_key.gen
               and msg = Field.gen_uniform in
-              (sk0, sk1, Random_oracle.Input.field_elements [| msg |])
+              (sk0, sk1, Random_oracle.Input.Chunked.field_elements [| msg |])
             in
             Quickcheck.test ~trials:1 gen ~f:(fun (sk0, sk1, msg) ->
                 let pk0 = Inner_curve.(scale one sk0) in
@@ -5413,18 +5375,19 @@ let%test_module "transaction_snark" =
                  let%bind pk1_var =
                    exists Inner_curve.typ ~compute:(As_prover.return pk1)
                  in
-                 let sigma0 = Schnorr.sign sk0 msg in
-                 let sigma1 = Schnorr.sign sk1 msg in
+                 let sigma0 = Schnorr.Chunked.sign sk0 msg in
+                 let sigma1 = Schnorr.Chunked.sign sk1 msg in
                  let%bind sigma0_var =
-                   exists Schnorr.Signature.typ
+                   exists Schnorr.Chunked.Signature.typ
                      ~compute:(As_prover.return sigma0)
                  in
                  let%bind sigma1_var =
-                   exists Schnorr.Signature.typ
+                   exists Schnorr.Chunked.Signature.typ
                      ~compute:(As_prover.return sigma1)
                  in
                  let%bind msg_var =
-                   exists (Schnorr.message_typ ())
+                   exists
+                     (Schnorr.chunked_message_typ ())
                      ~compute:(As_prover.return msg)
                  in
                  let witness =
@@ -5463,7 +5426,9 @@ let%test_module "transaction_snark" =
 
         type _ Snarky_backendless.Request.t +=
           | Pubkey : int -> Inner_curve.t Snarky_backendless.Request.t
-          | Sigma : int -> Schnorr.Signature.t Snarky_backendless.Request.t
+          | Sigma :
+              int
+              -> Schnorr.Chunked.Signature.t Snarky_backendless.Request.t
 
         (* test with a 2-of-3 multisig *)
         let%test_unit "snapps-based proved transaction" =
@@ -5509,16 +5474,16 @@ let%test_module "transaction_snark" =
                         let msg_var =
                           tx_commitment
                           |> Snapp_statement.Checked.to_field_elements
-                          |> Random_oracle_input.field_elements
+                          |> Random_oracle_input.Chunked.field_elements
                         in
                         let%bind sigma0_var =
-                          exists Schnorr.Signature.typ
+                          exists Schnorr.Chunked.Signature.typ
                             ~request:(As_prover.return @@ Sigma 0)
                         and sigma1_var =
-                          exists Schnorr.Signature.typ
+                          exists Schnorr.Chunked.Signature.typ
                             ~request:(As_prover.return @@ Sigma 1)
                         and sigma2_var =
-                          exists Schnorr.Signature.typ
+                          exists Schnorr.Chunked.Signature.typ
                             ~request:(As_prover.return @@ Sigma 2)
                         in
                         let witness =
@@ -5564,29 +5529,7 @@ let%test_module "transaction_snark" =
                           ; main_value = (fun [ _; _ ] _ -> [ true; true ])
                           ; main =
                               (fun [ _; _ ] _ ->
-                                let dummy_constraints () =
-                                  let open Run in
-                                  let b =
-                                    exists Boolean.typ_unchecked
-                                      ~compute:(fun _ -> true)
-                                  in
-                                  let g =
-                                    exists
-                                      Pickles.Step_main_inputs.Inner_curve.typ
-                                      ~compute:(fun _ ->
-                                        Tick.Inner_curve.(to_affine_exn one))
-                                  in
-                                  let (_ : _) =
-                                    Pickles.Step_main_inputs.Ops.scale_fast g
-                                      (`Plus_two_to_len [| b; b |])
-                                  in
-                                  let (_ : _) =
-                                    Pickles.Pairing_main.Scalar_challenge.endo g
-                                      (Scalar_challenge [ b ])
-                                  in
-                                  ()
-                                in
-                                dummy_constraints ()
+                                Impl.run_checked (dummy_constraints ())
                                 |> fun () ->
                                 (* Unsatisfiable. *)
                                 Run.exists Field.typ ~compute:(fun () ->
@@ -5743,11 +5686,11 @@ let%test_module "transaction_snark" =
                   in
                   let msg =
                     tx_statement |> Snapp_statement.to_field_elements
-                    |> Random_oracle_input.field_elements
+                    |> Random_oracle_input.Chunked.field_elements
                   in
-                  let sigma0 = Schnorr.sign sk0 msg in
-                  let sigma1 = Schnorr.sign sk1 msg in
-                  let sigma2 = Schnorr.sign sk2 msg in
+                  let sigma0 = Schnorr.Chunked.sign sk0 msg in
+                  let sigma1 = Schnorr.Chunked.sign sk1 msg in
+                  let sigma2 = Schnorr.Chunked.sign sk2 msg in
                   let handler
                       (Snarky_backendless.Request.With { request; respond }) =
                     match request with
@@ -5779,16 +5722,16 @@ let%test_module "transaction_snark" =
                     in
                     { fee_payer with
                       authorization =
-                        Signature_lib.Schnorr.sign sender.private_key
-                          (Random_oracle.Input.field txn_comm)
+                        Signature_lib.Schnorr.Chunked.sign sender.private_key
+                          (Random_oracle.Input.Chunked.field txn_comm)
                     }
                   in
                   let sender =
                     { Party.data = sender_party_data
                     ; authorization =
                         Signature
-                          (Signature_lib.Schnorr.sign sender.private_key
-                             (Random_oracle.Input.field transaction))
+                          (Signature_lib.Schnorr.Chunked.sign sender.private_key
+                             (Random_oracle.Input.Chunked.field transaction))
                     }
                   in
                   let parties : Parties.t =
@@ -6117,10 +6060,10 @@ let%test_module "transaction_snark" =
                 Mina_state.Protocol_state.Body.consensus_state state_body1
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
-              let sparse_ledger =
-                Sparse_ledger.apply_user_command_exn ~constraint_constants
-                  ~txn_global_slot:current_global_slot sparse_ledger
-                  (t1 :> Signed_command.t)
+              let sparse_ledger, _ =
+                Sparse_ledger.apply_user_command ~constraint_constants
+                  ~txn_global_slot:current_global_slot sparse_ledger t1
+                |> Or_error.ok_exn
               in
               let pending_coinbase_stack_state2, state_body2 =
                 let previous_stack = pending_coinbase_stack_state1.pc.target in
@@ -6157,7 +6100,8 @@ let%test_module "transaction_snark" =
                 ( Ledger.apply_user_command ~constraint_constants ledger
                     ~txn_global_slot:current_global_slot t1
                   |> Or_error.ok_exn
-                  : Ledger.Transaction_applied.Signed_command_applied.t ) ;
+                  : Transaction_logic.Transaction_applied.Signed_command_applied
+                    .t ) ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
@@ -6171,16 +6115,17 @@ let%test_module "transaction_snark" =
                 Mina_state.Protocol_state.Body.consensus_state state_body2
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
-              let sparse_ledger =
-                Sparse_ledger.apply_user_command_exn ~constraint_constants
-                  ~txn_global_slot:current_global_slot sparse_ledger
-                  (t2 :> Signed_command.t)
+              let sparse_ledger, _ =
+                Sparse_ledger.apply_user_command ~constraint_constants
+                  ~txn_global_slot:current_global_slot sparse_ledger t2
+                |> Or_error.ok_exn
               in
               ignore
                 ( Ledger.apply_user_command ledger ~constraint_constants
                     ~txn_global_slot:current_global_slot t2
                   |> Or_error.ok_exn
-                  : Ledger.Transaction_applied.Signed_command_applied.t ) ;
+                  : Transaction_logic.Transaction_applied.Signed_command_applied
+                    .t ) ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
@@ -7705,17 +7650,6 @@ let%test_module "account timing check" =
       in
       min_balance
 
-    let snarky_integer_of_bools bools =
-      let snarky_bools =
-        List.map bools ~f:(fun b ->
-            let open Tick.Boolean in
-            if b then true_ else false_)
-      in
-      let bitstring_lsb =
-        Bitstring_lib.Bitstring.Lsb_first.of_list snarky_bools
-      in
-      Snarky_integer.Integer.of_bits ~m:Tick.m bitstring_lsb
-
     let run_checked_timing_and_compare account txn_amount txn_global_slot
         unchecked_timing unchecked_min_balance =
       let equal_balances_computation =
@@ -7734,14 +7668,9 @@ let%test_module "account timing check" =
           make_checked_min_balance_computation account txn_amount
             txn_global_slot
         in
-        let%bind unchecked_min_balance_as_snarky_integer =
-          Run.make_checked (fun () ->
-              snarky_integer_of_bools (Balance.to_bits unchecked_min_balance))
-        in
         let%map equal_balances_checked =
-          Run.make_checked (fun () ->
-              Snarky_integer.Integer.equal ~m checked_min_balance
-                unchecked_min_balance_as_snarky_integer)
+          Balance.Checked.equal checked_min_balance
+            (Balance.var_of_t unchecked_min_balance)
         in
         Snarky_backendless.As_prover.read Tick.Boolean.typ
           equal_balances_checked

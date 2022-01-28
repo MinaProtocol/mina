@@ -29,7 +29,7 @@ let display
       t) : display =
   let f x =
     Visualization.display_prefix_of_string
-      Zexe_backend.Pasta.(Bigint256.to_hex_string (Fp.to_bigint x))
+      Kimchi_backend.Pasta.Basic.(Bigint256.to_hex_string (Fp.to_bigint x))
   in
   { Parties_logic.Local_state.parties = f parties
   ; call_stack = f call_stack
@@ -96,7 +96,7 @@ let to_input
      ; failure_status = _
      } :
       t) =
-  let open Random_oracle.Input in
+  let open Random_oracle.Input.Chunked in
   Array.reduce_exn ~f:append
     [| field parties
      ; field call_stack
@@ -105,7 +105,7 @@ let to_input
      ; Token_id.to_input token_id
      ; Amount.to_input excess
      ; Ledger_hash.to_input ledger
-     ; bitstring [ success ]
+     ; packed (Mina_base.Util.field_of_bool success, 1)
     |]
 
 module Checked = struct
@@ -152,16 +152,16 @@ module Checked = struct
        } :
         t) =
     (* failure_status is the unit value, no need to represent it *)
-    let open Random_oracle.Input in
+    let open Random_oracle.Input.Chunked in
     Array.reduce_exn ~f:append
       [| field parties
        ; field call_stack
        ; field transaction_commitment
        ; field full_transaction_commitment
-       ; run_checked (Token_id.Checked.to_input token_id)
+       ; Token_id.Checked.to_input token_id
        ; Amount.var_to_input excess
        ; Ledger_hash.var_to_input ledger
-       ; bitstring [ success ]
+       ; packed ((success :> Snark_params.Tick.Field.Var.t), 1)
       |]
 end
 

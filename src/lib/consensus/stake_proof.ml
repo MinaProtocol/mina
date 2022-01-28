@@ -18,26 +18,6 @@ module Stable = struct
 
     let to_latest = Fn.id
   end
-
-  module V1 = struct
-    type t =
-      { delegator : Account.Index.Stable.V1.t
-      ; delegator_pk : Public_key.Compressed.Stable.V1.t
-      ; coinbase_receiver_pk : Public_key.Compressed.Stable.V1.t
-      ; ledger : Sparse_ledger.Stable.V1.t
-      ; producer_private_key : Private_key.Stable.V1.t
-      ; producer_public_key : Public_key.Stable.V1.t
-      }
-
-    let to_latest (t : t) : V2.t =
-      { delegator = t.delegator
-      ; delegator_pk = t.delegator_pk
-      ; coinbase_receiver_pk = t.coinbase_receiver_pk
-      ; ledger = Sparse_ledger.Stable.V1.to_latest t.ledger
-      ; producer_private_key = t.producer_private_key
-      ; producer_public_key = t.producer_public_key
-      }
-  end
 end]
 
 (* This is only the data that is necessary for creating the

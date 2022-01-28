@@ -21,11 +21,11 @@ module type S = sig
   type t [@@deriving sexp, to_yojson]
 
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type nonrec t = t [@@deriving bin_io, sexp, to_yojson, version]
     end
 
-    module Latest = V1
+    module Latest = V2
   end
 
   module Coinbase_data : sig
@@ -114,7 +114,7 @@ module type S = sig
 
     val gen : t Quickcheck.Generator.t
 
-    val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+    val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
     val to_bits : t -> bool list
 
@@ -122,7 +122,7 @@ module type S = sig
 
     val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
 
-    val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+    val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 
     val empty : t
 

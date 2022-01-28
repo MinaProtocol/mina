@@ -58,7 +58,11 @@ end
  *  by transitioning the root.
  *)
 module Root_transition : sig
-  type 'repr t = { new_root : Root_data.Limited.t; garbage : 'repr Node_list.t }
+  type 'repr t =
+    { new_root : Root_data.Limited.t
+    ; garbage : 'repr Node_list.t
+    ; just_emitted_a_proof : bool
+    }
 
   type 'repr root_transition = 'repr t
 
@@ -67,12 +71,6 @@ module Root_transition : sig
     module Stable : sig
       module V2 : sig
         type t = lite root_transition
-      end
-
-      module V1 : sig
-        type t
-
-        val to_latest : t -> V2.t
       end
     end]
   end
@@ -134,10 +132,6 @@ module Lite : sig
     module Stable : sig
       module V2 : sig
         type t = E : (lite, 'mutant) diff -> t
-      end
-
-      module V1 : sig
-        type t
       end
     end]
   end

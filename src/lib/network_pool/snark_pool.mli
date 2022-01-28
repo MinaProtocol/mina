@@ -106,11 +106,5 @@ module Diff_versioned : sig
         | Empty
       [@@deriving compare, sexp, hash]
     end
-
-    module V1 : sig
-      type t [@@deriving compare, sexp, hash]
-
-      val to_latest : t -> V2.t
-    end
   end]
 end

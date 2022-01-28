@@ -1,0 +1,8 @@
+(library
+  (name node_status_service)
+  (public_name node_status_service)
+  (inline_tests)
+  (libraries core_kernel async rfc3339_time cohttp-async logger mina_metrics transition_frontier pipe_lib sync_status mina_incremental mina_networking mina_base network_peer)
+  (preprocess (pps ppx_jane ppx_deriving.std ppx_coda ppx_version))
+  (instrumentation (backend bisect_ppx))
+  (synopsis "Node status service library for collect data from nodes"))

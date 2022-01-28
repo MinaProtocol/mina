@@ -59,9 +59,9 @@ let check :
             | Some pk ->
                 if
                   not
-                    (Signature_lib.Schnorr.verify s
+                    (Signature_lib.Schnorr.Chunked.verify s
                        (Backend.Tick.Inner_curve.of_affine pk)
-                       (Random_oracle_input.field msg))
+                       (Random_oracle_input.Chunked.field msg))
                 then
                   return
                     (`Invalid_signature

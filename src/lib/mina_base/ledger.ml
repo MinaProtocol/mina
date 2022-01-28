@@ -83,12 +83,6 @@ module Ledger_inner = struct
           | Not_owned _ ->
               false
       end
-
-      module V1 = struct
-        type t = Account.Stable.V1.t [@@deriving equal, compare, sexp]
-
-        let to_latest = Account.Stable.V1.to_latest
-      end
     end]
 
     let empty = Stable.Latest.empty

@@ -11,10 +11,6 @@ module Historical : sig
     module V2 : sig
       type t
     end
-
-    module V1 : sig
-      type t
-    end
   end]
 
   val transition : t -> External_transition.Validated.t
@@ -35,12 +31,6 @@ module Limited : sig
   module Stable : sig
     module V2 : sig
       type t [@@deriving to_yojson]
-    end
-
-    module V1 : sig
-      type t
-
-      val to_latest : t -> V2.t
     end
   end]
 
@@ -72,10 +62,6 @@ module Minimal : sig
   [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t
-    end
-
-    module V1 : sig
       type t
     end
   end]

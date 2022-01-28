@@ -53,23 +53,28 @@ module Compressed = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (Field.t, bool) Poly.Stable.V1.t
-      [@@deriving compare, equal, hash]
+      module T = struct
+        type t = (Field.t, bool) Poly.Stable.V1.t
+        [@@deriving equal, compare, hash]
 
-      (* dummy type for inserting constraint
-         adding constraint to t produces "unused rec" error
-      *)
-      type unused = unit constraint t = Arg.Stable.V1.t
+        (* dummy type for inserting constraint
+           adding constraint to t produces "unused rec" error
+        *)
+        type unused = unit constraint t = Arg.Stable.V1.t
 
-      let to_latest = Fn.id
+        let to_latest = Fn.id
 
-      module Base58 = Codable.Make_base58_check (Arg.Stable.V1)
-      include Base58
+        module Base58 = Codable.Make_base58_check (Arg.Stable.V1)
+        include Base58
 
-      (* sexp representation is a Base58Check string, like the yojson representation *)
-      let sexp_of_t t = to_base58_check t |> Sexp.of_string
+        (* sexp representation is a Base58Check string, like the yojson representation *)
+        let sexp_of_t t = to_base58_check t |> Sexp.of_string
 
-      let t_of_sexp sexp = Sexp.to_string sexp |> of_base58_check_exn
+        let t_of_sexp sexp = Sexp.to_string sexp |> of_base58_check_exn
+      end
+
+      include T
+      include Hashable.Make_binable (T)
 
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -117,7 +122,12 @@ module Compressed = struct
   let empty = Poly.{ x = Field.zero; is_odd = false }
 
   let to_input { Poly.x; is_odd } =
-    { Random_oracle.Input.field_elements = [| x |]
+    { Random_oracle.Input.Chunked.field_elements = [| x |]
+    ; packeds = [| (Field.project [ is_odd ], 1) |]
+    }
+
+  let to_input_legacy { Poly.x; is_odd } =
+    { Random_oracle.Input.Legacy.field_elements = [| x |]
     ; bitstrings = [| [ is_odd ] |]
     }
 
@@ -146,7 +156,12 @@ module Compressed = struct
       let%bind odd_eq = Boolean.equal t1.is_odd t2.is_odd in
       Boolean.(x_eq && odd_eq)
 
-    let to_input = to_input
+    let to_input ({ x; is_odd } : var) =
+      { Random_oracle.Input.Chunked.field_elements = [| x |]
+      ; packeds = [| ((is_odd :> Field.Var.t), 1) |]
+      }
+
+    let to_input_legacy = to_input_legacy
 
     let if_ cond ~then_:t1 ~else_:t2 =
       let%map x = Field.Checked.if_ cond ~then_:t1.Poly.x ~else_:t2.Poly.x

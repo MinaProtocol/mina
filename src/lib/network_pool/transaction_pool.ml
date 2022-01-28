@@ -48,12 +48,6 @@ module Diff_versioned = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t = User_command.Stable.V1.t list [@@deriving sexp, yojson, hash]
-
-      let to_latest : t -> V2.t = List.map ~f:User_command.Stable.V1.to_latest
-    end
   end]
 
   (* We defer do any checking on signed-commands until the call to
@@ -174,15 +168,6 @@ module Diff_versioned = struct
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
-        [@@deriving sexp, yojson]
-
-        let to_latest (t : t) : V2.t =
-          List.map t ~f:(fun (cmd, err) ->
-              (User_command.Stable.V1.to_latest cmd, err))
       end
     end]
 

@@ -99,10 +99,10 @@ let parse_field_element_or_hash_string s ~f =
   | Error e1 -> (
       match Signed_command_memo.create_from_string s with
       | Ok memo ->
-          Random_oracle.(
+          Random_oracle.Legacy.(
             hash ~init:Hash_prefix.snapp_test
               ( Signed_command_memo.to_bits memo
-              |> Random_oracle_input.bitstring |> pack_input ))
+              |> Random_oracle_input.Legacy.bitstring |> pack_input ))
           |> f
       | Error e2 ->
           failwith

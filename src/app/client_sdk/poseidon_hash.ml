@@ -89,7 +89,7 @@ module Hash = struct
   let hash ?init = hash ?init params
 
   let pack_input =
-    Random_oracle_input.pack_to_fields ~size_in_bits:Field.size_in_bits
+    Random_oracle_input.Legacy.pack_to_fields ~size_in_bits:Field.size_in_bits
       ~pack:Field.project
 end
 
@@ -108,9 +108,9 @@ type string_js = Js.js_string Js.t
 (* input is a raw string of bytes *)
 let hash_bytearray (bytearray : u8_array_js) : string_js =
   let string_to_bitstring s =
-    let char_bits = String_sign.Message.char_bits in
+    let char_bits = String_sign.char_bits in
     let x = Stdlib.(Array.of_seq (Seq.map char_bits (String.to_seq s))) in
-    Random_oracle_input.bitstrings x
+    Random_oracle_input.Legacy.bitstrings x
   in
   let input = Js_of_ocaml.Typed_array.String.of_uint8Array bytearray in
   let input =

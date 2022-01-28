@@ -118,6 +118,12 @@ let signature_of_js_object (signature_js : signature_js) : Signature.t =
   in
   (field, scalar)
 
+type signed_string =
+  < string : string_js Js.readonly_prop
+  ; signer : string_js Js.readonly_prop
+  ; signature : signature_js Js.readonly_prop >
+  Js.t
+
 type signed_payment =
   < payment : payment_js Js.readonly_prop
   ; sender : string_js Js.readonly_prop
@@ -129,3 +135,14 @@ type signed_stake_delegation =
   ; sender : string_js Js.readonly_prop
   ; signature : signature_js Js.readonly_prop >
   Js.t
+
+let signature_kind_of_string_js network_js fname : Mina_signature_kind.t =
+  match Js.to_string network_js |> Base.String.lowercase with
+  | "mainnet" ->
+      Mainnet
+  | "testnet" ->
+      Testnet
+  | s ->
+      raise_js_error
+        (Core_kernel.sprintf
+           "%s: expected network to be mainnet or testnet, got: %s" fname s)
