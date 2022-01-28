@@ -30,6 +30,11 @@ versions checked out (in most cases):
 git submodule init
 git submodule sync
 git submodule update
+pushd src/lib/marlin
+git submodule init
+git submodule sync
+git submodule update
+popd
 ```
 
 If you don't do this, Nix may not always yell at you right away
