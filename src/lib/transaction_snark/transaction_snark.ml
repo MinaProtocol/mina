@@ -1994,9 +1994,6 @@ module Base = struct
         | Check_predicate (_is_start, { party; _ }, account, _global) ->
             Snapp_predicate.Account.Checked.check party.data.predicate
               account.data
-        | Check_fee_excess (valid_fee_excess, ()) ->
-            with_label __LOC__ (fun () ->
-                Boolean.Assert.is_true valid_fee_excess)
         | Check_auth_and_update_account
             { is_start
             ; at_party = at_party, _

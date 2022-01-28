@@ -1734,10 +1734,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Account.Nonce.equal account.nonce n
           | Full p ->
               Or_error.is_ok (Snapp_predicate.Account.check p account) )
-      | Check_fee_excess (valid_fee_excess, prev_failure_status) ->
-          if not valid_fee_excess then
-            Some Transaction_status.Failure.Invalid_fee_excess
-          else prev_failure_status
       | Check_auth_and_update_account
           { is_start
           ; at_party = _

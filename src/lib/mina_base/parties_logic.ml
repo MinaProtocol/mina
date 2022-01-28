@@ -236,9 +236,6 @@ module Eff = struct
              ; protocol_state_predicate : 'protocol_state_pred
              ; .. > )
            t
-    | Check_fee_excess :
-        'bool * 'failure
-        -> ('failure, < bool : 'bool ; failure : 'failure ; .. >) t
     | Check_auth_and_update_account :
         { is_start : 'bool
         ; party : 'party
@@ -398,8 +395,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (party, current_stack, call_stack)
 
-  let apply (type failure_status)
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+  let apply ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start :
          [ `Yes of _ Start_data.t | `No | `Compute of _ Start_data.t ])
       (h :
@@ -408,7 +404,7 @@ module Make (Inputs : Inputs_intf) = struct
          ; full_transaction_commitment : Transaction_commitment.t
          ; amount : Amount.t
          ; bool : Bool.t
-         ; failure : failure_status
+         ; failure : Local_state.failure_status
          ; .. >
          as
          'env)
@@ -597,15 +593,8 @@ module Make (Inputs : Inputs_intf) = struct
       let delta_settled = Amount.equal local_state.excess Amount.zero in
       Bool.((not is_last_party) ||| delta_settled)
     in
-    let failure_status =
-      h.perform
-        (Check_fee_excess (valid_fee_excess, local_state.failure_status))
-    in
     let local_state =
-      { local_state with
-        success = Bool.(local_state.success &&& valid_fee_excess)
-      ; failure_status
-      }
+      Local_state.add_check local_state Invalid_fee_excess valid_fee_excess
     in
     let global_excess_update_failed = ref Bool.true_ in
     let global_state =
