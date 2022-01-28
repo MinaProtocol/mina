@@ -901,6 +901,8 @@ let balance_change (t : t) : Amount.Signed.t = t.data.body.balance_change
 let protocol_state (t : t) : Snapp_predicate.Protocol_state.t =
   t.data.body.protocol_state
 
+let public_key (t : t) : Public_key.Compressed.t = t.data.body.public_key
+
 let token_id (t : t) : Token_id.t = t.data.body.token_id
 
 let use_full_commitment (t : t) : bool = t.data.body.use_full_commitment

@@ -1540,6 +1540,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         l
 
       let check_inclusion _ledger (_account, _loc) = ()
+
+      let check_account public_key token_id
+          ((account, loc) : Account.t * inclusion_proof) =
+        assert (Public_key.Compressed.equal public_key account.public_key) ;
+        assert (Token_id.equal token_id account.token_id) ;
+        match loc with `Existing _ -> `Is_new false | `New -> `Is_new true
     end
 
     module Transaction_commitment = struct
@@ -1552,6 +1558,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let commitment ~party:_ ~other_parties:_ ~memo_hash:_ = ()
 
       let full_commitment ~party:_ ~commitment:_ = ()
+    end
+
+    module Public_key = struct
+      type t = Public_key.Compressed.t
     end
 
     module Account = struct
@@ -1755,7 +1765,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ; global_state
           ; party = p
           ; account = a
-          ; inclusion_proof = loc
+          ; account_is_new
           ; signature_verifies = _
           } -> (
           if (is_start : bool) then
@@ -1766,7 +1776,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 (Fn.flip Permissions.Auth_required.check
                    (Control.tag p.authorization))
               ~has_proof:(Control.Tag.equal (Control.tag p.authorization) Proof)
-              ~is_new:(match loc with `Existing _ -> false | `New -> true)
+              ~is_new:account_is_new
               ~global_slot_since_genesis:
                 global_state.protocol_state.global_slot_since_genesis ~is_start
               p.data a
