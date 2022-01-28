@@ -27,14 +27,8 @@ run any nix commands. This should make sure you have the right
 versions checked out (in most cases):
 
 ```
-git submodule init
 git submodule sync
-git submodule update
-pushd src/lib/marlin
-git submodule init
-git submodule sync
-git submodule update
-popd
+git submodule update --init --recursive
 ```
 
 If you don't do this, Nix may not always yell at you right away
