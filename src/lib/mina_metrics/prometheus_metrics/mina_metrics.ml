@@ -1061,7 +1061,7 @@ module Block_producer = struct
     Counter.v "blocks_produced" ~help ~namespace ~subsystem
 
   module Block_production_delay_histogram = Histogram (struct
-    let spec = Histogram_spec.of_exponential 0.1 2. 5
+    let spec = Histogram_spec.of_exponential 1. 2. 9
   end)
 
   let block_production_delay =
