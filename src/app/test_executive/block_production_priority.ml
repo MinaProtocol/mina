@@ -65,7 +65,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
     let sender_bp = List.nth_exn (Network.block_producers network) 1 in
     let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
-    let tps_i = 20 in
+    let tps_i = 50 in
     let tps = Unsigned.UInt32.of_int tps_i in
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
