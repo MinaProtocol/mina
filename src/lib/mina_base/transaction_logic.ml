@@ -1512,6 +1512,20 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let if_ = Parties.value_if
 
       let empty = L.empty
+
+      type inclusion_proof = [ `Existing of location | `New ]
+
+      let get_account p l =
+        let loc, acct =
+          Or_error.ok_exn (get_with_location l (Party.account_id p))
+        in
+        (acct, loc)
+
+      let set_account l (a, loc) =
+        Or_error.ok_exn (set_with_location l loc a) ;
+        l
+
+      let check_inclusion _ledger (_account, _loc) = ()
     end
 
     module Transaction_commitment = struct
@@ -1673,13 +1687,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ((), ())
       | Balance a ->
           Balance.to_amount a.balance
-      | Get_account (p, l) ->
-          let loc, acct =
-            Or_error.ok_exn (get_with_location l (Party.account_id p))
-          in
-          (acct, loc)
-      | Check_inclusion (_ledger, _account, _loc) ->
-          ()
       | Check_protocol_state_predicate (pred, global_state) -> (
           Snapp_predicate.Protocol_state.check pred global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
@@ -1691,9 +1698,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Account.Nonce.equal account.nonce n
           | Full p ->
               Or_error.is_ok (Snapp_predicate.Account.check p account) )
-      | Set_account (l, a, loc) ->
-          Or_error.ok_exn (set_with_location l loc a) ;
-          l
       | Check_fee_excess (valid_fee_excess, prev_failure_status) ->
           if not valid_fee_excess then
             Some Transaction_status.Failure.Invalid_fee_excess

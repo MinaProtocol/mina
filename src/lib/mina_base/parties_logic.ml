@@ -198,28 +198,23 @@ end
 module type Ledger_intf = sig
   include Iffable
 
+  type party
+
+  type account
+
+  type inclusion_proof
+
   val empty : depth:int -> unit -> t
+
+  val get_account : party -> t -> account * inclusion_proof
+
+  val set_account : t -> account * inclusion_proof -> t
+
+  val check_inclusion : t -> account * inclusion_proof -> unit
 end
 
 module Eff = struct
   type (_, _) t =
-    | Get_account :
-        'party * 'ledger
-        -> ( 'account * 'inclusion_proof
-           , < party : 'party
-             ; account : 'account
-             ; inclusion_proof : 'inclusion_proof
-             ; ledger : 'ledger
-             ; .. > )
-           t
-    | Check_inclusion :
-        'ledger * 'account * 'inclusion_proof
-        -> ( unit
-           , < ledger : 'ledger
-             ; inclusion_proof : 'inclusion_proof
-             ; account : 'account
-             ; .. > )
-           t
     | Check_predicate :
         'bool * 'party * 'account * 'global_state
         -> ( 'bool
@@ -235,14 +230,6 @@ module Eff = struct
            , < bool : 'bool
              ; global_state : 'global_state
              ; protocol_state_predicate : 'protocol_state_pred
-             ; .. > )
-           t
-    | Set_account :
-        'ledger * 'account * 'inclusion_proof
-        -> ( 'ledger
-           , < ledger : 'ledger
-             ; inclusion_proof : 'inclusion_proof
-             ; account : 'account
              ; .. > )
            t
     | Check_fee_excess :
@@ -320,12 +307,6 @@ type 'e handler = { perform : 'r. ('r, 'e) Eff.t -> 'r }
 module type Inputs_intf = sig
   module Bool : Bool_intf
 
-  module Ledger : Ledger_intf with type bool := Bool.t
-
-  module Account : sig
-    type t
-  end
-
   module Amount : Amount_intf with type bool := Bool.t
 
   module Token_id : Token_id_intf with type bool := Bool.t
@@ -336,6 +317,16 @@ module type Inputs_intf = sig
     Party_intf
       with type signed_amount := Amount.Signed.t
        and type protocol_state_predicate := Protocol_state_predicate.t
+
+  module Account : sig
+    type t
+  end
+
+  module Ledger :
+    Ledger_intf
+      with type bool := Bool.t
+       and type account := Account.t
+       and type party := Party.t
 
   module Parties :
     Parties_intf with type bool := Bool.t and type party := Party.t
@@ -502,9 +493,9 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let local_state = { local_state with parties = remaining; call_stack } in
     let a, inclusion_proof =
-      h.perform (Get_account (party, local_state.ledger))
+      Inputs.Ledger.get_account party local_state.ledger
     in
-    h.perform (Check_inclusion (local_state.ledger, a, inclusion_proof)) ;
+    Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
     let predicate_satisfied : Bool.t =
       h.perform (Check_predicate (is_start', party, a, global_state))
     in
@@ -584,7 +575,7 @@ module Make (Inputs : Inputs_intf) = struct
        The local state excess (plus the local delta) gets moved to the fee excess if it is default token.
     *)
     let new_ledger =
-      h.perform (Set_account (local_state.ledger, a', inclusion_proof))
+      Inputs.Ledger.set_account local_state.ledger (a', inclusion_proof)
     in
     let is_last_party = Ps.is_empty remaining in
     let local_state =
