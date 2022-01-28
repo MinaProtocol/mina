@@ -308,6 +308,22 @@ module type Inputs_intf = sig
     val full_commitment : party:Party.t -> commitment:t -> t
   end
 
+  module Local_state : sig
+    type failure_status
+
+    type t =
+      ( Parties.t
+      , Token_id.t
+      , Amount.t
+      , Ledger.t
+      , Bool.t
+      , Transaction_commitment.t
+      , failure_status )
+      Local_state.t
+
+    val add_check : t -> Transaction_status.Failure.t -> Bool.t -> t
+  end
+
   module Global_state : sig
     type t
 
@@ -396,8 +412,8 @@ module Make (Inputs : Inputs_intf) = struct
          ; .. >
          as
          'env)
-        handler)
-      ((global_state : Global_state.t), (local_state : _ Local_state.t)) =
+        handler) ((global_state : Global_state.t), (local_state : Local_state.t))
+      =
     let open Inputs in
     let is_start' =
       let is_start' = Ps.is_empty local_state.parties in

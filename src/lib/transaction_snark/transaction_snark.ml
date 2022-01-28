@@ -1916,6 +1916,23 @@ module Base = struct
           type t = Field.t
         end
 
+        module Local_state = struct
+          type failure_status = unit
+
+          type t =
+            ( Parties.t
+            , Token_id.t
+            , Amount.t
+            , Ledger.t
+            , Bool.t
+            , Transaction_commitment.t
+            , failure_status )
+            Parties_logic.Local_state.t
+
+          let add_check (t : t) _failure b =
+            { t with success = Bool.(t.success &&& b) }
+        end
+
         module Global_state = struct
           type t = Global_state.t =
             { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
