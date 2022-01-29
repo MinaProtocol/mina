@@ -4,6 +4,67 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2022/01/18:
+
+- /network/list uses `MINA_ROSETTA_NETWORK`
+- Include unsigned transaction in `hex_bytes` instead
+- Under-the-hood improvements to the signature representation to prevent
+  future regressions at the type-system level
+- Release of rosetta-v16 with above changes
+
+2022/01/13:
+
+- Construction APIs use a new encoding scheme
+- /network/list and /network/options also work offline
+- Release of rosetta-v15 with above changes
+
+2022/01/05:
+
+- Deterministic responses to block and account balance queries so that
+   they see same block at tip
+- Optional `MINA_ROSETTA_MAX_HEIGHT_DELTA` environment variable to adjust
+   the visible height of the tip
+- Release of rosetta-v14 with above changes
+
+2021/12/22:
+
+- Attempts to fix missing pubkey SQL error
+- Release of rosetta-v13 with all of the above (and below)
+
+2021/12/15:
+
+- Mainnet check:data succeeds with 99% reconciliation
+- Ubuntu 20.04 support
+- Release of rosetta-v12 with all of the above (and below)
+
+2021/12/08:
+
+- Uses the migrated archive node and changes around some queries
+- Release of rosetta-v11 with all of the above (and below)
+
+2021/11/19:
+
+- Uses the archive node as a backup for checking for duplicates
+- Release of rosetta-v10 with all of the above (and below)
+
+2021/11/06:
+
+- Properly throws duplicate transaction errors instead of bad nonce errors when
+  duplicate transactions occur.
+- Release of rosetta-v9 with all of the above (and below)
+
+2021/11/06:
+
+- Rebase off of a combination of stable daemon changes that are pending for next
+  public release while removing unstable recent Rosetta changes that are still
+  in testing.
+- Release of rosetta-v8 with all of the above (and below)
+
+2021/11/02:
+
+- Adds explicit transaction submit errors for all known invalid transaction
+  cases. Note: Fallback errors go through via GraphQL errors as before.
+
 2021/10/27:
 
 - Adds memo to construction in the same way as `valid_until`. To use a memo, add the `memo` field to the metadata next to `valid_until` and give it a string, like `"memo": "hello"`. The string must be small -- it is limited to less than 32 bytes.
@@ -99,12 +160,11 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## How to build your own docker image
 
-Checkout the "rosetta-v7" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
+Checkout the "rosetta-v16" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
 
-`cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu | docker build -t mina-rosetta:v7 --build-arg "deb_codename=stretch" --build-arg "MINA_BRANCH=rosetta-v7" -`
+`cat dockerfiles/stages/1-build-deps-ubuntu dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-prod-ubuntu | docker build -t mina-rosetta:v16 --build-arg "MINA_BRANCH=rosetta-v16" -`
 
-This creates an image (mina-rosetta:v7) based on the most up-to-date changes that support rosetta. This image
-can be used as a drop-in replacement for `minaprotocol/mina-rosetta:v7` in any of the below commands for testing.
+This creates an image (mina-rosetta:vX) based on the most up-to-date changes that support rosetta.
 
 ## How to Run
 
@@ -112,13 +172,13 @@ The container includes 4 scripts in /rosetta which run a different set of servic
 - `docker-standalone-start.sh` is the most straightforward, it starts only the mina-rosetta API endpoint and any flags passed into the script go to mina-rosetta. Use this for the "offline" part of the Construction API.
 - `docker-demo-start.sh` launches a mina node with a very simple 1-address genesis ledger as a sandbox for developing and playing around in. This script starts the full suite of tools (a mina node, mina-archive, a postgresql DB, and mina-rosetta), but for a demo network with all operations occuring inside this container and no external network activity.
 - `docker-test-start.sh` launches the same demo network as in demo-start.sh but also launches the mina-rosetta-test-agent to run a suite of tests against the rosetta API.
-- The default, `docker-start.sh`, which connects the mina node to our [Mainnet](https://docs.minaprotocol.com/en/using-mina/connecting) network and initializes the archive database from publicly-availible nightly O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. The script also periodically checks for blocks that may be missing between the nightly backup and the tip of the chain and will fill in those gaps by walking back the linked list of blocks in the canonical chain and importing them one at a time. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/rosetta-v7/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
+- The default, `docker-start.sh`, which connects the mina node to our [Mainnet](https://docs.minaprotocol.com/en/using-mina/connecting) network and initializes the archive database from publicly-availible nightly O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. The script also periodically checks for blocks that may be missing between the nightly backup and the tip of the chain and will fill in those gaps by walking back the linked list of blocks in the canonical chain and importing them one at a time. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/rosetta-v16/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
 - Finally, the previous default, `docker-devnet-start.sh`, which connects the mina node to our [Devnet](https://docs.minaprotocol.com/en/advanced/connecting-devnet) network with the archive database initalized in a similar way to docker-start.sh. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. `docker-devnet-start.sh` is now just a special case of `docker-start.sh` so inspect the source there for more detailed configuration.
 
 For example, to run the `docker-devnet-start.sh` and connect to the live devnet:
 
 ```
-docker run -it --rm --name rosetta --entrypoint=./docker-devnet-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 minaprotocol/mina-rosetta:v7
+docker run -it --rm --name rosetta --entrypoint=./docker-devnet-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 minaprotocol/mina-rosetta:v16
 ```
 
 Note: It will take 20min-1hr for your node to sync
@@ -216,13 +276,13 @@ The Construction API is _not_ validated using `rosetta-cli` as this would requir
 
 ### Reproduce agent and rosetta-cli validation
 
-`minaprotocol/mina-rosetta:v7` and `rosetta-cli @ v0.5.12`
+`minaprotocol/mina-rosetta:v16` and `rosetta-cli @ v0.5.12`
 using this [`rosetta.conf`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/rosetta.conf) and the [`bootstrap_balances.json`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/bootstrap_balances.json) next to it.
 
 **Create one of each transaction type using the test-agent and exit**
 
 ```
-$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-test --entrypoint ./docker-test-start.sh -d minaprotocol/mina-rosetta:v7
+$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-test --entrypoint ./docker-test-start.sh -d minaprotocol/mina-rosetta:v16
 
 $ docker logs --follow mina-rosetta-test
 ```
@@ -230,7 +290,7 @@ $ docker logs --follow mina-rosetta-test
 **Run a fast sandbox network forever and test with rosetta-cli**
 
 ```
-$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-demo --entrypoint ./docker-demo-start.sh -d minaprotocol/mina-rosetta:v7
+$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-demo --entrypoint ./docker-demo-start.sh -d minaprotocol/mina-rosetta:v16
 
 $ docker logs --follow mina-rosetta-demo
 
