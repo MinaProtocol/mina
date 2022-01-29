@@ -2357,6 +2357,17 @@
               "description": "Send a payment",
               "args": [
                 {
+                  "name": "repeat_delay_ms",
+                  "description":
+                    "Should only be set in tests, specifies with which delay shall transaction be repeated",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "UInt32",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
                   "name": "repeat_count",
                   "description":
                     "Should only be set in tests, specifies how many times shall transaction be repeated",

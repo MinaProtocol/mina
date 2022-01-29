@@ -34,27 +34,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ())
     |> Malleable_error.all_unit
 
-  let send_payments ~tps ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee
-      ~node end_t =
-    let open Malleable_error.Let_syntax in
-    let rec go n =
-      if Time.(now () > end_t) then return ()
-      else
-        let%bind () =
-          let%map () =
-            Network.Node.send_payment
-              ~initial_delay_sec:1.
-              ~repeat_count:tps
-              ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee node
-            |> Async_kernel.Deferred.bind ~f:(Malleable_error.or_soft_error ~value:())
-          in
-          [%log info] "payment #%d sent." n ;
-          ()
-        in
-        go (n + 1)
-    in
-    go 1
-
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
@@ -65,26 +44,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
     let sender_bp = List.nth_exn (Network.block_producers network) 1 in
     let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
-    let tps_i = 1 in
-    let tps = Unsigned.UInt32.of_int tps_i in
+    let tps = 50 in
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
     let num_slots = 2 in
-    let num_payments = num_slots * window_ms / 1000 in
+    let num_payments = tps * num_slots * window_ms / 1000 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let amount = Currency.Amount.of_int 10_000_000 in
-    [%log info] "will now send %d payment batches, %d payments each second" num_payments tps_i;
+    [%log info] "will now send %d payments" num_payments;
     let get_metrics node =
       Async_kernel.Deferred.bind
         (Network.Node.get_metrics ~logger node)
         ~f:Malleable_error.or_hard_error
     in
-    let end_t = Time.add (Time.now ()) (Time.Span.of_int_sec num_payments) in
-    let%bind () =
-      send_payments ~tps ~logger ~sender_pub_key ~receiver_pub_key
-        ~node:sender_bp ~fee ~amount end_t
-    in
+    let end_t = Time.add (Time.now ()) (Time.Span.of_ms @@ float_of_int @@ num_slots * window_ms) in
+    let%bind () = Network.Node.must_send_payment
+              ~initial_delay_sec:1.
+              ~repeat_count:(Unsigned.UInt32.of_int num_payments)
+              ~repeat_delay_ms:(Unsigned.UInt32.of_int @@ 1000 / tps)
+              ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee sender_bp in
+    let%bind () = Async_kernel.Deferred.bind (Async.after (Time.diff end_t @@ Time.now ())) ~f:(const Malleable_error.ok_unit) in
     let%bind { block_production_delay = snd_delay } = get_metrics sender_bp in
     let%bind { block_production_delay = rcv_delay } = get_metrics receiver_bp in
     let gt0 a = a > 0 in

@@ -169,10 +169,12 @@ module Node = struct
       $fee: UInt64!,
       $nonce: UInt32,
       $memo: String,
-      $repeat_count: UInt32) {
+      $repeat_count: UInt32,
+      $repeat_delay_ms: UInt32) {
         sendPayment(input:
           {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo},
-          repeat_count: $repeat_count) {
+          repeat_count: $repeat_count,
+          repeat_delay_ms: $repeat_delay_ms) {
             payment {
               id
             }
@@ -359,7 +361,7 @@ module Node = struct
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
-  let send_payment ?initial_delay_sec ?repeat_count ~logger t ~sender_pub_key
+  let send_payment ?initial_delay_sec ?repeat_count ?repeat_delay_ms ~logger t ~sender_pub_key
       ~receiver_pub_key ~amount ~fee =
     (* We have two calls to `exec_graphql_request`, so we split total delay in half *)
     [%log info] "Sending a payment"
@@ -389,6 +391,7 @@ module Node = struct
           ~amount:(Graphql_lib.Encoders.amount amount)
           ~fee:(Graphql_lib.Encoders.fee fee)
           ?repeat_count:(Option.map ~f:Graphql_lib.Encoders.uint32 repeat_count)
+          ?repeat_delay_ms:(Option.map ~f:Graphql_lib.Encoders.uint32 repeat_delay_ms)
           ()
       in
       exec_graphql_request ?initial_delay_sec ~logger ~node:t
@@ -401,9 +404,9 @@ module Node = struct
       ~metadata:[ ("user_command_id", `String user_cmd_id) ] ;
     ()
 
-  let must_send_payment ?initial_delay_sec ?repeat_count ~logger t ~sender_pub_key
+  let must_send_payment ?initial_delay_sec ?repeat_count ?repeat_delay_ms ~logger t ~sender_pub_key
       ~receiver_pub_key ~amount ~fee =
-    send_payment ?initial_delay_sec ?repeat_count ~logger t ~sender_pub_key ~receiver_pub_key
+    send_payment ?initial_delay_sec ?repeat_count ?repeat_delay_ms ~logger t ~sender_pub_key ~receiver_pub_key
       ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 

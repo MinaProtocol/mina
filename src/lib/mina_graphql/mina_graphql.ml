@@ -2162,6 +2162,12 @@ module Types = struct
           ~doc:
             "Should only be set in tests, specifies how many times shall \
              transaction be repeated"
+
+      let repeat_delay_ms =
+        arg "repeat_delay_ms" ~typ:uint32_arg
+          ~doc:
+            "Should only be set in tests, specifies with which delay shall \
+             transaction be repeated"
     end
 
     let send_payment =
@@ -2899,14 +2905,19 @@ module Mutations = struct
           [ arg "input" ~typ:(non_null Types.Input.send_payment)
           ; Types.Input.Fields.signature
           ; Types.Input.Fields.repeat_count
+          ; Types.Input.Fields.repeat_delay_ms
           ]
       ~resolve:
         (fun { ctx = coda; _ } ()
              (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
-             signature repeat_count_opt ->
+             signature repeat_count_opt repeat_delay_ms_opt ->
         let repeat_count =
           Unsigned.UInt32.to_int
           @@ Option.value ~default:(Unsigned.UInt32.of_int 1) repeat_count_opt
+        in
+        let repeat_delay =
+          Time.Span.of_ms @@ float_of_int @@ Option.value ~default:1000
+          @@ Option.map ~f:Unsigned.UInt32.to_int repeat_delay_ms_opt
         in
         let body =
           Signed_command_payload.Body.Payment
@@ -2917,13 +2928,27 @@ module Mutations = struct
             }
         in
         let fee_token = Token_id.default in
+        let start = Time.now () in
         match signature with
         | None when repeat_count > 0 ->
-            Deferred.List.init repeat_count ~f:(fun _ ->
-                send_unsigned_user_command ~coda ~nonce_opt ~signer:from ~memo
-                  ~fee ~fee_token ~fee_payer_pk:from ~valid_until ~body
-                |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command)
-            >>| List.last_exn
+            let send_tx _ =
+              send_unsigned_user_command ~coda ~nonce_opt ~signer:from ~memo
+                ~fee ~fee_token ~fee_payer_pk:from ~valid_until ~body
+              |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command
+            in
+            let do_ i =
+              let pause =
+                Time.diff
+                  ( Time.add start
+                  @@ Time.Span.scale repeat_delay
+                  @@ float_of_int i )
+                @@ Time.now ()
+              in
+              (if Time.Span.(pause > zero) then after pause else Deferred.unit)
+              >>= send_tx >>| const ()
+            in
+            don't_wait_for (Deferred.for_ 2 ~to_:repeat_count ~do_) ;
+            send_tx ()
         | Some signature when repeat_count = 1 ->
             send_signed_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
               ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
