@@ -22,7 +22,7 @@ module Stable = struct
       , Account_id.Stable.V1.t
       , Account.Stable.V2.t
       , Token_id.Stable.V1.t )
-      Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
+      Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
     [@@deriving yojson, sexp]
 
     let to_latest = Fn.id
@@ -129,8 +129,7 @@ M.
   , data
   , iteri
   , depth
-  , next_available_token
-  , next_available_index )]
+  , next_available_token )]
 
 (* TODO: share this cache globally across modules *)
 let empty_hash =
@@ -138,28 +137,15 @@ let empty_hash =
     (module Ledger_hash)
     ~init_hash:(Ledger_hash.of_digest Account.empty_digest)
 
-let of_root ~depth ~next_available_token ~next_available_index
-    (h : Ledger_hash.t) =
-  of_hash ~depth ~next_available_token ~next_available_index
+let of_root ~depth ~next_available_token (h : Ledger_hash.t) =
+  of_hash ~depth ~next_available_token
     (* TODO: Is this of_digest casting really necessary? What's it doing? *)
     (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))
 
 let of_any_ledger_root ledger =
-  let next_available_index =
-    match Ledger.Any_ledger.M.last_filled ledger with
-    | Some (Ledger.Location.Account addr) ->
-        Option.map (Ledger.Addr.next addr) ~f:Ledger.Addr.to_int
-    | Some _ ->
-        failwith
-          "unable to get next available index from ledger: last filled \
-           location is invalid"
-    | None ->
-        Some 0
-  in
   of_root
     ~depth:(Ledger.Any_ledger.M.depth ledger)
     ~next_available_token:(Ledger.Any_ledger.M.next_available_token ledger)
-    ~next_available_index
     (Ledger.Any_ledger.M.merkle_root ledger)
 
 let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
@@ -318,7 +304,7 @@ let%test_unit "adding paths generated via derive_next_arm_exn does not \
   let ledger =
     of_root ~depth:3
       ~next_available_token:(Token_id.of_uint64 Unsigned_extended.UInt64.one)
-      ~next_available_index:(Some 1) root
+      root
   in
   let ledger = add_path ledger path (Account.identifier account) account in
   let ledger, _ =
@@ -334,7 +320,7 @@ let%test_unit "adding paths generated via derive_next_arm_exn does not \
   in
   [%test_eq: Ledger_hash.t] (merkle_root ledger) root
 
-let of_sparse_ledger_subset_exn base_ledger account_ids =
+let of_sparse_ledger_subset_exn base_ledger ~next_idx account_ids =
   let account_ids = dedup_list account_ids ~comparator:(module Account_id) in
   let add_existing_accounts l =
     List.fold_right account_ids ~init:(l, [])
@@ -348,15 +334,11 @@ let of_sparse_ledger_subset_exn base_ledger account_ids =
             (l, id :: missing_accounts))
   in
   let add_missing_accounts l missing_account_ids =
-    let next_idx =
-      Option.value_exn (next_available_index l)
-        ~message:"not enough space in ledger"
-    in
     let last_arm =
       if next_idx > 0 then arm_exn base_ledger (next_idx - 1)
       else left_empty_arm (depth l)
     in
-    let result, _, _ =
+    let result, _, next_idx =
       (* TODO: we could just check the remaining available slots in the ledger upfront instead of folding over the index (which is otherwise unused here) *)
       List.fold_left missing_account_ids ~init:(l, last_arm, Some next_idx)
         ~f:(fun (l, prev_arm, idx_opt) id ->
@@ -368,24 +350,23 @@ let of_sparse_ledger_subset_exn base_ledger account_ids =
           , next_arm
           , next_index ~depth:(depth l) idx ))
     in
-    result
+    (result, next_idx)
   in
-  let result_ledger =
+  let result_ledger, next_idx =
     let ledger =
       of_root ~depth:(depth base_ledger)
         ~next_available_token:(next_available_token base_ledger)
-        ~next_available_index:(next_available_index base_ledger)
         (merkle_root base_ledger)
     in
     let ledger, missing_account_ids = add_existing_accounts ledger in
-    if List.is_empty missing_account_ids then ledger
+    if List.is_empty missing_account_ids then (ledger, Some next_idx)
     else add_missing_accounts ledger missing_account_ids
   in
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
         (merkle_root result_ledger)
         (merkle_root base_ledger)) ;
-  result_ledger
+  (result_ledger, next_idx)
 
 (* IMPORTANT TODO: rightmost path in parent sparse ledger must exist in order for derivation on new accounts to work *)
 (* ^^^ should probably setup a test to ensure the error message is decent *)
@@ -454,7 +435,10 @@ let%test_module "of_sparse_ledger_subset_exn" =
           let sl = of_ledger_subset_exn ledger account_ids in
           [%test_result: Ledger_hash.t]
             ~expect:(Ledger.merkle_root ledger)
-            (merkle_root @@ of_sparse_ledger_subset_exn sl account_ids))
+            ( merkle_root @@ fst
+            @@ of_sparse_ledger_subset_exn
+                 ~next_idx:(Ledger.num_accounts ledger)
+                 sl account_ids ))
 
     let%test_unit "with new accounts" =
       let depth = 4 in
@@ -477,7 +461,10 @@ let%test_module "of_sparse_ledger_subset_exn" =
           in
           [%test_result: Ledger_hash.t]
             ~expect:(Ledger.merkle_root ledger)
-            (merkle_root @@ of_sparse_ledger_subset_exn sl account_ids))
+            ( merkle_root @@ fst
+            @@ of_sparse_ledger_subset_exn
+                 ~next_idx:(Ledger.num_accounts ledger)
+                 sl account_ids ))
 
     let%test_unit "on an empty ledger" =
       let depth = 4 in
@@ -491,7 +478,10 @@ let%test_module "of_sparse_ledger_subset_exn" =
           let sl = of_ledger_subset_exn ledger [] in
           [%test_result: Ledger_hash.t]
             ~expect:(Ledger.merkle_root ledger)
-            (merkle_root @@ of_sparse_ledger_subset_exn sl account_ids))
+            ( merkle_root @@ fst
+            @@ of_sparse_ledger_subset_exn
+                 ~next_idx:(Ledger.num_accounts ledger)
+                 sl account_ids ))
   end )
 
 let get_or_initialize_exn account_id t idx =

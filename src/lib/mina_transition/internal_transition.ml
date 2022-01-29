@@ -45,6 +45,7 @@ module Stable = struct
   end
 end]
 
+(* bin_io, version omitted *)
 type t = Stable.Latest.t =
   { snark_transition : Snark_transition.Value.t
   ; ledger_proof : Ledger_proof.t option
