@@ -55,8 +55,8 @@ variable "seed_count" {
 
 locals {
   testnet_name = "test-labels"
-  coda_image = "gcr.io/o1labs-192920/mina-daemon-baked:1.2.0beta3-fix-stop-daemon-devnet-b30a76e-test-labels-b30a76e"
-  coda_archive_image = "gcr.io/o1labs-192920/mina-archive:1.2.0beta1-develop-devnet-585c76f"
+  mina_image = "gcr.io/o1labs-192920/mina-daemon-baked:1.2.0beta3-fix-stop-daemon-devnet-b30a76e-test-labels-b30a76e"
+  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:1.2.0beta1-develop-devnet-585c76f"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
 
@@ -113,8 +113,8 @@ module "testlabels" {
   ]
 
 
-  coda_faucet_amount = "10000000000"
-  coda_faucet_fee    = "100000000"
+  mina_faucet_amount = "10000000000"
+  mina_faucet_fee    = "100000000"
 
   agent_min_fee = "0.05"
   agent_max_fee = "0.1"
