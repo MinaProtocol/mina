@@ -44,11 +44,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
     let sender_bp = List.nth_exn (Network.block_producers network) 1 in
     let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
-    let tps = 50 in
+    let tps = 1 in
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
-    let num_slots = 2 in
+    let num_slots = 10 in
     let num_payments = tps * num_slots * window_ms / 1000 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let amount = Currency.Amount.of_int 10_000_000 in
