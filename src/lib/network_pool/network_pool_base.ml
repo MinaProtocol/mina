@@ -126,7 +126,7 @@ end)
     let r, w =
       Strict_pipe.create ~name:"verified network pool diffs"
         (Buffered
-           ( `Capacity 1024
+           ( `Capacity 10240000
            , `Overflow
                (Call
                   (fun (env, cb) ->
