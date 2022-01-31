@@ -1863,6 +1863,8 @@ module Base = struct
           let use_full_commitment (t : t) =
             t.party.data.body.use_full_commitment
 
+          let increment_nonce (t : t) = t.party.data.body.increment_nonce
+
           let check_authorization ~(account : Account.t) ~commitment
               ~at_party:(at_party, _) ({ party; control; _ } : t) =
             ( match (auth_type, snapp_statement) with
@@ -2051,14 +2053,7 @@ module Base = struct
             ; inclusion_proof = _
             } ->
             let add_check, checks_succeeded = create_checker () in
-            (* The fee-payer must increment their nonce. *)
-            add_check Boolean.(party.data.body.increment_nonce ||| not is_start) ;
             (* If there's a valid signature, it must increment the nonce or use full commitment *)
-            add_check
-              Boolean.(
-                party.data.body.increment_nonce
-                ||| party.data.body.use_full_commitment
-                ||| not signature_verifies) ;
             let account', `proof_must_verify proof_must_verify =
               let tag =
                 Option.map snapp_statement ~f:(fun (i, _) -> side_loaded i)

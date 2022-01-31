@@ -1761,25 +1761,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           if (is_start : bool) then
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
           match
-            let%bind.Result () =
-              if is_start && not p.data.body.increment_nonce then
-                (* The fee-payer must increment their nonce. *)
-                Error Transaction_status.Failure.Fee_payer_nonce_must_increase
-              else Ok ()
-            in
-            let%bind.Result () =
-              match
-                ( Control.tag p.authorization
-                , p.data.body.increment_nonce
-                , p.data.body.use_full_commitment )
-              with
-              | Signature, false, false ->
-                  (* If there's a signature, it must increment the nonce or use
-                     full commitment to avoid replays *)
-                  Error Transaction_status.Failure.Parties_replay_check_failed
-              | _ ->
-                  Ok ()
-            in
             apply_body ~constraint_constants ~state_view
               ~check_auth:
                 (Fn.flip Permissions.Auth_required.check
