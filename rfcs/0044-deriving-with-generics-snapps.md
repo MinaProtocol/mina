@@ -6,15 +6,15 @@ This RFC introduces a mechanism for datatype generic programming (see [motivatio
 ## Motivation
 [motivation]: #motivation
 
-Datatype generic programming sometimes referred to as reflection refers to a form of abstraction for creating reusable logic that acts on a wide variety of datatypes. Typically this is used to fold over data structures to "automatically" implement toJson, toString, hash, equals, etc.
+Datatype generic programming sometimes referred to as reflection refers to a form of abstraction for creating reusable logic that acts on a wide variety of datatypes. Typically this is used to fold and unfold over data structures to "automatically" implement toJson, toString, hash, equals, etc.
 
-Specifically with respect to Snapps transactions: We have complex nested structures to define the new parties transaction and at the moment, we redeclare JSON, GraphQL, JS/OCaml bridges, specifications, and TypeScript definitions in SnarkyJS completely separately. This is error-prone, hard to maintain, and has already introduced bugs in our Snapps implementation even before we've shipped v1. Using datatype generic programming, we can define all of these only once, atomically on each primitive of the datatype, never forget to update when definitions change (the compiler will yell at us), and rely on the datatype generic machinery to perform the structural fold for us.
+Specifically with respect to Snapps transactions: We have complex nested structures to define the new parties transaction and at the moment, we redeclare JSON, GraphQL, JS/OCaml bridges, specifications, and TypeScript definitions in SnarkyJS completely separately. This is error-prone, hard to maintain, and has already introduced bugs in our Snapps implementation even before we've shipped v1. Using datatype generic programming, we can define all of these only once, atomically on each primitive of the datatype, never forget to update when definitions change (the compiler will yell at us), and rely on the datatype generic machinery to perform the structural fold and unfold for us.
 
-In OCaml, we'd look for some form of datatype generic programming that allows us to fold over algebraic datatypes and records. Typically, in Mina's codebase we have used ppx deriving macros. `[@@deriving yojson]` derives a JSON serializer and deserializer and `[@@deriving sexp]` derives an S-expression parser and printer.
+In OCaml, we'd look for some form of datatype generic programming that allows us to fold and unfold over algebraic datatypes and records. Typically, in Mina's codebase we have used ppx deriving macros. `[@@deriving yojson]` derives a JSON serializer and deserializer and `[@@deriving sexp]` derives an S-expression parser and printer.
 
 While PPX macros are very powerful, writing custom PPX macros is extremely difficult in OCaml, unfortunately, and very hard to maintain.
 
-Luckily, folks at Jane Street have implemented a mechanism to mechanically, generically, define folds on arbitrary data types in OCaml using the `[@@deriving fields]` macros that is written with "common OCaml" and anyone familiary with Jane Street libraries in OCaml, ie. most contributors to the Mina OCaml core, can maintain. 
+Luckily, folks at Jane Street have implemented a mechanism to mechanically, generically, define folds/unfolds on arbitrary data types in OCaml using the `[@@deriving fields]` macros that is written with "common OCaml" and anyone familiary with Jane Street libraries in OCaml, ie. most contributors to the Mina OCaml core, can maintain. 
 
 ```ocaml
 (* to_string from the ppx_fields_conv docs *)
@@ -40,7 +40,7 @@ let to_string t =
   String.concat fs ~sep:", "
 ```
 
-This is a step in the right direction but we can make this more succinct with terser combinators:
+This is a step in the right direction but we can make this more succinct with terser combinators -- (note we use `Fields.make_creator` so we can compose decoders with encoders)
 
 ```ocaml
 type t = {
@@ -52,18 +52,19 @@ type t = {
 } [@@deriving fields]
 
 let to_string t =
-  let open To_string.Combinators in
+  let open To_string.Prim in
   String.concat ~sep:", " @@
-      Fields.fold ~init:[]
+      (Fields.make_creator ~init:(To_string.init ())
         ~dir
         ~quantity:int
         ~price:float
-        ~cancelled:bool
+        ~cancelled:bool |> To_string.finish ())
 ```
 
 Further we can build combinators for horizontally composing derivers such that:
 
 ```ocaml
+(* pseudocode *)
 type t = {
   dir : [ `Buy | `Sell ];
   quantity : int;
@@ -72,15 +73,13 @@ type t = {
   symbol : string;
 } [@@deriving fields]
 
-let derive t =
-  let module Combinators = Derive.Make2(To_string)(To_equal) in
-  let open Combinators in
+let to_string, equal =
+  let module D = Derive.Make2(To_string)(To_equal) in
+  let open D.Prim in
   let dir = both Dir.to_string Dir.to_yojson in
-  Fields.fold ~init ~dir ~quantity:int ~price:float ~cancelled:bool |> finish
-
-let to_string = derive t |> fst
-let equal = derive t |> snd
-(* etc. *)
+  Fields.make_creator
+    ~init:(D.init ()) ~dir ~quantity:int ~price:float ~cancelled:bool
+  |> D.finish
 ```
 
 Coupled with combinators these custom folds are almost powerful enough.
@@ -94,34 +93,7 @@ Rather than pollute our data types we can settle for one extra relatively simple
 
 ### General Framework
 
-TODO
-
-
-```ocaml
-(* TODO *)
-
-module type Deriver = sig
-  module Source = struct type t end
-  module Init = struct type t ; val init : t end
-  module Finish = struct type t end
-
-  val t : Source.t -> Finish.t
-end
-
-module Make2 (D1 : Deriver) (D2 : Deriver) : Deriver = struct
-  type t = D1.t * D2.t
-
-  module Init = struct
-    type t = D1.Init.t * D2.Init.t
-    let init = D1.Init.init * D2.Init.init
-  end
-  module Finish = struct
-    type t = D1.Finish.t * D2.Finish.t
-  end
-
-end
-
-```
+See #10132 for a proposed imlementation of the machinery in the `fields_deriver` library.
 
 #### Deriving Annotations
 
@@ -167,106 +139,56 @@ module Ann = struct
 end
 ```
 
-Now we can build combinators on our field folds assuming a `t_ann` value is in scope.
+Now we can build combinators on our field folds/unfolds
 
 #### Combinators
 
-TODO
-
-#### Recipes
-
-TODO
-
+The combinators look something like this:
 
 ```ocaml
-module Reflection = struct
-  let regex = lazy (Re2.create_exn {regex|\_(\w)|regex})
+  val int_
+  val string_
+  val bool_
+  val list_
 
-  let underToCamel s =
-    Re2.replace_exn (Lazy.force regex) s ~f:(fun m ->
-        let s = Re2.Match.get_exn ~sub:(`Index 1) m in
-        String.capitalize s)
-
-  (** When Fields.folding, create graphql fields via reflection *)
-  let reflect f ~typ acc x =
-    let new_name = underToCamel (Field.name x) in
-    Schema.(
-      field new_name ~typ ~args:Arg.[] ~resolve:(fun _ v -> f (Field.get x v))
-      :: acc)
-
-  module Shorthand = struct
-    open Schema
-
-    (* Note: Eta expansion is needed here to combat OCaml's weak polymorphism nonsense *)
-
-    let id ~typ a x = reflect Fn.id ~typ a x
-
-    let nn_int a x = id ~typ:(non_null int) a x
-
-    let int a x = id ~typ:int a x
-
-    let nn_bool a x = id ~typ:(non_null bool) a x
-
-    let bool a x = id ~typ:bool a x
-
-    let nn_string a x = id ~typ:(non_null string) a x
-
-    let nn_time a x =
-      reflect
-        (fun t -> Block_time.to_time t |> Time.to_string)
-        ~typ:(non_null string) a x
-
-    let nn_catchup_status a x =
-      reflect
-        (fun o ->
-          Option.map o
-            ~f:
-              (List.map ~f:(function
-                | ( Transition_frontier.Full_catchup_tree.Node.State.Enum
-                    .Finished
-                  , _ ) ->
-                    "finished"
-                | Failed, _ ->
-                    "failed"
-                | To_download, _ ->
-                    "to_download"
-                | To_initial_validate, _ ->
-                    "to_initial_validate"
-                | To_verify, _ ->
-                    "to_verify"
-                | Wait_for_parent, _ ->
-                    "wait_for_parent"
-                | To_build_breadcrumb, _ ->
-                    "to_build_breadcrumb"
-                | Root, _ ->
-                    "root")))
-        ~typ:(list (non_null string))
-        a x
-
-    let string a x = id ~typ:string a x
-
-    module F = struct
-      let int f a x = reflect f ~typ:Schema.int a x
-
-      let nn_int f a x = reflect f ~typ:Schema.(non_null int) a x
-
-      let string f a x = reflect f ~typ:Schema.string a x
-
-      let nn_string f a x = reflect f ~typ:Schema.(non_null string) a x
-    end
+  module Prim = struct
+    val int
+    val string
+    val bool
+    val list
   end
-end
 ```
+
+The derivers in `Prim` are intended to be used directly by the `make_creator` fold/unfold. Example:
+
+```ocaml
+let open Prim in
+Fields.make_creator (init ()) ~foo:int ~bar:string |> finish
+```
+
+The underscore-suffixed versions of the derivers are used whenenever types need to be composed -- for example, when using `list`
+
+```ocaml
+let open Prim in
+Fields.make_creator (init ()) ~foo:int ~bar:(list D.string_) |> finish
+```
+
+More examples are present in the first PR #10132. Suggestions on naming scheme for these is appreciated, either here or on that PR.
 
 ### Applications for Snapps Parties (minimal)
 
-A minimal application of this mechanism applied to snapps transactions would be to 
+A minimal application of this mechanism applied to snapps transactions would be to apply these derivers to all the types involved in the Snapps parties transactions.
 
-TODO
+The derivers we need at a minimum are:
+`To_json`, `Of_json`, `Graphql_fields`, `Graphql_args`
+
+With these four derivers we can decode and encode JSON and send and receive JSON in GraphQL requests.
+
+When we bridge the `to_json` over to SnarkyJS we can generate a Snapp transaction and we'll know that it will be accepted by the GraphQL server generated via the `Graphql_fields/args` schema.
 
 ### Applications for Snapps Parties (phase2)
 
-TODO
+Create derivers for TypeScript `.d.ts` parties interface types and the OCaml/JavaScript bridge for these data types.
 
 ### Other Applications
 
