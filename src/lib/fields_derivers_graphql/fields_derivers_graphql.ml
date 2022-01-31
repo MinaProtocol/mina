@@ -121,6 +121,9 @@ module Graphql_fields_raw = struct
       let bool_opt_ = Input.{ run = (fun ?doc:_ () -> Schema.bool) }
 
       let bool_ = Input.{ run = (fun ?doc:_ () -> Schema.(non_null bool)) }
+
+      let list_ (x : 'a Input.t) =
+        Input.{ run = (fun ?doc:_ () -> Schema.(non_null (list (x.run ())))) }
     end
 
     include Fields_derivers.Make (Deriver_basic)
@@ -276,16 +279,16 @@ query IntrospectionQuery {
       | Error err ->
           failwith err
 
-    type t = { foo_hello : int; bar : string } [@@deriving fields]
+    type t = { foo_hello : int; bar : string list } [@@deriving fields]
 
-    let v = { foo_hello = 1; bar = "baz" }
+    let v = { foo_hello = 1; bar = [ "baz1"; "baz2" ] }
 
     let%test_unit "folding creates a graphql object we expect" =
       let open Graphql_fields.Prim in
       let typ1 =
         let typ_input =
           Fields.make_creator (Graphql_fields.init ()) ~foo_hello:int
-            ~bar:string
+            ~bar:(list Graphql_fields.string_)
           |> Graphql_fields.finish
         in
         typ_input.run ()
@@ -299,7 +302,7 @@ query IntrospectionQuery {
                   ~resolve:(fun _ t -> t.foo_hello)
               ; field "bar"
                   ~args:Arg.[]
-                  ~typ:(non_null string)
+                  ~typ:(non_null (list (non_null string)))
                   ~resolve:(fun _ t -> t.bar)
               ]))
       in

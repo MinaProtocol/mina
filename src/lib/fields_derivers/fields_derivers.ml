@@ -35,6 +35,8 @@ module type Deriver_basic_intf = sig
   val string_ : string Input.t
 
   val bool_ : bool Input.t
+
+  val list_ : 'a Input.t -> 'a list Input.t
 end
 
 module type Deriver_intf = sig
@@ -56,6 +58,8 @@ module type Deriver_intf = sig
     val string : ('a, 'input_type, string) Step.t
 
     val bool : ('a, 'input_type, bool) Step.t
+
+    val list : 'l Input.t -> ('a, 'input_type, 'l list) Step.t
   end
 end
 
@@ -83,6 +87,8 @@ module Make (D : Deriver_basic_intf) :
     let string fd acc = add_field D.string_ fd acc
 
     let bool fd acc = add_field D.bool_ fd acc
+
+    let list l fd acc = add_field (D.list_ l) fd acc
   end
 end
 
@@ -165,6 +171,8 @@ module Make2 (D1 : Deriver_intf) (D2 : Deriver_intf) :
 
   let bool_ = (D1.bool_, D2.bool_)
 
+  let list_ (l1, l2) = (D1.list_ l1, D2.list_ l2)
+
   module Prim = struct
     let int : (_, 'input_type, int) Step.t =
      fun fd acc -> add_field (D1.int_, D2.int_) fd acc
@@ -174,5 +182,7 @@ module Make2 (D1 : Deriver_intf) (D2 : Deriver_intf) :
 
     let bool : (_, 'input_type, bool) Step.t =
      fun fd acc -> add_field (D1.bool_, D2.bool_) fd acc
+
+    let list (l1, l2) fd acc = add_field (D1.list_ l1, D2.list_ l2) fd acc
   end
 end
