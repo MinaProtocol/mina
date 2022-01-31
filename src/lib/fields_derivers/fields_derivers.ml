@@ -24,7 +24,8 @@ module type Deriver_basic_intf = sig
        , 'f )
        Fieldslib.Field.t_with_perm
     -> 'input_type Accumulator.t
-    -> ('input_type Creator.t -> 'f) * 'input_type Accumulator.t
+    -> ('input_type Creator.t -> ('f, string) Result.t)
+       * 'input_type Accumulator.t
 
   val finish :
        ('input_type Creator.t -> 'input_type) * 'input_type Accumulator.t
@@ -49,7 +50,8 @@ module type Deriver_intf = sig
          , 'f )
          Fieldslib.Field.t_with_perm
       -> 'input_type Accumulator.t
-      -> ('input_type Creator.t -> 'f) * 'input_type Accumulator.t
+      -> ('input_type Creator.t -> ('f, string) Result.t)
+         * 'input_type Accumulator.t
   end
 
   module Prim : sig
@@ -78,7 +80,8 @@ module Make (D : Deriver_basic_intf) :
          , 'f )
          Fieldslib.Field.t_with_perm
       -> 'input_type Accumulator.t
-      -> ('input_type Creator.t -> 'f) * 'input_type Accumulator.t
+      -> ('input_type Creator.t -> ('f, string) Result.t)
+         * 'input_type Accumulator.t
   end
 
   module Prim = struct
@@ -162,7 +165,8 @@ module Make2 (D1 : Deriver_intf) (D2 : Deriver_intf) :
          , 'f )
          Fieldslib.Field.t_with_perm
       -> 'input_type Accumulator.t
-      -> ('input_type Creator.t -> 'f) * 'input_type Accumulator.t
+      -> ('input_type Creator.t -> ('f, string) Result.t)
+         * 'input_type Accumulator.t
   end
 
   let int_ = (D1.int_, D2.int_)
