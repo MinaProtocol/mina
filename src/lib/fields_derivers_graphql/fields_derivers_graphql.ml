@@ -53,79 +53,77 @@ module Graphql_fields_raw = struct
   module Make (IO : Graphql_intf.IO) = struct
     module Schema = Graphql_schema.Make (IO)
 
-    module Input = struct
-      type 'input_type t =
-        { run : 'ctx. ?doc:string -> unit -> ('ctx, 'input_type) Schema.typ }
-    end
-
-    module Creator = struct
-      type 'input_type t = unit
-    end
-
-    module Output = struct
-      type 'input_type t = 'input_type option Input.t
-    end
-
-    module Accumulator = struct
-      module Elem = struct
+    module Deriver_basic = struct
+      module Input = struct
         type 'input_type t =
-          { run : 'ctx. unit -> ('ctx, 'input_type) Schema.field }
+          { run : 'ctx. ?doc:string -> unit -> ('ctx, 'input_type) Schema.typ }
       end
 
-      (** thunks generating the schema in reverse *)
-      type 'input_type t = 'input_type Elem.t list
-    end
+      module Creator = struct
+        type 'input_type t = unit
+      end
 
-    let init () = []
+      module Output = struct
+        type 'input_type t = 'input_type option Input.t
+      end
 
-    let add_field (type f input_type) :
-           f Input.t
-        -> ( [< `Read | `Set_and_create ]
-           , input_type
-           , f )
-           Fieldslib.Field.t_with_perm
-        -> input_type Accumulator.t
-        -> (input_type Creator.t -> f) * input_type Accumulator.t =
-     fun t_field field acc ->
-      ( (fun _ -> failwith "Unused")
-      , { Accumulator.Elem.run =
-            (fun () ->
-              Schema.field
-                (Fields_derivers.name_under_to_camel field)
-                ~args:Schema.Arg.[]
-                ?doc:None ?deprecated:None ~typ:(t_field.run ())
-                ~resolve:(fun _ x -> Field.get field x))
+      module Accumulator = struct
+        module Elem = struct
+          type 'input_type t =
+            { run : 'ctx. unit -> ('ctx, 'input_type) Schema.field }
+        end
+
+        (** thunks generating the schema in reverse *)
+        type 'input_type t = 'input_type Elem.t list
+      end
+
+      let init () = []
+
+      let add_field (type f input_type) :
+             f Input.t
+          -> ( [< `Read | `Set_and_create ]
+             , input_type
+             , f )
+             Fieldslib.Field.t_with_perm
+          -> input_type Accumulator.t
+          -> (input_type Creator.t -> f) * input_type Accumulator.t =
+       fun t_field field acc ->
+        ( (fun _ -> failwith "Unused")
+        , { Accumulator.Elem.run =
+              (fun () ->
+                Schema.field
+                  (Fields_derivers.name_under_to_camel field)
+                  ~args:Schema.Arg.[]
+                  ?doc:None ?deprecated:None ~typ:(t_field.run ())
+                  ~resolve:(fun _ x -> Field.get field x))
+          }
+          :: acc )
+
+      (* TODO: Do we need doc and deprecated and name on finish? *)
+      let finish ((_creator, schema_rev_thunk) : 'u * 'input_type Accumulator.t)
+          : 'input_type Output.t =
+        { run =
+            (fun ?doc () ->
+              Schema.obj "TODO" ?doc ~fields:(fun _ ->
+                  List.rev
+                  @@ List.map schema_rev_thunk ~f:(fun f ->
+                         f.Accumulator.Elem.run ())))
         }
-        :: acc )
 
-    (* TODO: Do we need doc and deprecated and name on finish? *)
-    let finish ((_creator, schema_rev_thunk) : 'u * 'input_type Accumulator.t) :
-        'input_type Output.t =
-      { run =
-          (fun ?doc () ->
-            Schema.obj "TODO" ?doc ~fields:(fun _ ->
-                List.rev
-                @@ List.map schema_rev_thunk ~f:(fun f ->
-                       f.Accumulator.Elem.run ())))
-      }
+      let int_opt_ = Input.{ run = (fun ?doc:_ () -> Schema.int) }
 
-    module Prim = struct
-      let int field acc =
-        add_field Input.{ run = (fun ?doc:_ () -> Schema.int) } field acc
+      let int_ = Input.{ run = (fun ?doc:_ () -> Schema.(non_null int)) }
 
-      let nn_int field acc =
-        add_field
-          Input.{ run = (fun ?doc:_ () -> Schema.(non_null int)) }
-          field acc
+      let string_opt_ = Input.{ run = (fun ?doc:_ () -> Schema.string) }
 
-      let string field acc =
-        add_field Input.{ run = (fun ?doc:_ () -> Schema.string) } field acc
+      let string_ = Input.{ run = (fun ?doc:_ () -> Schema.(non_null string)) }
 
-      let nn_string field acc =
-        add_field
-          Input.{ run = (fun ?doc:_ () -> Schema.(non_null string)) }
-          field acc
+      let bool_opt_ = Input.{ run = (fun ?doc:_ () -> Schema.bool) }
+
+      let bool_ = Input.{ run = (fun ?doc:_ () -> Schema.(non_null bool)) }
     end
+
+    include Fields_derivers.Make (Deriver_basic)
   end
 end
 
@@ -156,7 +154,7 @@ let typ_conv (typ : ('a, 'b) Graphql_fields.Schema.typ) :
   Obj.magic typ
 
 (* Make sure that this is a deriver *)
-module Graphql_fields_ : Fields_derivers.Deriver = Graphql_fields
+module Graphql_fields_ : Fields_derivers.Deriver_intf = Graphql_fields
 
 let%test_module "Test" =
   ( module struct
@@ -286,8 +284,8 @@ query IntrospectionQuery {
       let open Graphql_fields.Prim in
       let typ1 =
         let typ_input =
-          Fields.make_creator (Graphql_fields.init ()) ~foo_hello:nn_int
-            ~bar:nn_string
+          Fields.make_creator (Graphql_fields.init ()) ~foo_hello:int
+            ~bar:string
           |> Graphql_fields.finish
         in
         typ_input.run ()
