@@ -2952,10 +2952,10 @@ module Mutations = struct
               (if Time.Span.(pause > zero) then after pause else Deferred.unit)
               >>= send_tx >>| const ()
             in
-            for i = 2 to repeat_count do
+            (* for i = 2 to repeat_count do
               don't_wait_for (do_ i)
-            done ;
-            (* don't_wait_for (Deferred.for_ 2 ~to_:repeat_count ~do_) ; *)
+            done ; *)
+            don't_wait_for (Deferred.for_ 2 ~to_:repeat_count ~do_) ;
             send_tx ()
         | Some signature when repeat_count = 1 ->
             send_signed_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
