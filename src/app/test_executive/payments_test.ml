@@ -54,13 +54,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let logger = Logger.create () in
     (* fee for user commands *)
     let fee = Currency.Fee.of_int 10_000_000 in
-    let block_producer_nodes = Network.block_producers network in
+    let all_nodes = Network.all_nodes network in
     let%bind () =
-      Malleable_error.List.iter block_producer_nodes
+      Malleable_error.List.iter all_nodes
         ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
     in
     let[@warning "-8"] [ untimed_node_a; untimed_node_b; timed_node_a ] =
-      block_producer_nodes
+      Network.block_producers network
     in
     let%bind () =
       section "send a single payment between 2 untimed accounts"

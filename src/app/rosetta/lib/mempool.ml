@@ -320,6 +320,7 @@ let router ~graphql_uri ~logger (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /mempool/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
+  [%log info] "Mempool query" ~metadata:[("query",body)];
   match route with
   | [] | [""] ->
       let%bind req =
