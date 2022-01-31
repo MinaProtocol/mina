@@ -7,6 +7,8 @@ open Signature_lib
 
 type metrics_t = { block_production_delay : int list }
 
+type best_chain_block = { state_hash : string; command_transaction_count : int }
+
 (* TODO: malleable error -> or error *)
 
 module Engine = struct
@@ -86,10 +88,16 @@ module Engine = struct
         logger:Logger.t -> t -> (string * string list) Malleable_error.t
 
       val get_best_chain :
-        logger:Logger.t -> t -> string list Async_kernel.Deferred.Or_error.t
+           ?max_length:int
+        -> logger:Logger.t
+        -> t
+        -> best_chain_block list Async_kernel.Deferred.Or_error.t
 
       val must_get_best_chain :
-        logger:Logger.t -> t -> string list Malleable_error.t
+           ?max_length:int
+        -> logger:Logger.t
+        -> t
+        -> best_chain_block list Malleable_error.t
 
       val dump_archive_data :
         logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t

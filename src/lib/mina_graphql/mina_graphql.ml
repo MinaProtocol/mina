@@ -1625,6 +1625,11 @@ module Types = struct
         ; field "transactions" ~typ:(non_null transactions)
             ~args:Arg.[]
             ~resolve:(fun _ { With_hash.data; _ } -> data.transactions)
+        ; field "commandTransactionCount" ~typ:(non_null int)
+            ~doc:"Count of user command transactions in the block"
+            ~args:Arg.[]
+            ~resolve:(fun _ { With_hash.data; _ } ->
+              List.length data.transactions.commands)
         ; field "snarkJobs"
             ~typ:(non_null @@ list @@ non_null completed_work)
             ~args:Arg.[]
@@ -2947,9 +2952,9 @@ module Mutations = struct
               (if Time.Span.(pause > zero) then after pause else Deferred.unit)
               >>= send_tx >>| const ()
             in
-            for i=2 to repeat_count do
+            for i = 2 to repeat_count do
               don't_wait_for (do_ i)
-            done;
+            done ;
             (* don't_wait_for (Deferred.for_ 2 ~to_:repeat_count ~do_) ; *)
             send_tx ()
         | Some signature when repeat_count = 1 ->

@@ -44,7 +44,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
     let sender_bp = List.nth_exn (Network.block_producers network) 1 in
     let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
-    let tps = 500 in
+    let tps = 1000 in
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
@@ -52,30 +52,49 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let num_payments = tps * num_slots * window_ms / 1000 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let amount = Currency.Amount.of_int 10_000_000 in
-    [%log info] "will now send %d payments" num_payments;
+    [%log info] "will now send %d payments" num_payments ;
     let get_metrics node =
       Async_kernel.Deferred.bind
         (Network.Node.get_metrics ~logger node)
         ~f:Malleable_error.or_hard_error
     in
-    let end_t = Time.add (Time.now ()) (Time.Span.of_ms @@ float_of_int @@ num_slots * window_ms) in
-    let%bind () = Network.Node.must_send_payment
-              ~initial_delay_sec:1.
-              ~repeat_count:(Unsigned.UInt32.of_int num_payments)
-              ~repeat_delay_ms:(Unsigned.UInt32.of_int @@ 1000 / tps)
-              ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee sender_bp in
-    let%bind () = Async_kernel.Deferred.bind (Async.after (Time.diff end_t @@ Time.now ())) ~f:(const Malleable_error.ok_unit) in
+    (* check account nonce on both nodes *)
+    let end_t =
+      Time.add (Time.now ())
+        (Time.Span.of_ms @@ float_of_int @@ (num_slots * window_ms))
+    in
+    let%bind () =
+      Network.Node.must_send_payment ~initial_delay_sec:1.
+        ~repeat_count:(Unsigned.UInt32.of_int num_payments)
+        ~repeat_delay_ms:(Unsigned.UInt32.of_int @@ (1000 / tps))
+        ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee sender_bp
+    in
+    let%bind () =
+      Async_kernel.Deferred.bind
+        (Async.after (Time.diff end_t @@ Time.now ()))
+        ~f:(const Malleable_error.ok_unit)
+    in
     let%bind { block_production_delay = snd_delay } = get_metrics sender_bp in
     let%bind { block_production_delay = rcv_delay } = get_metrics receiver_bp in
-    let gt0 a = a > 0 in
+    let%bind blocks = Network.Node.must_get_best_chain ~logger ~max_length:num_slots receiver_bp in
+    let res_num_payments, _ = List.fold_map blocks ~init:0 ~f:(fun s b -> s + b.command_transaction_count, ()) in
+    [%log info] "Total %d payments in blocks, see $blocks for details" res_num_payments
+      ~metadata:[
+        ("blocks" , `List (List.map blocks ~f:(fun b ->
+          `Tuple [`String b.state_hash; `Int b.command_transaction_count]
+          )))
+      ];
     let rcv_delay0 = List.nth_exn rcv_delay 0 in
     let snd_delay0 = List.nth_exn snd_delay 0 in
     let%map () =
       Malleable_error.ok_if_true
         ~error:(Error.of_string "unexpected block production delays")
         ( rcv_delay0 > 0 && snd_delay0 > 0
-        && List.is_empty (List.filter ~f:gt0 @@ List.tl_exn rcv_delay)
-        && List.is_empty (List.filter ~f:gt0 @@ List.tl_exn snd_delay)
+        (* Due to long start, a block will inevitably get in later brackets *)
+        (* && (let gt0 a = a > 0 in
+           List.is_empty (List.filter ~f:gt0 @@ List.tl_exn rcv_delay)
+        && List.is_empty (List.filter ~f:gt0 @@ List.tl_exn snd_delay)) *)
+        && res_num_payments * 2 > num_payments
         && rcv_delay0 + snd_delay0 >= num_slots - 1 )
     in
     [%log info] "block_production_priority test: test finished!!"

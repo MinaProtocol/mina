@@ -213,9 +213,10 @@ module Node = struct
     module Best_chain =
     [%graphql
     {|
-      query {
-        bestChain {
+      query ($max_length: Int) {
+        bestChain (maxLength: $max_length) {
           stateHash
+          commandTransactionCount
         }
       }
     |}]
@@ -244,10 +245,14 @@ module Node = struct
     else
       let uri = Graphql.ingress_uri node in
       let metadata =
-        [ ("query", `String query_name); ("uri", `String (Uri.to_string uri))
-        ; ("init_delay", `Float initial_delay_sec) ]
+        [ ("query", `String query_name)
+        ; ("uri", `String (Uri.to_string uri))
+        ; ("init_delay", `Float initial_delay_sec)
+        ]
       in
-      [%log info] "Attempting to send GraphQL request \"$query\" to \"$uri\" after $init_delay sec"
+      [%log info]
+        "Attempting to send GraphQL request \"$query\" to \"$uri\" after \
+         $init_delay sec"
         ~metadata ;
       let rec retry n =
         if n <= 0 then (
@@ -312,9 +317,9 @@ module Node = struct
   let must_get_peer_id ~logger t =
     get_peer_id ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let get_best_chain ~logger t =
+  let get_best_chain ?max_length ~logger t =
     let open Deferred.Or_error.Let_syntax in
-    let query = Graphql.Best_chain.make () in
+    let query = Graphql.Best_chain.make ?max_length () in
     let%bind result =
       exec_graphql_request ~logger ~node:t ~query_name:"best_chain" query
     in
@@ -323,10 +328,11 @@ module Node = struct
         Deferred.Or_error.error_string "failed to get best chains"
     | Some chain ->
         return
-        @@ List.map ~f:(fun block -> block#stateHash) (Array.to_list chain)
+        @@ List.map ~f:(fun block -> Intf.{state_hash=block#stateHash; command_transaction_count=block#commandTransactionCount}) (Array.to_list chain)
 
-  let must_get_best_chain ~logger t =
-    get_best_chain ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
+  let must_get_best_chain ?max_length ~logger t =
+    get_best_chain ?max_length ~logger t
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let get_balance ~logger t ~account_id =
     let open Deferred.Or_error.Let_syntax in
@@ -361,8 +367,8 @@ module Node = struct
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
-  let send_payment ?initial_delay_sec ?repeat_count ?repeat_delay_ms ~logger t ~sender_pub_key
-      ~receiver_pub_key ~amount ~fee =
+  let send_payment ?initial_delay_sec ?repeat_count ?repeat_delay_ms ~logger t
+      ~sender_pub_key ~receiver_pub_key ~amount ~fee =
     (* We have two calls to `exec_graphql_request`, so we split total delay in half *)
     [%log info] "Sending a payment"
       ~metadata:
@@ -391,7 +397,8 @@ module Node = struct
           ~amount:(Graphql_lib.Encoders.amount amount)
           ~fee:(Graphql_lib.Encoders.fee fee)
           ?repeat_count:(Option.map ~f:Graphql_lib.Encoders.uint32 repeat_count)
-          ?repeat_delay_ms:(Option.map ~f:Graphql_lib.Encoders.uint32 repeat_delay_ms)
+          ?repeat_delay_ms:
+            (Option.map ~f:Graphql_lib.Encoders.uint32 repeat_delay_ms)
           ()
       in
       exec_graphql_request ?initial_delay_sec ~logger ~node:t
@@ -404,10 +411,10 @@ module Node = struct
       ~metadata:[ ("user_command_id", `String user_cmd_id) ] ;
     ()
 
-  let must_send_payment ?initial_delay_sec ?repeat_count ?repeat_delay_ms ~logger t ~sender_pub_key
-      ~receiver_pub_key ~amount ~fee =
-    send_payment ?initial_delay_sec ?repeat_count ?repeat_delay_ms ~logger t ~sender_pub_key ~receiver_pub_key
-      ~amount ~fee
+  let must_send_payment ?initial_delay_sec ?repeat_count ?repeat_delay_ms
+      ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
+    send_payment ?initial_delay_sec ?repeat_count ?repeat_delay_ms ~logger t
+      ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =
