@@ -64,7 +64,11 @@ module Graphql_fields_raw = struct
       end
 
       module Output = struct
-        type 'input_type t = 'input_type option Input.t
+        type 'output_type t =
+          { run :
+              'ctx.    ?doc:string -> name:string
+              -> ('ctx, 'output_type option) Schema.typ
+          }
       end
 
       module Accumulator = struct
@@ -102,9 +106,9 @@ module Graphql_fields_raw = struct
       (* TODO: Do we need doc and deprecated and name on finish? *)
       let finish ((_creator, schema_rev_thunk) : 'u * 'input_type Accumulator.t)
           : 'input_type Output.t =
-        { run =
-            (fun ?doc () ->
-              Schema.obj "TODO" ?doc ~fields:(fun _ ->
+        { Output.run =
+            (fun ?doc ~name ->
+              Schema.obj name ?doc ~fields:(fun _ ->
                   List.rev
                   @@ List.map schema_rev_thunk ~f:(fun f ->
                          f.Accumulator.Elem.run ())))
@@ -291,11 +295,11 @@ query IntrospectionQuery {
             ~bar:(list Graphql_fields.string_)
           |> Graphql_fields.finish
         in
-        typ_input.run ()
+        typ_input.run ~name:"T"
       in
       let typ2 =
         Graphql_fields.Schema.(
-          obj "TODO" ?doc:None ~fields:(fun _ ->
+          obj "T" ?doc:None ~fields:(fun _ ->
               [ field "fooHello"
                   ~args:Arg.[]
                   ~typ:(non_null int)
