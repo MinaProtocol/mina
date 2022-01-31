@@ -239,27 +239,6 @@ module Eff = struct
     | Check_fee_excess :
         'bool * 'failure
         -> ('failure, < bool : 'bool ; failure : 'failure ; .. >) t
-    | Get_global_ledger :
-        'global_state
-        -> ('ledger, < global_state : 'global_state ; ledger : 'ledger ; .. >) t
-    | Modify_global_excess :
-        'global_state * ('signed_amount -> 'signed_amount)
-        -> ( 'global_state
-           , < global_state : 'global_state
-             ; signed_amount : 'signed_amount
-             ; .. > )
-           t
-    | Modify_global_ledger :
-        { global_state : 'global_state
-        ; ledger : 'ledger
-        ; should_update : 'bool
-        }
-        -> ( 'global_state
-           , < bool : 'bool
-             ; global_state : 'global_state
-             ; ledger : 'ledger
-             ; .. > )
-           t
     | Check_auth_and_update_account :
         { is_start : 'bool
         ; party : 'party
@@ -328,6 +307,18 @@ module type Inputs_intf = sig
 
     val full_commitment : party:Party.t -> commitment:t -> t
   end
+
+  module Global_state : sig
+    type t
+
+    val ledger : t -> Ledger.t
+
+    val set_ledger : should_update:Bool.t -> t -> Ledger.t -> t
+
+    val fee_excess : t -> Amount.Signed.t
+
+    val set_fee_excess : t -> Amount.Signed.t -> t
+  end
 end
 
 module Start_data = struct
@@ -391,12 +382,12 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (party, current_stack, call_stack)
 
-  let apply (type global_state failure_status)
+  let apply (type failure_status)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start :
          [ `Yes of _ Start_data.t | `No | `Compute of _ Start_data.t ])
       (h :
-        (< global_state : global_state
+        (< global_state : Global_state.t
          ; transaction_commitment : Transaction_commitment.t
          ; full_transaction_commitment : Transaction_commitment.t
          ; amount : Amount.t
@@ -405,8 +396,8 @@ module Make (Inputs : Inputs_intf) = struct
          ; .. >
          as
          'env)
-        handler) ((global_state : global_state), (local_state : _ Local_state.t))
-      =
+        handler)
+      ((global_state : Global_state.t), (local_state : _ Local_state.t)) =
     let open Inputs in
     let is_start' =
       let is_start' = Ps.is_empty local_state.parties in
@@ -429,7 +420,7 @@ module Make (Inputs : Inputs_intf) = struct
       { local_state with
         ledger =
           Inputs.Ledger.if_ is_start'
-            ~then_:(h.perform (Get_global_ledger global_state))
+            ~then_:(Inputs.Global_state.ledger global_state)
             ~else_:local_state.ledger
       }
     in
@@ -584,7 +575,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let update_local_excess = Bool.(is_start' ||| is_last_party) in
     let update_global_state =
-      ref Bool.(update_local_excess &&& local_state.success)
+      Bool.(update_local_excess &&& local_state.success)
     in
     let valid_fee_excess =
       let delta_settled = Amount.equal local_state.excess Amount.zero in
@@ -600,41 +591,39 @@ module Make (Inputs : Inputs_intf) = struct
       ; failure_status
       }
     in
-    let global_excess_update_failed = ref Bool.true_ in
-    let global_state, local_state =
-      ( h.perform
-          (Modify_global_excess
-             ( global_state
-             , fun amt ->
-                 let res, `Overflow overflow =
-                   Amount.Signed.add_flagged amt
-                     (Amount.Signed.of_unsigned local_state.excess)
-                 in
-                 (global_excess_update_failed :=
-                    Bool.(!update_global_state &&& overflow)) ;
-                 (update_global_state :=
-                    Bool.(!update_global_state &&& not overflow)) ;
-                 Amount.Signed.if_ !update_global_state ~then_:res ~else_:amt ))
-      , { local_state with
-          excess =
-            Amount.if_ update_local_excess ~then_:Amount.zero
-              ~else_:local_state.excess
-        } )
+    let global_state, global_excess_update_failed, update_global_state =
+      let amt = Global_state.fee_excess global_state in
+      let res, `Overflow overflow =
+        Amount.Signed.add_flagged amt
+          (Amount.Signed.of_unsigned local_state.excess)
+      in
+      let global_excess_update_failed =
+        Bool.(update_global_state &&& overflow)
+      in
+      let update_global_state = Bool.(update_global_state &&& not overflow) in
+      let new_amt =
+        Amount.Signed.if_ update_global_state ~then_:res ~else_:amt
+      in
+      ( Global_state.set_fee_excess global_state new_amt
+      , global_excess_update_failed
+      , update_global_state )
     in
-    Bool.(assert_ (not (is_start' &&& !global_excess_update_failed))) ;
     let local_state =
       { local_state with
-        success =
-          Bool.(local_state.success &&& not !global_excess_update_failed)
+        excess =
+          Amount.if_ update_local_excess ~then_:Amount.zero
+            ~else_:local_state.excess
+      }
+    in
+    Bool.(assert_ (not (is_start' &&& global_excess_update_failed))) ;
+    let local_state =
+      { local_state with
+        success = Bool.(local_state.success &&& not global_excess_update_failed)
       }
     in
     let global_state =
-      h.perform
-        (Modify_global_ledger
-           { global_state
-           ; ledger = local_state.ledger
-           ; should_update = !update_global_state
-           })
+      Global_state.set_ledger ~should_update:update_global_state global_state
+        local_state.ledger
     in
     let local_state =
       (* Make sure to reset the local_state at the end of a transaction.
