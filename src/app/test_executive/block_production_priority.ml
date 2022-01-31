@@ -76,25 +76,35 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind { block_production_delay = snd_delay } = get_metrics sender_bp in
     let%bind { block_production_delay = rcv_delay } = get_metrics receiver_bp in
-    let%bind blocks = Network.Node.must_get_best_chain ~logger ~max_length:num_slots receiver_bp in
-    let res_num_payments, _ = List.fold_map blocks ~init:0 ~f:(fun s b -> s + b.command_transaction_count, ()) in
-    [%log info] "Total %d payments in blocks, see $blocks for details" res_num_payments
-      ~metadata:[
-        ("blocks" , `List (List.map blocks ~f:(fun b ->
-          `Tuple [`String b.state_hash; `Int b.command_transaction_count]
-          )))
-      ];
+    let%bind blocks =
+      Network.Node.must_get_best_chain ~logger ~max_length:num_slots receiver_bp
+    in
+    let res_num_payments, _ =
+      List.fold_map blocks ~init:0 ~f:(fun s b ->
+          (s + b.command_transaction_count, ()))
+    in
+    [%log info] "Total %d payments in blocks, see $blocks for details"
+      res_num_payments
+      ~metadata:
+        [ ( "blocks"
+          , `List
+              (List.map blocks ~f:(fun b ->
+                   `Tuple
+                     [ `String b.state_hash; `Int b.command_transaction_count ]))
+          )
+        ] ;
     let rcv_delay0 = List.nth_exn rcv_delay 0 in
     let snd_delay0 = List.nth_exn snd_delay 0 in
     let%map () =
       Malleable_error.ok_if_true
         ~error:(Error.of_string "unexpected block production delays")
-        ( rcv_delay0 > 0 && snd_delay0 > 0
-        (* Due to long start, a block will inevitably get in later brackets *)
-        (* && (let gt0 a = a > 0 in
-           List.is_empty (List.filter ~f:gt0 @@ List.tl_exn rcv_delay)
-        && List.is_empty (List.filter ~f:gt0 @@ List.tl_exn snd_delay)) *)
-        && res_num_payments * 2 > num_payments
+        ( (* Check that testing tps was actually realized (at least in half) into
+             transactions that got to blocks *)
+          res_num_payments * 2 > num_payments
+        (* Check that there were no short forks *)
+        && rcv_delay0 + snd_delay0 <= List.length blocks
+        (* Check that most of blocks got to the first delay bucket
+           (were produced within a minute) *)
         && rcv_delay0 + snd_delay0 >= num_slots - 1 )
     in
     [%log info] "block_production_priority test: test finished!!"

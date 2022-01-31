@@ -328,7 +328,13 @@ module Node = struct
         Deferred.Or_error.error_string "failed to get best chains"
     | Some chain ->
         return
-        @@ List.map ~f:(fun block -> Intf.{state_hash=block#stateHash; command_transaction_count=block#commandTransactionCount}) (Array.to_list chain)
+        @@ List.map
+             ~f:(fun block ->
+               Intf.
+                 { state_hash = block#stateHash
+                 ; command_transaction_count = block#commandTransactionCount
+                 })
+             (Array.to_list chain)
 
   let must_get_best_chain ?max_length ~logger t =
     get_best_chain ?max_length ~logger t
