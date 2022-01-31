@@ -182,7 +182,11 @@ module Status = struct
   end
 
   module Metrics = struct
-    type t = { block_production_delay : int list }
+    type t =
+      { block_production_delay : int list
+      ; transaction_pool_diff_received : int
+      ; transaction_pool_diff_broadcasted : int
+      }
     [@@deriving to_yojson, bin_io_unversioned, fields]
   end
 
@@ -401,7 +405,14 @@ module Status = struct
           fmt_field "block_production_delay"
           @@ list_mapper ~to_string:string_of_int
         in
+        let transaction_pool_diff_received =
+          fmt_field "transaction_pool_diff_received" string_of_int
+        in
+        let transaction_pool_diff_broadcasted =
+          fmt_field "transaction_pool_diff_broadcasted" string_of_int
+        in
         Metrics.Fields.to_list ~block_production_delay
+          ~transaction_pool_diff_received ~transaction_pool_diff_broadcasted
         |> List.concat
         |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
         |> digest_entries ~title:""

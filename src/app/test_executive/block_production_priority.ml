@@ -74,8 +74,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Async.after (Time.diff end_t @@ Time.now ()))
         ~f:(const Malleable_error.ok_unit)
     in
-    let%bind { block_production_delay = snd_delay } = get_metrics sender_bp in
-    let%bind { block_production_delay = rcv_delay } = get_metrics receiver_bp in
+    let%bind { block_production_delay = snd_delay; _ } =
+      get_metrics sender_bp
+    in
+    let%bind { block_production_delay = rcv_delay; _ } =
+      get_metrics receiver_bp
+    in
     let%bind blocks =
       Network.Node.must_get_best_chain ~logger ~max_length:num_slots receiver_bp
     in

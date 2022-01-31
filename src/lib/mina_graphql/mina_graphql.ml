@@ -377,7 +377,9 @@ module Types = struct
           let open Reflection.Shorthand in
           List.rev
           @@ Daemon_rpcs.Types.Status.Metrics.Fields.fold ~init:[]
-               ~block_production_delay:nn_int_list)
+               ~block_production_delay:nn_int_list
+               ~transaction_pool_diff_received:nn_int
+               ~transaction_pool_diff_broadcasted:nn_int)
 
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
@@ -2953,8 +2955,8 @@ module Mutations = struct
               >>= send_tx >>| const ()
             in
             (* for i = 2 to repeat_count do
-              don't_wait_for (do_ i)
-            done ; *)
+                 don't_wait_for (do_ i)
+               done ; *)
             don't_wait_for (Deferred.for_ 2 ~to_:repeat_count ~do_) ;
             send_tx ()
         | Some signature when repeat_count = 1 ->

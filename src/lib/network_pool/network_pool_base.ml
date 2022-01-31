@@ -76,9 +76,7 @@ end)
   let broadcasts { read_broadcasts; _ } = read_broadcasts
 
   let create_rate_limiter () =
-    Rate_limiter.create
-      ~capacity:
-        (10000000, `Per (Time.Span.of_sec 15.0))
+    Rate_limiter.create ~capacity:(10000000, `Per (Time.Span.of_sec 15.0))
 
   let apply_and_broadcast t
       (diff : Resource_pool.Diff.verified Envelope.Incoming.t) cb =

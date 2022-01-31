@@ -228,6 +228,8 @@ module Node = struct
         daemonStatus {
           metrics {
             blockProductionDelay
+            transactionPoolDiffReceived
+            transactionPoolDiffBroadcasted
           }
         }
       }
@@ -547,14 +549,28 @@ module Node = struct
       exec_graphql_request ~logger ~node:t ~query_name:"query_metrics" query_obj
     in
     [%log info] "get_metrics, finished exec_graphql_request" ;
-    let bn_delay =
+    let block_production_delay =
       Array.to_list
       @@ query_result_obj#daemonStatus#metrics#blockProductionDelay
     in
+    let transaction_pool_diff_received =
+      query_result_obj#daemonStatus#metrics#transactionPoolDiffReceived
+    in
+    let transaction_pool_diff_broadcasted =
+      query_result_obj#daemonStatus#metrics#transactionPoolDiffBroadcasted
+    in
     [%log info]
-      "get_metrics, result of graphql query (block_production_delay) (%s)"
-      (String.concat ~sep:", " @@ List.map ~f:string_of_int bn_delay) ;
-    return { Intf.block_production_delay = bn_delay }
+      "get_metrics, result of graphql query (block_production_delay; \
+       tx_received; tx_broadcasted) (%s; %d; %d)"
+      ( String.concat ~sep:", "
+      @@ List.map ~f:string_of_int block_production_delay )
+      transaction_pool_diff_received transaction_pool_diff_broadcasted ;
+    return
+      Intf.
+        { block_production_delay
+        ; transaction_pool_diff_broadcasted
+        ; transaction_pool_diff_received
+        }
 end
 
 type t =

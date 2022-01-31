@@ -7772,6 +7772,30 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "transactionPoolDiffReceived",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "transactionPoolDiffBroadcasted",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,

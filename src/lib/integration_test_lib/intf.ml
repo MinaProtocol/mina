@@ -5,7 +5,11 @@ open Mina_base
 open Pipe_lib
 open Signature_lib
 
-type metrics_t = { block_production_delay : int list }
+type metrics_t =
+  { block_production_delay : int list
+  ; transaction_pool_diff_received : int
+  ; transaction_pool_diff_broadcasted : int
+  }
 
 type best_chain_block = { state_hash : string; command_transaction_count : int }
 
