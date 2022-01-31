@@ -1688,21 +1688,23 @@ module Base = struct
 
           let check_account public_key token_id
               (({ data = account; _ }, _) : Account.t * _) =
-            let ( ! ) = run_checked in
             let is_new =
-              !(Public_key.Compressed.Checked.equal account.public_key
-                  Public_key.Compressed.(var_of_t empty))
+              run_checked
+                (Public_key.Compressed.Checked.equal account.public_key
+                   Public_key.Compressed.(var_of_t empty))
             in
             with_label __LOC__ (fun () ->
                 Boolean.Assert.any
                   [ is_new
-                  ; !(Public_key.Compressed.Checked.equal public_key
-                        account.public_key)
+                  ; run_checked
+                      (Public_key.Compressed.Checked.equal public_key
+                         account.public_key)
                   ]) ;
             with_label __LOC__ (fun () ->
                 Boolean.Assert.any
                   [ is_new
-                  ; !(Token_id.Checked.equal token_id account.token_id)
+                  ; run_checked
+                      (Token_id.Checked.equal token_id account.token_id)
                   ]) ;
             `Is_new is_new
         end
