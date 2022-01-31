@@ -1916,6 +1916,23 @@ module Base = struct
           type t = Field.t
         end
 
+        module Local_state = struct
+          type failure_status = unit
+
+          type t =
+            ( Parties.t
+            , Token_id.t
+            , Amount.t
+            , Ledger.t
+            , Bool.t
+            , Transaction_commitment.t
+            , failure_status )
+            Parties_logic.Local_state.t
+
+          let add_check (t : t) _failure b =
+            { t with success = Bool.(t.success &&& b) }
+        end
+
         module Global_state = struct
           type t = Global_state.t =
             { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
@@ -1977,9 +1994,6 @@ module Base = struct
         | Check_predicate (_is_start, { party; _ }, account, _global) ->
             Snapp_predicate.Account.Checked.check party.data.predicate
               account.data
-        | Check_fee_excess (valid_fee_excess, ()) ->
-            with_label __LOC__ (fun () ->
-                Boolean.Assert.is_true valid_fee_excess)
         | Check_auth_and_update_account
             { is_start
             ; at_party = at_party, _

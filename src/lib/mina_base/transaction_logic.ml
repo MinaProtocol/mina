@@ -1665,6 +1665,30 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       let push_stack x ~onto : t = Stack (x, ()) :: onto
     end
+
+    module Local_state = struct
+      type failure_status = Transaction_status.Failure.t option
+
+      type t =
+        ( Parties.t
+        , Token_id.t
+        , Amount.t
+        , Ledger.t
+        , Bool.t
+        , Transaction_commitment.t
+        , failure_status )
+        Parties_logic.Local_state.t
+
+      let add_check (t : t) failure b =
+        let failure_status =
+          match t.failure_status with
+          | None when not b ->
+              Some failure
+          | old_failure_status ->
+              old_failure_status
+        in
+        { t with failure_status; success = t.success && b }
+    end
   end
 
   module Env = struct
@@ -1710,10 +1734,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Account.Nonce.equal account.nonce n
           | Full p ->
               Or_error.is_ok (Snapp_predicate.Account.check p account) )
-      | Check_fee_excess (valid_fee_excess, prev_failure_status) ->
-          if not valid_fee_excess then
-            Some Transaction_status.Failure.Invalid_fee_excess
-          else prev_failure_status
       | Check_auth_and_update_account
           { is_start
           ; at_party = _
