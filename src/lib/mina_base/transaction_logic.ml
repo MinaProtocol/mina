@@ -1609,7 +1609,23 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       include Snapp_predicate.Protocol_state
     end
 
-    module Party = Party
+    module Party = struct
+      include Party
+
+      type parties = (Party.t, unit) Parties.Party_or_stack.t list
+
+      type transaction_commitment = Transaction_commitment.t
+
+      let check_authorization ~account:_ ~commitment:_ ~at_party:_ (party : t) =
+        (* The transaction's validity should already have been checked before
+           this point.
+        *)
+        match party.authorization with
+        | Signature _ ->
+            `Signature_verifies true
+        | Proof _ | None_given ->
+            `Signature_verifies false
+    end
 
     module Parties = struct
       module Opt = struct
@@ -1736,13 +1752,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Or_error.is_ok (Snapp_predicate.Account.check p account) )
       | Check_auth_and_update_account
           { is_start
-          ; at_party = _
           ; global_state
           ; party = p
           ; account = a
-          ; transaction_commitment = ()
-          ; full_transaction_commitment = ()
           ; inclusion_proof = loc
+          ; signature_verifies = _
           } -> (
           if (is_start : bool) then
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
