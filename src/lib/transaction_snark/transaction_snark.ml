@@ -1533,7 +1533,7 @@ module Base = struct
     module Single (I : Single_inputs) = struct
       open I
 
-      let { auth_type; is_start } = spec
+      let { auth_type; is_start = _ } = spec
 
       module V = Prover_value
       open Impl
@@ -1545,6 +1545,19 @@ module Base = struct
           let if_ = Field.if_
 
           let empty = Field.constant Parties.Transaction_commitment.empty
+
+          let commitment ~party:{ party; _ } ~other_parties:(other_parties, _)
+              ~memo_hash =
+            Parties.Transaction_commitment.Checked.create
+              ~other_parties_hash:other_parties
+              ~protocol_state_predicate_hash:
+                (Snapp_predicate.Protocol_state.Checked.digest
+                   party.data.body.protocol_state)
+              ~memo_hash
+
+          let full_commitment ~party:{ party; _ } ~commitment =
+            Parties.Transaction_commitment.Checked.with_fee_payer commitment
+              ~fee_payer_hash:party.hash
         end
 
         module Bool = struct
@@ -1896,6 +1909,10 @@ module Base = struct
         module Protocol_state_predicate = struct
           type t = Snapp_predicate.Protocol_state.Checked.t
         end
+
+        module Field = struct
+          type t = Field.t
+        end
       end
 
       module Env = struct
@@ -1934,29 +1951,6 @@ module Base = struct
         match eff with
         | Get_global_ledger g ->
             g.ledger
-        | Transaction_commitments_on_start
-            { other_parties = other_parties, _
-            ; protocol_state_predicate
-            ; memo_hash
-            ; party = { party; _ }
-            } -> (
-            match is_start with
-            | `No ->
-                assert false
-            | `Yes | `Compute_in_circuit ->
-                let transaction_commitment =
-                  Parties.Transaction_commitment.Checked.create
-                    ~other_parties_hash:other_parties
-                    ~protocol_state_predicate_hash:
-                      (Snapp_predicate.Protocol_state.Checked.digest
-                         protocol_state_predicate)
-                    ~memo_hash
-                in
-                let full_transaction_commitment =
-                  Parties.Transaction_commitment.Checked.with_fee_payer
-                    transaction_commitment ~fee_payer_hash:party.hash
-                in
-                (transaction_commitment, full_transaction_commitment) )
         | Check_protocol_state_predicate (protocol_state_predicate, global_state)
           ->
             Snapp_predicate.Protocol_state.Checked.check
@@ -2063,8 +2057,6 @@ module Base = struct
             in
             (* omit failure status here, unlike `Transaction_logic` *)
             (Inputs.Account.account_with_hash account', success, ())
-        | Balance account ->
-            Balance.Checked.to_amount account.data.balance
     end
 
     let check_protocol_state ~pending_coinbase_stack_init
