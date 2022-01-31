@@ -176,51 +176,6 @@ module Transaction_applied = struct
       let to_latest = Fn.id
     end
   end]
-
-  let transaction_with_status : t -> Transaction.t With_status.t =
-   fun { varying; _ } ->
-    match varying with
-    | Command (Signed_command uc) ->
-        With_status.map uc.common.user_command ~f:(fun cmd ->
-            Transaction.Command (User_command.Signed_command cmd))
-    | Command (Snapp_command s) ->
-        With_status.map s.command ~f:(fun c ->
-            Transaction.Command (User_command.Snapp_command c))
-    | Fee_transfer f ->
-        { data = Fee_transfer f.fee_transfer
-        ; status =
-            Applied
-              ( Transaction_status.Auxiliary_data.empty
-              , Transaction_status.Fee_transfer_balance_data.to_balance_data
-                  f.balances )
-        }
-    | Coinbase c ->
-        { data = Coinbase c.coinbase
-        ; status =
-            Applied
-              ( Transaction_status.Auxiliary_data.empty
-              , Transaction_status.Coinbase_balance_data.to_balance_data
-                  c.balances )
-        }
-
-  let user_command_status : t -> Transaction_status.t =
-   fun { varying; _ } ->
-    match varying with
-    | Command
-        (Signed_command { common = { user_command = { status; _ }; _ }; _ }) ->
-        status
-    | Command (Snapp_command c) ->
-        c.command.status
-    | Fee_transfer f ->
-        Applied
-          ( Transaction_status.Auxiliary_data.empty
-          , Transaction_status.Fee_transfer_balance_data.to_balance_data
-              f.balances )
-    | Coinbase c ->
-        Applied
-          ( Transaction_status.Auxiliary_data.empty
-          , Transaction_status.Coinbase_balance_data.to_balance_data c.balances
-          )
 end
 
 module type S = sig
