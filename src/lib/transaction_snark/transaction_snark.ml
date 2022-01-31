@@ -1853,6 +1853,8 @@ module Base = struct
           let balance_change (t : t) = t.party.data.body.balance_change
 
           let protocol_state (t : t) = t.party.data.body.protocol_state
+
+          let token_id (t : t) = t.party.data.body.token_id
         end
 
         module Amount = struct
@@ -1969,8 +1971,6 @@ module Base = struct
                 Inputs.Ledger.if_ should_update ~then_:ledger
                   ~else_:global_state.ledger
             }
-        | Party_token_id { party; _ } ->
-            party.data.body.token_id
         | Check_auth_and_update_account
             { is_start
             ; at_party = at_party, _

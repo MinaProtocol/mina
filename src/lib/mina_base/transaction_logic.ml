@@ -1712,8 +1712,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           (* Commit, modifying the underlying ledger. *)
           if should_update then L.apply_mask global_state.ledger ~masked:ledger ;
           global_state
-      | Party_token_id p ->
-          p.data.body.token_id
       | Check_auth_and_update_account
           { is_start
           ; at_party = _
