@@ -1,7 +1,7 @@
 open Core_kernel
 open Fieldslib
 
-module To_yojson = Fields_derivers.Make (struct
+module To_yojson_basic = struct
   module Input = struct
     type 'input_type t = 'input_type -> Yojson.Safe.t
   end
@@ -32,12 +32,13 @@ module To_yojson = Fields_derivers.Make (struct
   let string_ x = `String x
 
   let bool_ x = `Bool x
-end)
 
-(* Make sure that this is a deriver *)
-module To_yojson_ : Fields_derivers.Deriver_intf = To_yojson
+  let list_ f xs = `List (List.map ~f xs)
+end
 
-module Of_yojson = Fields_derivers.Make (struct
+module To_yojson = Fields_derivers.Make (To_yojson_basic)
+
+module Of_yojson_basic = struct
   module Input = struct
     type 'input_type t = Yojson.Safe.t -> 'input_type
   end
@@ -71,35 +72,46 @@ module Of_yojson = Fields_derivers.Make (struct
   let string_ = function `String x -> x | _ -> failwith "todo"
 
   let bool_ = function `Bool x -> x | _ -> failwith "todo"
-end)
 
-(* Make sure that this is a deriver *)
-module Of_yojson_ : Fields_derivers.Deriver_intf = Of_yojson
+  let list_ f = function `List xs -> List.map xs ~f | _ -> failwith "todo"
+end
+
+module Of_yojson = Fields_derivers.Make (Of_yojson_basic)
+module Both_yojson = Fields_derivers.Make2 (To_yojson) (Of_yojson)
 
 let%test_module "Test" =
   ( module struct
-    type t = { foo_hello : int; bar : string } [@@deriving fields]
+    type t = { foo_hello : int; bar : string list } [@@deriving fields]
 
-    let v = { foo_hello = 1; bar = "baz" }
+    let v = { foo_hello = 1; bar = [ "baz1"; "baz2" ] }
 
-    let m = "{ fooHello: 1, bar: \"baz\" }" |> Yojson.Safe.from_string
+    let m =
+      "{ fooHello: 1, bar: [\"baz1\", \"baz2\"] }" |> Yojson.Safe.from_string
 
     module Yojson_version = struct
-      type t = { foo_hello : int [@key "fooHello"]; bar : string }
+      type t = { foo_hello : int [@key "fooHello"]; bar : string list }
       [@@deriving yojson]
 
-      let v = { foo_hello = 1; bar = "baz" }
+      let v = { foo_hello = 1; bar = [ "baz1"; "baz2" ] }
     end
 
     let to_json =
-      Fields.make_creator (To_yojson.init ()) ~foo_hello:To_yojson.Prim.int
-        ~bar:To_yojson.Prim.string
+      let open To_yojson.Prim in
+      Fields.make_creator (To_yojson.init ()) ~foo_hello:int
+        ~bar:(list To_yojson.string_)
       |> To_yojson.finish
 
     let of_json =
-      Fields.make_creator (Of_yojson.init ()) ~foo_hello:Of_yojson.Prim.int
-        ~bar:Of_yojson.Prim.string
+      let open Of_yojson.Prim in
+      Fields.make_creator (Of_yojson.init ()) ~foo_hello:int
+        ~bar:(list Of_yojson.string_)
       |> Of_yojson.finish
+
+    let to_json', of_json' =
+      let open Both_yojson.Prim in
+      Fields.make_creator (Both_yojson.init ()) ~foo_hello:int
+        ~bar:(list Both_yojson.string_)
+      |> Both_yojson.finish
 
     let%test_unit "folding creates a yojson object we expect (modulo camel \
                    casing)" =
@@ -112,11 +124,16 @@ let%test_module "Test" =
         Yojson_version.of_yojson m |> Result.ok |> Option.value_exn
       in
       let actual = of_json m in
-      [%test_eq: string] expected.bar actual.bar ;
+      [%test_eq: string list] expected.bar actual.bar ;
       [%test_eq: int] expected.foo_hello actual.foo_hello
 
     let%test_unit "round trip" =
       [%test_eq: string]
         (to_json (of_json m) |> Yojson.Safe.to_string)
         (m |> Yojson.Safe.to_string)
+
+    let%test_unit "composed same as decomposed" =
+      [%test_eq: string]
+        (to_json (of_json m) |> Yojson.Safe.to_string)
+        (to_json' (of_json' m) |> Yojson.Safe.to_string)
   end )
