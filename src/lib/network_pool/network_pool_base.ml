@@ -78,7 +78,7 @@ end)
   let create_rate_limiter () =
     Rate_limiter.create
       ~capacity:
-        (Resource_pool.Diff.max_per_15_seconds, `Per (Time.Span.of_sec 15.0))
+        (10000000, `Per (Time.Span.of_sec 15.0))
 
   let apply_and_broadcast t
       (diff : Resource_pool.Diff.verified Envelope.Incoming.t) cb =
