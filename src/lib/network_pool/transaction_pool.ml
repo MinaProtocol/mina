@@ -284,6 +284,10 @@ struct
       Sequence.unfold ~init:p ~f:(fun pool ->
           match Indexed_pool.get_highest_fee pool with
           | Some cmd -> (
+              let cmd_nonce =
+                Transaction_hash.User_command_with_valid_signature.command cmd
+                |> User_command.nonce_exn
+              in
               match
                 Indexed_pool.handle_committed_txn pool
                   cmd
@@ -291,12 +295,27 @@ struct
                      in the pool are always valid against the best tip, so
                      no need to check balances here *)
                   ~fee_payer_balance:Currency.Amount.max_int
-                  ~fee_payer_nonce:
-                    ( Transaction_hash.User_command_with_valid_signature.command
-                        cmd
-                    |> User_command.nonce_exn )
+                  ~fee_payer_nonce:cmd_nonce
               with
-              | Ok (t, _) ->
+              | Ok (t, dropped) ->
+                  [%log error]
+                    "Taken cmd with nonce %d: dropped %d txs, pool size: %d -> \
+                     %d; dropped nonces: $nonces"
+                    (Unsigned.UInt32.to_int cmd_nonce)
+                    (Sequence.length dropped) (Indexed_pool.size pool)
+                    (Indexed_pool.size t)
+                    ~metadata:
+                      [ ( "nonces"
+                        , `List
+                            ( List.map ~f:(fun cmd' ->
+                                  `Int
+                                    ( Transaction_hash
+                                      .User_command_with_valid_signature
+                                      .command cmd'
+                                    |> User_command.nonce_exn
+                                    |> Unsigned.UInt32.to_int ))
+                            @@ Sequence.to_list dropped ) )
+                      ] ;
                   Some (cmd, t)
               | Error (`Queued_txns_by_sender (error_str, queued_cmds)) ->
                   [%log error]
