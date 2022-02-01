@@ -61,7 +61,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* check account nonce on both nodes *)
     let end_t =
       Time.add (Time.now ())
-        (Time.Span.of_ms @@ float_of_int @@ (num_slots * window_ms))
+        (Time.Span.of_ms (1.5 *. (float_of_int (num_slots * window_ms))))
     in
     let%bind () =
       Network.Node.must_send_payment ~initial_delay_sec:1.
