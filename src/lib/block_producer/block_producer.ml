@@ -143,6 +143,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
         Consensus.Data.Block_data.coinbase_receiver block_data
       in
       let diff =
+        let txs_len = Sequence.length transactions in
         let diff =
           measure "create_diff" (fun () ->
               Staged_ledger.create_diff ~constraint_constants staged_ledger
@@ -153,6 +154,16 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           |> Result.map_error ~f:(fun err ->
                  Staged_ledger.Staged_ledger_error.Pre_diff err)
         in
+        let diff_len =
+          match diff with
+          | Ok d ->
+              List.length
+              @@ Staged_ledger_diff.With_valid_signatures_and_proofs.commands d
+          | _ ->
+              0
+        in
+        [%log error] "Created diff: txs sequence length %d, diff length %d"
+          txs_len diff_len ;
         match (diff, block_reward_threshold) with
         | Ok d, Some threshold ->
             let net_return =
