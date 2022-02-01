@@ -36,7 +36,7 @@ val of_root :
   -> next_available_index:int option
   -> Ledger_hash.t
   -> t
-  
+
 val apply_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_global_slot:Mina_numbers.Global_slot.t
