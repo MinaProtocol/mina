@@ -8,41 +8,6 @@ open Async
 (* TODO: Parameterize this against prod/test networks *)
 (* this is the same as PK in Rosetta dockerfile *)
 let pk = "B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV"
-
-module Staking = struct
-  module Disable =
-  [%graphql
-  {|
-    mutation disableStaking {
-      setStaking(input: {publicKeys: []}) {
-        lastStaking
-      }
-    }
-  |}]
-
-  let disable ~graphql_uri =
-    let open Deferred.Result.Let_syntax in
-    let%map res = Graphql.query (Disable.make ()) graphql_uri in
-    (res#setStaking)#lastStaking
-
-  module Enable =
-  [%graphql
-  {|
-  mutation enableStaking($publicKey: PublicKey!) {
-      setStaking(input: {publicKeys: [$publicKey]}) {
-        lastStaking
-      }
-    }
-|}]
-
-  let enable ~graphql_uri =
-    let open Deferred.Result.Let_syntax in
-    let%map res =
-      Graphql.query (Enable.make ~publicKey:(`String pk) ()) graphql_uri
-    in
-    (res#setStaking)#lastStaking
-end
-
 module Account = struct
   module Unlock =
   [%graphql
