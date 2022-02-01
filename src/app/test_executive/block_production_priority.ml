@@ -22,6 +22,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { balance = "9999999"; timing = Untimed }
         ; { balance = "9999999"; timing = Untimed }
         ])
+    ; num_snark_workers = 2
     }
 
   let wait_for_all_to_initialize ~logger network t =
@@ -61,7 +62,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* check account nonce on both nodes *)
     let end_t =
       Time.add (Time.now ())
-        (Time.Span.of_ms @@ 2. *. (float_of_int @@ num_slots * window_ms))
+        (Time.Span.of_ms @@ float_of_int @@ num_slots * window_ms)
     in
     let%bind () =
       Network.Node.must_send_payment ~initial_delay_sec:1.
