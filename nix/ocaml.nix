@@ -84,8 +84,8 @@ let
         # Prevent unnecessary rebuilds on non-source changes
         src = filtered-src;
 
-      # TODO, get this from somewhere
-      MARLIN_REPO_SHA = "<unknown>";
+        # TODO, get this from somewhere
+        MARLIN_REPO_SHA = "<unknown>";
         MINA_COMMIT_DATE =
           if sourceInfo ? rev then sourceInfo.lastModifiedDate else "<unknown>";
         MINA_COMMIT_SHA1 = sourceInfo.rev or "DIRTY";
@@ -100,7 +100,7 @@ let
         MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
-      MARLIN_PLONK_STUBS = "${pkgs.marlin_plonk_bindings_stubs}/lib";
+        MARLIN_PLONK_STUBS = "${pkgs.marlin_plonk_bindings_stubs}/lib";
         configurePhase = ''
           export MINA_ROOT="$PWD"
           patchShebangs .
@@ -115,7 +115,10 @@ let
           mv _build/default/src/app/{logproc/logproc.exe,cli/src/mina.exe} $out/bin
           remove-references-to -t $(dirname $(dirname $(command -v ocaml))) $out/bin/*
         '';
-      } // pkgs.lib.optionalAttrs static { OCAMLPARAM = "_,ccopt=-static"; });
+      } // pkgs.lib.optionalAttrs static { OCAMLPARAM = "_,ccopt=-static"; }
+        // pkgs.lib.optionalAttrs pkgs.stdenv.isDarwin {
+          OCAMLPARAM = "_,cclib=-lc++";
+        });
 
       mina_client_sdk = pkgs.stdenv.mkDerivation {
         pname = "mina_client_sdk";
