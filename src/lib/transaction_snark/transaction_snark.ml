@@ -1206,7 +1206,7 @@ module Base = struct
     let apply_body
         ~(constraint_constants : Genesis_constants.Constraint_constants.t) ?tag
         ~txn_global_slot ~(add_check : ?label:string -> Boolean.var -> unit)
-        ~check_auth ~is_start
+        ~check_auth ~is_start ~is_new
         ({ body =
              { public_key
              ; token_id = _
@@ -1250,15 +1250,6 @@ module Base = struct
       in
       let proof_must_verify () = Boolean.any (List.map !r ~f:Lazy.force) in
       let ( ! ) = run_checked in
-      let is_new =
-        !(Public_key.Compressed.Checked.equal a.public_key
-            Public_key.Compressed.(var_of_t empty))
-      in
-      with_label __LOC__ (fun () ->
-          Boolean.Assert.any
-            [ is_new
-            ; !(Public_key.Compressed.Checked.equal public_key a.public_key)
-            ]) ;
       let is_receiver =
         Sgn.Checked.is_pos !(Currency.Amount.Signed.Checked.sgn balance_change)
       in
@@ -1694,6 +1685,28 @@ module Base = struct
             with_label __LOC__
               (fun () -> Field.Assert.equal (implied_root account incl))
               (Ledger_hash.var_to_hash_packed root)
+
+          let check_account public_key token_id
+              (({ data = account; _ }, _) : Account.t * _) =
+            let is_new =
+              run_checked
+                (Public_key.Compressed.Checked.equal account.public_key
+                   Public_key.Compressed.(var_of_t empty))
+            in
+            with_label __LOC__ (fun () ->
+                Boolean.Assert.any
+                  [ is_new
+                  ; run_checked
+                      (Public_key.Compressed.Checked.equal public_key
+                         account.public_key)
+                  ]) ;
+            with_label __LOC__ (fun () ->
+                Boolean.Assert.any
+                  [ is_new
+                  ; run_checked
+                      (Token_id.Checked.equal token_id account.token_id)
+                  ]) ;
+            `Is_new is_new
         end
 
         module Parties = struct
@@ -1860,6 +1873,8 @@ module Base = struct
 
           let token_id (t : t) = t.party.data.body.token_id
 
+          let public_key (t : t) = t.party.data.body.public_key
+
           let use_full_commitment (t : t) =
             t.party.data.body.use_full_commitment
 
@@ -1958,6 +1973,10 @@ module Base = struct
           let invalid = Token_id.(var_of_t invalid)
         end
 
+        module Public_key = struct
+          type t = Public_key.Compressed.var
+        end
+
         module Protocol_state_predicate = struct
           type t = Snapp_predicate.Protocol_state.Checked.t
         end
@@ -2050,7 +2069,7 @@ module Base = struct
             ; signature_verifies
             ; party = { party; _ }
             ; account
-            ; inclusion_proof = _
+            ; account_is_new
             } ->
             let add_check, checks_succeeded = create_checker () in
             (* If there's a valid signature, it must increment the nonce or use full commitment *)
@@ -2065,7 +2084,7 @@ module Base = struct
                 ~check_auth:(fun t ->
                   Permissions.Auth_required.Checked.spec_eval
                     ~signature_verifies t)
-                ~is_start party.data account.data
+                ~is_start ~is_new:account_is_new party.data account.data
             in
             let proof_must_verify = proof_must_verify () in
             let checks_succeeded = checks_succeeded () in

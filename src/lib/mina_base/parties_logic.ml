@@ -161,6 +161,8 @@ module type Party_intf = sig
 
   type protocol_state_predicate
 
+  type public_key
+
   type token_id
 
   type account
@@ -168,6 +170,8 @@ module type Party_intf = sig
   val balance_change : t -> signed_amount
 
   val protocol_state : t -> protocol_state_predicate
+
+  val public_key : t -> public_key
 
   val token_id : t -> token_id
 
@@ -221,6 +225,10 @@ end
 module type Ledger_intf = sig
   include Iffable
 
+  type public_key
+
+  type token_id
+
   type party
 
   type account
@@ -234,6 +242,9 @@ module type Ledger_intf = sig
   val set_account : t -> account * inclusion_proof -> t
 
   val check_inclusion : t -> account * inclusion_proof -> unit
+
+  val check_account :
+    public_key -> token_id -> account * inclusion_proof -> [ `Is_new of bool ]
 end
 
 module Eff = struct
@@ -259,13 +270,12 @@ module Eff = struct
         { is_start : 'bool
         ; party : 'party
         ; account : 'account
+        ; account_is_new : 'bool
         ; signature_verifies : 'bool
         ; global_state : 'global_state
-        ; inclusion_proof : 'ip
         }
         -> ( 'account * 'bool * 'failure
-           , < inclusion_proof : 'ip
-             ; bool : 'bool
+           , < bool : 'bool
              ; party : 'party
              ; parties : 'parties
              ; account : 'account
@@ -286,6 +296,10 @@ module type Inputs_intf = sig
 
   module Amount : Amount_intf with type bool := Bool.t
 
+  module Public_key : sig
+    type t
+  end
+
   module Token_id : Token_id_intf with type bool := Bool.t
 
   module Protocol_state_predicate : Protocol_state_predicate_intf
@@ -301,12 +315,15 @@ module type Inputs_intf = sig
        and type token_id := Token_id.t
        and type bool := Bool.t
        and type account := Account.t
+       and type public_key := Public_key.t
 
   module Ledger :
     Ledger_intf
       with type bool := Bool.t
        and type account := Account.t
        and type party := Party.t
+       and type token_id := Token_id.t
+       and type public_key := Public_key.t
 
   module Parties :
     Parties_intf
@@ -540,6 +557,10 @@ module Make (Inputs : Inputs_intf) = struct
           ||| Inputs.Party.use_full_commitment party
           ||| not signature_verifies)
     in
+    let (`Is_new account_is_new) =
+      Inputs.Ledger.check_account (Party.public_key party)
+        (Party.token_id party) (a, inclusion_proof)
+    in
     let a', update_permitted, failure_status =
       h.perform
         (Check_auth_and_update_account
@@ -548,7 +569,7 @@ module Make (Inputs : Inputs_intf) = struct
            ; global_state
            ; party
            ; account = a
-           ; inclusion_proof
+           ; account_is_new
            })
     in
     let party_succeeded =
