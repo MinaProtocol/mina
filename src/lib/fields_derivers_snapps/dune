@@ -7,12 +7,10 @@
   fields_derivers
   fields_derivers.json
   fields_derivers.graphql
-  mina_base
   mina_numbers
   unsigned_extended
   currency
-  signature_lib
-  pickles)
+  signature_lib)
  (inline_tests)
  (preprocess
   (pps

@@ -20,6 +20,8 @@
    debug_assert
    dummy_values
    fold_lib
+   fields_derivers
+   fields_derivers.snapps
    hash_prefix_states
    hash_prefixes
    linked_tree
