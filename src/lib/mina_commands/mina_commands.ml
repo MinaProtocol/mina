@@ -370,6 +370,11 @@ let get_status ~flag t =
           Float.to_int @@ Gauge.value Network.transaction_pool_diff_received
       ; transaction_pool_diff_broadcasted =
           Float.to_int @@ Gauge.value Network.transaction_pool_diff_broadcasted
+      ; transaction_pool_size =
+          Float.to_int @@ Gauge.value Transaction_pool.pool_size
+      ; transactions_added_to_pool =
+          Float.to_int
+          @@ Counter.value Transaction_pool.transactions_added_to_pool
       }
   in
   { Daemon_rpcs.Types.Status.num_accounts

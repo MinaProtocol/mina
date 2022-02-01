@@ -230,6 +230,8 @@ module Node = struct
             blockProductionDelay
             transactionPoolDiffReceived
             transactionPoolDiffBroadcasted
+            transactionsAddedToPool
+            transactionPoolSize
           }
         }
       }
@@ -553,23 +555,28 @@ module Node = struct
       Array.to_list
       @@ query_result_obj#daemonStatus#metrics#blockProductionDelay
     in
-    let transaction_pool_diff_received =
-      query_result_obj#daemonStatus#metrics#transactionPoolDiffReceived
-    in
+    let metrics = query_result_obj#daemonStatus#metrics in
+    let transaction_pool_diff_received = metrics#transactionPoolDiffReceived in
     let transaction_pool_diff_broadcasted =
-      query_result_obj#daemonStatus#metrics#transactionPoolDiffBroadcasted
+      metrics#transactionPoolDiffBroadcasted
     in
+    let transactions_added_to_pool = metrics#transactionsAddedToPool in
+    let transaction_pool_size = metrics#transactionPoolSize in
     [%log info]
       "get_metrics, result of graphql query (block_production_delay; \
-       tx_received; tx_broadcasted) (%s; %d; %d)"
+       tx_received; tx_broadcasted; txs_added_to_pool; tx_pool_size) (%s; %d; \
+       %d; %d; %d)"
       ( String.concat ~sep:", "
       @@ List.map ~f:string_of_int block_production_delay )
-      transaction_pool_diff_received transaction_pool_diff_broadcasted ;
+      transaction_pool_diff_received transaction_pool_diff_broadcasted
+      transactions_added_to_pool transaction_pool_size ;
     return
       Intf.
         { block_production_delay
         ; transaction_pool_diff_broadcasted
         ; transaction_pool_diff_received
+        ; transactions_added_to_pool
+        ; transaction_pool_size
         }
 end
 

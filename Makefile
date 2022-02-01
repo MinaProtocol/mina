@@ -111,7 +111,7 @@ build_rosetta_all_sigs: ocaml_checks
 
 build_intgtest: ocaml_checks
 	$(info Starting Build)
-	dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe src/app/cli/src/mina.exe
+	dune build --profile=integration_tests src/app/cli/src/mina.exe src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 	$(info Build complete)
 
 client_sdk: ocaml_checks

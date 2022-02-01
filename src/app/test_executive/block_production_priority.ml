@@ -69,11 +69,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~repeat_delay_ms:(Unsigned.UInt32.of_int @@ (1000 / tps))
         ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee sender_bp
     in
-    let%bind () =
-      Async_kernel.Deferred.bind
-        (Async.after (Time.diff end_t @@ Time.now ()))
-        ~f:(const Malleable_error.ok_unit)
-    in
+    let%bind () = Async.(at end_t >>= const Malleable_error.ok_unit) in
     let%bind { block_production_delay = snd_delay; _ } =
       get_metrics sender_bp
     in

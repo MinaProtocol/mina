@@ -379,7 +379,8 @@ module Types = struct
           @@ Daemon_rpcs.Types.Status.Metrics.Fields.fold ~init:[]
                ~block_production_delay:nn_int_list
                ~transaction_pool_diff_received:nn_int
-               ~transaction_pool_diff_broadcasted:nn_int)
+               ~transaction_pool_diff_broadcasted:nn_int
+               ~transactions_added_to_pool:nn_int ~transaction_pool_size:nn_int)
 
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->

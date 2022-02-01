@@ -69,6 +69,8 @@ module Transaction_pool : sig
   val useful_transactions_received_time_sec : Gauge.t
 
   val pool_size : Gauge.t
+
+  val transactions_added_to_pool : Counter.t
 end
 
 module Network : sig

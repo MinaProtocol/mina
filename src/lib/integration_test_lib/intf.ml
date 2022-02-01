@@ -9,6 +9,8 @@ type metrics_t =
   { block_production_delay : int list
   ; transaction_pool_diff_received : int
   ; transaction_pool_diff_broadcasted : int
+  ; transactions_added_to_pool : int
+  ; transaction_pool_size : int
   }
 
 type best_chain_block = { state_hash : string; command_transaction_count : int }

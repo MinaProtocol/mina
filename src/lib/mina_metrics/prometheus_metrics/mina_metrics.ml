@@ -338,6 +338,12 @@ module Transaction_pool = struct
   let pool_size : Gauge.t =
     let help = "Number of transactions in the pool" in
     Gauge.v "size" ~help ~namespace ~subsystem
+
+  let transactions_added_to_pool : Counter.t =
+    let help =
+      "Number of transactions added to the pool since the node start"
+    in
+    Counter.v "transactions_added_to_pool" ~help ~namespace ~subsystem
 end
 
 module Metric_map (Metric : sig
