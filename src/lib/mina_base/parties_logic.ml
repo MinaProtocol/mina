@@ -647,7 +647,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let update_local_excess = Bool.(is_start' ||| is_last_party) in
     let update_global_state =
-      ref Bool.(update_local_excess &&& local_state.success)
+      Bool.(update_local_excess &&& local_state.success)
     in
     let valid_fee_excess =
       let delta_settled = Amount.equal local_state.excess Amount.zero in
@@ -656,19 +656,22 @@ module Make (Inputs : Inputs_intf) = struct
     let local_state =
       Local_state.add_check local_state Invalid_fee_excess valid_fee_excess
     in
-    let global_excess_update_failed = ref Bool.true_ in
-    let global_state =
+    let global_state, global_excess_update_failed, update_global_state =
       let amt = Global_state.fee_excess global_state in
       let res, `Overflow overflow =
         Amount.Signed.add_flagged amt
           (Amount.Signed.of_unsigned local_state.excess)
       in
-      (global_excess_update_failed := Bool.(!update_global_state &&& overflow)) ;
-      (update_global_state := Bool.(!update_global_state &&& not overflow)) ;
-      let new_amt =
-        Amount.Signed.if_ !update_global_state ~then_:res ~else_:amt
+      let global_excess_update_failed =
+        Bool.(update_global_state &&& overflow)
       in
-      Global_state.set_fee_excess global_state new_amt
+      let update_global_state = Bool.(update_global_state &&& not overflow) in
+      let new_amt =
+        Amount.Signed.if_ update_global_state ~then_:res ~else_:amt
+      in
+      ( Global_state.set_fee_excess global_state new_amt
+      , global_excess_update_failed
+      , update_global_state )
     in
     let local_state =
       { local_state with
@@ -677,15 +680,14 @@ module Make (Inputs : Inputs_intf) = struct
             ~else_:local_state.excess
       }
     in
-    Bool.(assert_ (not (is_start' &&& !global_excess_update_failed))) ;
+    Bool.(assert_ (not (is_start' &&& global_excess_update_failed))) ;
     let local_state =
       { local_state with
-        success =
-          Bool.(local_state.success &&& not !global_excess_update_failed)
+        success = Bool.(local_state.success &&& not global_excess_update_failed)
       }
     in
     let global_state =
-      Global_state.set_ledger ~should_update:!update_global_state global_state
+      Global_state.set_ledger ~should_update:update_global_state global_state
         local_state.ledger
     in
     let local_state =
