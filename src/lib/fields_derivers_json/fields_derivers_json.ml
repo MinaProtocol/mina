@@ -87,7 +87,8 @@ let%test_module "Test" =
     let v = { foo_hello = 1; bar = [ "baz1"; "baz2" ] }
 
     let m =
-      "{ fooHello: 1, bar: [\"baz1\", \"baz2\"] }" |> Yojson.Safe.from_string
+      {json|{ fooHello: 1, bar: ["baz1", "baz2"] }|json}
+      |> Yojson.Safe.from_string
 
     module Yojson_version = struct
       type t = { foo_hello : int [@key "fooHello"]; bar : string list }
