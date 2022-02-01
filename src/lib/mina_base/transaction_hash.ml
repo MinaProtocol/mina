@@ -64,7 +64,20 @@ module User_command_with_valid_signature = struct
       (* Compare only on hashes, comparing on the data too would be slower and
          add no value.
       *)
-      let compare (x : t) (y : t) = T.compare x.hash y.hash
+      let compare (x : t) (y : t) =
+        let nonce_x_opt =
+          User_command.nonce (User_command.forget_check x.data)
+        in
+        let nonce_y_opt =
+          User_command.nonce (User_command.forget_check y.data)
+        in
+        let nonce_cmp =
+          Option.value ~default:0
+          @@ Option.map ~f:(fun (a, b) -> Unsigned.UInt32.compare a b)
+          @@ Option.both nonce_x_opt nonce_y_opt
+        in
+        (* TODO make sure the resulting order is linear *)
+        if Int.(nonce_cmp = 0) then T.compare x.hash y.hash else nonce_cmp
     end
   end]
 

@@ -205,6 +205,13 @@ let fee_payer (t : t) =
   | Snapp_command x ->
       Snapp_command.fee_payer x
 
+let nonce (t : t) =
+  match t with
+  | Signed_command x ->
+      Some (Signed_command.nonce x)
+  | Snapp_command x ->
+      Snapp_command.nonce x
+
 let nonce_exn (t : t) =
   match t with
   | Signed_command x ->
