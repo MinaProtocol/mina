@@ -20,7 +20,7 @@ module To_yojson_basic = struct
 
   let add_field t_field field acc =
     ( (fun _ -> failwith "Unused")
-    , ( Fields_derivers.name_under_to_camel field
+    , ( Fields_derivers_util.name_under_to_camel field
       , fun x -> t_field (Field.get field x) )
       :: acc )
 
@@ -57,7 +57,8 @@ module Of_yojson_basic = struct
 
   let add_field t_field field () =
     ( (fun map ->
-        t_field (Map.find_exn map (Fields_derivers.name_under_to_camel field)))
+        t_field
+          (Map.find_exn map (Fields_derivers_util.name_under_to_camel field)))
     , () )
 
   let finish (creator, ()) json =

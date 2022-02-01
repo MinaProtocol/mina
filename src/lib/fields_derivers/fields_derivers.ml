@@ -92,27 +92,6 @@ module Make (D : Deriver_basic_intf) :
   end
 end
 
-let under_to_camel s =
-  let open Core_kernel in
-  let ws = String.split s ~on:'_' in
-  match ws with
-  | [] ->
-      ""
-  | w :: ws ->
-      w :: (ws |> List.map ~f:String.capitalize) |> String.concat ?sep:None
-
-let%test_unit "under_to_camel works as expected" =
-  let open Core_kernel in
-  [%test_eq: string] "fooHello" (under_to_camel "foo_hello") ;
-  [%test_eq: string] "fooHello" (under_to_camel "foo_hello___")
-
-(** Like Field.name but rewrites underscore_case to camelCase. *)
-let name_under_to_camel f = Fieldslib.Field.name f |> under_to_camel
-
-module Either = struct
-  type ('a, 'b) t = A of 'a | B of 'b
-end
-
 module Make2 (D1 : Deriver_intf) (D2 : Deriver_intf) :
   Deriver_intf
     with type 'input_type Accumulator.t =
@@ -120,7 +99,7 @@ module Make2 (D1 : Deriver_intf) (D2 : Deriver_intf) :
      and type 'input_type Input.t =
           'input_type D1.Input.t * 'input_type D2.Input.t
      and type 'input_type Creator.t =
-          ('input_type D1.Creator.t, 'input_type D2.Creator.t) Either.t
+          ('input_type D1.Creator.t, 'input_type D2.Creator.t) Base.Either.t
      and type 'input_type Output.t =
           'input_type D1.Output.t * 'input_type D2.Output.t = struct
   module Input = struct
@@ -129,7 +108,7 @@ module Make2 (D1 : Deriver_intf) (D2 : Deriver_intf) :
 
   module Creator = struct
     type 'input_type t =
-      ('input_type D1.Creator.t, 'input_type D2.Creator.t) Either.t
+      ('input_type D1.Creator.t, 'input_type D2.Creator.t) Base.Either.t
   end
 
   module Output = struct
@@ -144,16 +123,16 @@ module Make2 (D1 : Deriver_intf) (D2 : Deriver_intf) :
   let init () = (D1.init (), D2.init ())
 
   let add_field (d1_field, d2_field) field (d1_acc, d2_acc) =
-    let open Either in
+    let open Base.Either in
     let d1_create, d1 = D1.add_field d1_field field d1_acc in
     let d2_create, d2 = D2.add_field d2_field field d2_acc in
-    let create = function A x -> d1_create x | B x -> d2_create x in
+    let create = function First x -> d1_create x | Second x -> d2_create x in
     (create, (d1, d2))
 
   let finish (creator, (d1_acc, d2_acc)) =
-    let open Either in
-    ( D1.finish ((fun x -> creator (A x)), d1_acc)
-    , D2.finish ((fun x -> creator (B x)), d2_acc) )
+    let open Base.Either in
+    ( D1.finish ((fun x -> creator (First x)), d1_acc)
+    , D2.finish ((fun x -> creator (Second x)), d2_acc) )
 
   module Step = struct
     type ('a, 'input_type, 'f) t =

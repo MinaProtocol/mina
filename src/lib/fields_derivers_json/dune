@@ -1,6 +1,6 @@
 (library
  (name fields_derivers_json)
  (public_name fields_derivers.json)
- (libraries core_kernel fieldslib fields_derivers yojson)
+ (libraries core_kernel fieldslib fields_derivers fields_derivers.util yojson)
  (inline_tests)
  (preprocess (pps ppx_deriving_yojson ppx_jane ppx_fields_conv ppx_let ppx_inline_test ppx_custom_printf)))

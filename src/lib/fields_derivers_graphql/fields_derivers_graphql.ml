@@ -96,7 +96,7 @@ module Graphql_fields_raw = struct
         , { Accumulator.Elem.run =
               (fun () ->
                 Schema.field
-                  (Fields_derivers.name_under_to_camel field)
+                  (Fields_derivers_util.name_under_to_camel field)
                   ~args:Schema.Arg.[]
                   ?doc:None ?deprecated:None ~typ:(t_field.run ())
                   ~resolve:(fun _ x -> Field.get field x))
@@ -295,7 +295,7 @@ query IntrospectionQuery {
             ~bar:(list Graphql_fields.string_)
           |> Graphql_fields.finish
         in
-        typ_input.run ~name:"T"
+        typ_input.run ?doc:None ~name:"T"
       in
       let typ2 =
         Graphql_fields.Schema.(
@@ -310,26 +310,26 @@ query IntrospectionQuery {
                   ~resolve:(fun _ t -> t.bar)
               ]))
       in
-      let hit_server (typ : _ Graphql.Schema.typ) =
+      let hit_server (typ : _ Graphql_fields.Schema.typ) =
         let query_top_level =
-          Graphql.Schema.(
+          Graphql_fields.Schema.(
             field "query" ~typ:(non_null typ)
               ~args:Arg.[]
               ~doc:"sample query"
               ~resolve:(fun _ _ -> v))
         in
         let schema =
-          Graphql.Schema.(
+          Graphql_fields.Schema.(
             schema [ query_top_level ] ~mutations:[] ~subscriptions:[])
         in
-        let res = Graphql.Schema.execute schema () (introspection_query ()) in
+        let res =
+          Graphql_fields.Schema.execute schema () (introspection_query ())
+        in
         match res with
         | Ok (`Response data) ->
             data |> Yojson.Basic.to_string
         | _ ->
             failwith "Unexpected response"
       in
-      [%test_eq: string]
-        (hit_server (Obj.magic typ1))
-        (hit_server (Obj.magic typ2))
+      [%test_eq: string] (hit_server typ1) (hit_server typ2)
   end )
