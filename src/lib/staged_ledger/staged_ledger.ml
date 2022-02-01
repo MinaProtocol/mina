@@ -1876,7 +1876,9 @@ module T = struct
                 Sequence.append (Sequence.singleton txn_with_status) seq
               in
               let count' = count + 1 in
-              if count' >= Scan_state.free_space t.scan_state then Stop seq'
+              if count' >= Scan_state.free_space t.scan_state then (
+                [%log error] "Stopped adding txs to diff at count %d" count ;
+                Stop seq' )
               else Continue (seq', count'))
         ~finish:fst
     in
