@@ -84,12 +84,17 @@ let%test_module "Test" =
     module V2 = struct
       type t = { field : Field.t } [@@deriving compare, sexp, equal, fields]
 
-      let v = { field = Field.of_int (-1) }
+      let v = { field = Field.of_int 10 }
     end
 
     let (to_json', of_json'), _typ' =
       let open Derivers.Prim in
       V2.Fields.make_creator (Derivers.init ()) ~field |> Derivers.finish
+
+    let%test_unit "to_json'" =
+      [%test_eq: string]
+        (Yojson.Safe.to_string (to_json' V2.v))
+        {|{"field":"10"}|}
 
     let%test_unit "roundtrip json'" =
       [%test_eq: V2.t] (of_json' (to_json' V2.v)) V2.v
