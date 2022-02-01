@@ -217,6 +217,9 @@ module Node = struct
         bestChain (maxLength: $max_length) {
           stateHash
           commandTransactionCount
+          creatorAccount {
+            publicKey
+          }
         }
       }
     |}]
@@ -337,6 +340,9 @@ module Node = struct
                Intf.
                  { state_hash = block#stateHash
                  ; command_transaction_count = block#commandTransactionCount
+                 ; creator_pk = match block#creatorAccount#publicKey with
+                    | `String pk -> pk
+                    | _ -> "unknown"
                  })
              (Array.to_list chain)
 

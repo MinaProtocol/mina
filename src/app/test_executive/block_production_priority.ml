@@ -61,7 +61,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* check account nonce on both nodes *)
     let end_t =
       Time.add (Time.now ())
-        (Time.Span.of_ms (2. *. (float_of_int (num_slots * window_ms))))
+        (Time.Span.of_ms @@ 2. *. (float_of_int @@ num_slots * window_ms))
     in
     let%bind () =
       Network.Node.must_send_payment ~initial_delay_sec:1.
@@ -77,7 +77,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       get_metrics receiver_bp
     in
     let%bind blocks =
-      Network.Node.must_get_best_chain ~logger ~max_length:num_slots receiver_bp
+      Network.Node.must_get_best_chain ~logger ~max_length:(2*num_slots) receiver_bp
     in
     let res_num_payments, _ =
       List.fold_map blocks ~init:0 ~f:(fun s b ->
@@ -90,7 +90,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           , `List
               (List.map blocks ~f:(fun b ->
                    `Tuple
-                     [ `String b.state_hash; `Int b.command_transaction_count ]))
+                     [ `String b.state_hash; `Int b.command_transaction_count; `String b.creator_pk ]))
           )
         ] ;
     let rcv_delay0 = List.nth_exn rcv_delay 0 in
