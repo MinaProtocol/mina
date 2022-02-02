@@ -40,6 +40,12 @@ module Derivers = struct
       ~doc:"String representing an Fp Field element" ~to_string:Field.to_string
       ~of_string:Field.of_string
 
+  let public_key_ =
+    Helpers.iso_string ~name:"Public_key"
+      ~doc:"String representing a public key in base58"
+      ~to_string:Signature_lib.Public_key.Compressed.to_string
+      ~of_string:Signature_lib.Public_key.Compressed.of_base58_check_exn
+
   module Prim = struct
     include Prim
 
@@ -48,12 +54,15 @@ module Derivers = struct
     let uint32 fd acc = add_field uint32_ fd acc
 
     let field fd acc = add_field field_ fd acc
+
+    let public_key fd acc = add_field public_key_ fd acc
   end
 end
 
 let%test_module "Test" =
   ( module struct
     module Field = Pickles.Impls.Step.Field.Constant
+    module Public_key = Signature_lib.Public_key.Compressed
 
     module V = struct
       type t =
@@ -98,4 +107,27 @@ let%test_module "Test" =
 
     let%test_unit "roundtrip json'" =
       [%test_eq: V2.t] (of_json' (to_json' V2.v)) V2.v
+
+    module V3 = struct
+      type t = { public_key : Public_key.t }
+      [@@deriving compare, sexp, equal, fields]
+
+      let v =
+        { public_key =
+            Public_key.of_base58_check_exn
+              "B62qoTqMG41DFgkyQmY2Pos1x671Gfzs9k8NKqUdSg7wQasEV6qnXQP"
+        }
+    end
+
+    let (to_json', of_json'), _typ' =
+      let open Derivers.Prim in
+      V3.Fields.make_creator (Derivers.init ()) ~public_key |> Derivers.finish
+
+    let%test_unit "to_json'" =
+      [%test_eq: string]
+        (Yojson.Safe.to_string (to_json' V3.v))
+        {|{"publicKey":"B62qoTqMG41DFgkyQmY2Pos1x671Gfzs9k8NKqUdSg7wQasEV6qnXQP"}|}
+
+    let%test_unit "roundtrip json'" =
+      [%test_eq: V3.t] (of_json' (to_json' V3.v)) V3.v
   end )
