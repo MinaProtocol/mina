@@ -65,7 +65,7 @@ module Update = struct
           ; vesting_period : Global_slot.Stable.V1.t
           ; vesting_increment : Amount.Stable.V1.t
           }
-        [@@deriving compare, equal, sexp, hash, yojson, hlist]
+        [@@deriving compare, equal, sexp, hash, yojson, hlist, fields]
 
         let to_latest = Fn.id
       end
@@ -158,6 +158,13 @@ module Update = struct
         ]
         ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+    let derivers =
+      let open Fields_derivers_snapps.Prim in
+      Fields_derivers_snapps.derivers
+      @@ Fields.make_creator ~initial_minimum_balance:balance
+           ~cliff_time:global_slot ~cliff_amount:amount
+           ~vesting_period:global_slot ~vesting_increment:amount
   end
 
   open Snapp_basic

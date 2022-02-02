@@ -51,6 +51,19 @@ module Derivers = struct
       ~doc:"String representing an Fp Field element" ~to_string:Field.to_string
       ~of_string:Field.of_string
 
+  let global_slot_ : Mina_numbers.Global_slot.t Input.t =
+    Helpers.iso_string ~name:"GlobalSlot" ~doc:"TODO"
+      ~to_string:Unsigned.UInt32.to_string ~of_string:Unsigned.UInt32.of_string
+
+  let amount_ : Currency.Amount.t Input.t =
+    Helpers.iso_string ~name:"Amount" ~doc:"TODO"
+      ~to_string:Currency.Amount.to_string ~of_string:Currency.Amount.of_string
+
+  let balance_ : Currency.Balance.t Input.t =
+    Helpers.iso_string ~name:"Balance" ~doc:"TODO"
+      ~to_string:Currency.Balance.to_string
+      ~of_string:Currency.Balance.of_string
+
   module Prim = struct
     include Prim
 
@@ -59,6 +72,12 @@ module Derivers = struct
     let uint32 fd acc = add_field uint32_ fd acc
 
     let field fd acc = add_field field_ fd acc
+
+    let global_slot fd acc = add_field global_slot_ fd acc
+
+    let amount fd acc = add_field amount_ fd acc
+
+    let balance fd acc = add_field balance_ fd acc
   end
 
   let derivers make_creator = finish (make_creator (init ()))
