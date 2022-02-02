@@ -142,7 +142,7 @@ module Transaction_applied : sig
   module Command_applied : sig
     type t = Transaction_applied.Command_applied.t =
       | Signed_command of Signed_command_applied.t
-      | Snapp_command of Snapp_command_applied.t
+      | Parties of Parties_applied.t
     [@@deriving sexp]
   end
 
