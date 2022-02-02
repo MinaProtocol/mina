@@ -2,5 +2,23 @@
  (name fields_derivers_snapps)
  (public_name fields_derivers.snapps)
  (libraries core_kernel fieldslib fields_derivers fields_derivers.json fields_derivers.graphql mina_numbers unsigned_extended currency signature_lib)
+ (libraries
+  core_kernel
+  fieldslib
+  fields_derivers
+  fields_derivers.json
+  fields_derivers.graphql
+  mina_numbers
+  unsigned_extended
+  currency
+  signature_lib
+  pickles)
  (inline_tests)
- (preprocess (pps ppx_deriving_yojson ppx_jane ppx_fields_conv ppx_let ppx_inline_test ppx_custom_printf)))
+ (preprocess
+  (pps
+   ppx_deriving_yojson
+   ppx_jane
+   ppx_fields_conv
+   ppx_let
+   ppx_inline_test
+   ppx_custom_printf)))
