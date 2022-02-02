@@ -22,7 +22,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { balance = "9999999"; timing = Untimed }
         ; { balance = "9999999"; timing = Untimed }
         ])
-    ; num_snark_workers = 2
+    ; num_snark_workers = 20
     }
 
   (* let wait_for_bps_to_initialize ~logger network t =
