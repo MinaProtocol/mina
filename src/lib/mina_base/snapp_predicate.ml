@@ -29,7 +29,7 @@ module Closed_interval = struct
   module Stable = struct
     module V1 = struct
       type 'a t = { lower : 'a; upper : 'a }
-      [@@deriving sexp, equal, compare, hash, yojson, hlist]
+      [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 
@@ -46,6 +46,28 @@ module Closed_interval = struct
   let typ x =
     Typ.of_hlistable [ x; x ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  let derivers a =
+    Fields_derivers_snapps.derivers @@ Fields.make_creator ~lower:a ~upper:a
+
+  let%test_module "ClosedInterval" =
+    ( module struct
+      module IntClosedInterval = struct
+        type t_ = int t [@@deriving sexp, equal, compare]
+
+        (* Note: nonrec doesn't work with ppx-deriving *)
+        type t = t_ [@@deriving sexp, equal, compare]
+
+        let v = { lower = 10; upper = 100 }
+      end
+
+      let%test_unit "roundtrip json" =
+        let open Fields_derivers_snapps.Prim in
+        let (to_json, of_json), _ = derivers int in
+        [%test_eq: IntClosedInterval.t]
+          (of_json (to_json IntClosedInterval.v))
+          IntClosedInterval.v
+    end )
 end
 
 let assert_ b e = if b then Ok () else Or_error.error_string e

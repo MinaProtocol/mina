@@ -24,6 +24,17 @@ module Derivers = struct
           (Format.sprintf
              !"String representing a %s number in base 10"
              (String.lowercase name))
+
+    let iso_int ~name ?doc:doc_top ~to_int ~of_int : 'a Input.t =
+      ( ( (fun x -> `Int (to_int x))
+        , function `Int x -> of_int x | _ -> failwith "expected number" )
+      , { G.Deriver_basic.Input.run =
+            (fun ?doc () ->
+              G.Schema.scalar name
+                ?doc:(match doc with Some doc -> Some doc | None -> doc_top)
+                ~coerce:(fun x -> `Int (to_int x))
+              |> G.Schema.non_null)
+        } )
   end
 
   let uint64_ : Unsigned.UInt64.t Input.t =
@@ -49,7 +60,11 @@ module Derivers = struct
 
     let field fd acc = add_field field_ fd acc
   end
+
+  let derivers make_creator = finish (make_creator (init ()))
 end
+
+include Derivers
 
 let%test_module "Test" =
   ( module struct
@@ -88,8 +103,7 @@ let%test_module "Test" =
     end
 
     let (to_json', of_json'), _typ' =
-      let open Derivers.Prim in
-      V2.Fields.make_creator (Derivers.init ()) ~field |> Derivers.finish
+      derivers @@ V2.Fields.make_creator ~field:Prim.field
 
     let%test_unit "to_json'" =
       [%test_eq: string]

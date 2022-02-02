@@ -1,18 +1,7 @@
 (library
  (name fields_derivers_snapps)
  (public_name fields_derivers.snapps)
- (libraries
-  core_kernel
-  fieldslib
-  fields_derivers
-  fields_derivers.json
-  fields_derivers.graphql
-  mina_base
-  mina_numbers
-  unsigned_extended
-  currency
-  signature_lib
-  pickles)
+ (libraries core_kernel fieldslib fields_derivers fields_derivers.json fields_derivers.graphql mina_numbers unsigned_extended currency signature_lib pickles)
  (inline_tests)
  (preprocess
   (pps
