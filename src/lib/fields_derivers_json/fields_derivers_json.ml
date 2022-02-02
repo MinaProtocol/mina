@@ -1,132 +1,134 @@
 open Core_kernel
 open Fieldslib
 
-module To_yojson_basic = struct
+module To_yojson = struct
   module Input = struct
-    type 'input_type t = 'input_type -> Yojson.Safe.t
-  end
-
-  module Creator = struct
-    type 'input_type t = unit
-  end
-
-  module Output = struct
-    module Finish = struct
-      type t = unit
-    end
-
-    type 'input_type t = 'input_type Input.t
+    type ('input_type, 'a) t =
+      < to_json : ('input_type -> Yojson.Safe.t) ref ; .. > as 'a
   end
 
   module Accumulator = struct
-    type 'input_type t = (string * ('input_type -> Yojson.Safe.t)) list
+    type ('input_type, 'a) t =
+      < to_json_accumulator : (string * ('input_type -> Yojson.Safe.t)) list ref
+      ; .. >
+      as
+      'a
+      constraint ('input_type, 'a) t = ('input_type, 'a) Input.t
   end
-
-  let init () = []
 
   let add_field t_field field acc =
-    ( (fun _ -> failwith "Unused")
-    , ( Fields_derivers_util.name_under_to_camel field
-      , fun x -> t_field (Field.get field x) )
-      :: acc )
+    let rest = !(acc#to_json_accumulator) in
+    acc#to_json_accumulator :=
+      ( Fields_derivers.name_under_to_camel field
+      , fun x -> !(t_field#to_json) (Field.get field x) )
+      :: rest ;
+    ((fun _ -> failwith "Unused"), acc)
 
-  let finish () (_creator, field_convs) t =
-    `Assoc (List.map field_convs ~f:(fun (name, f) -> (name, f t)) |> List.rev)
+  let finish (_creator, obj) =
+    let to_json_accumulator = !(obj#to_json_accumulator) in
+    (obj#to_json :=
+       fun t ->
+         `Assoc
+           ( List.map to_json_accumulator ~f:(fun (name, f) -> (name, f t))
+           |> List.rev )) ;
+    obj
 
-  let int_ x = `Int x
+  let ( !. ) x fd acc = add_field x fd acc
 
-  let string_ x = `String x
-
-  let bool_ x = `Bool x
-
-  let list_ f xs = `List (List.map ~f xs)
-end
-
-module To_yojson = struct
-  include Fields_derivers.Make (To_yojson_basic)
-
-  let optional_ (a_ : 'a Input.t) : 'a option Input.t =
-   fun x_opt -> match x_opt with Some x -> a_ x | None -> `Null
-
-  module Prim = struct
-    include Prim
-
-    let optional a_ fd acc = add_field (optional_ a_) fd acc
-  end
-end
-
-module Of_yojson_basic = struct
-  module Input = struct
-    type 'input_type t = Yojson.Safe.t -> 'input_type
-  end
-
-  module Creator = struct
-    type 'input_type t = Yojson.Safe.t String.Map.t
-  end
-
-  module Output = struct
-    module Finish = struct
-      type t = unit
+  let int =
+    object
+      method to_json = ref (fun x -> `Int x)
     end
 
-    type 'input_type t = 'input_type Input.t
-  end
+  let string =
+    object
+      method to_json = ref (fun x -> `String x)
+    end
 
-  module Accumulator = struct
-    type _ t = unit
-  end
+  let bool =
+    object
+      method to_json = ref (fun x -> `Bool x)
+    end
 
-  let init () = ()
+  let list o =
+    object
+      method to_json = ref (fun x -> `List (List.map ~f:!(o#to_json) x))
+    end
 
-  let add_field t_field field () =
-    ( (fun map ->
-        t_field
-          (Map.find_exn map (Fields_derivers_util.name_under_to_camel field)))
-    , () )
-
-  let finish () (creator, ()) json =
-    match json with
-    | `Assoc pairs ->
-        creator (String.Map.of_alist_exn pairs)
-    | _ ->
-        failwith "oh no"
-
-  let int_ = function `Int x -> x | _ -> failwith "todo"
-
-  let string_ = function `String x -> x | _ -> failwith "todo"
-
-  let bool_ = function `Bool x -> x | _ -> failwith "todo"
-
-  let list_ f = function `List xs -> List.map xs ~f | _ -> failwith "todo"
+  let option o =
+    object
+      method to_json =
+        ref (fun x_opt ->
+            match x_opt with Some x -> !(o#to_json) x | None -> `Null)
+    end
 end
 
 module Of_yojson = struct
-  include Fields_derivers.Make (Of_yojson_basic)
-
-  let optional_ (f : 'a Input.t) : 'a option Input.t = function
-    | `Null ->
-        None
-    | other ->
-        Some (f other)
-
-  module Prim = struct
-    include Prim
-
-    let optional f_ fd acc = add_field (optional_ f_) fd acc
+  module Input = struct
+    type ('input_type, 'a) t =
+      < of_json : (Yojson.Safe.t -> 'input_type) ref ; .. > as 'a
   end
-end
 
-module Both_yojson = struct
-  include Fields_derivers.Make2 (To_yojson) (Of_yojson)
-
-  let optional_ (f, x) = (To_yojson.optional_ f, Of_yojson.optional_ x)
-
-  module Prim = struct
-    include Prim
-
-    let optional (l, r) fd acc =
-      add_field (To_yojson.optional_ l, Of_yojson.optional_ r) fd acc
+  module Creator = struct
+    type ('input_type, 'a) t =
+      < of_json_creator : Yojson.Safe.t String.Map.t ref ; .. > as 'a
+      constraint ('input_type, 'a) t = ('input_type, 'a) Input.t
   end
+
+  let add_field : ('t, 'a) Input.t -> 'field -> 'obj -> 'creator * 'obj =
+   fun t_field field acc_obj ->
+    let creator finished_obj =
+      let map = !(finished_obj#of_json_creator) in
+      !(t_field#of_json)
+        (Map.find_exn map (Fields_derivers.name_under_to_camel field))
+    in
+    (creator, acc_obj)
+
+  let finish (creator, obj) =
+    let of_json json =
+      match json with
+      | `Assoc pairs ->
+          obj#of_json_creator := String.Map.of_alist_exn pairs ;
+          creator obj
+      | _ ->
+          failwith "todo"
+    in
+    obj#of_json := of_json ;
+    obj
+
+  let ( !. ) x fd acc = add_field x fd acc
+
+  (* TODO: Replace failwith's exception *)
+  let int =
+    object
+      method of_json = ref (function `Int x -> x | _ -> failwith "todo")
+    end
+
+  let string =
+    object
+      method of_json = ref (function `String x -> x | _ -> failwith "todo")
+    end
+
+  let bool =
+    object
+      method of_json = ref (function `Bool x -> x | _ -> failwith "todo")
+    end
+
+  let list obj =
+    object
+      method of_json =
+        ref (function
+          | `List xs ->
+              List.map xs ~f:!(obj#of_json)
+          | _ ->
+              failwith "todo")
+    end
+
+  let optional obj =
+    object
+      method of_json =
+        ref (function `Null -> None | other -> Some (!(obj#of_json) other))
+    end
 end
 
 let%test_module "Test" =
@@ -146,45 +148,47 @@ let%test_module "Test" =
       let v = { foo_hello = 1; bar = [ "baz1"; "baz2" ] }
     end
 
-    let to_json =
-      let open To_yojson.Prim in
-      Fields.make_creator (To_yojson.init ()) ~foo_hello:int
-        ~bar:(list To_yojson.string_)
-      |> To_yojson.finish ()
+    let deriver =
+      let to_json = ref (fun _ -> failwith "unimplemented") in
+      let of_json = ref (fun _ -> failwith "unimplemented") in
+      let to_json_accumulator = ref [] in
+      let of_json_creator = ref String.Map.empty in
+      object
+        method to_json = to_json
 
-    let of_json =
-      let open Of_yojson.Prim in
-      Fields.make_creator (Of_yojson.init ()) ~foo_hello:int
-        ~bar:(list Of_yojson.string_)
-      |> Of_yojson.finish ()
+        method of_json = of_json
 
-    let to_json', of_json' =
-      let open Both_yojson.Prim in
-      Fields.make_creator (Both_yojson.init ()) ~foo_hello:int
-        ~bar:(list Both_yojson.string_)
-      |> Both_yojson.finish ((), ())
+        method to_json_accumulator = to_json_accumulator
+
+        method of_json_creator = of_json_creator
+      end
+
+    let _to_json =
+      let open To_yojson in
+      Fields.make_creator deriver ~foo_hello:!.int ~bar:!.(list string)
+      |> finish
+
+    let _of_json =
+      let open Of_yojson in
+      Fields.make_creator deriver ~foo_hello:!.int ~bar:!.(list string)
+      |> finish
 
     let%test_unit "folding creates a yojson object we expect (modulo camel \
                    casing)" =
       [%test_eq: string]
         (Yojson_version.to_yojson Yojson_version.v |> Yojson.Safe.to_string)
-        (to_json v |> Yojson.Safe.to_string)
+        (!(deriver#to_json) v |> Yojson.Safe.to_string)
 
     let%test_unit "unfolding creates a yojson object we expect" =
       let expected =
         Yojson_version.of_yojson m |> Result.ok |> Option.value_exn
       in
-      let actual = of_json m in
+      let actual = !(deriver#of_json) m in
       [%test_eq: string list] expected.bar actual.bar ;
       [%test_eq: int] expected.foo_hello actual.foo_hello
 
     let%test_unit "round trip" =
       [%test_eq: string]
-        (to_json (of_json m) |> Yojson.Safe.to_string)
+        (!(deriver#to_json) (!(deriver#of_json) m) |> Yojson.Safe.to_string)
         (m |> Yojson.Safe.to_string)
-
-    let%test_unit "composed same as decomposed" =
-      [%test_eq: string]
-        (to_json (of_json m) |> Yojson.Safe.to_string)
-        (to_json' (of_json' m) |> Yojson.Safe.to_string)
   end )
