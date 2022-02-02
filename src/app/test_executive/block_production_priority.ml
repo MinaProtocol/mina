@@ -45,6 +45,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
     let sender_bp = List.nth_exn (Network.block_producers network) 1 in
     let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
+    let pk_to_string = Signature_lib.Public_key.Compressed.to_base58_check in
+    [%log info] "receiver: %s" (pk_to_string receiver_pub_key) ;
+    [%log info] "sender: %s" (pk_to_string sender_pub_key) ;
     let tps = 1 in
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
