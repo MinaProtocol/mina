@@ -49,7 +49,9 @@ module Closed_interval = struct
 
   let derivers a =
     let open Fields_derivers_snapps in
-    Fields.make_creator (Derivers.init ()) ~lower:a ~upper:a |> Derivers.finish
+    Fields.make_creator (Derivers.init ()) ~lower:a ~upper:a
+    |> Derivers.(finish (finished "ClosedInterval"))
+    |> Derivers.non_null
 
   let%test_module "ClosedInterval" =
     ( module struct
@@ -186,6 +188,30 @@ module Numeric = struct
       [@@deriving sexp, equal, yojson, hash, compare]
     end
   end]
+
+  let derivers a =
+    let open Fields_derivers_snapps in
+    Closed_interval.Fields.make_creator (Derivers.init ()) ~lower:a ~upper:a
+    |> Derivers.(finish (finished "Numeric"))
+    |> Derivers.optional
+
+  let%test_module "Numeric" =
+    ( module struct
+      module IntNumeric = struct
+        type t_ = int t [@@deriving sexp, equal, compare]
+
+        (* Note: nonrec doesn't work with ppx-deriving *)
+        type t = t_ [@@deriving sexp, equal, compare]
+
+        let v : t = Or_ignore.Check { Closed_interval.lower = 10; upper = 100 }
+      end
+
+      let%test_unit "roundtrip json" =
+        let open Fields_derivers_snapps in
+        let open Derivers.Prim in
+        let (to_json, of_json), _ = derivers int in
+        [%test_eq: IntNumeric.t] (of_json (to_json IntNumeric.v)) IntNumeric.v
+    end )
 
   let gen gen_a compare_a = Or_ignore.gen (Closed_interval.gen gen_a compare_a)
 

@@ -8,6 +8,10 @@ module type Deriver_basic_intf = sig
   end
 
   module Output : sig
+    module Finish : sig
+      type t
+    end
+
     type 'output_type t
   end
 
@@ -27,7 +31,8 @@ module type Deriver_basic_intf = sig
     -> ('input_type Creator.t -> 'f) * 'input_type Accumulator.t
 
   val finish :
-       ('input_type Creator.t -> 'input_type) * 'input_type Accumulator.t
+       Output.Finish.t
+    -> ('input_type Creator.t -> 'input_type) * 'input_type Accumulator.t
     -> 'input_type Output.t
 
   val int_ : int Input.t
@@ -101,7 +106,8 @@ module Make2 (D1 : Deriver_intf) (D2 : Deriver_intf) :
      and type 'input_type Creator.t =
           ('input_type D1.Creator.t, 'input_type D2.Creator.t) Base.Either.t
      and type 'input_type Output.t =
-          'input_type D1.Output.t * 'input_type D2.Output.t = struct
+          'input_type D1.Output.t * 'input_type D2.Output.t
+     and type Output.Finish.t = D1.Output.Finish.t * D2.Output.Finish.t = struct
   module Input = struct
     type 'input_type t = 'input_type D1.Input.t * 'input_type D2.Input.t
   end
@@ -112,6 +118,10 @@ module Make2 (D1 : Deriver_intf) (D2 : Deriver_intf) :
   end
 
   module Output = struct
+    module Finish = struct
+      type t = D1.Output.Finish.t * D2.Output.Finish.t
+    end
+
     type 'input_type t = 'input_type D1.Output.t * 'input_type D2.Output.t
   end
 
@@ -129,10 +139,10 @@ module Make2 (D1 : Deriver_intf) (D2 : Deriver_intf) :
     let create = function First x -> d1_create x | Second x -> d2_create x in
     (create, (d1, d2))
 
-  let finish (creator, (d1_acc, d2_acc)) =
+  let finish (m1, m2) (creator, (d1_acc, d2_acc)) =
     let open Base.Either in
-    ( D1.finish ((fun x -> creator (First x)), d1_acc)
-    , D2.finish ((fun x -> creator (Second x)), d2_acc) )
+    ( D1.finish m1 ((fun x -> creator (First x)), d1_acc)
+    , D2.finish m2 ((fun x -> creator (Second x)), d2_acc) )
 
   module Step = struct
     type ('a, 'input_type, 'f) t =

@@ -4,7 +4,12 @@ module Derivers = struct
   include Fields_derivers.Make2
             (Fields_derivers_json.Both_yojson)
             (Fields_derivers_graphql.Graphql_fields)
+  module Json = Fields_derivers_json.Both_yojson
   module G = Fields_derivers_graphql.Graphql_fields
+
+  module Uniform = struct
+    type 'j t = 'j Json.Output.t * 'j G.Input.t
+  end
 
   module Helpers = struct
     let iso_string ~name ?doc:doc_top ~to_string ~of_string : 'a Input.t =
@@ -49,6 +54,16 @@ module Derivers = struct
 
     let field fd acc = add_field field_ fd acc
   end
+
+  (** Take the derivers' output and make the graphql part non-null *)
+  let non_null ((json, graphql_fields) : 'a Output.t) : 'a Uniform.t =
+    (json, G.non_null_ graphql_fields)
+
+  (** Take the derivers' output and make the json part optional *)
+  let optional ((json, graphql_fields) : 'a Output.t) : 'a option Uniform.t =
+    (Json.optional_ json, graphql_fields)
+
+  let finished name = (((), ()), name)
 end
 
 let%test_module "Test" =
@@ -74,7 +89,7 @@ let%test_module "Test" =
       let open Derivers.Prim in
       V.Fields.make_creator (Derivers.init ()) ~foo:int ~bar:uint64
         ~baz:(list Derivers.uint32_)
-      |> Derivers.finish
+      |> Derivers.(finish (finished "V"))
 
     let%test_unit "roundtrips json" =
       [%test_eq: V.t]

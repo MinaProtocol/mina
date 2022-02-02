@@ -64,11 +64,12 @@ module Graphql_fields_raw = struct
       end
 
       module Output = struct
-        type 'output_type t =
-          { run :
-              'ctx.    ?doc:string -> name:string
-              -> ('ctx, 'output_type option) Schema.typ
-          }
+        module Finish = struct
+          (** the name *)
+          type t = string
+        end
+
+        type 'output_type t = 'output_type option Input.t
       end
 
       module Accumulator = struct
@@ -104,10 +105,11 @@ module Graphql_fields_raw = struct
           :: acc )
 
       (* TODO: Do we need doc and deprecated and name on finish? *)
-      let finish ((_creator, schema_rev_thunk) : 'u * 'input_type Accumulator.t)
-          : 'input_type Output.t =
-        { Output.run =
-            (fun ?doc ~name ->
+      let finish (name : Output.Finish.t)
+          ((_creator, schema_rev_thunk) : 'u * 'input_type Accumulator.t) :
+          'input_type Output.t =
+        { Input.run =
+            (fun ?doc () ->
               Schema.obj name ?doc ~fields:(fun _ ->
                   List.rev
                   @@ List.map schema_rev_thunk ~f:(fun f ->
@@ -116,21 +118,31 @@ module Graphql_fields_raw = struct
 
       let int_opt_ = Input.{ run = (fun ?doc:_ () -> Schema.int) }
 
-      let int_ = Input.{ run = (fun ?doc:_ () -> Schema.(non_null int)) }
+      let non_null_ a_ =
+        Input.{ run = (fun ?doc:_ () -> Schema.(non_null (a_.run ()))) }
+
+      let int_ = non_null_ int_opt_
 
       let string_opt_ = Input.{ run = (fun ?doc:_ () -> Schema.string) }
 
-      let string_ = Input.{ run = (fun ?doc:_ () -> Schema.(non_null string)) }
+      let string_ = non_null_ string_opt_
 
       let bool_opt_ = Input.{ run = (fun ?doc:_ () -> Schema.bool) }
 
-      let bool_ = Input.{ run = (fun ?doc:_ () -> Schema.(non_null bool)) }
+      let bool_ = non_null_ bool_opt_
 
       let list_ (x : 'a Input.t) =
         Input.{ run = (fun ?doc:_ () -> Schema.(non_null (list (x.run ())))) }
     end
 
     include Fields_derivers.Make (Deriver_basic)
+    include Deriver_basic
+
+    module Prim = struct
+      include Prim
+
+      let non_null a_ fd acc = add_field (non_null_ a_) fd acc
+    end
   end
 end
 
@@ -293,9 +305,9 @@ query IntrospectionQuery {
         let typ_input =
           Fields.make_creator (Graphql_fields.init ()) ~foo_hello:int
             ~bar:(list Graphql_fields.string_)
-          |> Graphql_fields.finish
+          |> Graphql_fields.finish "T"
         in
-        typ_input.run ?doc:None ~name:"T"
+        typ_input.run ?doc:None ()
       in
       let typ2 =
         Graphql_fields.Schema.(
