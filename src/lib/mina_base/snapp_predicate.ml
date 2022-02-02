@@ -48,8 +48,7 @@ module Closed_interval = struct
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let derivers a =
-    let open Fields_derivers_snapps in
-    Fields.make_creator (Derivers.init ()) ~lower:a ~upper:a |> Derivers.finish
+    Fields_derivers_snapps.derivers @@ Fields.make_creator ~lower:a ~upper:a
 
   let%test_module "ClosedInterval" =
     ( module struct
@@ -63,8 +62,7 @@ module Closed_interval = struct
       end
 
       let%test_unit "roundtrip json" =
-        let open Fields_derivers_snapps in
-        let open Derivers.Prim in
+        let open Fields_derivers_snapps.Prim in
         let (to_json, of_json), _ = derivers int in
         [%test_eq: IntClosedInterval.t]
           (of_json (to_json IntClosedInterval.v))
