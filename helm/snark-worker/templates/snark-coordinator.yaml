@@ -23,7 +23,7 @@ spec:
         prometheus.io/path: '/metrics'
     spec:
       containers:
-      - name: coordinator
+      - name: mina
         resources:
           limits:
           requests:

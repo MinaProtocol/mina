@@ -25,21 +25,26 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; num_snark_workers = 2
     }
 
-  let wait_for_bps_to_initialize ~logger network t =
-    let open Malleable_error.Let_syntax in
-    let all_nodes = Network.block_producers network in
-    let n = List.length all_nodes in
-    List.mapi all_nodes ~f:(fun i node ->
-        let%map () = wait_for t (Wait_condition.node_to_initialize node) in
-        [%log info] "Block producer %d (of %d) initialized" (i + 1) n ;
-        ())
-    |> Malleable_error.all_unit
+  (* let wait_for_bps_to_initialize ~logger network t =
+     let open Malleable_error.Let_syntax in
+     let all_nodes = Network.block_producers network in
+     let n = List.length all_nodes in
+     List.mapi all_nodes ~f:(fun i node ->
+         let%map () = wait_for t (Wait_condition.node_to_initialize node) in
+         [%log info] "Block producer %d (of %d) initialized" (i + 1) n ;
+         ())
+     |> Malleable_error.all_unit *)
 
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     [%log info] "starting..." ;
-    let%bind () = wait_for_bps_to_initialize ~logger network t in
+    (* let%bind () = wait_for_bps_to_initialize ~logger network t in *)
+    let all_nodes = Network.all_nodes network in
+    let%bind () =
+      Malleable_error.List.iter all_nodes
+        ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
+    in
     [%log info] "done waiting for initializations" ;
     let receiver_bp = List.nth_exn (Network.block_producers network) 0 in
     let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in

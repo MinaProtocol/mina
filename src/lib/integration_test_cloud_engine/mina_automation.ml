@@ -402,7 +402,7 @@ module Network_manager = struct
     in
     let snark_coordinator_nodes =
       if network_config.terraform.snark_worker_replicas > 0 then
-        [ cons_node snark_coordinator_name "coordinator" None None ]
+        [ cons_node snark_coordinator_name "mina" None None ]
       else []
     in
     let block_producer_nodes =
