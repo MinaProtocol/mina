@@ -13,7 +13,8 @@ type metrics_t =
   ; transaction_pool_size : int
   }
 
-type best_chain_block = { state_hash : string; command_transaction_count : int; creator_pk: string }
+type best_chain_block =
+  { state_hash : string; command_transaction_count : int; creator_pk : string }
 
 (* TODO: malleable error -> or error *)
 
