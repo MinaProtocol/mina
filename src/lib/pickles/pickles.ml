@@ -32,7 +32,7 @@ module Cache_handle = Cache_handle
 module Step_main_inputs = Step_main_inputs
 module Pairing_main = Pairing_main
 
-let profile_constraints = true
+let profile_constraints = false
 
 let verify = Verify.verify
 

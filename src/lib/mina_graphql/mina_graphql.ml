@@ -2893,6 +2893,12 @@ module Types = struct
             ]
     end
 
+    let send_test_snapp =
+      scalar "SendTestSnappInput" ~doc:"Parties for a test snapp"
+        ~coerce:(fun json ->
+          let json = to_yojson json in
+          Mina_base.Parties.of_yojson json)
+
     let precomputed_block =
       scalar "PrecomputedBlock" ~doc:"Block encoded in precomputed block format"
         ~coerce:(fun json ->
@@ -4049,6 +4055,13 @@ module Mutations = struct
       ~doc:"Mock a snapp transaction, no effect on blockchain"
       ~f:mock_snapp_command
 
+  let send_test_snapp =
+    io_field "sendTestSnapp" ~doc:"Send a test snapp"
+      ~args:Arg.[ arg "parties" ~typ:(non_null Types.Input.send_test_snapp) ]
+      ~typ:(non_null Types.Payload.send_snapp)
+      ~resolve:(fun { ctx = mina; _ } () parties ->
+        send_snapp_command mina parties)
+
   let create_token =
     io_field "createToken" ~doc:"Create a new token"
       ~typ:(non_null Types.Payload.create_token)
@@ -4394,6 +4407,7 @@ module Mutations = struct
     ; mint_tokens
     ; send_snapp
     ; mock_snapp
+    ; send_test_snapp
     ; export_logs
     ; set_staking
     ; set_coinbase_receiver

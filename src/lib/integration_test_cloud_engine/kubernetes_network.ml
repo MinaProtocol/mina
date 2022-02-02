@@ -24,7 +24,10 @@ module Node = struct
 
   let base_kube_args t = [ "--cluster"; t.cluster; "--namespace"; t.namespace ]
 
+  let node_password = "naughty blue worm"
+
   let get_logs_in_container ?container node =
+    let open Deferred.Let_syntax in
     let container_id : string =
       match container with None -> node.mina_container_id | Some id -> id
     in
@@ -33,7 +36,7 @@ module Node = struct
     let pod_cmd =
       sprintf "%s get pod -l \"app=%s\" -o name" base_kube_cmd node.pod_id
     in
-    let%bind.Deferred cwd = Unix.getcwd () in
+    let%bind cwd = Unix.getcwd () in
     let%bind pod = Util.run_cmd_exn cwd "sh" [ "-c"; pod_cmd ] in
     let kubectl_cmd =
       Printf.sprintf "%s logs -c %s -n %s %s" base_kube_cmd container_id
@@ -174,6 +177,35 @@ module Node = struct
             payment {
               id
             }
+          }
+      }
+    |}]
+
+    (* TODO: temporary version *)
+    module Send_test_snapp =
+    [%graphql
+    {|
+         mutation ($parties: SendTestSnappInput!) {
+          sendTestSnapp(parties: $parties) {
+               snapp { id
+                       hash
+                       nonce
+                       failureReason
+                     }
+             }
+         }
+       |}]
+
+    module Send_snapp =
+    [%graphql
+    {|
+      mutation ($feePayer: SnappPartyFeePayer!,$otherParties : [SnappParty!]!, $memo : String!) {
+       sendSnapp(input: {feePayer: $feePayer, otherParties: $otherParties, memo : $memo}) {
+            snapp { id
+                    hash
+                    nonce
+                    failureReason
+                  }
           }
       }
     |}]
@@ -356,14 +388,14 @@ module Node = struct
       ~metadata:[ ("sender_pk", `String sender_pk_str) ] ;
     let unlock_sender_account_graphql () =
       let unlock_account_obj =
-        Graphql.Unlock_account.make ~password:"naughty blue worm"
+        Graphql.Unlock_account.make ~password:node_password
           ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
           ()
       in
       exec_graphql_request ~logger ~node:t
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
     in
-    let%bind _ = unlock_sender_account_graphql () in
+    let%bind _unlock_acct_obj = unlock_sender_account_graphql () in
     let send_payment_graphql () =
       let send_payment_obj =
         Graphql.Send_payment.make
@@ -387,6 +419,42 @@ module Node = struct
       =
     send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  let send_snapp ~logger t ~(parties : Mina_base.Parties.t) =
+    [%log info] "Sending a snapp"
+      ~metadata:
+        [ ("namespace", `String t.namespace); ("pod_id", `String t.pod_id) ] ;
+    let open Deferred.Or_error.Let_syntax in
+    let fee_payer_pk = parties.fee_payer.data.body.public_key in
+    let fee_payer_pk_str =
+      fee_payer_pk |> Signature_lib.Public_key.Compressed.to_base58_check
+    in
+    [%log info] "send_snapp: unlocking fee payer account"
+      ~metadata:[ ("fee_payer_pk", `String fee_payer_pk_str) ] ;
+    let unlock_sender_account_graphql () =
+      let unlock_account_obj =
+        Graphql.Unlock_account.make ~password:node_password
+          ~public_key:(Graphql_lib.Encoders.public_key fee_payer_pk)
+          ()
+      in
+      exec_graphql_request ~logger ~node:t
+        ~query_name:"unlock_fee_payer_account_graphql" unlock_account_obj
+    in
+    let%bind _unlock_acct_obj = unlock_sender_account_graphql () in
+    let parties_json =
+      Mina_base.Parties.to_yojson parties |> Yojson.Safe.to_basic
+    in
+    let send_snapp_graphql () =
+      let send_snapp_obj =
+        Graphql.Send_test_snapp.make ~parties:parties_json ()
+      in
+      exec_graphql_request ~logger ~node:t ~query_name:"send_snapp_graphql"
+        send_snapp_obj
+    in
+    let%map sent_snapp_obj = send_snapp_graphql () in
+    assert (Option.is_none sent_snapp_obj#sendTestSnapp#snapp#failureReason) ;
+    let snapp_id = sent_snapp_obj#sendTestSnapp#snapp#id in
+    [%log info] "Sent snapp" ~metadata:[ ("snapp_id", `String snapp_id) ]
 
   let dump_archive_data ~logger (t : t) ~data_file =
     (* this function won't work if t doesn't happen to be an archive node *)
