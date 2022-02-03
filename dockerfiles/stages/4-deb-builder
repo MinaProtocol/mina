@@ -44,7 +44,6 @@ RUN echo "--- Build all major tagets required for packaging" \
     src/app/rosetta/rosetta.exe \
     src/app/rosetta/rosetta_mainnet_signatures.exe \
     src/app/rosetta/rosetta_testnet_signatures.exe \
-    src/app/rosetta/test-agent/agent.exe \
     src/app/rosetta/ocaml-signer/signer.exe
 
 # --- MAKE DEB
