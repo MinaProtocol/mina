@@ -11,7 +11,6 @@ open Signature_lib
 
 [%%else]
 
-module Currency = Currency_nonconsensus.Currency
 open Signature_lib_nonconsensus
 
 [%%endif]

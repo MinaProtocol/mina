@@ -3,7 +3,6 @@
 open Js_of_ocaml
 open Snark_params.Tick
 open Mina_base_nonconsensus
-module Currency = Currency_nonconsensus.Currency
 module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
 module Global_slot = Mina_numbers_nonconsensus.Global_slot
 module Memo = Signed_command_memo

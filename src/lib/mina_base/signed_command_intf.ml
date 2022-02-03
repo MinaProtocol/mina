@@ -13,7 +13,6 @@ open Mina_numbers
 [%%else]
 
 open Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
 
 [%%endif]
 

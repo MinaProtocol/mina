@@ -6,7 +6,6 @@ open Import
 [%%ifndef consensus_mechanism]
 
 module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
 module Quickcheck_lib = Quickcheck_lib_nonconsensus.Quickcheck_lib
 
 [%%endif]

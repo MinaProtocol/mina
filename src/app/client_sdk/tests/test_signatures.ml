@@ -15,7 +15,6 @@ open Snark_params.Tick
 open Snark_params.Tick
 module Mina_base = Mina_base_nonconsensus
 module Signature_lib = Signature_lib_nonconsensus
-module Currency = Currency_nonconsensus.Currency
 module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
 
 [%%endif]
