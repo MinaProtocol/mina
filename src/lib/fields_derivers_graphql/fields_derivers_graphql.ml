@@ -54,8 +54,6 @@ module Nullable = struct
     | Non_null : ('a, 'a option) t
 end
 
-open Nullable
-
 module Graphql_fields_raw = struct
   module Make (IO : Graphql_intf.IO) = struct
     module Schema = Graphql_schema.Make (IO)
@@ -138,16 +136,14 @@ module Graphql_fields_raw = struct
       obj#nullable_graphql_fields := nullable_graphql_fields ;
       obj
 
-    let int ~fresh =
-      let obj = fresh in
+    let int obj =
       (obj#graphql_fields := Input.T.{ run = (fun () -> Schema.(non_null int)) }) ;
       obj#contramap := Fn.id ;
       obj#graphql_fields_accumulator := !(obj#graphql_fields_accumulator) ;
       (obj#nullable_graphql_fields := Input.T.{ run = (fun () -> Schema.int) }) ;
       obj
 
-    let string ~fresh =
-      let obj = fresh in
+    let string obj =
       (obj#graphql_fields :=
          Input.T.{ run = (fun () -> Schema.(non_null string)) }) ;
       obj#contramap := Fn.id ;
@@ -156,11 +152,7 @@ module Graphql_fields_raw = struct
          Input.T.{ run = (fun () -> Schema.string) }) ;
       obj
 
-    let list ~fresh ~fresh'
-        (inner : fresh:'fresh -> ('input_type, 'b, _, _) Input.t) :
-        ('input_type list, _, _, _) Input.t =
-      let obj = fresh in
-      let x = inner ~fresh:fresh' in
+    let list x obj : ('input_type list, _, _, _) Input.t =
       (obj#graphql_fields :=
          Input.T.
            { run =
@@ -174,22 +166,16 @@ module Graphql_fields_raw = struct
       obj
 
     (* I can't get OCaml to typecheck this poperly unless we pass the same fresh function twice *)
-    let option ~fresh ~fresh'
-        (inner : fresh:'fresh -> ('input_type, 'b, 'c, 'nullable) Input.t) :
+    let option (x : ('input_type, 'b, 'c, 'nullable) Input.t) obj :
         ('input_type option, _, 'c option, _) Input.t =
-      let obj = fresh in
-      let x = inner ~fresh:fresh' in
       obj#graphql_fields := !(x#nullable_graphql_fields) ;
       obj#nullable_graphql_fields := !(x#nullable_graphql_fields) ;
       obj#contramap := Option.map ~f:!(x#contramap) ;
       obj#graphql_fields_accumulator := !(x#graphql_fields_accumulator) ;
       obj
 
-    let contramap ~fresh ~fresh' ~(f : 'd -> 'c)
-        (inner : fresh:'fresh -> ('input_type, 'b, 'c, 'nullable) Input.t) :
-        ('input_type, _, 'd, _) Input.t =
-      let obj = fresh in
-      let x = inner ~fresh:fresh' in
+    let contramap ~(f : 'd -> 'c) (x : ('input_type, 'b, 'c, 'nullable) Input.t)
+        obj : ('input_type, _, 'd, _) Input.t =
       obj#graphql_fields := !(x#graphql_fields) ;
       (obj#contramap := fun a -> !(x#contramap) (f a)) ;
       obj#nullable_graphql_fields := !(x#nullable_graphql_fields) ;
@@ -344,10 +330,10 @@ query IntrospectionQuery {
       | Error err ->
           failwith err
 
-    let deriver (type a b c d e) () :
+    let deriver (type a b c d) () :
         < contramap : (a -> b) ref
         ; graphql_fields : c Graphql_fields.Input.T.t ref
-        ; nullable_graphql_fields : e Graphql_fields.Input.T.t ref
+        ; nullable_graphql_fields : d Graphql_fields.Input.T.t ref
         ; .. >
         as
         'row =
@@ -370,13 +356,9 @@ query IntrospectionQuery {
         method graphql_fields_accumulator = graphql_fields_accumulator
       end
 
-    let ( ~!. ) x fd acc =
-      Graphql_fields.add_field
-        (x ~fresh:(deriver ()) ~fresh':(deriver ()))
-        fd acc
+    let o () = deriver ()
 
-    let ( !. ) x fd acc =
-      Graphql_fields.add_field (x ~fresh:(deriver ())) fd acc
+    let ( !. ) x fd acc = Graphql_fields.add_field (x (o ())) fd acc
 
     let hit_server (typ : _ Graphql_fields.Schema.typ) v =
       let query_top_level =
@@ -417,26 +399,26 @@ query IntrospectionQuery {
                   ~resolve:(fun _ t -> t.bar)
               ]))
 
-      let derived ~fresh =
+      let derived init =
         let open Graphql_fields in
-        Fields.make_creator fresh
-          ~foo_hello:~!.(option int)
-          ~bar:~!.(list string)
+        Fields.make_creator init
+          ~foo_hello:!.(option @@ int @@ o ())
+          ~bar:!.(list @@ string @@ o ())
         |> finish ~name:"T1" ?doc:None
     end
 
     module Or_ignore_test = struct
       type 'a t = Check of 'a | Ignore
 
-      let of_option = function None -> Ignore | Some x -> Check x
+      let _of_option = function None -> Ignore | Some x -> Check x
 
       let to_option = function Ignore -> None | Check x -> Some x
 
-      let derived ~fresh inner =
+      let derived
+          (inner : 'o -> ('input_type, 'b, 'c, _) Graphql_fields.Input.t) init :
+          (_, _, 'c t, _) Graphql_fields.Input.t =
         let open Graphql_fields in
-        let obj = option ~fresh ~fresh':(deriver ()) inner in
-        let obj' = contramap ~f:of_option ~fresh:obj ~fresh':(deriver ()) in
-        obj'
+        contramap ~f:to_option ((option @@ inner @@ o ()) (o ())) init
 
       (*
       let derived (type input_type)
@@ -483,21 +465,16 @@ query IntrospectionQuery {
                   ~resolve:(fun _ t -> Or_ignore_test.to_option t.foo)
               ]))
 
-      let derived =
-        let foo =
-          let open Graphql_fields in
-          !.(Or_ignore_test.derived T1.derived)
-        in
-        let _ = foo in
-        failwith "FIXME WITH OBJ MAGIC"
-
-      (*Fields.make_creator (deriver ()) ~foo |> finish ~name:"T2" ?doc:None*)
+      let derived init =
+        let open Graphql_fields in
+        Fields.make_creator init ~foo:!.(Or_ignore_test.derived @@ T1.derived)
+        |> finish ~name:"T2" ?doc:None
     end
 
     let%test_unit "T2 fold" =
       let open Graphql_fields in
       let generated_typ =
-        let typ_input = T2.(option derived) in
+        let typ_input = T2.(option @@ derived @@ o ()) (o ()) in
         !(typ_input#graphql_fields).run ()
       in
       [%test_eq: string]
