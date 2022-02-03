@@ -451,10 +451,17 @@ module Node = struct
       exec_graphql_request ~logger ~node:t ~query_name:"send_snapp_graphql"
         send_snapp_obj
     in
-    let%map sent_snapp_obj = send_snapp_graphql () in
-    assert (Option.is_none sent_snapp_obj#sendTestSnapp#snapp#failureReason) ;
+    let%bind sent_snapp_obj = send_snapp_graphql () in
+    let%bind () =
+      match sent_snapp_obj#sendTestSnapp#snapp#failureReason with
+      | None ->
+          return ()
+      | Some s ->
+          Deferred.Or_error.errorf "Snapp failed, reason: %s" s
+    in
     let snapp_id = sent_snapp_obj#sendTestSnapp#snapp#id in
-    [%log info] "Sent snapp" ~metadata:[ ("snapp_id", `String snapp_id) ]
+    return
+      ([%log info] "Sent snapp" ~metadata:[ ("snapp_id", `String snapp_id) ])
 
   let dump_archive_data ~logger (t : t) ~data_file =
     (* this function won't work if t doesn't happen to be an archive node *)
