@@ -3,13 +3,6 @@
 open Core_kernel
 open Snark_params.Tick
 
-[%%ifndef consensus_mechanism]
-
-module Hex = Hex_nonconsensus.Hex
-module Rosetta_coding = Rosetta_coding_nonconsensus
-
-[%%endif]
-
 module Arg = struct
   type t = (Field.t, Inner_curve.Scalar.t) Signature_poly.Stable.Latest.t
   [@@deriving bin_io_unversioned]

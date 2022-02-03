@@ -5,16 +5,7 @@
 open Core_kernel
 module Field = Snark_params.Tick.Field
 module Scalar = Snark_params.Tick.Inner_curve.Scalar
-
-[%%ifdef consensus_mechanism]
-
 open Signature_lib
-
-[%%else]
-
-open Signature_lib_nonconsensus
-
-[%%endif]
 
 (* see RFC 0038, section "marshal-keys" for a specification *)
 

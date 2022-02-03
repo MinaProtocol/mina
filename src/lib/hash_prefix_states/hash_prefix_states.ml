@@ -1,14 +1,3 @@
-[%%import "/src/config.mlh"]
-
-[%%ifdef consensus_mechanism]
-
-[%%else]
-
-module Mina_compile_config =
-  Mina_compile_config_nonconsensus.Mina_compile_config
-
-[%%endif]
-
 open Core_kernel
 open Hash_prefixes
 

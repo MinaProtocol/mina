@@ -1,14 +1,5 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Async_kernel
-
-[%%ifndef consensus_mechanism]
-
-module Mina_compile_config =
-  Mina_compile_config_nonconsensus.Mina_compile_config
-
-[%%endif]
 
 module Partial_reason = struct
   type t =

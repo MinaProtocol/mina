@@ -9,12 +9,6 @@ open Core_kernel
 open Snark_params
 open Tick
 
-[%%else]
-
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Mina_compile_config =
-  Mina_compile_config_nonconsensus.Mina_compile_config
-
 [%%endif]
 
 open Currency

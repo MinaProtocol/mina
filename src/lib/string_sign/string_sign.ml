@@ -1,19 +1,7 @@
 (* string_sign.ml -- signatures for strings *)
 
-[%%import "/src/config.mlh"]
-
 module Inner_curve = Snark_params.Tick.Inner_curve
-
-[%%ifdef consensus_mechanism]
-
 open Signature_lib
-
-[%%else]
-
-module Signature_lib = Signature_lib_nonconsensus
-open Signature_lib
-
-[%%endif]
 
 let nybble_bits = function
   | 0x0 ->

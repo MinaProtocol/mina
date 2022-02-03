@@ -7,14 +7,10 @@ open Core_kernel
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-open Signature_lib
-
-[%%else]
-
-open Signature_lib_nonconsensus
 
 [%%endif]
 
+open Signature_lib
 module Amount = Currency.Amount
 module Fee = Currency.Fee
 

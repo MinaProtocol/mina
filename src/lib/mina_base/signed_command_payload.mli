@@ -4,12 +4,6 @@ open Core_kernel
 open Import
 open Snark_params.Tick
 
-[%%ifndef consensus_mechanism]
-
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-
-[%%endif]
-
 module Body : sig
   type t =
     | Payment of Payment_payload.t

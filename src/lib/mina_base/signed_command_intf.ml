@@ -5,16 +5,7 @@
 open Import
 open Core_kernel
 open Snark_params.Tick
-
-[%%ifdef consensus_mechanism]
-
 open Mina_numbers
-
-[%%else]
-
-open Mina_numbers_nonconsensus.Mina_numbers
-
-[%%endif]
 
 module type Gen_intf = sig
   type t

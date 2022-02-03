@@ -485,8 +485,6 @@ module Make
         false
 end
 
-open Hash_prefix_states_nonconsensus
-
 [%%endif]
 
 open Snark_params

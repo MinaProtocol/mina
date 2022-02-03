@@ -3,13 +3,6 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifndef consensus_mechanism]
-
-module Outside_hash_image = Outside_hash_image_nonconsensus.Outside_hash_image
-
-[%%endif]
-
 open Snark_params.Tick
 
 include Data_hash.Make_full_size (struct

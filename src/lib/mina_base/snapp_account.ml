@@ -5,13 +5,6 @@ open Core_kernel
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-module Mina_numbers = Mina_numbers
-module Hash_prefix_states = Hash_prefix_states
-
-[%%else]
-
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Hash_prefix_states = Hash_prefix_states_nonconsensus.Hash_prefix_states
 
 [%%endif]
 
