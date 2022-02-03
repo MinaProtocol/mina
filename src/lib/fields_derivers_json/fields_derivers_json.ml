@@ -38,44 +38,31 @@ module To_yojson = struct
            |> List.rev )) ;
     obj
 
-  let ( !. ) x fd acc = add_field x fd acc
+  let int obj =
+    obj#contramap := Fn.id ;
+    (obj#to_json := fun x -> `Int x) ;
+    obj
 
-  let int =
-    object
-      method to_json = ref (fun x -> `Int x)
+  let string obj =
+    obj#contramap := Fn.id ;
+    (obj#to_json := fun x -> `String x) ;
+    obj
 
-      method contramap = ref Fn.id
-    end
+  let bool obj =
+    obj#contramap := Fn.id ;
+    (obj#to_json := fun x -> `String x) ;
+    obj
 
-  let string =
-    object
-      method to_json = ref (fun x -> `String x)
+  let list x obj =
+    obj#contramap := List.map ~f:!(x#contramap) ;
+    (obj#to_json := fun a -> `List (List.map ~f:!(x#to_json) a)) ;
+    obj
 
-      method contramap = ref Fn.id
-    end
-
-  let bool =
-    object
-      method to_json = ref (fun x -> `Bool x)
-
-      method contramap = ref Fn.id
-    end
-
-  let list o =
-    object
-      method to_json = ref (fun x -> `List (List.map ~f:!(o#to_json) x))
-
-      method contramap = ref (List.map ~f:!(o#contramap))
-    end
-
-  let option o =
-    object
-      method to_json =
-        ref (fun x_opt ->
-            match x_opt with Some x -> !(o#to_json) x | None -> `Null)
-
-      method contramap = ref (Option.map ~f:!(o#contramap))
-    end
+  let option x obj =
+    obj#contramap := Option.map ~f:!(x#contramap) ;
+    (obj#to_json :=
+       fun a_opt -> match a_opt with Some a -> !(x#to_json) a | None -> `Null) ;
+    obj
 end
 
 module Of_yojson = struct
@@ -116,49 +103,33 @@ module Of_yojson = struct
     obj#of_json := of_json ;
     obj
 
-  let ( !. ) x fd acc = add_field x fd acc
-
   (* TODO: Replace failwith's exception *)
-  let int =
-    object
-      method of_json = ref (function `Int x -> x | _ -> failwith "todo")
+  let int obj =
+    (obj#of_json := function `Int x -> x | _ -> failwith "todo") ;
+    obj#map := Fn.id ;
+    obj
 
-      method map = ref Fn.id
-    end
+  let string obj =
+    (obj#of_json := function `String x -> x | _ -> failwith "todo") ;
+    obj#map := Fn.id ;
+    obj
 
-  let string =
-    object
-      method of_json = ref (function `String x -> x | _ -> failwith "todo")
+  let bool obj =
+    (obj#of_json := function `Bool x -> x | _ -> failwith "todo") ;
+    obj#map := Fn.id ;
+    obj
 
-      method map = ref Fn.id
-    end
+  let list x obj =
+    (obj#of_json :=
+       function `List xs -> List.map xs ~f:!(x#of_json) | _ -> failwith "todo") ;
+    obj#map := List.map ~f:!(x#map) ;
+    obj
 
-  let bool =
-    object
-      method of_json = ref (function `Bool x -> x | _ -> failwith "todo")
-
-      method map = ref Fn.id
-    end
-
-  let list obj =
-    object
-      method of_json =
-        ref (function
-          | `List xs ->
-              List.map xs ~f:!(obj#of_json)
-          | _ ->
-              failwith "todo")
-
-      method map = ref (List.map ~f:!(obj#map))
-    end
-
-  let option obj =
-    object
-      method of_json =
-        ref (function `Null -> None | other -> Some (!(obj#of_json) other))
-
-      method map = ref (Option.map ~f:!(obj#map))
-    end
+  let option x obj =
+    (obj#of_json :=
+       function `Null -> None | other -> Some (!(x#of_json) other)) ;
+    obj#map := Option.map ~f:!(x#map) ;
+    obj
 end
 
 let%test_module "Test" =
@@ -178,7 +149,7 @@ let%test_module "Test" =
       let v = { foo_hello = 1; bar = [ "baz1"; "baz2" ] }
     end
 
-    let deriver =
+    let deriver () =
       let to_json = ref (fun _ -> failwith "unimplemented") in
       let of_json = ref (fun _ -> failwith "unimplemented") in
       let to_json_accumulator = ref [] in
@@ -190,7 +161,7 @@ let%test_module "Test" =
 
         method map = map
 
-        method contramp = contramap
+        method contramap = contramap
 
         method of_json = of_json
 
@@ -199,32 +170,44 @@ let%test_module "Test" =
         method of_json_creator = of_json_creator
       end
 
-    let _to_json =
+    let o () = deriver ()
+
+    let to_json obj =
       let open To_yojson in
-      Fields.make_creator deriver ~foo_hello:!.int ~bar:!.(list string)
+      let ( !. ) x fd acc = add_field (x @@ o ()) fd acc in
+      Fields.make_creator obj ~foo_hello:!.int ~bar:!.(list @@ string @@ o ())
       |> finish
 
-    let _of_json =
+    let of_json obj =
       let open Of_yojson in
-      Fields.make_creator deriver ~foo_hello:!.int ~bar:!.(list string)
+      let ( !. ) x fd acc = add_field (x @@ o ()) fd acc in
+      Fields.make_creator obj ~foo_hello:!.int ~bar:!.(list @@ string @@ o ())
       |> finish
+
+    let both_json obj =
+      let _a = to_json obj in
+      let _b = of_json obj in
+      obj
+
+    let full_derivers = both_json @@ o ()
 
     let%test_unit "folding creates a yojson object we expect (modulo camel \
                    casing)" =
       [%test_eq: string]
         (Yojson_version.to_yojson Yojson_version.v |> Yojson.Safe.to_string)
-        (!(deriver#to_json) v |> Yojson.Safe.to_string)
+        (!(full_derivers#to_json) v |> Yojson.Safe.to_string)
 
     let%test_unit "unfolding creates a yojson object we expect" =
       let expected =
         Yojson_version.of_yojson m |> Result.ok |> Option.value_exn
       in
-      let actual = !(deriver#of_json) m in
+      let actual = !(full_derivers#of_json) m in
       [%test_eq: string list] expected.bar actual.bar ;
       [%test_eq: int] expected.foo_hello actual.foo_hello
 
     let%test_unit "round trip" =
       [%test_eq: string]
-        (!(deriver#to_json) (!(deriver#of_json) m) |> Yojson.Safe.to_string)
+        ( !(full_derivers#to_json) (!(full_derivers#of_json) m)
+        |> Yojson.Safe.to_string )
         (m |> Yojson.Safe.to_string)
   end )
