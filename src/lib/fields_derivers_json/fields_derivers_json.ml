@@ -63,6 +63,11 @@ module To_yojson = struct
     (obj#to_json :=
        fun a_opt -> match a_opt with Some a -> !(x#to_json) a | None -> `Null) ;
     obj
+
+  let contramap ~f x obj =
+    (obj#contramap := fun a -> !(x#contramap) (f a)) ;
+    obj#to_json := !(x#to_json) ;
+    obj
 end
 
 module Of_yojson = struct
@@ -129,6 +134,11 @@ module Of_yojson = struct
     (obj#of_json :=
        function `Null -> None | other -> Some (!(x#of_json) other)) ;
     obj#map := Option.map ~f:!(x#map) ;
+    obj
+
+  let map ~f x obj =
+    (obj#map := fun a -> f (!(x#map) a)) ;
+    obj#of_json := !(x#of_json) ;
     obj
 end
 
