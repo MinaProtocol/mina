@@ -14,7 +14,7 @@ RET=$?
 
 if [ $RET -eq 0 ]; then
   # Found a conflict
-  echo "This pull request conflicts with $BRANCH , please open a new PR https://github.com/MinaProtocol/mina/compare/${BRANCH}...${BUILDKITE_BRANCH}"
+  echo "This pull request conflicts with $BRANCH , please open a new PR @ https://github.com/MinaProtocol/mina/compare/${BRANCH}...${BUILDKITE_BRANCH}"
   exit 1
 else
   echo "No conflicts found against upstream branch ${BRANCH}"
