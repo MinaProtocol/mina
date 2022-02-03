@@ -14,7 +14,6 @@ module Mina_numbers = Mina_numbers
 
 open Signature_lib_nonconsensus
 module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 

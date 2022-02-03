@@ -5,12 +5,6 @@
 open Core_kernel
 open Snark_params.Tick
 
-[%%ifndef consensus_mechanism]
-
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
-
 module Elt : sig
   type t =
     | Signed_command of Signed_command.Payload.t

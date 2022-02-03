@@ -10,7 +10,6 @@ open Tick
 [%%else]
 
 module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Mina_compile_config =
   Mina_compile_config_nonconsensus.Mina_compile_config
 

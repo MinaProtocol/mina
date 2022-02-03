@@ -4,14 +4,6 @@ open Core_kernel
 open Snark_params
 open Tick
 
-[%%ifdef consensus_mechanism]
-
-[%%else]
-
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
-
 type t = Field.t * Field.t [@@deriving sexp, hash]
 
 include Codable.S with type t := t

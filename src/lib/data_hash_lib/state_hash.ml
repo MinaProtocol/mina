@@ -7,7 +7,6 @@ open Core_kernel
 [%%ifndef consensus_mechanism]
 
 module Outside_hash_image = Outside_hash_image_nonconsensus.Outside_hash_image
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 

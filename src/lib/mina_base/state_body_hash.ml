@@ -1,13 +1,5 @@
-[%%import "/src/config.mlh"]
-
 open Core
 open Snark_params.Tick
-
-[%%ifndef consensus_mechanism]
-
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
 
 include Data_hash.Make_full_size (struct
   let description = "State body hash"

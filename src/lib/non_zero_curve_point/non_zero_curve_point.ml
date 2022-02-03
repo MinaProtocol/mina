@@ -11,8 +11,6 @@ let parity y = Bigint.(test_bit (of_field y) 0)
 
 let parity y = Field.parity y
 
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
 [%%endif]
 
 let gen_uncompressed =

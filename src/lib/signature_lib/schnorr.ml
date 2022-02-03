@@ -485,7 +485,6 @@ module Make
         false
 end
 
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 open Hash_prefix_states_nonconsensus
 
 [%%endif]

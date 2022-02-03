@@ -11,7 +11,6 @@ open Signature_lib
 [%%else]
 
 module Signature_lib = Signature_lib_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 open Signature_lib
 
 [%%endif]

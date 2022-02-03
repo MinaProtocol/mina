@@ -8,7 +8,6 @@ module Signature_lib = Signature_lib_nonconsensus
 module Mina_compile_config =
   Mina_compile_config_nonconsensus.Mina_compile_config
 module Sgn = Sgn_nonconsensus.Sgn
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Mina_numbers = Mina_numbers_nonconsensus
 module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
 module Hash_prefix_states = Hash_prefix_states_nonconsensus.Hash_prefix_states

@@ -1,14 +1,5 @@
-[%%import "/src/config.mlh"]
-
 open Snark_params
 open Tick
-
-[%%ifndef consensus_mechanism]
-
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
-
 open Random_oracle
 
 val signature : Field.t State.t

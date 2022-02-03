@@ -6,12 +6,6 @@ open Core_kernel
 module B58_lib = Base58_check
 open Snark_params.Tick
 
-[%%ifndef consensus_mechanism]
-
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
-
 module Elt = struct
   type t =
     | Signed_command of Signed_command.Payload.t

@@ -2,13 +2,6 @@
 
 open Core_kernel
 open Snark_params.Tick
-
-[%%ifndef consensus_mechanism]
-
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
-
 module T = Mina_numbers.Length
 
 (*constants actually required for blockchain snark*)
