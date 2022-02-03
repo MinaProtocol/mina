@@ -8,7 +8,7 @@ module Common = struct
     module V2 = struct
       type t =
         { scan_state: Staged_ledger.Scan_state.Stable.V2.t
-        ; pending_coinbase: Pending_coinbase.Stable.V2.t }
+        ; pending_coinbase: Pending_coinbase.Stable.V1.t }
 
       let to_latest = Fn.id
 
@@ -16,7 +16,7 @@ module Common = struct
         `Assoc
           [ ("scan_state", `String "<opaque>")
           ; ( "pending_coinbase"
-            , Pending_coinbase.Stable.V2.to_yojson pending_coinbase ) ]
+            , Pending_coinbase.Stable.V1.to_yojson pending_coinbase ) ]
     end
   end]
 
