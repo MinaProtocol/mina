@@ -816,6 +816,16 @@
         },
         {
           "kind": "SCALAR",
+          "name": "SendTestSnappInput",
+          "description": "Parties for a test snapp",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "SnappProof",
           "description": null,
           "fields": null,
@@ -6230,6 +6240,37 @@
                     "ofType": {
                       "kind": "INPUT_OBJECT",
                       "name": "SendSnappInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SendSnappPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sendTestSnapp",
+              "description": "Send a test snapp",
+              "args": [
+                {
+                  "name": "parties",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "SendTestSnappInput",
                       "ofType": null
                     }
                   },

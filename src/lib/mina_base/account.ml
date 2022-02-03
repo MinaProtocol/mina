@@ -111,7 +111,7 @@ module Token_symbol = struct
 
         let max_length = 6
 
-        let check (x : t) = assert (String.length x < max_length)
+        let check (x : t) = assert (String.length x <= max_length)
 
         let t_of_sexp sexp =
           let res = t_of_sexp sexp in

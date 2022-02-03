@@ -1291,7 +1291,6 @@ let create ?wallets (config : Config.t) =
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       trace "mina_lib" (fun () ->
-          let start = Time.now () in
           let block_production_keypairs =
             Agent.create
               ~f:(fun kps ->
@@ -1301,6 +1300,7 @@ let create ?wallets (config : Config.t) =
                 |> Keypair.And_compressed_pk.Set.of_list)
               config.initial_block_production_keypairs
           in
+          let start = Time.now () in
           let%bind prover =
             Monitor.try_with ~here:[%here]
               ~rest:
