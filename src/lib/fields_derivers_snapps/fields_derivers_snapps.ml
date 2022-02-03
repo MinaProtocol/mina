@@ -16,7 +16,7 @@ module Derivers = struct
     let of_json = ref (fun _ -> failwith "unimplemented") in
     let to_json_accumulator = ref [] in
     let of_json_creator = ref String.Map.empty in
-    let map = ref Fn.id in
+    let map = ref (fun _ -> failwith "unimplemented") in
 
     object
       method graphql_fields = graphql_fields
@@ -32,8 +32,6 @@ module Derivers = struct
       method to_json = to_json
 
       method map = map
-
-      method contramp = contramap
 
       method of_json = of_json
 
@@ -58,27 +56,21 @@ module Derivers = struct
        Graphql_fields.Input.T.
          { run =
              (fun () ->
-               scalar name ?doc ~coerce:(fun x ->
-                   Yojson.Safe.to_basic (contramap x))
-               |> non_null)
+               scalar name ?doc ~coerce:Yojson.Safe.to_basic |> non_null)
          }) ;
 
-    obj#contramap := Fn.id ;
+    obj#contramap := contramap ;
 
     (obj#nullable_graphql_fields :=
        let open Graphql_fields.Schema in
        Graphql_fields.Input.T.
-         { run =
-             (fun () ->
-               scalar name ?doc ~coerce:(fun x ->
-                   Yojson.Safe.to_basic (contramap x)))
-         }) ;
+         { run = (fun () -> scalar name ?doc ~coerce:Yojson.Safe.to_basic) }) ;
 
-    obj#to_json := contramap ;
+    obj#to_json := Fn.id ;
 
-    obj#map := Fn.id ;
+    obj#map := map ;
 
-    obj#of_json := map ;
+    obj#of_json := Fn.id ;
     obj
 
   let iso_string obj ~(to_string : 'a -> string) ~(of_string : string -> 'a)
@@ -124,6 +116,13 @@ module Derivers = struct
     let _b = Fields_derivers_json.To_yojson.list x obj in
     Fields_derivers_json.Of_yojson.list x obj
 
+  let iso ~map ~contramap (x : _ Unified_input.t) obj : _ Unified_input.t =
+    let _a =
+      Fields_derivers_graphql.Graphql_fields.contramap ~f:contramap x obj
+    in
+    let _b = Fields_derivers_json.To_yojson.contramap ~f:contramap x obj in
+    Fields_derivers_json.Of_yojson.map ~f:map x obj
+
   let add_field (x : _ Unified_input.t) fd acc =
     let _, acc' = Fields_derivers_graphql.Graphql_fields.add_field x fd acc in
     let _, acc'' = Fields_derivers_json.To_yojson.add_field x fd acc' in
@@ -141,23 +140,44 @@ let%test_module "Test" =
   ( module struct
     module Field = Pickles.Impls.Step.Field.Constant
 
+    module Or_ignore_test = struct
+      type 'a t = Check of 'a | Ignore [@@deriving compare, sexp, equal]
+
+      let of_option = function None -> Ignore | Some x -> Check x
+
+      let to_option = function Ignore -> None | Check x -> Some x
+
+      let to_yojson a x = [%to_yojson: 'a option] a (to_option x)
+
+      let of_yojson a x = Result.map ~f:of_option ([%of_yojson: 'a option] a x)
+
+      let derived inner init =
+        let open Derivers in
+        iso ~map:of_option ~contramap:to_option
+          ((option @@ inner @@ o ()) (o ()))
+          init
+    end
+
     module V = struct
       type t =
         { foo : int
-        ; bar : Unsigned_extended.UInt64.t
+        ; foo1 : Unsigned_extended.UInt64.t
+        ; bar : Unsigned_extended.UInt64.t Or_ignore_test.t
         ; baz : Unsigned_extended.UInt32.t list
         }
       [@@deriving compare, sexp, equal, fields, yojson]
 
       let v =
         { foo = 1
-        ; bar = Unsigned.UInt64.of_int 10
+        ; foo1 = Unsigned.UInt64.of_int 10
+        ; bar = Or_ignore_test.Check (Unsigned.UInt64.of_int 10)
         ; baz = Unsigned.UInt32.[ of_int 11; of_int 12 ]
         }
 
       let derivers obj =
         let open Derivers in
-        Fields.make_creator obj ~foo:!.int ~bar:!.uint64
+        Fields.make_creator obj ~foo:!.int ~foo1:!.uint64
+          ~bar:!.(Or_ignore_test.derived uint64)
           ~baz:!.(list @@ uint32 @@ o ())
         |> finish ~name:"V"
     end

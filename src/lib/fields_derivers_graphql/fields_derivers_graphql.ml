@@ -81,7 +81,7 @@ module Graphql_fields_raw = struct
 
       (** thunks generating the schema in reverse *)
       type ('input_type, 'a, 'c, 'nullable) t =
-        < graphql_fields_accumulator : 'input_type T.t list ref ; .. > as 'a
+        < graphql_fields_accumulator : 'c T.t list ref ; .. > as 'a
         constraint
           ('input_type, 'a, 'c, 'nullable) t =
           ('input_type, 'a, 'c, 'nullable) Input.t
@@ -89,10 +89,7 @@ module Graphql_fields_raw = struct
 
     let add_field (type f input_type orig nullable c' nullable') :
            (orig, 'a, f, nullable) Input.t
-        -> ( [< `Read | `Set_and_create ]
-           , input_type
-           , f )
-           Fieldslib.Field.t_with_perm
+        -> ([< `Read | `Set_and_create ], c', f) Fieldslib.Field.t_with_perm
         -> (input_type, 'row2, c', nullable') Accumulator.t
         -> (_ -> f) * (input_type, 'row2, c', nullable') Accumulator.t =
      fun t_field field acc ->
@@ -414,11 +411,11 @@ query IntrospectionQuery {
 
       let to_option = function Ignore -> None | Check x -> Some x
 
-      let derived
-          (inner : 'o -> ('input_type, 'b, 'c, _) Graphql_fields.Input.t) init :
+      let derived (x : ('input_type, 'b, 'c, _) Graphql_fields.Input.t) init :
           (_, _, 'c t, _) Graphql_fields.Input.t =
         let open Graphql_fields in
-        contramap ~f:to_option ((option @@ inner @@ o ()) (o ())) init
+        let opt = option x (o ()) in
+        contramap ~f:to_option opt init
 
       (*
       let derived (type input_type)
@@ -467,7 +464,8 @@ query IntrospectionQuery {
 
       let derived init =
         let open Graphql_fields in
-        Fields.make_creator init ~foo:!.(Or_ignore_test.derived @@ T1.derived)
+        Fields.make_creator init
+          ~foo:!.(Or_ignore_test.derived @@ T1.derived @@ o ())
         |> finish ~name:"T2" ?doc:None
     end
 
