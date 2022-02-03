@@ -22,7 +22,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { balance = "9999999"; timing = Untimed }
         ; { balance = "9999999"; timing = Untimed }
         ])
-    ; num_snark_workers = 20
+    ; num_snark_workers = 2
     }
 
   (* let wait_for_bps_to_initialize ~logger network t =
@@ -53,7 +53,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let pk_to_string = Signature_lib.Public_key.Compressed.to_base58_check in
     [%log info] "receiver: %s" (pk_to_string receiver_pub_key) ;
     [%log info] "sender: %s" (pk_to_string sender_pub_key) ;
-    let tps = 1 in
+    let tps = 10 in
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
