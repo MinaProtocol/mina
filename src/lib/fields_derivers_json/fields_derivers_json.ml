@@ -3,24 +3,29 @@ open Fieldslib
 
 module To_yojson = struct
   module Input = struct
-    type ('input_type, 'a) t =
-      < to_json : ('input_type -> Yojson.Safe.t) ref ; .. > as 'a
+    type ('input_type, 'a, 'c) t =
+      < to_json : ('input_type -> Yojson.Safe.t) ref
+      ; contramap : ('c -> 'input_type) ref
+      ; .. >
+      as
+      'a
   end
 
   module Accumulator = struct
-    type ('input_type, 'a) t =
+    type ('input_type, 'a, 'c) t =
       < to_json_accumulator : (string * ('input_type -> Yojson.Safe.t)) list ref
       ; .. >
       as
       'a
-      constraint ('input_type, 'a) t = ('input_type, 'a) Input.t
+      constraint ('input_type, 'a, 'c) t = ('input_type, 'a, 'c) Input.t
   end
 
   let add_field t_field field acc =
     let rest = !(acc#to_json_accumulator) in
     acc#to_json_accumulator :=
       ( Fields_derivers.name_under_to_camel field
-      , fun x -> !(t_field#to_json) (Field.get field x) )
+      , fun x -> !(t_field#to_json) (!(t_field#contramap) (Field.get field x))
+      )
       :: rest ;
     ((fun _ -> failwith "Unused"), acc)
 
@@ -38,21 +43,29 @@ module To_yojson = struct
   let int =
     object
       method to_json = ref (fun x -> `Int x)
+
+      method contramap = ref Fn.id
     end
 
   let string =
     object
       method to_json = ref (fun x -> `String x)
+
+      method contramap = ref Fn.id
     end
 
   let bool =
     object
       method to_json = ref (fun x -> `Bool x)
+
+      method contramap = ref Fn.id
     end
 
   let list o =
     object
       method to_json = ref (fun x -> `List (List.map ~f:!(o#to_json) x))
+
+      method contramap = ref (List.map ~f:!(o#contramap))
     end
 
   let option o =
@@ -60,27 +73,34 @@ module To_yojson = struct
       method to_json =
         ref (fun x_opt ->
             match x_opt with Some x -> !(o#to_json) x | None -> `Null)
+
+      method contramap = ref (Option.map ~f:!(o#contramap))
     end
 end
 
 module Of_yojson = struct
   module Input = struct
-    type ('input_type, 'a) t =
-      < of_json : (Yojson.Safe.t -> 'input_type) ref ; .. > as 'a
+    type ('input_type, 'a, 'c) t =
+      < of_json : (Yojson.Safe.t -> 'input_type) ref
+      ; map : ('input_type -> 'c) ref
+      ; .. >
+      as
+      'a
   end
 
   module Creator = struct
-    type ('input_type, 'a) t =
+    type ('input_type, 'a, 'c) t =
       < of_json_creator : Yojson.Safe.t String.Map.t ref ; .. > as 'a
-      constraint ('input_type, 'a) t = ('input_type, 'a) Input.t
+      constraint ('input_type, 'a, 'c) t = ('input_type, 'a, 'c) Input.t
   end
 
-  let add_field : ('t, 'a) Input.t -> 'field -> 'obj -> 'creator * 'obj =
+  let add_field : ('t, 'a, 'c) Input.t -> 'field -> 'obj -> 'creator * 'obj =
    fun t_field field acc_obj ->
     let creator finished_obj =
       let map = !(finished_obj#of_json_creator) in
-      !(t_field#of_json)
-        (Map.find_exn map (Fields_derivers.name_under_to_camel field))
+      !(t_field#map)
+        (!(t_field#of_json)
+           (Map.find_exn map (Fields_derivers.name_under_to_camel field)))
     in
     (creator, acc_obj)
 
@@ -102,16 +122,22 @@ module Of_yojson = struct
   let int =
     object
       method of_json = ref (function `Int x -> x | _ -> failwith "todo")
+
+      method map = ref Fn.id
     end
 
   let string =
     object
       method of_json = ref (function `String x -> x | _ -> failwith "todo")
+
+      method map = ref Fn.id
     end
 
   let bool =
     object
       method of_json = ref (function `Bool x -> x | _ -> failwith "todo")
+
+      method map = ref Fn.id
     end
 
   let list obj =
@@ -122,12 +148,16 @@ module Of_yojson = struct
               List.map xs ~f:!(obj#of_json)
           | _ ->
               failwith "todo")
+
+      method map = ref (List.map ~f:!(obj#map))
     end
 
-  let optional obj =
+  let option obj =
     object
       method of_json =
         ref (function `Null -> None | other -> Some (!(obj#of_json) other))
+
+      method map = ref (Option.map ~f:!(obj#map))
     end
 end
 
@@ -153,8 +183,14 @@ let%test_module "Test" =
       let of_json = ref (fun _ -> failwith "unimplemented") in
       let to_json_accumulator = ref [] in
       let of_json_creator = ref String.Map.empty in
+      let map = ref Fn.id in
+      let contramap = ref Fn.id in
       object
         method to_json = to_json
+
+        method map = map
+
+        method contramp = contramap
 
         method of_json = of_json
 

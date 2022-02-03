@@ -69,7 +69,6 @@ module Graphql_fields_raw = struct
       type ('input_type, 'a, 'c, 'nullable) t =
         < graphql_fields : 'input_type T.t ref
         ; contramap : ('c -> 'input_type) ref
-        ; nullable : ('input_type, 'nullable) Nullable.t ref
         ; nullable_graphql_fields : 'nullable T.t ref
         ; .. >
         as
@@ -85,18 +84,6 @@ module Graphql_fields_raw = struct
       (** thunks generating the schema in reverse *)
       type ('input_type, 'a, 'c, 'nullable) t =
         < graphql_fields_accumulator : 'input_type T.t list ref ; .. > as 'a
-        constraint
-          ('input_type, 'a, 'c, 'nullable) t =
-          ('input_type, 'a, 'c, 'nullable) Input.t
-    end
-
-    module Output = struct
-      module T = struct
-        type 'c t = { run : 'ctx. unit -> ('ctx, 'c option) Schema.typ }
-      end
-
-      (** thunks generating the schema in reverse *)
-      type ('input_type, 'a, 'c, 'nullable) t = < .. > as 'a
         constraint
           ('input_type, 'a, 'c, 'nullable) t =
           ('input_type, 'a, 'c, 'nullable) Input.t
@@ -126,8 +113,7 @@ module Graphql_fields_raw = struct
       ((fun _ -> failwith "Unused"), acc)
 
     (* TODO: Do we need doc and deprecated and name on finish? *)
-    let finish ~name ?doc ((_creator, obj) : 'u * _ Accumulator.t) : _ Output.t
-        =
+    let finish ~name ?doc ((_creator, obj) : 'u * _ Accumulator.t) : _ Input.t =
       let graphql_fields_accumulator = !(obj#graphql_fields_accumulator) in
       let graphql_fields =
         { Input.T.run =
@@ -150,69 +136,65 @@ module Graphql_fields_raw = struct
       in
       obj#graphql_fields := graphql_fields ;
       obj#nullable_graphql_fields := nullable_graphql_fields ;
-      obj#nullable := Non_null ;
       obj
 
-    let ( !. ) x fd acc = add_field x fd acc
+    let int ~fresh =
+      let obj = fresh in
+      (obj#graphql_fields := Input.T.{ run = (fun () -> Schema.(non_null int)) }) ;
+      obj#contramap := Fn.id ;
+      obj#graphql_fields_accumulator := !(obj#graphql_fields_accumulator) ;
+      (obj#nullable_graphql_fields := Input.T.{ run = (fun () -> Schema.int) }) ;
+      obj
 
-    let int =
-      object
-        method graphql_fields =
-          ref Input.T.{ run = (fun () -> Schema.(non_null int)) }
+    let string ~fresh =
+      let obj = fresh in
+      (obj#graphql_fields :=
+         Input.T.{ run = (fun () -> Schema.(non_null string)) }) ;
+      obj#contramap := Fn.id ;
+      obj#graphql_fields_accumulator := !(obj#graphql_fields_accumulator) ;
+      (obj#nullable_graphql_fields :=
+         Input.T.{ run = (fun () -> Schema.string) }) ;
+      obj
 
-        method contramap = ref Fn.id
-
-        method nullable = ref Non_null
-
-        method nullable_graphql_fields =
-          ref Input.T.{ run = (fun () -> Schema.int) }
-      end
-
-    let string =
-      object
-        method graphql_fields =
-          ref Input.T.{ run = (fun () -> Schema.(non_null string)) }
-
-        method contramap = ref Fn.id
-
-        method nullable = ref Non_null
-
-        method nullable_graphql_fields =
-          ref Input.T.{ run = (fun () -> Schema.string) }
-      end
-
-    let list (x : ('input_type, 'b, _, _) Input.t) :
+    let list ~fresh ~fresh'
+        (inner : fresh:'fresh -> ('input_type, 'b, _, _) Input.t) :
         ('input_type list, _, _, _) Input.t =
-      object
-        method graphql_fields =
-          ref
-            Input.T.
-              { run =
-                  (fun () ->
-                    Schema.(non_null (list (!(x#graphql_fields).run ()))))
-              }
+      let obj = fresh in
+      let x = inner ~fresh:fresh' in
+      (obj#graphql_fields :=
+         Input.T.
+           { run =
+               (fun () -> Schema.(non_null (list (!(x#graphql_fields).run ()))))
+           }) ;
+      obj#contramap := List.map ~f:!(x#contramap) ;
+      obj#graphql_fields_accumulator := !(x#graphql_fields_accumulator) ;
+      (obj#nullable_graphql_fields :=
+         Input.T.
+           { run = (fun () -> Schema.(list (!(x#graphql_fields).run ()))) }) ;
+      obj
 
-        method contramap = ref Fn.id
+    (* I can't get OCaml to typecheck this poperly unless we pass the same fresh function twice *)
+    let option ~fresh ~fresh'
+        (inner : fresh:'fresh -> ('input_type, 'b, 'c, 'nullable) Input.t) :
+        ('input_type option, _, 'c option, _) Input.t =
+      let obj = fresh in
+      let x = inner ~fresh:fresh' in
+      obj#graphql_fields := !(x#nullable_graphql_fields) ;
+      obj#nullable_graphql_fields := !(x#nullable_graphql_fields) ;
+      obj#contramap := Option.map ~f:!(x#contramap) ;
+      obj#graphql_fields_accumulator := !(x#graphql_fields_accumulator) ;
+      obj
 
-        method nullable = ref Non_null
-
-        method nullable_graphql_fields =
-          ref
-            Input.T.
-              { run = (fun () -> Schema.(list (!(x#graphql_fields).run ()))) }
-      end
-
-    let option (x : ('input_type, 'b, 'c, 'nullable) Input.t) :
-        ('input_type option, _, _, _) Input.t =
-      object
-        method graphql_fields = ref !(x#nullable_graphql_fields)
-
-        method contramap = ref (Option.map ~f:!(x#contramap))
-
-        method nullable = ref Nullable
-
-        method nullable_graphql_fields = ref !(x#nullable_graphql_fields)
-      end
+    let contramap ~fresh ~fresh' ~(f : 'd -> 'c)
+        (inner : fresh:'fresh -> ('input_type, 'b, 'c, 'nullable) Input.t) :
+        ('input_type, _, 'd, _) Input.t =
+      let obj = fresh in
+      let x = inner ~fresh:fresh' in
+      obj#graphql_fields := !(x#graphql_fields) ;
+      (obj#contramap := fun a -> !(x#contramap) (f a)) ;
+      obj#nullable_graphql_fields := !(x#nullable_graphql_fields) ;
+      obj#graphql_fields_accumulator := !(x#graphql_fields_accumulator) ;
+      obj
   end
 end
 
@@ -362,7 +344,13 @@ query IntrospectionQuery {
       | Error err ->
           failwith err
 
-    let deriver () =
+    let deriver (type a b c d e) () :
+        < contramap : (a -> b) ref
+        ; graphql_fields : c Graphql_fields.Input.T.t ref
+        ; nullable_graphql_fields : e Graphql_fields.Input.T.t ref
+        ; .. >
+        as
+        'row =
       let open Graphql_fields in
       let graphql_fields =
         ref Input.T.{ run = (fun () -> failwith "unimplemented") }
@@ -372,7 +360,6 @@ query IntrospectionQuery {
         ref Input.T.{ run = (fun () -> failwith "unimplemented") }
       in
       let graphql_fields_accumulator = ref [] in
-      let nullable = ref Non_null in
       object
         method graphql_fields = graphql_fields
 
@@ -381,16 +368,75 @@ query IntrospectionQuery {
         method nullable_graphql_fields = nullable_graphql_fields
 
         method graphql_fields_accumulator = graphql_fields_accumulator
-
-        method nullable = nullable
       end
+
+    let ( ~!. ) x fd acc =
+      Graphql_fields.add_field
+        (x ~fresh:(deriver ()) ~fresh':(deriver ()))
+        fd acc
+
+    let ( !. ) x fd acc =
+      Graphql_fields.add_field (x ~fresh:(deriver ())) fd acc
+
+    let hit_server (typ : _ Graphql_fields.Schema.typ) v =
+      let query_top_level =
+        Graphql_fields.Schema.(
+          field "query" ~typ:(non_null typ)
+            ~args:Arg.[]
+            ~doc:"sample query"
+            ~resolve:(fun _ _ -> v))
+      in
+      let schema =
+        Graphql_fields.Schema.(
+          schema [ query_top_level ] ~mutations:[] ~subscriptions:[])
+      in
+      let res =
+        Graphql_fields.Schema.execute schema () (introspection_query ())
+      in
+      match res with
+      | Ok (`Response data) ->
+          data |> Yojson.Basic.to_string
+      | _ ->
+          failwith "Unexpected response"
+
+    module T1 = struct
+      type t = { foo_hello : int option; bar : string list } [@@deriving fields]
+
+      let _v = { foo_hello = Some 1; bar = [ "baz1"; "baz2" ] }
+
+      let manual_typ =
+        Graphql_fields.Schema.(
+          obj "T1" ?doc:None ~fields:(fun _ ->
+              [ field "fooHello"
+                  ~args:Arg.[]
+                  ~typ:int
+                  ~resolve:(fun _ t -> t.foo_hello)
+              ; field "bar"
+                  ~args:Arg.[]
+                  ~typ:(non_null (list (non_null string)))
+                  ~resolve:(fun _ t -> t.bar)
+              ]))
+
+      let derived ~fresh =
+        let open Graphql_fields in
+        Fields.make_creator fresh
+          ~foo_hello:~!.(option int)
+          ~bar:~!.(list string)
+        |> finish ~name:"T1" ?doc:None
+    end
 
     module Or_ignore_test = struct
       type 'a t = Check of 'a | Ignore
 
-      let _of_option = function None -> Ignore | Some x -> Check x
+      let of_option = function None -> Ignore | Some x -> Check x
 
-      let _to_option = function Ignore -> None | Check x -> Some x
+      let to_option = function Ignore -> None | Check x -> Some x
+
+      let derived ~fresh inner =
+        let open Graphql_fields in
+        let obj = option ~fresh ~fresh':(deriver ()) inner in
+        let obj' = contramap ~f:of_option ~fresh:obj ~fresh':(deriver ()) in
+        obj'
 
       (*
       let derived (type input_type)
@@ -408,74 +454,56 @@ query IntrospectionQuery {
       (*add_field ~nullable:Nullable of_option*)
     end
 
-    module T1 = struct
-      type t = { foo_hello : int option; bar : string list } [@@deriving fields]
-
-      let v = { foo_hello = Some 1; bar = [ "baz1"; "baz2" ] }
-
-      let derived =
-        let open Graphql_fields in
-        Fields.make_creator (deriver ())
-          ~foo_hello:!.(option int)
-          ~bar:!.(list string)
-        |> finish ~name:"T1" ?doc:None
-    end
+    (*
+    let%test_unit "folding creates a graphql object we expect" =
+      let open Graphql_fields in
+      let generated_typ =
+        let typ_input = T1.(option derived) in
+        !(typ_input#graphql_fields).run ()
+      in
+      [%test_eq: string]
+        (hit_server generated_typ T1.v)
+        (hit_server T1.manual_typ T1.v)
+  *)
 
     module T2 = struct
       type t = { foo : T1.t Or_ignore_test.t } [@@deriving fields]
 
-      let _v1 =
+      let v1 =
         { foo = Check { T1.foo_hello = Some 1; bar = [ "baz1"; "baz2" ] } }
 
-      let _v2 = { foo = Ignore }
+      let v2 = { foo = Ignore }
 
-      (*
+      let manual_typ =
+        Graphql_fields.Schema.(
+          obj "T2" ?doc:None ~fields:(fun _ ->
+              [ field "foo"
+                  ~args:Arg.[]
+                  ~typ:T1.manual_typ
+                  ~resolve:(fun _ t -> Or_ignore_test.to_option t.foo)
+              ]))
+
       let derived =
-        let open Graphql_fields in
-        Fields.make_creator (deriver ()) ~foo:!.(Or_ignore_test.derived T1.derived)
-        |> finish ~name:"T2" ?doc:None
-        *)
+        let foo =
+          let open Graphql_fields in
+          !.(Or_ignore_test.derived T1.derived)
+        in
+        let _ = foo in
+        failwith "FIXME WITH OBJ MAGIC"
+
+      (*Fields.make_creator (deriver ()) ~foo |> finish ~name:"T2" ?doc:None*)
     end
 
-    let%test_unit "folding creates a graphql object we expect" =
+    let%test_unit "T2 fold" =
       let open Graphql_fields in
-      let typ1 =
-        let typ_input = T1.(option derived) in
+      let generated_typ =
+        let typ_input = T2.(option derived) in
         !(typ_input#graphql_fields).run ()
       in
-      let typ2 =
-        Graphql_fields.Schema.(
-          obj "T1" ?doc:None ~fields:(fun _ ->
-              [ field "fooHello"
-                  ~args:Arg.[]
-                  ~typ:int
-                  ~resolve:(fun _ t -> t.T1.foo_hello)
-              ; field "bar"
-                  ~args:Arg.[]
-                  ~typ:(non_null (list (non_null string)))
-                  ~resolve:(fun _ t -> t.T1.bar)
-              ]))
-      in
-      let hit_server (typ : _ Graphql_fields.Schema.typ) =
-        let query_top_level =
-          Graphql_fields.Schema.(
-            field "query" ~typ:(non_null typ)
-              ~args:Arg.[]
-              ~doc:"sample query"
-              ~resolve:(fun _ _ -> T1.v))
-        in
-        let schema =
-          Graphql_fields.Schema.(
-            schema [ query_top_level ] ~mutations:[] ~subscriptions:[])
-        in
-        let res =
-          Graphql_fields.Schema.execute schema () (introspection_query ())
-        in
-        match res with
-        | Ok (`Response data) ->
-            data |> Yojson.Basic.to_string
-        | _ ->
-            failwith "Unexpected response"
-      in
-      [%test_eq: string] (hit_server typ1) (hit_server typ2)
+      [%test_eq: string]
+        (hit_server generated_typ T2.v1)
+        (hit_server T2.manual_typ T2.v1) ;
+      [%test_eq: string]
+        (hit_server generated_typ T2.v2)
+        (hit_server T2.manual_typ T2.v2)
   end )

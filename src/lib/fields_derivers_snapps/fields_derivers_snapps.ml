@@ -1,69 +1,107 @@
 open Core_kernel
 
 module Derivers = struct
-  include Fields_derivers.Make2
-            (Fields_derivers_json.Both_yojson)
-            (Fields_derivers_graphql.Graphql_fields)
-  module Json = Fields_derivers_json.Both_yojson
-  module G = Fields_derivers_graphql.Graphql_fields
+  let derivers () =
+    let open Fields_derivers_graphql in
+    let graphql_fields =
+      ref Graphql_fields.Input.T.{ run = (fun () -> failwith "unimplemented") }
+    in
+    let contramap = ref (fun _ -> failwith "unimplemented") in
+    let nullable_graphql_fields =
+      ref Graphql_fields.Input.T.{ run = (fun () -> failwith "unimplemented") }
+    in
+    let graphql_fields_accumulator = ref [] in
+    let nullable = ref Nullable.Non_null in
+    let to_json = ref (fun _ -> failwith "unimplemented") in
+    let of_json = ref (fun _ -> failwith "unimplemented") in
+    let to_json_accumulator = ref [] in
+    let of_json_creator = ref String.Map.empty in
+    let map = ref Fn.id in
 
-  module Uniform = struct
-    type 'j t = 'j Json.Output.t * 'j G.Input.t
+    object
+      method graphql_fields = graphql_fields
+
+      method contramap = contramap
+
+      method nullable_graphql_fields = nullable_graphql_fields
+
+      method graphql_fields_accumulator = graphql_fields_accumulator
+
+      method nullable = nullable
+
+      method to_json = to_json
+
+      method map = map
+
+      method contramp = contramap
+
+      method of_json = of_json
+
+      method to_json_accumulator = to_json_accumulator
+
+      method of_json_creator = of_json_creator
+    end
+
+  module Unified_input = struct
+    type 'a t = < .. > as 'a
+      constraint 'a = _ Fields_derivers_json.To_yojson.Input.t
+      constraint 'a = _ Fields_derivers_json.Of_yojson.Input.t
+      constraint 'a = _ Fields_derivers_graphql.Graphql_fields.Input.t
   end
 
-  module Helpers = struct
-    let iso_string ~name ?doc:doc_top ~to_string ~of_string : 'a Input.t =
-      ( ( (fun x -> `String (to_string x))
-        , function `String x -> of_string x | _ -> failwith "expected string" )
-      , { G.Deriver_basic.Input.run =
-            (fun ?doc () ->
-              G.Schema.scalar name
-                ?doc:(match doc with Some doc -> Some doc | None -> doc_top)
-                ~coerce:(fun x -> `String (to_string x))
-              |> G.Schema.non_null)
-        } )
+  let yojson ?doc ~name ~map ~contramap : 'a Unified_input.t =
+    let open Fields_derivers_graphql in
+    object
+      method graphql_fields =
+        let open Graphql_fields.Schema in
+        ref
+          Graphql_fields.Input.T.
+            { run =
+                (fun () ->
+                  scalar name ?doc ~coerce:Yojson.Safe.to_basic |> non_null)
+            }
 
-    let unsigned_scalar ~to_string ~of_string ~name =
-      iso_string ~to_string ~of_string ~name
-        ~doc:
-          (Format.sprintf
-             !"String representing a %s number in base 10"
-             (String.lowercase name))
-  end
+      method contramap = ref contramap
 
-  let uint64_ : Unsigned.UInt64.t Input.t =
-    Helpers.unsigned_scalar ~name:"UInt64" ~to_string:Unsigned.UInt64.to_string
+      method nullable_graphql_fields =
+        let open Graphql_fields.Schema in
+        ref
+          Graphql_fields.Input.T.
+            { run = (fun () -> scalar name ?doc ~coerce:Yojson.Safe.to_basic) }
+
+      method nullable = ref Nullable.Non_null
+
+      method to_json = ref Fn.id
+
+      method map = ref map
+
+      method of_json = ref Fn.id
+    end
+
+  let iso_string ~to_string ~of_string ~doc ~name =
+    yojson ~doc ~name
+      ~map:(function `String x -> of_string x | _ -> failwith "unsupported")
+      ~contramap:(fun uint64 -> `String (to_string uint64))
+
+  let uint64 : _ Unified_input.t =
+    iso_string ~doc:"Unsigned 64-bit integer represented as a string in base10"
+      ~name:"UInt64" ~to_string:Unsigned.UInt64.to_string
       ~of_string:Unsigned.UInt64.of_string
 
-  let uint32_ : Unsigned.UInt32.t Input.t =
-    Helpers.unsigned_scalar ~name:"UInt32" ~to_string:Unsigned.UInt32.to_string
+  let uint32 : _ Unified_input.t =
+    iso_string ~doc:"Unsigned 32-bit integer represented as a string in base10"
+      ~name:"UInt32" ~to_string:Unsigned.UInt32.to_string
       ~of_string:Unsigned.UInt32.of_string
 
-  let field_ =
+  let field : _ Unified_input.t =
     let module Field = Pickles.Impls.Step.Field.Constant in
-    Helpers.iso_string ~name:"Field"
-      ~doc:"String representing an Fp Field element" ~to_string:Field.to_string
-      ~of_string:Field.of_string
+    iso_string ~name:"Field" ~doc:"String representing an Fp Field element"
+      ~to_string:Field.to_string ~of_string:Field.of_string
 
-  module Prim = struct
-    include Prim
-
-    let uint64 fd acc = add_field uint64_ fd acc
-
-    let uint32 fd acc = add_field uint32_ fd acc
-
-    let field fd acc = add_field field_ fd acc
-  end
-
-  (** Take the derivers' output and make the graphql part non-null *)
-  let non_null ((json, graphql_fields) : 'a Output.t) : 'a Uniform.t =
-    (json, G.non_null_ graphql_fields)
-
-  (** Take the derivers' output and make the json part optional *)
-  let optional ((json, graphql_fields) : 'a Output.t) : 'a option Uniform.t =
-    (Json.optional_ json, graphql_fields)
-
-  let finished name = (((), ()), name)
+  let option (x : _ Unified_input.t) : _ Unified_input.t =
+    x |> Fields_derivers_graphql.Graphql_fields.option'
+    |> Fields_derivers_json.To_yojson.option
+    |> Fields_derivers_json.Of_yojson.option
 end
 
 let%test_module "Test" =
