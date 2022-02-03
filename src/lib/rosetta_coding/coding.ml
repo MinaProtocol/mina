@@ -3,17 +3,15 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+module Field = Snark_params.Tick.Field
+module Scalar = Snark_params.Tick.Inner_curve.Scalar
 
 [%%ifdef consensus_mechanism]
 
-module Field = Snark_params.Tick.Field
-module Scalar = Snark_params.Tick.Inner_curve.Scalar
 open Signature_lib
 
 [%%else]
 
-module Field = Snark_params_nonconsensus.Field
-module Scalar = Snark_params_nonconsensus.Inner_curve.Scalar
 open Signature_lib_nonconsensus
 
 [%%endif]

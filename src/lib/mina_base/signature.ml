@@ -1,14 +1,10 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
 
-[%%else]
+[%%ifndef consensus_mechanism]
 
-open Snark_params_nonconsensus
 module Hex = Hex_nonconsensus.Hex
 module Rosetta_coding = Rosetta_coding_nonconsensus
 

@@ -4,14 +4,10 @@
 
 open Core_kernel
 module B58_lib = Base58_check
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
 
-[%%else]
+[%%ifndef consensus_mechanism]
 
-open Snark_params_nonconsensus
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]

@@ -9,7 +9,7 @@ open Snark_bits
 
 [%%else]
 
-open Snark_params_nonconsensus
+open Snark_params.Tick
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]

@@ -12,7 +12,7 @@ open Snark_params.Tick
 
 [%%else]
 
-open Snark_params_nonconsensus
+open Snark_params.Tick
 module Mina_base = Mina_base_nonconsensus
 module Signature_lib = Signature_lib_nonconsensus
 module Currency = Currency_nonconsensus.Currency

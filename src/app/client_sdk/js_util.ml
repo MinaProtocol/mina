@@ -1,7 +1,7 @@
 (* js_util.ml -- types and transformers for Javascript *)
 
 open Js_of_ocaml
-open Snark_params_nonconsensus
+open Snark_params.Tick
 open Mina_base_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers

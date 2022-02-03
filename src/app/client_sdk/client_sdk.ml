@@ -88,7 +88,7 @@ let _ =
            in
            let verified =
              Schnorr.verify signature
-               (Snark_params_nonconsensus.Inner_curve.of_affine pk)
+               (Snark_params.Tick.Inner_curve.of_affine pk)
                message
            in
            if verified then Js._true

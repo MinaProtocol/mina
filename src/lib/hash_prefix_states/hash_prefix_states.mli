@@ -1,13 +1,10 @@
 [%%import "/src/config.mlh"]
 
-[%%ifdef consensus_mechanism]
-
 open Snark_params
 open Tick
 
-[%%else]
+[%%ifndef consensus_mechanism]
 
-open Snark_params_nonconsensus
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]

@@ -311,6 +311,6 @@ let invalid_public_key : Public_key.Compressed.t Lazy.t =
 
 [%%else]
 
-module F = Snark_params_nonconsensus.Field
+module F = Snark_params.Tick.Field
 
 [%%endif]

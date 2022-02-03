@@ -2,14 +2,14 @@
 
 [%%import "/src/config.mlh"]
 
+module Inner_curve = Snark_params.Tick.Inner_curve
+
 [%%ifdef consensus_mechanism]
 
-module Inner_curve = Snark_params.Tick.Inner_curve
 open Signature_lib
 
 [%%else]
 
-module Inner_curve = Snark_params_nonconsensus.Inner_curve
 module Signature_lib = Signature_lib_nonconsensus
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 open Signature_lib

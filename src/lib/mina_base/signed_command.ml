@@ -381,7 +381,7 @@ let check_signature ?signature_kind ({ payload; signer; signature } : t) =
 
 let check_signature ?signature_kind ({ payload; signer; signature } : t) =
   Signature_lib_nonconsensus.Schnorr.verify ?signature_kind signature
-    (Snark_params_nonconsensus.Inner_curve.of_affine signer)
+    (Snark_params.Tick.Inner_curve.of_affine signer)
     (to_input payload)
 
 [%%endif]

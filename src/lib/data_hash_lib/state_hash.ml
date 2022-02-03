@@ -8,13 +8,10 @@ open Core_kernel
 
 module Outside_hash_image = Outside_hash_image_nonconsensus.Outside_hash_image
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-open Snark_params_nonconsensus
-
-[%%else]
-
-open Snark_params.Tick
 
 [%%endif]
+
+open Snark_params.Tick
 
 include Data_hash.Make_full_size (struct
   let version_byte = Base58_check.Version_bytes.state_hash
@@ -33,7 +30,7 @@ let zero = dummy
 (* in the nonconsensus world, we don't have the Pedersen machinery available,
    so just inline the value for zero
 *)
-let zero = Snark_params_nonconsensus.Field.of_string "0"
+let zero = Field.of_string "0"
 
 [%%endif]
 

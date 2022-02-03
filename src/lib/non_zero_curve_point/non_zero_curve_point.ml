@@ -1,16 +1,13 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Snark_params.Tick
 
 [%%ifdef consensus_mechanism]
-
-open Snark_params.Tick
 
 let parity y = Bigint.(test_bit (of_field y) 0)
 
 [%%else]
-
-open Snark_params_nonconsensus
 
 let parity y = Field.parity y
 
