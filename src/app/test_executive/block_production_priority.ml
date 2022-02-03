@@ -53,7 +53,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let pk_to_string = Signature_lib.Public_key.Compressed.to_base58_check in
     [%log info] "receiver: %s" (pk_to_string receiver_pub_key) ;
     [%log info] "sender: %s" (pk_to_string sender_pub_key) ;
-    let tps = 10 in
+    let tps = 8 in
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
@@ -67,6 +67,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Network.Node.get_metrics ~logger node)
         ~f:Malleable_error.or_hard_error
     in
+    let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 3) in
     (* check account nonce on both nodes *)
     let end_t =
       Time.add (Time.now ())
@@ -79,12 +80,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee sender_bp
     in
     let%bind () = Async.(at end_t >>= const Malleable_error.ok_unit) in
-    let%bind { block_production_delay = snd_delay; _ } =
-      get_metrics sender_bp
-    in
-    let%bind { block_production_delay = rcv_delay; _ } =
-      get_metrics receiver_bp
-    in
     let%bind blocks =
       Network.Node.must_get_best_chain ~logger ~max_length:(2 * num_slots)
         receiver_bp
@@ -105,6 +100,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                      ; `String b.creator_pk
                      ])) )
         ] ;
+    let%bind { block_production_delay = rcv_delay; _ } =
+      get_metrics receiver_bp
+    in
+    let%bind { block_production_delay = snd_delay; _ } =
+      get_metrics sender_bp
+    in
     let rcv_delay0 = List.nth_exn rcv_delay 0 in
     let snd_delay0 = List.nth_exn snd_delay 0 in
     let%map () =
