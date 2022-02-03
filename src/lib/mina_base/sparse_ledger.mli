@@ -32,16 +32,7 @@ val find_index_exn : t -> Account_id.t -> int
 
 val of_root : depth:int -> next_available_token:Token_id.t -> Ledger_hash.t -> t
 
-<<<<<<< HEAD
-val apply_user_command :
-||||||| a830646c1
-val has_locked_tokens_exn :
-  global_slot:Mina_numbers.Global_slot.t -> account_id:Account_id.t -> t -> bool
-
-val apply_user_command :
-=======
 val apply_user_command_exn :
->>>>>>> origin/lk86/simpler-optimized-staged-ledger-compatible
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_global_slot:Mina_numbers.Global_slot.t
   -> t
@@ -65,16 +56,8 @@ val iteri : t -> f:(Account.Index.t -> Account.t -> unit) -> unit
 
 val handler : t -> Handler.t Staged.t
 
-<<<<<<< HEAD
-val has_locked_tokens_exn :
-  global_slot:Mina_numbers.Global_slot.t -> account_id:Account_id.t -> t -> bool
-||||||| a830646c1
-val snapp_accounts :
-  t -> Transaction.t -> Snapp_account.t option * Snapp_account.t option
-=======
 val snapp_accounts :
   t -> Transaction.t -> Snapp_account.t option * Snapp_account.t option
 
 val has_locked_tokens_exn :
   global_slot:Mina_numbers.Global_slot.t -> account_id:Account_id.t -> t -> bool
->>>>>>> origin/lk86/simpler-optimized-staged-ledger-compatible
