@@ -131,10 +131,10 @@ module Transaction_applied : sig
     [@@deriving sexp]
   end
 
-  module Snapp_command_applied : sig
-    type t = Transaction_applied.Snapp_command_applied.t =
+  module Parties_applied : sig
+    type t = Transaction_applied.Parties_applied.t =
       { accounts : (Account_id.t * Account.t option) list
-      ; command : Snapp_command.t With_status.t
+      ; command : Parties.t With_status.t
       }
     [@@deriving sexp]
   end
