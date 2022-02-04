@@ -359,19 +359,79 @@ module Balance = struct
         in
         {amount with metadata= Some metadata}
       in
-      let%bind block_query =
-        Query.of_partial_identifier' req.block_identifier
-      in
-      let%map block_identifier, {liquid_balance; total_balance} =
-        env.db_block_identifier_and_balance_info ~block_query ~address
-      in
-      { Account_balance_response.block_identifier
-      ; balances=
-          [ make_balance_amount
-              ~liquid_balance:(Unsigned.UInt64.of_int64 liquid_balance)
-              ~total_balance:(Unsigned.UInt64.of_int64 total_balance) ]
-      ; metadata=Some (`Assoc [ ("created_via_historical_lookup", `Bool true ) ]) }
-
+      match req.block_identifier with
+      | None ->
+        let%bind res =
+          env.gql
+            ?token_id:(Option.map token_id ~f:Unsigned.UInt64.to_string)
+            ~address ()
+        in
+        let%bind account =
+          match res#account with
+          | None ->
+              M.fail (Errors.create (`Account_not_found address))
+          | Some account ->
+              M.return account
+        in
+        let%bind state_hash =
+          match (account#balance)#stateHash with
+          | None ->
+              M.fail
+                (Errors.create
+                   ~context:
+                     "Failed accessing state hash from GraphQL \
+                      communication with the Mina Daemon -- or \
+                      the account is missing."
+                   `Chain_info_missing)
+          | Some state_hash ->
+              M.return state_hash
+        in
+        let%bind nonce =
+          match account#nonce with
+          | None -> M.fail
+                      (Errors.create
+                         ~context:
+                           "Unable to access nonce since your Mina \
+                            daemon isn't fully bootstrapped."
+                         `Chain_info_missing)
+          | Some nonce -> M.return @@ nonce
+        in
+        let%map liquid_balance =
+          match (account#balance)#liquid with
+          | None ->
+              M.fail
+                (Errors.create
+                   ~context:
+                     "Unable to access liquid balance since your Mina \
+                      daemon isn't fully bootstrapped."
+                   `Chain_info_missing)
+          | Some liquid_balance ->
+              M.return liquid_balance
+        in
+        let total_balance = (account#balance)#total in
+        { Account_balance_response.block_identifier =
+            { Block_identifier.index=
+                Unsigned.UInt32.to_int64 (account#balance)#blockHeight
+            ; hash= state_hash }
+        ; balances=
+            [ make_balance_amount ~liquid_balance ~total_balance ]
+        ; metadata=Some (`Assoc
+            [ ("nonce", `Intlit nonce)
+            ; ("created_via_historical_lookup", `Bool false ) ]) }
+      | Some partial_identifier ->
+          let%bind block_query =
+            Query.of_partial_identifier partial_identifier
+          in
+          let%map block_identifier, {liquid_balance; total_balance} =
+            env.db_block_identifier_and_balance_info ~block_query ~address
+          in
+          { Account_balance_response.block_identifier
+          ; balances=
+              [ make_balance_amount
+                  ~liquid_balance:(Unsigned.UInt64.of_int64 liquid_balance)
+                  ~total_balance:(Unsigned.UInt64.of_int64 total_balance) ]
+          ; metadata=Some (`Assoc
+            [ ("created_via_historical_lookup", `Bool true ) ]) }
   end
 
   module Real = Impl (Deferred.Result)
