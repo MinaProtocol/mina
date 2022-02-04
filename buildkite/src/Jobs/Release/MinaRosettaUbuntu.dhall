@@ -38,7 +38,7 @@ Pipeline.build
       let rosettaUbuntuSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-rosetta-ubuntu",
-        deb_codename="stretch",
+        deb_codename="focal",
         extra_args="--no-cache",
         step_key="mina-rosetta-ubuntu-docker-image"
       }
