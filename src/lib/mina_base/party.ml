@@ -65,7 +65,7 @@ module Update = struct
           ; vesting_period : Global_slot.Stable.V1.t
           ; vesting_increment : Amount.Stable.V1.t
           }
-        [@@deriving compare, equal, sexp, hash, yojson, hlist]
+        [@@deriving compare, equal, sexp, hash, yojson, hlist, fields]
 
         let to_latest = Fn.id
       end
@@ -388,7 +388,7 @@ module Body = struct
           ; protocol_state : 'protocol_state
           ; use_full_commitment : 'bool
           }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare]
+        [@@deriving hlist, sexp, equal, yojson, hash, compare, fields]
       end
     end]
   end
@@ -549,6 +549,44 @@ module Body = struct
     ; protocol_state = Snapp_predicate.Protocol_state.accept
     ; use_full_commitment = false
     }
+
+  let derivers =
+    Fields_derivers_snapps.derivers
+    @@ Poly.Fields.make_creator
+         ~public_key:Fields_derivers_snapps.Prim.public_key
+         ~update:Fields_derivers_snapps.Prim.update
+         ~token_id:Fields_derivers_snapps.Prim.token_id
+         ~balance_change:Fields_derivers_snapps.Prim.uint64
+         ~increment_nonce:Fields_derivers_snapps.Prim.bool
+         ~events:Fields_derivers_snapps.Prim.events
+         ~sequence_events:Fields_derivers_snapps.Prim.events
+         ~call_data:Fields_derivers_snapps.Prim.field
+         ~call_depth:Fields_derivers_snapps.Prim.uint64
+         ~protocol_state:Fields_derivers_snapps.Prim.protocol_state
+         ~use_full_commitment:Fields_derivers_snapps.Prim.bool
+
+  let%test_unit "json roundtrip" =
+    let (to_json, of_json), _ = derivers in
+    [%test_eq: t] dummy (dummy |> to_json |> of_json)
+
+  let%test_unit "json value" =
+    let (to_json, _), _ = derivers in
+    [%test_eq: string]
+      (dummy |> to_json |> Yojson.Safe.to_string)
+      ( {json|{
+          publicKey: "B62qoTqMG41DFgkyQmY2Pos1x671Gfzs9k8NKqUdSg7wQasEV6qnXQP",
+          update: "this fails",
+          tokenId: "this fails",
+          balanceChange: 0,
+          incrementNonce: false,
+          events: "this fails",
+          sequence_events: "this fails",
+          call_data: 1,
+          call_depth: 1,
+          protocol_state: "this fails",
+          use_full_commitment: false,
+        }|json}
+      |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
 
   let to_input
       ({ public_key
@@ -840,7 +878,7 @@ module Fee_payer = struct
         { data : Predicated.Fee_payer.Stable.V1.t
         ; authorization : Signature.Stable.V1.t
         }
-      [@@deriving sexp, equal, yojson, hash, compare]
+      [@@deriving sexp, equal, yojson, hash, compare, fields]
 
       let to_latest = Fn.id
     end
@@ -873,7 +911,7 @@ module Stable = struct
   module V1 = struct
     type t = Poly(Predicated.Stable.V1)(Control.Stable.V2).t =
       { data : Predicated.Stable.V1.t; authorization : Control.Stable.V2.t }
-    [@@deriving sexp, equal, yojson, hash, compare]
+    [@@deriving sexp, equal, yojson, hash, compare, fields]
 
     let to_latest = Fn.id
   end

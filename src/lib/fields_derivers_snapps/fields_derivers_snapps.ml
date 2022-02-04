@@ -67,6 +67,14 @@ module Derivers = struct
     let field fd acc = add_field field_ fd acc
 
     let public_key fd acc = add_field public_key_ fd acc
+
+    let update = failwith "todo: party update"
+
+    let token_id = failwith "todo: token_id"
+
+    let events = failwith "todo: events - sequence events"
+
+    let protocol_state = failwith "todo: protocol states"
   end
 
   let derivers make_creator = finish (make_creator (init ()))
