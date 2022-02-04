@@ -134,6 +134,13 @@ module Derivers = struct
     let _a = Fields_derivers_graphql.Graphql_fields.finish ~name ?doc res in
     let _b = Fields_derivers_json.To_yojson.finish res in
     Fields_derivers_json.Of_yojson.finish res
+
+  let to_json obj x = !(obj#to_json) x
+
+  let of_json obj x = !(obj#of_json) x
+
+  let typ obj =
+    !(obj#graphql_fields).Fields_derivers_graphql.Graphql_fields.Input.T.run ()
 end
 
 let%test_module "Test" =
@@ -185,8 +192,9 @@ let%test_module "Test" =
     let v1 = V.derivers @@ Derivers.o ()
 
     let%test_unit "roundtrips json" =
+      let open Derivers in
       [%test_eq: V.t]
-        (!(v1#of_json) (!(v1#to_json) V.v))
+        (of_json v1 @@ to_json v1 V.v)
         (V.of_yojson (V.to_yojson V.v) |> Result.ok_or_failwith)
 
     module V2 = struct
@@ -202,10 +210,12 @@ let%test_module "Test" =
     let v2 = V2.derivers @@ Derivers.o ()
 
     let%test_unit "to_json'" =
+      let open Derivers in
       [%test_eq: string]
-        (Yojson.Safe.to_string (!(v2#to_json) V2.v))
+        (Yojson.Safe.to_string (to_json v2 V2.v))
         {|{"field":"10"}|}
 
     let%test_unit "roundtrip json'" =
-      [%test_eq: V2.t] (!(v2#of_json) (!(v2#to_json) V2.v)) V2.v
+      let open Derivers in
+      [%test_eq: V2.t] (of_json v2 (to_json v2 V2.v)) V2.v
   end )

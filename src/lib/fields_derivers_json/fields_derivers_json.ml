@@ -31,6 +31,7 @@ module To_yojson = struct
 
   let finish (_creator, obj) =
     let to_json_accumulator = !(obj#to_json_accumulator) in
+    obj#contramap := Fn.id ;
     (obj#to_json :=
        fun t ->
          `Assoc
@@ -105,6 +106,7 @@ module Of_yojson = struct
       | _ ->
           failwith "todo"
     in
+    obj#map := Fn.id ;
     obj#of_json := of_json ;
     obj
 

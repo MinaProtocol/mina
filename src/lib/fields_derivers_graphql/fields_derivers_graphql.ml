@@ -131,6 +131,7 @@ module Graphql_fields_raw = struct
       in
       obj#graphql_fields := graphql_fields ;
       obj#nullable_graphql_fields := nullable_graphql_fields ;
+      obj#contramap := Fn.id ;
       obj
 
     let int obj =
