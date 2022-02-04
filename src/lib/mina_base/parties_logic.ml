@@ -77,6 +77,7 @@ module Local_state = struct
   module Stable = struct
     module V1 = struct
       type ( 'parties
+           , 'call_stack
            , 'token_id
            , 'excess
            , 'ledger
@@ -85,7 +86,7 @@ module Local_state = struct
            , 'failure_status )
            t =
         { parties : 'parties
-        ; call_stack : 'parties
+        ; call_stack : 'call_stack
         ; transaction_commitment : 'comm
         ; full_transaction_commitment : 'comm
         ; token_id : 'token_id
@@ -98,10 +99,10 @@ module Local_state = struct
     end
   end]
 
-  let typ parties token_id excess ledger bool comm failure_status =
+  let typ parties call_stack token_id excess ledger bool comm failure_status =
     Pickles.Impls.Step.Typ.of_hlistable
       [ parties
-      ; parties
+      ; call_stack
       ; comm
       ; comm
       ; token_id
@@ -119,6 +120,7 @@ module Local_state = struct
       module V1 = struct
         type t =
           ( Parties.Digest.Stable.V1.t
+          , Parties.Digest.Stable.V1.t
           , Token_id.Stable.V1.t
           , Currency.Amount.Stable.V1.t
           , Ledger_hash.Stable.V1.t
@@ -138,6 +140,7 @@ module Local_state = struct
 
     type t =
       ( Field.t
+      , Field.t
       , Token_id.Checked.t
       , Currency.Amount.Checked.t
       , Ledger_hash.var
@@ -187,25 +190,47 @@ module type Party_intf = sig
     -> [ `Signature_verifies of bool ]
 end
 
-module type Parties_intf = sig
+module type Opt_intf = sig
+  type bool
+
+  type 'a t
+
+  val is_some : 'a t -> bool
+
+  val map : 'a t -> f:('a -> 'b) -> 'b t
+
+  val or_default :
+    if_:(bool -> then_:'a -> else_:'a -> 'a) -> 'a t -> default:'a -> 'a
+
+  val or_exn : 'a t -> 'a
+end
+
+module type Stack_intf = sig
   include Iffable
 
-  module Opt : sig
-    type 'a t
+  module Opt : Opt_intf with type bool := bool
 
-    val is_some : 'a t -> bool
+  type elt
 
-    val map : 'a t -> f:('a -> 'b) -> 'b t
+  val empty : t
 
-    val or_default :
-      if_:(bool -> then_:'a -> else_:'a -> 'a) -> 'a t -> default:'a -> 'a
+  val is_empty : t -> bool
 
-    val or_exn : 'a t -> 'a
-  end
+  val pop_exn : t -> elt * t
+
+  val pop : t -> (elt * t) Opt.t
+
+  val push : elt -> onto:t -> t
+end
+
+module type Parties_intf = sig
+  include Iffable
 
   type party_or_stack
 
   type party
+
+  module Opt : Opt_intf with type bool := bool
 
   val empty : t
 
@@ -218,8 +243,12 @@ module type Parties_intf = sig
   val pop_party_exn : t -> party * t
 
   val pop_stack : t -> (t * t) Opt.t
+end
 
-  val push_stack : t -> onto:t -> t
+module type Call_stack_intf = sig
+  type parties
+
+  include Stack_intf with type elt := parties
 end
 
 module type Ledger_intf = sig
@@ -325,11 +354,20 @@ module type Inputs_intf = sig
        and type token_id := Token_id.t
        and type public_key := Public_key.t
 
+  module Opt : Opt_intf with type bool := Bool.t
+
   module Parties :
     Parties_intf
       with type t = Party.parties
        and type bool := Bool.t
        and type party := Party.t
+       and module Opt := Opt
+
+  module Call_stack :
+    Call_stack_intf
+      with type parties := Parties.t
+       and type bool := Bool.t
+       and module Opt := Opt
 
   module Transaction_commitment : sig
     include
@@ -348,6 +386,7 @@ module type Inputs_intf = sig
 
     type t =
       ( Parties.t
+      , Call_stack.t
       , Token_id.t
       , Amount.t
       , Ledger.t
@@ -390,15 +429,16 @@ module Make (Inputs : Inputs_intf) = struct
 
   let get_next_party
       (current_stack : Ps.t) (* The stack for the most recent snapp *)
-      (call_stack : Ps.t) (* The partially-completed parent stacks *) =
+      (call_stack : Call_stack.t) (* The partially-completed parent stacks *) =
     (* Invariant: [call_stack] only contains stacks. *)
     let next_stack, next_call_stack =
-      let res = Ps.pop_stack call_stack in
+      let res = Call_stack.pop call_stack in
       let next_stack =
-        Ps.Opt.or_default ~if_:Ps.if_ ~default:Ps.empty (Ps.Opt.map ~f:fst res)
+        Opt.or_default ~if_:Ps.if_ ~default:Ps.empty (Opt.map ~f:fst res)
       in
       let next_call_stack =
-        Ps.Opt.or_default ~if_:Ps.if_ ~default:Ps.empty (Ps.Opt.map ~f:snd res)
+        Opt.or_default ~if_:Call_stack.if_ ~default:Call_stack.empty
+          (Opt.map ~f:snd res)
       in
       (next_stack, next_call_stack)
     in
@@ -408,18 +448,16 @@ module Make (Inputs : Inputs_intf) = struct
     let current_stack, call_stack =
       let current_is_empty = Ps.is_empty current_stack in
       ( Ps.if_ current_is_empty ~then_:next_stack ~else_:current_stack
-      , Ps.if_ current_is_empty ~then_:next_call_stack ~else_:call_stack )
+      , Call_stack.if_ current_is_empty ~then_:next_call_stack ~else_:call_stack
+      )
     in
     let stack_or_party, next_stack = Ps.pop_exn current_stack in
     let party, remaining_stack =
       let as_stack = Ps.as_stack stack_or_party in
-      let stack =
-        Ps.Opt.or_default ~if_:Ps.if_ ~default:current_stack as_stack
-      in
+      let stack = Opt.or_default ~if_:Ps.if_ ~default:current_stack as_stack in
       let popped_value, remaining_stack = Ps.pop_party_exn stack in
       ( popped_value
-      , Ps.if_ (Ps.Opt.is_some as_stack) ~then_:remaining_stack ~else_:Ps.empty
-      )
+      , Ps.if_ (Opt.is_some as_stack) ~then_:remaining_stack ~else_:Ps.empty )
     in
     let current_stack, next_stack =
       let is_empty = Ps.is_empty remaining_stack in
@@ -428,8 +466,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let call_stack =
       let is_empty = Ps.is_empty next_stack in
-      Ps.if_ is_empty ~then_:call_stack
-        ~else_:(Ps.push_stack next_stack ~onto:call_stack)
+      Call_stack.if_ is_empty ~then_:call_stack
+        ~else_:(Call_stack.push next_stack ~onto:call_stack)
     in
     (party, current_stack, call_stack)
 
@@ -480,9 +518,10 @@ module Make (Inputs : Inputs_intf) = struct
         | `Compute start_data ->
             ( Ps.if_ is_start' ~then_:start_data.parties
                 ~else_:local_state.parties
-            , Ps.if_ is_start' ~then_:Ps.empty ~else_:local_state.call_stack )
+            , Call_stack.if_ is_start' ~then_:Call_stack.empty
+                ~else_:local_state.call_stack )
         | `Yes start_data ->
-            (start_data.parties, Ps.empty)
+            (start_data.parties, Call_stack.empty)
         | `No ->
             (local_state.parties, local_state.call_stack)
       in
