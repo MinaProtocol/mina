@@ -184,6 +184,20 @@ let%test_module "Test" =
 
     let o () = deriver ()
 
+    (* Explanation: Fields.make_creator roughly executes the following code:
+
+       let make_creator ~foo_hello ~bar obj =
+         (* Fieldslib.Field is actually a little more complicated *)
+         let field_foo = Field { name = "foo_hello" ; getter = (fun o -> o.foo_hello) } in
+         let field_bar = Field { name = "bar"; getter = (fun o -> o.bar) } in
+         let creator_foo, obj = foo_hello field_foo obj in
+         let creator_bar, obj = bar field_bar obj in
+         let creator finished_obj =
+           { foo_hello = creator_foo finished_obj ; bar = creator_bar finished_obj }
+         in
+         (creator, acc_obj)
+    *)
+
     let to_json obj =
       let open To_yojson in
       let ( !. ) x fd acc = add_field (x @@ o ()) fd acc in
