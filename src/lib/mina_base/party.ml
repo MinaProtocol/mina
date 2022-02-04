@@ -365,12 +365,11 @@ module Update = struct
 
   let deriver obj =
     let open Fields_derivers_snapps in
-    let throw _ _ = failwith "todo" in
     finish ~name:"Update"
     @@ Poly.Fields.make_creator
          ~app_state:!.(Snapp_state.deriver @@ Set_or_keep.deriver field)
          ~delegate:!.(Set_or_keep.deriver public_key)
-         ~verification_key:throw
+         ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
          ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
          ~snapp_uri:!.(Set_or_keep.deriver string)
          ~token_symbol:!.(Set_or_keep.deriver string)

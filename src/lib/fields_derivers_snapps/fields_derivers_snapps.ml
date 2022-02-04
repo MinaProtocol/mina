@@ -158,6 +158,17 @@ module Derivers = struct
     let _b = Fields_derivers_json.To_yojson.finish res in
     Fields_derivers_json.Of_yojson.finish res
 
+  let verification_key_with_hash obj =
+    let verification_key obj =
+      Pickles.Side_loaded.Verification_key.(
+        iso_string obj ~name:"VerificationKey" ~to_string:to_base58_check
+          ~of_string:of_base58_check_exn
+          ~doc:"Verification key in Base58Check format")
+    in
+    With_hash.Stable.Latest.Fields.make_creator ~data:!.verification_key
+      ~hash:!.field obj
+    |> finish ~name:"VerificationKeyWithHash" ~doc:"Verification key with hash"
+
   let to_json obj x = !(obj#to_json) x
 
   let of_json obj x = !(obj#of_json) x

@@ -11,7 +11,8 @@
   unsigned_extended
   currency
   signature_lib
-  pickles)
+  pickles
+  with_hash)
  (inline_tests)
  (preprocess
   (pps
