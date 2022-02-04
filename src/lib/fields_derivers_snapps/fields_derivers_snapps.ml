@@ -96,15 +96,20 @@ module Derivers = struct
     iso_string obj ~name:"Field" ~doc:"String representing an Fp Field element"
       ~to_string:Field.to_string ~of_string:Field.of_string
 
-  let int obj =
+  let int obj : _ Unified_input.t =
     let _a = Fields_derivers_graphql.Graphql_fields.int obj in
     let _b = Fields_derivers_json.To_yojson.int obj in
     Fields_derivers_json.Of_yojson.int obj
 
-  let string obj =
-    let _a = Fields_derivers_graphql.Graphql_fields.int obj in
-    let _b = Fields_derivers_json.To_yojson.int obj in
-    Fields_derivers_json.Of_yojson.int obj
+  let string obj : _ Unified_input.t =
+    let _a = Fields_derivers_graphql.Graphql_fields.string obj in
+    let _b = Fields_derivers_json.To_yojson.string obj in
+    Fields_derivers_json.Of_yojson.string obj
+
+  let bool obj : _ Unified_input.t =
+    let _a = Fields_derivers_graphql.Graphql_fields.bool obj in
+    let _b = Fields_derivers_json.To_yojson.bool obj in
+    Fields_derivers_json.Of_yojson.bool obj
 
   let option (x : _ Unified_input.t) obj : _ Unified_input.t =
     let _a = Fields_derivers_graphql.Graphql_fields.option x obj in
@@ -142,6 +147,8 @@ module Derivers = struct
   let typ obj =
     !(obj#graphql_fields).Fields_derivers_graphql.Graphql_fields.Input.T.run ()
 end
+
+include Derivers
 
 let%test_module "Test" =
   ( module struct

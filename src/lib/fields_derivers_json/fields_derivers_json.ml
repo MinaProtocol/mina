@@ -51,7 +51,7 @@ module To_yojson = struct
 
   let bool obj =
     obj#contramap := Fn.id ;
-    (obj#to_json := fun x -> `String x) ;
+    (obj#to_json := fun x -> `Bool x) ;
     obj
 
   let list x obj =

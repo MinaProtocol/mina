@@ -150,6 +150,14 @@ module Graphql_fields_raw = struct
          Input.T.{ run = (fun () -> Schema.string) }) ;
       obj
 
+    let bool obj =
+      (obj#graphql_fields :=
+         Input.T.{ run = (fun () -> Schema.(non_null bool)) }) ;
+      obj#contramap := Fn.id ;
+      obj#graphql_fields_accumulator := !(obj#graphql_fields_accumulator) ;
+      (obj#nullable_graphql_fields := Input.T.{ run = (fun () -> Schema.bool) }) ;
+      obj
+
     let list x obj : ('input_type list, _, _, _) Input.t =
       (obj#graphql_fields :=
          Input.T.
