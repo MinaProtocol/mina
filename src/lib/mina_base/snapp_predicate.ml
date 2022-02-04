@@ -47,8 +47,10 @@ module Closed_interval = struct
     Typ.of_hlistable [ x; x ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let derivers a =
-    Fields_derivers_snapps.derivers @@ Fields.make_creator ~lower:a ~upper:a
+  let deriver a obj =
+    let open Fields_derivers_snapps.Derivers in
+    Fields.make_creator obj ~lower:!.a ~upper:!.a
+    |> finish ~name:"ClosedInterval"
 
   let%test_module "ClosedInterval" =
     ( module struct
@@ -62,10 +64,11 @@ module Closed_interval = struct
       end
 
       let%test_unit "roundtrip json" =
-        let open Fields_derivers_snapps.Prim in
-        let (to_json, of_json), _ = derivers int in
+        let open Fields_derivers_snapps.Derivers in
+        let full = o () in
+        let _a : _ Unified_input.t = deriver int full in
         [%test_eq: IntClosedInterval.t]
-          (of_json (to_json IntClosedInterval.v))
+          (!(full#of_json) (!(full#to_json) IntClosedInterval.v))
           IntClosedInterval.v
     end )
 end
@@ -184,6 +187,42 @@ module Numeric = struct
       [@@deriving sexp, equal, yojson, hash, compare]
     end
   end]
+
+  let deriver a obj =
+    let open Fields_derivers_snapps.Derivers in
+    let inner obj =
+      Closed_interval.Fields.make_creator obj ~lower:!.a ~upper:!.a
+      |> finish ~name:"ClosedInterval"
+    in
+    Or_ignore.deriver inner obj
+
+  let%test_module "Numeric" =
+    ( module struct
+      module Int_numeric = struct
+        type t_ = int t [@@deriving sexp, equal, compare]
+
+        (* Note: nonrec doesn't work with ppx-deriving *)
+        type t = t_ [@@deriving sexp, equal, compare]
+      end
+
+      module T = struct
+        type t = { foo : Int_numeric.t }
+        [@@deriving sexp, equal, compare, fields]
+
+        let v : t =
+          { foo = Or_ignore.Check { Closed_interval.lower = 10; upper = 100 } }
+
+        let deriver obj =
+          let open Fields_derivers_snapps.Derivers in
+          Fields.make_creator obj ~foo:!.(deriver int) |> finish ~name:"T"
+      end
+
+      let%test_unit "roundtrip json" =
+        let open Fields_derivers_snapps.Derivers in
+        let full = o () in
+        let _a : _ Unified_input.t = T.deriver full in
+        [%test_eq: T.t] (of_json full (to_json full T.v)) T.v
+    end )
 
   let gen gen_a compare_a = Or_ignore.gen (Closed_interval.gen gen_a compare_a)
 

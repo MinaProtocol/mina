@@ -159,12 +159,12 @@ module Update = struct
         ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-    let derivers =
-      let open Fields_derivers_snapps.Prim in
-      Fields_derivers_snapps.derivers
-      @@ Fields.make_creator ~initial_minimum_balance:balance
-           ~cliff_time:global_slot ~cliff_amount:amount
-           ~vesting_period:global_slot ~vesting_increment:amount
+    let deriver obj =
+      let open Fields_derivers_snapps in
+      Fields.make_creator obj ~initial_minimum_balance:!.balance
+        ~cliff_time:!.global_slot ~cliff_amount:!.amount
+        ~vesting_period:!.global_slot ~vesting_increment:!.amount
+      |> finish ~name:"Timing"
   end
 
   open Snapp_basic
