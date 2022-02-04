@@ -2009,27 +2009,6 @@ module Types = struct
               ~resolve:(fun _ -> Fn.id)
           ])
 
-    let set_staking =
-      obj "SetStakingPayload" ~fields:(fun _ ->
-          [ field "lastStaking"
-              ~doc:"Returns the public keys that were staking funds previously"
-              ~typ:(non_null (list (non_null public_key)))
-              ~args:Arg.[]
-              ~resolve:(fun _ (lastStaking, _, _) -> lastStaking)
-          ; field "lockedPublicKeys"
-              ~doc:
-                "List of public keys that could not be used to stake because \
-                 they were locked"
-              ~typ:(non_null (list (non_null public_key)))
-              ~args:Arg.[]
-              ~resolve:(fun _ (_, locked, _) -> locked)
-          ; field "currentStakingKeys"
-              ~doc:"Returns the public keys that are now staking their funds"
-              ~typ:(non_null (list (non_null public_key)))
-              ~args:Arg.[]
-              ~resolve:(fun _ (_, _, currentStaking) -> currentStaking)
-          ])
-
     let set_coinbase_receiver =
       obj "SetCoinbaseReceiverPayload" ~fields:(fun _ ->
           [ field "lastCoinbaseReceiver"
@@ -3297,16 +3276,6 @@ module Types = struct
               ~typ:(non_null public_key_arg)
           ]
 
-    let set_staking =
-      obj "SetStakingInput" ~coerce:Fn.id
-        ~fields:
-          [ arg "publicKeys"
-              ~typ:(non_null (list (non_null public_key_arg)))
-              ~doc:
-                "Public keys of accounts you wish to stake with - these must \
-                 be accounts that are in trackedAccounts"
-          ]
-
     let set_coinbase_receiver =
       obj "SetCoinbaseReceiverInput" ~coerce:Fn.id
         ~fields:
@@ -4208,19 +4177,6 @@ module Mutations = struct
         Result.map_error result
           ~f:(Fn.compose Yojson.Safe.to_string Error_json.error_to_yojson))
 
-  let set_staking =
-    result_field "setStaking" ~doc:"Set keys you wish to stake with"
-      ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.set_staking) ]
-      ~typ:(non_null Types.Payload.set_staking)
-      ~deprecated:
-        (Deprecated
-           (Some "Restart the daemon with the flag --block-producer-key instead"))
-      ~resolve:(fun { ctx = _coda; _ } () _pks ->
-        Error
-          "The setStaking command is deprecated and no longer has any effect. \
-           To enable block production, instead restart the daemon with the \
-           flag --block-producer-key.")
-
   let set_coinbase_receiver =
     field "setCoinbaseReceiver" ~doc:"Set the key to receive coinbases"
       ~args:
@@ -4409,7 +4365,6 @@ module Mutations = struct
     ; mock_snapp
     ; send_test_snapp
     ; export_logs
-    ; set_staking
     ; set_coinbase_receiver
     ; set_snark_worker
     ; set_snark_work_fee
