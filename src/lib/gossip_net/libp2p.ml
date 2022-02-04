@@ -104,7 +104,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
               (Network_peer.Peer.to_multiaddr_string peer)
               ()
         | `Within_capacity ->
-            handler peer ~version q
+            time_execution (Printf.sprintf "handling_rpc_%s" Impl.name)
+              (fun () -> handler peer ~version q)
       in
       Impl.implement_multi handler
 

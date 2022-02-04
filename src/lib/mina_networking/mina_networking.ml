@@ -1280,7 +1280,7 @@ let create (config : Config.t)
       incr_failed_response Rpcs.Get_some_initial_peers.failed_response_counter ;
     result
   in
-  let get_best_tip_rpc conn ~version:_ (() : unit) =
+  let get_best_tip_rpc conn ~version:_ () =
     [%log debug] "Sending best_tip to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_best_tip. query: $query" in
     let msg_args = [ ("query", Rpcs.Get_best_tip.query_to_yojson ()) ] in

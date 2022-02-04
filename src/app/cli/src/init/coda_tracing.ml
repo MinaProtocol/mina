@@ -3,7 +3,7 @@ open Async
 
 (** [start dir] starts writing the trace output to [dir ^/ "trace" ^/(current_pid ^ ".trace")]. *)
 let start dir =
-  O1trace_webkit_event.forget_tid (fun () ->
+  O1trace.forget_tid (fun () ->
       let trace_dir = dir ^/ "trace" in
       let%bind () = File_system.create_dir trace_dir in
       Writer.open_file ~append:true

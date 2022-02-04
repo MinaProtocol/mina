@@ -1443,6 +1443,31 @@ module Object_lifetime_statistics = struct
     Gauge_map.add lifetime_quartile_ms_table ~name ~help
 end
 
+module Execution_times = struct
+  let tracked_metrics = String.Table.create ()
+
+  let create_metric name =
+    let info : MetricInfo.t =
+      { name = MetricName.v (Printf.sprintf "Mina_Daemon_time_spent_%s_ms" name)
+      ; help = Printf.sprintf "Total number of ms spent on '%s'" name
+      ; metric_type = Counter
+      ; label_names = []
+      }
+    in
+    let collect () =
+      let elapsed = O1trace.Thread_timers.get_elapsed_time name in
+      LabelSetMap.singleton [] [ Sample_set.sample (Time.Span.to_ms elapsed) ]
+    in
+    CollectorRegistry.register CollectorRegistry.default info collect
+
+  let sync_metrics () =
+    O1trace.Thread_timers.iter_timed_threads ~f:(fun name ->
+        if not (Hashtbl.mem tracked_metrics name) then
+          Hashtbl.add_exn tracked_metrics ~key:name ~data:(create_metric name))
+
+  let () = CollectorRegistry.(register_pre_collect default sync_metrics)
+end
+
 let generic_server ?forward_uri ~port ~logger ~registry () =
   let open Cohttp in
   let open Cohttp_async in
