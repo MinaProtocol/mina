@@ -302,8 +302,12 @@ let stream_messages pipe =
   r
 
 let read_incoming_messages reader =
-  Strict_pipe.Reader.map (stream_messages reader)
-    ~f:(Or_error.map ~f:Reader.DaemonInterface.Message.of_message)
+  Strict_pipe.Reader.map
+    (O1trace.time_execution "ipc_stream_messages" (fun () ->
+         stream_messages reader))
+    ~f:
+      (Or_error.map ~f:(fun msg ->
+           Reader.DaemonInterface.Message.of_message msg))
 
 let write_outgoing_message writer msg =
   msg |> Builder.Libp2pHelperInterface.Message.to_message

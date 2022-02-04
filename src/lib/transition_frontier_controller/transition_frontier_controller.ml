@@ -103,16 +103,18 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
   |> don't_wait_for ;
   let clean_up_catchup_scheduler = Ivar.create () in
   trace_recurring "processor" (fun () ->
-      Transition_handler.Processor.run ~logger ~precomputed_values
-        ~time_controller ~trust_system ~verifier ~frontier
-        ~primary_transition_reader ~producer_transition_reader
-        ~clean_up_catchup_scheduler ~catchup_job_writer
-        ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-        ~processed_transition_writer) ;
+      time_execution "processing_blocks" (fun () ->
+          Transition_handler.Processor.run ~logger ~precomputed_values
+            ~time_controller ~trust_system ~verifier ~frontier
+            ~primary_transition_reader ~producer_transition_reader
+            ~clean_up_catchup_scheduler ~catchup_job_writer
+            ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
+            ~processed_transition_writer)) ;
   trace_recurring "catchup" (fun () ->
-      Ledger_catchup.run ~logger ~precomputed_values ~trust_system ~verifier
-        ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
-        ~unprocessed_transition_cache) ;
+      time_execution "in_catchup" (fun () ->
+          Ledger_catchup.run ~logger ~precomputed_values ~trust_system ~verifier
+            ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
+            ~unprocessed_transition_cache)) ;
   Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
       let open Strict_pipe.Writer in
       kill valid_transition_writer ;

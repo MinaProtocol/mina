@@ -136,14 +136,11 @@ module Runtime = struct
   let gc_allocated_bytes = ref (Gc.allocated_bytes ())
 
   let rec gc_stat () =
-    Async.Deferred.(
-      upon
-        (after (Time_ns.Span.of_min !gc_stat_interval_mins))
-        (fun () ->
-          current_gc := Gc.stat () ;
-          current_jemalloc := Jemalloc.get_memory_stats () ;
-          gc_allocated_bytes := Gc.allocated_bytes () ;
-          gc_stat ()))
+    let%bind () = after (Time_ns.Span.of_min !gc_stat_interval_mins) in
+    current_gc := Gc.stat () ;
+    current_jemalloc := Jemalloc.get_memory_stats () ;
+    gc_allocated_bytes := Gc.allocated_bytes () ;
+    gc_stat ()
 
   let simple_metric ~metric_type ~help name fn =
     let name = Printf.sprintf "%s_%s_%s" namespace subsystem name in
@@ -850,6 +847,10 @@ module Network = struct
   let ipc_latency_ns_summary : Ipc_latency_histogram.t =
     let help = "A histogram for all IPC message latencies" in
     Ipc_latency_histogram.v "ipc_latency_ns_summary" ~help ~namespace ~subsystem
+
+  let ipc_logs_received_total : Counter.t =
+    let help = "Total number of logs received from libp2p helper subprocess" in
+    Counter.v "ipc_logs_received_total" ~help ~namespace ~subsystem
 end
 
 module Pipe = struct
@@ -1459,6 +1460,32 @@ module Object_lifetime_statistics = struct
     Gauge_map.add lifetime_quartile_ms_table ~name ~help
 end
 
+module Execution_times = struct
+  let tracked_metrics = String.Table.create ()
+
+  let create_metric name =
+    let info : MetricInfo.t =
+      { name = MetricName.v (Printf.sprintf "Mina_Daemon_time_spent_%s_ms" name)
+      ; help = Printf.sprintf "Total number of ms spent on '%s'" name
+      ; metric_type = Counter
+      ; label_names = []
+      }
+    in
+    let collect () =
+      let elapsed = Option.value_exn (O1trace.Thread.get_elapsed_time name) in
+      LabelSetMap.singleton []
+        [ Sample_set.sample (Time_ns.Span.to_ms elapsed) ]
+    in
+    CollectorRegistry.register CollectorRegistry.default info collect
+
+  let sync_metrics () =
+    O1trace.Thread.iter_threads ~f:(fun name ->
+        if not (Hashtbl.mem tracked_metrics name) then
+          Hashtbl.add_exn tracked_metrics ~key:name ~data:(create_metric name))
+
+  let () = CollectorRegistry.(register_pre_collect default sync_metrics)
+end
+
 let generic_server ?forward_uri ~port ~logger ~registry () =
   let open Cohttp in
   let open Cohttp_async in
@@ -1513,9 +1540,11 @@ let generic_server ?forward_uri ~port ~logger ~registry () =
 type t = (Async.Socket.Address.Inet.t, int) Cohttp_async.Server.t
 
 let server ?forward_uri ~port ~logger () =
-  Runtime.gc_stat () ;
-  generic_server ?forward_uri ~port ~logger ~registry:CollectorRegistry.default
-    ()
+  don't_wait_for
+    (O1trace.time_execution "collecting_gc_metrics" Runtime.gc_stat) ;
+  O1trace.time_execution "serving_metrics"
+    (generic_server ?forward_uri ~port ~logger
+       ~registry:CollectorRegistry.default)
 
 module Archive = struct
   type t =

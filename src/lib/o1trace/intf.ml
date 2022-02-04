@@ -1,3 +1,6 @@
+open Core_kernel
+open Async_kernel
+
 module type S = sig
   (** Emit an instantaneous named event.
 
@@ -44,12 +47,14 @@ module type S = sig
       stacked rectangles showing the stack of things that are measured.
   *)
   val measure : string -> (unit -> 'a) -> 'a
+end
 
-  (** Forget about the current tid and execute [f] with tid=0.
+module type S_with_hooks = sig
+  include S
 
-      This is useful, for example, when opening a writer. The writer will
-      internally do a lot of work that will show up in the trace when it
-      isn't necessarily desired.
-  *)
-  val forget_tid : (unit -> 'a) -> 'a
+  module Hooks : sig
+    val on_job_enter : Execution_context.t -> unit
+
+    val on_job_exit : Execution_context.t -> Time_ns.Span.t -> unit
+  end
 end
