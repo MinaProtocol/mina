@@ -170,11 +170,13 @@ module Node = struct
       $nonce: UInt32,
       $memo: String,
       $repeat_count: UInt32,
-      $repeat_delay_ms: UInt32) {
+      $repeat_delay_ms: UInt32,
+      $aux_account_password: String) {
         sendPayment(input:
           {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo},
           repeat_count: $repeat_count,
-          repeat_delay_ms: $repeat_delay_ms) {
+          repeat_delay_ms: $repeat_delay_ms,
+          aux_account_password: $aux_account_password) {
             payment {
               id
             }
@@ -386,8 +388,9 @@ module Node = struct
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
-  let send_payment ?initial_delay_sec ?repeat_count ?repeat_delay_ms ~logger t
-      ~sender_pub_key ~receiver_pub_key ~amount ~fee =
+  let send_payment ?initial_delay_sec ?repeat_count ?repeat_delay_ms
+      ?(unlock_account = true) ~logger t ~sender_pub_key ~receiver_pub_key
+      ~amount ~fee =
     (* We have two calls to `exec_graphql_request`, so we split total delay in half *)
     [%log info] "Sending a payment"
       ~metadata:
@@ -407,7 +410,10 @@ module Node = struct
       exec_graphql_request ~logger ~node:t ~initial_delay_sec:0.
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
     in
-    let%bind _ = unlock_sender_account_graphql () in
+    let%bind () =
+      if unlock_account then unlock_sender_account_graphql () >>| const ()
+      else return ()
+    in
     let send_payment_graphql () =
       let send_payment_obj =
         Graphql.Send_payment.make
@@ -418,7 +424,7 @@ module Node = struct
           ?repeat_count:(Option.map ~f:Graphql_lib.Encoders.uint32 repeat_count)
           ?repeat_delay_ms:
             (Option.map ~f:Graphql_lib.Encoders.uint32 repeat_delay_ms)
-          ()
+          ~aux_account_password:"naughty blue worm" ()
       in
       exec_graphql_request ?initial_delay_sec ~logger ~node:t
         ~query_name:"send_payment_graphql" send_payment_obj
@@ -431,9 +437,9 @@ module Node = struct
     ()
 
   let must_send_payment ?initial_delay_sec ?repeat_count ?repeat_delay_ms
-      ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
-    send_payment ?initial_delay_sec ?repeat_count ?repeat_delay_ms ~logger t
-      ~sender_pub_key ~receiver_pub_key ~amount ~fee
+      ?unlock_account ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
+    send_payment ?initial_delay_sec ?repeat_count ?repeat_delay_ms
+      ?unlock_account ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =

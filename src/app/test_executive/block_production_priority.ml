@@ -23,6 +23,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { balance = "9999999"; timing = Untimed }
         ])
     ; num_snark_workers = 2
+    ; aux_account_balance = Some "1000"
     }
 
   (* let wait_for_bps_to_initialize ~logger network t =
@@ -46,14 +47,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
     in
     [%log info] "done waiting for initializations" ;
-    let receiver_bp = List.nth_exn (Network.block_producers network) 0 in
+    let bps = Network.block_producers network in
+    let receiver_bp = List.nth_exn bps 0 in
     let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
-    let sender_bp = List.nth_exn (Network.block_producers network) 1 in
+    let sender_bp = List.nth_exn bps 1 in
     let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
     let pk_to_string = Signature_lib.Public_key.Compressed.to_base58_check in
     [%log info] "receiver: %s" (pk_to_string receiver_pub_key) ;
     [%log info] "sender: %s" (pk_to_string sender_pub_key) ;
-    let tps = 8 in
+    let tps = 2 in
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
@@ -73,11 +75,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Time.add (Time.now ())
         (Time.Span.of_ms @@ float_of_int (num_slots * window_ms))
     in
+    let aux_first_pk, _ =
+      (Lazy.force @@ Mina_base.Sample_keypairs.keypairs).(List.length bps + 1)
+    in
     let%bind () =
       Network.Node.must_send_payment ~initial_delay_sec:1.
         ~repeat_count:(Unsigned.UInt32.of_int num_payments)
         ~repeat_delay_ms:(Unsigned.UInt32.of_int @@ (1000 / tps))
-        ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee sender_bp
+        ~unlock_account:false ~logger ~sender_pub_key:aux_first_pk
+        ~receiver_pub_key ~amount ~fee sender_bp
     in
     let%bind () = Async.(at end_t >>= const Malleable_error.ok_unit) in
     let%bind blocks =

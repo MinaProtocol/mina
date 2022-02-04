@@ -54,6 +54,7 @@ module Engine = struct
            ?initial_delay_sec:float
         -> ?repeat_count:Unsigned.uint32
         -> ?repeat_delay_ms:Unsigned.uint32
+        -> ?unlock_account:bool
         -> logger:Logger.t
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
@@ -66,6 +67,7 @@ module Engine = struct
            ?initial_delay_sec:float
         -> ?repeat_count:Unsigned.uint32
         -> ?repeat_delay_ms:Unsigned.uint32
+        -> ?unlock_account:bool
         -> logger:Logger.t
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t

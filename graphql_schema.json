@@ -2357,6 +2357,17 @@
               "description": "Send a payment",
               "args": [
                 {
+                  "name": "aux_account_password",
+                  "description":
+                    "Should only be set in tests when sending from aux accounts is needed, password for the aux accounts to be unlocked",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
                   "name": "repeat_delay_ms",
                   "description":
                     "Should only be set in tests, specifies with which delay shall transaction be repeated",
