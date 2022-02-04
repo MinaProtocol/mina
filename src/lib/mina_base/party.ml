@@ -367,7 +367,9 @@ module Update = struct
     let open Fields_derivers_snapps in
     let throw _ _ = failwith "todo" in
     finish ~name:"Update"
-    @@ Poly.Fields.make_creator ~app_state:throw ~delegate:throw
+    @@ Poly.Fields.make_creator
+         ~app_state:!.(Snapp_state.deriver @@ Set_or_keep.deriver field)
+         ~delegate:!.(Set_or_keep.deriver public_key)
          ~verification_key:throw
          ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
          ~snapp_uri:!.(Set_or_keep.deriver string)

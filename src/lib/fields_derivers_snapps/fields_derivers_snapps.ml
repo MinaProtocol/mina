@@ -92,7 +92,7 @@ module Derivers = struct
       ~of_string:Unsigned.UInt32.of_string
 
   let field obj : _ Unified_input.t =
-    let module Field = Pickles.Impls.Step.Field.Constant in
+    let module Field = Pickles.Backend.Tick.Field in
     iso_string obj ~name:"Field" ~doc:"String representing an Fp Field element"
       ~to_string:Field.to_string ~of_string:Field.of_string
 
