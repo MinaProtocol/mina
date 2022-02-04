@@ -96,6 +96,12 @@ module Derivers = struct
     iso_string obj ~name:"Field" ~doc:"String representing an Fp Field element"
       ~to_string:Field.to_string ~of_string:Field.of_string
 
+  let public_key obj : _ Unified_input.t =
+    iso_string obj ~name:"Field"
+      ~doc:"String representing a public key in base58"
+      ~to_string:Signature_lib.Public_key.Compressed.to_string
+      ~of_string:Signature_lib.Public_key.Compressed.of_base58_check_exn
+
   let int obj : _ Unified_input.t =
     let _a = Fields_derivers_graphql.Graphql_fields.int obj in
     let _b = Fields_derivers_json.To_yojson.int obj in
@@ -165,6 +171,7 @@ include Derivers
 let%test_module "Test" =
   ( module struct
     module Field = Pickles.Impls.Step.Field.Constant
+    module Public_key = Signature_lib.Public_key.Compressed
 
     module Or_ignore_test = struct
       type 'a t = Check of 'a | Ignore [@@deriving compare, sexp, equal]
@@ -237,4 +244,31 @@ let%test_module "Test" =
     let%test_unit "roundtrip json'" =
       let open Derivers in
       [%test_eq: V2.t] (of_json v2 (to_json v2 V2.v)) V2.v
+
+    module V3 = struct
+      type t = { public_key : Public_key.t }
+      [@@deriving compare, sexp, equal, fields]
+
+      let v =
+        { public_key =
+            Public_key.of_base58_check_exn
+              "B62qoTqMG41DFgkyQmY2Pos1x671Gfzs9k8NKqUdSg7wQasEV6qnXQP"
+        }
+
+      let derivers obj =
+        let open Derivers in
+        Fields.make_creator obj ~public_key:!.public_key |> finish ~name:"V3"
+    end
+
+    let v3 = V3.derivers @@ Derivers.o ()
+
+    let%test_unit "to_json'" =
+      let open Derivers in
+      [%test_eq: string]
+        (Yojson.Safe.to_string (to_json v3 V3.v))
+        {|{"publicKey":"B62qoTqMG41DFgkyQmY2Pos1x671Gfzs9k8NKqUdSg7wQasEV6qnXQP"}|}
+
+    let%test_unit "roundtrip json'" =
+      let open Derivers in
+      [%test_eq: V3.t] (of_json v3 (to_json v3 V3.v)) V3.v
   end )
