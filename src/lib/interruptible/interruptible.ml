@@ -1,5 +1,5 @@
 open Core_kernel
-open Async_kernel
+open Async
 
 module T = struct
   type ('a, 's) t =
@@ -94,6 +94,21 @@ module T = struct
   let return a =
     { interruption_signal = Ivar.create (); d = Deferred.Result.return a }
 
+  let with_priority priority f =
+    let interruption_signal = Ivar.create () in
+    let d =
+      Scheduler.within' ~priority (fun () ->
+          let t = f () in
+          don't_wait_for
+            ( Ivar.read t.interruption_signal
+            >>| Ivar.fill_if_empty interruption_signal ) ;
+          Deferred.choose
+            [ Deferred.choice (Ivar.read t.interruption_signal) Result.fail
+            ; Deferred.choice t.d Fn.id
+            ])
+    in
+    { interruption_signal; d }
+
   let don't_wait_for { d; _ } =
     don't_wait_for @@ Deferred.map d ~f:(function Ok () -> () | Error _ -> ())
 
@@ -159,14 +174,14 @@ module Deferred_let_syntax = struct
     let both x y =
       Let_syntax.Let_syntax.both (uninterruptible x) (uninterruptible y)
 
-    module Open_on_rhs = Deferred.Let_syntax
+    module Open_on_rhs = Async_kernel.Deferred.Let_syntax
   end
 end
 
 let%test_unit "monad gets interrupted" =
   Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
-      let wait i = after (Time_ns.Span.of_ms i) in
+      let wait i = after (Time.Span.of_ms i) in
       let ivar = Ivar.create () in
       don't_wait_for
         (let open Let_syntax in
@@ -184,7 +199,7 @@ let%test_unit "monad gets interrupted" =
 let%test_unit "monad gets interrupted within nested binds" =
   Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
-      let wait i = after (Time_ns.Span.of_ms i) in
+      let wait i = after (Time.Span.of_ms i) in
       let ivar = Ivar.create () in
       let rec go () =
         let open Let_syntax in
@@ -204,7 +219,7 @@ let%test_unit "monad gets interrupted within nested binds" =
 let%test_unit "interruptions still run finally blocks" =
   Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
-      let wait i = after (Time_ns.Span.of_ms i) in
+      let wait i = after (Time.Span.of_ms i) in
       let ivar = Ivar.create () in
       let rec go () =
         let open Let_syntax in
@@ -225,7 +240,7 @@ let%test_unit "interruptions branches do not cancel each other" =
   Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
       let s = ref 0 in
-      let wait i = after (Time_ns.Span.of_ms i) in
+      let wait i = after (Time.Span.of_ms i) in
       let ivar_r = Ivar.create () in
       let ivar_s = Ivar.create () in
       let rec go r =

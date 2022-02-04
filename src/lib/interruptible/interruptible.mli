@@ -51,6 +51,10 @@ val uninterruptible : 'a Deferred.t -> ('a, 's) t
 *)
 val force : ('a, 's) t -> ('a, 's) Deferred.Result.t
 
+(* TODO: doccomment *)
+val with_priority :
+  Async_kernel.Priority.t -> (unit -> ('a, 's) t) -> ('a, 's) t
+
 module Result : sig
   type nonrec ('a, 'b, 's) t = (('a, 'b) Result.t, 's) t
 

@@ -1222,7 +1222,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
     let coda_ref : Mina_lib.t option ref = ref None in
     Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
       ~child_pids:pids ~top_logger:logger coda_ref ;
-    Async.Scheduler.within' ~monitor
+    Async.Scheduler.within' ~monitor ~priority:Priority.low
     @@ fun () ->
     let%bind { Coda_initialization.coda
              ; client_trustlist

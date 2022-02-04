@@ -3,7 +3,7 @@
  (public_name interruptible)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel async_kernel run_in_thread)
+ (libraries core_kernel async run_in_thread)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving.std))
  (instrumentation (backend bisect_ppx))
