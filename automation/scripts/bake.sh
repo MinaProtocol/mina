@@ -72,12 +72,12 @@ docker build \
   --build-arg "TESTNET_NAME=${TESTNET}" \
   --build-arg "CONFIG_FILE=${CONFIG_FILE}" .
 
-sudo docker tag "$hub_baked_tag" "$gcr_baked_tag"
+docker tag "$hub_baked_tag" "$gcr_baked_tag"
 
 echo "Pushing to dockerhub"
-sudo docker push "$hub_baked_tag"
+docker push "$hub_baked_tag"
 echo "Pushing to GCR"
-sudo docker push "$gcr_baked_tag"
+docker push "$gcr_baked_tag"
 
 echo "Built + Pushed Image"
 echo "Dockerhub url: ${hub_baked_tag}"
