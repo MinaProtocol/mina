@@ -9,6 +9,7 @@ type display =
   , string
   , string
   , string
+  , string
   , bool
   , string
   , string )

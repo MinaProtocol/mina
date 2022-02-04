@@ -93,6 +93,7 @@ val apply_parties_unchecked_with_states :
   -> ( Transaction_logic.Transaction_applied.Parties_applied.t
      * ( Global_state.t
        * ( (Party.t, unit) Parties.Party_or_stack.t list
+         , (Party.t, unit) Parties.Party_or_stack.t list list
          , Token_id.t
          , Currency.Amount.t
          , t

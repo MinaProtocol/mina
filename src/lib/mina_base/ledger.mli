@@ -144,6 +144,7 @@ val apply_parties_unchecked :
   -> Parties.t
   -> ( Transaction_applied.Parties_applied.t
      * ( ( (Party.t, unit) Parties.Party_or_stack.t list
+         , (Party.t, unit) Parties.Party_or_stack.t list list
          , Token_id.t
          , Currency.Amount.t
          , t
