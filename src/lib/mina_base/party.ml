@@ -49,7 +49,7 @@ module Update = struct
           ; token_symbol : 'token_symbol
           ; timing : 'timing
           }
-        [@@deriving compare, equal, sexp, hash, yojson, hlist]
+        [@@deriving compare, equal, sexp, hash, yojson, hlist, fields]
       end
     end]
   end
@@ -160,7 +160,7 @@ module Update = struct
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
     let deriver obj =
-      let open Fields_derivers_snapps in
+      let open Fields_derivers_snapps.Derivers in
       Fields.make_creator obj ~initial_minimum_balance:!.balance
         ~cliff_time:!.global_slot ~cliff_amount:!.amount
         ~vesting_period:!.global_slot ~vesting_increment:!.amount
@@ -243,15 +243,14 @@ module Update = struct
     *)
     let timing = Set_or_keep.Keep in
     return
-      Poly.
-        { app_state
-        ; delegate
-        ; verification_key
-        ; permissions
-        ; snapp_uri
-        ; token_symbol
-        ; timing
-        }
+      { Poly.app_state
+      ; delegate
+      ; verification_key
+      ; permissions
+      ; snapp_uri
+      ; token_symbol
+      ; timing
+      }
 
   module Checked = struct
     open Pickles.Impls.Step
@@ -363,6 +362,18 @@ module Update = struct
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
+
+  let deriver obj =
+    let open Fields_derivers_snapps in
+    let throw _ _ = failwith "todo" in
+    finish ~name:"Update"
+    @@ Poly.Fields.make_creator ~app_state:throw ~delegate:throw
+         ~verification_key:throw
+         ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
+         ~snapp_uri:!.(Set_or_keep.deriver string)
+         ~token_symbol:!.(Set_or_keep.deriver string)
+         ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
+         obj
 end
 
 module Events = Snapp_account.Events

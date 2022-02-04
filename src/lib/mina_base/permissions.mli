@@ -101,3 +101,37 @@ val typ : (Checked.t, t) Typ.t
 val user_default : t
 
 val empty : t
+
+(* TODO can this be written more concisely? *)
+val deriver :
+     (< contramap :
+          ((bool, Auth_required.t) Poly.t -> (bool, Auth_required.t) Poly.t) ref
+      ; graphql_fields :
+          (bool, Auth_required.t) Poly.t
+          Fields_derivers_graphql.Graphql_fields.Input.T.t
+          ref
+      ; graphql_fields_accumulator :
+          (bool, Auth_required.t) Poly.t
+          Fields_derivers_graphql.Graphql_fields.Accumulator.T.t
+          list
+          ref
+      ; map : ('b -> 'b) ref
+      ; nullable_graphql_fields :
+          (bool, Auth_required.t) Poly.t option
+          Fields_derivers_graphql.Graphql_fields.Input.T.t
+          ref
+      ; of_json :
+          (   [> `Assoc of (string * Yojson.Safe.t) list ]
+           -> (bool, Auth_required.t) Poly.t)
+          ref
+      ; of_json_creator : Yojson.Safe.t Core_kernel.String.Map.t ref
+      ; to_json :
+          (   (bool, Auth_required.t) Poly.t
+           -> [> `Assoc of (string * Yojson.Safe.t) list ])
+          ref
+      ; to_json_accumulator :
+          (string * ((bool, Auth_required.t) Poly.t -> Yojson.Safe.t)) list ref
+      ; .. >
+      as
+      'a)
+  -> 'a
