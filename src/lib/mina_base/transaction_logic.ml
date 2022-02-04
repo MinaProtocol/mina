@@ -357,6 +357,7 @@ module type S = sig
     -> Parties.t
     -> ( Transaction_applied.Parties_applied.t
        * ( ( (Party.t, unit) Parties.Party_or_stack.t list
+           , (Party.t, unit) Parties.Party_or_stack.t list list
            , Token_id.t
            , Amount.t
            , ledger
@@ -389,6 +390,7 @@ module type S = sig
          (   'acc
           -> Global_state.t
              * ( (Party.t, unit) Parties.Party_or_stack.t list
+               , (Party.t, unit) Parties.Party_or_stack.t list list
                , Token_id.t
                , Amount.t
                , ledger
@@ -1637,27 +1639,24 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             `Signature_verifies false
     end
 
-    module Parties = struct
-      module Opt = struct
-        type 'a t = 'a option
+    module Opt = struct
+      type 'a t = 'a option
 
-        let is_some = Option.is_some
+      let is_some = Option.is_some
 
-        let map = Option.map
+      let map = Option.map
 
-        let or_default ~if_ x ~default =
-          if_ (is_some x) ~then_:(Option.value ~default x) ~else_:default
+      let or_default ~if_ x ~default =
+        if_ (is_some x) ~then_:(Option.value ~default x) ~else_:default
 
-        let or_exn x = Option.value_exn x
-      end
+      let or_exn x = Option.value_exn x
+    end
 
-      type party_or_stack = (Party.t, unit) Parties.Party_or_stack.t
-
-      type t = party_or_stack list
-
-      let of_parties_list : Party.t list -> t =
-        Parties.Party_or_stack.of_parties_list
-          ~party_depth:(fun (p : Party.t) -> p.data.body.call_depth)
+    module Stack (Elt : sig
+      type t
+    end) =
+    struct
+      type t = Elt.t list
 
       let if_ = Parties.value_if
 
@@ -1665,11 +1664,33 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       let is_empty = List.is_empty
 
-      let pop_exn : t -> party_or_stack * t = function
+      let pop_exn : t -> Elt.t * t = function
         | [] ->
             failwith "pop_exn"
         | x :: xs ->
             (x, xs)
+
+      let pop : t -> (Elt.t * t) option = function
+        | x :: xs ->
+            Some (x, xs)
+        | _ ->
+            None
+
+      let push x ~onto : t = x :: onto
+    end
+
+    module Parties = struct
+      module Party_or_stack = struct
+        type t = (Party.t, unit) Parties.Party_or_stack.t
+      end
+
+      type party_or_stack = Party_or_stack.t
+
+      include Stack (Party_or_stack)
+
+      let of_parties_list : Party.t list -> t =
+        Parties.Party_or_stack.of_parties_list
+          ~party_depth:(fun (p : Party.t) -> p.data.body.call_depth)
 
       let as_stack : party_or_stack -> t option = function
         | Party _ ->
@@ -1688,15 +1709,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             Some (x, xs)
         | _ ->
             None
-
-      let push_stack x ~onto : t = Stack (x, ()) :: onto
     end
+
+    module Call_stack = Stack (Parties)
 
     module Local_state = struct
       type failure_status = Transaction_status.Failure.t option
 
       type t =
         ( Parties.t
+        , Call_stack.t
         , Token_id.t
         , Amount.t
         , Ledger.t
@@ -1733,6 +1755,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; inclusion_proof : [ `Existing of location | `New ]
       ; local_state :
           ( Parties.t
+          , Call_stack.t
           , Token_id.t
           , Amount.t
           , L.t
