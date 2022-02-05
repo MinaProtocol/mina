@@ -690,7 +690,7 @@ module Balance_data = struct
     end
   end]
 
-  let _ =
+  (*  let _ =
     let layout = Stable.Latest.bin_layout_t in
     let layout_compressed =
       { layout with
@@ -701,6 +701,7 @@ module Balance_data = struct
     Format.eprintf "BALANCE DATA LAYOUT: %s@."
       ( Ppx_version_runtime.Bin_prot_layout.to_yojson layout_compressed
       |> Yojson.Safe.pretty_to_string )
+*)
 
   let empty =
     {fee_payer_balance= None; source_balance= None; receiver_balance= None}

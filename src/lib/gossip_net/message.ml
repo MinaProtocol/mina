@@ -32,6 +32,24 @@ module V1 = struct
     let callee_model_of_msg = Fn.id
 
     let msg_of_caller_model = Fn.id
+
+    let _ =
+      let random_value = Quickcheck.random_value in
+      let init_ledger_state =
+        random_value Mina_base.Ledger.gen_initial_ledger_state
+      in
+      let (cmds : msg) =
+        Transaction_pool_diff
+          (random_value
+             (Mina_base.User_command.Gen.sequence ~sign_type:`Real ~length:5
+                init_ledger_state))
+      in
+      let sz = bin_size_msg cmds in
+      let buf = Bin_prot.Common.create_buf sz in
+      ignore (bin_write_msg buf ~pos:0 cmds) ;
+      let s = String.init sz ~f:(fun ndx -> buf.{ndx}) in
+      Format.eprintf "BIN IO@." ;
+      Format.eprintf "%s@." (Hex.Safe.to_hex s)
   end
 
   include Register (T)

@@ -408,14 +408,6 @@ let gen_test =
   Gen.payment_with_random_participants ~sign_type:`Real
     ~keys:(Array.of_list keys) ~max_amount:10000 ~fee_range:1000 ()
 
-let _ =
-  let payment = Quickcheck.random_value gen_test in
-  let buf = Bin_prot.Common.create_buf 8192 in
-  let len = Stable.Latest.bin_write_t buf ~pos:0 payment in
-  Format.eprintf "BUF LEN: %d@." len ;
-  let s = String.init len ~f:(fun ndx -> buf.{ndx}) in
-  Format.eprintf "%s@." (Hex.Safe.to_hex s)
-
 let%test_unit "completeness" =
   Quickcheck.test ~trials:20 gen_test ~f:(fun t -> assert (check_signature t))
 

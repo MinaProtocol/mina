@@ -121,7 +121,7 @@ type t_ = Raw_versioned__.t =
   ; mutable validation_callback: Validate_content.t }
 *)
 
-let _ =
+(*let _ =
   let layout = Stable.Latest.bin_layout_t in
   let layout_compressed =
     { layout with
@@ -132,6 +132,7 @@ let _ =
   Format.eprintf "LAYOUT: %s@."
     ( Ppx_version_runtime.Bin_prot_layout.to_yojson layout_compressed
     |> Yojson.Safe.pretty_to_string )
+*)
 
 module Precomputed_block = struct
   module Proof = struct
