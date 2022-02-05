@@ -1,113 +1,109 @@
 open Core
 module Digest = Kimchi_backend.Pasta.Basic.Fp
 
-module Party_or_stack = struct
+module Call_forest = struct
+  let empty = Outside_hash_image.t
+
+  module Tree = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('party, 'digest) t =
+          { party : 'party
+          ; party_digest : 'digest
+          ; calls :
+              (('party, 'digest) t, 'digest) With_stack_hash.Stable.V1.t list
+          }
+        [@@deriving sexp, compare, equal, hash, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let rec map (t : _ t) ~f =
+      { calls = List.map t.calls ~f:(With_stack_hash.map ~f:(map ~f))
+      ; party = f t.party
+      ; party_digest = t.party_digest
+      }
+
+    let hash { party = _; calls; party_digest } =
+      Random_oracle.hash ~init:Hash_prefix_states.party_node
+        [| party_digest
+         ; (match calls with [] -> empty | e :: _ -> e.stack_hash)
+        |]
+  end
+
   [%%versioned
   module Stable = struct
     module V1 = struct
       type ('party, 'digest) t =
-        | Party of 'party * 'digest
-        | Stack of (('party, 'digest) t list * 'digest)
+        ( ('party, 'digest) Tree.Stable.V1.t
+        , 'digest )
+        With_stack_hash.Stable.V1.t
+        list
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  let of_parties_list ~party_depth parties =
-    let _depth, stack =
-      List.fold ~init:(-1, []) parties ~f:(fun (depth, stack) party ->
-          let new_depth = party_depth party in
-          let depth, stack =
-            if depth = -1 then
-              (new_depth - 1, List.init new_depth ~f:(Fn.const []))
-            else (depth, stack)
-          in
-          if depth + 1 = new_depth then
-            (new_depth, [ Party (party, ()) ] :: stack)
-          else
-            let rec go depth stack =
-              match stack with
-              | xs :: stack when depth = new_depth ->
-                  (* We're at the correct depth, insert this party. *)
-                  (depth, (Party (party, ()) :: xs) :: stack)
-              | xs :: ys :: stack ->
-                  (* We're still too deep, finalize the current parties and
-                     push them inside the parent parties.
-                  *)
-                  go (depth - 1) ((Stack (List.rev xs, ()) :: ys) :: stack)
-              | _ ->
-                  (* An invariant is broken. The depth doesn't correspond
-                     with any of the depths remaining in the stack. In
-                     practise, this means that [0 <= new_depth <= depth]
-                     wasn't true.
-                  *)
-                  assert false
-            in
-            go depth stack)
-    in
-    let rec finalize stack =
-      match stack with
-      | [] ->
-          (* Empty stack *)
-          []
-      | [ xs ] ->
-          (* Final stack is promoted to be the actual stack. *)
-          List.rev xs
-      | xs :: ys :: stack ->
-          (* Finalize the current parties and push them inside the parent
-             parties.
-          *)
-          finalize ((Stack (List.rev xs, ()) :: ys) :: stack)
-    in
-    finalize stack
+  let rec of_parties_list ~(party_depth : 'p -> int) (parties : 'p list) :
+      ('p, unit) t =
+    match parties with
+    | [] ->
+        []
+    | p :: ps ->
+        let depth = party_depth p in
+        let children, post =
+          List.split_while ps ~f:(fun p' -> party_depth p' > depth)
+        in
+        { With_stack_hash.elt =
+            { Tree.party = p
+            ; party_digest = ()
+            ; calls = of_parties_list ~party_depth children
+            }
+        ; stack_hash = ()
+        }
+        :: of_parties_list ~party_depth post
 
-  let to_parties_list (xs : _ t list) =
-    let rec collect acc (xs : _ t list) =
+  let to_parties_list (xs : _ t) =
+    let rec collect acc (xs : _ t) =
       match xs with
       | [] ->
           acc
-      | Party (party, _) :: xs ->
-          collect (party :: acc) xs
-      | Stack (xs, _) :: xss ->
-          let acc = collect acc xs in
-          collect acc xss
+      | { elt = { party; calls; party_digest = _ }; stack_hash = _ } :: xs ->
+          collect (collect (party :: acc) calls) xs
     in
     List.rev (collect [] xs)
 
   let%test_unit "Party_or_stack.of_parties_list" =
     let parties_list_1 = [ 0; 0; 0; 0 ] in
-    let parties_list_1_res =
-      [ Party (0, ()); Party (0, ()); Party (0, ()); Party (0, ()) ]
+    let node i calls =
+      { With_stack_hash.elt = { Tree.calls; party = i; party_digest = () }
+      ; stack_hash = ()
+      }
     in
-    [%test_eq: (int, unit) t list]
+    let parties_list_1_res : (int, unit) t =
+      let n0 = node 0 [] in
+      [ n0; n0; n0; n0 ]
+    in
+    [%test_eq: (int, unit) t]
       (of_parties_list ~party_depth:Fn.id parties_list_1)
       parties_list_1_res ;
     [%test_eq: int list]
       (to_parties_list (of_parties_list ~party_depth:Fn.id parties_list_1))
       parties_list_1 ;
     let parties_list_2 = [ 0; 0; 1; 1 ] in
-    let parties_list_2_res =
-      [ Party (0, ())
-      ; Party (0, ())
-      ; Stack ([ Party (1, ()); Party (1, ()) ], ())
-      ]
-    in
-    [%test_eq: (int, unit) t list]
+    let parties_list_2_res = [ node 0 []; node 0 [ node 1 []; node 1 [] ] ] in
+    [%test_eq: (int, unit) t]
       (of_parties_list ~party_depth:Fn.id parties_list_2)
       parties_list_2_res ;
     [%test_eq: int list]
       (to_parties_list (of_parties_list ~party_depth:Fn.id parties_list_2))
       parties_list_2 ;
     let parties_list_3 = [ 0; 0; 1; 0 ] in
-    let parties_list_3_res =
-      [ Party (0, ())
-      ; Party (0, ())
-      ; Stack ([ Party (1, ()) ], ())
-      ; Party (0, ())
-      ]
-    in
-    [%test_eq: (int, unit) t list]
+    let parties_list_3_res = [ node 0 []; node 0 [ node 1 [] ]; node 0 [] ] in
+    [%test_eq: (int, unit) t]
       (of_parties_list ~party_depth:Fn.id parties_list_3)
       parties_list_3_res ;
     [%test_eq: int list]
@@ -115,76 +111,45 @@ module Party_or_stack = struct
       parties_list_3 ;
     let parties_list_4 = [ 0; 1; 2; 3; 2; 1; 0 ] in
     let parties_list_4_res =
-      [ Party (0, ())
-      ; Stack
-          ( [ Party (1, ())
-            ; Stack
-                ( [ Party (2, ()); Stack ([ Party (3, ()) ], ()); Party (2, ()) ]
-                , () )
-            ; Party (1, ())
-            ]
-          , () )
-      ; Party (0, ())
+      [ node 0 [ node 1 [ node 2 [ node 3 [] ]; node 2 [] ]; node 1 [] ]
+      ; node 0 []
       ]
     in
-    [%test_eq: (int, unit) t list]
+    [%test_eq: (int, unit) t]
       (of_parties_list ~party_depth:Fn.id parties_list_4)
       parties_list_4_res ;
     [%test_eq: int list]
       (to_parties_list (of_parties_list ~party_depth:Fn.id parties_list_4))
       parties_list_4
 
-  let to_parties_with_hashes_list (xs : _ t list) =
-    let rec collect acc (xs : _ t list) =
+  let to_parties_with_hashes_list (xs : _ t) =
+    let rec collect acc (xs : _ t) =
       match xs with
       | [] ->
           acc
-      | Party (party, hash) :: xs ->
-          collect ((party, hash) :: acc) xs
-      | Stack (xs, _) :: xss ->
-          let acc = collect acc xs in
-          collect acc xss
+      | { elt = { party; calls; party_digest = _ }; stack_hash } :: xs ->
+          collect (collect ((party, stack_hash) :: acc) calls) xs
     in
     List.rev (collect [] xs)
-
-  let empty = Outside_hash_image.t
 
   let hash_cons hash h_tl =
     Random_oracle.hash ~init:Hash_prefix_states.party_cons [| hash; h_tl |]
 
-  let hash ~hash_party = function
-    | Party (party, _) ->
-        hash_party party
-    | Stack (_, hash) ->
-        hash
+  let hash = function [] -> empty | x :: _ -> With_stack_hash.stack_hash x
 
-  let stack_hash = function
-    | [] ->
-        empty
-    | (Party (_, hash) | Stack (_, hash)) :: _ ->
-        hash
+  let map (x : _ t) ~f = List.map x ~f:(With_stack_hash.map ~f:(Tree.map ~f))
 
-  let rec map (x : _ t) ~f =
-    match x with
-    | Party (party, h) ->
-        Party (f party, h)
-    | Stack (stack, h) ->
-        Stack (map_stack ~f stack, h)
-
-  and map_stack (xs : _ t list) ~f = List.map ~f:(map ~f) xs
-
-  let rec accumulate_hashes ~hash_party (xs : _ t list) =
+  let rec accumulate_hashes ~hash_party (xs : _ t) =
     let go = accumulate_hashes ~hash_party in
     match xs with
     | [] ->
         []
-    | Party (party, _) :: xs ->
-        let tl = go xs in
-        Party (party, hash_cons (hash_party party) (stack_hash tl)) :: tl
-    | Stack (stack, _) :: xs ->
-        let tl = go xs in
-        let hd_stack = go stack in
-        Stack (hd_stack, hash_cons (stack_hash hd_stack) (stack_hash tl)) :: tl
+    | { elt = { party; calls; party_digest = _ }; stack_hash = _ } :: xs ->
+        let calls = go calls in
+        let xs = go xs in
+        let node = { Tree.party; calls; party_digest = hash_party party } in
+        let node_hash = Tree.hash node in
+        { elt = node; stack_hash = hash_cons node_hash (hash xs) } :: xs
 
   let accumulate_hashes' xs =
     let hash_party (p : Party.t) = Party.Predicated.digest p.data in
@@ -198,7 +163,7 @@ module Party_or_stack = struct
     module Stable = struct
       module V1 = struct
         type 'data t =
-          (Party.Stable.V1.t * 'data, Digest.Stable.V1.t) Stable.V1.t list
+          (Party.Stable.V1.t * 'data, Digest.Stable.V1.t) Stable.V1.t
         [@@deriving sexp, compare, equal, hash, yojson]
 
         let to_latest = Fn.id
@@ -221,11 +186,9 @@ module Party_or_stack = struct
 
     let to_parties_with_hashes_list (x : _ t) = to_parties_with_hashes_list x
 
-    let hash x = hash ~hash_party x
+    (*     let hash x = hash ~hash_party x *)
 
-    let stack_hash = stack_hash
-
-    let other_parties_hash' xs = of_parties_list xs |> stack_hash
+    let other_parties_hash' xs = of_parties_list xs |> hash
 
     let other_parties_hash xs =
       List.map ~f:(fun x -> (x, ())) xs |> other_parties_hash'
@@ -383,7 +346,7 @@ module Verifiable = struct
         { fee_payer : Party.Fee_payer.Stable.V1.t
         ; other_parties :
             Pickles.Side_loaded.Verification_key.Stable.V2.t option
-            Party_or_stack.With_hashes.Stable.V1.t
+            Call_forest.With_hashes.Stable.V1.t
         ; memo : Signed_command_memo.Stable.V1.t
         }
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -396,7 +359,7 @@ end
 let of_verifiable (t : Verifiable.t) : t =
   { fee_payer = t.fee_payer
   ; other_parties =
-      List.map ~f:fst (Party_or_stack.to_parties_list t.other_parties)
+      List.map ~f:fst (Call_forest.to_parties_list t.other_parties)
   ; memo = t.memo
   }
 
@@ -437,7 +400,7 @@ end
 let commitment (t : t) : Transaction_commitment.t =
   Transaction_commitment.create
     ~other_parties_hash:
-      (Party_or_stack.With_hashes.other_parties_hash t.other_parties)
+      (Call_forest.With_hashes.other_parties_hash t.other_parties)
     ~protocol_state_predicate_hash:
       (Snapp_predicate.Protocol_state.digest
          t.fee_payer.data.body.protocol_state)
