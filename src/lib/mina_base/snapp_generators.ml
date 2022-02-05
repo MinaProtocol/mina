@@ -890,7 +890,7 @@ let gen_parties_from ?(succeed = true)
     }
   in
   let other_parties_hash =
-    Parties.Party_or_stack.With_hashes.other_parties_hash
+    Parties.Call_forest.With_hashes.other_parties_hash
       parties_dummy_signatures.other_parties
   in
   let protocol_state_predicate_hash =
