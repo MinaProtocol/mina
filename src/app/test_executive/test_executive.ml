@@ -291,7 +291,7 @@ let main inputs =
              (sprintf
                 !"log engine fatal error: %s"
                 (Yojson.Safe.to_string (Logger.Message.to_yojson message)))
-           ~test_result:(Malleable_error.return ()))
+           ~test_result:(Malleable_error.hard_error_string "fatal error"))
     in
     Monitor.try_with ~here:[%here] ~extract_exn:false (fun () ->
         let init_result =
