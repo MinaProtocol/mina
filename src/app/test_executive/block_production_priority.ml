@@ -48,9 +48,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     [%log info] "done waiting for initializations" ;
     let bps = Network.block_producers network in
-    let receiver_bp = List.nth_exn bps 0 in
+    let receiver_bp = List.nth_exn bps 1 in
     let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
-    let sender_bp = List.nth_exn bps 1 in
+    let sender_bp = List.nth_exn bps 0 in
     let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
     let pk_to_string = Signature_lib.Public_key.Compressed.to_base58_check in
     [%log info] "receiver: %s" (pk_to_string receiver_pub_key) ;
