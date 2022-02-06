@@ -106,9 +106,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
             w: zk_w3(domain),
             endo: endo_q,
 
-            lookup_used: None,
-            lookup_tables: vec![],
-            lookup_selectors: vec![],
+            lookup_index: None,
             linearization: index.linearization.into(),
 
             fr_sponge_params: oracle::pasta::fp_3::params(),
@@ -153,7 +151,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_read(
     path: String,
 ) -> Result<CamlPastaFpPlonkVerifierIndex, ocaml::Error> {
     let mut vi = read_raw(offset, srs, path)?;
-    vi.linearization = expr_linearization(vi.domain, false, None);
+    vi.linearization = expr_linearization(vi.domain, false, &None);
     Ok(vi.into())
 }
 
