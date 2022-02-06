@@ -1,4 +1,4 @@
-use kimchi_circuits::expr::caml::{CamlLinearization, CamlPolishToken};
+use kimchi::circuits::expr::caml::{CamlLinearization, CamlPolishToken};
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlPlonkDomain<Fr> {

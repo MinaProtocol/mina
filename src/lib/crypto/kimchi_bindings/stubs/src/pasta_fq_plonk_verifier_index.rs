@@ -12,9 +12,9 @@ use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 
 use kimchi::index::{expr_linearization, VerifierIndex};
-use kimchi_circuits::expr::{Linearization, PolishToken};
-use kimchi_circuits::nolookup::constraints::{zk_polynomial, zk_w3, Shifts};
-use kimchi_circuits::wires::{COLUMNS, PERMUTS};
+use kimchi::circuits::expr::{Linearization, PolishToken};
+use kimchi::circuits::constraints::{zk_polynomial, zk_w3, Shifts};
+use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use std::convert::TryInto;
 use std::path::Path;
 

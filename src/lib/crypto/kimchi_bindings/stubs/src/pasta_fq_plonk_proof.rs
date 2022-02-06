@@ -19,8 +19,8 @@ use mina_curves::pasta::{
 use kimchi::index::Index;
 use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover::{ProverCommitments, ProverProof};
-use kimchi_circuits::nolookup::scalars::ProofEvaluations;
-use kimchi_circuits::polynomial::COLUMNS;
+use kimchi::circuits::scalars::ProofEvaluations;
+use kimchi::circuits::polynomial::COLUMNS;
 use oracle::{
     poseidon::PlonkSpongeConstants15W,
     sponge::{DefaultFqSponge, DefaultFrSponge},
