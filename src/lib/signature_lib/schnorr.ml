@@ -331,8 +331,6 @@ module Make
   end
 end
 
-open Snark_params
-
 [%%else]
 
 (* nonconsensus version of the functor; yes, there's some repeated code,
@@ -340,7 +338,7 @@ open Snark_params
  *)
 
 module type S = sig
-  open Snark_params_nonconsensus
+  open Snark_params.Tick
 
   type curve
 
@@ -379,7 +377,7 @@ module type S = sig
 end
 
 module Make
-    (Impl : module type of Snark_params_nonconsensus) (Curve : sig
+    (Impl : module type of Snark_params.Tick) (Curve : sig
       open Impl
 
       module Scalar : sig
@@ -487,11 +485,9 @@ module Make
         false
 end
 
-module Tick = Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-open Hash_prefix_states_nonconsensus
-
 [%%endif]
+
+open Snark_params
 
 module Message = struct
   open Tick

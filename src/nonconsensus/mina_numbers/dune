@@ -1,5 +1,5 @@
 (library
- (name mina_numbers_nonconsensus)
+ (name mina_numbers)
  (public_name mina_numbers_nonconsensus)
  (inline_tests)
  (library_flags -linkall)

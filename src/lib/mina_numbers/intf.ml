@@ -4,18 +4,7 @@ open Core_kernel
 open Fold_lib
 open Tuple_lib
 open Unsigned
-
-[%%ifdef consensus_mechanism]
-
 open Snark_bits
-
-[%%else]
-
-open Snark_bits_nonconsensus
-module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
 
 module type S_unchecked = sig
   type t [@@deriving sexp, compare, hash, yojson]
