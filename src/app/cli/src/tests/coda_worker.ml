@@ -456,8 +456,7 @@ module T = struct
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
-            Async.Scheduler.within' ~monitor ~priority:Priority.low (fun () ->
-                f input)
+            Async.Scheduler.within' ~monitor (fun () -> f input)
           in
           let start_time = Time.now () in
           let coda_deferred () =

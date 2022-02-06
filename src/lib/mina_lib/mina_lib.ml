@@ -1175,26 +1175,25 @@ let start t =
       (Keypair.And_compressed_pk.Set.is_empty
          t.config.block_production_keypairs)
   then
-    Scheduler.within ~priority:Priority.low (fun () ->
-        Block_producer.run ~logger:t.config.logger
-          ~vrf_evaluator:t.processes.vrf_evaluator
-          ~verifier:t.processes.verifier ~set_next_producer_timing
-          ~prover:t.processes.prover ~trust_system:t.config.trust_system
-          ~transaction_resource_pool:
-            (Network_pool.Transaction_pool.resource_pool
-               t.components.transaction_pool)
-          ~get_completed_work:
-            (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
-          ~time_controller:t.config.time_controller
-          ~coinbase_receiver:t.coinbase_receiver
-          ~consensus_local_state:t.config.consensus_local_state
-          ~frontier_reader:t.components.transition_frontier
-          ~transition_writer:t.pipes.producer_transition_writer
-          ~log_block_creation:t.config.log_block_creation
-          ~precomputed_values:t.config.precomputed_values
-          ~block_reward_threshold:t.config.block_reward_threshold
-          ~block_produced_bvar:t.components.block_produced_bvar ;
-        perform_compaction t) ;
+    Block_producer.run ~logger:t.config.logger
+      ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
+      ~set_next_producer_timing ~prover:t.processes.prover
+      ~trust_system:t.config.trust_system
+      ~transaction_resource_pool:
+        (Network_pool.Transaction_pool.resource_pool
+           t.components.transaction_pool)
+      ~get_completed_work:
+        (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
+      ~time_controller:t.config.time_controller
+      ~coinbase_receiver:t.coinbase_receiver
+      ~consensus_local_state:t.config.consensus_local_state
+      ~frontier_reader:t.components.transition_frontier
+      ~transition_writer:t.pipes.producer_transition_writer
+      ~log_block_creation:t.config.log_block_creation
+      ~precomputed_values:t.config.precomputed_values
+      ~block_reward_threshold:t.config.block_reward_threshold
+      ~block_produced_bvar:t.components.block_produced_bvar ;
+  perform_compaction t ;
   let () =
     match t.config.node_status_url with
     | Some node_status_url ->
@@ -1275,7 +1274,7 @@ let create ?wallets (config : Config.t) =
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
-  Async.(Scheduler.within' ~monitor ~priority:Priority.low) (fun () ->
+  Async.Scheduler.within' ~monitor (fun () ->
       trace "mina_lib" (fun () ->
           let%bind prover =
             Monitor.try_with ~here:[%here]
