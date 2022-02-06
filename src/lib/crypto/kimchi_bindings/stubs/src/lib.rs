@@ -57,7 +57,7 @@ pub mod linearization {
     ) -> (String, Vec<(String, String)>) {
         let d1 = ark_poly::EvaluationDomain::<F>::new(1).unwrap();
         let evaluated_cols = kimchi::index::linearization_columns::<F>();
-        let kimchi_circuits::expr::Linearization {
+        let kimchi::circuits::expr::Linearization {
             constant_term,
             mut index_terms,
         } = kimchi::index::constraints_expr(d1, false, None)
@@ -90,10 +90,10 @@ pub mod linearization {
 pub use {
     commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
     kimchi::prover::caml::{CamlProverCommitments, CamlProverProof},
-    kimchi_circuits::{
+    kimchi::circuits::{
         expr::caml::{CamlColumn, CamlLinearization, CamlPolishToken, CamlVariable},
         gate::{caml::CamlCircuitGate, CurrOrNext, GateType},
-        nolookup::scalars::caml::{CamlLookupEvaluations, CamlProofEvaluations, CamlRandomOracles},
+        scalars::caml::{CamlLookupEvaluations, CamlProofEvaluations, CamlRandomOracles},
         wires::caml::CamlWire,
     },
     oracle::sponge::caml::CamlScalarChallenge,
