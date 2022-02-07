@@ -1217,7 +1217,7 @@ module Base = struct
                  ; permissions
                  ; snapp_uri
                  ; token_symbol
-                 ; timing
+                 ; timing = _
                  }
              ; balance_change
              ; increment_nonce
@@ -1252,25 +1252,6 @@ module Base = struct
       let ( ! ) = run_checked in
       let is_receiver =
         Sgn.Checked.is_pos !(Currency.Amount.Signed.Checked.sgn balance_change)
-      in
-      let timing =
-        let open Snapp_basic in
-        let new_timing =
-          let timing_info = Set_or_keep.Checked.data timing in
-          ( { is_timed = Set_or_keep.Checked.is_set timing
-            ; initial_minimum_balance = timing_info.initial_minimum_balance
-            ; cliff_time = timing_info.cliff_time
-            ; cliff_amount = timing_info.cliff_amount
-            ; vesting_period = timing_info.vesting_period
-            ; vesting_increment = timing_info.vesting_increment
-            }
-            : Account_timing.var )
-        in
-        add_check ~label:__LOC__
-          Boolean.(is_new || Set_or_keep.Checked.is_keep timing) ;
-        !(Account.Timing.if_
-            (Set_or_keep.Checked.is_set timing)
-            ~then_:new_timing ~else_:a.timing)
       in
       (* Check send/receive permissions *)
       let balance =
@@ -1320,7 +1301,7 @@ module Base = struct
                balance, so using the result directly is equivalent.
             *)
             check_timing ~balance_check ~timed_balance_check
-              ~account:{ a with timing; balance }
+              ~account:{ a with balance }
               ~txn_amount:Amount.(var_of_t zero)
               ~txn_global_slot))
       in
@@ -1559,6 +1540,21 @@ module Base = struct
           let assert_ = Assert.is_true
         end
 
+        module Global_slot = struct
+          include Global_slot.Checked
+
+          let ( > ) x y = run_checked (x > y)
+        end
+
+        module Timing = struct
+          type t = Account_timing.var
+
+          let if_ b ~then_ ~else_ =
+            run_checked (Account_timing.if_ b ~then_ ~else_)
+
+          let vesting_period (t : t) = t.vesting_period
+        end
+
         module Account = struct
           type t = (Account.Checked.Unhashed.t, Field.t) With_hash.t
 
@@ -1572,6 +1568,13 @@ module Base = struct
                   }
                 in
                 run_checked (Account.Checked.digest a))
+
+          type timing = Account_timing.var
+
+          let timing (account : t) : timing = account.data.timing
+
+          let set_timing (timing : timing) (account : t) : t =
+            { account with data = { account.data with timing } }
         end
 
         module Ledger = struct
@@ -1882,18 +1885,21 @@ module Base = struct
 
           let check_authorization ~(account : Account.t) ~commitment
               ~at_party:(at_party, _) ({ party; control; _ } : t) =
-            ( match (auth_type, snapp_statement) with
-            | Proof, Some (i, s) ->
-                Pickles.Side_loaded.in_circuit (side_loaded i)
-                  (Lazy.force account.data.snapp.verification_key.data) ;
-                with_label __LOC__ (fun () ->
-                    Snapp_statement.Checked.Assert.equal
-                      { transaction = commitment; at_party }
-                      s)
-            | (Signature | None_given), None ->
-                ()
-            | Proof, None | (Signature | None_given), Some _ ->
-                assert false ) ;
+            let proof_verifies =
+              match (auth_type, snapp_statement) with
+              | Proof, Some (i, s) ->
+                  Pickles.Side_loaded.in_circuit (side_loaded i)
+                    (Lazy.force account.data.snapp.verification_key.data) ;
+                  with_label __LOC__ (fun () ->
+                      Snapp_statement.Checked.Assert.equal
+                        { transaction = commitment; at_party }
+                        s) ;
+                  Boolean.true_
+              | (Signature | None_given), None ->
+                  Boolean.false_
+              | Proof, None | (Signature | None_given), Some _ ->
+                  assert false
+            in
             let signature_verifies =
               match auth_type with
               | None_given | Proof ->
@@ -1919,7 +1925,23 @@ module Base = struct
                        ~payload_digest:commitment signature
                        party.data.body.public_key)
             in
-            `Signature_verifies signature_verifies
+            ( `Proof_verifies proof_verifies
+            , `Signature_verifies signature_verifies )
+
+          module Update = struct
+            open Snapp_basic
+
+            type 'a set_or_keep = 'a Set_or_keep.Checked.t
+
+            let timing ({ party; _ } : t) : Account.timing set_or_keep =
+              Set_or_keep.Checked.map
+                ~f:Party.Update.Timing_info.Checked.to_account_timing
+                party.data.body.update.timing
+          end
+        end
+
+        module Set_or_keep = struct
+          include Snapp_basic.Set_or_keep.Checked
         end
 
         module Amount = struct
