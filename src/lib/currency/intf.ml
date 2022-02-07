@@ -268,8 +268,6 @@ module type S = sig
   module Signed :
     Signed_intf with type magnitude := t and type magnitude_var := var
 
-  val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
-
   module Checked :
     Checked_arithmetic_intf
       with type var := var
@@ -281,4 +279,6 @@ module type S = sig
   module Signed : Signed_intf with type magnitude := t
 
   [%%endif]
+
+  val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
 end
