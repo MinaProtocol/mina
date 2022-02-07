@@ -1965,12 +1965,7 @@ module Base = struct
             { Snapp_basic.Flagged_option.is_some; data }
         end
 
-        module Call_stack
-            (*: Parties_logic.Call_stack_intf
-              with type parties := Parties.t
-               and type bool := Bool.t
-               and module Opt := Opt *) =
-        Stack (struct
+        module Call_stack = Stack (struct
           module Parties = Mina_base.Parties
 
           type t =
@@ -1985,85 +1980,6 @@ module Base = struct
               (t, _) With_stack_hash.t list =
             { stack_hash = consed_hash; elt = t } :: xs
         end)
-
-        (*
-
-          type elt = (Elt.t V.t, Field.t) With_hash.t
-
-          type t = ((Elt.t, Field.Constant.t) With_stack_hash.t list V.t, Field.t) With_hash.t
-
-          let if_ b ~then_:(t : t) ~else_:(e : t): t =
-            { hash= Field.if_ b ~then_:t.hash ~else_:e.hash
-            ; data= V.if_ b ~then_:t.data ~else_:e.data
-            }
-
-          let empty = Field.constant empty_constant
-
-          let is_empty ({ hash=x; _} : t) = Field.equal empty x
-
-          let empty : t = { hash=empty ; data= V.create (fun () -> []) }
-
-          let stack_hash (type a) (xs: (a, Field.Constant.t) With_stack_hash.t list) : Field.Constant.t =
-                   match xs with
-                  | [] -> empty_constant
-                  | e :: _ -> e.stack_hash
-
-          let pop ({ hash=h; data= r} as t : t) : (elt * t) Opt.t =
-            let input_is_empty = is_empty t in
-            let hd_r = V.create (fun () ->
-                V.get r
-                |> List.hd
-                |> Option.value_map
-                  ~default:Elt.default
-                  ~f:(fun x -> x.elt) )
-            in
-            let tl_r = V.create (fun () -> V.get r |> List.tl |> Option.value ~default:[]) in
-            let elt, stack =
-              exists
-                Typ.(Field.typ * Field.typ)
-                ~compute:(fun () ->
-                  ( V.get hd_r |> Elt.hash
-                  , stack_hash (V.get tl_r)
-                  ))
-            in
-            let h' = Elt.hash_cons elt stack in
-            with_label __LOC__ (fun () -> 
-                Boolean.Assert.any
-                  [ input_is_empty
-                  ; Field.equal h h'
-                  ]
-                ) ;
-            { is_some= Boolean.not input_is_empty
-            ; data= ({hash=elt;data= hd_r}, {hash=stack;data= tl_r})
-            }
-
-          let pop_exn ({hash=h;data= r} : t) : elt * t =
-            let hd_r = V.create (fun () -> (V.get r |> List.hd_exn).elt) in
-            let tl_r = V.create (fun () -> V.get r |> List.tl_exn) in
-            let elt, stack =
-              exists
-                Typ.(Field.typ * Field.typ)
-                ~compute:(fun () ->
-                  ( V.get hd_r |> Elt.hash
-                  , stack_hash (V.get tl_r)
-                  ))
-            in
-            let h' = Elt.hash_cons elt stack in
-            with_label __LOC__ (fun () -> Field.Assert.equal h h') ;
-            ({hash=elt;data= hd_r}, {hash=stack;data= tl_r})
-
-          let push ({hash=h_hd;data= r_hd} : elt) 
-              ~onto:({hash=h_tl;data= r_tl} : t) : t =
-            let h = Elt.hash_cons h_hd h_tl in
-            let r =
-              V.create (fun () ->
-                  let hd = V.get r_hd in
-                  let tl = V.get r_tl in
-                  Elt.push ~consed_hash:(As_prover.read Field.typ h)
-                    hd tl )
-            in
-            {hash=h;data= r}
-        end *)
 
         module Party = struct
           type t = party
