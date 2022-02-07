@@ -419,6 +419,18 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
   module Ps = Inputs.Parties
 
+  (* Pop from the call stack, returning dummy values if the stack is empty. *)
+  let pop_call_stack (s : Call_stack.t) : Ps.t * Call_stack.t =
+    let res = Call_stack.pop s in
+    (* Split out the option returned by Call_stack.pop into two options *)
+    let next_forest, next_call_stack =
+      (Opt.map ~f:fst res, Opt.map ~f:snd res)
+    in
+    (* Handle the None cases *)
+    ( Opt.or_default ~if_:Ps.if_ ~default:Ps.empty next_forest
+    , Opt.or_default ~if_:Call_stack.if_ ~default:Call_stack.empty
+        next_call_stack )
+
   let get_next_party
       (current_forest : Ps.t) (* The stack for the most recent snapp *)
       (call_stack : Call_stack.t) (* The partially-completed parent stacks *) =
@@ -428,15 +440,7 @@ module Make (Inputs : Inputs_intf) = struct
     let current_forest, call_stack =
       let next_forest, next_call_stack =
         (* Invariant: call_stack contains only non-empty forests. *)
-        let res = Call_stack.pop call_stack in
-        let next_forest =
-          Opt.or_default ~if_:Ps.if_ ~default:Ps.empty (Opt.map ~f:fst res)
-        in
-        let next_call_stack =
-          Opt.or_default ~if_:Call_stack.if_ ~default:Call_stack.empty
-            (Opt.map ~f:snd res)
-        in
-        (next_forest, next_call_stack)
+        pop_call_stack call_stack
       in
       (* TODO: I believe current should only be empty for the first party in
          a transaction. *)
@@ -463,16 +467,14 @@ module Make (Inputs : Inputs_intf) = struct
     let remainder_of_current_forest_empty =
       Ps.is_empty remainder_of_current_forest
     in
-    let popped_call_stack = Call_stack.pop call_stack in
+    let newly_popped_forest, popped_call_stack = pop_call_stack call_stack in
     let new_call_stack =
       Call_stack.if_ party_forest_empty
         ~then_:
           (Call_stack.if_ remainder_of_current_forest_empty
              ~then_:
-               ((* Don't actually need this or_default in this case. *)
-                Opt.or_default ~if_:Call_stack.if_ ~default:Call_stack.empty
-                  (Opt.map popped_call_stack ~f:snd))
-             ~else_:call_stack)
+               (* Don't actually need the or_default used in this case. *)
+               popped_call_stack ~else_:call_stack)
         ~else_:
           (Call_stack.if_ remainder_of_current_forest_empty ~then_:call_stack
              ~else_:
@@ -481,10 +483,7 @@ module Make (Inputs : Inputs_intf) = struct
     let new_current_forest =
       Ps.if_ party_forest_empty
         ~then_:
-          (Ps.if_ remainder_of_current_forest_empty
-             ~then_:
-               (Opt.or_default ~if_:Ps.if_ ~default:Ps.empty
-                  (Opt.map popped_call_stack ~f:fst))
+          (Ps.if_ remainder_of_current_forest_empty ~then_:newly_popped_forest
              ~else_:remainder_of_current_forest)
         ~else_:party_forest
     in

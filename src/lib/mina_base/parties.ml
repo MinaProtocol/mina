@@ -54,7 +54,7 @@ module Call_forest = struct
         []
     | p :: ps ->
         let depth = party_depth p in
-        let children, post =
+        let children, siblings =
           List.split_while ps ~f:(fun p' -> party_depth p' > depth)
         in
         { With_stack_hash.elt =
@@ -64,17 +64,17 @@ module Call_forest = struct
             }
         ; stack_hash = ()
         }
-        :: of_parties_list ~party_depth post
+        :: of_parties_list ~party_depth siblings
 
   let to_parties_list (xs : _ t) =
-    let rec collect acc (xs : _ t) =
+    let rec collect (xs : _ t) acc =
       match xs with
       | [] ->
           acc
       | { elt = { party; calls; party_digest = _ }; stack_hash = _ } :: xs ->
-          collect (collect (party :: acc) calls) xs
+          party :: acc |> collect calls |> collect xs
     in
-    List.rev (collect [] xs)
+    List.rev (collect xs [])
 
   let%test_unit "Party_or_stack.of_parties_list" =
     let parties_list_1 = [ 0; 0; 0; 0 ] in
@@ -123,14 +123,14 @@ module Call_forest = struct
       parties_list_4
 
   let to_parties_with_hashes_list (xs : _ t) =
-    let rec collect acc (xs : _ t) =
+    let rec collect (xs : _ t) acc =
       match xs with
       | [] ->
           acc
       | { elt = { party; calls; party_digest = _ }; stack_hash } :: xs ->
-          collect (collect ((party, stack_hash) :: acc) calls) xs
+          (party, stack_hash) :: acc |> collect calls |> collect xs
     in
-    List.rev (collect [] xs)
+    List.rev (collect xs [])
 
   let hash_cons hash h_tl =
     Random_oracle.hash ~init:Hash_prefix_states.party_cons [| hash; h_tl |]
@@ -185,8 +185,6 @@ module Call_forest = struct
     let to_parties_list (x : _ t) = to_parties_list x
 
     let to_parties_with_hashes_list (x : _ t) = to_parties_with_hashes_list x
-
-    (*     let hash x = hash ~hash_party x *)
 
     let other_parties_hash' xs = of_parties_list xs |> hash
 
