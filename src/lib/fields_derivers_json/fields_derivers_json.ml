@@ -195,7 +195,7 @@ let%test_module "Test" =
          let creator finished_obj =
            { foo_hello = creator_foo finished_obj ; bar = creator_bar finished_obj }
          in
-         (creator, acc_obj)
+         (creator, obj)
     *)
 
     let to_json obj =

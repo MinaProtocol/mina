@@ -73,9 +73,9 @@ module Derivers = struct
     obj#of_json := Fn.id ;
     obj
 
-  let iso_string obj ~(to_string : 'a -> string) ~(of_string : string -> 'a)
-      ~doc ~name =
-    yojson obj ~doc ~name
+  let iso_string ?doc obj ~(to_string : 'a -> string)
+      ~(of_string : string -> 'a) ~name =
+    yojson obj ?doc ~name
       ~map:(function `String x -> of_string x | _ -> failwith "unsupported")
       ~contramap:(fun uint64 -> `String (to_string uint64))
 
@@ -117,16 +117,16 @@ module Derivers = struct
     let _b = Fields_derivers_json.To_yojson.bool obj in
     Fields_derivers_json.Of_yojson.bool obj
 
-  let global_slot =
-    iso_string ~name:"GlobalSlot" ~doc:"TODO"
-      ~to_string:Unsigned.UInt32.to_string ~of_string:Unsigned.UInt32.of_string
+  let global_slot obj =
+    iso_string obj ~name:"GlobalSlot" ~to_string:Unsigned.UInt32.to_string
+      ~of_string:Unsigned.UInt32.of_string
 
-  let amount =
-    iso_string ~name:"Amount" ~doc:"TODO" ~to_string:Currency.Amount.to_string
+  let amount obj =
+    iso_string obj ~name:"CurrencyAmount" ~to_string:Currency.Amount.to_string
       ~of_string:Currency.Amount.of_string
 
-  let balance =
-    iso_string ~name:"Balance" ~doc:"TODO" ~to_string:Currency.Balance.to_string
+  let balance obj =
+    iso_string obj ~name:"Balance" ~to_string:Currency.Balance.to_string
       ~of_string:Currency.Balance.of_string
 
   let option (x : _ Unified_input.t) obj : _ Unified_input.t =

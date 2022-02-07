@@ -2334,7 +2334,7 @@ module Types = struct
                 ~typ:(non_null string)
             ; arg "cliffTime" ~doc:"Cliff time, a global slot, as a string"
                 ~typ:(non_null string)
-            ; arg "cliffAmount" ~doc:"Cliff amoount, as a string"
+            ; arg "cliffAmount" ~doc:"Cliff amount, as a string"
                 ~typ:(non_null string)
             ; arg "vestingPeriod"
                 ~doc:"Vesting period, a number of slots, as a string"
