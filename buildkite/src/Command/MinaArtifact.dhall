@@ -20,7 +20,7 @@ let dirtyWhen = [
   S.strictlyStart (S.contains "buildkite/src/Command/MinaArtifact"),
   S.exactly "buildkite/scripts/build-artifact" "sh",
   S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh",
-  S.strictlyStart (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest"),
+  S.strictlyStart (S.contains "buildkite/src/Jobs"),
   S.strictlyStart (S.contains "dockerfiles"),
   S.strictlyStart (S.contains "scripts")
 ]
