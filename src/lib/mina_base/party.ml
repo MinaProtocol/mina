@@ -49,7 +49,7 @@ module Update = struct
           ; token_symbol : 'token_symbol
           ; timing : 'timing
           }
-        [@@deriving compare, equal, sexp, hash, yojson, hlist]
+        [@@deriving compare, equal, sexp, hash, yojson, hlist, fields]
       end
     end]
   end
@@ -65,7 +65,7 @@ module Update = struct
           ; vesting_period : Global_slot.Stable.V1.t
           ; vesting_increment : Amount.Stable.V1.t
           }
-        [@@deriving compare, equal, sexp, hash, yojson, hlist]
+        [@@deriving compare, equal, sexp, hash, yojson, hlist, fields]
 
         let to_latest = Fn.id
       end
@@ -158,6 +158,13 @@ module Update = struct
         ]
         ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+    let deriver obj =
+      let open Fields_derivers_snapps.Derivers in
+      Fields.make_creator obj ~initial_minimum_balance:!.balance
+        ~cliff_time:!.global_slot ~cliff_amount:!.amount
+        ~vesting_period:!.global_slot ~vesting_increment:!.amount
+      |> finish ~name:"Timing"
   end
 
   open Snapp_basic
@@ -236,15 +243,14 @@ module Update = struct
     *)
     let timing = Set_or_keep.Keep in
     return
-      Poly.
-        { app_state
-        ; delegate
-        ; verification_key
-        ; permissions
-        ; snapp_uri
-        ; token_symbol
-        ; timing
-        }
+      { Poly.app_state
+      ; delegate
+      ; verification_key
+      ; permissions
+      ; snapp_uri
+      ; token_symbol
+      ; timing
+      }
 
   module Checked = struct
     open Pickles.Impls.Step
@@ -356,6 +362,48 @@ module Update = struct
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
+
+  let deriver obj =
+    let open Fields_derivers_snapps in
+    finish ~name:"PartyUpdate"
+    @@ Poly.Fields.make_creator
+         ~app_state:!.(Snapp_state.deriver @@ Set_or_keep.deriver field)
+         ~delegate:!.(Set_or_keep.deriver public_key)
+         ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
+         ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
+         ~snapp_uri:!.(Set_or_keep.deriver string)
+         ~token_symbol:!.(Set_or_keep.deriver string)
+         ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
+         obj
+
+  let%test_unit "json roundtrip" =
+    let app_state =
+      Snapp_state.V.of_list_exn
+        Set_or_keep.
+          [ Set (F.negate F.one); Keep; Keep; Keep; Keep; Keep; Keep; Keep ]
+    in
+    let verification_key =
+      Set_or_keep.Set
+        (let data =
+           Pickles.Side_loaded.Verification_key.(
+             dummy |> to_base58_check |> of_base58_check_exn)
+         in
+         let hash = Snapp_account.digest_vk data in
+         { With_hash.data; hash })
+    in
+    let update =
+      { Poly.app_state
+      ; delegate = Set_or_keep.Set Public_key.Compressed.empty
+      ; verification_key
+      ; permissions = Set_or_keep.Set Permissions.user_default
+      ; snapp_uri = Set_or_keep.Set "https://www.example.com"
+      ; token_symbol = Set_or_keep.Set "TOKEN"
+      ; timing = Set_or_keep.Set Timing_info.dummy
+      }
+    in
+    let module Fd = Fields_derivers_snapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    [%test_eq: t] update (update |> Fd.to_json full |> Fd.of_json full)
 end
 
 module Events = Snapp_account.Events

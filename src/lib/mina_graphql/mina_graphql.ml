@@ -2334,7 +2334,7 @@ module Types = struct
                 ~typ:(non_null string)
             ; arg "cliffTime" ~doc:"Cliff time, a global slot, as a string"
                 ~typ:(non_null string)
-            ; arg "cliffAmount" ~doc:"Cliff amoount, as a string"
+            ; arg "cliffAmount" ~doc:"Cliff amount, as a string"
                 ~typ:(non_null string)
             ; arg "vestingPeriod"
                 ~doc:"Vesting period, a number of slots, as a string"
@@ -2365,15 +2365,14 @@ module Types = struct
             let%bind vk' = s vk in
             let%bind perms' = s perms in
             let%map timing' = s timing in
-            Party.Update.Poly.
-              { app_state
-              ; delegate = v delegate
-              ; verification_key = v vk'
-              ; permissions = v perms'
-              ; snapp_uri = v snapp_uri
-              ; token_symbol = v tok_sym
-              ; timing = v timing'
-              })
+            { Party.Update.Poly.app_state
+            ; delegate = v delegate
+            ; verification_key = v vk'
+            ; permissions = v perms'
+            ; snapp_uri = v snapp_uri
+            ; token_symbol = v tok_sym
+            ; timing = v timing'
+            })
           ~fields:
             [ arg "appState"
                 ~doc:"List of _exactly_ 8 field elements (null if keep)"
@@ -2412,7 +2411,7 @@ module Types = struct
         let i name typ =
           obj (name ^ "Interval")
             ~coerce:(fun lower upper ->
-              Snapp_predicate.Closed_interval.{ lower; upper })
+              { Snapp_predicate.Closed_interval.lower; upper })
             ~fields:
               [ arg "lower" ~typ:(non_null typ)
               ; arg "upper" ~typ:(non_null typ)
@@ -4832,12 +4831,10 @@ module Queries = struct
           (Mina_lib.config coda).precomputed_values.constraint_constants
         transition
     in
-    With_hash.Stable.Latest.
-      { data =
-          Filtered_external_transition.of_transition transition `All
-            transactions
-      ; hash
-      }
+    { With_hash.Stable.Latest.data =
+        Filtered_external_transition.of_transition transition `All transactions
+    ; hash
+    }
 
   let best_chain =
     io_field "bestChain"

@@ -221,7 +221,6 @@ module Stable = struct
                     ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
                     ; max_quot_size
                     ; srs = Backend.Tock.Keypair.load_urs ()
-                    ; linearization = failwith "TODO"
                     ; evals =
                         (let g (x, y) =
                            { Kimchi.Protocol.unshifted =

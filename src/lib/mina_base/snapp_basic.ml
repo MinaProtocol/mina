@@ -107,6 +107,12 @@ module Set_or_keep = struct
 
   let is_keep = function Keep -> true | _ -> false
 
+  let deriver inner obj =
+    let open Fields_derivers_snapps.Derivers in
+    iso ~map:of_option ~contramap:to_option
+      ((option @@ inner @@ o ()) (o ()))
+      obj
+
   let gen gen_a =
     let open Quickcheck.Let_syntax in
     (* with equal probability, return a Set or a Keep *)
