@@ -1230,27 +1230,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     apply_user_command_unchecked ~constraint_constants ~txn_global_slot ledger
       (Signed_command.forget_check user_command)
 
-  let opt_fail e = function Some x -> Ok x | None -> Error (failure e)
-
-  let add_signed_amount b (a : Amount.Signed.t) =
-    ( match a.sgn with
-    | Pos ->
-        Balance.add_amount b a.magnitude
-    | Neg ->
-        Balance.sub_amount b a.magnitude )
-    |> opt_fail Overflow
-
   let check e b = if b then Ok () else Error (failure e)
 
   open Pickles_types
 
-  let apply_body
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~(state_view : Snapp_predicate.Protocol_state.View.t) ~check_auth
-      ~has_proof ~is_new ~global_slot_since_genesis ~is_start
+  let apply_body ~(state_view : Snapp_predicate.Protocol_state.View.t)
+      ~check_auth ~has_proof ~is_new ~global_slot_since_genesis ~is_start
       ({ body =
            { public_key = _
-           ; token_id
+           ; token_id = _
            ; update =
                { app_state
                ; delegate
@@ -1274,32 +1262,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Party.Predicated.t) (a : Account.t) : (Account.t, _) Result.t =
     let open Snapp_basic in
     let open Result.Let_syntax in
-    let%bind balance =
-      let%bind b = add_signed_amount a.balance balance_change in
-      let fee = constraint_constants.account_creation_fee in
-      let%bind () =
-        (* TODO: Fix when we want to enable tokens. The trickiness here is we need to subtract
-           the account creation fee from somewhere (like the fee excess in the local state) *)
-        if Token_id.(equal default) token_id then Ok ()
-        else Error Transaction_status.Failure.Cannot_pay_creation_fee_in_token
-      in
-      if is_new then
-        Balance.sub_amount b (Amount.of_fee fee)
-        |> opt_fail Amount_insufficient_to_create_account
-      else Ok b
-    in
-    (* Check send/receive permissions *)
-    let%bind () =
-      if Amount.(equal zero) balance_change.magnitude then Ok ()
-      else
-        check Update_not_permitted_balance
-          (check_auth
-             ( match balance_change.sgn with
-             | Pos ->
-                 a.permissions.receive
-             | Neg ->
-                 a.permissions.send ))
-    in
     (* Check timing. *)
     let%bind timing =
       match balance_change.sgn with
@@ -1441,8 +1403,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            ~error:Transaction_status.Failure.Parties_replay_check_failed
     in
     { a with
-      balance
-    ; snapp
+      snapp
     ; delegate
     ; permissions
     ; timing
@@ -1541,6 +1502,22 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       type t = Public_key.Compressed.t
     end
 
+    module Controller = struct
+      type t = Permissions.Auth_required.t
+
+      let if_ = Parties.value_if
+
+      let check ~proof_verifies ~signature_verifies perm =
+        (* Invariant: We either have a proof, a signature, or neither. *)
+        assert (not (proof_verifies && signature_verifies)) ;
+        let tag =
+          if proof_verifies then Control.Tag.Proof
+          else if signature_verifies then Control.Tag.Signature
+          else Control.Tag.None_given
+        in
+        Permissions.Auth_required.check perm tag
+    end
+
     module Global_slot = struct
       include Mina_numbers.Global_slot
     end
@@ -1558,8 +1535,43 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             (Account_timing.to_record Untimed).vesting_period
     end
 
+    module Balance = struct
+      include Balance
+
+      let if_ = Parties.value_if
+    end
+
     module Account = struct
       include Account
+
+      module Permissions = struct
+        let edit_state : t -> Controller.t = fun a -> a.permissions.edit_state
+
+        let send : t -> Controller.t = fun a -> a.permissions.send
+
+        let receive : t -> Controller.t = fun a -> a.permissions.receive
+
+        let set_delegate : t -> Controller.t =
+         fun a -> a.permissions.set_delegate
+
+        let set_permissions : t -> Controller.t =
+         fun a -> a.permissions.set_permissions
+
+        let set_verification_key : t -> Controller.t =
+         fun a -> a.permissions.set_verification_key
+
+        let set_snapp_uri : t -> Controller.t =
+         fun a -> a.permissions.set_snapp_uri
+
+        let edit_sequence_state : t -> Controller.t =
+         fun a -> a.permissions.edit_sequence_state
+
+        let set_token_symbol : t -> Controller.t =
+         fun a -> a.permissions.set_token_symbol
+
+        let increment_nonce : t -> Controller.t =
+         fun a -> a.permissions.increment_nonce
+      end
 
       type timing = Party.Update.Timing_info.t option
 
@@ -1572,6 +1584,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             Option.value_map ~default:Account_timing.Untimed
               ~f:Party.Update.Timing_info.to_account_timing timing
         }
+
+      let balance (a : t) : Balance.t = a.balance
+
+      let set_balance (balance : Balance.t) (a : t) : t = { a with balance }
     end
 
     module Amount = struct
@@ -1613,6 +1629,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               |> Amount.of_uint64
             in
             (magnitude, `Overflow true)
+
+      let of_constant_fee = of_fee
     end
 
     module Token_id = struct
@@ -1769,7 +1787,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; field : Snark_params.Tick.Field.t
       ; failure : Transaction_status.Failure.t option >
 
-    let perform ~constraint_constants ~state_view (type r)
+    let perform ~constraint_constants:_ ~state_view (type r)
         (eff : (r, t) Parties_logic.Eff.t) : r =
       match eff with
       | Check_protocol_state_predicate (pred, global_state) -> (
@@ -1794,7 +1812,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           if (is_start : bool) then
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
           match
-            apply_body ~constraint_constants ~state_view
+            apply_body ~state_view
               ~check_auth:
                 (Fn.flip Permissions.Auth_required.check
                    (Control.tag p.authorization))
