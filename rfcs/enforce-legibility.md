@@ -43,9 +43,8 @@ The rules are up to change, but we propose the following set as a first step. Th
 
   ; - left untouched if...
   (keep
-    ; ...either it is allow-listed, ...
-    (or (in-list ("Base" "Core" "Core_kernel" "Async" "Async_kernel" "Mina_base"
-                  "Import" "Currency" "Signature_lib" "Unsigned"))
+    ; ...either it is whitelisted, ...
+    (or (in-list ("Base" "Core" "Core_kernel"))
         ; ...it is used for infix operators, ...
         exports-syntax
         ; ...it is only for its exposed submodules, ...
@@ -72,9 +71,10 @@ The rules are up to change, but we propose the following set as a first step. Th
   ;   ... it is used only by only a few functions.
   (local (<= functions 4))
 
-  ; - moved closer to its first actual use if...
-  ;   ... it is too far from that optimal placement.
-  (move (>= dist-to-optimal 40)))
+  ; - moved closer to its optimal position (see 'placement' parameter), if...
+  ;   ... it is too far from that optimal placement, or after it.
+  (move (and (>= dist-to-optimal 40) (not optimal-is-before))))
+
 ```
 
 This makes the rules easily modifiable in the future, along with the evolution of the tool and the consensus of the team, and we propose that future changes of rules can be made with simple pull requests rather than new RFCs. The current rules can always be gathered by consulting the `.ocamlclose` file.
