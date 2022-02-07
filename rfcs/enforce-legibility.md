@@ -27,6 +27,13 @@ The rules are up to change, but we propose the following set as a first step. Th
 ```scheme
 (root) ; ocaml-close will not look for .ocamlclose files in parent directories
 
+; Determines what is the considered the optimal placement of a global open.
+; Either:
+;   - 'pos':   the position before the first actual use of the open is optimal
+;   - 'scope': the beginning of the smallest enclosing module of all the uses is
+;              optimal
+(placement scope)
+
 ; The order in which rules are matched
 ; (e.g., we keep opens matched by the 'keep' rule no matter the other rules)
 (precedence (keep remove local structure move))
