@@ -7,16 +7,12 @@
  *)
 
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
 open Mina_base
-open Mina_state
 open Cache_lib
-open O1trace
 open Mina_transition
-open Network_peer
 module Transition_frontier_validation =
   External_transition.Transition_frontier_validation (Transition_frontier)
 
@@ -80,6 +76,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
   Catchup_scheduler.notify catchup_scheduler
     ~hash:(External_transition.Validated.state_hash transition)
 
+open Network_peer
 let process_transition ~logger ~trust_system ~verifier ~frontier
     ~catchup_scheduler ~processed_transition_writer ~time_controller
     ~transition:cached_initially_validated_transition ~precomputed_values =
@@ -166,7 +163,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     in
     (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
     let parent_hash =
-      Protocol_state.previous_state_hash
+      Mina_state.Protocol_state.previous_state_hash
         (External_transition.protocol_state transition)
     in
     let parent_breadcrumb = Transition_frontier.find_exn frontier parent_hash in
@@ -266,7 +263,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
         ]
         ~f:(fun msg ->
           let open Deferred.Let_syntax in
-          trace_recurring "transition_handler_processor" (fun () ->
+          O1trace.trace_recurring "transition_handler_processor" (fun () ->
               match msg with
               | `Catchup_breadcrumbs
                   (breadcrumb_subtrees, subsequent_callback_action) -> (
@@ -309,8 +306,8 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                     Transition_frontier.Breadcrumb.validated_transition
                       (Cached.peek breadcrumb)
                     |> External_transition.Validated.protocol_state
-                    |> Protocol_state.blockchain_state
-                    |> Blockchain_state.timestamp |> Block_time.to_time
+                    |> Mina_state.Protocol_state.blockchain_state
+                    |> Mina_state.Blockchain_state.timestamp |> Block_time.to_time
                   in
                   Perf_histograms.add_span
                     ~name:"accepted_transition_local_latency"
@@ -342,10 +339,10 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                   process_transition ~transition))
       : unit Deferred.t )
 
+open Inline_test_quiet_logs
 let%test_module "Transition_handler.Processor tests" =
   ( module struct
     open Async
-    open Pipe_lib
 
     let () =
       Backtrace.elide := false ;
@@ -379,6 +376,7 @@ let%test_module "Transition_handler.Processor tests" =
       Envelope.Incoming.wrap ~data:transition ~sender:Envelope.Sender.Local
 
     let%test_unit "adding transitions whose parents are in the frontier" =
+      let open Pipe_lib in
       let frontier_size = 1 in
       let branch_size = 10 in
       let max_length = frontier_size + branch_size in

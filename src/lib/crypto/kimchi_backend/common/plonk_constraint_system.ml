@@ -1,5 +1,4 @@
 (* TODO: remove these openings *)
-open Sponge
 open Unsigned.Size_t
 
 (* TODO: open Core here instead of opening it multiple times below *)
@@ -305,7 +304,7 @@ module Make
     (* We create a type for gate vector, instead of using `Gate.t list`. If we did, we would have to convert it to a `Gate.t array` to pass it across the FFI boundary, where then it gets converted to a `Vec<Gate>`; it's more efficient to just create the `Vec<Gate>` directly. *)
     (Gates : Gate_vector_intf with type field := Fp.t)
     (Params : sig
-      val params : Fp.t Params.t
+      val params : Fp.t Sponge.Params.t
     end) =
 struct
   open Core

@@ -1,5 +1,4 @@
 open Core
-open Sodium
 
 module BytesWr = struct
   include Bytes
@@ -80,6 +79,7 @@ let of_yojson (t : Yojson.Safe.t) =
 
 (** warning: this will zero [password] *)
 let encrypt ~(password : Bytes.t) ~(plaintext : Bytes.t) =
+  let open Sodium in
   let nonce = Secret_box.random_nonce () in
   let salt = Password_hash.random_salt () in
   let ({ Password_hash.mem_limit; ops_limit } as diff) =
@@ -105,6 +105,7 @@ let decrypt ~(password : Bytes.t)
     ; pwdiff = mem_limit, ops_limit
     ; ciphertext
     } =
+  let open Sodium in
   if not (String.equal box_primitive Secret_box.primitive) then
     Error
       (`Corrupted_privkey

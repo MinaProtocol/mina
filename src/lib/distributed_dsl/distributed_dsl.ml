@@ -1,6 +1,5 @@
 open Core_kernel
 open Async_kernel
-open Pipe_lib
 
 module Ident = struct
   let state = ref 0
@@ -161,7 +160,7 @@ struct
 
   type t =
     { network :
-        (message Linear_pipe.Reader.t * message Linear_pipe.Writer.t)
+        (message Pipe_lib.Linear_pipe.Reader.t * message Pipe_lib.Linear_pipe.Writer.t)
         Peer.Table.t
     ; q : action Time_queue.t
     ; timer_stoppers : [ `Cancelled | `Finished ] Ivar.t Token.Table.t
@@ -187,8 +186,8 @@ struct
                 (Peer.sexp_of_t p |> Sexp.to_string_hum)
                 ()
           | Some (r, w) ->
-              Linear_pipe.write_or_exn ~capacity:1024 w r m ;
-              Linear_pipe.values_available r >>| Fn.const () ))
+              Pipe_lib.Linear_pipe.write_or_exn ~capacity:1024 w r m ;
+              Pipe_lib.Linear_pipe.values_available r >>| Fn.const () ))
 
   let wait t ts =
     let tok = Ident.next () in
@@ -220,7 +219,7 @@ struct
         Deferred.Or_error.return ()
 
   let listen t ~me =
-    let r, w = Linear_pipe.create () in
+    let r, w = Pipe_lib.Linear_pipe.create () in
     Peer.Table.add_exn t.network ~key:me ~data:(r, w) ;
     r
 

@@ -14,7 +14,6 @@ module Make
                        with module Engine := Engine
                         and module Event_router := Event_router) =
 struct
-  open Network_state
   module Node = Engine.Network.Node
 
   type 'a predicate_result =
@@ -56,7 +55,7 @@ struct
     let check () (state : Network_state.t) =
       if
         List.for_all nodes ~f:(fun node ->
-            String.Map.find state.node_initialization (Node.id node)
+            String.Map.find Network_state.state.node_initialization (Node.id node)
             |> Option.value ~default:false)
       then Predicate_passed
       else Predicate_continuation ()
@@ -75,9 +74,9 @@ struct
 
   (* let blocks_produced ?(active_stake_percentage = 1.0) n = *)
   let blocks_to_be_produced n =
-    let init state = Predicate_continuation state.blocks_generated in
+    let init state = Predicate_continuation Network_state.state.blocks_generated in
     let check init_blocks_generated state =
-      if state.blocks_generated - init_blocks_generated >= n then
+      if Network_state.state.blocks_generated - init_blocks_generated >= n then
         Predicate_passed
       else Predicate_continuation init_blocks_generated
     in
@@ -96,7 +95,7 @@ struct
       in
       let best_tips =
         List.map nodes ~f:(fun node ->
-            String.Map.find state.best_tips_by_node (Node.id node))
+            String.Map.find Network_state.state.best_tips_by_node (Node.id node))
       in
       if
         List.for_all best_tips ~f:Option.is_some

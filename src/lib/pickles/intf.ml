@@ -1,5 +1,4 @@
 open Core_kernel
-open Pickles_types
 module Sponge_lib = Sponge
 
 module Snarkable = struct
@@ -126,9 +125,9 @@ module Evals = struct
   module type S = sig
     type n
 
-    val n : n Vector.nat
+    val n : n Pickles_types.Vector.nat
 
-    include Binable.S1 with type 'a t = ('a, n) Vector.t
+    include Binable.S1 with type 'a t = ('a, n) Pickles_types.Vector.t
 
     include Snarkable.S1 with type 'a t := 'a t
   end
@@ -227,7 +226,7 @@ module type Inputs_base = sig
   module Other_field : sig
     type t = Inner_curve.Constant.Scalar.t [@@deriving sexp]
 
-    include Shifted_value.Field_intf with type t := t
+    include Pickles_types.Shifted_value.Field_intf with type t := t
 
     val to_bigint : t -> Impl.Bigint.t
 

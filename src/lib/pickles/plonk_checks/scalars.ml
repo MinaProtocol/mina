@@ -24,8 +24,6 @@ module Column = struct
   include T
 end
 
-open Gate_type
-open Column
 
 module Env = struct
   type 'a t =
@@ -75,6 +73,8 @@ module Tick : S = struct
        ; srs_length_log2 = _
        } :
         a Env.t) =
+    let open Column in
+    let open Gate_type in
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
     let x_1 = pow (cell (var (Witness 1, Curr)), 7) in
     let x_2 = pow (cell (var (Witness 2, Curr)), 7) in
@@ -156,6 +156,8 @@ module Tick : S = struct
        ; srs_length_log2 = _
        } :
         a Env.t) =
+    let open Column in
+    let open Gate_type in
     Column.Table.of_alist_exn
       [ ( Index CompleteAdd
         , lazy
@@ -1066,6 +1068,8 @@ module Tock : S = struct
        ; srs_length_log2 = _
        } :
         a Env.t) =
+    let open Column in
+    let open Gate_type in
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
     let x_1 = pow (cell (var (Witness 1, Curr)), 7) in
     let x_2 = pow (cell (var (Witness 2, Curr)), 7) in
@@ -1147,6 +1151,8 @@ module Tock : S = struct
        ; srs_length_log2 = _
        } :
         a Env.t) =
+    let open Column in
+    let open Gate_type in
     Column.Table.of_alist_exn
       [ ( Index CompleteAdd
         , lazy

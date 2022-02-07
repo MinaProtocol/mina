@@ -1,6 +1,5 @@
 open Core_kernel
 open Snarky_backendless
-open Snark_params.Tick
 open Unsigned
 module Length = Mina_numbers.Length
 
@@ -132,6 +131,7 @@ module N =
     (Unsigned_extended.UInt64)
     (Snark_bits.Bits.UInt64)
 
+open Snark_params.Tick
 module Constants_checked :
   M_intf
     with type length = Length.Checked.t

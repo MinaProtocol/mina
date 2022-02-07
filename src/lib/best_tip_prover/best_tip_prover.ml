@@ -1,6 +1,5 @@
 open Core_kernel
 open Mina_base
-open Mina_state
 open Async_kernel
 open Mina_transition
 
@@ -22,12 +21,12 @@ module Make (Inputs : Inputs_intf) :
 
     let to_proof_elem external_transition =
       external_transition |> External_transition.Validated.protocol_state
-      |> Protocol_state.body |> Protocol_state.Body.hash
+      |> Mina_state.Protocol_state.body |> Mina_state.Protocol_state.Body.hash
 
     let get_previous ~context transition =
       let parent_hash =
         transition |> External_transition.Validated.protocol_state
-        |> Protocol_state.previous_state_hash
+        |> Mina_state.Protocol_state.previous_state_hash
       in
       let open Option.Let_syntax in
       let%map breadcrumb = Transition_frontier.find context parent_hash in
@@ -40,7 +39,7 @@ module Make (Inputs : Inputs_intf) :
     type proof_elem = State_body_hash.t
 
     let hash acc body_hash =
-      Protocol_state.hash_abstract ~hash_body:Fn.id
+      Mina_state.Protocol_state.hash_abstract ~hash_body:Fn.id
         { previous_state_hash = acc; body = body_hash }
   end)
 

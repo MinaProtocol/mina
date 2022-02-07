@@ -4,7 +4,6 @@ open Core_kernel
 
 [%%ifdef consensus_mechanism]
 
-open Snark_params.Tick
 
 [%%else]
 
@@ -91,6 +90,7 @@ let to_input (t : value) =
 type var = (T.Checked.t, T.Checked.t, Block_time.Checked.t) Poly.t
 
 let data_spec =
+  let open Snark_params.Tick in
   Data_spec.
     [ T.Checked.typ
     ; T.Checked.typ
@@ -100,6 +100,7 @@ let data_spec =
     ]
 
 let typ =
+  let open Snark_params.Tick in
   Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
     ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
     ~value_of_hlist:Poly.of_hlist
@@ -121,6 +122,7 @@ let var_to_input (var : var) =
     |]
 
 let%test_unit "value = var" =
+  let open Snark_params.Tick in
   let compiled = Genesis_constants.for_unit_tests.protocol in
   let test protocol_constants =
     let open Snarky_backendless in

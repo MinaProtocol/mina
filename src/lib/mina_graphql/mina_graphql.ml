@@ -1,6 +1,5 @@
 open Core
 open Async
-open Graphql_async
 open Mina_base
 open Signature_lib
 open Currency
@@ -40,6 +39,7 @@ let result_of_or_error ?error v =
       | Some error ->
           sprintf "%s (%s)" error str_error)
 
+open Graphql_async
 let result_field_no_inputs ~resolve =
   Schema.io_field ~resolve:(fun resolve_info src ->
       Deferred.return @@ resolve resolve_info src)
@@ -81,7 +81,15 @@ module Reflection = struct
       :: acc)
 
   module Shorthand = struct
-    open Schema
+    open struct
+  open Schema
+  let list = list
+  let int = int
+  let non_null = non_null
+  let string = string
+  let bool = bool
+end
+    
 
     (* Note: Eta expansion is needed here to combat OCaml's weak polymorphism nonsense *)
 
@@ -2550,9 +2558,9 @@ module Types = struct
 end
 
 module Subscriptions = struct
-  open Schema
 
   let new_sync_update =
+    let open Schema in
     subscription_field "newSyncUpdate"
       ~doc:"Event that triggers when the network sync status changes"
       ~deprecated:NotDeprecated
@@ -2563,6 +2571,7 @@ module Subscriptions = struct
         |> Deferred.Result.return)
 
   let new_block =
+    let open Schema in
     subscription_field "newBlock"
       ~doc:
         "Event that triggers when a new block is created that either contains \
@@ -2580,6 +2589,7 @@ module Subscriptions = struct
         @@ Mina_commands.Subscriptions.new_block coda public_key)
 
   let chain_reorganization =
+    let open Schema in
     subscription_field "chainReorganization"
       ~doc:
         "Event that triggers when the best tip changes in a way that is not a \

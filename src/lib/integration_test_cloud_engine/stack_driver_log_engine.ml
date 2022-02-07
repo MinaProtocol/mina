@@ -1,6 +1,5 @@
 open Async
 open Core
-open Integration_test_lib.Util
 open Integration_test_lib
 module Timeout = Timeout_lib.Core_time
 module Node = Kubernetes_network.Node
@@ -78,6 +77,7 @@ module Subscription = struct
        from the sink on your project's Activity page; you can ignore them.
   *)
   let create_sink ~topic ~filter ~key ~logger name =
+    let open Integration_test_lib.Util in
     let open Deferred.Or_error.Let_syntax in
     let url =
       "https://logging.googleapis.com/v2/projects/o1labs-192920/sinks?key="
@@ -139,6 +139,7 @@ module Subscription = struct
     { name; topic; sink }
 
   let create ~name ~filter ~logger =
+    let open Integration_test_lib.Util in
     let open Deferred.Or_error.Let_syntax in
     let gcloud_key_file_env = "GCLOUD_API_KEY" in
     let%bind key =
@@ -176,6 +177,7 @@ module Subscription = struct
     t
 
   let delete t =
+    let open Integration_test_lib.Util in
     let open Deferred.Let_syntax in
     let%bind delete_subscription_res =
       run_cmd_or_error "." prog
@@ -213,6 +215,7 @@ module Subscription = struct
         Deferred.Or_error.return res
 
   let pull ~logger t =
+    let open Integration_test_lib.Util in
     let open Deferred.Or_error.Let_syntax in
     let subscription_id =
       String.concat ~sep:"/" [ "projects"; project_id; "subscriptions"; t.name ]

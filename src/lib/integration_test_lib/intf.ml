@@ -2,7 +2,6 @@ open Async_kernel
 open Core_kernel
 open Currency
 open Mina_base
-open Pipe_lib
 open Signature_lib
 
 (* TODO: malleable error -> or error *)
@@ -215,7 +214,7 @@ module Dsl = struct
     val listen :
          logger:Logger.t
       -> Event_router.t
-      -> t Broadcast_pipe.Reader.t * t Broadcast_pipe.Writer.t
+      -> t Pipe_lib.Broadcast_pipe.Reader.t * t Pipe_lib.Broadcast_pipe.Writer.t
   end
 
   module type Wait_condition_intf = sig
@@ -323,7 +322,7 @@ module Dsl = struct
          logger:Logger.t
       -> network:Engine.Network.t
       -> event_router:Event_router.t
-      -> network_state_reader:Network_state.t Broadcast_pipe.Reader.t
+      -> network_state_reader:Network_state.t Pipe_lib.Broadcast_pipe.Reader.t
       -> [ `Don't_call_in_tests of t ]
 
     type log_error_accumulator

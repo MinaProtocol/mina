@@ -1,12 +1,7 @@
 open Core
 open Async
-open Pipe_lib
 open Mina_base
-open Mina_state
-open Mina_transition
 open Signature_lib
-open O1trace
-open Otp_lib
 module Time = Block_time
 
 type Structured_log_events.t += Block_produced
@@ -53,6 +48,7 @@ end = struct
     interruptible
 end
 
+open Mina_transition
 module Transition_frontier_validation =
   External_transition.Transition_frontier_validation (Transition_frontier)
 
@@ -111,10 +107,12 @@ end = struct
     t.timeout <- Some timeout
 end
 
+open Mina_state
 let generate_next_state ~constraint_constants ~previous_protocol_state
     ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
     ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
     ~log_block_creation ~block_reward_threshold =
+  let open O1trace in
   let open Interruptible.Let_syntax in
   let previous_protocol_state_body_hash =
     Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
@@ -470,6 +468,7 @@ module Vrf_evaluation_state = struct
     }
 
   let poll_vrf_evaluator ~logger vrf_evaluator =
+    let open O1trace in
     let f () =
       measure "asking vrf evaluator for any slots won" (fun () ->
           Vrf_evaluator.slots_won_so_far vrf_evaluator)
@@ -518,6 +517,7 @@ module Vrf_evaluation_state = struct
         ]
 
   let update_epoch_data ~vrf_evaluator ~logger ~epoch_data_for_vrf t =
+    let open O1trace in
     let set_epoch_data () =
       let f () =
         measure "Setting epoch data of the VRF evaluator" (fun () ->
@@ -540,6 +540,8 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
     ~transition_writer ~set_next_producer_timing ~log_block_creation
     ~(precomputed_values : Precomputed_values.t) ~block_reward_threshold
     ~block_produced_bvar =
+  let open O1trace in
+  let open Pipe_lib in
   trace "block_producer" (fun () ->
       let constraint_constants = precomputed_values.constraint_constants in
       let consensus_constants = precomputed_values.consensus_constants in
@@ -877,7 +879,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
         trace_recurring "check next block timing" (fun () ->
             (* See if we want to change keypairs *)
             let _keypairs =
-              match Agent.get keypairs with
+              match Otp_lib.Agent.get keypairs with
               | keypairs, `Different ->
                   (* Perform block production key swap since we have new
                      keypairs *)
@@ -1130,7 +1132,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
          * erase this timeout even if the last run of the producer wants to wait
          * for a long while.
          * *)
-        Agent.on_update keypairs ~f:(fun _new_keypairs ->
+        Otp_lib.Agent.on_update keypairs ~f:(fun _new_keypairs ->
             Singleton_scheduler.schedule scheduler (Time.now time_controller)
               ~f:
                 (check_next_block_timing Mina_numbers.Global_slot.zero
@@ -1161,6 +1163,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
 let run_precomputed ~logger ~verifier ~trust_system ~time_controller
     ~frontier_reader ~transition_writer ~precomputed_blocks
     ~(precomputed_values : Precomputed_values.t) =
+  let open Pipe_lib in
   let consensus_constants = precomputed_values.consensus_constants in
   let log_bootstrap_mode () =
     [%log info] "Pausing block production while bootstrapping"

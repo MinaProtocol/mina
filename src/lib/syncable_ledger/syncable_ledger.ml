@@ -1,7 +1,5 @@
 open Core_kernel
 open Async_kernel
-open Pipe_lib
-open Network_peer
 
 type Structured_log_events.t += Snarked_ledger_synced
   [@@deriving register_event { msg = "Snarked database sync'd. All done" }]
@@ -70,6 +68,8 @@ module type Inputs_intf = sig
   val account_subtree_height : int
 end
 
+open Network_peer
+open Pipe_lib
 module type S = sig
   type 'a t [@@deriving sexp]
 

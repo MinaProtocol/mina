@@ -1,6 +1,5 @@
 open Async
 open Core
-open Pipe_lib
 
 type catchup_job_states =
   { finished : int
@@ -159,7 +158,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
   @@ fun () ->
   don't_wait_for
   @@
-  match Broadcast_pipe.Reader.peek transition_frontier with
+  match Pipe_lib.Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       [%log info] "Transition frontier not available for node status service" ;
       Deferred.unit

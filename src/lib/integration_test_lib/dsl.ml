@@ -1,6 +1,5 @@
 open Async_kernel
 open Core_kernel
-open Pipe_lib
 module Timeout = Timeout_lib.Core_time
 
 let broadcast_pipe_fold_until_with_timeout reader ~timeout_duration
@@ -9,7 +8,7 @@ let broadcast_pipe_fold_until_with_timeout reader ~timeout_duration
   let result = ref None in
   let acc = ref init in
   let read_deferred =
-    Broadcast_pipe.Reader.iter_until reader ~f:(fun msg ->
+    Pipe_lib.Broadcast_pipe.Reader.iter_until reader ~f:(fun msg ->
         Deferred.return
           ( if !timed_out then true
           else
@@ -43,10 +42,10 @@ module Make (Engine : Intf.Engine.S) () :
     { logger : Logger.t
     ; network : Engine.Network.t
     ; event_router : Event_router.t
-    ; network_state_reader : Network_state.t Broadcast_pipe.Reader.t
+    ; network_state_reader : Network_state.t Pipe_lib.Broadcast_pipe.Reader.t
     }
 
-  let network_state t = Broadcast_pipe.Reader.peek t.network_state_reader
+  let network_state t = Pipe_lib.Broadcast_pipe.Reader.peek t.network_state_reader
 
   let create ~logger ~network ~event_router ~network_state_reader =
     let t = { logger; network; event_router; network_state_reader } in
@@ -74,7 +73,7 @@ module Make (Engine : Intf.Engine.S) () :
     in
     [%log debug] "Initializing network state predicate" ;
     match
-      Broadcast_pipe.Reader.peek network_state_reader
+      Pipe_lib.Broadcast_pipe.Reader.peek network_state_reader
       |> init |> handle_predicate_result
     with
     | `Stop result ->

@@ -1,9 +1,8 @@
 open Pickles_types
-open Import
 open Backend
 
 type dlog_opening =
-  (Tock.Curve.Affine.t, Tock.Field.t) Types.Pairing_based.Openings.Bulletproof.t
+  (Tock.Curve.Affine.t, Tock.Field.t) Import.Types.Pairing_based.Openings.Bulletproof.t
 
 type t = dlog_opening * Tock.Curve.Affine.t Dlog_plonk_types.Messages.t
 
@@ -12,7 +11,7 @@ open Step_main_inputs
 type var =
   ( Inner_curve.t
   , Impls.Step.Other_field.t Shifted_value.Type2.t )
-  Types.Pairing_based.Openings.Bulletproof.t
+  Import.Types.Pairing_based.Openings.Bulletproof.t
   * Inner_curve.t Dlog_plonk_types.Messages.t
 
 open Impls.Step
@@ -20,7 +19,7 @@ open Impls.Step
 let typ : (var, t) Typ.t =
   let shift = Shifted_value.Type2.Shift.create (module Tock.Field) in
   Typ.tuple2
-    (Types.Pairing_based.Openings.Bulletproof.typ
+    (Import.Types.Pairing_based.Openings.Bulletproof.typ
        ~length:(Nat.to_int Tock.Rounds.n)
        ( Typ.transport Other_field.typ
            ~there:(fun x ->

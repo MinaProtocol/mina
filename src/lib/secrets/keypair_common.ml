@@ -1,6 +1,5 @@
 open Core
 open Async
-open Async.Deferred.Let_syntax
 
 let error_raise e ~error_ctx = Error.tag ~tag:error_ctx e |> Error.raise
 
@@ -18,9 +17,10 @@ module Make_terminal_stdin (KP : sig
     t -> privkey_path:string -> password:Secret_file.password -> unit Deferred.t
 end) =
 struct
-  open KP
 
   let rec prompt_password prompt =
+    let open KP in
+    let open Async.Deferred.Let_syntax in
     let open Deferred.Let_syntax in
     let%bind pw1 = Password.hidden_line_or_env prompt ~env in
     let%bind pw2 = Password.hidden_line_or_env "Again to confirm: " ~env in
@@ -30,6 +30,8 @@ struct
     else return pw2
 
   let read_exn ?(should_prompt_user = true) ?(should_reask = true) ~which path =
+    let open KP in
+    let open Async.Deferred.Let_syntax in
     let read_privkey password = read ~privkey_path:path ~password in
     let%bind result =
       match Sys.getenv env with
@@ -68,6 +70,7 @@ struct
         Privkey_error.raise ~which e
 
   let write_exn kp ~privkey_path =
+    let open KP in
     write_exn kp ~privkey_path
       ~password:(lazy (prompt_password "Password for new private key file: "))
 end

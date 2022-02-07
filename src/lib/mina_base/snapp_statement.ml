@@ -117,14 +117,13 @@ module Complement = struct
       [@@deriving hlist, sexp, equal, yojson, hash, compare]
     end
 
-    open Mina_numbers
 
     module Checked = struct
       type t =
         ( Boolean.var
         , Token_id.Checked.t
         , (Boolean.var, Other_fee_payer.Payload.Checked.t) Flagged_option.t
-        , Account_nonce.Checked.t )
+        , Mina_numbers.Account_nonce.Checked.t )
         Poly.t
 
       let complete
@@ -153,7 +152,7 @@ module Complement = struct
       ( bool
       , Token_id.t
       , Other_fee_payer.Payload.t option
-      , Account_nonce.t )
+      , Mina_numbers.Account_nonce.t )
       Poly.t
 
     let typ : (Checked.t, t) Typ.t =
@@ -162,7 +161,7 @@ module Complement = struct
         [ Boolean.typ
         ; Boolean.typ
         ; Token_id.typ
-        ; Account_nonce.typ
+        ; Mina_numbers.Account_nonce.typ
         ; Flagged_option.typ Other_fee_payer.Payload.typ
           |> Typ.transport
                ~there:

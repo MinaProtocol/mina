@@ -1,5 +1,4 @@
 open Ppxlib
-open Asttypes
 
 (* `log` reduces the boilerplate needed to call the logger
 
@@ -32,6 +31,7 @@ module Make (Info : Ppxinfo) = struct
   let prime s = s ^ "'"
 
   let expand ~loc (log_level : longident) (logger : expression) =
+    let open Asttypes in
     let module E = Ppxlib.Ast_builder.Make (struct
       let loc = loc
     end) in
@@ -49,6 +49,7 @@ module Make (Info : Ppxinfo) = struct
         [%e log_level_expr] [%e logger] ~module_:__MODULE__ ~location:__LOC__]
 
   let expand_capture_logger ~loc ~path:_ log_level =
+    let open Asttypes in
     expand ~loc log_level [%expr logger]
 
   let expand_explicit_logger ~loc ~path:_ (log_level : longident)

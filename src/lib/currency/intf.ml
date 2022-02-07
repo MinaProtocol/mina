@@ -4,7 +4,6 @@ open Core_kernel
 
 [%%ifdef consensus_mechanism]
 
-open Snark_bits
 open Snark_params.Tick
 
 [%%else]
@@ -36,7 +35,7 @@ module type Basic = sig
 
   val gen : t Quickcheck.Generator.t
 
-  include Bits_intf.Convertible_bits with type t := t
+  include Snark_bits.Bits_intf.Convertible_bits with type t := t
 
   val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 

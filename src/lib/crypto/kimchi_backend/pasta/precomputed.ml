@@ -26,10 +26,9 @@ module Lagrange_precomputations = struct
 
   let max_public_input_size = 150
 
-  open Basic
 
   let vesta =
-    let f s = Fq.of_bigint (Bigint256.of_hex_string ~reverse:true (g s)) in
+    let f s = Basic.Fq.of_bigint (Basic.Bigint256.of_hex_string ~reverse:true (g s)) in
     [| [| [| ( f
                  "0x68fe06f08453cb5167c77c7420a9c361707aa89b4606f3ad395f757f2d55c33f"
              , f
@@ -10023,7 +10022,7 @@ module Lagrange_precomputations = struct
     |]
 
   let pallas =
-    let f s = Fp.of_bigint (Bigint256.of_hex_string ~reverse:true (g s)) in
+    let f s = Basic.Fp.of_bigint (Basic.Bigint256.of_hex_string ~reverse:true (g s)) in
     [| [| [| ( f
                  "0xf3ea7359f0d7b7ebc106234ed8dd59d753a344fe432d455c00bf9792c2fe1834"
              , f

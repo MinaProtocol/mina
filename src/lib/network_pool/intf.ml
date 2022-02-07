@@ -2,7 +2,6 @@ open Async_kernel
 open Core_kernel
 open Mina_base
 open Pipe_lib
-open Network_peer
 
 (** A [Resource_pool_base_intf] is a mutable pool of resources that supports
  *  mutation via some [Resource_pool_diff_intf]. A [Resource_pool_base_intf]
@@ -45,6 +44,7 @@ end
  *  perform on a [Resource_pool_base_intf]. It includes the logic for
  *  processing this mutation and applying it to an underlying
  *  [Resource_pool_base_intf]. *)
+open Network_peer
 module type Resource_pool_diff_intf = sig
   type pool
 

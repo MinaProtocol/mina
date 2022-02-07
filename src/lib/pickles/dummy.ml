@@ -1,8 +1,5 @@
 open Core_kernel
 open Pickles_types
-open Backend
-open Composition_types
-open Common
 
 let wrap_domains = Common.wrap_domains
 
@@ -24,31 +21,33 @@ let evals_combined =
 module Ipa = struct
   module Wrap = struct
     let challenges =
-      Vector.init Tock.Rounds.n ~f:(fun _ ->
+      let open Composition_types in
+      Vector.init Backend.Tock.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
           { Bulletproof_challenge.prechallenge })
 
     let challenges_computed =
-      Vector.map challenges ~f:(fun { prechallenge } : Tock.Field.t ->
-          Ipa.Wrap.compute_challenge prechallenge)
+      Vector.map challenges ~f:(fun { prechallenge } : Backend.Tock.Field.t ->
+          Common.Ipa.Wrap.compute_challenge prechallenge)
 
     let sg =
       lazy
-        (Common.time "dummy wrap sg" (fun () -> Ipa.Wrap.compute_sg challenges))
+        (Common.time "dummy wrap sg" (fun () -> Common.Ipa.Wrap.compute_sg challenges))
   end
 
   module Step = struct
     let challenges =
-      Vector.init Tick.Rounds.n ~f:(fun _ ->
+      let open Composition_types in
+      Vector.init Backend.Tick.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
           { Bulletproof_challenge.prechallenge })
 
     let challenges_computed =
-      Vector.map challenges ~f:(fun { prechallenge } : Tick.Field.t ->
-          Ipa.Step.compute_challenge prechallenge)
+      Vector.map challenges ~f:(fun { prechallenge } : Backend.Tick.Field.t ->
+          Common.Ipa.Step.compute_challenge prechallenge)
 
     let sg =
       lazy
-        (Common.time "dummy wrap sg" (fun () -> Ipa.Step.compute_sg challenges))
+        (Common.time "dummy wrap sg" (fun () -> Common.Ipa.Step.compute_sg challenges))
   end
 end

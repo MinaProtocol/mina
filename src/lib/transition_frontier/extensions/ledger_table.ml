@@ -1,6 +1,5 @@
 open Core_kernel
 open Mina_base
-open Frontier_base
 
 (* WARNING: don't use this code until @nholland has landed a PR that
    synchronize the read/write of transition frontier
@@ -36,7 +35,7 @@ module T = struct
     in
     let breadcrumbs = Full_frontier.all_breadcrumbs frontier in
     List.iter breadcrumbs ~f:(fun bc ->
-        let ledger = Staged_ledger.ledger @@ Breadcrumb.staged_ledger bc in
+        let ledger = Staged_ledger.ledger @@ Frontier_base.Breadcrumb.staged_ledger bc in
         let ledger_hash = Ledger.merkle_root ledger in
         add_entry t ~ledger_hash ~ledger ) ;
     (t, ())
@@ -44,11 +43,11 @@ module T = struct
   let lookup t ledger_hash = Ledger_hash.Table.find t.ledgers ledger_hash
 
   let handle_diffs t _frontier diffs_with_mutants =
-    let open Diff.Full.With_mutant in
+    let open Frontier_base.Diff.Full.With_mutant in
     List.iter diffs_with_mutants ~f:(function
       | E (New_node (Full breadcrumb), _) ->
           let ledger =
-            Staged_ledger.ledger @@ Breadcrumb.staged_ledger breadcrumb
+            Staged_ledger.ledger @@ Frontier_base.Breadcrumb.staged_ledger breadcrumb
           in
           let ledger_hash = Ledger.merkle_root ledger in
           add_entry t ~ledger_hash ~ledger

@@ -2,9 +2,8 @@ open Async
 open Core
 open Otp_lib
 open Mina_base
-open Frontier_base
 
-type input = Diff.Lite.E.t list
+type input = Frontier_base.Diff.Lite.E.t list
 
 type create_args =
   { db: Database.t
@@ -58,7 +57,7 @@ module Worker = struct
     | `Not_found (`Arcs hash) ->
         Printf.sprintf "arcs not found for %s" (State_hash.to_base58_check hash)
 
-  let apply_diff (type mutant) (t : t) (diff : mutant Diff.Lite.t) :
+  let apply_diff (type mutant) (t : t) (diff : mutant Frontier_base.Diff.Lite.t) :
       (mutant, apply_diff_error) Result.t =
     let map_error result ~diff_type ~diff_type_name =
       Result.map_error result ~f:(fun err ->
@@ -105,7 +104,7 @@ module Worker = struct
           ( Database.set_best_tip t.db best_tip_hash
             :> (mutant, apply_diff_error_internal) Result.t )
 
-  let handle_diff t (Diff.Lite.E.E diff) =
+  let handle_diff t Frontier_base.(Diff.Lite.E.E diff) =
     let open Result.Let_syntax in
     let%map _mutant = apply_diff t diff in
     ()

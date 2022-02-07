@@ -11,7 +11,6 @@ module Quickcheck_lib = Quickcheck_lib_nonconsensus.Quickcheck_lib
 
 [%%endif]
 
-open Mina_numbers
 module Fee = Currency.Fee
 module Payload = Signed_command_payload
 
@@ -158,7 +157,7 @@ end
 
 module Gen = struct
   let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
-      ?(nonce = Account_nonce.zero) ?(fee_token = Token_id.default) ~fee_range
+      ?(nonce = Mina_numbers.Account_nonce.zero) ?(fee_token = Token_id.default) ~fee_range
       create_body =
     let open Quickcheck.Generator.Let_syntax in
     let min_fee = Fee.to_int Mina_compile_config.minimum_user_command_fee in
@@ -305,7 +304,7 @@ module Gen = struct
           let sender_pk, _, _, _ = account_info.(sender) in
           currency_splits.(sender) <- rest_splits ;
           let nonce = account_nonces.(sender) in
-          account_nonces.(sender) <- Account_nonce.succ nonce ;
+          account_nonces.(sender) <- Mina_numbers.Account_nonce.succ nonce ;
           let%bind fee =
             (* use of_string here because json_of_ocaml won't handle
                equivalent integer constants

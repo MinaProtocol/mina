@@ -10,14 +10,13 @@ module Make (Env : sig
   val which : string
 end) =
 struct
-  open Env
 
   (* avoid spurious cyclic dependency *)
   module Keypair = Signature_lib.Keypair
 
   type t = Keypair.t
 
-  let env = env
+  let env = Env.env
 
   (** Writes a keypair to [privkey_path] and [privkey_path ^ ".pub"] using [Secret_file] *)
   let write_exn { Keypair.private_key; public_key } ~(privkey_path : string)
@@ -41,7 +40,7 @@ struct
         Writer.write_line pubkey_f pubkey_string ;
         Writer.close pubkey_f
     | Error e ->
-        Privkey_error.raise ~which e
+        Privkey_error.raise ~Env.which e
 
   (** Reads a private key from [privkey_path] using [Secret_file] *)
   let read ~(privkey_path : string) ~(password : Secret_file.password) :
@@ -74,7 +73,7 @@ struct
     | Ok keypair ->
         keypair
     | Error priv_key_error ->
-        Privkey_error.raise ~which priv_key_error
+        Privkey_error.raise ~Env.which priv_key_error
 
   let read_exn' path =
     let password =

@@ -10,12 +10,10 @@
     into the processor as if catchup had successfully completed. *)
 
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
 open Cache_lib
-open Otp_lib
 open Mina_base
 open Mina_transition
 open Network_peer
@@ -56,7 +54,7 @@ type t =
         Cached.t
         Rose_tree.t
         list )
-      Capped_supervisor.t
+      Otp_lib.Capped_supervisor.t
   }
 
 let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
@@ -88,7 +86,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
           Block_time.Timeout.cancel time_controller timeout ())) ;
   let breadcrumb_builder_supervisor =
     O1trace.trace_recurring "breadcrumb builder" (fun () ->
-        Capped_supervisor.create ~job_capacity:30
+        Otp_lib.Capped_supervisor.create ~job_capacity:30
           (fun (initial_hash, transition_branches) ->
             match%map
               Breadcrumb_builder.build_subtrees_of_breadcrumbs
@@ -270,14 +268,14 @@ let notify t ~hash =
         let transition_subtrees =
           List.map collected_transitions ~f:(extract_subtree t)
         in
-        Capped_supervisor.dispatch t.breadcrumb_builder_supervisor
+        Otp_lib.Capped_supervisor.dispatch t.breadcrumb_builder_supervisor
           (hash, transition_subtrees)) ;
     remove_tree t hash ;
     Or_error.return ()
 
+open Inline_test_quiet_logs
 let%test_module "Transition_handler.Catchup_scheduler tests" =
   ( module struct
-    open Pipe_lib
 
     let () =
       Core.Backtrace.elide := false ;
@@ -316,6 +314,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       Envelope.Incoming.wrap ~data:transition ~sender:Envelope.Sender.Local
 
     let%test_unit "catchup jobs fire after the timeout" =
+      let open Pipe_lib in
       let timeout_duration = Block_time.Span.of_ms 200L in
       let test_delta = Block_time.Span.of_ms 100L in
       Quickcheck.test ~trials:3
@@ -366,6 +365,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let%test_unit "catchup jobs do not fire after timeout if they are \
                    invalidated" =
+      let open Pipe_lib in
       let timeout_duration = Block_time.Span.of_ms 200L in
       let test_delta = Block_time.Span.of_ms 400L in
       Quickcheck.test ~trials:3
@@ -452,6 +452,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let%test_unit "catchup scheduler should not create duplicate jobs when a \
                    sequence of transitions is added in reverse order" =
+      let open Pipe_lib in
       let timeout_duration = Block_time.Span.of_ms 400L in
       Quickcheck.test ~trials:3
         (Transition_frontier.For_tests.gen_with_branch ~precomputed_values

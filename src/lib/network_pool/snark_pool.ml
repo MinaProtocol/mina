@@ -1,8 +1,5 @@
 open Core_kernel
 open Async
-open Pipe_lib
-open Network_peer
-open O1trace
 module Statement_table = Transaction_snark_work.Statement.Table
 
 module Snark_tables = struct
@@ -62,6 +59,8 @@ module Snark_tables = struct
     res
 end
 
+open Network_peer
+open Pipe_lib
 module type S = sig
   type transition_frontier
 
@@ -273,7 +272,7 @@ struct
       let handle_new_best_tip_ledger t ledger =
         let open Mina_base in
         let open Signature_lib in
-        trace_recurring "handle_new_best_tip_ledger" (fun () ->
+        O1trace.trace_recurring "handle_new_best_tip_ledger" (fun () ->
             Throttle.enqueue t.snark_table_lock (fun () ->
                 let%map _ =
                   let open Interruptible.Deferred_let_syntax in
@@ -283,7 +282,7 @@ struct
                          (Base_ledger.detached_signal ledger)
                      in
                      let%bind prover_account_ids =
-                       trace_recurring
+                       O1trace.trace_recurring
                          "generate account ids of provers in snark table"
                          (fun () ->
                            let account_ids =
@@ -305,7 +304,7 @@ struct
                      in
                      (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
                      let%bind prover_account_locations =
-                       trace_recurring
+                       O1trace.trace_recurring
                          "lookup prover account locations in best tip ledger"
                          (fun () ->
                            let account_locations =
@@ -318,7 +317,7 @@ struct
                      in
                      let yield = Staged.unstage (Scheduler.yield_every ~n:50) in
                      let%map () =
-                       trace_recurring
+                       O1trace.trace_recurring
                          "filter snark table based on best tip ledger"
                          (fun () ->
                            let open Deferred.Let_syntax in
@@ -350,7 +349,7 @@ struct
       let handle_new_refcount_table t
           ({ removed; refcount_table; best_tip_table } :
             Extensions.Snark_pool_refcount.view) =
-        trace_recurring "handle_new_refcount_table" (fun () ->
+        O1trace.trace_recurring "handle_new_refcount_table" (fun () ->
             t.ref_table <- Some refcount_table ;
             t.best_tip_table <- Some best_tip_table ;
             t.removed_counter <- t.removed_counter + removed ;

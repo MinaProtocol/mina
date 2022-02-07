@@ -4,9 +4,7 @@ open Async_kernel
 open Core_kernel
 open Signature_lib
 open Mina_base
-open Mina_transition
 open Frontier_base
-open Deferred.Let_syntax
 
 let%test_module "Full_frontier tests" =
   ( module struct
@@ -79,7 +77,7 @@ let%test_module "Full_frontier tests" =
       in
       let root_data =
         let open Root_data in
-        { transition= External_transition.For_tests.genesis ~precomputed_values
+        { transition= Mina_transition.External_transition.For_tests.genesis ~precomputed_values
         ; staged_ledger=
             Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
         ; protocol_states= [] }
@@ -105,6 +103,7 @@ let%test_module "Full_frontier tests" =
       in
       Persistent_root.Instance.destroy persistent_root_instance
 
+    open Deferred.Let_syntax
     let%test_unit "Should be able to find a breadcrumbs after adding them" =
       Quickcheck.test gen_breadcrumb ~trials:4 ~f:(fun make_breadcrumb ->
           Async.Thread_safe.block_on_async_exn (fun () ->

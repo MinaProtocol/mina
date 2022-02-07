@@ -2,11 +2,9 @@ module S = Sponge
 open Core_kernel
 open Pickles_types
 open Common
-open Poly_types
 open Hlist
 open Import
 open Impls.Step
-open Step_main_inputs
 module B = Inductive_rule.B
 
 (* The SNARK function corresponding to the input inductive rule. *)
@@ -47,7 +45,8 @@ let step_main :
  fun (module Req) (module Max_branching) ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length ~branching
      ~lte ~basic ~self rule ->
-  let module T (F : T4) = struct
+  let open Step_main_inputs in
+  let module T (F : Poly_types.T4) = struct
     type ('a, 'b, 'n, 'm) t =
       | Other of ('a, 'b, 'n, 'm) F.t
       | Self : (a_var, a_value, max_branching, self_branches) t

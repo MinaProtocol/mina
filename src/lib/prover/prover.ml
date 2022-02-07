@@ -2,7 +2,6 @@ open Core
 open Async
 open Mina_base
 open Mina_state
-open Mina_transition
 open Blockchain_snark
 
 module type S = Intf.S
@@ -411,16 +410,16 @@ let extend_blockchain { connection; logger; _ } chain next_state block
       Error e
 
 let prove t ~prev_state ~prev_state_proof ~next_state
-    (transition : Internal_transition.t) pending_coinbase =
+    (transition : Mina_transition.Internal_transition.t) pending_coinbase =
   let open Deferred.Or_error.Let_syntax in
   let start_time = Core.Time.now () in
   let%map chain =
     extend_blockchain t
       (Blockchain.create ~proof:prev_state_proof ~state:prev_state)
       next_state
-      (Internal_transition.snark_transition transition)
-      (Internal_transition.ledger_proof transition)
-      (Internal_transition.prover_state transition)
+      (Mina_transition.Internal_transition.snark_transition transition)
+      (Mina_transition.Internal_transition.ledger_proof transition)
+      (Mina_transition.Internal_transition.prover_state transition)
       pending_coinbase
   in
   Mina_metrics.(

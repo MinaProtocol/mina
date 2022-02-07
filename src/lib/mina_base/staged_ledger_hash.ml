@@ -1,9 +1,6 @@
 [%%import "../../config.mlh"]
 
 open Core
-open Util
-open Fold_lib
-open Snark_params.Tick
 
 module Aux_hash = struct
   let length_in_bits = 256
@@ -89,6 +86,7 @@ module Pending_coinbase_aux = struct
   let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
 end
 
+open Snark_params.Tick
 module Non_snark = struct
   [%%versioned
   module Stable = struct
@@ -130,14 +128,14 @@ module Non_snark = struct
     let h = Digestif.SHA256.feed_string h pending_coinbase_aux in
     Digestif.SHA256.(get h |> to_raw_string)
 
-  let fold t = Fold.string_bits (digest t)
+  let fold t = Fold_lib.Fold.string_bits (digest t)
 
   let to_input t =
     let open Random_oracle.Input.Chunked in
     Array.reduce_exn ~f:append
       (Array.of_list_map
-         (Fold.to_list (fold t))
-         ~f:(fun b -> packed (field_of_bool b, 1)))
+         (Fold_lib.Fold.to_list (fold t))
+         ~f:(fun b -> packed (Util.field_of_bool b, 1)))
 
   let ledger_hash ({ ledger_hash; _ } : t) = ledger_hash
 
@@ -153,7 +151,7 @@ module Non_snark = struct
       (Array.of_list_map t ~f:(fun b -> packed ((b :> Field.Var.t), 1)))
 
   let var_of_t t : var =
-    List.map (Fold.to_list @@ fold t) ~f:Boolean.var_of_value
+    List.map (Fold_lib.Fold.to_list @@ fold t) ~f:Boolean.var_of_value
 
   [%%if proof_level = "check"]
 
@@ -168,7 +166,7 @@ module Non_snark = struct
 
   let typ : (var, value) Typ.t =
     Typ.transport (Typ.list ~length:length_in_bits Boolean.typ)
-      ~there:(Fn.compose Fold.to_list fold) ~back:(fun _ ->
+      ~there:(Fn.compose Fold_lib.Fold.to_list fold) ~back:(fun _ ->
         (* If we put a failwith here, we lose the ability to printf-inspect
            * anything that uses staged-ledger-hashes from within Checked
            * computations. It's useful when debugging to dump the protocol state

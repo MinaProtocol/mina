@@ -306,7 +306,6 @@ module E2
 
   val unitary_inverse : t -> t
 end = struct
-  open Params
 
   module T = struct
     module Base = F
@@ -353,6 +352,7 @@ end = struct
 
        so this is correct as well.
     *)
+    open Params
     let square (a, b) =
       let open F in
       let%map ab = a * b and t = (a + b) * (a + mul_by_non_residue b) in
@@ -604,7 +604,6 @@ module F3
     module Base = F
     module Unchecked = Snarkette.Fields.Make_fp3 (F.Unchecked) (Params)
     module Impl = F.Impl
-    open Impl
 
     let mul_by_primitive_element (a, b, c) = (F.scale c Params.non_residue, a, b)
 
@@ -612,6 +611,7 @@ module F3
       include T3
 
       let sequence (x, y, z) =
+        let open Impl in
         let%map x = x and y = y and z = z in
         (x, y, z)
     end
@@ -620,15 +620,18 @@ module F3
 
     include Make_applicative (Base) (A)
 
-    let typ = Typ.tuple3 F.typ F.typ F.typ
+    let typ = let open Impl in
+              Typ.tuple3 F.typ F.typ F.typ
 
     let mul_field (a, b, c) x =
+      let open Impl in
       let%map a = Base.mul_field a x
       and b = Base.mul_field b x
       and c = Base.mul_field c x in
       (a, b, c)
 
     let assert_r1cs (a0, a1, a2) (b0, b1, b2) (c0, c1, c2) =
+      let open Impl in
       let open F in
       let%bind v0 = a0 * b0 and v4 = a2 * b2 in
       let beta = Params.non_residue in

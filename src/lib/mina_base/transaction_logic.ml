@@ -1193,7 +1193,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let check e b = if b then Ok () else Error (failure e)
 
-  open Pickles_types
 
   let apply_body
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -1266,8 +1265,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let%bind snapp =
       let%map app_state =
         update a.permissions.edit_state app_state init.app_state
-          ~is_keep:(Vector.for_all ~f:Set_or_keep.is_keep)
-          ~update:(Vector.map2 ~f:Set_or_keep.set_or_keep)
+          ~is_keep:(Pickles_types.Vector.for_all ~f:Set_or_keep.is_keep)
+          ~update:(Pickles_types.Vector.map2 ~f:Set_or_keep.set_or_keep)
       and verification_key =
         update a.permissions.set_verification_key verification_key
           init.verification_key ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->

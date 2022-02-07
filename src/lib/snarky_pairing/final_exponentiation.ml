@@ -29,21 +29,20 @@ end
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
   open Impl
-  open Let_syntax
 
   let exponentiate elt power =
     let naf = Snarkette.Fields.find_wnaf (module N) 1 power in
     let%bind elt_inv = Fqk.inv_exn elt in
     let rec go i found_nonzero acc =
-      if i < 0 then return acc
+      if i < 0 then Let_syntax.return acc
       else
         let%bind acc =
-          if found_nonzero then Fqk.cyclotomic_square acc else return acc
+          if found_nonzero then Fqk.cyclotomic_square acc else Let_syntax.return acc
         in
         let%bind acc =
           if naf.(i) > 0 then Fqk.(acc * elt)
           else if naf.(i) < 0 then Fqk.(acc * elt_inv)
-          else return acc
+          else Let_syntax.return acc
         in
         go (i - 1) (found_nonzero || naf.(i) <> 0) acc
     in
@@ -59,7 +58,7 @@ module Make (Inputs : Inputs_intf) = struct
     let%bind w0 =
       let%bind base =
         if Params.final_exponent_last_chunk_is_w0_neg then Fqk.inv_exn beta
-        else return beta
+        else Let_syntax.return beta
       in
       exponentiate base Params.final_exponent_last_chunk_abs_of_w0
     and w1 =
@@ -79,7 +78,7 @@ module Make (Inputs : Inputs_intf) = struct
       let%bind base =
         if Params.final_exponent_last_chunk_is_w0_neg then
           Fqk.(el * Fqk.frobenius el_inv 2) (* el_inv_q_2_minus_1 *)
-        else return el_q_2_minus_1
+        else Let_syntax.return el_q_2_minus_1
       in
       exponentiate base Params.final_exponent_last_chunk_abs_of_w0
     in

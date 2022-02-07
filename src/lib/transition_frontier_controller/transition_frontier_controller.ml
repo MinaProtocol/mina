@@ -1,11 +1,10 @@
 open Core_kernel
 open Async_kernel
-open Pipe_lib
-open O1trace
 
 let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~collected_transitions ~frontier ~network_transition_reader
     ~producer_transition_reader ~clear_reader ~precomputed_values =
+  let open Pipe_lib in
   let valid_transition_pipe_capacity = 50 in
   let start_time = Time.now () in
   let f_drop_head name head =
@@ -91,7 +90,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
              Gauge.set Catchup.initial_catchup_time
                Time.(Span.to_min @@ diff (now ()) start_time)) ;
            Deferred.return true )) ;
-  trace_recurring "validator" (fun () ->
+  O1trace.trace_recurring "validator" (fun () ->
       Transition_handler.Validator.run
         ~consensus_constants:
           (Precomputed_values.consensus_constants precomputed_values)
@@ -102,14 +101,14 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~f:(Strict_pipe.Writer.write primary_transition_writer)
   |> don't_wait_for ;
   let clean_up_catchup_scheduler = Ivar.create () in
-  trace_recurring "processor" (fun () ->
+  O1trace.trace_recurring "processor" (fun () ->
       Transition_handler.Processor.run ~logger ~precomputed_values
         ~time_controller ~trust_system ~verifier ~frontier
         ~primary_transition_reader ~producer_transition_reader
         ~clean_up_catchup_scheduler ~catchup_job_writer
         ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
         ~processed_transition_writer) ;
-  trace_recurring "catchup" (fun () ->
+  O1trace.trace_recurring "catchup" (fun () ->
       Ledger_catchup.run ~logger ~precomputed_values ~trust_system ~verifier
         ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
         ~unprocessed_transition_cache) ;

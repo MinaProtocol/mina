@@ -1,4 +1,3 @@
-open Pickles_types
 open Core_kernel
 open Import
 open Backend
@@ -119,8 +118,8 @@ module Step = struct
       Spec.packed_typ
         (module Impl)
         (T
-           ( Shifted_value.Type2.typ Other_field.typ_unchecked
-           , fun (Shifted_value.Type2.Shifted_value x as t) ->
+           ( Pickles_types.Shifted_value.Type2.typ Other_field.typ_unchecked
+           , fun (Pickles_types.Shifted_value.Type2.Shifted_value x as t) ->
                Impl.run_checked (Other_field.check x) ;
                t ))
         spec
@@ -200,7 +199,7 @@ module Wrap = struct
       Spec.packed_typ
         (module Impl)
         (T
-           ( Shifted_value.Type1.typ fp
+           ( Pickles_types.Shifted_value.Type1.typ fp
            , fun (Shifted_value x as t) ->
                Impl.run_checked (Other_field.check x) ;
                t ))

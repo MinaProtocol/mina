@@ -1,7 +1,5 @@
 open Async_kernel
 open Mina_base
-open Mina_state
-open Mina_transition
 open Blockchain_snark
 
 module type S = sig
@@ -28,8 +26,8 @@ module type S = sig
   val extend_blockchain :
        t
     -> Blockchain.t
-    -> Protocol_state.Value.t
-    -> Snark_transition.value
+    -> Mina_state.Protocol_state.Value.t
+    -> Mina_state.Snark_transition.value
     -> Ledger_proof.t option
     -> Consensus.Data.Prover_state.t
     -> Pending_coinbase_witness.t
@@ -37,10 +35,10 @@ module type S = sig
 
   val prove :
        t
-    -> prev_state:Protocol_state.Value.t
+    -> prev_state:Mina_state.Protocol_state.Value.t
     -> prev_state_proof:Proof.t
-    -> next_state:Protocol_state.Value.t
-    -> Internal_transition.t
+    -> next_state:Mina_state.Protocol_state.Value.t
+    -> Mina_transition.Internal_transition.t
     -> Pending_coinbase_witness.t
     -> Proof.t Deferred.Or_error.t
 

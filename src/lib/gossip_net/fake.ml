@@ -19,7 +19,6 @@ end
 
 module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
-  open Intf
   open Rpc_intf
 
   module Network = struct
@@ -128,8 +127,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
-      ; ban_notification_reader : ban_notification Linear_pipe.Reader.t
-      ; ban_notification_writer : ban_notification Linear_pipe.Writer.t
+      ; ban_notification_reader : Intf.ban_notification Linear_pipe.Reader.t
+      ; ban_notification_writer : Intf.ban_notification Linear_pipe.Writer.t
       }
 
     let rpc_hook t rpc_handlers =

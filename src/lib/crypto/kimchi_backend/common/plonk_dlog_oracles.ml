@@ -1,8 +1,7 @@
 open Core_kernel
-open Intf
 
 module type Inputs_intf = sig
-  module Verifier_index : T0
+  module Verifier_index : Intf.T0
 
   module Field : sig
     type t
@@ -11,7 +10,7 @@ module type Inputs_intf = sig
   module Proof : sig
     type t
 
-    module Challenge_polynomial : T0
+    module Challenge_polynomial : Intf.T0
 
     module Backend : sig
       type t

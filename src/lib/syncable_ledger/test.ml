@@ -1,7 +1,5 @@
 open Core
 open Async_kernel
-open Pipe_lib
-open Network_peer
 
 module type Ledger_intf = sig
   include Merkle_ledger.Syncable_intf.S
@@ -41,7 +39,6 @@ module Make_test
     end) =
 struct
   open Input
-  open Input'
   module Sync_responder = Sync_ledger.Responder
 
   (* not really kosher but the tests are run in-order, so this will get filled
@@ -58,7 +55,7 @@ struct
 
   let%test "full_sync_entirely_different" =
     let l1, _k1 = Ledger.load_ledger 1 1 in
-    let l2, _k2 = Ledger.load_ledger num_accts 2 in
+    let l2, _k2 = Ledger.load_ledger Input'.num_accts 2 in
     let desired_root = Ledger.merkle_root l2 in
     let lsync = Sync_ledger.create l1 ~logger ~trust_system in
     let qr = Sync_ledger.query_reader lsync in
@@ -70,10 +67,10 @@ struct
         ~logger ~trust_system
     in
     don't_wait_for
-      (Linear_pipe.iter_unordered ~max_concurrency:3 qr
+      (Pipe_lib.Linear_pipe.iter_unordered ~max_concurrency:3 qr
          ~f:(fun (root_hash, query) ->
            let%bind answ_opt =
-             Sync_responder.answer_query sr (Envelope.Incoming.local query)
+             Sync_responder.answer_query sr (Network_peer.Envelope.Incoming.local query)
            in
            let answ =
              Option.value_exn ~message:"refused to answer query" answ_opt
@@ -85,7 +82,7 @@ struct
                     ~percent:(Percent.of_percentage 20.))
              else Deferred.unit
            in
-           Linear_pipe.write aw (root_hash, query, Envelope.Incoming.local answ))) ;
+           Pipe_lib.Linear_pipe.write aw (root_hash, query, Network_peer.Envelope.Incoming.local answ))) ;
     match
       Async.Thread_safe.block_on_async_exn (fun () ->
           Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () ->
@@ -98,9 +95,9 @@ struct
         false
 
   let%test_unit "new_goal_soon" =
-    let l1, _k1 = Ledger.load_ledger num_accts 1 in
-    let l2, _k2 = Ledger.load_ledger num_accts 2 in
-    let l3, _k3 = Ledger.load_ledger num_accts 3 in
+    let l1, _k1 = Ledger.load_ledger Input'.num_accts 1 in
+    let l2, _k2 = Ledger.load_ledger Input'.num_accts 2 in
+    let l3, _k3 = Ledger.load_ledger Input'.num_accts 3 in
     let desired_root = ref @@ Ledger.merkle_root l2 in
     let lsync = Sync_ledger.create l1 ~logger ~trust_system in
     let qr = Sync_ledger.query_reader lsync in
@@ -114,7 +111,7 @@ struct
     in
     let ctr = ref 0 in
     don't_wait_for
-      (Linear_pipe.iter qr ~f:(fun (hash, query) ->
+      (Pipe_lib.Linear_pipe.iter qr ~f:(fun (hash, query) ->
            if not (Root_hash.equal hash !desired_root) then Deferred.unit
            else
              let res =
@@ -132,13 +129,13 @@ struct
                else
                  let%bind answ_opt =
                    Sync_responder.answer_query !sr
-                     (Envelope.Incoming.local query)
+                     (Network_peer.Envelope.Incoming.local query)
                  in
                  let answ =
                    Option.value_exn ~message:"refused to answer query" answ_opt
                  in
-                 Linear_pipe.write aw
-                   (!desired_root, query, Envelope.Incoming.local answ)
+                 Pipe_lib.Linear_pipe.write aw
+                   (!desired_root, query, Network_peer.Envelope.Incoming.local answ)
              in
              ctr := !ctr + 1 ;
              res)) ;

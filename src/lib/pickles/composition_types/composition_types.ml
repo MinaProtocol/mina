@@ -30,8 +30,7 @@ module Dlog_based = struct
           end]
         end
 
-        open Pickles_types
-        module Generic_coeffs_vec = Vector.With_length (Nat.N5)
+        module Generic_coeffs_vec = Pickles_types.Vector.With_length (Pickles_types.Nat.N5)
 
         module In_circuit = struct
           type ('challenge, 'scalar_challenge, 'fp) t =
@@ -72,7 +71,7 @@ module Dlog_based = struct
             ; endomul = f t.endomul
             ; endomul_scalar = f t.endomul_scalar
             ; perm = f t.perm
-            ; generic = Vector.map ~f t.generic
+            ; generic = Pickles_types.Vector.map ~f t.generic
             }
 
           let typ (type f fp) ~challenge ~scalar_challenge
@@ -90,7 +89,7 @@ module Dlog_based = struct
               ; fp
               ; fp
               ; fp
-              ; Vector.typ fp Nat.N5.n
+              ; Pickles_types.Vector.typ fp Pickles_types.Nat.N5.n
               ]
               ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
               ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist

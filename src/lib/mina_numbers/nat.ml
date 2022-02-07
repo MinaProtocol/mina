@@ -1,17 +1,15 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Fold_lib
 include Intf
 module Intf = Intf
 
 [%%ifdef consensus_mechanism]
 
-open Snark_bits
 
 module Make_checked
     (N : Unsigned_extended.S)
-    (Bits : Bits_intf.Convertible_bits with type t := N.t) =
+    (Bits : Snark_bits.Bits_intf.Convertible_bits with type t := N.t) =
 struct
   open Snark_params.Tick
 
@@ -61,7 +59,7 @@ struct
     in
     of_bits (List.take (Field.unpack x) N.length_in_bits)
 
-  let to_field (x : N.t) : Field.t = Field.project (Fold.to_list (Bits.fold x))
+  let to_field (x : N.t) : Field.t = Field.project (Fold_lib.Fold.to_list (Bits.fold x))
 
   let typ : (var, N.t) Typ.t =
     Typ.transport
@@ -182,7 +180,6 @@ struct
   let zero = Field.Var.constant Field.zero
 end
 
-open Snark_params.Tick
 
 [%%else]
 
@@ -198,7 +195,7 @@ module Make (N : sig
 
   val random : unit -> t
 end)
-(Bits : Bits_intf.Convertible_bits with type t := N.t) =
+(Bits : Snark_bits.Bits_intf.Convertible_bits with type t := N.t) =
 struct
   type t = N.t [@@deriving sexp, compare, hash, yojson]
 
@@ -229,12 +226,13 @@ struct
   let of_bits = Bits.of_bits
 
   let to_input (t : t) =
+    let open Snark_params.Tick in
     Random_oracle.Input.Chunked.packed
       (Field.project (to_bits t), N.length_in_bits)
 
   let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
-  let fold t = Fold.group3 ~default:false (Bits.fold t)
+  let fold t = Fold_lib.Fold.group3 ~default:false (Bits.fold t)
 
   let gen =
     Quickcheck.Generator.map
@@ -278,7 +276,7 @@ module Make32 () : UInt32 = struct
                   ( Int32.max_value |> Random.int32 |> Int64.of_int32
                   |> UInt32.of_int64 )
             end)
-            (Bits.UInt32)
+            (Snark_bits.Bits.UInt32)
 
   let to_uint32 = Unsigned_extended.UInt32.to_uint32
 
@@ -310,7 +308,7 @@ module Make64 () : UInt64 = struct
                 logor (mask lsl 63)
                   (Int64.max_value |> Random.int64 |> UInt64.of_int64)
             end)
-            (Bits.UInt64)
+            (Snark_bits.Bits.UInt64)
 
   let to_uint64 = Unsigned_extended.UInt64.to_uint64
 

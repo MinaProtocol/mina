@@ -3,7 +3,6 @@ open Core_kernel
 module Partial = struct
   module Bin_io (M : Intf.Input.Bin_io_intf) :
     Intf.Partial.Bin_io_intf with type t := M.t = struct
-    open Bin_prot.Type_class
 
     let bin_size_t = M.bin_size_t
 
@@ -19,9 +18,11 @@ module Partial = struct
 
     let bin_writer_t = M.bin_writer_t
 
-    let bin_reader_t = { read = bin_read_t; vtag_read = __bin_read_t__ }
+    let bin_reader_t = let open Bin_prot.Type_class in
+                       { read = bin_read_t; vtag_read = __bin_read_t__ }
 
     let bin_t =
+      let open Bin_prot.Type_class in
       { shape = bin_shape_t; writer = bin_writer_t; reader = bin_reader_t }
   end
 

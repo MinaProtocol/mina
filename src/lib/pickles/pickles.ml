@@ -14,12 +14,8 @@ module SC = Scalar_challenge
 open Core_kernel
 open Async_kernel
 open Import
-open Types
 open Pickles_types
-open Poly_types
-open Hlist
 open Common
-open Backend
 module Backend = Backend
 module Sponge_inputs = Sponge_inputs
 module Util = Util
@@ -120,6 +116,7 @@ let verify = Verify.verify
       and use *that* in the "verifies" computation.
 *)
 
+open Hlist
 let pad_local_max_branchings
     (type prev_varss prev_valuess env max_branching branches)
     (max_branching : max_branching Nat.t)
@@ -166,6 +163,7 @@ module Statement_with_proof = struct
     's * ('max_width, 'max_width) Proof.t
 end
 
+open Types
 let pad_pass_throughs
     (type local_max_branchings max_local_max_branchings max_branching)
     (module M : Hlist.Maxes.S
@@ -337,7 +335,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     let padded = V.f branches (M.f choices) |> Vector.transpose in
     (padded, Maxes.m padded)
 
-  module Lazy_ (A : T0) = struct
+  module Lazy_ (A : Poly_types.T0) = struct
     type t = A.t Lazy.t
   end
 
@@ -549,7 +547,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           (struct
             let etyp =
               Impls.Step.input ~branching:Max_branching.n
-                ~wrap_rounds:Tock.Rounds.n
+                ~wrap_rounds:Backend.Tock.Rounds.n
 
             let f (T b : _ Branch_data.t) =
               let (T (typ, conv)) = etyp in
@@ -608,7 +606,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let module V = H4.To_vector (Lazy_keys) in
       lazy
         (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
-             Tick.Keypair.vk_commitments (fst (Lazy.force vk))))
+             Backend.Tick.Keypair.vk_commitments (fst (Lazy.force vk))))
     in
     Timer.clock __LOC__ ;
     let wrap_requests, wrap_main =
@@ -980,9 +978,9 @@ module Proof0 = Proof
 
 let%test_module "test no side-loaded" =
   ( module struct
-    let () = Tock.Keypair.set_urs_info []
+    let () = Backend.Tock.Keypair.set_urs_info []
 
-    let () = Tick.Keypair.set_urs_info []
+    let () = Backend.Tick.Keypair.set_urs_info []
 
     open Impls.Step
 

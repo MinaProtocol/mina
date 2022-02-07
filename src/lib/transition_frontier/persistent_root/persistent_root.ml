@@ -1,9 +1,9 @@
 open Core
 open Mina_base
-open Frontier_base
 module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 
 let genesis_root_identifier ~genesis_state_hash =
+  let open Frontier_base in
   let open Root_identifier.Stable.Latest in
   {state_hash= genesis_state_hash}
 
@@ -215,6 +215,7 @@ module Instance = struct
   let snarked_ledger {snarked_ledger; _} = snarked_ledger
 
   let set_root_identifier t new_root_identifier =
+    let open Frontier_base in
     [%log' trace t.factory.logger]
       ~metadata:
         [("root_identifier", Root_identifier.to_yojson new_root_identifier)]
@@ -229,6 +230,7 @@ module Instance = struct
 
   (* defaults to genesis *)
   let load_root_identifier t =
+    let open Frontier_base in
     let file = Locations.root_identifier t.factory.directory in
     match Unix.access file [`Exists; `Read] with
     | Error _ ->

@@ -1,6 +1,4 @@
 open Async_kernel
-open Pipe_lib
-open Frontier_base
 
 module type Extension_base_intf = sig
   type t
@@ -11,7 +9,7 @@ module type Extension_base_intf = sig
 
   (* It is of upmost importance to make this synchronous. To prevent data races via context switching *)
   val handle_diffs :
-    t -> Full_frontier.t -> Diff.Full.With_mutant.t list -> view option
+    t -> Full_frontier.t -> Frontier_base.Diff.Full.With_mutant.t list -> view option
 end
 
 module type Broadcasted_extension_intf = sig
@@ -29,10 +27,10 @@ module type Broadcasted_extension_intf = sig
 
   val peek : t -> view
 
-  val reader : t -> view Broadcast_pipe.Reader.t
+  val reader : t -> view Pipe_lib.Broadcast_pipe.Reader.t
 
   val update :
-    t -> Full_frontier.t -> Diff.Full.With_mutant.t list -> unit Deferred.t
+    t -> Full_frontier.t -> Frontier_base.Diff.Full.With_mutant.t list -> unit Deferred.t
 end
 
 module type Extension_intf = sig

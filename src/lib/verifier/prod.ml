@@ -3,16 +3,14 @@
 open Core_kernel
 open Async
 open Mina_base
-open Mina_state
 open Blockchain_snark
-open O1trace
 
 type ledger_proof = Ledger_proof.Prod.t
 
 module Worker_state = struct
   module type S = sig
     val verify_blockchain_snarks :
-      (Protocol_state.Value.t * Proof.t) list -> bool Deferred.t
+      (Mina_state.Protocol_state.Value.t * Proof.t) list -> bool Deferred.t
 
     val verify_commands :
          Mina_base.User_command.Verifiable.t list
@@ -416,7 +414,7 @@ let with_retry ~logger f =
   go 4
 
 let verify_blockchain_snarks { worker; logger } chains =
-  trace_recurring "Verifier.verify_blockchain_snarks" (fun () ->
+  O1trace.trace_recurring "Verifier.verify_blockchain_snarks" (fun () ->
       with_retry ~logger (fun () ->
           let%bind { connection; _ } =
             let ivar = !worker in
@@ -442,7 +440,7 @@ let verify_blockchain_snarks { worker; logger } chains =
 module Id = Unique_id.Int ()
 
 let verify_transaction_snarks { worker; logger } ts =
-  trace_recurring "Verifier.verify_transaction_snarks" (fun () ->
+  O1trace.trace_recurring "Verifier.verify_transaction_snarks" (fun () ->
       let id = Id.create () in
       let n = List.length ts in
       let metadata () =
@@ -467,7 +465,7 @@ let verify_transaction_snarks { worker; logger } ts =
       res)
 
 let verify_commands { worker; logger } ts =
-  trace_recurring "Verifier.verify_commands" (fun () ->
+  O1trace.trace_recurring "Verifier.verify_commands" (fun () ->
       with_retry ~logger (fun () ->
           let%bind { connection; _ } = Ivar.read !worker in
           Worker.Connection.run connection ~f:Worker.functions.verify_commands

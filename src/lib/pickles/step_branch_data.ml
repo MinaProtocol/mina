@@ -1,8 +1,6 @@
 open Core_kernel
 open Pickles_types
-open Hlist
 open Common
-open Import
 
 (* The data obtained from "compiling" an inductive rule into a circuit. *)
 type ( 'a_var
@@ -16,9 +14,9 @@ type ( 'a_var
      t =
   | T :
       { branching : 'branching Nat.t * ('prev_vars, 'branching) Hlist.Length.t
-      ; index : Types.Index.t
+      ; index : Import.Types.Index.t
       ; lte : ('branching, 'max_branching) Nat.Lte.t
-      ; domains : Domains.t
+      ; domains : Import.Domains.t
       ; rule :
           ( 'prev_vars
           , 'prev_values
@@ -28,11 +26,11 @@ type ( 'a_var
           , 'a_value )
           Inductive_rule.t
       ; main :
-             step_domains:(Domains.t, 'branches) Vector.t
+             step_domains:(Import.Domains.t, 'branches) Vector.t
           -> ( (Unfinalized.t, 'max_branching) Vector.t
              , Impls.Step.Field.t
              , (Impls.Step.Field.t, 'max_branching) Vector.t )
-             Types.Pairing_based.Statement.t
+             Import.Types.Pairing_based.Statement.t
           -> unit
       ; requests :
           (module Requests.Step.S
@@ -60,6 +58,7 @@ let create
     ~(max_branching : max_branching Nat.t)
     ~(branchings : (int, branches) Vector.t) ~(branches : branches Nat.t) ~typ
     var_to_field_elements value_to_field_elements (rule : _ Inductive_rule.t) =
+  let open Hlist in
   Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
   let (T (self_width, branching)) = HT.length rule.prevs in

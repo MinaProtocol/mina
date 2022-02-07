@@ -1,12 +1,7 @@
 [%%import "/src/config.mlh"]
 
-open Ppxlib
-open Asttypes
-open Parsetree
-open Longident
 open Core
 open Async
-open Mina_state
 
 (* TODO: refactor to do compile time selection *)
 [%%if proof_level = "full"]
@@ -41,6 +36,8 @@ let hashes =
      ts @ bs)
 
 let hashes_to_expr ~loc hashes =
+  let open Longident in
+  let open Asttypes in
   let open Ppxlib.Ast_builder.Default in
   elist ~loc
   @@ List.map hashes ~f:(fun (x, y) ->
@@ -49,6 +46,8 @@ let hashes_to_expr ~loc hashes =
            , Core.Md5.of_hex_exn [%e estring ~loc (Core.Md5.to_hex y)]])
 
 let vk_id_to_expr ~loc vk_id =
+  let open Longident in
+  let open Asttypes in
   let open Ppxlib.Ast_builder.Default in
   [%expr
     let t =
@@ -76,7 +75,7 @@ module Inputs = struct
       ~protocol_constants:genesis_constants.protocol
 
   let protocol_state_with_hash =
-    Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
+    Mina_state.Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
       ~genesis_epoch_data ~constraint_constants ~consensus_constants
 end
 
@@ -84,6 +83,8 @@ module Dummy = struct
   let loc = Ppxlib.Location.none
 
   let base_proof_expr =
+    let open Longident in
+    let open Asttypes in
     if generate_genesis_proof then
       Some (Async.return [%expr Mina_base.Proof.blockchain_dummy])
     else None
@@ -142,6 +143,9 @@ module Make_real () = struct
 end
 
 let main () =
+  let open Longident in
+  let open Parsetree in
+  let open Asttypes in
   let open Ppxlib.Ast_builder.Default in
   let target = (Sys.get_argv ()).(1) in
   let fmt = Format.formatter_of_out_channel (Out_channel.create target) in
@@ -275,7 +279,7 @@ let main () =
           | None ->
               [%expr None]]]
   in
-  Pprintast.top_phrase fmt (Ptop_def structure) ;
+  Ppxlib.Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0
 
 let () =

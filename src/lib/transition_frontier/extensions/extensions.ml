@@ -1,6 +1,5 @@
 open Async_kernel
 open Core_kernel
-open Pipe_lib
 module Best_tip_diff = Best_tip_diff
 module Identity = Identity
 module Root_history = Root_history
@@ -136,7 +135,7 @@ let get_extension : type ext view. t -> (ext, view) access -> ext =
   B.extension ext
 
 let get_view_pipe : type ext view.
-    t -> (ext, view) access -> view Broadcast_pipe.Reader.t =
+    t -> (ext, view) access -> view Pipe_lib.Broadcast_pipe.Reader.t =
  fun t access ->
   let (Broadcasted_extension ((module B), ext)) = get t access in
   B.reader ext

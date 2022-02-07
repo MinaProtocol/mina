@@ -4,7 +4,6 @@
     dependencies. We have this modue to prevent adding dependencies to
     different functors*)
 
-open Pipe_lib
 open Async_kernel
 
 module Make
@@ -15,6 +14,7 @@ struct
   include Incremental
 
   let to_pipe observer =
+    let open Pipe_lib in
     let reader, writer =
       Strict_pipe.(
         create
@@ -31,6 +31,7 @@ struct
     (Strict_pipe.Reader.to_linear_pipe reader).Linear_pipe.Reader.pipe
 
   let of_broadcast_pipe pipe =
+    let open Pipe_lib in
     let init = Broadcast_pipe.Reader.peek pipe in
     let var = Var.create init in
     Broadcast_pipe.Reader.iter pipe ~f:(fun value ->

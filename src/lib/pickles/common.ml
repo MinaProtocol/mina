@@ -122,7 +122,6 @@ let or_infinite_conv :
       Infinity
 
 module Ipa = struct
-  open Backend
 
   (* TODO: Make all this completely generic over backend *)
 
@@ -136,7 +135,7 @@ module Ipa = struct
 
   module Wrap = struct
     let field =
-      (module Tock.Field : Kimchi_backend.Field.S with type t = Tock.Field.t)
+      (module Backend.Tock.Field : Kimchi_backend.Field.S with type t = Backend.Tock.Field.t)
 
     let endo_to_field = Endo.Step_inner_curve.to_field
 
@@ -155,7 +154,7 @@ module Ipa = struct
 
   module Step = struct
     let field =
-      (module Tick.Field : Kimchi_backend.Field.S with type t = Tick.Field.t)
+      (module Backend.Tick.Field : Kimchi_backend.Field.S with type t = Backend.Tick.Field.t)
 
     let endo_to_field = Endo.Wrap_inner_curve.to_field
 

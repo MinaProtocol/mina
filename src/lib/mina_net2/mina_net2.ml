@@ -1,6 +1,5 @@
 open Core
 open Async
-open Async_unix
 open Network_peer
 module Keypair = Keypair
 module Libp2p_stream = Libp2p_stream
@@ -25,7 +24,7 @@ module Peer_without_id = struct
   module Set = Set.Make (T)
 
   let of_peer ({ libp2p_port; host; _ } : Peer.t) =
-    { libp2p_port; host = Unix.Inet_addr.to_string host }
+    { libp2p_port; host = Async_unix.Unix.Inet_addr.to_string host }
 end
 
 (* TODO: connection gating info is currently stored in to places, that needs to be fixed... *)
@@ -34,13 +33,13 @@ type connection_gating =
 
 let gating_config_to_helper_format (config : connection_gating) =
   let trusted_ips =
-    List.map ~f:(fun p -> Unix.Inet_addr.to_string p.host) config.trusted_peers
+    List.map ~f:(fun p -> Async_unix.Unix.Inet_addr.to_string p.host) config.trusted_peers
   in
   let banned_ips =
     let trusted = String.Set.of_list trusted_ips in
     List.filter_map
       ~f:(fun p ->
-        let p = Unix.Inet_addr.to_string p.host in
+        let p = Async_unix.Unix.Inet_addr.to_string p.host in
         (* Trusted peers cannot be banned. *)
         if Set.mem trusted p then None else Some p)
       config.banned_peers
@@ -77,7 +76,7 @@ type t =
   ; protocol_handlers : protocol_handler String.Table.t
   ; mutable connection_gating : connection_gating
   ; mutable all_peers_seen : Peer_without_id.Set.t option
-  ; mutable banned_ips : Unix.Inet_addr.t list
+  ; mutable banned_ips : Async_unix.Unix.Inet_addr.t list
   ; peer_connected_callback : string -> unit
   ; peer_disconnected_callback : string -> unit
   }
@@ -542,7 +541,7 @@ let create ~all_peers_seen_metric ~logger ~pids ~conf_dir ~on_peer_connected
   ( if all_peers_seen_metric then
     let log_all_peers_interval = Time.Span.of_hr 2.0 in
     let log_message_batch_size = 50 in
-    every log_all_peers_interval (fun () ->
+    Async_unix.every log_all_peers_interval (fun () ->
         Option.iter t.all_peers_seen ~f:(fun all_peers_seen ->
             let num_batches, num_in_batch, batches, batch =
               Set.fold_right all_peers_seen ~init:(0, 0, [], [])

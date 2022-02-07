@@ -1,6 +1,5 @@
 open Core
-open Key_cache
-include T (Or_error)
+include Key_cache.T (Or_error)
 
 let on_disk to_string read write prefix =
   let path k = prefix ^/ to_string k in
@@ -58,7 +57,7 @@ let s3 to_string read ~bucket_prefix ~install_path =
   { read; write }
 
 module Disk_storable = struct
-  include Disk_storable (Or_error)
+  include Key_cache.Disk_storable (Or_error)
 
   let of_binable to_string m =
     (* TODO: Make more efficient *)
@@ -83,10 +82,10 @@ let read spec { Disk_storable.to_string; read = r; write = w } k =
   Or_error.find_map_ok spec ~f:(fun s ->
       let res, cache_hit =
         match s with
-        | Spec.On_disk { directory; should_write } ->
+        | Key_cache.Spec.On_disk { directory; should_write } ->
             ( (on_disk to_string r w directory).read k
             , if should_write then `Locally_generated else `Cache_hit )
-        | S3 _ when not (may_download ()) ->
+        | S3 _ when not (Key_cache.may_download ()) ->
             (Or_error.errorf "Downloading from S3 is disabled", `Cache_hit)
         | S3 { bucket_prefix; install_path } ->
             Unix.mkdir_p install_path ;
@@ -100,7 +99,7 @@ let write spec { Disk_storable.to_string; read = r; write = w } k v =
     List.filter_map spec ~f:(fun s ->
         let res =
           match s with
-          | Spec.On_disk { directory; should_write } ->
+          | Key_cache.Spec.On_disk { directory; should_write } ->
               if should_write then (
                 Unix.mkdir_p directory ;
                 (on_disk to_string r w directory).write k v )

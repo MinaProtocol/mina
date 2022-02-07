@@ -1,6 +1,5 @@
 open Core_kernel
 open Async_kernel
-open Pipe_lib
 open Mina_base
 
 let trust_system = Trust_system.null ()
@@ -44,6 +43,7 @@ module Transition_frontier = struct
     let staged_ledger = Fn.id
   end
 
+  open Pipe_lib
   type t =
     { refcount_table : table
     ; best_tip_table : Transaction_snark_work.Statement.Hash_set.t

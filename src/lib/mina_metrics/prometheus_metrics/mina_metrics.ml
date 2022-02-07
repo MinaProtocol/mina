@@ -7,7 +7,11 @@ open Core_kernel
 *)
 include Prometheus
 open Prometheus
-open Namespace
+open struct
+  open Namespace
+  let namespace = namespace
+end
+
 open Metric_generators
 open Async_kernel
 

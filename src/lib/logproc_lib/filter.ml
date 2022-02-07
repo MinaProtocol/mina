@@ -257,7 +257,6 @@ module Parser = struct
 end
 
 module Interpreter = struct
-  open Ast
   open Option.Let_syntax
 
   let option_list_map ls ~f =
@@ -270,7 +269,8 @@ module Interpreter = struct
     in
     loop [] ls >>| List.rev
 
-  let json_value = function
+  let json_value = let open Ast in
+                   function
     | Bool b ->
         `Bool b
     | String s ->
@@ -288,7 +288,8 @@ module Interpreter = struct
   let access_int json i =
     match json with `List ls -> List.nth ls i | _ -> None
 
-  let rec interpret_value_exp (json : Yojson.Safe.t) = function
+  let rec interpret_value_exp (json : Yojson.Safe.t) = let open Ast in
+                                                       function
     | Value_lit v ->
         Some (json_value v)
     | Value_list ls ->
@@ -301,7 +302,8 @@ module Interpreter = struct
     | Value_access_int (parent, i) ->
         interpret_value_exp json parent >>= (Fn.flip access_int) i
 
-  let interpret_cmp_exp json = function
+  let interpret_cmp_exp json = let open Ast in
+                               function
     | Cmp_eq (x, y) ->
         Option.map2
           (interpret_value_exp json x)
@@ -326,7 +328,8 @@ module Interpreter = struct
             match value with `String str -> Re2.matches regex str | _ -> false)
         |> Option.value ~default:false
 
-  let rec interpret_bool_exp json = function
+  let rec interpret_bool_exp json = let open Ast in
+                                    function
     | Bool_lit b ->
         b
     | Bool_cmp cmp ->

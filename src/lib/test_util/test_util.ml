@@ -1,5 +1,4 @@
 open Core_kernel
-open Fold_lib
 
 module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
   let triple_string trips =
@@ -34,7 +33,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
         ()
       |> Or_error.ok_exn
     in
-    let unchecked = Fold.to_list (fold input) in
+    let unchecked = Fold_lib.Fold.to_list (fold input) in
     if not ([%equal: (bool * bool * bool) list] checked unchecked) then
       failwithf
         !"Got %s (%d)\nexpected %s (%d)"

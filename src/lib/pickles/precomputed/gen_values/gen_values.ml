@@ -1,12 +1,7 @@
-open Ppxlib
-open Asttypes
-open Parsetree
-open Longident
 open Core_kernel
-open Kimchi_pasta.Pasta
-open Pickles_types
 
 let () =
+  let open Kimchi_pasta.Pasta in
   Vesta_based_plonk.Keypair.set_urs_info [] ;
   Pallas_based_plonk.Keypair.set_urs_info []
 
@@ -26,7 +21,8 @@ let unwrap = function
 let max_public_input_size = 128
 
 let vesta =
-  let max_domain_log2 = Nat.to_int Vesta_based_plonk.Rounds.n in
+  let open Kimchi_pasta.Pasta in
+  let max_domain_log2 = Pickles_types.Nat.to_int Vesta_based_plonk.Rounds.n in
   List.map
     (List.range ~start:`inclusive ~stop:`inclusive 1 max_domain_log2)
     ~f:(fun d ->
@@ -41,7 +37,8 @@ let vesta =
           |> unwrap))
 
 let pallas =
-  let max_domain_log2 = Nat.to_int Pallas_based_plonk.Rounds.n in
+  let open Kimchi_pasta.Pasta in
+  let max_domain_log2 = Pickles_types.Nat.to_int Pallas_based_plonk.Rounds.n in
   List.map
     (List.range ~start:`inclusive ~stop:`inclusive 1 max_domain_log2)
     ~f:(fun d ->
@@ -57,7 +54,7 @@ let pallas =
 
 let mk xss ~f =
   let module E = Ppxlib.Ast_builder.Make (struct
-    let loc = Location.none
+    let loc = Ppxlib.Location.none
   end) in
   let open E in
   pexp_array
@@ -65,6 +62,10 @@ let mk xss ~f =
          pexp_array (List.map xs ~f:(fun g -> pexp_array (List.map g ~f)))))
 
 let structure =
+  let open Kimchi_pasta.Pasta in
+  let open Longident in
+  let open Parsetree in
+  let open Asttypes in
   let loc = Ppxlib.Location.none in
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
@@ -94,7 +95,8 @@ let structure =
     end]
 
 let () =
+  let open Parsetree in
   let target = Sys.argv.(1) in
   let fmt = Format.formatter_of_out_channel (Out_channel.create target) in
-  Pprintast.top_phrase fmt (Ptop_def structure) ;
+  Ppxlib.Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0

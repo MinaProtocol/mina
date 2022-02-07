@@ -1,6 +1,5 @@
 open Core_kernel
 open Ppxlib
-open Asttypes
 
 (* define_from_scope creates local definitions from those in scope
 
@@ -25,6 +24,7 @@ open Asttypes
 let name = "define_from_scope"
 
 let expr_to_id loc expr =
+  let open Asttypes in
   match expr.pexp_desc with
   | Pexp_ident { txt = Lident s; _ } ->
       s
@@ -32,6 +32,7 @@ let expr_to_id loc expr =
       Location.raise_errorf ~loc "Expected identifier"
 
 let expand ~loc ~path:_ (items : expression list) =
+  let open Asttypes in
   let (module Ast_builder) = Ast_builder.make loc in
   let open Ast_builder in
   let ids = List.map items ~f:(expr_to_id loc) in

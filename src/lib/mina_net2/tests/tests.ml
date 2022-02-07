@@ -1,6 +1,5 @@
 open Core
 open Async
-open Mina_net2
 
 (* Only show stdout for failed inline tests. *)
 open Inline_test_quiet_logs
@@ -16,6 +15,7 @@ let%test_module "coda network tests" =
     let pids = Child_processes.Termination.create_pid_table ()
 
     let setup_two_nodes network_id =
+      let open Mina_net2 in
       let%bind a_tmp = Unix.mkdtemp "p2p_helper_test_a" in
       let%bind b_tmp = Unix.mkdtemp "p2p_helper_test_b" in
       let%bind c_tmp = Unix.mkdtemp "p2p_helper_test_c" in
@@ -101,6 +101,7 @@ let%test_module "coda network tests" =
 
     (* TODO fails occasionally, uncomment after debugging it *)
     let%test_unit "b_stream_c" =
+      let open Mina_net2 in
       let () = Core.Backtrace.elide := false in
       let test_def =
         let open Deferred.Let_syntax in
@@ -160,6 +161,7 @@ let%test_module "coda network tests" =
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
 
     let%test_unit "stream" =
+      let open Mina_net2 in
       let () = Core.Backtrace.elide := false in
       let test_def =
         let open Deferred.Let_syntax in

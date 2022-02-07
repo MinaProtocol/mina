@@ -331,7 +331,6 @@ module Make
   end
 end
 
-open Snark_params
 
 [%%else]
 
@@ -493,6 +492,7 @@ open Hash_prefix_states_nonconsensus
 
 [%%endif]
 
+open Snark_params
 module Message = struct
   let network_id_mainnet = Char.of_int_exn 1
 

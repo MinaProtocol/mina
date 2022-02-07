@@ -2,7 +2,6 @@
 
 open Core_kernel
 open Snark_params
-open Tick
 open Unsigned_extended
 open Snark_bits
 
@@ -237,7 +236,7 @@ module Time = struct
 
   let unpacked_to_number var =
     let bits = Span.Unpacked.var_to_bits var in
-    Number.of_bits (bits :> Boolean.var list)
+    Tick.Number.of_bits (bits :> Tick.Boolean.var list)
 
   let to_int64 = Fn.compose Span.to_ms to_span_since_epoch
 

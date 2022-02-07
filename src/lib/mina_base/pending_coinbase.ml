@@ -2,7 +2,6 @@ open Core_kernel
 open Import
 open Snarky_backendless
 module Coda_base_util = Util
-open Snark_params
 open Snark_params.Tick
 open Let_syntax
 open Currency
@@ -112,6 +111,7 @@ end = struct
     if t2 < t1 then Or_error.error_string "Stack_id overflow" else Ok t2
 end
 
+open Snark_params
 module type Data_hash_intf = sig
   type t = private Field.t [@@deriving sexp, compare, equal, yojson, hash]
 

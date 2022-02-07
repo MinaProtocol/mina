@@ -1,6 +1,5 @@
 open Core_kernel
 open Mina_base
-open Snark_params.Tick
 
 module Poly = struct
   [%%versioned
@@ -61,6 +60,7 @@ let create_value ~staged_ledger_hash ~snarked_ledger_hash ~genesis_ledger_hash
   ; timestamp
   }
 
+open Snark_params.Tick
 let data_spec =
   let open Data_spec in
   [ Staged_ledger_hash.typ

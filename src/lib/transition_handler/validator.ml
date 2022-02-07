@@ -1,9 +1,6 @@
 open Async_kernel
 open Core_kernel
-open Pipe_lib.Strict_pipe
 open Mina_base
-open Mina_state
-open Cache_lib
 open Mina_transition
 open Network_peer
 
@@ -50,12 +47,13 @@ let validate_transition ~consensus_constants ~logger ~frontier
   Unprocessed_transition_cache.register_exn unprocessed_transition_cache
     enveloped_transition
 
+open Pipe_lib.Strict_pipe
 let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
     ~transition_reader
     ~(valid_transition_writer :
        ( ( External_transition.Initial_validated.t Envelope.Incoming.t
          , State_hash.t )
-         Cached.t
+         Cache_lib.Cached.t
        , drop_head buffered
        , unit )
        Writer.t) ~unprocessed_transition_cache =
@@ -82,7 +80,7 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
              in
              let transition_time =
                External_transition.protocol_state transition
-               |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
+               |> Mina_state.Protocol_state.blockchain_state |> Mina_state.Blockchain_state.timestamp
                |> Block_time.to_time
              in
              Perf_histograms.add_span ~name:"accepted_transition_remote_latency"
@@ -106,7 +104,7 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                  ; ("reason", `String "not selected over current root")
                  ; ( "protocol_state"
                    , External_transition.protocol_state transition
-                     |> Protocol_state.value_to_yojson )
+                     |> Mina_state.Protocol_state.value_to_yojson )
                  ]
                "Validation error: external transition with state hash \
                 $state_hash was rejected for reason $reason" ;

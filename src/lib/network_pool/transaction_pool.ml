@@ -8,7 +8,6 @@ open Async
 open Mina_base
 open Pipe_lib
 open Signature_lib
-open Network_peer
 
 let max_per_15_seconds = 10
 
@@ -197,6 +196,7 @@ end
 
 (* Functor over user command, base ledger and transaction validator for
    mocking. *)
+open Network_peer
 module Make0
     (Base_ledger : Intf.Base_ledger_intf) (Staged_ledger : sig
       type t

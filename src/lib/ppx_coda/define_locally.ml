@@ -1,7 +1,5 @@
 open Core_kernel
 open Ppxlib
-open Asttypes
-open Ast_helper
 
 (* define_locally mirrors local definitions from some other module
 
@@ -20,6 +18,7 @@ let name = "define_locally"
 let raise_errorf = Location.raise_errorf
 
 let expr_to_id loc expr =
+  let open Asttypes in
   match expr.pexp_desc with
   | Pexp_ident { txt = Lident s; _ } ->
       s
@@ -27,6 +26,8 @@ let expr_to_id loc expr =
       Location.raise_errorf ~loc "Expected identifier"
 
 let expand ~loc ~path:_ open_decl defs =
+  let open Ast_helper in
+  let open Asttypes in
   match defs.pexp_desc with
   | Pexp_tuple exps ->
       let (module Ast_builder) = Ast_builder.make loc in

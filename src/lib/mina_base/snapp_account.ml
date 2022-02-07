@@ -4,7 +4,6 @@ open Core_kernel
 
 [%%ifdef consensus_mechanism]
 
-open Snark_params.Tick
 module Mina_numbers = Mina_numbers
 module Hash_prefix_states = Hash_prefix_states
 
@@ -49,7 +48,6 @@ module Stable = struct
   end
 end]
 
-open Pickles_types
 
 let digest_vk (t : Side_loaded_verification_key.t) =
   Random_oracle.(
@@ -70,7 +68,7 @@ module Checked = struct
     let open Random_oracle.Input.Chunked in
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
     let app_state v =
-      Random_oracle.Input.Chunked.field_elements (Vector.to_array v)
+      Random_oracle.Input.Chunked.field_elements (Pickles_types.Vector.to_array v)
     in
     Poly.Fields.fold ~init:[] ~app_state:(f app_state)
       ~verification_key:(f (fun x -> field x))
@@ -93,6 +91,7 @@ module Checked = struct
       hash ~init:Hash_prefix_states.snapp_account (pack_input (to_input' t)))
 end
 
+open Snark_params.Tick
 let typ : (Checked.t, t) Typ.t =
   let open Poly in
   Typ.of_hlistable
@@ -123,7 +122,7 @@ let to_input (t : t) =
   let open Random_oracle.Input.Chunked in
   let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
   let app_state v =
-    Random_oracle.Input.Chunked.field_elements (Vector.to_array v)
+    Random_oracle.Input.Chunked.field_elements (Pickles_types.Vector.to_array v)
   in
   Poly.Fields.fold ~init:[] ~app_state:(f app_state)
     ~verification_key:
@@ -134,7 +133,7 @@ let to_input (t : t) =
 
 let default : _ Poly.t =
   (* These are the permissions of a "user"/"non snapp" account. *)
-  { app_state = Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> F.zero)
+  { app_state = Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> F.zero)
   ; verification_key = None
   }
 

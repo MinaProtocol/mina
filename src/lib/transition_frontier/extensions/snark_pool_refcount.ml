@@ -1,5 +1,4 @@
 open Core_kernel
-open Frontier_base
 module Work = Transaction_snark_work.Statement
 
 module T = struct
@@ -66,6 +65,7 @@ module T = struct
     remove_from_table ~get_work ~get_statement:Fn.id table scan_state
 
   let create ~logger:_ frontier =
+    let open Frontier_base in
     let t =
       { refcount_table= Work.Table.create ()
       ; best_tip_table= Work.Hash_set.create () }
@@ -85,6 +85,7 @@ module T = struct
   type diff_update = {num_removed: int; is_added: bool}
 
   let handle_diffs t frontier diffs_with_mutants =
+    let open Frontier_base in
     let open Diff.Full.With_mutant in
     let {num_removed; is_added} =
       List.fold diffs_with_mutants ~init:{num_removed= 0; is_added= false}

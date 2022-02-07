@@ -26,7 +26,6 @@
 open Core_kernel
 open Pickles_types
 open Common
-open Import
 module V = Pickles_base.Side_loaded_verification_key
 
 include (
@@ -286,6 +285,7 @@ module Checked = struct
   open Step_main_inputs
   open Impl
 
+  open Import
   type t =
     { step_domains : (Field.t Domain.t Domains.t, Max_branches.n) Vector.t
           (** The domain size for proofs of each branch. *)

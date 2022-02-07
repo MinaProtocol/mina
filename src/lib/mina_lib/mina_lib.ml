@@ -2,13 +2,8 @@ open Core_kernel
 open Async
 open Unsigned
 open Mina_base
-open Mina_transition
 open Pipe_lib
-open Strict_pipe
 open Signature_lib
-open O1trace
-open Otp_lib
-open Network_peer
 module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
@@ -58,6 +53,7 @@ type processes =
   ; uptime_snark_worker_opt : Uptime_service.Uptime_snark_worker.t option
   }
 
+open Mina_transition
 type components =
   { net : Mina_networking.t
   ; transaction_pool : Network_pool.Transaction_pool.t
@@ -68,6 +64,7 @@ type components =
   ; block_produced_bvar : (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
   }
 
+open Network_peer
 type pipes =
   { validated_transitions_reader :
       External_transition.Validated.t Strict_pipe.Reader.t
@@ -115,6 +112,7 @@ type pipes =
       Strict_pipe.Writer.t
   }
 
+open Otp_lib
 type t =
   { config : Config.t
   ; processes : processes
@@ -413,6 +411,7 @@ exception Offline_shutdown
 let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
+  let open O1trace in
   let open Mina_incremental.Status in
   let restart_delay = Time.Span.of_min 5. in
   let offline_shutdown_delay = Time.Span.of_min 25. in
@@ -763,6 +762,8 @@ let initialization_finish_signal t = t.initialization_finish_signal
  *     items from the identity extension with no route for termination
  *)
 let root_diff t =
+  let open O1trace in
+  let open Strict_pipe in
   let root_diff_reader, root_diff_writer =
     Strict_pipe.create ~name:"root diff"
       (Buffered (`Capacity 30, `Overflow Crash))
@@ -1273,6 +1274,8 @@ let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
   able_to_send_or_wait ()
 
 let create ?wallets (config : Config.t) =
+  let open O1trace in
+  let open Strict_pipe in
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in

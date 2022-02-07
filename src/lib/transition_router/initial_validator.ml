@@ -1,11 +1,7 @@
 open Core_kernel
 open Async_kernel
-open Pipe_lib.Strict_pipe
 open Mina_base
-open Mina_state
 open Signature_lib
-open Mina_transition
-open Network_peer
 
 type validation_error =
   [ `Invalid_time_received of [ `Too_early | `Too_late of int64 ]
@@ -19,6 +15,7 @@ type validation_error =
 let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     ~trust_system ~sender ~transition_with_hash ~delta
     (error : validation_error) =
+  let open Mina_transition in
   let open Trust_system.Actions in
   let state_hash = With_hash.hash transition_with_hash in
   let transition = With_hash.data transition_with_hash in
@@ -52,7 +49,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         [ ("reason", `String "invalid proof")
         ; ( "protocol_state"
           , External_transition.protocol_state transition
-            |> Protocol_state.value_to_yojson )
+            |> Mina_state.Protocol_state.value_to_yojson )
         ; ( "proof"
           , External_transition.protocol_state_proof transition
             |> Proof.to_yojson )
@@ -84,7 +81,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
   [%log' debug rejected_blocks_logger]
     ~metadata:
       ( ( "protocol_state"
-        , Protocol_state.Value.to_yojson
+        , Mina_state.Protocol_state.Value.to_yojson
             (External_transition.protocol_state transition) )
       :: metadata )
     "Validation error: external transition with state hash $state_hash was \
@@ -188,6 +185,7 @@ module Duplicate_block_detector = struct
 
   let check ~precomputed_values ~rejected_blocks_logger ~time_received t logger
       external_transition_with_hash =
+    let open Mina_transition in
     let external_transition = external_transition_with_hash.With_hash.data in
     let protocol_state_hash = external_transition_with_hash.hash in
     let open Consensus.Data.Consensus_state in
@@ -231,6 +229,9 @@ end
 
 let run ~logger ~trust_system ~verifier ~transition_reader
     ~valid_transition_writer ~initialization_finish_signal ~precomputed_values =
+  let open Network_peer in
+  let open Mina_transition in
+  let open Pipe_lib.Strict_pipe in
   let genesis_state_hash =
     Precomputed_values.genesis_state_hash precomputed_values
   in
@@ -263,7 +264,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                Envelope.Incoming.data transition_env
                |> With_hash.of_data
                     ~hash_data:
-                      (Fn.compose Protocol_state.hash
+                      (Fn.compose Mina_state.Protocol_state.hash
                          External_transition.protocol_state)
              in
              Duplicate_block_detector.check ~precomputed_values

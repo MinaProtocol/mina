@@ -20,7 +20,6 @@ All upcalls and RPC request/response pairs are tested this way. *)
 
 open Core
 open Async
-open Mina_net2
 
 (* Only show stdout for failed inline tests. *)
 open Inline_test_quiet_logs
@@ -87,6 +86,7 @@ let%test_module "all-ipc test" =
       ; stream_2_msg_1 : string
       }
 
+    open Mina_net2
     let check_msg (env : 'a Network_peer.Envelope.Incoming.t) cb has_received
         expected_sender vr =
       assert (not !has_received) ;

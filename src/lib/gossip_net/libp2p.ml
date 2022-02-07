@@ -1,9 +1,5 @@
 open Core
 open Async
-open Network_peer
-open O1trace
-open Pipe_lib
-open Mina_base.Rpc_intf
 
 type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
@@ -63,6 +59,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   open Rpc_intf
 
   module T = struct
+    open Pipe_lib
+    open Network_peer
     type t =
       { config : Config.t
       ; mutable added_seeds : Peer.Hash_set.t
@@ -170,7 +168,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       match%bind
         Monitor.try_with ~here:[%here] ~rest:(`Call handle_mina_net2_exception)
           (fun () ->
-            trace "mina_net2" (fun () ->
+            O1trace.trace "mina_net2" (fun () ->
                 Mina_net2.create
                   ~all_peers_seen_metric:config.all_peers_seen_metric
                   ~on_peer_connected:(fun _ -> record_peer_connection ())
@@ -742,6 +740,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let query_peer ?heartbeat_timeout ?timeout t (peer_id : Peer.Id.t) rpc
         rpc_input =
+      let open Mina_base.Rpc_intf in
       let%bind net2 = !(t.net2) in
       match%bind
         Mina_net2.open_stream net2 ~protocol:rpc_transport_proto ~peer:peer_id
@@ -759,6 +758,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let query_peer' (type q r) ?how ?heartbeat_timeout ?timeout t
         (peer_id : Peer.Id.t) (rpc : (q, r) rpc) (qs : q list) =
+      let open Mina_base.Rpc_intf in
       let%bind net2 = !(t.net2) in
       match%bind
         Mina_net2.open_stream net2 ~protocol:rpc_transport_proto ~peer:peer_id

@@ -1,7 +1,5 @@
 open Async_kernel
 open Core_kernel
-open Pipe_lib
-open Network_peer
 
 (* Only show stdout for failed inline tests. *)
 open Inline_test_quiet_logs
@@ -38,6 +36,7 @@ let%test_module "network pool test" =
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
+      let open Pipe_lib in
       let pool_reader, _pool_writer =
         Strict_pipe.(create ~name:"Network pool test" Synchronous)
       in
@@ -76,7 +75,7 @@ let%test_module "network pool test" =
           in
           don't_wait_for
             (Mock_snark_pool.apply_and_broadcast network_pool
-               (Envelope.Incoming.local command)
+               (Network_peer.Envelope.Incoming.local command)
                (Mock_snark_pool.Broadcast_callback.Local (Fn.const ()))) ;
           let%map _ =
             Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
@@ -92,6 +91,7 @@ let%test_module "network pool test" =
 
     let%test_unit "when creating a network, the incoming diffs and local diffs \
                    in the reader pipes will automatically get process" =
+      let open Pipe_lib in
       let work_count = 10 in
       let works =
         Quickcheck.random_sequence ~seed:(`Deterministic "works")
@@ -122,7 +122,7 @@ let%test_module "network pool test" =
         in
         List.map (List.take works per_reader) ~f:create_work
         |> List.map ~f:(fun work ->
-               ( Envelope.Incoming.local work
+               ( Network_peer.Envelope.Incoming.local work
                , Mina_net2.Validation_callback.create_without_expiration () ))
         |> List.iter ~f:(fun diff ->
                Strict_pipe.Writer.write pool_writer diff

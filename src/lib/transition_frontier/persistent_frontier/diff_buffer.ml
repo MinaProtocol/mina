@@ -1,7 +1,6 @@
 (* TODO: flush on timeout interval in addition to meeting flush capacity *)
 open Async_kernel
 open Core_kernel
-open Frontier_base
 
 let max_latency
     {Genesis_constants.Constraint_constants.block_window_duration_ms; _} =
@@ -46,10 +45,10 @@ module Timer = struct
   let reset t = stop t ; start t
 end
 
-type work = {diffs: Diff.Lite.E.t list}
+type work = {diffs: Frontier_base.Diff.Lite.E.t list}
 
 type t =
-  { diff_array: Diff.Lite.E.t DynArray.t
+  { diff_array: Frontier_base.Diff.Lite.E.t DynArray.t
   ; worker: Worker.t
         (* timer unfortunately needs to be mutable to break recursion *)
   ; mutable timer: Timer.t option

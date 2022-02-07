@@ -1,6 +1,5 @@
 open Core_kernel
 open Mina_base
-open Frontier_base
 
 module Catchup_job_id = Unique_id.Int ()
 
@@ -83,6 +82,7 @@ let max_catchup_chain_length t =
   Hash_set.fold t.tips ~init:0 ~f:(fun acc tip ->
       Int.max acc (missing_length 0 (Hashtbl.find_exn t.nodes tip)) )
 
+open Frontier_base
 let create ~root =
   let root_hash = Breadcrumb.state_hash root in
   let parent = Breadcrumb.parent_hash root in

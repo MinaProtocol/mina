@@ -1,10 +1,6 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
-open Mina_transition
-open O1trace
-open Network_peer
-open Mina_numbers
 
 type Structured_log_events.t += Starting_transition_frontier_controller
   [@@deriving
@@ -18,6 +14,7 @@ let create_bufferred_pipe ?name ~f () =
 
 let is_transition_for_bootstrap ~logger
     ~(precomputed_values : Precomputed_values.t) frontier new_transition =
+  let open Mina_transition in
   let root_consensus_state =
     Transition_frontier.root frontier
     |> Transition_frontier.Breadcrumb.consensus_state_with_hash
@@ -36,11 +33,11 @@ let is_transition_for_bootstrap ~logger
   | `Take ->
       let slack = 5 in
       if
-        Length.to_int
+        Mina_numbers.Length.to_int
           ( Transition_frontier.best_tip frontier
           |> Transition_frontier.Breadcrumb.blockchain_length )
         + 290 + slack
-        < Length.to_int
+        < Mina_numbers.Length.to_int
             (Consensus.Data.Consensus_state.blockchain_length
                new_consensus_state.data)
       then (* Then our entire frontier is useless. *)
@@ -84,7 +81,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
   producer_transition_writer_ref := producer_transition_writer ;
   Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
   let new_verified_transition_reader =
-    trace_recurring "transition frontier controller" (fun () ->
+    O1trace.trace_recurring "transition frontier controller" (fun () ->
         Transition_frontier_controller.run ~logger ~trust_system ~verifier
           ~network ~time_controller ~collected_transitions ~frontier
           ~network_transition_reader:!transition_reader_ref
@@ -127,7 +124,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
   Option.iter best_seen_transition ~f:(fun best_seen_transition ->
       Strict_pipe.Writer.write bootstrap_controller_writer best_seen_transition) ;
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
-  trace_recurring "bootstrap controller" (fun () ->
+  O1trace.trace_recurring "bootstrap controller" (fun () ->
       upon
         (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
            ~consensus_local_state ~transition_reader:!transition_reader_ref
@@ -143,6 +140,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
 
 let download_best_tip ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer ~genesis_constants ~precomputed_values =
+  let open Mina_transition in
   let num_peers = 16 in
   let%bind peers = Mina_networking.random_peers network num_peers in
   [%log info] "Requesting peers for their best tip to do initialization" ;
@@ -167,7 +165,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
               ~metadata:
                 [ ("peer", Network_peer.Peer.to_yojson peer)
                 ; ( "length"
-                  , Length.to_yojson
+                  , Mina_numbers.Length.to_yojson
                       (External_transition.blockchain_length peer_best_tip.data)
                   )
                 ]
@@ -199,7 +197,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                   "Successfully verified best tip from $peer" ;
                 return
                   (Some
-                     (Envelope.Incoming.wrap_peer
+                     (Network_peer.Envelope.Incoming.wrap_peer
                         ~data:{ peer_best_tip with data = candidate_best_tip }
                         ~sender:peer)) ))
   in
@@ -231,7 +229,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
   Option.iter res ~f:(fun best ->
       let best_tip_length =
         External_transition.Initial_validated.blockchain_length best.data.data
-        |> Length.to_int
+        |> Mina_numbers.Length.to_int
       in
       Mina_metrics.Transition_frontier.update_max_blocklength_observed
         best_tip_length ;
@@ -240,7 +238,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
            best.data.data) ;
   Option.map res
     ~f:
-      (Envelope.Incoming.map ~f:(fun (x : _ Proof_carrying_data.t) ->
+      (Network_peer.Envelope.Incoming.map ~f:(fun (x : _ Proof_carrying_data.t) ->
            Ledger_catchup.Best_tip_lru.add x ;
            x.data))
 
@@ -310,6 +308,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
     ~transition_reader_ref ~transition_writer_ref
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
     ~consensus_local_state ~precomputed_values ~catchup_mode =
+  let open Mina_transition in
   let%bind () =
     if is_demo_mode then return ()
     else wait_for_high_connectivity ~logger ~network ~is_seed
@@ -342,7 +341,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
       match best_tip with
       | Some best_tip
         when is_transition_for_bootstrap ~logger frontier
-               (best_tip |> Envelope.Incoming.data)
+               (best_tip |> Network_peer.Envelope.Incoming.data)
                ~precomputed_values ->
           [%log info]
             ~metadata:
@@ -471,6 +470,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     ~most_recent_valid_block:
       (most_recent_valid_block_reader, most_recent_valid_block_writer)
     ~precomputed_values ~catchup_mode =
+  let open Mina_transition in
   let initialization_finish_signal = Ivar.create () in
   let clear_reader, clear_writer =
     Strict_pipe.create ~name:"clear" Synchronous
@@ -549,7 +549,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
           @@ Strict_pipe.Reader.iter valid_transition_reader1
                ~f:(fun enveloped_transition ->
                  let incoming_transition =
-                   Envelope.Incoming.data enveloped_transition
+                   Network_peer.Envelope.Incoming.data enveloped_transition
                  in
                  let current_transition =
                    Broadcast_pipe.Reader.peek most_recent_valid_block_reader
@@ -579,7 +579,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                  don't_wait_for
                  @@ let%map () =
                       let incoming_transition =
-                        Envelope.Incoming.data enveloped_transition
+                        Network_peer.Envelope.Incoming.data enveloped_transition
                       in
                       match Broadcast_pipe.Reader.peek frontier_r with
                       | Some frontier ->

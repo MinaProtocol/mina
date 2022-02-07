@@ -1,11 +1,8 @@
 open Core_kernel
-open Common
-open Backend
-module Me = Tock
-module Other = Tick
+module Me = Backend.Tock
+module Other = Backend.Tick
 module Impl = Impls.Wrap
 open Pickles_types
-open Import
 
 let high_entropy_bits = 128
 
@@ -13,15 +10,15 @@ let sponge_params_constant =
   Sponge.Params.(map pasta_q_3 ~f:Impl.Field.Constant.of_string)
 
 let field_random_oracle ?(length = Me.Field.size_in_bits - 1) s =
-  Me.Field.of_bits (bits_random_oracle ~length s)
+  Me.Field.of_bits (Common.bits_random_oracle ~length s)
 
 let unrelated_g =
   let group_map =
     unstage
-      (group_map
+      (Common.group_map
          (module Me.Field)
          ~a:Me.Inner_curve.Params.a ~b:Me.Inner_curve.Params.b)
-  and str = Fn.compose bits_to_bytes Me.Field.to_bits in
+  and str = Fn.compose Common.bits_to_bytes Me.Field.to_bits in
   fun (x, y) -> group_map (field_random_oracle (str x ^ str y))
 
 open Impl
@@ -29,7 +26,7 @@ open Impl
 module Other_field = struct
   type t = Impls.Step.Field.Constant.t [@@deriving sexp]
 
-  include (Tick.Field : module type of Tick.Field with type t := t)
+  include (Backend.Tick.Field : module type of Backend.Tick.Field with type t := t)
 
   let size = Impls.Step.Bigint.to_bignum_bigint size
 end
@@ -74,15 +71,15 @@ let%test_unit "sponge" =
 
 module Input_domain = struct
   let lagrange_commitments domain : Me.Inner_curve.Affine.t array =
-    let domain_size = Domain.size domain in
-    time "lagrange" (fun () ->
+    let domain_size = Import.Domain.size domain in
+    Common.time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
             (Kimchi.Protocol.SRS.Fp.lagrange_commitment
-               (Tick.Keypair.load_urs ()) domain_size i)
+               (Backend.Tick.Keypair.load_urs ()) domain_size i)
               .unshifted.(0)
             |> Common.finite_exn))
 
-  let domain = Domain.Pow_2_roots_of_unity 7
+  let domain = Import.Domain.Pow_2_roots_of_unity 7
 end
 
 module Inner_curve = struct

@@ -1,10 +1,8 @@
 open Core
 open Async
-open Cache_lib
 open Mina_base
 open Mina_transition
 open Network_peer
-open Mina_numbers
 
 module Attempt_history = struct
   module Attempt = struct
@@ -28,7 +26,7 @@ open Frontier_base
 
 module Downloader_job = struct
   type t =
-    ( State_hash.t * Length.t
+    ( State_hash.t * Mina_numbers.Length.t
     , Attempt_history.Attempt.t
     , External_transition.t )
     Downloader.Job.t
@@ -37,12 +35,13 @@ module Downloader_job = struct
     let h, l = t.key in
     `Assoc
       [ ("hash", State_hash.to_yojson h)
-      ; ("length", Length.to_yojson l)
+      ; ("length", Mina_numbers.Length.to_yojson l)
       ; ("attempts", Attempt_history.to_yojson t.attempts) ]
 
   let result (t : t) = Ivar.read t.res
 end
 
+open Cache_lib
 module Node = struct
   module State = struct
     type t =
@@ -107,7 +106,7 @@ module Node = struct
     { mutable state: State.t
     ; mutable attempts: Attempt_history.t
     ; state_hash: State_hash.t
-    ; blockchain_length: Length.t
+    ; blockchain_length: Mina_numbers.Length.t
     ; parent: State_hash.t
     ; result: ([`Added_to_frontier], Attempt_history.t) Result.t Ivar.t }
 end

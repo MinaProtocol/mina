@@ -1,10 +1,8 @@
 open Core
 open Signature_lib
 open Mina_base
-open Snark_params
 module Global_slot = Mina_numbers.Global_slot
 open Currency
-open Pickles_types
 module Impl = Pickles.Impls.Step
 
 let top_hash_logging_enabled = ref false
@@ -43,6 +41,7 @@ module Proof_type = struct
   end]
 end
 
+open Snark_params
 module Pending_coinbase_stack_state = struct
   module Init_stack = struct
     [%%versioned
@@ -456,6 +455,7 @@ let chain if_ b ~then_ ~else_ =
   let%bind then_ = then_ and else_ = else_ in
   if_ b ~then_ ~else_
 
+open Pickles_types
 module Base = struct
   module User_command_failure = struct
     (** The various ways that a user command may fail. These should be computed
@@ -2936,7 +2936,6 @@ module Transition_data = struct
 end
 
 module Merge = struct
-  open Tick
 
   (* spec for [main top_hash]:
      constraints pass iff
@@ -2949,6 +2948,7 @@ module Merge = struct
       ([ s1; s2 ] :
         (Statement.With_sok.var * (Statement.With_sok.var * _))
         Pickles_types.Hlist.HlistId.t) (s : Statement.With_sok.Checked.t) =
+    let open Tick in
     let%bind fee_excess =
       Fee_excess.combine_checked s1.Statement.fee_excess s2.Statement.fee_excess
     in
@@ -2990,6 +2990,7 @@ module Merge = struct
       | _ ->
           false
     in
+    let open Tick in
     let b = Boolean.var_of_value prev_should_verify in
     { identifier = "merge"
     ; prevs = [ self; self ]
@@ -3246,10 +3247,9 @@ module Make (Inputs : sig
   val proof_level : Genesis_constants.Proof_level.t
 end) =
 struct
-  open Inputs
 
   let tag, cache_handle, p, Pickles.Provers.[ base; merge ] =
-    system ~proof_level ~constraint_constants
+    system ~Inputs.proof_level ~Inputs.constraint_constants
 
   module Proof = (val p)
 
@@ -3388,7 +3388,7 @@ struct
     Ok { statement = s; proof }
 
   let constraint_system_digests =
-    lazy (constraint_system_digests ~constraint_constants ())
+    lazy (constraint_system_digests ~Inputs.constraint_constants ())
 end
 
 let%test_module "transaction_snark" =
@@ -5689,7 +5689,6 @@ let%test_module "account timing check" =
     open Core_kernel
     open Mina_numbers
     open Currency
-    open Transaction_validator.For_tests
 
     (* test that unchecked and checked calculations for timing agree *)
 
@@ -5757,6 +5756,7 @@ let%test_module "account timing check" =
       in
       Or_error.is_error @@ Tick.run_and_check checked_timing_computation ()
 
+    open Transaction_validator.For_tests
     let%test "before_cliff_time" =
       let pk = Public_key.Compressed.empty in
       let account_id = Account_id.create pk Token_id.default in

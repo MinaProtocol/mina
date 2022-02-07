@@ -1,7 +1,6 @@
 open Core_kernel
 open Async
 open Currency
-open Pipe_lib
 
 module Make_test (Make_selection_method : Intf.Make_selection_method_intf) =
 struct
@@ -21,12 +20,12 @@ struct
   let precomputed_values = Precomputed_values.for_unit_tests
 
   let init_state sl reassignment_wait logger =
-    let tf_reader, tf_writer = Broadcast_pipe.create None in
+    let tf_reader, tf_writer = Pipe_lib.Broadcast_pipe.create None in
     let work_state =
       Lib.State.init ~reassignment_wait ~frontier_broadcast_pipe:tf_reader
         ~logger
     in
-    let%map () = Broadcast_pipe.Writer.write tf_writer (Some sl) in
+    let%map () = Pipe_lib.Broadcast_pipe.Writer.write tf_writer (Some sl) in
     work_state
 
   let%test_unit "Workspec chunk doesn't send same things again" =

@@ -1,7 +1,6 @@
 open Core
 open Signed
 open Unsigned
-open Num_util
 
 include Mina_numbers.Nat.Make32 ()
 
@@ -13,7 +12,7 @@ let of_time_exn ~(constants : Constants.t) t : t =
       (Invalid_argument
          "Epoch.of_time: time is earlier than genesis block timestamp") ;
   let time_since_genesis = Time.diff t constants.genesis_state_timestamp in
-  uint32_of_int64
+  Num_util.uint32_of_int64
     Int64.Infix.(
       Time.Span.to_ms time_since_genesis
       / Time.Span.(to_ms constants.epoch_duration))
@@ -23,7 +22,7 @@ let start_time ~(constants : Constants.t) (epoch : t) =
     let open Int64.Infix in
     Block_time.Span.to_ms
       Block_time.(to_span_since_epoch constants.genesis_state_timestamp)
-    + (int64_of_uint32 epoch * Block_time.Span.(to_ms constants.epoch_duration))
+    + (Num_util.int64_of_uint32 epoch * Block_time.Span.(to_ms constants.epoch_duration))
   in
   Block_time.of_span_since_epoch (Block_time.Span.of_ms ms)
 
@@ -35,7 +34,7 @@ let slot_start_time ~(constants : Constants.t) (epoch : t) (slot : Slot.t) =
     (start_time epoch ~constants)
     (Block_time.Span.of_ms
        Int64.Infix.(
-         int64_of_uint32 slot * Time.Span.to_ms constants.slot_duration_ms))
+         Num_util.int64_of_uint32 slot * Time.Span.to_ms constants.slot_duration_ms))
 
 let slot_end_time ~(constants : Constants.t) (epoch : t) (slot : Slot.t) =
   Time.add (slot_start_time epoch slot ~constants) constants.slot_duration_ms
@@ -44,7 +43,7 @@ let epoch_and_slot_of_time_exn ~(constants : Constants.t) tm : t * Slot.t =
   let epoch = of_time_exn tm ~constants in
   let time_since_epoch = Block_time.diff tm (start_time epoch ~constants) in
   let slot =
-    uint32_of_int64
+    Num_util.uint32_of_int64
     @@ Int64.Infix.(
          Time.Span.to_ms time_since_epoch
          / Time.Span.to_ms constants.slot_duration_ms)

@@ -3,7 +3,6 @@ open Async_kernel
 module Work = Transaction_snark_work.Statement
 module Ledger_proof = Ledger_proof
 module Work_info = Transaction_snark_work.Info
-open Network_peer
 
 module Rejected = struct
   [%%versioned
@@ -96,7 +95,7 @@ module Make
         "Rejecting snark work $work from $sender: $reason"
         ~metadata:
           [ ("work", Work.compact_json work)
-          ; ("sender", Envelope.Sender.to_yojson sender)
+          ; ("sender", Network_peer.Envelope.Sender.to_yojson sender)
           ; ("reason", `String reason)
           ] ;
       Or_error.error_string reason
@@ -115,7 +114,7 @@ module Make
         | _ ->
             failwith "compare didn't return -1, 0, or 1!" )
 
-  let verify pool ({ data; sender; _ } as t : t Envelope.Incoming.t) =
+  let verify pool ({ data; sender; _ } as t : t Network_peer.Envelope.Incoming.t) =
     match data with
     | Empty ->
         Deferred.Or_error.error_string "cannot verify empty snark pool diff"
@@ -136,8 +135,8 @@ module Make
               Deferred.return (Error e) )
 
   (* This is called after verification has occurred.*)
-  let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
-    let { Envelope.Incoming.data = diff; sender; _ } = t in
+  let unsafe_apply (pool : Pool.t) (t : t Network_peer.Envelope.Incoming.t) =
+    let Network_peer.{ Envelope.Incoming.data = diff; sender; _ } = t in
     match diff with
     | Empty ->
         Deferred.return

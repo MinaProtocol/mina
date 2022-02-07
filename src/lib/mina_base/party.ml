@@ -18,9 +18,7 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 [%%endif]
 
 module Impl = Pickles.Impls.Step
-open Mina_numbers
 open Currency
-open Pickles_types
 module Digest = Random_oracle.Digest
 
 module type Type = sig
@@ -89,7 +87,7 @@ module Update = struct
 
   let noop : t =
     { app_state =
-        Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> Set_or_keep.Keep)
+        Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> Set_or_keep.Keep)
     ; delegate = Keep
     ; verification_key = Keep
     ; permissions = Keep
@@ -364,6 +362,7 @@ module Predicated = struct
   end
 
   module Signed = struct
+    open Mina_numbers
     [%%versioned
     module Stable = struct
       module V1 = struct

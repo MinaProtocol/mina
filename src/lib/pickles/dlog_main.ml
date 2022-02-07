@@ -1,14 +1,9 @@
 module type Inputs = Intf.Wrap_main_inputs.S
 
 module S = Sponge
-open Backend
 open Core_kernel
-open Util
 module SC = Scalar_challenge
 open Pickles_types
-open Dlog_plonk_types
-open Tuple_lib
-open Import
 
 (* given [chals], compute
    \prod_i (1 / chals.(i) + chals.(i) * x^{2^i}) *)
@@ -35,9 +30,9 @@ let b_poly ~one ~add ~mul chals =
 
 module Make
     (Inputs : Inputs
-                with type Impl.field = Tock.Field.t
-                 and type Impl.Bigint.t = Tock.Bigint.R.t
-                 and type Inner_curve.Constant.Scalar.t = Tick.Field.t) =
+                with type Impl.field = Backend.Tock.Field.t
+                 and type Impl.Bigint.t = Backend.Tock.Bigint.R.t
+                 and type Inner_curve.Constant.Scalar.t = Backend.Tick.Field.t) =
 struct
   open Inputs
   open Impl
@@ -70,6 +65,7 @@ struct
     end
   end
 
+  open Import
   let print_g lab (x, y) =
     if debug then
       as_prover
@@ -111,7 +107,7 @@ struct
   let product m f = List.reduce_exn (List.init m ~f) ~f:Field.( * )
 
   let absorb sponge ty t =
-    absorb
+    Util.absorb
       ~mask_g1_opt:(fun () -> assert false)
       ~absorb_field:(Sponge.absorb sponge)
       ~g1_to_field_elements:Inner_curve.to_field_elements
@@ -168,6 +164,7 @@ struct
   type 'a index = 'a Plonk_verification_key_evals.t
 
   (* Mask out the given vector of indices with the given one-hot vector *)
+  open Tuple_lib
   let choose_key :
       type n.
          n One_hot_vector.t
@@ -341,6 +338,7 @@ struct
 
   let scale_fast = Ops.scale_fast
 
+  open Dlog_plonk_types
   let check_bulletproof ~pcs_batch ~(sponge : Sponge.t)
       ~(xi : Scalar_challenge.t)
       ~(combined_inner_product : Other_field.Packed.t Shifted_value.Type1.t)
@@ -423,7 +421,7 @@ struct
     in
     let length = Pseudo.choose (choice, lengths) ~f:Field.of_int in
     let (T max) = Nat.of_int max in
-    Vector.to_array (ones_vector (module Impl) ~first_zero:length max)
+    Vector.to_array (Util.ones_vector (module Impl) ~first_zero:length max)
 
   module Plonk = Types.Dlog_based.Proof_state.Deferred_values.Plonk
 
@@ -478,7 +476,7 @@ struct
             Pseudo.choose (which_branch, step_widths) ~f:Field.of_int
           in
           Vector.map2
-            (ones_vector (module Impl) ~first_zero:actual_width Max_branching.n)
+            (Util.ones_vector (module Impl) ~first_zero:actual_width Max_branching.n)
             sg_old
             ~f:(fun keep sg -> [| (keep, sg) |]))
     in
@@ -832,7 +830,7 @@ struct
                     Vector.map sg_olds ~f:(fun f -> [| f pt |])
                 | Some branching ->
                     let mask =
-                      ones_vector
+                      Util.ones_vector
                         (module Impl)
                         ~first_zero:branching (Vector.length sg_olds)
                     in

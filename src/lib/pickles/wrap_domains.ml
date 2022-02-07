@@ -1,11 +1,10 @@
 open Core_kernel
 open Pickles_types
 open Import
-open Poly_types
 open Hlist
 
 (* Compute the domains corresponding to wrap_main *)
-module Make (A : T0) (A_value : T0) = struct
+module Make (A : Poly_types.T0) (A_value : Poly_types.T0) = struct
   module I = Inductive_rule.T (A) (A_value)
 
   let prev (type xs ys ws hs) ~self ~(choices : (xs, ys, ws, hs) H4.T(I).t) =

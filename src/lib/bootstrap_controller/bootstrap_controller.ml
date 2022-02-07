@@ -1,12 +1,8 @@
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core
 open Async
 open Mina_base
-open Mina_state
-open Pipe_lib.Strict_pipe
 open Mina_transition
-open Network_peer
 
 type Structured_log_events.t += Bootstrap_complete
   [@@deriving register_event { msg = "Bootstrap state: complete." }]
@@ -96,10 +92,10 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip peer_root
     t.current_root |> External_transition.Initial_validated.blockchain_state
   in
   let expected_staged_ledger_hash =
-    blockchain_state |> Blockchain_state.staged_ledger_hash
+    blockchain_state |> Mina_state.Blockchain_state.staged_ledger_hash
   in
   let snarked_ledger_hash =
-    blockchain_state |> Blockchain_state.snarked_ledger_hash
+    blockchain_state |> Mina_state.Blockchain_state.snarked_ledger_hash
   in
   return
   @@
@@ -119,6 +115,7 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip peer_root
   | `Repeat ->
       `Ignored
 
+open Network_peer
 let on_transition t ~sender ~root_sync_ledger ~genesis_constants
     candidate_transition =
   let candidate_consensus_state =
@@ -153,6 +150,7 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
 
 let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
     ~sync_ledger_reader ~genesis_constants =
+  let open Pipe_lib.Strict_pipe in
   let query_reader = Sync_ledger.Db.query_reader root_sync_ledger in
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
   Mina_networking.glue_sync_ledger ~preferred t.network query_reader
@@ -205,6 +203,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     ~transition_reader ~best_seen_transition ~persistent_root
     ~persistent_frontier ~initial_root_transition ~precomputed_values
     ~catchup_mode =
+  let open Pipe_lib.Strict_pipe in
   let genesis_constants =
     Precomputed_values.genesis_constants precomputed_values
   in
@@ -594,9 +593,9 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     Gauge.set Bootstrap.bootstrap_time_ms Core.Time.(Span.to_ms @@ time_elapsed)) ;
   result
 
+open Inline_test_quiet_logs
 let%test_module "Bootstrap_controller tests" =
   ( module struct
-    open Pipe_lib
 
     let max_frontier_length =
       Transition_frontier.global_max_length Genesis_constants.compiled
@@ -651,6 +650,7 @@ let%test_module "Bootstrap_controller tests" =
 
     let%test_unit "Bootstrap controller caches all transitions it is passed \
                    through the transition_reader" =
+      let open Pipe_lib.Strict_pipe in
       let branch_size = (max_frontier_length * 2) + 2 in
       Quickcheck.test ~trials:1
         (let open Quickcheck.Generator.Let_syntax in
@@ -698,10 +698,10 @@ let%test_module "Bootstrap_controller tests" =
               in
               let%bind () =
                 Deferred.List.iter branch ~f:(fun breadcrumb ->
-                    Strict_pipe.Writer.write sync_ledger_writer
+                    Pipe_lib.Strict_pipe.Writer.write sync_ledger_writer
                       (downcast_breadcrumb ~sender:other.peer breadcrumb))
               in
-              Strict_pipe.Writer.close sync_ledger_writer ;
+              Pipe_lib.Strict_pipe.Writer.close sync_ledger_writer ;
               sync_deferred) ;
           let expected_transitions =
             List.map branch
@@ -789,6 +789,7 @@ let%test_module "Bootstrap_controller tests" =
           : External_transition.t )
 
     let%test_unit "sync with one node after receiving a transition" =
+      let open Pipe_lib.Strict_pipe in
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length

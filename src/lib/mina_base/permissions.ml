@@ -1,11 +1,9 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Util
 
 [%%ifdef consensus_mechanism]
 
-open Snark_params.Tick
 module Mina_numbers = Mina_numbers
 
 [%%else]
@@ -53,6 +51,7 @@ module Ledger_hash = Ledger_hash0
      "Making sense" can be captured by the idea that these are the *increasing*
      boolean functions on the type { has_valid_signature: bool; has_valid_proof: bool }.
   *)
+open Snark_params.Tick
 module Auth_required = struct
   [%%versioned
   module Stable = struct
@@ -265,7 +264,7 @@ module Auth_required = struct
 
   [%%endif]
 
-  let to_input x = Encoding.to_input (encode x) ~field_of_bool
+  let to_input x = Encoding.to_input (encode x) ~Util.field_of_bool
 
   let check (t : t) (c : Control.Tag.t) =
     match (t, c) with
@@ -374,7 +373,7 @@ let typ =
 
 [%%endif]
 
-let to_input (x : t) = Poly.to_input ~field_of_bool Auth_required.to_input x
+let to_input (x : t) = Poly.to_input ~Util.field_of_bool Auth_required.to_input x
 
 let user_default : t =
   { stake = true

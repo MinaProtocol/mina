@@ -1,6 +1,5 @@
 open Core
 open Async_kernel
-open Network_peer
 module Id = Libp2p_ipc.Subscription_id
 
 type 'a t =
@@ -8,10 +7,10 @@ type 'a t =
   ; id : Id.t
   ; mutable closed : bool
   ; validator :
-      'a Envelope.Incoming.t -> Validation_callback.t -> unit Deferred.t
+      'a Network_peer.Envelope.Incoming.t -> Validation_callback.t -> unit Deferred.t
   ; encode : 'a -> string
   ; on_decode_failure :
-      [ `Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit ]
+      [ `Ignore | `Call of string Network_peer.Envelope.Incoming.t -> Error.t -> unit ]
   ; decode : string -> 'a Or_error.t
   }
 
@@ -49,15 +48,15 @@ let unsubscribe ~helper sub =
     sub.closed <- true
   else Deferred.Or_error.error_string "already unsubscribed"
 
-let handle_and_validate sub ~validation_expiration ~(sender : Peer.t)
+let handle_and_validate sub ~validation_expiration ~(sender : Network_peer.Peer.t)
     ~data:raw_data =
   let open Libp2p_ipc.Reader.ValidationResult in
   let wrap_message data =
     if
       Unix.Inet_addr.equal sender.host (Unix.Inet_addr.of_string "127.0.0.1")
       && Int.equal sender.libp2p_port 0
-    then Envelope.Incoming.local data
-    else Envelope.Incoming.wrap_peer ~sender ~data
+    then Network_peer.Envelope.Incoming.local data
+    else Network_peer.Envelope.Incoming.wrap_peer ~sender ~data
   in
   match sub.decode raw_data with
   | Ok data -> (

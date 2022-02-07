@@ -3,7 +3,6 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Util
 
 [%%ifdef consensus_mechanism]
 
@@ -21,9 +20,6 @@ module Mina_compile_config =
 [%%endif]
 
 open Currency
-open Mina_numbers
-open Fold_lib
-open Import
 
 module Index = struct
   [%%versioned
@@ -62,11 +58,11 @@ module Index = struct
   let of_bits = List.foldi ~init:Vector.empty ~f:(fun i t b -> Vector.set t i b)
 
   let to_input ~ledger_depth x =
-    List.map (to_bits ~ledger_depth x) ~f:(fun b -> (field_of_bool b, 1))
+    List.map (to_bits ~ledger_depth x) ~f:(fun b -> (Util.field_of_bool b, 1))
     |> List.to_array |> Random_oracle.Input.Chunked.packeds
 
   let fold_bits ~ledger_depth t =
-    { Fold.fold =
+    Fold_lib.{ Fold.fold =
         (fun ~init ~f ->
           let rec go acc i =
             if i = ledger_depth then acc else go (f acc (Vector.get t i)) (i + 1)
@@ -75,7 +71,7 @@ module Index = struct
     }
 
   let fold ~ledger_depth t =
-    Fold.group3 ~default:false (fold_bits ~ledger_depth t)
+    Fold_lib.Fold.group3 ~default:false (fold_bits ~ledger_depth t)
 
   [%%ifdef consensus_mechanism]
 
@@ -97,6 +93,7 @@ module Index = struct
   [%%endif]
 end
 
+open Mina_numbers
 module Nonce = Account_nonce
 
 module Poly = struct
@@ -132,6 +129,7 @@ module Poly = struct
   end]
 end
 
+open Import
 module Key = struct
   [%%versioned
   module Stable = struct

@@ -1,7 +1,6 @@
-open Ppxlib
-open Asttypes
-open Parsetree
-open Longident
+open Ppxlib.Asttypes
+open Ppxlib.Parsetree
+open Ppxlib.Longident
 open Core
 
 let hashes ~constraint_constants ~loc =
@@ -219,10 +218,10 @@ let main () =
   in
   if Array.mem ~equal:String.equal Sys.argv "--download-keys" then
     Key_cache.set_downloads_enabled true ;
-  let%bind str = str ~proof_level ~constraint_constants ~loc:Location.none in
+  let%bind str = str ~proof_level ~constraint_constants ~loc:Ppxlib.Location.none in
   (* End comment started at the top of this function *)
   Format.printf "*)@." ;
-  Pprintast.top_phrase Format.std_formatter (Ptop_def str) ;
+  Ppxlib.Pprintast.top_phrase Format.std_formatter (Ptop_def str) ;
   exit 0
 
 let () =

@@ -4,8 +4,6 @@ open Core_kernel
 
 [%%ifdef consensus_mechanism]
 
-open Snark_bits
-open Bitstring_lib
 open Snark_params
 open Tick
 open Let_syntax
@@ -18,7 +16,6 @@ module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
 
 [%%endif]
 
-open Intf
 module Signed_poly = Signed_poly
 
 type uint64 = Unsigned.uint64
@@ -47,7 +44,7 @@ end) : sig
   [%%ifdef consensus_mechanism]
 
   include
-    S
+    Intf.S
       with type t = Unsigned.t
        and type var = Field.Var.t
        and type Signed.var = Field.Var.t Signed_var.t
@@ -149,9 +146,9 @@ end = struct
       if b then Infix.(v lor (one lsl i)) else Infix.(v land lognot (one lsl i))
   end
 
-  module B = Bits.Vector.Make (Vector)
+  module B = Snark_bits.Bits.Vector.Make (Vector)
 
-  include (B : Bits_intf.Convertible_bits with type t := t)
+  include (B : Snark_bits.Bits_intf.Convertible_bits with type t := t)
 
   [%%ifdef consensus_mechanism]
 
@@ -167,7 +164,7 @@ end = struct
 
   let var_to_bits_ (t : var) = Field.Checked.unpack ~length:length_in_bits t
 
-  let var_to_bits t = var_to_bits_ t >>| Bitstring.Lsb_first.of_list
+  let var_to_bits t = var_to_bits_ t >>| Bitstring_lib.Bitstring.Lsb_first.of_list
 
   let var_to_input (t : var) =
     Random_oracle.Input.Chunked.packed (t, length_in_bits)
@@ -859,7 +856,7 @@ module Balance = struct
 
   [%%ifdef consensus_mechanism]
 
-  include (Amount : Basic with type t := t with type var = Amount.var)
+  include (Amount : Intf.Basic with type t := t with type var = Amount.var)
 
   [%%else]
 
@@ -912,7 +909,6 @@ let%test_module "sub_flagged module" =
   ( module struct
     [%%ifdef consensus_mechanism]
 
-    open Tick
 
     module type Sub_flagged_S = sig
       type t
@@ -928,13 +924,13 @@ let%test_module "sub_flagged module" =
 
       val ( - ) : t -> t -> t option
 
-      val typ : (var, t) Typ.t
+      val typ : (var, t) Tick.Typ.t
 
       val gen : t Quickcheck.Generator.t
 
       module Checked : sig
         val sub_flagged :
-          var -> var -> (var * [ `Underflow of Boolean.var ], 'a) Tick.Checked.t
+          var -> var -> (var * [ `Underflow of Tick.Boolean.var ], 'a) Tick.Checked.t
       end
     end
 
@@ -949,8 +945,8 @@ let%test_module "sub_flagged module" =
           Snarky_backendless.Checked.map (M.Checked.sub_flagged x y)
             ~f:(fun (r, `Underflow u) -> (r, u))
         in
-        Test_util.checked_to_unchecked (Typ.tuple2 typ typ)
-          (Typ.tuple2 typ Boolean.typ)
+        Test_util.checked_to_unchecked (Tick.Typ.tuple2 typ typ)
+          (Tick.Typ.tuple2 typ Tick.Boolean.typ)
           f
       in
       Quickcheck.test ~trials:100 (Quickcheck.Generator.tuple2 gen gen)

@@ -3,28 +3,24 @@ open Core_kernel
 open Async_kernel
 module P = Proof
 open Pickles_types
-open Poly_types
 open Hlist
 open Backend
-open Tuple_lib
 open Import
-open Types
-open Common
 
 (* This contains the "step" prover *)
 
 module Make
-    (A : T0) (A_value : sig
+    (A : Poly_types.T0) (A_value : sig
       type t
 
       val to_field_elements : t -> Tick.Field.t array
     end)
     (Max_branching : Nat.Add.Intf_transparent) =
 struct
-  let double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
+  let double_zip = Tuple_lib.Double.map2 ~f:Core_kernel.Tuple2.create
 
   module E = struct
-    type t = Tock.Field.t array Dlog_plonk_types.Evals.t Double.t * Tock.Field.t
+    type t = Tock.Field.t array Dlog_plonk_types.Evals.t Tuple_lib.Double.t * Tock.Field.t
   end
 
   module Plonk_checks = struct
@@ -64,6 +60,8 @@ struct
       P.Base.Pairing_based.t
       Deferred.t =
     let _, prev_vars_length = branch_data.branching in
+    let open Common in
+    let open Types in
     let T = Length.contr prev_vars_length prevs_length in
     let (module Req) = branch_data.requests in
     let T = Hlist.Length.contr (snd branch_data.branching) prev_vars_length in
@@ -86,7 +84,7 @@ struct
       branch_data.rule.main_value prevs next_state
     in
     let module X_hat = struct
-      type t = Tock.Field.t Double.t
+      type t = Tock.Field.t Tuple_lib.Double.t
     end in
     let module Statement_with_hashes = struct
       type t =
@@ -141,7 +139,7 @@ struct
           let combined_evals =
             Plonk_checks.evals_of_split_evals
               (module Tick.Field)
-              (Double.map t.prev_evals.evals ~f:(fun e -> e.evals))
+              (Tuple_lib.Double.map t.prev_evals.evals ~f:(fun e -> e.evals))
               ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw
           in
           let plonk_minimal =
@@ -614,7 +612,7 @@ struct
                Dlog_plonk_types.All_evals.
                  { ft_eval1
                  ; evals =
-                     Double.map2 es x_hat ~f:(fun es x_hat ->
+                     Tuple_lib.Double.map2 es x_hat ~f:(fun es x_hat ->
                          { With_public_input.evals = es; public_input = x_hat })
                  }))
           lte Max_branching.n Dummy.evals

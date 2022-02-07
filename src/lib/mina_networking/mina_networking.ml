@@ -1,11 +1,8 @@
 open Core
 open Async
 open Mina_base
-open Mina_state
-open Mina_transition
 open Network_peer
 open Network_pool
-open Pipe_lib
 
 let refused_answer_query_string = "Refused to answer_query"
 
@@ -55,6 +52,7 @@ type Structured_log_events.t +=
  *      new constructor to the new module for your RPC
  *   - add a match case to `match_handler`, below
  *)
+open Mina_transition
 module Rpcs = struct
   (* for versioning of the types here, see
 
@@ -1029,6 +1027,7 @@ module Config = struct
   [@@deriving make]
 end
 
+open Pipe_lib
 type t =
   { logger : Logger.t
   ; trust_system : Trust_system.t
@@ -1503,8 +1502,8 @@ let create (config : Config.t)
               (Core.Time.abs_diff
                  Block_time.(now config.time_controller |> to_time)
                  ( External_transition.protocol_state state
-                 |> Protocol_state.blockchain_state
-                 |> Blockchain_state.timestamp |> Block_time.to_time )) ;
+                 |> Mina_state.Protocol_state.blockchain_state
+                 |> Mina_state.Blockchain_state.timestamp |> Block_time.to_time )) ;
             Mina_metrics.(Gauge.inc_one Network.new_state_received) ;
             if config.log_gossip_heard.new_state then
               [%str_log info]

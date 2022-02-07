@@ -1,7 +1,6 @@
 open Async_kernel
 open Core
 open Mina_base
-open Mina_state
 open Mina_transition
 open Frontier_base
 module Database = Database
@@ -11,6 +10,7 @@ exception Invalid_genesis_state_hash of External_transition.Validated.t
 let construct_staged_ledger_at_root
     ~(precomputed_values : Precomputed_values.t) ~root_ledger ~root_transition
     ~root ~protocol_states ~logger =
+  let open Mina_state in
   let open Deferred.Or_error.Let_syntax in
   let open Root_data.Minimal in
   let snarked_ledger_hash =
@@ -185,6 +185,7 @@ module Instance = struct
   let load_full_frontier t ~root_ledger ~consensus_local_state ~max_length
       ~ignore_consensus_local_state ~precomputed_values
       ~persistent_root_instance =
+    let open Mina_state in
     let open Deferred.Result.Let_syntax in
     let downgrade_transition transition genesis_state_hash :
         ( External_transition.Almost_validated.t

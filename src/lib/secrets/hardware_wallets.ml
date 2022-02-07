@@ -1,4 +1,3 @@
-open Snark_params
 open Core
 open Signature_lib
 open Mina_base
@@ -102,7 +101,7 @@ let sign ~hd_index ~public_key ~user_command_payload :
   in
   let fields = Random_oracle.Legacy.pack_input input in
   let messages =
-    Array.map fields ~f:(fun field -> Tick.Field.to_string field)
+    Array.map fields ~f:(fun field -> Snark_params.Tick.Field.to_string field)
   in
   if Array.length messages <> 2 then
     Deferred.Result.fail "Malformed user command"

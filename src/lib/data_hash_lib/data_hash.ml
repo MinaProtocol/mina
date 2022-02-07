@@ -7,7 +7,6 @@ open Core_kernel
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-open Bitstring_lib
 
 [%%else]
 
@@ -52,7 +51,7 @@ struct
 
   type var =
     { digest : Random_oracle.Checked.Digest.t
-    ; mutable bits : Boolean.var Bitstring.Lsb_first.t option
+    ; mutable bits : Boolean.var Bitstring_lib.Bitstring.Lsb_first.t option
     }
 
   let var_of_t t =
@@ -60,7 +59,7 @@ struct
     { digest = Field.Var.constant t
     ; bits =
         Some
-          (Bitstring.Lsb_first.of_list
+          (Bitstring_lib.Bitstring.Lsb_first.of_list
              (List.init M.length_in_bits ~f:(fun i ->
                   Boolean.var_of_value (Bigint.test_bit n i))))
     }
@@ -82,7 +81,7 @@ struct
         return (bits :> Boolean.var list)
     | None ->
         let%map bits = unpack t.digest in
-        t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;
+        t.bits <- Some (Bitstring_lib.Bitstring.Lsb_first.of_list bits) ;
         bits
 
   let var_to_input (t : var) = Random_oracle.Input.Chunked.field t.digest

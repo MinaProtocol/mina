@@ -1,7 +1,5 @@
 open Async
 open Core
-open Pipe_lib
-open O1trace
 
 exception Libp2p_helper_died_unexpectedly
 
@@ -233,9 +231,9 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
         }
       in
       termination_handler := handle_libp2p_helper_termination t ~pids ;
-      trace_recurring_task "process libp2p_helper stderr" (fun () ->
+      O1trace.trace_recurring_task "process libp2p_helper stderr" (fun () ->
           Child_processes.stderr process
-          |> Strict_pipe.Reader.iter ~f:(fun line ->
+          |> Pipe_lib.Strict_pipe.Reader.iter ~f:(fun line ->
                  let record_result =
                    let open Result.Let_syntax in
                    let%bind json =
@@ -255,10 +253,10 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
                         $error"
                        ~metadata:[ ("error", `String error) ] ) ;
                  Deferred.unit)) ;
-      trace_recurring_task "process libp2p_helper stdout" (fun () ->
+      O1trace.trace_recurring_task "process libp2p_helper stdout" (fun () ->
           Child_processes.stdout process
           |> Libp2p_ipc.read_incoming_messages
-          |> Strict_pipe.Reader.iter ~f:(function
+          |> Pipe_lib.Strict_pipe.Reader.iter ~f:(function
                | Ok msg ->
                    msg |> Libp2p_ipc.Reader.DaemonInterface.Message.get
                    |> handle_incoming_message t ~handle_push_message

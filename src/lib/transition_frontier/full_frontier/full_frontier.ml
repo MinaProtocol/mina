@@ -1,7 +1,6 @@
 open Core_kernel
 open Mina_base
 open Mina_state
-open Mina_transition
 open Frontier_base
 
 module Node = struct
@@ -92,7 +91,7 @@ let find_protocol_state (t : t) hash =
   | Some breadcrumb ->
       Some
         ( Breadcrumb.validated_transition breadcrumb
-        |> External_transition.Validated.protocol_state )
+        |> Mina_transition.External_transition.Validated.protocol_state )
 
 let root t = find_exn t t.root
 
@@ -113,13 +112,13 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
   let open Root_data in
   let transition_receipt_time = None in
   let root_hash =
-    External_transition.Validated.state_hash root_data.transition
+    Mina_transition.External_transition.Validated.state_hash root_data.transition
   in
   let protocol_states_for_root_scan_state =
     State_hash.Map.of_alist_exn root_data.protocol_states
   in
   let root_protocol_state =
-    External_transition.Validated.protocol_state root_data.transition
+    Mina_transition.External_transition.Validated.protocol_state root_data.transition
   in
   let root_blockchain_state =
     Protocol_state.blockchain_state root_protocol_state
@@ -392,7 +391,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
     (* STEP 1 *)
     List.iter garbage ~f:(fun node ->
         let open Diff.Node_list in
-        let hash = External_transition.Validated.state_hash node.transition in
+        let hash = Mina_transition.External_transition.Validated.state_hash node.transition in
         let breadcrumb = find_exn t hash in
         let mask = Breadcrumb.mask breadcrumb in
         (* this should get garbage collected and should not require additional destruction *)
@@ -618,7 +617,7 @@ module Metrics = struct
   let has_coinbase b =
     let d1, d2 =
       ( Breadcrumb.validated_transition b
-      |> External_transition.Validated.staged_ledger_diff )
+      |> Mina_transition.External_transition.Validated.staged_ledger_diff )
         .diff
     in
     match (d1.coinbase, d2) with

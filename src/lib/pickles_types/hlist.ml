@@ -1,5 +1,13 @@
 open Core_kernel
-open Poly_types
+open struct
+  open Poly_types
+  module type T4 = T4
+  module type T3 = T3
+  module type T2 = T2
+  module type T0 = T0
+  module type T1 = T1
+end
+
 
 module E13 (T : T1) = struct
   type ('a, _, _) t = 'a T.t

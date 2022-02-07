@@ -225,7 +225,6 @@ module Breadcrumb_added = struct
 end
 
 module Gossip = struct
-  open Or_error.Let_syntax
 
   module Direction = struct
     type t = Sent | Received [@@deriving yojson]
@@ -245,6 +244,7 @@ module Gossip = struct
     let id = Mina_networking.block_received_structured_events_id
 
     let parse_func message =
+      let open Or_error.Let_syntax in
       match%bind parse id message with
       | Mina_networking.Block_received { state_hash; sender = _ } ->
           Ok ({ state_hash }, Direction.Received)
@@ -267,6 +267,7 @@ module Gossip = struct
     let id = Mina_networking.snark_work_received_structured_events_id
 
     let parse_func message =
+      let open Or_error.Let_syntax in
       match%bind parse id message with
       | Mina_networking.Snark_work_received { work; sender = _ } ->
           Ok ({ work }, Direction.Received)
@@ -290,6 +291,7 @@ module Gossip = struct
     let id = Mina_networking.transactions_received_structured_events_id
 
     let parse_func message =
+      let open Or_error.Let_syntax in
       match%bind parse id message with
       | Mina_networking.Transactions_received { txns; sender = _ } ->
           Ok ({ txns }, Direction.Received)

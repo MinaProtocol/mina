@@ -5,7 +5,6 @@ open Core_kernel
 [%%ifdef consensus_mechanism]
 
 open Snark_params
-open Tick
 
 [%%else]
 
@@ -108,6 +107,7 @@ let to_record t =
         ; vesting_increment
         }
 
+open Tick
 let to_input t =
   let As_record.
         { is_timed

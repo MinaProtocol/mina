@@ -6,7 +6,6 @@ open Core
 
 open Async_kernel
 open Mina_base
-open Mina_transition
 include Frontier_base
 module Full_frontier = Full_frontier
 module Extensions = Extensions
@@ -51,7 +50,7 @@ type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
 
 let genesis_root_data ~precomputed_values =
   let open Root_data.Limited in
-  let transition = External_transition.genesis ~precomputed_values in
+  let transition = Mina_transition.External_transition.genesis ~precomputed_values in
   let constraint_constants = precomputed_values.constraint_constants in
   let scan_state = Staged_ledger.Scan_state.empty ~constraint_constants () in
   (*if scan state is empty the protocol states required is also empty*)
@@ -453,11 +452,11 @@ end
 module For_tests = struct
   open Signature_lib
   module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
-  open Full_frontier.For_tests
 
   let proxy2 f {full_frontier= x; _} {full_frontier= y; _} = f x y
 
-  let equal = proxy2 equal
+  let equal = let open Full_frontier.For_tests in
+              proxy2 equal
 
   let load_with_max_length = load_with_max_length
 
@@ -496,7 +495,7 @@ module For_tests = struct
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let transition_receipt_time = Some (Time.now ()) in
         let genesis_transition =
-          External_transition.For_tests.genesis ~precomputed_values
+          Mina_transition.External_transition.For_tests.genesis ~precomputed_values
         in
         let genesis_ledger =
           Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
@@ -646,7 +645,7 @@ module For_tests = struct
     ) ;
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
         Persistent_root.Instance.set_root_state_hash instance
-          (External_transition.Validated.state_hash
+          (Mina_transition.External_transition.Validated.state_hash
              (Root_data.Limited.transition root_data)) ;
         ignore
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger

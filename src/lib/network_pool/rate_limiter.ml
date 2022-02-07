@@ -1,5 +1,4 @@
 open Core
-open Network_peer
 
 (*
    We maintain, for each "attribute" (IP, peer ID), how many operations have we
@@ -118,7 +117,7 @@ module Ip = struct
 end
 
 module Peer_id = struct
-  module Hash_queue = Hash_queue.Make (Peer.Id)
+  module Hash_queue = Hash_queue.Make (Network_peer.Peer.Id)
   module Lru = Lru_table (Hash_queue)
 end
 
@@ -133,12 +132,12 @@ let create ~capacity:(capacity, `Per t) =
   ; by_peer_id = Peer_id.Lru.create ~initial_capacity
   }
 
-let add { by_ip; by_peer_id } (sender : Envelope.Sender.t) ~now ~score =
+let add { by_ip; by_peer_id } (sender : Network_peer.Envelope.Sender.t) ~now ~score =
   match sender with
   | Local ->
       `Within_capacity
   | Remote peer ->
-      let ip = Peer.ip peer in
+      let ip = Network_peer.Peer.ip peer in
       let id = peer.peer_id in
       if
         Ip.Lru.has_capacity by_ip ip ~now ~score
@@ -149,7 +148,7 @@ let add { by_ip; by_peer_id } (sender : Envelope.Sender.t) ~now ~score =
         `Within_capacity )
       else `Capacity_exceeded
 
-let next_expires { by_peer_id; _ } (sender : Envelope.Sender.t) =
+let next_expires { by_peer_id; _ } (sender : Network_peer.Envelope.Sender.t) =
   match sender with
   | Local ->
       Time.now ()
@@ -175,7 +174,7 @@ let summary ({ by_ip; by_peer_id } : t) =
     ; by_peer_id =
         Peer_id.Hash_queue.foldi by_peer_id.table ~init:[]
           ~f:(fun acc ~key ~data ->
-            ( Peer.Id.to_string key
+            ( Network_peer.Peer.Id.to_string key
             , { capacity_used = by_ip.initial_capacity - data.remaining_capacity
               } )
             :: acc)

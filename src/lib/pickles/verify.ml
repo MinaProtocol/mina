@@ -2,11 +2,7 @@ module SC = Scalar_challenge
 open Core_kernel
 open Async_kernel
 open Pickles_types
-open Common
 open Import
-open Types
-open Backend
-open Tuple_lib
 
 module Instance = struct
   type t =
@@ -29,6 +25,8 @@ module Plonk_checks = struct
 end
 
 let verify_heterogenous (ts : Instance.t list) =
+  let open Backend in
+  let open Common in
   let module Plonk = Types.Dlog_based.Proof_state.Deferred_values.Plonk in
   let module Tick_field = Backend.Tick.Field in
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
@@ -83,7 +81,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let zeta = sc plonk0.zeta in
         let alpha = sc plonk0.alpha in
-        let step_domains = key.step_domains.(Index.to_int which_branch) in
+        let step_domains = key.step_domains.(Types.Index.to_int which_branch) in
         let w =
           Tick.Field.domain_generator
             ~log2_size:(Domain.log2_size step_domains.h)
@@ -100,7 +98,7 @@ let verify_heterogenous (ts : Instance.t list) =
         let tick_combined_evals =
           Plonk_checks.evals_of_split_evals
             (module Tick.Field)
-            (Double.map evals.evals ~f:(fun e -> e.evals))
+            (Tuple_lib.Double.map evals.evals ~f:(fun e -> e.evals))
             ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw
         in
         let tick_domain =
@@ -139,7 +137,7 @@ let verify_heterogenous (ts : Instance.t list) =
           let sponge =
             let s = create Tick_field_sponge.params in
             absorb s
-              (Digest.Constant.to_tick_field
+              (Types.Digest.Constant.to_tick_field
                  statement.proof_state.sponge_digest_before_evaluations) ;
             s
           in
@@ -148,7 +146,7 @@ let verify_heterogenous (ts : Instance.t list) =
               Challenge.Constant.of_bits
                 (squeeze sponge ~length:Challenge.Constant.length)
             in
-            sc (Scalar_challenge.create underlying)
+            sc (Types.Scalar_challenge.create underlying)
           in
           (absorb sponge, squeeze)
         in
@@ -161,7 +159,7 @@ let verify_heterogenous (ts : Instance.t list) =
             Vector.([| x_hat |] :: (to_list xs @ to_list ys))
             ~f:(Array.iter ~f:absorb)
         in
-        Double.(iter ~f:absorb_evals evals.evals) ;
+        Tuple_lib.Double.(iter ~f:absorb_evals evals.evals) ;
         absorb evals.ft_eval1 ;
         let xi_actual = squeeze () in
         let r_actual = squeeze () in
@@ -176,8 +174,8 @@ let verify_heterogenous (ts : Instance.t list) =
           Wrap.combined_inner_product ~env:tick_env ~plonk:tick_plonk_minimal
             ~domain:tick_domain ~ft_eval1:evals.ft_eval1
             ~actual_branching:(Nat.Add.create actual_branching)
-            (Double.map evals.evals ~f:(fun e -> e.evals))
-            ~x_hat:(Double.map evals.evals ~f:(fun e -> e.public_input))
+            (Tuple_lib.Double.map evals.evals ~f:(fun e -> e.evals))
+            ~x_hat:(Tuple_lib.Double.map evals.evals ~f:(fun e -> e.public_input))
             ~old_bulletproof_challenges:
               (Vector.map ~f:Ipa.Step.compute_challenges
                  statement.pass_through.old_bulletproof_challenges)

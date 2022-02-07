@@ -28,7 +28,6 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) :
   S with module Impl := Impl = struct
   module B = Bigint
   open Impl
-  open Let_syntax
   module Unchecked = Unsigned.UInt32
 
   type t = Boolean.var array
@@ -58,7 +57,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) :
   let xor t1 t2 =
     let res = Array.create ~len:length Boolean.false_ in
     let rec go i =
-      if i < 0 then return res
+      if i < 0 then Let_syntax.return res
       else
         let%bind ri = Boolean.( lxor ) t1.(i) t2.(i) in
         res.(i) <- ri ;
@@ -103,7 +102,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) :
     in
     match vars with
     | [] ->
-        return (constant (Unchecked.of_int (c mod (1 lsl 32))))
+        Let_syntax.return (constant (Unchecked.of_int (c mod (1 lsl 32))))
     | _ ->
         let max_length =
           Int.(

@@ -12,7 +12,6 @@ open Snark_params_nonconsensus
 
 [%%else]
 
-open Snark_params.Tick
 
 [%%endif]
 
@@ -51,6 +50,7 @@ module Stable = struct
 
   module V1 = struct
     module T = struct
+      let open Snark_params.Tick in
       type t = Field.t [@@deriving sexp, compare, hash, version { asserted }]
     end
 

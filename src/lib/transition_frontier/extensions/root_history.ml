@@ -1,6 +1,5 @@
 open Core_kernel
 open Mina_base
-open Mina_transition
 open Frontier_base
 module Queue = Hash_queue.Make (State_hash)
 
@@ -44,10 +43,10 @@ module T = struct
           ~new_scan_state:(scan_state new_oldest_root)
           ~old_root_state:
             { With_hash.data=
-                External_transition.Validated.protocol_state
+                Mina_transition.External_transition.Validated.protocol_state
                   (transition oldest_root)
             ; hash=
-                External_transition.Validated.state_hash
+                Mina_transition.External_transition.Validated.state_hash
                   (transition oldest_root) }
         |> State_hash.Map.of_alist_exn
       in
@@ -55,7 +54,7 @@ module T = struct
     assert (
       [%equal: [`Ok | `Key_already_present]] `Ok
         (Queue.enqueue_back t.history
-           (External_transition.Validated.state_hash
+           (Mina_transition.External_transition.Validated.state_hash
               (transition t.current_root))
            t.current_root) ) ;
     t.current_root <- new_root
@@ -99,7 +98,7 @@ let protocol_states_for_scan_state
         match Queue.lookup history hash with
         | Some data ->
             Some
-              (External_transition.Validated.protocol_state (transition data))
+              (Mina_transition.External_transition.Validated.protocol_state (transition data))
         | None ->
             (*Not present in the history queue, check in the protocol states map that has all the protocol states required for transactions in the root*)
             State_hash.Map.find protocol_states_for_root_scan_state hash

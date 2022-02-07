@@ -1,15 +1,14 @@
 open Async
 open Core
-open Network_peer
 
-type state = Peer.t
+type state = Network_peer.Peer.t
 
 type ('query, 'response) rpc_fn =
   state -> version:int -> 'query -> 'response Deferred.t
 
 type 'r rpc_response =
   | Failed_to_connect of Error.t
-  | Connected of 'r Or_error.t Envelope.Incoming.t
+  | Connected of 'r Or_error.t Network_peer.Envelope.Incoming.t
 
 module type Rpc_implementation_intf = sig
   type query

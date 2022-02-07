@@ -1,6 +1,5 @@
 open Async
 open Core
-open Pipe_lib
 open Network_peer
 
 module Job = struct
@@ -44,6 +43,7 @@ module Claimed_knowledge = struct
         f k
 end
 
+open Pipe_lib
 module Make (Key : sig
   type t [@@deriving to_yojson, hash, sexp, compare]
 

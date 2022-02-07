@@ -1,5 +1,4 @@
 open Core_kernel
-open Sgn_type
 
 module type Inputs_intf = sig
   module Impl : Snarky_backendless.Snark_intf.S
@@ -106,14 +105,14 @@ module Make (Inputs : Inputs_intf) = struct
     >>| finalize
 
   let batch_miller_loop
-      (pairs : (Sgn.t * G1_precomputation.t * G2_precomputation.t) list) =
+      (pairs : (Sgn_type.Sgn.t * G1_precomputation.t * G2_precomputation.t) list) =
     let naf = Snarkette.Fields.find_wnaf (module N) 1 Params.loop_count in
     let accum f acc pairs =
       Checked.List.fold_map pairs ~init:acc ~f:(fun acc (sgn, p, q) ->
           let c, coeffs = uncons_exn q.G2_precomputation.coeffs in
           let%bind a = f p c q.q in
           let%map acc =
-            match (sgn : Sgn.t) with
+            match (sgn : Sgn_type.Sgn.t) with
             | Pos ->
                 Fqk.special_mul acc a
             | Neg ->

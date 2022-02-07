@@ -1,7 +1,5 @@
 open Core_kernel
 open Async_kernel
-open Pipe_lib
-open O1trace
 
 let dispatch ?(max_tries = 5)
     (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name) diff =
@@ -67,8 +65,8 @@ let dispatch_extensional_block =
 let transfer ~logger ~archive_location
     (breadcrumb_reader :
       Transition_frontier.Extensions.New_breadcrumbs.view
-      Broadcast_pipe.Reader.t) =
-  Broadcast_pipe.Reader.iter breadcrumb_reader ~f:(fun breadcrumbs ->
+      Pipe_lib.Broadcast_pipe.Reader.t) =
+  Pipe_lib.Broadcast_pipe.Reader.iter breadcrumb_reader ~f:(fun breadcrumbs ->
       Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
           let diff = Archive_lib.Diff.Builder.breadcrumb_added breadcrumb in
           match%map dispatch archive_location (Transition_frontier diff) with
@@ -85,9 +83,9 @@ let transfer ~logger ~archive_location
 
 let run ~logger
     ~(frontier_broadcast_pipe :
-       Transition_frontier.t option Broadcast_pipe.Reader.t) archive_location =
-  trace_task "Daemon sending diffs to archive loop" (fun () ->
-      Broadcast_pipe.Reader.iter frontier_broadcast_pipe
+       Transition_frontier.t option Pipe_lib.Broadcast_pipe.Reader.t) archive_location =
+  O1trace.trace_task "Daemon sending diffs to archive loop" (fun () ->
+      Pipe_lib.Broadcast_pipe.Reader.iter frontier_broadcast_pipe
         ~f:
           (Option.value_map ~default:Deferred.unit
              ~f:(fun transition_frontier ->

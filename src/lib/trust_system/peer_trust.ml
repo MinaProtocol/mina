@@ -1,6 +1,5 @@
 open Core
 open Async
-open Pipe_lib
 
 let tmp_bans_are_disabled = false
 
@@ -85,6 +84,7 @@ end
 
 include Log_events
 
+open Pipe_lib
 module Make0 (Inputs : Input_intf) = struct
   open Inputs
 

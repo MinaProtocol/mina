@@ -1,12 +1,10 @@
 [%%import "/src/config.mlh"]
 
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core_kernel
 open Async
 open Mina_base
 open Currency
-open O1trace
 open Signature_lib
 
 let option lab =
@@ -564,13 +562,13 @@ module T = struct
         s
     in
     let ledger_witness =
-      measure "extract witness" (fun () ->
+      O1trace.measure "extract witness" (fun () ->
           Sparse_ledger.of_sparse_ledger_subset_exn !ledger
             (Set.elements account_ids))
     in
     let%bind () = yield_result () in
     let%bind applied_txn, statement, updated_pending_coinbase_stack_state =
-      measure "apply+stmt" (fun () ->
+      O1trace.measure "apply+stmt" (fun () ->
           apply_transaction_and_get_statement ~constraint_constants ledger
             pending_coinbase_stack_state s txn_state_view)
       |> Deferred.return
@@ -705,7 +703,7 @@ module T = struct
 
   let time ~logger label f =
     let start = Core.Time.now () in
-    let%map x = trace_recurring label f in
+    let%map x = O1trace.trace_recurring label f in
     [%log debug]
       ~metadata:
         [ ("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))
@@ -1975,12 +1973,13 @@ module T = struct
             , Diff_creation_log.detail_list_to_yojson
                 (List.map ~f:List.rev detailed) )
           ] ;
-    trace_event "prediffs done" ;
+    O1trace.trace_event "prediffs done" ;
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff }
 end
 
 include T
 
+open Inline_test_quiet_logs
 let%test_module "test" =
   ( module struct
     module Sl = T

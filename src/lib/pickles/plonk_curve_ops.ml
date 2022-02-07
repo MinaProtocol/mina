@@ -1,6 +1,5 @@
 open Core_kernel
 
-open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 let seal i = Tuple_lib.Double.map ~f:(Util.seal i)
 
@@ -9,6 +8,7 @@ let add_fast (type f)
     ?(check_finite = true) ((x1, y1) as p1) ((x2, y2) as p2) :
     Impl.Field.t * Impl.Field.t =
   let p1 = seal (module Impl) p1 in
+  let open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint in
   let p2 = seal (module Impl) p2 in
   let open Impl in
   let open Field.Constant in
@@ -78,6 +78,7 @@ struct
       (Pickles_types.Shifted_value.Type1.Shifted_value (scalar : Field.t))
       ~num_bits : (Field.t * Field.t) * Boolean.var array =
     let ((x_base, y_base) as base) = seal base in
+    let open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint in
     let ( !! ) = As_prover.read_var in
     let mk f = exists Field.typ ~compute:f in
     (* MSB bits *)

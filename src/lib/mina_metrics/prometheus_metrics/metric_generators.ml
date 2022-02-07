@@ -1,7 +1,5 @@
 open Core_kernel
 open Async_kernel
-open Prometheus
-open Namespace
 
 module type Metric_spec_intf = sig
   val subsystem : string
@@ -32,7 +30,7 @@ end
 module type Moving_average_metric_intf = sig
   type datum
 
-  val v : Gauge.t
+  val v : Prometheus.Gauge.t
 
   val update : datum -> unit
 
@@ -43,7 +41,7 @@ module Moving_bucketed_average (Spec : Bucketed_average_spec_intf) () :
   Moving_average_metric_intf with type datum := float = struct
   open Spec
 
-  let v = Gauge.v name ~subsystem ~namespace ~help
+  let v = Prometheus.Gauge.v name ~subsystem ~Namespace.namespace ~help
 
   let empty_bucket_entry = (0.0, 0)
 
@@ -68,7 +66,7 @@ module Moving_bucketed_average (Spec : Bucketed_average_spec_intf) () :
         (fun () ->
           if Option.is_none !buckets then buckets := Some (empty_buckets ()) ;
           let buckets_val = Option.value_exn !buckets in
-          Gauge.set v (render_average buckets_val) ;
+          Prometheus.Gauge.set v (render_average buckets_val) ;
           buckets :=
             Some (empty_bucket_entry :: List.take buckets_val (num_buckets - 1)) ;
           tick ())

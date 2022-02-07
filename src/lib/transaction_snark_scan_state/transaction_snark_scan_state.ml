@@ -2,7 +2,6 @@ open Core_kernel
 open Async
 open Mina_base
 open Currency
-open O1trace
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -308,7 +307,7 @@ struct
   let time label f =
     let logger = Lazy.force logger in
     let start = Core.Time.now () in
-    let%map x = trace_recurring label f in
+    let%map x = O1trace.trace_recurring label f in
     [%log debug]
       ~metadata:
         [ ("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))

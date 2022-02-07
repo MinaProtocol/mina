@@ -1,7 +1,6 @@
 open Core_kernel
 open Pickles_types
 open Pickles_base
-open Tuple_lib
 module Scalars = Scalars
 module Domain = Domain
 
@@ -85,7 +84,7 @@ let actual_evaluation (type f) (module Field : Field_intf with type t = f)
       failwith "empty list"
 
 let evals_of_split_evals field ~zeta ~zetaw
-    ((es1, es2) : _ Dlog_plonk_types.Evals.t Double.t) ~rounds =
+    ((es1, es2) : _ Dlog_plonk_types.Evals.t Tuple_lib.Double.t) ~rounds =
   let e = Fn.flip (actual_evaluation field ~rounds) in
   Dlog_plonk_types.Evals.(map es1 ~f:(e zeta), map es2 ~f:(e zetaw))
 
@@ -94,7 +93,7 @@ open Composition_types.Dlog_based.Proof_state.Deferred_values.Plonk
 let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
     ~field_of_hex ~domain ~srs_length_log2
     ({ alpha; beta = _; gamma = _; zeta } : (c, _) Minimal.t)
-    ((e0, e1) : _ Dlog_plonk_types.Evals.t Double.t) =
+    ((e0, e1) : _ Dlog_plonk_types.Evals.t Tuple_lib.Double.t) =
   let w0 = Vector.to_array e0.w in
   let w1 = Vector.to_array e1.w in
   let var (col, row) =
@@ -175,7 +174,7 @@ let perm_alpha0 : int = 2 + 15
 module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
       ~(env : t Scalars.Env.t) ({ alpha = _; beta; gamma; zeta } : _ Minimal.t)
-      ((e0, e1) : _ Dlog_plonk_types.Evals.t Double.t) p_eval0 =
+      ((e0, e1) : _ Dlog_plonk_types.Evals.t Tuple_lib.Double.t) p_eval0 =
     let zkp = env.zk_polynomial in
     let alpha_pow = env.alpha_pow in
     let zeta1m1 = env.zeta_to_n_minus_1 in
@@ -215,7 +214,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     let _ = with_label in
     let open F in
     fun ({ alpha; beta; gamma; zeta } : _ Minimal.t)
-        ((e0, e1) : _ Dlog_plonk_types.Evals.t Double.t) ->
+        ((e0, e1) : _ Dlog_plonk_types.Evals.t Tuple_lib.Double.t) ->
       let zkp = env.zk_polynomial in
       let index_terms = Sc.index_terms env in
       let alpha_pow = env.alpha_pow in

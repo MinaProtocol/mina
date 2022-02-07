@@ -15,8 +15,6 @@ open Signature_lib
 *)
 
 module Make (Inputs : Intf.Inputs_intf) = struct
-  open Inputs
-  open Snark_work_lib
 
   module Get_work = struct
     module Master = struct
@@ -28,9 +26,9 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         type response =
           ( ( Transaction.t
             , Transaction_witness.t
-            , Ledger_proof.t )
-            Work.Single.Spec.t
-            Work.Spec.t
+            , Inputs.Ledger_proof.t )
+            Snark_work_lib.Work.Single.Spec.t
+            Snark_work_lib.Work.Spec.t
           * Public_key.Compressed.t )
           option
       end
@@ -51,11 +49,11 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         type query =
           ( ( Transaction.t
             , Transaction_witness.t
-            , Ledger_proof.t )
-            Work.Single.Spec.t
-            Work.Spec.t
-          , Ledger_proof.t )
-          Work.Result.t
+            , Inputs.Ledger_proof.t )
+            Snark_work_lib.Work.Single.Spec.t
+            Snark_work_lib.Work.Spec.t
+          , Inputs.Ledger_proof.t )
+          Snark_work_lib.Work.Result.t
 
         type response = unit
       end

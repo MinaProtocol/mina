@@ -1,8 +1,6 @@
 open Core_kernel
 open Snarky_backendless
 open Snark
-open Snarky_integer
-open Util
 module B = Bigint
 
 (* This module is for representing arbitrary precision rationals in the interval
@@ -22,7 +20,7 @@ let to_bignum (type f) ~m:((module M) as m : f m) t =
   let d = t.precision in
   fun () ->
     let t = As_prover.read_var t.value in
-    Bignum.(of_bigint (bigint_of_field ~m t) / of_bigint B.(one lsl d))
+    Bignum.(of_bigint (Util.bigint_of_field ~m t) / of_bigint B.(one lsl d))
 
 (*
     x      y        x*y
@@ -38,7 +36,7 @@ let mul (type f) ~m:((module I) : f m) x y =
 let constant (type f) ~m:((module M) as m : f m) ~value ~precision =
   assert (B.(value < one lsl precision)) ;
   let open M in
-  { value = Field.constant (bigint_to_field ~m value); precision }
+  { value = Field.constant (Util.bigint_to_field ~m value); precision }
 
 (* x, x^2, ..., x^n *)
 let powers ~m x n =
@@ -116,8 +114,8 @@ let le (type f) ~m:((module M) : f m) t1 t2 =
     top / bottom as floor(2^k * top / bottom).
 *)
 let of_quotient ~m ~precision ~top ~bottom ~top_is_less_than_bottom:() =
-  let q, _r = Integer.(div_mod ~m (shift_left ~m top precision) bottom) in
-  { value = Integer.to_field q; precision }
+  let q, _r = Snarky_integer.Integer.(div_mod ~m (shift_left ~m top precision) bottom) in
+  { value = Snarky_integer.Integer.to_field q; precision }
 
 let of_bits (type f) ~m:((module M) : f m) bits ~precision =
   assert (List.length bits <= precision) ;

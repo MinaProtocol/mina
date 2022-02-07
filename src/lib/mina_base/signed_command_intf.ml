@@ -8,7 +8,6 @@ open Core_kernel
 [%%ifdef consensus_mechanism]
 
 open Mina_numbers
-open Snark_params.Tick
 
 [%%else]
 
@@ -89,6 +88,7 @@ module type Gen_intf = sig
   end
 end
 
+open Snark_params.Tick
 module type S = sig
   type t [@@deriving sexp, yojson, hash]
 

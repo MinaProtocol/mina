@@ -2,7 +2,6 @@
 
 open Core_kernel
 open Async_kernel
-open Async_unix
 
 (* register a thunk to be called at exit; log registration and execution *)
 let register_handler ~logger ~description (f : unit -> unit) =
@@ -46,4 +45,4 @@ let register_async_shutdown_handler ~logger ~description
     in
     ()
   in
-  Shutdown.at_shutdown logging_thunk
+  Async_unix.Shutdown.at_shutdown logging_thunk

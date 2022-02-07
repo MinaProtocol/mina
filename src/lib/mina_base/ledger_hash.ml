@@ -1,8 +1,5 @@
 open Core
-open Import
-open Snark_params
-open Snarky_backendless
-open Tick
+open Snark_params.Tick
 open Let_syntax
 
 let merge_var ~height h1 h2 =
@@ -10,7 +7,7 @@ let merge_var ~height h1 h2 =
 
 module Merkle_tree =
   Snarky_backendless.Merkle_tree.Checked
-    (Tick)
+    (Snark_params.Tick)
     (struct
       type value = Field.t
 
@@ -19,7 +16,7 @@ module Merkle_tree =
       let typ = Field.typ
 
       let merge ~height h1 h2 =
-        Tick.make_checked (fun () -> merge_var ~height h1 h2)
+        Snark_params.Tick.make_checked (fun () -> merge_var ~height h1 h2)
 
       let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
 
@@ -49,6 +46,7 @@ let of_digest = Fn.compose Fn.id of_hash
 
 type path = Random_oracle.Digest.t list
 
+open Snarky_backendless
 type _ Request.t +=
   | Get_path : Account.Index.t -> path Request.t
   | Get_element : Account.Index.t -> (Account.t * path) Request.t
@@ -112,8 +110,8 @@ let%snarkydef modify_account_send ~depth t aid ~is_writeable ~f =
            Account_id.Checked.equal (Account.identifier_of_var account) aid
          in
          let%bind account_not_there =
-           Public_key.Compressed.Checked.equal account.public_key
-             Public_key.Compressed.(var_of_t empty)
+           Import.Public_key.Compressed.Checked.equal account.public_key
+             Import.Public_key.Compressed.(var_of_t empty)
          in
          let%bind not_there_but_writeable =
            Boolean.(account_not_there && is_writeable)
@@ -142,8 +140,8 @@ let%snarkydef modify_account_recv ~depth t aid ~f =
            Account_id.Checked.equal (Account.identifier_of_var account) aid
          in
          let%bind account_not_there =
-           Public_key.Compressed.Checked.equal account.public_key
-             Public_key.Compressed.(var_of_t empty)
+           Import.Public_key.Compressed.Checked.equal account.public_key
+             Import.Public_key.Compressed.(var_of_t empty)
          in
          let%bind () =
            [%with_label "account is either present or empty"]

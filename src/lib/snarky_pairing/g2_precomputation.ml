@@ -35,7 +35,6 @@ struct
   type t = { q : g2; coeffs : Coeff.t list }
 
   open Impl
-  open Let_syntax
 
   let if_g2 b ~then_:(tx, ty) ~else_:(ex, ey) =
     let%map x = Fqe.if_ b ~then_:tx ~else_:ex
@@ -263,7 +262,7 @@ struct
   let create ((qx, qy) as q) =
     let naf = Snarkette.Fields.find_wnaf (module N) 1 Params.loop_count in
     let rec go i found_nonzero (s : Fqe.t loop_state) acc =
-      if i < 0 then return (List.rev acc)
+      if i < 0 then Let_syntax.return (List.rev acc)
       else if not found_nonzero then
         go (i - 1) (found_nonzero || naf.(i) <> 0) s acc
       else

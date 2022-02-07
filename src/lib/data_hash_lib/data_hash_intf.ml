@@ -5,7 +5,6 @@ open Core_kernel
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-open Snark_bits
 
 [%%else]
 
@@ -50,7 +49,7 @@ module type Basic = sig
   (* TODO : define bit ops using Random_oracle instead of Pedersen.Digest,
      move this outside of consensus_mechanism guard
   *)
-  include Bits_intf.S with type t := t
+  include Snark_bits.Bits_intf.S with type t := t
 
   [%%endif]
 

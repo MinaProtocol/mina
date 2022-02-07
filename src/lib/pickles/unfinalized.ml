@@ -1,9 +1,7 @@
 open Backend
 open Impls.Step
-open Pickles_types
-open Common
 open Import
-module Shifted_value = Shifted_value.Type2
+module Shifted_value = Pickles_types.Shifted_value.Type2
 
 (* Unfinalized dlog-based proof, along with a flag which is true iff it
    is expected to verify. This allows for situations like the blockchain
@@ -32,7 +30,7 @@ module Constant = struct
     , Tock.Field.t Shifted_value.t
     , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
       , Tock.Rounds.n )
-      Vector.t
+      Pickles_types.Vector.t
     , Digest.Constant.t
     , bool )
     Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
@@ -70,7 +68,7 @@ module Constant = struct
         ~domain:
           (Plonk_checks.domain
              (module Tock.Field)
-             wrap_domains.h ~shifts:Common.tock_shifts
+             Common.wrap_domains.h ~shifts:Common.tock_shifts
              ~domain_generator:Tock.Field.domain_generator)
         chals evals
     in

@@ -84,13 +84,13 @@ let%test_module "vrf-test" =
     end
 
     module Group = struct
-      open Impl
 
       module T = struct
         type t = Curve.t
 
         include Sexpable.Of_sexpable
                   (struct
+                    let open Impl in
                     type t = Field.t * Field.t [@@deriving sexp]
                   end)
                   (struct
@@ -122,6 +122,7 @@ let%test_module "vrf-test" =
       let typ = Curve.typ
 
       let to_bits (t : t) =
+        let open Impl in
         let x, y = Curve.to_affine_exn t in
         List.hd_exn (Field.unpack y) :: Field.unpack x
 
@@ -152,6 +153,7 @@ let%test_module "vrf-test" =
         include Curve.Checked
 
         let to_bits ((x, y) : var) =
+          let open Impl in
           let%map x =
             Field.Checked.choose_preimage_var ~length:Field.size_in_bits x
           and y =

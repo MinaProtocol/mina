@@ -1,11 +1,11 @@
 open Core
 open Async
-open Network_peer
 
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = { secret : string; public : string; peer_id : Peer.Id.Stable.V1.t }
+    type t = { secret : string; public : string; peer_id : let open Network_peer in
+                                                           Peer.Id.Stable.V1.t }
 
     let to_latest = Fn.id
   end
@@ -14,6 +14,7 @@ end]
 let secret { secret; _ } = secret
 
 let generate_random helper =
+  let open Network_peer in
   match%map
     Libp2p_helper.do_rpc helper
       (module Libp2p_ipc.Rpcs.GenerateKeypair)
@@ -44,10 +45,12 @@ let of_b64_data s =
 let to_b64_data (s : string) = Base64.encode_string ~pad:true s
 
 let to_string ({ secret; public; peer_id } : t) =
+  let open Network_peer in
   String.concat ~sep:","
     [ to_b64_data secret; to_b64_data public; Peer.Id.to_string peer_id ]
 
 let of_string s =
+  let open Network_peer in
   let parse_with_sep sep =
     match String.split s ~on:sep with
     | [ secret_b64; public_b64; peer_id ] ->

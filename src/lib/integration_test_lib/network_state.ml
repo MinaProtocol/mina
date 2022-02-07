@@ -1,6 +1,5 @@
 open Async_kernel
 open Core_kernel
-open Pipe_lib
 open Mina_base
 
 module Make
@@ -41,13 +40,13 @@ module Make
     }
 
   let listen ~logger event_router =
-    let r, w = Broadcast_pipe.create empty in
+    let r, w = Pipe_lib.Broadcast_pipe.create empty in
     let update ~f =
       (* should be safe to ignore the write here, so long as `f` is synchronous *)
-      let state = f (Broadcast_pipe.Reader.peek r) in
+      let state = f (Pipe_lib.Broadcast_pipe.Reader.peek r) in
       [%log debug] "updated network state to: $state"
         ~metadata:[ ("state", to_yojson state) ] ;
-      ignore (Broadcast_pipe.Writer.write w state : unit Deferred.t) ;
+      ignore (Pipe_lib.Broadcast_pipe.Writer.write w state : unit Deferred.t) ;
       Deferred.return `Continue
     in
     (* handle_block_produced *)

@@ -2,12 +2,11 @@
 
 [%%import "/src/config.mlh"]
 
-open Fold_lib
 
 module type Basic = sig
   type t
 
-  val fold : t -> bool Fold.t
+  val fold : t -> bool Fold_lib.Fold.t
 
   val size_in_bits : int
 end
@@ -28,7 +27,6 @@ end
 
 [%%ifdef consensus_mechanism]
 
-open Tuple_lib
 
 module Snarkable = struct
   module type Basic = sig
@@ -61,7 +59,7 @@ module Snarkable = struct
 
       val var_of_bits : boolean_var Bitstring_lib.Bitstring.Lsb_first.t -> var
 
-      val var_to_triples : var -> boolean_var Triple.t list
+      val var_to_triples : var -> boolean_var Tuple_lib.Triple.t list
 
       val var_of_value : value -> var
 

@@ -143,8 +143,6 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
   { fake_gossip_network; peer_networks }
 
 module Generator = struct
-  open Quickcheck
-  open Generator.Let_syntax
 
   type peer_config =
        logger:Logger.t
@@ -152,7 +150,7 @@ module Generator = struct
     -> verifier:Verifier.t
     -> max_frontier_length:int
     -> use_super_catchup:bool
-    -> peer_state Generator.t
+    -> peer_state Quickcheck.Generator.t
 
   let make_peer_state ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?get_some_initial_peers ?answer_sync_ledger_query ?get_ancestry
@@ -273,6 +271,7 @@ module Generator = struct
       ?get_best_tip ?get_node_status ?get_transition_knowledge
       ?get_transition_chain_proof ?get_transition_chain ~logger
       ~precomputed_values ~verifier ~max_frontier_length ~use_super_catchup =
+    let open Generator.Let_syntax in
     let epoch_ledger_location =
       Filename.temp_dir_name ^/ "epoch_ledger"
       ^ (Uuid_unix.create () |> Uuid.to_string)
@@ -314,6 +313,7 @@ module Generator = struct
       ?get_best_tip ?get_node_status ?get_transition_knowledge
       ?get_transition_chain_proof ?get_transition_chain ~logger
       ~precomputed_values ~verifier ~max_frontier_length ~use_super_catchup =
+    let open Generator.Let_syntax in
     let epoch_ledger_location =
       Filename.temp_dir_name ^/ "epoch_ledger"
       ^ (Uuid_unix.create () |> Uuid.to_string)
@@ -357,6 +357,7 @@ module Generator = struct
   let gen ?(logger = Logger.null ()) ~precomputed_values ~verifier
       ~max_frontier_length ~use_super_catchup
       (configs : (peer_config, 'n num_peers) Gadt_lib.Vect.t) =
+    let open Generator.Let_syntax in
     let open Quickcheck.Generator.Let_syntax in
     let%map states =
       Vect.Quickcheck_generator.map configs ~f:(fun (config : peer_config) ->

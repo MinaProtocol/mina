@@ -17,7 +17,6 @@ let rec deferred_list_result_iter ls ~f =
       deferred_list_result_iter t ~f
 
 (* TODO: should debug assert garbage checks be added? *)
-open Result.Let_syntax
 
 (* TODO: implement versions with module versioning. For
  * now, this is just stubbed so we can add db migrations
@@ -223,6 +222,7 @@ let get db ~key ~error =
 
 (* TODO: check that best tip is connected to root *)
 (* TODO: check for garbage *)
+open Result.Let_syntax
 let check t ~genesis_state_hash =
   Or_error.try_with (fun () ->
       let check_version () =

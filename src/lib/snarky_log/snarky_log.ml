@@ -1,12 +1,12 @@
 open Snarky_backendless
 open Webkit_trace_event
-open Webkit_trace_event.Output.JSON
-open Yojson
 
 let to_string ?buf ?len ?std events =
+  Yojson.let open Webkit_trace_event.Output.JSON in
   to_string ?buf ?len ?std @@ json_of_events events
 
 let to_channel ?buf ?len ?std out_channel events =
+  Yojson.let open Webkit_trace_event.Output.JSON in
   to_channel ?buf ?len ?std out_channel @@ json_of_events events
 
 let to_file ?buf ?len ?std filename events =

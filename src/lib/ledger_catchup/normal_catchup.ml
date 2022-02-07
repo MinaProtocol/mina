@@ -1,12 +1,7 @@
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core
 open Async
-open Cache_lib
-open Pipe_lib
 open Mina_base
-open Mina_transition
-open Network_peer
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
     into a transition frontier by requesting a path of external_transitions
@@ -46,6 +41,8 @@ open Network_peer
     After building the breadcrumb path, [Ledger_catchup] will then send it to
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 
+open Network_peer
+open Mina_transition
 let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
     ~unprocessed_transition_cache enveloped_transition =
   let sender = Envelope.Incoming.sender enveloped_transition in
@@ -458,6 +455,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
       in
       go [])
 
+open Cache_lib
 let verify_transitions_and_build_breadcrumbs ~logger
     ~(precomputed_values : Precomputed_values.t) ~trust_system ~verifier
     ~frontier ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees
@@ -601,6 +599,7 @@ let garbage_collect_subtrees ~logger ~subtrees =
           : 'a Rose_tree.t )) ;
   [%log trace] "garbage collected failed cached transitions"
 
+open Pipe_lib
 let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
     ~catchup_job_reader
     ~(catchup_breadcrumbs_writer :
@@ -823,6 +822,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
 
 (* Unit tests *)
 
+open Inline_test_quiet_logs
 let%test_module "Ledger_catchup tests" =
   ( module struct
     let () =

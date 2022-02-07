@@ -1,9 +1,7 @@
 [%%import "/src/config.mlh"]
 
-open Ppxlib
-open Asttypes
-open Parsetree
-open Longident
+open Ppxlib.Parsetree
+open Ppxlib.Longident
 open Core_kernel
 module Impl = Pickles.Impls.Step.Internal_Basic
 module Group = Pickles.Backend.Tick.Inner_curve
@@ -14,6 +12,7 @@ let group_map_params =
     Group.Params.{ a; b }
 
 let group_map_params_structure ~loc =
+  let open Asttypes in
   let module T = struct
     type t = Pickles.Backend.Tick.Field.Stable.Latest.t Group_map.Params.t
     [@@deriving bin_io_unversioned]
@@ -37,7 +36,7 @@ let group_map_params_structure ~loc =
 
 let generate_ml_file filename structure =
   let fmt = Format.formatter_of_out_channel (Out_channel.create filename) in
-  Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none))
+  Ppxlib.Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none))
 
 let () =
   generate_ml_file "group_map_params.ml" group_map_params_structure ;

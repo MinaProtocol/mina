@@ -1,8 +1,7 @@
 open Core
 open Async
-open Key_cache
 open Async_kernel
-include T (Deferred.Or_error)
+include Key_cache.T (Deferred.Or_error)
 
 let on_disk to_string read write prefix =
   let path k = prefix ^/ to_string k in
@@ -67,7 +66,7 @@ let s3 to_string read ~bucket_prefix ~install_path =
   { read; write }
 
 module Disk_storable = struct
-  include Disk_storable (Deferred.Or_error)
+  include Key_cache.Disk_storable (Deferred.Or_error)
 
   let of_binable (type t) to_string (module B : Binable.S with type t = t) =
     let read _ ~path = Reader.load_bin_prot path B.bin_reader_t in
@@ -89,10 +88,10 @@ let read spec { Disk_storable.to_string; read = r; write = w } k =
   Deferred.Or_error.find_map_ok spec ~f:(fun s ->
       let open Deferred.Or_error.Let_syntax in
       match s with
-      | Spec.On_disk { directory; should_write } ->
+      | Key_cache.Spec.On_disk { directory; should_write } ->
           let%map res = (on_disk to_string r w directory).read k in
           (res, if should_write then `Locally_generated else `Cache_hit)
-      | S3 _ when not (may_download ()) ->
+      | S3 _ when not (Key_cache.may_download ()) ->
           Deferred.Or_error.errorf "Downloading from S3 is disabled"
       | S3 { bucket_prefix; install_path } ->
           let%bind.Deferred () = Unix.mkdir ~p:() install_path in
@@ -104,7 +103,7 @@ let write spec { Disk_storable.to_string; read = r; write = w } k v =
     Deferred.List.filter_map spec ~f:(fun s ->
         let res =
           match s with
-          | Spec.On_disk { directory; should_write } ->
+          | Key_cache.Spec.On_disk { directory; should_write } ->
               if should_write then
                 let%bind () = Unix.mkdir ~p:() directory in
                 (on_disk to_string r w directory).write k v

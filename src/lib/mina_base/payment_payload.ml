@@ -6,7 +6,6 @@ open Core_kernel
 
 [%%ifdef consensus_mechanism]
 
-open Snark_params.Tick
 open Signature_lib
 
 [%%else]
@@ -62,6 +61,7 @@ let token { Poly.token_id; _ } = token_id
 
 type var = (Public_key.Compressed.var, Token_id.var, Amount.var) Poly.t
 
+open Snark_params.Tick
 let typ : (var, t) Typ.t =
   let spec =
     let open Data_spec in

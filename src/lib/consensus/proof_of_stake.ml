@@ -1,12 +1,8 @@
 open Async_kernel
 open Core_kernel
-open Signed
 open Unsigned
 open Currency
-open Fold_lib
 open Signature_lib
-open Snark_params
-open Num_util
 module Time = Block_time
 module Run = Snark_params.Tick.Run
 module Graphql_base_types = Graphql_lib.Base_types
@@ -80,6 +76,7 @@ module Segment_id = Mina_numbers.Nat.Make32 ()
 
 module Typ = Snark_params.Tick.Typ
 
+open Signed
 module Configuration = struct
   [%%versioned
   module Stable = struct
@@ -119,6 +116,7 @@ module Constants = Constants
 module Genesis_epoch_data = Genesis_epoch_data
 
 module Data = struct
+  open Snark_params
   module Epoch_seed = struct
     include Mina_base.Epoch_seed
 
@@ -147,7 +145,7 @@ module Data = struct
       let epoch = Epoch.of_time_exn tm ~constants in
       let time_since_epoch = Time.diff tm (Epoch.start_time epoch ~constants) in
       let slot =
-        uint32_of_int64
+        Num_util.uint32_of_int64
         @@ Int64.Infix.(
              Time.Span.to_ms time_since_epoch
              / Time.Span.to_ms constants.slot_duration_ms)
@@ -851,7 +849,7 @@ module Data = struct
                 ; ( "result"
                   , `String
                       (* use sexp representation; int might be too small *)
-                      ( Fold.string_bits truncated_vrf_result
+                      ( Fold_lib.Fold.string_bits truncated_vrf_result
                       |> Bignum_bigint.of_bit_fold_lsb
                       |> Bignum_bigint.sexp_of_t |> Sexp.to_string ) )
                 ] ;
@@ -916,7 +914,6 @@ module Data = struct
       val null : t
     end) =
     struct
-      open Snark_params
 
       module Value = struct
         type t =
@@ -930,7 +927,7 @@ module Data = struct
       end
 
       let data_spec =
-        let open Tick.Data_spec in
+        let open Snark_params.Tick.Data_spec in
         [ Epoch_ledger.typ
         ; Epoch_seed.typ
         ; Mina_base.State_hash.typ
@@ -976,8 +973,8 @@ module Data = struct
             Value.t) =
         let open Random_oracle.Input.Chunked in
         List.reduce_exn ~f:append
-          [ field (seed :> Tick.Field.t)
-          ; field (start_checkpoint :> Tick.Field.t)
+          [ field (seed :> Snark_params.Tick.Field.t)
+          ; field (start_checkpoint :> Snark_params.Tick.Field.t)
           ; Length.to_input epoch_length
           ; Epoch_ledger.to_input ledger
           ; Lock_checkpoint.to_input lock_checkpoint
@@ -3523,7 +3520,6 @@ let%test_module "Proof of stake tests" =
   ( module struct
     open Mina_base
     open Data
-    open Consensus_state
 
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
@@ -3536,6 +3532,7 @@ let%test_module "Proof of stake tests" =
 
     let test_update constraint_constants =
       (* build pieces needed to apply "update" *)
+      let open Consensus_state in
       let snarked_ledger_hash =
         Frozen_ledger_hash.of_ledger_hash
           (Ledger.merkle_root (Lazy.force Genesis_ledger.t))

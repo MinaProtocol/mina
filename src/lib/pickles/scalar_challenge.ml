@@ -1,6 +1,5 @@
 open Core_kernel
-open Import
-module SC = Scalar_challenge
+module SC = Import.Scalar_challenge
 
 (* Implementation of the algorithm described on page 29 of the Halo paper
    https://eprint.iacr.org/2019/1021.pdf
@@ -137,7 +136,7 @@ let to_field_checked (type f) ?num_bits
 
 let to_field_constant (type f) ~endo
     (module F : Plonk_checks.Field_intf with type t = f) { SC.inner = c } =
-  let bits = Array.of_list (Challenge.Constant.to_bits c) in
+  let bits = Array.of_list (Import.Challenge.Constant.to_bits c) in
   let a = ref (F.of_int 2) in
   let b = ref (F.of_int 2) in
   let one = F.of_int 1 in
@@ -176,7 +175,7 @@ let test (type f)
             to_field_constant
               (module Field.Constant)
               ~endo
-              (SC.create (Challenge.Constant.of_bits s)))
+              (SC.create (Import.Challenge.Constant.of_bits s)))
           xs
       with e ->
         eprintf !"Input %{sexp: bool list}\n%!" xs ;
@@ -185,7 +184,7 @@ let test (type f)
 module Make
     (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t)
-    (Challenge : Challenge.S with module Impl := Impl) (Endo : sig
+    (Challenge : Import.Challenge.S with module Impl := Impl) (Endo : sig
       val base : Impl.Field.Constant.t
 
       val scalar : G.Constant.Scalar.t

@@ -1,5 +1,4 @@
 open Core
-open Util
 open Import
 
 [%%versioned
@@ -45,7 +44,7 @@ module Digest = struct
         Random_oracle.Input.Chunked.packeds
           (Array.of_list_map
              Fold_lib.Fold.(to_list (string_bits t))
-             ~f:(fun b -> (field_of_bool b, 1)))
+             ~f:(fun b -> (Util.field_of_bool b, 1)))
 
       let typ =
         Typ.array ~length:Blake2.digest_size_in_bits Boolean.typ

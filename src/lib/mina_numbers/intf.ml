@@ -1,13 +1,10 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Fold_lib
-open Tuple_lib
 open Unsigned
 
 [%%ifdef consensus_mechanism]
 
-open Snark_bits
 open Snark_params.Tick
 
 [%%else]
@@ -58,7 +55,7 @@ module type S_unchecked = sig
 
   val to_string : t -> string
 
-  module Bits : Bits_intf.Convertible_bits with type t := t
+  module Bits : Snark_bits.Bits_intf.Convertible_bits with type t := t
 
   val to_bits : t -> bool list
 
@@ -68,7 +65,7 @@ module type S_unchecked = sig
 
   val to_input_legacy : t -> (_, bool) Random_oracle.Legacy.Input.t
 
-  val fold : t -> bool Triple.t Fold.t
+  val fold : t -> bool Tuple_lib.Triple.t Fold_lib.Fold.t
 end
 
 [%%ifdef consensus_mechanism]
@@ -202,14 +199,14 @@ module type F = functor
 
      val random : unit -> t
    end)
-  (Bits : Bits_intf.Convertible_bits with type t := N.t)
+  (Bits : Snark_bits.Bits_intf.Convertible_bits with type t := N.t)
   -> S with type t := N.t and module Bits := Bits
 
 [%%ifdef consensus_mechanism]
 
 module type F_checked = functor
   (N : Unsigned_extended.S)
-  (Bits : Bits_intf.Convertible_bits with type t := N.t)
+  (Bits : Snark_bits.Bits_intf.Convertible_bits with type t := N.t)
   -> S_checked with type unchecked := N.t
 [@@warning "-67"]
 

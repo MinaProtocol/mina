@@ -1,13 +1,7 @@
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core
 open Async
-open Cache_lib
-open Pipe_lib
-open Mina_numbers
 open Mina_base
-open Mina_transition
-open Network_peer
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
     into a transition frontier by requesting a path of external_transitions
@@ -119,6 +113,8 @@ let write_graph (_ : t) =
   let _ = G.output_graph in
   ()
 
+open Network_peer
+open Mina_transition
 let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
     ~unprocessed_transition_cache enveloped_transition =
   let sender = Envelope.Incoming.sender enveloped_transition in
@@ -351,6 +347,7 @@ let try_to_connect_hash_chain t hashes ~frontier
       then Result.fail `No_common_ancestor
       else Result.fail `Peer_moves_too_fast)
 
+open Mina_numbers
 module Downloader = struct
   module Key = struct
     module T = struct
@@ -624,6 +621,7 @@ let download s d ~key ~attempts =
     "Download download $key" ;
   Downloader.download d ~key ~attempts
 
+open Cache_lib
 let create_node ~downloader t x =
   let attempts = Attempt_history.empty in
   let state, h, blockchain_length, parent, result =
@@ -684,6 +682,7 @@ let forest_pick forest =
       List.iter forest ~f:(Rose_tree.iter ~f:return) ;
       assert false)
 
+open Pipe_lib
 let setup_state_machine_runner ~t ~verifier ~downloader ~logger
     ~precomputed_values ~trust_system ~frontier ~unprocessed_transition_cache
     ~catchup_breadcrumbs_writer
@@ -1257,6 +1256,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
     ~catchup_breadcrumbs_writer ~build_func:(Transition_frontier.Breadcrumb.For_tests.build_fail)
   |> don't_wait_for *)
 
+open Inline_test_quiet_logs
 let%test_module "Ledger_catchup tests" =
   ( module struct
     let () =

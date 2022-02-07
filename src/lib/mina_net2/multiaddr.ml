@@ -1,5 +1,4 @@
 open Core
-open Network_peer
 
 type t = string [@@deriving compare, bin_io_unversioned]
 
@@ -17,7 +16,7 @@ let to_peer t =
       try
         let host = Unix.Inet_addr.of_string ip4_str in
         let libp2p_port = Int.of_string tcp_str in
-        Some (Peer.create host ~libp2p_port ~peer_id)
+        Some (Network_peer.Peer.create host ~libp2p_port ~peer_id)
       with _ -> None )
   | _ ->
       None

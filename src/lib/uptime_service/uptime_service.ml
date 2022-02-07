@@ -3,8 +3,6 @@
 open Core_kernel
 open Async
 open Mina_base
-open Mina_transition
-open Pipe_lib
 open Signature_lib
 
 module Blake2 = Blake2.Make ()
@@ -34,7 +32,7 @@ end
 let external_transition_of_breadcrumb breadcrumb =
   let { With_hash.data = external_transition; _ }, _ =
     Transition_frontier.Breadcrumb.validated_transition breadcrumb
-    |> External_transition.Validated.erase
+    |> Mina_transition.External_transition.Validated.erase
   in
   external_transition
 
@@ -184,7 +182,7 @@ let block_base64_of_breadcrumb breadcrumb =
   let external_transition = external_transition_of_breadcrumb breadcrumb in
   let block_string =
     Binable.to_string
-      (module External_transition.Stable.Latest)
+      (module Mina_transition.External_transition.Stable.Latest)
       external_transition
   in
   (* raises only on errors from invalid optional arguments *)
@@ -224,7 +222,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
 let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
     ~transition_frontier ~peer_id ~(submitter_keypair : Keypair.t)
     ~snark_work_fee =
-  match Broadcast_pipe.Reader.peek transition_frontier with
+  match Pipe_lib.Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       (* expected during daemon boot, so not logging as error *)
       [%log info]
@@ -242,11 +240,11 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
       let best_tip = Transition_frontier.best_tip tf in
       let external_transition =
         Transition_frontier.Breadcrumb.validated_transition best_tip
-        |> External_transition.Validation.forget_validation
+        |> Mina_transition.External_transition.Validation.forget_validation
       in
       if
         List.is_empty
-          (External_transition.transactions
+          (Mina_transition.External_transition.transactions
              ~constraint_constants:
                Genesis_constants.Constraint_constants.compiled
              external_transition)

@@ -1,6 +1,5 @@
 open Core_kernel
 open Mina_base
-open Mina_transition
 open Signature_lib
 
 module Fee_transfer_type = struct
@@ -110,6 +109,7 @@ let participant_pks
 let commands { transactions = { Transactions.commands; _ }; _ } = commands
 
 let validate_transactions ((transition_with_hash, _validity) as transition) =
+  let open Mina_transition in
   let staged_ledger_diff =
     External_transition.Validated.staged_ledger_diff transition
   in
@@ -125,6 +125,7 @@ let validate_transactions ((transition_with_hash, _validity) as transition) =
 
 let of_transition external_transition tracked_participants
     (calculated_transactions : Transaction.t With_status.t list) =
+  let open Mina_transition in
   let open External_transition.Validated in
   let creator = block_producer external_transition in
   let winner = block_winner external_transition in

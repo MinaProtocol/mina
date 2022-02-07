@@ -1,7 +1,6 @@
 open Core_kernel
 open Mina_base
 open Pipe_lib
-open Network_pool
 
 module State = struct
   [%%versioned
@@ -24,6 +23,7 @@ end
 
 (* TODO: this is extremely expensive as implemented and needs to be replaced with an extension *)
 let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
+  let open Network_pool in
   let open Or_error.Let_syntax in
   let%map check_cmd =
     Result.of_option (Signed_command.check cmd)
@@ -63,7 +63,6 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
 let%test_module "transaction_status" =
   ( module struct
     open Async
-    open Mina_numbers
 
     let max_length = 10
 
@@ -106,9 +105,10 @@ let%test_module "transaction_status" =
 
     let gen_user_command =
       Signed_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~fee_range:10
-        ~key_gen ~nonce:(Account_nonce.of_int 1) ()
+        ~key_gen ~nonce:(Mina_numbers.Account_nonce.of_int 1) ()
 
     let create_pool ~frontier_broadcast_pipe =
+      let open Network_pool in
       let pool_reader, _ =
         Strict_pipe.(
           create ~name:"transaction_status incomming diff" Synchronous)

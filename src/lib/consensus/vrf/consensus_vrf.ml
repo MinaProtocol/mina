@@ -233,11 +233,10 @@ module Output = struct
       |> Random_oracle.Input.Chunked.packeds
   end
 
-  open Tick
 
-  let typ = Field.typ
+  let typ = Tick.Field.typ
 
-  let gen = Field.gen
+  let gen = Tick.Field.gen
 
   let truncate x =
     Random_oracle.Digest.to_bits ~length:Truncated.length_in_bits x
@@ -266,7 +265,7 @@ module Output = struct
       let input =
         Random_oracle.Input.Chunked.(append msg (field_elements [| x; y |]))
       in
-      make_checked (fun () ->
+      Tick.make_checked (fun () ->
           let open Random_oracle.Checked in
           hash ~init:Hash_prefix_states.vrf_output (pack_input input))
   end
@@ -288,7 +287,7 @@ module Output = struct
     in
     Quickcheck.test ~trials:10 gen_message_and_curve_point
       ~f:
-        (Test_util.test_equal ~equal:Field.equal
+        (Test_util.test_equal ~equal:Tick.Field.equal
            Snark_params.Tick.Typ.(
              Message.typ ~constraint_constants
              * Snark_params.Tick.Inner_curve.typ)

@@ -2,8 +2,6 @@
 (* TODO: refactor the misleading implementation of Ledger.foldi that confused me so much in the first place. *)
 
 open Core
-open Import
-open Snark_params.Tick
 
 let dedup_list ls ~comparator =
   let ls', _ =
@@ -46,6 +44,7 @@ module M =
 
 type account_state = [ `Added | `Existed ] [@@deriving equal]
 
+open Import
 module L = struct
   type t = M.t ref
 
@@ -537,6 +536,7 @@ let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t
 let depth t = M.depth t
 
 let handler t =
+  let open Snark_params.Tick in
   let ledger = ref t in
   let path_exn idx =
     List.map (path_exn !ledger idx) ~f:(function `Left h -> h | `Right h -> h)

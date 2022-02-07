@@ -1,9 +1,7 @@
 open Core_kernel
 open Async_kernel
-open Pipe_lib
 open Mina_base
 open Signature_lib
-open O1trace
 
 type 'a reader_and_writer = 'a Pipe.Reader.t * 'a Pipe.Writer.t
 
@@ -44,6 +42,7 @@ let add_new_subscription (t : t) ~pk =
 let create ~logger ~constraint_constants ~wallets ~new_blocks
     ~transition_frontier ~is_storing_all ~time_controller
     ~upload_blocks_to_gcloud ~precomputed_block_writer =
+  let open Pipe_lib in
   let subscribed_block_users =
     Optional_public_key.Table.of_alist_multi
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
@@ -114,7 +113,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
         ( Core.Sys.command
             (sprintf "gcloud auth activate-service-account --key-file=%s" path)
           : int )) ;
-  trace_task "subscriptions new block loop" (fun () ->
+  O1trace.trace_task "subscriptions new block loop" (fun () ->
       Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
           let hash =
             new_block

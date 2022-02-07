@@ -1,6 +1,4 @@
 open Core_kernel
-open Bitstring_lib
-open Snark_bits
 
 module Make_snarkable (Impl : Snarky_backendless.Snark_intf.S) = struct
   open Impl
@@ -15,19 +13,19 @@ module Make_snarkable (Impl : Snarky_backendless.Snark_intf.S) = struct
 
   module Bits = struct
     module type Lossy =
-      Bits_intf.Snarkable.Lossy
+      Snark_bits.Bits_intf.Snarkable.Lossy
         with type ('a, 'b) typ := ('a, 'b) Typ.t
          and type ('a, 'b) checked := ('a, 'b) Checked.t
          and type boolean_var := Boolean.var
 
     module type Faithful =
-      Bits_intf.Snarkable.Faithful
+      Snark_bits.Bits_intf.Snarkable.Faithful
         with type ('a, 'b) typ := ('a, 'b) Typ.t
          and type ('a, 'b) checked := ('a, 'b) Checked.t
          and type boolean_var := Boolean.var
 
     module type Small =
-      Bits_intf.Snarkable.Small
+      Snark_bits.Bits_intf.Snarkable.Small
         with type ('a, 'b) typ := ('a, 'b) Typ.t
          and type ('a, 'b) checked := ('a, 'b) Checked.t
          and type boolean_var := Boolean.var
@@ -87,6 +85,7 @@ struct
 
   open Impl
 
+  open Bitstring_lib
   type var = Boolean.var Bitstring.Lsb_first.t
 
   let typ : (var, t) Typ.t =
@@ -181,7 +180,7 @@ module Tick = struct
   module Field = struct
     include Tick0.Field
     include Hashable.Make (Tick0.Field)
-    module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
+    module Bits = Snark_bits.Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
     let size_in_triples = Int.((size_in_bits + 2) / 3)
   end

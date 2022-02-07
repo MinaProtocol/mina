@@ -1,7 +1,6 @@
 open Core_kernel
 open Async_kernel
-open Pipe_lib
-open Strict_pipe
+open Pipe_lib.Strict_pipe
 
 type 'data t =
   { job_writer : ('data, crash buffered, unit) Writer.t
@@ -10,7 +9,7 @@ type 'data t =
 
 let create ?(buffer_capacity = 30) ~job_capacity f =
   let job_reader, job_writer =
-    Strict_pipe.create (Buffered (`Capacity buffer_capacity, `Overflow Crash))
+    Pipe_lib.Strict_pipe.create (Buffered (`Capacity buffer_capacity, `Overflow Crash))
   in
   let active_jobs = ref 0 in
   let pending_jobs = ref [] in

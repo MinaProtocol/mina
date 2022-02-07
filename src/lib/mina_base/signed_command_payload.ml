@@ -6,7 +6,6 @@ open Core_kernel
 
 [%%ifdef consensus_mechanism]
 
-open Snark_params.Tick
 open Signature_lib
 module Mina_numbers = Mina_numbers
 
@@ -155,6 +154,7 @@ module Common = struct
     Poly.t
 
   let typ =
+    let open Snark_params.Tick in
     Typ.of_hlistable
       [ Currency.Fee.typ
       ; Token_id.typ
@@ -179,6 +179,7 @@ module Common = struct
 
     let to_input_legacy
         ({ fee; fee_token; fee_payer_pk; nonce; valid_until; memo } : var) =
+      let open Snark_params.Tick in
       let%map nonce = Account_nonce.Checked.to_input_legacy nonce
       and valid_until = Global_slot.Checked.to_input_legacy valid_until
       and fee_token = Token_id.Checked.to_input_legacy fee_token

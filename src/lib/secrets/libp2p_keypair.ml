@@ -1,6 +1,5 @@
 open Core
 open Async
-open Async.Deferred.Let_syntax
 open Keypair_common
 
 module T = struct
@@ -14,6 +13,7 @@ module T = struct
   let write_exn kp ~(privkey_path : string) ~(password : Secret_file.password) :
       unit Deferred.t =
     let str = Mina_net2.Keypair.to_string kp in
+    let open Async.Deferred.Let_syntax in
     match%bind
       Secret_file.write ~path:privkey_path ~mkdir:true
         ~plaintext:(Bytes.of_string str) ~password
@@ -45,6 +45,7 @@ module T = struct
   (** Reads a private key from [privkey_path] using [Secret_file], throws on failure *)
   let read_exn ~(privkey_path : string) ~(password : Secret_file.password) :
       t Deferred.t =
+    let open Async.Deferred.Let_syntax in
     match%map read ~privkey_path ~password with
     | Ok keypair ->
         keypair

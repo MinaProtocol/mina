@@ -19,14 +19,15 @@ module type Inputs_intf = sig
 end
 
 module Make (Inputs : Inputs_intf) = struct
-  open Inputs
 
   let name =
+    let open Inputs in
     sprintf "%s_%d_%s_v3" name
       (Pickles_types.Nat.to_int Rounds.n)
       Version.marlin_repo_sha
 
   let set_urs_info, load_urs =
+    let open Inputs in
     let urs_info = Set_once.create () in
     let urs = ref None in
     let degree = 1 lsl Pickles_types.Nat.to_int Rounds.n in

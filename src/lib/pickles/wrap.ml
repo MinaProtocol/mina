@@ -1,13 +1,9 @@
 module SC = Scalar_challenge
 module P = Proof
 open Pickles_types
-open Hlist
-open Tuple_lib
-open Common
 open Core_kernel
 open Async_kernel
 open Import
-open Types
 open Backend
 
 (* This contains the "wrap" prover *)
@@ -36,6 +32,7 @@ let combined_inner_product (type actual_branching) ~env ~domain ~ft_eval1
     (e1, e2) ~(old_bulletproof_challenges : (_, actual_branching) Vector.t) ~r
     ~plonk ~xi ~zeta ~zetaw ~x_hat:(x_hat_1, x_hat_2)
     ~(step_branch_domains : Domains.t) =
+  let open Common in
   let combined_evals =
     Plonk_checks.evals_of_split_evals ~zeta ~zetaw
       (module Tick.Field)
@@ -79,6 +76,7 @@ let combined_inner_product (type actual_branching) ~env ~domain ~ft_eval1
 module Pairing_acc = Tock.Inner_curve.Affine
 
 (* The prover for wrapping a proof *)
+open Hlist
 let wrap (type actual_branching max_branching max_local_max_branchings)
     ~(max_branching : max_branching Nat.t)
     (module Max_local_max_branchings : Hlist.Maxes.S
@@ -102,6 +100,8 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     (Vector.to_array pairing_marlin_indices).(Index.to_int which_index)
   in
 *)
+  let open Types in
+  let open Common in
   let prev_me_only =
     let module M =
       H1.Map (P.Base.Me_only.Dlog_based) (P.Base.Me_only.Dlog_based.Prepared)
@@ -385,7 +385,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     ; statement = Types.Dlog_based.Statement.to_minimal next_statement
     ; prev_evals =
         { Dlog_plonk_types.All_evals.evals =
-            Double.map2 x_hat proof.openings.evals ~f:(fun p e ->
+            Tuple_lib.Double.map2 x_hat proof.openings.evals ~f:(fun p e ->
                 { Dlog_plonk_types.All_evals.With_public_input.public_input = p
                 ; evals = e
                 })

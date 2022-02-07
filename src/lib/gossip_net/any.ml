@@ -21,7 +21,6 @@ end
 
 module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
-  open Rpc_intf
 
   module type Implementation_intf =
     Intf.Gossip_net_intf with module Rpc_intf := Rpc_intf
@@ -30,7 +29,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
   type t = Any : 't implementation * 't -> t
 
-  type 't creator = rpc_handler list -> 't Deferred.t
+  type 't creator = Rpc_intf.rpc_handler list -> 't Deferred.t
 
   type creatable = Creatable : 't implementation * 't creator -> creatable
 

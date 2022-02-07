@@ -1,9 +1,7 @@
 open Core
 open Async
 open Signature_lib
-open Mina_numbers
 open Mina_base
-open Mina_state
 
 (** For status *)
 let txn_count = ref 0
@@ -274,7 +272,7 @@ let get_status ~flag t =
         None
   in
   let new_block_length_received =
-    Length.to_int @@ Consensus.Data.Consensus_state.blockchain_length
+    Mina_numbers.Length.to_int @@ Consensus.Data.Consensus_state.blockchain_length
     @@ Mina_transition.External_transition.Initial_validated.consensus_state
     @@ Pipe_lib.Broadcast_pipe.Reader.peek
          (Mina_lib.most_recent_valid_transition t)
@@ -292,10 +290,10 @@ let get_status ~flag t =
     in
     let num_accounts = Ledger.num_accounts ledger in
     let%bind state = Mina_lib.best_protocol_state t in
-    let state_hash = Protocol_state.hash state |> State_hash.to_base58_check in
-    let consensus_state = state |> Protocol_state.consensus_state in
+    let state_hash = Mina_state.Protocol_state.hash state |> State_hash.to_base58_check in
+    let consensus_state = state |> Mina_state.Protocol_state.consensus_state in
     let blockchain_length =
-      Length.to_int
+      Mina_numbers.Length.to_int
       @@ Consensus.Data.Consensus_state.blockchain_length consensus_state
     in
     let%map sync_status =

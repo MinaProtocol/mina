@@ -1,9 +1,6 @@
 open Core_kernel
 open Async
 open Mina_base
-open Mina_transition
-open Frontier_base
-open Network_peer
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
@@ -76,7 +73,7 @@ module Make (Inputs : Inputs_intf) :
   let answer_query :
          frontier:Inputs.Transition_frontier.t
       -> Ledger_hash.t
-      -> Sync_ledger.Query.t Envelope.Incoming.t
+      -> Sync_ledger.Query.t Network_peer.Envelope.Incoming.t
       -> logger:Logger.t
       -> trust_system:Trust_system.t
       -> Sync_ledger.Answer.t Option.t Deferred.t =
@@ -127,7 +124,7 @@ module Make (Inputs : Inputs_intf) :
     | Some res ->
         Some res
     | None ->
-        let open Root_data.Historical in
+        let open Frontier_base.Root_data.Historical in
         let%bind root = find_in_root_history frontier state_hash in
         let%map scan_state_protocol_states =
           protocol_states_in_root_history frontier state_hash
@@ -155,10 +152,10 @@ module Make (Inputs : Inputs_intf) :
           Transition_frontier.(
             find frontier hash >>| Breadcrumb.validated_transition)
           ( find_in_root_history frontier hash
-          >>| fun x -> Root_data.Historical.transition x )
+          >>| fun x -> Frontier_base.Root_data.Historical.transition x )
           ~f:Fn.const
       in
-      External_transition.Validation.forget_validation validated_transition
+      Mina_transition.External_transition.Validation.forget_validation validated_transition
     in
     match Transition_frontier.catchup_tree frontier with
     | Full _ ->
@@ -170,8 +167,8 @@ module Make (Inputs : Inputs_intf) :
 
   let best_tip_path ~frontier =
     let rec go acc b =
-      let acc = Breadcrumb.state_hash b :: acc in
-      match Transition_frontier.find frontier (Breadcrumb.parent_hash b) with
+      let acc = Frontier_base.Breadcrumb.state_hash b :: acc in
+      match Transition_frontier.find frontier (Frontier_base.Breadcrumb.parent_hash b) with
       | None ->
           acc
       | Some b' ->
@@ -190,7 +187,7 @@ module Make (Inputs : Inputs_intf) :
                (Logger.extend logger
                   [ ("selection_context", `String "Root.prove") ])
              ~existing:
-               (With_hash.map ~f:External_transition.consensus_state
+               (With_hash.map ~f:Mina_transition.External_transition.consensus_state
                   best_tip_with_witness.data)
              ~candidate:seen_consensus_state)
           `Keep
@@ -215,7 +212,7 @@ module Make (Inputs : Inputs_intf) :
                (Logger.extend logger
                   [ ("selection_context", `String "Root.verify") ])
              ~existing:
-               (With_hash.map ~f:External_transition.consensus_state
+               (With_hash.map ~f:Mina_transition.External_transition.consensus_state
                   best_tip_transition)
              ~candidate)
           `Keep

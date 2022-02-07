@@ -1,0 +1,42 @@
+(root) ; ocaml-close will not look for .ocamlclose files in parent directories
+
+; The order in which rules are matched
+; (e.g., we keep opens matched by the 'keep' rule no matter the other rules)
+(precedence (keep remove local structure move))
+
+; An 'open <X>' statement is...
+(rules
+
+  ; - left untouched if...
+  (keep
+    ; ...either it is whitelisted, ...
+    (or (in-list ("Base" "Core" "Core_kernel" "Async" "Async_kernel" "Mina_base" "Import" "Currency" "Signature_lib" "Unsigned"))
+        ; ...it is used for infix operators, ...
+        exports-syntax
+        ; ...it is only for its exposed submodules, ...
+        exports-modules-only
+        ; ...or its scope is roughly a screen.
+        (<= scope-lines 40)))
+
+  ; - removed, and its uses re-qualified, if...
+  ;   ... it is not used much and X is not too long and can be qualified easily.
+  (remove (and (<= uses 5) (<= name-length 15) (not ghost-use)))
+
+  ; - replaced by an explicit structured open, if...
+  (structure
+    ;   ... it exports few different identifiers, and...
+    (and (<= symbols 5)
+         ; ... it is used enough times, and...
+         (>= uses 15)
+         ; ... it only exports direct symbols, not from submodules, and...
+         (not exports-subvalues)
+         ; ... it does not exports types (avoid using ppx_import).
+         (not exports-types)))
+
+  ; - removed and replaced by local 'let open <X> in's if...
+  ;   ... it is used only by only a few functions.
+  (local (<= functions 4))
+
+  ; - moved closer to its first actual use if...
+  ;   ... it is too far from that optimal placement.
+  (move (>= dist-to-optimal 40)))

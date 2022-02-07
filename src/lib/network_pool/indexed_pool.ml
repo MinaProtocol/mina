@@ -1019,7 +1019,6 @@ open Inline_test_quiet_logs
 
 let%test_module _ =
   ( module struct
-    open For_tests
 
     let test_keys = Array.init 10 ~f:(fun _ -> Signature_lib.Keypair.create ())
 
@@ -1043,7 +1042,7 @@ let%test_module _ =
     let empty =
       empty ~constraint_constants ~consensus_constants ~time_controller
 
-    let%test_unit "empty invariants" = assert_invariants empty
+    let%test_unit "empty invariants" = For_tests.assert_invariants empty
 
     let don't_verify _ = None
 
@@ -1067,7 +1066,7 @@ let%test_module _ =
           else
             match add_res with
             | Ok (_, pool', dropped) ->
-                assert_invariants pool' ;
+                For_tests.assert_invariants pool' ;
                 assert (Sequence.is_empty dropped) ;
                 [%test_eq: int] (size pool') 1 ;
                 [%test_eq:
@@ -1137,7 +1136,7 @@ let%test_module _ =
                     [%test_eq:
                       Transaction_hash.User_command_with_valid_signature.t
                       Sequence.t] dropped Sequence.empty ;
-                    assert_invariants pool' ;
+                    For_tests.assert_invariants pool' ;
                     pool := pool' ;
                     go rest
                 | Error (Invalid_nonce (`Expected want, got)) ->
@@ -1356,7 +1355,7 @@ let%test_module _ =
             match add_res with
             | Ok (_, t', dropped) ->
                 assert (not (Sequence.is_empty dropped)) ;
-                assert_invariants t'
+                For_tests.assert_invariants t'
             | Error _ ->
                 failwith "adding command failed"
           else

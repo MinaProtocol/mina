@@ -1,4 +1,3 @@
-open Sgn_type
 
 module type S = sig
   module Impl : Snarky_backendless.Snark_intf.S
@@ -108,7 +107,7 @@ module type S = sig
   end
 
   val batch_miller_loop :
-       (Sgn.t * G1_precomputation.t * G2_precomputation.t) list
+       (Sgn_type.Sgn.t * G1_precomputation.t * G2_precomputation.t) list
     -> (Fqk.t, _) Checked.t
 
   val final_exponentiation : Fqk.t -> (Fqk.t, _) Checked.t

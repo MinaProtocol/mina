@@ -1,7 +1,4 @@
 open Core_kernel
-open Pickles_types
-open Import
-open Kimchi_pasta.Pasta
 
 module Data = struct
   [%%versioned
@@ -20,9 +17,11 @@ module Repr = struct
     module V2 = struct
       type t =
         { commitments :
+            let open Pickles_types in
             Backend.Tock.Curve.Affine.Stable.V1.t
             Plonk_verification_key_evals.Stable.V2.t
-        ; step_domains : Domains.Stable.V1.t array
+        ; step_domains : let open Import in
+                         Domains.Stable.V1.t array
         ; data : Data.Stable.V1.t
         }
 
@@ -34,6 +33,8 @@ end
 [%%versioned_binable
 module Stable = struct
   module V2 = struct
+    let open Import in
+    let open Pickles_types in
     type t =
       { commitments : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
       ; step_domains : Domains.t array
@@ -45,6 +46,9 @@ module Stable = struct
     let to_latest = Fn.id
 
     let of_repr srs { Repr.commitments = c; step_domains; data = d } =
+      let open Kimchi_pasta.Pasta in
+      let open Import in
+      let open Pickles_types in
       let t : Impls.Wrap.Verification_key.t =
         let log2_size = Int.ceil_log2 d.constraints in
         let d = Domain.Pow_2_roots_of_unity log2_size in
@@ -94,6 +98,7 @@ module Stable = struct
 end]
 
 let dummy_commitments g =
+  let open Pickles_types in
   let open Dlog_plonk_types in
   { Plonk_verification_key_evals.sigma_comm =
       Vector.init Permuts.n ~f:(fun _ -> g)
@@ -107,6 +112,7 @@ let dummy_commitments g =
   }
 
 let dummy =
+  let open Import in
   lazy
     (let rows = Domain.size Common.wrap_domains.h in
      let g = Backend.Tock.Curve.(to_affine_exn one) in

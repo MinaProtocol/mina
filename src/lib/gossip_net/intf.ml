@@ -1,7 +1,6 @@
 open Async
 open Core_kernel
 open Network_peer
-open Pipe_lib
 open Mina_base.Rpc_intf
 
 type ban_creator = { banned_peer : Peer.t; banned_until : Time.t }
@@ -76,7 +75,7 @@ module type Gossip_net_intf = sig
   val received_message_reader :
        t
     -> (Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t)
-       Strict_pipe.Reader.t
+       Pipe_lib.Strict_pipe.Reader.t
 
-  val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
+  val ban_notification_reader : t -> ban_notification Pipe_lib.Linear_pipe.Reader.t
 end

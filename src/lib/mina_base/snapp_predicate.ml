@@ -21,7 +21,6 @@ module A = Account
 open Mina_numbers
 open Currency
 open Snapp_basic
-open Pickles_types
 module Impl = Pickles.Impls.Step
 
 module Closed_interval = struct
@@ -382,6 +381,7 @@ module Account = struct
     end
   end]
 
+  open Pickles_types
   let accept : t =
     { balance = Ignore
     ; nonce = Ignore

@@ -8,7 +8,6 @@ include Intf
 [%%ifdef consensus_mechanism]
 
 open Snark_params
-open Tick
 
 [%%else]
 
@@ -23,7 +22,7 @@ module Extend
       val length : int
     end) : S with type t = Unsigned.t = struct
   ;;
-  assert (M.length < Field.size_in_bits - 3)
+  assert (M.length < Tick.Field.size_in_bits - 3)
 
   let length_in_bits = M.length
 

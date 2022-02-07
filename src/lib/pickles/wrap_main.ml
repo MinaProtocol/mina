@@ -1,11 +1,9 @@
 open Core_kernel
 open Pickles_types
 open Hlist
-open Common
 open Import
 open Types
 open Wrap_main_inputs
-open Impl
 module SC = Scalar_challenge
 
 (* Let's define an OCaml encoding for inductive NP sets. Let A be an inductive NP set.
@@ -106,6 +104,7 @@ module Old_bulletproof_chals = struct
         -> t
 end
 
+open Impl
 let pack_statement max_branching t =
   with_label __LOC__ (fun () ->
       Spec.pack
@@ -387,7 +386,7 @@ let wrap_main
           }
         in
         let openings_proof =
-          let shift = Shifts.tick1 in
+          let shift = Common.Shifts.tick1 in
           exists
             (Dlog_plonk_types.Openings.Bulletproof.typ
                ( Typ.transport Other_field.Packed.typ

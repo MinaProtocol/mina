@@ -1,7 +1,6 @@
-open Ppxlib
-open Asttypes
-open Parsetree
-open Longident
+open Ppxlib.Asttypes
+open Ppxlib.Parsetree
+open Ppxlib.Longident
 open Core
 open Async
 open Pickles_types
@@ -33,7 +32,7 @@ let main () =
     Format.formatter_of_out_channel (Out_channel.create "dummy_values.ml")
   in
   let loc = Ppxlib.Location.none in
-  Pprintast.top_phrase fmt (Ptop_def (str ~loc)) ;
+  Ppxlib.Pprintast.top_phrase fmt (Ptop_def (str ~loc)) ;
   ignore (exit 0 : 'a Deferred.t)
 
 let () =

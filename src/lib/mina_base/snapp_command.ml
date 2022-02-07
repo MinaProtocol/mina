@@ -20,7 +20,6 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Impl = Pickles.Impls.Step
 open Mina_numbers
 open Currency
-open Pickles_types
 module Digest = Random_oracle.Digest
 module Predicate = Snapp_predicate
 
@@ -97,7 +96,7 @@ module Party = struct
 
     let dummy : t =
       { app_state =
-          Vector.init Snapp_state.Max_state_size.n ~f:(fun _ ->
+          Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun _ ->
               Set_or_keep.Keep)
       ; delegate = Keep
       ; verification_key = Keep

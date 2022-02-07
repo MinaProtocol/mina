@@ -2,10 +2,6 @@
 open Core_kernel
 module SC = Scalar_challenge
 open Import
-open Util
-open Types.Pairing_based
-open Pickles_types
-open Common
 open Import
 module S = Sponge
 
@@ -71,6 +67,7 @@ struct
       (Inner_curve.to_field_elements g2)
     |> Boolean.all
 
+  open Util
   let absorb sponge ty t =
     absorb
       ~absorb_field:(fun x -> Sponge.absorb sponge (`Field x))
@@ -205,10 +202,12 @@ struct
     with_label __LOC__ (fun () ->
         Ops.scale_fast p s ~num_bits:Field.size_in_bits)
 
+  open Pickles_types
   let scale_fast2 p (s : Other_field.t Shifted_value.Type2.t) =
     with_label __LOC__ (fun () ->
         Ops.scale_fast2 p s ~num_bits:Field.size_in_bits)
 
+  open Types.Pairing_based
   let check_bulletproof ~pcs_batch ~(sponge : Sponge.t) ~xi
       ~combined_inner_product
       ~(* Corresponds to y in figure 7 of WTS *)
@@ -628,7 +627,6 @@ struct
     end )
 
   module Split_evaluations = struct
-    open Dlog_plonk_types
 
     let mask' { Bounded.max; actual } : Boolean.var array =
       let (T max) = Nat.of_int max in
@@ -663,7 +661,7 @@ struct
     let mod_max_degree =
       let k = Nat.to_int Backend.Tick.Rounds.n in
       fun d ->
-        let d = Number.of_bits (Field.unpack ~length:max_log2_degree d) in
+        let d = Number.of_bits (Field.unpack ~length:Common.max_log2_degree d) in
         Number.mod_pow_2 d (`Two_to_the k)
 
     let combine_split_evaluations' b_plus_26 =
@@ -674,7 +672,7 @@ struct
         ~init:(fun (_, fx) -> fx)
         (Common.dlog_pcs_batch b_plus_26)
         ~shifted_pow:
-          (Pseudo.Degree_bound.shifted_pow ~crs_max_degree:Max_degree.step)
+          (Pseudo.Degree_bound.shifted_pow ~crs_max_degree:Common.Max_degree.step)
 
     let combine_split_evaluations_side_loaded b_plus_26 =
       Pcs_batch.combine_split_evaluations ~last
@@ -685,6 +683,7 @@ struct
         (Common.dlog_pcs_batch b_plus_26)
         ~shifted_pow:(fun deg x -> pow x deg)
 
+    open Dlog_plonk_types
     let mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
         (choice : n One_hot_vector.T(Impl).t) (e : Field.t array Evals.t) :
         (Boolean.var * Field.t) array Evals.t =
@@ -699,7 +698,7 @@ struct
     Pcs_batch.combine_split_evaluations ~mul
       ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
       ~shifted_pow:
-        (Pseudo.Degree_bound.shifted_pow ~crs_max_degree:Max_degree.step)
+        (Pseudo.Degree_bound.shifted_pow ~crs_max_degree:Common.Max_degree.step)
       ~init:Fn.id ~evaluation_point ~xi
       (Common.dlog_pcs_batch b_plus_26)
       without_degree_bound with_degree_bound
@@ -735,7 +734,6 @@ struct
         | [] ->
             failwith "empty list")
 
-  open Dlog_plonk_types
 
   module Opt_sponge = struct
     include Opt_sponge.Make (Impl) (Step_main_inputs.Sponge.Permutation)
@@ -804,6 +802,7 @@ struct
           ( { evals = evals1; public_input = x_hat1 }
           , { evals = evals2; public_input = x_hat2 } )
       } =
+    let open Dlog_plonk_types in
     let open Vector in
     let step_domains, input_domain =
       with_label "step_domains" (fun () ->
@@ -860,7 +859,7 @@ struct
     let r = scalar (SC.SC.create r_actual) in
     let plonk_minimal = Plonk.to_minimal plonk in
     let combined_evals =
-      let n = Int.ceil_log2 Max_degree.step in
+      let n = Int.ceil_log2 Common.Max_degree.step in
       let zeta_n : Field.t = pow2_pow plonk.zeta n in
       let zetaw_n : Field.t = pow2_pow zetaw n in
       ( Dlog_plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zeta_n) evals1

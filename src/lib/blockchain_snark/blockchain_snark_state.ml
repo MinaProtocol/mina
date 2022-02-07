@@ -1,9 +1,7 @@
 open Core_kernel
 open Snark_params
-open Tick
 open Mina_base
 open Mina_state
-open Pickles_types
 
 include struct
   open Snarky_backendless.Request
@@ -67,6 +65,8 @@ let with_handler k w ?handler =
         transition consensus data is valid
         new consensus state is a function of the old consensus state
 *)
+open Pickles_types
+open Tick
 let%snarkydef step ~(logger : Logger.t)
     ~(proof_level : Genesis_constants.Proof_level.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)

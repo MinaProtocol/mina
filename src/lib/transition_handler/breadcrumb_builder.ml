@@ -1,12 +1,10 @@
 open Mina_base
 open Core
 open Async
-open Cache_lib
-open Mina_transition
-open Network_peer
 
 let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
     ~trust_system ~frontier ~initial_hash subtrees_of_enveloped_transitions =
+  let open Cache_lib in
   let missing_parent_msg =
     Printf.sprintf
       "Transition frontier already garbage-collected the parent of %s"
@@ -28,8 +26,8 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                        Rose_tree.to_yojson
                          (fun enveloped_transitions ->
                            Cached.peek enveloped_transitions
-                           |> Envelope.Incoming.data
-                           |> External_transition.Initial_validated.state_hash
+                           |> Network_peer.Envelope.Incoming.data
+                           |> Mina_transition.External_transition.Initial_validated.state_hash
                            |> Mina_base.State_hash.to_yojson)
                          subtree)) )
             ]
@@ -60,7 +58,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
               ~f:(fun enveloped_transition ->
                 let open Deferred.Or_error.Let_syntax in
                 let transition_with_initial_validation =
-                  Envelope.Incoming.data enveloped_transition
+                  Network_peer.Envelope.Incoming.data enveloped_transition
                 in
                 let transition_receipt_time = Some (Time.now ()) in
                 let transition_with_hash, _ =
@@ -70,18 +68,18 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                   (* TODO: handle this edge case more gracefully *)
                   (* since we are building a disconnected subtree of breadcrumbs,
                    * we skip this step in validation *)
-                  External_transition.skip_frontier_dependencies_validation
+                  Mina_transition.External_transition.skip_frontier_dependencies_validation
                     `This_transition_belongs_to_a_detached_subtree
                     transition_with_initial_validation
                 in
-                let sender = Envelope.Incoming.sender enveloped_transition in
+                let sender = Network_peer.Envelope.Incoming.sender enveloped_transition in
                 let parent = Cached.peek cached_parent in
                 let expected_parent_hash =
                   Transition_frontier.Breadcrumb.state_hash parent
                 in
                 let actual_parent_hash =
                   transition_with_hash |> With_hash.data
-                  |> External_transition.parent_hash
+                  |> Mina_transition.External_transition.parent_hash
                 in
                 let%bind () =
                   Deferred.return
@@ -126,7 +124,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                         let subtree_nodes = Rose_tree.flatten subtree in
                         let ip_address_set =
                           let sender_from_tree_node node =
-                            Envelope.Incoming.sender (Cached.peek node)
+                            Network_peer.Envelope.Incoming.sender (Cached.peek node)
                           in
                           List.fold subtree_nodes
                             ~init:(Set.empty (module Network_peer.Peer))

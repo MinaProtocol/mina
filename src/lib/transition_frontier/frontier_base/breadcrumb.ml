@@ -1,9 +1,7 @@
 open Async_kernel
 open Core
 open Mina_base
-open Mina_state
 open Mina_transition
-open Network_peer
 
 module T = struct
   let id = "breadcrumb"
@@ -101,9 +99,9 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
           let message = "invalid staged ledger diff: incorrect " ^ reasons in
           let%map () =
             match sender with
-            | None | Some Envelope.Sender.Local ->
+            | None | Some Network_peer.Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote peer) ->
+            | Some Network_peer.(Envelope.Sender.Remote peer) ->
                 Trust_system.(
                   record trust_system logger peer
                     Actions.(Gossiped_invalid_transition, Some (message, [])))
@@ -112,9 +110,9 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
       | Error (`Staged_ledger_application_failed staged_ledger_error) ->
           let%map () =
             match sender with
-            | None | Some Envelope.Sender.Local ->
+            | None | Some Network_peer.Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote peer) ->
+            | Some Network_peer.(Envelope.Sender.Remote peer) ->
                 let error_string =
                   Staged_ledger.Staged_ledger_error.to_string
                     staged_ledger_error
@@ -193,6 +191,7 @@ let name t =
   Visualization.display_prefix_of_string @@ State_hash.to_base58_check
   @@ state_hash t
 
+open Mina_state
 type display =
   { state_hash: string
   ; blockchain_state: Blockchain_state.display

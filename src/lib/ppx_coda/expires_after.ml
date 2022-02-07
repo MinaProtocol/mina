@@ -1,6 +1,5 @@
 open Core_kernel
 open Ppxlib
-open Asttypes
 
 (** This is a ppx to flag code that will expire after a certain date
 
@@ -17,6 +16,7 @@ open Asttypes
 let name = "expires_after"
 
 let expand ~loc ~path:_ str _delimiter =
+  let open Asttypes in
   let date =
     try
       (* the of_string function below allows too-long strings, as long as it starts

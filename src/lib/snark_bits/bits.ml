@@ -3,8 +3,6 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Fold_lib
-open Bitstring_lib
 
 (* Someday: Make more efficient by giving Field.unpack a length argument in
 camlsnark *)
@@ -12,7 +10,7 @@ let unpack_field unpack ~bit_length x = List.take (unpack x) bit_length
 
 let bits_per_char = 8
 
-let pad (type a) ~length ~default (bs : a Bitstring.Lsb_first.t) =
+let pad (type a) ~length ~default (bs : a Bitstring_lib.Bitstring.Lsb_first.t) =
   let bs = (bs :> a list) in
   let padding = length - List.length bs in
   assert (padding >= 0) ;
@@ -67,7 +65,7 @@ module Vector = struct
     type t = V.t
 
     let fold t =
-      { Fold.fold =
+      Fold_lib.{ Fold.fold =
           (fun ~init ~f ->
             let rec go acc i =
               if i = V.length then acc else go (f acc (V.get t i)) (i + 1)
@@ -113,7 +111,7 @@ module Make_field0
   type t = Field.t
 
   let fold t =
-    { Fold.fold =
+    Fold_lib.{ Fold.fold =
         (fun ~init ~f ->
           let n = Bigint.of_field t in
           let rec go acc i =
@@ -246,7 +244,7 @@ module Snarkable = struct
           (Typ.list ~length:V.length Boolean.typ)
           ~there:(v_to_list V.length) ~back:v_of_list
 
-      let var_to_bits = Bitstring.Lsb_first.of_list
+      let var_to_bits = Bitstring_lib.Bitstring.Lsb_first.of_list
 
       let var_of_bits = pad ~length:V.length ~default:Boolean.false_
 

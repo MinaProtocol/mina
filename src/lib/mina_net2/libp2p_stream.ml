@@ -1,6 +1,5 @@
 open Core_kernel
 open Async_kernel
-open Network_peer
 
 type participant = Us | Them [@@deriving equal, show]
 
@@ -22,7 +21,7 @@ type t =
   { protocol : string
   ; id : Libp2p_ipc.stream_id
   ; mutable state : state
-  ; peer : Peer.t
+  ; peer : Network_peer.Peer.t
   ; incoming_r : string Pipe.Reader.t
   ; incoming_w : string Pipe.Writer.t
   ; outgoing_w : string Pipe.Writer.t

@@ -1,7 +1,3 @@
-open Ppxlib
-open Asttypes
-open Parsetree
-open Longident
 open Core_kernel
 open Signature_lib
 
@@ -24,6 +20,8 @@ let keypairs =
     generated_keypairs
 
 let expr ~loc =
+  let open Longident in
+  let open Asttypes in
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
@@ -53,6 +51,8 @@ let expr ~loc =
   Array.map conv [%e earray]
 
 let structure ~loc =
+  let open Parsetree in
+  let open Asttypes in
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
@@ -72,9 +72,10 @@ let json =
            ]))
 
 let main () =
+  let open Parsetree in
   Out_channel.with_file "sample_keypairs.ml" ~f:(fun ml_file ->
       let fmt = Format.formatter_of_out_channel ml_file in
-      Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none))) ;
+      Ppxlib.Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none))) ;
   Out_channel.with_file "sample_keypairs.json" ~f:(fun json_file ->
       Yojson.pretty_to_channel json_file json) ;
   exit 0

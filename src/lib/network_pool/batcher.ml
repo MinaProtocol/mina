@@ -1,9 +1,7 @@
 open Core_kernel
 open Async_kernel
-open Network_peer
 
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 
 module Id = Unique_id.Int ()
 
@@ -214,6 +212,7 @@ let verify (type p r partial) (t : (p, partial, r) t) (proof : p) :
 
 type ('a, 'b, 'c) batcher = ('a, 'b, 'c) t [@@deriving sexp]
 
+open Network_peer
 let compare_envelope (e1 : _ Envelope.Incoming.t) (e2 : _ Envelope.Incoming.t) =
   Envelope.Sender.compare e1.sender e2.sender
 
@@ -338,6 +337,7 @@ module Transaction_pool = struct
   let verify (t : t) = verify t
 end
 
+open Inline_test_quiet_logs
 module Snark_pool = struct
   type proof_envelope =
     (Ledger_proof.t One_or_two.t * Mina_base.Sok_message.t) Envelope.Incoming.t

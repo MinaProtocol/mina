@@ -1,9 +1,7 @@
 open Core_kernel
-open Common
 open Backend
 open Pickles_types
 module Impl = Impls.Step
-open Import
 
 let high_entropy_bits = 128
 
@@ -11,15 +9,15 @@ let sponge_params_constant =
   Sponge.Params.(map pasta_p_3 ~f:Impl.Field.Constant.of_string)
 
 let tick_field_random_oracle ?(length = Tick.Field.size_in_bits - 1) s =
-  Tick.Field.of_bits (bits_random_oracle ~length s)
+  Tick.Field.of_bits (Common.bits_random_oracle ~length s)
 
 let unrelated_g =
   let group_map =
     unstage
-      (group_map
+      (Common.group_map
          (module Tick.Field)
          ~a:Tick.Inner_curve.Params.a ~b:Tick.Inner_curve.Params.b)
-  and str = Fn.compose bits_to_bytes Tick.Field.to_bits in
+  and str = Fn.compose Common.bits_to_bytes Tick.Field.to_bits in
   fun (x, y) -> group_map (tick_field_random_oracle (str x ^ str y))
 
 open Impl
@@ -78,12 +76,12 @@ let%test_unit "sponge" =
   T.test Tick_field_sponge.params
 
 module Input_domain = struct
-  let domain = Domain.Pow_2_roots_of_unity 6
+  let domain = Import.Domain.Pow_2_roots_of_unity 6
 
   let lagrange_commitments =
     lazy
-      (let domain_size = Domain.size domain in
-       time "lagrange" (fun () ->
+      (let domain_size = Import.Domain.size domain in
+       Common.time "lagrange" (fun () ->
            Array.init domain_size ~f:(fun i ->
                let v =
                  (Kimchi.Protocol.SRS.Fq.lagrange_commitment

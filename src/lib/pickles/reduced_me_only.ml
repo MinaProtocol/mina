@@ -2,8 +2,6 @@ open Core_kernel
 open Import
 open Pickles_types
 open Types
-open Common
-open Backend
 
 (* The pairing-based "reduced" me-only contains the data of the standard me-only
    but without the wrap verification key. The purpose of this type is for sending
@@ -24,7 +22,7 @@ module Pairing_based = struct
     ; sg
     ; dlog_plonk_index
     ; old_bulletproof_challenges =
-        Vector.map ~f:Ipa.Step.compute_challenges old_bulletproof_challenges
+        Vector.map ~f:Common.Ipa.Step.compute_challenges old_bulletproof_challenges
     }
 end
 
@@ -58,18 +56,18 @@ module Dlog_based = struct
       ()
 
     module Prepared = struct
-      type t = (Tock.Field.t, Tock.Rounds.n) Vector.t
+      type t = (Backend.Tock.Field.t, Backend.Tock.Rounds.n) Vector.t
     end
   end
 
   type 'max_local_max_branching t =
-    ( Tock.Inner_curve.Affine.t
+    ( Backend.Tock.Inner_curve.Affine.t
     , (Challenges_vector.t, 'max_local_max_branching) Vector.t )
     Dlog_based.Proof_state.Me_only.t
 
   module Prepared = struct
     type 'max_local_max_branching t =
-      ( Tock.Inner_curve.Affine.t
+      ( Backend.Tock.Inner_curve.Affine.t
       , (Challenges_vector.Prepared.t, 'max_local_max_branching) Vector.t )
       Dlog_based.Proof_state.Me_only.t
   end
@@ -77,6 +75,6 @@ module Dlog_based = struct
   let prepare ({ sg; old_bulletproof_challenges } : _ t) =
     { Dlog_based.Proof_state.Me_only.sg
     ; old_bulletproof_challenges =
-        Vector.map ~f:Ipa.Wrap.compute_challenges old_bulletproof_challenges
+        Vector.map ~f:Common.Ipa.Wrap.compute_challenges old_bulletproof_challenges
     }
 end
