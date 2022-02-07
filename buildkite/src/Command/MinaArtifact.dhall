@@ -57,7 +57,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         -- daemon devnet image
         let daemonDevnetSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
           service="mina-daemon",
           network="devnet",
           deb_codename="${DebianVersions.lowerName debVersion}",
@@ -70,7 +69,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         -- daemon mainnet image
         let daemonMainnetSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
           service="mina-daemon",
           network="mainnet",
           deb_codename="${DebianVersions.lowerName debVersion}",
@@ -83,7 +81,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         -- archive image
         let archiveSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
           service="mina-archive",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="archive-${DebianVersions.lowerName debVersion}-docker-image"
@@ -95,7 +92,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         -- rosetta image
         let rosettaSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOnGitEnv,
           service="mina-rosetta",
           extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH}",
           deb_codename="${DebianVersions.lowerName debVersion}",
