@@ -756,10 +756,18 @@ let initialize ~logger network =
         |> List.filter ~f:(fun { Node.pod_id; _ } ->
                not (String.Set.mem seed_pod_ids pod_id))
       in
-      (* TODO: parallelize (requires accumlative hard errors) *)
-      let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
-      (* put a short delay before starting other nodes, to help avoid artifact generation races *)
-      let%bind () =
-        after (Time.Span.of_sec 30.0) |> Deferred.bind ~f:Malleable_error.return
+      let start_print_delayed n =
+        Deferred.bind
+          (after @@ Time.Span.of_sec 30.0)
+          ~f:(fun () -> start_print n)
       in
-      Malleable_error.List.iter non_seed_nodes ~f:start_print
+      let start_many =
+        Malleable_error.(
+          function
+          | [] ->
+              return ()
+          | node0 :: rest ->
+              start_print node0
+              >>= fun () -> List.iter rest ~f:start_print_delayed)
+      in
+      start_many @@ seed_nodes @ non_seed_nodes
