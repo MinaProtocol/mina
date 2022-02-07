@@ -13,8 +13,7 @@
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable-small";
 
   inputs.mix-to-nix.url = "github:serokell/mix-to-nix";
-  inputs.nix-npm-buildPackage.url =
-    "github:lumiguide/nix-npm-buildpackage"; # todo: upstream
+  inputs.nix-npm-buildPackage.url = "github:serokell/nix-npm-buildpackage";
   inputs.opam-nix.url = "github:tweag/opam-nix";
   inputs.opam-nix.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.inputs.opam-repository.follows = "opam-repository";
