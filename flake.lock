@@ -99,15 +99,15 @@
     },
     "nix-npm-buildPackage": {
       "locked": {
-        "lastModified": 1624369261,
+        "lastModified": 1643828355,
         "narHash": "sha256-yeej9SblWlh5DQlLr/AGz8vVG0TrDZg38Yy2fv6wk7U=",
-        "owner": "lumiguide",
+        "owner": "serokell",
         "repo": "nix-npm-buildpackage",
-        "rev": "fc785f1e8aa5d214c915415428264c690b7d83fd",
+        "rev": "d9acd44139f56202084bd918cdf6b945935acfd6",
         "type": "github"
       },
       "original": {
-        "owner": "lumiguide",
+        "owner": "serokell",
         "repo": "nix-npm-buildpackage",
         "type": "github"
       }
