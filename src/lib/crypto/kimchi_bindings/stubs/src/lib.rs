@@ -89,12 +89,12 @@ pub mod linearization {
 /// Handy re-exports
 pub use {
     commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
-    kimchi::prover::caml::{CamlProverCommitments, CamlProverProof},
     kimchi::circuits::{
         expr::caml::{CamlColumn, CamlLinearization, CamlPolishToken, CamlVariable},
         gate::{caml::CamlCircuitGate, CurrOrNext, GateType},
         scalars::caml::{CamlLookupEvaluations, CamlProofEvaluations, CamlRandomOracles},
         wires::caml::CamlWire,
     },
+    kimchi::prover::caml::{CamlProverCommitments, CamlProverProof},
     oracle::sponge::caml::CamlScalarChallenge,
 };

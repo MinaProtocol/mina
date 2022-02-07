@@ -243,6 +243,7 @@ module Stable = struct
                          ; chacha_comm = None
                          })
                     ; shifts = Common.tock_shifts ~log2_size
+                    ; lookup_index = None
                     }
                 end
 
