@@ -2,8 +2,6 @@ let Prelude = ../External/Prelude.dhall
 let RunInToolchain = ../Command/RunInToolchain.dhall
 let ContainerImages = ./ContainerImages.dhall
 
-let dependsOnGitEnv = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
-
 let DebVersion = < Buster | Stretch >
 
 let capitalName = \(debVersion : DebVersion) ->
@@ -20,8 +18,8 @@ let toolchainImage = \(debVersion : DebVersion) ->
 
 let dependsOn = \(debVersion : DebVersion) ->
   merge {
-    Buster = dependsOnGitEnv # [{ name = "MinaArtifactBuster", key = "build-deb-pkg" }],
-    Stretch = dependsOnGitEnv # [{ name = "MinaArtifactStretch", key = "build-deb-pkg" }]
+    Buster = [{ name = "MinaArtifactBuster", key = "build-deb-pkg" }],
+    Stretch = [{ name = "MinaArtifactStretch", key = "build-deb-pkg" }]
   } debVersion
 
 in
@@ -32,6 +30,5 @@ in
   lowerName = lowerName,
   toolchainRunner = toolchainRunner,
   toolchainImage = toolchainImage,
-  dependsOn = dependsOn,
-  dependsOnGitEnv = dependsOnGitEnv
+  dependsOn = dependsOn
 }
