@@ -282,4 +282,12 @@ let%test_module "Test" =
     let%test_unit "roundtrip json'" =
       let open Derivers in
       [%test_eq: V3.t] (of_json v3 (to_json v3 V3.v)) V3.v
+
+    let%test_unit "verification key with hash, roundtrip json" =
+      let open Pickles.Side_loaded.Verification_key in
+      (* we do this because the dummy doesn't have a wrap_vk on it *)
+      let data = dummy |> to_base58_check |> of_base58_check_exn in
+      let v = { With_hash.data; hash = Field.one } in
+      let o = verification_key_with_hash @@ Derivers.o () in
+      [%test_eq: (t, Field.t) With_hash.t] v (of_json o (to_json o v))
   end )

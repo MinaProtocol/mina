@@ -382,49 +382,27 @@ module Update = struct
         Set_or_keep.
           [ Set (F.negate F.one); Keep; Keep; Keep; Keep; Keep; Keep; Keep ]
     in
-    let delegate = Set_or_keep.Set Public_key.Compressed.empty in
-    let __vk_str =
-      Yojson.Safe.to_string
-        (Pickles.Side_loaded.Verification_key.to_yojson
-           Pickles.Side_loaded.Verification_key.dummy)
-    in
-    let __vk =
-      Result.ok_or_failwith
-      @@ Pickles.Side_loaded.Verification_key.of_yojson
-           (Yojson.Safe.from_string __vk_str)
-    in
-    printf "%s" __vk_str ;
-    (* let _vk =
-       Pickles.Side_loaded.Verification_key.of_base58_check_exn
-         (Pickles.Side_loaded.Verification_key.to_base58_check
-            Pickles.Side_loaded.Verification_key.dummy) *)
-    (* in *)
     let verification_key =
-      Set_or_keep.Keep
-      (* TODO *)
-      (* Set_or_keep.Set
-          (
-             (let data = Pickles.Side_loaded.Verification_key.dummy in
-              let hash = Snapp_account.digest_vk data in
-              { With_hash.data; hash })) *)
+      Set_or_keep.Set
+        (let data =
+           Pickles.Side_loaded.Verification_key.(
+             dummy |> to_base58_check |> of_base58_check_exn)
+         in
+         let hash = Snapp_account.digest_vk data in
+         { With_hash.data; hash })
     in
-    let permissions = Set_or_keep.Set Permissions.user_default in
-    let snapp_uri = Set_or_keep.Set "https://www.example.com" in
-    let token_symbol = Set_or_keep.Set "TOKEN" in
-    let timing = Set_or_keep.Set Timing_info.dummy in
     let update =
       { Poly.app_state
-      ; delegate
+      ; delegate = Set_or_keep.Set Public_key.Compressed.empty
       ; verification_key
-      ; permissions
-      ; snapp_uri
-      ; token_symbol
-      ; timing
+      ; permissions = Set_or_keep.Set Permissions.user_default
+      ; snapp_uri = Set_or_keep.Set "https://www.example.com"
+      ; token_symbol = Set_or_keep.Set "TOKEN"
+      ; timing = Set_or_keep.Set Timing_info.dummy
       }
     in
     let module Fd = Fields_derivers_snapps.Derivers in
     let full = deriver (Fd.o ()) in
-    printf "%s" (Yojson.Safe.to_string @@ !(full#to_json) update) ;
     [%test_eq: t] update (update |> Fd.to_json full |> Fd.of_json full)
 end
 
