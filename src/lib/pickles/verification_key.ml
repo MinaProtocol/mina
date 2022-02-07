@@ -56,7 +56,6 @@ module Stable = struct
         ; max_poly_size = 1 lsl Nat.to_int Rounds.Wrap.n
         ; max_quot_size
         ; srs
-        ; linearization = failwith "TODO"
         ; evals =
             (let g (x, y) =
                { Kimchi.Protocol.unshifted =
