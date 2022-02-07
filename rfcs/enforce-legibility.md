@@ -36,8 +36,9 @@ The rules are up to change, but we propose the following set as a first step. Th
 
   ; - left untouched if...
   (keep
-    ; ...either it is whitelisted, ...
-    (or (in-list ("Base" "Core" "Core_kernel"))
+    ; ...either it is allow-listed, ...
+    (or (in-list ("Base" "Core" "Core_kernel" "Async" "Async_kernel" "Mina_base"
+                  "Import" "Currency" "Signature_lib" "Unsigned"))
         ; ...it is used for infix operators, ...
         exports-syntax
         ; ...it is only for its exposed submodules, ...
@@ -76,9 +77,9 @@ This makes the rules easily modifiable in the future, along with the evolution o
 We propose that the tool is run with the aforementioned rules **as a pre-commit hook**, only on files that are about to be committed. This allows for an incremental removal of problematic `open`s instead of blocking development (with the rules exposed above, several hundreds of problematic `open`s are detected in the whole code base).
 
 The tool will block the commit if problems are found, and suggest modifications.
-It is then up to the developer to automatically apply the suggested patches, manually fix the problem or override the tool's decision by white-listing the modules.
+It is then up to the developer to automatically apply the suggested patches, manually fix the problem or override the tool's decision by allow-listing the modules.
 
-White-listing a module can be done by either modifying the global rule or dropping a new `.ocamlclose` encoding the white-listing. The module will thus only be white-listed in the directory and subdirectories of the new file, without affecting the global rules. Since it is encoded in the file-system, the white-listing can then be debated during a code review. 
+Allow-listing a module can be done by either modifying the global rule or dropping a new `.ocamlclose` encoding the allow-listing. The module will thus only be allow-listed in the directory and subdirectories of the new file, without affecting the global rules. Since it is encoded in the file-system, the allow-listing can then be debated during a code review. 
 
 ## Examples
 
