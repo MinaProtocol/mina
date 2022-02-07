@@ -16,6 +16,12 @@ let toolchainRunner = \(debVersion : DebVersion) ->
 let toolchainImage = \(debVersion : DebVersion) ->
   merge { Buster = ContainerImages.minaToolchainBuster, Stretch = ContainerImages.minaToolchainStretch } debVersion
 
+let dependsOn = \(debVersion : DebVersion) ->
+  merge {
+    Buster = [{ name = "MinaArtifactBuster", key = "build-deb-pkg" }],
+    Stretch = [{ name = "MinaArtifactStretch", key = "build-deb-pkg" }]
+  } debVersion
+
 in
 
 {
@@ -23,5 +29,6 @@ in
   capitalName = capitalName,
   lowerName = lowerName,
   toolchainRunner = toolchainRunner,
-  toolchainImage = toolchainImage
+  toolchainImage = toolchainImage,
+  dependsOn = dependsOn
 }
