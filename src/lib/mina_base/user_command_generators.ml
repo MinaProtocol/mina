@@ -68,6 +68,7 @@ let parties_with_ledger () =
       ; edit_sequence_state = Either
       ; set_token_symbol = Either
       ; increment_nonce = Either
+      ; set_voting_for = Either
       }
     in
     let verification_key =

@@ -970,6 +970,9 @@ let update_permissions =
        and increment_nonce =
          Param.flag "--increment-nonce" ~doc:"Proof|Signature|Both|Either|None"
            Param.(required string)
+       and set_voting_for =
+         Param.flag "--set-voting-for" ~doc:"Proof|Signature|Both|Either|None"
+           Param.(required string)
        and current_auth =
          Param.flag "--current-auth"
            ~doc:
@@ -991,6 +994,7 @@ let update_permissions =
            ; edit_sequence_state = Util.auth_of_string edit_sequence_state
            ; set_token_symbol = Util.auth_of_string set_token_symbol
            ; increment_nonce = Util.auth_of_string increment_nonce
+           ; set_voting_for = Util.auth_of_string set_voting_for
            }
        in
        if Currency.Fee.(fee < Flags.min_fee) then

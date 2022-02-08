@@ -319,7 +319,7 @@ module Binable_arg = struct
         , Public_key.Compressed.Stable.V1.t option
         , State_hash.Stable.V1.t
         , Timing.Stable.V1.t
-        , Permissions.Stable.V1.t
+        , Permissions.Stable.V2.t
         , Snapp_account.Stable.V2.t option
         , string )
         (* TODO: Cache the digest of this? *)
