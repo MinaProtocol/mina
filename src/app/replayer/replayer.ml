@@ -930,7 +930,9 @@ module Snapp_helpers = struct
       update_data.token_symbol |> Snapp_basic.Set_or_keep.of_option
     in
     let voting_for =
-      update_data.voting_for |> Snapp_basic.Set_or_keep.of_option
+      update_data.voting_for
+      |> Option.map ~f:State_hash.of_base58_check_exn
+      |> Snapp_basic.Set_or_keep.of_option
     in
     let%bind timing =
       match update_data.timing_id with
