@@ -63,7 +63,7 @@ module Party = struct
             , F.Stable.V1.t )
             With_hash.Stable.V1.t
             Set_or_keep.Stable.V1.t
-          , Permissions.Stable.V1.t Set_or_keep.Stable.V1.t )
+          , Permissions.Stable.V2.t Set_or_keep.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving compare, equal, sexp, hash, yojson]
 

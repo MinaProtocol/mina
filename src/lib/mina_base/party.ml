@@ -212,7 +212,7 @@ module Update = struct
           , F.Stable.V1.t )
           With_hash.Stable.V1.t
           Set_or_keep.Stable.V1.t
-        , Permissions.Stable.V1.t Set_or_keep.Stable.V1.t
+        , Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
         , string Set_or_keep.Stable.V1.t
         , Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
         , Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t )

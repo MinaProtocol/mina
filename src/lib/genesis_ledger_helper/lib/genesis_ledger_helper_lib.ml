@@ -72,8 +72,6 @@ module Accounts = struct
                   Proof
               | Signature ->
                   Signature
-              | Both ->
-                  Both
               | Impossible ->
                   Impossible
             in
@@ -229,8 +227,6 @@ module Accounts = struct
               Proof
           | Signature ->
               Signature
-          | Both ->
-              Both
           | Impossible ->
               Impossible
         in

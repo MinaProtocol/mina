@@ -362,8 +362,6 @@ module Util = struct
         Proof
     | "signature" ->
         Signature
-    | "both" ->
-        Both
     | "either" ->
         Either
     | "impossible" ->
@@ -505,8 +503,8 @@ let upgrade_snapp =
        and auth =
          Param.flag "--auth"
            ~doc:
-             "Proof|Signature|Both|Either|None Current authorization in the \
-              account to change the verification key"
+             "Proof|Signature|Either|None Current authorization in the account \
+              to change the verification key"
            Param.(required string)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
@@ -720,8 +718,8 @@ let update_snapp_uri =
        and auth =
          Param.flag "--auth"
            ~doc:
-             "Proof|Signature|Both|Either|None Current authorization in the \
-              account to change the snapp uri"
+             "Proof|Signature|Either|None Current authorization in the account \
+              to change the snapp uri"
            Param.(required string)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
@@ -879,8 +877,8 @@ let update_token_symbol =
        and auth =
          Param.flag "--auth"
            ~doc:
-             "Proof|Signature|Both|Either|None Current authorization in the \
-              account to change the token symbol"
+             "Proof|Signature|Either|None Current authorization in the account \
+              to change the token symbol"
            Param.(required string)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
@@ -939,42 +937,40 @@ let update_permissions =
            ~doc:"KEYFILE Private key file to create a new snapp account"
            Param.(required string)
        and edit_state =
-         Param.flag "--edit-stake" ~doc:"Proof|Signature|Both|Either|None"
+         Param.flag "--edit-stake" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and send =
-         Param.flag "--send" ~doc:"Proof|Signature|Both|Either|None"
+         Param.flag "--send" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and receive =
-         Param.flag "--receive" ~doc:"Proof|Signature|Both|Either|None"
+         Param.flag "--receive" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and set_permissions =
-         Param.flag "--set-permissions" ~doc:"Proof|Signature|Both|Either|None"
+         Param.flag "--set-permissions" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and set_delegate =
-         Param.flag "--set-delegate" ~doc:"Proof|Signature|Both|Either|None"
+         Param.flag "--set-delegate" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and set_verification_key =
-         Param.flag "--set-verification-key"
-           ~doc:"Proof|Signature|Both|Either|None"
+         Param.flag "--set-verification-key" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and set_snapp_uri =
-         Param.flag "--set-snapp-uri" ~doc:"Proof|Signature|Both|Either|None"
+         Param.flag "--set-snapp-uri" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and edit_sequence_state =
-         Param.flag "--set-sequence-state"
-           ~doc:"Proof|Signature|Both|Either|None"
+         Param.flag "--set-sequence-state" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and set_token_symbol =
-         Param.flag "--set-token-symbol" ~doc:"Proof|Signature|Both|Either|None"
+         Param.flag "--set-token-symbol" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and increment_nonce =
-         Param.flag "--increment-nonce" ~doc:"Proof|Signature|Both|Either|None"
+         Param.flag "--increment-nonce" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and current_auth =
          Param.flag "--current-auth"
            ~doc:
-             "Proof|Signature|Both|Either|None Current authorization in the \
-              account to change permissions"
+             "Proof|Signature|Either|None Current authorization in the account \
+              to change permissions"
            Param.(required string)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
