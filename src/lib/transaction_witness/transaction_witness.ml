@@ -4,14 +4,21 @@ module Parties_segment_witness = struct
   open Mina_base
   open Currency
 
+  (* TODO: Don't serialize all the hashes in here. *)
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t =
         { global_ledger : Sparse_ledger.Stable.V2.t
         ; local_state_init :
-            ( unit Parties.Call_forest.With_hashes.Stable.V1.t
-            , ( unit Parties.Call_forest.With_hashes.Stable.V1.t
+            ( ( (Account_id.Stable.V1.t, bool) Caller.Stable.V1.t
+              , unit Parties.Call_forest.With_hashes.Stable.V1.t )
+              Stack_frame.Stable.V1.t
+            , ( ( ( (Account_id.Stable.V1.t, bool) Caller.Stable.V1.t
+                  , unit Parties.Call_forest.With_hashes.Stable.V1.t )
+                  Stack_frame.Stable.V1.t
+                , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t )
+                With_hash.Stable.V1.t
               , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t )
               With_stack_hash.Stable.V1.t
               list
