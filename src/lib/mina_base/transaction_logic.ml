@@ -356,7 +356,8 @@ module type S = sig
     -> ledger
     -> Parties.t
     -> ( Transaction_applied.Parties_applied.t
-       * ( ( (Party.t, unit) Parties.Party_or_stack.t list
+       * ( ( (Party.t, unit) Parties.Call_forest.t
+           , (Party.t, unit) Parties.Call_forest.t list
            , Token_id.t
            , Amount.t
            , ledger
@@ -388,7 +389,8 @@ module type S = sig
     -> f:
          (   'acc
           -> Global_state.t
-             * ( (Party.t, unit) Parties.Party_or_stack.t list
+             * ( (Party.t, unit) Parties.Call_forest.t
+               , (Party.t, unit) Parties.Call_forest.t list
                , Token_id.t
                , Amount.t
                , ledger
@@ -1258,7 +1260,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                ; permissions
                ; snapp_uri
                ; token_symbol
-               ; timing
+               ; timing = _
                }
            ; balance_change
            ; increment_nonce
@@ -1300,33 +1302,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
              | Neg ->
                  a.permissions.send ))
     in
-    let%bind timing =
-      match timing with
-      | Keep ->
-          Ok a.timing
-      | Set timing_info when is_new ->
-          if Global_slot.(timing_info.vesting_period > zero) then
-            Ok
-              (Timed
-                 { initial_minimum_balance = timing_info.initial_minimum_balance
-                 ; cliff_time = timing_info.cliff_time
-                 ; cliff_amount = timing_info.cliff_amount
-                 ; vesting_period = timing_info.vesting_period
-                 ; vesting_increment = timing_info.vesting_increment
-                 })
-          else
-            (* This should be a reject, not a failure, otherwise the snark
-               circuit becomes unsatisfiable.
-            *)
-            failwith "Transaction contains invalid timing information"
-      | Set _ ->
-          Error (failure Update_not_permitted_timing_existing_account)
-    in
     (* Check timing. *)
     let%bind timing =
       match balance_change.sgn with
       | Pos when not is_new ->
-          Ok timing
+          Ok a.timing
       | _ ->
           let txn_amount =
             match balance_change.sgn with
@@ -1336,8 +1316,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 balance_change.magnitude
           in
           validate_timing ~txn_amount
-            ~txn_global_slot:state_view.global_slot_since_genesis
-            ~account:{ a with timing }
+            ~txn_global_slot:state_view.global_slot_since_genesis ~account:a
           |> Result.map_error ~f:timing_error_to_user_command_status
     in
     let init =
@@ -1564,8 +1543,35 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       type t = Public_key.Compressed.t
     end
 
+    module Global_slot = Mina_numbers.Global_slot
+
+    module Timing = struct
+      type t = Party.Update.Timing_info.t option
+
+      let if_ = Parties.value_if
+
+      let vesting_period (t : t) =
+        match t with
+        | Some t ->
+            t.vesting_period
+        | None ->
+            (Account_timing.to_record Untimed).vesting_period
+    end
+
     module Account = struct
       include Account
+
+      type timing = Party.Update.Timing_info.t option
+
+      let timing (a : t) : timing =
+        Party.Update.Timing_info.of_account_timing a.timing
+
+      let set_timing (timing : timing) (a : t) : t =
+        { a with
+          timing =
+            Option.value_map ~default:Account_timing.Untimed
+              ~f:Party.Update.Timing_info.to_account_timing timing
+        }
     end
 
     module Amount = struct
@@ -1622,7 +1628,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     module Party = struct
       include Party
 
-      type parties = (Party.t, unit) Parties.Party_or_stack.t list
+      type parties = (Party.t, unit) Parties.Call_forest.t
 
       type transaction_commitment = Transaction_commitment.t
 
@@ -1632,32 +1638,46 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         *)
         match party.authorization with
         | Signature _ ->
-            `Signature_verifies true
-        | Proof _ | None_given ->
-            `Signature_verifies false
+            (`Proof_verifies false, `Signature_verifies true)
+        | Proof _ ->
+            (`Proof_verifies true, `Signature_verifies false)
+        | None_given ->
+            (`Proof_verifies false, `Signature_verifies false)
+
+      module Update = struct
+        open Snapp_basic
+
+        type 'a set_or_keep = 'a Snapp_basic.Set_or_keep.t
+
+        let timing (party : t) : Account.timing set_or_keep =
+          Set_or_keep.map ~f:Option.some party.data.body.update.timing
+      end
     end
 
-    module Parties = struct
-      module Opt = struct
-        type 'a t = 'a option
+    module Set_or_keep = struct
+      include Snapp_basic.Set_or_keep
 
-        let is_some = Option.is_some
+      let set_or_keep ~if_:_ t x = set_or_keep t x
+    end
 
-        let map = Option.map
+    module Opt = struct
+      type 'a t = 'a option
 
-        let or_default ~if_ x ~default =
-          if_ (is_some x) ~then_:(Option.value ~default x) ~else_:default
+      let is_some = Option.is_some
 
-        let or_exn x = Option.value_exn x
-      end
+      let map = Option.map
 
-      type party_or_stack = (Party.t, unit) Parties.Party_or_stack.t
+      let or_default ~if_ x ~default =
+        if_ (is_some x) ~then_:(Option.value ~default x) ~else_:default
 
-      type t = party_or_stack list
+      let or_exn x = Option.value_exn x
+    end
 
-      let of_parties_list : Party.t list -> t =
-        Parties.Party_or_stack.of_parties_list
-          ~party_depth:(fun (p : Party.t) -> p.data.body.call_depth)
+    module Stack (Elt : sig
+      type t
+    end) =
+    struct
+      type t = Elt.t list
 
       let if_ = Parties.value_if
 
@@ -1665,38 +1685,50 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       let is_empty = List.is_empty
 
-      let pop_exn : t -> party_or_stack * t = function
+      let pop_exn : t -> Elt.t * t = function
         | [] ->
             failwith "pop_exn"
         | x :: xs ->
             (x, xs)
 
-      let as_stack : party_or_stack -> t option = function
-        | Party _ ->
-            None
-        | Stack (x, ()) ->
-            Some x
-
-      let pop_party_exn : t -> Party.t * t = function
-        | Party (x, ()) :: xs ->
-            (x, xs)
-        | _ ->
-            failwith "pop_party_exn"
-
-      let pop_stack : t -> (t * t) option = function
-        | Stack (x, ()) :: xs ->
+      let pop : t -> (Elt.t * t) option = function
+        | x :: xs ->
             Some (x, xs)
         | _ ->
             None
 
-      let push_stack x ~onto : t = Stack (x, ()) :: onto
+      let push x ~onto : t = x :: onto
     end
+
+    module Parties = struct
+      type t = (Party.t, unit) Parties.Call_forest.t
+
+      let empty = []
+
+      let if_ = Parties.value_if
+
+      let is_empty = List.is_empty
+
+      let of_parties_list : Party.t list -> t =
+        Parties.Call_forest.of_parties_list ~party_depth:(fun (p : Party.t) ->
+            p.data.body.call_depth)
+
+      let pop_exn : t -> (Party.t * t) * t = function
+        | { stack_hash = (); elt = { party; calls; party_digest = () } } :: xs
+          ->
+            ((party, calls), xs)
+        | _ ->
+            failwith "pop_exn"
+    end
+
+    module Call_stack = Stack (Parties)
 
     module Local_state = struct
       type failure_status = Transaction_status.Failure.t option
 
       type t =
         ( Parties.t
+        , Call_stack.t
         , Token_id.t
         , Amount.t
         , Ledger.t
@@ -1733,6 +1765,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; inclusion_proof : [ `Existing of location | `New ]
       ; local_state :
           ( Parties.t
+          , Call_stack.t
           , Token_id.t
           , Amount.t
           , L.t

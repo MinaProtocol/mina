@@ -105,6 +105,8 @@ let party_predicate = salt party_predicate
 
 let party_cons = salt party_cons
 
+let party_node = salt party_node
+
 let party_with_protocol_state_predicate =
   salt party_with_protocol_state_predicate
 
