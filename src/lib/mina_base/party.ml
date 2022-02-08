@@ -113,6 +113,28 @@ module Update = struct
       ; vesting_increment = amount_unused
       }
 
+    let to_account_timing (t : t) : Account_timing.t =
+      Timed
+        { initial_minimum_balance = t.initial_minimum_balance
+        ; cliff_time = t.cliff_time
+        ; cliff_amount = t.cliff_amount
+        ; vesting_period = t.vesting_period
+        ; vesting_increment = t.vesting_increment
+        }
+
+    let of_account_timing (t : Account_timing.t) : t option =
+      match t with
+      | Untimed ->
+          None
+      | Timed t ->
+          Some
+            { initial_minimum_balance = t.initial_minimum_balance
+            ; cliff_time = t.cliff_time
+            ; cliff_amount = t.cliff_amount
+            ; vesting_period = t.vesting_period
+            ; vesting_increment = t.vesting_increment
+            }
+
     module Checked = struct
       type t =
         { initial_minimum_balance : Balance.Checked.t
@@ -146,6 +168,23 @@ module Update = struct
           ; Global_slot.Checked.to_input vesting_period
           ; Amount.var_to_input vesting_increment
           ]
+
+      let to_account_timing (t : t) : Account_timing.var =
+        { is_timed = Boolean.true_
+        ; initial_minimum_balance = t.initial_minimum_balance
+        ; cliff_time = t.cliff_time
+        ; cliff_amount = t.cliff_amount
+        ; vesting_period = t.vesting_period
+        ; vesting_increment = t.vesting_increment
+        }
+
+      let of_account_timing (t : Account_timing.var) : t =
+        { initial_minimum_balance = t.initial_minimum_balance
+        ; cliff_time = t.cliff_time
+        ; cliff_amount = t.cliff_amount
+        ; vesting_period = t.vesting_period
+        ; vesting_increment = t.vesting_increment
+        }
     end
 
     let typ : (Checked.t, t) Typ.t =

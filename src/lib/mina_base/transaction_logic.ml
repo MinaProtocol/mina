@@ -1260,7 +1260,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                ; permissions
                ; snapp_uri
                ; token_symbol
-               ; timing
+               ; timing = _
                }
            ; balance_change
            ; increment_nonce
@@ -1302,33 +1302,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
              | Neg ->
                  a.permissions.send ))
     in
-    let%bind timing =
-      match timing with
-      | Keep ->
-          Ok a.timing
-      | Set timing_info when is_new ->
-          if Global_slot.(timing_info.vesting_period > zero) then
-            Ok
-              (Timed
-                 { initial_minimum_balance = timing_info.initial_minimum_balance
-                 ; cliff_time = timing_info.cliff_time
-                 ; cliff_amount = timing_info.cliff_amount
-                 ; vesting_period = timing_info.vesting_period
-                 ; vesting_increment = timing_info.vesting_increment
-                 })
-          else
-            (* This should be a reject, not a failure, otherwise the snark
-               circuit becomes unsatisfiable.
-            *)
-            failwith "Transaction contains invalid timing information"
-      | Set _ ->
-          Error (failure Update_not_permitted_timing_existing_account)
-    in
     (* Check timing. *)
     let%bind timing =
       match balance_change.sgn with
       | Pos when not is_new ->
-          Ok timing
+          Ok a.timing
       | _ ->
           let txn_amount =
             match balance_change.sgn with
@@ -1338,8 +1316,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 balance_change.magnitude
           in
           validate_timing ~txn_amount
-            ~txn_global_slot:state_view.global_slot_since_genesis
-            ~account:{ a with timing }
+            ~txn_global_slot:state_view.global_slot_since_genesis ~account:a
           |> Result.map_error ~f:timing_error_to_user_command_status
     in
     let init =
@@ -1566,8 +1543,35 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       type t = Public_key.Compressed.t
     end
 
+    module Global_slot = Mina_numbers.Global_slot
+
+    module Timing = struct
+      type t = Party.Update.Timing_info.t option
+
+      let if_ = Parties.value_if
+
+      let vesting_period (t : t) =
+        match t with
+        | Some t ->
+            t.vesting_period
+        | None ->
+            (Account_timing.to_record Untimed).vesting_period
+    end
+
     module Account = struct
       include Account
+
+      type timing = Party.Update.Timing_info.t option
+
+      let timing (a : t) : timing =
+        Party.Update.Timing_info.of_account_timing a.timing
+
+      let set_timing (timing : timing) (a : t) : t =
+        { a with
+          timing =
+            Option.value_map ~default:Account_timing.Untimed
+              ~f:Party.Update.Timing_info.to_account_timing timing
+        }
     end
 
     module Amount = struct
@@ -1634,9 +1638,26 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         *)
         match party.authorization with
         | Signature _ ->
-            `Signature_verifies true
-        | Proof _ | None_given ->
-            `Signature_verifies false
+            (`Proof_verifies false, `Signature_verifies true)
+        | Proof _ ->
+            (`Proof_verifies true, `Signature_verifies false)
+        | None_given ->
+            (`Proof_verifies false, `Signature_verifies false)
+
+      module Update = struct
+        open Snapp_basic
+
+        type 'a set_or_keep = 'a Snapp_basic.Set_or_keep.t
+
+        let timing (party : t) : Account.timing set_or_keep =
+          Set_or_keep.map ~f:Option.some party.data.body.update.timing
+      end
+    end
+
+    module Set_or_keep = struct
+      include Snapp_basic.Set_or_keep
+
+      let set_or_keep ~if_:_ t x = set_or_keep t x
     end
 
     module Opt = struct

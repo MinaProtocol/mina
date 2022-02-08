@@ -56,6 +56,24 @@ module type Amount_intf = sig
   val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
 end
 
+module type Global_slot_intf = sig
+  type t
+
+  type bool
+
+  val zero : t
+
+  val ( > ) : t -> t -> bool
+end
+
+module type Timing_intf = sig
+  include Iffable
+
+  type global_slot
+
+  val vesting_period : t -> global_slot
+end
+
 module type Token_id_intf = sig
   include Iffable
 
@@ -151,6 +169,18 @@ module Local_state = struct
   end
 end
 
+module type Set_or_keep_intf = sig
+  type _ t
+
+  type bool
+
+  val is_set : _ t -> bool
+
+  val is_keep : _ t -> bool
+
+  val set_or_keep : if_:(bool -> then_:'a -> else_:'a -> 'a) -> 'a t -> 'a -> 'a
+end
+
 module type Party_intf = sig
   type t
 
@@ -187,7 +217,15 @@ module type Party_intf = sig
     -> commitment:transaction_commitment
     -> at_party:parties
     -> t
-    -> [ `Signature_verifies of bool ]
+    -> [ `Proof_verifies of bool ] * [ `Signature_verifies of bool ]
+
+  module Update : sig
+    type _ set_or_keep
+
+    type timing
+
+    val timing : t -> timing set_or_keep
+  end
 end
 
 module type Opt_intf = sig
@@ -268,6 +306,16 @@ module type Ledger_intf = sig
     public_key -> token_id -> account * inclusion_proof -> [ `Is_new of bool ]
 end
 
+module type Account_intf = sig
+  type t
+
+  type timing
+
+  val timing : t -> timing
+
+  val set_timing : timing -> t -> t
+end
+
 module Eff = struct
   type (_, _) t =
     | Check_predicate :
@@ -323,11 +371,16 @@ module type Inputs_intf = sig
 
   module Token_id : Token_id_intf with type bool := Bool.t
 
+  module Set_or_keep : Set_or_keep_intf with type bool := Bool.t
+
   module Protocol_state_predicate : Protocol_state_predicate_intf
 
-  module Account : sig
-    type t
-  end
+  module Global_slot : Global_slot_intf with type bool := Bool.t
+
+  module Timing :
+    Timing_intf with type bool := Bool.t and type global_slot := Global_slot.t
+
+  module Account : Account_intf with type timing := Timing.t
 
   module Party :
     Party_intf
@@ -337,6 +390,8 @@ module type Inputs_intf = sig
        and type bool := Bool.t
        and type account := Account.t
        and type public_key := Public_key.t
+       and type Update.timing := Timing.t
+       and type 'a Update.set_or_keep := 'a Set_or_keep.t
 
   module Ledger :
     Ledger_intf
@@ -593,7 +648,7 @@ module Make (Inputs : Inputs_intf) = struct
         (Check_protocol_state_predicate
            (Party.protocol_state party, global_state))
     in
-    let (`Signature_verifies signature_verifies) =
+    let `Proof_verifies _, `Signature_verifies signature_verifies =
       let commitment =
         Inputs.Transaction_commitment.if_
           (Inputs.Party.use_full_commitment party)
@@ -617,6 +672,23 @@ module Make (Inputs : Inputs_intf) = struct
     let (`Is_new account_is_new) =
       Inputs.Ledger.check_account (Party.public_key party)
         (Party.token_id party) (a, inclusion_proof)
+    in
+    (* Set account timing for new accounts, if specified. *)
+    let a, local_state =
+      let timing = Party.Update.timing party in
+      let local_state =
+        Local_state.add_check local_state
+          Update_not_permitted_timing_existing_account
+          Bool.(account_is_new ||| Set_or_keep.is_keep timing)
+      in
+      let timing =
+        Set_or_keep.set_or_keep ~if_:Timing.if_ timing (Account.timing a)
+      in
+      let vesting_period = Timing.vesting_period timing in
+      (* Assert that timing is valid, otherwise we may have a division by 0. *)
+      Bool.assert_ Global_slot.(vesting_period > zero) ;
+      let a = Account.set_timing timing a in
+      (a, local_state)
     in
     let a', update_permitted, failure_status =
       h.perform
