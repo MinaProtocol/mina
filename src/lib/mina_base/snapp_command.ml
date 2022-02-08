@@ -59,7 +59,7 @@ module Party = struct
         type t =
           ( F.Stable.V1.t Set_or_keep.Stable.V1.t
           , Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
-          , ( Pickles.Side_loaded.Verification_key.Stable.V2.t
+          , ( Pickles.Side_loaded.Verification_key.Stable.V3.t
             , F.Stable.V1.t )
             With_hash.Stable.V1.t
             Set_or_keep.Stable.V1.t

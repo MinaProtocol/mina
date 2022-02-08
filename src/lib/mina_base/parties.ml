@@ -382,7 +382,7 @@ module Verifiable = struct
       type t =
         { fee_payer : Party.Fee_payer.Stable.V1.t
         ; other_parties :
-            Pickles.Side_loaded.Verification_key.Stable.V2.t option
+            Pickles.Side_loaded.Verification_key.Stable.V3.t option
             Party_or_stack.With_hashes.Stable.V1.t
         ; memo : Signed_command_memo.Stable.V1.t
         }

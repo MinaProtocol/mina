@@ -127,7 +127,7 @@ module Side_loaded : sig
   module Verification_key : sig
     [%%versioned:
     module Stable : sig
-      module V2 : sig
+      module V3 : sig
         type t [@@deriving sexp, equal, compare, hash, yojson]
       end
     end]
