@@ -607,11 +607,11 @@ module Body = struct
 
   let deriver obj =
     let open Fields_derivers_snapps in
-    Poly.Fields.make_creator obj ~public_key:!.public_key ~update:!.fail
-      ~token_id:!.token_id_deriver ~balance_change:!.fail
-      ~increment_nonce:!.bool ~events:!.fail ~sequence_events:!.fail
-      ~call_data:!.fail ~call_depth:!.int ~protocol_state:!.fail
-      ~use_full_commitment:!.bool
+    Poly.Fields.make_creator obj ~public_key:!.public_key
+      ~update:!.Update.deriver ~token_id:!.token_id_deriver
+      ~balance_change:!.fail ~increment_nonce:!.bool ~events:!.fail
+      ~sequence_events:!.fail ~call_data:!.fail ~call_depth:!.int
+      ~protocol_state:!.fail ~use_full_commitment:!.bool
     |> finish ~name:"TODO"
 
   let%test_unit "json roundtrip" =
