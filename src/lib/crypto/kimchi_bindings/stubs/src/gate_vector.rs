@@ -1,6 +1,6 @@
 //! A GateVector: this is used to represent a list of gates.
 
-use kimchi_circuits::{
+use kimchi::circuits::{
     gate::{caml::CamlCircuitGate, CircuitGate},
     wires::caml::CamlWire,
 };
