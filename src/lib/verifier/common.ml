@@ -42,9 +42,7 @@ let check :
             `Invalid_signature (Signed_command.public_keys c) )
   | Parties { fee_payer; other_parties; memo } ->
       with_return (fun { return } ->
-          let other_parties_hash =
-            Parties.Party_or_stack.With_hashes.stack_hash other_parties
-          in
+          let other_parties_hash = Parties.Call_forest.hash other_parties in
           let tx_commitment =
             Parties.Transaction_commitment.create ~other_parties_hash
               ~protocol_state_predicate_hash:
@@ -77,7 +75,7 @@ let check :
           check_signature fee_payer.authorization fee_payer.data.body.public_key
             full_tx_commitment ;
           let parties_with_hashes_list =
-            Parties.Party_or_stack.With_hashes.to_parties_with_hashes_list
+            Parties.Call_forest.With_hashes.to_parties_with_hashes_list
               other_parties
           in
           let valid_assuming =

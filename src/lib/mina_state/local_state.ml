@@ -9,6 +9,7 @@ type display =
   , string
   , string
   , string
+  , string
   , bool
   , string
   , string )
@@ -47,8 +48,8 @@ let display
   }
 
 let dummy : t =
-  { parties = Parties.Party_or_stack.With_hashes.empty
-  ; call_stack = Parties.Party_or_stack.With_hashes.empty
+  { parties = Parties.Call_forest.With_hashes.empty
+  ; call_stack = Parties.Call_forest.With_hashes.empty
   ; transaction_commitment = Parties.Transaction_commitment.empty
   ; full_transaction_commitment = Parties.Transaction_commitment.empty
   ; token_id = Token_id.default

@@ -109,6 +109,7 @@ module Local_state = struct
   module Stable = struct
     module V1 = struct
       type ( 'parties
+           , 'call_stack
            , 'token_id
            , 'excess
            , 'ledger
@@ -117,7 +118,7 @@ module Local_state = struct
            , 'failure_status )
            t =
         { parties : 'parties
-        ; call_stack : 'parties
+        ; call_stack : 'call_stack
         ; transaction_commitment : 'comm
         ; full_transaction_commitment : 'comm
         ; token_id : 'token_id
@@ -130,10 +131,10 @@ module Local_state = struct
     end
   end]
 
-  let typ parties token_id excess ledger bool comm failure_status =
+  let typ parties call_stack token_id excess ledger bool comm failure_status =
     Pickles.Impls.Step.Typ.of_hlistable
       [ parties
-      ; parties
+      ; call_stack
       ; comm
       ; comm
       ; token_id
@@ -151,6 +152,7 @@ module Local_state = struct
       module V1 = struct
         type t =
           ( Parties.Digest.Stable.V1.t
+          , Parties.Digest.Stable.V1.t
           , Token_id.Stable.V1.t
           , Currency.Amount.Stable.V1.t
           , Ledger_hash.Stable.V1.t
@@ -170,6 +172,7 @@ module Local_state = struct
 
     type t =
       ( Field.t
+      , Field.t
       , Token_id.Checked.t
       , Currency.Amount.Checked.t
       , Ledger_hash.var
@@ -239,39 +242,57 @@ module type Party_intf = sig
   end
 end
 
-module type Parties_intf = sig
+module type Opt_intf = sig
+  type bool
+
+  type 'a t
+
+  val is_some : 'a t -> bool
+
+  val map : 'a t -> f:('a -> 'b) -> 'b t
+
+  val or_default :
+    if_:(bool -> then_:'a -> else_:'a -> 'a) -> 'a t -> default:'a -> 'a
+
+  val or_exn : 'a t -> 'a
+end
+
+module type Stack_intf = sig
   include Iffable
 
-  module Opt : sig
-    type 'a t
+  module Opt : Opt_intf with type bool := bool
 
-    val is_some : 'a t -> bool
-
-    val map : 'a t -> f:('a -> 'b) -> 'b t
-
-    val or_default :
-      if_:(bool -> then_:'a -> else_:'a -> 'a) -> 'a t -> default:'a -> 'a
-
-    val or_exn : 'a t -> 'a
-  end
-
-  type party_or_stack
-
-  type party
+  type elt
 
   val empty : t
 
   val is_empty : t -> bool
 
-  val pop_exn : t -> party_or_stack * t
+  val pop_exn : t -> elt * t
 
-  val as_stack : party_or_stack -> t Opt.t
+  val pop : t -> (elt * t) Opt.t
 
-  val pop_party_exn : t -> party * t
+  val push : elt -> onto:t -> t
+end
 
-  val pop_stack : t -> (t * t) Opt.t
+module type Parties_intf = sig
+  include Iffable
 
-  val push_stack : t -> onto:t -> t
+  type party
+
+  module Opt : Opt_intf with type bool := bool
+
+  val empty : t
+
+  val is_empty : t -> bool
+
+  val pop_exn : t -> (party * t) * t
+end
+
+module type Call_stack_intf = sig
+  type parties
+
+  include Stack_intf with type elt := parties
 end
 
 module type Ledger_intf = sig
@@ -442,11 +463,20 @@ module type Inputs_intf = sig
        and type token_id := Token_id.t
        and type public_key := Public_key.t
 
+  module Opt : Opt_intf with type bool := Bool.t
+
   module Parties :
     Parties_intf
       with type t = Party.parties
        and type bool := Bool.t
        and type party := Party.t
+       and module Opt := Opt
+
+  module Call_stack :
+    Call_stack_intf
+      with type parties := Parties.t
+       and type bool := Bool.t
+       and module Opt := Opt
 
   module Transaction_commitment : sig
     include
@@ -465,6 +495,7 @@ module type Inputs_intf = sig
 
     type t =
       ( Parties.t
+      , Call_stack.t
       , Token_id.t
       , Amount.t
       , Ledger.t
@@ -505,50 +536,75 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
   module Ps = Inputs.Parties
 
-  let get_next_party
-      (current_stack : Ps.t) (* The stack for the most recent snapp *)
-      (call_stack : Ps.t) (* The partially-completed parent stacks *) =
-    (* Invariant: [call_stack] only contains stacks. *)
-    let next_stack, next_call_stack =
-      let res = Ps.pop_stack call_stack in
-      let next_stack =
-        Ps.Opt.or_default ~if_:Ps.if_ ~default:Ps.empty (Ps.Opt.map ~f:fst res)
-      in
-      let next_call_stack =
-        Ps.Opt.or_default ~if_:Ps.if_ ~default:Ps.empty (Ps.Opt.map ~f:snd res)
-      in
-      (next_stack, next_call_stack)
+  (* Pop from the call stack, returning dummy values if the stack is empty. *)
+  let pop_call_stack (s : Call_stack.t) : Ps.t * Call_stack.t =
+    let res = Call_stack.pop s in
+    (* Split out the option returned by Call_stack.pop into two options *)
+    let next_forest, next_call_stack =
+      (Opt.map ~f:fst res, Opt.map ~f:snd res)
     in
+    (* Handle the None cases *)
+    ( Opt.or_default ~if_:Ps.if_ ~default:Ps.empty next_forest
+    , Opt.or_default ~if_:Call_stack.if_ ~default:Call_stack.empty
+        next_call_stack )
+
+  let get_next_party
+      (current_forest : Ps.t) (* The stack for the most recent snapp *)
+      (call_stack : Call_stack.t) (* The partially-completed parent stacks *) =
     (* If the current stack is complete, 'return' to the previous
        partially-completed one.
     *)
-    let current_stack, call_stack =
-      let current_is_empty = Ps.is_empty current_stack in
-      ( Ps.if_ current_is_empty ~then_:next_stack ~else_:current_stack
-      , Ps.if_ current_is_empty ~then_:next_call_stack ~else_:call_stack )
-    in
-    let stack_or_party, next_stack = Ps.pop_exn current_stack in
-    let party, remaining_stack =
-      let as_stack = Ps.as_stack stack_or_party in
-      let stack =
-        Ps.Opt.or_default ~if_:Ps.if_ ~default:current_stack as_stack
+    let current_forest, call_stack =
+      let next_forest, next_call_stack =
+        (* Invariant: call_stack contains only non-empty forests. *)
+        pop_call_stack call_stack
       in
-      let popped_value, remaining_stack = Ps.pop_party_exn stack in
-      ( popped_value
-      , Ps.if_ (Ps.Opt.is_some as_stack) ~then_:remaining_stack ~else_:Ps.empty
+      (* TODO: I believe current should only be empty for the first party in
+         a transaction. *)
+      let current_is_empty = Ps.is_empty current_forest in
+      ( Ps.if_ current_is_empty ~then_:next_forest ~else_:current_forest
+      , Call_stack.if_ current_is_empty ~then_:next_call_stack ~else_:call_stack
       )
     in
-    let current_stack, next_stack =
-      let is_empty = Ps.is_empty remaining_stack in
-      ( Ps.if_ is_empty ~then_:next_stack ~else_:remaining_stack
-      , Ps.if_ is_empty ~then_:Ps.empty ~else_:next_stack )
+    let (party, party_forest), remainder_of_current_forest =
+      Ps.pop_exn current_forest
     in
-    let call_stack =
-      let is_empty = Ps.is_empty next_stack in
-      Ps.if_ is_empty ~then_:call_stack
-        ~else_:(Ps.push_stack next_stack ~onto:call_stack)
+    (* Cases:
+       - [party_forest] is empty, [remainder_of_current_forest] is empty.
+       Pop from the call stack to get another forest, which is guaranteed to be non-empty.
+       The result of popping becomes the "current forest".
+       - [party_forest] is empty, [remainder_of_current_forest] is non-empty.
+       Push nothing to the stack. [remainder_of_current_forest] becomes new "current forest"
+       - [party_forest] is non-empty, [remainder_of_current_forest] is empty.
+       Push nothing to the stack. [party_forest] becomes new "current forest"
+       - [party_forest] is non-empty, [remainder_of_current_forest] is non-empty:
+       Push [remainder_of_current_forest] to the stack. [party_forest] becomes new "current forest".
+    *)
+    let party_forest_empty = Ps.is_empty party_forest in
+    let remainder_of_current_forest_empty =
+      Ps.is_empty remainder_of_current_forest
     in
-    (party, current_stack, call_stack)
+    let newly_popped_forest, popped_call_stack = pop_call_stack call_stack in
+    let new_call_stack =
+      Call_stack.if_ party_forest_empty
+        ~then_:
+          (Call_stack.if_ remainder_of_current_forest_empty
+             ~then_:
+               (* Don't actually need the or_default used in this case. *)
+               popped_call_stack ~else_:call_stack)
+        ~else_:
+          (Call_stack.if_ remainder_of_current_forest_empty ~then_:call_stack
+             ~else_:
+               (Call_stack.push remainder_of_current_forest ~onto:call_stack))
+    in
+    let new_current_forest =
+      Ps.if_ party_forest_empty
+        ~then_:
+          (Ps.if_ remainder_of_current_forest_empty ~then_:newly_popped_forest
+             ~else_:remainder_of_current_forest)
+        ~else_:party_forest
+    in
+    (party, new_current_forest, new_call_stack)
 
   let apply ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start :
@@ -597,9 +653,10 @@ module Make (Inputs : Inputs_intf) = struct
         | `Compute start_data ->
             ( Ps.if_ is_start' ~then_:start_data.parties
                 ~else_:local_state.parties
-            , Ps.if_ is_start' ~then_:Ps.empty ~else_:local_state.call_stack )
+            , Call_stack.if_ is_start' ~then_:Call_stack.empty
+                ~else_:local_state.call_stack )
         | `Yes start_data ->
-            (start_data.parties, Ps.empty)
+            (start_data.parties, Call_stack.empty)
         | `No ->
             (local_state.parties, local_state.call_stack)
       in
