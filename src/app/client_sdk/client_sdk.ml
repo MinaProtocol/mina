@@ -9,12 +9,11 @@
 [%%endif]
 
 open Js_of_ocaml
-open Signature_lib_nonconsensus
-open Mina_base_nonconsensus
-open Rosetta_lib_nonconsensus
-open Rosetta_coding_nonconsensus
+open Signature_lib
+open Mina_base
+open Rosetta_lib
+open Rosetta_coding
 open Js_util
-module String_sign = String_sign_nonconsensus.String_sign
 
 let _ =
   Js.export "minaSDK"
@@ -77,18 +76,14 @@ let _ =
              Public_key.Compressed.of_base58_check_exn pk_base58_check
              |> Public_key.decompress_exn
            in
-           let dummy_payload =
-             Mina_base_nonconsensus.Signed_command_payload.dummy
-           in
+           let dummy_payload = Mina_base.Signed_command_payload.dummy in
            let signature =
-             Mina_base_nonconsensus.Signed_command.sign_payload sk dummy_payload
+             Mina_base.Signed_command.sign_payload sk dummy_payload
            in
-           let message =
-             Mina_base_nonconsensus.Signed_command.to_input dummy_payload
-           in
+           let message = Mina_base.Signed_command.to_input dummy_payload in
            let verified =
              Schnorr.verify signature
-               (Snark_params_nonconsensus.Inner_curve.of_affine pk)
+               (Snark_params.Tick.Inner_curve.of_affine pk)
                message
            in
            if verified then Js._true
@@ -266,14 +261,12 @@ let _ =
          let make_signed_transaction command nonce =
            let payload_or_err =
              command
-             |> Rosetta_lib_nonconsensus.User_command_info.Partial
-                .to_user_command_payload ~nonce
+             |> Rosetta_lib.User_command_info.Partial.to_user_command_payload
+                  ~nonce
            in
            match payload_or_err with
            | Ok payload -> (
-               let signature =
-                 Signed_command.sign_payload sk payload |> Signature.Raw.encode
-               in
+               let signature = Signed_command.sign_payload sk payload in
                let signed_txn =
                  Transaction.Signed.{ command; nonce; signature }
                in
@@ -283,9 +276,9 @@ let _ =
                    let json' = `Assoc [ ("data", json) ] in
                    Js.string (Yojson.Safe.to_string json')
                | Error errs ->
-                   make_error (Rosetta_lib_nonconsensus.Errors.show errs) )
+                   make_error (Rosetta_lib.Errors.show errs) )
            | Error errs ->
-               make_error (Rosetta_lib_nonconsensus.Errors.show errs)
+               make_error (Rosetta_lib.Errors.show errs)
          in
          match Transaction.Unsigned.Rendered.of_yojson unsigned_txn_json with
          | Ok

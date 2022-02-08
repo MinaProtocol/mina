@@ -2,19 +2,7 @@
 
 open Core_kernel
 open Import
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Currency = Currency_nonconsensus.Currency
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
 
 module Body : sig
   type t =

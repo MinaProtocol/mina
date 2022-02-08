@@ -1,17 +1,11 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Snark_bits
 
 [%%ifdef consensus_mechanism]
 
-open Snark_bits
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_bits_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Sgn = Sgn_nonconsensus.Sgn
 
 [%%endif]
 

@@ -1,20 +1,9 @@
 (* unsigned_extended.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 include Intf
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params
 open Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-
-[%%endif]
 
 module type Unsigned_intf = Unsigned.S
 
