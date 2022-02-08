@@ -28,6 +28,25 @@ module type Type = sig
   type t
 end
 
+module Call_type = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Call | Delegate_call
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let quickcheck_generator =
+    Quickcheck.Generator.map Bool.quickcheck_generator ~f:(function
+      | false ->
+          Call
+      | true ->
+          Delegate_call)
+end
+
 module Update = struct
   module Poly = struct
     [%%versioned
@@ -653,8 +672,25 @@ module Predicated = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('body, 'predicate) t = { body : 'body; predicate : 'predicate }
+        type ('body, 'predicate, 'caller) t =
+          { body : 'body; predicate : 'predicate; caller : 'caller }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
+      end
+    end]
+  end
+
+  module Wire = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Body.Stable.V1.t
+          , Predicate.Stable.V1.t
+          , Call_type.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
+
+        let to_latest = Fn.id
       end
     end]
   end
@@ -662,17 +698,22 @@ module Predicated = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = (Body.Stable.V1.t, Predicate.Stable.V1.t) Poly.Stable.V1.t
+      type t =
+        ( Body.Stable.V1.t
+        , Predicate.Stable.V1.t
+        , Account_id.Stable.V1.t )
+        Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
   end]
 
-  let to_input ({ body; predicate } : t) =
+  let to_input ({ body; predicate; caller } : t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Body.to_input body
       ; Random_oracle_input.Chunked.field (Predicate.digest predicate)
+      ; Account_id.to_input caller
       ]
 
   let digest (t : t) =
@@ -681,17 +722,18 @@ module Predicated = struct
   let typ () : (_, t) Typ.t =
     let open Poly in
     Typ.of_hlistable
-      [ Body.typ (); Predicate.typ () ]
+      [ Body.typ (); Predicate.typ (); Account_id.typ ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
   module Checked = struct
-    type t = (Body.Checked.t, Predicate.Checked.t) Poly.t
+    type t = (Body.Checked.t, Predicate.Checked.t, Account_id.var) Poly.t
 
-    let to_input ({ body; predicate } : t) =
+    let to_input ({ body; predicate; caller } : t) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Body.Checked.to_input body
         ; Random_oracle_input.Chunked.field (Predicate.Checked.digest predicate)
+        ; Account_id.Checked.to_input caller
         ]
 
     let digest (t : t) =
@@ -705,7 +747,8 @@ module Predicated = struct
       module V1 = struct
         type t =
           ( Body.Stable.V1.t
-          , Snapp_predicate.Account.Stable.V1.t )
+          , Snapp_predicate.Account.Stable.V1.t
+          , Account_id.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -714,15 +757,20 @@ module Predicated = struct
     end]
 
     module Digested = struct
-      type t = (Body.Digested.t, Snapp_predicate.Digested.t) Poly.t
+      type t =
+        (Body.Digested.t, Snapp_predicate.Digested.t, Account_id.t) Poly.t
 
       module Checked = struct
-        type t = (Body.Digested.Checked.t, Field.Var.t) Poly.t
+        type t = (Body.Digested.Checked.t, Field.Var.t, Account_id.var) Poly.t
       end
     end
 
     module Checked = struct
-      type t = (Body.Checked.t, Snapp_predicate.Account.Checked.t) Poly.t
+      type t =
+        ( Body.Checked.t
+        , Snapp_predicate.Account.Checked.t
+        , Account_id.var )
+        Poly.t
     end
   end
 
@@ -730,27 +778,10 @@ module Predicated = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = (Body.Stable.V1.t, Account_nonce.Stable.V1.t) Poly.Stable.V1.t
-        [@@deriving sexp, equal, yojson, hash, compare]
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    module Checked = struct
-      type t = (Body.Checked.t, Account_nonce.Checked.t) Poly.t
-    end
-
-    let dummy : t = { body = Body.dummy; predicate = Account_nonce.zero }
-  end
-
-  module Fee_payer = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
         type t =
-          ( Body.Fee_payer.Stable.V1.t
-          , Account_nonce.Stable.V1.t )
+          ( Body.Stable.V1.t
+          , Account_nonce.Stable.V1.t
+          , Account_id.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -759,41 +790,85 @@ module Predicated = struct
     end]
 
     module Checked = struct
-      type t = (Body.Checked.t, Account_nonce.Checked.t) Poly.t
+      type t = (Body.Checked.t, Account_nonce.Checked.t, Account_id.var) Poly.t
     end
 
     let dummy : t =
-      { body = Body.Fee_payer.dummy; predicate = Account_nonce.zero }
-
-    let to_signed (t : t) : Signed.t =
-      { body = Body.of_fee_payer t.body; predicate = t.predicate }
+      { body = Body.dummy
+      ; predicate = Account_nonce.zero
+      ; caller = Account_id.invalid
+      }
   end
 
-  module Empty = struct
+  module Fee_payer = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = (Body.Stable.V1.t, unit) Poly.Stable.V1.t
+        type t =
+          ( Body.Fee_payer.Stable.V1.t
+          , Account_nonce.Stable.V1.t
+          , unit )
+          Poly.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
       end
     end]
 
-    let dummy : t = { body = Body.dummy; predicate = () }
+    module Checked = struct
+      type t = (Body.Checked.t, Account_nonce.Checked.t, Account_id.var) Poly.t
+    end
 
-    let create body : t = { body; predicate = () }
+    let dummy : t =
+      { body = Body.Fee_payer.dummy
+      ; predicate = Account_nonce.zero
+      ; caller = ()
+      }
+
+    let to_signed (t : t) : Signed.t =
+      { body = Body.of_fee_payer t.body
+      ; predicate = t.predicate
+      ; caller = Account_id.invalid
+      }
   end
 
-  let of_signed ({ body; predicate } : Signed.t) : t =
-    { body; predicate = Nonce predicate }
+  module Empty = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          (Body.Stable.V1.t, unit, Account_id.Stable.V1.t) Poly.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
 
-  let of_fee_payer ({ body; predicate } : Fee_payer.t) : t =
-    { body = Body.of_fee_payer body; predicate = Nonce predicate }
+        let to_latest = Fn.id
+      end
+    end]
+
+    let dummy : t =
+      { body = Body.dummy; predicate = (); caller = Account_id.invalid }
+  end
+
+  let of_signed ({ body; predicate; caller } : Signed.t) : t =
+    { body; predicate = Nonce predicate; caller }
+
+  let of_fee_payer ({ body; predicate; caller = () } : Fee_payer.t) : t =
+    { body = Body.of_fee_payer body
+    ; predicate = Nonce predicate
+    ; caller = Account_id.invalid
+    }
 end
 
-module Poly (Data : Type) (Auth : Type) = struct
-  type t = { data : Data.t; authorization : Auth.t }
+module Poly = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('body, 'predicate, 'caller, 'auth) t =
+        { data : ('body, 'predicate, 'caller) Predicated.Poly.Stable.V1.t
+        ; authorization : 'auth
+        }
+      [@@deriving hlist, sexp, equal, yojson, hash, compare]
+    end
+  end]
 end
 
 module Proved = struct
@@ -801,12 +876,11 @@ module Proved = struct
   module Stable = struct
     module V1 = struct
       type t =
-            Poly(Predicated.Proved.Stable.V1)
-              (Pickles.Side_loaded.Proof.Stable.V2)
-            .t =
-        { data : Predicated.Proved.Stable.V1.t
-        ; authorization : Pickles.Side_loaded.Proof.Stable.V2.t
-        }
+        ( Body.Stable.V1.t
+        , Snapp_predicate.Account.Stable.V1.t
+        , Account_id.Stable.V1.t
+        , Pickles.Side_loaded.Proof.Stable.V2.t )
+        Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -818,28 +892,29 @@ module Signed = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Poly(Predicated.Signed.Stable.V1)(Signature.Stable.V1).t =
-        { data : Predicated.Signed.Stable.V1.t
-        ; authorization : Signature.Stable.V1.t
-        }
+      type t =
+        ( Body.Stable.V1.t
+        , Account_nonce.Stable.V1.t
+        , Account_id.Stable.V1.t
+        , Signature.Stable.V1.t )
+        Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
   end]
-
-  let account_id (t : t) : Account_id.t =
-    Account_id.create t.data.body.public_key t.data.body.token_id
 end
 
 module Fee_payer = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Poly(Predicated.Fee_payer.Stable.V1)(Signature.Stable.V1).t =
-        { data : Predicated.Fee_payer.Stable.V1.t
-        ; authorization : Signature.Stable.V1.t
-        }
+      type t =
+        ( Body.Fee_payer.Stable.V1.t
+        , Account_nonce.Stable.V1.t
+        , unit
+        , Signature.Stable.V1.t )
+        Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -859,8 +934,8 @@ module Empty = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Poly(Predicated.Empty.Stable.V1)(Unit.Stable.V1).t =
-        { data : Predicated.Empty.Stable.V1.t; authorization : unit }
+      type t =
+        (Body.Stable.V1.t, unit, Account_id.Stable.V1.t, unit) Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -868,19 +943,53 @@ module Empty = struct
   end]
 end
 
+type 'caller t_ = (Body.t, Predicate.t, 'caller, Control.t) Poly.t
+
+module Wire = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        ( Body.Stable.V1.t
+        , Predicate.Stable.V1.t
+        , Call_type.Stable.V1.t
+        , Control.Stable.V2.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
+    { authorization = Signature authorization
+    ; data =
+        { body = Body.of_fee_payer data.body
+        ; predicate = Nonce data.predicate
+        ; caller = Call
+        }
+    }
+end
+
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = Poly(Predicated.Stable.V1)(Control.Stable.V2).t =
-      { data : Predicated.Stable.V1.t; authorization : Control.Stable.V2.t }
+    type t =
+      ( Body.Stable.V1.t
+      , Predicate.Stable.V1.t
+      , Account_id.Stable.V1.t
+      , Control.Stable.V2.t )
+      Poly.Stable.V1.t
     [@@deriving sexp, equal, yojson, hash, compare]
 
     let to_latest = Fn.id
   end
 end]
 
-let account_id (t : t) : Account_id.t =
+let account_id (t : _ t_) : Account_id.t =
   Account_id.create t.data.body.public_key t.data.body.token_id
+
+let caller (t : _ t_) : Account_id.t = t.data.caller
 
 let of_signed ({ data; authorization } : Signed.t) : t =
   { authorization = Signature authorization; data = Predicated.of_signed data }
@@ -896,15 +1005,15 @@ let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
     When this is positive, the amount will be deposited into the account from
     the funds made available by previous parties in the same transaction.
 *)
-let balance_change (t : t) : Amount.Signed.t = t.data.body.balance_change
+let balance_change (t : _ t_) : Amount.Signed.t = t.data.body.balance_change
 
-let protocol_state (t : t) : Snapp_predicate.Protocol_state.t =
+let protocol_state (t : _ t_) : Snapp_predicate.Protocol_state.t =
   t.data.body.protocol_state
 
-let public_key (t : t) : Public_key.Compressed.t = t.data.body.public_key
+let public_key (t : _ t_) : Public_key.Compressed.t = t.data.body.public_key
 
-let token_id (t : t) : Token_id.t = t.data.body.token_id
+let token_id (t : _ t_) : Token_id.t = t.data.body.token_id
 
-let use_full_commitment (t : t) : bool = t.data.body.use_full_commitment
+let use_full_commitment (t : _ t_) : bool = t.data.body.use_full_commitment
 
-let increment_nonce (t : t) : bool = t.data.body.increment_nonce
+let increment_nonce (t : _ t_) : bool = t.data.body.increment_nonce
