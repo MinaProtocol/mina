@@ -146,6 +146,11 @@ module Derivers = struct
     let _b = Fields_derivers_json.To_yojson.contramap ~f:contramap x obj in
     Fields_derivers_json.Of_yojson.map ~f:map x obj
 
+  let array inner obj : _ Unified_input.t =
+    iso ~map:Array.of_list ~contramap:Array.to_list
+      ((list @@ inner @@ o ()) (o ()))
+      obj
+
   let add_field (x : _ Unified_input.t) fd acc =
     let _, acc' = Fields_derivers_graphql.Graphql_fields.add_field x fd acc in
     let _, acc'' = Fields_derivers_json.To_yojson.add_field x fd acc' in
