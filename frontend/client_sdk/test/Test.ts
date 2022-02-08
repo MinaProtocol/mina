@@ -84,45 +84,27 @@ deepStrictEqual(
   "Invalid signed delegation was verified"
 );
 
-const signedRosettaTnxMock = `
-{
-    "signature": "389ac7d4077f3d485c1494782870979faa222cd906b25b2687333a92f41e40b925adb08705eddf2a7098e5ac9938498e8a0ce7c70b25ea392f4846b854086d43",
-    "payment": {
-      "to": "B62qnzbXmRNo9q32n4SNu2mpB8e7FYYLH8NmaX6oFCBYjjQ8SbD7uzV",
-      "from": "B62qnzbXmRNo9q32n4SNu2mpB8e7FYYLH8NmaX6oFCBYjjQ8SbD7uzV",
-      "fee": "10000000",
-      "token": "1",
-      "nonce": "0",
-      "memo": null,
-      "amount": "1000000000",
-      "valid_until": "4294967295"
-    },
-    "stake_delegation": null,
-    "create_token": null,
-    "create_token_account": null,
-    "mint_tokens": null
-  }
-`;
+const signedRosettaTxnMock = "{\"signature\":\"C1B98ADACCEC9BB0BC7646C43A128BF83FC31B44CFC4F28BA7874489AFA7312B251D96FE23D9195C65B77430CA0D326626009C28FDBE1AA47990C4235238A436\",\"payment\":{\"to\":\"B62qoDWfBZUxKpaoQCoFqr12wkaY84FrhxXNXzgBkMUi2Tz4K8kBDiv\",\"from\":\"B62qkUHaJUHERZuCHQhXCQ8xsGBqyYSgjQsKnKN5HhSJecakuJ4pYyk\",\"fee\":\"2000000000\",\"token\":\"1\",\"nonce\":\"2\",\"memo\":\"hello\",\"amount\":\"3000000000\",\"valid_until\":\"10000000\"},\"stake_delegation\":null,\"create_token\":null,\"create_token_account\":null,\"mint_tokens\":null}";
 
 const signedGraphQLCommand =
-  MinaSDK.signedRosettaTransactionToSignedCommand(signedRosettaTnxMock);
-const signedRosettaTnxMockJson = JSON.parse(signedRosettaTnxMock);
+  MinaSDK.signedRosettaTransactionToSignedCommand(signedRosettaTxnMock);
+const signedRosettaTxnMockJson = JSON.parse(signedRosettaTxnMock);
 const signedGraphQLCommandJson = JSON.parse(signedGraphQLCommand);
 
 deepStrictEqual(
-  signedRosettaTnxMockJson.payment.to,
+  signedRosettaTxnMockJson.payment.to,
   signedGraphQLCommandJson.data.payload.body[1].receiver_pk,
   "Rosetta to GraphQL transaction conversion has mismatched receiver public key"
 );
 
 deepStrictEqual(
-  signedRosettaTnxMockJson.payment.from,
+  signedRosettaTxnMockJson.payment.from,
   signedGraphQLCommandJson.data.payload.body[1].source_pk,
   "Rosetta to GraphQL transaction conversion has mismatched source public key"
 );
 
 deepStrictEqual(
-  signedRosettaTnxMockJson.payment.amount,
+  signedRosettaTxnMockJson.payment.amount,
   signedGraphQLCommandJson.data.payload.body[1].amount,
   "Rosetta to GraphQL transaction conversion has mismatched amount"
 );

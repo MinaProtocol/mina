@@ -3864,6 +3864,8 @@ module Mutations = struct
       Result.ok_if_true
         Currency.Fee.(fee >= Signed_command.minimum_fee)
         ~error:
+          (* IMPORTANT! Do not change the content of this error without
+           * updating Rosetta's construction API to handle the changes *)
           (sprintf
              !"Invalid user command. Fee %s is less than the minimum fee, %s."
              (Currency.Fee.to_formatted_string fee)
