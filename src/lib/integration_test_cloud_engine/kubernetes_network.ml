@@ -162,7 +162,7 @@ module Node = struct
     module Send_test_payments =
     [%graphql
     {|
-      mutation ($senders: PrivateKeys!,
+      mutation ($senders: [PrivateKey!]!,
       $receiver: PublicKey!,
       $amount: UInt64!,
       $fee: UInt64!,
@@ -451,13 +451,10 @@ module Node = struct
     let open Deferred.Or_error.Let_syntax in
     let send_payment_graphql () =
       let send_payment_obj =
-        (* TODO use array type *)
         Graphql.Send_test_payments.make
           ~senders:
-            (`String
-              ( String.concat ~sep:","
-              @@ List.map ~f:Signature_lib.Private_key.to_base58_check senders
-              ))
+            (Array.of_list
+               (List.map ~f:Signature_lib.Private_key.to_yojson senders))
           ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
           ~amount:(Graphql_lib.Encoders.amount amount)
           ~fee:(Graphql_lib.Encoders.fee fee)
@@ -472,8 +469,7 @@ module Node = struct
     [%log info] "Sent test payments"
 
   let must_send_test_payments ~repeat_count ~repeat_delay_ms ~logger t ~senders
-      ~receiver_pub_key ~amount ~fee
-      =
+      ~receiver_pub_key ~amount ~fee =
     send_test_payments ~repeat_count ~repeat_delay_ms ~logger t ~senders
       ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error

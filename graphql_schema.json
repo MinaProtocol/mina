@@ -1474,9 +1474,8 @@
         },
         {
           "kind": "SCALAR",
-          "name": "PrivateKeys",
-          "description":
-            "Base58Check-encoded private keys separated by comma",
+          "name": "PrivateKey",
+          "description": "Base58Check-encoded private key",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -2489,9 +2488,17 @@
                     "kind": "NON_NULL",
                     "name": null,
                     "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PrivateKeys",
-                      "ofType": null
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "PrivateKey",
+                          "ofType": null
+                        }
+                      }
                     }
                   },
                   "defaultValue": null

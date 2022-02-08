@@ -1944,18 +1944,9 @@ module Types = struct
           | _ ->
               Error "Invalid format for public key.")
 
-    let private_keys_arg =
-      scalar "PrivateKeys"
-        ~doc:"Base58Check-encoded private keys separated by comma"
-        ~coerce:(function
-        | `String s ->
-            Result.map_error ~f:(const "private key decoding error")
-            @@ Result.combine_errors
-            @@ List.map (String.split ~on:',' s) ~f:(fun s ->
-                   Result.try_with (fun () ->
-                       Signature_lib.Private_key.of_base58_check_exn s))
-        | _ ->
-            Error "not string")
+    let private_key_arg =
+      scalar "PrivateKey" ~doc:"Base58Check-encoded private key"
+        ~coerce:Signature_lib.Private_key.of_yojson
 
     let token_id_arg =
       scalar "TokenId"
@@ -2182,7 +2173,7 @@ module Types = struct
 
       let senders =
         arg "senders"
-          ~typ:(non_null private_keys_arg)
+          ~typ:(non_null (list (non_null private_key_arg)))
           ~doc:"The private keys from which to sign the payments"
 
       let repeat_count =
