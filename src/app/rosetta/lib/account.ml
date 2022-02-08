@@ -32,10 +32,13 @@ end
 module Sql = struct
   module Balance_from_last_relevant_command = struct
 
+    (* These queries get the current balance up to some specific block height
+     * and the nonce used at the most recent transaction (so the current nonce
+     * in the account is one greater than this one). *)
     let query_pending =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup2 int64 int64)
+        Caqti_type.(tup3 int64 int64 int64)
         {sql| WITH RECURSIVE pending_chain AS (
 
                (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
@@ -56,7 +59,7 @@ module Sql = struct
 
                )
 
-              SELECT full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance
+              SELECT full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance,cmds.nonce
 
               FROM (SELECT
                     id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
@@ -69,11 +72,14 @@ module Sql = struct
                     FROM blocks b
                     WHERE chain_status = 'canonical') AS full_chain
 
-              INNER JOIN balances bal ON full_chain.id = bal.block_id
-              INNER JOIN public_keys pks ON bal.public_key_id = pks.id
+              INNER JOIN balances             bal  ON full_chain.id = bal.block_id
+              INNER JOIN public_keys          pks  ON bal.public_key_id = pks.id
+              INNER JOIN user_commands        cmds ON cmds.source_id = pks.id
+              INNER JOIN blocks_user_commands busc ON busc.block_id = full_chain.id
 
               WHERE pks.value = $1
               AND full_chain.height <= $2
+              AND busc.user_command_id = cmds.id
 
               ORDER BY (bal.block_height, bal.block_sequence_no, bal.block_secondary_sequence_no) DESC
               LIMIT 1
@@ -82,20 +88,23 @@ module Sql = struct
     let query_canonical =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup2 int64 int64)
-        {sql| SELECT b.global_slot_since_genesis AS block_global_slot_since_genesis,balance
+        Caqti_type.(tup3 int64 int64 int64)
+        {sql| SELECT b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,cmds.nonce
 
               FROM blocks b
-              INNER JOIN balances bal ON b.id = bal.block_id
-              INNER JOIN public_keys pks ON bal.public_key_id = pks.id
+              INNER JOIN balances             bal  ON b.id = bal.block_id
+              INNER JOIN public_keys          pks  ON bal.public_key_id = pks.id
+              INNER JOIN user_commands        cmds ON cmds.source_id = pks.id
+              INNER JOIN blocks_user_commands busc ON busc.block_id = b.id
 
               WHERE pks.value = $1
               AND b.height <= $2
               AND b.chain_status = 'canonical'
+              AND busc.user_command_id = cmds.id
 
               ORDER BY (bal.block_height, bal.block_sequence_no, bal.block_secondary_sequence_no) DESC
               LIMIT 1
-      |sql}
+        |sql}
 
     let run (module Conn : Caqti_async.CONNECTION) requested_block_height
         address =
@@ -187,7 +196,7 @@ module Sql = struct
            * this is ambiguous in the spec but Coinbase confirmed we can return 0.
            * https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
           Deferred.Result.return 0L
-        | Some (_, last_relevant_command_balance), None ->
+        | Some (_, last_relevant_command_balance, _), None ->
           (* This account has no special vesting, so just use its last known balance *)
           Deferred.Result.return last_relevant_command_balance
         | None, Some timing_info ->
@@ -207,7 +216,7 @@ module Sql = struct
               |> UInt64.to_int64 )
         | ( Some
               ( last_relevant_command_global_slot_since_genesis
-              , last_relevant_command_balance )
+              , last_relevant_command_balance, _ )
           , Some timing_info ) ->
           (* This block was in the genesis ledger and has been involved in at least one user or internal command. We need
            * to compute the change in its balance between the most recent command and the start block (if it has vesting
@@ -225,22 +234,23 @@ module Sql = struct
                   + incremental_balance_between_slots)
               |> UInt64.to_int64 )
       in
-      let%bind total_balance =
+      let%bind (total_balance, nonce) =
         match (last_relevant_command_info_opt, timing_info_opt) with
         | None, None ->
           (* We've never heard of this account, at least as of the block_identifier provided *)
-          (* TODO: This means they requested a block from before account creation. Should it error instead? Need to clarify with Coinbase team. *)
-          Deferred.Result.return 0L
-        | Some (_, last_relevant_command_balance), _ ->
+          Deferred.Result.return (0L, UInt64.zero)
+        | Some (_, last_relevant_command_balance, nonce), _ ->
           (* This account was involved in a command and we don't care about its vesting, so just use the last known
-           * balance from the command *)
-          Deferred.Result.return last_relevant_command_balance
+           * balance from the command. The nonce is returned from this
+           * user-command, so we need to add one from here to get the current
+           * nonce in the account. *)
+          Deferred.Result.return (last_relevant_command_balance, UInt64.(of_int64 nonce |> add one))
         | None, Some timing_info ->
           (* This account hasn't seen any transactions but was in the genesis ledger, so use its genesis balance  *)
-          Deferred.Result.return timing_info.initial_balance
+          Deferred.Result.return (timing_info.initial_balance, UInt64.zero)
       in
       let balance_info : Balance_info.t = {liquid_balance; total_balance} in
-      Deferred.Result.return (requested_block_identifier, balance_info)
+      Deferred.Result.return (requested_block_identifier, balance_info, nonce)
 end
 
 module Balance = struct
@@ -253,7 +263,7 @@ module Balance = struct
         ; db_block_identifier_and_balance_info:
                block_query:Block_query.t
             -> address:string
-            -> (Block_identifier.t * Balance_info.t, Errors.t) M.t
+            -> (Block_identifier.t * Balance_info.t * Unsigned.UInt64.t, Errors.t) M.t
         ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
     end
 
@@ -314,7 +324,7 @@ module Balance = struct
             let balance_info : Balance_info.t =
               {liquid_balance= 0L; total_balance= 0L}
             in
-            Result.return @@ (dummy_block_identifier, balance_info) )
+            Result.return @@ (dummy_block_identifier, balance_info, UInt64.zero) )
       ; validate_network_choice= Network.Validate_choice.Mock.succeed }
   end
 
@@ -362,7 +372,7 @@ module Balance = struct
       let%bind block_query =
         Query.of_partial_identifier' req.block_identifier
       in
-      let%map block_identifier, {liquid_balance; total_balance} =
+      let%map block_identifier, {liquid_balance; total_balance}, nonce =
         env.db_block_identifier_and_balance_info ~block_query ~address
       in
       { Account_balance_response.block_identifier
@@ -370,7 +380,9 @@ module Balance = struct
           [ make_balance_amount
               ~liquid_balance:(Unsigned.UInt64.of_int64 liquid_balance)
               ~total_balance:(Unsigned.UInt64.of_int64 total_balance) ]
-      ; metadata=Some (`Assoc [ ("created_via_historical_lookup", `Bool true ) ]) }
+      ; metadata=Some (`Assoc [ ("created_via_historical_lookup", `Bool true )
+                              ; ("nonce",
+                                  `String (Unsigned.UInt64.to_string nonce)) ]) }
 
   end
 
