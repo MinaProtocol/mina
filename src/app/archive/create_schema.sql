@@ -205,6 +205,7 @@ CREATE TABLE blocks_internal_commands
 
 CREATE INDEX idx_blocks_internal_commands_block_id ON blocks_internal_commands(block_id);
 CREATE INDEX idx_blocks_internal_commands_internal_command_id ON blocks_internal_commands(internal_command_id);
+CREATE INDEX idx_blocks_internal_commands_receiver_balance ON blocks_internal_commands(receiver_balance);
 
 /* in this file because reference to balances doesn't work if in snapp_tables.sql */
 CREATE TABLE snapp_party_balances
@@ -234,4 +235,3 @@ CREATE TABLE blocks_snapp_commands
 CREATE INDEX idx_blocks_snapp_commands_block_id ON blocks_snapp_commands(block_id);
 CREATE INDEX idx_blocks_snapp_commands_snapp_command_id ON blocks_snapp_commands(snapp_command_id);
 CREATE INDEX idx_blocks_snapp_commands_sequence_no ON blocks_snapp_commands(sequence_no);
-CREATE INDEX idx_blocks_internal_commands_receiver_balance ON blocks_internal_commands(receiver_balance);
