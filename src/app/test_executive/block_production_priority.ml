@@ -33,6 +33,24 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "starting..." ;
     (* let%bind () = wait_for_bps_to_initialize ~logger network t in *)
     let all_nodes = Network.all_nodes network in
+    let%bind all_peerids =
+      Malleable_error.List.map all_nodes
+        ~f:(Network.Node.must_get_peer_id ~logger)
+      >>| List.map ~f:fst
+    in
+    let trusted_peers =
+      List.map all_peerids ~f:(fun peer_id ->
+          { Network_peer.Peer.peer_id
+          ; host = Unix.Inet_addr.of_string "127.0.0.1"
+          ; libp2p_port = 8888
+          })
+    in
+    let%bind () =
+      Malleable_error.List.iter all_nodes
+        ~f:
+          (Network.Node.must_set_connection_gating_config ~logger ~trusted_peers
+             ~isolate:false ~banned_peers:[])
+    in
     let%bind () =
       Malleable_error.List.iter all_nodes
         ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
@@ -84,18 +102,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let num_sender_keys = List.length sender_keys in
     let keys_per_sender = num_sender_keys / num_senders in
-    let%bind () = Malleable_error.ok_if_true ~error_type:`Hard ~error:(
-      Error.of_string "not enough sender keys"
-    ) (keys_per_sender > 0) in
-    let repeat_count = (Unsigned.UInt32.of_int num_payments) in
-    let repeat_delay_ms = (Unsigned.UInt32.of_int (1000 / tps))in
+    let%bind () =
+      Malleable_error.ok_if_true ~error_type:`Hard
+        ~error:(Error.of_string "not enough sender keys")
+        (keys_per_sender > 0)
+    in
+    let repeat_count = Unsigned.UInt32.of_int num_payments in
+    let repeat_delay_ms = Unsigned.UInt32.of_int (1000 / tps) in
     let%bind _ =
       Malleable_error.List.fold ~init:sender_keys senders ~f:(fun keys node ->
-        let keys0, rest = List.split_n keys keys_per_sender in
-          Network.Node.must_send_test_payments
-            ~repeat_count
-            ~repeat_delay_ms
-            ~logger ~senders:keys0 ~receiver_pub_key ~amount ~fee node >>| const rest)
+          let keys0, rest = List.split_n keys keys_per_sender in
+          Network.Node.must_send_test_payments ~repeat_count ~repeat_delay_ms
+            ~logger ~senders:keys0 ~receiver_pub_key ~amount ~fee node
+          >>| const rest)
     in
     let%bind () = Async.(at end_t >>= const Malleable_error.ok_unit) in
     let%bind blocks =
