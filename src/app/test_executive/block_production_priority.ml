@@ -19,22 +19,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; block_producers =
         (let open Block_producer in
-        [ { balance = "9999999"; timing = Untimed }
+        [ { balance = "9999999"; timing = Untimed } (* Two senders *)
+        ; { balance = "0"; timing = Untimed }
         ; { balance = "0"; timing = Untimed }
         ])
-    ; num_snark_workers = 2
+    ; num_snark_workers = 0
     ; aux_account_balance = Some "1000"
     }
-
-  (* let wait_for_bps_to_initialize ~logger network t =
-     let open Malleable_error.Let_syntax in
-     let all_nodes = Network.block_producers network in
-     let n = List.length all_nodes in
-     List.mapi all_nodes ~f:(fun i node ->
-         let%map () = wait_for t (Wait_condition.node_to_initialize node) in
-         [%log info] "Block producer %d (of %d) initialized" (i + 1) n ;
-         ())
-     |> Malleable_error.all_unit *)
 
   let run network t =
     let open Malleable_error.Let_syntax in
@@ -47,14 +38,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
     in
     [%log info] "done waiting for initializations" ;
-    let bps = Network.block_producers network in
-    let receiver_bp = List.nth_exn bps 0 in
-    let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
-    let sender_bp = List.nth_exn bps 1 in
-    let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
+    let%bind receiver, senders =
+      match Network.block_producers network with
+      | [] ->
+          Malleable_error.hard_error_string "no block producers"
+      | r :: rs ->
+          return (r, rs)
+    in
+    let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+    (* let sender_bp = List.nth_exn bps 1 in *)
+    (* let%bind sender_pub_key = Util.pub_key_of_node sender_bp in *)
     let pk_to_string = Signature_lib.Public_key.Compressed.to_base58_check in
     [%log info] "receiver: %s" (pk_to_string receiver_pub_key) ;
-    [%log info] "sender: %s" (pk_to_string sender_pub_key) ;
+    let%bind () =
+      Malleable_error.List.iter senders ~f:(fun s ->
+          let%map pk = Util.pub_key_of_node s in
+          [%log info] "sender: %s" (pk_to_string pk))
+    in
     let tps = 1 in
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
@@ -75,20 +75,32 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Time.add (Time.now ())
         (Time.Span.of_ms @@ float_of_int (num_slots * window_ms))
     in
-    let aux_first_pk, _ =
-      (Lazy.force @@ Mina_base.Sample_keypairs.keypairs).(List.length bps + 1)
+    let num_senders = List.length senders in
+    let sender_keys =
+      List.map ~f:snd
+      @@ List.drop
+           (Array.to_list @@ Lazy.force @@ Mina_base.Sample_keypairs.keypairs)
+           (num_senders + 2)
     in
-    let%bind () =
-      Network.Node.must_send_payment ~initial_delay_sec:1.
-        ~repeat_count:(Unsigned.UInt32.of_int num_payments)
-        ~repeat_delay_ms:(Unsigned.UInt32.of_int @@ (1000 / tps))
-        ~unlock_account:false ~logger ~sender_pub_key:aux_first_pk
-        ~receiver_pub_key ~amount ~fee sender_bp
+    let num_sender_keys = List.length sender_keys in
+    let keys_per_sender = num_sender_keys / num_senders in
+    let%bind () = Malleable_error.ok_if_true ~error_type:`Hard ~error:(
+      Error.of_string "not enough sender keys"
+    ) (keys_per_sender > 0) in
+    let repeat_count = (Unsigned.UInt32.of_int num_payments) in
+    let repeat_delay_ms = (Unsigned.UInt32.of_int (1000 / tps))in
+    let%bind _ =
+      Malleable_error.List.fold ~init:sender_keys senders ~f:(fun keys node ->
+        let keys0, rest = List.split_n keys keys_per_sender in
+          Network.Node.must_send_test_payments
+            ~repeat_count
+            ~repeat_delay_ms
+            ~logger ~senders:keys0 ~receiver_pub_key ~amount ~fee node >>| const rest)
     in
     let%bind () = Async.(at end_t >>= const Malleable_error.ok_unit) in
     let%bind blocks =
       Network.Node.must_get_best_chain ~logger ~max_length:(2 * num_slots)
-        receiver_bp
+        receiver
     in
     let res_num_payments, _ =
       List.fold_map blocks ~init:0 ~f:(fun s b ->
@@ -106,14 +118,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                      ; `String b.creator_pk
                      ])) )
         ] ;
-    let%bind { block_production_delay = rcv_delay; _ } =
-      get_metrics receiver_bp
-    in
-    let%bind { block_production_delay = snd_delay; _ } =
-      get_metrics sender_bp
+    let%bind { block_production_delay = rcv_delay; _ } = get_metrics receiver in
+    (* We omit the result because we just want to query senders to see some useful
+       output in test logs *)
+    let%bind () =
+      Malleable_error.List.iter senders
+        ~f:
+          (Fn.compose Malleable_error.soften_error
+             (Fn.compose Malleable_error.ignore_m get_metrics))
     in
     let rcv_delay0 = List.nth_exn rcv_delay 0 in
-    let snd_delay0 = List.nth_exn snd_delay 0 in
     let%map () =
       Malleable_error.ok_if_true
         ~error:(Error.of_string "unexpected block production delays")
@@ -121,10 +135,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              transactions that got to blocks *)
           res_num_payments * 2 > num_payments
         (* Check that there were no short forks *)
-        && rcv_delay0 + snd_delay0 <= List.length blocks
+        && rcv_delay0 <= List.length blocks
         (* Check that most of blocks got to the first delay bucket
            (were produced within a minute) *)
-        && rcv_delay0 + snd_delay0 >= num_slots - 1 )
+        && rcv_delay0 >= num_slots - 1 )
     in
     [%log info] "block_production_priority test: test finished!!"
 end

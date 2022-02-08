@@ -51,11 +51,7 @@ module Engine = struct
       val stop : t -> unit Malleable_error.t
 
       val send_payment :
-           ?initial_delay_sec:float
-        -> ?repeat_count:Unsigned.uint32
-        -> ?repeat_delay_ms:Unsigned.uint32
-        -> ?unlock_account:bool
-        -> logger:Logger.t
+           logger:Logger.t
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
@@ -64,13 +60,20 @@ module Engine = struct
         -> unit Deferred.Or_error.t
 
       val must_send_payment :
-           ?initial_delay_sec:float
-        -> ?repeat_count:Unsigned.uint32
-        -> ?repeat_delay_ms:Unsigned.uint32
-        -> ?unlock_account:bool
-        -> logger:Logger.t
+           logger:Logger.t
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
+        -> unit Malleable_error.t
+
+      val must_send_test_payments :
+           repeat_count:Unsigned.uint32
+        -> repeat_delay_ms:Unsigned.uint32
+        -> logger:Logger.t
+        -> t
+        -> senders:Signature_lib.Private_key.t list
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
         -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t

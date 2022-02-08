@@ -1944,6 +1944,19 @@ module Types = struct
           | _ ->
               Error "Invalid format for public key.")
 
+    let private_keys_arg =
+      scalar "PrivateKeys"
+        ~doc:"Base58Check-encoded private keys separated by comma"
+        ~coerce:(function
+        | `String s ->
+            Result.map_error ~f:(const "private key decoding error")
+            @@ Result.combine_errors
+            @@ List.map (String.split ~on:',' s) ~f:(fun s ->
+                   Result.try_with (fun () ->
+                       Signature_lib.Private_key.of_base58_check_exn s))
+        | _ ->
+            Error "not string")
+
     let token_id_arg =
       scalar "TokenId"
         ~doc:"String representation of a token's UInt64 identifier"
@@ -2142,6 +2155,8 @@ module Types = struct
 
       let fee ~doc = arg "fee" ~typ:(non_null uint64_arg) ~doc
 
+      let amount ~doc = arg "amount" ~typ:(non_null uint64_arg) ~doc
+
       let memo =
         arg "memo" ~typ:string
           ~doc:"Short arbitrary message provided by the sender"
@@ -2165,24 +2180,18 @@ module Types = struct
              and will be broadcasted to the network without requiring a \
              private key"
 
+      let senders =
+        arg "senders"
+          ~typ:(non_null private_keys_arg)
+          ~doc:"The private keys from which to sign the payments"
+
       let repeat_count =
-        arg "repeat_count" ~typ:uint32_arg
-          ~doc:
-            "Should only be set in tests, specifies how many times shall \
-             transaction be repeated"
+        arg "repeat_count" ~typ:(non_null uint32_arg)
+          ~doc:"How many times shall transaction be repeated"
 
       let repeat_delay_ms =
-        arg "repeat_delay_ms" ~typ:uint32_arg
-          ~doc:
-            "Should only be set in tests, specifies with which delay shall \
-             transaction be repeated"
-
-      let aux_account_password =
-        arg "aux_account_password"
-          ~doc:
-            "Should only be set in tests when sending from aux accounts is \
-             needed, password for the aux accounts to be unlocked"
-          ~typ:string
+        arg "repeat_delay_ms" ~typ:(non_null uint32_arg)
+          ~doc:"Delay with which a transaction shall be repeated"
     end
 
     let send_payment =
@@ -2194,8 +2203,7 @@ module Types = struct
           [ from ~doc:"Public key of sender of payment"
           ; to_ ~doc:"Public key of recipient of payment"
           ; token_opt ~doc:"Token to send"
-          ; arg "amount" ~doc:"Amount of mina to send to receiver"
-              ~typ:(non_null uint64_arg)
+          ; amount ~doc:"Amount of mina to send to receiver"
           ; fee ~doc:"Fee amount in order to send payment"
           ; valid_until
           ; memo
@@ -2919,22 +2927,11 @@ module Mutations = struct
         Arg.
           [ arg "input" ~typ:(non_null Types.Input.send_payment)
           ; Types.Input.Fields.signature
-          ; Types.Input.Fields.repeat_count
-          ; Types.Input.Fields.repeat_delay_ms
-          ; Types.Input.Fields.aux_account_password
           ]
       ~resolve:
         (fun { ctx = coda; _ } ()
              (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
-             signature repeat_count_opt repeat_delay_ms_opt aux_acc_passwd ->
-        let repeat_count =
-          Unsigned.UInt32.to_int
-          @@ Option.value ~default:(Unsigned.UInt32.of_int 1) repeat_count_opt
-        in
-        let repeat_delay =
-          Time.Span.of_ms @@ float_of_int @@ Option.value ~default:1000
-          @@ Option.map ~f:Unsigned.UInt32.to_int repeat_delay_ms_opt
-        in
+             signature ->
         let body =
           Signed_command_payload.Body.Payment
             { source_pk = from
@@ -2944,82 +2941,86 @@ module Mutations = struct
             }
         in
         let fee_token = Token_id.default in
-        let start = Time.now () in
         match signature with
-        | None when repeat_count = 1 ->
+        | None ->
             send_unsigned_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
               ~fee_token ~fee_payer_pk:from ~valid_until ~body
             |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command
-        | Some signature when repeat_count = 1 ->
+        | Some signature ->
             send_signed_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
               ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
-            |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command
-        | None when repeat_count > 1 ->
-            let sample_keys =
-              Array.of_list
-              @@ List.drop_while
-                   ~f:
-                     ( Fn.compose not
-                     @@ Fn.compose (Public_key.Compressed.equal from) fst )
-              @@ Array.to_list
-              @@ Lazy.force Sample_keypairs.keypairs
-            in
-            let aux_acc_passwd =
-              if Array.is_empty sample_keys then None else aux_acc_passwd
-            in
-            let send_tx i =
-              let%bind from, body =
-                match aux_acc_passwd with
-                | Some password ->
-                    let from, from_sk =
-                      sample_keys.(i % Array.length sample_keys)
-                    in
-                    let body =
-                      Signed_command_payload.Body.Payment
-                        { source_pk = from
-                        ; receiver_pk = to_
-                        ; token_id =
-                            Option.value ~default:Token_id.default token_id
-                        ; amount = Amount.of_uint64 amount
-                        }
-                    in
-                    let password = lazy (return (Bytes.of_string password)) in
-                    let kp =
-                      Keypair.
-                        { private_key = from_sk
-                        ; public_key =
-                            Option.value_exn (Public_key.decompress from)
-                        }
-                    in
-                    Secrets.Wallets.import_keypair (Mina_lib.wallets coda) kp
-                      ~password
-                    >>| const (from, body)
-                | None ->
-                    return (from, body)
-              in
-              send_unsigned_user_command ~coda ~nonce_opt ~signer:from ~memo
-                ~fee ~fee_token ~fee_payer_pk:from ~valid_until ~body
-              |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command
-            in
-            let do_ i =
-              let pause =
-                Time.diff
-                  ( Time.add start
-                  @@ Time.Span.scale repeat_delay
-                  @@ float_of_int i )
-                @@ Time.now ()
-              in
-              (if Time.Span.(pause > zero) then after pause else Deferred.unit)
-              >>= fun () -> send_tx i >>| const ()
-            in
-            for i = 2 to repeat_count do
-              don't_wait_for (do_ i)
-            done ;
-            (* don't_wait_for (Deferred.for_ 2 ~to_:repeat_count ~do_) ; *)
-            send_tx 1
-        | _ ->
-            Deferred.Result.fail
-              "repeat_count must be 1 when used with signature")
+            |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command)
+
+  let send_test_payments =
+    io_field "sendTestPayments" ~doc:"Send a series of test payments"
+      ~typ:(non_null int)
+      ~args:
+        Types.Input.Fields.
+          [ senders
+          ; receiver ~doc:"The receiver of the payments"
+          ; amount ~doc:"The amount of each payment"
+          ; fee ~doc:"The fee of each payment"
+          ; repeat_count
+          ; repeat_delay_ms
+          ]
+      ~resolve:
+        (fun { ctx = coda; _ } () senders_list receiver_pk amount fee
+             repeat_count repeat_delay_ms ->
+        let dumb_password = lazy (return (Bytes.of_string "dumb")) in
+        let senders = Array.of_list senders_list in
+        let repeat_delay =
+          Time.Span.of_ms @@ float_of_int
+          @@ Unsigned.UInt32.to_int repeat_delay_ms
+        in
+        let fee_token = Token_id.default in
+        let start = Time.now () in
+        let send_tx i =
+          let source_privkey = senders.(i % Array.length senders) in
+          let source_pk_decompressed =
+            Signature_lib.Public_key.of_private_key_exn source_privkey
+          in
+          let source_pk =
+            Signature_lib.Public_key.compress source_pk_decompressed
+          in
+          let body =
+            Signed_command_payload.Body.Payment
+              { source_pk
+              ; receiver_pk
+              ; token_id = Token_id.default
+              ; amount = Amount.of_uint64 amount
+              }
+          in
+          let memo = "" in
+          let kp =
+            Keypair.
+              { private_key = source_privkey
+              ; public_key = source_pk_decompressed
+              }
+          in
+          let%bind _ =
+            Secrets.Wallets.import_keypair (Mina_lib.wallets coda) kp
+              ~password:dumb_password
+          in
+          send_unsigned_user_command ~coda ~nonce_opt:None ~signer:source_pk
+            ~memo:(Some memo) ~fee ~fee_token ~fee_payer_pk:source_pk
+            ~valid_until:None ~body
+          |> Deferred.Result.map ~f:(const 0)
+        in
+
+        let do_ i =
+          let pause =
+            Time.diff
+              (Time.add start @@ Time.Span.scale repeat_delay @@ float_of_int i)
+            @@ Time.now ()
+          in
+          (if Time.Span.(pause > zero) then after pause else Deferred.unit)
+          >>= fun () -> send_tx i >>| const ()
+        in
+        for i = 2 to Unsigned.UInt32.to_int repeat_count do
+          don't_wait_for (do_ i)
+        done ;
+        (* don't_wait_for (Deferred.for_ 2 ~to_:repeat_count ~do_) ; *)
+        send_tx 1)
 
   let create_token =
     io_field "createToken" ~doc:"Create a new token"
@@ -3347,6 +3348,7 @@ module Mutations = struct
     ; import_account
     ; reload_wallets
     ; send_payment
+    ; send_test_payments
     ; send_delegation
     ; create_token
     ; create_token_account

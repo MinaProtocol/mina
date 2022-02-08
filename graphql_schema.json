@@ -1473,6 +1473,17 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "PrivateKeys",
+          "description":
+            "Base58Check-encoded private keys separated by comma",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "SendPaymentPayload",
           "description": null,
@@ -2357,39 +2368,6 @@
               "description": "Send a payment",
               "args": [
                 {
-                  "name": "aux_account_password",
-                  "description":
-                    "Should only be set in tests when sending from aux accounts is needed, password for the aux accounts to be unlocked",
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "String",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                },
-                {
-                  "name": "repeat_delay_ms",
-                  "description":
-                    "Should only be set in tests, specifies with which delay shall transaction be repeated",
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "UInt32",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                },
-                {
-                  "name": "repeat_count",
-                  "description":
-                    "Should only be set in tests, specifies how many times shall transaction be repeated",
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "UInt32",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                },
-                {
                   "name": "signature",
                   "description":
                     "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
@@ -2423,6 +2401,106 @@
                   "name": "SendPaymentPayload",
                   "ofType": null
                 }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sendTestPayments",
+              "description": "Send a series of test payments",
+              "args": [
+                {
+                  "name": "repeat_delay_ms",
+                  "description":
+                    "Delay with which a transaction shall be repeated",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt32",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "repeat_count",
+                  "description":
+                    "How many times shall transaction be repeated",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt32",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "fee",
+                  "description": "The fee of each payment",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt64",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "amount",
+                  "description": "The amount of each payment",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt64",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "receiver",
+                  "description": "The receiver of the payments",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "PublicKey",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "senders",
+                  "description":
+                    "The private keys from which to sign the payments",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "PrivateKeys",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
