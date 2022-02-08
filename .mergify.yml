@@ -1,3 +1,10 @@
+queue_rules:
+  - name: default
+    conditions:
+      # Conditions to get out of the queue (= merged)
+    #   - check-success=ci-one
+    #   - check-success=ci-two
+
 pull_request_rules:
     - name: automatically merge approved PRs with the ready-to-merge label
       conditions:
@@ -6,9 +13,9 @@ pull_request_rules:
           - "#approved-reviews-by>=1"
           - label=ready-to-merge
       actions:
-          merge:
+          queue:
               method: merge
-              strict: false
+              strict: default
           delete_head_branch: {}
     - name: automatically merge approved PRs into develop with the ready-to-merge-into-develop label
       conditions:
@@ -18,9 +25,9 @@ pull_request_rules:
           - label=ready-to-merge-into-develop
           - base=develop
       actions:
-          merge:
+          queue:
               method: merge
-              strict: false
+              strict: default
           delete_head_branch: {}
     - name: automatically merge approved PRs into develop-until-4.1-hardfork with the ready-to-merge-into-develop label
       conditions:
@@ -30,9 +37,9 @@ pull_request_rules:
           - label=ready-to-merge-into-develop
           - base=develop-until-4.1-hardfork
       actions:
-          merge:
+          queue:
               method: merge
-              strict: false
+              strict: default
           delete_head_branch: {}
     - name: automatically merge approved PRs into develop-until-adversarial with the ready-to-merge-into-develop label
       conditions:
@@ -42,7 +49,7 @@ pull_request_rules:
           - label=ready-to-merge-into-develop
           - base=develop-until-adversarial
       actions:
-          merge:
+          queue:
               method: merge
-              strict: false
+              strict: default
           delete_head_branch: {}
