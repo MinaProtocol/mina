@@ -110,6 +110,8 @@ let party_node = salt party_node
 let party_with_protocol_state_predicate =
   salt party_with_protocol_state_predicate
 
+let party_stack_frame = salt party_stack_frame
+
 let snapp_uri = salt snapp_uri
 
 let snapp_event = salt snapp_event
