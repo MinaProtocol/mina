@@ -1759,7 +1759,7 @@ module Base = struct
             ; data = V.if_ b ~then_:t.data ~else_:e.data
             }
 
-          let empty_constant = Parties.Party_or_stack.With_hashes.empty
+          let empty_constant = Parties.Call_forest.With_hashes.empty
 
           let empty = Field.constant empty_constant
 
@@ -1826,21 +1826,8 @@ module Base = struct
         end
 
         module Parties = struct
-          module Elt = struct
-            type t = (Party.t * unit, Parties.Digest.t) Parties.Party_or_stack.t
-          end
-
-          type elt = (Elt.t V.t, Field.t) With_hash.t
-
-          type party_or_stack = elt
-
-          (* TODO: This module should be refactored to make it so we can just
-             use the Stack functor, but that would require refactoring Party_or_stack.t
-             to not contain the stack hash inside of the element value itself, so that
-             we could instead wrap it in a With_stack_hash.t. *)
           type t =
-            ( (Party.t * unit, Parties.Digest.t) Parties.Party_or_stack.t list
-              V.t
+            ( (Party.t * unit, Parties.Digest.t) Parties.Call_forest.t V.t
             , Field.t )
             With_hash.t
 
@@ -1849,7 +1836,7 @@ module Base = struct
             ; data = V.if_ b ~then_:t.data ~else_:e.data
             }
 
-          let empty = Field.constant Parties.Party_or_stack.With_hashes.empty
+          let empty = Field.constant Parties.Call_forest.With_hashes.empty
 
           let is_empty ({ hash = x; _ } : t) = Field.equal empty x
 
@@ -1859,122 +1846,56 @@ module Base = struct
             Random_oracle.Checked.hash ~init:Hash_prefix_states.party_cons
               [| hash; h_tl |]
 
-          let pop_exn ({ hash = h; data = r } : t) : elt * t =
-            let hd_r = V.create (fun () -> V.get r |> List.hd_exn) in
-            let tl_r = V.create (fun () -> V.get r |> List.tl_exn) in
-            let party_or_stack, stack =
-              exists
-                Typ.(Field.typ * Field.typ)
-                ~compute:(fun () ->
-                  ( V.get hd_r |> Parties.Party_or_stack.With_hashes.hash
-                  , V.get tl_r |> Parties.Party_or_stack.With_hashes.stack_hash
-                  ))
+          let pop_exn ({ hash = h; data = r } : t) : (party * t) * t =
+            let hd_r =
+              V.create (fun () -> V.get r |> List.hd_exn |> With_stack_hash.elt)
             in
-            let h' = hash_cons party_or_stack stack in
-            with_label __LOC__ (fun () -> Field.Assert.equal h h') ;
-            ( { hash = party_or_stack; data = hd_r }
-            , { hash = stack; data = tl_r } )
-
-          let as_stack ({ hash = h; data = r } : elt) : t Opt.t =
-            (* NB: Don't need to check here, since interpreting a stack as a
-               party or party as a stack implies a hash collision.
-            *)
-            let is_some =
-              exists Boolean.typ ~compute:(fun () ->
-                  match V.get r with Party _ -> false | Stack _ -> true)
-            in
-            let data : t =
-              { hash = h
-              ; data =
-                  V.create (fun () ->
-                      match V.get r with Party _ -> [] | Stack (xs, _) -> xs)
-              }
-            in
-            { Snapp_basic.Flagged_option.is_some; data }
-
-          let pop_party_exn ({ hash = h; data = r } : t) : party * t =
-            let first_party =
-              V.create (fun () ->
-                  match V.get r |> List.hd_exn with
-                  | Party ((party, ()), _) ->
-                      party
-                  | Stack _ ->
-                      failwith "pop_party_exn")
-            in
-            let body, tl =
-              exists
-                Typ.(Party.Body.typ () * field)
-                ~compute:(fun () ->
-                  let p = V.get first_party in
-                  let h =
-                    V.get r |> List.tl_exn
-                    |> Parties.Party_or_stack.With_hashes.stack_hash
-                  in
-                  (p.data.body, h))
+            let party = V.create (fun () -> (V.get hd_r).party |> fst) in
+            let body =
+              exists (Party.Body.typ ()) ~compute:(fun () ->
+                  (V.get party).data.body)
             in
             let predicate : Party.Predicate.Checked.t =
               exists (Party.Predicate.typ ()) ~compute:(fun () ->
-                  (V.get first_party).data.predicate)
+                  (V.get party).data.predicate)
             in
-            let auth =
-              V.(create (fun () -> (V.get first_party).authorization))
-            in
+            let auth = V.(create (fun () -> (V.get party).authorization)) in
             let party : Party.Predicated.Checked.t = { body; predicate } in
             let party =
               With_hash.of_data party ~hash_data:Party.Predicated.Checked.digest
             in
-            let actual_h =
-              Random_oracle.Checked.hash ~init:Hash_prefix_states.party_cons
-                [| party.hash; tl |]
+            let subforest : t =
+              let subforest = V.create (fun () -> (V.get hd_r).calls) in
+              let subforest_hash =
+                exists Field.typ ~compute:(fun () ->
+                    Parties.Call_forest.hash (V.get subforest))
+              in
+              { hash = subforest_hash; data = subforest }
             in
-            with_label __LOC__ (fun () -> Field.Assert.equal h actual_h) ;
-            ( { party; control = auth }
-            , { hash = tl; data = V.(create (fun () -> List.tl_exn (get r))) }
-            )
-
-          let pop_stack ({ hash = h; data = r } : t) : (t * t) Opt.t =
-            let hd_r =
-              V.create (fun () ->
-                  match V.get r |> List.hd with
-                  | Some (Stack (x, _)) ->
-                      x
-                  | _ ->
-                      [])
+            let tl_hash =
+              exists Field.typ ~compute:(fun () ->
+                  V.get r |> List.tl_exn |> Parties.Call_forest.hash)
             in
-            let tl_r =
-              V.create (fun () ->
-                  V.get r |> List.tl |> Option.value ~default:[])
+            let tree_hash =
+              Random_oracle.Checked.hash ~init:Hash_prefix_states.party_node
+                [| party.hash; subforest.hash |]
             in
-            let party_or_stack, stack =
-              exists
-                Typ.(Field.typ * Field.typ)
-                ~compute:(fun () ->
-                  ( V.get hd_r |> Parties.Party_or_stack.With_hashes.stack_hash
-                  , V.get tl_r |> Parties.Party_or_stack.With_hashes.stack_hash
-                  ))
-            in
-            let h' = hash_cons party_or_stack stack in
-            (* NB: Don't need to check here, since interpreting a stack as a
-               party or party as a stack implies a hash collision.
-            *)
-            let is_some = Field.equal h h' in
-            let data : t * t =
-              ( { hash = party_or_stack; data = hd_r }
-              , { hash = stack; data = tl_r } )
-            in
-            { Snapp_basic.Flagged_option.is_some; data }
+            Field.Assert.equal (hash_cons tree_hash tl_hash) h ;
+            ( ({ party; control = auth }, subforest)
+            , { hash = tl_hash
+              ; data = V.(create (fun () -> List.tl_exn (get r)))
+              } )
         end
 
         module Call_stack = Stack (struct
           module Parties = Mina_base.Parties
 
           type t =
-            (Party.t * unit, Parties.Digest.t) Parties.Party_or_stack.t list
+            (Party.t * unit, Parties.Digest.t) Mina_base.Parties.Call_forest.t
 
           let default : t = []
 
-          let hash : t -> Field.Constant.t =
-            Parties.Party_or_stack.With_hashes.stack_hash
+          let hash : t -> Field.Constant.t = Mina_base.Parties.Call_forest.hash
 
           let push ~consed_hash (t : t) (xs : (t, _) With_stack_hash.t list) :
               (t, _) With_stack_hash.t list =
@@ -2336,11 +2257,11 @@ module Base = struct
                       Party.of_fee_payer p.parties.Parties.fee_payer
                       :: p.parties.Parties.other_parties
                       |> List.map ~f:(fun party -> (party, ()))
-                      |> Parties.Party_or_stack.With_hashes.of_parties_list)
+                      |> Parties.Call_forest.With_hashes.of_parties_list)
               in
               let h =
                 exists Field.typ ~compute:(fun () ->
-                    Parties.Party_or_stack.With_hashes.stack_hash (V.get ps))
+                    Parties.Call_forest.hash (V.get ps))
               in
               let start_data =
                 { Parties_logic.Start_data.parties =
@@ -2387,7 +2308,7 @@ module Base = struct
                           `Skip
                       | p :: ps ->
                           let should_pop =
-                            Field.Constant.equal Parties.Party_or_stack.empty
+                            Field.Constant.equal Parties.Call_forest.empty
                               (As_prover.read_var local.parties.hash)
                           in
                           if should_pop then (
@@ -2400,7 +2321,7 @@ module Base = struct
                     As_prover.(
                       fun () ->
                         [%test_eq: Impl.Field.Constant.t]
-                          Parties.Party_or_stack.empty
+                          Parties.Call_forest.empty
                           (read_var local.parties.hash)) ;
                   V.create (fun () ->
                       match As_prover.Ref.get start_parties with
@@ -3952,13 +3873,9 @@ let rec accumulate_call_stack_hashes ~(hash_frame : 'frame -> field)
       let h_f = hash_frame f in
       let tl = accumulate_call_stack_hashes ~hash_frame fs in
       let h_tl =
-        match tl with
-        | [] ->
-            Parties.Party_or_stack.empty
-        | t :: _ ->
-            t.stack_hash
+        match tl with [] -> Parties.Call_forest.empty | t :: _ -> t.stack_hash
       in
-      { stack_hash = Parties.Party_or_stack.hash_cons h_f h_tl; elt = f } :: tl
+      { stack_hash = Parties.Call_forest.hash_cons h_f h_tl; elt = f } :: tl
 
 let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
     ~pending_coinbase_init_stack ledger partiess =
@@ -3990,10 +3907,10 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
       ([ List.hd_exn (List.hd_exn states) ] :: states)
   in
   let tx_statement transaction
-      (remaining_parties : (Party.t, _) Parties.Party_or_stack.t list) :
+      (remaining_parties : (Party.t, _) Parties.Call_forest.t) :
       Snapp_statement.t =
     let at_party =
-      Parties.Party_or_stack.(stack_hash (accumulate_hashes' remaining_parties))
+      Parties.Call_forest.(hash (accumulate_hashes' remaining_parties))
     in
     { transaction; at_party }
   in
@@ -4083,24 +4000,22 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
       in
       let hash_local_state (local : _ Parties_logic.Local_state.t) =
         let hash_parties_stack ps =
-          ps |> Parties.Party_or_stack.accumulate_hashes'
-          |> List.map ~f:(Parties.Party_or_stack.map ~f:(fun p -> (p, ())))
+          ps |> Parties.Call_forest.accumulate_hashes'
+          |> Parties.Call_forest.map ~f:(fun p -> (p, ()))
         in
-        let call_stack : (Party.t, unit) Parties.Party_or_stack.t list list =
+        let call_stack : (Party.t, unit) Parties.Call_forest.t list =
           local.call_stack
         in
         let call_stack :
-            (unit Parties.Party_or_stack.With_hashes.t, field) With_stack_hash.t
+            (unit Parties.Call_forest.With_hashes.t, field) With_stack_hash.t
             list =
           accumulate_call_stack_hashes
-            (List.map call_stack ~f:Parties.Party_or_stack.accumulate_hashes')
-            ~hash_frame:Parties.Party_or_stack.With_hashes.stack_hash
+            (List.map call_stack ~f:Parties.Call_forest.accumulate_hashes')
+            ~hash_frame:Parties.Call_forest.hash
           |> List.map
                ~f:
                  (With_stack_hash.map
-                    ~f:
-                      (List.map ~f:(fun p ->
-                           Parties.Party_or_stack.map p ~f:(fun p -> (p, ())))))
+                    ~f:(Parties.Call_forest.map ~f:(fun p -> (p, ()))))
         in
         { local with
           Parties_logic.Local_state.parties = hash_parties_stack local.parties
@@ -4151,7 +4066,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
       in
       let call_stack_hash s =
         List.hd s
-        |> Option.value_map ~default:Parties.Party_or_stack.empty
+        |> Option.value_map ~default:Parties.Call_forest.empty
              ~f:With_stack_hash.stack_hash
       in
       let statement : Statement.With_sok.t =
@@ -4170,8 +4085,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
             ; pending_coinbase_stack = pending_coinbase_init_stack
             ; local_state =
                 { source_local with
-                  parties =
-                    Parties.Party_or_stack.stack_hash source_local.parties
+                  parties = Parties.Call_forest.hash source_local.parties
                 ; call_stack = call_stack_hash source_local.call_stack
                 ; ledger = source_local_ledger
                 }
@@ -4185,8 +4099,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                   pending_coinbase_init_stack
             ; local_state =
                 { target_local with
-                  parties =
-                    Parties.Party_or_stack.stack_hash target_local.parties
+                  parties = Parties.Call_forest.hash target_local.parties
                 ; call_stack = call_stack_hash target_local.call_stack
                 ; ledger = Sparse_ledger.merkle_root target_local.ledger
                 }
@@ -4266,7 +4179,7 @@ struct
                   List.concat_map witness.start_parties ~f:(fun s ->
                       s.parties.other_parties)
               | xs ->
-                  Parties.Party_or_stack.to_parties_list xs |> List.map ~f:fst
+                  Parties.Call_forest.to_parties_list xs |> List.map ~f:fst
             in
             List.filter_map parties ~f:(fun p ->
                 let%bind tag, snapp_statement = snapp_statement in
@@ -4577,12 +4490,12 @@ module For_tests = struct
       Snapp_predicate.Protocol_state.digest protocol_state
     in
     let ps =
-      Parties.Party_or_stack.of_parties_list
+      Parties.Call_forest.of_parties_list
         ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
         other_parties_data
-      |> Parties.Party_or_stack.accumulate_hashes_predicated
+      |> Parties.Call_forest.accumulate_hashes_predicated
     in
-    let other_parties_hash = Parties.Party_or_stack.stack_hash ps in
+    let other_parties_hash = Parties.Call_forest.hash ps in
     let commitment : Parties.Transaction_commitment.t =
       Parties.Transaction_commitment.create ~other_parties_hash
         ~protocol_state_predicate_hash
@@ -4684,12 +4597,12 @@ module For_tests = struct
       | Permissions.Auth_required.Proof ->
           let proof_party =
             let ps =
-              Parties.Party_or_stack.of_parties_list
+              Parties.Call_forest.of_parties_list
                 ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
                 [ snapp_party.data ]
-              |> Parties.Party_or_stack.accumulate_hashes_predicated
+              |> Parties.Call_forest.accumulate_hashes_predicated
             in
-            Parties.Party_or_stack.stack_hash ps
+            Parties.Call_forest.hash ps
           in
           let tx_statement : Snapp_statement.t =
             { transaction = commitment; at_party = proof_party }
@@ -4848,12 +4761,12 @@ module For_tests = struct
     let protocol_state = Snapp_predicate.Protocol_state.accept in
     let memo = Signed_command_memo.empty in
     let ps =
-      Parties.Party_or_stack.of_parties_list
+      Parties.Call_forest.of_parties_list
         ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
         [ sender_party_data; snapp_party_data ]
-      |> Parties.Party_or_stack.accumulate_hashes_predicated
+      |> Parties.Call_forest.accumulate_hashes_predicated
     in
-    let other_parties_hash = Parties.Party_or_stack.stack_hash ps in
+    let other_parties_hash = Parties.Call_forest.hash ps in
     let protocol_state_predicate_hash =
       (*FIXME: is this ok? *)
       Snapp_predicate.Protocol_state.digest protocol_state
@@ -4866,12 +4779,12 @@ module For_tests = struct
     in
     let proof_party =
       let ps =
-        Parties.Party_or_stack.of_parties_list
+        Parties.Call_forest.of_parties_list
           ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
           [ snapp_party_data ]
-        |> Parties.Party_or_stack.accumulate_hashes_predicated
+        |> Parties.Call_forest.accumulate_hashes_predicated
       in
-      Parties.Party_or_stack.stack_hash ps
+      Parties.Call_forest.hash ps
     in
     let tx_statement : Snapp_statement.t =
       { transaction; at_party = proof_party }
@@ -5863,15 +5776,13 @@ let%test_module "transaction_snark" =
                   let protocol_state = Snapp_predicate.Protocol_state.accept in
                   let memo = Signed_command_memo.empty in
                   let ps =
-                    Parties.Party_or_stack.of_parties_list
+                    Parties.Call_forest.of_parties_list
                       ~party_depth:(fun (p : Party.Predicated.t) ->
                         p.body.call_depth)
                       [ sender_party_data; snapp_party_data ]
-                    |> Parties.Party_or_stack.accumulate_hashes_predicated
+                    |> Parties.Call_forest.accumulate_hashes_predicated
                   in
-                  let other_parties_hash =
-                    Parties.Party_or_stack.stack_hash ps
-                  in
+                  let other_parties_hash = Parties.Call_forest.hash ps in
                   let protocol_state_predicate_hash =
                     (*FIXME: is this ok? *)
                     Snapp_predicate.Protocol_state.digest protocol_state
@@ -5882,7 +5793,7 @@ let%test_module "transaction_snark" =
                       ~protocol_state_predicate_hash
                       ~memo_hash:(Signed_command_memo.hash memo)
                   in
-                  let at_party = Parties.Party_or_stack.stack_hash ps in
+                  let at_party = Parties.Call_forest.hash ps in
                   let tx_statement : Snapp_statement.t =
                     { transaction; at_party }
                   in

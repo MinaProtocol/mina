@@ -356,8 +356,8 @@ module type S = sig
     -> ledger
     -> Parties.t
     -> ( Transaction_applied.Parties_applied.t
-       * ( ( (Party.t, unit) Parties.Party_or_stack.t list
-           , (Party.t, unit) Parties.Party_or_stack.t list list
+       * ( ( (Party.t, unit) Parties.Call_forest.t
+           , (Party.t, unit) Parties.Call_forest.t list
            , Token_id.t
            , Amount.t
            , ledger
@@ -389,8 +389,8 @@ module type S = sig
     -> f:
          (   'acc
           -> Global_state.t
-             * ( (Party.t, unit) Parties.Party_or_stack.t list
-               , (Party.t, unit) Parties.Party_or_stack.t list list
+             * ( (Party.t, unit) Parties.Call_forest.t
+               , (Party.t, unit) Parties.Call_forest.t list
                , Token_id.t
                , Amount.t
                , ledger
@@ -1624,7 +1624,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     module Party = struct
       include Party
 
-      type parties = (Party.t, unit) Parties.Party_or_stack.t list
+      type parties = (Party.t, unit) Parties.Call_forest.t
 
       type transaction_commitment = Transaction_commitment.t
 
@@ -1680,35 +1680,24 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     end
 
     module Parties = struct
-      module Party_or_stack = struct
-        type t = (Party.t, unit) Parties.Party_or_stack.t
-      end
+      type t = (Party.t, unit) Parties.Call_forest.t
 
-      type party_or_stack = Party_or_stack.t
+      let empty = []
 
-      include Stack (Party_or_stack)
+      let if_ = Parties.value_if
+
+      let is_empty = List.is_empty
 
       let of_parties_list : Party.t list -> t =
-        Parties.Party_or_stack.of_parties_list
-          ~party_depth:(fun (p : Party.t) -> p.data.body.call_depth)
+        Parties.Call_forest.of_parties_list ~party_depth:(fun (p : Party.t) ->
+            p.data.body.call_depth)
 
-      let as_stack : party_or_stack -> t option = function
-        | Party _ ->
-            None
-        | Stack (x, ()) ->
-            Some x
-
-      let pop_party_exn : t -> Party.t * t = function
-        | Party (x, ()) :: xs ->
-            (x, xs)
+      let pop_exn : t -> (Party.t * t) * t = function
+        | { stack_hash = (); elt = { party; calls; party_digest = () } } :: xs
+          ->
+            ((party, calls), xs)
         | _ ->
-            failwith "pop_party_exn"
-
-      let pop_stack : t -> (t * t) option = function
-        | Stack (x, ()) :: xs ->
-            Some (x, xs)
-        | _ ->
-            None
+            failwith "pop_exn"
     end
 
     module Call_stack = Stack (Parties)
