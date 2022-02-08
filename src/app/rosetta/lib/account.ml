@@ -324,7 +324,7 @@ module Balance = struct
             let balance_info : Balance_info.t =
               {liquid_balance= 0L; total_balance= 0L}
             in
-            Result.return @@ (dummy_block_identifier, balance_info, UInt64.zero) )
+            Result.return @@ (dummy_block_identifier, balance_info, Unsigned.UInt64.zero) )
       ; validate_network_choice= Network.Validate_choice.Mock.succeed }
   end
 
