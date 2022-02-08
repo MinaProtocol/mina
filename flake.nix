@@ -30,6 +30,8 @@
   inputs.gitignore-nix.url = "github:hercules-ci/gitignore.nix";
   inputs.gitignore-nix.inputs.nixpkgs.follows = "nixpkgs";
 
+  inputs.nix-filter.url = "github:balsoft/nix-filter/tomatcher-matchparents";
+
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
     , opam-nix, opam-repository, nixpkgs-mozilla, ... }:
     let inherit (utils.lib) exportOverlays exportPackages;
@@ -148,6 +150,7 @@
 
           inherit ocamlPackages ocamlPackages_static;
           packages.mina = ocamlPackages.mina;
+          packages.mina_tests = ocamlPackages.mina_tests;
           packages.mina_client_sdk_binding = ocamlPackages.mina_client_sdk;
           packages.mina-docker = pkgs.dockerTools.buildImage {
             name = "mina";

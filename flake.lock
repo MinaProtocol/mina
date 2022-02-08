@@ -97,6 +97,22 @@
         "type": "github"
       }
     },
+    "nix-filter": {
+      "locked": {
+        "lastModified": 1644355753,
+        "narHash": "sha256-YMSxv4eDZuidKxvescWBwXg81mQFsTcVGlhGmJ/VuX0=",
+        "owner": "balsoft",
+        "repo": "nix-filter",
+        "rev": "c5fecf01af1b0526d6ad3c09afc323360d46e406",
+        "type": "github"
+      },
+      "original": {
+        "owner": "balsoft",
+        "ref": "tomatcher-matchparents",
+        "repo": "nix-filter",
+        "type": "github"
+      }
+    },
     "nix-npm-buildPackage": {
       "locked": {
         "lastModified": 1643828355,
@@ -225,6 +241,7 @@
         "flake-compat": "flake-compat",
         "gitignore-nix": "gitignore-nix",
         "mix-to-nix": "mix-to-nix",
+        "nix-filter": "nix-filter",
         "nix-npm-buildPackage": "nix-npm-buildPackage",
         "nixpkgs": "nixpkgs",
         "nixpkgs-mozilla": "nixpkgs-mozilla",
