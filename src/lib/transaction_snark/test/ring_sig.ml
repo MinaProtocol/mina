@@ -178,8 +178,8 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                    }
              }) ;
           let sender_pk = sender.public_key |> Public_key.compress in
-          let fee_payer =
-            { Party.Fee_payer.data =
+          let fee_payer : Party.Fee_payer.t =
+            { data =
                 { body =
                     { public_key = sender_pk
                     ; update = Party.Update.noop
@@ -194,12 +194,13 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                     ; use_full_commitment = ()
                     }
                 ; predicate = sender_nonce
+                ; caller = ()
                 }
                 (* Real signature added in below *)
             ; authorization = Signature.dummy
             }
           in
-          let sender_party_data : Party.Predicated.t =
+          let sender_party_data : Party.Predicated.Wire.t =
             { body =
                 { public_key = sender_pk
                 ; update = Party.Update.noop
@@ -213,10 +214,11 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 ; protocol_state = Snapp_predicate.Protocol_state.accept
                 ; use_full_commitment = false
                 }
+            ; caller = Call
             ; predicate = Nonce (Account.Nonce.succ sender_nonce)
             }
           in
-          let snapp_party_data : Party.Predicated.t =
+          let snapp_party_data : Party.Predicated.Wire.t =
             { Party.Predicated.Poly.body =
                 { public_key = ringsig_account_pk
                 ; update = Party.Update.noop
@@ -231,14 +233,12 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 ; use_full_commitment = false
                 }
             ; predicate = Full Snapp_predicate.Account.accept
+            ; caller = Call
             }
           in
           let protocol_state = Snapp_predicate.Protocol_state.accept in
           let ps =
-            Parties.Call_forest.of_parties_list
-              ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
-              [ sender_party_data; snapp_party_data ]
-            |> Parties.Call_forest.accumulate_hashes_predicated
+            Parties.of_predicated_list [ sender_party_data; snapp_party_data ]
           in
           let other_parties_hash = Parties.Call_forest.hash ps in
           let protocol_state_predicate_hash =
@@ -281,23 +281,24 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                   (Random_oracle.Input.Chunked.field txn_comm)
             }
           in
-          let sender =
+          let sender : Party.Wire.t =
             let sender_signature =
               Signature_lib.Schnorr.Chunked.sign sender.private_key
                 (Random_oracle.Input.Chunked.field transaction)
             in
-            { Party.data = sender_party_data
+            { data = sender_party_data
             ; authorization = Signature sender_signature
             }
           in
           let parties : Parties.t =
-            { fee_payer
-            ; other_parties =
-                [ sender
-                ; { data = snapp_party_data; authorization = Proof pi }
-                ]
-            ; memo
-            }
+            Parties.of_wire
+              { fee_payer
+              ; other_parties =
+                  [ sender
+                  ; { data = snapp_party_data; authorization = Proof pi }
+                  ]
+              ; memo
+              }
           in
           ( if debug_mode then
             (* print fee payer *)
@@ -306,7 +307,8 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             |> printf "fee_payer:\n%s\n\n"
             |> fun () ->
             (* print other_party data *)
-            List.iteri parties.other_parties ~f:(fun idx (p : Party.t) ->
+            Parties.Call_forest.iteri parties.other_parties
+              ~f:(fun idx (p : Party.t) ->
                 Party.Predicated.to_yojson p.data
                 |> Yojson.Safe.pretty_to_string
                 |> printf "other_party #%d data:\n%s\n\n" idx)
