@@ -157,8 +157,10 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	}
 	trustedPeers := peer.NewSet()
 	err = capnpPeerIdListForeach(trustedPeerIds, func(peerID string) error {
-		id := peer.ID(peerID)
-		trustedPeers.Add(id)
+		id, err := peer.Decode(peerID)
+		if err == nil {
+			trustedPeers.Add(id)
+		}
 		return nil
 	})
 	if err != nil {
