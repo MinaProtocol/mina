@@ -187,7 +187,7 @@ end
 
 [%%versioned_binable
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     type t = (Backend.Tock.Curve.Affine.t, Vk.t) Poly.Stable.V2.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
