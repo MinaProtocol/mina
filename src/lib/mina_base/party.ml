@@ -702,7 +702,7 @@ module Predicate = struct
     let deriver obj =
       let open Fields_derivers_snapps.Derivers in
       Fields.make_creator obj ~tag:!.Tag.deriver
-        ~predicate:!.(fun _ -> failwith "")
+        ~predicate:!.Snapp_predicate.Account.deriver
       |> finish ~name:"AccountPredicate"
   end
 

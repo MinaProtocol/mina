@@ -457,7 +457,7 @@ module Account = struct
           ; sequence_state : 'field
           ; proved_state : 'bool
           }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare]
+        [@@deriving hlist, sexp, equal, yojson, hash, compare, fields]
       end
 
       module V1 = struct
@@ -536,16 +536,15 @@ module Account = struct
       Or_ignore.gen field_gen
     in
     let%map proved_state = Or_ignore.gen Quickcheck.Generator.bool in
-    Poly.
-      { balance
-      ; nonce
-      ; receipt_chain_hash
-      ; public_key
-      ; delegate
-      ; state
-      ; sequence_state
-      ; proved_state
-      }
+    { Poly.balance
+    ; nonce
+    ; receipt_chain_hash
+    ; public_key
+    ; delegate
+    ; state
+    ; sequence_state
+    ; proved_state
+    }
 
   let accept : t =
     { balance = Ignore
@@ -560,6 +559,19 @@ module Account = struct
     }
 
   let is_accept : t -> bool = equal accept
+
+  let deriver obj =
+    let open Fields_derivers_snapps in
+    Poly.Fields.make_creator obj
+      ~balance:!.(Numeric.deriver balance)
+      ~nonce:!.(Numeric.deriver uint32)
+      ~receipt_chain_hash:!.(Or_ignore.deriver field)
+      ~public_key:!.(Or_ignore.deriver public_key)
+      ~delegate:!.(Or_ignore.deriver public_key)
+      ~state:!.(Snapp_state.deriver @@ Or_ignore.deriver field)
+      ~sequence_state:!.(Or_ignore.deriver field)
+      ~proved_state:!.(Or_ignore.deriver bool)
+    |> finish ~name:"AccountPredicate"
 
   let to_input
       ({ balance
