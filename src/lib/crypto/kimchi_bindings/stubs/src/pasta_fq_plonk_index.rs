@@ -1,7 +1,7 @@
 use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
 use ark_poly::EvaluationDomain;
 use kimchi::index::{expr_linearization, Index as DlogIndex};
-use kimchi_circuits::{gate::CircuitGate, nolookup::constraints::ConstraintSystem};
+use kimchi::circuits::{gate::CircuitGate, constraints::ConstraintSystem};
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 use serde::{Deserialize, Serialize};
 use std::{

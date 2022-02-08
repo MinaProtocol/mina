@@ -65,7 +65,7 @@ let diff_in_slots ~(constants : Constants.t) ((epoch, slot) : t * Slot.t)
   let of_uint32 = UInt32.to_int64 in
   let epoch, slot = (of_uint32 epoch, of_uint32 slot) in
   let epoch', slot' = (of_uint32 epoch', of_uint32 slot') in
-  let epoch_size = UInt32.to_int64 constants.epoch_size in
+  let epoch_size = UInt32.to_int64 constants.slots_per_epoch in
   let epoch_diff = epoch - epoch' in
   if epoch_diff > 0L then
     ((epoch_diff - 1L) * epoch_size) + slot + (epoch_size - slot')
@@ -78,7 +78,7 @@ let%test_unit "test diff_in_slots" =
   let open Int64.Infix in
   let ( !^ ) = UInt32.of_int in
   let ( !@ ) = Fn.compose ( !^ ) Int64.to_int in
-  let epoch_size_int64 = UInt32.to_int64 constants.epoch_size in
+  let epoch_size_int64 = UInt32.to_int64 constants.slots_per_epoch in
   [%test_eq: int64] (diff_in_slots (!^0, !^5) (!^0, !^0) ~constants) 5L ;
   [%test_eq: int64] (diff_in_slots (!^3, !^23) (!^3, !^20) ~constants) 3L ;
   [%test_eq: int64]
@@ -101,6 +101,6 @@ let incr ~(constants : Constants.t) ((epoch, slot) : t * Slot.t) =
   let open UInt32 in
   if
     Slot.equal slot
-      (sub (Mina_numbers.Length.to_uint32 constants.epoch_size) one)
+      (sub (Mina_numbers.Length.to_uint32 constants.slots_per_epoch) one)
   then (add epoch one, zero)
   else (epoch, add slot one)
