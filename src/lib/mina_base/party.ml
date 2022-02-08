@@ -436,7 +436,7 @@ module Body = struct
           ; protocol_state : 'protocol_state
           ; use_full_commitment : 'bool
           }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare]
+        [@@deriving hlist, sexp, equal, yojson, hash, compare, fields]
       end
     end]
   end
@@ -597,6 +597,28 @@ module Body = struct
     ; protocol_state = Snapp_predicate.Protocol_state.accept
     ; use_full_commitment = false
     }
+
+  let token_id_deriver obj =
+    let open Fields_derivers_snapps in
+    iso_string obj ~name:"Token ID" ~to_string:Token_id.to_string
+      ~of_string:Token_id.of_string
+
+  let fail = failwith "TODO"
+
+  let deriver obj =
+    let open Fields_derivers_snapps in
+    Poly.Fields.make_creator obj ~public_key:!.public_key ~update:!.fail
+      ~token_id:!.token_id_deriver ~balance_change:!.fail
+      ~increment_nonce:!.bool ~events:!.fail ~sequence_events:!.fail
+      ~call_data:!.fail ~call_depth:!.int ~protocol_state:!.fail
+      ~use_full_commitment:!.bool
+    |> finish ~name:"TODO"
+
+  let%test_unit "json roundtrip" =
+    let open Fields_derivers_snapps.Derivers in
+    let full = o () in
+    let _a = deriver full in
+    [%test_eq: t] dummy (dummy |> to_json full |> of_json full)
 
   let to_input
       ({ public_key
