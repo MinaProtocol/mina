@@ -48,7 +48,7 @@ The rules are up to change, but we propose the following set as a first step. Th
         ; ...it is used for infix operators, ...
         exports-syntax
         ; ...it is only for its exposed submodules, ...
-        exports-modules-only
+        exports-subvalues-only
         ; ...or its scope is roughly a screen.
         (<= scope-lines 40)))
 
@@ -147,52 +147,45 @@ Note that currently, the `structure` rule does not match if one of the symbols i
 
 ### Local
 
-Some open statements are heavily used, but their usage is concentrated in only a few functions. In this case, we can remove the global open and add a few local opens in these functions instead. For example in `src/lib/transition_frontier/persistent_frontier/persistent_frontier.ml`, we can transform two different opens:
+Some open statements are heavily used, but their usage is concentrated in only a few functions. In this case, we can remove the global open and add a few local opens in these functions instead. For example in `src/lib/mina_lib/mina_lib.ml`, we can transform two different opens:
 
 ```diff
- open Async_kernel
- open Core
+@@ -4,9 +4,7 @@
  open Mina_base
--open Mina_state
  open Mina_transition
--open Frontier_base
- module Database = Database
+ open Pipe_lib
+-open Strict_pipe
+ open Signature_lib
+-open O1trace
+ open Otp_lib
+ open Network_peer
+ module Archive_client = Archive_client
+@@ -413,6 +411,7 @@
+ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
+     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
+     ~first_connection_incr ~first_message_incr =
++  let open O1trace in
+   let open Mina_incremental.Status in
+   let restart_delay = Time.Span.of_min 5. in
+   let offline_shutdown_delay = Time.Span.of_min 25. in
+@@ -763,6 +762,8 @@
+  *     items from the identity extension with no route for termination
+  *)
+ let root_diff t =
++  let open O1trace in
++  let open Strict_pipe in
+   let root_diff_reader, root_diff_writer =
+     Strict_pipe.create ~name:"root diff"
+       (Buffered (`Capacity 30, `Overflow Crash))
+@@ -1273,6 +1274,8 @@
+   able_to_send_or_wait ()
  
- exception Invalid_genesis_state_hash of External_transition.Validated.t
-@@ -11,6 +9,8 @@
- let construct_staged_ledger_at_root
-     ~(precomputed_values : Precomputed_values.t) ~root_ledger ~root_transition
-     ~root ~protocol_states ~logger =
-+  let open Frontier_base in
-+  let open Mina_state in
-   let open Deferred.Or_error.Let_syntax in
-   let open Root_data.Minimal in
-   let snarked_ledger_hash =
-@@ -162,6 +162,7 @@
- 
-   let fast_forward t target_root :
-       (unit, [> `Failure of string | `Bootstrap_required]) Result.t =
-+    let open Frontier_base in
-     let open Root_identifier.Stable.Latest in
-     let open Result.Let_syntax in
-     let%bind () = assert_no_sync t in
-@@ -185,6 +186,8 @@
-   let load_full_frontier t ~root_ledger ~consensus_local_state ~max_length
-       ~ignore_consensus_local_state ~precomputed_values
-       ~persistent_root_instance =
-+    let open Frontier_base in
-+    let open Mina_state in
-     let open Deferred.Result.Let_syntax in
-     let downgrade_transition transition genesis_state_hash :
-         ( External_transition.Almost_validated.t
-@@ -344,6 +347,7 @@
-   x
- 
- let reset_database_exn t ~root_data ~genesis_state_hash =
-+  let open Frontier_base in
-   let open Root_data.Limited in
-   let open Deferred.Let_syntax in
-   let root_transition = transition root_data in
+ let create ?wallets (config : Config.t) =
++  let open O1trace in
++  let open Strict_pipe in
+   let catchup_mode = if config.super_catchup then `Super else `Normal in
+   let constraint_constants = config.precomputed_values.constraint_constants in
+   let consensus_constants = config.precomputed_values.consensus_constants in
 ```
 
 ### Moving
