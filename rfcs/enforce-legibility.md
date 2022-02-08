@@ -101,23 +101,25 @@ Here are some use cases for each rule.
 
 ### Remove
 
-Some open statements are just not used enough to justify their existence. For example, the file `src/lib/work_selector/work_lib.ml` contains an `open Currency` which is just used once. `ocaml-close` yields the following patch:
+Some open statements are just not used enough to justify their existence. For example, the file `src/lib/gossip_net/any.ml` contains an `open Rpc_intf` which is just used once. `ocaml-close` yields the following patch:
 
 ```diff
- open Core_kernel
--open Currency
- open Async
+@@ -21,7 +21,6 @@
  
- module Make (Inputs : Intf.Inputs_intf) = struct
-@@ -123,7 +122,7 @@
-       (Inputs.Snark_pool.get_completed_work snark_pool statements)
-       ~f:(fun priced_proof ->
-         let competing_fee = Inputs.Transaction_snark_work.fee priced_proof in
--        Fee.compare fee competing_fee < 0)
-+        Currency.Fee.compare fee competing_fee < 0)
+ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
+   S with module Rpc_intf := Rpc_intf = struct
+-  open Rpc_intf
  
-   module For_tests = struct
-     let does_not_have_better_fee = does_not_have_better_fee
+   module type Implementation_intf =
+     Intf.Gossip_net_intf with module Rpc_intf := Rpc_intf
+@@ -30,7 +29,7 @@
+ 
+   type t = Any : 't implementation * 't -> t
+ 
+-  type 't creator = rpc_handler list -> 't Deferred.t
++  type 't creator = Rpc_intf.rpc_handler list -> 't Deferred.t
+ 
+   type creatable = Creatable : 't implementation * 't creator -> creatable
 ```
 
 ### Structure
