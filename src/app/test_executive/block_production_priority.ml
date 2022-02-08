@@ -26,6 +26,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ])
     ; num_snark_workers = 0
     ; aux_account_balance = Some "1000"
+    ; txpool_max_size = 10_000_000
     }
 
   let run network t =
