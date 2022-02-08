@@ -663,6 +663,28 @@ module Predicate = struct
 
   module Tag = struct
     type t = Full | Nonce | Accept [@@deriving equal, compare, sexp, yojson]
+
+    let to_string = function
+      | Full ->
+          "Full"
+      | Nonce ->
+          "Nonce"
+      | Accept ->
+          "Accept"
+
+    let of_string = function
+      | "Full" ->
+          Full
+      | "Nonce" ->
+          Nonce
+      | "Accept" ->
+          Accept
+      | _ ->
+          failwith "impossible"
+
+    let deriver obj =
+      Fields_derivers_snapps.Derivers.iso_string obj
+        ~name:"AccountPredicateType" ~to_string ~of_string
   end
 
   let tag : t -> Tag.t = function
@@ -672,6 +694,37 @@ module Predicate = struct
         Nonce
     | Accept ->
         Accept
+
+  module AsRecord = struct
+    type t = { tag : Tag.t; predicate : Snapp_predicate.Account.t }
+    [@@deriving fields]
+
+    let deriver obj =
+      let open Fields_derivers_snapps.Derivers in
+      Fields.make_creator obj ~tag:!.Tag.deriver
+        ~predicate:!.(fun _ -> failwith "")
+      |> finish ~name:"AccountPredicate"
+  end
+
+  let to_record s = { AsRecord.tag = tag s; predicate = to_full s }
+
+  let of_record (r : AsRecord.t) : t =
+    match r.tag with
+    | Full ->
+        Full r.predicate
+    | Nonce ->
+        Nonce
+          ( match r.predicate.nonce with
+          | Check interval ->
+              interval.lower
+          | Ignore ->
+              failwith "impossible" )
+    | Accept ->
+        Accept
+
+  let deriver obj =
+    let open Fields_derivers_snapps.Derivers in
+    iso ~map:of_record ~contramap:to_record (AsRecord.deriver @@ o ()) obj
 
   let digest (t : t) =
     let digest x =
