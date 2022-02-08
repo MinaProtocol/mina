@@ -144,7 +144,7 @@ module Verifiable = struct
 end
 
 let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
-  let find_vk (p : Party.t) =
+  let find_vk (p : _ Party.t_) =
     let ( ! ) x = Option.value_exn x in
     let id = Party.account_id p in
     Option.try_with (fun () ->
@@ -158,11 +158,13 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
       Signed_command c
   | Parties { fee_payer; other_parties; memo } ->
       Parties
-        { fee_payer
+        { fee_payer =
+            { data = { fee_payer.data with caller = () }
+            ; authorization = fee_payer.authorization
+            }
         ; other_parties =
             other_parties
-            |> List.map ~f:(fun party -> (party, find_vk party))
-            |> Parties.Call_forest.With_hashes.of_parties_list
+            |> Parties.Call_forest.map ~f:(fun party -> (party, find_vk party))
         ; memo
         }
 
@@ -231,7 +233,7 @@ let check (t : t) : Valid.t option =
   | Signed_command x ->
       Option.map (Signed_command.check x) ~f:(fun c -> Signed_command c)
   | Parties p ->
-      if Parties.check p then Some (Parties (p :> Parties.Valid.t)) else None
+      Some (Parties (p :> Parties.Valid.t))
 
 let fee_token (t : t) =
   match t with

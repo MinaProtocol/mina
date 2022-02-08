@@ -333,19 +333,16 @@ end
 
 module F = Pickles.Backend.Tick.Field
 
-let invalid_public_key : Public_key.Compressed.t Lazy.t =
-  let open F in
-  let f x =
-    let open Pickles.Backend.Tick.Inner_curve.Params in
-    b + (x * (a + square x))
-  in
-  let rec go i : Public_key.Compressed.t =
-    if not (is_square (f i)) then { x = i; is_odd = false } else go (i + one)
-  in
-  lazy (go zero)
-
 [%%else]
 
 module F = Snark_params_nonconsensus.Field
 
 [%%endif]
+
+let invalid_public_key : Public_key.Compressed.t Lazy.t =
+  let open F in
+  let rec go i : Public_key.Compressed.t =
+    let t : Public_key.Compressed.t = { x = i; is_odd = false } in
+    if Option.is_none (Public_key.decompress t) then t else go (i + one)
+  in
+  lazy (go zero)

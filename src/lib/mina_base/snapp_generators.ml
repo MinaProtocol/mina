@@ -638,8 +638,9 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false) ?account_id
     Account_id.create body.Party.Body.Poly.public_key
       body.Party.Body.Poly.token_id
   in
-  let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger () in
-  Party.Predicated.Poly.{ body; predicate }
+  let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger ()
+  and caller = Party.Call_type.quickcheck_generator in
+  Party.Predicated.Poly.{ body; predicate; caller }
 
 let gen_party_from ?(succeed = true) ?(new_account = false)
     ?(snapp_account = false) ?account_id ?permissions_auth
@@ -665,7 +666,7 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
       ?required_balance ~succeed ~new_account ~snapp_account ~increment_nonce
       ~available_public_keys ~ledger ~balances_tbl ()
   in
-  return { Party.data; authorization }
+  return { Party.Poly.data; authorization }
 
 (* takes an account id, if we want to sign this data *)
 let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
@@ -699,7 +700,7 @@ let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
             account )
   in
   let predicate = account.nonce in
-  Party.Predicated.Poly.{ body; predicate }
+  Party.Predicated.Poly.{ body; predicate; caller = () }
 
 let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ()
     : Party.Fee_payer.t Quickcheck.Generator.t =
@@ -710,7 +711,7 @@ let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
   let authorization = Signature.dummy in
-  Party.Fee_payer.{ data; authorization }
+  Party.Poly.{ data; authorization }
 
 let max_other_parties = 5
 
@@ -871,7 +872,7 @@ let gen_parties_from ?(succeed = true)
   let%bind memo = Signed_command_memo.gen in
   let memo_hash = Signed_command_memo.hash memo in
   let parties_dummy_signatures : Parties.t =
-    { fee_payer; other_parties; memo }
+    Parties.of_wire { fee_payer; other_parties; memo }
   in
   (* replace dummy signature in fee payer *)
   let fee_payer_hash =
@@ -890,8 +891,7 @@ let gen_parties_from ?(succeed = true)
     }
   in
   let other_parties_hash =
-    Parties.Call_forest.With_hashes.other_parties_hash
-      parties_dummy_signatures.other_parties
+    Parties.other_parties_hash parties_dummy_signatures
   in
   let protocol_state_predicate_hash =
     Snapp_predicate.Protocol_state.digest
@@ -913,7 +913,7 @@ let gen_parties_from ?(succeed = true)
   in
   (* replace dummy signatures in other parties *)
   let other_parties_with_valid_signatures =
-    List.map parties_dummy_signatures.other_parties
+    Parties.Call_forest.map parties_dummy_signatures.other_parties
       ~f:(fun { data; authorization } ->
         let authorization_with_valid_signature =
           match authorization with
@@ -938,7 +938,7 @@ let gen_parties_from ?(succeed = true)
           | Proof _ | None_given ->
               authorization
         in
-        { Party.data; authorization = authorization_with_valid_signature })
+        { Party.Poly.data; authorization = authorization_with_valid_signature })
   in
   return
     { parties_dummy_signatures with
