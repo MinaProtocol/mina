@@ -128,7 +128,7 @@ module Network_config = struct
                   }
           in
           (* an account may be used for snapp transactions, so add
-             permissions and snapp account
+             permissions
           *)
           let (permissions
                 : Runtime_config.Accounts.Single.Permissions.t option) =
