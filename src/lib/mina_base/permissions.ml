@@ -252,7 +252,7 @@ module Auth_required = struct
 
     let eval_proof ({ constant; signature_necessary; signature_sufficient } : t)
         =
-      (* ways authorization can succeed a proof is present:
+      (* ways authorization can succeed if a proof is present:
          - None
            {constant= true; signature_necessary= _; signature_sufficient= true}
          - Either
