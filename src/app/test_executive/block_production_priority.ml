@@ -23,6 +23,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { balance = "0"; timing = Untimed }
         ; { balance = "0"; timing = Untimed }
         ; { balance = "0"; timing = Untimed }
+        ; { balance = "0"; timing = Untimed }
+        ; { balance = "0"; timing = Untimed }
         ])
     ; num_snark_workers = 0
     ; aux_account_balance = Some "1000"
