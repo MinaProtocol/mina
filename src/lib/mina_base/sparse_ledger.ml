@@ -53,7 +53,7 @@ type account_state = [ `Added | `Existed ] [@@deriving equal]
 let empty ~depth () =
   M.of_hash
     ~next_available_token:Token_id.(next default)
-    ~next_available_index:None ~depth Outside_hash_image.t
+    ~depth Outside_hash_image.t
 
 module L = struct
   type t = M.t ref
@@ -160,9 +160,7 @@ M.
   , add_path
   , merkle_root
   , iteri
-  , depth
-  , next_available_token
-  , next_available_index )]
+  , next_available_token )]
 
 let apply_parties_unchecked_with_states ~constraint_constants ~state_view
     ~fee_excess ledger c =
@@ -179,16 +177,8 @@ let apply_parties_unchecked_with_states ~constraint_constants ~state_view
          *)
          (party_applied, List.rev states))
 
-(* TODO: share this cache globally across modules *)
-let empty_hash =
-  Empty_hashes.extensible_cache
-    (module Ledger_hash)
-    ~init_hash:(Ledger_hash.of_digest Account.empty_digest)
-
-let of_root ~depth ~next_available_token ~next_available_index
-    (h : Ledger_hash.t) =
-  of_hash ~depth ~next_available_token ~next_available_index
-    (* TODO: Is this of_digest casting really necessary? What's it doing? *)
+let of_root ~depth ~next_available_token (h : Ledger_hash.t) =
+  of_hash ~depth ~next_available_token
     (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))
 
 let of_ledger_root ledger =

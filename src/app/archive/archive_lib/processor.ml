@@ -1815,8 +1815,8 @@ module Balance = struct
   [@@deriving hlist]
 
   let typ =
-    let spec = Caqti_type.[ int; int; int64; int; int64; int; int ] in
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist spec
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int; int64; int; int64; int; int ]
 
   let balance_to_int64 (balance : Currency.Balance.t) : int64 =
     balance |> Currency.Balance.to_amount |> Currency.Amount.to_uint64

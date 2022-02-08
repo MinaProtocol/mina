@@ -42,15 +42,6 @@ module T = struct
         ; next_available_token : 'token_id
         }
       [@@deriving sexp, yojson]
-
-      let to_latest acct_to_latest
-          { indexes; depth; tree; next_available_token; next_available_index } =
-        { indexes
-        ; depth
-        ; tree = Tree.Stable.V1.to_latest acct_to_latest tree
-        ; next_available_token
-        ; next_available_index
-        }
     end
   end]
 

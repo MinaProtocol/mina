@@ -9,7 +9,7 @@ module Stable : sig
       , Account_id.Stable.V1.t
       , Account.Stable.V2.t
       , Token_id.Stable.V1.t )
-      Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
+      Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
     [@@deriving sexp, to_yojson]
 
     val to_latest : t -> t

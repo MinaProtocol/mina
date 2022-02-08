@@ -794,7 +794,7 @@ let all_work_pairs t
         , init_stack ) ->
         let%map witness =
           let { With_status.data = transaction; status } =
-            Ledger.Transaction_applied.transaction_with_status
+            Transaction_logic.Transaction_applied.transaction_with_status
               transaction_with_info
           in
           let%bind protocol_state_body =
