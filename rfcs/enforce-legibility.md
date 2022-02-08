@@ -97,8 +97,15 @@ Allow-listing a module can be done by either modifying the global rule or droppi
 The current above configuration contains rules for **removing** (`remove`), **narrowing** (`structure`), **localizing** (`local`) or **moving** (`move`) open statements. They are applied by running the following commands:
 
 ```bash
-ocamlclose lint -p fixes file1.ml file2.ml # Prints a set of recommendations, saved in a 'fixes' file
-ocamlclose patch -ic fixes                 # Modifies the original file in place, checking they can still build
+ocamlclose lint -p fixes      # Analyze the whole code base and print a set of recommendations, saved in a 'fixes' file
+ocamlclose patch -ic fixes    # Modifies the original file in place, checking they can still build
+```
+
+The tool uses `.cmt` files and builds them if not already present. Since this can take some time, and a lot of files in the Mina code base do not build correctly, it can be worthwhile to do the following.
+
+```bash
+dune build @check                               # Build all buildable .cmt files
+ocamlclose lint --skip-absent --silence-errors  # Analyze all files that could be built, ignore others
 ```
 
 Here are some use cases for each rule.
