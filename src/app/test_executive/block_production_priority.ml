@@ -18,14 +18,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers =
-        (let open Block_producer in
-        [ { balance = "9999999"; timing = Untimed } (* Two senders *)
-        ; { balance = "0"; timing = Untimed }
-        ; { balance = "0"; timing = Untimed }
-        ; { balance = "0"; timing = Untimed }
-        ; { balance = "0"; timing = Untimed }
-        ; { balance = "0"; timing = Untimed }
-        ])
+        { Block_producer.balance = "9999999"; timing = Untimed }
+        :: List.init 10
+             ~f:(const { Block_producer.balance = "0"; timing = Untimed })
     ; num_snark_workers = 0
     ; aux_account_balance = Some "1000"
     ; txpool_max_size = 10_000_000
@@ -77,7 +72,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           let%map pk = Util.pub_key_of_node s in
           [%log info] "sender: %s" (pk_to_string pk))
     in
-    let tps = 2 in
+    let tps = 1 in
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
