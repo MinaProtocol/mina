@@ -23,7 +23,6 @@ Of course, `open` is a useful tool and there are many cases where it makes sense
 We propose a set of rules for flagging "bad" opens, encoded into a lisp-like configuration language, which can be understood and applied by the [ocaml-close](https://github.com/tweag/ocaml-close) tool (which is built for the sake of this RFC). This tool would be added as a dependency and installed in the mina switch.
 
 The rules are up to change, but we propose the following set as a first step. They are to be put in a a `.ocamlclose` at the root of the project.
-
 ```scheme
 (root) ; ocaml-close will not look for .ocamlclose files in parent directories
 
@@ -38,15 +37,20 @@ The rules are up to change, but we propose the following set as a first step. Th
 ; (e.g., we keep opens matched by the 'keep' rule no matter the other rules)
 (precedence (keep remove local structure move))
 
-; An 'open <X>' statement is...
+; List of opens that are never ever touched, considered "standard".
+(standard ("Base" "Core" "Core_kernel" "Async" "Async_kernel" "Mina_base"
+           "Import" "Currency" "Signature_lib" "Unsigned"))
+
+; If there is only one non-standard open that should be modified, keep it,
+; since there is no ambiguity
+(single true)
+
+; An 'open <X>' (where X is not in the allow-list) statement is...
 (rules
 
-  ; - left untouched if...
+  ; - left untouched if either...
   (keep
-    ; ...either it is whitelisted, ...
-    (or (in-list ("Base" "Core" "Core_kernel" "Async" "Async_kernel" "Mina_base"
-                  "Import" "Currency" "Signature_lib" "Unsigned"))
-        ; ...it is used for infix operators, ...
+    (or ; ...it is used for infix operators, ...
         exports-syntax
         ; ...it is only for its exposed submodules, ...
         exports-subvalues-only
@@ -75,7 +79,6 @@ The rules are up to change, but we propose the following set as a first step. Th
   ; - moved closer to its optimal position (see 'placement' parameter), if...
   ;   ... it is too far from that optimal placement, or after it.
   (move (and (>= dist-to-optimal 40) (not optimal-is-before))))
-
 ```
 
 This makes the rules easily modifiable in the future, along with the evolution of the tool and the consensus of the team, and we propose that future changes of rules can be made with simple pull requests rather than new RFCs. The current rules can always be gathered by consulting the `.ocamlclose` file.
