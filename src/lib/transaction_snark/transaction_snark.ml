@@ -1537,8 +1537,8 @@ module Base = struct
 
           let empty = Field.constant Parties.Transaction_commitment.empty
 
-          let commitment ~party:{ party; _ } ~other_parties:(other_parties, _)
-              ~memo_hash =
+          let commitment ~party:{ party; _ }
+              ~other_parties:{ With_hash.hash = other_parties; _ } ~memo_hash =
             Parties.Transaction_commitment.Checked.create
               ~other_parties_hash:other_parties
               ~protocol_state_predicate_hash:
@@ -1709,47 +1709,157 @@ module Base = struct
             `Is_new is_new
         end
 
-        module Parties = struct
-          module Opt = struct
-            open Snapp_basic
+        module Opt = struct
+          open Snapp_basic
 
-            type 'a t = (Bool.t, 'a) Flagged_option.t
+          type 'a t = (Bool.t, 'a) Flagged_option.t
 
-            let is_some = Flagged_option.is_some
+          let is_some = Flagged_option.is_some
 
-            let map x ~f = Flagged_option.map ~f x
+          let map x ~f = Flagged_option.map ~f x
 
-            let or_default ~if_ x ~default =
-              if_ (is_some x) ~then_:(Flagged_option.data x) ~else_:default
+          let or_default ~if_ x ~default =
+            if_ (is_some x) ~then_:(Flagged_option.data x) ~else_:default
 
-            let or_exn x =
-              with_label "or_exn is_some" (fun () -> Bool.assert_ (is_some x)) ;
-              Flagged_option.data x
-          end
+          let or_exn x =
+            with_label "or_exn is_some" (fun () -> Bool.assert_ (is_some x)) ;
+            Flagged_option.data x
+        end
 
-          type party_or_stack =
-            Field.t
-            * (Party.t * unit, Parties.Digest.t) Parties.Party_or_stack.t V.t
+        module Stack (Elt : sig
+          type t
+
+          val default : t
+
+          val hash : t -> Field.Constant.t
+
+          val push :
+               consed_hash:Field.Constant.t
+            -> t
+            -> (t, Field.Constant.t) With_stack_hash.t list
+            -> (t, Field.Constant.t) With_stack_hash.t list
+        end) :
+          Parties_logic.Stack_intf
+            with type elt = (Elt.t V.t, Field.t) With_hash.t
+             and type t =
+                  ( (Elt.t, Field.Constant.t) With_stack_hash.t list V.t
+                  , Field.t )
+                  With_hash.t
+             and type bool := Bool.t
+             and module Opt := Opt = struct
+          type elt = (Elt.t V.t, Field.t) With_hash.t
 
           type t =
-            Field.t
-            * (Party.t * unit, Parties.Digest.t) Parties.Party_or_stack.t list
-              V.t
+            ( (Elt.t, Field.Constant.t) With_stack_hash.t list V.t
+            , Field.t )
+            With_hash.t
 
-          let if_ b ~then_:(xt, rt) ~else_:(xe, re) =
-            (Field.if_ b ~then_:xt ~else_:xe, V.if_ b ~then_:rt ~else_:re)
+          let if_ b ~then_:(t : t) ~else_:(e : t) : t =
+            { hash = Field.if_ b ~then_:t.hash ~else_:e.hash
+            ; data = V.if_ b ~then_:t.data ~else_:e.data
+            }
 
-          let empty = Field.constant Parties.Party_or_stack.With_hashes.empty
+          let empty_constant = Parties.Party_or_stack.With_hashes.empty
 
-          let is_empty (x, _) = Field.equal empty x
+          let empty = Field.constant empty_constant
 
-          let empty = (empty, V.create (fun () -> []))
+          let is_empty ({ hash = x; _ } : t) = Field.equal empty x
+
+          let empty : t = { hash = empty; data = V.create (fun () -> []) }
 
           let hash_cons hash h_tl =
             Random_oracle.Checked.hash ~init:Hash_prefix_states.party_cons
               [| hash; h_tl |]
 
-          let pop_exn ((h, r) : t) : party_or_stack * t =
+          let stack_hash (type a)
+              (xs : (a, Field.Constant.t) With_stack_hash.t list) :
+              Field.Constant.t =
+            match xs with [] -> empty_constant | e :: _ -> e.stack_hash
+
+          let pop ({ hash = h; data = r } as t : t) : (elt * t) Opt.t =
+            let input_is_empty = is_empty t in
+            let hd_r =
+              V.create (fun () ->
+                  V.get r |> List.hd
+                  |> Option.value_map ~default:Elt.default ~f:(fun x -> x.elt))
+            in
+            let tl_r =
+              V.create (fun () ->
+                  V.get r |> List.tl |> Option.value ~default:[])
+            in
+            let elt, stack =
+              exists
+                Typ.(Field.typ * Field.typ)
+                ~compute:(fun () ->
+                  (V.get hd_r |> Elt.hash, stack_hash (V.get tl_r)))
+            in
+            let h' = hash_cons elt stack in
+            with_label __LOC__ (fun () ->
+                Boolean.Assert.any [ input_is_empty; Field.equal h h' ]) ;
+            { is_some = Boolean.not input_is_empty
+            ; data = ({ hash = elt; data = hd_r }, { hash = stack; data = tl_r })
+            }
+
+          let pop_exn ({ hash = h; data = r } : t) : elt * t =
+            let hd_r = V.create (fun () -> (V.get r |> List.hd_exn).elt) in
+            let tl_r = V.create (fun () -> V.get r |> List.tl_exn) in
+            let elt, stack =
+              exists
+                Typ.(Field.typ * Field.typ)
+                ~compute:(fun () ->
+                  (V.get hd_r |> Elt.hash, stack_hash (V.get tl_r)))
+            in
+            let h' = hash_cons elt stack in
+            with_label __LOC__ (fun () -> Field.Assert.equal h h') ;
+            ({ hash = elt; data = hd_r }, { hash = stack; data = tl_r })
+
+          let push ({ hash = h_hd; data = r_hd } : elt)
+              ~onto:({ hash = h_tl; data = r_tl } : t) : t =
+            let h = hash_cons h_hd h_tl in
+            let r =
+              V.create (fun () ->
+                  let hd = V.get r_hd in
+                  let tl = V.get r_tl in
+                  Elt.push ~consed_hash:(As_prover.read Field.typ h) hd tl)
+            in
+            { hash = h; data = r }
+        end
+
+        module Parties = struct
+          module Elt = struct
+            type t = (Party.t * unit, Parties.Digest.t) Parties.Party_or_stack.t
+          end
+
+          type elt = (Elt.t V.t, Field.t) With_hash.t
+
+          type party_or_stack = elt
+
+          (* TODO: This module should be refactored to make it so we can just
+             use the Stack functor, but that would require refactoring Party_or_stack.t
+             to not contain the stack hash inside of the element value itself, so that
+             we could instead wrap it in a With_stack_hash.t. *)
+          type t =
+            ( (Party.t * unit, Parties.Digest.t) Parties.Party_or_stack.t list
+              V.t
+            , Field.t )
+            With_hash.t
+
+          let if_ b ~then_:(t : t) ~else_:(e : t) : t =
+            { hash = Field.if_ b ~then_:t.hash ~else_:e.hash
+            ; data = V.if_ b ~then_:t.data ~else_:e.data
+            }
+
+          let empty = Field.constant Parties.Party_or_stack.With_hashes.empty
+
+          let is_empty ({ hash = x; _ } : t) = Field.equal empty x
+
+          let empty : t = { hash = empty; data = V.create (fun () -> []) }
+
+          let hash_cons hash h_tl =
+            Random_oracle.Checked.hash ~init:Hash_prefix_states.party_cons
+              [| hash; h_tl |]
+
+          let pop_exn ({ hash = h; data = r } : t) : elt * t =
             let hd_r = V.create (fun () -> V.get r |> List.hd_exn) in
             let tl_r = V.create (fun () -> V.get r |> List.tl_exn) in
             let party_or_stack, stack =
@@ -1762,9 +1872,10 @@ module Base = struct
             in
             let h' = hash_cons party_or_stack stack in
             with_label __LOC__ (fun () -> Field.Assert.equal h h') ;
-            ((party_or_stack, hd_r), (stack, tl_r))
+            ( { hash = party_or_stack; data = hd_r }
+            , { hash = stack; data = tl_r } )
 
-          let as_stack ((h, r) : party_or_stack) : t Opt.t =
+          let as_stack ({ hash = h; data = r } : elt) : t Opt.t =
             (* NB: Don't need to check here, since interpreting a stack as a
                party or party as a stack implies a hash collision.
             *)
@@ -1772,14 +1883,16 @@ module Base = struct
               exists Boolean.typ ~compute:(fun () ->
                   match V.get r with Party _ -> false | Stack _ -> true)
             in
-            let data =
-              ( h
-              , V.create (fun () ->
-                    match V.get r with Party _ -> [] | Stack (xs, _) -> xs) )
+            let data : t =
+              { hash = h
+              ; data =
+                  V.create (fun () ->
+                      match V.get r with Party _ -> [] | Stack (xs, _) -> xs)
+              }
             in
             { Snapp_basic.Flagged_option.is_some; data }
 
-          let pop_party_exn ((h, r) : t) : party * t =
+          let pop_party_exn ({ hash = h; data = r } : t) : party * t =
             let first_party =
               V.create (fun () ->
                   match V.get r |> List.hd_exn with
@@ -1816,9 +1929,10 @@ module Base = struct
             in
             with_label __LOC__ (fun () -> Field.Assert.equal h actual_h) ;
             ( { party; control = auth }
-            , (tl, V.(create (fun () -> List.tl_exn (get r)))) )
+            , { hash = tl; data = V.(create (fun () -> List.tl_exn (get r))) }
+            )
 
-          let pop_stack ((h, r) : t) : (t * t) Opt.t =
+          let pop_stack ({ hash = h; data = r } : t) : (t * t) Opt.t =
             let hd_r =
               V.create (fun () ->
                   match V.get r |> List.hd with
@@ -1844,21 +1958,28 @@ module Base = struct
                party or party as a stack implies a hash collision.
             *)
             let is_some = Field.equal h h' in
-            let data = ((party_or_stack, hd_r), (stack, tl_r)) in
-            { Snapp_basic.Flagged_option.is_some; data }
-
-          let push_stack ((h_hd, r_hd) : t) ~onto:((h_tl, r_tl) : t) : t =
-            let h = hash_cons h_hd h_tl in
-            let r =
-              V.create (fun () ->
-                  let hd_stack = V.get r_hd in
-                  let tl = V.get r_tl in
-                  Parties.Party_or_stack.Stack
-                    (hd_stack, As_prover.read Field.typ h)
-                  :: tl)
+            let data : t * t =
+              ( { hash = party_or_stack; data = hd_r }
+              , { hash = stack; data = tl_r } )
             in
-            (h, r)
+            { Snapp_basic.Flagged_option.is_some; data }
         end
+
+        module Call_stack = Stack (struct
+          module Parties = Mina_base.Parties
+
+          type t =
+            (Party.t * unit, Parties.Digest.t) Parties.Party_or_stack.t list
+
+          let default : t = []
+
+          let hash : t -> Field.Constant.t =
+            Parties.Party_or_stack.With_hashes.stack_hash
+
+          let push ~consed_hash (t : t) (xs : (t, _) With_stack_hash.t list) :
+              (t, _) With_stack_hash.t list =
+            { stack_hash = consed_hash; elt = t } :: xs
+        end)
 
         module Party = struct
           type t = party
@@ -1881,7 +2002,8 @@ module Base = struct
           let increment_nonce (t : t) = t.party.data.body.increment_nonce
 
           let check_authorization ~(account : Account.t) ~commitment
-              ~at_party:(at_party, _) ({ party; control; _ } : t) =
+              ~at_party:({ hash = at_party; _ } : Parties.t)
+              ({ party; control; _ } : t) =
             ( match (auth_type, snapp_statement) with
             | Proof, Some (i, s) ->
                 Pickles.Side_loaded.in_circuit (side_loaded i)
@@ -1990,6 +2112,7 @@ module Base = struct
 
           type t =
             ( Parties.t
+            , Call_stack.t
             , Token_id.t
             , Amount.t
             , Ledger.t
@@ -2038,6 +2161,7 @@ module Base = struct
           ; parties : Parties.t
           ; local_state :
               ( Parties.t
+              , Call_stack.t
               , Token_id.t
               , Amount.t
               , Ledger.t
@@ -2156,11 +2280,13 @@ module Base = struct
         in
         let l : _ Parties_logic.Local_state.t =
           { parties =
-              ( statement.source.local_state.parties
-              , V.create (fun () -> !witness.local_state_init.parties) )
+              { With_hash.hash = statement.source.local_state.parties
+              ; data = V.create (fun () -> !witness.local_state_init.parties)
+              }
           ; call_stack =
-              ( statement.source.local_state.call_stack
-              , V.create (fun () -> !witness.local_state_init.call_stack) )
+              { With_hash.hash = statement.source.local_state.call_stack
+              ; data = V.create (fun () -> !witness.local_state_init.call_stack)
+              }
           ; transaction_commitment =
               statement.source.local_state.transaction_commitment
           ; full_transaction_commitment =
@@ -2217,7 +2343,8 @@ module Base = struct
                     Parties.Party_or_stack.With_hashes.stack_hash (V.get ps))
               in
               let start_data =
-                { Parties_logic.Start_data.parties = (h, ps)
+                { Parties_logic.Start_data.parties =
+                    { With_hash.hash = h; data = ps }
                 ; memo_hash =
                     exists Field.typ ~compute:(fun () ->
                         match V.get v with
@@ -2261,7 +2388,7 @@ module Base = struct
                       | p :: ps ->
                           let should_pop =
                             Field.Constant.equal Parties.Party_or_stack.empty
-                              (As_prover.read_var (fst local.parties))
+                              (As_prover.read_var local.parties.hash)
                           in
                           if should_pop then (
                             As_prover.Ref.set start_parties ps ;
@@ -2274,7 +2401,7 @@ module Base = struct
                       fun () ->
                         [%test_eq: Impl.Field.Constant.t]
                           Parties.Party_or_stack.empty
-                          (read_var (fst local.parties))) ;
+                          (read_var local.parties.hash)) ;
                   V.create (fun () ->
                       match As_prover.Ref.get start_parties with
                       | [] ->
@@ -2294,14 +2421,14 @@ module Base = struct
            it will never be upgraded to the global ledger. If we have such a
            failure, we just pretend we achieved the target hash.
         *)
-        Field.if_ local.success ~then_:(fst local.parties)
+        Field.if_ local.success ~then_:local.parties.hash
           ~else_:statement.target.local_state.parties
       in
       with_label __LOC__ (fun () ->
           Local_state.Checked.assert_equal statement.target.local_state
             { local with
               parties = local_state_ledger
-            ; call_stack = fst local.call_stack
+            ; call_stack = local.call_stack.hash
             ; ledger = fst local.ledger
             }) ;
       with_label __LOC__ (fun () ->
@@ -3816,6 +3943,23 @@ let group_by_parties_rev partiess stmtss =
   in
   group_by_parties_rev partiess stmtss []
 
+let rec accumulate_call_stack_hashes ~(hash_frame : 'frame -> field)
+    (frames : 'frame list) : ('frame, field) With_stack_hash.t list =
+  match frames with
+  | [] ->
+      []
+  | f :: fs ->
+      let h_f = hash_frame f in
+      let tl = accumulate_call_stack_hashes ~hash_frame fs in
+      let h_tl =
+        match tl with
+        | [] ->
+            Parties.Party_or_stack.empty
+        | t :: _ ->
+            t.stack_hash
+      in
+      { stack_hash = Parties.Party_or_stack.hash_cons h_f h_tl; elt = f } :: tl
+
 let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
     ~pending_coinbase_init_stack ledger partiess =
   let sparse_ledger =
@@ -3942,9 +4086,25 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
           ps |> Parties.Party_or_stack.accumulate_hashes'
           |> List.map ~f:(Parties.Party_or_stack.map ~f:(fun p -> (p, ())))
         in
+        let call_stack : (Party.t, unit) Parties.Party_or_stack.t list list =
+          local.call_stack
+        in
+        let call_stack :
+            (unit Parties.Party_or_stack.With_hashes.t, field) With_stack_hash.t
+            list =
+          accumulate_call_stack_hashes
+            (List.map call_stack ~f:Parties.Party_or_stack.accumulate_hashes')
+            ~hash_frame:Parties.Party_or_stack.With_hashes.stack_hash
+          |> List.map
+               ~f:
+                 (With_stack_hash.map
+                    ~f:
+                      (List.map ~f:(fun p ->
+                           Parties.Party_or_stack.map p ~f:(fun p -> (p, ())))))
+        in
         { local with
           Parties_logic.Local_state.parties = hash_parties_stack local.parties
-        ; call_stack = hash_parties_stack local.call_stack
+        ; call_stack
         }
       in
       let source_local =
@@ -3989,6 +4149,11 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
         ; fee_excess_r = Fee.Signed.zero
         }
       in
+      let call_stack_hash s =
+        List.hd s
+        |> Option.value_map ~default:Parties.Party_or_stack.empty
+             ~f:With_stack_hash.stack_hash
+      in
       let statement : Statement.With_sok.t =
         (* empty ledger hash in the local state at the beginning of each
            transaction
@@ -4007,8 +4172,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                 { source_local with
                   parties =
                     Parties.Party_or_stack.stack_hash source_local.parties
-                ; call_stack =
-                    Parties.Party_or_stack.stack_hash source_local.call_stack
+                ; call_stack = call_stack_hash source_local.call_stack
                 ; ledger = source_local_ledger
                 }
             }
@@ -4023,8 +4187,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                 { target_local with
                   parties =
                     Parties.Party_or_stack.stack_hash target_local.parties
-                ; call_stack =
-                    Parties.Party_or_stack.stack_hash target_local.call_stack
+                ; call_stack = call_stack_hash target_local.call_stack
                 ; ledger = Sparse_ledger.merkle_root target_local.ledger
                 }
             }
