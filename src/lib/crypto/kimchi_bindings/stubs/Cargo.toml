@@ -1,3 +1,9 @@
+[workspace]
+members = [
+    ".",
+    "binding_generation",
+]
+
 [package]
 name = "wires_15_stubs"
 version = "0.1.0"
