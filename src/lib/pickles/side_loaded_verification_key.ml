@@ -197,66 +197,54 @@ module Stable = struct
 
     let version_byte = Base58_check.Version_bytes.verification_key
 
+    let to_repr { Poly.step_data; max_width; wrap_index; wrap_vk = _ } =
+      { Repr.Stable.V2.step_data; max_width; wrap_index }
+
+    let of_repr
+        ({ Repr.Stable.V2.step_data; max_width; wrap_index = c } :
+          R.Stable.V2.t) : t =
+      let d = Common.wrap_domains.h in
+      let log2_size = Import.Domain.log2_size d in
+      let max_quot_size = Common.max_quot_size_int (Import.Domain.size d) in
+      let wrap_vk : Impls.Wrap.Verification_key.t =
+        { domain =
+            { log_size_of_group = log2_size
+            ; group_gen = Backend.Tock.Field.domain_generator log2_size
+            }
+        ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
+        ; max_quot_size
+        ; srs = Backend.Tock.Keypair.load_urs ()
+        ; evals =
+            (let g (x, y) =
+               { Kimchi.Protocol.unshifted =
+                   [| Kimchi.Foundations.Finite (x, y) |]
+               ; shifted = None
+               }
+             in
+             { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comm)
+             ; coefficients_comm =
+                 Array.map ~f:g (Vector.to_array c.coefficients_comm)
+             ; generic_comm = g c.generic_comm
+             ; mul_comm = g c.mul_comm
+             ; psm_comm = g c.psm_comm
+             ; emul_comm = g c.emul_comm
+             ; complete_add_comm = g c.complete_add_comm
+             ; endomul_scalar_comm = g c.endomul_scalar_comm
+             ; chacha_comm = None
+             })
+        ; shifts = Common.tock_shifts ~log2_size
+        }
+      in
+      { Poly.step_data; max_width; wrap_index = c; wrap_vk = Some wrap_vk }
+
     include Binable.Of_binable
               (R.Stable.V2)
               (struct
                 type nonrec t = t
 
-                module Repr_conv = struct
-                  include Vk
+                let to_binable r = to_repr r
 
-                  let of_repr
-                      ({ Repr.Stable.V2.step_data; max_width; wrap_index = c } :
-                        R.Stable.V2.t) : Impls.Wrap.Verification_key.t =
-                    let d = Common.wrap_domains.h in
-                    let log2_size = Import.Domain.log2_size d in
-                    let max_quot_size =
-                      Common.max_quot_size_int (Import.Domain.size d)
-                    in
-                    { domain =
-                        { log_size_of_group = log2_size
-                        ; group_gen =
-                            Backend.Tock.Field.domain_generator log2_size
-                        }
-                    ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
-                    ; max_quot_size
-                    ; srs = Backend.Tock.Keypair.load_urs ()
-                    ; evals =
-                        (let g (x, y) =
-                           { Kimchi.Protocol.unshifted =
-                               [| Kimchi.Foundations.Finite (x, y) |]
-                           ; shifted = None
-                           }
-                         in
-                         { sigma_comm =
-                             Array.map ~f:g (Vector.to_array c.sigma_comm)
-                         ; coefficients_comm =
-                             Array.map ~f:g
-                               (Vector.to_array c.coefficients_comm)
-                         ; generic_comm = g c.generic_comm
-                         ; mul_comm = g c.mul_comm
-                         ; psm_comm = g c.psm_comm
-                         ; emul_comm = g c.emul_comm
-                         ; complete_add_comm = g c.complete_add_comm
-                         ; endomul_scalar_comm = g c.endomul_scalar_comm
-                         ; chacha_comm = None
-                         })
-                    ; shifts = Common.tock_shifts ~log2_size
-                    }
-                end
-
-                let to_binable
-                    { Poly.step_data; max_width; wrap_index; wrap_vk = _ } =
-                  { Repr.Stable.V2.step_data; max_width; wrap_index }
-
-                let of_binable
-                    ( { Repr.Stable.V2.step_data; max_width; wrap_index = c } as
-                    t ) =
-                  { Poly.step_data
-                  ; max_width
-                  ; wrap_index = c
-                  ; wrap_vk = Some (Repr_conv.of_repr t)
-                  }
+                let of_binable r = of_repr r
               end)
   end
 end]
