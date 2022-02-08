@@ -356,8 +356,8 @@ module type S = sig
     -> ledger
     -> Parties.t
     -> ( Transaction_applied.Parties_applied.t
-       * ( ( (Party.t, unit) Parties.Call_forest.t
-           , (Party.t, unit) Parties.Call_forest.t list
+       * ( ( Stack_frame.value
+           , Stack_frame.value list
            , Token_id.t
            , Amount.t
            , ledger
@@ -389,8 +389,8 @@ module type S = sig
     -> f:
          (   'acc
           -> Global_state.t
-             * ( (Party.t, unit) Parties.Call_forest.t
-               , (Party.t, unit) Parties.Call_forest.t list
+             * ( Stack_frame.value
+               , Stack_frame.value list
                , Token_id.t
                , Amount.t
                , ledger
@@ -1271,6 +1271,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            ; protocol_state = _
            ; use_full_commitment
            }
+       ; caller = _
        ; predicate
        } :
         Party.Predicated.t) (a : Account.t) : (Account.t, _) Result.t =
@@ -1505,7 +1506,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     module Bool = struct
       type t = bool
 
-      let assert_ b = assert b
+      module Assert = struct
+        let is_true b = assert b
+
+        let any bs = List.exists ~f:Fn.id bs |> is_true
+      end
 
       let if_ = Parties.value_if
 
@@ -1520,6 +1525,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let ( ||| ) = ( || )
 
       let ( &&& ) = ( && )
+    end
+
+    module Account_id = struct
+      include Account_id
+
+      let if_ = Parties.value_if
     end
 
     module Ledger = struct
@@ -1568,6 +1579,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
     module Account = struct
       include Account
+
+      let token_owner (a : t) =
+        match a.token_permissions with Token_owned _ -> true | _ -> false
     end
 
     module Amount = struct
@@ -1624,9 +1638,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     module Party = struct
       include Party
 
-      type parties = (Party.t, unit) Parties.Call_forest.t
+      type parties = (Party.t, Parties.Digest.t) Parties.Call_forest.t
 
       type transaction_commitment = Transaction_commitment.t
+
+      let caller _ = Account_id.invalid
 
       let check_authorization ~account:_ ~commitment:_ ~at_party:_ (party : t) =
         (* The transaction's validity should already have been checked before
@@ -1680,7 +1696,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     end
 
     module Parties = struct
-      type t = (Party.t, unit) Parties.Call_forest.t
+      type t = (Party.t, Parties.Digest.t) Parties.Call_forest.t
 
       let empty = []
 
@@ -1688,25 +1704,30 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       let is_empty = List.is_empty
 
-      let of_parties_list : Party.t list -> t =
-        Parties.Call_forest.of_parties_list ~party_depth:(fun (p : Party.t) ->
-            p.data.body.call_depth)
-
       let pop_exn : t -> (Party.t * t) * t = function
-        | { stack_hash = (); elt = { party; calls; party_digest = () } } :: xs
-          ->
+        | { stack_hash = _; elt = { party; calls; party_digest = _ } } :: xs ->
             ((party, calls), xs)
         | _ ->
             failwith "pop_exn"
     end
 
-    module Call_stack = Stack (Parties)
+    module Stack_frame = struct
+      include Stack_frame
+
+      type t = value
+
+      let if_ = Parties.if_
+
+      let make = Stack_frame.make
+    end
+
+    module Call_stack = Stack (Stack_frame)
 
     module Local_state = struct
       type failure_status = Transaction_status.Failure.t option
 
       type t =
-        ( Parties.t
+        ( Stack_frame.t
         , Call_stack.t
         , Token_id.t
         , Amount.t
@@ -1743,7 +1764,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; global_state : Global_state.t
       ; inclusion_proof : [ `Existing of location | `New ]
       ; local_state :
-          ( Parties.t
+          ( Stack_frame.t
           , Call_stack.t
           , Token_id.t
           , Amount.t
@@ -1819,7 +1840,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let rec step_all user_acc
         ( (g_state : Inputs.Global_state.t)
         , (l_state : _ Parties_logic.Local_state.t) ) : user_acc Or_error.t =
-      if List.is_empty l_state.parties then Ok user_acc
+      if List.is_empty l_state.frame.Stack_frame.calls then Ok user_acc
       else
         match M.step ~constraint_constants { perform } (g_state, l_state) with
         | exception exn ->
@@ -1833,7 +1854,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     let initial_state : Inputs.Global_state.t * _ Parties_logic.Local_state.t =
       ( { protocol_state = state_view; ledger; fee_excess }
-      , { parties = []
+      , { frame =
+            ({ calls = []
+             ; caller = { id = Account_id.invalid; token_owner = false }
+             ; caller_caller = { id = Account_id.invalid; token_owner = false }
+             } : Inputs.Stack_frame.t)
         ; call_stack = []
         ; transaction_commitment = ()
         ; full_transaction_commitment = ()
@@ -1846,18 +1871,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     let user_acc = f init initial_state in
     let start : Inputs.Global_state.t * _ =
-      let parties =
-        let p = Party.Fee_payer.to_signed c.fee_payer in
-        { Party.authorization = Control.Signature p.authorization
-        ; data =
-            { p.data with predicate = Party.Predicate.Nonce p.data.predicate }
-        }
-        :: c.other_parties
-      in
+      let parties = Parties.parties c in
       M.start ~constraint_constants
-        { parties = Inputs.Parties.of_parties_list parties
-        ; memo_hash = Signed_command_memo.hash c.memo
-        }
+        { parties; memo_hash = Signed_command_memo.hash c.memo }
         { perform } initial_state
     in
     let accounts () =
@@ -2631,9 +2647,9 @@ module For_tests = struct
       |> Unsigned.UInt32.(mul (of_int 2))
       |> Account.Nonce.to_uint32
     in
-    let parties : Parties.t =
+    let parties : Parties.Wire.t =
       { fee_payer =
-          { Party.Fee_payer.data =
+          { Party.Poly.data =
               { body =
                   { public_key = sender_pk
                   ; update = Party.Update.noop
@@ -2648,6 +2664,7 @@ module For_tests = struct
                   ; use_full_commitment = ()
                   }
               ; predicate = actual_nonce
+              ; caller = ()
               }
               (* Real signature added in below *)
           ; authorization = Signature.dummy
@@ -2669,6 +2686,7 @@ module For_tests = struct
                     ; use_full_commitment
                     }
                 ; predicate = Nonce (Account.Nonce.succ actual_nonce)
+                ; caller = Call
                 }
             ; authorization = None_given
             }
@@ -2687,6 +2705,7 @@ module For_tests = struct
                     ; use_full_commitment = false
                     }
                 ; predicate = Accept
+                ; caller = Call
                 }
             ; authorization = None_given
             }
@@ -2694,6 +2713,7 @@ module For_tests = struct
       ; memo = Signed_command_memo.empty
       }
     in
+    let parties = Parties.of_wire parties in
     let commitment = Parties.commitment parties in
     let full_commitment =
       Parties.Transaction_commitment.with_fee_payer commitment
@@ -2707,10 +2727,12 @@ module For_tests = struct
         (Random_oracle.Input.Chunked.field c)
     in
     let other_parties =
-      List.map parties.other_parties ~f:(fun party ->
+      Parties.Call_forest.map parties.other_parties ~f:(fun party ->
           match party.data.predicate with
           | Nonce _ ->
-              { party with authorization = Signature other_parties_signature }
+              { party with
+                authorization = Control.Signature other_parties_signature
+              }
           | _ ->
               party)
     in
