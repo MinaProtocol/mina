@@ -77,7 +77,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           let%map pk = Util.pub_key_of_node s in
           [%log info] "sender: %s" (pk_to_string pk))
     in
-    let tps = 1 in
+    let tps = 2 in
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
