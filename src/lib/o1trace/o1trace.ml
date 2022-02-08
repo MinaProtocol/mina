@@ -3,7 +3,11 @@ open Async
 include Intf
 
 type thread_timer =
-  { mutable elapsed : Time.Span.t; mutable last_start_time : Time.t option }
+  { name : string
+  ; parent : thread_timer option
+  ; mutable elapsed : Time.Span.t
+  ; mutable last_start_time : Time.t option
+  }
 [@@deriving sexp_of]
 
 let thread_timer : thread_timer Type_equal.Id.t =
@@ -27,18 +31,33 @@ module Thread_registry = struct
 end
 
 module Thread_timers = struct
-  let thread_timers = String.Table.create ()
+  module Maybe_string = Hashable.Make (struct
+    type t = string option [@@deriving compare, hash, sexp]
+  end)
 
-  let register name =
-    match Hashtbl.find thread_timers name with
+  let thread_timers : thread_timer Maybe_string.Table.t String.Table.t =
+    String.Table.create ()
+
+  let register ~name ~parent =
+    if not (Hashtbl.mem thread_timers name) then
+      Hashtbl.add_exn thread_timers ~key:name
+        ~data:(Maybe_string.Table.create ()) ;
+    let subkey = Option.map parent ~f:(fun p -> p.name) in
+    let subtable = Hashtbl.find_exn thread_timers name in
+    match Hashtbl.find subtable subkey with
     | Some timer ->
         timer
     | None ->
-        let timer = { elapsed = Time.Span.zero; last_start_time = None } in
-        Hashtbl.add_exn thread_timers ~key:name ~data:timer ;
+        let timer =
+          { name; elapsed = Time.Span.zero; last_start_time = None; parent }
+        in
+        Hashtbl.add_exn subtable ~key:subkey ~data:timer ;
         timer
 
-  let get_elapsed_time name = (Hashtbl.find_exn thread_timers name).elapsed
+  let get_elapsed_time name =
+    Hashtbl.find_exn thread_timers name
+    |> Hashtbl.data
+    |> List.sum (module Time.Span) ~f:(fun t -> t.elapsed)
 
   let iter_timed_threads ~f = Hashtbl.iter_keys thread_timers ~f
 end
@@ -99,10 +118,20 @@ let forget_tid f =
 (* execution timing *)
 
 let time_execution (name : string) (f : unit -> 'a) =
-  let timer = Thread_timers.register name in
+  let rec thread_name timer =
+    timer.name
+    ^ Option.value_map timer.parent ~default:"" ~f:(fun p ->
+          ":" ^ thread_name p)
+  in
   let ctx = Scheduler.current_execution_context () in
+  let parent = Execution_context.find_local ctx thread_timer in
+  let timer = Thread_timers.register ~name ~parent in
   let ctx = Execution_context.with_local ctx thread_timer (Some timer) in
-  let ctx = if ctx.tid = 0 then Thread_registry.assign_tid name ctx else ctx in
+  let ctx =
+    if ctx.tid = 0 || Option.is_some parent then
+      Thread_registry.assign_tid (thread_name timer) ctx
+    else ctx
+  in
   match Scheduler.within_context ctx f with
   | Error () ->
       failwithf "timing task `%s` failed, exception reported to parent monitor"
@@ -115,14 +144,18 @@ let time_execution (name : string) (f : unit -> 'a) =
 let trace_thread_switch (old_ctx : Execution_context.t)
     (new_ctx : Execution_context.t) =
   let now = lazy (Time.now ()) in
+  let rec update_timer elapsed_this_execution timer =
+    timer.elapsed <- Time.Span.(timer.elapsed + elapsed_this_execution) ;
+    Option.iter timer.parent ~f:(update_timer elapsed_this_execution)
+  in
   Option.iter (Execution_context.find_local old_ctx thread_timer)
     ~f:(fun timer ->
       let last_start_time = Option.value_exn timer.last_start_time in
       let elapsed_this_execution =
         Time.abs_diff (Lazy.force now) last_start_time
       in
-      timer.elapsed <- Time.Span.(timer.elapsed + elapsed_this_execution) ;
-      timer.last_start_time <- None) ;
+      timer.last_start_time <- None ;
+      update_timer elapsed_this_execution timer) ;
   Option.iter (Execution_context.find_local new_ctx thread_timer)
     ~f:(fun timer -> timer.last_start_time <- Some (Lazy.force now)) ;
   let (module M) = !implementation in

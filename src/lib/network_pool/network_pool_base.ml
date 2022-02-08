@@ -220,8 +220,7 @@ end)
     in
     (*proiority: Transition frontier diffs > local diffs > incomming diffs*)
     Deferred.don't_wait_for
-      (O1trace.time_execution
-         (Printf.sprintf "processing_%s_pool_diffs" Resource_pool.label)
+      (O1trace.time_execution (Printf.sprintf "in_%s" Resource_pool.label)
          (fun () ->
            Strict_pipe.Reader.Merge.iter
              [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
@@ -230,25 +229,30 @@ end)
                  (filter_verified ~log_rate_limiter:false local_diffs
                     network_pool ~f:(fun (diff, cb) ->
                       (Envelope.Incoming.local diff, Broadcast_callback.Local cb)))
-                 ~f:(fun d -> `Local d)
+                 ~f:(fun d -> `Diff d)
              ; Strict_pipe.Reader.map
                  (filter_verified ~log_rate_limiter:true incoming_diffs
                     network_pool ~f:(fun (diff, cb) ->
                       (diff, Broadcast_callback.External cb)))
-                 ~f:(fun d -> `Incoming d)
+                 ~f:(fun d -> `Diff d)
              ]
              ~f:(fun diff_source ->
                match diff_source with
-               | `Incoming (verified_diff, cb) ->
-                   apply_and_broadcast network_pool verified_diff cb
-               | `Local (verified_diff, cb) ->
-                   apply_and_broadcast network_pool verified_diff cb
+               | `Diff (verified_diff, cb) ->
+                   O1trace.time_execution
+                     (Printf.sprintf "processing_%s_diffs" Resource_pool.label)
+                     (fun () ->
+                       apply_and_broadcast network_pool verified_diff cb)
                | `Transition_frontier_extension diff ->
                    trace_recurring
                      (Resource_pool.label ^ "_handle_transition_frontier_diff")
                      (fun () ->
-                       Resource_pool.handle_transition_frontier_diff diff
-                         resource_pool)))) ;
+                       O1trace.time_execution
+                         (Printf.sprintf
+                            "processing_%s_transition_frontier_diffs"
+                            Resource_pool.label) (fun () ->
+                           Resource_pool.handle_transition_frontier_diff diff
+                             resource_pool))))) ;
     network_pool
 
   (* Rebroadcast locally generated pool items every 10 minutes. Do so for 50
