@@ -2495,7 +2495,7 @@ let%test_module "staged ledger tests" =
               in
               let memo_hash = Signed_command_memo.hash parties.memo in
               let other_parties_hash =
-                Parties.Party_or_stack.With_hashes.other_parties_hash
+                Parties.Call_forest.With_hashes.other_parties_hash
                   parties.other_parties
               in
               let sign_for_other_party ~use_full_commitment sk protocol_state =

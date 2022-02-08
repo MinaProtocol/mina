@@ -356,7 +356,8 @@ module type S = sig
     -> ledger
     -> Parties.t
     -> ( Transaction_applied.Parties_applied.t
-       * ( ( (Party.t, unit) Parties.Party_or_stack.t list
+       * ( ( (Party.t, unit) Parties.Call_forest.t
+           , (Party.t, unit) Parties.Call_forest.t list
            , Token_id.t
            , Amount.t
            , ledger
@@ -388,7 +389,8 @@ module type S = sig
     -> f:
          (   'acc
           -> Global_state.t
-             * ( (Party.t, unit) Parties.Party_or_stack.t list
+             * ( (Party.t, unit) Parties.Call_forest.t
+               , (Party.t, unit) Parties.Call_forest.t list
                , Token_id.t
                , Amount.t
                , ledger
@@ -1626,7 +1628,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     module Party = struct
       include Party
 
-      type parties = (Party.t, unit) Parties.Party_or_stack.t list
+      type parties = (Party.t, unit) Parties.Call_forest.t
 
       type transaction_commitment = Transaction_commitment.t
 
@@ -1658,27 +1660,24 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let set_or_keep ~if_:_ t x = set_or_keep t x
     end
 
-    module Parties = struct
-      module Opt = struct
-        type 'a t = 'a option
+    module Opt = struct
+      type 'a t = 'a option
 
-        let is_some = Option.is_some
+      let is_some = Option.is_some
 
-        let map = Option.map
+      let map = Option.map
 
-        let or_default ~if_ x ~default =
-          if_ (is_some x) ~then_:(Option.value ~default x) ~else_:default
+      let or_default ~if_ x ~default =
+        if_ (is_some x) ~then_:(Option.value ~default x) ~else_:default
 
-        let or_exn x = Option.value_exn x
-      end
+      let or_exn x = Option.value_exn x
+    end
 
-      type party_or_stack = (Party.t, unit) Parties.Party_or_stack.t
-
-      type t = party_or_stack list
-
-      let of_parties_list : Party.t list -> t =
-        Parties.Party_or_stack.of_parties_list
-          ~party_depth:(fun (p : Party.t) -> p.data.body.call_depth)
+    module Stack (Elt : sig
+      type t
+    end) =
+    struct
+      type t = Elt.t list
 
       let if_ = Parties.value_if
 
@@ -1686,38 +1685,50 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       let is_empty = List.is_empty
 
-      let pop_exn : t -> party_or_stack * t = function
+      let pop_exn : t -> Elt.t * t = function
         | [] ->
             failwith "pop_exn"
         | x :: xs ->
             (x, xs)
 
-      let as_stack : party_or_stack -> t option = function
-        | Party _ ->
-            None
-        | Stack (x, ()) ->
-            Some x
-
-      let pop_party_exn : t -> Party.t * t = function
-        | Party (x, ()) :: xs ->
-            (x, xs)
-        | _ ->
-            failwith "pop_party_exn"
-
-      let pop_stack : t -> (t * t) option = function
-        | Stack (x, ()) :: xs ->
+      let pop : t -> (Elt.t * t) option = function
+        | x :: xs ->
             Some (x, xs)
         | _ ->
             None
 
-      let push_stack x ~onto : t = Stack (x, ()) :: onto
+      let push x ~onto : t = x :: onto
     end
+
+    module Parties = struct
+      type t = (Party.t, unit) Parties.Call_forest.t
+
+      let empty = []
+
+      let if_ = Parties.value_if
+
+      let is_empty = List.is_empty
+
+      let of_parties_list : Party.t list -> t =
+        Parties.Call_forest.of_parties_list ~party_depth:(fun (p : Party.t) ->
+            p.data.body.call_depth)
+
+      let pop_exn : t -> (Party.t * t) * t = function
+        | { stack_hash = (); elt = { party; calls; party_digest = () } } :: xs
+          ->
+            ((party, calls), xs)
+        | _ ->
+            failwith "pop_exn"
+    end
+
+    module Call_stack = Stack (Parties)
 
     module Local_state = struct
       type failure_status = Transaction_status.Failure.t option
 
       type t =
         ( Parties.t
+        , Call_stack.t
         , Token_id.t
         , Amount.t
         , Ledger.t
@@ -1754,6 +1765,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; inclusion_proof : [ `Existing of location | `New ]
       ; local_state :
           ( Parties.t
+          , Call_stack.t
           , Token_id.t
           , Amount.t
           , L.t
