@@ -1541,9 +1541,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       type t = Public_key.Compressed.t
     end
 
-    module Global_slot = struct
-      include Mina_numbers.Global_slot
-    end
+    module Global_slot = Mina_numbers.Global_slot
 
     module Timing = struct
       type t = Party.Update.Timing_info.t option
