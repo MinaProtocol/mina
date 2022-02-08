@@ -191,37 +191,25 @@ Some open statements are heavily used, but their usage is concentrated in only a
 
 ### Moving
 
-The open statements are often all grouped at the beginning of the file. Sometimes, this is very far from the point of their first actual use, or the even in a scope that is too global compared to its real use. In some of these case, it makes sense to move it. For example in file `src/lib/network_pool/transaction_pool.ml` (a very large file), we can move two open statements hundres of line away so that their scope is narrower.
+The open statements are often all grouped at the beginning of the file. Sometimes, this is very far from the point of their first actual use, or the even in a scope that is too global compared to its real use. In some of these case, it makes sense to move it. Moving opens away from the beginning of the file can be risky though since it makes the rest of the code more dependent on the order of declaration. This can be mitigated by moving open statements to the beginning of their smallest necessary scope (for example a submodule) rather than to their first usage point. Choosing between these two strategies is done with the `placement` parameter of the configuration.
+
+For example in file `src/lib/snarky/src/base/typ.ml` (a large file), we can move an open statement in a submodule so that its scope is narrower.
 
 ```diff
-@@ -7,8 +7,6 @@
- open Async
- open Mina_base
- open Pipe_lib
--open Signature_lib
--open Network_peer
+@@ -1,5 +1,4 @@
+ open Core_kernel
+-open Types.Typ
  
- let max_per_15_seconds = 10
- 
-@@ -197,6 +195,7 @@
- 
- (* Functor over user command, base ledger and transaction validator for
-    mocking. *)
-+open Network_peer
- module Make0
-     (Base_ledger : Intf.Base_ledger_intf) (Staged_ledger : sig
-       type t
-@@ -1468,6 +1467,7 @@
-             ~conf_dir:None
-             ~pids:(Child_processes.Termination.create_pid_table ()))
- 
-+    open Signature_lib
-     module Mock_transition_frontier = struct
-       module Breadcrumb = struct
-         type t = Mock_staged_ledger.t
+ module Data_spec0 = struct
+   (** A list of {!type:Type.Typ.t} values, describing the inputs to a checked
+@@ -82,6 +81,7 @@
+                   and type ('a, 's, 'f) t :=
+                              ('a, 's, 'f) Checked.Types.As_prover.t) =
+ struct
++  open Types.Typ
+   type ('var, 'value, 'field) t =
+     ('var, 'value, 'field, (unit, unit, 'field) Checked.t) Types.Typ.t
 ```
-
-Moving opens away from the beginning of the file can be risky since it makes the rest of the code more dependent on the order of declaration. This can be mitigated by moving open statements to the beginning of their smallest necessary scope (for example a submodule) rather than to their first usage point.
 
 ## Perspectives
 
