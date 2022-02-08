@@ -72,6 +72,24 @@ module type Account_id_intf = sig
   val create : public_key -> token_id -> t
 end
 
+module type Global_slot_intf = sig
+  type t
+
+  type bool
+
+  val zero : t
+
+  val ( > ) : t -> t -> bool
+end
+
+module type Timing_intf = sig
+  include Iffable
+
+  type global_slot
+
+  val vesting_period : t -> global_slot
+end
+
 module type Token_id_intf = sig
   include Iffable
 
@@ -167,6 +185,18 @@ module Local_state = struct
   end
 end
 
+module type Set_or_keep_intf = sig
+  type _ t
+
+  type bool
+
+  val is_set : _ t -> bool
+
+  val is_keep : _ t -> bool
+
+  val set_or_keep : if_:(bool -> then_:'a -> else_:'a -> 'a) -> 'a t -> 'a -> 'a
+end
+
 module type Party_intf = sig
   type t
 
@@ -209,7 +239,15 @@ module type Party_intf = sig
     -> commitment:transaction_commitment
     -> at_party:parties
     -> t
-    -> [ `Signature_verifies of bool ]
+    -> [ `Proof_verifies of bool ] * [ `Signature_verifies of bool ]
+
+  module Update : sig
+    type _ set_or_keep
+
+    type timing
+
+    val timing : t -> timing set_or_keep
+  end
 end
 
 module type Opt_intf = sig
@@ -306,6 +344,20 @@ module type Ledger_intf = sig
     public_key -> token_id -> account * inclusion_proof -> [ `Is_new of bool ]
 end
 
+module type Account_intf = sig
+  type bool
+
+  type t
+
+  type timing
+
+  val timing : t -> timing
+
+  val set_timing : timing -> t -> t
+
+  val token_owner : t -> bool
+end
+
 module Eff = struct
   type (_, _) t =
     | Check_predicate :
@@ -367,13 +419,17 @@ module type Inputs_intf = sig
        and type public_key := Public_key.t
        and type token_id := Token_id.t
 
+  module Set_or_keep : Set_or_keep_intf with type bool := Bool.t
+
   module Protocol_state_predicate : Protocol_state_predicate_intf
 
-  module Account : sig
-    type t
+  module Global_slot : Global_slot_intf with type bool := Bool.t
 
-    val token_owner : t -> Bool.t
-  end
+  module Timing :
+    Timing_intf with type bool := Bool.t and type global_slot := Global_slot.t
+
+  module Account :
+    Account_intf with type timing := Timing.t and type bool := Bool.t
 
   module Party :
     Party_intf
@@ -384,6 +440,8 @@ module type Inputs_intf = sig
        and type account := Account.t
        and type public_key := Public_key.t
        and type account_id := Account_id.t
+       and type Update.timing := Timing.t
+       and type 'a Update.set_or_keep := 'a Set_or_keep.t
 
   module Ledger :
     Ledger_intf
@@ -481,6 +539,18 @@ module Make (Inputs : Inputs_intf) = struct
 
   let assert_ = Bool.Assert.is_true
 
+  (* Pop from the call stack, returning dummy values if the stack is empty. *)
+  let pop_call_stack (s : Call_stack.t) : Stack_frame.t * Call_stack.t =
+    let res = Call_stack.pop s in
+    (* Split out the option returned by Call_stack.pop into two options *)
+    let next_frame, next_call_stack =
+      (Opt.map ~f:fst res, Opt.map ~f:snd res)
+    in
+    (* Handle the None cases *)
+    ( Opt.or_default ~if_:Stack_frame.if_ ~default:stack_frame_default next_frame
+    , Opt.or_default ~if_:Call_stack.if_ ~default:Call_stack.empty
+        next_call_stack )
+
   let get_next_party (current_forest : Stack_frame.t)
       (* The stack for the most recent snapp *)
         (call_stack : Call_stack.t) (* The partially-completed parent stacks *)
@@ -491,16 +561,7 @@ module Make (Inputs : Inputs_intf) = struct
     let current_forest, call_stack =
       let next_forest, next_call_stack =
         (* Invariant: call_stack contains only non-empty forests. *)
-        let res = Call_stack.pop call_stack in
-        let next_forest =
-          Opt.or_default ~if_:Stack_frame.if_ ~default:stack_frame_default
-            (Opt.map ~f:fst res)
-        in
-        let next_call_stack =
-          Opt.or_default ~if_:Call_stack.if_ ~default:Call_stack.empty
-            (Opt.map ~f:snd res)
-        in
-        (next_forest, next_call_stack)
+        pop_call_stack call_stack
       in
       (* TODO: I believe current should only be empty for the first party in
          a transaction. *)
@@ -553,7 +614,7 @@ module Make (Inputs : Inputs_intf) = struct
     let remainder_of_current_forest_empty =
       Ps.is_empty remainder_of_current_forest
     in
-    let popped_call_stack = Call_stack.pop call_stack in
+    let newly_popped_frame, popped_call_stack = pop_call_stack call_stack in
     let remainder_of_current_forest_frame : Stack_frame.t =
       Stack_frame.make
         ~caller:(Stack_frame.caller current_forest)
@@ -565,10 +626,8 @@ module Make (Inputs : Inputs_intf) = struct
         ~then_:
           (Call_stack.if_ remainder_of_current_forest_empty
              ~then_:
-               ((* Don't actually need this or_default in this case. *)
-                Opt.or_default ~if_:Call_stack.if_ ~default:Call_stack.empty
-                  (Opt.map popped_call_stack ~f:snd))
-             ~else_:call_stack)
+               (* Don't actually need the or_default used in this case. *)
+               popped_call_stack ~else_:call_stack)
         ~else_:
           (Call_stack.if_ remainder_of_current_forest_empty ~then_:call_stack
              ~else_:
@@ -579,10 +638,7 @@ module Make (Inputs : Inputs_intf) = struct
       Stack_frame.if_ party_forest_empty
         ~then_:
           (Stack_frame.if_ remainder_of_current_forest_empty
-             ~then_:
-               (Opt.or_default ~if_:Stack_frame.if_ ~default:stack_frame_default
-                  (Opt.map popped_call_stack ~f:fst))
-             ~else_:remainder_of_current_forest_frame)
+             ~then_:newly_popped_frame ~else_:remainder_of_current_forest_frame)
         ~else_:
           (Stack_frame.make ~calls:party_forest
              ~caller:
@@ -712,7 +768,7 @@ module Make (Inputs : Inputs_intf) = struct
         (Check_protocol_state_predicate
            (Party.protocol_state party, global_state))
     in
-    let (`Signature_verifies signature_verifies) =
+    let `Proof_verifies _, `Signature_verifies signature_verifies =
       let commitment =
         Inputs.Transaction_commitment.if_
           (Inputs.Party.use_full_commitment party)
@@ -738,6 +794,23 @@ module Make (Inputs : Inputs_intf) = struct
     let (`Is_new account_is_new) =
       Inputs.Ledger.check_account (Party.public_key party)
         (Party.token_id party) (a, inclusion_proof)
+    in
+    (* Set account timing for new accounts, if specified. *)
+    let a, local_state =
+      let timing = Party.Update.timing party in
+      let local_state =
+        Local_state.add_check local_state
+          Update_not_permitted_timing_existing_account
+          Bool.(account_is_new ||| Set_or_keep.is_keep timing)
+      in
+      let timing =
+        Set_or_keep.set_or_keep ~if_:Timing.if_ timing (Account.timing a)
+      in
+      let vesting_period = Timing.vesting_period timing in
+      (* Assert that timing is valid, otherwise we may have a division by 0. *)
+      assert_ Global_slot.(vesting_period > zero) ;
+      let a = Account.set_timing timing a in
+      (a, local_state)
     in
     let a', update_permitted, failure_status =
       h.perform

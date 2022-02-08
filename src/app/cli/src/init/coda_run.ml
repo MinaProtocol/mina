@@ -1,6 +1,5 @@
 open Core
 open Async
-open Signature_lib
 open O1trace
 module Graphql_cohttp_async =
   Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
@@ -382,15 +381,6 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return (Mina_lib.visualize_frontier ~filename coda))
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
         (fun () filename -> return (Mina_base.Ledger.Debug.visualize ~filename))
-    ; implement Daemon_rpcs.Set_staking.rpc (fun () keypairs ->
-          let keypair_and_compressed_key =
-            List.map keypairs
-              ~f:(fun ({ Keypair.Stable.Latest.public_key; _ } as keypair) ->
-                (keypair, Public_key.compress public_key))
-          in
-          Mina_lib.replace_block_production_keypairs coda
-            (Keypair.And_compressed_pk.Set.of_list keypair_and_compressed_key) ;
-          Deferred.unit)
     ; implement Daemon_rpcs.Add_trustlist.rpc (fun () cidr ->
           return
             (let cidr_str = Unix.Cidr.to_string cidr in
