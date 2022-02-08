@@ -62,7 +62,7 @@ The rules are up to change, but we propose the following set as a first step. Th
     ;   ... it exports few different identifiers, and...
     (and (<= symbols 5)
          ; ... it is used enough times, and...
-         (>= uses 15)
+         (>= uses 10)
          ; ... it only exports direct symbols, not from submodules, and...
          (not exports-subvalues)
          ; ... it does not exports types (avoid using ppx_import).
@@ -125,23 +125,19 @@ Some open statements are just not used enough to justify their existence. For ex
 
 ### Structure
 
-When a global statement is used a lot but only for a referring to a few different symbols from the opened module, we can make this set of symbols explicit by using a structured open. For example, in file `src/lib/pickles_types/hlist.ml`, we obtain:
+When a global statement is used a lot but only for a referring to a few different symbols from the opened module, we can make this set of symbols explicit by using a structured open. For example, in file `src/lib/snarky/ppx/snarky_module.ml`, we open the `Location` to use a single of its values. Hence we can do:
 
 ```diff
+@@ -1,5 +1,9 @@
  open Core_kernel
--open Poly_types
+-open Location
 +open struct
-+  open Poly_types
-+  module type T4 = T4
-+  module type T3 = T3
-+  module type T2 = T2
-+  module type T0 = T0
-+  module type T1 = T1
++  open Location
++  let raise_errorf = raise_errorf
 +end
 +
- 
- module E13 (T : T1) = struct
-   type ('a, _, _) t = 'a T.t
+ open Ppxlib
+ open Ast_helper
 ```
 
 Note that currently, the `structure` rule does not match if one of the symbols is a type, even though it would be very useful (often a module is opened only for its single type `t`). This is because opening a type alias does not export the constructures or fields of the original type. Hence in the structured open, we would have to explicitly copy the whole definition of the original type, which would arguably defeat the legibility purpose. Another possibility is the usage of `ppx_import` or `ppx_open`. However this would add new ppxs in the Mina codebase (staged ppxs even, which slow down the compilation since they need access to type information), which would again go against legibility.
