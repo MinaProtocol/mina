@@ -1270,14 +1270,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Pos when not is_new ->
           Ok a.timing
       | _ ->
-          let txn_amount =
-            match balance_change.sgn with
-            | Pos ->
-                Amount.zero
-            | Neg ->
-                balance_change.magnitude
-          in
-          validate_timing ~txn_amount
+          validate_timing ~txn_amount:Amount.zero
             ~txn_global_slot:state_view.global_slot_since_genesis ~account:a
           |> Result.map_error ~f:timing_error_to_user_command_status
     in
