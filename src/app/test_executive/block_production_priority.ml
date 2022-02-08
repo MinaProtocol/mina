@@ -21,7 +21,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { Block_producer.balance = "9999999"; timing = Untimed }
         :: List.init 10
              ~f:(const { Block_producer.balance = "0"; timing = Untimed })
-    ; num_snark_workers = 0
+    ; num_snark_workers = 1
     ; aux_account_balance = Some "1000"
     ; txpool_max_size = 10_000_000
     }
