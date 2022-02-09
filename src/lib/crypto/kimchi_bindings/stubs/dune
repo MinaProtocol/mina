@@ -24,8 +24,7 @@
     RUSTFLAGS
     "-C target-feature=+bmi2,+adx"
     (run cargo build --release))
-   (no-infer ;; dune doesn't know about the file we're copying
-    (copy %{read:cargo-target-path}/release/libwires_15_stubs.a .)))))
+   (run cp %{read:cargo-target-path}/release/libwires_15_stubs.a .))))
 
 ;; library
 
