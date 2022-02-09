@@ -963,10 +963,19 @@ module Protocol_state = struct
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
+    let token_id obj =
+      iso ~map:Token_id.of_uint64 ~contramap:Token_id.to_uint64
+        (uint64 @@ o ())
+        obj
+    in
+    let block_time obj =
+      iso_string ~name:"BlockTime" ~of_string:Block_time.of_string_exn
+        ~to_string:Block_time.to_string obj
+    in
     Poly.Fields.make_creator obj
       ~snarked_ledger_hash:!.(Or_ignore.deriver field)
-      ~snarked_next_available_token:!.(Numeric.deriver uint64)
-      ~timestamp:!.(Numeric.deriver uint64)
+      ~snarked_next_available_token:!.(Numeric.deriver token_id)
+      ~timestamp:!.(Numeric.deriver block_time)
       ~blockchain_length:!.(Numeric.deriver uint32)
       ~min_window_density:!.(Numeric.deriver uint32)
       ~last_vrf_output:!.unit
@@ -1264,6 +1273,12 @@ module Protocol_state = struct
     ; staking_epoch_data = epoch_data
     ; next_epoch_data = epoch_data
     }
+
+  let%test_unit "json roundtrip" =
+    let predicate = accept in
+    let module Fd = Fields_derivers_snapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
 
   let check
       (* Bind all the fields explicity so we make sure they are all used. *)
