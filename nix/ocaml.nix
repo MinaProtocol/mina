@@ -58,8 +58,13 @@ let
   filtered-src = with inputs.nix-filter.lib;
     filter {
       root = ../.;
-      include = [ "src" "dune" "dune-project" ];
+      include = [ "src" "dune" "dune-project" "./graphql_schema.json" ];
     };
+
+  dockerfiles-scripts = path {
+    path = filterSource (name: type:
+    hasPrefix (toString (../. + "/dockerfiles")) name) ../.;
+  };
 
   overlay = self: super:
     let
@@ -106,13 +111,24 @@ let
         '';
 
         buildPhase = ''
-          dune build --display=short src/app/logproc/logproc.exe src/app/cli/src/mina.exe -j$NIX_BUILD_CORES
+          dune build --display=short src/app/logproc/logproc.exe src/app/cli/src/mina.exe src/app/cli/src/mina_testnet_signatures.exe src/app/cli/src/mina_mainnet_signatures.exe src/app/rosetta/rosetta.exe src/app/rosetta/rosetta_testnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe -j$NIX_BUILD_CORES
+          dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
         '';
 
+        outputs = [ "out" "mainnet" "testnet" "genesis" ];
+
         installPhase = ''
-          mkdir -p $out/bin
-          mv _build/default/src/app/{logproc/logproc.exe,cli/src/mina.exe} $out/bin
-          remove-references-to -t $(dirname $(dirname $(command -v ocaml))) $out/bin/*
+          mkdir -p $out/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda
+          mv _build/default/src/app/cli/src/mina.exe $out/bin/mina
+          mv _build/default/src/app/logproc/logproc.exe $out/bin/logproc
+          mv _build/default/src/app/rosetta/rosetta.exe $out/bin/rosetta
+          mv _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe $genesis/bin/runtime_genesis_ledger
+          mv _build/default/src/app/cli/src/mina_mainnet_signatures.exe $mainnet/bin/mina_mainnet_signatures
+          mv _build/default/src/app/rosetta/rosetta_mainnet_signatures.exe $mainnet/bin/rosetta_mainnet_signatures
+          mv _build/default/src/app/cli/src/mina_testnet_signatures.exe $testnet/bin/mina_testnet_signatures
+          mv _build/default/src/app/rosetta/rosetta_testnet_signatures.exe $testnet/bin/rosetta_testnet_signatures
+          mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
+          remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$mainnet/bin/*,$testnet/bin*,$genesis/bin/*}
         '';
       } // pkgs.lib.optionalAttrs static { OCAMLPARAM = "_,ccopt=-static"; }
         // pkgs.lib.optionalAttrs pkgs.stdenv.isDarwin {
@@ -122,6 +138,7 @@ let
       mina_tests = self.mina.overrideAttrs (oa: {
         pname = "mina_tests";
         src = filtered-src;
+        outputs = [ "out" ];
         MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
         TZDIR = "${pkgs.tzdata}/share/zoneinfo";
         nativeBuildInputs = oa.nativeBuildInputs ++ [ pkgs.ephemeralpg ];
@@ -149,6 +166,33 @@ let
         installPhase = ''
           mkdir -p $out/share/client_sdk
           mv _build/default/src/app/client_sdk/client_sdk.bc.js $out/share/client_sdk
+        '';
+      };
+
+      mina_build_config = pkgs.stdenv.mkDerivation {
+        pname = "mina_build_config";
+        version = "dev";
+        src = filtered-src;
+        nativeBuildInputs = [ pkgs.rsync ];
+
+        installPhase = ''
+          mkdir -p $out/etc/coda/build_config
+          cp src/config/mainnet.mlh $out/etc/coda/build_config/BUILD.mlh
+          rsync -Huav src/config/* $out/etc/coda/build_config/.
+        '';
+      };
+
+      mina_daemon_scripts = pkgs.stdenv.mkDerivation {
+        pname = "mina_daemon_scripts";
+        version = "dev";
+        src = dockerfiles-scripts;
+        buildInputs = [ pkgs.bash pkgs.python3 ];
+        installPhase = ''
+          mkdir -p $out/healthcheck $out/entrypoint.d
+          mv dockerfiles/scripts/healthcheck-utilities.sh $out/healthcheck/utilities.sh
+          mv dockerfiles/scripts/cron_job_dump_ledger.sh $out/cron_job_dump_ledger.sh
+          mv dockerfiles/scripts/daemon-entrypoint.sh $out/entrypoint.sh
+          mv dockerfiles/puppeteer-context/* $out/
         '';
       };
     };
