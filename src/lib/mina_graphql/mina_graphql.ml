@@ -3672,6 +3672,10 @@ module Mutations = struct
           ]
       ~resolve:(fun { ctx = coda; _ } () privkey_path password ->
         let open Deferred.Result.Let_syntax in
+        (* the Keypair.read zeroes the password, so copy for use in import step below *)
+        let saved_password =
+          Lazy.return (Deferred.return (Bytes.of_string password))
+        in
         let password =
           Lazy.return (Deferred.return (Bytes.of_string password))
         in
@@ -3686,7 +3690,8 @@ module Mutations = struct
             return (pk, true)
         | None ->
             let%map.Async.Deferred pk =
-              Secrets.Wallets.import_keypair wallets keypair ~password
+              Secrets.Wallets.import_keypair wallets keypair
+                ~password:saved_password
             in
             Ok (pk, false))
 
