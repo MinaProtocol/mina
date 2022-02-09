@@ -21,7 +21,7 @@ source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 cd "${SCRIPTPATH}/../_build"
 
 # Set dependencies based on debian release
-SHARED_DEPS="libssl1.1, libgmp10, libgomp1, libffi6"
+SHARED_DEPS="libssl1.1, libgmp10, libgomp1, libffi6, tzdata"
 case "${MINA_DEB_CODENAME}" in
   buster)
     DAEMON_DEPS=", libjemalloc2, libpq-dev, libprocps7"

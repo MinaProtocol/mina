@@ -1,5 +1,5 @@
 (library
- (name hash_prefix_states_nonconsensus)
+ (name hash_prefix_states)
  (public_name hash_prefix_states_nonconsensus)
  (library_flags -linkall)
  (inline_tests)

@@ -59,7 +59,7 @@ clean:
 	$(info Removing previous build artifacts)
 	@rm -rf _build
 	@rm -rf src/$(COVERAGE_DIR)
-	@rm -rf src/app/libp2p_helper/result
+	@rm -rf src/app/libp2p_helper/result src/libp2p_ipc/libp2p_ipc.capnp.go
 
 # enforces the OCaml version being used
 ocaml_version:

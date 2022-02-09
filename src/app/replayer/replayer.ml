@@ -48,6 +48,13 @@ module type Get_command_ids = sig
     -> (int list, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
 end
 
+type balance_block_data =
+  { block_id : int
+  ; block_height : int64
+  ; sequence_no : int
+  ; secondary_sequence_no : int
+  }
+
 let error_count = ref 0
 
 let constraint_constants = Genesis_constants.Constraint_constants.compiled
@@ -160,20 +167,25 @@ let pk_of_pk_id pool pk_id : Account.key Deferred.t =
           failwithf "Error retrieving public key with id %d, error: %s" pk_id
             (Caqti_error.show msg) () )
 
-let balance_of_id_and_pk_id pool ~id ~pk_id : Currency.Balance.t Deferred.t =
-  let open Deferred.Let_syntax in
-  match%map
-    Caqti_async.Pool.use (fun db -> Sql.Balance.run db ~id ~pk_id) pool
-  with
-  | Ok (Some balance) ->
-      balance |> Unsigned.UInt64.of_int64 |> Currency.Balance.of_uint64
-  | Ok None ->
-      failwithf "Could not find balance with id %d and public key %d" id pk_id
-        ()
-  | Error msg ->
-      failwithf
-        "Error retrieving balance with id %d and public key %d, error: %s" id
-        pk_id (Caqti_error.show msg) ()
+let balance_info_of_id pool ~id =
+  query_db pool
+    ~f:(fun db -> Archive_lib.Processor.Balance.load db ~id)
+    ~item:"balance info of id"
+
+let internal_command_to_balance_block_data
+    (internal_cmd : Sql.Internal_command.t) =
+  { block_id = internal_cmd.block_id
+  ; block_height = internal_cmd.block_height
+  ; sequence_no = internal_cmd.sequence_no
+  ; secondary_sequence_no = internal_cmd.secondary_sequence_no
+  }
+
+let user_command_to_balance_block_data (user_cmd : Sql.User_command.t) =
+  { block_id = user_cmd.block_id
+  ; block_height = user_cmd.block_height
+  ; sequence_no = user_cmd.sequence_no
+  ; secondary_sequence_no = 0
+  }
 
 let process_block_infos_of_state_hash ~logger pool state_hash ~f =
   match%bind
@@ -303,12 +315,16 @@ let cache_fee_transfer_via_coinbase pool (internal_cmd : Sql.Internal_command.t)
   | _ ->
       Deferred.unit
 
+(* balance_block_data come from a loaded internal or user command, which
+    includes data from the blocks table and
+    - for internal commands, the tables internal_commands and blocks_internals_commands
+    - for user commands, the tables user_commands and blocks_user_commands
+   we compare those against the same-named values in the balances row
+*)
 let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
-    ~continue_on_error =
+    ~balance_block_data ~continue_on_error =
   let%bind pk = pk_of_pk_id pool pk_id in
-  let%map claimed_balance =
-    balance_of_id_and_pk_id pool ~id:balance_id ~pk_id
-  in
+  let%map balance_info = balance_info_of_id pool ~id:balance_id in
   let token = token_int64 |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64 in
   let account_id = Account_id.create pk token in
   let actual_balance =
@@ -329,12 +345,58 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
           (Signature_lib.Public_key.Compressed.to_base58_check pk)
           (Token_id.to_string token) ()
   in
+  let claimed_balance =
+    balance_info.balance |> Unsigned.UInt64.of_int64
+    |> Currency.Balance.of_uint64
+  in
   if not (Currency.Balance.equal actual_balance claimed_balance) then (
     [%log error] "Claimed balance does not match actual balance in ledger"
       ~metadata:
         [ ("who", `String who)
         ; ("claimed_balance", Currency.Balance.to_yojson claimed_balance)
         ; ("actual_balance", Currency.Balance.to_yojson actual_balance)
+        ] ;
+    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
+  let { block_id; block_height; sequence_no; secondary_sequence_no } =
+    balance_block_data
+  in
+  if not (block_id = balance_info.block_id) then (
+    [%log error]
+      "Block id from command does not match block id in balances table"
+      ~metadata:
+        [ ("who", `String who)
+        ; ("block_id_command", `Int block_id)
+        ; ("block_id_balances", `Int balance_info.block_id)
+        ] ;
+    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
+  if not (Int64.equal block_height balance_info.block_height) then (
+    [%log error]
+      "Block height from command does not match block height in balances table"
+      ~metadata:
+        [ ("who", `String who)
+        ; ("block_height_command", `String (Int64.to_string block_height))
+        ; ( "block_height_balances"
+          , `String (Int64.to_string balance_info.block_height) )
+        ] ;
+    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
+  if not (sequence_no = balance_info.block_sequence_no) then (
+    [%log error]
+      "Sequence no from command does not match sequence no in balances table"
+      ~metadata:
+        [ ("who", `String who)
+        ; ("block_sequence_no_command", `Int sequence_no)
+        ; ("block_sequence_no_balances", `Int balance_info.block_sequence_no)
+        ] ;
+    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
+  if not (secondary_sequence_no = balance_info.block_secondary_sequence_no) then (
+    [%log error]
+      "Secondary sequence no from command does not match secondary sequence no \
+       in balances table"
+      ~metadata:
+        [ ("who", `String who)
+        ; ("block_secondary_sequence_no_command", `Int secondary_sequence_no)
+        ; ( "block_secondary_sequence_no_balances"
+          , `Int balance_info.block_secondary_sequence_no )
         ] ;
     if continue_on_error then incr error_count else Core_kernel.exit 1 )
 
@@ -345,9 +407,11 @@ let account_creation_fee_int64 =
   Currency.Fee.to_int constraint_constants.account_creation_fee |> Int64.of_int
 
 let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
-    ~balance_id ~pk_id ~fee ~continue_on_error =
-  let%map claimed_balance =
-    balance_of_id_and_pk_id pool ~id:balance_id ~pk_id
+    ~balance_id ~fee ~continue_on_error =
+  let%map balance_info = balance_info_of_id pool ~id:balance_id in
+  let claimed_balance =
+    balance_info.balance |> Unsigned.UInt64.of_int64
+    |> Currency.Balance.of_uint64
   in
   let balance_uint64 = Currency.Balance.to_uint64 claimed_balance in
   let fee_uint64 = Currency.Fee.to_uint64 fee in
@@ -457,9 +521,10 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
   let balance_id = cmd.receiver_balance_id in
   let token_int64 = cmd.token in
   let receiver_account_creation_fee = cmd.receiver_account_creation_fee_paid in
+  let balance_block_data = internal_command_to_balance_block_data cmd in
   let%bind () =
     verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
-      ~balance_id ~pk_id ~fee ~continue_on_error
+      ~balance_id ~fee ~continue_on_error
   in
   let open Mina_base.Ledger in
   match cmd.type_ with
@@ -474,7 +539,8 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       match undo_or_error with
       | Ok _undo ->
           verify_balance ~logger ~pool ~ledger ~who:"fee transfer receiver"
-            ~balance_id ~pk_id ~token_int64 ~continue_on_error
+            ~balance_id ~pk_id ~token_int64 ~balance_block_data
+            ~continue_on_error
       | Error err ->
           fail_on_error err )
   | "coinbase" -> (
@@ -500,7 +566,8 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       match undo_or_error with
       | Ok _undo ->
           verify_balance ~logger ~pool ~ledger ~who:"coinbase receiver"
-            ~balance_id ~pk_id ~token_int64 ~continue_on_error
+            ~balance_id ~pk_id ~token_int64 ~balance_block_data
+            ~continue_on_error
       | Error err ->
           fail_on_error err )
   | "fee_transfer_via_coinbase" ->
@@ -541,14 +608,16 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger ~continue_on_error
   in
   match applied_or_error with
   | Ok _ ->
+      let balance_block_data = internal_command_to_balance_block_data cmd1 in
       let%bind () =
         verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (1)"
           ~balance_id:cmd1.receiver_balance_id ~pk_id:cmd1.receiver_id
-          ~token_int64:cmd1.token ~continue_on_error
+          ~token_int64:cmd1.token ~balance_block_data ~continue_on_error
       in
+      let balance_block_data = internal_command_to_balance_block_data cmd2 in
       verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (2)"
         ~balance_id:cmd2.receiver_balance_id ~pk_id:cmd2.receiver_id
-        ~token_int64:cmd2.token ~continue_on_error
+        ~token_int64:cmd2.token ~balance_block_data ~continue_on_error
   | Error err ->
       Error.tag_arg err "Error applying combined fee transfer"
         ("sequence number", cmd1.sequence_no)
@@ -674,11 +743,13 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
         | _, None ->
             cmd.token
       in
+      let balance_block_data = user_command_to_balance_block_data cmd in
       let%bind () =
         match cmd.source_balance_id with
         | Some balance_id ->
             verify_balance ~logger ~pool ~ledger ~who:"source" ~balance_id
-              ~pk_id:cmd.source_id ~token_int64 ~continue_on_error
+              ~pk_id:cmd.source_id ~token_int64 ~balance_block_data
+              ~continue_on_error
         | None ->
             return ()
       in
@@ -686,13 +757,14 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
         match cmd.receiver_balance_id with
         | Some balance_id ->
             verify_balance ~logger ~pool ~ledger ~who:"receiver" ~balance_id
-              ~pk_id:cmd.receiver_id ~token_int64 ~continue_on_error
+              ~pk_id:cmd.receiver_id ~token_int64 ~balance_block_data
+              ~continue_on_error
         | None ->
             return ()
       in
       verify_balance ~logger ~pool ~ledger ~who:"fee payer"
         ~balance_id:cmd.fee_payer_balance_id ~pk_id:cmd.fee_payer_id
-        ~token_int64:cmd.fee_token ~continue_on_error
+        ~token_int64:cmd.fee_token ~balance_block_data ~continue_on_error
   | Error err ->
       Error.tag_arg err "User command failed on replay"
         ( ("global slot_since_genesis", cmd.global_slot_since_genesis)

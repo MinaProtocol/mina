@@ -128,33 +128,53 @@ module Make (Engine : Intf.Engine.S) = struct
       [%log error] "%s" error_str ;
       Malleable_error.soft_error ~value:() (Error.of_string error_str)
 
-  let check_peer_connectivity ~nodes_by_peer_id ~peer_id ~connected_peers =
-    let get_node_id p =
-      p |> String.Map.find_exn nodes_by_peer_id |> Engine.Network.Node.id
-    in
-    let expected_peers =
-      nodes_by_peer_id |> String.Map.keys
-      |> List.filter ~f:(fun p -> not (String.equal p peer_id))
-    in
-    Malleable_error.List.iter expected_peers ~f:(fun p ->
-        let error =
-          Printf.sprintf "node %s (id=%s) is not connected to node %s (id=%s)"
-            (get_node_id peer_id) peer_id (get_node_id p) p
-          |> Error.of_string
-        in
-        Malleable_error.ok_if_true
-          (List.mem connected_peers p ~equal:String.equal)
-          ~error_type:`Hard ~error)
+  module X = struct
+    include String
 
-  let check_peers ~logger nodes =
+    type display = string [@@deriving yojson]
+
+    let display = Fn.id
+
+    let name = Fn.id
+  end
+
+  module G = Visualization.Make_ocamlgraph (X)
+
+  let graph_of_adjacency_list (adj : (string * string list) list) =
+    List.fold adj ~init:G.empty ~f:(fun acc (x, xs) ->
+        let acc = G.add_vertex acc x in
+        List.fold xs ~init:acc ~f:(fun acc y ->
+            let acc = G.add_vertex acc y in
+            G.add_edge acc x y))
+
+  let fetch_connectivity_data ~logger nodes =
     let open Malleable_error.Let_syntax in
-    let%bind nodes_and_responses =
-      Malleable_error.List.map nodes ~f:(fun node ->
-          let%map response =
-            Engine.Network.Node.must_get_peer_id ~logger node
+    Malleable_error.List.map nodes ~f:(fun node ->
+        let%map response = Engine.Network.Node.must_get_peer_id ~logger node in
+        (node, response))
+
+  let assert_peers_completely_connected nodes_and_responses =
+    (* this check checks if every single peer in the network is connected to every other peer, in graph theory this network would be a complete graph.  this property will only hold true on small networks *)
+    let check_peer_connected_to_all_others ~nodes_by_peer_id ~peer_id
+        ~connected_peers =
+      let get_node_id p =
+        p |> String.Map.find_exn nodes_by_peer_id |> Engine.Network.Node.id
+      in
+      let expected_peers =
+        nodes_by_peer_id |> String.Map.keys
+        |> List.filter ~f:(fun p -> not (String.equal p peer_id))
+      in
+      Malleable_error.List.iter expected_peers ~f:(fun p ->
+          let error =
+            Printf.sprintf "node %s (id=%s) is not connected to node %s (id=%s)"
+              (get_node_id peer_id) peer_id (get_node_id p) p
+            |> Error.of_string
           in
-          (node, response))
+          Malleable_error.ok_if_true
+            (List.mem connected_peers p ~equal:String.equal)
+            ~error_type:`Hard ~error)
     in
+
     let nodes_by_peer_id =
       nodes_and_responses
       |> List.map ~f:(fun (node, (peer_id, _)) -> (peer_id, node))
@@ -162,5 +182,26 @@ module Make (Engine : Intf.Engine.S) = struct
     in
     Malleable_error.List.iter nodes_and_responses
       ~f:(fun (_, (peer_id, connected_peers)) ->
-        check_peer_connectivity ~nodes_by_peer_id ~peer_id ~connected_peers)
+        check_peer_connected_to_all_others ~nodes_by_peer_id ~peer_id
+          ~connected_peers)
+
+  let assert_peers_cant_be_partitioned ~max_disconnections nodes_and_responses =
+    (* this check checks that the network does NOT become partitioned into isolated subgraphs, even if n nodes are hypothetically removed from the network.*)
+    let _, responses = List.unzip nodes_and_responses in
+    let open Graph_algorithms in
+    let () =
+      Out_channel.with_file "/tmp/network-graph.dot" ~f:(fun c ->
+          G.output_graph c (graph_of_adjacency_list responses))
+    in
+    (* Check that the network cannot be disconnected by removing up to max_disconnections number of nodes. *)
+    match
+      Nat.take
+        (Graph_algorithms.connectivity (module String) responses)
+        max_disconnections
+    with
+    | `Failed_after n ->
+        Malleable_error.hard_error_format
+          "The network could be disconnected by removing %d node(s)" n
+    | `Ok ->
+        Malleable_error.return ()
 end

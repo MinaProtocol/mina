@@ -1,19 +1,7 @@
 (* stake_delegation.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Signature_lib
-
-[%%else]
-
-open Signature_lib_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
 
 [%%versioned
 module Stable = struct
