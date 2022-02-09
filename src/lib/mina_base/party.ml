@@ -607,43 +607,18 @@ module Body = struct
     let open Fields_derivers_snapps in
     array field obj
 
-  (** WIP: Clean this up after getting some eyes on it. Is this correct? *)
-  let balance_change_to_string
-      (balance_change : (Amount.t, Sgn.t) Signed_poly.t) =
-    let magnitude =
-      Currency.Amount.to_uint64 balance_change.magnitude
-      |> Unsigned.UInt64.to_int64
-    in
-    match balance_change.sgn with
-    | Sgn.Pos ->
-        magnitude
-    | Sgn.Neg ->
-        Int64.neg magnitude
-
-  let balance_change_of_string (balance_change_s : string) =
-    let balance_change = Int64.of_string balance_change_s in
-    let magnitude =
-      balance_change |> Int64.abs |> Unsigned.UInt64.of_int64
-      |> Currency.Amount.of_uint64
-    in
-    let sgn = if Int64.is_negative balance_change then Sgn.Neg else Sgn.Pos in
-    Currency.Signed_poly.{ magnitude; sgn }
-
-  let balance_to_string (balance_change : (Amount.t, Sgn.t) Signed_poly.t) =
-    balance_change |> balance_change_to_string |> Int64.to_string
+  let fail _ = failwith "TODO"
 
   let balance_deriver obj =
     let open Fields_derivers_snapps in
-    iso_string obj ~name:"TODO" ~to_string:balance_to_string
-      ~of_string:balance_change_of_string
-
-  let fail _ = failwith "TODO"
+    Currency.Signed_poly.Fields.make_creator obj ~magnitude:!.fail ~sgn:!.fail
+    |> finish ~name:"Balance Change"
 
   let deriver obj =
     let open Fields_derivers_snapps in
     Poly.Fields.make_creator obj ~public_key:!.public_key
       ~update:!.Update.deriver ~token_id:!.token_id_deriver
-      ~balance_change:!.balance_deriver ~increment_nonce:!.bool
+      ~balance_change:!.fail ~increment_nonce:!.bool
       ~events:!.(list @@ events_deriver @@ o ())
       ~sequence_events:!.(list @@ events_deriver @@ o ())
       ~call_data:!.field ~call_depth:!.int ~protocol_state:!.fail
