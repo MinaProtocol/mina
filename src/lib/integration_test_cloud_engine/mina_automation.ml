@@ -176,7 +176,7 @@ module Network_config = struct
           Some
             { txpool_max_size = Some txpool_max_size
             ; peer_list_url = None
-            ; trasnaction_expiry_hr = None
+            ; transaction_expiry_hr = None
             }
       ; genesis =
           Some
