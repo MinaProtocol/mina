@@ -240,13 +240,15 @@ let%test_module "Test" =
         (V.of_yojson (V.to_yojson V.v) |> Result.ok_or_failwith)
 
     module V2 = struct
-      type t = { field : Field.t } [@@deriving compare, sexp, equal, fields]
+      type t = { field : Field.t; nothing : unit }
+      [@@deriving compare, sexp, equal, fields]
 
-      let v = { field = Field.of_int 10 }
+      let v = { field = Field.of_int 10; nothing = () }
 
       let derivers obj =
         let open Derivers in
-        Fields.make_creator obj ~field:!.field |> finish ~name:"V2"
+        Fields.make_creator obj ~field:!.field ~nothing:!.unit
+        |> finish ~name:"V2"
     end
 
     let v2 = V2.derivers @@ Derivers.o ()
@@ -255,7 +257,7 @@ let%test_module "Test" =
       let open Derivers in
       [%test_eq: string]
         (Yojson.Safe.to_string (to_json v2 V2.v))
-        {|{"field":"10"}|}
+        {|{"field":"10","nothing":null}|}
 
     let%test_unit "roundtrip json'" =
       let open Derivers in
