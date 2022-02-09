@@ -2322,57 +2322,21 @@ module Base = struct
     let is_fee_transfer = Transaction_union.Tag.Unpacked.is_fee_transfer tag in
     let is_coinbase = Transaction_union.Tag.Unpacked.is_coinbase tag in
     let fee_token = payload.common.fee_token in
-    let%bind fee_token_invalid =
-      Token_id.(Checked.equal fee_token (var_of_t invalid))
-    in
     let%bind fee_token_default =
       Token_id.(Checked.equal fee_token (var_of_t default))
     in
     let token = payload.body.token_id in
-    let%bind token_invalid =
-      Token_id.(Checked.equal token (var_of_t invalid))
-    in
     let%bind token_default =
       Token_id.(Checked.equal token (var_of_t default))
     in
     let%bind () =
       [%with_label "Validate tokens"]
         (Checked.all_unit
-           [ [%with_label "Fee token is valid"]
-               Boolean.(Assert.is_true (not fee_token_invalid))
-           ; [%with_label
-               "Fee token is default or command allows non-default fee"]
-               (Boolean.Assert.any
-                  [ fee_token_default
-                  ; is_payment
-                  ; is_stake_delegation
-                  ; is_fee_transfer
-                  ])
-           ; (* TODO: Remove this check and update the transaction snark once we
-                have an exchange rate mechanism. See issue #4447.
-             *)
-             [%with_label "Fees in tokens disabled"]
+           [ [%with_label "Fees in default token"]
                (Boolean.Assert.is_true fee_token_default)
-           ; [%with_label "Token is valid"]
-               Boolean.(Assert.is_true (not token_invalid))
            ; [%with_label
-               "Token is default or command allows non-default token"]
-               (Boolean.Assert.any
-                  [ token_default
-                  ; is_payment
-                    (* TODO: Enable this when fees in tokens are enabled. *)
-                    (*; is_fee_transfer*)
-                  ])
-           ; [%with_label
-               "Token is non-default or command allows default token"]
-               Boolean.(
-                 Assert.any
-                   [ not token_default
-                   ; is_payment
-                   ; is_stake_delegation
-                   ; is_fee_transfer
-                   ; is_coinbase
-                   ])
+               "Token is default"]
+               (Boolean.Assert.is_true token_default)
            ])
     in
     let current_global_slot =
