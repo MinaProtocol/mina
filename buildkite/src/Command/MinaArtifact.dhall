@@ -49,7 +49,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
               -- add zexe standardization preprocessing step (see: https://github.com/MinaProtocol/mina/pull/5777)
               "PREPROCESSOR=./scripts/zexe-standardize.sh"
             ] "./buildkite/scripts/build-artifact.sh",
-            label = "Build Mina packages for Debian ${DebianVersions.capitalName debVersion}",
+            label = "Build Mina for ${DebianVersions.capitalName debVersion}",
             key = "build-deb-pkg",
             target = Size.XLarge,
             retries = [ Command.Retry::{ exit_status = +2, limit = Some 2 } ] -- libp2p error
