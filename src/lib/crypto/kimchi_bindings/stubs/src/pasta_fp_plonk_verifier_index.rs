@@ -11,9 +11,9 @@ use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 
-use kimchi::index::{expr_linearization, VerifierIndex};
 use kimchi::circuits::constraints::{zk_polynomial, zk_w3, Shifts};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
+use kimchi::index::{expr_linearization, VerifierIndex};
 use std::convert::TryInto;
 use std::path::Path;
 
