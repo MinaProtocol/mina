@@ -1,18 +1,7 @@
 (* state_hash.mli *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-
-[%%endif]
 
 include Data_hash.Full_size
 

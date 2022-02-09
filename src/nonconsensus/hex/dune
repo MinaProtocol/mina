@@ -1,5 +1,5 @@
 (library
- (name hex_nonconsensus)
+ (name hex)
  (public_name hex_nonconsensus)
  (inline_tests)
  (instrumentation (backend bisect_ppx))

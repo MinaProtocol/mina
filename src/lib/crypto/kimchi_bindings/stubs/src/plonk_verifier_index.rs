@@ -1,9 +1,6 @@
 use ark_ec::AffineCurve;
 use commitment_dlog::{commitment::CommitmentCurve, PolyComm};
-use kimchi::circuits::{
-    expr::caml::{CamlLinearization, CamlPolishToken},
-    gate::LookupsUsed,
-};
+use kimchi::circuits::gate::LookupsUsed;
 use kimchi::verifier::LookupVerifierIndex;
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
@@ -101,5 +98,4 @@ pub struct CamlPlonkVerifierIndex<Fr, SRS, PolyComm> {
     pub evals: CamlPlonkVerificationEvals<PolyComm>,
     pub shifts: Vec<Fr>,
     pub lookup_index: Option<CamlLookupVerifierIndex<PolyComm>>,
-    pub linearization: CamlLinearization<CamlPolishToken<Fr>>,
 }
