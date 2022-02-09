@@ -58,11 +58,11 @@ RUN sudo apt-get update -y \
 # Buster images are used in our migrated integration tests which reqiure python2 jinja2
 RUN test "$deb_codename" = "buster" \
       && sudo apt-get install -y \
-          python python3 \
-          python-pip python3-pip \
-          python-jinja2 python3-jinja2 \
-          python-sexpdata python3-sexpdata \
-          python-flake8 python3-flake8 \
+          python \
+          python-pip \
+          python-jinja2 \
+          python-flake8 \
+          python-sexpdata \
       || exit 0
 
 # --- deb-s3 tool
