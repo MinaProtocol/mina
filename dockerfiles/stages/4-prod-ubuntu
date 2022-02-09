@@ -2,7 +2,8 @@
 # The "production" Stage
 # - sets up the final container with built binaries and a running postgresql archive node setup
 #################################################################################################
-FROM ubuntu:20.04 AS production
+ARG deb_codename=focal
+FROM ubuntu:${deb_codename} AS production
 
 ARG MINA_DAEMON_PORT=10101
 ARG MINA_CONFIG_DIR=/data/.mina-config

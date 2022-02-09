@@ -1,8 +1,9 @@
 #################################################################################################
 # The "build-deps" stage
-# - Installs all compilers/interpreters, tools, and OS packages on Ubuntu 20.04
+# - Installs all compilers/interpreters, tools, and OS packages on Ubuntu Focal Fossa (20.04)
 #################################################################################################
-FROM ubuntu:20.04 AS build-deps
+ARG deb_codename=focal
+FROM ubuntu:${deb_codename} AS build-deps
 
 # Ocaml Version
 ARG OCAML_VERSION=4.11
@@ -24,9 +25,8 @@ ARG RUST_VERSION=1.52.1
 ARG ROCKSDB_VERSION=v5.18.4
 
 # OS package dependencies
-# First add support for https and pkg-config for apt, then install everything else
-# TODO: make sure this is the minimum compile-time deps
 # Organized as two alphabetized lists, first libraries and then tools/other packages
+# TODO: make sure this is the minimum compile-time deps
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
   && apt-get install --yes \
@@ -43,7 +43,6 @@ RUN apt-get update \
     libprocps-dev \
     libsodium-dev \
     libssl-dev \
-    zlib1g-dev \
     build-essential \
     capnproto \
     cmake \
@@ -54,7 +53,8 @@ RUN apt-get update \
     pkg-config \
     rsync \
     sudo \
-    unzip
+    unzip \
+    zlib1g-dev
 
 # Create opam user (for later) and give sudo to make opam happy
 RUN adduser --uid 65533 --disabled-password --gecos '' opam \
