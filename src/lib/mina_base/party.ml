@@ -726,6 +726,29 @@ module Predicate = struct
     let open Fields_derivers_snapps.Derivers in
     iso ~map:of_record ~contramap:to_record (AsRecord.deriver @@ o ()) obj
 
+  let%test_unit "json roundtrip" =
+    let predicate = Accept in
+    let module Fd = Fields_derivers_snapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
+
+  let%test_unit "to_json" =
+    let predicate = Nonce (Account_nonce.of_int 34928) in
+    let module Fd = Fields_derivers_snapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    [%test_eq: string]
+      (predicate |> Fd.to_json full |> Yojson.Safe.to_string)
+      ( {json|{
+         tag: "Nonce",
+         predicate: {
+          balance: null,
+          nonce: {lower: "34928", upper: "34928"},
+          receiptChainHash: null, publicKey: null, delegate: null,
+          state: [null,null,null,null,null,null,null,null],
+          sequenceState: null, provedState: null
+        }}|json}
+      |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
+
   let digest (t : t) =
     let digest x =
       Random_oracle.(

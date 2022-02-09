@@ -573,6 +573,20 @@ module Account = struct
       ~proved_state:!.(Or_ignore.deriver bool)
     |> finish ~name:"AccountPredicate"
 
+  let%test_unit "json roundtrip" =
+    let b = Balance.of_int 1000 in
+    let predicate =
+      { accept with
+        balance = Or_ignore.Check { Closed_interval.lower = b; upper = b }
+      ; public_key = Or_ignore.Check Public_key.Compressed.empty
+      ; sequence_state = Or_ignore.Check (Field.of_int 99)
+      ; proved_state = Or_ignore.Check true
+      }
+    in
+    let module Fd = Fields_derivers_snapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
+
   let to_input
       ({ balance
        ; nonce
