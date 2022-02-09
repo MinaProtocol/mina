@@ -821,14 +821,14 @@ module Protocol_state = struct
         Epoch_ledger.Poly.Fields.make_creator obj'
           ~hash:!.(Or_ignore.deriver field)
           ~total_currency:!.(Numeric.deriver amount)
-        |> finish ~name:"EpochLedger"
+        |> finish ~name:"EpochLedgerPredicate"
       in
       Poly.Fields.make_creator obj ~ledger:!.ledger
         ~seed:!.(Or_ignore.deriver field)
         ~start_checkpoint:!.(Or_ignore.deriver field)
         ~lock_checkpoint:!.(Or_ignore.deriver field)
         ~epoch_length:!.(Numeric.deriver uint32)
-      |> finish ~name:"EpochLedgerPredicate"
+      |> finish ~name:"EpochDataPredicate"
 
     let gen : t Quickcheck.Generator.t =
       let open Quickcheck.Let_syntax in
