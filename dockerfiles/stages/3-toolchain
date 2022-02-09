@@ -55,11 +55,20 @@ RUN sudo apt-get update -y \
     rubygems \
     zlib1g-dev
 
-# -- Debian Buster python dependencies (largely installed above from apt)
+# -- Debian Stretch python dependencies (largely installed above from apt)
 RUN test "$deb_codename" = "stretch" \
       && sudo pip3 install readchar sexpdata \
-      || sudo apt-get install -y \
-        python3-sexpdata
+      || exit 0
+
+# -- Debian Buster python dependencies (largely installed above from apt)
+RUN test "$deb_codename" = "buster" \
+      && sudo apt-get install -y python3-sexpdata \
+      || exit 0
+
+# -- Ubuntu Focal python dependencies (largely installed above from apt)
+RUN test "$deb_codename" = "focal" \
+      && sudo apt-get install -y python3-sexpdata \
+      || exit 0
 
 # --- deb-s3 tool
 RUN curl -sLO https://github.com/deb-s3/deb-s3/releases/download/0.11.3/deb-s3-0.11.3.gem \
