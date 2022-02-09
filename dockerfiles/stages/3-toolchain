@@ -49,23 +49,17 @@ RUN sudo apt-get update -y \
     postgresql-contrib \
     perl \
     pkg-config \
-    python \
-    python-flake8 \
-    python-jinja2 \
-    python-pip \
     python3-flake8 \
     python3-jinja2 \
     python3-pip \
     rubygems \
     zlib1g-dev
 
-# -- python dependencies (largely installed above from apt)
-RUN test "$deb_codename" = "buster" \
-      && sudo apt-get install -y \
-        python3-sexpdata \
-        python-sexpdata \
-      || sudo pip install readchar sexpdata \
-      && sudo pip3 install readchar sexpdata
+# -- Debian Buster python dependencies (largely installed above from apt)
+RUN test "$deb_codename" = "stretch" \
+      && sudo pip3 install readchar sexpdata \
+      || sudo apt-get install -y \
+        python3-sexpdata
 
 # --- deb-s3 tool
 RUN curl -sLO https://github.com/deb-s3/deb-s3/releases/download/0.11.3/deb-s3-0.11.3.gem \
