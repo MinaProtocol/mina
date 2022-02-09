@@ -99,7 +99,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           service="mina-rosetta",
           extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --no-cache",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="rosetta-mainnet-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
         }
 
         in
