@@ -830,6 +830,27 @@ module Protocol_state = struct
         ~epoch_length:!.(Numeric.deriver uint32)
       |> finish ~name:"EpochDataPredicate"
 
+    let%test_unit "json roundtrip" =
+      let f = Or_ignore.Check Field.one in
+      let u = Length.zero in
+      let a = Amount.zero in
+      let predicate =
+        { Poly.ledger =
+            { Epoch_ledger.Poly.hash = f
+            ; total_currency =
+                Or_ignore.Check { Closed_interval.lower = a; upper = a }
+            }
+        ; seed = f
+        ; start_checkpoint = f
+        ; lock_checkpoint = f
+        ; epoch_length =
+            Or_ignore.Check { Closed_interval.lower = u; upper = u }
+        }
+      in
+      let module Fd = Fields_derivers_snapps.Derivers in
+      let full = deriver (Fd.o ()) in
+      [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
+
     let gen : t Quickcheck.Generator.t =
       let open Quickcheck.Let_syntax in
       let%bind ledger =
