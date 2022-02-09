@@ -199,13 +199,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "send payment with sender = snapp fee payer"
         (let amount = Currency.Amount.of_int 2_000_000_000 in
          let fee = Currency.Fee.of_int 10_000_000 in
-         let sender = node in
-         (* choose receiver that's not in the snapp other parties
+         (* choose sender, receiver that are not in the snapp other parties
             there's a check that user commands can't involve snapp accounts
          *)
-         let receiver =
+         let sender =
            List.nth_exn block_producer_nodes
              (List.length parties_valid.other_parties + 1)
+         in
+         let receiver =
+           List.nth_exn block_producer_nodes
+             (List.length parties_valid.other_parties + 2)
          in
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
          let%bind sender_pub_key = Util.pub_key_of_node sender in
