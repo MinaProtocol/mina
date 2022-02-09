@@ -72,6 +72,8 @@ module Flagged_option = struct
 
   let to_option { is_some; data } = Option.some_if is_some data
 
+  let map ~f { is_some; data } = { is_some; data = f data }
+
   [%%ifdef consensus_mechanism]
 
   let typ t =
@@ -105,6 +107,15 @@ module Set_or_keep = struct
 
   let is_keep = function Keep -> true | _ -> false
 
+  let gen gen_a =
+    let open Quickcheck.Let_syntax in
+    (* with equal probability, return a Set or a Keep *)
+    let%bind b = Quickcheck.Generator.bool in
+    if b then
+      let%bind a = gen_a in
+      return (Set a)
+    else return Keep
+
   [%%ifdef consensus_mechanism]
 
   module Checked : sig
@@ -122,6 +133,8 @@ module Set_or_keep = struct
     val typ :
       dummy:'a -> ('a_var, 'a) Typ.t -> ('a_var t, 'a Stable.Latest.t) Typ.t
 
+    val map : f:('a -> 'b) -> 'a t -> 'b t
+
     val to_input :
          'a t
       -> f:('a -> Field.Var.t Random_oracle_input.Chunked.t)
@@ -137,6 +150,8 @@ module Set_or_keep = struct
     let is_set = Flagged_option.is_some
 
     let is_keep x = Boolean.not (Flagged_option.is_some x)
+
+    let map = Flagged_option.map
 
     let typ ~dummy t =
       Typ.transport
@@ -165,6 +180,15 @@ module Or_ignore = struct
       [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
+
+  let gen gen_a =
+    let open Quickcheck.Let_syntax in
+    (* choose constructor *)
+    let%bind b = Quickcheck.Generator.bool in
+    if b then
+      let%map a = gen_a in
+      Check a
+    else return Ignore
 
   let to_option = function Ignore -> None | Check x -> Some x
 

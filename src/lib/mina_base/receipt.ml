@@ -9,7 +9,7 @@ open Snark_params.Tick
 module Elt = struct
   type t =
     | Signed_command of Signed_command.Payload.t
-    | Snapp_command of Random_oracle.Digest.t
+    | Parties of Random_oracle.Digest.t
 end
 
 module Chain_hash = struct
@@ -54,7 +54,7 @@ module Chain_hash = struct
           ( receipt_chain_user_command
           , Transaction_union_payload.(
               to_input_legacy (of_user_command_payload payload)) )
-      | Snapp_command s ->
+      | Parties s ->
           (receipt_chain_snapp, Input.field s)
     in
     Input.(append x (field (t :> Field.t)))
@@ -66,7 +66,7 @@ module Chain_hash = struct
     module Elt = struct
       type t =
         | Signed_command of Transaction_union_payload.var
-        | Snapp_command of Random_oracle.Checked.Digest.t
+        | Parties of Random_oracle.Checked.Digest.t
     end
 
     let constant (t : t) =
@@ -87,7 +87,7 @@ module Chain_hash = struct
               Transaction_union_payload.Checked.to_input_legacy payload
             in
             (receipt_chain_user_command, payload)
-        | Snapp_command s ->
+        | Parties s ->
             Let_syntax.return (receipt_chain_snapp, Input.field s)
       in
       make_checked (fun () ->
