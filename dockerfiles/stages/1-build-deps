@@ -1,7 +1,8 @@
 #################################################################################################
 # The "build-deps" stage
-# - Installs all compilers/interpreters, tools, and OS packages on debian ${deb_codename}-slim
+# - Installs all compilers/interpreters, tools, and OS packages on the given debian or ubuntu image
 #################################################################################################
+# Supports debian:stretch-slim, debian:buster-slim, and ubuntu:focal
 ARG image=ubuntu:focal
 FROM ${image} AS build-deps
 
