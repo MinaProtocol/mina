@@ -154,7 +154,26 @@
           packages.mina_client_sdk_binding = ocamlPackages.mina_client_sdk;
           packages.mina-docker = pkgs.dockerTools.buildImage {
             name = "mina";
-            contents = [ ocamlPackages.mina ];
+            contents = [ ocamlPackages.mina.out ];
+          };
+          packages.mina-daemon-docker = pkgs.dockerTools.buildImage {
+            name = "mina-daemon";
+            contents = [
+              pkgs.dumb-init
+              pkgs.coreutils
+              pkgs.bashInteractive
+              pkgs.python3
+              pkgs.libp2p_helper
+              ocamlPackages.mina.out
+              ocamlPackages.mina.mainnet
+              ocamlPackages.mina.genesis
+              ocamlPackages.mina_build_config
+              ocamlPackages.mina_daemon_scripts
+            ];
+            config = {
+              env = ["MINA_TIME_OFFSET=0"];
+              cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
+            };
           };
           packages.mina_static = ocamlPackages_static.mina;
           packages.marlin_plonk_bindings_stubs =
