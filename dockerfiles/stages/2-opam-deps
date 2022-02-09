@@ -20,6 +20,7 @@ ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
 ENV OPAMKEEPBUILDDIR false
 ENV OPAMREUSEBUILDDIR false
 
+# --- Shallow clone the Mina repo, only focused on the given MINA_BRANCH
 # git will clone into an empty dir, but this also helps us set the workdir in advance
 RUN git clone \
   -b "${MINA_BRANCH}" \
@@ -32,9 +33,11 @@ WORKDIR $HOME/$MINA_DIR
 
 ENV OPAMYES 1
 
+# --- Import Opam Switch
 # TODO: handle this opam work without cloning the full repository (directly pull src/opam.export)
 RUN opam switch import src/opam.export
 
+# --- Pin external packages / submodules
 # TODO: Would be really nice to pull this script, the git submodules, and src/opam.export exclusively in this stage
 RUN eval $(opam config env) \
   && scripts/pin-external-packages.sh \
