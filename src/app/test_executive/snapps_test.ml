@@ -80,7 +80,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       let other_parties_hash =
-        Mina_base.Parties.Party_or_stack.With_hashes.other_parties_hash
+        Mina_base.Parties.Call_forest.With_hashes.other_parties_hash
           parties_valid_fee_payer_signature.other_parties
       in
       let parties_with_other_parties_nonces =
