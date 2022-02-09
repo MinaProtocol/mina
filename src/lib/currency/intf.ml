@@ -2,12 +2,7 @@
 
 open Core_kernel
 open Snark_bits
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
 
 type uint64 = Unsigned.uint64
 

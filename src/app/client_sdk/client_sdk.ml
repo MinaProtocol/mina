@@ -79,8 +79,6 @@ let _ =
            let dummy_payload = Mina_base.Signed_command_payload.dummy in
            let signature =
              Mina_base.Signed_command.sign_payload sk dummy_payload
-               Mina_base_nonconsensus.Signed_command.sign_payload sk
-               dummy_payload
            in
            let message =
              Mina_base.Signed_command.to_input_legacy dummy_payload

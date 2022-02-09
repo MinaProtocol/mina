@@ -2,12 +2,12 @@
 
 open Core_kernel
 open Snark_bits
+open Snark_params
+open Tick
 
 [%%ifdef consensus_mechanism]
 
 open Bitstring_lib
-open Snark_params
-open Tick
 open Let_syntax
 
 [%%endif]
