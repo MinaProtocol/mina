@@ -5,12 +5,6 @@ open Core_kernel
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-module Mina_numbers = Mina_numbers
-
-[%%else]
-
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
