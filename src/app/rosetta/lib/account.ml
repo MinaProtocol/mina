@@ -39,7 +39,15 @@ module Sql = struct
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         Caqti_type.(tup3 int64 int64 int64)
-        {sql| WITH RECURSIVE pending_chain AS (
+        {sql|
+SELECT DISTINCT
+  combo.pk_id,
+  MIN(combo.block_global_slot_since_genesis) AS block_global_slot_since_genesis,
+  MIN(combo.balance) AS balance,
+  MIN(combo.nonce) AS nonce
+FROM (
+(
+WITH RECURSIVE pending_chain AS (
 
                (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
 
@@ -59,7 +67,7 @@ module Sql = struct
 
                )
 
-              SELECT full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance,cmds.nonce
+              SELECT pks.id AS pk_id,full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance,NULL AS nonce
 
               FROM (SELECT
                     id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
@@ -74,37 +82,102 @@ module Sql = struct
 
               INNER JOIN balances             bal  ON full_chain.id = bal.block_id
               INNER JOIN public_keys          pks  ON bal.public_key_id = pks.id
-              INNER JOIN user_commands        cmds ON cmds.source_id = pks.id
+
+              WHERE pks.value = $1
+              AND full_chain.height <= $2
+
+              ORDER BY (bal.block_height, bal.block_sequence_no, bal.block_secondary_sequence_no) DESC
+              LIMIT 1
+            )
+            UNION ALL
+(
+WITH RECURSIVE pending_chain AS (
+
+               (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+
+                FROM blocks b
+                WHERE height = (select MAX(height) from blocks)
+                ORDER BY timestamp ASC, state_hash ASC
+                LIMIT 1)
+
+                UNION ALL
+
+                SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status
+
+                FROM blocks b
+                INNER JOIN pending_chain
+                ON b.id = pending_chain.parent_id AND pending_chain.id <> pending_chain.parent_id
+                AND pending_chain.chain_status <> 'canonical'
+
+               )
+
+              SELECT pks.id AS pk_id,NULL,NULL,cmds.nonce
+
+              FROM (SELECT
+                    id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+                    FROM pending_chain
+
+                    UNION ALL
+
+                    SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+
+                    FROM blocks b
+                    WHERE chain_status = 'canonical') AS full_chain
+
               INNER JOIN blocks_user_commands busc ON busc.block_id = full_chain.id
+              INNER JOIN user_commands        cmds ON cmds.id = busc.user_command_id
+              INNER JOIN public_keys          pks  ON pks.id = cmds.source_id
 
               WHERE pks.value = $1
               AND full_chain.height <= $2
               AND busc.user_command_id = cmds.id
 
-              ORDER BY (bal.block_height, bal.block_sequence_no, bal.block_secondary_sequence_no) DESC
+              ORDER BY (full_chain.height, busc.sequence_no) DESC
               LIMIT 1
+            )
+)
+AS combo GROUP BY combo.pk_id
         |sql}
 
     let query_canonical =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         Caqti_type.(tup3 int64 int64 int64)
-        {sql| SELECT b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,cmds.nonce
+        {sql| SELECT DISTINCT
+                combo.pk_id,
+                MIN(combo.block_global_slot_since_genesis) AS block_global_slot_since_genesis,
+                MIN(combo.balance) AS balance,
+                MIN(combo.nonce) AS nonce
+              FROM (
+                (SELECT pks.id as pk_id,b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,NULL AS nonce
 
-              FROM blocks b
-              INNER JOIN balances             bal  ON b.id = bal.block_id
-              INNER JOIN public_keys          pks  ON bal.public_key_id = pks.id
-              INNER JOIN user_commands        cmds ON cmds.source_id = pks.id
-              INNER JOIN blocks_user_commands busc ON busc.block_id = b.id
+                FROM blocks b
+                INNER JOIN balances             bal  ON b.id = bal.block_id
+                INNER JOIN public_keys          pks  ON bal.public_key_id = pks.id
 
-              WHERE pks.value = $1
-              AND b.height <= $2
-              AND b.chain_status = 'canonical'
-              AND busc.user_command_id = cmds.id
+                WHERE pks.value = $1
+                AND b.height <= $2
+                AND b.chain_status = 'canonical'
 
-              ORDER BY (bal.block_height, bal.block_sequence_no, bal.block_secondary_sequence_no) DESC
-              LIMIT 1
-        |sql}
+                ORDER BY (bal.block_height, bal.block_sequence_no, bal.block_secondary_sequence_no) DESC
+                LIMIT 1)
+                UNION ALL
+                (SELECT pks.id,NULL,NULL,cmds.nonce
+
+                FROM blocks b
+                INNER JOIN blocks_user_commands busc ON busc.block_id = b.id
+                INNER JOIN user_commands        cmds ON cmds.id = busc.user_command_id
+                INNER JOIN public_keys          pks  ON pks.id = cmds.source_id
+
+                WHERE pks.value = $1
+                AND b.height <= $2
+                AND b.chain_status = 'canonical'
+
+                ORDER BY (b.height, busc.sequence_no) DESC
+                LIMIT 1)
+                )
+              AS combo GROUP BY combo.pk_id
+              |sql}
 
     let run (module Conn : Caqti_async.CONNECTION) requested_block_height
         address =
