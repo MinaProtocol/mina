@@ -173,6 +173,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       mk_parties_with_signatures ~fee_payer_nonce:Unsigned.UInt32.zero
         parties_valid_pks
     in
+    (* choose payment sender, receiver that are not in the snapp other parties
+       because there's a check that user commands can't involve snapp accounts
+       TODO: that check will be removed; change sender to snapp fee payer
+    *)
+    let sender =
+      List.nth_exn block_producer_nodes
+        (List.length parties_valid.other_parties + 1)
+    in
+    let receiver =
+      List.nth_exn block_producer_nodes
+        (List.length parties_valid.other_parties + 2)
+    in
+    let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+    let%bind sender_pub_key = Util.pub_key_of_node sender in
+    (* other payment info *)
+    let amount = Currency.Amount.of_int 2_000_000_000 in
+    let fee = Currency.Fee.of_int 10_000_000 in
     let%bind () =
       section "send a valid snapp"
         ( [%log info] "Sending valid snapp" ;
@@ -180,13 +197,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Network.Node.send_snapp ~logger node ~parties:parties_valid
           with
           | Ok _snapp_id ->
-              [%log info] "Snapps transaction succeeded" ;
-              let%bind () =
-                wait_for t
-                @@ Wait_condition.snapp_to_be_included_in_frontier
-                     ~parties:parties_valid
-              in
-              [%log info] "Snapps transaction included in transition frontier" ;
+              [%log info] "Snapps transaction sent" ;
               Malleable_error.return ()
           | Error err ->
               let err_str = Error.to_string_mach err in
@@ -196,32 +207,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 "Error sending snapp: %s" err_str )
     in
     let%bind () =
-      section "send payment with sender = snapp fee payer"
-        (let amount = Currency.Amount.of_int 2_000_000_000 in
-         let fee = Currency.Fee.of_int 10_000_000 in
-         (* choose sender, receiver that are not in the snapp other parties
-            there's a check that user commands can't involve snapp accounts
-         *)
-         let sender =
-           List.nth_exn block_producer_nodes
-             (List.length parties_valid.other_parties + 1)
+      section "send payment"
+        ( [%log info] "Sending payment" ;
+          let%map () =
+            Network.Node.must_send_payment ~logger sender ~sender_pub_key
+              ~receiver_pub_key ~amount ~fee
+          in
+          [%log info] "Sent payment" )
+    in
+    let%bind () =
+      section "Wait for snapp, payment inclusion in transition frontier"
+        (let%bind () =
+           wait_for t
+           @@ Wait_condition.snapp_to_be_included_in_frontier
+                ~parties:parties_valid
          in
-         let receiver =
-           List.nth_exn block_producer_nodes
-             (List.length parties_valid.other_parties + 2)
+         [%log info] "Snapps transaction included in transition frontier" ;
+         let%map () =
+           wait_for t
+           @@ Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
+                ~receiver_pub_key ~amount
          in
-         let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-         let%bind sender_pub_key = Util.pub_key_of_node sender in
-         [%log info] "Sending payment" ;
-         let%bind () =
-           Network.Node.must_send_payment ~logger sender ~sender_pub_key
-             ~receiver_pub_key ~amount ~fee
-         in
-         [%log info]
-           "Sent payment, waiting for inclusion in transition frontier" ;
-         wait_for t
-           (Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
-              ~receiver_pub_key ~amount))
+         [%log info] "Payment included in transition frontier")
     in
     let%bind () =
       section "send a snapp with bad fee payer signature"
