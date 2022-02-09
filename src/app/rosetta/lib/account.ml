@@ -38,7 +38,7 @@ module Sql = struct
     let query_pending =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup3 int64 int64 int64)
+        Caqti_type.(tup4 int64 int64 int64 int64)
         {sql|
 SELECT DISTINCT
   combo.pk_id,
@@ -142,7 +142,7 @@ AS combo GROUP BY combo.pk_id
     let query_canonical =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup3 int64 int64 int64)
+        Caqti_type.(tup4 int64 int64 int64 int64)
         {sql| SELECT DISTINCT
                 combo.pk_id,
                 MIN(combo.block_global_slot_since_genesis) AS block_global_slot_since_genesis,
@@ -269,7 +269,7 @@ AS combo GROUP BY combo.pk_id
            * this is ambiguous in the spec but Coinbase confirmed we can return 0.
            * https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
           Deferred.Result.return 0L
-        | Some (_, last_relevant_command_balance, _), None ->
+        | Some (_, _, last_relevant_command_balance, _), None ->
           (* This account has no special vesting, so just use its last known balance *)
           Deferred.Result.return last_relevant_command_balance
         | None, Some timing_info ->
@@ -288,7 +288,8 @@ AS combo GROUP BY combo.pk_id
                   + incremental_balance_since_genesis)
               |> UInt64.to_int64 )
         | ( Some
-              ( last_relevant_command_global_slot_since_genesis
+              (_
+              , last_relevant_command_global_slot_since_genesis
               , last_relevant_command_balance, _ )
           , Some timing_info ) ->
           (* This block was in the genesis ledger and has been involved in at least one user or internal command. We need
@@ -312,7 +313,7 @@ AS combo GROUP BY combo.pk_id
         | None, None ->
           (* We've never heard of this account, at least as of the block_identifier provided *)
           Deferred.Result.return (0L, UInt64.zero)
-        | Some (_, last_relevant_command_balance, nonce), _ ->
+        | Some (_, _, last_relevant_command_balance, nonce), _ ->
           (* This account was involved in a command and we don't care about its vesting, so just use the last known
            * balance from the command. The nonce is returned from this
            * user-command, so we need to add one from here to get the current
