@@ -400,7 +400,7 @@ func (h *Helper) SetGatingState(gs *CodaGatingConfig) {
 	for _, c := range h.Host.Network().Conns() {
 		pid := c.RemotePeer()
 		maddr := c.RemoteMultiaddr()
-		if !h.gatingState.isAllowedPeerWithAddr(pid, maddr) {
+		if h.gatingState.checkAllowedPeerWithAddr(pid, maddr).isDeny() {
 			go func() {
 				if err := h.Host.Network().ClosePeer(pid); err != nil {
 					h.gatingState.logger.Infof("failed to close banned peer %v: %v", pid, err)
@@ -428,36 +428,101 @@ func (gs *CodaGatingState) MarkPrivateAddrAsKnown(addr ma.Multiaddr) {
 	}
 }
 
-func (gs *CodaGatingState) isPeerTrusted(p peer.ID) bool {
-	return gs.TrustedPeers.Contains(p)
+type connectionAllowance int
+
+const (
+	Undecided connectionAllowance = iota
+	DenyUnknownPrivateAddress
+	DenyBannedPeer
+	DenyBannedAddress
+	Accept
+)
+
+var connectionAllowanceStrings = map[connectionAllowance]string{
+	Undecided:                 "Undecided",
+	DenyUnknownPrivateAddress: "DenyUnknownPrivateAddress",
+	DenyBannedPeer:            "DenyBannedPeer",
+	DenyBannedAddress:         "DenyBannedAddress",
+	Accept:                    "Allow",
 }
 
-func (gs *CodaGatingState) isPeerBanned(p peer.ID) bool {
-	return gs.BannedPeers.Contains(p)
+func (ca connectionAllowance) String() string {
+	return connectionAllowanceStrings[ca]
+}
+
+func (c connectionAllowance) isDeny() bool {
+	return !(c == Accept || c == Undecided)
+}
+
+func (gs *CodaGatingState) checkPeerTrusted(p peer.ID) connectionAllowance {
+	if gs.TrustedPeers.Contains(p) {
+		return Accept
+	}
+	return Undecided
+}
+
+func (gs *CodaGatingState) checkPeerBanned(p peer.ID) connectionAllowance {
+	if gs.BannedPeers.Contains(p) {
+		return DenyBannedPeer
+	}
+	return Undecided
+}
+
+// bothAccept makes sure neither allowance denies the connection
+func bothAccept(a connectionAllowance, b connectionAllowance) connectionAllowance {
+	if a == Undecided {
+		return b
+	}
+	if a == Accept {
+		if b == Undecided {
+			return Accept
+		}
+		return b
+	}
+	return a
+}
+
+// eitherAccepts makes sure either allowance allows the connection (or both are undecided)
+func eitherAccepts(a connectionAllowance, b connectionAllowance) connectionAllowance {
+	if a == Undecided {
+		return b
+	}
+	return a
 }
 
 // checks if a peer id is allowed to dial/accept
-func (gs *CodaGatingState) isAllowedPeer(p peer.ID) bool {
-	return gs.isPeerTrusted(p) || !gs.isPeerBanned(p)
+func (gs *CodaGatingState) checkAllowedPeer(p peer.ID) connectionAllowance {
+	return eitherAccepts(gs.checkPeerTrusted(p), gs.checkPeerBanned(p))
 }
 
-func (gs *CodaGatingState) isAddrTrusted(addr ma.Multiaddr) bool {
-	return !gs.TrustedAddrFilters.AddrBlocked(addr)
+func (gs *CodaGatingState) checkAddrTrusted(addr ma.Multiaddr) connectionAllowance {
+	if !gs.TrustedAddrFilters.AddrBlocked(addr) {
+		return Accept
+	}
+	return Undecided
 }
 
-func (gs *CodaGatingState) isAddrBanned(addr ma.Multiaddr) bool {
-	return gs.BannedAddrFilters.AddrBlocked(addr)
+func (gs *CodaGatingState) checkAddrBanned(addr ma.Multiaddr) connectionAllowance {
+	if gs.BannedAddrFilters.AddrBlocked(addr) {
+		return DenyBannedAddress
+	}
+	return Undecided
 }
 
 // checks if an address is allowed to dial/accept
-func (gs *CodaGatingState) isAllowedAddr(addr ma.Multiaddr) bool {
-	publicOrKnownPrivate := !isPrivateAddr(addr) || !gs.KnownPrivateAddrFilters.AddrBlocked(addr)
-	return gs.isAddrTrusted(addr) || (!gs.isAddrBanned(addr) && publicOrKnownPrivate)
+func (gs *CodaGatingState) checkAllowedAddr(addr ma.Multiaddr) connectionAllowance {
+	if st := gs.checkAddrTrusted(addr); st != Undecided {
+		return st
+	}
+	if isPrivateAddr(addr) && gs.KnownPrivateAddrFilters.AddrBlocked(addr) {
+		return DenyUnknownPrivateAddress
+	}
+	return gs.checkAddrBanned(addr)
 }
 
 // checks if a peer is allowed to dial/accept; if the peer is in the trustlist, the address checks are overriden
-func (gs *CodaGatingState) isAllowedPeerWithAddr(p peer.ID, addr ma.Multiaddr) bool {
-	return gs.isPeerTrusted(p) || (gs.isAllowedPeer(p) && gs.isAllowedAddr(addr))
+func (gs *CodaGatingState) checkAllowedPeerWithAddr(p peer.ID, addr ma.Multiaddr) connectionAllowance {
+	return eitherAccepts(gs.checkPeerTrusted(p), bothAccept(gs.checkAllowedPeer(p), gs.checkAllowedAddr(addr)))
 }
 
 func (gs *CodaGatingState) logGate() {
@@ -467,15 +532,14 @@ func (gs *CodaGatingState) logGate() {
 // InterceptPeerDial tests whether we're permitted to Dial the specified peer.
 //
 // This is called by the network.Network implementation when dialling a peer.
-func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
-	allow = gs.isAllowedPeer(p)
-
-	if !allow {
-		gs.logger.Infof("disallowing peer dial to: %v (peer)", p)
+func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) bool {
+	allowance := gs.checkAllowedPeer(p)
+	if allowance.isDeny() {
+		gs.logger.Infof("disallowing peer dial to: %v (peer, %s)", p, allowance)
 		gs.logGate()
+		return false
 	}
-
-	return
+	return true
 }
 
 // InterceptAddrDial tests whether we're permitted to dial the specified
@@ -483,37 +547,32 @@ func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
 //
 // This is called by the network.Network implementation after it has
 // resolved the peer's addrs, and prior to dialling each.
-func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (allow bool) {
-	allow = gs.isAllowedPeerWithAddr(id, addr)
-
-	if !allow {
-		gs.logger.Infof("disallowing peer dial to: %v + %v (peer + address)", id, addr)
+func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) bool {
+	allowance := gs.checkAllowedPeerWithAddr(id, addr)
+	if allowance.isDeny() {
+		gs.logger.Infof("disallowing peer dial to: %v + %v (peer + address, %s)", id, addr, allowance)
 		gs.logGate()
+		return false
 	}
-
-	return
+	return true
 }
 
 // InterceptAccept tests whether an incipient inbound connection is allowed.
 //
 // This is called by the upgrader, or by the transport directly (e.g. QUIC,
 // Bluetooth), straight after it has accepted a connection from its socket.
-func (gs *CodaGatingState) InterceptAccept(addrs network.ConnMultiaddrs) (allow bool) {
+func (gs *CodaGatingState) InterceptAccept(addrs network.ConnMultiaddrs) bool {
 	remoteAddr := addrs.RemoteMultiaddr()
-	allow = gs.isAddrTrusted(remoteAddr) || !gs.isAddrBanned(remoteAddr)
-
-	if !allow {
-		gs.logger.Infof("refusing to accept inbound connection from addr: %v", remoteAddr)
+	allowance := eitherAccepts(gs.checkAddrTrusted(remoteAddr), gs.checkAddrBanned(remoteAddr))
+	if allowance.isDeny() {
+		gs.logger.Infof("refusing to accept inbound connection from addr: %v (%s)", remoteAddr, allowance)
 		gs.logGate()
+		return false
 	}
-
 	// If we are receiving a connection, and the remote address is private,
 	// then we infer that we should be able to connect to that private address.
-	if allow {
-		gs.MarkPrivateAddrAsKnown(remoteAddr)
-	}
-
-	return
+	gs.MarkPrivateAddrAsKnown(remoteAddr)
+	return true
 }
 
 // InterceptSecured tests whether a given connection, now authenticated,
@@ -522,19 +581,18 @@ func (gs *CodaGatingState) InterceptAccept(addrs network.ConnMultiaddrs) (allow 
 // This is called by the upgrader, after it has performed the security
 // handshake, and before it negotiates the muxer, or by the directly by the
 // transport, at the exact same checkpoint.
-func (gs *CodaGatingState) InterceptSecured(_ network.Direction, id peer.ID, addrs network.ConnMultiaddrs) (allow bool) {
+func (gs *CodaGatingState) InterceptSecured(_ network.Direction, id peer.ID, addrs network.ConnMultiaddrs) bool {
 	// note: we don't care about the direction (inbound/outbound). all
 	// connections in coda are symmetric: if i am allowed to connect to
 	// you, you are allowed to connect to me.
 	remoteAddr := addrs.RemoteMultiaddr()
-	allow = gs.isAllowedPeerWithAddr(id, remoteAddr)
-
-	if !allow {
-		gs.logger.Infof("refusing to accept inbound connection from authenticated addr: %v", remoteAddr)
+	allowance := gs.checkAllowedPeerWithAddr(id, remoteAddr)
+	if allowance.isDeny() {
+		gs.logger.Infof("refusing to accept inbound connection from authenticated addr: %v (%s)", remoteAddr, allowance)
 		gs.logGate()
+		return false
 	}
-
-	return
+	return true
 }
 
 // InterceptUpgraded tests whether a fully capable connection is allowed.
