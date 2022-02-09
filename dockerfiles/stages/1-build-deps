@@ -24,9 +24,8 @@ ARG RUST_VERSION=1.52.1
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4
 
-# OS package dependencies
+# --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
-# TODO: make sure this is the minimum compile-time deps
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
   && apt-get install --yes \
@@ -56,7 +55,7 @@ RUN apt-get update \
     unzip \
     zlib1g-dev
 
-# Create opam user (for later) and give sudo to make opam happy
+# --- Create opam user (for later) and give sudo to make opam happy
 RUN adduser --uid 65533 --disabled-password --gecos '' opam \
   && passwd -l opam \
   && chown -R opam:opam /home/opam \
@@ -65,16 +64,16 @@ RUN adduser --uid 65533 --disabled-password --gecos '' opam \
   && chown root:root /etc/sudoers.d/opam \
   && chmod 777 /tmp
 
-# Opam install of a given OPAM_VERSION from github release
+# --- Opam install of a given OPAM_VERSION from github release
 RUN curl -sL \
   "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-x86_64-linux" \
   -o /usr/bin/opam \
   && chmod +x /usr/bin/opam
 
-# Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
+# --- Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
 RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
 
-# Rust install via rustup-init to a given RUST_VERSION
+# --- Rust install via rustup-init to a given RUST_VERSION
 USER opam
 RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
   https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init \
@@ -85,8 +84,10 @@ RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
 # As opposed to introducing another shell script here (that mostly just determines the platform)
 # we just download the binary for the only platform we care about in this docker environment
 
-# RocksDB Installation
+# --- RocksDB Installation of a given ROCKSDB_VERSION
 USER root
+# These flags turn some errors into warnings for running with G++ 9 or higher
+# The build command below checks for the g++ major version and removes CXXFLAGS if its less than 9
 ENV CXXFLAGS '-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess'
 # This builds and installs just the rocksdb static lib for us, and cleans up after itself
 RUN git clone https://github.com/facebook/rocksdb \
@@ -98,6 +99,8 @@ RUN git clone https://github.com/facebook/rocksdb \
   && cp /rocksdb/librocksdb.a /usr/local/lib/librocksdb_coda.a \
   && rm -rf /rocksdb \
   && strip -S /usr/local/lib/librocksdb_coda.a
+# Clear CXXFLAGS afterwards to avoid affecting other code
+ENV CXXFLAGS ""
 
 ###########################################################################################
 # Initialize opam in a minimal fashion
@@ -108,7 +111,7 @@ WORKDIR /home/opam
 USER opam
 ENV HOME /home/opam
 
-# Create the following user directory configs as the Opam user:
+# --- Create the following user directory configs as the Opam user:
 ## Add go + rust to the path, unlimit the opam user,
 ## unlimit stack for future shells that might use spacetime,
 ## disable ipv6
@@ -118,7 +121,7 @@ RUN mkdir --mode=700 ~/.gnupg \
   && echo 'ulimit -s unlimited' >> ~/.bashrc \
   && echo "disable-ipv6" >> ~/.gnupg/dirmngr.conf
 
-# Ocaml install of a given OCAML_VERSION via opam switch
+# --- Ocaml install of a given OCAML_VERSION via opam switch
 # additionally initializes opam with sandboxing disabled, as we did not install bubblewrap above.
 RUN git clone \
   https://github.com/ocaml/opam-repository.git \
