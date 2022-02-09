@@ -22,7 +22,7 @@ let%test_module "network pool test" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
-    let expiry_ns = Time_ns.Span.of_hr 72.0
+    let expiry_ns = Time_ns.Span.of_hr Mina_compile_config.transaction_expiry_hr
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->

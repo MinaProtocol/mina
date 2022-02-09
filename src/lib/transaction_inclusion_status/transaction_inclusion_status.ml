@@ -120,7 +120,9 @@ let%test_module "transaction_status" =
         Transaction_pool.create ~config
           ~constraint_constants:precomputed_values.constraint_constants
           ~consensus_constants:precomputed_values.consensus_constants
-          ~time_controller ~expiry_ns:(Time_ns.Span.of_hr 72.0)
+          ~time_controller
+          ~expiry_ns:
+            (Time_ns.Span.of_hr Mina_compile_config.transaction_expiry_hr)
           ~incoming_diffs:pool_reader ~logger ~local_diffs:local_reader
           ~frontier_broadcast_pipe
       in

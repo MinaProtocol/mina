@@ -1720,7 +1720,10 @@ let create ?wallets (config : Config.t) =
                 Network_pool.Transaction_pool.create ~config:txn_pool_config
                   ~constraint_constants ~consensus_constants
                   ~time_controller:config.time_controller
-                  ~expiry_ns:(Time_ns.Span.of_hr 72.0) ~logger:config.logger
+                  ~expiry_ns:
+                    (Time_ns.Span.of_hr
+                       Mina_compile_config.transaction_expiry_hr)
+                  ~logger:config.logger
                   ~incoming_diffs:(Mina_networking.transaction_pool_diffs net)
                   ~local_diffs:local_txns_reader
                   ~frontier_broadcast_pipe:frontier_broadcast_pipe_r)
@@ -1966,7 +1969,10 @@ let create ?wallets (config : Config.t) =
                 Network_pool.Snark_pool.load ~config:snark_pool_config
                   ~constraint_constants ~consensus_constants
                   ~time_controller:config.time_controller
-                  ~expiry_ns:(Time_ns.Span.of_hr 72.0) ~logger:config.logger
+                  ~expiry_ns:
+                    (Time_ns.Span.of_hr
+                       Mina_compile_config.transaction_expiry_hr)
+                  ~logger:config.logger
                   ~incoming_diffs:(Mina_networking.snark_pool_diffs net)
                   ~local_diffs:local_snark_work_reader
                   ~frontier_broadcast_pipe:frontier_broadcast_pipe_r)
