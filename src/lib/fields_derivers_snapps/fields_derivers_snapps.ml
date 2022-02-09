@@ -117,6 +117,11 @@ module Derivers = struct
     let _b = Fields_derivers_json.To_yojson.bool obj in
     Fields_derivers_json.Of_yojson.bool obj
 
+  let unit obj : _ Unified_input.t =
+    let _a = Fields_derivers_graphql.Graphql_fields.unit obj in
+    let _b = Fields_derivers_json.To_yojson.unit obj in
+    Fields_derivers_json.Of_yojson.unit obj
+
   let global_slot obj =
     iso_string obj ~name:"GlobalSlot" ~to_string:Unsigned.UInt32.to_string
       ~of_string:Unsigned.UInt32.of_string

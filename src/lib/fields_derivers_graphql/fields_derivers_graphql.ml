@@ -158,6 +158,19 @@ module Graphql_fields_raw = struct
       (obj#nullable_graphql_fields := Input.T.{ run = (fun () -> Schema.bool) }) ;
       obj
 
+    let unit obj =
+      (* TODO: get rid of Obj.magic *)
+      let schema_unit : (_, unit option) Schema.typ =
+        Schema.scalar "Unit" ?doc:None ~coerce:(fun _ -> `Null)
+      in
+      (obj#graphql_fields :=
+         Input.T.{ run = Obj.magic (fun () -> Schema.non_null schema_unit) }) ;
+      obj#contramap := Fn.id ;
+      obj#graphql_fields_accumulator := !(obj#graphql_fields_accumulator) ;
+      (obj#nullable_graphql_fields :=
+         Input.T.{ run = Obj.magic (fun () -> schema_unit) }) ;
+      obj
+
     let list x obj : ('input_type list, _, _, _) Input.t =
       (obj#graphql_fields :=
          Input.T.
