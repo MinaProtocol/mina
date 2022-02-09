@@ -2353,7 +2353,7 @@ module Base = struct
              *)
              [%with_label "Fees in tokens disabled"]
                (Boolean.Assert.is_true fee_token_default)
-           ; [%with_label "Token is valid or command allows invalid token"]
+           ; [%with_label "Token is valid"]
                Boolean.(Assert.is_true (not token_invalid))
            ; [%with_label
                "Token is default or command allows non-default token"]
