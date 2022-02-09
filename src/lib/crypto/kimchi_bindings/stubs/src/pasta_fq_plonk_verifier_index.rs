@@ -12,7 +12,6 @@ use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 
 use kimchi::circuits::constraints::{zk_polynomial, zk_w3, Shifts};
-use kimchi::circuits::expr::{Linearization, PolishToken};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::index::{expr_linearization, VerifierIndex};
 use std::convert::TryInto;
