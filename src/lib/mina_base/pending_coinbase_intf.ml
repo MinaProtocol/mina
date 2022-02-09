@@ -21,11 +21,11 @@ module type S = sig
   type t [@@deriving sexp, to_yojson]
 
   module Stable : sig
-    module V2 : sig
+    module V1 : sig
       type nonrec t = t [@@deriving bin_io, sexp, to_yojson, version]
     end
 
-    module Latest = V2
+    module Latest = V1
   end
 
   module Coinbase_data : sig

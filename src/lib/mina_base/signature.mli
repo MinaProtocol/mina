@@ -34,7 +34,7 @@ include Codable.Base58_check_intf with type t := t
 
 val dummy : t
 
-(** Coding reflecting the RFC0038 spec (eventually) *)
+(** Coding reflecting the RFC0038 spec *)
 module Raw : sig
   val encode : t -> string
 

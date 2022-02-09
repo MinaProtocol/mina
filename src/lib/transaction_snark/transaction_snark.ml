@@ -6235,8 +6235,7 @@ let%test_module "transaction_snark" =
                 ( Ledger.apply_user_command ~constraint_constants ledger
                     ~txn_global_slot:current_global_slot t1
                   |> Or_error.ok_exn
-                  : Transaction_logic.Transaction_applied.Signed_command_applied
-                    .t ) ;
+                  : Ledger.Transaction_applied.Signed_command_applied.t ) ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;

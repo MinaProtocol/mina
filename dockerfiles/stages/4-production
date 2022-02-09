@@ -2,7 +2,9 @@
 # The "production" Stage
 # - sets up the final container with built binaries and a running postgresql archive node setup
 #################################################################################################
-FROM ubuntu:18.04 AS production
+ARG deb_codename=stretch
+FROM debian:${deb_codename}-slim AS production
+ARG deb_codename=stretch
 
 ARG MINA_DAEMON_PORT=10101
 ARG MINA_CONFIG_DIR=/root/.mina-config
@@ -13,28 +15,43 @@ ENV DEBIAN_FRONTEND noninteractive
 
 # Dependencies
 # TODO: make sure this is the minimum runtime deps
-RUN apt-get -y update \
-  && apt -y install \
+RUN apt-get update -y \
+  && apt install -y \
     apt-utils \
     curl \
     ca-certificates \
     dnsutils \
     dumb-init \
     gettext \
+    libffi6 \
     libgmp10 \
     libgomp1 \
     libssl1.1 \
     postgresql \
     postgresql-contrib \
     tzdata \
-    libjemalloc1 \
-    libprocps6 \
-    libffi6 \
     jq \
     sudo
 
+RUN test "$deb_codename" = "buster" \
+     && apt-get update -y \
+     && apt-get install -y \
+         libjemalloc2 \
+         libprocps7 \
+     || exit 0
+
+RUN test "$deb_codename" = "stretch" \
+     && apt-get update -y \
+     && apt-get install -y \
+         libjemalloc1 \
+         libprocps6 \
+     || exit 0
+
 # Install rosetta-cli
 RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/master/scripts/install.sh | sh -s
+
+# Generate en_US.UTF-8 to allow use of O(1) Labs DB dumps
+RUN locale-gen en_US.UTF-8
 
 RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
   && echo "$PK" >  ${MINA_CONFIG_DIR}/wallets/store/$PK.pub \
@@ -49,20 +66,13 @@ COPY --from=builder /home/opam/mina/src/app/rosetta/README.md /rosetta/
 COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
 
 USER postgres
-
 RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && echo "$POSTGRES_VERSION" "$(psql -V)" \
-    && echo "data_directory = '/data/postgresql'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
-    && echo "listen_addresses='*'" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
-    && echo "max_locks_per_transaction=1024" >> /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf \
     && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf
 
 USER root
 
 WORKDIR /rosetta
-
-# Generate en_US.UTF-8 to allow use of O(1) Labs DB dumps
-RUN locale-gen en_US.UTF-8
 
 EXPOSE 3087
 EXPOSE $MINA_DAEMON_PORT
