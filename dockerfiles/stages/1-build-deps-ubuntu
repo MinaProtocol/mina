@@ -18,7 +18,7 @@ ARG GO_VERSION=1.16.5
 ARG GO_CAPNP_VERSION=v3.0.0-alpha.1
 
 # Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
-ARG RUST_VERSION=1.52.1
+ARG RUST_VERSION=1.56.0
 
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4

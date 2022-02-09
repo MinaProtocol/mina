@@ -1,7 +1,7 @@
 open Core_kernel
 open Pickles_types
 open Import
-open Zexe_backend.Pasta
+open Kimchi_pasta.Pasta
 
 module Data = struct
   [%%versioned
@@ -17,11 +17,11 @@ end
 module Repr = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         { commitments :
-            Backend.Tock.Curve.Affine.Stable.V1.t array
-            Plonk_verification_key_evals.Stable.V1.t
+            Backend.Tock.Curve.Affine.Stable.V1.t
+            Plonk_verification_key_evals.Stable.V2.t
         ; step_domains : Domains.Stable.V1.t array
         ; data : Data.Stable.V1.t
         }
@@ -33,10 +33,9 @@ end
 
 [%%versioned_binable
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      { commitments :
-          Backend.Tock.Curve.Affine.t array Plonk_verification_key_evals.t
+      { commitments : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
       ; step_domains : Domains.t array
       ; index : Impls.Wrap.Verification_key.t
       ; data : Data.t
@@ -45,7 +44,7 @@ module Stable = struct
 
     let to_latest = Fn.id
 
-    let of_repr urs { Repr.commitments = c; step_domains; data = d } =
+    let of_repr srs { Repr.commitments = c; step_domains; data = d } =
       let t : Impls.Wrap.Verification_key.t =
         let log2_size = Int.ceil_log2 d.constraints in
         let d = Domain.Pow_2_roots_of_unity log2_size in
@@ -56,20 +55,33 @@ module Stable = struct
             }
         ; max_poly_size = 1 lsl Nat.to_int Rounds.Wrap.n
         ; max_quot_size
-        ; urs
+        ; srs
+        ; linearization = failwith "TODO"
         ; evals =
-            Plonk_verification_key_evals.map c ~f:(fun unshifted ->
-                { Marlin_plonk_bindings.Types.Poly_comm.shifted = None
-                ; unshifted =
-                    Array.map unshifted ~f:(fun x -> Or_infinity.Finite x)
-                })
+            (let g (x, y) =
+               { Kimchi.Protocol.unshifted =
+                   [| Kimchi.Foundations.Finite (x, y) |]
+               ; shifted = None
+               }
+             in
+             { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comm)
+             ; coefficients_comm =
+                 Array.map ~f:g (Vector.to_array c.coefficients_comm)
+             ; generic_comm = g c.generic_comm
+             ; mul_comm = g c.mul_comm
+             ; psm_comm = g c.psm_comm
+             ; emul_comm = g c.emul_comm
+             ; complete_add_comm = g c.complete_add_comm
+             ; endomul_scalar_comm = g c.endomul_scalar_comm
+             ; chacha_comm = None
+             })
         ; shifts = Common.tock_shifts ~log2_size
         }
       in
       { commitments = c; step_domains; data = d; index = t }
 
     include Binable.Of_binable
-              (Repr.Stable.V1)
+              (Repr.Stable.V2)
               (struct
                 type nonrec t = t
 
@@ -82,38 +94,24 @@ module Stable = struct
 end]
 
 let dummy_commitments g =
-  { Plonk_verification_key_evals.sigma_comm_0 = g
-  ; sigma_comm_1 = g
-  ; sigma_comm_2 = g
-  ; ql_comm = g
-  ; qr_comm = g
-  ; qo_comm = g
-  ; qm_comm = g
-  ; qc_comm = g
-  ; rcm_comm_0 = g
-  ; rcm_comm_1 = g
-  ; rcm_comm_2 = g
+  let open Dlog_plonk_types in
+  { Plonk_verification_key_evals.sigma_comm =
+      Vector.init Permuts.n ~f:(fun _ -> g)
+  ; coefficients_comm = Vector.init Columns.n ~f:(fun _ -> g)
+  ; generic_comm = g
   ; psm_comm = g
-  ; add_comm = g
-  ; mul1_comm = g
-  ; mul2_comm = g
-  ; emul1_comm = g
-  ; emul2_comm = g
-  ; emul3_comm = g
+  ; complete_add_comm = g
+  ; mul_comm = g
+  ; emul_comm = g
+  ; endomul_scalar_comm = g
   }
 
 let dummy =
   lazy
     (let rows = Domain.size Common.wrap_domains.h in
-     let g =
-       let len =
-         let max_degree = Common.Max_degree.wrap in
-         Int.round_up rows ~to_multiple_of:max_degree / max_degree
-       in
-       Array.create ~len Backend.Tock.Curve.(to_affine_exn one)
-     in
+     let g = Backend.Tock.Curve.(to_affine_exn one) in
      { Repr.commitments = dummy_commitments g
      ; step_domains = [||]
      ; data = { constraints = rows }
      }
-     |> Stable.Latest.of_repr (Marlin_plonk_bindings.Pasta_fq_urs.create 1))
+     |> Stable.Latest.of_repr (Kimchi.Protocol.SRS.Fq.create 1))

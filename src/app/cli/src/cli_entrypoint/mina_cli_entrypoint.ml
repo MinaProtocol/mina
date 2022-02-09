@@ -594,18 +594,10 @@ let setup_daemon logger =
         (conf_dir ^/ "daemon.json", `May_be_missing)
       in
       let config_file_envvar =
-        (* TODO: remove deprecated variable, eventually *)
-        let mina_config_file = "MINA_CONFIG_FILE" in
-        let coda_config_file = "CODA_CONFIG_FILE" in
-        match (Sys.getenv mina_config_file, Sys.getenv coda_config_file) with
-        | Some config_file, _ ->
+        match Sys.getenv "MINA_CONFIG_FILE" with
+        | Some config_file ->
             Some (config_file, `Must_exist)
-        | None, Some config_file ->
-            [%log warn]
-              "Using deprecated environment variable %s, please use %s instead"
-              coda_config_file mina_config_file ;
-            Some (config_file, `Must_exist)
-        | None, None ->
+        | None ->
             None
       in
       let config_files =
@@ -890,9 +882,7 @@ let setup_daemon logger =
         >>| Or_error.ok
       in
       let client_trustlist =
-        (* TODO: remove deprecated var, eventually *)
         let mina_client_trustlist = "MINA_CLIENT_TRUSTLIST" in
-        let coda_client_trustlist = "CODA_CLIENT_TRUSTLIST" in
         let cidrs_of_env_str env_str env_var =
           let cidrs =
             String.split ~on:',' env_str
@@ -906,17 +896,10 @@ let setup_daemon logger =
           in
           Some (List.append cidrs (Option.value ~default:[] client_trustlist))
         in
-        match
-          (Unix.getenv mina_client_trustlist, Unix.getenv coda_client_trustlist)
-        with
-        | Some env_str, _ ->
+        match Unix.getenv mina_client_trustlist with
+        | Some env_str ->
             cidrs_of_env_str env_str mina_client_trustlist
-        | None, Some env_str ->
-            [%log warn]
-              "Using deprecated environment variable %s, please use %s instead"
-              coda_client_trustlist mina_client_trustlist ;
-            cidrs_of_env_str env_str coda_client_trustlist
-        | None, None ->
+        | None ->
             client_trustlist
       in
       Stream.iter

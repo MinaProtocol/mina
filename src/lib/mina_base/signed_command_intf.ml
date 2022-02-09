@@ -128,8 +128,8 @@ module type S = sig
 
   val next_available_token : t -> Token_id.t -> Token_id.t
 
-  val to_input :
-    Signed_command_payload.t -> (Field.t, bool) Random_oracle_input.t
+  val to_input_legacy :
+    Signed_command_payload.t -> (Field.t, bool) Random_oracle_input.Legacy.t
 
   (** Check that the command is used with compatible tokens. This check is fast
       and cheap, to be used for filtering.

@@ -1,6 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Util
 
 [%%ifdef consensus_mechanism]
 
@@ -108,9 +109,11 @@ module Auth_required = struct
       }
     [@@deriving hlist, fields]
 
-    let to_input t =
+    let to_input ~field_of_bool t =
       let [ x; y; z ] = to_hlist t in
-      Random_oracle.Input.bitstring [ x; y; z ]
+      let bs = [| x; y; z |] in
+      Random_oracle.Input.Chunked.packeds
+        (Array.map bs ~f:(fun b -> (field_of_bool b, 1)))
 
     let map t ~f =
       { constant = f t.constant
@@ -207,7 +210,9 @@ module Auth_required = struct
 
     let if_ = Encoding.if_
 
-    let to_input : t -> _ = Encoding.to_input
+    let to_input : t -> _ =
+      Encoding.to_input ~field_of_bool:(fun (b : Boolean.var) ->
+          (b :> Field.Var.t))
 
     let constant t = Encoding.map (encode t) ~f:Boolean.var_of_value
 
@@ -253,7 +258,7 @@ module Auth_required = struct
 
   [%%endif]
 
-  let to_input x = Encoding.to_input (encode x)
+  let to_input x = Encoding.to_input (encode x) ~field_of_bool
 
   let check (t : t) (c : Control.Tag.t) =
     match (t, c) with
@@ -261,16 +266,14 @@ module Auth_required = struct
         false
     | None, _ ->
         true
-    | Both, Both ->
-        true
     | Both, (Proof | Signature) ->
         false
-    | Proof, (Proof | Both) ->
+    | Proof, Proof ->
         true
-    | Signature, (Signature | Both) ->
+    | Signature, Signature ->
         true
     (* The signatures and proofs have already been checked by this point. *)
-    | Either, (Proof | Signature | Both) ->
+    | Either, (Proof | Signature) ->
         true
     | Signature, Proof ->
         false
@@ -297,14 +300,15 @@ module Poly = struct
     end
   end]
 
-  let to_input controller t =
+  let to_input ~field_of_bool controller t =
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
     Stable.Latest.Fields.fold ~init:[]
-      ~stake:(f (fun x -> Random_oracle.Input.bitstring [ x ]))
+      ~stake:
+        (f (fun x -> Random_oracle.Input.Chunked.packed (field_of_bool x, 1)))
       ~edit_state:(f controller) ~send:(f controller)
       ~set_delegate:(f controller) ~set_permissions:(f controller)
       ~set_verification_key:(f controller) ~receive:(f controller)
-    |> List.reduce_exn ~f:Random_oracle.Input.append
+    |> List.reduce_exn ~f:Random_oracle.Input.Chunked.append
 end
 
 [%%versioned
@@ -322,7 +326,9 @@ end]
 module Checked = struct
   type t = (Boolean.var, Auth_required.Checked.t) Poly.Stable.Latest.t
 
-  let to_input x = Poly.to_input Auth_required.Checked.to_input x
+  let to_input (x : t) =
+    Poly.to_input Auth_required.Checked.to_input x
+      ~field_of_bool:(fun (b : Boolean.var) -> (b :> Field.Var.t))
 
   open Pickles.Impls.Step
 
@@ -361,7 +367,7 @@ let typ =
 
 [%%endif]
 
-let to_input x = Poly.to_input Auth_required.to_input x
+let to_input (x : t) = Poly.to_input ~field_of_bool Auth_required.to_input x
 
 let user_default : t =
   { stake = true

@@ -1,0 +1,17 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 👀 Mina documentation
+    url: https://docs.minaprotocol.com/
+    about: Check out the Mina documentation for answers to common questions
+  - name: 🚀 Mina discussions
+    url: https://github.com/MinaProtocol/mina/discussions
+    about: Ask questions, request features & discuss RFCs
+  - name: Mina Discord
+    url: https://discord.com/invite/Vexf4ED
+    about: Ask questions, get help and discuss new things you're building with the Mina community
+  - name: Mina Telegram
+    url: https://t.me/minaprotocol
+    about: The official Mina Telegram
+  - name: Mina Twitter
+    url: https://twitter.com/MinaProtocol
+    about: The official Mina Twitter account

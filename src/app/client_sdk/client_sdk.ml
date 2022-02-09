@@ -79,10 +79,14 @@ let _ =
            let dummy_payload = Mina_base.Signed_command_payload.dummy in
            let signature =
              Mina_base.Signed_command.sign_payload sk dummy_payload
+               Mina_base_nonconsensus.Signed_command.sign_payload sk
+               dummy_payload
            in
-           let message = Mina_base.Signed_command.to_input dummy_payload in
+           let message =
+             Mina_base.Signed_command.to_input_legacy dummy_payload
+           in
            let verified =
-             Schnorr.verify signature
+             Schnorr.Legacy.verify signature
                (Snark_params.Tick.Inner_curve.of_affine pk)
                message
            in
@@ -332,6 +336,12 @@ let _ =
                `Assoc [ ("error", `String err_msg) ]
          in
          Js.string (Yojson.Safe.to_string result_json)
+
+       method hashBytearray = Poseidon_hash.hash_bytearray
+
+       method hashFieldElems = Poseidon_hash.hash_field_elems
+
+       val hashOrder = Poseidon_hash.Field.(Hex.encode @@ Nat.to_bytes order)
 
        method runUnitTests () : bool Js.t = Coding.run_unit_tests () ; Js._true
     end)

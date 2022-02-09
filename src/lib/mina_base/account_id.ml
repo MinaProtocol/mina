@@ -21,11 +21,6 @@ let public_key (key, _tid) = key
 
 let token_id (_key, tid) = tid
 
-let to_input (key, tid) =
-  Random_oracle.Input.append
-    (Public_key.Compressed.to_input key)
-    (Token_id.to_input tid)
-
 let gen =
   let open Quickcheck.Let_syntax in
   let%map key = Public_key.Compressed.gen and tid = Token_id.gen in
@@ -52,10 +47,6 @@ module Checked = struct
   let public_key (key, _tid) = key
 
   let token_id (_key, tid) = tid
-
-  let to_input (key, tid) =
-    let%map tid = Token_id.Checked.to_input tid in
-    Random_oracle.Input.append (Public_key.Compressed.Checked.to_input key) tid
 
   let equal (pk1, tid1) (pk2, tid2) =
     let%bind pk_equal = Public_key.Compressed.Checked.equal pk1 pk2 in

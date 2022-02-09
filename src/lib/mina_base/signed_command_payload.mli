@@ -68,7 +68,7 @@ module Common : sig
     end
   end]
 
-  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+  val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
 
   val gen : ?fee_token_id:Token_id.t -> unit -> t Quickcheck.Generator.t
 
@@ -86,9 +86,9 @@ module Common : sig
   val typ : (var, t) Typ.t
 
   module Checked : sig
-    val to_input :
+    val to_input_legacy :
          var
-      -> ( (Field.Var.t, Boolean.var) Random_oracle.Input.t
+      -> ( (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
          , _ )
          Snark_params.Tick.Checked.t
 

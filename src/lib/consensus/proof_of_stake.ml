@@ -6,7 +6,6 @@ open Currency
 open Fold_lib
 open Signature_lib
 open Snark_params
-open Bitstring_lib
 open Num_util
 module Time = Block_time
 module Run = Snark_params.Tick.Run
@@ -108,7 +107,7 @@ module Configuration = struct
     let of_span = Fn.compose Int64.to_int Block_time.Span.to_ms in
     { delta = of_int32 constants.delta
     ; k = of_int32 constants.k
-    ; slots_per_epoch = of_int32 constants.epoch_size
+    ; slots_per_epoch = of_int32 constants.slots_per_epoch
     ; slot_duration = of_span constants.slot_duration_ms
     ; epoch_duration = of_span constants.epoch_duration
     ; genesis_state_timestamp = constants.genesis_state_timestamp
@@ -181,7 +180,7 @@ module Data = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V1 = struct
+      module V2 = struct
         type t =
           { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
           ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
@@ -189,7 +188,7 @@ module Data = struct
           ; global_slot : Mina_numbers.Global_slot.Stable.V1.t
           ; global_slot_since_genesis : Mina_numbers.Global_slot.Stable.V1.t
           ; delegatee_table :
-              Mina_base.Account.Stable.V1.t
+              Mina_base.Account.Stable.V2.t
               Mina_base.Account.Index.Stable.V1.Table.t
               Public_key.Compressed.Stable.V1.Table.t
           }
@@ -912,7 +911,7 @@ module Data = struct
       val resolve : t -> graphql_type
 
       val to_input :
-        t -> (Snark_params.Tick.Field.t, bool) Random_oracle.Input.t
+        t -> Snark_params.Tick.Field.t Random_oracle.Input.Chunked.t
 
       val null : t
     end) =
@@ -975,14 +974,11 @@ module Data = struct
       let to_input
           ({ ledger; seed; start_checkpoint; lock_checkpoint; epoch_length } :
             Value.t) =
-        let input =
-          { Random_oracle.Input.field_elements =
-              [| (seed :> Tick.Field.t); (start_checkpoint :> Tick.Field.t) |]
-          ; bitstrings = [| Length.Bits.to_bits epoch_length |]
-          }
-        in
-        List.reduce_exn ~f:Random_oracle.Input.append
-          [ input
+        let open Random_oracle.Input.Chunked in
+        List.reduce_exn ~f:append
+          [ field (seed :> Tick.Field.t)
+          ; field (start_checkpoint :> Tick.Field.t)
+          ; Length.to_input epoch_length
           ; Epoch_ledger.to_input ledger
           ; Lock_checkpoint.to_input lock_checkpoint
           ]
@@ -990,19 +986,11 @@ module Data = struct
       let var_to_input
           ({ ledger; seed; start_checkpoint; lock_checkpoint; epoch_length } :
             var) =
-        let open Tick in
-        let%map epoch_length = Length.Checked.to_bits epoch_length in
-        let open Random_oracle.Input in
-        let input =
-          { field_elements =
-              [| Epoch_seed.var_to_hash_packed seed
-               ; Mina_base.State_hash.var_to_hash_packed start_checkpoint
-              |]
-          ; bitstrings = [| Bitstring.Lsb_first.to_list epoch_length |]
-          }
-        in
-        List.reduce_exn ~f:Random_oracle.Input.append
-          [ input
+        let open Random_oracle.Input.Chunked in
+        List.reduce_exn ~f:append
+          [ field (Epoch_seed.var_to_hash_packed seed)
+          ; field (Mina_base.State_hash.var_to_hash_packed start_checkpoint)
+          ; Length.Checked.to_input epoch_length
           ; Epoch_ledger.var_to_input ledger
           ; field (Mina_base.State_hash.var_to_hash_packed lock_checkpoint)
           ]
@@ -1019,7 +1007,8 @@ module Data = struct
     module T = struct
       include Mina_base.State_hash
 
-      let to_input (t : t) = Random_oracle.Input.field (t :> Tick.Field.t)
+      let to_input (t : t) =
+        Random_oracle.Input.Chunked.field (t :> Tick.Field.t)
 
       let null = Mina_base.State_hash.(of_hash zero)
 
@@ -1330,8 +1319,10 @@ module Data = struct
         in
         let%bind overlapping_window =
           Global_sub_window.Checked.(
-            add prev_global_sub_window constants.sub_windows_per_window
-            >= next_global_sub_window)
+            let%bind x =
+              add prev_global_sub_window constants.sub_windows_per_window
+            in
+            x >= next_global_sub_window)
         in
         let if_ cond ~then_ ~else_ =
           let%bind cond = cond and then_ = then_ and else_ = else_ in
@@ -1375,8 +1366,8 @@ module Data = struct
           let%bind in_grace_period =
             Global_slot.Checked.( < ) next_global_slot
               (Global_slot.Checked.of_slot_number ~constants
-                 (Mina_numbers.Global_slot.Checked.Unsafe.of_integer
-                    (Length.Checked.to_integer constants.grace_period_end)))
+                 (Mina_numbers.Global_slot.Checked.Unsafe.of_field
+                    (Length.Checked.to_field constants.grace_period_end)))
           in
           if_
             Boolean.(same_sub_window || in_grace_period)
@@ -1802,23 +1793,21 @@ module Data = struct
          ; supercharge_coinbase
          } :
           Value.t) =
-      let input =
-        { Random_oracle.Input.bitstrings =
-            [| Length.Bits.to_bits blockchain_length
-             ; Length.Bits.to_bits epoch_count
-             ; Length.Bits.to_bits min_window_density
-             ; List.concat_map ~f:Length.Bits.to_bits sub_window_densities
-             ; Vrf.Output.Truncated.to_bits last_vrf_output
-             ; Amount.to_bits total_currency
-             ; Global_slot.to_bits curr_global_slot
-             ; Mina_numbers.Global_slot.to_bits global_slot_since_genesis
-             ; [ has_ancestor_in_same_checkpoint_window; supercharge_coinbase ]
-            |]
-        ; field_elements = [||]
-        }
-      in
-      List.reduce_exn ~f:Random_oracle.Input.append
-        [ input
+      let open Random_oracle.Input.Chunked in
+      List.reduce_exn ~f:append
+        [ Length.to_input blockchain_length
+        ; Length.to_input epoch_count
+        ; Length.to_input min_window_density
+        ; List.reduce_exn ~f:append
+            (List.map ~f:Length.to_input sub_window_densities)
+        ; Vrf.Output.Truncated.to_input last_vrf_output
+        ; Amount.to_input total_currency
+        ; Global_slot.to_input curr_global_slot
+        ; Mina_numbers.Global_slot.to_input global_slot_since_genesis
+        ; packed
+            ( Mina_base.Util.field_of_bool has_ancestor_in_same_checkpoint_window
+            , 1 )
+        ; packed (Mina_base.Util.field_of_bool supercharge_coinbase, 1)
         ; Epoch_data.Staking.to_input staking_epoch_data
         ; Epoch_data.Next.to_input next_epoch_data
         ; Public_key.Compressed.to_input block_stake_winner
@@ -1844,54 +1833,25 @@ module Data = struct
          ; supercharge_coinbase
          } :
           var) =
-      let open Tick.Checked.Let_syntax in
-      let%map input =
-        let bs = Bitstring.Lsb_first.to_list in
-        let up k x = k x >>| Bitstring.Lsb_first.to_list in
-        let length = up Length.Checked.to_bits in
-        let%map blockchain_length = length blockchain_length
-        and epoch_count = length epoch_count
-        and min_window_density = length min_window_density
-        and curr_global_slot = up Global_slot.Checked.to_bits curr_global_slot
-        and global_slot_since_genesis =
-          up Mina_numbers.Global_slot.Checked.to_bits global_slot_since_genesis
-        and sub_window_densities =
-          Checked.List.fold sub_window_densities ~init:[] ~f:(fun acc l ->
-              let%map res = length l in
-              List.append acc res)
-        in
-        { Random_oracle.Input.bitstrings =
-            [| blockchain_length
-             ; epoch_count
-             ; min_window_density
-             ; sub_window_densities
-             ; Array.to_list last_vrf_output
-             ; bs (Amount.var_to_bits total_currency)
-             ; curr_global_slot
-             ; global_slot_since_genesis
-             ; [ has_ancestor_in_same_checkpoint_window; supercharge_coinbase ]
-            |]
-        ; field_elements = [||]
-        }
-      and staking_epoch_data =
-        Epoch_data.Staking.var_to_input staking_epoch_data
-      and next_epoch_data = Epoch_data.Next.var_to_input next_epoch_data in
-      let block_stake_winner =
-        Public_key.Compressed.Checked.to_input block_stake_winner
-      in
-      let block_creator =
-        Public_key.Compressed.Checked.to_input block_creator
-      in
-      let coinbase_receiver =
-        Public_key.Compressed.Checked.to_input coinbase_receiver
-      in
-      List.reduce_exn ~f:Random_oracle.Input.append
-        [ input
-        ; staking_epoch_data
-        ; next_epoch_data
-        ; block_stake_winner
-        ; block_creator
-        ; coinbase_receiver
+      let open Random_oracle.Input.Chunked in
+      List.reduce_exn ~f:append
+        [ Length.Checked.to_input blockchain_length
+        ; Length.Checked.to_input epoch_count
+        ; Length.Checked.to_input min_window_density
+        ; List.reduce_exn ~f:append
+            (List.map ~f:Length.Checked.to_input sub_window_densities)
+        ; Vrf.Output.Truncated.var_to_input last_vrf_output
+        ; Amount.var_to_input total_currency
+        ; Global_slot.Checked.to_input curr_global_slot
+        ; Mina_numbers.Global_slot.Checked.to_input global_slot_since_genesis
+        ; packed
+            ((has_ancestor_in_same_checkpoint_window :> Tick.Field.Var.t), 1)
+        ; packed ((supercharge_coinbase :> Tick.Field.Var.t), 1)
+        ; Epoch_data.Staking.var_to_input staking_epoch_data
+        ; Epoch_data.Next.var_to_input next_epoch_data
+        ; Public_key.Compressed.Checked.to_input block_stake_winner
+        ; Public_key.Compressed.Checked.to_input block_creator
+        ; Public_key.Compressed.Checked.to_input coinbase_receiver
         ]
 
     let global_slot { Poly.curr_global_slot; _ } = curr_global_slot
@@ -1999,27 +1959,28 @@ module Data = struct
     let same_checkpoint_window ~(constants : Constants.var)
         ~prev:(slot1 : Global_slot.Checked.t)
         ~next:(slot2 : Global_slot.Checked.t) =
-      let open Snarky_integer in
-      let open Run in
       let module Slot = Mina_numbers.Global_slot in
-      let slot1 = Slot.Checked.to_integer (Global_slot.slot_number slot1) in
+      let slot1 : Slot.Checked.t = Global_slot.slot_number slot1 in
       let checkpoint_window_size_in_slots =
-        Length.Checked.to_integer constants.checkpoint_window_size_in_slots
+        constants.checkpoint_window_size_in_slots
       in
-      let _q1, r1 = Integer.div_mod ~m slot1 checkpoint_window_size_in_slots in
+      let%bind _q1, r1 =
+        Slot.Checked.div_mod slot1
+          (Slot.Checked.Unsafe.of_field
+             (Length.Checked.to_field checkpoint_window_size_in_slots))
+      in
       let next_window_start =
-        Field.(
-          Integer.to_field slot1 - Integer.to_field r1
-          + Integer.to_field checkpoint_window_size_in_slots)
+        Run.Field.(
+          Slot.Checked.to_field slot1
+          - Slot.Checked.to_field r1
+          + Length.Checked.to_field checkpoint_window_size_in_slots)
       in
-      (Field.compare ~bit_length:Slot.length_in_bits
-         ( Global_slot.slot_number slot2
-         |> Slot.Checked.to_integer |> Integer.to_field )
-         next_window_start)
-        .less
+      Slot.Checked.( < )
+        (Global_slot.slot_number slot2)
+        (Slot.Checked.Unsafe.of_field next_window_start)
 
     let same_checkpoint_window ~constants ~prev ~next =
-      make_checked (fun () -> same_checkpoint_window ~constants ~prev ~next)
+      same_checkpoint_window ~constants ~prev ~next
 
     let negative_one ~genesis_ledger
         ~(genesis_epoch_data : Genesis_epoch_data.t) ~(constants : Constants.t)
@@ -2562,13 +2523,13 @@ module Hooks = struct
         include Master
       end)
 
-      module V1 = struct
+      module V2 = struct
         module T = struct
           type query = Mina_base.Ledger_hash.Stable.V1.t
           [@@deriving bin_io, version { rpc }]
 
           type response =
-            ( Mina_base.Sparse_ledger.Stable.V1.t
+            ( Mina_base.Sparse_ledger.Stable.V2.t
             , string )
             Core_kernel.Result.Stable.V1.t
           [@@deriving bin_io, version { rpc }]

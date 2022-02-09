@@ -26,10 +26,10 @@ type ('app_state, 'vk) t_ = ('app_state, 'vk) Poly.t =
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
       ( Snapp_state.Value.Stable.V1.t
-      , ( Side_loaded_verification_key.Stable.V1.t
+      , ( Side_loaded_verification_key.Stable.V2.t
         , F.Stable.V1.t )
         With_hash.Stable.V1.t
         option )
@@ -52,15 +52,17 @@ let digest_vk (t : Side_loaded_verification_key.t) =
 module Checked = struct
   type t =
     ( Pickles.Impls.Step.Field.t Snapp_state.V.t
-    , ( Pickles.Side_loaded.Verification_key.Checked.t
+    , ( Pickles.Side_loaded.Verification_key.Checked.t Lazy.t
       , Pickles.Impls.Step.Field.t Lazy.t )
       With_hash.t )
     Poly.t
 
   let to_input' (t : _ Poly.t) =
-    let open Random_oracle.Input in
+    let open Random_oracle.Input.Chunked in
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-    let app_state v = Random_oracle.Input.field_elements (Vector.to_array v) in
+    let app_state v =
+      Random_oracle.Input.Chunked.field_elements (Vector.to_array v)
+    in
     Poly.Fields.fold ~init:[] ~app_state:(f app_state)
       ~verification_key:(f (fun x -> field x))
     |> List.reduce_exn ~f:append
@@ -93,9 +95,12 @@ let typ : (Checked.t, t) Typ.t =
           | Some x ->
               With_hash.data x)
         ~back:(fun x -> Some (With_hash.of_data x ~hash_data:digest_vk))
-      |> Typ.transport_var ~there:With_hash.data
-           ~back:
-             (With_hash.of_data ~hash_data:(fun x -> lazy (Checked.digest_vk x)))
+      |> Typ.transport_var
+           ~there:(fun wh -> Lazy.force (With_hash.data wh))
+           ~back:(fun x ->
+             With_hash.of_data
+               (lazy x)
+               ~hash_data:(fun _ -> lazy (Checked.digest_vk x)))
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
@@ -106,9 +111,11 @@ let dummy_vk_hash =
   Memo.unit (fun () -> digest_vk Side_loaded_verification_key.dummy)
 
 let to_input (t : t) =
-  let open Random_oracle.Input in
+  let open Random_oracle.Input.Chunked in
   let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-  let app_state v = Random_oracle.Input.field_elements (Vector.to_array v) in
+  let app_state v =
+    Random_oracle.Input.Chunked.field_elements (Vector.to_array v)
+  in
   Poly.Fields.fold ~init:[] ~app_state:(f app_state)
     ~verification_key:
       (f
