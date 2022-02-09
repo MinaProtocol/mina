@@ -324,7 +324,7 @@ let gen_epoch_data_predicate
       closed_interval_exact epoch_data.ledger.total_currency
       |> return |> Snapp_basic.Or_ignore.gen
     in
-    Epoch_ledger.Poly.{ hash; total_currency }
+    { Epoch_ledger.Poly.hash; total_currency }
   in
   let%bind seed = Snapp_basic.Or_ignore.gen @@ return epoch_data.seed in
   let%bind start_checkpoint =

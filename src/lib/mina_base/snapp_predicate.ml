@@ -801,6 +801,21 @@ module Protocol_state = struct
       end
     end]
 
+    let deriver obj =
+      let open Fields_derivers_snapps.Derivers in
+      let ledger obj' =
+        Epoch_ledger.Poly.Fields.make_creator obj'
+          ~hash:!.(Or_ignore.deriver field)
+          ~total_currency:!.(Numeric.deriver amount)
+        |> finish ~name:"EpochLedger"
+      in
+      Poly.Fields.make_creator obj ~ledger:!.ledger
+        ~seed:!.(Or_ignore.deriver field)
+        ~start_checkpoint:!.(Or_ignore.deriver field)
+        ~lock_checkpoint:!.(Or_ignore.deriver field)
+        ~epoch_length:!.(Numeric.deriver uint32)
+      |> finish ~name:"EpochLedgerPredicate"
+
     let gen : t Quickcheck.Generator.t =
       let open Quickcheck.Let_syntax in
       let%bind ledger =
@@ -931,6 +946,22 @@ module Protocol_state = struct
       let to_latest = Fn.id
     end
   end]
+
+  let deriver obj =
+    let open Fields_derivers_snapps.Derivers in
+    Poly.Fields.make_creator obj
+      ~snarked_ledger_hash:!.(Or_ignore.deriver field)
+      ~snarked_next_available_token:!.(Numeric.deriver uint64)
+      ~timestamp:!.(Numeric.deriver uint64)
+      ~blockchain_length:!.(Numeric.deriver uint32)
+      ~min_window_density:!.(Numeric.deriver uint32)
+      ~last_vrf_output:!.unit
+      ~total_currency:!.(Numeric.deriver amount)
+      ~global_slot_since_hard_fork:!.(Numeric.deriver uint32)
+      ~global_slot_since_genesis:!.(Numeric.deriver uint32)
+      ~staking_epoch_data:!.Epoch_data.deriver
+      ~next_epoch_data:!.Epoch_data.deriver
+    |> finish ~name:"ProtocolStatePredicate"
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
