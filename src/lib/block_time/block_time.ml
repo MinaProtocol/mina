@@ -79,9 +79,11 @@ module Time = struct
               | Some tm ->
                   Int.of_string tm
               | None ->
+                  let default = 0 in
                   eprintf
-                    "Environment variable %s not found, using default of 0" env ;
-                  0
+                    "Environment variable %s not found, using default of %d\n%!"
+                    env default ;
+                  default
             in
             Core_kernel.Time.Span.of_int_sec env_offset
           in

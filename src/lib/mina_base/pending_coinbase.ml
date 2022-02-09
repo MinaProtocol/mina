@@ -641,6 +641,24 @@ module T = struct
 
     let equal_data t1 t2 = Coinbase_stack.equal t1.Poly.data t2.Poly.data
 
+    let connected ?(prev : t option = None) ~first ~second () =
+      let coinbase_stack_connected =
+        (*same as old stack or second could be a new stack with empty data*)
+        equal_data first second || Coinbase_stack.(equal empty second.Poly.data)
+      in
+      let state_stack_connected =
+        (*1. same as old stack or
+          2. new stack initialized with the stack state of last block. Not possible to know this unless we track all the stack states because they are updated once per block (init=curr)
+          3. [second] could be a new stack initialized with the latest state of [first] or
+          4. [second] starts from the previous state of [first]. This is not available in either [first] or [second] *)
+        equal_state_hash first second
+        || Stack_hash.equal second.state.init second.state.curr
+        || Stack_hash.equal first.state.curr second.state.curr
+        || Option.value_map prev ~default:true ~f:(fun prev ->
+               Stack_hash.equal prev.state.curr second.state.curr)
+      in
+      coinbase_stack_connected && state_stack_connected
+
     let push_coinbase (cb : Coinbase.t) t =
       let data = Coinbase_stack.push t.Poly.data cb in
       { t with data }

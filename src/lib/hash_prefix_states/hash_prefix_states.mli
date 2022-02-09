@@ -53,6 +53,8 @@ val party : Field.t State.t
 
 val party_cons : Field.t State.t
 
+val party_node : Field.t State.t
+
 val party_with_protocol_state_predicate : Field.t State.t
 
 val receipt_chain_user_command : Field.t State.t
@@ -74,3 +76,15 @@ val checkpoint_list : Field.t State.t
 val merge_snark : Field.t State.t
 
 val base_snark : Field.t State.t
+
+val snapp_uri : Field.t State.t
+
+val snapp_event : Field.t State.t
+
+val snapp_events : Field.t State.t
+
+val snapp_sequence_events : Field.t State.t
+
+val snapp_memo : Field.t State.t
+
+val snapp_test : Field.t State.t
