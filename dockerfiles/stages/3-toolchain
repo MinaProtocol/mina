@@ -63,6 +63,7 @@ RUN test "$deb_codename" = "buster" \
           python-jinja2 \
           python-flake8 \
           python-sexpdata \
+      && sudo pip install readchar \
       || exit 0
 
 # --- deb-s3 tool
