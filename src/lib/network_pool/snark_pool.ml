@@ -584,21 +584,23 @@ struct
                           )
                         ] ;
                     Deferred.return false
-                | Some _ -> (
-                    match%bind
-                      Batcher.Snark_pool.verify t.batcher proof_env
-                    with
-                    | Ok true ->
-                        return true
-                    | Ok false ->
-                        (* if this proof is in the set of invalid proofs*)
-                        let e = Error.of_string "Invalid proof" in
-                        let%map () = log e in
-                        false
-                    | Error e ->
-                        (* Verifier crashed or other errors at our end. Don't punish the peer*)
-                        let%map () = log ~punish:false e in
-                        false ) )
+                | Some _ ->
+                    O1trace.time_execution "snark_pool_batch_verifying_proofs"
+                      (fun () ->
+                        match%bind
+                          Batcher.Snark_pool.verify t.batcher proof_env
+                        with
+                        | Ok true ->
+                            return true
+                        | Ok false ->
+                            (* if this proof is in the set of invalid proofs*)
+                            let e = Error.of_string "Invalid proof" in
+                            let%map () = log e in
+                            false
+                        | Error e ->
+                            (* Verifier crashed or other errors at our end. Don't punish the peer*)
+                            let%map () = log ~punish:false e in
+                            false) )
         in
         match One_or_two.zip proofs statements with
         | Ok pairs ->

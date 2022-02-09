@@ -173,37 +173,41 @@ end)
                     Broadcast_callback.error
                       (Error.of_string "exceeded capacity")
                       cb
-                | `Within_capacity -> (
-                    match%bind
-                      Resource_pool.Diff.verify t.resource_pool diff
-                    with
-                    | Error err ->
-                        [%log' debug t.logger]
-                          "Refusing to rebroadcast $diff. Verification error: \
-                           $error"
-                          ~metadata:
-                            [ ("diff", summary)
-                            ; ("error", Error_json.error_to_yojson err)
-                            ] ;
-                        (*reject incoming messages*)
-                        Broadcast_callback.error err cb
-                    | Ok verified_diff -> (
-                        [%log' debug t.logger] "Verified diff: $verified_diff"
-                          ~metadata:
-                            [ ( "verified_diff"
-                              , Resource_pool.Diff.verified_to_yojson
-                                @@ Envelope.Incoming.data verified_diff )
-                            ; ( "sender"
-                              , Envelope.Sender.to_yojson
-                                @@ Envelope.Incoming.sender verified_diff )
-                            ] ;
-                        match
-                          Strict_pipe.Writer.write w (verified_diff, cb)
+                | `Within_capacity ->
+                    O1trace.time_execution
+                      (Printf.sprintf "verifying_%s_diffs" Resource_pool.label)
+                      (fun () ->
+                        match%bind
+                          Resource_pool.Diff.verify t.resource_pool diff
                         with
-                        | Some r ->
-                            r
-                        | None ->
-                            Deferred.unit ) ) ) )))
+                        | Error err ->
+                            [%log' debug t.logger]
+                              "Refusing to rebroadcast $diff. Verification \
+                               error: $error"
+                              ~metadata:
+                                [ ("diff", summary)
+                                ; ("error", Error_json.error_to_yojson err)
+                                ] ;
+                            (*reject incoming messages*)
+                            Broadcast_callback.error err cb
+                        | Ok verified_diff -> (
+                            [%log' debug t.logger]
+                              "Verified diff: $verified_diff"
+                              ~metadata:
+                                [ ( "verified_diff"
+                                  , Resource_pool.Diff.verified_to_yojson
+                                    @@ Envelope.Incoming.data verified_diff )
+                                ; ( "sender"
+                                  , Envelope.Sender.to_yojson
+                                    @@ Envelope.Incoming.sender verified_diff )
+                                ] ;
+                            match
+                              Strict_pipe.Writer.write w (verified_diff, cb)
+                            with
+                            | Some r ->
+                                r
+                            | None ->
+                                Deferred.unit )) ) )))
     |> don't_wait_for ;
     r
 
