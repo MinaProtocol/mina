@@ -170,7 +170,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       }
     in
     let%bind parties_valid =
-      mk_parties_with_signatures ~fee_payer_nonce:Unsigned.UInt32.one
+      mk_parties_with_signatures ~fee_payer_nonce:Unsigned.UInt32.zero
         parties_valid_pks
     in
     let%bind () =
