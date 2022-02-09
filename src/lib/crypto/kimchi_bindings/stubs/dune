@@ -8,7 +8,6 @@
  (targets libwires_15_stubs.a target)
  (deps
   Cargo.toml
-  rust-toolchain.toml
   (source_tree src)
   (source_tree ../../proof-systems))
  (action
@@ -17,7 +16,12 @@
     RUSTFLAGS
     "-C target-feature=+bmi2,+adx"
     (run cargo build --release))
-   (run cp target/release/libwires_15_stubs.a .))))
+   (with-stdout-to cargo-target-path
+    (pipe-stdout
+     (run cargo metadata)
+     (run cargo_target_dir/cargo_target_dir.exe)))
+   (no-infer ;; dune doesn't know about the file we're copying
+    (copy %{read:cargo-target-path}/release/libwires_15_stubs.a .)))))
 
 ;; library
 
@@ -38,7 +42,6 @@
  (target kimchi.ml)
  (deps
   Cargo.toml
-  rust-toolchain.toml
   ../../../../.ocamlformat
   (source_tree src)
   (source_tree binding_generation)

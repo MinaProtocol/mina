@@ -1,9 +1,3 @@
-[workspace]
-members = [
-    ".",
-    "binding_generation",
-]
-
 [package]
 name = "wires_15_stubs"
 version = "0.1.0"
@@ -44,6 +38,3 @@ kimchi = { path = "../../proof-systems/kimchi", features = ["ocaml_types"] }
 # ocaml-specific
 ocaml = { version = "0.22.2" }
 ocaml-gen = { path = "../../proof-systems/ocaml/ocaml-gen" }
-
-[profile.release]
-debug = true
