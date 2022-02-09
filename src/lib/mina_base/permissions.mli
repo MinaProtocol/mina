@@ -1,14 +1,6 @@
 [%%import "/src/config.mlh"]
 
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-
-[%%endif]
 
 module Auth_required : sig
   [%%versioned:
@@ -57,6 +49,10 @@ module Poly : sig
         ; set_delegate : 'controller
         ; set_permissions : 'controller
         ; set_verification_key : 'controller
+        ; set_snapp_uri : 'controller
+        ; edit_sequence_state : 'controller
+        ; set_token_symbol : 'controller
+        ; increment_nonce : 'controller
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
@@ -70,6 +66,11 @@ module Stable : sig
     [@@deriving sexp, equal, compare, hash, yojson]
   end
 end]
+
+(** if [auth_tag] is provided, the generated permissions will be compatible with
+    the corresponding authorization
+*)
+val gen : auth_tag:Control.Tag.t -> t Core_kernel.Quickcheck.Generator.t
 
 val to_input : t -> Field.t Random_oracle_input.Chunked.t
 

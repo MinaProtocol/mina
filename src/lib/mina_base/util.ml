@@ -1,16 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-
-[%%endif]
 
 let field_of_bool b = if b then Field.one else Field.zero
 
@@ -26,3 +17,10 @@ let split_last_exn =
   function [] -> failwith "split_last: Empty list" | x :: xs -> go [] x xs
 
 let two_to_the i = Bignum_bigint.(pow (of_int 2) (of_int i))
+
+let todo_snapps = `Needs_some_work_for_snapps_on_mainnet
+
+let todo_separate_fee = `Update_when_we_add_a_separate_fee
+
+let todo_multiple_slots_per_transaction =
+  `Needs_update_for_multiple_slots_per_txn

@@ -4,9 +4,7 @@ open Pipe_lib
 open Mina_base
 open Mina_state
 open Mina_transition
-open Signature_lib
 open O1trace
-open Otp_lib
 module Time = Block_time
 
 type Structured_log_events.t += Block_produced
@@ -237,19 +235,17 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               previous_protocol_state |> Protocol_state.blockchain_state
               |> Blockchain_state.snarked_ledger_hash
             in
-            let next_ledger_hash =
-              Option.value_map ledger_proof_opt
-                ~f:(fun (proof, _) ->
-                  Ledger_proof.statement proof |> Ledger_proof.statement_target)
-                ~default:previous_ledger_hash
-            in
-            let snarked_next_available_token =
+            let next_registers =
               match ledger_proof_opt with
               | Some (proof, _) ->
-                  (Ledger_proof.statement proof).next_available_token_after
+                  { ( Ledger_proof.statement proof
+                    |> Ledger_proof.statement_target )
+                    with
+                    pending_coinbase_stack = ()
+                  }
               | None ->
                   previous_protocol_state |> Protocol_state.blockchain_state
-                  |> Blockchain_state.snarked_next_available_token
+                  |> Blockchain_state.registers
             in
             let genesis_ledger_hash =
               previous_protocol_state |> Protocol_state.blockchain_state
@@ -271,8 +267,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                  has a different slot from the [scheduled_time]
               *)
               Blockchain_state.create_value ~timestamp:scheduled_time
-                ~snarked_ledger_hash:next_ledger_hash ~genesis_ledger_hash
-                ~snarked_next_available_token
+                ~registers:next_registers ~genesis_ledger_hash
                 ~staged_ledger_hash:next_staged_ledger_hash
             in
             let current_time =
@@ -535,7 +530,7 @@ module Vrf_evaluation_state = struct
 end
 
 let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
-    ~get_completed_work ~transaction_resource_pool ~time_controller ~keypairs
+    ~get_completed_work ~transaction_resource_pool ~time_controller
     ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
     ~(precomputed_values : Precomputed_values.t) ~block_reward_threshold
@@ -875,22 +870,6 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
       let vrf_evaluation_state = Vrf_evaluation_state.create () in
       let rec check_next_block_timing slot i () =
         trace_recurring "check next block timing" (fun () ->
-            (* See if we want to change keypairs *)
-            let _keypairs =
-              match Agent.get keypairs with
-              | keypairs, `Different ->
-                  (* Perform block production key swap since we have new
-                     keypairs *)
-                  Consensus.Data.Local_state.block_production_keys_swap
-                    ~constants:consensus_constants consensus_local_state
-                    ( Keypair.And_compressed_pk.Set.to_list keypairs
-                    |> List.map ~f:snd |> Public_key.Compressed.Set.of_list )
-                    (Time.now time_controller) ;
-                  (*TODO: propagate updated delegatee table to the VRF evaluator*)
-                  keypairs
-              | keypairs, `Same ->
-                  keypairs
-            in
             (* Begin checking for the ability to produce a block *)
             match Broadcast_pipe.Reader.peek frontier_reader with
             | None ->
@@ -1122,19 +1101,6 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                              Deferred.return () )))
       in
       let start () =
-        (* Schedule to wake up immediately on the next tick of the producer loop
-         * instead of immediately mutating local_state here as there could be a
-         * race.
-         *
-         * Given that rescheduling takes the min of the two timeouts, we won't
-         * erase this timeout even if the last run of the producer wants to wait
-         * for a long while.
-         * *)
-        Agent.on_update keypairs ~f:(fun _new_keypairs ->
-            Singleton_scheduler.schedule scheduler (Time.now time_controller)
-              ~f:
-                (check_next_block_timing Mina_numbers.Global_slot.zero
-                   Mina_numbers.Length.zero)) ;
         check_next_block_timing Mina_numbers.Global_slot.zero
           Mina_numbers.Length.zero ()
       in

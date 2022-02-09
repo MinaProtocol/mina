@@ -1,13 +1,10 @@
 (* js_util.ml -- types and transformers for Javascript *)
 
 open Js_of_ocaml
-open Snark_params_nonconsensus
-open Mina_base_nonconsensus
-module Currency = Currency_nonconsensus.Currency
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Global_slot = Mina_numbers_nonconsensus.Global_slot
+open Snark_params.Tick
+open Mina_base
+module Global_slot = Mina_numbers.Global_slot
 module Memo = Signed_command_memo
-module Signature_lib = Signature_lib_nonconsensus
 
 let raise_js_error s = Js.raise_js_error (new%js Js.error_constr (Js.string s))
 

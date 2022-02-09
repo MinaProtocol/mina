@@ -51,7 +51,6 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
             lookup_index: vi.lookup_index.map(Into::into),
-            linearization: vi.linearization.into(),
         }
     }
 }
@@ -83,6 +82,9 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
         let shifts: Vec<Fp> = shifts.iter().map(Into::into).collect();
         let shift: [Fp; PERMUTS] = shifts.try_into().expect("wrong size");
 
+        // TODO chacha, dummy_lookup_value ?
+        let linearization = expr_linearization(domain, false, &None);
+
         VerifierIndex::<GAffine> {
             domain,
             max_poly_size: index.max_poly_size as usize,
@@ -108,7 +110,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
             endo: endo_q,
 
             lookup_index: index.lookup_index.map(Into::into),
-            linearization: index.linearization.into(),
+            linearization,
 
             fr_sponge_params: oracle::pasta::fp_3::params(),
             fq_sponge_params: oracle::pasta::fq_3::params(),
@@ -151,8 +153,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_read(
     srs: CamlFpSrs,
     path: String,
 ) -> Result<CamlPastaFpPlonkVerifierIndex, ocaml::Error> {
-    let mut vi = read_raw(offset, srs, path)?;
-    vi.linearization = expr_linearization(vi.domain, false, &None);
+    let vi = read_raw(offset, srs, path)?;
     Ok(vi.into())
 }
 
@@ -229,7 +230,6 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
         },
         shifts: (0..PERMUTS - 1).map(|_| Fp::one().into()).collect(),
         lookup_index: None,
-        linearization: Linearization::<Vec<PolishToken<Fp>>>::default().into(),
     }
 }
 

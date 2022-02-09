@@ -51,7 +51,6 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
             lookup_index: vi.lookup_index.map(Into::into),
-            linearization: vi.linearization.into(),
         }
     }
 }
@@ -83,6 +82,9 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
         let shifts: Vec<Fq> = shifts.iter().map(Into::into).collect();
         let shift: [Fq; PERMUTS] = shifts.try_into().expect("wrong size");
 
+        // TODO chacha, dummy_lookup_value ?
+        let linearization = expr_linearization(domain, false, &None);
+
         VerifierIndex::<GAffine> {
             domain,
             max_poly_size: index.max_poly_size as usize,
@@ -108,7 +110,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
             endo: endo_q,
 
             lookup_index: index.lookup_index.map(Into::into),
-            linearization: index.linearization.into(),
+            linearization,
 
             fr_sponge_params: oracle::pasta::fq_3::params(),
             fq_sponge_params: oracle::pasta::fp_3::params(),
@@ -151,8 +153,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_read(
     srs: CamlFqSrs,
     path: String,
 ) -> Result<CamlPastaFqPlonkVerifierIndex, ocaml::Error> {
-    let mut vi = read_raw(offset, srs, path)?;
-    vi.linearization = expr_linearization(vi.domain, false, &None);
+    let vi = read_raw(offset, srs, path)?;
     Ok(vi.into())
 }
 
@@ -191,7 +192,6 @@ pub fn caml_pasta_fq_plonk_verifier_index_create(
 pub fn caml_pasta_fq_plonk_verifier_index_shifts(log2_size: ocaml::Int) -> Vec<CamlFq> {
     let domain = Domain::<Fq>::new(1 << log2_size).unwrap();
     let shifts = Shifts::new(&domain);
-
     shifts.shifts().iter().map(Into::into).collect()
 }
 
@@ -230,7 +230,6 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
         },
         shifts: (0..PERMUTS - 1).map(|_| Fq::one().into()).collect(),
         lookup_index: None,
-        linearization: Linearization::<Vec<PolishToken<Fq>>>::default().into(),
     }
 }
 

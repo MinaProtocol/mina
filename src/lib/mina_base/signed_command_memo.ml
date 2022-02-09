@@ -3,12 +3,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
-open Crypto_params
-
-[%%endif]
+open Snark_params
 
 [%%versioned
 module Stable = struct
@@ -155,6 +150,15 @@ let fold_bits t =
   }
 
 let to_bits t = Fold_lib.Fold.to_list (fold_bits t)
+
+let gen =
+  Quickcheck.Generator.map String.quickcheck_generator
+    ~f:create_by_digesting_string_exn
+
+let hash memo =
+  Random_oracle.hash ~init:Hash_prefix.snapp_memo
+    (Random_oracle.Legacy.pack_input
+       (Random_oracle_input.Legacy.bitstring (to_bits memo)))
 
 [%%ifdef consensus_mechanism]
 

@@ -30,7 +30,7 @@ module Stable = struct
   module V2 = struct
     module T = struct
       type t =
-        { protocol_state : Protocol_state.Value.Stable.V1.t
+        { protocol_state : Protocol_state.Value.Stable.V2.t
         ; protocol_state_proof : Proof.Stable.V2.t [@sexp.opaque]
         ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
         ; delta_transition_chain_proof :
@@ -201,9 +201,10 @@ module Precomputed_block = struct
     module V2 = struct
       type t = T.t =
         { scheduled_time : Block_time.Stable.V1.t
-        ; protocol_state : Protocol_state.Value.Stable.V1.t
+        ; protocol_state : Protocol_state.Value.Stable.V2.t
         ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
         ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
+              (* TODO: Delete this or find out why it is here. *)
         ; delta_transition_chain_proof :
             Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
         }
@@ -560,8 +561,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_proof :
            ( 'time_received
@@ -594,8 +593,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_genesis_state :
            ( 'time_received
@@ -628,8 +625,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_delta_transition_chain :
            ( 'time_received
@@ -667,8 +662,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_frontier_dependencies :
            ( 'time_received
@@ -701,8 +694,6 @@ module Validation = struct
           , (`Frontier_dependencies, Truth.True ())
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_staged_ledger_diff :
            ( 'time_received
@@ -735,8 +726,6 @@ module Validation = struct
           , frontier_dependencies
           , (`Staged_ledger_diff, Truth.True ())
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_protocol_versions :
            ( 'time_received
@@ -769,8 +758,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , (`Protocol_versions, Truth.True ()) )
-      | _ ->
-          failwith "why can't this be refuted?"
   end
 end
 
@@ -1003,7 +990,7 @@ module Validated = struct
   module Stable = struct
     module V2 = struct
       type t =
-        (external_transition, State_hash.t) With_hash.t
+        (Stable.V2.t, State_hash.t) With_hash.t
         * ( [ `Time_received ] * (unit, Truth.True.t) Truth.t
           , [ `Genesis_state ] * (unit, Truth.True.t) Truth.t
           , [ `Proof ] * (unit, Truth.True.t) Truth.t
@@ -1229,7 +1216,7 @@ end
 module Staged_ledger_validation = struct
   let target_hash_of_ledger_proof =
     let open Ledger_proof in
-    Fn.compose statement_target statement
+    Fn.compose Registers.ledger (Fn.compose statement_target statement)
 
   let validate_staged_ledger_diff :
          ?skip_staged_ledger_verification:[ `All | `Proofs ]

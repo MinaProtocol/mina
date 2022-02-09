@@ -77,9 +77,8 @@ module Minimal : sig
   val upgrade :
        t
     -> transition:External_transition.Validated.t
-    -> protocol_states:( Mina_base.State_hash.t
-                       * Mina_state.Protocol_state.Value.t )
-                       list
+    -> protocol_states:
+         (Mina_base.State_hash.t * Mina_state.Protocol_state.Value.t) list
     -> Limited.t
 
   val create :
@@ -90,10 +89,11 @@ module Minimal : sig
 end
 
 type t =
-  { transition: External_transition.Validated.t
-  ; staged_ledger: Staged_ledger.t
-  ; protocol_states:
-      (Mina_base.State_hash.t * Mina_state.Protocol_state.Value.t) list }
+  { transition : External_transition.Validated.t
+  ; staged_ledger : Staged_ledger.t
+  ; protocol_states :
+      (Mina_base.State_hash.t * Mina_state.Protocol_state.Value.t) list
+  }
 
 val minimize : t -> Minimal.t
 

@@ -90,7 +90,6 @@ pub mod linearization {
 pub use {
     commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
     kimchi::circuits::{
-        expr::caml::{CamlColumn, CamlLinearization, CamlPolishToken, CamlVariable},
         gate::{caml::CamlCircuitGate, CurrOrNext, GateType},
         scalars::caml::{CamlLookupEvaluations, CamlProofEvaluations, CamlRandomOracles},
         wires::caml::CamlWire,

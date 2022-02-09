@@ -6,30 +6,33 @@ open Frontier_base
 
 module Node = struct
   type t =
-    {breadcrumb: Breadcrumb.t; successor_hashes: State_hash.t list; length: int}
+    { breadcrumb : Breadcrumb.t
+    ; successor_hashes : State_hash.t list
+    ; length : int
+    }
   [@@deriving sexp, fields]
 
   type display =
-    { length: int
-    ; state_hash: string
-    ; blockchain_state: Blockchain_state.display
-    ; consensus_state: Consensus.Data.Consensus_state.display }
+    { length : int
+    ; state_hash : string
+    ; blockchain_state : Blockchain_state.display
+    ; consensus_state : Consensus.Data.Consensus_state.display
+    }
   [@@deriving yojson]
 
   let equal node1 node2 = Breadcrumb.equal node1.breadcrumb node2.breadcrumb
 
   let hash node = Breadcrumb.hash node.breadcrumb
 
-  let compare node1 node2 =
-    Breadcrumb.compare node1.breadcrumb node2.breadcrumb
+  let compare node1 node2 = Breadcrumb.compare node1.breadcrumb node2.breadcrumb
 
   let name t = Breadcrumb.name t.breadcrumb
 
   let display t =
-    let {Breadcrumb.state_hash; consensus_state; blockchain_state; _} =
+    let { Breadcrumb.state_hash; consensus_state; blockchain_state; _ } =
       Breadcrumb.display t.breadcrumb
     in
-    {state_hash; blockchain_state; length= t.length; consensus_state}
+    { state_hash; blockchain_state; length = t.length; consensus_state }
 end
 
 module Protocol_states_for_root_scan_state = struct
@@ -44,37 +47,38 @@ module Protocol_states_for_root_scan_state = struct
     in
     let protocol_state_map =
       (*Note: Protocol states for the next root should all be in this map
-      assuming roots transition to their successors and do not skip any node in
-      between*)
+        assuming roots transition to their successors and do not skip any node in
+        between*)
       State_hash.Map.set protocol_states_for_old_root ~key:old_root_state.hash
         ~data:old_root_state.data
     in
     List.map required_state_hashes ~f:(fun hash ->
-        (hash, State_hash.Map.find_exn protocol_state_map hash) )
+        (hash, State_hash.Map.find_exn protocol_state_map hash))
 end
 
 (* Invariant: The path from the root to the tip inclusively, will be max_length *)
 type t =
-  { root_ledger: Ledger.Any_ledger.witness
-  ; mutable root: State_hash.t
-  ; mutable best_tip: State_hash.t
-  ; logger: Logger.t
-  ; table: Node.t State_hash.Table.t
-  ; mutable protocol_states_for_root_scan_state:
+  { root_ledger : Ledger.Any_ledger.witness
+  ; mutable root : State_hash.t
+  ; mutable best_tip : State_hash.t
+  ; logger : Logger.t
+  ; table : Node.t State_hash.Table.t
+  ; mutable protocol_states_for_root_scan_state :
       Protocol_states_for_root_scan_state.t
-  ; consensus_local_state: Consensus.Data.Local_state.t
-  ; max_length: int
-  ; precomputed_values: Precomputed_values.t
-  ; time_controller: Block_time.Controller.t
-  ; persistent_root_instance: Persistent_root.Instance.t }
+  ; consensus_local_state : Consensus.Data.Local_state.t
+  ; max_length : int
+  ; precomputed_values : Precomputed_values.t
+  ; time_controller : Block_time.Controller.t
+  ; persistent_root_instance : Persistent_root.Instance.t
+  }
 
-let persistent_root_instance {persistent_root_instance; _} =
+let persistent_root_instance { persistent_root_instance; _ } =
   persistent_root_instance
 
-let consensus_local_state {consensus_local_state; _} = consensus_local_state
+let consensus_local_state { consensus_local_state; _ } = consensus_local_state
 
 let all_breadcrumbs t =
-  List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
+  List.map (Hashtbl.data t.table) ~f:(fun { breadcrumb; _ } -> breadcrumb)
 
 let find t hash =
   let open Option.Let_syntax in
@@ -138,31 +142,33 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
       ~transition_receipt_time
   in
   let root_node =
-    {Node.breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
+    { Node.breadcrumb = root_breadcrumb; successor_hashes = []; length = 0 }
   in
-  let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
+  let table = State_hash.Table.of_alist_exn [ (root_hash, root_node) ] in
   Mina_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 1.0) ;
   { logger
   ; root_ledger
-  ; root= root_hash
-  ; best_tip= root_hash
+  ; root = root_hash
+  ; best_tip = root_hash
   ; table
   ; consensus_local_state
   ; max_length
   ; precomputed_values
   ; protocol_states_for_root_scan_state
   ; persistent_root_instance
-  ; time_controller }
+  ; time_controller
+  }
 
 let root_data t =
   let open Root_data in
   let root = root t in
-  { transition= Breadcrumb.validated_transition root
-  ; staged_ledger= Breadcrumb.staged_ledger root
-  ; protocol_states=
-      State_hash.Map.to_alist t.protocol_states_for_root_scan_state }
+  { transition = Breadcrumb.validated_transition root
+  ; staged_ledger = Breadcrumb.staged_ledger root
+  ; protocol_states =
+      State_hash.Map.to_alist t.protocol_states_for_root_scan_state
+  }
 
-let max_length {max_length; _} = max_length
+let max_length { max_length; _ } = max_length
 
 let root_length t = (Hashtbl.find_exn t.table t.root).length
 
@@ -172,7 +178,7 @@ let successor_hashes t hash =
 
 let rec successor_hashes_rec t hash =
   List.bind (successor_hashes t hash) ~f:(fun succ_hash ->
-      succ_hash :: successor_hashes_rec t succ_hash )
+      succ_hash :: successor_hashes_rec t succ_hash)
 
 let successors t breadcrumb =
   List.map
@@ -181,7 +187,7 @@ let successors t breadcrumb =
 
 let rec successors_rec t breadcrumb =
   List.bind (successors t breadcrumb) ~f:(fun succ ->
-      succ :: successors_rec t succ )
+      succ :: successors_rec t succ)
 
 let path_map ?max_length t breadcrumb ~f =
   let rec find_path b count_opt acc =
@@ -208,7 +214,7 @@ let genesis_constants t = t.precomputed_values.genesis_constants
 
 let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
 
-let best_tip_path_length_exn {table; root; best_tip; _} =
+let best_tip_path_length_exn { table; root; best_tip; _ } =
   let open Option.Let_syntax in
   let result =
     let%bind best_tip_node = Hashtbl.find table best_tip in
@@ -217,8 +223,7 @@ let best_tip_path_length_exn {table; root; best_tip; _} =
   in
   result |> Option.value_exn
 
-let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) : State_hash.t
-    =
+let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) : State_hash.t =
   let rec go ancestors1 ancestors2 b1 b2 =
     let sh1 = Breadcrumb.state_hash b1 in
     let sh2 = Breadcrumb.state_hash b2 in
@@ -259,15 +264,16 @@ module Visualizor = struct
                 [%log' debug t.logger]
                   ~metadata:
                     [ ("state_hash", State_hash.to_yojson successor_state_hash)
-                    ; ("error", `String "missing from frontier") ]
+                    ; ("error", `String "missing from frontier")
+                    ]
                   "Could not visualize state $state_hash: $error" ;
-                acc_graph ) )
+                acc_graph))
 end
 
 let visualize ~filename (t : t) =
   Out_channel.with_file filename ~f:(fun output_channel ->
       let graph = Visualizor.to_graph t in
-      Visualizor.output_graph output_channel graph )
+      Visualizor.output_graph output_channel graph)
 
 let visualize_to_string t =
   let graph = Visualizor.to_graph t in
@@ -286,11 +292,11 @@ let calculate_root_transition_diff t heir =
   let heir_staged_ledger = Breadcrumb.staged_ledger heir in
   let heir_siblings =
     List.filter (successors t root) ~f:(fun breadcrumb ->
-        not (State_hash.equal heir_hash (Breadcrumb.state_hash breadcrumb)) )
+        not (State_hash.equal heir_hash (Breadcrumb.state_hash breadcrumb)))
   in
   let garbage_breadcrumbs =
     List.bind heir_siblings ~f:(fun sibling ->
-        sibling :: successors_rec t sibling )
+        sibling :: successors_rec t sibling)
     |> List.rev
   in
   let garbage_nodes =
@@ -300,15 +306,14 @@ let calculate_root_transition_diff t heir =
         let scan_state =
           Staged_ledger.scan_state (Breadcrumb.staged_ledger breadcrumb)
         in
-        {transition; scan_state} )
+        { transition; scan_state })
   in
   let protocol_states =
-    Protocol_states_for_root_scan_state
-    .protocol_states_for_next_root_scan_state
+    Protocol_states_for_root_scan_state.protocol_states_for_next_root_scan_state
       t.protocol_states_for_root_scan_state
       ~new_scan_state:(Staged_ledger.scan_state heir_staged_ledger)
       ~old_root_state:
-        {With_hash.hash= root_hash; data= Breadcrumb.protocol_state root}
+        { With_hash.hash = root_hash; data = Breadcrumb.protocol_state root }
   in
   let new_root_data =
     Root_data.Limited.create ~transition:heir_transition
@@ -320,9 +325,10 @@ let calculate_root_transition_diff t heir =
   let just_emitted_a_proof = Breadcrumb.just_emitted_a_proof heir in
   Diff.Full.E.E
     (Root_transitioned
-       { new_root= new_root_data
-       ; garbage= Full garbage_nodes
-       ; just_emitted_a_proof })
+       { new_root = new_root_data
+       ; garbage = Full garbage_nodes
+       ; just_emitted_a_proof
+       })
 
 let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
     ~enable_epoch_ledger_sync =
@@ -381,7 +387,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
               (Breadcrumb.consensus_state old_root_node.breadcrumb)
               (Breadcrumb.consensus_state new_root_node.breadcrumb)
               ~local_state:t.consensus_local_state ~snarked_ledger
-              ~genesis_ledger_hash )
+              ~genesis_ledger_hash)
     | `Disabled ->
         ()
   in
@@ -399,7 +405,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         ignore
           ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mask
             : Ledger.unattached_mask ) ;
-        Hashtbl.remove t.table hash ) ;
+        Hashtbl.remove t.table hash) ;
     (* STEP 2 *)
     (* go ahead and remove the old root from the frontier *)
     Hashtbl.remove t.table t.root ;
@@ -435,7 +441,13 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
           ~directory_name:location
       in
       [%log' info t.logger]
-        ~metadata:[ ("potential_snarked_ledger_hash", Frozen_ledger_hash.to_yojson @@ Frozen_ledger_hash.of_ledger_hash @@ Ledger.Db.merkle_root t.persistent_root_instance.snarked_ledger)] "Enqueued a snarked ledger" ;
+        ~metadata:
+          [ ( "potential_snarked_ledger_hash"
+            , Frozen_ledger_hash.to_yojson @@ Frozen_ledger_hash.of_ledger_hash
+              @@ Ledger.Db.merkle_root t.persistent_root_instance.snarked_ledger
+            )
+          ]
+        "Enqueued a snarked ledger" ;
       Persistent_root.Instance.enqueue_snarked_ledger ~location
         t.persistent_root_instance ;
       let s = t.root_ledger in
@@ -462,7 +474,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
                    ~constraint_constants:
                      t.precomputed_values.constraint_constants ~txn_state_view
                    mt txn.data)
-              : Transaction_logic.Transaction_applied.t ) ) ;
+              : Ledger.Transaction_applied.t )) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
@@ -483,15 +495,15 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         (Breadcrumb.transition_receipt_time new_root_node.breadcrumb)
   in
   (*Update the protocol states required for scan state at the new root.
-  Note: this should be after applying the transactions to the snarked ledger (Step 5)
-  because the protocol states corresponding to those transactions won't be part
-  of the new_root_protocol_states since those transactions would have been
-  deleted from the scan state after emitting the proof*)
+    Note: this should be after applying the transactions to the snarked ledger (Step 5)
+    because the protocol states corresponding to those transactions won't be part
+    of the new_root_protocol_states since those transactions would have been
+    deleted from the scan state after emitting the proof*)
   let new_protocol_states_map =
     State_hash.Map.of_alist_exn new_root_protocol_states
   in
   t.protocol_states_for_root_scan_state <- new_protocol_states_map ;
-  let new_root_node = {new_root_node with breadcrumb= new_root_breadcrumb} in
+  let new_root_node = { new_root_node with breadcrumb = new_root_breadcrumb } in
   (* update the new root breadcrumb in the frontier *)
   Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
   (* rewrite the root pointer to the new root hash *)
@@ -507,7 +519,7 @@ let calculate_diffs t breadcrumb =
       in
       let root_node = Hashtbl.find_exn t.table t.root in
       let current_best_tip = best_tip t in
-      let diffs = [Full.E.E (New_node (Full breadcrumb))] in
+      let diffs = [ Full.E.E (New_node (Full breadcrumb)) ] in
       (* check if new breadcrumb extends frontier to longer than k *)
       let diffs =
         if parent_node.length + 1 - root_node.length > t.max_length then
@@ -521,19 +533,19 @@ let calculate_diffs t breadcrumb =
           Consensus.Hooks.equal_select_status
             (Consensus.Hooks.select
                ~constants:t.precomputed_values.consensus_constants
-               ~existing:
-                 (Breadcrumb.consensus_state_with_hash current_best_tip)
+               ~existing:(Breadcrumb.consensus_state_with_hash current_best_tip)
                ~candidate:(Breadcrumb.consensus_state_with_hash breadcrumb)
                ~logger:
                  (Logger.extend t.logger
                     [ ( "selection_context"
-                      , `String "comparing new breadcrumb to best tip" ) ]))
+                      , `String "comparing new breadcrumb to best tip" )
+                    ]))
             `Take
         then Full.E.E (Best_tip_changed breadcrumb_hash) :: diffs
         else diffs
       in
       (* reverse diffs so that they are applied in the correct order *)
-      List.rev diffs )
+      List.rev diffs)
 
 (* TODO: refactor metrics tracking outside of apply_diff (could maybe even be an extension?) *)
 let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
@@ -544,18 +556,19 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       let parent_hash = Breadcrumb.parent_hash breadcrumb in
       let parent_node = Hashtbl.find_exn t.table parent_hash in
       Hashtbl.add_exn t.table ~key:breadcrumb_hash
-        ~data:{breadcrumb; successor_hashes= []; length= parent_node.length + 1} ;
+        ~data:
+          { breadcrumb; successor_hashes = []; length = parent_node.length + 1 } ;
       Hashtbl.set t.table ~key:parent_hash
         ~data:
           { parent_node with
-            successor_hashes= breadcrumb_hash :: parent_node.successor_hashes
+            successor_hashes = breadcrumb_hash :: parent_node.successor_hashes
           } ;
       ((), None)
   | Best_tip_changed new_best_tip ->
       let old_best_tip = t.best_tip in
       t.best_tip <- new_best_tip ;
       (old_best_tip, None)
-  | Root_transitioned {new_root; garbage= Full garbage; _} ->
+  | Root_transitioned { new_root; garbage = Full garbage; _ } ->
       let new_root_hash = Root_data.Limited.hash new_root in
       let old_root_hash = t.root in
       let new_root_protocol_states =
@@ -572,20 +585,20 @@ module Metrics = struct
       let tbl = State_hash.Table.create () in
       Hashtbl.iter t.table ~f:(fun node ->
           let b = node.breadcrumb in
-          Hashtbl.add_multi tbl ~key:(Breadcrumb.parent_hash b) ~data:b ) ;
+          Hashtbl.add_multi tbl ~key:(Breadcrumb.parent_hash b) ~data:b) ;
       fun b -> Hashtbl.find_multi tbl (Breadcrumb.state_hash b)
     in
     let on_best_tip_path : Breadcrumb.t -> bool =
       let s = State_hash.Hash_set.create () in
       List.iter (best_tip_path t) ~f:(fun b ->
-          Hash_set.add s (Breadcrumb.state_hash b) ) ;
+          Hash_set.add s (Breadcrumb.state_hash b)) ;
       fun b -> Hash_set.mem s (Breadcrumb.state_hash b)
     in
     let rec longest_fork subtree_root =
       (* TODO: Make tail recursive *)
       List.map (children subtree_root) ~f:(fun child ->
           if on_best_tip_path child then longest_fork child
-          else 1 + longest_fork child )
+          else 1 + longest_fork child)
       |> List.max_elt ~compare:Int.compare
       |> Option.value ~default:0
     in
@@ -622,9 +635,9 @@ module Metrics = struct
         .diff
     in
     match (d1.coinbase, d2) with
-    | Zero, None | Zero, Some {coinbase= Zero; _} ->
+    | Zero, None | Zero, Some { coinbase = Zero; _ } ->
         false
-    | Zero, Some {coinbase= One _; _} | One _, _ | Two _, _ ->
+    | Zero, Some { coinbase = One _; _ } | One _, _ | Two _, _ ->
         true
 
   let intprop f b = Unsigned.UInt32.to_int (f (Breadcrumb.consensus_state b))
@@ -662,8 +675,8 @@ module Metrics = struct
     else Float.of_int length_change /. Float.of_int slot_change
 end
 
-let update_metrics_with_diff (type mutant) t
-    (diff : (Diff.full, mutant) Diff.t) : unit =
+let update_metrics_with_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
+    : unit =
   let open Metrics in
   match diff with
   | New_node (Full b) ->
@@ -672,7 +685,7 @@ let update_metrics_with_diff (type mutant) t
         Counter.inc_one Transition_frontier.total_breadcrumbs ;
         Gauge.set Transition_frontier.accepted_block_slot_time_sec
           (slot_time t b |> slot_time_to_offset_time_span))
-  | Root_transitioned {garbage= Full garbage_breadcrumbs; _} ->
+  | Root_transitioned { garbage = Full garbage_breadcrumbs; _ } ->
       let new_root_breadcrumb = root t in
       Mina_metrics.(
         let num_breadcrumbs_removed =
@@ -681,8 +694,7 @@ let update_metrics_with_diff (type mutant) t
         let num_finalized_staged_txns =
           Int.to_float (List.length (Breadcrumb.commands new_root_breadcrumb))
         in
-        Gauge.dec Transition_frontier.active_breadcrumbs
-          num_breadcrumbs_removed ;
+        Gauge.dec Transition_frontier.active_breadcrumbs num_breadcrumbs_removed ;
         Gauge.set Transition_frontier.recently_finalized_staged_txns
           num_finalized_staged_txns ;
         Counter.inc Transition_frontier.finalized_staged_txns
@@ -762,15 +774,14 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
           | None ->
               prev_root
           | Some state_hash ->
-              Some {state_hash}
+              Some { state_hash }
         in
-        (new_root, Diff.Full.With_mutant.E (diff, mutant) :: diffs_with_mutants)
-    )
+        (new_root, Diff.Full.With_mutant.E (diff, mutant) :: diffs_with_mutants))
   in
   [%log' trace t.logger] "after applying diffs to full frontier" ;
   if
     (not
-       ([%equal: [`Enabled of _ | `Disabled]] enable_epoch_ledger_sync
+       ([%equal: [ `Enabled of _ | `Disabled ]] enable_epoch_ledger_sync
           `Disabled))
     && not has_long_catchup_job
   then
@@ -787,8 +798,8 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
             (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
             if local_state_was_synced_at_start then (
               [%log' fatal t.logger]
-                "after lock transition, the best tip consensus state is out \
-                 of sync with the local state -- bug in either \
+                "after lock transition, the best tip consensus state is out of \
+                 sync with the local state -- bug in either \
                  required_local_state_sync or frontier_root_transition."
                 ~metadata:
                   [ ( "sync_jobs"
@@ -796,11 +807,12 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
                   ; ( "local_state"
                     , Consensus.Data.Local_state.to_yojson
                         t.consensus_local_state )
-                  ; ("tf_viz", `String (visualize_to_string t)) ] ;
+                  ; ("tf_viz", `String (visualize_to_string t))
+                  ] ;
               failwith
                 "local state desynced after applying diffs to full frontier" )
         | None ->
-            () ) ;
+            ()) ;
   `New_root_and_diffs_with_mutants (new_root, diffs_with_mutants)
 
 module For_tests = struct
