@@ -2,9 +2,9 @@
 -- TODO: Make focal image distinct from Buster
 {
   toolchainBase = "codaprotocol/ci-toolchain-base:v3",
-  minaToolchainStretch = "gcr.io/o1labs-192920/mina-toolchain@sha256:cdd590b5b2fd98476642f869524d73006ff556c4f10ce62a99893a911467048f",
-  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:63fb0890f49e01d95f18fc2a34c213f4fdcb786f0bd37342d417184cc4d5549e",
-  minaToolchainFocal = "gcr.io/o1labs-192920/mina-toolchain@sha256:dbe4907bb7a79437f60b25473abb3a1a28eb896e3353f2d909cd10cfbec42d7a",
+  minaToolchainStretch = "gcr.io/o1labs-192920/mina-toolchain@sha256:ca6ac234bf3ac62cda3fd396864053a980f21c4b83384904827375a28ac65bd3",
+  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:383de47004e7bb16ba7d166e3c82dc5087e014b766d64a2a4f92dbbefc7af4b6",
+  minaToolchainFocal = "gcr.io/o1labs-192920/mina-toolchain@sha256:4c6ce8e3a1789ba0b9ca5f5b7e377a2ae113252d6f482bed7b157c8e82aeca43",
   delegationBackendToolchain = "gcr.io/o1labs-192920/delegation-backend-production@sha256:8ca5880845514ef56a36bf766a0f9de96e6200d61b51f80d9f684a0ec9c031f4",
   elixirToolchain = "elixir:1.10-alpine",
   rustToolchain = "codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3",
