@@ -343,22 +343,33 @@ type CodaGatingState struct {
 	TrustedPeers            *peer.Set
 }
 
+type CodaGatingConfig struct {
+	BannedAddrFilters  *ma.Filters
+	TrustedAddrFilters *ma.Filters
+	BannedPeers        *peer.Set
+	TrustedPeers       *peer.Set
+}
+
 // NewCodaGatingState returns a new CodaGatingState
-func NewCodaGatingState(bannedAddrFilters *ma.Filters, trustedAddrFilters *ma.Filters, bannedPeers *peer.Set, trustedPeers *peer.Set) *CodaGatingState {
+func NewCodaGatingState(config *CodaGatingConfig) *CodaGatingState {
 	logger := logging.Logger("codanet.CodaGatingState")
 
+	bannedAddrFilters := config.BannedAddrFilters
 	if bannedAddrFilters == nil {
 		bannedAddrFilters = ma.NewFilters()
 	}
 
+	trustedAddrFilters := config.TrustedAddrFilters
 	if trustedAddrFilters == nil {
 		trustedAddrFilters = ma.NewFilters()
 	}
 
+	bannedPeers := config.BannedPeers
 	if bannedPeers == nil {
 		bannedPeers = peer.NewSet()
 	}
 
+	trustedPeers := config.TrustedPeers
 	if trustedPeers == nil {
 		trustedPeers = peer.NewSet()
 	}
@@ -381,19 +392,18 @@ func (h *Helper) GatingState() *CodaGatingState {
 	return h.gatingState
 }
 
-func (h *Helper) SetGatingState(gs *CodaGatingState) {
+func (h *Helper) SetGatingState(gs *CodaGatingConfig) {
 	h.gatingState.TrustedPeers = gs.TrustedPeers
 	h.gatingState.BannedPeers = gs.BannedPeers
 	h.gatingState.TrustedAddrFilters = gs.TrustedAddrFilters
 	h.gatingState.BannedAddrFilters = gs.BannedAddrFilters
-	h.gatingState.KnownPrivateAddrFilters = gs.KnownPrivateAddrFilters
 	for _, c := range h.Host.Network().Conns() {
 		pid := c.RemotePeer()
 		maddr := c.RemoteMultiaddr()
-		if !gs.isAllowedPeerWithAddr(pid, maddr) {
+		if !h.gatingState.isAllowedPeerWithAddr(pid, maddr) {
 			go func() {
 				if err := h.Host.Network().ClosePeer(pid); err != nil {
-					gs.logger.Infof("failed to close banned peer %v: %v", pid, err)
+					h.gatingState.logger.Infof("failed to close banned peer %v: %v", pid, err)
 				}
 			}()
 		}
@@ -670,7 +680,7 @@ func (h Helper) pxConnectionWorker() {
 }
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration) (*Helper, error) {
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingConfig *CodaGatingConfig, minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration) (*Helper, error) {
 	me, err := peer.IDFromPrivateKey(pk)
 	if err != nil {
 		return nil, err
@@ -709,13 +719,13 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	connManager := newCodaConnectionManager(minConnections, maxConnections, minaPeerExchange, grace)
 	bandwidthCounter := metrics.NewBandwidthCounter()
-
+	gs := NewCodaGatingState(gatingConfig)
 	host, err := p2p.New(ctx,
 		p2p.Muxer("/coda/mplex/1.0.0", libp2pmplex.DefaultTransport),
 		p2p.Identity(pk),
 		p2p.Peerstore(ps),
 		p2p.DisableRelay(),
-		p2p.ConnectionGater(gatingState),
+		p2p.ConnectionGater(gs),
 		p2p.ConnectionManager(connManager),
 		p2p.ListenAddrs(listenOn...),
 		p2p.AddrsFactory(func(as []ma.Multiaddr) []ma.Multiaddr {
@@ -777,7 +787,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		Rendezvous:        rendezvousString,
 		Discovery:         nil,
 		Me:                me,
-		gatingState:       gatingState,
+		gatingState:       gs,
 		ConnectionManager: connManager,
 		BandwidthCounter:  bandwidthCounter,
 		MsgStats:          &MessageStats{min: math.MaxUint64},

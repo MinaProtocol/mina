@@ -98,7 +98,7 @@ func capnpTextListForeach(l capnp.TextList, f func(string) error) error {
 	return nil
 }
 
-func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet.CodaGatingState, error) {
+func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet.CodaGatingConfig, error) {
 	_, totalIpNet, err := gonet.ParseCIDR("0.0.0.0/0")
 	if err != nil {
 		return nil, err
@@ -168,7 +168,11 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 		trustedPeers.Add(peer.ID)
 	}
 
-	return codanet.NewCodaGatingState(bannedAddrFilters, trustedAddrFilters, bannedPeers, trustedPeers), nil
+	return &codanet.CodaGatingConfig{
+		BannedAddrFilters:  bannedAddrFilters,
+		TrustedAddrFilters: trustedAddrFilters,
+		BannedPeers:        bannedPeers,
+		TrustedPeers:       trustedPeers}, nil
 }
 
 func panicOnErr(err error) {
