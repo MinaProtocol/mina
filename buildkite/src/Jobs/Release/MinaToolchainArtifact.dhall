@@ -39,7 +39,7 @@ Pipeline.build
         service="mina-toolchain",
         deb_codename="buster",
         extra_args="--no-cache",
-        step_key="mina-toolchain-buster-docker-image"
+        step_key="toolchain-buster-docker-image"
       }
 
       in
@@ -52,7 +52,7 @@ Pipeline.build
         service="mina-toolchain",
         deb_codename="stretch",
         extra_args="--no-cache",
-        step_key="mina-toolchain-stretch-docker-image"
+        step_key="toolchain-stretch-docker-image"
       }
 
       in
@@ -65,7 +65,7 @@ Pipeline.build
         service="mina-toolchain",
         deb_codename="focal",
         extra_args="--no-cache",
-        step_key="mina-toolchain-focal-docker-image"
+        step_key="toolchain-focal-docker-image"
       }
 
       in
