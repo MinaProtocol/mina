@@ -87,7 +87,6 @@ RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
 
 # RocksDB Installation
 USER root
-ENV CXXFLAGS '-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess'
 # This builds and installs just the rocksdb static lib for us, and cleans up after itself
 RUN git clone https://github.com/facebook/rocksdb \
   --depth 1 --shallow-submodules \
@@ -96,7 +95,6 @@ RUN git clone https://github.com/facebook/rocksdb \
   && cp /rocksdb/librocksdb.a /usr/local/lib/librocksdb_coda.a \
   && rm -rf /rocksdb \
   && strip -S /usr/local/lib/librocksdb_coda.a
-ENV CXXFLAGS ""
 
 ###########################################################################################
 # Initialize opam in a minimal fashion
