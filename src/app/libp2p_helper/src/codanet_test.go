@@ -18,7 +18,7 @@ func TestTrustedPrivateConnectionGating(t *testing.T) {
 	trustedAddrFilters := ma.NewFilters()
 	trustedAddrFilters.AddFilter(*totalIpNet, ma.ActionDeny)
 
-	gs := NewCodaGatingState(nil, trustedAddrFilters, nil, nil)
+	gs := NewCodaGatingState(&CodaGatingConfig{TrustedAddrFilters: trustedAddrFilters})
 
 	testMa, err := ma.NewMultiaddr("/ip4/10.0.0.1/tcp/80")
 	require.NoError(t, err)

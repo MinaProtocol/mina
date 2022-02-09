@@ -400,16 +400,16 @@ func (m SetGatingConfigReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
-	var newState *codanet.CodaGatingState
+	var gatingConfig *codanet.CodaGatingConfig
 	gc, err := SetGatingConfigReqT(m).GatingConfig()
 	if err == nil {
-		newState, err = readGatingConfig(gc, app.AddedPeers)
+		gatingConfig, err = readGatingConfig(gc, app.AddedPeers)
 	}
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	app.P2p.SetGatingState(newState)
+	app.P2p.SetGatingState(gatingConfig)
 
 	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
 		_, err := m.NewSetGatingConfig()
