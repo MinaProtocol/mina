@@ -57,7 +57,20 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep toolchainStretchSpec
+      DockerImage.generateStep toolchainStretchSpec,
+
+      -- mina-toolchain Ubuntu Focal Fossa 20.04 image
+      let toolchainStretchSpec = DockerImage.ReleaseSpec::{
+        deps=dependsOn,
+        service="mina-toolchain",
+        deb_codename="focal",
+        extra_args="--no-cache",
+        step_key="mina-toolchain-focal-docker-image"
+      }
+
+      in
+
+      DockerImage.generateStep toolchainFocalSpec
 
     ]
   }
