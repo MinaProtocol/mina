@@ -4,6 +4,8 @@
 #################################################################################################
 FROM opam-deps AS toolchain
 
+ARG deb_codename=focal
+
 ARG DOCKER_VERSION=19.03.4
 ARG TERRAFORM_VERSION=0.14.11
 
