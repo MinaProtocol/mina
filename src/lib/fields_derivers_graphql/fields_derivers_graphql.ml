@@ -1,6 +1,11 @@
 open Core_kernel
 open Fieldslib
 
+module Iso = struct
+  type ('row, 'a, 'b) t =
+    < map : ('a -> 'b) ref ; contramap : ('b -> 'a) ref ; .. > as 'row
+end
+
 module Graphql_args_raw = struct
   module Make (Schema : Graphql_intf.Schema) = struct
     module Input = struct
@@ -162,9 +167,8 @@ module Graphql_fields_raw = struct
           { run : 'ctx. unit -> ('ctx, 'input_type) Schema.typ }
       end
 
-      type ('input_type, 'a, 'c, 'nullable) t =
+      type ('input_type, 'a, 'nullable) t =
         < graphql_fields : 'input_type T.t ref
-        ; contramap : ('c -> 'input_type) ref
         ; nullable_graphql_fields : 'nullable T.t ref
         ; .. >
         as
@@ -174,39 +178,69 @@ module Graphql_fields_raw = struct
     module Accumulator = struct
       module T = struct
         type 'input_type t =
-          { run : 'ctx. unit -> ('ctx, 'input_type) Schema.field }
+          { run :
+              'ctx 'row1 'output_type.    ( 'row1
+                                          , 'input_type
+                                          , 'output_type )
+                                          Iso.t
+              -> ('ctx, 'output_type) Schema.field
+          }
       end
 
       (** thunks generating the schema in reverse *)
-      type ('input_type, 'a, 'c, 'nullable) t =
-        < graphql_fields_accumulator : 'c T.t list ref ; .. > as 'a
+      type ('input_type, 'a, 'nullable) t =
+        < graphql_fields_accumulator : 'input_type T.t list ref ; .. > as 'a
         constraint
-          ('input_type, 'a, 'c, 'nullable) t =
-          ('input_type, 'a, 'c, 'nullable) Input.t
+          ('input_type, 'a, 'nullable) t =
+          ('input_type, 'a, 'nullable) Input.t
     end
 
-    let add_field (type f input_type orig nullable c' nullable') :
-           (orig, 'a, f, nullable) Input.t
-        -> ([< `Read | `Set_and_create ], c', f) Fieldslib.Field.t_with_perm
-        -> (input_type, 'row2, c', nullable') Accumulator.t
-        -> (_ -> f) * (input_type, 'row2, c', nullable') Accumulator.t =
+    module Output = struct
+      module T = struct
+        type 'input_type t =
+          { run :
+              'ctx 'row1 'output_type.    ( 'row1
+                                          , 'input_type
+                                          , 'output_type )
+                                          Iso.t
+              -> ('ctx, 'output_type) Schema.typ
+          }
+      end
+
+      type ('input_type, 'a, 'nullable) t =
+        < graphql_output : 'input_type T.t ref ; .. > as 'a
+        constraint
+          ('input_type, 'a, 'nullable) t =
+          ('input_type, 'a, 'nullable) Input.t
+    end
+
+    let add_field (type input_type orig nullable nullable') :
+           (orig, 'a, nullable) Input.t
+        -> ( [< `Read | `Set_and_create ]
+           , input_type
+           , orig )
+           Fieldslib.Field.t_with_perm
+        -> (input_type, 'row2, nullable') Accumulator.t
+        -> (_ -> orig) * (input_type, 'row2, nullable') Accumulator.t =
      fun t_field field acc ->
       let rest = !(acc#graphql_fields_accumulator) in
       acc#graphql_fields_accumulator :=
         { Accumulator.T.run =
-            (fun () ->
+            (fun iso ->
               Schema.field
                 (Fields_derivers_util.name_under_to_camel field)
                 ~args:Schema.Arg.[]
                 ?doc:None ?deprecated:None
                 ~typ:(!(t_field#graphql_fields).Input.T.run ())
-                ~resolve:(fun _ x -> !(t_field#contramap) (Field.get field x)))
+                ~resolve:(fun _ x -> Field.get field (!(iso#contramap) x)))
         }
         :: rest ;
       ((fun _ -> failwith "Unused"), acc)
 
     (* TODO: Do we need doc and deprecated and name on finish? *)
     let finish ~name ?doc ((_creator, obj) : 'u * _ Accumulator.t) : _ Input.t =
+      let obj : _ Output.t = obj in
+      obj#contramap := Fn.id ;
       let graphql_fields_accumulator = !(obj#graphql_fields_accumulator) in
       let graphql_fields =
         { Input.T.run =
@@ -214,7 +248,7 @@ module Graphql_fields_raw = struct
               Schema.obj name ?doc ~fields:(fun _ ->
                   List.rev
                   @@ List.map graphql_fields_accumulator ~f:(fun g ->
-                         g.Accumulator.T.run ()))
+                         g.Accumulator.T.run obj))
               |> Schema.non_null)
         }
       in
@@ -224,12 +258,22 @@ module Graphql_fields_raw = struct
               Schema.obj name ?doc ~fields:(fun _ ->
                   List.rev
                   @@ List.map graphql_fields_accumulator ~f:(fun g ->
-                         g.Accumulator.T.run ())))
+                         g.Accumulator.T.run obj)))
         }
       in
+      let graphql_output =
+        { Output.T.run =
+            (fun iso ->
+              Schema.obj name ?doc ~fields:(fun _ ->
+                  List.rev
+                  @@ List.map graphql_fields_accumulator ~f:(fun g ->
+                         g.Accumulator.T.run iso))
+              |> Schema.non_null)
+        }
+      in
+      obj#graphql_output := graphql_output ;
       obj#graphql_fields := graphql_fields ;
       obj#nullable_graphql_fields := nullable_graphql_fields ;
-      obj#contramap := Fn.id ;
       obj
 
     let int obj =
@@ -237,6 +281,8 @@ module Graphql_fields_raw = struct
       obj#contramap := Fn.id ;
       obj#graphql_fields_accumulator := !(obj#graphql_fields_accumulator) ;
       (obj#nullable_graphql_fields := Input.T.{ run = (fun () -> Schema.int) }) ;
+      (obj#graphql_output :=
+         Output.T.{ run = (fun _ -> failwith "you cannot transform scalars") }) ;
       obj
 
     let string obj =
@@ -246,6 +292,8 @@ module Graphql_fields_raw = struct
       obj#graphql_fields_accumulator := !(obj#graphql_fields_accumulator) ;
       (obj#nullable_graphql_fields :=
          Input.T.{ run = (fun () -> Schema.string) }) ;
+      (obj#graphql_output :=
+         Output.T.{ run = (fun _ -> failwith "you cannot transform scalars") }) ;
       obj
 
     let bool obj =
@@ -254,9 +302,11 @@ module Graphql_fields_raw = struct
       obj#contramap := Fn.id ;
       obj#graphql_fields_accumulator := !(obj#graphql_fields_accumulator) ;
       (obj#nullable_graphql_fields := Input.T.{ run = (fun () -> Schema.bool) }) ;
+      (obj#graphql_output :=
+         Output.T.{ run = (fun _ -> failwith "you cannot transform scalars") }) ;
       obj
 
-    let list x obj : ('input_type list, _, _, _) Input.t =
+    let list x obj : ('input_type list, _, _) Input.t =
       (obj#graphql_fields :=
          Input.T.
            { run =
@@ -267,23 +317,29 @@ module Graphql_fields_raw = struct
       (obj#nullable_graphql_fields :=
          Input.T.
            { run = (fun () -> Schema.(list (!(x#graphql_fields).run ()))) }) ;
+      (obj#graphql_output :=
+         Output.T.{ run = (fun _ -> failwith "You can't transform a list") }) ;
       obj
 
     (* I can't get OCaml to typecheck this poperly unless we pass the same fresh function twice *)
-    let option (x : ('input_type, 'b, 'c, 'nullable) Input.t) obj :
-        ('input_type option, _, 'c option, _) Input.t =
+    let option (x : ('input_type, 'b, 'nullable) Input.t) obj :
+        ('input_type option, _, _) Input.t =
       obj#graphql_fields := !(x#nullable_graphql_fields) ;
       obj#nullable_graphql_fields := !(x#nullable_graphql_fields) ;
       obj#contramap := Option.map ~f:!(x#contramap) ;
       obj#graphql_fields_accumulator := !(x#graphql_fields_accumulator) ;
+      (obj#graphql_output :=
+         Output.T.{ run = (fun _ -> failwith "You cannot transform options") }) ;
       obj
 
-    let contramap ~(f : 'd -> 'c) (x : ('input_type, 'b, 'c, 'nullable) Input.t)
-        obj : ('input_type, _, 'd, _) Input.t =
+    let contramap ~(f : 'd -> 'c) (x : ('input_type, 'b, 'nullable) Input.t) obj
+        : ('input_type, _, _) Input.t =
       obj#graphql_fields := !(x#graphql_fields) ;
       (obj#contramap := fun a -> !(x#contramap) (f a)) ;
       obj#nullable_graphql_fields := !(x#nullable_graphql_fields) ;
       obj#graphql_fields_accumulator := !(x#graphql_fields_accumulator) ;
+      (obj#graphql_output :=
+         Output.T.{ run = (fun _ -> failwith "you cannot transform scalars") }) ;
       obj
   end
 end
@@ -462,6 +518,9 @@ query IntrospectionQuery {
       let graphql_fields_accumulator = ref [] in
       let graphql_arg_accumulator = ref Graphql_args.Acc.T.Init in
       let graphql_creator = ref (fun _ -> failwith "unimplemented") in
+      let graphql_output =
+        ref Output.T.{ run = (fun _ -> failwith "unimplemented") }
+      in
       object
         method graphql_fields = graphql_fields
 
@@ -480,6 +539,8 @@ query IntrospectionQuery {
         method graphql_arg_accumulator = graphql_arg_accumulator
 
         method graphql_creator = graphql_creator
+
+        method graphql_output = graphql_output
       end
 
     let o () = deriver ()
@@ -584,8 +645,8 @@ query IntrospectionQuery {
 
       let to_option = function Ignore -> None | Check x -> Some x
 
-      let derived (x : ('input_type, 'b, 'c, _) Graphql_fields.Input.t) init :
-          (_, _, 'c t, _) Graphql_fields.Input.t =
+      let derived (x : ('input_type, 'b, _) Graphql_fields.Input.t) init :
+          (_, _, _) Graphql_fields.Input.t =
         let open Graphql_fields in
         let opt = option x (o ()) in
         contramap ~f:to_option opt init

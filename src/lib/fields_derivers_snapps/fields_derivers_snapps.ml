@@ -410,4 +410,23 @@ let%test_module "Test" =
       let v = { With_hash.data; hash = Field.one } in
       let o = verification_key_with_hash @@ Derivers.o () in
       [%test_eq: (t, Field.t) With_hash.t] v (of_json o (to_json o v))
+
+    module V4 = struct
+      type t = Foo of int | Bar of string
+
+      module As_record = struct
+        type t = { foo : int option; bar : string option } [@@deriving fields]
+
+        let deriver obj =
+          Fields.make_creator obj
+            ~foo:!.(option @@ int @@ o ())
+            ~bar:!.(option @@ string @@ o ())
+          |> finish ~name:"As_record"
+      end
+
+      let deriver obj =
+        let map _ = failwith "unimplemented" in
+        let contramap _ = failwith "unimplemented" in
+        iso ~map ~contramap (As_record.deriver @@ o ())
+    end
   end )
