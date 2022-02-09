@@ -169,25 +169,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ; other_parties = other_parties_with_valid_keys
       }
     in
-    let%bind () =
-      section "send payment with sender = snapp fee payer"
-        (let amount = Currency.Amount.of_int 2_000_000_000 in
-         let fee = Currency.Fee.of_int 10_000_000 in
-         let sender = node in
-         let receiver = List.nth_exn block_producer_nodes 1 in
-         let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-         let%bind sender_pub_key = Util.pub_key_of_node sender in
-         [%log info] "Sending payment" ;
-         let%bind () =
-           Network.Node.must_send_payment ~logger sender ~sender_pub_key
-             ~receiver_pub_key ~amount ~fee
-         in
-         [%log info]
-           "Sent payment, waiting for inclusion in transition frontier" ;
-         wait_for t
-           (Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
-              ~receiver_pub_key ~amount))
-    in
     let%bind parties_valid =
       mk_parties_with_signatures ~fee_payer_nonce:Unsigned.UInt32.one
         parties_valid_pks
@@ -213,6 +194,31 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ~metadata:[ ("error", `String err_str) ] ;
               Malleable_error.soft_error_format ~value:()
                 "Error sending snapp: %s" err_str )
+    in
+    let%bind () =
+      section "send payment with sender = snapp fee payer"
+        (let amount = Currency.Amount.of_int 2_000_000_000 in
+         let fee = Currency.Fee.of_int 10_000_000 in
+         let sender = node in
+         (* choose receiver that's not in the snapp other parties
+            there's a check that user commands can't involve snapp accounts
+         *)
+         let receiver =
+           List.nth_exn block_producer_nodes
+             (List.length parties_valid.other_parties + 1)
+         in
+         let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+         let%bind sender_pub_key = Util.pub_key_of_node sender in
+         [%log info] "Sending payment" ;
+         let%bind () =
+           Network.Node.must_send_payment ~logger sender ~sender_pub_key
+             ~receiver_pub_key ~amount ~fee
+         in
+         [%log info]
+           "Sent payment, waiting for inclusion in transition frontier" ;
+         wait_for t
+           (Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
+              ~receiver_pub_key ~amount))
     in
     let%bind () =
       section "send a snapp with bad fee payer signature"
