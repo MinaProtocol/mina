@@ -58,16 +58,19 @@ RUN sudo apt-get update -y \
     zlib1g-dev
 
 # -- Debian Stretch python dependencies (largely installed above from apt)
+# Python3 readchar and sexpdata packages don't exist for stretch but they're in pip
 RUN test "$deb_codename" = "stretch" \
       && sudo pip3 install readchar sexpdata \
       || exit 0
 
 # -- Debian Buster python dependencies (largely installed above from apt)
+# Buster images are used in our migrated integration tests which reqiure python2 jinja2
 RUN test "$deb_codename" = "buster" \
-      && sudo apt-get install -y python3-sexpdata \
+      && sudo apt-get install -y python3-sexpdata python-jinja2 python-flake8 python python-pip \
       || exit 0
 
 # -- Ubuntu Focal python dependencies (largely installed above from apt)
+# Does not have many of the python2 packages, but that should be fine?
 RUN test "$deb_codename" = "focal" \
       && sudo apt-get install -y python3-sexpdata \
       || exit 0
