@@ -29,7 +29,7 @@ func TestTrustedPrivateConnectionGating(t *testing.T) {
 	}
 
 	require.True(t, isPrivateAddr(testMa))
-	require.False(t, gs.isAddrTrusted(testMa))
+	require.Equal(t, Undecided, gs.checkAddrTrusted(testMa))
 
 	allowed := gs.InterceptAddrDial(testInfo.ID, testMa)
 	require.False(t, allowed)

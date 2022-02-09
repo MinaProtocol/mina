@@ -36,6 +36,8 @@ exception UnexpectedEof of string
 
 exception UnexpectedState
 
+exception UnexpectedGossipSender of string * string
+
 let nonEof msg a = match a with `Ok r -> r | _ -> raise (UnexpectedEof msg)
 
 let expectEof m = match m with `Eof -> () | _ -> raise UnexpectedState
@@ -95,7 +97,8 @@ let%test_module "all-ipc test" =
       | Local ->
           raise UnexpectedState
       | Remote p ->
-          assert (String.equal p.peer_id expected_sender) ) ;
+          if not (String.equal p.peer_id expected_sender) then
+            raise (UnexpectedGossipSender (expected_sender, p.peer_id)) ) ;
       Validation_callback.fire_if_not_already_fired cb vr
 
     let mk_banning_gating_config peer_id =
@@ -166,7 +169,7 @@ let%test_module "all-ipc test" =
       let pcIter pred = iteratePcWhile "alice" pc pcLs ~pred in
       (* Connect Alice to Bob *)
       let%bind () = add_peer a ad.b_addr ~is_seed:false >>| Or_error.ok_exn in
-      (* Await connection to succeed *)
+      (* Await connection from Bob to Alice to succeed *)
       let%bind () =
         pcIter (fun () ->
             match !bobStatus with
@@ -181,15 +184,6 @@ let%test_module "all-ipc test" =
       (* Get addresses of Alice *)
       let%bind lAddrs = listening_addrs a >>| Or_error.ok_exn in
       assert (List.length lAddrs > 0) ;
-      (* List peers of Alice *)
-      let%bind peers = peers a in
-      assert (List.length peers = 3) ;
-      assert (
-        List.fold [ ad.y_peerid; ad.b_peerid; ad.c_peerid ] ~init:true
-          ~f:(fun b_acc pid ->
-            b_acc
-            && List.fold peers ~init:false ~f:(fun acc p ->
-                   acc || String.equal p.peer_id pid)) ) ;
       (* Await Carol to connect *)
       (* This is done mainly to test PeerConnected upcall *)
       let%bind () =
@@ -203,6 +197,15 @@ let%test_module "all-ipc test" =
                 raise UnexpectedState)
         |> or_timeout ~msg:"Alice: wait for Carol to connect"
       in
+      (* List peers of Alice *)
+      let%bind peers = peers a in
+      assert (List.length peers = 3) ;
+      assert (
+        List.fold [ ad.y_peerid; ad.b_peerid; ad.c_peerid ] ~init:true
+          ~f:(fun b_acc pid ->
+            b_acc
+            && List.fold peers ~init:false ~f:(fun acc p ->
+                   acc || String.equal p.peer_id pid)) ) ;
       (* Subscribe to topic "c" *)
       let topic_c_received_1 = ref false in
       let topic_c_received_2 = ref false in
@@ -412,7 +415,7 @@ let%test_module "all-ipc test" =
         |> or_timeout ~msg:"Bob: waiting for stream 1"
       in
       let stream1_in, stream1_out = Libp2p_stream.pipes stream1 in
-      (* 20. Send message 1 on stream 1 *)
+      (* Send message 1 on stream 1 *)
       let%bind () =
         Pipe.write stream1_out msgs.stream_1_msg_1
         |> or_timeout ~msg:"Bob: send message 1 to stream 1"
@@ -424,7 +427,7 @@ let%test_module "all-ipc test" =
       let%bind () = Pubsub.publish b subC msgs.topic_c_msg_1 in
       let%bind () = Pubsub.publish b subC msgs.topic_c_msg_2 in
 
-      (* 23. Await message 2 on stream 1 *)
+      (* Await message 2 on stream 1 *)
       let%bind s1m2 =
         Pipe.read stream1_in >>| nonEof "stream 1 / msg 2"
         |> or_timeout ~msg:"Bob: receive message 2 on stream 1"
@@ -582,17 +585,17 @@ let%test_module "all-ipc test" =
         setup_node "yota" ~ignore_advertise_error:true ~on_peer_connected:ignore
           ~on_peer_disconnected:ignore
       in
-      (* 01. Configuration *)
+      (* Configuration *)
       let%bind a, a_peerid, a_addr, a_shutdown =
         setup_node "alice" (* ~ignore_advertise_error:true *)
           ~seed_peers:[ y_addr ] ~on_peer_connected:(on_connected a_pipe)
           ~on_peer_disconnected:(on_disconnected a_pipe)
       in
-      (* 12. Generate keypair *)
+      (* Generate keypair *)
       let%bind kp_c = generate_random_keypair a in
       let c_peerid = Keypair.to_peer_id kp_c in
       let b_pipe = Pipe.create () in
-      (* 02. Configuration *)
+      (* Configuration *)
       let%bind b, b_peerid, b_addr, b_shutdown =
         setup_node "bob" (* ~ignore_advertise_error:true *)
           ~seed_peers:[ y_addr ]
@@ -601,7 +604,7 @@ let%test_module "all-ipc test" =
           ~on_peer_disconnected:(on_disconnected b_pipe)
       in
       let c_pipe = Pipe.create () in
-      (* 13. Configuration *)
+      (* Configuration *)
       let%bind c, _, c_addr, c_shutdown =
         setup_node "carol" ~keypair:kp_c ~seed_peers:[ y_addr; a_addr; b_addr ]
           ~on_peer_connected:(on_connected c_pipe)
