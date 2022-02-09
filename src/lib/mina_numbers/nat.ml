@@ -4,10 +4,9 @@ open Core_kernel
 open Fold_lib
 include Intf
 module Intf = Intf
+open Snark_bits
 
 [%%ifdef consensus_mechanism]
-
-open Snark_bits
 
 module Make_checked
     (N : Unsigned_extended.S)
@@ -182,14 +181,9 @@ struct
   let zero = Field.Var.constant Field.zero
 end
 
-open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-open Snark_bits_nonconsensus
-
 [%%endif]
+
+open Snark_params.Tick
 
 module Make (N : sig
   type t [@@deriving sexp, compare, hash]

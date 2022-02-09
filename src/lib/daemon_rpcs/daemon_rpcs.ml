@@ -1,7 +1,6 @@
 open Core_kernel
 open Async
 open Mina_base
-open Signature_lib
 module Types = Types
 module Client = Client
 
@@ -239,15 +238,6 @@ module Stop_tracing = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
-end
-
-module Set_staking = struct
-  type query = Keypair.Stable.Latest.t list [@@deriving bin_io_unversioned]
-
-  type response = unit [@@deriving bin_io_unversioned]
-
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Set_staking" ~version:0 ~bin_query ~bin_response
 end
 
 module Visualization = struct
