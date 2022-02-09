@@ -174,9 +174,9 @@ module Derivers = struct
       ~hash:!.field obj
     |> finish ~name:"VerificationKeyWithHash" ~doc:"Verification key with hash"
 
-  let to_json obj x = !(obj#to_json) x
+  let to_json obj x = !(obj#to_json) @@ !(obj#contramap) x
 
-  let of_json obj x = !(obj#of_json) x
+  let of_json obj x = !(obj#map) @@ !(obj#of_json) x
 
   let typ obj =
     !(obj#graphql_fields).Fields_derivers_graphql.Graphql_fields.Input.T.run ()
