@@ -56,7 +56,6 @@ module Stable = struct
         ; max_poly_size = 1 lsl Nat.to_int Rounds.Wrap.n
         ; max_quot_size
         ; srs
-        ; linearization = failwith "TODO"
         ; evals =
             (let g (x, y) =
                { Kimchi.Protocol.unshifted =
@@ -76,6 +75,7 @@ module Stable = struct
              ; chacha_comm = None
              })
         ; shifts = Common.tock_shifts ~log2_size
+        ; lookup_index = None
         }
       in
       { commitments = c; step_domains; data = d; index = t }

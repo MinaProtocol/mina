@@ -29,9 +29,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let wait_for_all_to_initialize ~logger network t =
     let open Malleable_error.Let_syntax in
-    let producers = Network.block_producers network in
-    let n = List.length producers in
-    List.mapi producers ~f:(fun i node ->
+    let all_nodes = Network.all_nodes network in
+    let n = List.length all_nodes in
+    List.mapi all_nodes ~f:(fun i node ->
         let%map () = wait_for t (Wait_condition.node_to_initialize node) in
         [%log info]
           "gossip_consistency test: Block producer %d (of %d) initialized"

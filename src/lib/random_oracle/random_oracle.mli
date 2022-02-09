@@ -6,7 +6,7 @@ open Pickles.Impls.Step.Internal_Basic
 
 [%%else]
 
-open Snark_params_nonconsensus
+open Snark_params.Tick
 
 [%%endif]
 

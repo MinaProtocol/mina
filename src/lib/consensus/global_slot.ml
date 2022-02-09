@@ -106,7 +106,7 @@ let diff ~(constants : Constants.t) (t : t) (other_epoch, other_slot) =
     - UInt32.(of_int @@ if compare other_slot slot > 0 then 1 else 0)
   in
   let old_slot =
-    (slot - other_slot) mod Length.to_uint32 constants.epoch_size
+    (slot - other_slot) mod Length.to_uint32 constants.slots_per_epoch
   in
   of_epoch_and_slot (old_epoch, old_slot) ~constants
 

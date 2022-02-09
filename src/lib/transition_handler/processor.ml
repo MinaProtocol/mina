@@ -157,12 +157,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
               in
               Catchup_scheduler.watch catchup_scheduler ~timeout_duration
                 ~cached_transition:cached_initially_validated_transition ;
-              return (Error ())
-          | _ ->
-              failwith
-                "This is impossible since the transition just passed \
-                 initial_validation so delta_transition_chain_proof must be \
-                 true" )
+              return (Error ()) )
     in
     (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
     let parent_hash =
