@@ -418,10 +418,10 @@ let remove_entry_times (cmd_hash : Transaction_hash.t) (t : t) : t =
 (* Reset entry_times and all_by_entry_time for a command *)
 let reset_entry_times (cmd_hash : Transaction_hash.t) (t : t) : t =
   let entry_time = Time_ns.now () in
-  { (remove_entry_times cmd_hash t) with
-    entry_times = Map.add_exn t.entry_times ~key:cmd_hash ~data:entry_time
+  { t with
+    entry_times = Map.update t.entry_times cmd_hash ~f:(fun _ -> entry_time)
   ; all_by_entry_time =
-      Map.add_exn t.all_by_entry_time ~key:entry_time ~data:cmd_hash
+      Map.update t.all_by_entry_time entry_time ~f:(fun _ -> cmd_hash)
   }
 
 (* Remove a command from the all_by_fee and all_by_hash fields, and decrement
