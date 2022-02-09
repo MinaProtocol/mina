@@ -149,8 +149,6 @@ module Node = struct
       let headers = String.Map.empty
     end)
 
-    let json_of_NetworkPeerPayload = Network_peer.Peer.to_yojson
-
     module Unlock_account =
     [%graphql
     {|
@@ -251,16 +249,6 @@ module Node = struct
             transactionPoolSize
           }
         }
-      }
-    |}]
-
-    module Set_gating_config =
-    [%graphql
-    {|
-      mutation ($trusted_peers: [NetworkPeerPayload!]!, $banned_peers: [NetworkPeerPayload!]!, $isolate: Boolean!) {
-        setConnectionGatingConfig (input: {trustedPeers: $trusted_peers, bannedPeers: $banned_peers, isolate: $isolate}) {
-          isolate 
-        } 
       }
     |}]
   end
@@ -449,26 +437,6 @@ module Node = struct
     [%log info] "Sent payment"
       ~metadata:[ ("user_command_id", `String user_cmd_id) ] ;
     ()
-
-  let set_connection_gating_config ~logger t ~isolate ~banned_peers
-      ~trusted_peers =
-    (* We have two calls to `exec_graphql_request`, so we split total delay in half *)
-    let open Deferred.Or_error.Let_syntax in
-    let obj =
-      Graphql.Set_gating_config.make
-        ~trusted_peers:(Array.of_list trusted_peers)
-        ~isolate
-        ~banned_peers:(Array.of_list banned_peers)
-        ()
-    in
-    exec_graphql_request ~logger ~node:t
-      ~query_name:"set_connection_gating_config_graphql" obj
-    >>| const ()
-
-  let must_set_connection_gating_config ~logger t ~isolate ~banned_peers
-      ~trusted_peers =
-    set_connection_gating_config ~logger t ~isolate ~banned_peers ~trusted_peers
-    |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let must_send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
       =

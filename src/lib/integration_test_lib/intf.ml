@@ -79,22 +79,6 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> unit Malleable_error.t
 
-      val set_connection_gating_config :
-           logger:Logger.t
-        -> t
-        -> isolate:bool
-        -> banned_peers:Network_peer.Peer.t list
-        -> trusted_peers:Network_peer.Peer.t list
-        -> unit Deferred.Or_error.t
-
-      val must_set_connection_gating_config :
-           logger:Logger.t
-        -> t
-        -> isolate:bool
-        -> banned_peers:Network_peer.Peer.t list
-        -> trusted_peers:Network_peer.Peer.t list
-        -> unit Malleable_error.t
-
       val get_balance :
            logger:Logger.t
         -> t
