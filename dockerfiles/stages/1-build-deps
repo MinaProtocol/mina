@@ -2,8 +2,8 @@
 # The "build-deps" stage
 # - Installs all compilers/interpreters, tools, and OS packages on debian ${deb_codename}-slim
 #################################################################################################
-ARG deb_codename=stretch
-FROM debian:${deb_codename}-slim AS build-deps
+ARG image=ubuntu:focal
+FROM ${image} AS build-deps
 
 # Ocaml Version
 ARG OCAML_VERSION=4.11
@@ -87,11 +87,14 @@ RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
 
 # RocksDB Installation
 USER root
+ENV CXXFLAGS '-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess'
 # This builds and installs just the rocksdb static lib for us, and cleans up after itself
 RUN git clone https://github.com/facebook/rocksdb \
   --depth 1 --shallow-submodules \
   -b "${ROCKSDB_VERSION}" /rocksdb \
-  && make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) \
+  && test $(g++ -dumpversion | cut -c 1 -) -lt 8 \
+    && CXXFLAGS='' make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) \
+    || make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) \
   && cp /rocksdb/librocksdb.a /usr/local/lib/librocksdb_coda.a \
   && rm -rf /rocksdb \
   && strip -S /usr/local/lib/librocksdb_coda.a
