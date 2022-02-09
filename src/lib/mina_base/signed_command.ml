@@ -19,9 +19,9 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      ( Payload.Stable.V1.t
+      ( Payload.Stable.V2.t
       , Public_key.Stable.V1.t
       , Signature.Stable.V1.t )
       Poly.Stable.V1.t
@@ -99,12 +99,6 @@ let tag_string (t : t) =
       "payment"
   | Stake_delegation _ ->
       "delegation"
-  | Create_new_token _ ->
-      "create_token"
-  | Create_token_account _ ->
-      "create_account"
-  | Mint_tokens _ ->
-      "mint_tokens"
 
 let next_available_token ({ payload; _ } : t) tid =
   Payload.next_available_token payload tid
@@ -120,14 +114,6 @@ let check_tokens ({ payload = { common = { fee_token; _ }; body }; _ } : t) =
       not (Token_id.(equal invalid) token_id)
   | Stake_delegation _ ->
       true
-  | Create_new_token _ ->
-      Token_id.(equal default) fee_token
-  | Create_token_account { token_id; account_disabled; _ } ->
-      Token_id.(equal default) fee_token
-      && not (Token_id.(equal default) token_id && account_disabled)
-  | Mint_tokens { token_id; _ } ->
-      (not (Token_id.(equal invalid) token_id))
-      && not (Token_id.(equal default) token_id)
 
 let sign_payload ?signature_kind (private_key : Signature_lib.Private_key.t)
     (payload : Payload.t) : Signature.t =
@@ -337,14 +323,14 @@ end
 module With_valid_signature = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Stable.V1.t [@@deriving sexp, equal, yojson, hash]
+    module V2 = struct
+      type t = Stable.V2.t [@@deriving sexp, equal, yojson, hash]
 
-      let to_latest = Stable.V1.to_latest
+      let to_latest = Stable.V2.to_latest
 
-      let compare = Stable.V1.compare
+      let compare = Stable.V2.compare
 
-      let equal = Stable.V1.equal
+      let equal = Stable.V2.equal
 
       module Gen = Gen
     end

@@ -570,13 +570,6 @@ WITH RECURSIVE chain AS (
                 M.return `Payment
             | "delegation" ->
                 M.return `Delegation
-            | "create_token" ->
-                M.return `Create_token
-            | "create_account" ->
-                (* N.B.: not create_token_account *)
-                M.return `Create_token_account
-            | "mint_tokens" ->
-                M.return `Mint_tokens
             | other ->
                 M.fail
                   (Errors.create

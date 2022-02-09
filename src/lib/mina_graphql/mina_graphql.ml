@@ -1231,26 +1231,12 @@ module Types = struct
   end
 
   module User_command = struct
-    let kind :
-        ( 'context
-        , [< `Payment
-          | `Stake_delegation
-          | `Create_new_token
-          | `Create_token_account
-          | `Mint_tokens ]
-          option )
-        typ =
+    let kind : ('context, [< `Payment | `Stake_delegation ] option) typ =
       scalar "UserCommandKind" ~doc:"The kind of user command" ~coerce:(function
         | `Payment ->
             `String "PAYMENT"
         | `Stake_delegation ->
-            `String "STAKE_DELEGATION"
-        | `Create_new_token ->
-            `String "CREATE_NEW_TOKEN"
-        | `Create_token_account ->
-            `String "CREATE_TOKEN_ACCOUNT"
-        | `Mint_tokens ->
-            `String "MINT_TOKENS")
+            `String "STAKE_DELEGATION")
 
     let to_kind (t : Signed_command.t) =
       match Signed_command.payload t |> Signed_command_payload.body with
@@ -1258,12 +1244,6 @@ module Types = struct
           `Payment
       | Stake_delegation _ ->
           `Stake_delegation
-      | Create_new_token _ ->
-          `Create_new_token
-      | Create_token_account _ ->
-          `Create_token_account
-      | Mint_tokens _ ->
-          `Mint_tokens
 
     let user_command_interface :
         ( 'context
@@ -1480,70 +1460,6 @@ module Types = struct
 
     let mk_stake_delegation = add_type user_command_interface stake_delegation
 
-    let create_new_token =
-      obj "UserCommandNewToken" ~fields:(fun _ ->
-          field_no_status "tokenOwner" ~typ:(non_null public_key) ~args:[]
-            ~doc:"Public key to set as the owner of the new token"
-            ~resolve:(fun _ cmd -> Signed_command.source_pk cmd.With_hash.data)
-          :: field_no_status "newAccountsDisabled" ~typ:(non_null bool) ~args:[]
-               ~doc:"Whether new accounts created in this token are disabled"
-               ~resolve:(fun _ cmd ->
-                 match
-                   Signed_command_payload.body
-                   @@ Signed_command.payload cmd.With_hash.data
-                 with
-                 | Create_new_token { disable_new_accounts; _ } ->
-                     disable_new_accounts
-                 | _ ->
-                     (* We cannot exclude this at the type level. *)
-                     failwith
-                       "Type error: Expected a Create_new_token user command")
-          :: user_command_shared_fields)
-
-    let mk_create_new_token = add_type user_command_interface create_new_token
-
-    let create_token_account =
-      obj "UserCommandNewAccount" ~fields:(fun _ ->
-          field_no_status "tokenOwner" ~typ:(non_null AccountObj.account)
-            ~args:[] ~doc:"The account that owns the token for the new account"
-            ~resolve:(fun { ctx = coda; _ } cmd ->
-              AccountObj.get_best_ledger_account coda
-                (Signed_command.source ~next_available_token:Token_id.invalid
-                   cmd.With_hash.data))
-          :: field_no_status "disabled" ~typ:(non_null bool) ~args:[]
-               ~doc:
-                 "Whether this account should be disabled upon creation. If \
-                  this command was not issued by the token owner, it should \
-                  match the 'newAccountsDisabled' property set in the token \
-                  owner's account." ~resolve:(fun _ cmd ->
-                 match
-                   Signed_command_payload.body
-                   @@ Signed_command.payload cmd.With_hash.data
-                 with
-                 | Create_token_account { account_disabled; _ } ->
-                     account_disabled
-                 | _ ->
-                     (* We cannot exclude this at the type level. *)
-                     failwith
-                       "Type error: Expected a Create_token_account user \
-                        command")
-          :: user_command_shared_fields)
-
-    let mk_create_token_account =
-      add_type user_command_interface create_token_account
-
-    let mint_tokens =
-      obj "UserCommandMintTokens" ~fields:(fun _ ->
-          field_no_status "tokenOwner" ~typ:(non_null AccountObj.account)
-            ~args:[] ~doc:"The account that owns the token to mint"
-            ~resolve:(fun { ctx = coda; _ } cmd ->
-              AccountObj.get_best_ledger_account coda
-                (Signed_command.source ~next_available_token:Token_id.invalid
-                   cmd.With_hash.data))
-          :: user_command_shared_fields)
-
-    let mk_mint_tokens = add_type user_command_interface mint_tokens
-
     let mk_user_command
         (cmd : (Signed_command.t, Transaction_hash.t) With_hash.t With_status.t)
         =
@@ -1554,12 +1470,6 @@ module Types = struct
           mk_payment cmd
       | Stake_delegation _ ->
           mk_stake_delegation cmd
-      | Create_new_token _ ->
-          mk_create_new_token cmd
-      | Create_token_account _ ->
-          mk_create_token_account cmd
-      | Mint_tokens _ ->
-          mk_mint_tokens cmd
 
     let user_command = user_command_interface
   end
@@ -1938,33 +1848,6 @@ module Types = struct
           [ field "delegation"
               ~typ:(non_null User_command.user_command)
               ~doc:"Delegation change that was sent"
-              ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id)
-          ])
-
-    let create_token =
-      obj "SendCreateTokenPayload" ~fields:(fun _ ->
-          [ field "createNewToken"
-              ~typ:(non_null User_command.create_new_token)
-              ~doc:"Token creation command that was sent"
-              ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id)
-          ])
-
-    let create_token_account =
-      obj "SendCreateTokenAccountPayload" ~fields:(fun _ ->
-          [ field "createNewTokenAccount"
-              ~typ:(non_null User_command.create_token_account)
-              ~doc:"Token account creation command that was sent"
-              ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id)
-          ])
-
-    let mint_tokens =
-      obj "SendMintTokensPayload" ~fields:(fun _ ->
-          [ field "mintTokens"
-              ~typ:(non_null User_command.mint_tokens)
-              ~doc:"Token minting command that was sent"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id)
           ])
@@ -4038,110 +3921,6 @@ module Mutations = struct
       ~resolve:(fun { ctx = mina; _ } () parties ->
         send_snapp_command mina parties)
 
-  let create_token =
-    io_field "createToken" ~doc:"Create a new token"
-      ~typ:(non_null Types.Payload.create_token)
-      ~args:
-        Arg.
-          [ arg "input" ~typ:(non_null Types.Input.create_token)
-          ; Types.Input.Fields.signature
-          ]
-      ~resolve:
-        (fun { ctx = coda; _ } ()
-             (fee_payer_pk, token_owner, fee, valid_until, memo, nonce_opt)
-             signature ->
-        let fee_payer_pk = Option.value ~default:token_owner fee_payer_pk in
-        let body =
-          Signed_command_payload.Body.Create_new_token
-            { token_owner_pk = token_owner
-            ; disable_new_accounts =
-                (* TODO(5274): Expose when permissions commands are merged. *)
-                false
-            }
-        in
-        let fee_token = Token_id.default in
-        match signature with
-        | None ->
-            send_unsigned_user_command ~coda ~nonce_opt ~signer:token_owner
-              ~memo ~fee ~fee_token ~fee_payer_pk ~valid_until ~body
-        | Some signature ->
-            send_signed_user_command ~coda ~nonce_opt ~signer:token_owner ~memo
-              ~fee ~fee_token ~fee_payer_pk ~valid_until ~body ~signature)
-
-  let create_token_account =
-    io_field "createTokenAccount" ~doc:"Create a new account for a token"
-      ~typ:(non_null Types.Payload.create_token_account)
-      ~args:
-        Arg.
-          [ arg "input" ~typ:(non_null Types.Input.create_token_account)
-          ; Types.Input.Fields.signature
-          ]
-      ~resolve:
-        (fun { ctx = coda; _ } ()
-             ( token_owner
-             , token
-             , receiver
-             , fee
-             , fee_payer
-             , valid_until
-             , memo
-             , nonce_opt ) signature ->
-        let body =
-          Signed_command_payload.Body.Create_token_account
-            { token_id = token
-            ; token_owner_pk = token_owner
-            ; receiver_pk = receiver
-            ; account_disabled =
-                (* TODO(5274): Expose when permissions commands are merged. *)
-                false
-            }
-        in
-        let fee_token = Token_id.default in
-        let fee_payer_pk = Option.value ~default:receiver fee_payer in
-        match signature with
-        | None ->
-            send_unsigned_user_command ~coda ~nonce_opt ~signer:fee_payer_pk
-              ~memo ~fee ~fee_token ~fee_payer_pk ~valid_until ~body
-        | Some signature ->
-            send_signed_user_command ~coda ~nonce_opt ~signer:fee_payer_pk ~memo
-              ~fee ~fee_token ~fee_payer_pk ~valid_until ~body ~signature)
-
-  let mint_tokens =
-    io_field "mintTokens" ~doc:"Mint more of a token"
-      ~typ:(non_null Types.Payload.mint_tokens)
-      ~args:
-        Arg.
-          [ arg "input" ~typ:(non_null Types.Input.mint_tokens)
-          ; Types.Input.Fields.signature
-          ]
-      ~resolve:
-        (fun { ctx = coda; _ } ()
-             ( token_owner
-             , token
-             , receiver
-             , amount
-             , fee
-             , valid_until
-             , memo
-             , nonce_opt ) signature ->
-        let body =
-          Signed_command_payload.Body.Mint_tokens
-            { token_id = token
-            ; token_owner_pk = token_owner
-            ; receiver_pk = Option.value ~default:token_owner receiver
-            ; amount = Amount.of_uint64 amount
-            }
-        in
-        let fee_token = Token_id.default in
-        match signature with
-        | None ->
-            send_unsigned_user_command ~coda ~nonce_opt ~signer:token_owner
-              ~memo ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until ~body
-        | Some signature ->
-            send_signed_user_command ~coda ~nonce_opt ~signer:token_owner ~memo
-              ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until ~body
-              ~signature)
-
   let send_rosetta_transaction =
     io_field "sendRosettaTransaction"
       ~doc:"Send a transaction in Rosetta format"
@@ -4365,9 +4144,6 @@ module Mutations = struct
     ; reload_wallets
     ; send_payment
     ; send_delegation
-    ; create_token
-    ; create_token_account
-    ; mint_tokens
     ; send_snapp
     ; mock_snapp
     ; send_test_snapp

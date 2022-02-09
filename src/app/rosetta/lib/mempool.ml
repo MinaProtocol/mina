@@ -160,12 +160,6 @@ module Transaction = struct
               `String "PAYMENT"
           | `Delegation ->
               `String "STAKE_DELEGATION"
-          | `Create_token ->
-              `String "CREATE_NEW_TOKEN"
-          | `Create_token_account ->
-              `String "CREATE_TOKEN_ACCOUNT"
-          | `Mint_tokens ->
-              `String "MINT_TOKENS"
 
         method feeToken = user_command_info.fee_token
 
@@ -232,12 +226,6 @@ module Transaction = struct
             M.return `Payment
         | `String "STAKE_DELEGATION" ->
             M.return `Delegation
-        | `String "CREATE_NEW_TOKEN" ->
-            M.return `Create_token
-        | `String "CREATE_TOKEN_ACCOUNT" ->
-            M.return `Create_token_account
-        | `String "MINT_TOKENS" ->
-            M.return `Mint_tokens
         | kind ->
             M.fail
               (Errors.create

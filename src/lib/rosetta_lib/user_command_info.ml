@@ -78,13 +78,7 @@ module Op = struct
 end
 
 module Kind = struct
-  type t =
-    [ `Payment
-    | `Delegation
-    | `Create_token
-    | `Create_token_account
-    | `Mint_tokens ]
-  [@@deriving yojson, equal, sexp, compare]
+  type t = [ `Payment | `Delegation ] [@@deriving yojson, equal, sexp, compare]
 end
 
 module Account_creation_fees_paid = struct
@@ -175,40 +169,6 @@ module Partial = struct
               { delegator = source_pk; new_delegate = receiver_pk }
           in
           Result.return @@ Signed_command.Payload.Body.Stake_delegation payload
-      | `Create_token ->
-          let payload =
-            { Mina_base.New_token_payload.token_owner_pk = receiver_pk
-            ; disable_new_accounts = false
-            }
-          in
-          Result.return @@ Signed_command.Payload.Body.Create_new_token payload
-      | `Create_token_account ->
-          let payload =
-            { Mina_base.New_account_payload.token_id =
-                Token_id.of_uint64 t.token
-            ; token_owner_pk = source_pk
-            ; receiver_pk
-            ; account_disabled = false
-            }
-          in
-          Result.return
-          @@ Signed_command.Payload.Body.Create_token_account payload
-      | `Mint_tokens ->
-          let%map amount =
-            Result.of_option t.amount
-              ~error:
-                (Errors.create
-                   (`Operations_not_valid
-                     [ Errors.Partial_reason.Amount_not_some ]))
-          in
-          let payload =
-            { Mina_base.Minting_payload.token_id = Token_id.of_uint64 t.token
-            ; token_owner_pk = source_pk
-            ; receiver_pk
-            ; amount = Amount_currency.of_uint64 amount
-            }
-          in
-          Signed_command.Payload.Body.Mint_tokens payload
     in
     Signed_command.Payload.create
       ~fee:(Fee_currency.of_uint64 t.fee)
@@ -416,211 +376,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
     ; memo
     }
   in
-  (* For token creation, we demand:
-     *
-     * ops = length exactly 2
-     *
-     * fee_payment with account 'a, some amount 'y, status="Pending"
-     * create_token with account=None, status="Pending"
-  *)
-  let create_token =
-    let%map () =
-      if Int.equal (List.length ops) 2 then V.return ()
-      else V.fail Length_mismatch
-    and account_a =
-      let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payment ops in
-      Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
-    and fee_token =
-      let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payment ops in
-      match account with
-      | Some account -> (
-          match token_id_of_account account with
-          | Some token_id ->
-              V.return token_id
-          | None ->
-              V.fail Incorrect_token_id )
-      | None ->
-          V.fail Account_not_some
-    and () =
-      if
-        List.for_all ops ~f:(fun op ->
-            Option.equal String.equal op.status (Some "Pending"))
-      then V.return ()
-      else V.fail Status_not_pending
-    and payment_amount_y =
-      let open Result.Let_syntax in
-      let%bind { amount; _ } = find_kind `Fee_payment ops in
-      match amount with
-      | Some x ->
-          V.return (Amount_of.negated x)
-      | None ->
-          V.fail Amount_not_some
-    (* distinguish create token ops from delegation ops *)
-    and () =
-      match find_kind `Delegate_change ops with
-      | Ok _ ->
-          V.fail Invalid_metadata
-      | Error _ ->
-          V.return ()
-    (* distinguish from mint tokens ops *)
-    and () =
-      match find_kind `Mint_tokens ops with
-      | Ok _ ->
-          V.fail Invalid_metadata
-      | Error _ ->
-          V.return ()
-    in
-    { Partial.kind = `Create_token
-    ; fee_payer = `Pk account_a.address
-    ; source = `Pk account_a.address
-    ; receiver = `Pk account_a.address (* reviewer: is this sane? *)
-    ; fee_token
-    ; token = Token_id.(default |> to_uint64)
-    ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
-    ; amount = None
-    ; valid_until
-    ; memo
-    }
-  in
-  (* For token account creation, we demand:
-     *
-     * ops = length exactly 1
-     *
-     * fee_payment with account 'a, some amount 'y, status="Pending"
-  *)
-  let create_token_account =
-    let%map () =
-      if Int.equal (List.length ops) 1 then V.return ()
-      else V.fail Length_mismatch
-    and account_a =
-      let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payment ops in
-      Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
-    and fee_token =
-      let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payment ops in
-      match account with
-      | Some account -> (
-          match token_id_of_account account with
-          | Some token_id ->
-              V.return token_id
-          | None ->
-              V.fail Incorrect_token_id )
-      | None ->
-          V.fail Account_not_some
-    and () =
-      if
-        List.for_all ops ~f:(fun op ->
-            Option.equal String.equal op.status (Some "Pending"))
-      then V.return ()
-      else V.fail Status_not_pending
-    and payment_amount_y =
-      let open Result.Let_syntax in
-      let%bind { amount; _ } = find_kind `Fee_payment ops in
-      match amount with
-      | Some x ->
-          V.return (Amount_of.negated x)
-      | None ->
-          V.fail Amount_not_some
-    in
-    { Partial.kind = `Create_token_account
-    ; fee_payer = `Pk account_a.address
-    ; source = `Pk account_a.address
-    ; receiver = `Pk account_a.address
-    ; fee_token
-    ; token = Token_id.(default |> to_uint64)
-    ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
-    ; amount = None
-    ; valid_until
-    ; memo
-    }
-  in
-  (* For token minting, we demand:
-     *
-     * ops = length exactly 2
-     *
-     * fee_payment with account 'a, some amount 'y, status="Pending"
-     * mint_tokens with account 'a, some amount 'y with the minted token id, metadata={token_owner_pk:'b}, status=Pending
-  *)
-  let mint_tokens =
-    let%map () =
-      if Int.equal (List.length ops) 2 then V.return ()
-      else V.fail Length_mismatch
-    and account_a =
-      let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payment ops in
-      Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
-    and fee_token =
-      let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payment ops in
-      match account with
-      | Some account -> (
-          match token_id_of_account account with
-          | Some token_id ->
-              V.return token_id
-          | None ->
-              V.fail Incorrect_token_id )
-      | None ->
-          V.fail Account_not_some
-    and () =
-      if
-        List.for_all ops ~f:(fun op ->
-            Option.equal String.equal op.status (Some "Pending"))
-      then V.return ()
-      else V.fail Status_not_pending
-    and payment_amount_y =
-      let open Result.Let_syntax in
-      let%bind { amount; _ } = find_kind `Fee_payment ops in
-      match amount with
-      | Some x ->
-          V.return (Amount_of.negated x)
-      | None ->
-          V.fail Amount_not_some
-    and account_b =
-      let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Mint_tokens ops in
-      Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
-    and amount_b =
-      let open Result.Let_syntax in
-      let%bind { amount; _ } = find_kind `Mint_tokens ops in
-      Option.value_map amount ~default:(V.fail Amount_not_some) ~f:V.return
-    and account_c =
-      let open Result.Let_syntax in
-      let%bind { metadata; _ } = find_kind `Mint_tokens ops in
-      match metadata with
-      | Some metadata -> (
-          match metadata with
-          | `Assoc [ ("token_owner_pk", `String s) ] ->
-              return s
-          | _ ->
-              V.fail Invalid_metadata )
-      | None ->
-          V.fail Account_not_some
-    and token =
-      let open Result.Let_syntax in
-      let%bind { amount; _ } = find_kind `Mint_tokens ops in
-      (* check for Amount_not_some already done for amount_b *)
-      let Amount.{ currency = { symbol; _ }; _ } = Option.value_exn amount in
-      if String.equal symbol "MINA+" then return (Unsigned.UInt64.of_int 2)
-      else V.fail Incorrect_token_id
-    in
-    { Partial.kind = `Mint_tokens
-    ; fee_payer = `Pk account_a.address
-    ; source = `Pk account_c
-    ; receiver = `Pk account_b.address
-    ; fee_token
-    ; token
-    ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
-    ; amount = Some (amount_b.Amount.value |> Unsigned.UInt64.of_string)
-    ; valid_until
-    ; memo
-    }
-  in
-  let partials =
-    [ payment; delegation; create_token; create_token_account; mint_tokens ]
-  in
+  let partials = [ payment; delegation ] in
   let oks, errs = List.partition_map partials ~f:Result.ok_fst in
   match (oks, errs) with
   | [], errs ->
@@ -674,17 +430,6 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
             [] )
     | `Delegation ->
         [ { Op.label = `Delegate_change; related_to = None } ]
-    | `Create_token ->
-        [ { Op.label = `Create_token; related_to = None } ]
-    | `Create_token_account ->
-        [] (* Covered by account creation fee *)
-    | `Mint_tokens -> (
-        (* When amount is not none, the amount goes to receiver's account *)
-        match t.amount with
-        | Some amount ->
-            [ { Op.label = `Mint_tokens amount; related_to = None } ]
-        | None ->
-            [] )
   in
   Op.build
     ~a_eq:
@@ -959,66 +704,6 @@ let dummies =
     ; amount = None
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
     ; hash = "TXN_2_HASH"
-    ; valid_until = None
-    ; memo = Some "hello"
-    }
-  ; { kind = `Create_token (* no new account *)
-    ; fee_payer = `Pk "Alice"
-    ; source = `Pk "Alice"
-    ; token = Unsigned.UInt64.of_int 1
-    ; fee = Unsigned.UInt64.of_int 2_000_000_000
-    ; receiver = `Pk "Bob"
-    ; fee_token = Unsigned.UInt64.of_int 1
-    ; nonce = Unsigned.UInt32.of_int 3
-    ; amount = None
-    ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
-    ; hash = "TXN_3a_HASH"
-    ; valid_until = None
-    ; memo = Some "hello"
-    }
-  ; { kind = `Create_token (* new account fee *)
-    ; fee_payer = `Pk "Alice"
-    ; source = `Pk "Alice"
-    ; token = Unsigned.UInt64.of_int 1
-    ; fee = Unsigned.UInt64.of_int 2_000_000_000
-    ; receiver = `Pk "Bob"
-    ; fee_token = Unsigned.UInt64.of_int 1
-    ; nonce = Unsigned.UInt32.of_int 3
-    ; amount = None
-    ; failure_status =
-        Some
-          (`Applied
-            (Account_creation_fees_paid.By_fee_payer
-               (Unsigned.UInt64.of_int 3_000)))
-    ; hash = "TXN_3b_HASH"
-    ; valid_until = None
-    ; memo = Some "hello"
-    }
-  ; { kind = `Create_token_account
-    ; fee_payer = `Pk "Alice"
-    ; source = `Pk "Alice"
-    ; token = Unsigned.UInt64.of_int 1
-    ; fee = Unsigned.UInt64.of_int 2_000_000_000
-    ; receiver = `Pk "Bob"
-    ; fee_token = Unsigned.UInt64.of_int 1
-    ; nonce = Unsigned.UInt32.of_int 3
-    ; amount = None
-    ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
-    ; hash = "TXN_4_HASH"
-    ; valid_until = None
-    ; memo = Some "hello"
-    }
-  ; { kind = `Mint_tokens
-    ; fee_payer = `Pk "Alice"
-    ; source = `Pk "Alice"
-    ; token = Unsigned.UInt64.of_int 10
-    ; fee = Unsigned.UInt64.of_int 2_000_000_000
-    ; receiver = `Pk "Bob"
-    ; fee_token = Unsigned.UInt64.of_int 1
-    ; nonce = Unsigned.UInt32.of_int 3
-    ; amount = Some (Unsigned.UInt64.of_int 30_000)
-    ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
-    ; hash = "TXN_5_HASH"
     ; valid_until = None
     ; memo = Some "hello"
     }

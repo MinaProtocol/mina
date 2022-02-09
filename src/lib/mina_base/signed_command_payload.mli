@@ -8,16 +8,13 @@ module Body : sig
   type t =
     | Payment of Payment_payload.t
     | Stake_delegation of Stake_delegation.t
-    | Create_new_token of New_token_payload.t
-    | Create_token_account of New_account_payload.t
-    | Mint_tokens of Minting_payload.t
   [@@deriving equal, sexp, hash, yojson]
 
   [%%versioned:
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V1 : sig
+    module V2 : sig
       type nonrec t = t [@@deriving compare, equal, sexp, hash, yojson]
     end
   end]
@@ -116,8 +113,8 @@ end
 
 [%%versioned:
 module Stable : sig
-  module V1 : sig
-    type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
+  module V2 : sig
+    type t = (Common.Stable.V1.t, Body.Stable.V2.t) Poly.Stable.V1.t
     [@@deriving compare, equal, sexp, hash, yojson]
   end
 end]
