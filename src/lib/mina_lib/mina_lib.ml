@@ -1722,7 +1722,9 @@ let create ?wallets (config : Config.t) =
                   ~time_controller:config.time_controller
                   ~expiry_ns:
                     (Time_ns.Span.of_hr
-                       Mina_compile_config.transaction_expiry_hr)
+                       (Float.of_int
+                          config.precomputed_values.genesis_constants
+                            .transaction_expiry_hr))
                   ~logger:config.logger
                   ~incoming_diffs:(Mina_networking.transaction_pool_diffs net)
                   ~local_diffs:local_txns_reader
@@ -1971,7 +1973,9 @@ let create ?wallets (config : Config.t) =
                   ~time_controller:config.time_controller
                   ~expiry_ns:
                     (Time_ns.Span.of_hr
-                       Mina_compile_config.transaction_expiry_hr)
+                       (Float.of_int
+                          config.precomputed_values.genesis_constants
+                            .transaction_expiry_hr))
                   ~logger:config.logger
                   ~incoming_diffs:(Mina_networking.snark_pool_diffs net)
                   ~local_diffs:local_snark_work_reader

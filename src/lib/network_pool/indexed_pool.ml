@@ -1379,7 +1379,10 @@ let%test_module _ =
 
     let time_controller = Block_time.Controller.basic ~logger
 
-    let expiry_ns = Time_ns.Span.of_hr Mina_compile_config.transaction_expiry_hr
+    let expiry_ns =
+      Time_ns.Span.of_hr
+        (Float.of_int
+           precomputed_values.genesis_constants.transaction_expiry_hr)
 
     let empty =
       empty ~constraint_constants ~consensus_constants ~time_controller

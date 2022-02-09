@@ -55,4 +55,4 @@ let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
 
 [%%inject "generate_genesis_proof", generate_genesis_proof]
 
-let transaction_expiry_hr = 72.0
+let transaction_expiry_hr = 2

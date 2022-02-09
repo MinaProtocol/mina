@@ -122,7 +122,9 @@ let%test_module "transaction_status" =
           ~consensus_constants:precomputed_values.consensus_constants
           ~time_controller
           ~expiry_ns:
-            (Time_ns.Span.of_hr Mina_compile_config.transaction_expiry_hr)
+            (Time_ns.Span.of_hr
+               (Float.of_int
+                  precomputed_values.genesis_constants.transaction_expiry_hr))
           ~incoming_diffs:pool_reader ~logger ~local_diffs:local_reader
           ~frontier_broadcast_pipe
       in
