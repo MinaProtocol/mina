@@ -195,5 +195,20 @@ let
           mv dockerfiles/puppeteer-context/* $out/
         '';
       };
+
+      mina_integration_tests = self.mina.overrideAttrs (oa: {
+        pname = "mina_integration_tests";
+        src = filtered-src;
+        outputs = [ "out" ];
+
+        buildPhase = ''
+          dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe -j$NIX_BUILD_CORES
+        '';
+        installPhase = ''
+          mkdir -p $out/bin
+          mv _build/default/src/app/test_executive/test_executive.exe $out/bin/test_executive
+          mv _build/default/src/app/logproc/logproc.exe $out/bin/logproc
+        '';
+      });
     };
 in scope.overrideScope' overlay
