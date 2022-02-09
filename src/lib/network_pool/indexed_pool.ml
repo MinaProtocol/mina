@@ -936,6 +936,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
   let check_timestamp_predicate expiry_ns (user_command : User_command.t) : bool
       =
     let current_time = Time_ns.now () in
+    let expiry_time = Time_ns.(sub current_time expiry_ns) in
     match user_command with
     | User_command.Signed_command _ ->
         true
@@ -953,7 +954,10 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
                      Block_time.to_time upper
                      |> Time_ns.of_time_float_round_nearest_microsecond
                    in
-                   Time_ns.(upper > current_time)
+                   (*Timestamp bounds are compared against slot start time of
+                     the most recent block and that could be any number of slots
+                     old. So give the transaction more time to be included*)
+                   Time_ns.(upper > expiry_time)
                    && Time_ns.(lower < add current_time expiry_ns)
                | _ ->
                    true)
