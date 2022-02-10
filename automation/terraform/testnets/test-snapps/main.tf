@@ -60,8 +60,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name = "test-snapps"
-  mina_image = "minaprotocol/mina-daemon:1.3.0alpha1-feature-snapps-protocol-ce068a6-buster-devnet"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.0alpha1-feature-snapps-protocol-ce068a6-buster"
+  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-feature-snapps-protocol-733f61a-buster-devnet"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-feature-snapps-protocol-733f61a-buster-devnet"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
 
