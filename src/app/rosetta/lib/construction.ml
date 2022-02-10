@@ -890,7 +890,7 @@ module Submit = struct
       [@@deriving hlist]
 
       let typ =
-        let open Archive_lib.Processor.Caqti_type_spec in
+        let open Mina_caqti.Type_spec in
         let spec =
           Caqti_type.[int64; string; string; int64; int64]
         in

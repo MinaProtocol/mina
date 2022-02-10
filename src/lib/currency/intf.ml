@@ -83,6 +83,8 @@ module type Arithmetic_intf = sig
 
   val sub : t -> t -> t option
 
+  val sub_flagged : t -> t -> t * [ `Underflow of bool ]
+
   val ( + ) : t -> t -> t option
 
   val ( - ) : t -> t -> t option
@@ -126,6 +128,8 @@ module type Signed_intf = sig
   val to_input_legacy : t -> (_, bool) Random_oracle.Legacy.Input.t
 
   val add : t -> t -> t option
+
+  val add_flagged : t -> t -> t * [ `Overflow of bool ]
 
   val ( + ) : t -> t -> t option
 
@@ -263,4 +267,6 @@ module type S = sig
   module Signed : Signed_intf with type magnitude := t
 
   [%%endif]
+
+  val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
 end
