@@ -221,6 +221,9 @@ module Body = struct
   [%%else]
 
   let check (t : Binable_arg.t) =
+    let fail () =
+      failwithf !"Tokens disabled. Read %{sexp:Binable_arg.t}" t ()
+    in
     match t with
     | Payment p ->
         if Token_id.equal p.token_id Token_id.default then t else fail ()
@@ -230,13 +233,13 @@ module Body = struct
   [%%versioned_binable
   module Stable = struct
     module V2 = struct
-      type t = Binable_arg.Stable.V1.t =
+      type t = Binable_arg.Stable.V2.t =
         | Payment of Payment_payload.Stable.V1.t
         | Stake_delegation of Stake_delegation.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
 
       include Binable.Of_binable
-                (Binable_arg.Stable.V1)
+                (Binable_arg.Stable.V2)
                 (struct
                   type nonrec t = t
 
