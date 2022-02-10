@@ -827,8 +827,7 @@ module Predicated = struct
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
-    Poly.Fields.make_creator obj
-      ~body:!.(fun _ -> failwith "TODO")
+    Poly.Fields.make_creator obj ~body:!.Body.deriver
       ~predicate:!.Predicate.deriver
     |> finish ~name:"SnappPartyPredicated"
 
@@ -1077,3 +1076,13 @@ let deriver obj =
   Fields.make_creator obj ~data:!.Predicated.deriver
     ~authorization:!.Control.deriver
   |> finish ~name:"SnappParty"
+
+let%test_unit "json roundtrip dummy" =
+  let dummy =
+    { data = { body = Body.dummy; predicate = Predicate.Accept }
+    ; authorization = Control.dummy_of_tag Signature
+    }
+  in
+  let module Fd = Fields_derivers_snapps.Derivers in
+  let full = deriver @@ Fd.o () in
+  [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
