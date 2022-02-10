@@ -263,11 +263,7 @@ module For_tests = struct
             ~valid_until:None ~memo:Signed_command_memo.dummy
             ~body:
               (Payment
-                 { source_pk = sender_pk
-                 ; receiver_pk
-                 ; token_id = token
-                 ; amount = send_amount
-                 })
+                 { source_pk = sender_pk; receiver_pk; amount = send_amount })
         in
         Signed_command.sign sender_keypair payload)
 

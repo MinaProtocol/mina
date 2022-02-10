@@ -106,14 +106,9 @@ let next_available_token ({ payload; _ } : t) tid =
 let to_input_legacy (payload : Payload.t) =
   Transaction_union_payload.(to_input_legacy (of_user_command_payload payload))
 
-let check_tokens ({ payload = { common = { fee_token; _ }; body }; _ } : t) =
-  (not (Token_id.(equal invalid) fee_token))
-  &&
-  match body with
-  | Payment { token_id; _ } ->
-      not (Token_id.(equal invalid) token_id)
-  | Stake_delegation _ ->
-      true
+let check_tokens ({ payload = { common = { fee_token; _ }; body = _ }; _ } : t)
+    =
+  not (Token_id.(equal invalid) fee_token)
 
 let sign_payload ?signature_kind (private_key : Signature_lib.Private_key.t)
     (payload : Payload.t) : Signature.t =
@@ -160,8 +155,7 @@ module Gen = struct
 
   module Payment = struct
     let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
-        ?nonce ~max_amount ?fee_token ?(payment_token = Token_id.default)
-        ~fee_range () =
+        ?nonce ~max_amount ?fee_token ~fee_range () =
       gen_inner sign' ~key_gen ?nonce ?fee_token ~fee_range
       @@ fun { public_key = signer; _ } { public_key = receiver; _ } ->
       let open Quickcheck.Generator.Let_syntax in
@@ -169,7 +163,6 @@ module Gen = struct
       Signed_command_payload.Body.Payment
         { receiver_pk = Public_key.compress receiver
         ; source_pk = Public_key.compress signer
-        ; token_id = payment_token
         ; amount
         }
 
@@ -181,10 +174,9 @@ module Gen = struct
           gen_inner sign
 
     let gen_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-        ?fee_token ?payment_token ~fee_range =
+        ?fee_token ~fee_range =
       with_random_participants ~keys ~gen:(fun ~key_gen ->
-          gen ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
-            ~fee_range)
+          gen ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ~fee_range)
   end
 
   module Stake_delegation = struct
@@ -308,11 +300,7 @@ module Gen = struct
               ~fee_payer_pk:sender_pk ~valid_until:None ~nonce ~memo
               ~body:
                 (Payment
-                   { source_pk = sender_pk
-                   ; receiver_pk = receiver
-                   ; token_id = Token_id.default
-                   ; amount
-                   })
+                   { source_pk = sender_pk; receiver_pk = receiver; amount })
           in
           let sign' =
             match sign_type with `Fake -> For_tests.fake_sign | `Real -> sign

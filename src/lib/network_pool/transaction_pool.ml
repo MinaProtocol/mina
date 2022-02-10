@@ -2003,7 +2003,6 @@ let%test_module _ =
              (Signed_command_payload.Body.Payment
                 { source_pk = get_pk sender_idx
                 ; receiver_pk = get_pk receiver_idx
-                ; token_id = Token_id.default
                 ; amount = Currency.Amount.of_int amount
                 }))
 

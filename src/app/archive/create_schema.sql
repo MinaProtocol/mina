@@ -63,7 +63,6 @@ CREATE TABLE user_commands
 , source_id      int                 NOT NULL REFERENCES public_keys(id)
 , receiver_id    int                 NOT NULL REFERENCES public_keys(id)
 , fee_token      bigint              NOT NULL
-, token          bigint              NOT NULL
 , nonce          bigint              NOT NULL
 , amount         bigint
 , fee            bigint              NOT NULL

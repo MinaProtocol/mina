@@ -2990,12 +2990,11 @@ module Types = struct
     let send_payment =
       let open Fields in
       obj "SendPaymentInput"
-        ~coerce:(fun from to_ token amount fee valid_until memo nonce ->
-          (from, to_, token, amount, fee, valid_until, memo, nonce))
+        ~coerce:(fun from to_ amount fee valid_until memo nonce ->
+          (from, to_, amount, fee, valid_until, memo, nonce))
         ~fields:
           [ from ~doc:"Public key of sender of payment"
           ; to_ ~doc:"Public key of recipient of payment"
-          ; token_opt ~doc:"Token to send"
           ; arg "amount" ~doc:"Amount of MINA to send to receiver"
               ~typ:(non_null uint64_arg)
           ; fee ~doc:"Fee amount in order to send payment"
@@ -3858,13 +3857,11 @@ module Mutations = struct
           ]
       ~resolve:
         (fun { ctx = coda; _ } ()
-             (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
-             signature ->
+             (from, to_, amount, fee, valid_until, memo, nonce_opt) signature ->
         let body =
           Signed_command_payload.Body.Payment
             { source_pk = from
             ; receiver_pk = to_
-            ; token_id = Option.value ~default:Token_id.default token_id
             ; amount = Amount.of_uint64 amount
             }
         in
@@ -4794,14 +4791,12 @@ module Queries = struct
           ]
       ~resolve:
         (fun { ctx = mina; _ } ()
-             (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
-             signature ->
+             (from, to_, amount, fee, valid_until, memo, nonce_opt) signature ->
         let open Deferred.Result.Let_syntax in
         let body =
           Signed_command_payload.Body.Payment
             { source_pk = from
             ; receiver_pk = to_
-            ; token_id = Option.value ~default:Token_id.default token_id
             ; amount = Amount.of_uint64 amount
             }
         in

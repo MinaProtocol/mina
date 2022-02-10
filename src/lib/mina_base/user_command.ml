@@ -33,17 +33,15 @@ module Gen_make (C : Signed_command_intf.Gen_intf) = struct
 
   open C.Gen
 
-  let payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
-      ~fee_range () =
+  let payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ~fee_range () =
     to_signed_command
-      (payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
-         ~fee_range ())
+      (payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ~fee_range ())
 
   let payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-      ?fee_token ?payment_token ~fee_range () =
+      ?fee_token ~fee_range () =
     to_signed_command
       (payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-         ?fee_token ?payment_token ~fee_range ())
+         ?fee_token ~fee_range ())
 
   let stake_delegation ~key_gen ?nonce ?fee_token ~fee_range () =
     to_signed_command

@@ -24,7 +24,6 @@ module type Gen_intf = sig
       -> ?nonce:Account_nonce.t
       -> max_amount:int
       -> ?fee_token:Token_id.t
-      -> ?payment_token:Token_id.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -41,7 +40,6 @@ module type Gen_intf = sig
       -> ?nonce:Account_nonce.t
       -> max_amount:int
       -> ?fee_token:Token_id.t
-      -> ?payment_token:Token_id.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t

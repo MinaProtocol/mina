@@ -529,13 +529,7 @@ module T = struct
               User_command_input.create ~fee ~fee_token:Token_id.default
                 ~fee_payer_pk:sender_pk ~signer:sender_pk ~memo
                 ~valid_until:None
-                ~body:
-                  (Payment
-                     { source_pk = sender_pk
-                     ; receiver_pk
-                     ; token_id = Token_id.default
-                     ; amount
-                     })
+                ~body:(Payment { source_pk = sender_pk; receiver_pk; amount })
                 ~sign_choice:
                   (User_command_input.Sign_choice.Keypair
                      (Keypair.of_private_key_exn sender_sk))

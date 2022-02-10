@@ -845,7 +845,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           , Transaction_status.Auxiliary_data.empty
           , Transaction_applied.Signed_command_applied.Body.Stake_delegation
               { previous_delegate } )
-      | Payment { amount; token_id = token; _ } ->
+      | Payment { amount; _ } ->
+          let token = Token_id.default in
           let receiver_location, receiver_account =
             get_with_location ledger receiver |> ok_or_reject
           in
@@ -2332,13 +2333,7 @@ module For_tests = struct
           ; valid_until = Global_slot.max_value
           ; memo = Signed_command_memo.dummy
           }
-      ; body =
-          Payment
-            { source_pk = sender_pk
-            ; receiver_pk = receiver
-            ; token_id = Token_id.default
-            ; amount
-            }
+      ; body = Payment { source_pk = sender_pk; receiver_pk = receiver; amount }
       }
     |> Signed_command.forget_check
 

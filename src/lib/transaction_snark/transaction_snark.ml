@@ -4582,19 +4582,13 @@ let%test_module "transaction_snark" =
       in
       Array.init n ~f:(fun _ -> random_wallet ())
 
-    let user_command ~fee_payer ~source_pk ~receiver_pk ~fee_token ~token amt
-        fee nonce memo =
+    let user_command ~fee_payer ~source_pk ~receiver_pk ~fee_token amt fee nonce
+        memo =
       let payload : Signed_command.Payload.t =
         Signed_command.Payload.create ~fee ~fee_token
           ~fee_payer_pk:(Account.public_key fee_payer.account)
           ~nonce ~memo ~valid_until:None
-          ~body:
-            (Payment
-               { source_pk
-               ; receiver_pk
-               ; token_id = token
-               ; amount = Amount.of_int amt
-               })
+          ~body:(Payment { source_pk; receiver_pk; amount = Amount.of_int amt })
       in
       let signature =
         Signed_command.sign_payload fee_payer.private_key payload
@@ -4608,13 +4602,13 @@ let%test_module "transaction_snark" =
       |> Option.value_exn
 
     let user_command_with_wallet wallets ~sender:i ~receiver:j amt fee
-        ~fee_token ~token nonce memo =
+        ~fee_token nonce memo =
       let fee_payer = wallets.(i) in
       let receiver = wallets.(j) in
       user_command ~fee_payer
         ~source_pk:(Account.public_key fee_payer.account)
         ~receiver_pk:(Account.public_key receiver.account)
-        ~fee_token ~token amt fee nonce memo
+        ~fee_token amt fee nonce memo
 
     let state_body =
       let compile_time_genesis =
@@ -4780,8 +4774,7 @@ let%test_module "transaction_snark" =
                 user_command_with_wallet wallets ~sender:1 ~receiver:0
                   8_000_000_000
                   (Fee.of_int (Random.int 20 * 1_000_000_000))
-                  ~fee_token:Token_id.default ~token:Token_id.default
-                  Account.Nonce.zero
+                  ~fee_token:Token_id.default Account.Nonce.zero
                   (Signed_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
                         ~len:Signed_command_memo.max_digestible_string_length))
@@ -5669,8 +5662,8 @@ let%test_module "transaction_snark" =
                       user_command ~fee_payer:sender
                         ~source_pk:(Account.public_key sender.account)
                         ~receiver_pk:(Account.public_key receiver.account)
-                        ~fee_token:Token_id.default ~token:Token_id.default
-                        amount (Fee.of_int txn_fee) nonce memo
+                        ~fee_token:Token_id.default amount (Fee.of_int txn_fee)
+                        nonce memo
                     in
                     (Account.Nonce.succ nonce, txns @ [ uc ]))
               in
@@ -5804,15 +5797,13 @@ let%test_module "transaction_snark" =
                 user_command_with_wallet wallets ~sender:0 ~receiver:1
                   8_000_000_000
                   (Fee.of_int (Random.int 20 * 1_000_000_000))
-                  ~fee_token:Token_id.default ~token:Token_id.default
-                  Account.Nonce.zero memo
+                  ~fee_token:Token_id.default Account.Nonce.zero memo
               in
               let t2 =
                 user_command_with_wallet wallets ~sender:1 ~receiver:2
                   8_000_000_000
                   (Fee.of_int (Random.int 20 * 1_000_000_000))
-                  ~fee_token:Token_id.default ~token:Token_id.default
-                  Account.Nonce.zero memo
+                  ~fee_token:Token_id.default Account.Nonce.zero memo
               in
               let sok_digest =
                 Sok_message.create ~fee:Fee.zero
@@ -6073,7 +6064,6 @@ let%test_module "transaction_snark" =
               let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
-              let token_id = Quickcheck.random_value Token_id.gen_non_default in
               let accounts =
                 [| create_account fee_payer_pk fee_token 20_000_000_000 |]
               in
@@ -6084,7 +6074,7 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Payment { source_pk; receiver_pk; token_id; amount })
+                  (Payment { source_pk; receiver_pk; amount })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let expected_fee_payer_balance =
@@ -6105,10 +6095,9 @@ let%test_module "transaction_snark" =
               let source_pk = wallets.(1).account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
               let fee_token = Token_id.default in
-              let token_id = Quickcheck.random_value Token_id.gen_non_default in
               let accounts =
                 [| create_account fee_payer_pk fee_token 20_000_000_000
-                 ; create_account source_pk token_id 30_000_000_000
+                 ; create_account source_pk Token_id.default 30_000_000_000
                 |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
@@ -6118,7 +6107,7 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Payment { source_pk; receiver_pk; token_id; amount })
+                  (Payment { source_pk; receiver_pk; amount })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in
@@ -6289,7 +6278,7 @@ let%test_module "transaction_snark" =
                     let uc =
                       user_command_with_wallet wallets ~sender:0 ~receiver
                         amount (Fee.of_int txn_fee) ~fee_token:Token_id.default
-                        ~token:Token_id.default nonce memo
+                        nonce memo
                     in
                     (Account.Nonce.succ nonce, txns @ [ uc ]))
               in
@@ -6741,7 +6730,6 @@ let%test_module "transaction_undos" =
                   (Payment
                      { source_pk = sender_pk
                      ; receiver_pk = reciever_pk
-                     ; token_id = Token_id.default
                      ; amount
                      })
             in

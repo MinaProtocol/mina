@@ -17,7 +17,6 @@ module Unsigned = struct
         { to_ : public_key [@key "to"]
         ; from : public_key
         ; fee : Unsigned_extended.UInt64.t
-        ; token : Unsigned_extended.UInt64.t
         ; nonce : Unsigned_extended.UInt32.t
         ; memo : string option
         ; amount : Unsigned_extended.UInt64.t
@@ -78,7 +77,6 @@ module Unsigned = struct
           ; from = un_pk command.source
           ; fee = command.fee
           ; nonce
-          ; token = command.token
           ; memo = command.memo
           ; amount
           ; valid_until = command.valid_until
@@ -129,8 +127,7 @@ module Unsigned = struct
     ; source = `Pk r.from
     ; kind = `Payment
     ; fee_payer = `Pk r.from
-    ; fee_token = r.token
-    ; token = r.token
+    ; fee_token = Mina_base.Token_id.(default |> to_uint64)
     ; fee = r.fee
     ; amount = Some r.amount
     ; valid_until = r.valid_until
@@ -144,7 +141,6 @@ module Unsigned = struct
     ; kind = `Delegation
     ; fee_payer = `Pk r.delegator
     ; fee_token = Mina_base.Token_id.(default |> to_uint64)
-    ; token = Mina_base.Token_id.(default |> to_uint64)
     ; fee = r.fee
     ; amount = None
     ; valid_until = r.valid_until

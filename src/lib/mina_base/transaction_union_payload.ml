@@ -28,9 +28,13 @@ module Body = struct
   [@@deriving sexp]
 
   let of_user_command_payload_body = function
-    | Signed_command_payload.Body.Payment
-        { source_pk; receiver_pk; token_id; amount } ->
-        { tag = Tag.Payment; source_pk; receiver_pk; token_id; amount }
+    | Signed_command_payload.Body.Payment { source_pk; receiver_pk; amount } ->
+        { tag = Tag.Payment
+        ; source_pk
+        ; receiver_pk
+        ; token_id = Token_id.default
+        ; amount
+        }
     | Stake_delegation (Set_delegate { delegator; new_delegate }) ->
         { tag = Tag.Stake_delegation
         ; source_pk = delegator

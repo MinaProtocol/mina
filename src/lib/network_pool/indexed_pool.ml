@@ -1233,10 +1233,9 @@ let%test_module _ =
 
     let test_keys = Array.init 10 ~f:(fun _ -> Signature_lib.Keypair.create ())
 
-    let gen_cmd ?sign_type ?nonce ?fee_token ?payment_token () =
+    let gen_cmd ?sign_type ?nonce ?fee_token () =
       User_command.Valid.Gen.payment_with_random_participants ~keys:test_keys
-        ~max_amount:1000 ~fee_range:10 ?sign_type ?nonce ?fee_token
-        ?payment_token ()
+        ~max_amount:1000 ~fee_range:10 ?sign_type ?nonce ?fee_token ()
       |> Quickcheck.Generator.map
            ~f:Transaction_hash.User_command_with_valid_signature.create
 

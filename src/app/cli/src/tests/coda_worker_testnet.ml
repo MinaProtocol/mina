@@ -163,8 +163,7 @@ module Api = struct
     run_user_command
       ~memo:(Signed_command_memo.create_from_string_exn (sprintf "pay%i" i))
       t i sender_sk fee valid_until
-      ~body:
-        (Payment { source_pk; receiver_pk; token_id = Token_id.default; amount })
+      ~body:(Payment { source_pk; receiver_pk; amount })
 
   let new_block t i key =
     run_online_worker

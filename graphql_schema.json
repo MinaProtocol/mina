@@ -6463,14 +6463,6 @@
               "deprecationReason": null
             },
             {
-              "name": "token",
-              "description": "Token to send",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "TokenId", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "to",
               "description": "Public key of recipient of payment",
               "args": [],
@@ -6550,12 +6542,6 @@
                   "ofType": null
                 }
               },
-              "defaultValue": null
-            },
-            {
-              "name": "token",
-              "description": "Token to send",
-              "type": { "kind": "SCALAR", "name": "TokenId", "ofType": null },
               "defaultValue": null
             },
             {

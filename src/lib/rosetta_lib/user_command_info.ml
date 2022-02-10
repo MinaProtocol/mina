@@ -14,10 +14,13 @@ let pk_to_public_key ~context (`Pk pk) =
   |> Result.map_error ~f:(fun _ ->
          Errors.create ~context `Public_key_format_not_valid)
 
-let account_id (`Pk pk) token_id =
+let account_id ?token_id (`Pk pk) =
   { Account_identifier.address = pk
   ; sub_account = None
-  ; metadata = Some (Amount_of.Token_id.encode token_id)
+  ; metadata =
+      Some
+        (Amount_of.Token_id.encode
+           (Option.value ~default:Amount_of.Token_id.default token_id))
   }
 
 let token_id_of_account (account : Account_identifier.t) =
@@ -100,7 +103,6 @@ type t =
   ; source : [ `Pk of string ]
   ; receiver : [ `Pk of string ]
   ; fee_token : Unsigned_extended.UInt64.t
-  ; token : Unsigned_extended.UInt64.t
   ; fee : Unsigned_extended.UInt64.t
   ; nonce : Unsigned_extended.UInt32.t
   ; amount : Unsigned_extended.UInt64.t option
@@ -118,7 +120,6 @@ module Partial = struct
     ; source : [ `Pk of string ]
     ; receiver : [ `Pk of string ]
     ; fee_token : Unsigned_extended.UInt64.t
-    ; token : Unsigned_extended.UInt64.t
     ; fee : Unsigned_extended.UInt64.t
     ; amount : Unsigned_extended.UInt64.t option
     ; valid_until : Unsigned_extended.UInt32.t option
@@ -158,7 +159,6 @@ module Partial = struct
           let payload =
             { Payment_payload.Poly.source_pk
             ; receiver_pk
-            ; token_id = Token_id.of_uint64 t.token
             ; amount = Amount_currency.of_uint64 amount
             }
           in
@@ -184,7 +184,6 @@ let forget (t : t) : Partial.t =
   ; source = t.source
   ; receiver = t.receiver
   ; fee_token = t.fee_token
-  ; token = t.token
   ; fee = t.fee
   ; amount = t.amount
   ; valid_until = t.valid_until
@@ -197,7 +196,6 @@ let remember ~nonce ~hash t =
   ; source = t.source
   ; receiver = t.receiver
   ; fee_token = t.fee_token
-  ; token = t.token
   ; fee = t.fee
   ; amount = t.amount
   ; valid_until = t.valid_until
@@ -241,18 +239,6 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
       | Some _, Some _ ->
           V.fail Fee_payer_and_source_mismatch
       | None, _ | _, None ->
-          V.fail Account_not_some
-    and token =
-      let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Payment_source_dec ops in
-      match account with
-      | Some account -> (
-          match token_id_of_account account with
-          | None ->
-              V.fail Incorrect_token_id
-          | Some token ->
-              V.return token )
-      | None ->
           V.fail Account_not_some
     and fee_token =
       let open Result.Let_syntax in
@@ -301,7 +287,6 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
     ; source = `Pk account_a.address
     ; receiver = `Pk account_b.address
     ; fee_token
-    ; token (* TODO: Catch exception properly on these uint64 decodes *)
     ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount = Some (Unsigned.UInt64.of_string payment_amount_x.Amount.value)
     ; valid_until
@@ -367,9 +352,6 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
     ; source = `Pk account_a.address
     ; receiver = `Pk account_b
     ; fee_token
-    ; token =
-        Token_id.(default |> to_uint64)
-        (* only default token can be delegated *)
     ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount = None
     ; valid_until
@@ -471,7 +453,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           ; related_operations
           ; status =
               Some (status |> pending_or_success_only |> Operation_statuses.name)
-          ; account = Some (account_id t.fee_payer t.fee_token)
+          ; account = Some (account_id ~token_id:t.fee_token t.fee_payer)
           ; _type = Operation_types.name `Fee_payment
           ; amount = Some Amount_of.(negated @@ token t.fee_token t.fee)
           ; coin_change = None
@@ -481,11 +463,11 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           { Operation.operation_identifier
           ; related_operations
           ; status = Some (Operation_statuses.name status)
-          ; account = Some (account_id t.source t.token)
+          ; account = Some (account_id t.source)
           ; _type = Operation_types.name `Payment_source_dec
           ; amount =
               ( if did_fail then None
-              else Some Amount_of.(negated @@ token t.token amount) )
+              else Some Amount_of.(negated @@ mina amount) )
           ; coin_change = None
           ; metadata
           }
@@ -493,10 +475,9 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           { Operation.operation_identifier
           ; related_operations
           ; status = Some (Operation_statuses.name status)
-          ; account = Some (account_id t.receiver t.token)
+          ; account = Some (account_id t.receiver)
           ; _type = Operation_types.name `Payment_receiver_inc
-          ; amount =
-              (if did_fail then None else Some (Amount_of.token t.token amount))
+          ; amount = (if did_fail then None else Some (Amount_of.mina amount))
           ; coin_change = None
           ; metadata
           }
@@ -504,7 +485,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           { Operation.operation_identifier
           ; related_operations
           ; status = Some (Operation_statuses.name status)
-          ; account = Some (account_id t.receiver t.token)
+          ; account = Some (account_id t.receiver)
           ; _type = Operation_types.name `Account_creation_fee_via_payment
           ; amount = Some Amount_of.(negated @@ mina account_creation_fee)
           ; coin_change = None
@@ -514,19 +495,9 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           { Operation.operation_identifier
           ; related_operations
           ; status = Some (Operation_statuses.name status)
-          ; account = Some (account_id t.fee_payer t.fee_token)
+          ; account = Some (account_id ~token_id:t.fee_token t.fee_payer)
           ; _type = Operation_types.name `Account_creation_fee_via_fee_payer
           ; amount = Some Amount_of.(negated @@ mina account_creation_fee)
-          ; coin_change = None
-          ; metadata
-          }
-      | `Create_token ->
-          { Operation.operation_identifier
-          ; related_operations
-          ; status = Some (Operation_statuses.name status)
-          ; account = None
-          ; _type = Operation_types.name `Create_token
-          ; amount = None
           ; coin_change = None
           ; metadata
           }
@@ -534,7 +505,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           { Operation.operation_identifier
           ; related_operations
           ; status = Some (Operation_statuses.name status)
-          ; account = Some (account_id t.source Amount_of.Token_id.default)
+          ; account = Some (account_id t.source)
           ; _type = Operation_types.name `Delegate_change
           ; amount = None
           ; coin_change = None
@@ -547,24 +518,6 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
                            (let (`Pk r) = t.receiver in
                             r) )
                      ]))
-          }
-      | `Mint_tokens amount ->
-          { Operation.operation_identifier
-          ; related_operations
-          ; status = Some (Operation_statuses.name status)
-          ; account = Some (account_id t.receiver t.token)
-          ; _type = Operation_types.name `Mint_tokens
-          ; amount = Some (Amount_of.token t.token amount)
-          ; coin_change = None
-          ; metadata =
-              merge_metadata metadata
-                (Some
-                   (`Assoc
-                     [ ( "token_owner_pk"
-                       , `String
-                           (let (`Pk r) = t.source in
-                            r) )
-                     ]))
           })
 
 let to_operations' (t : t) : Operation.t list =
@@ -572,10 +525,9 @@ let to_operations' (t : t) : Operation.t list =
 
 let%test_unit "payment_round_trip" =
   let start =
-    { kind = `Payment (* default token *)
+    { kind = `Payment
     ; fee_payer = `Pk "Alice"
     ; source = `Pk "Alice"
-    ; token = Unsigned.UInt64.of_int 1
     ; fee = Unsigned.UInt64.of_int 2_000_000_000
     ; receiver = `Pk "Bob"
     ; fee_token = Unsigned.UInt64.of_int 1
@@ -599,7 +551,6 @@ let%test_unit "delegation_round_trip" =
     { kind = `Delegation
     ; fee_payer = `Pk "Alice"
     ; source = `Pk "Alice"
-    ; token = Unsigned.UInt64.of_int 1
     ; fee = Unsigned.UInt64.of_int 1_000_000_000
     ; receiver = `Pk "Bob"
     ; fee_token = Unsigned.UInt64.of_int 1
@@ -619,10 +570,9 @@ let%test_unit "delegation_round_trip" =
       failwithf !"Mismatch because %{sexp: Partial.Reason.t list}" e ()
 
 let dummies =
-  [ { kind = `Payment (* default token *)
+  [ { kind = `Payment (* payment *)
     ; fee_payer = `Pk "Alice"
     ; source = `Pk "Alice"
-    ; token = Unsigned.UInt64.of_int 1
     ; fee = Unsigned.UInt64.of_int 2_000_000_000
     ; receiver = `Pk "Bob"
     ; fee_token = Unsigned.UInt64.of_int 1
@@ -636,7 +586,6 @@ let dummies =
   ; { kind = `Payment (* new account created *)
     ; fee_payer = `Pk "Alice"
     ; source = `Pk "Alice"
-    ; token = Unsigned.UInt64.of_int 1
     ; fee = Unsigned.UInt64.of_int 2_000_000_000
     ; receiver = `Pk "Bob"
     ; fee_token = Unsigned.UInt64.of_int 1
@@ -654,7 +603,6 @@ let dummies =
   ; { kind = `Payment (* failed payment *)
     ; fee_payer = `Pk "Alice"
     ; source = `Pk "Alice"
-    ; token = Unsigned.UInt64.of_int 1
     ; fee = Unsigned.UInt64.of_int 2_000_000_000
     ; receiver = `Pk "Bob"
     ; fee_token = Unsigned.UInt64.of_int 1
@@ -665,24 +613,9 @@ let dummies =
     ; valid_until = None
     ; memo = Some "hello"
     }
-  ; { kind = `Payment (* custom token *)
-    ; fee_payer = `Pk "Alice"
-    ; source = `Pk "Alice"
-    ; token = Unsigned.UInt64.of_int 3
-    ; fee = Unsigned.UInt64.of_int 2_000_000_000
-    ; receiver = `Pk "Bob"
-    ; fee_token = Unsigned.UInt64.of_int 1
-    ; nonce = Unsigned.UInt32.of_int 3
-    ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
-    ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
-    ; hash = "TXN_1a_HASH"
-    ; valid_until = None
-    ; memo = Some "hello"
-    }
   ; { kind = `Payment (* custom fee-token *)
     ; fee_payer = `Pk "Alice"
     ; source = `Pk "Alice"
-    ; token = Unsigned.UInt64.of_int 1
     ; fee = Unsigned.UInt64.of_int 2_000_000_000
     ; receiver = `Pk "Bob"
     ; fee_token = Unsigned.UInt64.of_int 3
@@ -696,7 +629,6 @@ let dummies =
   ; { kind = `Delegation
     ; fee_payer = `Pk "Alice"
     ; source = `Pk "Alice"
-    ; token = Unsigned.UInt64.of_int 1
     ; fee = Unsigned.UInt64.of_int 2_000_000_000
     ; receiver = `Pk "Bob"
     ; fee_token = Unsigned.UInt64.of_int 1

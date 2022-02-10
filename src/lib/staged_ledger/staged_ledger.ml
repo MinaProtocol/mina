@@ -3566,7 +3566,6 @@ let%test_module "staged ledger tests" =
           Payment_payload.Poly.
             { source_pk
             ; receiver_pk
-            ; token_id = Token_id.default
             ; amount = insufficient_account_creation_fee
             }
       in
@@ -3637,11 +3636,7 @@ let%test_module "staged ledger tests" =
           let body =
             Signed_command_payload.Body.Payment
               Payment_payload.Poly.
-                { source_pk
-                ; receiver_pk
-                ; token_id = Token_id.default
-                ; amount = account_creation_fee
-                }
+                { source_pk; receiver_pk; amount = account_creation_fee }
           in
           let payload =
             Signed_command.Payload.create ~fee ~fee_payer_pk:source_pk

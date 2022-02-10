@@ -190,69 +190,17 @@ module Common = struct
 end
 
 module Body = struct
-  module Binable_arg = struct
-    [%%versioned
-    module Stable = struct
-      module V2 = struct
-        type t =
-          | Payment of Payment_payload.Stable.V1.t
-          | Stake_delegation of Stake_delegation.Stable.V1.t
-        [@@deriving sexp]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
-  [%%if feature_tokens]
-
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t = Binable_arg.Stable.V2.t =
-        | Payment of Payment_payload.Stable.V1.t
+      type t =
+        | Payment of Payment_payload.Stable.V2.t
         | Stake_delegation of Stake_delegation.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
 
       let to_latest = Fn.id
     end
   end]
-
-  [%%else]
-
-  let check (t : Binable_arg.t) =
-    let fail () =
-      failwithf !"Tokens disabled. Read %{sexp:Binable_arg.t}" t ()
-    in
-    match t with
-    | Payment p ->
-        if Token_id.equal p.token_id Token_id.default then t else fail ()
-    | Stake_delegation _ ->
-        t
-
-  [%%versioned_binable
-  module Stable = struct
-    module V2 = struct
-      type t = Binable_arg.Stable.V2.t =
-        | Payment of Payment_payload.Stable.V1.t
-        | Stake_delegation of Stake_delegation.Stable.V1.t
-      [@@deriving compare, equal, sexp, hash, yojson]
-
-      include Binable.Of_binable
-                (Binable_arg.Stable.V2)
-                (struct
-                  type nonrec t = t
-
-                  let of_binable = check
-
-                  let to_binable = check
-                end)
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  [%%endif]
 
   module Tag = Transaction_union_tag
 
@@ -288,21 +236,21 @@ module Body = struct
   let token (t : t) =
     match t with
     | Payment payload ->
-        payload.token_id
+        Payment_payload.token payload
     | Stake_delegation _ ->
         Token_id.default
 
   let source ~next_available_token:_ t =
     match t with
     | Payment payload ->
-        Account_id.create payload.source_pk payload.token_id
+        Payment_payload.source payload
     | Stake_delegation payload ->
         Stake_delegation.source payload
 
   let receiver ~next_available_token:_ t =
     match t with
     | Payment payload ->
-        Account_id.create payload.receiver_pk payload.token_id
+        Payment_payload.receiver payload
     | Stake_delegation payload ->
         Stake_delegation.receiver payload
 
