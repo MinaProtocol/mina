@@ -90,6 +90,11 @@ let dummy_of_tag : Tag.t -> t = function
   | None_given ->
       None_given
 
+let signature_deriver obj =
+  Fields_derivers_snapps.Derivers.iso_string obj ~name:"Signature"
+    ~to_string:Signature.to_base58_check
+    ~of_string:Signature.of_base58_check_exn
+
 module As_record = struct
   type t =
     { proof : Pickles.Side_loaded.Proof.t option
@@ -99,13 +104,9 @@ module As_record = struct
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
-    let signature obj' =
-      iso_string obj' ~name:"Signature" ~to_string:Signature.to_base58_check
-        ~of_string:Signature.of_base58_check_exn
-    in
     Fields.make_creator obj
       ~proof:!.(option @@ proof @@ o ())
-      ~signature:!.(option @@ signature @@ o ())
+      ~signature:!.(option @@ signature_deriver @@ o ())
     |> finish ~name:"Control"
 end
 

@@ -465,11 +465,12 @@ module Body = struct
   end]
 
   (* * Balance change for the fee payer is always going to be Neg, so represent it using
-       an unsigned fee,
-     * token id is always going to be the default, so use unit value as a
-       placeholder,
-     * increment nonce must always be true for a fee payer, so use unit as a
-       placeholder.
+        an unsigned fee,
+      * token id is always going to be the default, so use unit value as a
+        placeholder,
+      * increment nonce must always be true for a fee payer, so use unit as a
+        placeholder.
+      TODO: what about use_full_commitment? it's unit here and bool there
   *)
   module Fee_payer = struct
     [%%versioned
@@ -505,6 +506,29 @@ module Body = struct
       ; protocol_state = Snapp_predicate.Protocol_state.accept
       ; use_full_commitment = ()
       }
+
+    let deriver obj =
+      let open Fields_derivers_snapps in
+      let fee obj =
+        iso_string obj ~name:"Fee" ~to_string:Fee.to_string
+          ~of_string:Fee.of_string
+      in
+      Poly.Fields.make_creator obj ~public_key:!.public_key
+        ~update:!.Update.deriver ~token_id:!.unit ~balance_change:!.fee
+        ~increment_nonce:!.unit
+        ~events:!.(list @@ array field @@ o ())
+        ~sequence_events:!.(list @@ array field @@ o ())
+        ~call_data:!.field ~call_depth:!.int
+        ~protocol_state:!.Snapp_predicate.Protocol_state.deriver
+        ~use_full_commitment:!.unit
+      |> finish ~name:"FeePayerPartyBody"
+           ~doc:"Body component of a snapp Fee Payer Party"
+
+    let%test_unit "json roundtrip" =
+      let open Fields_derivers_snapps.Derivers in
+      let full = o () in
+      let _a = deriver full in
+      [%test_eq: t] dummy (dummy |> to_json full |> of_json full)
   end
 
   let of_fee_payer (t : Fee_payer.t) : t =
@@ -598,16 +622,12 @@ module Body = struct
     ; use_full_commitment = false
     }
 
-  let fail _ = failwith "TODO"
-
   let deriver obj =
     let open Fields_derivers_snapps in
     let token_id_deriver obj =
       iso_string obj ~name:"TokenId" ~to_string:Token_id.to_string
         ~of_string:Token_id.of_string
     in
-    let events_deriver obj = array field obj in
-
     let balance_change_deriver obj =
       let sign_to_string = function
         | Sgn.Pos ->
@@ -634,12 +654,12 @@ module Body = struct
     Poly.Fields.make_creator obj ~public_key:!.public_key
       ~update:!.Update.deriver ~token_id:!.token_id_deriver
       ~balance_change:!.balance_change_deriver ~increment_nonce:!.bool
-      ~events:!.(list @@ events_deriver @@ o ())
-      ~sequence_events:!.(list @@ events_deriver @@ o ())
+      ~events:!.(list @@ array field @@ o ())
+      ~sequence_events:!.(list @@ array field @@ o ())
       ~call_data:!.field ~call_depth:!.int
       ~protocol_state:!.Snapp_predicate.Protocol_state.deriver
       ~use_full_commitment:!.bool
-    |> finish ~name:"Party" ~doc:"Party in a snapp transaction"
+    |> finish ~name:"PartyBody" ~doc:"Body component of a snapp Party"
 
   let%test_unit "json roundtrip" =
     let open Fields_derivers_snapps.Derivers in
@@ -929,6 +949,13 @@ module Predicated = struct
 
     let to_signed (t : t) : Signed.t =
       { body = Body.of_fee_payer t.body; predicate = t.predicate }
+
+    let deriver obj =
+      let open Fields_derivers_snapps.Derivers in
+      Poly.Fields.make_creator obj ~body:!.Body.Fee_payer.deriver
+        ~predicate:!.uint32
+      |> finish ~name:"SnappPartyPredicatedFeePayer"
+           ~doc:"A party to a snapp transaction with a nonce predicate"
   end
 
   module Empty = struct
@@ -1002,7 +1029,7 @@ module Fee_payer = struct
         { data : Predicated.Fee_payer.Stable.V1.t
         ; authorization : Signature.Stable.V1.t
         }
-      [@@deriving sexp, equal, yojson, hash, compare]
+      [@@deriving sexp, equal, yojson, hash, compare, fields]
 
       let to_latest = Fn.id
     end
@@ -1015,6 +1042,23 @@ module Fee_payer = struct
     { authorization = t.authorization
     ; data = Predicated.Fee_payer.to_signed t.data
     }
+
+  let deriver obj =
+    let open Fields_derivers_snapps.Derivers in
+    Fields.make_creator obj
+      ~data:!.Predicated.Fee_payer.deriver
+      ~authorization:!.Control.signature_deriver
+    |> finish ~name:"SnappPartyFeePayer"
+         ~doc:"A party to a snapp transaction with a signature authorization"
+
+  let%test_unit "json roundtrip" =
+    let dummy =
+      { data = Predicated.Fee_payer.dummy; authorization = Signature.dummy }
+    in
+    let open Fields_derivers_snapps.Derivers in
+    let full = o () in
+    let _a = deriver full in
+    [%test_eq: t] dummy (dummy |> to_json full |> of_json full)
 end
 
 module Empty = struct
@@ -1075,7 +1119,7 @@ let deriver obj =
   let open Fields_derivers_snapps.Derivers in
   Fields.make_creator obj ~data:!.Predicated.deriver
     ~authorization:!.Control.deriver
-  |> finish ~name:"SnappParty"
+  |> finish ~name:"SnappParty" ~doc:"A party to a snapp transaction"
 
 let%test_unit "json roundtrip dummy" =
   let dummy =
