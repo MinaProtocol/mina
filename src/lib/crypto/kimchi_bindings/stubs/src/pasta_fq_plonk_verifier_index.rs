@@ -191,7 +191,6 @@ pub fn caml_pasta_fq_plonk_verifier_index_create(
 pub fn caml_pasta_fq_plonk_verifier_index_shifts(log2_size: ocaml::Int) -> Vec<CamlFq> {
     let domain = Domain::<Fq>::new(1 << log2_size).unwrap();
     let shifts = Shifts::new(&domain);
-
     shifts.shifts().iter().map(Into::into).collect()
 }
 

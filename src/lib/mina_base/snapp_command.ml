@@ -223,7 +223,7 @@ module Party = struct
       module Stable = struct
         module V2 = struct
           type t =
-            (Body.Stable.V2.t, Snapp_predicate.Stable.V1.t) Poly.Stable.V1.t
+            (Body.Stable.V2.t, Snapp_predicate.Stable.V2.t) Poly.Stable.V1.t
           [@@deriving sexp, equal, yojson, hash, compare]
 
           let to_latest = Fn.id

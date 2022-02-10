@@ -57,6 +57,12 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> unit Malleable_error.t
 
+      val send_snapp :
+           logger:Logger.t
+        -> t
+        -> parties:Mina_base.Parties.t
+        -> unit Deferred.Or_error.t
+
       val get_balance :
            logger:Logger.t
         -> t
@@ -247,6 +253,8 @@ module Dsl = struct
       -> receiver_pub_key:Public_key.Compressed.t
       -> amount:Amount.t
       -> t
+
+    val snapp_to_be_included_in_frontier : parties:Mina_base.Parties.t -> t
   end
 
   module type Util_intf = sig

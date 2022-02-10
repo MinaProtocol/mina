@@ -25,6 +25,13 @@ module Closed_interval = struct
     end
   end]
 
+  let gen gen_a compare_a =
+    let open Quickcheck.Let_syntax in
+    let%bind a1 = gen_a in
+    let%map a2 = gen_a in
+    if compare_a a1 a2 <= 0 then { lower = a1; upper = a2 }
+    else { lower = a2; upper = a1 }
+
   let to_input { lower; upper } ~f =
     Random_oracle_input.Chunked.append (f lower) (f upper)
 
@@ -148,6 +155,8 @@ module Numeric = struct
     end
   end]
 
+  let gen gen_a compare_a = Or_ignore.gen (Closed_interval.gen gen_a compare_a)
+
   let to_input { zero; max_value; to_input; _ } (t : 'a t) =
     Closed_interval.to_input ~f:to_input
       ( match t with
@@ -208,6 +217,30 @@ module Eq_data = struct
         ; default = zero
         ; to_input = field
         ; to_input_checked = field
+        }
+
+    let sequence_state =
+      let open Random_oracle_input.Chunked in
+      lazy
+        Field.
+          { typ
+          ; equal
+          ; equal_checked = run Checked.equal
+          ; default = Lazy.force Snapp_account.Sequence_events.empty_hash
+          ; to_input = field
+          ; to_input_checked = field
+          }
+
+    let boolean =
+      let open Random_oracle_input.Chunked in
+      Boolean.
+        { typ
+        ; equal = Bool.equal
+        ; equal_checked = run equal
+        ; default = false
+        ; to_input = (fun b -> packed (field_of_bool b, 1))
+        ; to_input_checked =
+            (fun (b : Boolean.var) -> packed ((b :> Field.Var.t), 1))
         }
 
     let receipt_chain_hash =
@@ -344,6 +377,20 @@ module Account = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type ('balance, 'nonce, 'receipt_chain_hash, 'pk, 'field, 'bool) t =
+          { balance : 'balance
+          ; nonce : 'nonce
+          ; receipt_chain_hash : 'receipt_chain_hash
+          ; public_key : 'pk
+          ; delegate : 'pk
+          ; state : 'field Snapp_state.V.Stable.V1.t
+          ; sequence_state : 'field
+          ; proved_state : 'bool
+          }
+        [@@deriving hlist, sexp, equal, yojson, hash, compare]
+      end
+
       module V1 = struct
         type ('balance, 'nonce, 'receipt_chain_hash, 'pk, 'field) t =
           { balance : 'balance
@@ -360,6 +407,20 @@ module Account = struct
 
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        ( Balance.Stable.V1.t Numeric.Stable.V1.t
+        , Account_nonce.Stable.V1.t Numeric.Stable.V1.t
+        , Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
+        , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
+        , F.Stable.V1.t Eq_data.Stable.V1.t
+        , bool Eq_data.Stable.V1.t )
+        Poly.Stable.V2.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         ( Balance.Stable.V1.t Numeric.Stable.V1.t
@@ -370,9 +431,52 @@ module Account = struct
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
-      let to_latest = Fn.id
+      let to_latest
+          ({ balance; nonce; receipt_chain_hash; public_key; delegate; state } :
+            t) : V2.t =
+        { balance
+        ; nonce
+        ; receipt_chain_hash
+        ; public_key
+        ; delegate
+        ; state
+        ; sequence_state = Ignore
+        ; proved_state = Ignore
+        }
     end
   end]
+
+  let gen : t Quickcheck.Generator.t =
+    let open Quickcheck.Let_syntax in
+    let%bind balance = Numeric.gen Balance.gen Balance.compare in
+    let%bind nonce = Numeric.gen Account_nonce.gen Account_nonce.compare in
+    let%bind receipt_chain_hash = Or_ignore.gen Receipt.Chain_hash.gen in
+    let%bind public_key = Eq_data.gen Public_key.Compressed.gen in
+    let%bind delegate = Eq_data.gen Public_key.Compressed.gen in
+    let%bind state =
+      let%bind fields =
+        let field_gen = Snark_params.Tick.Field.gen in
+        Quickcheck.Generator.list_with_length 8 (Or_ignore.gen field_gen)
+      in
+      (* won't raise because length is correct *)
+      Quickcheck.Generator.return (Snapp_state.V.of_list_exn fields)
+    in
+    let%bind sequence_state =
+      let%bind n = Int.gen_uniform_incl Int.min_value Int.max_value in
+      let field_gen = Quickcheck.Generator.return (F.of_int n) in
+      Or_ignore.gen field_gen
+    in
+    let%map proved_state = Or_ignore.gen Quickcheck.Generator.bool in
+    Poly.
+      { balance
+      ; nonce
+      ; receipt_chain_hash
+      ; public_key
+      ; delegate
+      ; state
+      ; sequence_state
+      ; proved_state
+      }
 
   let accept : t =
     { balance = Ignore
@@ -382,11 +486,23 @@ module Account = struct
     ; delegate = Ignore
     ; state =
         Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> Or_ignore.Ignore)
+    ; sequence_state = Ignore
+    ; proved_state = Ignore
     }
 
+  let is_accept : t -> bool = equal accept
+
   let to_input
-      ({ balance; nonce; receipt_chain_hash; public_key; delegate; state } : t)
-      =
+      ({ balance
+       ; nonce
+       ; receipt_chain_hash
+       ; public_key
+       ; delegate
+       ; state
+       ; sequence_state
+       ; proved_state
+       } :
+        t) =
     let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Numeric.(to_input Tc.balance balance)
@@ -396,6 +512,9 @@ module Account = struct
       ; Eq_data.(to_input_explicit (Tc.public_key ()) delegate)
       ; Vector.reduce_exn ~f:append
           (Vector.map state ~f:Eq_data.(to_input_explicit Tc.field))
+      ; Eq_data.(to_input ~explicit:false (Lazy.force Tc.sequence_state))
+          sequence_state
+      ; Eq_data.(to_input_explicit Tc.boolean) proved_state
       ]
 
   let digest t =
@@ -408,11 +527,20 @@ module Account = struct
       , Account_nonce.Checked.t Numeric.Checked.t
       , Receipt.Chain_hash.var Hash.Checked.t
       , Public_key.Compressed.var Eq_data.Checked.t
-      , Field.Var.t Eq_data.Checked.t )
+      , Field.Var.t Eq_data.Checked.t
+      , Boolean.var Eq_data.Checked.t )
       Poly.Stable.Latest.t
 
     let to_input
-        ({ balance; nonce; receipt_chain_hash; public_key; delegate; state } :
+        ({ balance
+         ; nonce
+         ; receipt_chain_hash
+         ; public_key
+         ; delegate
+         ; state
+         ; sequence_state
+         ; proved_state
+         } :
           t) =
       let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
@@ -423,12 +551,23 @@ module Account = struct
         ; Eq_data.(to_input_checked (Tc.public_key ()) delegate)
         ; Vector.reduce_exn ~f:append
             (Vector.map state ~f:Eq_data.(to_input_checked Tc.field))
+        ; Eq_data.(to_input_checked (Lazy.force Tc.sequence_state))
+            sequence_state
+        ; Eq_data.(to_input_checked Tc.boolean) proved_state
         ]
 
     open Impl
 
     let nonsnapp
-        ({ balance; nonce; receipt_chain_hash; public_key; delegate; state = _ } :
+        ({ balance
+         ; nonce
+         ; receipt_chain_hash
+         ; public_key
+         ; delegate
+         ; state = _
+         ; sequence_state = _
+         ; proved_state = _
+         } :
           t) (a : Account.Checked.Unhashed.t) =
       [ Numeric.(Checked.check Tc.balance balance a.balance)
       ; Numeric.(Checked.check Tc.nonce nonce a.nonce)
@@ -448,10 +587,21 @@ module Account = struct
          ; public_key = _
          ; delegate = _
          ; state
+         ; sequence_state
+         ; proved_state
          } :
           t) (snapp : Snapp_account.Checked.t) =
-      Vector.(
-        to_list (map2 state snapp.app_state ~f:Eq_data.(check_checked Tc.field)))
+      Boolean.any
+        Vector.(
+          to_list
+            (map snapp.sequence_state
+               ~f:
+                 Eq_data.(
+                   check_checked (Lazy.force Tc.sequence_state) sequence_state)))
+      :: Eq_data.(check_checked Tc.boolean proved_state snapp.proved_state)
+      :: Vector.(
+           to_list
+             (map2 state snapp.app_state ~f:Eq_data.(check_checked Tc.field)))
 
     let check_snapp t a = Boolean.all (snapp t a)
 
@@ -471,16 +621,25 @@ module Account = struct
       ; receipt_chain_hash
       ; public_key ()
       ; public_key ()
-      ; Snapp_state.typ
-          (Or_ignore.typ_implicit Field.typ ~equal:Field.equal
-             ~ignore:Field.zero)
+      ; Snapp_state.typ (Or_ignore.typ_explicit Field.typ ~ignore:Field.zero)
+      ; Or_ignore.typ_implicit Field.typ ~equal:Field.equal
+          ~ignore:(Lazy.force Snapp_account.Sequence_events.empty_hash)
+      ; Or_ignore.typ_explicit Boolean.typ ~ignore:false
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
   let check
-      ({ balance; nonce; receipt_chain_hash; public_key; delegate; state } : t)
-      (a : Account.t) =
+      ({ balance
+       ; nonce
+       ; receipt_chain_hash
+       ; public_key
+       ; delegate
+       ; state
+       ; sequence_state
+       ; proved_state
+       } :
+        t) (a : Account.t) =
     let open Or_error.Let_syntax in
     let%bind () =
       Numeric.(check ~label:"balance" Tc.balance balance a.balance)
@@ -506,21 +665,37 @@ module Account = struct
       | None ->
           return ()
       | Some snapp ->
-          List.fold_result ~init:0
-            Vector.(to_list (zip state snapp.app_state))
-            ~f:(fun i (c, v) ->
-              let%map () =
-                Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v)
-              in
-              i + 1)
-          >>| ignore
+          let%bind (_ : int) =
+            List.fold_result ~init:0
+              Vector.(to_list (zip state snapp.app_state))
+              ~f:(fun i (c, v) ->
+                let%map () =
+                  Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v)
+                in
+                i + 1)
+          in
+          let%bind () =
+            Eq_data.(
+              check ~label:"proved_state" Tc.boolean proved_state
+                snapp.proved_state)
+          in
+          if
+            Option.is_some
+            @@ List.find (Vector.to_list snapp.sequence_state) ~f:(fun state ->
+                   Eq_data.(
+                     check
+                       (Lazy.force Tc.sequence_state)
+                       ~label:"" sequence_state state)
+                   |> Or_error.is_ok)
+          then Ok ()
+          else Or_error.errorf "Equality check failed: sequence_state"
     in
     return ()
 end
 
 module Protocol_state = struct
   (* On each numeric field, you may assert a range
-      On each hash field, you may assert an equality
+     On each hash field, you may assert an equality
   *)
 
   module Epoch_data = struct
@@ -544,6 +719,27 @@ module Protocol_state = struct
         let to_latest = Fn.id
       end
     end]
+
+    let gen : t Quickcheck.Generator.t =
+      let open Quickcheck.Let_syntax in
+      let%bind ledger =
+        let%bind hash = Hash.gen Frozen_ledger_hash0.gen in
+        let%map total_currency = Numeric.gen Amount.gen Amount.compare in
+        { Epoch_ledger.Poly.hash; total_currency }
+      in
+      let%bind seed = Hash.gen Epoch_seed.gen in
+      let%bind start_checkpoint = Hash.gen State_hash.gen in
+      let%bind lock_checkpoint = Hash.gen State_hash.gen in
+      let min_epoch_length = 8 in
+      let max_epoch_length = Genesis_constants.slots_per_epoch in
+      let%map epoch_length =
+        Numeric.gen
+          (Length.gen_incl
+             (Length.of_int min_epoch_length)
+             (Length.of_int max_epoch_length))
+          Length.compare
+      in
+      { Poly.ledger; seed; start_checkpoint; lock_checkpoint; epoch_length }
 
     let to_input
         ({ ledger = { hash; total_currency }
@@ -615,18 +811,18 @@ module Protocol_state = struct
           ; timestamp : 'time
           ; blockchain_length : 'length
                 (* TODO: This previously had epoch_count but I removed it as I believe it is redundant
-                   with curr_global_slot.
+                   with global_slot_since_hard_fork.
 
                    epoch_count in [a, b]
 
                    should be equivalent to
 
-                   curr_global_slot in [slots_per_epoch * a, slots_per_epoch * b]
+                   global_slot_since_hard_fork in [slots_per_epoch * a, slots_per_epoch * b]
                 *)
           ; min_window_density : 'length
           ; last_vrf_output : 'vrf_output
           ; total_currency : 'amount
-          ; curr_global_slot : 'global_slot
+          ; global_slot_since_hard_fork : 'global_slot
           ; global_slot_since_genesis : 'global_slot
           ; staking_epoch_data : 'epoch_data
           ; next_epoch_data : 'epoch_data
@@ -655,6 +851,50 @@ module Protocol_state = struct
     end
   end]
 
+  let gen : t Quickcheck.Generator.t =
+    let open Quickcheck.Let_syntax in
+    (* TODO: pass in ledger hash, next available token *)
+    let snarked_ledger_hash = Snapp_basic.Or_ignore.Ignore in
+    let snarked_next_available_token = Snapp_basic.Or_ignore.Ignore in
+    let%bind timestamp = Numeric.gen Block_time.gen Block_time.compare in
+    let%bind blockchain_length = Numeric.gen Length.gen Length.compare in
+    let max_min_window_density =
+      Genesis_constants.for_unit_tests.protocol.slots_per_sub_window
+      * Genesis_constants.Constraint_constants.compiled.sub_windows_per_window
+      - 1
+      |> Length.of_int
+    in
+    let%bind min_window_density =
+      Numeric.gen
+        (Length.gen_incl Length.zero max_min_window_density)
+        Length.compare
+    in
+    (* TODO: fix when type becomes something other than unit *)
+    let last_vrf_output = () in
+    let%bind total_currency =
+      Numeric.gen Currency.Amount.gen Currency.Amount.compare
+    in
+    let%bind global_slot_since_hard_fork =
+      Numeric.gen Global_slot.gen Global_slot.compare
+    in
+    let%bind global_slot_since_genesis =
+      Numeric.gen Global_slot.gen Global_slot.compare
+    in
+    let%bind staking_epoch_data = Epoch_data.gen in
+    let%map next_epoch_data = Epoch_data.gen in
+    { Poly.snarked_ledger_hash
+    ; snarked_next_available_token
+    ; timestamp
+    ; blockchain_length
+    ; min_window_density
+    ; last_vrf_output
+    ; total_currency
+    ; global_slot_since_hard_fork
+    ; global_slot_since_genesis
+    ; staking_epoch_data
+    ; next_epoch_data
+    }
+
   let to_input
       ({ snarked_ledger_hash
        ; snarked_next_available_token
@@ -663,7 +903,7 @@ module Protocol_state = struct
        ; min_window_density
        ; last_vrf_output
        ; total_currency
-       ; curr_global_slot
+       ; global_slot_since_hard_fork
        ; global_slot_since_genesis
        ; staking_epoch_data
        ; next_epoch_data
@@ -679,7 +919,7 @@ module Protocol_state = struct
       ; length blockchain_length
       ; length min_window_density
       ; Numeric.(to_input Tc.amount total_currency)
-      ; Numeric.(to_input Tc.global_slot curr_global_slot)
+      ; Numeric.(to_input Tc.global_slot global_slot_since_hard_fork)
       ; Numeric.(to_input Tc.global_slot global_slot_since_genesis)
       ; Epoch_data.to_input staking_epoch_data
       ; Epoch_data.to_input next_epoch_data
@@ -756,7 +996,7 @@ module Protocol_state = struct
          ; min_window_density
          ; last_vrf_output
          ; total_currency
-         ; curr_global_slot
+         ; global_slot_since_hard_fork
          ; global_slot_since_genesis
          ; staking_epoch_data
          ; next_epoch_data
@@ -772,7 +1012,7 @@ module Protocol_state = struct
         ; length blockchain_length
         ; length min_window_density
         ; Numeric.(Checked.to_input Tc.amount total_currency)
-        ; Numeric.(Checked.to_input Tc.global_slot curr_global_slot)
+        ; Numeric.(Checked.to_input Tc.global_slot global_slot_since_hard_fork)
         ; Numeric.(Checked.to_input Tc.global_slot global_slot_since_genesis)
         ; Epoch_data.Checked.to_input staking_epoch_data
         ; Epoch_data.Checked.to_input next_epoch_data
@@ -792,7 +1032,7 @@ module Protocol_state = struct
            ; min_window_density
            ; last_vrf_output
            ; total_currency
-           ; curr_global_slot
+           ; global_slot_since_hard_fork
            ; global_slot_since_genesis
            ; staking_epoch_data
            ; next_epoch_data
@@ -829,7 +1069,7 @@ module Protocol_state = struct
               min_window_density s.min_window_density
           ; Numeric.(Checked.check Tc.amount) total_currency s.total_currency
           ; Numeric.(Checked.check Tc.global_slot)
-              curr_global_slot s.curr_global_slot
+              global_slot_since_hard_fork s.global_slot_since_hard_fork
           ; Numeric.(Checked.check Tc.global_slot)
               global_slot_since_genesis s.global_slot_since_genesis
           ]
@@ -893,7 +1133,7 @@ module Protocol_state = struct
     ; min_window_density = Ignore
     ; last_vrf_output = ()
     ; total_currency = Ignore
-    ; curr_global_slot = Ignore
+    ; global_slot_since_hard_fork = Ignore
     ; global_slot_since_genesis = Ignore
     ; staking_epoch_data = epoch_data
     ; next_epoch_data = epoch_data
@@ -908,7 +1148,7 @@ module Protocol_state = struct
          ; min_window_density
          ; last_vrf_output
          ; total_currency
-         ; curr_global_slot
+         ; global_slot_since_hard_fork
          ; global_slot_since_genesis
          ; staking_epoch_data
          ; next_epoch_data
@@ -974,7 +1214,7 @@ module Protocol_state = struct
     in
     let%bind () =
       Numeric.(check ~label:"curr_global_slot" Tc.global_slot)
-        curr_global_slot s.curr_global_slot
+        global_slot_since_hard_fork s.global_slot_since_hard_fork
     in
     let%bind () =
       Numeric.(check ~label:"global_slot_since_genesis" Tc.global_slot)
@@ -1114,6 +1354,17 @@ module Other = struct
 
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        ( Account.Stable.V2.t
+        , Account_state.Stable.V1.t Transition.Stable.V1.t
+        , F.Stable.V1.t Hash.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         ( Account.Stable.V1.t
@@ -1122,7 +1373,11 @@ module Other = struct
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
-      let to_latest = Fn.id
+      let to_latest ({ predicate; account_transition; account_vk } : t) : V2.t =
+        { predicate = Account.Stable.V1.to_latest predicate
+        ; account_transition
+        ; account_vk
+        }
     end
   end]
 
@@ -1189,6 +1444,18 @@ end
 
 [%%versioned
 module Stable = struct
+  module V2 = struct
+    type t =
+      ( Account.Stable.V2.t
+      , Protocol_state.Stable.V1.t
+      , Other.Stable.V2.t
+      , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t )
+      Poly.Stable.V1.t
+    [@@deriving sexp, equal, yojson, hash, compare]
+
+    let to_latest = Fn.id
+  end
+
   module V1 = struct
     type t =
       ( Account.Stable.V1.t
@@ -1198,7 +1465,14 @@ module Stable = struct
       Poly.Stable.V1.t
     [@@deriving sexp, equal, yojson, hash, compare]
 
-    let to_latest = Fn.id
+    let to_latest
+        ({ self_predicate; other; fee_payer; protocol_state_predicate } : t) :
+        V2.t =
+      { self_predicate = Account.Stable.V1.to_latest self_predicate
+      ; other = Other.Stable.V1.to_latest other
+      ; fee_payer
+      ; protocol_state_predicate
+      }
   end
 end]
 
