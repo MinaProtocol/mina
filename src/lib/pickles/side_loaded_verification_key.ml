@@ -233,6 +233,7 @@ module Stable = struct
              ; chacha_comm = None
              })
         ; shifts = Common.tock_shifts ~log2_size
+        ; lookup_index = None
         }
       in
       { Poly.step_data; max_width; wrap_index = c; wrap_vk = Some wrap_vk }

@@ -49,6 +49,7 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
                     .map(|x| x.to_vec().iter().map(Into::into).collect()),
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
+            lookup_index: vi.lookup_index.map(Into::into),
         }
     }
 }
@@ -81,7 +82,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
         let shift: [Fp; PERMUTS] = shifts.try_into().expect("wrong size");
 
         // TODO chacha, dummy_lookup_value ?
-        let linearization = expr_linearization(domain, false, None);
+        let linearization = expr_linearization(domain, false, &None);
 
         VerifierIndex::<GAffine> {
             domain,
@@ -107,9 +108,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
             w: zk_w3(domain),
             endo: endo_q,
 
-            lookup_used: None,
-            lookup_tables: vec![],
-            lookup_selectors: vec![],
+            lookup_index: index.lookup_index.map(Into::into),
             linearization,
 
             fr_sponge_params: oracle::pasta::fp_3::params(),
@@ -229,6 +228,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
             chacha_comm: None,
         },
         shifts: (0..PERMUTS - 1).map(|_| Fp::one().into()).collect(),
+        lookup_index: None,
     }
 }
 
