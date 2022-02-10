@@ -987,7 +987,7 @@ module Stable = struct
   module V1 = struct
     type t = Poly(Predicated.Stable.V1)(Control.Stable.V2).t =
       { data : Predicated.Stable.V1.t; authorization : Control.Stable.V2.t }
-    [@@deriving sexp, equal, yojson, hash, compare]
+    [@@deriving sexp, equal, yojson, hash, compare, fields]
 
     let to_latest = Fn.id
   end
@@ -1022,3 +1022,9 @@ let token_id (t : t) : Token_id.t = t.data.body.token_id
 let use_full_commitment (t : t) : bool = t.data.body.use_full_commitment
 
 let increment_nonce (t : t) : bool = t.data.body.increment_nonce
+
+let deriver obj =
+  let open Fields_derivers_snapps.Derivers in
+  Fields.make_creator obj ~data:!.Predicated.deriver
+    ~authorization:!.Control.deriver
+  |> finish ~name:"SnappParty"
