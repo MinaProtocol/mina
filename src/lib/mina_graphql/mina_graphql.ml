@@ -2782,16 +2782,15 @@ module Types = struct
             let open Result.Let_syntax in
             let v o = Snapp_basic.Or_ignore.of_option o in
             let%map state = state_result in
-            ( Snapp_predicate.Account.Poly.
-                { balance = v balance
-                ; nonce = v nonce
-                ; receipt_chain_hash = v receipt_chain_hash
-                ; public_key = v public_key
-                ; delegate = v delegate
-                ; state
-                ; sequence_state = v sequence_state
-                ; proved_state = v proved_state
-                }
+            ( { Snapp_predicate.Account.Poly.balance = v balance
+              ; nonce = v nonce
+              ; receipt_chain_hash = v receipt_chain_hash
+              ; public_key = v public_key
+              ; delegate = v delegate
+              ; state
+              ; sequence_state = v sequence_state
+              ; proved_state = v proved_state
+              }
               : Snapp_predicate.Account.t ))
           ~fields:
             [ arg "balance" ~typ:Interval.balance
