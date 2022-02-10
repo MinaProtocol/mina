@@ -695,7 +695,7 @@ module Predicate = struct
     | Accept ->
         Accept
 
-  module AsRecord = struct
+  module As_record = struct
     type t = { tag : Tag.t; predicate : Snapp_predicate.Account.t }
     [@@deriving fields]
 
@@ -706,9 +706,9 @@ module Predicate = struct
       |> finish ~name:"AccountPredicate"
   end
 
-  let to_record s = { AsRecord.tag = tag s; predicate = to_full s }
+  let to_record s = { As_record.tag = tag s; predicate = to_full s }
 
-  let of_record (r : AsRecord.t) : t =
+  let of_record (r : As_record.t) : t =
     match r.tag with
     | Full ->
         Full r.predicate
@@ -724,7 +724,7 @@ module Predicate = struct
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
-    iso ~map:of_record ~contramap:to_record (AsRecord.deriver @@ o ()) obj
+    iso ~map:of_record ~contramap:to_record (As_record.deriver @@ o ()) obj
 
   let%test_unit "json roundtrip" =
     let predicate : t = Accept in
