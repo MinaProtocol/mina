@@ -317,3 +317,151 @@ let%test_module "Test" =
       let o = verification_key_with_hash @@ Derivers.o () in
       [%test_eq: (t, Field.t) With_hash.t] v (of_json o (to_json o v))
   end )
+
+(* TODO: remove this or move to a %test_module once the deriver code is stable *)
+(* Can be used to print the graphql schema, like this:
+   Fields_derivers_snapps.Test.print_schema (!(full#graphql_fields).run ()) dummy ;
+*)
+module Test = struct
+  module Graphql_fields_pure =
+  Fields_derivers_graphql.Graphql_fields_raw.Make (struct
+    type +'a t = 'a
+
+    let bind t f = f t
+
+    let return t = t
+
+    module Stream = struct
+      type 'a t = 'a Seq.t
+
+      let map t f = Seq.map f t
+
+      let iter t f = Seq.iter f t
+
+      let close _t = ()
+    end
+  end)
+
+  let introspection_query_raw =
+    {graphql|
+  query IntrospectionQuery {
+    __schema {
+      queryType { name }
+      mutationType { name }
+      subscriptionType { name }
+      types {
+        ...FullType
+      }
+      directives {
+        name
+        description
+        locations
+        args {
+          ...InputValue
+        }
+      }
+    }
+  }
+  fragment FullType on __Type {
+    kind
+    name
+    description
+    fields(includeDeprecated: true) {
+      name
+      description
+      args {
+        ...InputValue
+      }
+      type {
+        ...TypeRef
+      }
+      isDeprecated
+      deprecationReason
+    }
+    inputFields {
+      ...InputValue
+    }
+    interfaces {
+      ...TypeRef
+    }
+    enumValues(includeDeprecated: true) {
+      name
+      description
+      isDeprecated
+      deprecationReason
+    }
+    possibleTypes {
+      ...TypeRef
+    }
+  }
+  fragment InputValue on __InputValue {
+    name
+    description
+    type { ...TypeRef }
+    defaultValue
+  }
+  fragment TypeRef on __Type {
+    kind
+    name
+    ofType {
+      kind
+      name
+      ofType {
+        kind
+        name
+        ofType {
+          kind
+          name
+          ofType {
+            kind
+            name
+            ofType {
+              kind
+              name
+              ofType {
+                kind
+                name
+                ofType {
+                  kind
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  |graphql}
+
+  let introspection_query () =
+    match Graphql_parser.parse introspection_query_raw with
+    | Ok res ->
+        res
+    | Error err ->
+        failwith err
+
+  let print_schema (typ' : _ Fields_derivers_graphql.Graphql_fields.Schema.typ)
+      v =
+    let typ : _ Graphql_fields_pure.Schema.typ = Obj.magic typ' in
+    let module Schema = Graphql_fields_pure.Schema in
+    let query_top_level =
+      Schema.(
+        field "query" ~typ:(non_null typ)
+          ~args:Arg.[]
+          ~doc:"sample query"
+          ~resolve:(fun _ _ -> v))
+    in
+    let schema =
+      Schema.(schema [ query_top_level ] ~mutations:[] ~subscriptions:[])
+    in
+    let res = Schema.execute schema () (introspection_query ()) in
+    let str =
+      match res with
+      | Ok (`Response data) ->
+          data |> Yojson.Basic.to_string
+      | _ ->
+          failwith "Unexpected response"
+    in
+    printf "%s" str
+end
