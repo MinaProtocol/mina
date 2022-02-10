@@ -2,16 +2,7 @@
 
 open Core_kernel
 open Import
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-
-[%%endif]
 
 [%%versioned:
 module Stable : sig

@@ -4,19 +4,8 @@
 
 open Import
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
-open Mina_numbers
 open Snark_params.Tick
-
-[%%else]
-
-open Mina_numbers_nonconsensus.Mina_numbers
-open Snark_params_nonconsensus
-module Currency = Currency_nonconsensus.Currency
-
-[%%endif]
+open Mina_numbers
 
 module type Gen_intf = sig
   type t
