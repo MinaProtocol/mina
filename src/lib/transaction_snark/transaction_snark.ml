@@ -817,19 +817,14 @@ module Base = struct
               } )
 
     let%snarkydef compute_as_prover ~constraint_constants ~txn_global_slot
-        ~next_available_token (txn : Transaction_union.var) =
+        (txn : Transaction_union.var) =
       let%bind data =
         exists (Typ.Internal.ref ())
           ~compute:
             As_prover.(
-              let%bind txn = read Transaction_union.typ txn in
+              let%map txn = read Transaction_union.typ txn in
               let fee_token = txn.payload.common.fee_token in
               let token = txn.payload.body.token_id in
-              let%map token =
-                if Token_id.(equal invalid) token then
-                  read Token_id.typ next_available_token
-                else return token
-              in
               let fee_payer =
                 Account_id.create txn.payload.common.fee_payer_pk fee_token
               in
@@ -2334,8 +2329,7 @@ module Base = struct
         (Checked.all_unit
            [ [%with_label "Fees in default token"]
                (Boolean.Assert.is_true fee_token_default)
-           ; [%with_label
-               "Token is default"]
+           ; [%with_label "Token is default"]
                (Boolean.Assert.is_true token_default)
            ])
     in
@@ -2346,7 +2340,7 @@ module Base = struct
     (* Query user command predicted failure/success. *)
     let%bind user_command_failure =
       User_command_failure.compute_as_prover ~constraint_constants
-        ~txn_global_slot:current_global_slot ~next_available_token txn
+        ~txn_global_slot:current_global_slot txn
     in
     let%bind user_command_fails =
       User_command_failure.any user_command_failure
