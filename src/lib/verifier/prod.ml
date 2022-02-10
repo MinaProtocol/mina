@@ -453,11 +453,13 @@ let verify_transaction_snarks { worker; logger } ts =
       [%log trace] "verify $n transaction_snarks (before)"
         ~metadata:(metadata ()) ;
       let%map res =
-        with_retry ~logger (fun () ->
-            let%bind { connection; _ } = Ivar.read !worker in
-            Worker.Connection.run connection
-              ~f:Worker.functions.verify_transaction_snarks ~arg:ts
-            |> Deferred.Or_error.map ~f:(fun x -> `Continue x))
+        O1trace.time_execution "submit_verify_transaction_snarks_to_verifier"
+          (fun () ->
+            with_retry ~logger (fun () ->
+                let%bind { connection; _ } = Ivar.read !worker in
+                Worker.Connection.run connection
+                  ~f:Worker.functions.verify_transaction_snarks ~arg:ts
+                |> Deferred.Or_error.map ~f:(fun x -> `Continue x)))
       in
       [%log trace] "verify $n transaction_snarks (after)!"
         ~metadata:
@@ -468,8 +470,9 @@ let verify_transaction_snarks { worker; logger } ts =
 
 let verify_commands { worker; logger } ts =
   trace_recurring "Verifier.verify_commands" (fun () ->
-      with_retry ~logger (fun () ->
-          let%bind { connection; _ } = Ivar.read !worker in
-          Worker.Connection.run connection ~f:Worker.functions.verify_commands
-            ~arg:ts
-          |> Deferred.Or_error.map ~f:(fun x -> `Continue x)))
+      O1trace.time_execution "submit_verify_commands_to_verifier" (fun () ->
+          with_retry ~logger (fun () ->
+              let%bind { connection; _ } = Ivar.read !worker in
+              Worker.Connection.run connection
+                ~f:Worker.functions.verify_commands ~arg:ts
+              |> Deferred.Or_error.map ~f:(fun x -> `Continue x))))

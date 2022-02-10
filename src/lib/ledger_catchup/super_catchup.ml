@@ -464,7 +464,7 @@ module Initial_validate_batcher = struct
   type nonrec 'a t = (input, input, 'a) t
 
   let create ~verifier : _ t =
-    create
+    create ~name:"super_catchup_blocks"
       ~logger:
         (Logger.create
            ~metadata:[ ("name", `String "initial_validate_batcher") ]
@@ -510,7 +510,7 @@ module Verify_work_batcher = struct
       External_transition.staged_ledger_diff wh.data
       |> Staged_ledger_diff.completed_works
     in
-    create
+    create ~name:"super_catchup_work"
       ~logger:
         (Logger.create ~metadata:[ ("name", `String "verify_work_batcher") ] ())
       ~weight:(fun (x : input) ->
