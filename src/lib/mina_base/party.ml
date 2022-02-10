@@ -391,7 +391,7 @@ module Update = struct
          let hash = Snapp_account.digest_vk data in
          { With_hash.data; hash })
     in
-    let update =
+    let update : t =
       { Poly.app_state
       ; delegate = Set_or_keep.Set Public_key.Compressed.empty
       ; verification_key
@@ -727,13 +727,13 @@ module Predicate = struct
     iso ~map:of_record ~contramap:to_record (AsRecord.deriver @@ o ()) obj
 
   let%test_unit "json roundtrip" =
-    let predicate = Accept in
+    let predicate : t = Accept in
     let module Fd = Fields_derivers_snapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
 
   let%test_unit "to_json" =
-    let predicate = Nonce (Account_nonce.of_int 34928) in
+    let predicate : t = Nonce (Account_nonce.of_int 34928) in
     let module Fd = Fields_derivers_snapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: string]
