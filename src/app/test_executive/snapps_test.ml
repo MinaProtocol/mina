@@ -173,6 +173,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 body =
                   { parties_valid_pks.fee_payer.data.body with
                     update = Mina_base.Party.Update.noop
+                  ; sequence_events = []
                   }
               }
           }
