@@ -4,7 +4,7 @@ let ContainerImages = ./ContainerImages.dhall
 
 let dependsOnGitEnv = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
 
-let DebVersion = < Buster | Stretch | Focal | Bionic >
+let DebVersion = < Bullseye | Buster | Stretch | Focal | Bionic >
 
 let capitalName = \(debVersion : DebVersion) ->
   merge {
