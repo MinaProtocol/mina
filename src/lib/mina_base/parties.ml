@@ -466,12 +466,9 @@ let weight (parties : t) : int =
 
 let deriver obj =
   let open Fields_derivers_snapps.Derivers in
-  let memo obj' =
-    Signed_command_memo.(iso_string obj' ~name:"Memo" ~to_string ~of_string)
-  in
   Fields.make_creator obj ~fee_payer:!.Party.Fee_payer.deriver
     ~other_parties:!.(list @@ Party.deriver @@ o ())
-    ~memo:!.memo
+    ~memo:!.Signed_command_memo.deriver
   |> finish ~name:"SendSnappInput"
 
 let%test_unit "json roundtrip dummy" =

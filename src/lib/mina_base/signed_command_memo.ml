@@ -199,6 +199,9 @@ let typ : (Checked.t, t) Typ.t =
     ~there:(fun (t : t) -> Blake2.string_to_bits (t :> string))
     ~back:(fun bs -> (Blake2.bits_to_string bs :> t))
 
+let deriver obj =
+  Fields_derivers_snapps.iso_string obj ~name:"Memo" ~to_string ~of_string
+
 [%%endif]
 
 let%test_module "user_command_memo" =
