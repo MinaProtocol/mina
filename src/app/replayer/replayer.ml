@@ -657,30 +657,6 @@ module User_command_helpers = struct
         Stake_delegation
           (Stake_delegation.Set_delegate
              { delegator = source_pk; new_delegate = receiver_pk })
-    | "create_token" ->
-        Create_new_token
-          { New_token_payload.token_owner_pk = source_pk
-          ; disable_new_accounts = false
-          }
-    | "create_account" ->
-        Create_token_account
-          { New_account_payload.token_id
-          ; token_owner_pk = source_pk
-          ; receiver_pk
-          ; account_disabled = false
-          }
-    | "mint_tokens" ->
-        if Option.is_none amount then
-          failwithf
-            "Mint token at global slot since genesis %Ld has NULL amount"
-            global_slot_since_genesis () ;
-        let amount = Option.value_exn amount in
-        Mint_tokens
-          { Minting_payload.token_id
-          ; token_owner_pk = source_pk
-          ; receiver_pk
-          ; amount
-          }
     | _ ->
         failwithf "Invalid user command type: %s" type_ ()
 end
