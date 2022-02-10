@@ -38,16 +38,28 @@ module Sql = struct
     let query_pending =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup4 int64 int64 int64 int64)
+        Caqti_type.(tup4 int64 int64 int64 (option int64))
         {sql|
+/* In this query, we are recursively traversing the chain (up to the point of canonicity) to a specific height and then, subject to this height at most, (a) finding the balance of some account and (b) finding the nonce in the most recent user command that this account has sent. Then these two subqueries are combined into one row. */
+
+/* TODO: Only do the recursive construction of pending_chain and full_chain once
+ * and reuse it for the balance and nonce subqueries. See #10206  */
+
+/* The SELECT DISTINCT clause combines the rows -- the MIN function takes the non-null value for each column. The two subqueries are disjoint so there is always at most one non-null value per column. */
 SELECT DISTINCT
-  combo.pk_id,
+  combo.pk_id, -- this is only used as a slug to combine the rows but ignored in the OCaml
   MIN(combo.block_global_slot_since_genesis) AS block_global_slot_since_genesis,
   MIN(combo.balance) AS balance,
   MIN(combo.nonce) AS nonce
 FROM (
+  /* There are two large recursive subqueries here. One for balance, and the
+   * other for nonce.
+   *
+   * This subquery pulls the balance and the slot where it updated by looking at
+   * the most recent balance changing event up to from a specific block looking
+   * backwards. The balance table helps here. */
 (
-WITH RECURSIVE pending_chain AS (
+WITH RECURSIVE pending_chain_balance AS (
 
                (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
 
@@ -61,37 +73,40 @@ WITH RECURSIVE pending_chain AS (
                 SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status
 
                 FROM blocks b
-                INNER JOIN pending_chain
-                ON b.id = pending_chain.parent_id AND pending_chain.id <> pending_chain.parent_id
-                AND pending_chain.chain_status <> 'canonical'
+                INNER JOIN pending_chain_balance
+                ON b.id = pending_chain_balance.parent_id AND pending_chain_balance.id <> pending_chain_balance.parent_id
+                AND pending_chain_balance.chain_status <> 'canonical'
 
                )
 
-              SELECT pks.id AS pk_id,full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance,NULL AS nonce
+              /* Nonce is NULL here */
+              SELECT pks.id AS pk_id,full_chain_balance.global_slot_since_genesis AS block_global_slot_since_genesis,balance,NULL AS nonce
 
               FROM (SELECT
                     id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
-                    FROM pending_chain
+                    FROM pending_chain_balance
 
                     UNION ALL
 
                     SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
 
                     FROM blocks b
-                    WHERE chain_status = 'canonical') AS full_chain
+                    WHERE chain_status = 'canonical') AS full_chain_balance
 
-              INNER JOIN balances             bal  ON full_chain.id = bal.block_id
+              INNER JOIN balances             bal  ON full_chain_balance.id = bal.block_id
               INNER JOIN public_keys          pks  ON bal.public_key_id = pks.id
 
               WHERE pks.value = $1
-              AND full_chain.height <= $2
+              AND full_chain_balance.height <= $2
 
               ORDER BY (bal.block_height, bal.block_sequence_no, bal.block_secondary_sequence_no) DESC
               LIMIT 1
             )
-            UNION ALL
+UNION ALL
+/* This subquery pulls the nonce by looking at the most recent user-command up
+ * to from a specific block looking backwards. */
 (
-WITH RECURSIVE pending_chain AS (
+WITH RECURSIVE pending_chain_nonce AS (
 
                (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
 
@@ -105,45 +120,49 @@ WITH RECURSIVE pending_chain AS (
                 SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status
 
                 FROM blocks b
-                INNER JOIN pending_chain
-                ON b.id = pending_chain.parent_id AND pending_chain.id <> pending_chain.parent_id
-                AND pending_chain.chain_status <> 'canonical'
+                INNER JOIN pending_chain_nonce
+                ON b.id = pending_chain_nonce.parent_id AND pending_chain_nonce.id <> pending_chain_nonce.parent_id
+                AND pending_chain_nonce.chain_status <> 'canonical'
 
                )
 
+              /* Slot and balance are NULL here */
               SELECT pks.id AS pk_id,NULL,NULL,cmds.nonce
 
               FROM (SELECT
                     id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
-                    FROM pending_chain
+                    FROM pending_chain_nonce
 
                     UNION ALL
 
                     SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
 
                     FROM blocks b
-                    WHERE chain_status = 'canonical') AS full_chain
+                    WHERE chain_status = 'canonical') AS full_chain_nonce
 
-              INNER JOIN blocks_user_commands busc ON busc.block_id = full_chain.id
+              INNER JOIN blocks_user_commands busc ON busc.block_id = full_chain_nonce.id
               INNER JOIN user_commands        cmds ON cmds.id = busc.user_command_id
               INNER JOIN public_keys          pks  ON pks.id = cmds.source_id
 
               WHERE pks.value = $1
-              AND full_chain.height <= $2
+              AND full_chain_nonce.height <= $2
               AND busc.user_command_id = cmds.id
 
-              ORDER BY (full_chain.height, busc.sequence_no) DESC
+              ORDER BY (full_chain_nonce.height, busc.sequence_no) DESC
               LIMIT 1
             )
 )
 AS combo GROUP BY combo.pk_id
-        |sql}
+|sql}
 
     let query_canonical =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup4 int64 int64 int64 int64)
-        {sql| SELECT DISTINCT
+        Caqti_type.(tup4 int64 int64 int64 (option int64))
+        {sql| /* See comments on the above query to help understand this one.
+               * Since this query acts on only canonical blocks, we can skip the
+               * recursive traversal part. */
+              SELECT DISTINCT
                 combo.pk_id,
                 MIN(combo.block_global_slot_since_genesis) AS block_global_slot_since_genesis,
                 MIN(combo.balance) AS balance,
@@ -313,12 +332,21 @@ AS combo GROUP BY combo.pk_id
         | None, None ->
           (* We've never heard of this account, at least as of the block_identifier provided *)
           Deferred.Result.return (0L, UInt64.zero)
-        | Some (_, _, last_relevant_command_balance, nonce), _ ->
+        | Some (_, _, last_relevant_command_balance, Some nonce), _ ->
           (* This account was involved in a command and we don't care about its vesting, so just use the last known
            * balance from the command. The nonce is returned from this
            * user-command, so we need to add one from here to get the current
-           * nonce in the account. *)
+           * nonce in the account.
+           *
+           * If the nonce is null, then this account hasn't sent any user
+           * commands and their nonce should be zero.
+           *)
           Deferred.Result.return (last_relevant_command_balance, UInt64.(of_int64 nonce |> add one))
+        | Some (_, _, last_relevant_command_balance, None), _ ->
+          (* Like the above case but the retrieved nonce is null, thus this
+           * account hasn't sent any user commands and their nonce should be
+           * zero. *)
+          Deferred.Result.return (last_relevant_command_balance, UInt64.zero)
         | None, Some timing_info ->
           (* This account hasn't seen any transactions but was in the genesis ledger, so use its genesis balance  *)
           Deferred.Result.return (timing_info.initial_balance, UInt64.zero)
