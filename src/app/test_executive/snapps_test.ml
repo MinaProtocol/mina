@@ -83,18 +83,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Mina_base.Parties.Call_forest.With_hashes.other_parties_hash
           parties_valid_fee_payer_signature.other_parties
       in
-      let parties_with_other_parties_nonces =
-        { parties_valid_fee_payer_signature with
-          other_parties = parties_valid_fee_payer_signature.other_parties
-        }
-      in
       let protocol_state_predicate_hash =
         Mina_base.Snapp_predicate.Protocol_state.digest
-          parties_with_other_parties_nonces.fee_payer.data.body.protocol_state
+          parties_valid_fee_payer_signature.fee_payer.data.body.protocol_state
       in
       let memo_hash =
         Mina_base.Signed_command_memo.hash
-          parties_with_other_parties_nonces.memo
+          parties_valid_fee_payer_signature.memo
       in
       let tx_commitment =
         Mina_base.Parties.Transaction_commitment.create ~other_parties_hash
@@ -137,7 +132,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             })
       in
       return
-        { parties_with_other_parties_nonces with
+        { parties_valid_fee_payer_signature with
           other_parties = other_parties_with_valid_signatures
         }
     in
@@ -169,24 +164,33 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ; other_parties = other_parties_with_valid_keys
       }
     in
+    let parties_no_fee_payer_update =
+      { parties_valid_pks with
+        fee_payer =
+          { parties_valid_pks.fee_payer with
+            data =
+              { parties_valid_pks.fee_payer.data with
+                body =
+                  { parties_valid_pks.fee_payer.data.body with
+                    update = Mina_base.Party.Update.noop
+                  }
+              }
+          }
+      }
+    in
     let%bind parties_valid =
       mk_parties_with_signatures ~fee_payer_nonce:Unsigned.UInt32.zero
-        parties_valid_pks
+        parties_no_fee_payer_update
     in
-    (* choose payment sender, receiver that are not in the snapp other parties
+    let sender_pub_key = fee_payer_pk in
+    (* choose payment receiver that is not in the snapp other parties
        because there's a check that user commands can't involve snapp accounts
-       TODO: that check will be removed; change sender to snapp fee payer
     *)
-    let sender =
+    let receiver =
       List.nth_exn block_producer_nodes
         (List.length parties_valid.other_parties + 1)
     in
-    let receiver =
-      List.nth_exn block_producer_nodes
-        (List.length parties_valid.other_parties + 2)
-    in
     let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-    let%bind sender_pub_key = Util.pub_key_of_node sender in
     (* other payment info *)
     let amount = Currency.Amount.of_int 2_000_000_000 in
     let fee = Currency.Fee.of_int 10_000_000 in
@@ -210,7 +214,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "send payment"
         ( [%log info] "Sending payment" ;
           let%map () =
-            Network.Node.must_send_payment ~logger sender ~sender_pub_key
+            Network.Node.must_send_payment ~logger node ~sender_pub_key
               ~receiver_pub_key ~amount ~fee
           in
           [%log info] "Sent payment" )
