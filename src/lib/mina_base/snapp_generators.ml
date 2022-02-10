@@ -266,11 +266,11 @@ let gen_balance_change ?balances_tbl ?permissions_auth (account : Account.t) =
       (* if positive, the account balance does not impose a constraint on the magnitude; but
          to avoid overflow over several Party.t, we'll limit the value
       *)
-      let%map magnitude =
+      let%map (magnitude : Currency.Amount.t) =
         Currency.Amount.gen_incl Currency.Amount.zero
           (Currency.Amount.of_int 100_000_000_000)
       in
-      Currency.Signed_poly.{ magnitude; sgn = Sgn.Pos }
+      ({ magnitude; sgn = Sgn.Pos } : Currency.Amount.Signed.t)
   | Neg ->
       (* if negative, magnitude constrained to balance in account
          the effective balance is either what's in the balances table,
@@ -291,7 +291,7 @@ let gen_balance_change ?balances_tbl ?permissions_auth (account : Account.t) =
         Currency.Amount.gen_incl Currency.Amount.zero
           (Currency.Balance.to_amount effective_balance)
       in
-      Currency.Signed_poly.{ magnitude; sgn = Sgn.Neg }
+      ({ magnitude; sgn = Sgn.Neg } : Currency.Amount.Signed.t)
 
 let gen_use_full_commitment ~increment_nonce () :
     bool Base_quickcheck.Generator.t =

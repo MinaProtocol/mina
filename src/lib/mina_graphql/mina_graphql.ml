@@ -2223,7 +2223,7 @@ module Types = struct
           ((Amount.t, Sgn.t) Signed_poly.t, string) Result.t option arg_typ =
         obj "BalanceChange" ~doc:"A signed amount"
           ~coerce:(fun magnitude sgn ->
-            try Ok Currency.Signed_poly.{ magnitude; sgn }
+            try Ok ({ magnitude; sgn } : Currency.Amount.Signed.t)
             with exn -> Error (Exn.to_string exn))
           ~fields:
             [ arg "magnitude" ~doc:"An amount of MINA"
@@ -2584,8 +2584,7 @@ module Types = struct
               let events = mk_field_arrays events in
               let sequence_events = mk_field_arrays sequence_events in
               let call_data = Snark_params.Tick.Field.of_string call_data in
-              Party.Body.Poly.
-                { public_key
+              ( { public_key
                 ; update
                 ; token_id
                 ; increment_nonce
@@ -2597,6 +2596,7 @@ module Types = struct
                 ; protocol_state
                 ; use_full_commitment
                 }
+                : Party.Body.t )
             with exn -> Error (Exn.to_string exn))
           ~fields:
             [ arg "publicKey" ~doc:"Public key as a Base58Check string"

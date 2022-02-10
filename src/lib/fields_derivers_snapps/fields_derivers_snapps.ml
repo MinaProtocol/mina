@@ -165,6 +165,11 @@ module Derivers = struct
   let iso_record ~of_record ~to_record record_deriver obj =
     iso ~map:of_record ~contramap:to_record (record_deriver @@ o ()) obj
 
+  let array inner obj : _ Unified_input.t =
+    iso ~map:Array.of_list ~contramap:Array.to_list
+      ((list @@ inner @@ o ()) (o ()))
+      obj
+
   let add_field (x : _ Unified_input.t) fd acc =
     let _, acc' = Fields_derivers_graphql.Graphql_fields.add_field x fd acc in
     let _, acc'' = Fields_derivers_json.To_yojson.add_field x fd acc' in
