@@ -661,30 +661,22 @@ module Predicate = struct
     | Accept ->
         Snapp_predicate.Account.accept
 
+  let of_full (p : Snapp_predicate.Account.t) =
+    let module A = Snapp_predicate.Account in
+    if Snapp_predicate.Account.equal p A.accept then Accept
+    else
+      match p.nonce with
+      | Ignore ->
+          Full p
+      | Check { lower; upper } as n ->
+          if
+            A.equal p { A.accept with nonce = n }
+            && Account.Nonce.equal lower upper
+          then Nonce lower
+          else Full p
+
   module Tag = struct
     type t = Full | Nonce | Accept [@@deriving equal, compare, sexp, yojson]
-
-    let to_string = function
-      | Full ->
-          "Full"
-      | Nonce ->
-          "Nonce"
-      | Accept ->
-          "Accept"
-
-    let of_string = function
-      | "Full" ->
-          Full
-      | "Nonce" ->
-          Nonce
-      | "Accept" ->
-          Accept
-      | _ ->
-          failwith "impossible"
-
-    let deriver obj =
-      Fields_derivers_snapps.Derivers.iso_string obj
-        ~name:"AccountPredicateType" ~to_string ~of_string
   end
 
   let tag : t -> Tag.t = function
@@ -695,39 +687,32 @@ module Predicate = struct
     | Accept ->
         Accept
 
-  module As_record = struct
-    type t = { tag : Tag.t; predicate : Snapp_predicate.Account.t }
-    [@@deriving fields]
-
-    let deriver obj =
-      let open Fields_derivers_snapps.Derivers in
-      Fields.make_creator obj ~tag:!.Tag.deriver
-        ~predicate:!.Snapp_predicate.Account.deriver
-      |> finish ~name:"AccountPredicate"
-  end
-
-  let to_record s = { As_record.tag = tag s; predicate = to_full s }
-
-  let of_record (r : As_record.t) : t =
-    match r.tag with
-    | Full ->
-        Full r.predicate
-    | Nonce ->
-        Nonce
-          ( match r.predicate.nonce with
-          | Check interval ->
-              interval.lower
-          | Ignore ->
-              failwith "impossible" )
-    | Accept ->
-        Accept
-
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
-    iso ~map:of_record ~contramap:to_record (As_record.deriver @@ o ()) obj
+    iso_record ~of_record:of_full ~to_record:to_full
+      Snapp_predicate.Account.deriver obj
 
-  let%test_unit "json roundtrip" =
+  let%test_unit "json roundtrip accept" =
     let predicate : t = Accept in
+    let module Fd = Fields_derivers_snapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
+
+  let%test_unit "json roundtrip nonce" =
+    let predicate : t = Nonce (Account_nonce.of_int 928472) in
+    let module Fd = Fields_derivers_snapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
+
+  let%test_unit "json roundtrip full" =
+    let n = Account_nonce.of_int 4513 in
+    let predicate : t =
+      Full
+        { Snapp_predicate.Account.accept with
+          nonce = Check { lower = n; upper = n }
+        ; public_key = Check Public_key.Compressed.empty
+        }
+    in
     let module Fd = Fields_derivers_snapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
@@ -739,14 +724,12 @@ module Predicate = struct
     [%test_eq: string]
       (predicate |> Fd.to_json full |> Yojson.Safe.to_string)
       ( {json|{
-         tag: "Nonce",
-         predicate: {
           balance: null,
           nonce: {lower: "34928", upper: "34928"},
           receiptChainHash: null, publicKey: null, delegate: null,
           state: [null,null,null,null,null,null,null,null],
           sequenceState: null, provedState: null
-        }}|json}
+        }|json}
       |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
 
   let digest (t : t) =
