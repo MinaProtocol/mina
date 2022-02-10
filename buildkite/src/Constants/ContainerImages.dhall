@@ -1,5 +1,5 @@
 -- TODO: Automatically push, tag, and update images #4862
--- TODO: Make focal image distinct from Buster
+-- NOTE: minaToolchainStretch is also used for building Ubuntu Bionic packages in CI
 {
   toolchainBase = "codaprotocol/ci-toolchain-base:v3",
   minaToolchainStretch = "gcr.io/o1labs-192920/mina-toolchain@sha256:c4873c52041996a4eacdd96d0310b909a099689552c8b4fec7d464872abd1e1f",
