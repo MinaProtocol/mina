@@ -611,22 +611,23 @@ module Body = struct
       let open Fields_derivers_snapps in
       array field obj
     in
-    let sign_to_string = function
-      | Sgn.Pos ->
-          "Positive"
-      | Sgn.Neg ->
-          "Negative"
-    in
-    let sign_of_string = function
-      | "Positive" ->
-          Sgn.Pos
-      | "Negative" ->
-          Sgn.Neg
-      | _ ->
-          failwith "impossible"
-    in
+
     let balance_change_deriver obj =
       let open Fields_derivers_snapps in
+      let sign_to_string = function
+        | Sgn.Pos ->
+            "Positive"
+        | Sgn.Neg ->
+            "Negative"
+      in
+      let sign_of_string = function
+        | "Positive" ->
+            Sgn.Pos
+        | "Negative" ->
+            Sgn.Neg
+        | _ ->
+            failwith "impossible"
+      in
       let sign_deriver =
         iso_string ~name:"Sign" ~to_string:sign_to_string
           ~of_string:sign_of_string
