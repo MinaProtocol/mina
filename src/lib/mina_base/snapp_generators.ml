@@ -324,7 +324,7 @@ let gen_epoch_data_predicate
       closed_interval_exact epoch_data.ledger.total_currency
       |> return |> Snapp_basic.Or_ignore.gen
     in
-    Epoch_ledger.Poly.{ hash; total_currency }
+    { Epoch_ledger.Poly.hash; total_currency }
   in
   let%bind seed = Snapp_basic.Or_ignore.gen @@ return epoch_data.seed in
   let%bind start_checkpoint =
@@ -639,7 +639,7 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false) ?account_id
       body.Party.Body.Poly.token_id
   in
   let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger () in
-  Party.Predicated.Poly.{ body; predicate }
+  { Party.Predicated.Poly.body; predicate }
 
 let gen_party_from ?(succeed = true) ?(new_account = false)
     ?(snapp_account = false) ?account_id ?permissions_auth
@@ -699,7 +699,7 @@ let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
             account )
   in
   let predicate = account.nonce in
-  Party.Predicated.Poly.{ body; predicate }
+  { Party.Predicated.Poly.body; predicate }
 
 let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ()
     : Party.Fee_payer.t Quickcheck.Generator.t =
@@ -710,7 +710,7 @@ let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
   let authorization = Signature.dummy in
-  Party.Fee_payer.{ data; authorization }
+  { Party.Fee_payer.data; authorization }
 
 let max_other_parties = 5
 

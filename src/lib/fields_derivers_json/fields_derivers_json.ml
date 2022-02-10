@@ -54,6 +54,11 @@ module To_yojson = struct
     (obj#to_json := fun x -> `Bool x) ;
     obj
 
+  let unit obj =
+    obj#contramap := Fn.id ;
+    (obj#to_json := fun () -> `Null) ;
+    obj
+
   let list x obj =
     obj#contramap := List.map ~f:!(x#contramap) ;
     (obj#to_json := fun a -> `List (List.map ~f:!(x#to_json) a)) ;
@@ -123,6 +128,11 @@ module Of_yojson = struct
 
   let bool obj =
     (obj#of_json := function `Bool x -> x | _ -> failwith "todo") ;
+    obj#map := Fn.id ;
+    obj
+
+  let unit obj =
+    (obj#of_json := function `Null -> () | _ -> failwith "todo") ;
     obj#map := Fn.id ;
     obj
 

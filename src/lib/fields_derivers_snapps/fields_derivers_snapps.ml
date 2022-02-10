@@ -117,6 +117,11 @@ module Derivers = struct
     let _b = Fields_derivers_json.To_yojson.bool obj in
     Fields_derivers_json.Of_yojson.bool obj
 
+  let unit obj : _ Unified_input.t =
+    let _a = Fields_derivers_graphql.Graphql_fields.unit obj in
+    let _b = Fields_derivers_json.To_yojson.unit obj in
+    Fields_derivers_json.Of_yojson.unit obj
+
   let global_slot obj =
     iso_string obj ~name:"GlobalSlot" ~to_string:Unsigned.UInt32.to_string
       ~of_string:Unsigned.UInt32.of_string
@@ -128,6 +133,17 @@ module Derivers = struct
   let balance obj =
     iso_string obj ~name:"Balance" ~to_string:Currency.Balance.to_string
       ~of_string:Currency.Balance.of_string
+
+  let proof obj : _ Unified_input.t =
+    let of_string s =
+      match Pickles.Side_loaded.Proof.of_base64 s with
+      | Ok proof ->
+          proof
+      | Error _err ->
+          failwith "error"
+    in
+    iso_string obj ~name:"SnappProof"
+      ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
 
   let option (x : _ Unified_input.t) obj : _ Unified_input.t =
     let _a = Fields_derivers_graphql.Graphql_fields.option x obj in
@@ -145,6 +161,9 @@ module Derivers = struct
     in
     let _b = Fields_derivers_json.To_yojson.contramap ~f:contramap x obj in
     Fields_derivers_json.Of_yojson.map ~f:map x obj
+
+  let iso_record ~of_record ~to_record record_deriver obj =
+    iso ~map:of_record ~contramap:to_record (record_deriver @@ o ()) obj
 
   let array inner obj : _ Unified_input.t =
     iso ~map:Array.of_list ~contramap:Array.to_list
@@ -174,9 +193,9 @@ module Derivers = struct
       ~hash:!.field obj
     |> finish ~name:"VerificationKeyWithHash" ~doc:"Verification key with hash"
 
-  let to_json obj x = !(obj#to_json) x
+  let to_json obj x = !(obj#to_json) @@ !(obj#contramap) x
 
-  let of_json obj x = !(obj#of_json) x
+  let of_json obj x = !(obj#map) @@ !(obj#of_json) x
 
   let typ obj =
     !(obj#graphql_fields).Fields_derivers_graphql.Graphql_fields.Input.T.run ()
@@ -240,13 +259,15 @@ let%test_module "Test" =
         (V.of_yojson (V.to_yojson V.v) |> Result.ok_or_failwith)
 
     module V2 = struct
-      type t = { field : Field.t } [@@deriving compare, sexp, equal, fields]
+      type t = { field : Field.t; nothing : unit }
+      [@@deriving compare, sexp, equal, fields]
 
-      let v = { field = Field.of_int 10 }
+      let v = { field = Field.of_int 10; nothing = () }
 
       let derivers obj =
         let open Derivers in
-        Fields.make_creator obj ~field:!.field |> finish ~name:"V2"
+        Fields.make_creator obj ~field:!.field ~nothing:!.unit
+        |> finish ~name:"V2"
     end
 
     let v2 = V2.derivers @@ Derivers.o ()
@@ -255,7 +276,7 @@ let%test_module "Test" =
       let open Derivers in
       [%test_eq: string]
         (Yojson.Safe.to_string (to_json v2 V2.v))
-        {|{"field":"10"}|}
+        {|{"field":"10","nothing":null}|}
 
     let%test_unit "roundtrip json'" =
       let open Derivers in
@@ -296,3 +317,151 @@ let%test_module "Test" =
       let o = verification_key_with_hash @@ Derivers.o () in
       [%test_eq: (t, Field.t) With_hash.t] v (of_json o (to_json o v))
   end )
+
+(* TODO: remove this or move to a %test_module once the deriver code is stable *)
+(* Can be used to print the graphql schema, like this:
+   Fields_derivers_snapps.Test.print_schema (!(full#graphql_fields).run ()) dummy ;
+*)
+module Test = struct
+  module Graphql_fields_pure =
+  Fields_derivers_graphql.Graphql_fields_raw.Make (struct
+    type +'a t = 'a
+
+    let bind t f = f t
+
+    let return t = t
+
+    module Stream = struct
+      type 'a t = 'a Seq.t
+
+      let map t f = Seq.map f t
+
+      let iter t f = Seq.iter f t
+
+      let close _t = ()
+    end
+  end)
+
+  let introspection_query_raw =
+    {graphql|
+  query IntrospectionQuery {
+    __schema {
+      queryType { name }
+      mutationType { name }
+      subscriptionType { name }
+      types {
+        ...FullType
+      }
+      directives {
+        name
+        description
+        locations
+        args {
+          ...InputValue
+        }
+      }
+    }
+  }
+  fragment FullType on __Type {
+    kind
+    name
+    description
+    fields(includeDeprecated: true) {
+      name
+      description
+      args {
+        ...InputValue
+      }
+      type {
+        ...TypeRef
+      }
+      isDeprecated
+      deprecationReason
+    }
+    inputFields {
+      ...InputValue
+    }
+    interfaces {
+      ...TypeRef
+    }
+    enumValues(includeDeprecated: true) {
+      name
+      description
+      isDeprecated
+      deprecationReason
+    }
+    possibleTypes {
+      ...TypeRef
+    }
+  }
+  fragment InputValue on __InputValue {
+    name
+    description
+    type { ...TypeRef }
+    defaultValue
+  }
+  fragment TypeRef on __Type {
+    kind
+    name
+    ofType {
+      kind
+      name
+      ofType {
+        kind
+        name
+        ofType {
+          kind
+          name
+          ofType {
+            kind
+            name
+            ofType {
+              kind
+              name
+              ofType {
+                kind
+                name
+                ofType {
+                  kind
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  |graphql}
+
+  let introspection_query () =
+    match Graphql_parser.parse introspection_query_raw with
+    | Ok res ->
+        res
+    | Error err ->
+        failwith err
+
+  let print_schema (typ' : _ Fields_derivers_graphql.Graphql_fields.Schema.typ)
+      v =
+    let typ : _ Graphql_fields_pure.Schema.typ = Obj.magic typ' in
+    let module Schema = Graphql_fields_pure.Schema in
+    let query_top_level =
+      Schema.(
+        field "query" ~typ:(non_null typ)
+          ~args:Arg.[]
+          ~doc:"sample query"
+          ~resolve:(fun _ _ -> v))
+    in
+    let schema =
+      Schema.(schema [ query_top_level ] ~mutations:[] ~subscriptions:[])
+    in
+    let res = Schema.execute schema () (introspection_query ()) in
+    let str =
+      match res with
+      | Ok (`Response data) ->
+          data |> Yojson.Basic.to_string
+      | _ ->
+          failwith "Unexpected response"
+    in
+    printf "%s" str
+end

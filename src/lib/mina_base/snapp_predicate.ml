@@ -457,7 +457,7 @@ module Account = struct
           ; sequence_state : 'field
           ; proved_state : 'bool
           }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare]
+        [@@deriving hlist, sexp, equal, yojson, hash, compare, fields]
       end
 
       module V1 = struct
@@ -536,16 +536,15 @@ module Account = struct
       Or_ignore.gen field_gen
     in
     let%map proved_state = Or_ignore.gen Quickcheck.Generator.bool in
-    Poly.
-      { balance
-      ; nonce
-      ; receipt_chain_hash
-      ; public_key
-      ; delegate
-      ; state
-      ; sequence_state
-      ; proved_state
-      }
+    { Poly.balance
+    ; nonce
+    ; receipt_chain_hash
+    ; public_key
+    ; delegate
+    ; state
+    ; sequence_state
+    ; proved_state
+    }
 
   let accept : t =
     { balance = Ignore
@@ -560,6 +559,33 @@ module Account = struct
     }
 
   let is_accept : t -> bool = equal accept
+
+  let deriver obj =
+    let open Fields_derivers_snapps in
+    Poly.Fields.make_creator obj
+      ~balance:!.(Numeric.deriver balance)
+      ~nonce:!.(Numeric.deriver uint32)
+      ~receipt_chain_hash:!.(Or_ignore.deriver field)
+      ~public_key:!.(Or_ignore.deriver public_key)
+      ~delegate:!.(Or_ignore.deriver public_key)
+      ~state:!.(Snapp_state.deriver @@ Or_ignore.deriver field)
+      ~sequence_state:!.(Or_ignore.deriver field)
+      ~proved_state:!.(Or_ignore.deriver bool)
+    |> finish ~name:"AccountPredicate"
+
+  let%test_unit "json roundtrip" =
+    let b = Balance.of_int 1000 in
+    let predicate : t =
+      { accept with
+        balance = Or_ignore.Check { Closed_interval.lower = b; upper = b }
+      ; public_key = Or_ignore.Check Public_key.Compressed.empty
+      ; sequence_state = Or_ignore.Check (Field.of_int 99)
+      ; proved_state = Or_ignore.Check true
+      }
+    in
+    let module Fd = Fields_derivers_snapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
 
   let to_input
       ({ balance
@@ -789,6 +815,42 @@ module Protocol_state = struct
       end
     end]
 
+    let deriver obj =
+      let open Fields_derivers_snapps.Derivers in
+      let ledger obj' =
+        Epoch_ledger.Poly.Fields.make_creator obj'
+          ~hash:!.(Or_ignore.deriver field)
+          ~total_currency:!.(Numeric.deriver amount)
+        |> finish ~name:"EpochLedgerPredicate"
+      in
+      Poly.Fields.make_creator obj ~ledger:!.ledger
+        ~seed:!.(Or_ignore.deriver field)
+        ~start_checkpoint:!.(Or_ignore.deriver field)
+        ~lock_checkpoint:!.(Or_ignore.deriver field)
+        ~epoch_length:!.(Numeric.deriver uint32)
+      |> finish ~name:"EpochDataPredicate"
+
+    let%test_unit "json roundtrip" =
+      let f = Or_ignore.Check Field.one in
+      let u = Length.zero in
+      let a = Amount.zero in
+      let predicate : t =
+        { Poly.ledger =
+            { Epoch_ledger.Poly.hash = f
+            ; total_currency =
+                Or_ignore.Check { Closed_interval.lower = a; upper = a }
+            }
+        ; seed = f
+        ; start_checkpoint = f
+        ; lock_checkpoint = f
+        ; epoch_length =
+            Or_ignore.Check { Closed_interval.lower = u; upper = u }
+        }
+      in
+      let module Fd = Fields_derivers_snapps.Derivers in
+      let full = deriver (Fd.o ()) in
+      [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
+
     let gen : t Quickcheck.Generator.t =
       let open Quickcheck.Let_syntax in
       let%bind ledger =
@@ -919,6 +981,30 @@ module Protocol_state = struct
       let to_latest = Fn.id
     end
   end]
+
+  let deriver obj =
+    let open Fields_derivers_snapps.Derivers in
+    let token_id obj =
+      iso_string obj ~name:"TokenId" ~to_string:Token_id.to_string
+        ~of_string:Token_id.of_string
+    in
+    let block_time obj =
+      iso_string ~name:"BlockTime" ~of_string:Block_time.of_string_exn
+        ~to_string:Block_time.to_string obj
+    in
+    Poly.Fields.make_creator obj
+      ~snarked_ledger_hash:!.(Or_ignore.deriver field)
+      ~snarked_next_available_token:!.(Numeric.deriver token_id)
+      ~timestamp:!.(Numeric.deriver block_time)
+      ~blockchain_length:!.(Numeric.deriver uint32)
+      ~min_window_density:!.(Numeric.deriver uint32)
+      ~last_vrf_output:!.unit
+      ~total_currency:!.(Numeric.deriver amount)
+      ~global_slot_since_hard_fork:!.(Numeric.deriver uint32)
+      ~global_slot_since_genesis:!.(Numeric.deriver uint32)
+      ~staking_epoch_data:!.Epoch_data.deriver
+      ~next_epoch_data:!.Epoch_data.deriver
+    |> finish ~name:"ProtocolStatePredicate"
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
@@ -1207,6 +1293,12 @@ module Protocol_state = struct
     ; staking_epoch_data = epoch_data
     ; next_epoch_data = epoch_data
     }
+
+  let%test_unit "json roundtrip" =
+    let predicate : t = accept in
+    let module Fd = Fields_derivers_snapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
 
   let check
       (* Bind all the fields explicity so we make sure they are all used. *)

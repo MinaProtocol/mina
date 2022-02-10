@@ -104,3 +104,18 @@ val gen : t Quickcheck.Generator.t
 
 (** Compute a standalone hash of the current memo. *)
 val hash : t -> Tick.Field.t
+
+val deriver :
+     (< contramap : (t -> Yojson.Safe.t) ref
+      ; graphql_fields :
+          Yojson.Safe.t Fields_derivers_graphql.Graphql_fields.Input.T.t ref
+      ; map : (Yojson.Safe.t -> t) ref
+      ; nullable_graphql_fields :
+          Yojson.Safe.t option Fields_derivers_graphql.Graphql_fields.Input.T.t
+          ref
+      ; of_json : (Yojson.Safe.t -> Yojson.Safe.t) ref
+      ; to_json : (Yojson.Safe.t -> Yojson.Safe.t) ref
+      ; .. >
+      as
+      'a)
+  -> 'a
