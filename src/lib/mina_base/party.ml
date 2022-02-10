@@ -598,27 +598,46 @@ module Body = struct
     ; use_full_commitment = false
     }
 
-  let token_id_deriver obj =
-    let open Fields_derivers_snapps in
-    iso_string obj ~name:"Token ID" ~to_string:Token_id.to_string
-      ~of_string:Token_id.of_string
-
-  let events_deriver obj =
-    let open Fields_derivers_snapps in
-    array field obj
-
   let fail _ = failwith "TODO"
-
-  let balance_deriver obj =
-    let open Fields_derivers_snapps in
-    Currency.Signed_poly.Fields.make_creator obj ~magnitude:!.fail ~sgn:!.fail
-    |> finish ~name:"Balance Change"
 
   let deriver obj =
     let open Fields_derivers_snapps in
+    let token_id_deriver obj =
+      let open Fields_derivers_snapps in
+      iso_string obj ~name:"Token ID" ~to_string:Token_id.to_string
+        ~of_string:Token_id.of_string
+    in
+    let events_deriver obj =
+      let open Fields_derivers_snapps in
+      array field obj
+    in
+    let sign_to_string = function
+      | Sgn.Pos ->
+          "Positive"
+      | Sgn.Neg ->
+          "Negative"
+    in
+    let sign_of_string = function
+      | "Positive" ->
+          Sgn.Pos
+      | "Negative" ->
+          Sgn.Neg
+      | _ ->
+          failwith "impossible"
+    in
+    let balance_change_deriver obj =
+      let open Fields_derivers_snapps in
+      let sign_deriver =
+        iso_string ~name:"Sign" ~to_string:sign_to_string
+          ~of_string:sign_of_string
+      in
+      Currency.Signed_poly.Fields.make_creator obj ~magnitude:!.amount
+        ~sgn:!.sign_deriver
+      |> finish ~name:"Balance Change"
+    in
     Poly.Fields.make_creator obj ~public_key:!.public_key
       ~update:!.Update.deriver ~token_id:!.token_id_deriver
-      ~balance_change:!.fail ~increment_nonce:!.bool
+      ~balance_change:!.balance_change_deriver ~increment_nonce:!.bool
       ~events:!.(list @@ events_deriver @@ o ())
       ~sequence_events:!.(list @@ events_deriver @@ o ())
       ~call_data:!.field ~call_depth:!.int ~protocol_state:!.fail
