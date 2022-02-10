@@ -2932,7 +2932,7 @@
             },
             {
               "name": "cliffAmount",
-              "description": "Cliff amoount, as a string",
+              "description": "Cliff amount, as a string",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3010,7 +3010,7 @@
             },
             {
               "name": "cliffAmount",
-              "description": "Cliff amoount, as a string",
+              "description": "Cliff amount, as a string",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
