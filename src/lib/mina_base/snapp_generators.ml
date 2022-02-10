@@ -710,7 +710,7 @@ let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
   let authorization = Signature.dummy in
-  Party.Fee_payer.{ data; authorization }
+  { Party.Fee_payer.data; authorization }
 
 let max_other_parties = 5
 

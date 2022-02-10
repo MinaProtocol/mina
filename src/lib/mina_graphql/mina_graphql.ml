@@ -2743,7 +2743,7 @@ module Types = struct
           ~coerce:(fun data authorization ->
             let open Result.Let_syntax in
             let%bind data = data in
-            Ok Party.Fee_payer.{ data; authorization })
+            Ok { Party.Fee_payer.data; authorization })
           ~fields:
             [ arg "data" ~doc:"party with a signature and nonce predicate"
                 ~typ:(non_null snapp_party_predicated_fee_payer)
