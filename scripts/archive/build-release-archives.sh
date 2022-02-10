@@ -19,7 +19,7 @@ case "${MINA_DEB_CODENAME}" in
   buster|focal)
     ARCHIVE_DEPS="libjemalloc2"
     ;;
-  stretch)
+  stretch|bionic)
     ARCHIVE_DEPS="libjemalloc1"
     ;;
   *)
