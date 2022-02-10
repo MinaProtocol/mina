@@ -663,7 +663,7 @@ module Predicate = struct
 
   let of_full (p : Snapp_predicate.Account.t) =
     let module A = Snapp_predicate.Account in
-    if Snapp_predicate.Account.equal p A.accept then Accept
+    if A.equal p A.accept then Accept
     else
       match p.nonce with
       | Ignore ->
