@@ -2,7 +2,6 @@
 -- NOTE: minaToolchainStretch is also used for building Ubuntu Bionic packages in CI
 {
   toolchainBase = "codaprotocol/ci-toolchain-base:v3",
-  minaToolchainBionic = "gcr.io/o1labs-192920/mina-toolchain@sha256:c4873c52041996a4eacdd96d0310b909a099689552c8b4fec7d464872abd1e1f",
   minaToolchainStretch = "gcr.io/o1labs-192920/mina-toolchain@sha256:c4873c52041996a4eacdd96d0310b909a099689552c8b4fec7d464872abd1e1f",
   minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:b53c4948599ec40ec1ce9178d84ce48e88db472da0005b9a6b4260e0d4aaa95c",
   minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:00dbcb936954f10b4995ad28535d08e32d6d2dbc31531e846307d156e610af04",

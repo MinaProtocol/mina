@@ -83,20 +83,7 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep toolchainFocalSpec,
-
-      -- mina-toolchain Ubuntu 18.04 "Bionic Beaver" Toolchain
-      let toolchainBionicSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn,
-        service="mina-toolchain",
-        deb_codename="bionic",
-        extra_args="--no-cache",
-        step_key="toolchain-bionic-docker-image"
-      }
-
-      in
-
-      DockerImage.generateStep toolchainBionicSpec
+      DockerImage.generateStep toolchainFocalSpec
 
     ]
   }
