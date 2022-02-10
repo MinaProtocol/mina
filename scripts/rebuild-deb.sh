@@ -25,11 +25,8 @@ SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata"
 case "${MINA_DEB_CODENAME}" in
   buster)
     DAEMON_DEPS=", libffi6, libjemalloc2, libpq-dev, libprocps7"
-    # buster deps that should only affect the toolchain container:
-    # python3-sexpdata \
-    # python-sexpdata \
     ;;
-  stretch)
+  stretch|bionic)
     DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6"
     ;;
   focal)

@@ -46,14 +46,8 @@ esac; shift; done
 
 # Determine the proper image for ubuntu or debian
 case "${DEB_CODENAME##*=}" in
-  focal|impish|jammy)
+  bionic|focal|impish|jammy)
     IMAGE="ubuntu:${DEB_CODENAME##*=}"
-  ;;
-  bionic)
-    # workaround to avoid introducing a distinct package / pipeline for bionic
-    # the stretch package works as intended, but with this you can easily make an ubuntu-based container
-    IMAGE="ubuntu:bionic"
-    DEB_CODENAME="--build-arg deb_codename=stretch"
   ;;
   stretch|buster|bullseye|sid)
     IMAGE="debian:${DEB_CODENAME##*=}-slim"

@@ -115,6 +115,7 @@ in
 {
   buster  = pipeline DebianVersions.DebVersion.Buster,
   stretch = pipeline DebianVersions.DebVersion.Stretch,
+  bionic = pipeline DebianVersions.DebVersion.Bionic,
   focal   = pipeline DebianVersions.DebVersion.Focal,
   dirtyWhen = dirtyWhen
 }
