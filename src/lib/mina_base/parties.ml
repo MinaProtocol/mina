@@ -240,7 +240,7 @@ module Stable = struct
       ; other_parties : Party.Stable.V1.t list
       ; memo : Signed_command_memo.Stable.V1.t
       }
-    [@@deriving sexp, compare, equal, hash, yojson]
+    [@@deriving sexp, compare, equal, hash, yojson, fields]
 
     let to_latest = Fn.id
 
@@ -463,3 +463,14 @@ let weight (parties : t) : int =
     ; Weight.other_parties other_parties
     ; Weight.memo memo
     ]
+
+let deriver obj =
+  let open Fields_derivers_snapps.Derivers in
+  let memo obj' =
+    Signed_command_memo.(iso_string obj' ~name:"Memo" ~to_string ~of_string)
+  in
+  Fields.make_creator obj
+    ~fee_payer:!.(fun _ -> failwith "TODO")
+    ~other_parties:!.(list @@ Party.deriver @@ o ())
+    ~memo:!.memo
+  |> finish ~name:"SendSnappInput"
