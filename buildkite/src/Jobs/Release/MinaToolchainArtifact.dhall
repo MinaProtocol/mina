@@ -33,7 +33,20 @@ Pipeline.build
       },
     steps = [
 
-      -- mina-toolchain Debian Buster image
+      -- mina-toolchain Debian 11 "Bullseye" Toolchain
+      let toolchainBullseyeSpec = DockerImage.ReleaseSpec::{
+        deps=dependsOn,
+        service="mina-toolchain",
+        deb_codename="bullseye",
+        extra_args="--no-cache",
+        step_key="toolchain-bullseye-docker-image"
+      }
+
+      in
+
+      DockerImage.generateStep toolchainBullseyeSpec,
+
+      -- mina-toolchain Debian 10 "Buster" Toolchain
       let toolchainBusterSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-toolchain",
@@ -46,7 +59,7 @@ Pipeline.build
 
       DockerImage.generateStep toolchainBusterSpec,
 
-      -- mina-toolchain Debian Stretch image
+      -- mina-toolchain Debian 9 "Stretch" Toolchain
       let toolchainStretchSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-toolchain",
@@ -59,7 +72,20 @@ Pipeline.build
 
       DockerImage.generateStep toolchainStretchSpec,
 
-      -- mina-toolchain Ubuntu Focal Fossa 20.04 image
+      -- mina-toolchain Ubuntu 21.10 "Impish Indri" Toolchain
+      let toolchainImpishSpec = DockerImage.ReleaseSpec::{
+        deps=dependsOn,
+        service="mina-toolchain",
+        deb_codename="impish",
+        extra_args="--no-cache",
+        step_key="toolchain-impish-docker-image"
+      }
+
+      in
+
+      DockerImage.generateStep toolchainImpishSpec,
+
+      -- mina-toolchain Ubuntu 20.04 "Focal Fossa" Toolchain
       let toolchainFocalSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-toolchain",
@@ -70,7 +96,20 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep toolchainFocalSpec
+      DockerImage.generateStep toolchainFocalSpec,
+
+      -- mina-toolchain Ubuntu 18.04 "Bionic Beaver" Toolchain
+      let toolchainBionicSpec = DockerImage.ReleaseSpec::{
+        deps=dependsOn,
+        service="mina-toolchain",
+        deb_codename="bionic",
+        extra_args="--no-cache",
+        step_key="toolchain-bionic-docker-image"
+      }
+
+      in
+
+      DockerImage.generateStep toolchainBionicSpec
 
     ]
   }
