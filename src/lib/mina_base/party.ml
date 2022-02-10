@@ -1052,7 +1052,7 @@ module Fee_payer = struct
          ~doc:"A party to a snapp transaction with a signature authorization"
 
   let%test_unit "json roundtrip" =
-    let dummy =
+    let dummy : t =
       { data = Predicated.Fee_payer.dummy; authorization = Signature.dummy }
     in
     let open Fields_derivers_snapps.Derivers in
@@ -1122,7 +1122,7 @@ let deriver obj =
   |> finish ~name:"SnappParty" ~doc:"A party to a snapp transaction"
 
 let%test_unit "json roundtrip dummy" =
-  let dummy =
+  let dummy : t =
     { data = { body = Body.dummy; predicate = Predicate.Accept }
     ; authorization = Control.dummy_of_tag Signature
     }

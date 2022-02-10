@@ -469,8 +469,23 @@ let deriver obj =
   let memo obj' =
     Signed_command_memo.(iso_string obj' ~name:"Memo" ~to_string ~of_string)
   in
-  Fields.make_creator obj
-    ~fee_payer:!.(fun _ -> failwith "TODO")
+  Fields.make_creator obj ~fee_payer:!.Party.Fee_payer.deriver
     ~other_parties:!.(list @@ Party.deriver @@ o ())
     ~memo:!.memo
   |> finish ~name:"SendSnappInput"
+
+let%test_unit "json roundtrip dummy" =
+  let party : Party.t =
+    { data = { body = Party.Body.dummy; predicate = Party.Predicate.Accept }
+    ; authorization = Control.dummy_of_tag Signature
+    }
+  in
+  let fee_payer : Party.Fee_payer.t =
+    { data = Party.Predicated.Fee_payer.dummy; authorization = Signature.dummy }
+  in
+  let dummy : t =
+    { fee_payer; other_parties = [ party ]; memo = Signed_command_memo.empty }
+  in
+  let module Fd = Fields_derivers_snapps.Derivers in
+  let full = deriver @@ Fd.o () in
+  [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
