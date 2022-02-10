@@ -761,7 +761,7 @@ module Predicated = struct
     module Stable = struct
       module V1 = struct
         type ('body, 'predicate) t = { body : 'body; predicate : 'predicate }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare]
+        [@@deriving hlist, sexp, equal, yojson, hash, compare, fields]
       end
     end]
   end
@@ -775,6 +775,13 @@ module Predicated = struct
       let to_latest = Fn.id
     end
   end]
+
+  let deriver obj =
+    let open Fields_derivers_snapps.Derivers in
+    Poly.Fields.make_creator obj
+      ~body:!.(fun _ -> failwith "TODO")
+      ~predicate:!.Predicate.deriver
+    |> finish ~name:"SnappPartyPredicated"
 
   let to_input ({ body; predicate } : t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
