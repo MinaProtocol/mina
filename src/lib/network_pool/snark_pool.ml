@@ -632,6 +632,18 @@ module Diff_versioned = struct
         * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
   [@@deriving compare, sexp, to_yojson]
+
+  let _ =
+    let layout = Stable.Latest.bin_layout_t in
+    let layout_compressed =
+      { layout with
+        bin_prot_rule=
+          Ppx_version_runtime.Bin_prot_rule.compress_references
+            layout.bin_prot_rule }
+    in
+    Format.eprintf "SNARK POOL DIFF LAYOUT: %s@."
+      ( Ppx_version_runtime.Bin_prot_layout.to_yojson layout_compressed
+      |> Yojson.Safe.pretty_to_string )
 end
 
 let%test_module "random set test" =

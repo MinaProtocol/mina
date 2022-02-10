@@ -45,7 +45,7 @@ module Diff_versioned = struct
     end
   end]
 
-  let _ =
+  (*  let _ =
     let layout = Stable.Latest.bin_layout_t in
     let layout_compressed =
       { layout with
@@ -55,7 +55,7 @@ module Diff_versioned = struct
     in
     Format.eprintf "TXN POOL DIFF LAYOUT: %s@."
       ( Ppx_version_runtime.Bin_prot_layout.to_yojson layout_compressed
-      |> Yojson.Safe.pretty_to_string )
+      |> Yojson.Safe.pretty_to_string ) *)
 
   (* We defer do any checking on signed-commands until the call to
    [add_from_gossip_gossip_exn].

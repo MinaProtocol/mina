@@ -33,7 +33,7 @@ module V1 = struct
 
     let msg_of_caller_model = Fn.id
 
-    let _ =
+    (*    let _ =
       let random_value = Quickcheck.random_value in
       let init_ledger_state =
         random_value Mina_base.Ledger.gen_initial_ledger_state
@@ -49,7 +49,7 @@ module V1 = struct
       ignore (bin_write_msg buf ~pos:0 cmds) ;
       let s = String.init sz ~f:(fun ndx -> buf.{ndx}) in
       Format.eprintf "BIN IO@." ;
-      Format.eprintf "%s@." (Hex.Safe.to_hex s)
+      Format.eprintf "%s@." (Hex.Safe.to_hex s) *)
   end
 
   include Register (T)
