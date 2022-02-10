@@ -23,6 +23,9 @@ cd "${SCRIPTPATH}/../_build"
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata"
 case "${MINA_DEB_CODENAME}" in
+  bullseye)
+    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8"
+    ;;
   buster)
     DAEMON_DEPS=", libffi6, libjemalloc2, libpq-dev, libprocps7"
     ;;

@@ -72,19 +72,6 @@ Pipeline.build
 
       DockerImage.generateStep toolchainStretchSpec,
 
-      -- mina-toolchain Ubuntu 21.10 "Impish Indri" Toolchain
-      let toolchainImpishSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn,
-        service="mina-toolchain",
-        deb_codename="impish",
-        extra_args="--no-cache",
-        step_key="toolchain-impish-docker-image"
-      }
-
-      in
-
-      DockerImage.generateStep toolchainImpishSpec,
-
       -- mina-toolchain Ubuntu 20.04 "Focal Fossa" Toolchain
       let toolchainFocalSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,

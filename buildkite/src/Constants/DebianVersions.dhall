@@ -8,7 +8,8 @@ let DebVersion = < Buster | Stretch | Focal | Bionic >
 
 let capitalName = \(debVersion : DebVersion) ->
   merge {
-    Buster = "Buster"
+    Bullseye = "Bullseye"
+    , Buster = "Buster"
     , Stretch = "Stretch"
     , Focal = "Focal"
     , Bionic = "Bionic"
@@ -16,7 +17,8 @@ let capitalName = \(debVersion : DebVersion) ->
 
 let lowerName = \(debVersion : DebVersion) ->
   merge {
-    Buster = "buster"
+    Bullseye = "bullseye"
+    , Buster = "buster"
     , Stretch = "stretch"
     , Focal = "focal"
     , Bionic = "bionic"
@@ -25,7 +27,8 @@ let lowerName = \(debVersion : DebVersion) ->
 --- Bionic and Stretch are so similar that they share a toolchain image
 let toolchainRunner = \(debVersion : DebVersion) ->
   merge {
-    Buster = RunInToolchain.runInToolchainBuster
+    Bullseye = RunInToolchain.runInToolchainBullseye
+    , Buster = RunInToolchain.runInToolchainBuster
     , Stretch = RunInToolchain.runInToolchainStretch
     , Focal = RunInToolchain.runInToolchainFocal
     , Bionic = RunInToolchain.runInToolchainStretch
@@ -34,7 +37,8 @@ let toolchainRunner = \(debVersion : DebVersion) ->
 --- Bionic and Stretch are so similar that they share a toolchain image
 let toolchainImage = \(debVersion : DebVersion) ->
   merge { 
-    Buster = ContainerImages.minaToolchainBuster
+    Bullseye = ContainerImages.minaToolchainBullseye
+    , Buster = ContainerImages.minaToolchainBuster
     , Stretch = ContainerImages.minaToolchainStretch
     , Focal = ContainerImages.minaToolchainFocal
     , Bionic = ContainerImages.minaToolchainStretch
@@ -42,7 +46,8 @@ let toolchainImage = \(debVersion : DebVersion) ->
 
 let dependsOn = \(debVersion : DebVersion) ->
   merge {
-    Buster = dependsOnGitEnv # [{ name = "MinaArtifactBuster", key = "build-deb-pkg" }]
+    Bullseye = dependsOnGitEnv # [{ name = "MinaArtifactBullseye", key = "build-deb-pkg" }]
+    , Buster = dependsOnGitEnv # [{ name = "MinaArtifactBuster", key = "build-deb-pkg" }]
     , Stretch = dependsOnGitEnv # [{ name = "MinaArtifactStretch", key = "build-deb-pkg" }]
     , Bionic = dependsOnGitEnv # [{ name = "MinaArtifactBionic", key = "build-deb-pkg" }]
     , Focal = dependsOnGitEnv # [{ name = "MinaArtifactFocal", key = "build-deb-pkg" }]
