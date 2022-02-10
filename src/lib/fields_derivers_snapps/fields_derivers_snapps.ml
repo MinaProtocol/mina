@@ -134,6 +134,17 @@ module Derivers = struct
     iso_string obj ~name:"Balance" ~to_string:Currency.Balance.to_string
       ~of_string:Currency.Balance.of_string
 
+  let proof obj : _ Unified_input.t =
+    let of_string s =
+      match Pickles.Side_loaded.Proof.of_base64 s with
+      | Ok proof ->
+          proof
+      | Error _err ->
+          failwith "error"
+    in
+    iso_string obj ~name:"SnappProof"
+      ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
+
   let option (x : _ Unified_input.t) obj : _ Unified_input.t =
     let _a = Fields_derivers_graphql.Graphql_fields.option x obj in
     let _b = Fields_derivers_json.To_yojson.option x obj in
@@ -150,6 +161,9 @@ module Derivers = struct
     in
     let _b = Fields_derivers_json.To_yojson.contramap ~f:contramap x obj in
     Fields_derivers_json.Of_yojson.map ~f:map x obj
+
+  let iso_record ~of_record ~to_record record_deriver obj =
+    iso ~map:of_record ~contramap:to_record (record_deriver @@ o ()) obj
 
   let add_field (x : _ Unified_input.t) fd acc =
     let _, acc' = Fields_derivers_graphql.Graphql_fields.add_field x fd acc in
