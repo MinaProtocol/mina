@@ -639,7 +639,7 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false) ?account_id
       body.Party.Body.Poly.token_id
   in
   let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger () in
-  Party.Predicated.Poly.{ body; predicate }
+  { Party.Predicated.Poly.body; predicate }
 
 let gen_party_from ?(succeed = true) ?(new_account = false)
     ?(snapp_account = false) ?account_id ?permissions_auth
@@ -699,7 +699,7 @@ let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
             account )
   in
   let predicate = account.nonce in
-  Party.Predicated.Poly.{ body; predicate }
+  { Party.Predicated.Poly.body; predicate }
 
 let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ()
     : Party.Fee_payer.t Quickcheck.Generator.t =

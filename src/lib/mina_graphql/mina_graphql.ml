@@ -2717,7 +2717,7 @@ module Types = struct
             let open Result.Let_syntax in
             let%map body = body in
             let predicate = nonce in
-            Party.Predicated.Poly.{ body; predicate })
+            { Party.Predicated.Poly.body; predicate })
           ~fields:
             [ arg "body" ~doc:"fee payer party"
                 ~typ:(non_null snapp_fee_payer_party_body)
@@ -2843,7 +2843,7 @@ module Types = struct
             let open Result.Let_syntax in
             let%bind body = body_result in
             let%bind predicate = predicate_result in
-            Ok Party.Predicated.Poly.{ body; predicate })
+            Ok { Party.Predicated.Poly.body; predicate })
           ~fields:
             [ arg "body" ~doc:"Body of the party predicated"
                 ~typ:(non_null snapp_party_body)
@@ -2882,7 +2882,7 @@ module Types = struct
             let open Result.Let_syntax in
             let%bind data = predicated_result in
             let%bind authorization = authorization_result in
-            Ok Party.{ data; authorization })
+            Ok { Party.data; authorization })
           ~fields:
             [ arg "data" ~doc:"Predicated party"
                 ~typ:(non_null snapp_party_predicated)
