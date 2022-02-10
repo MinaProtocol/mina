@@ -985,9 +985,8 @@ module Protocol_state = struct
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
     let token_id obj =
-      iso ~map:Token_id.of_uint64 ~contramap:Token_id.to_uint64
-        (uint64 @@ o ())
-        obj
+      iso_string obj ~name:"TokenId" ~to_string:Token_id.to_string
+        ~of_string:Token_id.of_string
     in
     let block_time obj =
       iso_string ~name:"BlockTime" ~of_string:Block_time.of_string_exn

@@ -603,17 +603,12 @@ module Body = struct
   let deriver obj =
     let open Fields_derivers_snapps in
     let token_id_deriver obj =
-      let open Fields_derivers_snapps in
-      iso_string obj ~name:"Token ID" ~to_string:Token_id.to_string
+      iso_string obj ~name:"TokenId" ~to_string:Token_id.to_string
         ~of_string:Token_id.of_string
     in
-    let events_deriver obj =
-      let open Fields_derivers_snapps in
-      array field obj
-    in
+    let events_deriver obj = array field obj in
 
     let balance_change_deriver obj =
-      let open Fields_derivers_snapps in
       let sign_to_string = function
         | Sgn.Pos ->
             "Positive"
@@ -641,7 +636,8 @@ module Body = struct
       ~balance_change:!.balance_change_deriver ~increment_nonce:!.bool
       ~events:!.(list @@ events_deriver @@ o ())
       ~sequence_events:!.(list @@ events_deriver @@ o ())
-      ~call_data:!.field ~call_depth:!.int ~protocol_state:!.fail
+      ~call_data:!.field ~call_depth:!.int
+      ~protocol_state:!.Snapp_predicate.Protocol_state.deriver
       ~use_full_commitment:!.bool
     |> finish ~name:"Party" ~doc:"Party in a snapp transaction"
 
