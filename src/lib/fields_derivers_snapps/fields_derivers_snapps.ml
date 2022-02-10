@@ -443,8 +443,7 @@ let%test_module "Test" =
    Fields_derivers_snapps.Test.print_schema (!(full#graphql_fields).run ()) dummy ;
 *)
 module Test = struct
-  module Graphql_fields_pure =
-  Fields_derivers_graphql.Graphql_fields_raw.Make (struct
+  module IO = struct
     type +'a t = 'a
 
     let bind t f = f t
@@ -460,7 +459,11 @@ module Test = struct
 
       let close _t = ()
     end
-  end)
+  end
+
+  module Schema = Graphql_schema.Make (IO)
+  module Graphql_fields_pure =
+    Fields_derivers_graphql.Graphql_fields_raw.Make (Schema)
 
   let introspection_query_raw =
     {graphql|
@@ -561,10 +564,8 @@ module Test = struct
     | Error err ->
         failwith err
 
-  let print_schema (typ' : _ Fields_derivers_graphql.Graphql_fields.Schema.typ)
-      v =
-    let typ : _ Graphql_fields_pure.Schema.typ = Obj.magic typ' in
-    let module Schema = Graphql_fields_pure.Schema in
+  let print_schema (typ' : _ Fields_derivers_graphql.Schema.typ) v =
+    let typ : _ Schema.typ = Obj.magic typ' in
     let query_top_level =
       Schema.(
         field "query" ~typ:(non_null typ)
