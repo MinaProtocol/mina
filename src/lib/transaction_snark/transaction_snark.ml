@@ -1114,11 +1114,18 @@ module Base = struct
         ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
         ~initial_minimum_balance
     in
-    let%bind proposed_balance, `Underflow underflow =
-      Balance.Checked.sub_amount_flagged account.balance txn_amount
+    let%bind proposed_balance =
+      match txn_amount with
+      | Some txn_amount ->
+          let%bind proposed_balance, `Underflow underflow =
+            Balance.Checked.sub_amount_flagged account.balance txn_amount
+          in
+          (* underflow indicates insufficient balance *)
+          let%map () = balance_check (Boolean.not underflow) in
+          proposed_balance
+      | None ->
+          return account.balance
     in
-    (* underflow indicates insufficient balance *)
-    let%bind () = balance_check (Boolean.not underflow) in
     let%bind sufficient_timed_balance =
       Balance.Checked.( >= ) proposed_balance curr_min_balance
     in
@@ -1273,8 +1280,7 @@ module Base = struct
                balance, so using the result directly is equivalent.
             *)
             check_timing ~balance_check ~timed_balance_check ~account:a
-              ~txn_amount:Amount.(var_of_t zero)
-              ~txn_global_slot))
+              ~txn_amount:None ~txn_global_slot))
       in
       let open Snapp_basic in
       let snapp : Snapp_account.Checked.t =
@@ -2860,7 +2866,7 @@ module Base = struct
                       (Boolean.Assert.is_true ok)
                   in
                   check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount ~txn_global_slot)
+                    ~txn_amount:(Some txn_amount) ~txn_global_slot)
              in
              let%bind balance =
                [%with_label "Check payer balance"]
@@ -3164,7 +3170,7 @@ module Base = struct
                          user_command_failure.source_bad_timing)
                   in
                   check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount:amount ~txn_global_slot)
+                    ~txn_amount:(Some amount) ~txn_global_slot)
              in
              let%bind balance, `Underflow underflow =
                Balance.Checked.sub_amount_flagged account.balance amount
@@ -7802,8 +7808,8 @@ let%test_module "account timing check" =
       let txn_global_slot = Global_slot.Checked.constant txn_global_slot in
       let%map `Min_balance min_balance, timing =
         Base.check_timing ~balance_check:Tick.Boolean.Assert.is_true
-          ~timed_balance_check:Tick.Boolean.Assert.is_true ~account ~txn_amount
-          ~txn_global_slot
+          ~timed_balance_check:Tick.Boolean.Assert.is_true ~account
+          ~txn_amount:(Some txn_amount) ~txn_global_slot
       in
       (min_balance, timing)
 
