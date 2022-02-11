@@ -1223,7 +1223,7 @@ module Base = struct
                  ; snapp_uri = _
                  ; token_symbol = _
                  ; timing = _
-                 ; voting_for
+                 ; voting_for = _
                  }
              ; balance_change = _
              ; increment_nonce
@@ -1255,7 +1255,6 @@ module Base = struct
             res
       in
       let proof_must_verify () = Boolean.any (List.map !r ~f:Lazy.force) in
-      let ( ! ) = run_checked in
       let open Snapp_basic in
       let permissions =
         update_authorized a.permissions.set_permissions
@@ -1264,15 +1263,6 @@ module Base = struct
             (`Ok
               (Set_or_keep.Checked.set_or_keep ~if_:Permissions.Checked.if_
                  permissions a.permissions))
-      in
-      let voting_for =
-        update_authorized a.permissions.set_voting_for
-          ~is_keep:(Set_or_keep.Checked.is_keep voting_for)
-          ~updated:
-            (`Ok
-              (Set_or_keep.Checked.set_or_keep
-                 ~if_:(fun b ~then_ ~else_ -> !(State_hash.if_ b ~then_ ~else_))
-                 voting_for a.voting_for))
       in
 
       (* enforce that either the predicate is `Accept`,
@@ -1294,9 +1284,7 @@ module Base = struct
             ; increment_nonce
             ; Boolean.(use_full_commitment &&& not is_start)
             ]) ;
-      let a : Account.Checked.Unhashed.t =
-        { a with permissions; public_key; voting_for }
-      in
+      let a : Account.Checked.Unhashed.t = { a with permissions; public_key } in
       (a, `proof_must_verify proof_must_verify)
 
     let create_checker () =
@@ -1395,6 +1383,12 @@ module Base = struct
           let succ t = run_checked (Account.Nonce.Checked.succ t)
         end
 
+        module State_hash = struct
+          type t = State_hash.var
+
+          let if_ b ~then_ ~else_ = run_checked (State_hash.if_ b ~then_ ~else_)
+        end
+
         module Timing = struct
           type t = Account_timing.var
 
@@ -1473,6 +1467,9 @@ module Base = struct
 
             let increment_nonce : t -> Controller.t =
              fun a -> a.data.permissions.increment_nonce
+
+            let set_voting_for : t -> Controller.t =
+             fun a -> a.data.permissions.set_voting_for
           end
 
           let account_with_hash (account : Account.Checked.Unhashed.t) =
@@ -1589,6 +1586,11 @@ module Base = struct
 
           let set_nonce nonce ({ data = a; hash } : t) : t =
             { data = { a with nonce }; hash }
+
+          let voting_for (a : t) = a.data.voting_for
+
+          let set_voting_for voting_for ({ data = a; hash } : t) : t =
+            { data = { a with voting_for }; hash }
         end
 
         module Ledger = struct
@@ -2009,6 +2011,9 @@ module Base = struct
               party.data.body.update.token_symbol
 
             let delegate ({ party; _ } : t) = party.data.body.update.delegate
+
+            let voting_for ({ party; _ } : t) =
+              party.data.body.update.voting_for
           end
         end
 

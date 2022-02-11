@@ -277,6 +277,10 @@ module type Party_intf = sig
     val token_symbol : t -> token_symbol set_or_keep
 
     val delegate : t -> public_key set_or_keep
+
+    type state_hash
+
+    val voting_for : t -> state_hash set_or_keep
   end
 end
 
@@ -391,6 +395,8 @@ module type Account_intf = sig
     val set_token_symbol : t -> controller
 
     val increment_nonce : t -> controller
+
+    val set_voting_for : t -> controller
   end
 
   type timing
@@ -471,6 +477,12 @@ module type Account_intf = sig
   val nonce : t -> nonce
 
   val set_nonce : nonce -> t -> t
+
+  type state_hash
+
+  val voting_for : t -> state_hash
+
+  val set_voting_for : state_hash -> t -> t
 end
 
 module Eff = struct
@@ -541,6 +553,8 @@ module type Inputs_intf = sig
     val succ : t -> t
   end
 
+  module State_hash : Iffable with type bool := Bool.t
+
   module Timing :
     Timing_intf with type bool := Bool.t and type global_slot := Global_slot.t
 
@@ -563,6 +577,7 @@ module type Inputs_intf = sig
        and type token_symbol := Token_symbol.t
        and type public_key := Public_key.t
        and type nonce := Nonce.t
+       and type state_hash := State_hash.t
 
   module Events : Events_intf with type bool := Bool.t and type field := Field.t
 
@@ -581,6 +596,7 @@ module type Inputs_intf = sig
        and type Update.events := Events.t
        and type Update.snapp_uri := Snapp_uri.t
        and type Update.token_symbol := Token_symbol.t
+       and type Update.state_hash := State_hash.t
 
   module Ledger :
     Ledger_intf
@@ -1124,6 +1140,24 @@ module Make (Inputs : Inputs_intf) = struct
           Bool.((not increment_nonce) ||| has_permission)
       in
       let a = Account.set_nonce nonce a in
+      (a, local_state)
+    in
+    (* Update voting-for. *)
+    let a, local_state =
+      let voting_for = Party.Update.voting_for party in
+      let has_permission =
+        Controller.check ~proof_verifies ~signature_verifies
+          (Account.Permissions.set_voting_for a)
+      in
+      let local_state =
+        Local_state.add_check local_state Update_not_permitted_voting_for
+          Bool.(Set_or_keep.is_keep voting_for ||| has_permission)
+      in
+      let voting_for =
+        Set_or_keep.set_or_keep ~if_:State_hash.if_ voting_for
+          (Account.voting_for a)
+      in
+      let a = Account.set_voting_for voting_for a in
       (a, local_state)
     in
     let a', update_permitted, failure_status =

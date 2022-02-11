@@ -1259,7 +1259,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                ; snapp_uri = _
                ; token_symbol = _
                ; timing = _
-               ; voting_for
+               ; voting_for = _
                }
            ; balance_change = _
            ; increment_nonce
@@ -1289,11 +1289,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
         ~error:Update_not_permitted_permissions
     in
-    let%bind voting_for =
-      update a.permissions.set_voting_for voting_for a.voting_for
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
-        ~error:Update_not_permitted_voting_for
-    in
     (* enforce that either the predicate is `Accept`,
          the nonce is incremented,
          or the full commitment is used to avoid replays. *)
@@ -1309,7 +1304,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       |> Result.ok_if_true
            ~error:Transaction_status.Failure.Parties_replay_check_failed
     in
-    { a with permissions; voting_for }
+    { a with permissions }
 
   module Global_state = struct
     type t =
@@ -1440,6 +1435,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let succ = Account.Nonce.succ
     end
 
+    module State_hash = struct
+      include State_hash
+
+      let if_ = Parties.value_if
+    end
+
     module Timing = struct
       type t = Party.Update.Timing_info.t option
 
@@ -1515,6 +1516,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
         let increment_nonce : t -> Controller.t =
          fun a -> a.permissions.increment_nonce
+
+        let set_voting_for : t -> Controller.t =
+         fun a -> a.permissions.set_voting_for
       end
 
       type timing = Party.Update.Timing_info.t option
@@ -1618,6 +1622,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let nonce (a : t) = a.nonce
 
       let set_nonce nonce (a : t) = { a with nonce }
+
+      let voting_for (a : t) = a.voting_for
+
+      let set_voting_for voting_for (a : t) = { a with voting_for }
     end
 
     module Amount = struct
@@ -1713,6 +1721,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         let token_symbol (party : t) = party.data.body.update.token_symbol
 
         let delegate (party : t) = party.data.body.update.delegate
+
+        let voting_for (party : t) = party.data.body.update.voting_for
       end
     end
 
