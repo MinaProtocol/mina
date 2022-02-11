@@ -465,6 +465,12 @@ module type Account_intf = sig
   val delegate : t -> public_key
 
   val set_delegate : public_key -> t -> t
+
+  type nonce
+
+  val nonce : t -> nonce
+
+  val set_nonce : nonce -> t -> t
 end
 
 module Eff = struct
@@ -529,6 +535,12 @@ module type Inputs_intf = sig
 
   module Global_slot : Global_slot_intf with type bool := Bool.t
 
+  module Nonce : sig
+    include Iffable with type bool := Bool.t
+
+    val succ : t -> t
+  end
+
   module Timing :
     Timing_intf with type bool := Bool.t and type global_slot := Global_slot.t
 
@@ -550,6 +562,7 @@ module type Inputs_intf = sig
        and type snapp_uri := Snapp_uri.t
        and type token_symbol := Token_symbol.t
        and type public_key := Public_key.t
+       and type nonce := Nonce.t
 
   module Events : Events_intf with type bool := Bool.t and type field := Field.t
 
@@ -1093,6 +1106,24 @@ module Make (Inputs : Inputs_intf) = struct
         Set_or_keep.set_or_keep ~if_:Public_key.if_ delegate base_delegate
       in
       let a = Account.set_delegate delegate a in
+      (a, local_state)
+    in
+    (* Update nonce. *)
+    let a, local_state =
+      let nonce = Account.nonce a in
+      let increment_nonce = Party.increment_nonce party in
+      let nonce =
+        Nonce.if_ increment_nonce ~then_:(Nonce.succ nonce) ~else_:nonce
+      in
+      let has_permission =
+        Controller.check ~proof_verifies ~signature_verifies
+          (Account.Permissions.increment_nonce a)
+      in
+      let local_state =
+        Local_state.add_check local_state Update_not_permitted_delegate
+          Bool.((not increment_nonce) ||| has_permission)
+      in
+      let a = Account.set_nonce nonce a in
       (a, local_state)
     in
     let a', update_permitted, failure_status =

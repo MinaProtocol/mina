@@ -1289,15 +1289,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
         ~error:Update_not_permitted_permissions
     in
-    let%bind nonce =
-      let update_nonce =
-        if increment_nonce then Set_or_keep.Set (Account.Nonce.succ a.nonce)
-        else Set_or_keep.Keep
-      in
-      update a.permissions.increment_nonce update_nonce a.nonce
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
-        ~error:Update_not_permitted_nonce
-    in
     let%bind voting_for =
       update a.permissions.set_voting_for voting_for a.voting_for
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
@@ -1318,7 +1309,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       |> Result.ok_if_true
            ~error:Transaction_status.Failure.Parties_replay_check_failed
     in
-    { a with permissions; nonce; voting_for }
+    { a with permissions; voting_for }
 
   module Global_state = struct
     type t =
@@ -1439,6 +1430,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       include Mina_numbers.Global_slot
 
       let if_ = Parties.value_if
+    end
+
+    module Nonce = struct
+      type t = Account.Nonce.t
+
+      let if_ = Parties.value_if
+
+      let succ = Account.Nonce.succ
     end
 
     module Timing = struct
@@ -1615,6 +1614,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           else Some delegate
         in
         { a with delegate }
+
+      let nonce (a : t) = a.nonce
+
+      let set_nonce nonce (a : t) = { a with nonce }
     end
 
     module Amount = struct
