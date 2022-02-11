@@ -191,6 +191,7 @@ module Snapp_permissions = struct
     ; edit_sequence_state : Permissions.Auth_required.t
     ; set_token_symbol : Permissions.Auth_required.t
     ; increment_nonce : Permissions.Auth_required.t
+    ; set_voting_for : Permissions.Auth_required.t
     }
   [@@deriving fields, hlist]
 
@@ -198,6 +199,7 @@ module Snapp_permissions = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.
         [ bool
+        ; auth_required_typ
         ; auth_required_typ
         ; auth_required_typ
         ; auth_required_typ
@@ -225,6 +227,7 @@ module Snapp_permissions = struct
       ; edit_sequence_state = perms.edit_sequence_state
       ; set_token_symbol = perms.set_token_symbol
       ; increment_nonce = perms.increment_nonce
+      ; set_voting_for = perms.set_voting_for
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -302,6 +305,7 @@ module Snapp_updates = struct
     ; snapp_uri : string option
     ; token_symbol : string option
     ; timing_id : int option
+    ; voting_for : string option
     }
   [@@deriving fields, hlist]
 
@@ -315,6 +319,7 @@ module Snapp_updates = struct
         ; option string
         ; option string
         ; option int
+        ; option string
         ]
 
   let table_name = "snapp_updates"
@@ -348,6 +353,10 @@ module Snapp_updates = struct
     in
     let snapp_uri = Snapp_basic.Set_or_keep.to_option update.snapp_uri in
     let token_symbol = Snapp_basic.Set_or_keep.to_option update.token_symbol in
+    let voting_for =
+      Option.map ~f:State_hash.to_base58_check
+        (Snapp_basic.Set_or_keep.to_option update.voting_for)
+    in
     let value =
       { app_state_id
       ; delegate_id
@@ -356,6 +365,7 @@ module Snapp_updates = struct
       ; snapp_uri
       ; token_symbol
       ; timing_id
+      ; voting_for
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)

@@ -1223,6 +1223,7 @@ module Base = struct
                  ; snapp_uri
                  ; token_symbol
                  ; timing = _
+                 ; voting_for
                  }
              ; balance_change = _
              ; increment_nonce
@@ -1304,6 +1305,15 @@ module Base = struct
                   ~then_:!(Account.Nonce.Checked.succ a.nonce)
                   ~else_:a.nonce))
       in
+      let voting_for =
+        update_authorized a.permissions.set_voting_for
+          ~is_keep:(Set_or_keep.Checked.is_keep voting_for)
+          ~updated:
+            (`Ok
+              (Set_or_keep.Checked.set_or_keep
+                 ~if_:(fun b ~then_ ~else_ -> !(State_hash.if_ b ~then_ ~else_))
+                 voting_for a.voting_for))
+      in
 
       (* enforce that either the predicate is `Accept`,
          the nonce is incremented,
@@ -1332,6 +1342,7 @@ module Base = struct
         ; public_key
         ; snapp_uri
         ; token_symbol
+        ; voting_for
         }
       in
       (a, `proof_must_verify proof_must_verify)
@@ -1518,7 +1529,7 @@ module Base = struct
             let invalid_timing = ref None in
             let balance_check _ = failwith "Should not be called" in
             let timed_balance_check b =
-              invalid_timing := Some b ;
+              invalid_timing := Some (Boolean.not b) ;
               return ()
             in
             let `Min_balance _, timing =
@@ -5198,6 +5209,7 @@ let%test_module "transaction_snark" =
                       ; snapp_uri = Keep
                       ; token_symbol = Keep
                       ; timing = Keep
+                      ; voting_for = Keep
                       }
                   ; token_id = ()
                   ; balance_change = Fee.of_int full_amount

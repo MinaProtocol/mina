@@ -1259,6 +1259,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                ; snapp_uri
                ; token_symbol
                ; timing = _
+               ; voting_for
                }
            ; balance_change = _
            ; increment_nonce
@@ -1315,6 +1316,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
         ~error:Update_not_permitted_nonce
     in
+    let%bind voting_for =
+      update a.permissions.set_voting_for voting_for a.voting_for
+        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
+        ~error:Update_not_permitted_voting_for
+    in
     (* enforce that either the predicate is `Accept`,
          the nonce is incremented,
          or the full commitment is used to avoid replays. *)
@@ -1330,7 +1336,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       |> Result.ok_if_true
            ~error:Transaction_status.Failure.Parties_replay_check_failed
     in
-    { a with delegate; permissions; nonce; snapp_uri; token_symbol }
+    { a with delegate; permissions; nonce; snapp_uri; token_symbol; voting_for }
 
   module Global_state = struct
     type t =
