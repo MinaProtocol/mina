@@ -20,10 +20,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql =
         true
         (* must have at least as many block producers as party's in any
-           Parties.t, because we need that many keypairs
+           Parties.t plus another for the payment receiver
         *)
     ; block_producers =
         [ { balance = "3000000000"; timing = Untimed }
+        ; { balance = "3000000000"; timing = Untimed }
         ; { balance = "3000000000"; timing = Untimed }
         ; { balance = "3000000000"; timing = Untimed }
         ; { balance = "3000000000"; timing = Untimed }
