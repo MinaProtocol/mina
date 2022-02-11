@@ -85,6 +85,9 @@ module Diff_versioned = struct
       end
     end]
 
+    (* IMPORTANT! Do not change the names of these errors as to adjust the
+     * to_yojson output without updating Rosetta's construction API to handle
+     * the changes *)
     type t = Stable.Latest.t =
       | Insufficient_replace_fee
       | Invalid_signature

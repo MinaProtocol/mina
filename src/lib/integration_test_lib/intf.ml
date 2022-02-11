@@ -57,6 +57,12 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> unit Malleable_error.t
 
+      val send_snapp :
+           logger:Logger.t
+        -> t
+        -> parties:Mina_base.Parties.t
+        -> unit Deferred.Or_error.t
+
       val get_balance :
            logger:Logger.t
         -> t
@@ -247,6 +253,8 @@ module Dsl = struct
       -> receiver_pub_key:Public_key.Compressed.t
       -> amount:Amount.t
       -> t
+
+    val snapp_to_be_included_in_frontier : parties:Mina_base.Parties.t -> t
   end
 
   module type Util_intf = sig
@@ -265,9 +273,25 @@ module Dsl = struct
          result
          Async_kernel.Deferred.t
 
-    val check_peers :
+    val fetch_connectivity_data :
          logger:Logger.t
       -> Engine.Network.Node.t list
+      -> ( (Engine.Network.Node.t * (string * string list)) list
+           Malleable_error.Result_accumulator.t
+         , Malleable_error.Hard_fail.t )
+         result
+         Deferred.t
+
+    val assert_peers_completely_connected :
+         (Engine.Network.Node.t * (string * string list)) list
+      -> ( unit Malleable_error.Result_accumulator.t
+         , Malleable_error.Hard_fail.t )
+         result
+         Deferred.t
+
+    val assert_peers_cant_be_partitioned :
+         max_disconnections:int
+      -> (Engine.Network.Node.t * (string * string list)) list
       -> ( unit Malleable_error.Result_accumulator.t
          , Malleable_error.Hard_fail.t )
          result

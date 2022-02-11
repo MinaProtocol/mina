@@ -6,18 +6,10 @@ open Util
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-open Signature_lib
-module Mina_numbers = Mina_numbers
-
-[%%else]
-
-open Signature_lib_nonconsensus
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
+open Signature_lib
 module Impl = Pickles.Impls.Step
 open Mina_numbers
 open Currency
@@ -39,7 +31,8 @@ module Update = struct
              , 'perms
              , 'snapp_uri
              , 'token_symbol
-             , 'timing )
+             , 'timing
+             , 'voting_for )
              t =
           { app_state : 'state_element Snapp_state.V.Stable.V1.t
           ; delegate : 'pk
@@ -48,6 +41,7 @@ module Update = struct
           ; snapp_uri : 'snapp_uri
           ; token_symbol : 'token_symbol
           ; timing : 'timing
+          ; voting_for : 'voting_for
           }
         [@@deriving compare, equal, sexp, hash, yojson, hlist]
       end
@@ -113,6 +107,28 @@ module Update = struct
       ; vesting_increment = amount_unused
       }
 
+    let to_account_timing (t : t) : Account_timing.t =
+      Timed
+        { initial_minimum_balance = t.initial_minimum_balance
+        ; cliff_time = t.cliff_time
+        ; cliff_amount = t.cliff_amount
+        ; vesting_period = t.vesting_period
+        ; vesting_increment = t.vesting_increment
+        }
+
+    let of_account_timing (t : Account_timing.t) : t option =
+      match t with
+      | Untimed ->
+          None
+      | Timed t ->
+          Some
+            { initial_minimum_balance = t.initial_minimum_balance
+            ; cliff_time = t.cliff_time
+            ; cliff_amount = t.cliff_amount
+            ; vesting_period = t.vesting_period
+            ; vesting_increment = t.vesting_increment
+            }
+
     module Checked = struct
       type t =
         { initial_minimum_balance : Balance.Checked.t
@@ -146,6 +162,23 @@ module Update = struct
           ; Global_slot.Checked.to_input vesting_period
           ; Amount.var_to_input vesting_increment
           ]
+
+      let to_account_timing (t : t) : Account_timing.var =
+        { is_timed = Boolean.true_
+        ; initial_minimum_balance = t.initial_minimum_balance
+        ; cliff_time = t.cliff_time
+        ; cliff_amount = t.cliff_amount
+        ; vesting_period = t.vesting_period
+        ; vesting_increment = t.vesting_increment
+        }
+
+      let of_account_timing (t : Account_timing.var) : t =
+        { initial_minimum_balance = t.initial_minimum_balance
+        ; cliff_time = t.cliff_time
+        ; cliff_amount = t.cliff_amount
+        ; vesting_period = t.vesting_period
+        ; vesting_increment = t.vesting_increment
+        }
     end
 
     let typ : (Checked.t, t) Typ.t =
@@ -173,10 +206,11 @@ module Update = struct
           , F.Stable.V1.t )
           With_hash.Stable.V1.t
           Set_or_keep.Stable.V1.t
-        , Permissions.Stable.V1.t Set_or_keep.Stable.V1.t
+        , Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
         , string Set_or_keep.Stable.V1.t
         , Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
-        , Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t )
+        , Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
+        , State_hash.Stable.V1.t Set_or_keep.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
 
@@ -231,6 +265,7 @@ module Update = struct
       in
       Set_or_keep.gen token_gen
     in
+    let%bind voting_for = Set_or_keep.gen Field.gen in
     (* a new account for the Party.t is in the ledger when we use
        this generated update in tests, so the timing must be Keep
     *)
@@ -244,6 +279,7 @@ module Update = struct
         ; snapp_uri
         ; token_symbol
         ; timing
+        ; voting_for
         }
 
   module Checked = struct
@@ -256,7 +292,8 @@ module Update = struct
       , Permissions.Checked.t Set_or_keep.Checked.t
       , string Data_as_hash.t Set_or_keep.Checked.t
       , Account.Token_symbol.var Set_or_keep.Checked.t
-      , Timing_info.Checked.t Set_or_keep.Checked.t )
+      , Timing_info.Checked.t Set_or_keep.Checked.t
+      , State_hash.var Set_or_keep.Checked.t )
       Poly.t
 
     let to_input
@@ -267,6 +304,7 @@ module Update = struct
          ; snapp_uri
          ; token_symbol
          ; timing
+         ; voting_for
          } :
           t) =
       let open Random_oracle_input.Chunked in
@@ -282,6 +320,7 @@ module Update = struct
         ; Set_or_keep.Checked.to_input token_symbol
             ~f:Account.Token_symbol.var_to_input
         ; Set_or_keep.Checked.to_input timing ~f:Timing_info.Checked.to_input
+        ; Set_or_keep.Checked.to_input voting_for ~f:State_hash.var_to_input
         ]
   end
 
@@ -294,6 +333,7 @@ module Update = struct
     ; snapp_uri = Keep
     ; token_symbol = Keep
     ; timing = Keep
+    ; voting_for = Keep
     }
 
   let dummy = noop
@@ -306,6 +346,7 @@ module Update = struct
        ; snapp_uri
        ; token_symbol
        ; timing
+       ; voting_for
        } :
         t) =
     let open Random_oracle_input.Chunked in
@@ -328,6 +369,8 @@ module Update = struct
           ~f:Account.Token_symbol.to_input
       ; Set_or_keep.to_input timing ~dummy:Timing_info.dummy
           ~f:Timing_info.to_input
+      ; Set_or_keep.to_input voting_for ~dummy:State_hash.dummy
+          ~f:State_hash.to_input
       ]
 
   let typ () : (Checked.t, t) Typ.t =
@@ -353,6 +396,7 @@ module Update = struct
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
           Account.Token_symbol.typ
       ; Set_or_keep.typ ~dummy:Timing_info.dummy Timing_info.typ
+      ; Set_or_keep.typ ~dummy:State_hash.dummy State_hash.typ
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -900,3 +944,11 @@ let balance_change (t : t) : Amount.Signed.t = t.data.body.balance_change
 
 let protocol_state (t : t) : Snapp_predicate.Protocol_state.t =
   t.data.body.protocol_state
+
+let public_key (t : t) : Public_key.Compressed.t = t.data.body.public_key
+
+let token_id (t : t) : Token_id.t = t.data.body.token_id
+
+let use_full_commitment (t : t) : bool = t.data.body.use_full_commitment
+
+let increment_nonce (t : t) : bool = t.data.body.increment_nonce

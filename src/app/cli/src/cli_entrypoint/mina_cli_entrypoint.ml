@@ -962,8 +962,11 @@ let setup_daemon logger =
         Precomputed_values.genesis_ledger precomputed_values
         |> Lazy.force |> Ledger.merkle_root
       in
-      let initial_block_production_keypairs =
-        block_production_keypair |> Option.to_list |> Keypair.Set.of_list
+      let block_production_keypairs =
+        block_production_keypair
+        |> Option.map ~f:(fun kp ->
+               (kp, Public_key.compress kp.Keypair.public_key))
+        |> Option.to_list |> Keypair.And_compressed_pk.Set.of_list
       in
       let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
       let consensus_local_state =
@@ -1186,7 +1189,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
              ~persistent_root_location:(conf_dir ^/ "root")
              ~persistent_frontier_location:(conf_dir ^/ "frontier")
              ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
-             ~time_controller ~initial_block_production_keypairs ~monitor
+             ~time_controller ~block_production_keypairs ~monitor
              ~consensus_local_state ~is_archive_rocksdb ~work_reassignment_wait
              ~archive_process_location ~log_block_creation ~precomputed_values
              ~start_time ?precomputed_blocks_path ~log_precomputed_blocks

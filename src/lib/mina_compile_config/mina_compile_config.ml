@@ -1,11 +1,5 @@
 [%%import "/src/config.mlh"]
 
-[%%ifndef consensus_mechanism]
-
-module Currency = Currency_nonconsensus.Currency
-
-[%%endif]
-
 (** This file consists of compile-time constants that are not in
     Genesis_constants.
     This file includes all of the constants defined at compile-time for both

@@ -196,26 +196,39 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t) =
     ; amount = Currency.Amount.of_int 10000000000 (*10 Mina*)
     }
   in
+  let consensus_constants =
+    Consensus.Constants.create ~constraint_constants
+      ~protocol_constants:Genesis_constants.compiled.protocol
+  in
+  let compile_time_genesis =
+    (*not using Precomputed_values.for_unit_test because of dependency cycle*)
+    Mina_state.Genesis_protocol_state.t
+      ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+      ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+      ~constraint_constants ~consensus_constants
+  in
+  let protocol_state_predicate =
+    let protocol_state_predicate_view =
+      Mina_state.Protocol_state.Body.view compile_time_genesis.data.body
+    in
+    Snapp_generators.gen_protocol_state_predicate protocol_state_predicate_view
+    |> Base_quickcheck.Generator.generate ~size:1
+         ~random:(Splittable_random.State.create Random.State.default)
+  in
   let%bind parties =
     Transaction_snark.For_tests.create_trivial_predicate_snapp
-      ~constraint_constants spec ledger
+      ~constraint_constants ~protocol_state_predicate spec ledger
   in
   printf "Snapp transaction yojson: %s\n\n%!"
     (Parties.to_yojson parties |> Yojson.Safe.to_string) ;
   printf "(Snapp transaction graphQL input %s\n\n%!"
     (graphql_snapp_command parties) ;
-  let consensus_constants =
-    Consensus.Constants.create ~constraint_constants
-      ~protocol_constants:Genesis_constants.compiled.protocol
-  in
+  printf "Updated accounts\n" ;
+  List.iter (Ledger.to_list ledger) ~f:(fun acc ->
+      printf "Account: %s\n%!"
+        ( Genesis_ledger_helper_lib.Accounts.Single.of_account acc None
+        |> Runtime_config.Accounts.Single.to_yojson |> Yojson.Safe.to_string )) ;
   let state_body =
-    let compile_time_genesis =
-      (*not using Precomputed_values.for_unit_test because of dependency cycle*)
-      Mina_state.Genesis_protocol_state.t
-        ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
-        ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-        ~constraint_constants ~consensus_constants
-    in
     compile_time_genesis.data |> Mina_state.Protocol_state.body
   in
   let witnesses =
@@ -970,6 +983,9 @@ let update_permissions =
        and increment_nonce =
          Param.flag "--increment-nonce" ~doc:"Proof|Signature|Both|Either|None"
            Param.(required string)
+       and set_voting_for =
+         Param.flag "--set-voting-for" ~doc:"Proof|Signature|Both|Either|None"
+           Param.(required string)
        and current_auth =
          Param.flag "--current-auth"
            ~doc:
@@ -991,6 +1007,7 @@ let update_permissions =
            ; edit_sequence_state = Util.auth_of_string edit_sequence_state
            ; set_token_symbol = Util.auth_of_string set_token_symbol
            ; increment_nonce = Util.auth_of_string increment_nonce
+           ; set_voting_for = Util.auth_of_string set_voting_for
            }
        in
        if Currency.Fee.(fee < Flags.min_fee) then

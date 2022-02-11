@@ -1,15 +1,7 @@
 (* quickcheck_lib.mli *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Quickcheck
-
-[%%ifndef consensus_mechanism]
-
-module Currency = Currency_nonconsensus.Currency
-
-[%%endif]
 
 (** [of_array array] selects a random element from [array] to select an element *)
 val of_array : 'a array -> 'a Generator.t

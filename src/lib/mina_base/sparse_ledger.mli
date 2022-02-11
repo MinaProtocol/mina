@@ -9,7 +9,7 @@ module Stable : sig
       , Account_id.Stable.V1.t
       , Account.Stable.V2.t
       , Token_id.Stable.V1.t )
-      Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
+      Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
     [@@deriving sexp, to_yojson]
 
     val to_latest : t -> t
@@ -45,12 +45,7 @@ val path_exn :
 
 val find_index_exn : t -> Account_id.t -> int
 
-val of_root :
-     depth:int
-  -> next_available_token:Token_id.t
-  -> next_available_index:int option
-  -> Ledger_hash.t
-  -> t
+val of_root : depth:int -> next_available_token:Token_id.t -> Ledger_hash.t -> t
 
 (** Create a new 'empty' ledger.
     This ledger has an invalid root hash, and cannot be used except as a
@@ -92,7 +87,8 @@ val apply_parties_unchecked_with_states :
   -> Parties.t
   -> ( Transaction_logic.Transaction_applied.Parties_applied.t
      * ( Global_state.t
-       * ( (Party.t, unit) Parties.Party_or_stack.t list
+       * ( (Party.t, unit) Parties.Call_forest.t
+         , (Party.t, unit) Parties.Call_forest.t list
          , Token_id.t
          , Currency.Amount.t
          , t
@@ -108,11 +104,6 @@ val of_any_ledger : Ledger.Any_ledger.M.t -> t
 val of_ledger_subset_exn : Ledger.t -> Account_id.t list -> t
 
 val of_ledger_index_subset_exn : Ledger.Any_ledger.witness -> int list -> t
-
-val of_sparse_ledger_subset_exn : t -> Account_id.t list -> t
-
-(* TODO: erase Account_id.t from here (doesn't make sense to have it) *)
-val data : t -> (int * Account.t) list
 
 val iteri : t -> f:(Account.Index.t -> Account.t -> unit) -> unit
 

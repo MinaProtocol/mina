@@ -78,6 +78,9 @@ type t =
 let config t = t.config
 
 module Command_error = struct
+  (* IMPORTANT! Do not change the names of these errors as to adjust the
+   * to_yojson output without updating Rosetta's construction API to handle the
+   * changes *)
   type t =
     | Invalid_nonce of
         [ `Expected of Account.Nonce.t

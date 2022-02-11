@@ -162,7 +162,7 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
         ; other_parties =
             other_parties
             |> List.map ~f:(fun party -> (party, find_vk party))
-            |> Parties.Party_or_stack.With_hashes.of_parties_list
+            |> Parties.Call_forest.With_hashes.of_parties_list
         ; memo
         }
 

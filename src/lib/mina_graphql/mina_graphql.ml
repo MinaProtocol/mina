@@ -2009,27 +2009,6 @@ module Types = struct
               ~resolve:(fun _ -> Fn.id)
           ])
 
-    let set_staking =
-      obj "SetStakingPayload" ~fields:(fun _ ->
-          [ field "lastStaking"
-              ~doc:"Returns the public keys that were staking funds previously"
-              ~typ:(non_null (list (non_null public_key)))
-              ~args:Arg.[]
-              ~resolve:(fun _ (lastStaking, _, _) -> lastStaking)
-          ; field "lockedPublicKeys"
-              ~doc:
-                "List of public keys that could not be used to stake because \
-                 they were locked"
-              ~typ:(non_null (list (non_null public_key)))
-              ~args:Arg.[]
-              ~resolve:(fun _ (_, locked, _) -> locked)
-          ; field "currentStakingKeys"
-              ~doc:"Returns the public keys that are now staking their funds"
-              ~typ:(non_null (list (non_null public_key)))
-              ~args:Arg.[]
-              ~resolve:(fun _ (_, _, currentStaking) -> currentStaking)
-          ])
-
     let set_coinbase_receiver =
       obj "SetCoinbaseReceiverPayload" ~fields:(fun _ ->
           [ field "lastCoinbaseReceiver"
@@ -2273,7 +2252,7 @@ module Types = struct
           ~coerce:
             (fun stake edit_state send receive set_delegate set_permissions
                  set_verification_key set_snapp_uri edit_sequence_state
-                 set_token_symbol increment_nonce ->
+                 set_token_symbol increment_nonce set_voting_for ->
             Ok
               { Permissions.Poly.stake
               ; edit_state
@@ -2286,6 +2265,7 @@ module Types = struct
               ; edit_sequence_state
               ; set_token_symbol
               ; increment_nonce
+              ; set_voting_for
               })
           ~fields:
             [ arg "stake" ~typ:(non_null bool)
@@ -2299,6 +2279,7 @@ module Types = struct
             ; arg "editSequenceState" ~typ:(non_null snapp_auth_required)
             ; arg "setTokenSymbol" ~typ:(non_null snapp_auth_required)
             ; arg "incrementNonce" ~typ:(non_null snapp_auth_required)
+            ; arg "setVotingFor" ~typ:(non_null snapp_auth_required)
             ]
 
       let snapp_timing =
@@ -2346,7 +2327,8 @@ module Types = struct
       let snapp_update : (Party.Update.t, string) Result.t option arg_typ =
         obj "PartyUpdate" ~doc:"Update component of a snapp Party"
           ~coerce:
-            (fun app_state_elts delegate vk perms snapp_uri tok_sym timing ->
+            (fun app_state_elts delegate vk perms snapp_uri tok_sym timing
+                 voting_for ->
             let open Result.Let_syntax in
             let v o = Snapp_basic.Set_or_keep.of_option o in
             let app_state_elts = List.map app_state_elts ~f:v in
@@ -2362,6 +2344,10 @@ module Types = struct
                      expected_len len)
             in
             let s = Option.Result.sequence in
+            let%bind voting_for =
+              s (Option.map ~f:State_hash.of_base58_check voting_for)
+              |> Result.map_error ~f:Error.to_string_hum
+            in
             let%bind vk' = s vk in
             let%bind perms' = s perms in
             let%map timing' = s timing in
@@ -2373,6 +2359,7 @@ module Types = struct
               ; snapp_uri = v snapp_uri
               ; token_symbol = v tok_sym
               ; timing = v timing'
+              ; voting_for = v voting_for
               })
           ~fields:
             [ arg "appState"
@@ -2387,6 +2374,8 @@ module Types = struct
             ; arg "snappUri" ~doc:"A URI string, or null if Keep" ~typ:string
             ; arg "tokenSymbol" ~doc:"Token symbol" ~typ:snapp_token
             ; arg "timing" ~doc:"Timing info, or null if Keep" ~typ:snapp_timing
+            ; arg "votingFor" ~doc:"State hash to vote for, or null if Keep"
+                ~typ:string
             ]
 
       let snapp_balance =
@@ -2893,6 +2882,12 @@ module Types = struct
             ]
     end
 
+    let send_test_snapp =
+      scalar "SendTestSnappInput" ~doc:"Parties for a test snapp"
+        ~coerce:(fun json ->
+          let json = to_yojson json in
+          Mina_base.Parties.of_yojson json)
+
     let precomputed_block =
       scalar "PrecomputedBlock" ~doc:"Block encoded in precomputed block format"
         ~coerce:(fun json ->
@@ -3291,16 +3286,6 @@ module Types = struct
               ~typ:(non_null public_key_arg)
           ]
 
-    let set_staking =
-      obj "SetStakingInput" ~coerce:Fn.id
-        ~fields:
-          [ arg "publicKeys"
-              ~typ:(non_null (list (non_null public_key_arg)))
-              ~doc:
-                "Public keys of accounts you wish to stake with - these must \
-                 be accounts that are in trackedAccounts"
-          ]
-
     let set_coinbase_receiver =
       obj "SetCoinbaseReceiverInput" ~coerce:Fn.id
         ~fields:
@@ -3697,6 +3682,10 @@ module Mutations = struct
           ]
       ~resolve:(fun { ctx = coda; _ } () privkey_path password ->
         let open Deferred.Result.Let_syntax in
+        (* the Keypair.read zeroes the password, so copy for use in import step below *)
+        let saved_password =
+          Lazy.return (Deferred.return (Bytes.of_string password))
+        in
         let password =
           Lazy.return (Deferred.return (Bytes.of_string password))
         in
@@ -3711,7 +3700,8 @@ module Mutations = struct
             return (pk, true)
         | None ->
             let%map.Async.Deferred pk =
-              Secrets.Wallets.import_keypair wallets keypair ~password
+              Secrets.Wallets.import_keypair wallets keypair
+                ~password:saved_password
             in
             Ok (pk, false))
 
@@ -3889,6 +3879,8 @@ module Mutations = struct
       Result.ok_if_true
         Currency.Fee.(fee >= Signed_command.minimum_fee)
         ~error:
+          (* IMPORTANT! Do not change the content of this error without
+           * updating Rosetta's construction API to handle the changes *)
           (sprintf
              !"Invalid user command. Fee %s is less than the minimum fee, %s."
              (Currency.Fee.to_formatted_string fee)
@@ -4049,6 +4041,13 @@ module Mutations = struct
       ~doc:"Mock a snapp transaction, no effect on blockchain"
       ~f:mock_snapp_command
 
+  let send_test_snapp =
+    io_field "sendTestSnapp" ~doc:"Send a test snapp"
+      ~args:Arg.[ arg "parties" ~typ:(non_null Types.Input.send_test_snapp) ]
+      ~typ:(non_null Types.Payload.send_snapp)
+      ~resolve:(fun { ctx = mina; _ } () parties ->
+        send_snapp_command mina parties)
+
   let create_token =
     io_field "createToken" ~doc:"Create a new token"
       ~typ:(non_null Types.Payload.create_token)
@@ -4194,19 +4193,6 @@ module Mutations = struct
         let%map result = export_logs ~coda basename_opt in
         Result.map_error result
           ~f:(Fn.compose Yojson.Safe.to_string Error_json.error_to_yojson))
-
-  let set_staking =
-    result_field "setStaking" ~doc:"Set keys you wish to stake with"
-      ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.set_staking) ]
-      ~typ:(non_null Types.Payload.set_staking)
-      ~deprecated:
-        (Deprecated
-           (Some "Restart the daemon with the flag --block-producer-key instead"))
-      ~resolve:(fun { ctx = _coda; _ } () _pks ->
-        Error
-          "The setStaking command is deprecated and no longer has any effect. \
-           To enable block production, instead restart the daemon with the \
-           flag --block-producer-key.")
 
   let set_coinbase_receiver =
     field "setCoinbaseReceiver" ~doc:"Set the key to receive coinbases"
@@ -4394,8 +4380,8 @@ module Mutations = struct
     ; mint_tokens
     ; send_snapp
     ; mock_snapp
+    ; send_test_snapp
     ; export_logs
-    ; set_staking
     ; set_coinbase_receiver
     ; set_snark_worker
     ; set_snark_work_fee

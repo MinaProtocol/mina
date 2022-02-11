@@ -1,20 +1,14 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Snark_bits
+open Snark_params
+open Tick
 
 [%%ifdef consensus_mechanism]
 
-open Snark_bits
 open Bitstring_lib
-open Snark_params
-open Tick
 open Let_syntax
-
-[%%else]
-
-open Snark_params_nonconsensus
-open Snark_bits_nonconsensus
-module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
 
 [%%endif]
 
@@ -221,6 +215,10 @@ end = struct
 
   let sub x y = if x < y then None else Some (Unsigned.sub x y)
 
+  let sub_flagged x y =
+    let z = Unsigned.sub x y in
+    (z, `Underflow (x < y))
+
   let add x y =
     let z = Unsigned.add x y in
     if z < x then None else Some z
@@ -228,6 +226,15 @@ end = struct
   let add_flagged x y =
     let z = Unsigned.add x y in
     (z, `Overflow (z < x))
+
+  let add_signed_flagged x y =
+    match y.Signed_poly.sgn with
+    | Sgn.Pos ->
+        let z, `Overflow b = add_flagged x y.Signed_poly.magnitude in
+        (z, `Overflow b)
+    | Sgn.Neg ->
+        let z, `Underflow b = sub_flagged x y.Signed_poly.magnitude in
+        (z, `Overflow b)
 
   let scale u64 i =
     let i = Unsigned.of_int i in
@@ -890,7 +897,13 @@ module Balance = struct
 
   let add_amount = Amount.add
 
+  let add_amount_flagged = Amount.add_flagged
+
   let sub_amount = Amount.sub
+
+  let sub_amount_flagged = Amount.sub_flagged
+
+  let add_signed_amount_flagged = Amount.add_signed_flagged
 
   let ( + ) = add_amount
 
@@ -968,6 +981,10 @@ module Fee_rate = struct
     (z, `Overflow (check_q z))
 
   let sub x y = of_q @@ Q.sub x y
+
+  let sub_flagged x y =
+    let z = Q.sub x y in
+    (z, `Underflow (check_q z))
 
   let mul x y = of_q @@ Q.mul x y
 
