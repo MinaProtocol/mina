@@ -558,15 +558,6 @@ query IntrospectionQuery {
                   ~resolve:(fun _ t -> t.bar)
               ]))
 
-      let manual_arg_typ =
-        Schema.Arg.(
-          obj "T1_arg" ?doc:None
-            ~fields:
-              [ arg "bar" ~typ:(non_null (list (non_null string)))
-              ; arg "fooHello" ~typ:int
-              ]
-            ~coerce:(fun bar foo_hello -> { bar; foo_hello }))
-
       let derived init =
         let open Graphql_fields in
         let ( !. ) x fd acc = add_field (x (o ())) fd acc in
@@ -576,6 +567,15 @@ query IntrospectionQuery {
         |> finish ~name:"T1" ?doc:None
 
       module Args = struct
+        let manual_typ =
+          Schema.Arg.(
+            obj "T1_arg" ?doc:None
+              ~fields:
+                [ arg "bar" ~typ:(non_null (list (non_null string)))
+                ; arg "fooHello" ~typ:int
+                ]
+              ~coerce:(fun bar foo_hello -> { bar; foo_hello }))
+
         let derived init =
           let open Graphql_args in
           let ( !. ) x fd acc = add_field (x (o ())) fd acc in
@@ -586,20 +586,10 @@ query IntrospectionQuery {
       end
     end
 
-    let%test_unit "T1 unfold" =
-      let open Graphql_args in
-      let generated_arg_typ =
-        let obj = T1.(option @@ Args.derived @@ o ()) (o ()) in
-        !(obj#graphql_arg) ()
-      in
-      [%test_eq: string]
-        (hit_server_args generated_arg_typ)
-        (hit_server_args T1.manual_arg_typ)
-
     module Or_ignore_test = struct
       type 'a t = Check of 'a | Ignore
 
-      let _of_option = function None -> Ignore | Some x -> Check x
+      let of_option = function None -> Ignore | Some x -> Check x
 
       let to_option = function Ignore -> None | Check x -> Some x
 
@@ -609,14 +599,13 @@ query IntrospectionQuery {
         let opt = option x (o ()) in
         contramap ~f:to_option opt init
 
-      (*
       module Args = struct
-        let derived init =
+        let derived (x : ('row1, 'c, 'input_type) Graphql_args.Input.t) init :
+            ('row2, 'c t, 'input_type) Graphql_args.Input.t =
           let open Graphql_args in
           let opt = option x (o ()) in
           map ~f:of_option opt init
       end
-    *)
     end
 
     module T2 = struct
@@ -642,6 +631,20 @@ query IntrospectionQuery {
         Fields.make_creator init
           ~foo:!.(Or_ignore_test.derived @@ T1.derived @@ o ())
         |> finish ~name:"T2" ?doc:None
+
+      module Args = struct
+        let manual_typ =
+          Schema.Arg.(
+            obj "T2_arg" ?doc:None ~fields:[ arg "foo" ~typ:T1.Args.manual_typ ]
+              ~coerce:(fun foo -> Or_ignore_test.of_option foo))
+
+        let derived init =
+          let open Graphql_args in
+          let ( !. ) x fd acc = add_field (x (o ())) fd acc in
+          Fields.make_creator init
+            ~foo:!.(Or_ignore_test.Args.derived @@ T1.Args.derived @@ o ())
+          |> finish ~name:"T2_arg" ?doc:None
+      end
     end
 
     let%test_unit "T2 fold" =
@@ -656,4 +659,14 @@ query IntrospectionQuery {
       [%test_eq: string]
         (hit_server generated_typ T2.v2)
         (hit_server T2.manual_typ T2.v2)
+
+    let%test_unit "T2 unfold" =
+      let open Graphql_args in
+      let generated_arg_typ =
+        let obj = T2.(option @@ Args.derived @@ o ()) (o ()) in
+        !(obj#graphql_arg) ()
+      in
+      [%test_eq: string]
+        (hit_server_args generated_arg_typ)
+        (hit_server_args T2.Args.manual_typ)
   end )
