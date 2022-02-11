@@ -7,13 +7,7 @@ let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
 let proof_level = Genesis_constants.Proof_level.Full
 
-(* changes first char to lower case unlike Mina_graphql.Reflection.underToCamel*)
-let underToCamel s =
-  let regex = lazy (Re2.create_exn {regex|\_(\w)|regex}) in
-  String.lowercase s
-  |> Re2.replace_exn (Lazy.force regex) ~f:(fun m ->
-         let s = Re2.Match.get_exn ~sub:(`Index 1) m in
-         String.capitalize s)
+let underToCamel s = String.lowercase s |> Mina_graphql.Reflection.underToCamel
 
 (* transform JSON into a string for a Javascript object,
    some special handling of cases where the GraphQL schema
