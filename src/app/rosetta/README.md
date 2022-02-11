@@ -4,6 +4,11 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2022/02/11:
+
+- Replaced "Pending" status with null as demanded by the specification:
+https://www.rosetta-api.org/docs/models/Operation.html
+
 2022/02/03:
 
 - Removed the current test-agent, in part because it relies
