@@ -71,6 +71,7 @@ CREATE TABLE snapp_permissions
 , edit_sequence_state      snapp_auth_required_type    NOT NULL
 , set_token_symbol         snapp_auth_required_type    NOT NULL
 , increment_nonce          snapp_auth_required_type    NOT NULL
+, set_voting_for               snapp_auth_required_type    NOT NULL
 );
 
 CREATE TABLE snapp_timing_info
@@ -92,6 +93,7 @@ CREATE TABLE snapp_updates
 , snapp_uri                text
 , token_symbol             text
 , timing_id                int              REFERENCES snapp_timing_info(id)
+, voting_for               text
 );
 
 CREATE TABLE snapp_balance_bounds
