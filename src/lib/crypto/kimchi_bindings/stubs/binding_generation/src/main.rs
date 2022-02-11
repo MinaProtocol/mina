@@ -12,7 +12,10 @@ use wires_15_stubs::{
     pasta_fq_plonk_index::*,
     pasta_fq_plonk_proof::*,
     pasta_fq_plonk_verifier_index::*,
-    plonk_verifier_index::{CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex},
+    plonk_verifier_index::{
+        CamlLookupVerifierIndex, CamlLookupsUsed, CamlPlonkDomain, CamlPlonkVerificationEvals,
+        CamlPlonkVerifierIndex,
+    },
     projective::{pallas::*, vesta::*},
     srs::{fp::*, fq::*},
     CamlCircuitGate,
@@ -25,8 +28,8 @@ use wires_15_stubs::{
     CamlRandomOracles,
     CamlScalarChallenge,
     CamlWire,
-    GateType,
     CurrOrNext,
+    GateType,
 };
 
 fn main() {
@@ -335,6 +338,10 @@ fn generate_bindings(mut w: impl std::io::Write) {
         });
 
         decl_module!(w, env, "VerifierIndex", {
+            decl_module!(w, env, "Lookup", {
+                decl_type!(w, env, CamlLookupsUsed => "lookups_used");
+                decl_type!(w, env, CamlLookupVerifierIndex<T1> => "t");
+            });
             decl_type!(w, env, CamlPlonkDomain<T1> => "domain");
             decl_type!(w, env, CamlPlonkVerificationEvals<T1> => "verification_evals");
             decl_type!(w, env, CamlPlonkVerifierIndex<T1, T2, T3> => "verifier_index");
