@@ -159,10 +159,10 @@ module Graphql_args_raw = struct
 
     let map ~(f : 'c -> 'd) (x : (_, 'c, 'input_type, _) Input.t) obj :
         (_, 'd, 'input_type, _) Input.t =
-      obj#graphql_fields := !(x#graphql_fields) ;
+      obj#graphql_arg := !(x#graphql_arg) ;
       (obj#map := fun a -> f (!(x#map) a)) ;
-      obj#nullable_graphql_fields := !(x#nullable_graphql_fields) ;
-      obj#graphql_fields_accumulator := !(x#graphql_fields_accumulator) ;
+      obj#nullable_graphql_arg := !(x#nullable_graphql_arg) ;
+      obj#graphql_arg_accumulator := !(x#graphql_arg_accumulator) ;
       obj
   end
 end
@@ -476,18 +476,18 @@ query IntrospectionQuery {
         'row =
       let open Graphql_fields in
       let graphql_fields =
-        ref Input.T.{ run = (fun () -> failwith "unimplemented") }
+        ref Input.T.{ run = (fun () -> failwith "unimplemented1") }
       in
-      let graphql_arg = ref (fun () -> failwith "unimplemented") in
-      let contramap = ref (fun _ -> failwith "unimplemented") in
-      let map = ref (fun _ -> failwith "unimplemented") in
+      let graphql_arg = ref (fun () -> failwith "unimplemented2") in
+      let contramap = ref (fun _ -> failwith "unimplemented3") in
+      let map = ref (fun _ -> failwith "unimplemented4") in
       let nullable_graphql_fields =
-        ref Input.T.{ run = (fun () -> failwith "unimplemented") }
+        ref Input.T.{ run = (fun () -> failwith "unimplemented5") }
       in
-      let nullable_graphql_arg = ref (fun () -> failwith "unimplemented") in
+      let nullable_graphql_arg = ref (fun () -> failwith "unimplemented6") in
       let graphql_fields_accumulator = ref [] in
       let graphql_arg_accumulator = ref Graphql_args.Acc.T.Init in
-      let graphql_creator = ref (fun _ -> failwith "unimplemented") in
+      let graphql_creator = ref (fun _ -> failwith "unimplemented7") in
       object
         method graphql_fields = graphql_fields
 
