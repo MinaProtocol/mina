@@ -118,28 +118,35 @@ let forget_tid f =
 (* execution timing *)
 
 let time_execution (name : string) (f : unit -> 'a) =
-  let rec thread_name timer =
-    timer.name
-    ^ Option.value_map timer.parent ~default:"" ~f:(fun p ->
-          ":" ^ thread_name p)
-  in
   let ctx = Scheduler.current_execution_context () in
   let parent = Execution_context.find_local ctx thread_timer in
-  let timer = Thread_timers.register ~name ~parent in
-  let ctx = Execution_context.with_local ctx thread_timer (Some timer) in
-  let ctx =
-    if ctx.tid = 0 || Option.is_some parent then
-      Thread_registry.assign_tid (thread_name timer) ctx
-    else ctx
-  in
-  match Scheduler.within_context ctx f with
-  | Error () ->
-      failwithf "timing task `%s` failed, exception reported to parent monitor"
-        name ()
-  | Ok x ->
-      x
+
+  if
+    Option.value_map parent ~default:false ~f:(fun p ->
+        String.equal p.name name)
+  then f ()
+  else
+    let rec thread_name timer =
+      timer.name
+      ^ Option.value_map timer.parent ~default:"" ~f:(fun p ->
+            ":" ^ thread_name p)
+    in
+    let timer = Thread_timers.register ~name ~parent in
+    let ctx =
+      Execution_context.with_local ctx thread_timer (Some timer)
+      |> Thread_registry.assign_tid (thread_name timer)
+    in
+    match Scheduler.within_context ctx f with
+    | Error () ->
+        failwithf
+          "timing task `%s` failed, exception reported to parent monitor" name
+          ()
+    | Ok x ->
+        x
 
 (* scheduler hooks *)
+
+let trace_log = Out_channel.create "trace"
 
 let trace_thread_switch (old_ctx : Execution_context.t)
     (new_ctx : Execution_context.t) =
@@ -150,6 +157,7 @@ let trace_thread_switch (old_ctx : Execution_context.t)
   in
   Option.iter (Execution_context.find_local old_ctx thread_timer)
     ~f:(fun timer ->
+      Out_channel.output_string trace_log (Printf.sprintf "< %s" timer.name) ;
       let last_start_time = Option.value_exn timer.last_start_time in
       let elapsed_this_execution =
         Time.abs_diff (Lazy.force now) last_start_time
@@ -157,7 +165,9 @@ let trace_thread_switch (old_ctx : Execution_context.t)
       timer.last_start_time <- None ;
       update_timer elapsed_this_execution timer) ;
   Option.iter (Execution_context.find_local new_ctx thread_timer)
-    ~f:(fun timer -> timer.last_start_time <- Some (Lazy.force now)) ;
+    ~f:(fun timer ->
+      Out_channel.output_string trace_log (Printf.sprintf "> %s" timer.name) ;
+      timer.last_start_time <- Some (Lazy.force now)) ;
   let (module M) = !implementation in
   M.Hooks.trace_thread_switch old_ctx new_ctx
 
