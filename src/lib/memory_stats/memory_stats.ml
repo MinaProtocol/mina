@@ -5,25 +5,27 @@ open Async
 open Gc.Stat
 
 let ocaml_memory_stats () =
-  let bytes_per_word = Sys.word_size / 8 in
-  let stat = Gc.stat () in
-  [ ("heap_size_bytes", `Int (stat.heap_words * bytes_per_word))
-  ; ("heap_chunks", `Int stat.heap_chunks)
-  ; ("max_heap_size_bytes", `Int (stat.top_heap_words * bytes_per_word))
-  ; ("live_size_bytes", `Int (stat.live_words * bytes_per_word))
-  ; ("live_blocks", `Int stat.live_blocks)
-  ; ("fragments", `Int stat.fragments)
-  ]
+  O1trace.time_execution "computing_ocaml_memory_stats" (fun () ->
+      let bytes_per_word = Sys.word_size / 8 in
+      let stat = Gc.stat () in
+      [ ("heap_size_bytes", `Int (stat.heap_words * bytes_per_word))
+      ; ("heap_chunks", `Int stat.heap_chunks)
+      ; ("max_heap_size_bytes", `Int (stat.top_heap_words * bytes_per_word))
+      ; ("live_size_bytes", `Int (stat.live_words * bytes_per_word))
+      ; ("live_blocks", `Int stat.live_blocks)
+      ; ("fragments", `Int stat.fragments)
+      ])
 
 let jemalloc_memory_stats () =
-  let { Jemalloc.active; resident; allocated; mapped } =
-    Jemalloc.get_memory_stats ()
-  in
-  [ ("active", `Int active)
-  ; ("resident", `Int resident)
-  ; ("allocated", `Int allocated)
-  ; ("mapped", `Int mapped)
-  ]
+  O1trace.time_execution "computing_jemalloc_memory_stats" (fun () ->
+      let { Jemalloc.active; resident; allocated; mapped } =
+        Jemalloc.get_memory_stats ()
+      in
+      [ ("active", `Int active)
+      ; ("resident", `Int resident)
+      ; ("allocated", `Int allocated)
+      ; ("mapped", `Int mapped)
+      ])
 
 let log_memory_stats logger ~process =
   don't_wait_for
