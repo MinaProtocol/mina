@@ -812,7 +812,7 @@ module Make (Inputs : Inputs_intf) = struct
       in
       let local_state =
         Local_state.add_check local_state Source_minimum_balance_violation
-          invalid_timing
+          (Bool.not invalid_timing)
       in
       let a = Account.set_timing timing a in
       (a, local_state)
