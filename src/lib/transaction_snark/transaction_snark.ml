@@ -1221,7 +1221,7 @@ module Base = struct
                  ; verification_key = _
                  ; permissions
                  ; snapp_uri = _
-                 ; token_symbol
+                 ; token_symbol = _
                  ; timing = _
                  ; voting_for
                  }
@@ -1257,14 +1257,6 @@ module Base = struct
       let proof_must_verify () = Boolean.any (List.map !r ~f:Lazy.force) in
       let ( ! ) = run_checked in
       let open Snapp_basic in
-      let token_symbol =
-        update_authorized a.permissions.set_snapp_uri
-          ~is_keep:(Set_or_keep.Checked.is_keep token_symbol)
-          ~updated:
-            (`Ok
-              (Set_or_keep.Checked.set_or_keep ~if_:Account.Token_symbol.if_
-                 token_symbol a.token_symbol))
-      in
       let delegate =
         let base_delegate =
           (* New accounts should have the delegate equal to the public key of the account. *)
@@ -1327,14 +1319,7 @@ module Base = struct
             ; Boolean.(use_full_commitment &&& not is_start)
             ]) ;
       let a : Account.Checked.Unhashed.t =
-        { a with
-          delegate
-        ; permissions
-        ; nonce
-        ; public_key
-        ; token_symbol
-        ; voting_for
-        }
+        { a with delegate; permissions; nonce; public_key; voting_for }
       in
       (a, `proof_must_verify proof_must_verify)
 
@@ -1465,6 +1450,12 @@ module Base = struct
           let if_ = Data_as_hash.if_
         end
 
+        module Token_symbol = struct
+          type t = Account.Token_symbol.var
+
+          let if_ = Account.Token_symbol.if_
+        end
+
         module Account = struct
           type t = (Account.Checked.Unhashed.t, Field.t) With_hash.t
 
@@ -1593,6 +1584,11 @@ module Base = struct
 
           let set_snapp_uri snapp_uri ({ data = a; hash } : t) : t =
             { data = { a with snapp_uri }; hash }
+
+          let token_symbol (a : t) = a.data.token_symbol
+
+          let set_token_symbol token_symbol ({ data = a; hash } : t) : t =
+            { data = { a with token_symbol }; hash }
         end
 
         module Ledger = struct
@@ -2008,6 +2004,9 @@ module Base = struct
               party.data.body.sequence_events
 
             let snapp_uri ({ party; _ } : t) = party.data.body.update.snapp_uri
+
+            let token_symbol ({ party; _ } : t) =
+              party.data.body.update.token_symbol
           end
         end
 

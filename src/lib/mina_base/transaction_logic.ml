@@ -1257,7 +1257,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                ; verification_key = _
                ; permissions
                ; snapp_uri = _
-               ; token_symbol
+               ; token_symbol = _
                ; timing = _
                ; voting_for
                }
@@ -1291,11 +1291,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ~update:(fun u x -> match u with Keep -> x | Set y -> Some y)
           ~error:Update_not_permitted_delegate
       else return a.delegate
-    in
-    let%bind token_symbol =
-      update a.permissions.set_token_symbol token_symbol a.token_symbol
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
-        ~error:Update_not_permitted_token_symbol
     in
     let%bind permissions =
       update a.permissions.set_permissions permissions a.permissions
@@ -1331,7 +1326,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       |> Result.ok_if_true
            ~error:Transaction_status.Failure.Parties_replay_check_failed
     in
-    { a with delegate; permissions; nonce; token_symbol; voting_for }
+    { a with delegate; permissions; nonce; voting_for }
 
   module Global_state = struct
     type t =
@@ -1491,6 +1486,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let if_ = Parties.value_if
     end
 
+    module Token_symbol = struct
+      type t = Account.Token_symbol.t
+
+      let if_ = Parties.value_if
+    end
+
     module Account = struct
       include Account
 
@@ -1602,6 +1603,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let snapp_uri (a : t) = a.snapp_uri
 
       let set_snapp_uri snapp_uri (a : t) = { a with snapp_uri }
+
+      let token_symbol (a : t) = a.token_symbol
+
+      let set_token_symbol token_symbol (a : t) = { a with token_symbol }
     end
 
     module Amount = struct
@@ -1693,6 +1698,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         let sequence_events (party : t) = party.data.body.sequence_events
 
         let snapp_uri (party : t) = party.data.body.update.snapp_uri
+
+        let token_symbol (party : t) = party.data.body.update.token_symbol
       end
     end
 
