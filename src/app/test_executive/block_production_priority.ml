@@ -21,7 +21,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { Block_producer.balance = "9999999"; timing = Untimed }
         :: List.init 10
              ~f:(const { Block_producer.balance = "0"; timing = Untimed })
-    ; num_snark_workers = 1
+    ; num_snark_workers = 3
     ; aux_account_balance = Some "1000"
     ; txpool_max_size = 10_000_000
     }
@@ -83,18 +83,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let num_sender_keys = List.length sender_keys in
     let keys_per_sender = num_sender_keys / num_senders in
-    let%bind () = Malleable_error.ok_if_true ~error_type:`Hard ~error:(
-      Error.of_string "not enough sender keys"
-    ) (keys_per_sender > 0) in
-    let repeat_count = (Unsigned.UInt32.of_int num_payments) in
-    let repeat_delay_ms = (Unsigned.UInt32.of_int (1000 / tps))in
+    let%bind () =
+      Malleable_error.ok_if_true ~error_type:`Hard
+        ~error:(Error.of_string "not enough sender keys")
+        (keys_per_sender > 0)
+    in
+    let repeat_count = Unsigned.UInt32.of_int num_payments in
+    let repeat_delay_ms = Unsigned.UInt32.of_int (1000 / tps) in
     let%bind _ =
       Malleable_error.List.fold ~init:sender_keys senders ~f:(fun keys node ->
-        let keys0, rest = List.split_n keys keys_per_sender in
-          Network.Node.must_send_test_payments
-            ~repeat_count
-            ~repeat_delay_ms
-            ~logger ~senders:keys0 ~receiver_pub_key ~amount ~fee node >>| const rest)
+          let keys0, rest = List.split_n keys keys_per_sender in
+          Network.Node.must_send_test_payments ~repeat_count ~repeat_delay_ms
+            ~logger ~senders:keys0 ~receiver_pub_key ~amount ~fee node
+          >>| const rest)
     in
     let%bind () = Async.(at end_t >>= const Malleable_error.ok_unit) in
     let%bind blocks =
