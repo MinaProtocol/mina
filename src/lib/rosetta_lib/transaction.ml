@@ -1,21 +1,5 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 module Field = Snark_params.Tick.Field
-
-[%%else]
-
-module Field = Snark_params_nonconsensus.Field
-module Mina_base = Mina_base_nonconsensus
-module Hex = Hex_nonconsensus.Hex
-module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
-module Signature_lib = Signature_lib_nonconsensus
-
-[%%endif]
-
 module Token_id = Mina_base.Token_id
 
 module Unsigned = struct

@@ -1,5 +1,5 @@
 (library
- (name snark_params_nonconsensus)
+ (name snark_params)
  (public_name snark_params_nonconsensus)
  (library_flags -linkall)
  (libraries core_kernel bignum_bigint snarkette)

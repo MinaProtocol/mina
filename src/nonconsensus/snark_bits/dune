@@ -1,5 +1,5 @@
 (library
- (name snark_bits_nonconsensus)
+ (name snark_bits)
  (public_name snark_bits_nonconsensus)
  (library_flags -linkall)
  (libraries fold_lib bitstring_lib core_kernel integers)

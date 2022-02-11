@@ -9,7 +9,7 @@ include Pickles.Side_loaded.Verification_key
 open Core_kernel
 
 module G = struct
-  open Snark_params_nonconsensus
+  open Snark_params.Tick
 
   [%%versioned
   module Stable = struct

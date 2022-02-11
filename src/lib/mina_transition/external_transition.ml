@@ -539,8 +539,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_proof :
            ( 'time_received
@@ -573,8 +571,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_genesis_state :
            ( 'time_received
@@ -607,8 +603,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_delta_transition_chain :
            ( 'time_received
@@ -646,8 +640,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_frontier_dependencies :
            ( 'time_received
@@ -680,8 +672,6 @@ module Validation = struct
           , (`Frontier_dependencies, Truth.True ())
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_staged_ledger_diff :
            ( 'time_received
@@ -714,8 +704,6 @@ module Validation = struct
           , frontier_dependencies
           , (`Staged_ledger_diff, Truth.True ())
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_protocol_versions :
            ( 'time_received
@@ -748,8 +736,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , (`Protocol_versions, Truth.True ()) )
-      | _ ->
-          failwith "why can't this be refuted?"
   end
 end
 

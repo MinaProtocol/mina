@@ -3,22 +3,15 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Currency
 
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-open Signature_lib
-open Currency
-
-[%%else]
-
-open Signature_lib_nonconsensus
-module Currency = Currency_nonconsensus.Currency
-open Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
+open Signature_lib
 module Tag = Transaction_union_tag
 
 module Body = struct
