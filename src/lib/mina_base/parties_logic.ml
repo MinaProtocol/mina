@@ -75,13 +75,13 @@ module type Amount_intf = sig
 end
 
 module type Global_slot_intf = sig
-  type t
-
-  type bool
+  include Iffable
 
   val zero : t
 
   val ( > ) : t -> t -> bool
+
+  val equal : t -> t -> bool
 end
 
 module type Timing_intf = sig
@@ -100,6 +100,18 @@ module type Token_id_intf = sig
   val invalid : t
 
   val default : t
+end
+
+module type Events_intf = sig
+  type t
+
+  type bool
+
+  type field
+
+  val is_empty : t -> bool
+
+  val push_events : field -> t -> field
 end
 
 module type Protocol_state_predicate_intf = sig
@@ -251,6 +263,10 @@ module type Party_intf = sig
     type verification_key
 
     val verification_key : t -> verification_key set_or_keep
+
+    type events
+
+    val sequence_events : t -> events
   end
 end
 
@@ -404,6 +420,14 @@ module type Account_intf = sig
   val verification_key : t -> verification_key
 
   val set_verification_key : verification_key -> t -> t
+
+  val last_sequence_slot : t -> global_slot
+
+  val set_last_sequence_slot : global_slot -> t -> t
+
+  val sequence_state : t -> field Pickles_types.Vector.Vector_5.t
+
+  val set_sequence_state : field Pickles_types.Vector.Vector_5.t -> t -> t
 end
 
 module Eff = struct
@@ -431,14 +455,12 @@ module Eff = struct
         ; account : 'account
         ; account_is_new : 'bool
         ; signature_verifies : 'bool
-        ; global_state : 'global_state
         }
         -> ( 'account * 'bool * 'failure
            , < bool : 'bool
              ; party : 'party
              ; parties : 'parties
              ; account : 'account
-             ; global_state : 'global_state
              ; failure : 'failure
              ; .. > )
            t
@@ -488,6 +510,8 @@ module type Inputs_intf = sig
        and type field := Field.t
        and type verification_key := Verification_key.t
 
+  module Events : Events_intf with type bool := Bool.t and type field := Field.t
+
   module Party :
     Party_intf
       with type signed_amount := Amount.Signed.t
@@ -500,6 +524,7 @@ module type Inputs_intf = sig
        and type 'a Update.set_or_keep := 'a Set_or_keep.t
        and type Update.field := Field.t
        and type Update.verification_key := Verification_key.t
+       and type Update.events := Events.t
 
   module Ledger :
     Ledger_intf
@@ -918,12 +943,49 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_verification_key verification_key a in
       (a, local_state)
     in
+    (* Update sequence state. *)
+    let a, local_state =
+      let sequence_events = Party.Update.sequence_events party in
+      let [ s1'; s2'; s3'; s4'; s5' ] = Account.sequence_state a in
+      let last_sequence_slot = Account.last_sequence_slot a in
+      (* Push events to s1. *)
+      let is_empty = Events.is_empty sequence_events in
+      let s1_updated = Events.push_events s1' sequence_events in
+      let s1 = Field.if_ is_empty ~then_:s1' ~else_:s1_updated in
+      (* Shift along if last update wasn't this slot *)
+      let is_this_slot = Global_slot.equal txn_global_slot last_sequence_slot in
+      let is_full_and_different_slot = Bool.((not is_empty) &&& is_this_slot) in
+      let s5 = Field.if_ is_full_and_different_slot ~then_:s5' ~else_:s4' in
+      let s4 = Field.if_ is_full_and_different_slot ~then_:s4' ~else_:s3' in
+      let s3 = Field.if_ is_full_and_different_slot ~then_:s3' ~else_:s2' in
+      let s2 = Field.if_ is_full_and_different_slot ~then_:s2' ~else_:s1' in
+      let last_sequence_slot =
+        Global_slot.if_ is_empty ~then_:last_sequence_slot
+          ~else_:txn_global_slot
+      in
+      let sequence_state =
+        ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
+      in
+      let has_permission =
+        Controller.check ~proof_verifies ~signature_verifies
+          (Account.Permissions.edit_sequence_state a)
+      in
+      let local_state =
+        Local_state.add_check local_state Update_not_permitted_sequence_state
+          Bool.(is_empty ||| has_permission)
+      in
+      let a =
+        a
+        |> Account.set_sequence_state sequence_state
+        |> Account.set_last_sequence_slot last_sequence_slot
+      in
+      (a, local_state)
+    in
     let a', update_permitted, failure_status =
       h.perform
         (Check_auth_and_update_account
            { is_start = is_start'
            ; signature_verifies
-           ; global_state
            ; party
            ; account = a
            ; account_is_new
