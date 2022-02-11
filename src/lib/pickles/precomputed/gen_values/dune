@@ -5,7 +5,7 @@
    ppxlib
    ppx_util
    core_kernel
-   zexe_backend)
+   kimchi_backend)
  (preprocess
   (pps ppx_version ppx_optcomp ppx_let ppxlib.metaquot))
  (instrumentation (backend bisect_ppx))

@@ -153,9 +153,10 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         let next_available_token_before =
           Sparse_ledger.next_available_token sparse_ledger
         in
-        let sparse_ledger' =
-          Sparse_ledger.apply_transaction_exn ~constraint_constants
-            ~txn_state_view sparse_ledger (Transaction.forget t)
+        let sparse_ledger', _ =
+          Sparse_ledger.apply_transaction ~constraint_constants ~txn_state_view
+            sparse_ledger (Transaction.forget t)
+          |> Or_error.ok_exn
         in
         let next_available_token_after =
           Sparse_ledger.next_available_token sparse_ledger'
@@ -167,16 +168,28 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         let span, proof =
           time (fun () ->
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  T.of_transaction ~sok_digest:Sok_message.Digest.default
-                    ~source:(Sparse_ledger.merkle_root sparse_ledger)
-                    ~target:(Sparse_ledger.merkle_root sparse_ledger')
-                    ~init_stack:coinbase_stack_source
-                    ~next_available_token_before ~next_available_token_after
-                    ~pending_coinbase_stack_state:
-                      { source = coinbase_stack_source
-                      ; target = coinbase_stack_target
+                  T.of_non_parties_transaction
+                    ~statement:
+                      { sok_digest = Sok_message.Digest.default
+                      ; source =
+                          { ledger = Sparse_ledger.merkle_root sparse_ledger
+                          ; pending_coinbase_stack = coinbase_stack_source
+                          ; next_available_token = next_available_token_before
+                          ; local_state = Mina_state.Local_state.empty
+                          }
+                      ; target =
+                          { ledger = Sparse_ledger.merkle_root sparse_ledger'
+                          ; pending_coinbase_stack = coinbase_stack_target
+                          ; next_available_token = next_available_token_after
+                          ; local_state = Mina_state.Local_state.empty
+                          }
+                      ; supply_increase =
+                          Transaction.supply_increase t |> Or_error.ok_exn
+                      ; fee_excess =
+                          Transaction.fee_excess (Transaction.forget t)
+                          |> Or_error.ok_exn
                       }
-                    ~snapp_account1:None ~snapp_account2:None
+                    ~init_stack:coinbase_stack_source
                     { Transaction_protocol_state.Poly.transaction = t
                     ; block_data = Lazy.force state_body
                     }
@@ -220,9 +233,10 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
           let next_available_token_before =
             Sparse_ledger.next_available_token sparse_ledger
           in
-          let sparse_ledger' =
-            Sparse_ledger.apply_transaction_exn ~constraint_constants
+          let sparse_ledger', _ =
+            Sparse_ledger.apply_transaction ~constraint_constants
               ~txn_state_view sparse_ledger (Transaction.forget t)
+            |> Or_error.ok_exn
           in
           let next_available_token_after =
             Sparse_ledger.next_available_token sparse_ledger'
@@ -267,9 +281,10 @@ let generate_base_snarks_witness sparse_ledger0
           let next_available_token_before =
             Sparse_ledger.next_available_token sparse_ledger
           in
-          let sparse_ledger' =
-            Sparse_ledger.apply_transaction_exn ~constraint_constants
+          let sparse_ledger', _ =
+            Sparse_ledger.apply_transaction ~constraint_constants
               ~txn_state_view sparse_ledger (Transaction.forget t)
+            |> Or_error.ok_exn
           in
           let next_available_token_after =
             Sparse_ledger.next_available_token sparse_ledger'

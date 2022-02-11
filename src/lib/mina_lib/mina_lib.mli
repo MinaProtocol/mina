@@ -36,9 +36,6 @@ val daemon_start_time : Time_ns.t
 (** Derived from local state (aka they may not reflect the latest public keys to which you've attempted to change *)
 val block_production_pubkeys : t -> Public_key.Compressed.Set.t
 
-val replace_block_production_keypairs :
-  t -> Keypair.And_compressed_pk.Set.t -> unit
-
 val coinbase_receiver : t -> Consensus.Coinbase_receiver.t
 
 val replace_coinbase_receiver : t -> Consensus.Coinbase_receiver.t -> unit
@@ -106,6 +103,13 @@ val add_full_transactions :
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
      Deferred.Or_error.t
 
+val add_snapp_transactions :
+     t
+  -> Parties.t list
+  -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+     * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+     Deferred.Or_error.t
+
 val get_account : t -> Account_id.t -> Account.t option Participating_state.T.t
 
 val get_inferred_nonce_from_transaction_pool_and_ledger :
@@ -139,9 +143,9 @@ val validated_transitions :
 module Root_diff : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t =
-        { commands : User_command.Stable.V1.t With_status.Stable.V1.t list
+        { commands : User_command.Stable.V2.t With_status.Stable.V1.t list
         ; root_length : int
         }
     end

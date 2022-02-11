@@ -1,5 +1,5 @@
 (library
- (name rosetta_lib_nonconsensus)
+ (name rosetta_lib)
  (public_name rosetta_lib_nonconsensus)
  (library_flags -linkall)
  (inline_tests)

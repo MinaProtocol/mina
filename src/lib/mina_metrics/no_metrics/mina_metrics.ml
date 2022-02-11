@@ -9,6 +9,9 @@ module Counter = struct
   let inc_one : t -> unit = fun _ -> ()
 
   let inc : t -> float -> unit = fun _ _ -> ()
+
+  let value : t -> float =
+   fun _ -> failwith "no_metrics doesn't store any value"
 end
 
 module Gauge = struct
@@ -23,6 +26,9 @@ module Gauge = struct
   let dec : t -> float -> unit = fun _ _ -> ()
 
   let set : t -> float -> unit = fun _ _ -> ()
+
+  let value : t -> float =
+   fun _ -> failwith "no_metrics doesn't store any value"
 end
 
 module type Histogram = sig
@@ -128,21 +134,21 @@ module Network = struct
 
   let rpc_requests_sent : Counter.t = ()
 
-  let get_some_initial_peers_rpcs_sent : Counter.t = ()
+  let get_some_initial_peers_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_some_initial_peers_rpcs_received : Counter.t = ()
+  let get_some_initial_peers_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let get_some_initial_peers_rpc_requests_failed : Counter.t = ()
 
   let get_some_initial_peers_rpc_responses_failed : Counter.t = ()
 
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent : Counter.t
-      =
-    ()
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent :
+      Counter.t * Gauge.t =
+    ((), ())
 
   let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received :
-      Counter.t =
-    ()
+      Counter.t * Gauge.t =
+    ((), ())
 
   let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_requests_failed :
       Counter.t =
@@ -152,73 +158,85 @@ module Network = struct
       Counter.t =
     ()
 
-  let answer_sync_ledger_query_rpcs_sent : Counter.t = ()
+  let answer_sync_ledger_query_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let answer_sync_ledger_query_rpcs_received : Counter.t = ()
+  let answer_sync_ledger_query_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let answer_sync_ledger_query_rpc_requests_failed : Counter.t = ()
 
   let answer_sync_ledger_query_rpc_responses_failed : Counter.t = ()
 
-  let get_transition_chain_rpcs_sent : Counter.t = ()
+  let get_transition_chain_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_transition_chain_rpcs_received : Counter.t = ()
+  let get_transition_chain_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let get_transition_chain_rpc_requests_failed : Counter.t = ()
 
   let get_transition_chain_rpc_responses_failed : Counter.t = ()
 
-  let get_transition_knowledge_rpcs_sent : Counter.t = ()
+  let get_transition_knowledge_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_transition_knowledge_rpcs_received : Counter.t = ()
+  let get_transition_knowledge_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let get_transition_knowledge_rpc_requests_failed : Counter.t = ()
 
   let get_transition_knowledge_rpc_responses_failed : Counter.t = ()
 
-  let get_transition_chain_proof_rpcs_sent : Counter.t = ()
+  let get_transition_chain_proof_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_transition_chain_proof_rpcs_received : Counter.t = ()
+  let get_transition_chain_proof_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let get_transition_chain_proof_rpc_requests_failed : Counter.t = ()
 
   let get_transition_chain_proof_rpc_responses_failed : Counter.t = ()
 
-  let get_node_status_rpcs_sent : Counter.t = ()
+  let get_node_status_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_node_status_rpcs_received : Counter.t = ()
+  let get_node_status_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let get_node_status_rpc_requests_failed : Counter.t = ()
 
   let get_node_status_rpc_responses_failed : Counter.t = ()
 
-  let get_ancestry_rpcs_sent : Counter.t = ()
+  let get_ancestry_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_ancestry_rpcs_received : Counter.t = ()
+  let get_ancestry_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let get_ancestry_rpc_requests_failed : Counter.t = ()
 
   let get_ancestry_rpc_responses_failed : Counter.t = ()
 
-  let ban_notify_rpcs_sent : Counter.t = ()
+  let ban_notify_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let ban_notify_rpcs_received : Counter.t = ()
+  let ban_notify_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let ban_notify_rpc_requests_failed : Counter.t = ()
 
   let ban_notify_rpc_responses_failed : Counter.t = ()
 
-  let get_best_tip_rpcs_sent : Counter.t = ()
+  let get_best_tip_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_best_tip_rpcs_received : Counter.t = ()
+  let get_best_tip_rpcs_received : Counter.t * Gauge.t = ((), ())
 
   let get_best_tip_rpc_requests_failed : Counter.t = ()
 
   let get_best_tip_rpc_responses_failed : Counter.t = ()
 
-  let get_epoch_ledger_rpcs_sent : Counter.t = ()
+  let get_epoch_ledger_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
-  let get_epoch_ledger_rpcs_received : Counter.t = ()
+  let get_epoch_ledger_rpcs_received : Counter.t * Gauge.t = ((), ())
+
+  let new_state_received : Gauge.t = ()
+
+  let new_state_broadcasted : Gauge.t = ()
+
+  let snark_pool_diff_received : Gauge.t = ()
+
+  let snark_pool_diff_broadcasted : Gauge.t = ()
+
+  let transaction_pool_diff_received : Gauge.t = ()
+
+  let transaction_pool_diff_broadcasted : Gauge.t = ()
 
   let get_epoch_ledger_rpc_requests_failed : Counter.t = ()
 

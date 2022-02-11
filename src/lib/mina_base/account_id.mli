@@ -3,16 +3,6 @@
 open Core_kernel
 open Import
 
-[%%ifdef consensus_mechanism]
-
-open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-
-[%%endif]
-
 [%%versioned:
 module Stable : sig
   module V1 : sig
@@ -27,8 +17,6 @@ val empty : t
 val public_key : t -> Public_key.Compressed.t
 
 val token_id : t -> Token_id.t
-
-val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
 val gen : t Quickcheck.Generator.t
 
@@ -53,14 +41,6 @@ module Checked : sig
   val public_key : var -> Public_key.Compressed.var
 
   val token_id : var -> Token_id.var
-
-  val to_input :
-       var
-    -> ( ( Snark_params.Tick.Field.Var.t
-         , Snark_params.Tick.Boolean.var )
-         Random_oracle.Input.t
-       , _ )
-       Checked.t
 
   val equal : var -> var -> (Boolean.var, _) Checked.t
 

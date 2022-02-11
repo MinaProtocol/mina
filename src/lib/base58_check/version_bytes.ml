@@ -52,6 +52,8 @@ let pending_coinbase_hash_builder : t = '\x19'
 
 let snapp_command : t = '\x1A'
 
+let verification_key : t = '\x1B'
+
 (** used for testing only *)
 
 let ledger_test_hash : t = '\x30'

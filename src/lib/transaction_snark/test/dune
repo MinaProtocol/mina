@@ -1,0 +1,16 @@
+(library
+  (name transaction_snark_tests)
+  (libraries
+    base
+    currency
+    mina_base
+    mina_state
+    signature_lib
+    snark_params
+    snarky.backendless
+    transaction_snark)
+  (library_flags -linkall)
+  (inline_tests)
+  (preprocess
+    (pps ppx_snarky ppx_version ppx_jane))
+  (instrumentation (backend bisect_ppx)))

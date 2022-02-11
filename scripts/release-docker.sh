@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-rosetta-ubuntu' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
+VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-rosetta-ubuntu' 'mina-snapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -67,15 +67,19 @@ bot)
 mina-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
   DOCKER_CONTEXT="dockerfiles/"
+  VERSION="${VERSION}-${NETWORK##*=}"
   ;;
 mina-toolchain)
-  DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps"
+  DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
   ;;
 mina-rosetta)
-  DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-production"
+  DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-production"
   ;;
 mina-rosetta-ubuntu)
-  DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps dockerfiles/stages/4-builder dockerfiles/stages/5-prod-ubuntu"
+  DOCKERFILE_PATH="dockerfiles/stages/1-build-deps-ubuntu dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-prod-ubuntu"
+  ;;
+mina-snapp-test-transaction)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-snapp-test-transaction"
   ;;
 leaderboard)
   DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
@@ -92,13 +96,12 @@ delegation-backend-toolchain)
 esac
 
 
+REPO="--build-arg MINA_REPO=${BUILDKITE_PULL_REQUEST_REPO}"
 if [[ -z "${BUILDKITE_PULL_REQUEST_REPO}" ]]; then
   REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
-else
-  REPO="--build-arg MINA_REPO=${BUILDKITE_PULL_REQUEST_REPO}"
 fi
 
-TAG="gcr.io/o1labs-192920/$SERVICE:$VERSION"
+TAG="minaprotocol/$SERVICE:$VERSION"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
@@ -108,9 +111,12 @@ else
   docker build $CACHE $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
-if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
-  TARGET="minaprotocol/$SERVICE:$VERSION"
-  docker tag "$TAG" "$TARGET"
-  docker push "$TAG"
-  docker push "$TARGET"
+tag-and-push() {
+  docker tag "${TAG}" "$1"
+  docker push "$1"
+}
+
+if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then
+  docker push "${TAG}"
+  tag-and-push "gcr.io/o1labs-192920/$SERVICE:$VERSION"
 fi

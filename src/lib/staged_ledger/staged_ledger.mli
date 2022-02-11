@@ -8,7 +8,7 @@ type t [@@deriving sexp]
 module Scan_state : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t [@@deriving sexp]
 
       val hash : t -> Staged_ledger_hash.Aux_hash.t
@@ -90,21 +90,20 @@ val of_scan_state_and_ledger :
      logger:Logger.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> verifier:Verifier.t
-  -> snarked_ledger_hash:Frozen_ledger_hash.t
-  -> snarked_next_available_token:Token_id.t
+  -> snarked_registers:Mina_state.Registers.Value.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t
-  -> t Or_error.t Deferred.t
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> t Deferred.Or_error.t
 
 val of_scan_state_and_ledger_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> snarked_ledger_hash:Frozen_ledger_hash.t
-  -> snarked_next_available_token:Token_id.t
+  -> snarked_registers:Mina_state.Registers.Value.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t
-  -> t Or_error.t Deferred.t
+  -> t Deferred.Or_error.t
 
 val replace_ledger_exn : t -> Ledger.t -> t
 
@@ -179,17 +178,23 @@ val can_apply_supercharged_coinbase_exn :
   -> global_slot:Mina_numbers.Global_slot.t
   -> bool
 
-val statement_exn :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> t
-  -> [ `Non_empty of Transaction_snark.Statement.t | `Empty ] Deferred.t
-
 val of_scan_state_pending_coinbases_and_snarked_ledger :
      logger:Logger.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> verifier:Verifier.t
   -> scan_state:Scan_state.t
   -> snarked_ledger:Ledger.t
+  -> snarked_local_state:Mina_state.Local_state.t
+  -> expected_merkle_root:Ledger_hash.t
+  -> pending_coinbases:Pending_coinbase.t
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> t Or_error.t Deferred.t
+
+val of_scan_state_pending_coinbases_and_snarked_ledger_unchecked :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> scan_state:Scan_state.t
+  -> snarked_ledger:Ledger.t
+  -> snarked_local_state:Mina_state.Local_state.t
   -> expected_merkle_root:Ledger_hash.t
   -> pending_coinbases:Pending_coinbase.t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
@@ -198,10 +203,7 @@ val of_scan_state_pending_coinbases_and_snarked_ledger :
 val all_work_pairs :
      t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> ( Transaction.t
-     , Transaction_witness.t
-     , Ledger_proof.t )
-     Snark_work_lib.Work.Single.Spec.t
+  -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
      list
      Or_error.t

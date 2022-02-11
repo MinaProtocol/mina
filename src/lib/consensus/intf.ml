@@ -26,57 +26,46 @@ end
 
 module type Blockchain_state = sig
   module Poly : sig
-    [%%versioned:
-    module Stable : sig
-      module V1 : sig
-        type ('staged_ledger_hash, 'snarked_ledger_hash, 'token_id, 'time) t
-        [@@deriving sexp]
-      end
-    end]
+    type ( 'staged_ledger_hash
+         , 'snarked_ledger_hash
+         , 'token_id
+         , 'local_state
+         , 'time )
+         t
+    [@@deriving sexp]
   end
 
   module Value : sig
-    [%%versioned:
-    module Stable : sig
-      module V1 : sig
-        type t =
-          ( Staged_ledger_hash.t
-          , Frozen_ledger_hash.t
-          , Token_id.t
-          , Block_time.t )
-          Poly.t
-        [@@deriving sexp]
-      end
-    end]
+    type t =
+      ( Staged_ledger_hash.t
+      , Frozen_ledger_hash.t
+      , Token_id.t
+      , Parties_logic.Local_state.Value.t
+      , Block_time.t )
+      Poly.t
+    [@@deriving sexp]
   end
 
   type var =
     ( Staged_ledger_hash.var
     , Frozen_ledger_hash.var
     , Token_id.var
-    , Block_time.Unpacked.var )
+    , Parties_logic.Local_state.Checked.t
+    , Block_time.Checked.t )
     Poly.t
 
-  val create_value :
-       staged_ledger_hash:Staged_ledger_hash.t
-    -> snarked_ledger_hash:Frozen_ledger_hash.t
-    -> genesis_ledger_hash:Frozen_ledger_hash.t
-    -> snarked_next_available_token:Token_id.t
-    -> timestamp:Block_time.t
-    -> Value.t
-
   val staged_ledger_hash :
-    ('staged_ledger_hash, _, _, _) Poly.t -> 'staged_ledger_hash
+    ('staged_ledger_hash, _, _, _, _) Poly.t -> 'staged_ledger_hash
 
   val snarked_ledger_hash :
-    (_, 'frozen_ledger_hash, _, _) Poly.t -> 'frozen_ledger_hash
+    (_, 'frozen_ledger_hash, _, _, _) Poly.t -> 'frozen_ledger_hash
 
   val genesis_ledger_hash :
-    (_, 'frozen_ledger_hash, _, _) Poly.t -> 'frozen_ledger_hash
+    (_, 'frozen_ledger_hash, _, _, _) Poly.t -> 'frozen_ledger_hash
 
-  val snarked_next_available_token : (_, _, 'token_id, _) Poly.t -> 'token_id
+  val snarked_next_available_token : (_, _, 'token_id, _, _) Poly.t -> 'token_id
 
-  val timestamp : (_, _, _, 'time) Poly.t -> 'time
+  val timestamp : (_, _, _, _, 'time) Poly.t -> 'time
 end
 
 module type Protocol_state = sig
@@ -89,38 +78,23 @@ module type Protocol_state = sig
   type consensus_state_var
 
   module Poly : sig
-    [%%versioned:
-    module Stable : sig
-      module V1 : sig
-        type ('state_hash, 'body) t [@@deriving equal, hash, sexp, to_yojson]
-      end
-    end]
+    type ('state_hash, 'body) t [@@deriving equal, hash, sexp, to_yojson]
   end
 
   module Body : sig
     module Poly : sig
-      [%%versioned:
-      module Stable : sig
-        module V1 : sig
-          type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t
-          [@@deriving sexp]
-        end
-      end]
+      type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t
+      [@@deriving sexp]
     end
 
     module Value : sig
-      [%%versioned:
-      module Stable : sig
-        module V1 : sig
-          type t =
-            ( State_hash.t
-            , blockchain_state
-            , consensus_state
-            , Protocol_constants_checked.Value.Stable.V1.t )
-            Poly.Stable.V1.t
-          [@@deriving sexp, to_yojson]
-        end
-      end]
+      type t =
+        ( State_hash.t
+        , blockchain_state
+        , consensus_state
+        , Protocol_constants_checked.Value.Stable.V1.t )
+        Poly.t
+      [@@deriving sexp, to_yojson]
     end
 
     type var =
@@ -128,17 +102,12 @@ module type Protocol_state = sig
       , blockchain_state_var
       , consensus_state_var
       , Protocol_constants_checked.var )
-      Poly.Stable.Latest.t
+      Poly.t
   end
 
   module Value : sig
-    [%%versioned:
-    module Stable : sig
-      module V1 : sig
-        type t = (State_hash.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
-        [@@deriving sexp, equal, compare]
-      end
-    end]
+    type t = (State_hash.t, Body.Value.t) Poly.t
+    [@@deriving sexp, equal, compare]
   end
 
   type var = (State_hash.var, Body.var) Poly.t
@@ -365,13 +334,37 @@ module type S = sig
         -> unit
     end
 
+    module Vrf : sig
+      val check :
+           constraint_constants:Genesis_constants.Constraint_constants.t
+        -> global_slot:Mina_numbers.Global_slot.t
+        -> seed:Mina_base.Epoch_seed.t
+        -> producer_private_key:Signature_lib.Private_key.t
+        -> producer_public_key:Signature_lib.Public_key.Compressed.t
+        -> total_stake:Amount.t
+        -> logger:Logger.t
+        -> get_delegators:
+             (   Public_key.Compressed.t
+              -> Mina_base.Account.t Mina_base.Account.Index.Table.t option)
+        -> ( ( [ `Vrf_eval of string ]
+             * [> `Vrf_output of Consensus_vrf.Output_hash.t ]
+             * [> `Delegator of
+                  Signature_lib.Public_key.Compressed.t
+                  * Mina_base.Account.Index.t ] )
+             option
+           , unit )
+           Interruptible.t
+    end
+
     module Prover_state : sig
       [%%versioned:
       module Stable : sig
         [@@@no_toplevel_latest_type]
 
-        module V1 : sig
+        module V2 : sig
           type t
+
+          val to_latest : t -> t
         end
       end]
 
@@ -430,6 +423,8 @@ module type S = sig
       val epoch : t -> Unsigned.UInt32.t
 
       val slot : t -> Unsigned.UInt32.t
+
+      val succ : t -> t
 
       val start_time : constants:Constants.t -> t -> Block_time.t
 
@@ -492,10 +487,9 @@ module type S = sig
 
       open Snark_params.Tick
 
-      val var_to_input :
-        var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+      val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 
-      val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
+      val to_input : Value.t -> Field.t Random_oracle.Input.Chunked.t
 
       val display : Value.t -> display
 
@@ -537,6 +531,8 @@ module type S = sig
 
       val curr_global_slot : Value.t -> Mina_numbers.Global_slot.t
 
+      val total_currency : Value.t -> Amount.t
+
       val global_slot_since_genesis : Value.t -> Mina_numbers.Global_slot.t
 
       val global_slot_since_genesis_var :
@@ -563,6 +559,48 @@ module type S = sig
       val global_slot_since_genesis : t -> Mina_numbers.Global_slot.t
 
       val coinbase_receiver : t -> Public_key.Compressed.t
+    end
+
+    module Epoch_data_for_vrf : sig
+      [%%versioned:
+      module Stable : sig
+        module V2 : sig
+          type t =
+            { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
+            ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
+            ; epoch : Mina_numbers.Length.Stable.V1.t
+            ; global_slot : Mina_numbers.Global_slot.Stable.V1.t
+            ; global_slot_since_genesis : Mina_numbers.Global_slot.Stable.V1.t
+            ; delegatee_table :
+                Mina_base.Account.Stable.V2.t
+                Mina_base.Account.Index.Stable.V1.Table.t
+                Public_key.Compressed.Stable.V1.Table.t
+            }
+          [@@deriving sexp]
+
+          val to_latest : t -> t
+        end
+      end]
+    end
+
+    module Slot_won : sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t =
+            { delegator :
+                Signature_lib.Public_key.Compressed.Stable.V1.t
+                * Mina_base.Account.Index.Stable.V1.t
+            ; producer : Signature_lib.Keypair.Stable.V1.t
+            ; global_slot : Mina_numbers.Global_slot.Stable.V1.t
+            ; global_slot_since_genesis : Mina_numbers.Global_slot.Stable.V1.t
+            ; vrf_result : Consensus_vrf.Output_hash.Stable.V1.t
+            }
+          [@@deriving sexp]
+
+          val to_latest : t -> t
+        end
+      end]
     end
   end
 
@@ -620,29 +658,20 @@ module type S = sig
       -> logger:Logger.t
       -> select_status
 
-    type block_producer_timing =
-      [ `Check_again of Unix_timestamp.t
-      | `Produce_now of Block_data.t * Public_key.Compressed.t
-      | `Produce of Unix_timestamp.t * Block_data.t * Public_key.Compressed.t
-      ]
-
-    (**
-     * Determine if and when to next produce a block. Either informs the callee
-     * to check again at some time in the future, or to schedule block
-     * production with some particular keypair at some time in the future, or to
-     * produce a block now with some keypair and check again some time in the
-     * future.
-     *)
-    val next_producer_timing :
-         constraint_constants:Genesis_constants.Constraint_constants.t
-      -> constants:Constants.t
+    (*Data required to evaluate VRFs for an epoch*)
+    val get_epoch_data_for_vrf :
+         constants:Constants.t
       -> Unix_timestamp.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
-      -> coinbase_receiver:Coinbase_receiver.t
       -> logger:Logger.t
-      -> block_producer_timing Async.Deferred.t
+      -> Data.Epoch_data_for_vrf.t * Local_state.Snapshot.Ledger_snapshot.t
+
+    val get_block_data :
+         slot_won:Slot_won.t
+      -> ledger_snapshot:Local_state.Snapshot.Ledger_snapshot.t
+      -> coinbase_receiver:Coinbase_receiver.t
+      -> Block_data.t
 
     (**
      * A hook for managing local state when the locked tip is updated.
@@ -670,6 +699,9 @@ module type S = sig
       -> consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
       -> Data.Local_state.Snapshot.Ledger_snapshot.t
+
+    val epoch_end_time :
+      constants:Constants.t -> Mina_numbers.Length.t -> Block_time.t
 
     (** Data needed to synchronize the local state. *)
     type local_state_sync [@@deriving to_yojson]

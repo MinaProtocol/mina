@@ -1,17 +1,11 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Util
 
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-module Mina_numbers = Mina_numbers
-
-[%%else]
-
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
@@ -72,6 +66,18 @@ module Auth_required = struct
     end
   end]
 
+  (* permissions such that [check permission (Proof _)] is true *)
+  let gen_for_proof_authorization : t Quickcheck.Generator.t =
+    Quickcheck.Generator.of_list [ None; Either; Proof ]
+
+  (* permissions such that [check permission (Signature _)] is true *)
+  let gen_for_signature_authorization : t Quickcheck.Generator.t =
+    Quickcheck.Generator.of_list [ None; Either; Signature ]
+
+  (* permissions such that [check permission None_given] is true *)
+  let gen_for_none_given_authorization : t Quickcheck.Generator.t =
+    Quickcheck.Generator.return None
+
   (* The encoding is chosen so that it is easy to write this function
 
       let spec_eval t ~signature_verifies =
@@ -115,9 +121,11 @@ module Auth_required = struct
       }
     [@@deriving hlist, fields]
 
-    let to_input t =
+    let to_input ~field_of_bool t =
       let [ x; y; z ] = to_hlist t in
-      Random_oracle.Input.bitstring [ x; y; z ]
+      let bs = [| x; y; z |] in
+      Random_oracle.Input.Chunked.packeds
+        (Array.map bs ~f:(fun b -> (field_of_bool b, 1)))
 
     let map t ~f =
       { constant = f t.constant
@@ -214,7 +222,9 @@ module Auth_required = struct
 
     let if_ = Encoding.if_
 
-    let to_input : t -> _ = Encoding.to_input
+    let to_input : t -> _ =
+      Encoding.to_input ~field_of_bool:(fun (b : Boolean.var) ->
+          (b :> Field.Var.t))
 
     let constant t = Encoding.map (encode t) ~f:Boolean.var_of_value
 
@@ -260,7 +270,7 @@ module Auth_required = struct
 
   [%%endif]
 
-  let to_input x = Encoding.to_input (encode x)
+  let to_input x = Encoding.to_input (encode x) ~field_of_bool
 
   let check (t : t) (c : Control.Tag.t) =
     match (t, c) with
@@ -268,16 +278,14 @@ module Auth_required = struct
         false
     | None, _ ->
         true
-    | Both, Both ->
-        true
     | Both, (Proof | Signature) ->
         false
-    | Proof, (Proof | Both) ->
+    | Proof, Proof ->
         true
-    | Signature, (Signature | Both) ->
+    | Signature, Signature ->
         true
     (* The signatures and proofs have already been checked by this point. *)
-    | Either, (Proof | Signature | Both) ->
+    | Either, (Proof | Signature) ->
         true
     | Signature, Proof ->
         false
@@ -290,7 +298,7 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type ('bool, 'controller) t =
         { stake : 'bool
         ; edit_state : 'controller
@@ -299,37 +307,87 @@ module Poly = struct
         ; set_delegate : 'controller
         ; set_permissions : 'controller
         ; set_verification_key : 'controller
+        ; set_snapp_uri : 'controller
+        ; edit_sequence_state : 'controller
+        ; set_token_symbol : 'controller
+        ; increment_nonce : 'controller
+        ; set_voting_for : 'controller
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 
-  let to_input controller t =
+  let to_input ~field_of_bool controller t =
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
     Stable.Latest.Fields.fold ~init:[]
-      ~stake:(f (fun x -> Random_oracle.Input.bitstring [ x ]))
+      ~stake:
+        (f (fun x -> Random_oracle.Input.Chunked.packed (field_of_bool x, 1)))
       ~edit_state:(f controller) ~send:(f controller)
       ~set_delegate:(f controller) ~set_permissions:(f controller)
       ~set_verification_key:(f controller) ~receive:(f controller)
-    |> List.reduce_exn ~f:Random_oracle.Input.append
+      ~set_snapp_uri:(f controller) ~edit_sequence_state:(f controller)
+      ~set_token_symbol:(f controller) ~increment_nonce:(f controller)
+      ~set_voting_for:(f controller)
+    |> List.reduce_exn ~f:Random_oracle.Input.Chunked.append
 end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
-    type t = (bool, Auth_required.Stable.V1.t) Poly.Stable.V1.t
+  module V2 = struct
+    type t = (bool, Auth_required.Stable.V1.t) Poly.Stable.V2.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
     let to_latest = Fn.id
   end
 end]
 
+let gen ~auth_tag : t Quickcheck.Generator.t =
+  let auth_required_gen =
+    (* for Auth_required permissions p, choose such that [check p authorization] is true *)
+    match auth_tag with
+    | Control.Tag.Proof ->
+        Auth_required.gen_for_proof_authorization
+    | Signature ->
+        Auth_required.gen_for_signature_authorization
+    | None_given ->
+        Auth_required.gen_for_none_given_authorization
+  in
+  let open Quickcheck.Generator.Let_syntax in
+  let%bind stake = Quickcheck.Generator.bool in
+  let%bind edit_state = auth_required_gen in
+  let%bind send = auth_required_gen in
+  let%bind receive = auth_required_gen in
+  let%bind set_delegate = auth_required_gen in
+  let%bind set_permissions = auth_required_gen in
+  let%bind set_verification_key = auth_required_gen in
+  let%bind set_snapp_uri = auth_required_gen in
+  let%bind edit_sequence_state = auth_required_gen in
+  let%bind set_token_symbol = auth_required_gen in
+  let%bind increment_nonce = auth_required_gen in
+  let%bind set_voting_for = auth_required_gen in
+  return
+    { Poly.stake
+    ; edit_state
+    ; send
+    ; receive
+    ; set_delegate
+    ; set_permissions
+    ; set_verification_key
+    ; set_snapp_uri
+    ; edit_sequence_state
+    ; set_token_symbol
+    ; increment_nonce
+    ; set_voting_for
+    }
+
 [%%ifdef consensus_mechanism]
 
 module Checked = struct
   type t = (Boolean.var, Auth_required.Checked.t) Poly.Stable.Latest.t
 
-  let to_input x = Poly.to_input Auth_required.Checked.to_input x
+  let to_input (x : t) =
+    Poly.to_input Auth_required.Checked.to_input x
+      ~field_of_bool:(fun (b : Boolean.var) -> (b :> Field.Var.t))
 
   open Pickles.Impls.Step
 
@@ -342,6 +400,8 @@ module Checked = struct
     let c = g Auth_required.Checked.if_ in
     Poly.Fields.map ~stake:(g Boolean.if_) ~edit_state:c ~send:c ~receive:c
       ~set_delegate:c ~set_permissions:c ~set_verification_key:c
+      ~set_snapp_uri:c ~edit_sequence_state:c ~set_token_symbol:c
+      ~increment_nonce:c ~set_voting_for:c
 
   let constant (t : Stable.Latest.t) : t =
     let open Core_kernel.Field in
@@ -349,7 +409,8 @@ module Checked = struct
     Poly.Fields.map
       ~stake:(fun f -> Boolean.var_of_value (get f t))
       ~edit_state:a ~send:a ~receive:a ~set_delegate:a ~set_permissions:a
-      ~set_verification_key:a
+      ~set_verification_key:a ~set_snapp_uri:a ~edit_sequence_state:a
+      ~set_token_symbol:a ~increment_nonce:a ~set_voting_for:a
 end
 
 let typ =
@@ -362,13 +423,18 @@ let typ =
     ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
+    ; Auth_required.typ
+    ; Auth_required.typ
+    ; Auth_required.typ
+    ; Auth_required.typ
+    ; Auth_required.typ
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
 
 [%%endif]
 
-let to_input x = Poly.to_input Auth_required.to_input x
+let to_input (x : t) = Poly.to_input ~field_of_bool Auth_required.to_input x
 
 let user_default : t =
   { stake = true
@@ -378,6 +444,11 @@ let user_default : t =
   ; set_delegate = Signature
   ; set_permissions = Signature
   ; set_verification_key = Signature
+  ; set_snapp_uri = Signature
+  ; edit_sequence_state = Signature
+  ; set_token_symbol = Signature
+  ; increment_nonce = Signature
+  ; set_voting_for = Signature
   }
 
 let empty : t =
@@ -388,4 +459,9 @@ let empty : t =
   ; set_delegate = None
   ; set_permissions = None
   ; set_verification_key = None
+  ; set_snapp_uri = None
+  ; edit_sequence_state = None
+  ; set_token_symbol = None
+  ; increment_nonce = None
+  ; set_voting_for = None
   }

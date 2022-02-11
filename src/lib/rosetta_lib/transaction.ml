@@ -1,26 +1,10 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 module Field = Snark_params.Tick.Field
-
-[%%else]
-
-module Field = Snark_params_nonconsensus.Field
-module Mina_base = Mina_base_nonconsensus
-module Hex = Hex_nonconsensus.Hex
-module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
-module Signature_lib = Signature_lib_nonconsensus
-
-[%%endif]
-
 module Token_id = Mina_base.Token_id
 
 module Unsigned = struct
   type t =
-    { random_oracle_input : (Field.t, bool) Random_oracle_input.t
+    { random_oracle_input : (Field.t, bool) Random_oracle_input.Legacy.t
     ; command : User_command_info.Partial.t
     ; nonce : Unsigned_extended.UInt32.t
     }
@@ -104,7 +88,7 @@ module Unsigned = struct
 
     type t =
       { random_oracle_input : string (* hex *) [@key "randomOracleInput"]
-      ; signer_input : Random_oracle_input.Coding2.Rendered.t
+      ; signer_input : Random_oracle_input.Legacy.Coding2.Rendered.t
             [@key "signerInput"]
       ; payment : Payment.t option
       ; stake_delegation : Delegation.t option [@key "stakeDelegation"]
@@ -118,11 +102,12 @@ module Unsigned = struct
 
   let string_of_field field =
     assert (Field.size_in_bits = 255) ;
-    Field.unpack field |> List.rev |> Random_oracle_input.Coding.string_of_field
+    Field.unpack field |> List.rev
+    |> Random_oracle_input.Legacy.Coding.string_of_field
 
   let field_of_string s =
     assert (Field.size_in_bits = 255) ;
-    Random_oracle_input.Coding.field_of_string s ~size_in_bits:255
+    Random_oracle_input.Legacy.Coding.field_of_string s ~size_in_bits:255
     |> Result.map ~f:(fun bits -> List.rev bits |> Field.project)
 
   let un_pk (`Pk pk) = pk
@@ -209,14 +194,14 @@ module Unsigned = struct
   let render (t : t) =
     let open Result.Let_syntax in
     let random_oracle_input =
-      Random_oracle_input.Coding.serialize ~string_of_field ~to_bool:Fn.id
-        ~of_bool:Fn.id t.random_oracle_input
+      Random_oracle_input.Legacy.Coding.serialize ~string_of_field
+        ~to_bool:Fn.id ~of_bool:Fn.id t.random_oracle_input
       |> Hex.Safe.to_hex
     in
     let signer_input =
-      Random_oracle_input.Coding2.serialize ~string_of_field ~pack:Field.project
-        t.random_oracle_input
-      |> Random_oracle_input.Coding2.Rendered.map ~f:Hex.Safe.to_hex
+      Random_oracle_input.Legacy.Coding2.serialize ~string_of_field
+        ~pack:Field.project t.random_oracle_input
+      |> Random_oracle_input.Legacy.Coding2.Rendered.map ~f:Hex.Safe.to_hex
     in
     match%map render_command ~nonce:t.nonce t.command with
     | `Payment payment ->
@@ -338,7 +323,8 @@ module Unsigned = struct
   let of_rendered (r : Rendered.t) : (t, Errors.t) Result.t =
     let open Result.Let_syntax in
     let%bind random_oracle_input =
-      Random_oracle_input.Coding.deserialize ~field_of_string ~of_bool:Fn.id
+      Random_oracle_input.Legacy.Coding.deserialize ~field_of_string
+        ~of_bool:Fn.id
         (String.to_list
            (Option.value_exn (Hex.Safe.of_hex r.random_oracle_input)))
       |> Result.map_error ~f:(fun e ->
@@ -398,12 +384,24 @@ module Unsigned = struct
              `Unsupported_operation_for_construction)
 end
 
+module Signature = struct
+  let decode signature_raw =
+    Mina_base.Signature.Raw.decode signature_raw
+    |> Result.of_option
+         ~error:
+           (Errors.create ~context:"Signed transaction un-rendering"
+              `Unsupported_operation_for_construction)
+
+  let encode = Mina_base.Signature.Raw.encode
+end
+
 module Signed = struct
   type t =
     { command : User_command_info.Partial.t
     ; nonce : Unsigned_extended.UInt32.t
-    ; signature : string
+    ; signature : Mina_base.Signature.t
     }
+  [@@deriving equal]
 
   module Rendered = struct
     type t =
@@ -419,9 +417,10 @@ module Signed = struct
 
   let render (t : t) =
     let open Result.Let_syntax in
+    let signature = Signature.encode t.signature in
     match%map Unsigned.render_command ~nonce:t.nonce t.command with
     | `Payment payment ->
-        { Rendered.signature = t.signature
+        { Rendered.signature
         ; payment = Some payment
         ; stake_delegation = None
         ; create_token = None
@@ -429,7 +428,7 @@ module Signed = struct
         ; mint_tokens = None
         }
     | `Delegation delegation ->
-        { Rendered.signature = t.signature
+        { Rendered.signature
         ; payment = None
         ; stake_delegation = Some delegation
         ; create_token = None
@@ -437,7 +436,7 @@ module Signed = struct
         ; mint_tokens = None
         }
     | `Create_token create_token ->
-        { Rendered.signature = t.signature
+        { Rendered.signature
         ; payment = None
         ; stake_delegation = None
         ; create_token = Some create_token
@@ -445,7 +444,7 @@ module Signed = struct
         ; mint_tokens = None
         }
     | `Create_token_account create_token_account ->
-        { Rendered.signature = t.signature
+        { Rendered.signature
         ; payment = None
         ; stake_delegation = None
         ; create_token = None
@@ -453,7 +452,7 @@ module Signed = struct
         ; mint_tokens = None
         }
     | `Mint_tokens mint_tokens ->
-        { Rendered.signature = t.signature
+        { Rendered.signature
         ; payment = None
         ; stake_delegation = None
         ; create_token = None
@@ -462,6 +461,8 @@ module Signed = struct
         }
 
   let of_rendered (r : Rendered.t) : (t, Errors.t) Result.t =
+    let open Result.Let_syntax in
+    let%bind signature = Signature.decode r.signature in
     match
       ( r.payment
       , r.stake_delegation
@@ -473,71 +474,68 @@ module Signed = struct
         Result.return
           { command = Unsigned.of_rendered_payment payment
           ; nonce = payment.nonce
-          ; signature = r.signature
+          ; signature
           }
     | None, Some delegation, None, None, None ->
         Result.return
           { command = Unsigned.of_rendered_delegation delegation
           ; nonce = delegation.nonce
-          ; signature = r.signature
+          ; signature
           }
     | None, None, Some create_token, None, None ->
         Result.return
           { command = Unsigned.of_rendered_create_token create_token
           ; nonce = create_token.nonce
-          ; signature = r.signature
+          ; signature
           }
     | None, None, None, Some create_token_account, None ->
         Result.return
           { command =
               Unsigned.of_rendered_create_token_account create_token_account
           ; nonce = create_token_account.nonce
-          ; signature = r.signature
+          ; signature
           }
     | None, None, None, None, Some mint_tokens ->
         Result.return
           { command = Unsigned.of_rendered_mint_tokens mint_tokens
           ; nonce = mint_tokens.nonce
-          ; signature = r.signature
+          ; signature
           }
     | _ ->
         Result.fail
           (Errors.create ~context:"Signed transaction un-rendering"
              `Unsupported_operation_for_construction)
+
+  let to_mina_signed t =
+    Or_error.try_with_join (fun () ->
+        let open Or_error.Let_syntax in
+        let pk (`Pk x) =
+          Signature_lib.Public_key.Compressed.of_base58_check_exn x
+        in
+        let%map payload =
+          User_command_info.Partial.to_user_command_payload t.command
+            ~nonce:t.nonce
+          |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
+        in
+        let command : Mina_base.Signed_command.t =
+          { Mina_base.Signed_command.Poly.signature = t.signature
+          ; signer =
+              pk t.command.fee_payer |> Signature_lib.Public_key.decompress_exn
+          ; payload
+          }
+        in
+        command)
 end
 
 let to_mina_signed transaction_json =
   Or_error.try_with_join (fun () ->
       let open Or_error.Let_syntax in
-      let%bind rosetta_transaction_rendered =
+      let%bind rendered =
         Signed.Rendered.of_yojson transaction_json
         |> Result.map_error ~f:Error.of_string
       in
-      let%bind rosetta_transaction =
-        Signed.of_rendered rosetta_transaction_rendered
+      let%bind t =
+        Signed.of_rendered rendered
         |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
       in
-      let pk (`Pk x) =
-        Signature_lib.Public_key.Compressed.of_base58_check_exn x
-      in
-      let%bind payload =
-        User_command_info.Partial.to_user_command_payload
-          rosetta_transaction.command ~nonce:rosetta_transaction.nonce
-        |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
-      in
-      let%map signature =
-        match Mina_base.Signature.Raw.decode rosetta_transaction.signature with
-        | Some signature ->
-            Ok signature
-        | None ->
-            Or_error.errorf "Could not decode signature"
-      in
-      let command : Mina_base.Signed_command.t =
-        { Mina_base.Signed_command.Poly.signature
-        ; signer =
-            pk rosetta_transaction.command.fee_payer
-            |> Signature_lib.Public_key.decompress_exn
-        ; payload
-        }
-      in
-      command)
+      Signed.to_mina_signed t)

@@ -1,5 +1,5 @@
 (library
- (name sgn_nonconsensus)
+ (name sgn)
  (public_name sgn_nonconsensus)
  (library_flags -linkall)
  (libraries sgn_type snark_params_nonconsensus core_kernel ppx_deriving_yojson.runtime

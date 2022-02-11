@@ -1,13 +1,10 @@
 (* js_util.ml -- types and transformers for Javascript *)
 
 open Js_of_ocaml
-open Snark_params_nonconsensus
-open Mina_base_nonconsensus
-module Currency = Currency_nonconsensus.Currency
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Global_slot = Mina_numbers_nonconsensus.Global_slot
+open Snark_params.Tick
+open Mina_base
+module Global_slot = Mina_numbers.Global_slot
 module Memo = Signed_command_memo
-module Signature_lib = Signature_lib_nonconsensus
 
 let raise_js_error s = Js.raise_js_error (new%js Js.error_constr (Js.string s))
 
@@ -118,6 +115,12 @@ let signature_of_js_object (signature_js : signature_js) : Signature.t =
   in
   (field, scalar)
 
+type signed_string =
+  < string : string_js Js.readonly_prop
+  ; signer : string_js Js.readonly_prop
+  ; signature : signature_js Js.readonly_prop >
+  Js.t
+
 type signed_payment =
   < payment : payment_js Js.readonly_prop
   ; sender : string_js Js.readonly_prop
@@ -129,3 +132,14 @@ type signed_stake_delegation =
   ; sender : string_js Js.readonly_prop
   ; signature : signature_js Js.readonly_prop >
   Js.t
+
+let signature_kind_of_string_js network_js fname : Mina_signature_kind.t =
+  match Js.to_string network_js |> Base.String.lowercase with
+  | "mainnet" ->
+      Mainnet
+  | "testnet" ->
+      Testnet
+  | s ->
+      raise_js_error
+        (Core_kernel.sprintf
+           "%s: expected network to be mainnet or testnet, got: %s" fname s)

@@ -1,19 +1,8 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_bits
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_bits_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Sgn = Sgn_nonconsensus.Sgn
-
-[%%endif]
 
 type uint64 = Unsigned.uint64
 
@@ -37,7 +26,9 @@ module type Basic = sig
 
   include Bits_intf.Convertible_bits with type t := t
 
-  val to_input : t -> (_, bool) Random_oracle.Input.t
+  val to_input : t -> Field.t Random_oracle.Input.Chunked.t
+
+  val to_input_legacy : t -> (_, bool) Random_oracle.Legacy.Input.t
 
   val zero : t
 
@@ -67,13 +58,18 @@ module type Basic = sig
 
   val var_of_t : t -> var
 
-  val var_to_number : var -> Number.t
+  val var_to_bits :
+    var -> (Boolean.var Bitstring_lib.Bitstring.Lsb_first.t, _) Checked.t
 
-  val var_to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
+  val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 
-  val var_to_input : var -> (_, Boolean.var) Random_oracle.Input.t
+  val var_to_input_legacy :
+       var
+    -> ((Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t, _) Checked.t
 
   val equal_var : var -> var -> (Boolean.var, _) Checked.t
+
+  val pack_var : var -> Field.Var.t
 
   [%%endif]
 end
@@ -83,7 +79,11 @@ module type Arithmetic_intf = sig
 
   val add : t -> t -> t option
 
+  val add_flagged : t -> t -> t * [ `Overflow of bool ]
+
   val sub : t -> t -> t option
+
+  val sub_flagged : t -> t -> t * [ `Underflow of bool ]
 
   val ( + ) : t -> t -> t option
 
@@ -94,6 +94,8 @@ end
 
 module type Signed_intf = sig
   type magnitude
+
+  type signed_fee
 
   [%%ifdef consensus_mechanism]
 
@@ -121,9 +123,13 @@ module type Signed_intf = sig
 
   val is_negative : t -> bool
 
-  val to_input : t -> (_, bool) Random_oracle.Input.t
+  val to_input : t -> Field.t Random_oracle.Input.Chunked.t
+
+  val to_input_legacy : t -> (_, bool) Random_oracle.Legacy.Input.t
 
   val add : t -> t -> t option
+
+  val add_flagged : t -> t -> t * [ `Overflow of bool ]
 
   val ( + ) : t -> t -> t option
 
@@ -131,24 +137,43 @@ module type Signed_intf = sig
 
   val of_unsigned : magnitude -> t
 
+  val to_fee : t -> signed_fee
+
+  val of_fee : signed_fee -> t
+
   [%%ifdef consensus_mechanism]
 
-  type var = (magnitude_var, Sgn.var) Signed_poly.t
+  type var (* = (magnitude_var, Sgn.var) Signed_poly.t *)
+
+  val create_var : magnitude:magnitude_var -> sgn:Sgn.var -> var
 
   val typ : (var, t) Typ.t
 
   module Checked : sig
+    type signed_fee_var
+
     val constant : t -> var
 
     val of_unsigned : magnitude_var -> var
+
+    val sgn : var -> (Sgn.var, _) Checked.t
+
+    val magnitude : var -> (magnitude_var, _) Checked.t
 
     val negate : var -> var
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-    val to_input : var -> (_, Boolean.var) Random_oracle.Input.t
+    val to_input :
+      var -> (Field.Var.t Random_oracle.Input.Chunked.t, _) Checked.t
+
+    val to_input_legacy :
+      var -> ((_, Boolean.var) Random_oracle.Legacy.Input.t, _) Checked.t
 
     val add : var -> var -> (var, _) Checked.t
+
+    val add_flagged :
+      var -> var -> (var * [ `Overflow of Boolean.var ], _) Checked.t
 
     val assert_equal : var -> var -> (unit, _) Checked.t
 
@@ -158,13 +183,9 @@ module type Signed_intf = sig
 
     val to_field_var : var -> (Field.Var.t, _) Checked.t
 
-    val scale : Field.Var.t -> var -> (var, _) Checked.t
+    val to_fee : var -> signed_fee_var
 
-    val cswap :
-         Boolean.var
-      -> (magnitude_var, Sgn.t) Signed_poly.t
-         * (magnitude_var, Sgn.t) Signed_poly.t
-      -> (var * var, _) Checked.t
+    val of_fee : signed_fee_var -> var
 
     type t = var
   end
@@ -185,14 +206,14 @@ module type Checked_arithmetic_intf = sig
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-  val if_value : Boolean.var -> then_:value -> else_:value -> var
-
   val add : var -> var -> (var, _) Checked.t
 
   val sub : var -> var -> (var, _) Checked.t
 
   val sub_flagged :
     var -> var -> (var * [ `Underflow of Boolean.var ], _) Checked.t
+
+  val sub_or_zero : var -> var -> (var, _) Checked.t
 
   val add_flagged :
     var -> var -> (var * [ `Overflow of Boolean.var ], _) Checked.t
@@ -246,4 +267,6 @@ module type S = sig
   module Signed : Signed_intf with type magnitude := t
 
   [%%endif]
+
+  val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
 end

@@ -19,13 +19,13 @@ module Checked : sig
 
   type t
 
-  val succ : t -> t
+  val succ : t -> (t, _) Checked.t
 
   val equal : t -> t -> (Boolean.var, _) Checked.t
 
   val constant : Unsigned.UInt32.t -> t
 
-  val add : t -> Mina_numbers.Length.Checked.t -> t
+  val add : t -> Mina_numbers.Length.Checked.t -> (t, _) Checked.t
 
   val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
 
