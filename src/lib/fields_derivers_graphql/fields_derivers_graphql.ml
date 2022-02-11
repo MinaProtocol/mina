@@ -4,9 +4,9 @@ open Fieldslib
 module Graphql_args_raw = struct
   module Make (Schema : Graphql_intf.Schema) = struct
     module Input = struct
-      type ('row, 'result, 'ty) t =
+      type ('row, 'result, 'ty, 'nullable) t =
         < graphql_arg : (unit -> 'ty Schema.Arg.arg_typ) ref
-        ; nullable_graphql_arg : (unit -> 'ty option Schema.Arg.arg_typ) ref
+        ; nullable_graphql_arg : (unit -> 'nullable Schema.Arg.arg_typ) ref
         ; map : ('ty -> 'result) ref
         ; .. >
         as
@@ -23,26 +23,33 @@ module Graphql_args_raw = struct
         type 'ty t = Init | Acc : ('ty, 'fields) t_inner -> 'ty t
       end
 
-      type ('row, 'result, 'ty) t =
+      type ('row, 'result, 'ty, 'nullable) t =
         < graphql_arg_accumulator : 'result T.t ref ; .. > as 'row
-        constraint ('row, 'c, 'ty) t = ('row, 'c, 'ty) Input.t
+        constraint
+          ('row, 'c, 'ty, 'nullable) t =
+          ('row, 'c, 'ty, 'nullable) Input.t
     end
 
     module Creator = struct
-      type ('row, 'c, 'ty) t = < .. > as 'row
-        constraint ('row, 'c, 'ty) t = ('row, 'c, 'ty) Input.t
+      type ('row, 'c, 'ty, 'nullable) t = < .. > as 'row
+        constraint
+          ('row, 'c, 'ty, 'nullable) t =
+          ('row, 'c, 'ty, 'nullable) Input.t
     end
 
     module Output = struct
-      type ('row, 'c, 'ty) t = < .. > as 'row
-        constraint ('row, 'c, 'ty) t = ('row, 'c, 'ty) Input.t
+      type ('row, 'c, 'ty, 'nullable) t = < .. > as 'row
+        constraint
+          ('row, 'c, 'ty, 'nullable) t =
+          ('row, 'c, 'ty, 'nullable) Input.t
     end
 
-    let add_field (type f f' ty ty') :
-           ('f_row, f', f) Input.t
-        -> ([< `Read | `Set_and_create ], ty, f) Field.t_with_perm
-        -> ('row, ty', ty) Acc.t
-        -> (('row, ty', ty) Creator.t -> f') * ('row_after, ty', ty) Acc.t =
+    let add_field (type f f' ty ty' nullable1 nullable2) :
+           ('f_row, f', f, nullable1) Input.t
+        -> ([< `Read | `Set_and_create ], _, _) Field.t_with_perm
+        -> ('row, ty', ty, nullable2) Acc.t
+        -> (('row, ty', ty, nullable2) Creator.t -> f')
+           * ('row_after, ty', ty, nullable2) Acc.t =
      fun f_input field acc ->
       let ref_as_pipe = ref None in
       let arg =
@@ -84,8 +91,9 @@ module Graphql_args_raw = struct
       ( (fun _creator_input -> !(f_input#map) @@ Option.value_exn !ref_as_pipe)
       , acc )
 
-    let finish ?doc ~name (type ty result) :
-           (('row, result, ty) Input.t -> result) * ('row, result, ty) Acc.t
+    let finish ?doc ~name (type ty result nullable) :
+           (('row, result, ty, nullable) Input.t -> result)
+           * ('row, result, ty, nullable) Acc.t
         -> _ Output.t =
      fun (creator, acc) ->
       acc#graphql_creator := creator ;
@@ -133,7 +141,7 @@ module Graphql_args_raw = struct
       (obj#nullable_graphql_arg := fun () -> Schema.Arg.bool) ;
       obj
 
-    let list x obj : (_, 'result list, 'input_type list) Input.t =
+    let list x obj : (_, 'result list, 'input_type list, _) Input.t =
       (obj#graphql_arg :=
          fun () -> Schema.Arg.(non_null (list (!(x#graphql_arg) ())))) ;
       obj#map := List.map ~f:!(x#map) ;
@@ -142,16 +150,15 @@ module Graphql_args_raw = struct
          fun () -> Schema.Arg.(list (!(x#graphql_arg) ()))) ;
       obj
 
-    let option (x : (_, 'result, 'input_type) Input.t) obj =
+    let option (x : (_, 'result, 'input_type, _) Input.t) obj =
       obj#graphql_arg := !(x#nullable_graphql_arg) ;
-      (obj#nullable_graphql_arg :=
-         fun () -> failwith "you can't double option in graphql args") ;
+      obj#nullable_graphql_arg := !(x#nullable_graphql_arg) ;
       obj#map := Option.map ~f:!(x#map) ;
       obj#graphql_arg_accumulator := !(x#graphql_arg_accumulator) ;
       obj
 
-    let map ~(f : 'c -> 'd) (x : (_, 'c, 'input_type) Input.t) obj :
-        (_, 'd, 'input_type) Input.t =
+    let map ~(f : 'c -> 'd) (x : (_, 'c, 'input_type, _) Input.t) obj :
+        (_, 'd, 'input_type, _) Input.t =
       obj#graphql_fields := !(x#graphql_fields) ;
       (obj#map := fun a -> f (!(x#map) a)) ;
       obj#nullable_graphql_fields := !(x#nullable_graphql_fields) ;
@@ -600,8 +607,8 @@ query IntrospectionQuery {
         contramap ~f:to_option opt init
 
       module Args = struct
-        let derived (x : ('row1, 'c, 'input_type) Graphql_args.Input.t) init :
-            ('row2, 'c t, 'input_type) Graphql_args.Input.t =
+        let derived (x : ('row1, 'c, 'input_type, _) Graphql_args.Input.t) init
+            : ('row2, 'c t, 'input_type option, _) Graphql_args.Input.t =
           let open Graphql_args in
           let opt = option x (o ()) in
           map ~f:of_option opt init
