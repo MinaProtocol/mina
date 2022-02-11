@@ -1210,8 +1210,7 @@ module Base = struct
           let acc' = Ledger_hash.merge_var ~height l r in
           acc')
 
-    let apply_body ~(add_check : ?label:string -> Boolean.var -> unit)
-        ~check_auth ~is_start
+    let apply_body ~is_start
         ({ body =
              { public_key
              ; token_id = _
@@ -1219,7 +1218,7 @@ module Base = struct
                  { app_state = _
                  ; delegate = _
                  ; verification_key = _
-                 ; permissions
+                 ; permissions = _
                  ; snapp_uri = _
                  ; token_symbol = _
                  ; timing = _
@@ -1241,29 +1240,7 @@ module Base = struct
         Account.Checked.Unhashed.t * _ =
       let open Impl in
       let r = ref [] in
-      let update_authorized (type a) perm ~is_keep
-          ~(updated : [ `Ok of a | `Flagged of a * Boolean.var ]) =
-        let speculative_success, `proof_must_verify x = check_auth perm in
-        r := lazy Boolean.((not is_keep) &&& x) :: !r ;
-        match updated with
-        | `Ok res ->
-            add_check ~label:__LOC__ Boolean.(speculative_success ||| is_keep) ;
-            res
-        | `Flagged (res, failed) ->
-            add_check ~label:__LOC__
-              Boolean.((not failed) &&& speculative_success ||| is_keep) ;
-            res
-      in
       let proof_must_verify () = Boolean.any (List.map !r ~f:Lazy.force) in
-      let open Snapp_basic in
-      let permissions =
-        update_authorized a.permissions.set_permissions
-          ~is_keep:(Set_or_keep.Checked.is_keep permissions)
-          ~updated:
-            (`Ok
-              (Set_or_keep.Checked.set_or_keep ~if_:Permissions.Checked.if_
-                 permissions a.permissions))
-      in
 
       (* enforce that either the predicate is `Accept`,
          the nonce is incremented,
@@ -1284,18 +1261,8 @@ module Base = struct
             ; increment_nonce
             ; Boolean.(use_full_commitment &&& not is_start)
             ]) ;
-      let a : Account.Checked.Unhashed.t = { a with permissions; public_key } in
+      let a : Account.Checked.Unhashed.t = { a with public_key } in
       (a, `proof_must_verify proof_must_verify)
-
-    let create_checker () =
-      let r = ref [] in
-      let finished = ref false in
-      ( (fun ?label:_ x ->
-          if finished.contents then failwith "finished"
-          else r := x :: r.contents)
-      , fun () ->
-          finished := true ;
-          Impl.Boolean.all r.contents )
 
     module type Single_inputs = sig
       val constraint_constants : Genesis_constants.Constraint_constants.t
@@ -1470,6 +1437,10 @@ module Base = struct
 
             let set_voting_for : t -> Controller.t =
              fun a -> a.data.permissions.set_voting_for
+
+            type t = Permissions.Checked.t
+
+            let if_ b ~then_ ~else_ = Permissions.Checked.if_ b ~then_ ~else_
           end
 
           let account_with_hash (account : Account.Checked.Unhashed.t) =
@@ -1591,6 +1562,11 @@ module Base = struct
 
           let set_voting_for voting_for ({ data = a; hash } : t) : t =
             { data = { a with voting_for }; hash }
+
+          let permissions (a : t) = a.data.permissions
+
+          let set_permissions permissions ({ data = a; hash } : t) : t =
+            { data = { a with permissions }; hash }
         end
 
         module Ledger = struct
@@ -2014,6 +1990,9 @@ module Base = struct
 
             let voting_for ({ party; _ } : t) =
               party.data.body.update.voting_for
+
+            let permissions ({ party; _ } : t) =
+              party.data.body.update.permissions
           end
         end
 
@@ -2175,25 +2154,19 @@ module Base = struct
             Snapp_predicate.Account.Checked.check party.data.predicate
               account.data
         | Check_auth_and_update_account
-            { is_start; signature_verifies; party = { party; _ }; account } ->
-            let add_check, checks_succeeded = create_checker () in
+            { is_start; party = { party; _ }; account } ->
             (* If there's a valid signature, it must increment the nonce or use full commitment *)
             let account', `proof_must_verify proof_must_verify =
-              apply_body ~add_check
-                ~check_auth:(fun t ->
-                  Permissions.Auth_required.Checked.spec_eval
-                    ~signature_verifies t)
-                ~is_start party.data account.data
+              apply_body ~is_start party.data account.data
             in
             let proof_must_verify = proof_must_verify () in
-            let checks_succeeded = checks_succeeded () in
             let success =
               match auth_type with
               | None_given | Signature ->
-                  Boolean.((not proof_must_verify) && checks_succeeded)
+                  Boolean.(not proof_must_verify)
               | Proof ->
                   (* We always assert that the proof verifies. *)
-                  checks_succeeded
+                  Boolean.true_
             in
             (* omit failure status here, unlike `Transaction_logic` *)
             (Inputs.Account.account_with_hash account', success, ())
