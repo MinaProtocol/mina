@@ -403,6 +403,11 @@ module type Account_intf = sig
   (** Fill the snapp field of the account if it's currently [None] *)
   val make_snapp : t -> t
 
+  (** If the current account has no snapp fields set, reset its snapp field to
+      [None].
+  *)
+  val unmake_snapp : t -> t
+
   val proved_state : t -> bool
 
   val set_proved_state : bool -> t -> t
@@ -981,6 +986,8 @@ module Make (Inputs : Inputs_intf) = struct
       in
       (a, local_state)
     in
+    (* Reset snapp state to [None] if it is unmodified. *)
+    let a = Account.unmake_snapp a in
     let a', update_permitted, failure_status =
       h.perform
         (Check_auth_and_update_account

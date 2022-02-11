@@ -1256,13 +1256,6 @@ module Base = struct
       let proof_must_verify () = Boolean.any (List.map !r ~f:Lazy.force) in
       let ( ! ) = run_checked in
       let open Snapp_basic in
-      let snapp : Snapp_account.Checked.t =
-        let snapp_version =
-          (* Current snapp version. Upgrade mechanism should live here. *)
-          Mina_numbers.Snapp_version.(Checked.constant zero)
-        in
-        { a.snapp with snapp_version }
-      in
       let snapp_uri =
         update_authorized a.permissions.set_snapp_uri
           ~is_keep:(Set_or_keep.Checked.is_keep snapp_uri)
@@ -1333,8 +1326,7 @@ module Base = struct
             ]) ;
       let a : Account.Checked.Unhashed.t =
         { a with
-          snapp
-        ; delegate
+          delegate
         ; permissions
         ; nonce
         ; public_key
@@ -1537,6 +1529,8 @@ module Base = struct
             (`Invalid_timing (Option.value_exn !invalid_timing), timing)
 
           let make_snapp (a : t) = a
+
+          let unmake_snapp (a : t) = a
 
           let proved_state (a : t) = a.data.snapp.proved_state
 
