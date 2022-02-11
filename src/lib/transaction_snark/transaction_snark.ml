@@ -1218,6 +1218,7 @@ module Base = struct
                  ; snapp_uri
                  ; token_symbol
                  ; timing = _
+                 ; voting_for
                  }
              ; balance_change
              ; increment_nonce
@@ -1444,6 +1445,15 @@ module Base = struct
                   ~then_:!(Account.Nonce.Checked.succ a.nonce)
                   ~else_:a.nonce))
       in
+      let voting_for =
+        update_authorized a.permissions.set_voting_for
+          ~is_keep:(Set_or_keep.Checked.is_keep voting_for)
+          ~updated:
+            (`Ok
+              (Set_or_keep.Checked.set_or_keep
+                 ~if_:(fun b ~then_ ~else_ -> !(State_hash.if_ b ~then_ ~else_))
+                 voting_for a.voting_for))
+      in
 
       (* enforce that either the predicate is `Accept`,
          the nonce is incremented,
@@ -1475,6 +1485,7 @@ module Base = struct
         ; public_key
         ; snapp_uri
         ; token_symbol
+        ; voting_for
         }
       in
       (a, `proof_must_verify proof_must_verify)
@@ -4676,7 +4687,9 @@ module For_tests = struct
     in
     { parties with other_parties }
 
-  let create_trivial_predicate_snapp ~constraint_constants spec ledger =
+  let create_trivial_predicate_snapp ~constraint_constants
+      ?(protocol_state_predicate = Snapp_predicate.Protocol_state.accept) spec
+      ledger =
     let { Transaction_logic.For_tests.Transaction_spec.fee
         ; sender = sender, sender_nonce
         ; receiver = trivial_account_pk
@@ -4737,7 +4750,7 @@ module For_tests = struct
               ; sequence_events = []
               ; call_data = Field.zero
               ; call_depth = 0
-              ; protocol_state = Snapp_predicate.Protocol_state.accept
+              ; protocol_state = protocol_state_predicate
               ; use_full_commitment = ()
               }
           ; predicate = sender_nonce
@@ -4757,7 +4770,7 @@ module For_tests = struct
           ; sequence_events = []
           ; call_data = Field.zero
           ; call_depth = 0
-          ; protocol_state = Snapp_predicate.Protocol_state.accept
+          ; protocol_state = protocol_state_predicate
           ; use_full_commitment = false
           }
       ; predicate = Nonce (Account.Nonce.succ sender_nonce)
@@ -4774,13 +4787,12 @@ module For_tests = struct
           ; sequence_events = []
           ; call_data = Field.zero
           ; call_depth = 0
-          ; protocol_state = Snapp_predicate.Protocol_state.accept
+          ; protocol_state = protocol_state_predicate
           ; use_full_commitment = false
           }
       ; predicate = Full Snapp_predicate.Account.accept
       }
     in
-    let protocol_state = Snapp_predicate.Protocol_state.accept in
     let memo = Signed_command_memo.empty in
     let ps =
       Parties.Call_forest.of_parties_list
@@ -4791,7 +4803,7 @@ module For_tests = struct
     let other_parties_hash = Parties.Call_forest.hash ps in
     let protocol_state_predicate_hash =
       (*FIXME: is this ok? *)
-      Snapp_predicate.Protocol_state.digest protocol_state
+      Snapp_predicate.Protocol_state.digest protocol_state_predicate
     in
     let transaction : Parties.Transaction_commitment.t =
       (*FIXME: is this correct? *)
@@ -5184,6 +5196,7 @@ let%test_module "transaction_snark" =
                       ; snapp_uri = Keep
                       ; token_symbol = Keep
                       ; timing = Keep
+                      ; voting_for = Keep
                       }
                   ; token_id = ()
                   ; balance_change = Fee.of_int full_amount

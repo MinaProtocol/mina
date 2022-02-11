@@ -2252,7 +2252,7 @@ module Types = struct
           ~coerce:
             (fun stake edit_state send receive set_delegate set_permissions
                  set_verification_key set_snapp_uri edit_sequence_state
-                 set_token_symbol increment_nonce ->
+                 set_token_symbol increment_nonce set_voting_for ->
             Ok
               { Permissions.Poly.stake
               ; edit_state
@@ -2265,6 +2265,7 @@ module Types = struct
               ; edit_sequence_state
               ; set_token_symbol
               ; increment_nonce
+              ; set_voting_for
               })
           ~fields:
             [ arg "stake" ~typ:(non_null bool)
@@ -2278,6 +2279,7 @@ module Types = struct
             ; arg "editSequenceState" ~typ:(non_null snapp_auth_required)
             ; arg "setTokenSymbol" ~typ:(non_null snapp_auth_required)
             ; arg "incrementNonce" ~typ:(non_null snapp_auth_required)
+            ; arg "setVotingFor" ~typ:(non_null snapp_auth_required)
             ]
 
       let snapp_timing =
@@ -2325,7 +2327,8 @@ module Types = struct
       let snapp_update : (Party.Update.t, string) Result.t option arg_typ =
         obj "PartyUpdate" ~doc:"Update component of a snapp Party"
           ~coerce:
-            (fun app_state_elts delegate vk perms snapp_uri tok_sym timing ->
+            (fun app_state_elts delegate vk perms snapp_uri tok_sym timing
+                 voting_for ->
             let open Result.Let_syntax in
             let v o = Snapp_basic.Set_or_keep.of_option o in
             let app_state_elts = List.map app_state_elts ~f:v in
@@ -2341,6 +2344,10 @@ module Types = struct
                      expected_len len)
             in
             let s = Option.Result.sequence in
+            let%bind voting_for =
+              s (Option.map ~f:State_hash.of_base58_check voting_for)
+              |> Result.map_error ~f:Error.to_string_hum
+            in
             let%bind vk' = s vk in
             let%bind perms' = s perms in
             let%map timing' = s timing in
@@ -2352,6 +2359,7 @@ module Types = struct
               ; snapp_uri = v snapp_uri
               ; token_symbol = v tok_sym
               ; timing = v timing'
+              ; voting_for = v voting_for
               })
           ~fields:
             [ arg "appState"
@@ -2366,6 +2374,8 @@ module Types = struct
             ; arg "snappUri" ~doc:"A URI string, or null if Keep" ~typ:string
             ; arg "tokenSymbol" ~doc:"Token symbol" ~typ:snapp_token
             ; arg "timing" ~doc:"Timing info, or null if Keep" ~typ:snapp_timing
+            ; arg "votingFor" ~doc:"State hash to vote for, or null if Keep"
+                ~typ:string
             ]
 
       let snapp_balance =

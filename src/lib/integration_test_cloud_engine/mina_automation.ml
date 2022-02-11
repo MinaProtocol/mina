@@ -144,6 +144,7 @@ module Network_config = struct
               ; edit_sequence_state = None
               ; set_token_symbol = None
               ; increment_nonce = None
+              ; set_voting_for = None
               }
           in
           let default = Runtime_config.Accounts.Single.default in
