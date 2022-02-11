@@ -480,7 +480,7 @@ let timing_error_to_user_command_status err =
   | _ ->
       failwith "Unexpected timed account validation error"
 
-let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
+let validate_timing_with_min_balance' ~account ~txn_amount ~txn_global_slot =
   let open Account.Poly in
   let open Account.Timing.Poly in
   let nsf_error kind =
@@ -498,7 +498,8 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
       | None ->
           nsf_error "untimed"
       | _ ->
-          Or_error.return (Untimed, `Min_balance Balance.zero) )
+          Or_error.return
+            (`Invalid_timing false, Untimed, `Min_balance Balance.zero) )
   | Timed
       { initial_minimum_balance
       ; cliff_time
@@ -507,17 +508,8 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
       ; vesting_increment
       } ->
       let open Or_error.Let_syntax in
-      let%map curr_min_balance =
+      let%map invalid_timing, curr_min_balance =
         let account_balance = account.balance in
-        let min_balance_error min_balance =
-          Or_error.errorf
-            !"For timed account, the requested transaction for amount %{sexp: \
-              Amount.t} at global slot %{sexp: Global_slot.t}, applying the \
-              transaction would put the balance below the calculated minimum \
-              balance of %{sexp: Balance.t}"
-            txn_amount txn_global_slot min_balance
-          |> Or_error.tag ~tag:min_balance_tag
-        in
         match Balance.(account_balance - txn_amount) with
         | None ->
             (* checking for sufficient funds may be redundant with a check elsewhere
@@ -532,13 +524,34 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
                 ~initial_minimum_balance
             in
             if Balance.(proposed_new_balance < curr_min_balance) then
-              min_balance_error curr_min_balance
-            else Or_error.return curr_min_balance
+              Or_error.return (true, curr_min_balance)
+            else Or_error.return (false, curr_min_balance)
       in
       (* once the calculated minimum balance becomes zero, the account becomes untimed *)
       if Balance.(curr_min_balance > zero) then
-        (account.timing, `Min_balance curr_min_balance)
-      else (Untimed, `Min_balance Balance.zero)
+        ( `Invalid_timing invalid_timing
+        , account.timing
+        , `Min_balance curr_min_balance )
+      else (`Invalid_timing invalid_timing, Untimed, `Min_balance Balance.zero)
+
+let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
+  let open Or_error.Let_syntax in
+  let min_balance_error min_balance =
+    Or_error.errorf
+      !"For timed account, the requested transaction for amount %{sexp: \
+        Amount.t} at global slot %{sexp: Global_slot.t}, applying the \
+        transaction would put the balance below the calculated minimum balance \
+        of %{sexp: Balance.t}"
+      txn_amount txn_global_slot min_balance
+    |> Or_error.tag ~tag:min_balance_tag
+  in
+  let%bind ( `Invalid_timing invalid_timing
+           , timing
+           , (`Min_balance curr_min_balance as min_balance) ) =
+    validate_timing_with_min_balance' ~account ~txn_amount ~txn_global_slot
+  in
+  if invalid_timing then min_balance_error curr_min_balance
+  else return (timing, min_balance)
 
 let validate_timing ~account ~txn_amount ~txn_global_slot =
   let open Result.Let_syntax in
@@ -1236,8 +1249,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   open Pickles_types
 
-  let apply_body ~(state_view : Snapp_predicate.Protocol_state.View.t)
-      ~check_auth ~has_proof ~is_new ~global_slot_since_genesis ~is_start
+  let apply_body ~check_auth ~has_proof ~global_slot_since_genesis ~is_start
       ({ body =
            { public_key = _
            ; token_id = _
@@ -1250,7 +1262,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                ; token_symbol
                ; timing = _
                }
-           ; balance_change
+           ; balance_change = _
            ; increment_nonce
            ; events = _ (* This is for the snapp to use, we don't need it. *)
            ; call_data = _ (* This is for the snapp to use, we don't need it. *)
@@ -1265,15 +1277,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let open Snapp_basic in
     let open Result.Let_syntax in
     (* Check timing. *)
-    let%bind timing =
-      match balance_change.sgn with
-      | Pos when not is_new ->
-          Ok a.timing
-      | _ ->
-          validate_timing ~txn_amount:Amount.zero
-            ~txn_global_slot:state_view.global_slot_since_genesis ~account:a
-          |> Result.map_error ~f:timing_error_to_user_command_status
-    in
     let init =
       match a.snapp with None -> Snapp_account.default | Some a -> a
     in
@@ -1397,15 +1400,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       |> Result.ok_if_true
            ~error:Transaction_status.Failure.Parties_replay_check_failed
     in
-    { a with
-      snapp
-    ; delegate
-    ; permissions
-    ; timing
-    ; nonce
-    ; snapp_uri
-    ; token_symbol
-    }
+    { a with snapp; delegate; permissions; nonce; snapp_uri; token_symbol }
 
   module Global_state = struct
     type t =
@@ -1423,6 +1418,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let fee_excess { fee_excess; _ } = fee_excess
 
     let set_fee_excess t fee_excess = { t with fee_excess }
+
+    let global_slot_since_genesis { protocol_state; _ } =
+      protocol_state.global_slot_since_genesis
   end
 
   module Inputs = struct
@@ -1581,6 +1579,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let balance (a : t) : Balance.t = a.balance
 
       let set_balance (balance : Balance.t) (a : t) : t = { a with balance }
+
+      let check_timing ~txn_global_slot account =
+        let invalid_timing, timing, _ =
+          validate_timing_with_min_balance' ~txn_amount:Amount.zero
+            ~txn_global_slot ~account
+          (* Safe because the only error is when txn_amount > 0 *)
+          |> Or_error.ok_exn
+        in
+        (invalid_timing, Party.Update.Timing_info.of_account_timing timing)
     end
 
     module Amount = struct
@@ -1790,7 +1797,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; field : Snark_params.Tick.Field.t
       ; failure : Transaction_status.Failure.t option >
 
-    let perform ~constraint_constants:_ ~state_view (type r)
+    let perform ~constraint_constants:_ (type r)
         (eff : (r, t) Parties_logic.Eff.t) : r =
       match eff with
       | Check_protocol_state_predicate (pred, global_state) -> (
@@ -1809,18 +1816,17 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ; global_state
           ; party = p
           ; account = a
-          ; account_is_new
+          ; account_is_new = _
           ; signature_verifies = _
           } -> (
           if (is_start : bool) then
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
           match
-            apply_body ~state_view
+            apply_body
               ~check_auth:
                 (Fn.flip Permissions.Auth_required.check
                    (Control.tag p.authorization))
               ~has_proof:(Control.Tag.equal (Control.tag p.authorization) Proof)
-              ~is_new:account_is_new
               ~global_slot_since_genesis:
                 global_state.protocol_state.global_slot_since_genesis ~is_start
               p.data a
@@ -1847,7 +1853,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               let%map a = L.get ledger loc in
               (loc, a)) ))
     in
-    let perform eff = Env.perform ~constraint_constants ~state_view eff in
+    let perform eff = Env.perform ~constraint_constants eff in
     let rec step_all user_acc
         ( (g_state : Inputs.Global_state.t)
         , (l_state : _ Parties_logic.Local_state.t) ) : user_acc Or_error.t =

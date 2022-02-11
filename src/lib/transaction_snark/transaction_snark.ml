@@ -1225,7 +1225,7 @@ module Base = struct
                  ; token_symbol
                  ; timing = _
                  }
-             ; balance_change
+             ; balance_change = _
              ; increment_nonce
              ; events = _ (* This is for the snapp to use, we don't need it. *)
              ; call_data =
@@ -1256,32 +1256,6 @@ module Base = struct
       in
       let proof_must_verify () = Boolean.any (List.map !r ~f:Lazy.force) in
       let ( ! ) = run_checked in
-      let is_receiver =
-        Sgn.Checked.is_pos !(Currency.Amount.Signed.Checked.sgn balance_change)
-      in
-      let `Min_balance _, timing =
-        !([%with_label "Check snapp timing"]
-            (let open Tick in
-            let balance_check ok =
-              add_check ~label:__LOC__ !(Boolean.any [ ok; is_receiver ]) ;
-              return ()
-            in
-            let timed_balance_check ok =
-              add_check ~label:__LOC__ !(Boolean.any [ ok; is_receiver ]) ;
-              return ()
-            in
-            (* NB: We perform the check here with the final balance and a zero
-               amount. This allows this to serve dual purposes:
-               * if the balance has decreased, this checks that it isn't below
-                 the minimum;
-               * if the account is new and this party has set its timing info,
-                 this checks that the timing is valid.
-               The balance and txn_amount are used only to find the resulting
-               balance, so using the result directly is equivalent.
-            *)
-            check_timing ~balance_check ~timed_balance_check ~account:a
-              ~txn_amount:None ~txn_global_slot))
-      in
       let open Snapp_basic in
       let snapp : Snapp_account.Checked.t =
         let keeping_app_state =
@@ -1446,7 +1420,6 @@ module Base = struct
           snapp
         ; delegate
         ; permissions
-        ; timing
         ; nonce
         ; public_key
         ; snapp_uri
@@ -1614,6 +1587,20 @@ module Base = struct
 
           let set_balance (balance : Balance.t) ({ data = a; hash } : t) : t =
             { data = { a with balance }; hash }
+
+          let check_timing ~txn_global_slot ({ data = account; _ } : t) =
+            let invalid_timing = ref None in
+            let balance_check _ = failwith "Should not be called" in
+            let timed_balance_check b =
+              invalid_timing := Some b ;
+              return ()
+            in
+            let `Min_balance _, timing =
+              run_checked
+              @@ check_timing ~balance_check ~timed_balance_check ~account
+                   ~txn_amount:None ~txn_global_slot
+            in
+            (`Invalid_timing (Option.value_exn !invalid_timing), timing)
         end
 
         module Ledger = struct
@@ -2126,6 +2113,9 @@ module Base = struct
             { t with
               ledger = Ledger.if_ should_update ~then_:ledger ~else_:t.ledger
             }
+
+          let global_slot_since_genesis { protocol_state; _ } =
+            protocol_state.global_slot_since_genesis
         end
       end
 
