@@ -370,13 +370,9 @@ struct
       let handle_transition_frontier_diff u t =
         match u with
         | `New_best_tip ledger ->
-            O1trace.time_execution
-              (Printf.sprintf "processing_snark_pool_best_tip_changes")
-              (fun () -> handle_new_best_tip_ledger t ledger)
+            handle_new_best_tip_ledger t ledger
         | `New_refcount_table refcount_table ->
-            O1trace.time_execution
-              (Printf.sprintf "processing_snark_pool_refcount_table_swaps")
-              (fun () -> handle_new_refcount_table t refcount_table)
+            handle_new_refcount_table t refcount_table
 
       (*TODO? add referenced statements from the transition frontier to ref_table here otherwise the work referenced in the root and not in any of the successor blocks will never be included. This may not be required because the chances of a new block from the root is very low (root's existing successor is 1 block away from finality)*)
       let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t)
@@ -584,23 +580,21 @@ struct
                           )
                         ] ;
                     Deferred.return false
-                | Some _ ->
-                    O1trace.time_execution "snark_pool_batch_verifying_proofs"
-                      (fun () ->
-                        match%bind
-                          Batcher.Snark_pool.verify t.batcher proof_env
-                        with
-                        | Ok true ->
-                            return true
-                        | Ok false ->
-                            (* if this proof is in the set of invalid proofs*)
-                            let e = Error.of_string "Invalid proof" in
-                            let%map () = log e in
-                            false
-                        | Error e ->
-                            (* Verifier crashed or other errors at our end. Don't punish the peer*)
-                            let%map () = log ~punish:false e in
-                            false) )
+                | Some _ -> (
+                    match%bind
+                      Batcher.Snark_pool.verify t.batcher proof_env
+                    with
+                    | Ok true ->
+                        return true
+                    | Ok false ->
+                        (* if this proof is in the set of invalid proofs*)
+                        let e = Error.of_string "Invalid proof" in
+                        let%map () = log e in
+                        false
+                    | Error e ->
+                        (* Verifier crashed or other errors at our end. Don't punish the peer*)
+                        let%map () = log ~punish:false e in
+                        false ) )
         in
         match One_or_two.zip proofs statements with
         | Ok pairs ->
