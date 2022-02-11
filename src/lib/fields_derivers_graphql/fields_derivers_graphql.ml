@@ -4,9 +4,10 @@ open Fieldslib
 module Graphql_args_raw = struct
   module Make (Schema : Graphql_intf.Schema) = struct
     module Input = struct
-      type ('row, 'ty) t =
+      type ('row, 'c, 'ty) t =
         < graphql_arg : (unit -> 'ty Schema.Arg.arg_typ) ref
         ; nullable_graphql_arg : (unit -> 'ty option Schema.Arg.arg_typ) ref
+        ; map : ('ty -> 'c) ref
         ; .. >
         as
         'row
@@ -22,23 +23,27 @@ module Graphql_args_raw = struct
         type 'ty t = Init | Acc : ('ty, 'fields) t_inner -> 'ty t
       end
 
-      type ('row, 'ty) t =
-        < graphql_arg_accumulator : 'ty T.t ref ; .. > as 'row
+      type ('row, 'c, 'ty) t =
+        < graphql_arg_accumulator : 'c T.t ref ; .. > as 'row
+        constraint ('row, 'c, 'ty) t = ('row, 'c, 'ty) Input.t
     end
 
     module Creator = struct
-      type 'row t = < .. > as 'row
+      type ('row, 'c, 'ty) t = < .. > as 'row
+        constraint ('row, 'c, 'ty) t = ('row, 'c, 'ty) Input.t
     end
 
     module Output = struct
-      type 'row t = < .. > as 'row
+      type ('row, 'c, 'ty) t = < .. > as 'row
+        constraint ('row, 'c, 'ty) t = ('row, 'c, 'ty) Input.t
     end
 
-    let add_field (type f ty) :
-           ('f_row, f) Input.t
-        -> ([< `Read | `Set_and_create ], ty, f) Field.t_with_perm
-        -> ('row, ty) Acc.t
-        -> ('row Creator.t -> f) * ('row_after, ty) Acc.t =
+    let add_field (type field_type ty result) :
+           ('f_row, result, field_type) Input.t
+        -> ([< `Read | `Set_and_create ], result, field_type) Field.t_with_perm
+        -> ('row, result, ty) Acc.t
+        -> (('row, result, ty) Creator.t -> ty) * ('row_after, result, ty) Acc.t
+        =
      fun f_input field acc ->
       let ref_as_pipe = ref None in
       let arg =
@@ -53,7 +58,7 @@ module Graphql_args_raw = struct
                 { graphql_arg_coerce =
                     (fun x ->
                       ref_as_pipe := Some x ;
-                      !(acc#graphql_creator) acc)
+                      !(acc#map) @@ !(acc#graphql_creator) acc)
                 ; graphql_arg_fields = [ arg ]
                 }
         | Acc { graphql_arg_fields; graphql_arg_coerce } -> (
@@ -64,7 +69,7 @@ module Graphql_args_raw = struct
                     { graphql_arg_coerce =
                         (fun x ->
                           ref_as_pipe := Some x ;
-                          !(acc#graphql_creator) acc)
+                          !(acc#map) @@ !(acc#graphql_creator) acc)
                     ; graphql_arg_fields = [ arg ]
                     }
             | _ ->
