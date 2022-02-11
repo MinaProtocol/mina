@@ -988,6 +988,7 @@ module Snapp_helpers = struct
             ; edit_sequence_state = perms_data.edit_sequence_state
             ; set_token_symbol = perms_data.set_token_symbol
             ; increment_nonce = perms_data.increment_nonce
+            ; set_voting_for = perms_data.set_voting_for
             }
           in
           Snapp_basic.Set_or_keep.Set perms
@@ -999,6 +1000,11 @@ module Snapp_helpers = struct
     in
     let token_symbol =
       update_data.token_symbol |> Snapp_basic.Set_or_keep.of_option
+    in
+    let voting_for =
+      update_data.voting_for
+      |> Option.map ~f:State_hash.of_base58_check_exn
+      |> Snapp_basic.Set_or_keep.of_option
     in
     let%bind timing =
       match update_data.timing_id with
@@ -1036,6 +1042,7 @@ module Snapp_helpers = struct
       ; snapp_uri
       ; token_symbol
       ; timing
+      ; voting_for
       }
     in
     let token_id =
