@@ -1,14 +1,6 @@
 [%%import "/src/config.mlh"]
 
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-
-[%%endif]
 
 module Auth_required : sig
   [%%versioned:

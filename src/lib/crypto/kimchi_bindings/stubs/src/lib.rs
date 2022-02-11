@@ -56,11 +56,11 @@ pub mod linearization {
     pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
     ) -> (String, Vec<(String, String)>) {
         let d1 = ark_poly::EvaluationDomain::<F>::new(1).unwrap();
-        let evaluated_cols = kimchi::index::linearization_columns::<F>();
-        let kimchi_circuits::expr::Linearization {
+        let evaluated_cols = kimchi::index::linearization_columns::<F>(&None);
+        let kimchi::circuits::expr::Linearization {
             constant_term,
             mut index_terms,
-        } = kimchi::index::constraints_expr(d1, false, None)
+        } = kimchi::index::constraints_expr(d1, false, &None)
             .linearize(evaluated_cols)
             .unwrap();
         // HashMap deliberately uses an unstable order; here we sort to ensure that the output is
@@ -89,11 +89,11 @@ pub mod linearization {
 /// Handy re-exports
 pub use {
     commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
-    kimchi::prover::caml::{CamlProverCommitments, CamlProverProof},
-    kimchi_circuits::{
+    kimchi::circuits::{
         gate::{caml::CamlCircuitGate, CurrOrNext, GateType},
-        nolookup::scalars::caml::{CamlLookupEvaluations, CamlProofEvaluations, CamlRandomOracles},
+        scalars::caml::{CamlLookupEvaluations, CamlProofEvaluations, CamlRandomOracles},
         wires::caml::CamlWire,
     },
+    kimchi::prover::caml::{CamlProverCommitments, CamlProverProof},
     oracle::sponge::caml::CamlScalarChallenge,
 };

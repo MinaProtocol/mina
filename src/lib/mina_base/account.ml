@@ -4,23 +4,8 @@
 
 open Core_kernel
 open Util
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params
 open Tick
-
-[%%else]
-
-module Currency = Currency_nonconsensus.Currency
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Mina_compile_config =
-  Mina_compile_config_nonconsensus.Mina_compile_config
-open Snark_params_nonconsensus
-
-[%%endif]
-
 open Currency
 open Mina_numbers
 open Fold_lib

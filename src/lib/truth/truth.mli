@@ -1,9 +1,9 @@
 module True : sig
-  type t
+  type t = True
 end
 
 module False : sig
-  type t
+  type t = False
 end
 
 type true_ = True.t

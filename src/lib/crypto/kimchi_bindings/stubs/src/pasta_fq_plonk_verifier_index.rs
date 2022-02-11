@@ -11,9 +11,9 @@ use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 
+use kimchi::circuits::constraints::{zk_polynomial, zk_w3, Shifts};
+use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::index::{expr_linearization, VerifierIndex};
-use kimchi_circuits::nolookup::constraints::{zk_polynomial, zk_w3, Shifts};
-use kimchi_circuits::wires::{COLUMNS, PERMUTS};
 use std::convert::TryInto;
 use std::path::Path;
 
@@ -49,6 +49,7 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
                     .map(|x| x.to_vec().iter().map(Into::into).collect()),
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
+            lookup_index: vi.lookup_index.map(Into::into),
         }
     }
 }
@@ -81,7 +82,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
         let shift: [Fq; PERMUTS] = shifts.try_into().expect("wrong size");
 
         // TODO chacha, dummy_lookup_value ?
-        let linearization = expr_linearization(domain, false, None);
+        let linearization = expr_linearization(domain, false, &None);
 
         VerifierIndex::<GAffine> {
             domain,
@@ -107,9 +108,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
             w: zk_w3(domain),
             endo: endo_q,
 
-            lookup_used: None,
-            lookup_tables: vec![],
-            lookup_selectors: vec![],
+            lookup_index: index.lookup_index.map(Into::into),
             linearization,
 
             fr_sponge_params: oracle::pasta::fq_3::params(),
@@ -135,7 +134,7 @@ pub fn read_raw(
         fq_sponge_params,
         fr_sponge_params,
     )
-    .map_err(|_e| {
+    .map_err(|_| {
         ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
             .err()
             .unwrap()
@@ -166,7 +165,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_write(
 ) -> Result<(), ocaml::Error> {
     let index: VerifierIndex<GAffine> = index.into();
     let path = Path::new(&path);
-    index.to_file(path, append).map_err(|_e| {
+    index.to_file(path, append).map_err(|_| {
         ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
             .err()
             .unwrap()
@@ -192,7 +191,6 @@ pub fn caml_pasta_fq_plonk_verifier_index_create(
 pub fn caml_pasta_fq_plonk_verifier_index_shifts(log2_size: ocaml::Int) -> Vec<CamlFq> {
     let domain = Domain::<Fq>::new(1 << log2_size).unwrap();
     let shifts = Shifts::new(&domain);
-
     shifts.shifts().iter().map(Into::into).collect()
 }
 
@@ -230,6 +228,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
             chacha_comm: None,
         },
         shifts: (0..PERMUTS - 1).map(|_| Fq::one().into()).collect(),
+        lookup_index: None,
     }
 }
 

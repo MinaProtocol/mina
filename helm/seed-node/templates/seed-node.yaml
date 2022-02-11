@@ -56,6 +56,9 @@ spec:
           "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
+          {{- if $.Values.mina.exposeGraphql }}
+          "-insecure-rest-server",
+          {{- end -}}
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-enable-peer-exchange", "true",

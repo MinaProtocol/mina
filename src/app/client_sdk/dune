@@ -18,7 +18,7 @@
   js_of_ocaml
   digestif.ocaml
   sponge
-  hex)
+  hex_nonconsensus)
  (preprocessor_deps ../../config.mlh)
  (instrumentation
   (backend bisect_ppx))
