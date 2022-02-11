@@ -247,6 +247,10 @@ module type Party_intf = sig
     type field
 
     val app_state : t -> field set_or_keep Snapp_state.V.t
+
+    type verification_key
+
+    val verification_key : t -> verification_key set_or_keep
   end
 end
 
@@ -392,6 +396,14 @@ module type Account_intf = sig
   val app_state : t -> field Snapp_state.V.t
 
   val set_app_state : field Snapp_state.V.t -> t -> t
+
+  val register_verification_key : t -> unit
+
+  type verification_key
+
+  val verification_key : t -> verification_key
+
+  val set_verification_key : verification_key -> t -> t
 end
 
 module Eff = struct
@@ -464,6 +476,8 @@ module type Inputs_intf = sig
   module Timing :
     Timing_intf with type bool := Bool.t and type global_slot := Global_slot.t
 
+  module Verification_key : Iffable with type bool := Bool.t
+
   module Account :
     Account_intf
       with type Permissions.controller := Controller.t
@@ -472,6 +486,7 @@ module type Inputs_intf = sig
        and type bool := Bool.t
        and type global_slot := Global_slot.t
        and type field := Field.t
+       and type verification_key := Verification_key.t
 
   module Party :
     Party_intf
@@ -484,6 +499,7 @@ module type Inputs_intf = sig
        and type Update.timing := Timing.t
        and type 'a Update.set_or_keep := 'a Set_or_keep.t
        and type Update.field := Field.t
+       and type Update.verification_key := Verification_key.t
 
   module Ledger :
     Ledger_intf
@@ -878,6 +894,28 @@ module Make (Inputs : Inputs_intf) = struct
           ~f:(Set_or_keep.set_or_keep ~if_:Field.if_)
       in
       let a = Account.set_app_state app_state a in
+      (a, local_state)
+    in
+    (* Register verification key, in case it needs to be 'side-loaded' to
+       verify a snapp proof.
+    *)
+    Account.register_verification_key a ;
+    (* Set verification key. *)
+    let a, local_state =
+      let verification_key = Party.Update.verification_key party in
+      let has_permission =
+        Controller.check ~proof_verifies ~signature_verifies
+          (Account.Permissions.set_verification_key a)
+      in
+      let local_state =
+        Local_state.add_check local_state Update_not_permitted_app_state
+          Bool.(Set_or_keep.is_keep verification_key ||| has_permission)
+      in
+      let verification_key =
+        Set_or_keep.set_or_keep ~if_:Verification_key.if_ verification_key
+          (Account.verification_key a)
+      in
+      let a = Account.set_verification_key verification_key a in
       (a, local_state)
     in
     let a', update_permitted, failure_status =

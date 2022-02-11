@@ -1254,7 +1254,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            ; update =
                { app_state = _
                ; delegate
-               ; verification_key
+               ; verification_key = _
                ; permissions
                ; snapp_uri
                ; token_symbol
@@ -1295,13 +1295,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       else return a.delegate
     in
     let%bind snapp =
-      let%map verification_key =
-        update a.permissions.set_verification_key verification_key
-          init.verification_key ~is_keep:Set_or_keep.is_keep
-          ~update:(fun u x ->
-            match (u, x) with Keep, _ -> x | Set x, _ -> Some x)
-          ~error:Update_not_permitted_verification_key
-      and sequence_state, last_sequence_slot =
+      let%map sequence_state, last_sequence_slot =
         let [ s1; s2; s3; s4; s5 ] = init.sequence_state in
         let last_sequence_slot = init.last_sequence_slot in
         let is_this_slot =
@@ -1337,12 +1331,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Mina_numbers.Snapp_version.zero
       in
       let t : Snapp_account.t =
-        { init with
-          verification_key
-        ; snapp_version
-        ; sequence_state
-        ; last_sequence_slot
-        }
+        { init with snapp_version; sequence_state; last_sequence_slot }
       in
       if Snapp_account.(equal default t) then None else Some t
     in
@@ -1521,6 +1510,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let if_ = Parties.value_if
     end
 
+    module Verification_key = struct
+      type t = (Side_loaded_verification_key.t, Field.t) With_hash.t option
+
+      let if_ = Parties.value_if
+    end
+
     module Account = struct
       include Account
 
@@ -1601,6 +1596,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       let set_app_state app_state (a : t) =
         set_snapp a ~f:(fun snapp -> { snapp with app_state })
+
+      let register_verification_key (_ : t) = ()
+
+      let verification_key (a : t) = (get_snapp a).verification_key
+
+      let set_verification_key verification_key (a : t) =
+        set_snapp a ~f:(fun snapp -> { snapp with verification_key })
     end
 
     module Amount = struct
@@ -1684,6 +1686,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           Set_or_keep.map ~f:Option.some party.data.body.update.timing
 
         let app_state (party : t) = party.data.body.update.app_state
+
+        let verification_key (party : t) =
+          Snapp_basic.Set_or_keep.map ~f:Option.some
+            party.data.body.update.verification_key
       end
     end
 
