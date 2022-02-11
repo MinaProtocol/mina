@@ -1603,7 +1603,7 @@ module Base = struct
             let invalid_timing = ref None in
             let balance_check _ = failwith "Should not be called" in
             let timed_balance_check b =
-              invalid_timing := Some b ;
+              invalid_timing := Some (Boolean.not b) ;
               return ()
             in
             let `Min_balance _, timing =
