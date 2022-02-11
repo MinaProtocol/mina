@@ -38,7 +38,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	record "github.com/libp2p/go-libp2p-record"
 	p2pconfig "github.com/libp2p/go-libp2p/config"
-	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns_legacy"
+	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"golang.org/x/crypto/blake2b"
@@ -266,7 +266,7 @@ type Helper struct {
 	Host              host.Host
 	Bitswap           *bitswap.Bitswap
 	BitswapStorage    BitswapStorage
-	Mdns              *mdns.Service
+	Mdns              mdns.Service
 	Dht               *dual.DHT
 	Ctx               context.Context
 	Pubsub            *pubsub.PubSub
