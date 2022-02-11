@@ -53,7 +53,9 @@ module Graphql_args_raw = struct
      fun f_input field acc ->
       let ref_as_pipe = ref None in
       let arg =
-        Schema.Arg.arg (Field.name field) ~typ:(!(f_input#graphql_arg) ())
+        Schema.Arg.arg
+          (Fields_derivers.name_under_to_camel field)
+          ~typ:(!(f_input#graphql_arg) ())
       in
       let () =
         let inner_acc = acc#graphql_arg_accumulator in
