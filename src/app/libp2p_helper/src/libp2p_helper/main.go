@@ -139,8 +139,7 @@ func main() {
 	setLogLevel("routedhost", "debug")
 	setLogLevel("swarm2", "info") // Logs a new stream to each peer when opended at debug
 	setLogLevel("peerstore/ds", "debug")
-	setLogLevel("mdns", "debug")        // Logs each mdns call
-	setLogLevel("bootstrap", "debug")
+	setLogLevel("mdns", "debug") // Logs each mdns call
 	setLogLevel("reuseport-transport", "debug")
 
 	decoder := capnp.NewDecoder(os.Stdin)
