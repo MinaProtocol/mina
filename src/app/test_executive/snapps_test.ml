@@ -23,14 +23,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Parties.t plus another for the payment receiver
         *)
     ; block_producers =
-        [ { balance = "3000000000"; timing = Untimed }
-        ; { balance = "3000000000"; timing = Untimed }
-        ; { balance = "3000000000"; timing = Untimed }
-        ; { balance = "3000000000"; timing = Untimed }
-        ; { balance = "3000000000"; timing = Untimed }
-        ; { balance = "3000000000"; timing = Untimed }
-        ; { balance = "3000000000"; timing = Untimed }
-        ]
+        List.init 7 ~f:(fun _ -> { balance = "2000000000"; timing = Untimed })
     ; num_snark_workers = 0
     }
 
