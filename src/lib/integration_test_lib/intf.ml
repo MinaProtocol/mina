@@ -112,6 +112,8 @@ module Engine = struct
 
     val block_producers : t -> Node.t list
 
+    val transaction_accounts : t -> Test_config.Transaction_account.t list
+
     val snark_coordinators : t -> Node.t list
 
     val archive_nodes : t -> Node.t list

@@ -583,6 +583,7 @@ type t =
   ; constants : Test_config.constants
   ; seeds : Node.t list
   ; block_producers : Node.t list
+  ; transaction_accounts : Test_config.Transaction_account.t list
   ; snark_coordinators : Node.t list
   ; archive_nodes : Node.t list
   ; testnet_log_filter : string
@@ -599,6 +600,8 @@ let genesis_constants { constants; _ } = constants.genesis
 let seeds { seeds; _ } = seeds
 
 let block_producers { block_producers; _ } = block_producers
+
+let transaction_accounts { transaction_accounts; _ } = transaction_accounts
 
 let snark_coordinators { snark_coordinators; _ } = snark_coordinators
 

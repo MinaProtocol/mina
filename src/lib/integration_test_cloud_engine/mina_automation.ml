@@ -84,6 +84,7 @@ module Network_config = struct
         ; txpool_max_size
         ; requires_graphql
         ; block_producers
+        ; transaction_accounts
         ; num_snark_workers
         ; num_archive_nodes
         ; log_precomputed_blocks
@@ -111,7 +112,7 @@ module Network_config = struct
       if num_block_producers > List.length keypairs then
         failwith
           "not enough sample keypairs for specified number of block producers" ;
-      let f index ({ Test_config.Block_producer.balance; timing }, (pk, sk)) =
+      let make_runtime_account index ~balance ~timing ~keypair:(pk, sk) =
         let runtime_account =
           let timing =
             match timing with
@@ -149,7 +150,7 @@ module Network_config = struct
           in
           let default = Runtime_config.Accounts.Single.default in
           { default with
-            pk = Some (Public_key.Compressed.to_string pk)
+            pk = Some (Public_key.Compressed.to_base58_check pk)
           ; sk = None
           ; balance =
               Balance.of_formatted_string balance
@@ -168,11 +169,32 @@ module Network_config = struct
         ( Network_keypair.create_network_keypair ~keypair ~secret_name
         , runtime_account )
       in
-      List.mapi ~f
-        (List.zip_exn block_producers
-           (List.take keypairs (List.length block_producers)))
-      |> List.unzip
+      let block_producer_keypairs, block_producer_runtime_accounts =
+        List.mapi
+          (List.zip_exn block_producers
+             (List.take keypairs (List.length block_producers)))
+          ~f:(fun index (bp, (pk, sk)) ->
+            make_runtime_account index ~balance:bp.balance ~timing:bp.timing
+              ~keypair:(pk, sk))
+        |> List.unzip
+      in
+      let transaction_runtime_accounts =
+        List.mapi transaction_accounts ~f:(fun index txn_acct ->
+            let ({ private_key; public_key } : Signature_lib.Keypair.t) =
+              txn_acct.keypair
+            in
+            let sk = private_key in
+            let pk = Signature_lib.Public_key.compress public_key in
+            make_runtime_account index ~balance:txn_acct.balance
+              ~timing:txn_acct.timing ~keypair:(pk, sk))
+        |> List.map ~f:(fun (_keypair, acct) -> acct)
+      in
+      let runtime_accounts =
+        block_producer_runtime_accounts @ transaction_runtime_accounts
+      in
+      (block_producer_keypairs, runtime_accounts)
     in
+    Format.eprintf "NO BP KPS: %d@." (List.length block_producer_keypairs) ;
     (* DAEMON CONFIG *)
     let proof_config =
       (* TODO: lift configuration of these up Test_config.t *)
@@ -241,6 +263,7 @@ module Network_config = struct
     let mina_archive_schema =
       "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
     in
+    Format.eprintf "NO BP KPS 2: %d@." (List.length block_producer_keypairs) ;
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
@@ -431,6 +454,7 @@ module Network_manager = struct
         ~f:(fun bp_config ->
           cons_node bp_config.name "mina" None (Some bp_config.keypair))
     in
+    Format.eprintf "NO BP NODES: %d@." (List.length block_producer_nodes) ;
     let archive_nodes =
       List.init network_config.terraform.archive_node_count ~f:(fun i ->
           cons_node (sprintf "archive-%d" (i + 1)) "mina" (Some "archive") None)
@@ -477,6 +501,7 @@ module Network_manager = struct
       ; seeds = t.seed_nodes
       ; block_producers = t.block_producer_nodes
       ; snark_coordinators = t.snark_coordinator_nodes
+      ; transaction_accounts = []
       ; archive_nodes = t.archive_nodes
       ; nodes_by_app_id = t.nodes_by_app_id
       ; testnet_log_filter = t.testnet_log_filter
