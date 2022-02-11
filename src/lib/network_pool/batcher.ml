@@ -379,20 +379,28 @@ module Snark_pool = struct
             [%log info] "Dispatching $num_proofs snark pool proofs to verifier"
               ~metadata:[ ("num_proofs", `Int (List.length ps0)) ] ;
             let ps =
-              List.concat_map ps0 ~f:(function
-                  | `Partially_validated env | `Init env ->
-                  let ps, message = env.data in
-                  One_or_two.map ps ~f:(fun p -> (p, message))
-                  |> One_or_two.to_list)
+              O1trace.time_execution "dispatching_snark_pool_verifications_1"
+                (fun () ->
+                  List.concat_map ps0 ~f:(function
+                      | `Partially_validated env | `Init env ->
+                      let ps, message = env.data in
+                      One_or_two.map ps ~f:(fun p -> (p, message))
+                      |> One_or_two.to_list))
             in
             let open Deferred.Or_error.Let_syntax in
-            match%map Verifier.verify_transaction_snarks verifier ps with
-            | true ->
-                List.map ps0 ~f:(fun _ -> `Valid ())
-            | false ->
-                List.map ps0 ~f:(function
-                    | `Partially_validated env | `Init env ->
-                    `Potentially_invalid env)))
+            let%map result =
+              O1trace.time_execution "dispatching_snark_pool_verifications_2"
+                (fun () -> Verifier.verify_transaction_snarks verifier ps)
+            in
+            O1trace.time_execution "dispatching_snark_pool_verifications_3"
+              (fun () ->
+                match result with
+                | true ->
+                    List.map ps0 ~f:(fun _ -> `Valid ())
+                | false ->
+                    List.map ps0 ~f:(function
+                        | `Partially_validated env | `Init env ->
+                        `Potentially_invalid env))))
 
   module Work_key = struct
     module T = struct
