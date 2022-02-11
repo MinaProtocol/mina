@@ -51,3 +51,8 @@ let optional_global_slot (json : Yojson.Basic.t option) =
   Option.bind
     (json :> Yojson.Safe.t option)
     ~f:(Fn.compose Result.ok Mina_numbers.Global_slot.of_yojson)
+
+let state_hash (json : Yojson.Basic.t option) =
+  Option.bind
+    (json :> Yojson.Safe.t option)
+    ~f:(Fn.compose Result.ok Mina_base.State_hash.of_yojson)

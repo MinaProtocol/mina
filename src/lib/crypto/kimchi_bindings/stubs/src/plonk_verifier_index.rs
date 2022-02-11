@@ -1,8 +1,6 @@
 use ark_ec::AffineCurve;
 use commitment_dlog::{commitment::CommitmentCurve, PolyComm};
-use kimchi::circuits::{
-    gate::LookupsUsed,
-};
+use kimchi::circuits::gate::LookupsUsed;
 use kimchi::verifier::LookupVerifierIndex;
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]

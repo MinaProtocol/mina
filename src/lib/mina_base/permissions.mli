@@ -40,7 +40,7 @@ end
 module Poly : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type ('bool, 'controller) t =
         { stake : 'bool
         ; edit_state : 'controller
@@ -53,6 +53,7 @@ module Poly : sig
         ; edit_sequence_state : 'controller
         ; set_token_symbol : 'controller
         ; increment_nonce : 'controller
+        ; set_voting_for : 'controller
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
@@ -61,8 +62,8 @@ end
 
 [%%versioned:
 module Stable : sig
-  module V1 : sig
-    type t = (bool, Auth_required.Stable.V1.t) Poly.Stable.V1.t
+  module V2 : sig
+    type t = (bool, Auth_required.Stable.V1.t) Poly.Stable.V2.t
     [@@deriving sexp, equal, compare, hash, yojson]
   end
 end]
