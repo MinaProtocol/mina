@@ -37,11 +37,10 @@ module Time = struct
       let s = string_of_int i in
       if Int.(i < 10) then "0" ^ s else s
     in
-    Stdlib.Format.sprintf "%i-%a-%a %a:%a:%a UTC" (Date.year date)
-      fmt_2_chars
+    Stdlib.Format.sprintf "%i-%a-%a %a:%a:%a UTC" (Date.year date) fmt_2_chars
       (Date.month date |> Month.to_int)
-      fmt_2_chars (Date.day date) fmt_2_chars time_parts.hr
-      fmt_2_chars time_parts.min fmt_2_chars time_parts.sec
+      fmt_2_chars (Date.day date) fmt_2_chars time_parts.hr fmt_2_chars
+      time_parts.min fmt_2_chars time_parts.sec
 
   let pretty_to_string_ref = ref pretty_to_string
 
