@@ -20,6 +20,8 @@ let dirtyWhen = [
   S.strictlyStart (S.contains "buildkite/src/Command/MinaArtifact"),
   S.exactly "buildkite/scripts/build-artifact" "sh",
   S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh",
+  S.strictlyStart (S.contains "buildkite/src/Jobs/Test"),
+  S.strictlyStart (S.contains "buildkite/src/Command"),
   S.strictlyStart (S.contains "dockerfiles"),
   S.strictlyStart (S.contains "scripts")
 ]
@@ -49,7 +51,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
               -- add zexe standardization preprocessing step (see: https://github.com/MinaProtocol/mina/pull/5777)
               "PREPROCESSOR=./scripts/zexe-standardize.sh"
             ] "./buildkite/scripts/build-artifact.sh",
-            label = "Build Mina packages for Debian ${DebianVersions.capitalName debVersion}",
+            label = "Build Mina for ${DebianVersions.capitalName debVersion}",
             key = "build-deb-pkg",
             target = Size.XLarge,
             retries = [ Command.Retry::{ exit_status = +2, limit = Some 2 } ] -- libp2p error
@@ -97,9 +99,9 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         let rosettaSpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOnGitEnv,
           service="mina-rosetta",
-          extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH}",
+          extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --no-cache",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="rosetta-mainnet-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
         }
 
         in
@@ -111,7 +113,10 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
 in
 {
-  buster  = pipeline DebianVersions.DebVersion.Buster,
-  stretch = pipeline DebianVersions.DebVersion.Stretch,
-  dirtyWhen = dirtyWhen
+  bullseye  = pipeline DebianVersions.DebVersion.Bullseye
+  , buster  = pipeline DebianVersions.DebVersion.Buster
+  , stretch = pipeline DebianVersions.DebVersion.Stretch
+  , bionic = pipeline DebianVersions.DebVersion.Bionic
+  , focal   = pipeline DebianVersions.DebVersion.Focal
+  , dirtyWhen = dirtyWhen
 }

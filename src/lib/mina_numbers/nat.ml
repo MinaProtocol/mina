@@ -4,10 +4,9 @@ open Core_kernel
 open Fold_lib
 include Intf
 module Intf = Intf
+open Snark_bits
 
 [%%ifdef consensus_mechanism]
-
-open Snark_bits
 
 let zero_checked =
   Snarky_integer.Integer.constant ~m:Snark_params.Tick.m Bigint.zero
@@ -112,10 +111,6 @@ struct
 
   let zero = zero_checked
 end
-
-[%%else]
-
-open Snark_bits_nonconsensus
 
 [%%endif]
 

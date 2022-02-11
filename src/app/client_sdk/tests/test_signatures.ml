@@ -2,24 +2,8 @@
     for comparison against signatures generated in client SDK
  *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Mina_base = Mina_base_nonconsensus
-module Signature_lib = Signature_lib_nonconsensus
-module Currency = Currency_nonconsensus.Currency
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-
-[%%endif]
-
 open Mina_base
 open Signature_lib
 
