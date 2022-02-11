@@ -1247,14 +1247,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let check e b = if b then Ok () else Error (failure e)
 
-  open Pickles_types
-
-  let apply_body ~check_auth ~has_proof ~global_slot_since_genesis ~is_start
+  let apply_body ~check_auth ~global_slot_since_genesis ~is_start
       ({ body =
            { public_key = _
            ; token_id = _
            ; update =
-               { app_state
+               { app_state = _
                ; delegate
                ; verification_key
                ; permissions
@@ -1297,19 +1295,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       else return a.delegate
     in
     let%bind snapp =
-      let proved_state =
-        let is_keep = Vector.for_all ~f:Set_or_keep.is_keep app_state in
-        if is_keep then init.proved_state
-        else if not has_proof then false
-        else if Vector.for_all ~f:Set_or_keep.is_set app_state then true
-        else init.proved_state
-      in
-      let%map app_state =
-        update a.permissions.edit_state app_state init.app_state
-          ~is_keep:(Vector.for_all ~f:Set_or_keep.is_keep)
-          ~update:(Vector.map2 ~f:Set_or_keep.set_or_keep)
-          ~error:Update_not_permitted_app_state
-      and verification_key =
+      let%map verification_key =
         update a.permissions.set_verification_key verification_key
           init.verification_key ~is_keep:Set_or_keep.is_keep
           ~update:(fun u x ->
@@ -1351,12 +1337,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Mina_numbers.Snapp_version.zero
       in
       let t : Snapp_account.t =
-        { app_state
-        ; verification_key
+        { init with
+          verification_key
         ; snapp_version
         ; sequence_state
         ; last_sequence_slot
-        ; proved_state
         }
       in
       if Snapp_account.(equal default t) then None else Some t
@@ -1429,6 +1414,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
     module Field = struct
       type t = Snark_params.Tick.Field.t
+
+      let if_ = Parties.value_if
     end
 
     module Bool = struct
@@ -1449,6 +1436,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let ( ||| ) = ( || )
 
       let ( &&& ) = ( && )
+
+      let all = List.for_all ~f:Fn.id
     end
 
     module Ledger = struct
@@ -1588,6 +1577,30 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           |> Or_error.ok_exn
         in
         (invalid_timing, Party.Update.Timing_info.of_account_timing timing)
+
+      let make_snapp (a : t) =
+        let snapp =
+          match a.snapp with
+          | None ->
+              Some Snapp_account.default
+          | Some _ as snapp ->
+              snapp
+        in
+        { a with snapp }
+
+      let get_snapp (a : t) = Option.value_exn a.snapp
+
+      let set_snapp (a : t) ~f : t = { a with snapp = Option.map a.snapp ~f }
+
+      let proved_state (a : t) = (get_snapp a).proved_state
+
+      let set_proved_state proved_state (a : t) =
+        set_snapp a ~f:(fun snapp -> { snapp with proved_state })
+
+      let app_state (a : t) = (get_snapp a).app_state
+
+      let set_app_state app_state (a : t) =
+        set_snapp a ~f:(fun snapp -> { snapp with app_state })
     end
 
     module Amount = struct
@@ -1669,6 +1682,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
         let timing (party : t) : Account.timing set_or_keep =
           Set_or_keep.map ~f:Option.some party.data.body.update.timing
+
+        let app_state (party : t) = party.data.body.update.app_state
       end
     end
 
@@ -1826,7 +1841,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               ~check_auth:
                 (Fn.flip Permissions.Auth_required.check
                    (Control.tag p.authorization))
-              ~has_proof:(Control.Tag.equal (Control.tag p.authorization) Proof)
               ~global_slot_since_genesis:
                 global_state.protocol_state.global_slot_since_genesis ~is_start
               p.data a

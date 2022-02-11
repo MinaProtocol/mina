@@ -1217,7 +1217,7 @@ module Base = struct
              { public_key
              ; token_id = _
              ; update =
-                 { app_state
+                 { app_state = _
                  ; delegate
                  ; verification_key
                  ; permissions
@@ -1258,33 +1258,6 @@ module Base = struct
       let ( ! ) = run_checked in
       let open Snapp_basic in
       let snapp : Snapp_account.Checked.t =
-        let keeping_app_state =
-          Boolean.all
-            (List.map (Vector.to_list app_state) ~f:Set_or_keep.Checked.is_keep)
-        in
-        let changing_app_state =
-          Boolean.all
-            (List.map (Vector.to_list app_state) ~f:Set_or_keep.Checked.is_set)
-        in
-        let proved_state =
-          Boolean.if_ keeping_app_state ~then_:a.snapp.proved_state
-            ~else_:
-              ( if Option.is_none tag then (* No proof *)
-                Boolean.false_
-              else
-                (* Has a proof, set proved_state if entire state was set *)
-                Boolean.if_ changing_app_state ~then_:Boolean.true_
-                  ~else_:a.snapp.proved_state )
-        in
-        let app_state =
-          with_label __LOC__ (fun () ->
-              update_authorized a.permissions.edit_state
-                ~is_keep:keeping_app_state
-                ~updated:
-                  (`Ok
-                    (Vector.map2 app_state a.snapp.app_state
-                       ~f:(Set_or_keep.Checked.set_or_keep ~if_:Field.if_))))
-        in
         Option.iter tag ~f:(fun t ->
             Pickles.Side_loaded.in_circuit t
               (Lazy.force a.snapp.verification_key.data)) ;
@@ -1333,18 +1306,17 @@ module Base = struct
           (* Current snapp version. Upgrade mechanism should live here. *)
           Mina_numbers.Snapp_version.(Checked.constant zero)
         in
-        { Snapp_account.verification_key =
+        { a.snapp with
+          Snapp_account.verification_key =
             (* Big hack. This relies on the fact that the "data" is not
                used for computing the hash of the snapp account. We can't
                provide the verification key since it's not available here. *)
             { With_hash.hash = lazy verification_key
             ; data = lazy (failwith "unused")
             }
-        ; app_state
         ; snapp_version
         ; sequence_state
         ; last_sequence_slot
-        ; proved_state
         }
       in
       let snapp_uri =
@@ -1601,6 +1573,18 @@ module Base = struct
                    ~txn_amount:None ~txn_global_slot
             in
             (`Invalid_timing (Option.value_exn !invalid_timing), timing)
+
+          let make_snapp (a : t) = a
+
+          let proved_state (a : t) = a.data.snapp.proved_state
+
+          let set_proved_state proved_state ({ data = a; hash } : t) : t =
+            { data = { a with snapp = { a.snapp with proved_state } }; hash }
+
+          let app_state (a : t) = a.data.snapp.app_state
+
+          let set_app_state app_state ({ data = a; hash } : t) : t =
+            { data = { a with snapp = { a.snapp with app_state } }; hash }
         end
 
         module Ledger = struct
@@ -2006,6 +1990,8 @@ module Base = struct
               Set_or_keep.Checked.map
                 ~f:Party.Update.Timing_info.Checked.to_account_timing
                 party.data.body.update.timing
+
+            let app_state ({ party; _ } : t) = party.data.body.update.app_state
           end
         end
 
@@ -2076,6 +2062,8 @@ module Base = struct
 
         module Field = struct
           type t = Field.t
+
+          let if_ = Field.if_
         end
 
         module Local_state = struct

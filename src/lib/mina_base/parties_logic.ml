@@ -1,5 +1,7 @@
 (* parties_logic.ml *)
 
+open Core_kernel
+
 module type Iffable = sig
   type bool
 
@@ -26,6 +28,8 @@ module type Bool_intf = sig
   val ( &&& ) : t -> t -> t
 
   val assert_ : t -> unit
+
+  val all : t list -> t
 end
 
 module type Balance_intf = sig
@@ -239,6 +243,10 @@ module type Party_intf = sig
     type timing
 
     val timing : t -> timing set_or_keep
+
+    type field
+
+    val app_state : t -> field set_or_keep Snapp_state.V.t
   end
 end
 
@@ -371,6 +379,19 @@ module type Account_intf = sig
 
   val check_timing :
     txn_global_slot:global_slot -> t -> [ `Invalid_timing of bool ] * timing
+
+  (** Fill the snapp field of the account if it's currently [None] *)
+  val make_snapp : t -> t
+
+  val proved_state : t -> bool
+
+  val set_proved_state : bool -> t -> t
+
+  type field
+
+  val app_state : t -> field Snapp_state.V.t
+
+  val set_app_state : field Snapp_state.V.t -> t -> t
 end
 
 module Eff = struct
@@ -414,11 +435,9 @@ end
 type 'e handler = { perform : 'r. ('r, 'e) Eff.t -> 'r }
 
 module type Inputs_intf = sig
-  module Field : sig
-    type t
-  end
-
   module Bool : Bool_intf
+
+  module Field : Iffable with type bool := Bool.t
 
   module Amount : Amount_intf with type bool := Bool.t
 
@@ -452,6 +471,7 @@ module type Inputs_intf = sig
        and type balance := Balance.t
        and type bool := Bool.t
        and type global_slot := Global_slot.t
+       and type field := Field.t
 
   module Party :
     Party_intf
@@ -463,6 +483,7 @@ module type Inputs_intf = sig
        and type public_key := Public_key.t
        and type Update.timing := Timing.t
        and type 'a Update.set_or_keep := 'a Set_or_keep.t
+       and type Update.field := Field.t
 
   module Ledger :
     Ledger_intf
@@ -815,6 +836,48 @@ module Make (Inputs : Inputs_intf) = struct
           invalid_timing
       in
       let a = Account.set_timing timing a in
+      (a, local_state)
+    in
+    (* Transform into a snapp account.
+       This must be done before updating snapp fields!
+    *)
+    let a = Account.make_snapp a in
+    (* Update app state. *)
+    let a, local_state =
+      let app_state = Party.Update.app_state party in
+      let keeping_app_state =
+        Bool.all
+          (List.map ~f:Set_or_keep.is_keep
+             (Pickles_types.Vector.to_list app_state))
+      in
+      let changing_app_state =
+        Bool.all
+          (List.map ~f:Set_or_keep.is_keep
+             (Pickles_types.Vector.to_list app_state))
+      in
+      let proved_state =
+        Bool.if_ keeping_app_state ~then_:(Account.proved_state a)
+          ~else_:
+            (Bool.if_ proof_verifies
+               ~then_:
+                 (Bool.if_ changing_app_state ~then_:Bool.true_
+                    ~else_:(Account.proved_state a))
+               ~else_:Bool.false_)
+      in
+      let a = Account.set_proved_state proved_state a in
+      let has_permission =
+        Controller.check ~proof_verifies ~signature_verifies
+          (Account.Permissions.edit_state a)
+      in
+      let local_state =
+        Local_state.add_check local_state Update_not_permitted_app_state
+          Bool.((not keeping_app_state) ||| has_permission)
+      in
+      let app_state =
+        Pickles_types.Vector.map2 app_state (Account.app_state a)
+          ~f:(Set_or_keep.set_or_keep ~if_:Field.if_)
+      in
+      let a = Account.set_app_state app_state a in
       (a, local_state)
     in
     let a', update_permitted, failure_status =
