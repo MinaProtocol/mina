@@ -439,19 +439,11 @@ let verify_blockchain_snarks { worker; logger } chains =
               |> Deferred.Or_error.map ~f:(fun x -> `Continue x)
             ]))
 
-module Id = Unique_id.Int ()
-
 let verify_transaction_snarks { worker; logger } ts =
   trace_recurring "Verifier.verify_transaction_snarks" (fun () ->
-      let id = Id.create () in
       let n = List.length ts in
-      let metadata () =
-        ("id", `String (Id.to_string id))
-        :: ("n", `Int n)
-        :: Memory_stats.(jemalloc_memory_stats () @ ocaml_memory_stats ())
-      in
-      [%log trace] "verify $n transaction_snarks (before)"
-        ~metadata:(metadata ()) ;
+      let metadata = [ ("n", `Int n) ] in
+      [%log trace] "verify $n transaction_snarks (before)" ~metadata ;
       let%map res =
         O1trace.time_execution "submit_verify_transaction_snarks_to_verifier"
           (fun () ->
@@ -465,7 +457,7 @@ let verify_transaction_snarks { worker; logger } ts =
         ~metadata:
           ( ( "result"
             , `String (Sexp.to_string ([%sexp_of: bool Or_error.t] res)) )
-          :: metadata () ) ;
+          :: metadata ) ;
       res)
 
 let verify_commands { worker; logger } ts =
