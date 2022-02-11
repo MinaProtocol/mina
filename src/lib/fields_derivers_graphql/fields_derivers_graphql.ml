@@ -4,10 +4,10 @@ open Fieldslib
 module Graphql_args_raw = struct
   module Make (Schema : Graphql_intf.Schema) = struct
     module Input = struct
-      type ('row, 'c, 'ty) t =
+      type ('row, 'result, 'ty) t =
         < graphql_arg : (unit -> 'ty Schema.Arg.arg_typ) ref
         ; nullable_graphql_arg : (unit -> 'ty option Schema.Arg.arg_typ) ref
-        ; map : ('ty -> 'c) ref
+        ; map : ('ty -> 'result) ref
         ; .. >
         as
         'row
@@ -23,8 +23,8 @@ module Graphql_args_raw = struct
         type 'ty t = Init | Acc : ('ty, 'fields) t_inner -> 'ty t
       end
 
-      type ('row, 'c, 'ty) t =
-        < graphql_arg_accumulator : 'c T.t ref ; .. > as 'row
+      type ('row, 'result, 'ty) t =
+        < graphql_arg_accumulator : 'result T.t ref ; .. > as 'row
         constraint ('row, 'c, 'ty) t = ('row, 'c, 'ty) Input.t
     end
 
@@ -38,12 +38,11 @@ module Graphql_args_raw = struct
         constraint ('row, 'c, 'ty) t = ('row, 'c, 'ty) Input.t
     end
 
-    let add_field (type field_type ty result) :
-           ('f_row, result, field_type) Input.t
-        -> ([< `Read | `Set_and_create ], result, field_type) Field.t_with_perm
-        -> ('row, result, ty) Acc.t
-        -> (('row, result, ty) Creator.t -> ty) * ('row_after, result, ty) Acc.t
-        =
+    let add_field (type f f' ty ty') :
+           ('f_row, f', f) Input.t
+        -> ([< `Read | `Set_and_create ], ty, f) Field.t_with_perm
+        -> ('row, ty', ty) Acc.t
+        -> (('row, ty', ty) Creator.t -> f') * ('row_after, ty', ty) Acc.t =
      fun f_input field acc ->
       let ref_as_pipe = ref None in
       let arg =
@@ -58,7 +57,7 @@ module Graphql_args_raw = struct
                 { graphql_arg_coerce =
                     (fun x ->
                       ref_as_pipe := Some x ;
-                      !(acc#map) @@ !(acc#graphql_creator) acc)
+                      !(acc#graphql_creator) acc)
                 ; graphql_arg_fields = [ arg ]
                 }
         | Acc { graphql_arg_fields; graphql_arg_coerce } -> (
@@ -69,7 +68,7 @@ module Graphql_args_raw = struct
                     { graphql_arg_coerce =
                         (fun x ->
                           ref_as_pipe := Some x ;
-                          !(acc#map) @@ !(acc#graphql_creator) acc)
+                          !(acc#graphql_creator) acc)
                     ; graphql_arg_fields = [ arg ]
                     }
             | _ ->
@@ -82,10 +81,12 @@ module Graphql_args_raw = struct
                     ; graphql_arg_fields = arg :: graphql_arg_fields
                     } )
       in
-      ((fun _creator_input -> Option.value_exn !ref_as_pipe), acc)
+      ( (fun _creator_input -> !(f_input#map) @@ Option.value_exn !ref_as_pipe)
+      , acc )
 
-    let finish ?doc ~name (type ty) :
-        (('row, ty) Input.t -> ty) * ('row, ty) Acc.t -> 'row Output.t =
+    let finish ?doc ~name (type ty result) :
+           (('row, result, ty) Input.t -> result) * ('row, result, ty) Acc.t
+        -> _ Output.t =
      fun (creator, acc) ->
       acc#graphql_creator := creator ;
       (acc#graphql_arg :=
@@ -94,19 +95,21 @@ module Graphql_args_raw = struct
            | Init ->
                failwith "Graphql args need at least one field"
            | Acc { graphql_arg_fields; graphql_arg_coerce } ->
-               Schema.Arg.(
-                 obj ?doc name ~fields:graphql_arg_fields
-                   ~coerce:graphql_arg_coerce
-                 |> non_null)) ;
+               Obj.magic
+               @@ Schema.Arg.(
+                    obj ?doc name ~fields:graphql_arg_fields
+                      ~coerce:graphql_arg_coerce
+                    |> non_null)) ;
       (acc#nullable_graphql_arg :=
          fun () ->
            match !(acc#graphql_arg_accumulator) with
            | Init ->
                failwith "Graphql args need at least one field"
            | Acc { graphql_arg_fields; graphql_arg_coerce } ->
-               Schema.Arg.(
-                 obj ?doc name ~fields:graphql_arg_fields
-                   ~coerce:graphql_arg_coerce)) ;
+               Obj.magic
+               @@ Schema.Arg.(
+                    obj ?doc name ~fields:graphql_arg_fields
+                      ~coerce:graphql_arg_coerce)) ;
       acc
 
     let int obj =
@@ -130,7 +133,7 @@ module Graphql_args_raw = struct
       (obj#nullable_graphql_arg := fun () -> Schema.Arg.bool) ;
       obj
 
-    let list x obj : (_, 'input_type list) Input.t =
+    let list x obj : (_, 'result list, 'input_type list) Input.t =
       (obj#graphql_arg :=
          fun () -> Schema.Arg.(non_null (list (!(x#graphql_arg) ())))) ;
       obj#map := List.map ~f:!(x#map) ;
@@ -139,7 +142,7 @@ module Graphql_args_raw = struct
          fun () -> Schema.Arg.(list (!(x#graphql_arg) ()))) ;
       obj
 
-    let option (x : (_, 'input_type) Input.t) obj =
+    let option (x : (_, 'result, 'input_type) Input.t) obj =
       obj#graphql_arg := !(x#nullable_graphql_arg) ;
       (obj#nullable_graphql_arg :=
          fun () -> failwith "you can't double option in graphql args") ;
@@ -147,15 +150,13 @@ module Graphql_args_raw = struct
       obj#graphql_arg_accumulator := !(x#graphql_arg_accumulator) ;
       obj
 
-    (*
-    let map ~(f : 'c -> 'd) (x : ('input_type, 'b, 'c, 'nullable) Input.t) obj :
-        ('input_type, _, 'd, _) Input.t =
+    let map ~(f : 'c -> 'd) (x : (_, 'c, 'input_type) Input.t) obj :
+        (_, 'd, 'input_type) Input.t =
       obj#graphql_fields := !(x#graphql_fields) ;
-      (obj#contramap := fun a -> !(x#contramap) (f a)) ;
+      (obj#map := fun a -> f (!(x#map) a)) ;
       obj#nullable_graphql_fields := !(x#nullable_graphql_fields) ;
       obj#graphql_fields_accumulator := !(x#graphql_fields_accumulator) ;
       obj
-      *)
   end
 end
 
