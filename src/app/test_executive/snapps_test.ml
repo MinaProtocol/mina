@@ -23,7 +23,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Parties.t plus another for the payment receiver
         *)
     ; block_producers =
-        List.init 11 ~f:(fun _ -> { balance = "2000000000"; timing = Untimed })
+        List.init 5 ~f:(fun _ -> { balance = "2000000000"; timing = Untimed })
     ; num_snark_workers = 0
     }
 
@@ -39,6 +39,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let[@warning "-8"] (Parties parties0 : Mina_base.User_command.t), _, _, _ =
       Quickcheck.random_value
         (Mina_base.User_command_generators.parties_with_ledger ())
+    in
+    (* limit number of other parties, so don't need too many block producers *)
+    let max_other_parties = 3 in
+    let parties1 =
+      { parties0 with
+        other_parties = List.take parties0.other_parties max_other_parties
+      }
     in
     let mk_parties_with_signatures ~fee_payer_nonce
         (parties : Mina_base.Parties.t) =
@@ -135,7 +142,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     *)
     let%bind fee_payer_pk = Util.pub_key_of_node node in
     let%bind other_parties_with_valid_keys =
-      Malleable_error.List.mapi parties0.other_parties
+      Malleable_error.List.mapi parties1.other_parties
         ~f:(fun ndx { data; authorization } ->
           (* 0th node has keypair for fee payer, so start at 1 *)
           let node = List.nth_exn block_producer_nodes (ndx + 1) in
@@ -144,13 +151,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           { Mina_base.Party.data; authorization })
     in
     let parties_valid_pks =
-      { parties0 with
+      { parties1 with
         fee_payer =
-          { parties0.fee_payer with
+          { parties1.fee_payer with
             data =
-              { parties0.fee_payer.data with
+              { parties1.fee_payer.data with
                 body =
-                  { parties0.fee_payer.data.body with
+                  { parties1.fee_payer.data.body with
                     public_key = fee_payer_pk
                   }
               }
