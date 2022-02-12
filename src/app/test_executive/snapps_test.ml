@@ -174,7 +174,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       }
     in
     let%bind parties_valid =
-      mk_parties_with_signatures ~fee_payer_nonce:Unsigned.UInt32.zero
+      mk_parties_with_signatures ~fee_payer_nonce:Mina_base.Account.Nonce.zero
         parties_no_fee_payer_update
     in
     let sender_pub_key = fee_payer_pk in
@@ -238,16 +238,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "send a snapp with bad fee payer signature"
         (* update nonce, signatures
 
-           we've sent a snapp with the same account, so new nonce is 1
-
-           TODO: when the payment sender is changed to be the snapp fee payer, the
-           new nonce will be 2
+           we've sent a snapp and payment with the same account, so new nonce is 2
 
            if we don't provide a valid nonce, the snapps would fail with Invalid_nonce
            instead of the desired Invalid_signature
         *)
         (let%bind parties_next_nonce =
-           mk_parties_with_signatures ~fee_payer_nonce:Unsigned.UInt32.one
+           mk_parties_with_signatures
+             ~fee_payer_nonce:(Mina_base.Account.Nonce.of_int 2)
              parties_valid_pks
          in
          let parties_bad_signature =
