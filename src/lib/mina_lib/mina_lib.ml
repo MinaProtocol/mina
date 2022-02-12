@@ -1168,24 +1168,25 @@ let start t =
     t.block_production_status := block_production_status ;
     t.next_producer_timing <- Some next_producer_timing
   in
-  Block_producer.run ~logger:t.config.logger ~verifier:t.processes.verifier
-    ~set_next_producer_timing ~prover:t.processes.prover
-    ~trust_system:t.config.trust_system
-    ~transaction_resource_pool:
-      (Network_pool.Transaction_pool.resource_pool
-         t.components.transaction_pool)
-    ~get_completed_work:
-      (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
-    ~time_controller:t.config.time_controller
-    ~keypairs:(Agent.read_only t.block_production_keypairs)
-    ~coinbase_receiver:t.coinbase_receiver
-    ~consensus_local_state:t.config.consensus_local_state
-    ~frontier_reader:t.components.transition_frontier
-    ~transition_writer:t.pipes.producer_transition_writer
-    ~log_block_creation:t.config.log_block_creation
-    ~precomputed_values:t.config.precomputed_values
-    ~block_reward_threshold:t.config.block_reward_threshold
-    ~block_produced_bvar:t.components.block_produced_bvar ;
+  O1trace.time_execution "in_block_producer" (fun () ->
+      Block_producer.run ~logger:t.config.logger ~verifier:t.processes.verifier
+        ~set_next_producer_timing ~prover:t.processes.prover
+        ~trust_system:t.config.trust_system
+        ~transaction_resource_pool:
+          (Network_pool.Transaction_pool.resource_pool
+             t.components.transaction_pool)
+        ~get_completed_work:
+          (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
+        ~time_controller:t.config.time_controller
+        ~keypairs:(Agent.read_only t.block_production_keypairs)
+        ~coinbase_receiver:t.coinbase_receiver
+        ~consensus_local_state:t.config.consensus_local_state
+        ~frontier_reader:t.components.transition_frontier
+        ~transition_writer:t.pipes.producer_transition_writer
+        ~log_block_creation:t.config.log_block_creation
+        ~precomputed_values:t.config.precomputed_values
+        ~block_reward_threshold:t.config.block_reward_threshold
+        ~block_produced_bvar:t.components.block_produced_bvar) ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
@@ -1560,94 +1561,100 @@ let create ?wallets (config : Config.t) =
                     Mina_networking.peers net)
           in
           let%bind net =
-            Mina_networking.create config.net_config ~get_some_initial_peers
-              ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
-                (fun query_env ->
-                trace_recurring
-                  "get_staged_ledger_aux_and_pending_coinbases_at_hash"
-                  (fun () ->
-                    let input = Envelope.Incoming.data query_env in
-                    Deferred.return
-                    @@
-                    let open Option.Let_syntax in
-                    let%bind frontier =
-                      Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                    in
-                    let%map ( scan_state
-                            , expected_merkle_root
-                            , pending_coinbases
-                            , protocol_states ) =
-                      Sync_handler
-                      .get_staged_ledger_aux_and_pending_coinbases_at_hash
-                        ~frontier input
-                    in
-                    let staged_ledger_hash =
-                      Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-                        (Staged_ledger.Scan_state.hash scan_state)
-                        expected_merkle_root pending_coinbases
-                    in
-                    [%log' debug config.logger]
-                      ~metadata:
-                        [ ( "staged_ledger_hash"
-                          , Staged_ledger_hash.to_yojson staged_ledger_hash )
-                        ]
-                      "sending scan state and pending coinbase" ;
-                    ( scan_state
-                    , expected_merkle_root
-                    , pending_coinbases
-                    , protocol_states )))
-              ~answer_sync_ledger_query:(fun query_env ->
-                let open Deferred.Or_error.Let_syntax in
-                trace_recurring "answer_sync_ledger_query" (fun () ->
-                    let ledger_hash, _ = Envelope.Incoming.data query_env in
-                    let%bind frontier =
-                      Deferred.return @@ peek_frontier frontier_broadcast_pipe_r
-                    in
-                    Sync_handler.answer_query ~frontier ledger_hash
-                      (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
-                      ~logger:config.logger ~trust_system:config.trust_system
-                    |> Deferred.map
-                       (* begin error string prefix so we can pattern-match *)
-                         ~f:
-                           (Result.of_option
-                              ~error:
-                                (Error.createf
-                                   !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
-                                   Mina_networking.refused_answer_query_string
-                                   ledger_hash))))
-              ~get_ancestry:
-                (handle_request "get_ancestry"
-                   ~f:
-                     (Sync_handler.Root.prove ~consensus_constants
-                        ~logger:config.logger))
-              ~get_best_tip:
-                (handle_request "get_best_tip" ~f:(fun ~frontier () ->
-                     let open Option.Let_syntax in
-                     let open Proof_carrying_data in
-                     let%map proof_with_data =
-                       Best_tip_prover.prove ~logger:config.logger frontier
-                     in
-                     { proof_with_data with
-                       data = With_hash.data proof_with_data.data
-                     }))
-              ~get_node_status
-              ~get_transition_chain_proof:
-                (handle_request "get_transition_chain_proof"
-                   ~f:(fun ~frontier hash ->
-                     Transition_chain_prover.prove ~frontier hash))
-              ~get_transition_chain:
-                (handle_request "get_transition_chain"
-                   ~f:Sync_handler.get_transition_chain)
-              ~get_transition_knowledge:(fun _q ->
-                trace_recurring "get_transition_knowledge" (fun () ->
-                    return
-                      ( match
+            O1trace.time_execution "in_networking" (fun () ->
+                Mina_networking.create config.net_config ~get_some_initial_peers
+                  ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
+                    (fun query_env ->
+                    trace_recurring
+                      "get_staged_ledger_aux_and_pending_coinbases_at_hash"
+                      (fun () ->
+                        let input = Envelope.Incoming.data query_env in
+                        Deferred.return
+                        @@
+                        let open Option.Let_syntax in
+                        let%bind frontier =
                           Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                        with
-                      | None ->
-                          []
-                      | Some frontier ->
-                          Sync_handler.best_tip_path ~frontier )))
+                        in
+                        let%map ( scan_state
+                                , expected_merkle_root
+                                , pending_coinbases
+                                , protocol_states ) =
+                          Sync_handler
+                          .get_staged_ledger_aux_and_pending_coinbases_at_hash
+                            ~frontier input
+                        in
+                        let staged_ledger_hash =
+                          Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
+                            (Staged_ledger.Scan_state.hash scan_state)
+                            expected_merkle_root pending_coinbases
+                        in
+                        [%log' debug config.logger]
+                          ~metadata:
+                            [ ( "staged_ledger_hash"
+                              , Staged_ledger_hash.to_yojson staged_ledger_hash
+                              )
+                            ]
+                          "sending scan state and pending coinbase" ;
+                        ( scan_state
+                        , expected_merkle_root
+                        , pending_coinbases
+                        , protocol_states )))
+                  ~answer_sync_ledger_query:(fun query_env ->
+                    let open Deferred.Or_error.Let_syntax in
+                    trace_recurring "answer_sync_ledger_query" (fun () ->
+                        let ledger_hash, _ = Envelope.Incoming.data query_env in
+                        let%bind frontier =
+                          Deferred.return
+                          @@ peek_frontier frontier_broadcast_pipe_r
+                        in
+                        Sync_handler.answer_query ~frontier ledger_hash
+                          (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
+                          ~logger:config.logger
+                          ~trust_system:config.trust_system
+                        |> Deferred.map
+                           (* begin error string prefix so we can pattern-match *)
+                             ~f:
+                               (Result.of_option
+                                  ~error:
+                                    (Error.createf
+                                       !"%s for ledger_hash: \
+                                         %{sexp:Ledger_hash.t}"
+                                       Mina_networking
+                                       .refused_answer_query_string ledger_hash))))
+                  ~get_ancestry:
+                    (handle_request "get_ancestry"
+                       ~f:
+                         (Sync_handler.Root.prove ~consensus_constants
+                            ~logger:config.logger))
+                  ~get_best_tip:
+                    (handle_request "get_best_tip" ~f:(fun ~frontier () ->
+                         let open Option.Let_syntax in
+                         let open Proof_carrying_data in
+                         let%map proof_with_data =
+                           Best_tip_prover.prove ~logger:config.logger frontier
+                         in
+                         { proof_with_data with
+                           data = With_hash.data proof_with_data.data
+                         }))
+                  ~get_node_status
+                  ~get_transition_chain_proof:
+                    (handle_request "get_transition_chain_proof"
+                       ~f:(fun ~frontier hash ->
+                         Transition_chain_prover.prove ~frontier hash))
+                  ~get_transition_chain:
+                    (handle_request "get_transition_chain"
+                       ~f:Sync_handler.get_transition_chain)
+                  ~get_transition_knowledge:(fun _q ->
+                    trace_recurring "get_transition_knowledge" (fun () ->
+                        return
+                          ( match
+                              Broadcast_pipe.Reader.peek
+                                frontier_broadcast_pipe_r
+                            with
+                          | None ->
+                              []
+                          | Some frontier ->
+                              Sync_handler.best_tip_path ~frontier ))))
           in
           (* tie the first knot *)
           net_ref := Some net ;

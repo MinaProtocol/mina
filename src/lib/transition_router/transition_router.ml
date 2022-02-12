@@ -129,10 +129,11 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
   trace_recurring "bootstrap controller" (fun () ->
       upon
-        (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
-           ~consensus_local_state ~transition_reader:!transition_reader_ref
-           ~persistent_frontier ~persistent_root ~initial_root_transition
-           ~best_seen_transition ~precomputed_values ~catchup_mode)
+        (O1trace.time_execution "in_bootstrap" (fun () ->
+             Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
+               ~consensus_local_state ~transition_reader:!transition_reader_ref
+               ~persistent_frontier ~persistent_root ~initial_root_transition
+               ~best_seen_transition ~precomputed_values ~catchup_mode))
         (fun (new_frontier, collected_transitions) ->
           Strict_pipe.Writer.kill !transition_writer_ref ;
           start_transition_frontier_controller ~logger ~trust_system ~verifier
