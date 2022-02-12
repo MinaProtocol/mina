@@ -182,27 +182,34 @@ let handle_incoming_message t msg ~handle_push_message =
   in
   match msg with
   | RpcResponse rpc_response ->
-      let rpc_header =
-        Libp2pHelperInterface.RpcResponse.header_get rpc_response
-      in
-      let sequence_number = RpcMessageHeader.sequence_number_get rpc_header in
-      record_message_delay (RpcMessageHeader.time_sent_get rpc_header) ;
-      ( match Hashtbl.find t.outstanding_requests sequence_number with
-      | Some ivar ->
-          if Ivar.is_full ivar then
-            [%log' error t.logger]
-              "Attempted fill outstanding libp2p_helper RPC request more than \
-               once"
-          else Ivar.fill ivar (Libp2p_ipc.rpc_response_to_or_error rpc_response)
-      | None ->
-          [%log' error t.logger]
-            "Attempted to fill outstanding libp2p_helper RPC request, but not \
-             outstanding request was found" ) ;
+      O1trace.time_execution' "handling_libp2p_helper_subprocess_rpc_response"
+        (fun () ->
+          let rpc_header =
+            Libp2pHelperInterface.RpcResponse.header_get rpc_response
+          in
+          let sequence_number =
+            RpcMessageHeader.sequence_number_get rpc_header
+          in
+          record_message_delay (RpcMessageHeader.time_sent_get rpc_header) ;
+          match Hashtbl.find t.outstanding_requests sequence_number with
+          | Some ivar ->
+              if Ivar.is_full ivar then
+                [%log' error t.logger]
+                  "Attempted fill outstanding libp2p_helper RPC request more \
+                   than once"
+              else
+                Ivar.fill ivar
+                  (Libp2p_ipc.rpc_response_to_or_error rpc_response)
+          | None ->
+              [%log' error t.logger]
+                "Attempted to fill outstanding libp2p_helper RPC request, but \
+                 not outstanding request was found") ;
       Deferred.unit
   | PushMessage push_msg ->
-      let push_header = DaemonInterface.PushMessage.header_get push_msg in
-      record_message_delay (PushMessageHeader.time_sent_get push_header) ;
-      handle_push_message t (DaemonInterface.PushMessage.get push_msg)
+      O1trace.time_execution "handling_libp2p_helper_subprocess_push" (fun () ->
+          let push_header = DaemonInterface.PushMessage.header_get push_msg in
+          record_message_delay (PushMessageHeader.time_sent_get push_header) ;
+          handle_push_message t (DaemonInterface.PushMessage.get push_msg))
   | Undefined n ->
       Libp2p_ipc.undefined_union ~context:"DaemonInterface.Message" n ;
       Deferred.unit
@@ -233,42 +240,47 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
         }
       in
       termination_handler := handle_libp2p_helper_termination t ~pids ;
-      trace_recurring_task "process libp2p_helper stderr" (fun () ->
-          Child_processes.stderr process
-          |> Strict_pipe.Reader.iter ~f:(fun line ->
-                 let record_result =
-                   let open Result.Let_syntax in
-                   let%bind json =
-                     try Ok (Yojson.Safe.from_string line)
-                     with Yojson.Json_error error ->
-                       Error
-                         (Printf.sprintf "Failed to parse json line: %s" error)
-                   in
-                   Go_log.record_of_yojson json
-                 in
-                 ( match record_result with
-                 | Ok record ->
-                     record |> Go_log.record_to_message |> Logger.raw logger
-                 | Error error ->
-                     [%log error]
-                       "failed to parse record over libp2p_helper stderr: \
-                        $error"
-                       ~metadata:[ ("error", `String error) ] ) ;
-                 Deferred.unit)) ;
-      trace_recurring_task "process libp2p_helper stdout" (fun () ->
-          Child_processes.stdout process
-          |> Libp2p_ipc.read_incoming_messages
-          |> Strict_pipe.Reader.iter ~f:(function
-               | Ok msg ->
-                   msg |> Libp2p_ipc.Reader.DaemonInterface.Message.get
-                   |> handle_incoming_message t ~handle_push_message
-               | Error error ->
-                   [%log error]
-                     "failed to parse IPC message over libp2p_helper stdout: \
-                      $error"
-                     ~metadata:
-                       [ ("error", `String (Error.to_string_hum error)) ] ;
-                   Deferred.unit)) ;
+      O1trace.time_execution "handling_libp2p_helper_subprocess_logs" (fun () ->
+          trace_recurring_task "process libp2p_helper stderr" (fun () ->
+              Child_processes.stderr process
+              |> Strict_pipe.Reader.iter ~f:(fun line ->
+                     let record_result =
+                       let open Result.Let_syntax in
+                       let%bind json =
+                         try Ok (Yojson.Safe.from_string line)
+                         with Yojson.Json_error error ->
+                           Error
+                             (Printf.sprintf "Failed to parse json line: %s"
+                                error)
+                       in
+                       Go_log.record_of_yojson json
+                     in
+                     ( match record_result with
+                     | Ok record ->
+                         record |> Go_log.record_to_message |> Logger.raw logger
+                     | Error error ->
+                         [%log error]
+                           "failed to parse record over libp2p_helper stderr: \
+                            $error"
+                           ~metadata:[ ("error", `String error) ] ) ;
+                     Deferred.unit))) ;
+      O1trace.time_execution "handling_libp2p_helper_incoming_ipc" (fun () ->
+          trace_recurring_task "process libp2p_helper stdout" (fun () ->
+              O1trace.time_execution "read_libp2p_helper_ipc_incoming"
+                (fun () ->
+                  Child_processes.stdout process
+                  |> Libp2p_ipc.read_incoming_messages)
+              |> Strict_pipe.Reader.iter ~f:(function
+                   | Ok msg ->
+                       msg |> Libp2p_ipc.Reader.DaemonInterface.Message.get
+                       |> handle_incoming_message t ~handle_push_message
+                   | Error error ->
+                       [%log error]
+                         "failed to parse IPC message over libp2p_helper \
+                          stdout: $error"
+                         ~metadata:
+                           [ ("error", `String (Error.to_string_hum error)) ] ;
+                       Deferred.unit))) ;
       Or_error.return t
 
 let shutdown t =
