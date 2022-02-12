@@ -39,7 +39,7 @@ variable "whale_count" {
   type = number
 
   description = "Number of online whales for the network to run"
-  default     = 16
+  default     = 2
 }
 
 variable "fish_count" {
