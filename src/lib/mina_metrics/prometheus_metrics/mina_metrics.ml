@@ -1455,13 +1455,13 @@ module Execution_times = struct
       }
     in
     let collect () =
-      let elapsed = O1trace.Thread_timers.get_elapsed_time name in
+      let elapsed = Option.value_exn (O1trace.Thread.get_elapsed_time name) in
       LabelSetMap.singleton [] [ Sample_set.sample (Time.Span.to_ms elapsed) ]
     in
     CollectorRegistry.register CollectorRegistry.default info collect
 
   let sync_metrics () =
-    O1trace.Thread_timers.iter_timed_threads ~f:(fun name ->
+    O1trace.Thread.iter_threads ~f:(fun name ->
         if not (Hashtbl.mem tracked_metrics name) then
           Hashtbl.add_exn tracked_metrics ~key:name ~data:(create_metric name))
 

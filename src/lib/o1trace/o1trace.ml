@@ -2,64 +2,71 @@ open Core
 open Async
 include Intf
 
-type thread_timer =
-  { name : string
-  ; parent : thread_timer option
-  ; mutable elapsed : Time.Span.t
-  ; mutable last_start_time : Time.t option
-  }
-[@@deriving sexp_of]
+module Thread = struct
+  type t = { name : string; mutable elapsed : Time.Span.t } [@@deriving sexp_of]
 
-let thread_timer : thread_timer Type_equal.Id.t =
-  Type_equal.Id.create ~name:"thread_timer" sexp_of_thread_timer
+  let threads : t String.Table.t = String.Table.create ()
 
-module Thread_registry = struct
-  let next_tid = ref 1
-
-  let tid_names = Int.Table.create ()
-
-  let assign_tid name ctx =
-    let ctx' = Execution_context.with_tid ctx !next_tid in
-    Hashtbl.set tid_names ~key:!next_tid ~data:name ;
-    incr next_tid ;
-    ctx'
-
-  let get_thread_name tid = Hashtbl.find tid_names tid
-
-  let iter_threads ~f =
-    Hashtbl.iteri tid_names ~f:(fun ~key ~data -> f data key)
-end
-
-module Thread_timers = struct
-  module Maybe_string = Hashable.Make (struct
-    type t = string option [@@deriving compare, hash, sexp]
-  end)
-
-  let thread_timers : thread_timer Maybe_string.Table.t String.Table.t =
-    String.Table.create ()
-
-  let register ~name ~parent =
-    if not (Hashtbl.mem thread_timers name) then
-      Hashtbl.add_exn thread_timers ~key:name
-        ~data:(Maybe_string.Table.create ()) ;
-    let subkey = Option.map parent ~f:(fun p -> p.name) in
-    let subtable = Hashtbl.find_exn thread_timers name in
-    match Hashtbl.find subtable subkey with
-    | Some timer ->
-        timer
+  let register name =
+    match Hashtbl.find threads name with
+    | Some thread ->
+        thread
     | None ->
-        let timer =
-          { name; elapsed = Time.Span.zero; last_start_time = None; parent }
-        in
-        Hashtbl.add_exn subtable ~key:subkey ~data:timer ;
-        timer
+        let thread = { name; elapsed = Time.Span.zero } in
+        Hashtbl.set threads ~key:name ~data:thread ;
+        thread
+
+  let iter_threads ~f = Hashtbl.iter threads ~f:(fun t -> f t.name)
 
   let get_elapsed_time name =
-    Hashtbl.find_exn thread_timers name
-    |> Hashtbl.data
-    |> List.sum (module Time.Span) ~f:(fun t -> t.elapsed)
+    let open Option.Let_syntax in
+    let%map thread = Hashtbl.find threads name in
+    thread.elapsed
+end
 
-  let iter_timed_threads ~f = Hashtbl.iter_keys thread_timers ~f
+module Fiber = struct
+  include Hashable.Make (struct
+    type t = string list [@@deriving compare, hash, sexp]
+  end)
+
+  let next_id = ref 1
+
+  type t =
+    { id : int
+    ; parent : t option
+    ; thread : Thread.t
+    ; mutable last_start_time : Time.t option
+    }
+  [@@deriving sexp_of]
+
+  let ctx_id : t Type_equal.Id.t = Type_equal.Id.create ~name:"fiber" sexp_of_t
+
+  let fibers : t Table.t = Table.create ()
+
+  let rec fiber_key name parent =
+    name
+    :: Option.value_map parent ~default:[] ~f:(fun p ->
+           fiber_key p.thread.name p.parent)
+
+  let register name parent =
+    let key = fiber_key name parent in
+    match Hashtbl.find fibers key with
+    | Some fiber ->
+        fiber
+    | None ->
+        let thread = Thread.register name in
+        let fiber = { id = !next_id; parent; thread; last_start_time = None } in
+        incr next_id ;
+        Hashtbl.set fibers ~key ~data:fiber ;
+        fiber
+
+  let apply_to_context t ctx =
+    let ctx = Execution_context.with_tid ctx t.id in
+    Execution_context.with_local ctx ctx_id (Some t)
+
+  let rec record_elapsed_time span t =
+    t.thread.elapsed <- Time.Span.(t.thread.elapsed + span) ;
+    Option.iter t.parent ~f:(record_elapsed_time span)
 end
 
 module No_trace = struct
@@ -117,25 +124,23 @@ let forget_tid f =
 
 (* execution timing *)
 
+let time_execution' (name : string) (f : unit -> 'a) =
+  let thread = Thread.register name in
+  let start_time = Time.now () in
+  let x = f () in
+  let elapsed_time = Time.abs_diff (Time.now ()) start_time in
+  thread.elapsed <- Time.Span.(thread.elapsed + elapsed_time) ;
+  x
+
 let time_execution (name : string) (f : unit -> 'a) =
   let ctx = Scheduler.current_execution_context () in
-  let parent = Execution_context.find_local ctx thread_timer in
-
+  let parent = Execution_context.find_local ctx Fiber.ctx_id in
   if
     Option.value_map parent ~default:false ~f:(fun p ->
-        String.equal p.name name)
+        String.equal p.thread.name name)
   then f ()
   else
-    let rec thread_name timer =
-      timer.name
-      ^ Option.value_map timer.parent ~default:"" ~f:(fun p ->
-            ":" ^ thread_name p)
-    in
-    let timer = Thread_timers.register ~name ~parent in
-    let ctx =
-      Execution_context.with_local ctx thread_timer (Some timer)
-      |> Thread_registry.assign_tid (thread_name timer)
-    in
+    let ctx = Fiber.apply_to_context (Fiber.register name parent) ctx in
     match Scheduler.within_context ctx f with
     | Error () ->
         failwithf
@@ -146,29 +151,22 @@ let time_execution (name : string) (f : unit -> 'a) =
 
 (* scheduler hooks *)
 
-let trace_log = Out_channel.create "trace"
-
 let trace_thread_switch (old_ctx : Execution_context.t)
     (new_ctx : Execution_context.t) =
   let now = lazy (Time.now ()) in
-  let rec update_timer elapsed_this_execution timer =
-    timer.elapsed <- Time.Span.(timer.elapsed + elapsed_this_execution) ;
-    Option.iter timer.parent ~f:(update_timer elapsed_this_execution)
-  in
-  Option.iter (Execution_context.find_local old_ctx thread_timer)
-    ~f:(fun timer ->
-      Out_channel.output_string trace_log (Printf.sprintf "< %s" timer.name) ;
-      let last_start_time = Option.value_exn timer.last_start_time in
+  Option.iter (Execution_context.find_local old_ctx Fiber.ctx_id)
+    ~f:(fun fiber ->
+      let last_start_time = Option.value_exn fiber.last_start_time in
       let elapsed_this_execution =
         Time.abs_diff (Lazy.force now) last_start_time
       in
-      timer.last_start_time <- None ;
-      update_timer elapsed_this_execution timer) ;
-  Option.iter (Execution_context.find_local new_ctx thread_timer)
-    ~f:(fun timer ->
-      Out_channel.output_string trace_log (Printf.sprintf "> %s" timer.name) ;
-      timer.last_start_time <- Some (Lazy.force now)) ;
+      fiber.last_start_time <- None ;
+      Fiber.record_elapsed_time elapsed_this_execution fiber) ;
+  Option.iter (Execution_context.find_local new_ctx Fiber.ctx_id)
+    ~f:(fun fiber -> fiber.last_start_time <- Some (Lazy.force now)) ;
   let (module M) = !implementation in
   M.Hooks.trace_thread_switch old_ctx new_ctx
 
 let () = Async_kernel.Tracing.fns := { trace_thread_switch }
+
+(* FUTURE: migrate to `thread` and `label` based api, with dynamic multidispatch for tracing subsystems *)

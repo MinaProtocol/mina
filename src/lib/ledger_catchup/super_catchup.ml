@@ -607,7 +607,7 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
 open Frontier_base
 
 let check_invariant ~downloader t =
-  O1trace.time_execution "checking_super_catchup_invariants" (fun () ->
+  O1trace.time_execution' "checking_super_catchup_invariants" (fun () ->
       Downloader.check_invariant downloader ;
       [%test_eq: int]
         (Downloader.total_jobs downloader)
