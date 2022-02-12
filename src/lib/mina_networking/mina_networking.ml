@@ -1436,23 +1436,26 @@ let create (config : Config.t)
             Rpcs.(Rpc_handler { rpc = Consensus_rpc rpc; f; cost; budget })))
   in
   let%map gossip_net =
-    Gossip_net.Any.create config.creatable_gossip_net rpc_handlers
+    O1trace.time_execution "in_gossip_net" (fun () ->
+        Gossip_net.Any.create config.creatable_gossip_net rpc_handlers)
   in
   (* The node status RPC is implemented directly in go, serving a string which
      is periodically updated. This is so that one can make this RPC on a node even
      if that node is at its connection limit. *)
   let fake_time = Time.now () in
-  Clock.every' (Time.Span.of_min 1.) (fun () ->
-      match%bind
-        get_node_status { data = (); sender = Local; received_at = fake_time }
-      with
-      | Error _ ->
-          Deferred.unit
-      | Ok data ->
-          Gossip_net.Any.set_node_status gossip_net
-            ( Rpcs.Get_node_status.Node_status.to_yojson data
-            |> Yojson.Safe.to_string )
-          >>| ignore) ;
+  O1trace.time_execution "in_networking_updating_node_status" (fun () ->
+      Clock.every' (Time.Span.of_min 1.) (fun () ->
+          match%bind
+            get_node_status
+              { data = (); sender = Local; received_at = fake_time }
+          with
+          | Error _ ->
+              Deferred.unit
+          | Ok data ->
+              Gossip_net.Any.set_node_status gossip_net
+                ( Rpcs.Get_node_status.Node_status.to_yojson data
+                |> Yojson.Safe.to_string )
+              >>| ignore)) ;
   don't_wait_for
     (Gossip_net.Any.on_first_connect gossip_net ~f:(fun () ->
          (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
@@ -1478,54 +1481,63 @@ let create (config : Config.t)
   in
   let first_received_message_signal = Ivar.create () in
   let states, snark_pool_diffs, transaction_pool_diffs =
-    Strict_pipe.Reader.partition_map3 received_gossips
-      ~f:(fun (envelope, valid_cb) ->
-        Ivar.fill_if_empty first_received_message_signal () ;
-        Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
-        match Envelope.Incoming.data envelope with
-        | New_state state ->
-            Perf_histograms.add_span ~name:"external_transition_latency"
-              (Core.Time.abs_diff
-                 Block_time.(now config.time_controller |> to_time)
-                 ( External_transition.protocol_state state
-                 |> Protocol_state.blockchain_state
-                 |> Blockchain_state.timestamp |> Block_time.to_time )) ;
-            Mina_metrics.(Gauge.inc_one Network.new_state_received) ;
-            if config.log_gossip_heard.new_state then
-              [%str_log info]
-                ~metadata:
-                  [ ("external_transition", External_transition.to_yojson state)
-                  ]
-                (Block_received
-                   { state_hash = External_transition.state_hash state
-                   ; sender = Envelope.Incoming.sender envelope
-                   }) ;
-            Mina_net2.Validation_callback.set_message_type valid_cb `Block ;
-            Mina_metrics.(Counter.inc_one Network.Block.received) ;
-            `Fst
-              ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
-              , Block_time.now config.time_controller
-              , valid_cb )
-        | Snark_pool_diff diff ->
-            Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_received) ;
-            if config.log_gossip_heard.snark_pool_diff then
-              Option.iter (Snark_pool.Resource_pool.Diff.to_compact diff)
-                ~f:(fun work ->
+    O1trace.time_execution "in_networking_handling_received_gossips" (fun () ->
+        Strict_pipe.Reader.partition_map3 received_gossips
+          ~f:(fun (envelope, valid_cb) ->
+            Ivar.fill_if_empty first_received_message_signal () ;
+            Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
+            match Envelope.Incoming.data envelope with
+            | New_state state ->
+                Perf_histograms.add_span ~name:"external_transition_latency"
+                  (Core.Time.abs_diff
+                     Block_time.(now config.time_controller |> to_time)
+                     ( External_transition.protocol_state state
+                     |> Protocol_state.blockchain_state
+                     |> Blockchain_state.timestamp |> Block_time.to_time )) ;
+                Mina_metrics.(Gauge.inc_one Network.new_state_received) ;
+                if config.log_gossip_heard.new_state then
+                  [%str_log info]
+                    ~metadata:
+                      [ ( "external_transition"
+                        , External_transition.to_yojson state )
+                      ]
+                    (Block_received
+                       { state_hash = External_transition.state_hash state
+                       ; sender = Envelope.Incoming.sender envelope
+                       }) ;
+                Mina_net2.Validation_callback.set_message_type valid_cb `Block ;
+                Mina_metrics.(Counter.inc_one Network.Block.received) ;
+                `Fst
+                  ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
+                  , Block_time.now config.time_controller
+                  , valid_cb )
+            | Snark_pool_diff diff ->
+                Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_received) ;
+                if config.log_gossip_heard.snark_pool_diff then
+                  Option.iter (Snark_pool.Resource_pool.Diff.to_compact diff)
+                    ~f:(fun work ->
+                      [%str_log debug]
+                        (Snark_work_received
+                           { work; sender = Envelope.Incoming.sender envelope })) ;
+                Mina_metrics.(Counter.inc_one Network.Snark_work.received) ;
+                Mina_net2.Validation_callback.set_message_type valid_cb
+                  `Snark_work ;
+                `Snd
+                  (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
+            | Transaction_pool_diff diff ->
+                Mina_metrics.(
+                  Gauge.inc_one Network.transaction_pool_diff_received) ;
+                if config.log_gossip_heard.transaction_pool_diff then
                   [%str_log debug]
-                    (Snark_work_received
-                       { work; sender = Envelope.Incoming.sender envelope })) ;
-            Mina_metrics.(Counter.inc_one Network.Snark_work.received) ;
-            Mina_net2.Validation_callback.set_message_type valid_cb `Snark_work ;
-            `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
-        | Transaction_pool_diff diff ->
-            Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_received) ;
-            if config.log_gossip_heard.transaction_pool_diff then
-              [%str_log debug]
-                (Transactions_received
-                   { txns = diff; sender = Envelope.Incoming.sender envelope }) ;
-            Mina_net2.Validation_callback.set_message_type valid_cb `Transaction ;
-            Mina_metrics.(Counter.inc_one Network.Transaction.received) ;
-            `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb))
+                    (Transactions_received
+                       { txns = diff
+                       ; sender = Envelope.Incoming.sender envelope
+                       }) ;
+                Mina_net2.Validation_callback.set_message_type valid_cb
+                  `Transaction ;
+                Mina_metrics.(Counter.inc_one Network.Transaction.received) ;
+                `Trd
+                  (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)))
   in
   { gossip_net
   ; logger = config.logger

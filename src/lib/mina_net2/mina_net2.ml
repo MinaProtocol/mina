@@ -512,9 +512,10 @@ let create ~all_peers_seen_metric ~logger ~pids ~conf_dir ~on_peer_connected
           "received push message from libp2p_helper before handler was attached")
   in
   let%bind helper =
-    Libp2p_helper.spawn ~logger ~pids ~conf_dir
-      ~handle_push_message:(fun _helper msg ->
-        Deferred.return (!push_message_handler msg))
+    O1trace.time_execution "managing_libp2p_helper_subprocess" (fun () ->
+        Libp2p_helper.spawn ~logger ~pids ~conf_dir
+          ~handle_push_message:(fun _helper msg ->
+            Deferred.return (!push_message_handler msg)))
   in
   let t =
     { helper
